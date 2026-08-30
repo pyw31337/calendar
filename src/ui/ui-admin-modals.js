@@ -535,7 +535,7 @@ const PRESET_COLORS = GATHER_APP_CONSTANTS.PRESET_COLORS || [];
 const DEFAULT_EXPENSE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_EXPENSE_CATEGORIES || [];
 const DEFAULT_PLACE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_PLACE_CATEGORIES || GATHER_APP_UTILS.DEFAULT_PLACE_CATEGORIES || [];
 const EMOJI_CATEGORIES = GATHER_APP_CHAT_DATA.EMOJI_CATEGORIES || [];
-const INCOME_EXPENSE_CATEGORY = GATHER_APP_UTILS.INCOME_EXPENSE_CATEGORY || { id: 'income', name: '수입', color: '#16A34A' };
+const INCOME_EXPENSE_CATEGORY = GATHER_APP_UTILS.INCOME_EXPENSE_CATEGORY || { id: 'income', name: '수입', color: 'var(--status-green)' };
 const PLACE_MAP_DEFAULT_CENTER = __gatherUiDeps().PLACE_MAP_DEFAULT_CENTER || [37.5665, 126.978];
 const PLACE_MAP_DEFAULT_ZOOM = __gatherUiDeps().PLACE_MAP_DEFAULT_ZOOM || 11;
 const PLACE_MARKER_SIZE = __gatherUiDeps().PLACE_MARKER_SIZE || 28;
@@ -1596,13 +1596,13 @@ export function AdminModal({
               }[log.action] || '활동';
 
               const actionBadgeColor = {
-                create: '#10B981', update: '#2563EB', delete: '#EF4444',
+                create: 'var(--status-green)', update: '#2563EB', delete: '#EF4444',
                 poll_create: '#8B5CF6', poll_vote: '#EC4899', poll_cancel: '#F97316',
                 expense_create: '#F59E0B', expense_update: '#F59E0B', expense_delete: '#DC2626',
                 tag_add: '#6366F1', tag_remove: '#DC2626',
                 meeting_confirm: '#8B5CF6', meeting_cancel: '#EF4444',
                 memo_create: '#6366F1', memo_update: '#F59E0B', memo_delete: '#EF4444',
-                place_create: '#10B981', place_update: '#2563EB', place_delete: '#EF4444'
+                place_create: 'var(--status-green)', place_update: '#2563EB', place_delete: '#EF4444'
               }[log.action] || '#64748B';
               const actionBadgeBg = `${actionBadgeColor}1F`;
 
@@ -2042,7 +2042,7 @@ export function AdminUnifiedSearchResultsView({
         calendarLabel: exp.calendarLabel, timeStr: formatDateWithDayName(exp.date),
         onClick: () => window.open(getAdminSearchResultTargetUrl('expenses', exp), '_blank', 'noopener')
       }, highlightKeyword(exp.label || exp.url || '', q), ' · ', /*#__PURE__*/React.createElement("span", {
-        style: { fontWeight: 800, color: exp.amount < 0 ? '#16A34A' : '#DC2626' }
+        style: { fontWeight: 800, color: exp.amount < 0 ? 'var(--status-green)' : '#DC2626' }
       }, `${exp.amount < 0 ? '+' : '-'}${Math.abs(Number(exp.amount)).toLocaleString()}원`))),
 
       activeTab === 'memos' && allMatches.memos.map(memo => /*#__PURE__*/React.createElement(SearchResultLogRow, {

@@ -485,7 +485,7 @@ const PRESET_COLORS = GATHER_APP_CONSTANTS.PRESET_COLORS || [];
 const DEFAULT_EXPENSE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_EXPENSE_CATEGORIES || [];
 const DEFAULT_PLACE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_PLACE_CATEGORIES || GATHER_APP_UTILS.DEFAULT_PLACE_CATEGORIES || [];
 const EMOJI_CATEGORIES = GATHER_APP_CHAT_DATA.EMOJI_CATEGORIES || [];
-const INCOME_EXPENSE_CATEGORY = GATHER_APP_UTILS.INCOME_EXPENSE_CATEGORY || { id: 'income', name: '수입', color: '#16A34A' };
+const INCOME_EXPENSE_CATEGORY = GATHER_APP_UTILS.INCOME_EXPENSE_CATEGORY || { id: 'income', name: '수입', color: 'var(--status-green)' };
 const PLACE_MAP_DEFAULT_CENTER = __gatherUiDeps().PLACE_MAP_DEFAULT_CENTER || [37.5665, 126.978];
 const PLACE_MAP_DEFAULT_ZOOM = __gatherUiDeps().PLACE_MAP_DEFAULT_ZOOM || 11;
 const PLACE_MARKER_SIZE = __gatherUiDeps().PLACE_MARKER_SIZE || 28;
@@ -1339,7 +1339,7 @@ export function SummaryList({
     onKeyDown: event => handleSectionTitleKeyDown(event, 'all'),
     "data-no-press-feedback": true,
     style: {
-      color: '#10B981',
+      color: 'var(--status-green)',
       marginBottom: '12px'
     }
   }, /*#__PURE__*/React.createElement("svg", {
@@ -1393,14 +1393,14 @@ export function SummaryList({
     }, /*#__PURE__*/React.createElement("span", {
       style: {
         fontWeight: 800,
-        color: isPast ? '#94A3B8' : '#10B981',
+        color: isPast ? '#94A3B8' : 'var(--status-green)',
         fontSize: '0.95rem',
         flexShrink: 0
       }
     }, formattedDateStr), /*#__PURE__*/React.createElement("span", {
       className: `date-item-badge ${isPast ? 'is-past' : 'is-all'}`,
       style: {
-        background: isPast ? '#E2E8F0' : '#10B981',
+        background: isPast ? '#E2E8F0' : 'var(--status-green)',
         color: isPast ? '#64748B' : '#FFF',
         border: 'none',
         flexShrink: 0

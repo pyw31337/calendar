@@ -484,7 +484,7 @@ const PRESET_COLORS = GATHER_APP_CONSTANTS.PRESET_COLORS || [];
 const DEFAULT_EXPENSE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_EXPENSE_CATEGORIES || [];
 const DEFAULT_PLACE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_PLACE_CATEGORIES || GATHER_APP_UTILS.DEFAULT_PLACE_CATEGORIES || [];
 const EMOJI_CATEGORIES = GATHER_APP_CHAT_DATA.EMOJI_CATEGORIES || [];
-const INCOME_EXPENSE_CATEGORY = GATHER_APP_UTILS.INCOME_EXPENSE_CATEGORY || { id: 'income', name: '수입', color: '#16A34A' };
+const INCOME_EXPENSE_CATEGORY = GATHER_APP_UTILS.INCOME_EXPENSE_CATEGORY || { id: 'income', name: '수입', color: 'var(--status-green)' };
 const PLACE_MAP_DEFAULT_CENTER = __gatherUiDeps().PLACE_MAP_DEFAULT_CENTER || [37.5665, 126.978];
 const PLACE_MAP_DEFAULT_ZOOM = __gatherUiDeps().PLACE_MAP_DEFAULT_ZOOM || 11;
 const PLACE_MARKER_SIZE = __gatherUiDeps().PLACE_MARKER_SIZE || 28;
@@ -1174,7 +1174,7 @@ export function CalendarGrid({
     // confirmed meeting, then '전원' if everyone's available that day (replacing a solar
     // term that would otherwise be shown), then the solar term.
     const cornerText = isHoliday ? holidayNames.join('·') : isConfirmed ? '확정' : isAllAvailable ? '전원' : solarTermName;
-    const cornerColor = isHoliday ? '#EF4444' : isConfirmed ? '#7C3AED' : isAllAvailable ? '#10B981' : '#94A3B8';
+    const cornerColor = isHoliday ? '#EF4444' : isConfirmed ? '#7C3AED' : isAllAvailable ? 'var(--status-green)' : '#94A3B8';
     const cornerTitle = isHoliday ? (lunarLabel ? `${holidayNames.join(', ')} (${lunarLabel})` : holidayNames.join(', ')) : undefined;
     const columnDow = idx % 7; // 0=Sun .. 6=Sat, since each week row starts on Sunday
     const isSunday = columnDow === 0;
@@ -2853,7 +2853,7 @@ export function GlobalSearchModal({
           timeStr: formatDateWithDayName(exp.date),
           onClick: () => { onSelectDate(exp.date); onClose(); }
         }, highlightKeyword(exp.label || exp.url || '', q), ' · ', /*#__PURE__*/React.createElement("span", {
-          style: { fontWeight: 800, color: exp.amount < 0 ? '#16A34A' : '#DC2626' }
+          style: { fontWeight: 800, color: exp.amount < 0 ? 'var(--status-green)' : '#DC2626' }
         }, `${exp.amount < 0 ? '+' : '-'}${Math.abs(Number(exp.amount)).toLocaleString()}원`)))
       ),
 

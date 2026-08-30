@@ -491,7 +491,7 @@ const PRESET_COLORS = GATHER_APP_CONSTANTS.PRESET_COLORS || [];
 const DEFAULT_EXPENSE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_EXPENSE_CATEGORIES || [];
 const DEFAULT_PLACE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_PLACE_CATEGORIES || GATHER_APP_UTILS.DEFAULT_PLACE_CATEGORIES || [];
 const EMOJI_CATEGORIES = GATHER_APP_CHAT_DATA.EMOJI_CATEGORIES || [];
-const INCOME_EXPENSE_CATEGORY = GATHER_APP_UTILS.INCOME_EXPENSE_CATEGORY || { id: 'income', name: '수입', color: '#16A34A' };
+const INCOME_EXPENSE_CATEGORY = GATHER_APP_UTILS.INCOME_EXPENSE_CATEGORY || { id: 'income', name: '수입', color: 'var(--status-green)' };
 const PLACE_MAP_DEFAULT_CENTER = __gatherUiDeps().PLACE_MAP_DEFAULT_CENTER || [37.5665, 126.978];
 const PLACE_MAP_DEFAULT_ZOOM = __gatherUiDeps().PLACE_MAP_DEFAULT_ZOOM || 11;
 const PLACE_MARKER_SIZE = __gatherUiDeps().PLACE_MARKER_SIZE || 28;
@@ -1506,7 +1506,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
     if (!Array.isArray(activeParticipants) || activeParticipants.length === 0) {
       return [{ value: '참여자', label: '참여자' }];
     }
-    const defaultColors = ['#EF4444', '#F97316', '#10B981', '#3B82F6', '#6366F1', '#8B5CF6', '#EC4899', '#14B8A6'];
+    const defaultColors = ['#EF4444', '#F97316', 'var(--status-green)', '#3B82F6', '#6366F1', '#8B5CF6', '#EC4899', '#14B8A6'];
     return activeParticipants.map((p, idx) => {
       const name = typeof p === 'string' ? p : (p?.name || p?.id || '참여자');
       const color = (typeof p === 'object' && p?.color) ? p.color : defaultColors[idx % defaultColors.length];
@@ -1583,7 +1583,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
   const personalParticipantPickerOptions = React.useMemo(() => {
     const activeByName = new Map(activeParticipants.map((p, idx) => {
       const name = typeof p === 'string' ? p : (p?.name || p?.id || '참여자');
-      return [name, { name, color: (typeof p === 'object' && p?.color) || ['#EF4444', '#F97316', '#10B981', '#3B82F6', '#6366F1'][idx % 5] }];
+      return [name, { name, color: (typeof p === 'object' && p?.color) || ['#EF4444', '#F97316', 'var(--status-green)', '#3B82F6', '#6366F1'][idx % 5] }];
     }));
     const seen = new Set();
     const options = [];
@@ -2131,7 +2131,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
             style: {
               position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              width: '20px', height: '20px', borderRadius: '50%', backgroundColor: '#10B981', color: '#FFFFFF',
+              width: '20px', height: '20px', borderRadius: '50%', backgroundColor: 'var(--status-green)', color: '#FFFFFF',
               fontSize: '0.72rem', fontWeight: 900, pointerEvents: 'none'
             }
           }, '✓')
@@ -2351,7 +2351,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
                   )
                 ),
                 item.description ? React.createElement('div', { style: { color: 'var(--text-main)', fontWeight: 700, fontSize: '0.8rem', overflowWrap: 'anywhere' } }, item.description) : null,
-                React.createElement('strong', { style: { alignSelf: 'flex-start', color: item?.signedAmount && Number(item.amount) > 0 ? '#16A34A' : '#DC2626', fontWeight: 800, fontSize: '0.86rem', marginTop: '1px' } }, `${item?.signedAmount && Number(item.amount) > 0 ? '+' : '-'}${Math.abs(Number(item.amount) || 0).toLocaleString()}원`)
+                React.createElement('strong', { style: { alignSelf: 'flex-start', color: item?.signedAmount && Number(item.amount) > 0 ? 'var(--status-green)' : '#DC2626', fontWeight: 800, fontSize: '0.86rem', marginTop: '1px' } }, `${item?.signedAmount && Number(item.amount) > 0 ? '+' : '-'}${Math.abs(Number(item.amount) || 0).toLocaleString()}원`)
               );
             })
           )
@@ -2430,7 +2430,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
             const amount = getIndividualSettlementAmount(row.participantId);
             return React.createElement('div', { key: `preview_${row.id}`, style: { display: 'flex', justifyContent: 'space-between', gap: '8px', padding: '7px 0', borderTop: '1px solid var(--border-subtle)', fontSize: '0.8rem' } },
               React.createElement('span', null, `${row.participantId}님은 개별 분담금 ${settlementPerPerson.toLocaleString()}원`),
-              React.createElement('strong', { style: { color: amount < 0 ? '#16A34A' : '#DC2626', whiteSpace: 'nowrap' } }, `${amount < 0 ? '환급금 -' : '분담금 '}${Math.abs(amount).toLocaleString()}원`)
+              React.createElement('strong', { style: { color: amount < 0 ? 'var(--status-green)' : '#DC2626', whiteSpace: 'nowrap' } }, `${amount < 0 ? '환급금 -' : '분담금 '}${Math.abs(amount).toLocaleString()}원`)
             );
           })
       ),
@@ -2677,7 +2677,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
 
   const monthLabelPrefix = `${month + 1}월`;
   const metricCards = [
-    { label: activeTab === 'total' ? '총 수입' : `${monthLabelPrefix} 수입`, value: displayIncome, color: '#16A34A', icon: React.createElement(BanknoteArrowUpIcon, { size: 16 }) },
+    { label: activeTab === 'total' ? '총 수입' : `${monthLabelPrefix} 수입`, value: displayIncome, color: 'var(--status-green)', icon: React.createElement(BanknoteArrowUpIcon, { size: 16 }) },
     { label: activeTab === 'total' ? '총 지출' : `${monthLabelPrefix} 지출`, value: displayExpense, color: '#DC2626', icon: React.createElement(BanknoteArrowDownIcon, { size: 16 }) },
     { label: activeTab === 'total' ? '현재 잔액' : `${monthLabelPrefix} 잔액`, value: displayBalance, color: 'var(--text-main)', icon: React.createElement(PiggyBankIcon, { size: 16 }) }
   ];
@@ -2710,7 +2710,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     ctx.fillText(periodLabel, 40, 138);
 
     const rowsStats = [
-      { label: activeTab === 'total' ? '총 수입' : `${monthLabelPrefix} 수입`, value: displayIncome, color: '#16A34A' },
+      { label: activeTab === 'total' ? '총 수입' : `${monthLabelPrefix} 수입`, value: displayIncome, color: 'var(--status-green)' },
       { label: activeTab === 'total' ? '총 지출' : `${monthLabelPrefix} 지출`, value: displayExpense, color: '#DC2626' },
       { label: activeTab === 'total' ? '현재 잔액' : `${monthLabelPrefix} 잔액`, value: displayBalance, color: '#0F172A' }
     ];
@@ -2797,7 +2797,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   }, /*#__PURE__*/React.createElement("div", {
     style: { minWidth: 0, display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }
   }, categoryBadge(getDisplayCategory(item)), showDate && /*#__PURE__*/React.createElement("span", { className: "registered-at-text" }, formatDateWithDayName(item.date))), /*#__PURE__*/React.createElement("strong", {
-    style: { fontSize: '0.9rem', color: item.isIncome ? '#16A34A' : '#DC2626', whiteSpace: 'nowrap' }
+    style: { fontSize: '0.9rem', color: item.isIncome ? 'var(--status-green)' : '#DC2626', whiteSpace: 'nowrap' }
   }, item.isIncome ? '+' : '-', Math.abs(item.amount).toLocaleString(), "원")), /*#__PURE__*/React.createElement("span", {
     style: { fontSize: '0.86rem', color: 'var(--text-main)', fontWeight: 500, overflowWrap: 'anywhere' }
   }, item.label), item.url && /*#__PURE__*/React.createElement("button", {
@@ -2851,11 +2851,11 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   }, /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', flexDirection: 'column', gap: '4px' }
   }, /*#__PURE__*/React.createElement("strong", {
-    style: { color: '#15803D', fontSize: '0.86rem' }
+    style: { color: 'var(--status-green)', fontSize: '0.86rem' }
   }, "기초 예산"), /*#__PURE__*/React.createElement("span", {
     className: "registered-at-text"
   }, "어드민에서 설정한 누적 잔액")), /*#__PURE__*/React.createElement("strong", {
-    style: { color: '#16A34A', whiteSpace: 'nowrap' }
+    style: { color: 'var(--status-green)', whiteSpace: 'nowrap' }
   }, "+", baseBudget.toLocaleString(), "원")), allTimeItems.map(item => renderItemRow(item, true))));
 
   const monthEmptyContent = /*#__PURE__*/React.createElement("div", {
@@ -2880,7 +2880,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
       // plain +/- colored amounts on the expense rows below it.
       style: {
         fontSize: '0.8rem', fontWeight: 900, color: '#FFFFFF',
-        backgroundColor: row.net < 0 ? '#DC2626' : '#16A34A',
+        backgroundColor: row.net < 0 ? '#DC2626' : 'var(--status-green)',
         padding: '4px 10px', borderRadius: '999px'
       }
     }, row.net >= 0 ? '+' : '-', Math.abs(row.net).toLocaleString(), "원"), /*#__PURE__*/React.createElement(SectionToggleButton, {
@@ -3011,7 +3011,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
               React.createElement("span", {
                 style: {
                   alignSelf: 'flex-start', fontSize: '0.68rem', fontWeight: 600, padding: '2px 6px', borderRadius: '4px',
-                  backgroundColor: isClosed ? 'rgba(255,255,255,0.18)' : '#22C55E',
+                  backgroundColor: isClosed ? 'rgba(255,255,255,0.18)' : 'var(--status-green)',
                   color: isClosed ? '#FFFFFF' : '#5B4BEB'
                 }
               }, isClosed ? "마감됨" : "진행중"),
@@ -3483,7 +3483,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
         },
           React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' } },
             React.createElement("strong", { style: { color: 'var(--text-main)', fontSize: '0.88rem' } }, card.title || '1/N 간편 송금'),
-            React.createElement("span", { style: { color: isClosed ? 'var(--text-muted)' : '#16A34A', fontSize: '0.7rem', fontWeight: 800 } }, isClosed ? '마감됨' : '진행중')
+            React.createElement("span", { style: { color: isClosed ? 'var(--text-muted)' : 'var(--status-green)', fontSize: '0.7rem', fontWeight: 800 } }, isClosed ? '마감됨' : '진행중')
           ),
           React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', color: 'var(--text-muted)', fontSize: '0.74rem' } },
             React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', minWidth: 0 } },

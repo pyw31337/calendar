@@ -481,7 +481,7 @@ const PRESET_COLORS = GATHER_APP_CONSTANTS.PRESET_COLORS || [];
 const DEFAULT_EXPENSE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_EXPENSE_CATEGORIES || [];
 const DEFAULT_PLACE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_PLACE_CATEGORIES || GATHER_APP_UTILS.DEFAULT_PLACE_CATEGORIES || [];
 const EMOJI_CATEGORIES = GATHER_APP_CHAT_DATA.EMOJI_CATEGORIES || [];
-const INCOME_EXPENSE_CATEGORY = GATHER_APP_UTILS.INCOME_EXPENSE_CATEGORY || { id: 'income', name: '수입', color: '#16A34A' };
+const INCOME_EXPENSE_CATEGORY = GATHER_APP_UTILS.INCOME_EXPENSE_CATEGORY || { id: 'income', name: '수입', color: 'var(--status-green)' };
 const PLACE_MAP_DEFAULT_CENTER = __gatherUiDeps().PLACE_MAP_DEFAULT_CENTER || [37.5665, 126.978];
 const PLACE_MAP_DEFAULT_ZOOM = __gatherUiDeps().PLACE_MAP_DEFAULT_ZOOM || 11;
 const PLACE_MARKER_SIZE = __gatherUiDeps().PLACE_MARKER_SIZE || 28;
@@ -759,7 +759,7 @@ export function UserManualOverlay({ calendar, onClose }) {
         style: {
           minHeight: '56px',
           borderRadius: 'var(--radius-md)',
-          border: day === 22 ? '1px solid #10B981' : day === 15 ? '1px solid #7C3AED' : '1px solid var(--border-subtle)',
+          border: day === 22 ? '1px solid var(--status-green)' : day === 15 ? '1px solid #7C3AED' : '1px solid var(--border-subtle)',
           background: day === 22 ? '#ECFDF5' : day === 15 ? '#FAF5FF' : 'var(--bg-primary)',
           padding: '8px',
           display: 'flex',
@@ -812,9 +812,9 @@ export function UserManualOverlay({ calendar, onClose }) {
       preview: /*#__PURE__*/React.createElement("div", {
         style: { display: 'flex', flexDirection: 'column', gap: '8px' }
       }, /*#__PURE__*/React.createElement("div", {
-        style: { border: '1px solid #10B981', background: '#ECFDF5', borderRadius: 'var(--radius-md)', padding: '12px', display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'center' }
-      }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", { style: { color: '#10B981', fontWeight: 900, marginBottom: '7px' } }, "전원 참석 가능"), /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '5px' } }, participantBadge(sampleParticipant), participantBadge(sampleParticipant2), participantBadge(sampleParticipant3))), /*#__PURE__*/React.createElement("span", {
-        style: { padding: '6px 10px', borderRadius: '999px', background: '#10B981', color: '#FFFFFF', fontSize: '0.75rem', fontWeight: 900, whiteSpace: 'nowrap' }
+        style: { border: '1px solid var(--status-green)', background: '#ECFDF5', borderRadius: 'var(--radius-md)', padding: '12px', display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'center' }
+      }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", { style: { color: 'var(--status-green)', fontWeight: 900, marginBottom: '7px' } }, "전원 참석 가능"), /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '5px' } }, participantBadge(sampleParticipant), participantBadge(sampleParticipant2), participantBadge(sampleParticipant3))), /*#__PURE__*/React.createElement("span", {
+        style: { padding: '6px 10px', borderRadius: '999px', background: 'var(--status-green)', color: '#FFFFFF', fontSize: '0.75rem', fontWeight: 900, whiteSpace: 'nowrap' }
       }, "전원")), /*#__PURE__*/React.createElement("div", {
         style: { border: '1px solid transparent', background: 'linear-gradient(var(--bg-card), var(--bg-card)) padding-box, var(--accent-gradient) border-box', borderRadius: 'var(--radius-md)', padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }
       }, /*#__PURE__*/React.createElement("strong", { style: { color: '#4F46E5' } }, "[모임확정] 26.08.22 (토)"), /*#__PURE__*/React.createElement("span", {

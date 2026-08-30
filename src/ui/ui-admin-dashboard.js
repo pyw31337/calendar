@@ -505,7 +505,7 @@ const PRESET_COLORS = GATHER_APP_CONSTANTS.PRESET_COLORS || [];
 const DEFAULT_EXPENSE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_EXPENSE_CATEGORIES || [];
 const DEFAULT_PLACE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_PLACE_CATEGORIES || GATHER_APP_UTILS.DEFAULT_PLACE_CATEGORIES || [];
 const EMOJI_CATEGORIES = GATHER_APP_CHAT_DATA.EMOJI_CATEGORIES || [];
-const INCOME_EXPENSE_CATEGORY = GATHER_APP_UTILS.INCOME_EXPENSE_CATEGORY || { id: 'income', name: '수입', color: '#16A34A' };
+const INCOME_EXPENSE_CATEGORY = GATHER_APP_UTILS.INCOME_EXPENSE_CATEGORY || { id: 'income', name: '수입', color: 'var(--status-green)' };
 const PLACE_MAP_DEFAULT_CENTER = __gatherUiDeps().PLACE_MAP_DEFAULT_CENTER || [37.5665, 126.978];
 const PLACE_MAP_DEFAULT_ZOOM = __gatherUiDeps().PLACE_MAP_DEFAULT_ZOOM || 11;
 const PLACE_MARKER_SIZE = __gatherUiDeps().PLACE_MARKER_SIZE || 28;
@@ -1956,8 +1956,8 @@ export function AdminDashboard({ initialCalendars }) {
       width: '100%',
       border: 'none',
       background: 'none',
-      color: isActive ? '#059669' : '#64748B',
-      borderBottom: isActive ? '3px solid #059669' : '3px solid transparent',
+      color: isActive ? 'var(--status-green)' : '#64748B',
+      borderBottom: isActive ? '3px solid var(--status-green)' : '3px solid transparent',
       backgroundColor: isActive ? '#ECFDF5' : 'transparent',
       borderRadius: 'var(--radius-md) var(--radius-md) 0 0',
       cursor: 'pointer',
@@ -2481,7 +2481,7 @@ export function AdminDashboard({ initialCalendars }) {
                 /*#__PURE__*/React.createElement("strong", { style: { fontSize: '0.78rem', color: '#0F172A' } }, formatDateWithDayName(item.date)),
                 /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.75rem', marginLeft: '6px', color: '#64748B' } }, item.count, "/", stat.participants.length, "명 가능")
               ),
-              item.count >= stat.participants.length ? /*#__PURE__*/React.createElement("span", { className: "date-item-badge", style: { background: '#DCFCE7', color: '#16A34A', fontSize: '0.7rem', border: '1px solid #86EFAC' } }, "전원") :
+              item.count >= stat.participants.length ? /*#__PURE__*/React.createElement("span", { className: "date-item-badge", style: { background: '#DCFCE7', color: 'var(--status-green)', fontSize: '0.7rem', border: '1px solid var(--status-green)' } }, "전원") :
               item.count > 0 ? /*#__PURE__*/React.createElement("span", { className: "date-item-badge", style: { fontSize: '0.7rem', backgroundColor: '#F1F5F9', color: '#64748B' } }, item.count, "명") : null
             ))
           ))
@@ -2921,13 +2921,13 @@ export function AdminDashboard({ initialCalendars }) {
 
                 const badgeColor = log.type === 'chat' ? '#0369A1' :
                                    {
-                                     create: '#15803D', update: '#1D4ED8', delete: '#B91C1C',
+                                     create: 'var(--status-green)', update: '#1D4ED8', delete: '#B91C1C',
                                      poll_create: '#7E22CE', poll_vote: '#BE185D', poll_cancel: '#C2410C',
                                      expense_create: '#B45309', expense_update: '#B45309', expense_delete: '#C2410C',
                                      tag_add: '#4338CA', tag_remove: '#B91C1C',
                                      meeting_confirm: '#7E22CE', meeting_cancel: '#B91C1C',
                                      memo_create: '#4338CA', memo_update: '#B45309', memo_delete: '#B91C1C',
-                                     place_create: '#15803D', place_update: '#1D4ED8', place_delete: '#B91C1C'
+                                     place_create: 'var(--status-green)', place_update: '#1D4ED8', place_delete: '#B91C1C'
                                    }[log.action] || '#64748B';
 
                 return /*#__PURE__*/React.createElement("div", {

@@ -16,6 +16,8 @@
   --accent-secondary: #7C3AED;
   --accent-gradient: linear-gradient(135deg, #4F46E5 0%, #7C3AED 50%, #EC4899 100%);
 
+  --status-green: #16A34A;
+
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
   --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.03);
@@ -79,7 +81,7 @@
   :root[data-theme="dark"] .day-cell { background: #1B2540; }
   :root[data-theme="dark"] .day-cell:hover { background: #212D4D; }
   :root[data-theme="dark"] .day-cell.today { background: #1E2648; }
-  :root[data-theme="dark"] .day-cell.all-available { background: #0F2E22; border-color: #10B981; animation: cell-glow-available 2.5s ease-in-out infinite alternate; }
+  :root[data-theme="dark"] .day-cell.all-available { background: #0F2E22; border-color: var(--status-green); animation: cell-glow-available 2.5s ease-in-out infinite alternate; }
   :root[data-theme="dark"] .day-cell.confirmed-meeting { background: #241B3D; border-color: #9333EA; animation: cell-glow-confirmed 2.5s ease-in-out infinite alternate; }
   :root[data-theme="dark"] .btn-secondary { background: #1B2540; color: var(--text-main); }
   :root[data-theme="dark"] .btn-secondary:hover { background: #232F49; }
@@ -97,7 +99,7 @@
 :root[data-theme="dark"] .day-cell { background: #1B2540; }
 :root[data-theme="dark"] .day-cell:hover { background: #212D4D; }
 :root[data-theme="dark"] .day-cell.today { background: #1E2648; }
-:root[data-theme="dark"] .day-cell.all-available { background: #0F2E22; border-color: #10B981; animation: cell-glow-available 2.5s ease-in-out infinite alternate; }
+:root[data-theme="dark"] .day-cell.all-available { background: #0F2E22; border-color: var(--status-green); animation: cell-glow-available 2.5s ease-in-out infinite alternate; }
 :root[data-theme="dark"] .day-cell.confirmed-meeting { background: #241B3D; border-color: #9333EA; animation: cell-glow-confirmed 2.5s ease-in-out infinite alternate; }
 :root[data-theme="dark"] .btn-secondary { background: #1B2540; color: var(--text-main); }
 :root[data-theme="dark"] .btn-secondary:hover { background: #232F49; }
@@ -139,9 +141,10 @@
 :root[data-theme="dark"] .date-item-badge.is-all {
   background: #0F3A2A !important;
   color: #A7F3D0 !important;
-  border: 1px solid #10B981 !important;
+  border: 1px solid var(--status-green) !important;
 }
 :root[data-theme="dark"] {
+  --status-green: #4ADE80;
   --bg-primary: #0B1120;
   --bg-secondary: #131B2E;
   --bg-card: #131B2E;
@@ -188,7 +191,7 @@
 :root[data-theme="dark"] .admin-scope .day-cell.today,
 :root[data-theme="dark"] .admin-scope .day-cell.today { background: #EEF2FF; }
 :root[data-theme="dark"] .admin-scope .day-cell.all-available,
-:root[data-theme="dark"] .admin-scope .day-cell.all-available { background: #ECFDF5; border-color: #10B981; }
+:root[data-theme="dark"] .admin-scope .day-cell.all-available { background: #ECFDF5; border-color: var(--status-green); }
 :root[data-theme="dark"] .admin-scope .day-cell.confirmed-meeting,
 :root[data-theme="dark"] .admin-scope .day-cell.confirmed-meeting { background: #FAF5FF; border-color: #9333EA; }
 :root[data-theme="dark"] .admin-scope .btn-secondary,
@@ -536,7 +539,7 @@ body:has(.admin-login-gate) {
   animation: motion-toast-out 180ms var(--motion-ease-soft) both;
 }
 .toast.is-info { background-color: #3B82F6; }
-.toast.is-success { background-color: #10B981; }
+.toast.is-success { background-color: var(--status-green); }
 .toast.is-delete,
 .toast.is-error { background-color: #EF4444; }
 .toast-message { flex: 1 1 180px; min-width: 0; }
@@ -1626,7 +1629,7 @@ select.form-select {
 
 .day-cell.all-available {
   background: #ECFDF5;
-  border: 1.5px solid #10B981;
+  border: 1.5px solid var(--status-green);
   box-shadow: inset 0 0 4px rgba(16, 185, 129, 0.15);
   animation: cell-glow-available 2.5s ease-in-out infinite alternate;
 }
@@ -1639,8 +1642,8 @@ select.form-select {
 }
 
 @keyframes cell-glow-available {
-  0% { border-color: #10B981; box-shadow: 0 0 1px rgba(16, 185, 129, 0.1), inset 0 0 3px rgba(16, 185, 129, 0.1); }
-  100% { border-color: #34D399; box-shadow: 0 0 8px rgba(52, 211, 153, 0.35), inset 0 0 5px rgba(52, 211, 153, 0.2); }
+  0% { border-color: var(--status-green); box-shadow: 0 0 1px rgba(16, 185, 129, 0.1), inset 0 0 3px rgba(16, 185, 129, 0.1); }
+  100% { border-color: var(--status-green); box-shadow: 0 0 8px rgba(52, 211, 153, 0.35), inset 0 0 5px rgba(52, 211, 153, 0.2); }
 }
 
 @keyframes cell-glow-confirmed {
@@ -1976,7 +1979,7 @@ select.form-select {
 .poll-progress-fill {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #2563EB, #10B981);
+  background: linear-gradient(90deg, #2563EB, var(--status-green));
   transition: width 0.25s ease;
 }
 .poll-voter-sheet {
@@ -2122,7 +2125,7 @@ select.form-select {
 }
 .sync-status-chip.is-live {
   background: rgba(16, 185, 129, 0.10);
-  color: #059669;
+  color: var(--status-green);
   border-color: rgba(16, 185, 129, 0.18);
 }
 .sync-status-chip.is-offline {
@@ -2346,7 +2349,7 @@ select.form-select {
 .admin-progress-fill {
   height: 100%;
   border-radius: inherit;
-  background: #10B981;
+  background: var(--status-green);
 }
 .admin-quota-grid {
   display: grid;
@@ -2885,7 +2888,7 @@ select.form-select {
   white-space: nowrap;
 }
 .settlement-person-amount.is-refund {
-  color: #16A34A;
+  color: var(--status-green);
 }
 .settlement-person-settlement-badge {
   display: inline-flex;
@@ -2901,7 +2904,7 @@ select.form-select {
 }
 .settlement-person-settlement-badge.is-refund {
   background: rgba(22, 163, 74, 0.14);
-  color: #16A34A;
+  color: var(--status-green);
 }
 .settlement-person-amount .settlement-person-settlement-badge {
   margin-right: 5px;
@@ -2954,7 +2957,7 @@ select.form-select {
   transform: translateY(-6px);
 }
 .settlement-expense-option-amount.is-income {
-  color: #16A34A;
+  color: var(--status-green);
 }
 .settlement-expense-resize-row {
   pointer-events: none;
@@ -3471,7 +3474,7 @@ select.form-select {
   :root[data-theme="dark"] .date-item-badge.is-all {
     background: #0F3A2A !important;
     color: #A7F3D0 !important;
-    border: 1px solid #10B981 !important;
+    border: 1px solid var(--status-green) !important;
   }
   :root[data-theme="dark"] .confirmed-meeting-label-badge {
     background-color: transparent;
@@ -4315,7 +4318,7 @@ select.form-select {
   min-width: 22px;
   padding: 2px 7px;
   border-radius: 999px;
-  background: #16A34A;
+  background: var(--status-green);
   color: #FFFFFF;
   font-size: 0.72rem;
   font-weight: 900;
@@ -4808,7 +4811,7 @@ textarea.form-input {
   background: #0F2E22 !important; border-color: #14532D !important;
 }
 :root[data-theme="dark"] .settlement-base-budget-card strong,
-:root[data-theme="dark"] .settlement-base-budget-card strong { color: #86EFAC !important; }
+:root[data-theme="dark"] .settlement-base-budget-card strong { color: var(--status-green) !important; }
 :root[data-theme="dark"] .poll-progress,
 :root[data-theme="dark"] .poll-progress,
 :root[data-theme="dark"] .admin-progress,

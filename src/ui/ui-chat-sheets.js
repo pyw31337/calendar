@@ -513,7 +513,7 @@ const PRESET_COLORS = GATHER_APP_CONSTANTS.PRESET_COLORS || [];
 const DEFAULT_EXPENSE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_EXPENSE_CATEGORIES || [];
 const DEFAULT_PLACE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_PLACE_CATEGORIES || GATHER_APP_UTILS.DEFAULT_PLACE_CATEGORIES || [];
 const EMOJI_CATEGORIES = GATHER_APP_CHAT_DATA.EMOJI_CATEGORIES || [];
-const INCOME_EXPENSE_CATEGORY = GATHER_APP_UTILS.INCOME_EXPENSE_CATEGORY || { id: 'income', name: '수입', color: '#16A34A' };
+const INCOME_EXPENSE_CATEGORY = GATHER_APP_UTILS.INCOME_EXPENSE_CATEGORY || { id: 'income', name: '수입', color: 'var(--status-green)' };
 const PLACE_MAP_DEFAULT_CENTER = __gatherUiDeps().PLACE_MAP_DEFAULT_CENTER || [37.5665, 126.978];
 const PLACE_MAP_DEFAULT_ZOOM = __gatherUiDeps().PLACE_MAP_DEFAULT_ZOOM || 11;
 const PLACE_MARKER_SIZE = __gatherUiDeps().PLACE_MARKER_SIZE || 28;
@@ -916,7 +916,7 @@ export function NotificationPermissionHelpModal({ onClose, onRetry, showToast })
     key: item.label,
     style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 11px', borderRadius: 'var(--radius-md)', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', minWidth: 0 }
   }, /*#__PURE__*/React.createElement("span", {
-    style: { width: '9px', height: '9px', borderRadius: '999px', background: item.ok ? '#10B981' : '#EF4444', flexShrink: 0 }
+    style: { width: '9px', height: '9px', borderRadius: '999px', background: item.ok ? 'var(--status-green)' : '#EF4444', flexShrink: 0 }
   }), /*#__PURE__*/React.createElement("span", {
     style: { display: 'flex', flexDirection: 'column', minWidth: 0 }
   }, /*#__PURE__*/React.createElement("strong", {

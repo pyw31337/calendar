@@ -489,7 +489,7 @@ const PRESET_COLORS = GATHER_APP_CONSTANTS.PRESET_COLORS || [];
 const DEFAULT_EXPENSE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_EXPENSE_CATEGORIES || [];
 const DEFAULT_PLACE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_PLACE_CATEGORIES || GATHER_APP_UTILS.DEFAULT_PLACE_CATEGORIES || [];
 const EMOJI_CATEGORIES = GATHER_APP_CHAT_DATA.EMOJI_CATEGORIES || [];
-const INCOME_EXPENSE_CATEGORY = GATHER_APP_UTILS.INCOME_EXPENSE_CATEGORY || { id: 'income', name: '수입', color: '#16A34A' };
+const INCOME_EXPENSE_CATEGORY = GATHER_APP_UTILS.INCOME_EXPENSE_CATEGORY || { id: 'income', name: '수입', color: 'var(--status-green)' };
 const PLACE_MAP_DEFAULT_CENTER = __gatherUiDeps().PLACE_MAP_DEFAULT_CENTER || [37.5665, 126.978];
 const PLACE_MAP_DEFAULT_ZOOM = __gatherUiDeps().PLACE_MAP_DEFAULT_ZOOM || 11;
 const PLACE_MARKER_SIZE = __gatherUiDeps().PLACE_MARKER_SIZE || 28;
@@ -1970,7 +1970,7 @@ export function DateModal({
     }
   }, titleParts.year, /*#__PURE__*/React.createElement("span", {
     style: {
-      color: isConfirmed ? '#7C3AED' : (isAllAvailable ? '#10B981' : 'var(--text-muted)'),
+      color: isConfirmed ? '#7C3AED' : (isAllAvailable ? 'var(--status-green)' : 'var(--text-muted)'),
       marginLeft: '4px'
     }
   }, titleParts.rest)), holidayLabelText && /*#__PURE__*/React.createElement("span", {
@@ -2701,7 +2701,7 @@ export function DateModal({
               whiteSpace: 'nowrap',
               backgroundColor: isNegative ? '#FEF2F2' : '#F0FDF4',
               border: `1px solid ${isNegative ? '#FCA5A5' : '#BBF7D0'}`,
-              color: isNegative ? '#DC2626' : '#16A34A'
+              color: isNegative ? '#DC2626' : 'var(--status-green)'
             }
           }, `${isNegative ? '-' : '+'}${Math.abs(netAmount).toLocaleString()}원`);
         })()
@@ -2720,7 +2720,7 @@ export function DateModal({
               value: expenseIsIncome ? 'income' : 'expense',
               onChange: v => setExpenseIsIncome(v === 'income'),
               options: [
-                { value: 'income', label: '+ 수입', activeColor: '#16A34A' },
+                { value: 'income', label: '+ 수입', activeColor: 'var(--status-green)' },
                 { value: 'expense', label: '- 지출', activeColor: '#DC2626' }
               ]
             }),
@@ -2917,7 +2917,7 @@ export function DateModal({
                   /*#__PURE__*/React.createElement(UrlCapsuleBadge, { url: expenseUrl })
                 ) : expenseLabel
               ),
-              /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.9rem', fontWeight: 900, color: Number(expense.amount) < 0 ? '#16A34A' : '#DC2626' } },
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.9rem', fontWeight: 900, color: Number(expense.amount) < 0 ? 'var(--status-green)' : '#DC2626' } },
                 `${Number(expense.amount) < 0 ? '+' : '-'}${Math.abs(Number(expense.amount)).toLocaleString()}원`
               )
             )
