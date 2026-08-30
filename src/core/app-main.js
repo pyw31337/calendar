@@ -4984,7 +4984,10 @@ function CalendarApp() {
       categoryId: mp('categoryId', cleanCategoryId),
       memo: nextMemo,
       visitStatus: derivePlaceVisitStatus({ memo: nextMemo }),
-      visitDate: cleanVisitDate || mp('visitDate', ''),
+      // An explicit empty visitDate is used when a date is removed from a place.
+      // Do not fall back to the previous date in that case, or the deleted date
+      // remains the place's primary date and can reappear after the next snapshot.
+      visitDate: placeData.visitDate !== undefined ? cleanVisitDate : mp('visitDate', ''),
       sourcePlaceId: mp('sourcePlaceId', sourcePlaceIdForSave || (isEditing && !mergeTargetPlace ? (existingPlaces.find(p => p.id === placeData.id) || {}).sourcePlaceId : '') || ''),
       updatedAt: now
     };
