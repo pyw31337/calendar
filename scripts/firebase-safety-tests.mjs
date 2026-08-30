@@ -14,6 +14,7 @@ const eventModalScript = fs.readFileSync('src/ui/ui-event-modals.js', 'utf8');
 const weatherScript = fs.readFileSync('src/ui/ui-weather.js', 'utf8');
 const sideMenuScript = fs.readFileSync('src/ui/ui-side-menu.js', 'utf8');
 const domainHelpersScript = fs.readFileSync('src/core/app-domain-helpers.js', 'utf8');
+const adminDashboardScript = fs.readFileSync('src/ui/ui-admin-dashboard.js', 'utf8');
 const firebaseDataScript = fs.readFileSync('src/core/app-firebase-data.js', 'utf8');
 const utilsScript = fs.readFileSync('assets/app-utils.js', 'utf8');
 const notificationScript = fs.readFileSync('assets/app-notifications.js', 'utf8');
@@ -36,6 +37,7 @@ assert(/writeRootCollectionDocumentWithFallback/.test(firebaseDataScript) && /ro
 assert(/withWeatherTimeout/.test(weatherScript) && /WEATHER_FIRESTORE_TIMEOUT_MS/.test(weatherScript), 'weather cache reads and writes must be bounded');
 assert(/writeSharedCollection/.test(sideMenuScript) && /기기 구독 삭제/.test(sideMenuScript), 'device subscription deletes must use the bounded collection write path');
 assert(/writeSharedCollection/.test(domainHelpersScript) && /기기 구독 등록/.test(domainHelpersScript) && /기기 구독 해제/.test(domainHelpersScript), 'push subscription registration and removal must use the bounded collection write path');
+assert(/writeAdminCollection/.test(adminDashboardScript) && /관리자 채팅 삭제/.test(adminDashboardScript), 'manual admin message deletes must use the bounded collection write path');
 assert(/async function writeConfirmedMeetingsToFirestore[\s\S]{0,1800}if \(res\.ok\) return true;[\s\S]{0,700}if \(firebaseDb\)/.test(firebaseDataScript), 'confirmed meeting writes must fall back to SDK after a REST failure');
 assert(/writeConfirmedMeetingsToFirestore[\s\S]{0,2600}validDates[\s\S]{0,700}writes\.push\(\{ delete: documentName \}\)/.test(firebaseDataScript), 'confirmed meeting writes must remove stale subcollection documents');
 assert(/Failed to inspect stale confirmed meetings[\s\S]{0,260}validMeetings\.length === 0/.test(firebaseDataScript), 'confirmed meeting writes must not block valid updates on cleanup-read failure');

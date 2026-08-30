@@ -9,6 +9,10 @@ const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
 const GATHER_APP_CONFIG = window.GATHER_APP_CONFIG || {};
 function __gatherUiDeps() { return window.GATHER_UI_DEPS || {}; }
+function writeAdminCollection(...args) {
+  const writer = __gatherUiDeps().writeCollectionDocumentWithFallback;
+  return typeof writer === 'function' ? writer(...args) : null;
+}
 function getActiveAvailabilities(calendar) {
   const f = __gatherUiDeps().getActiveAvailabilities || GATHER_APP_UTILS.getActiveAvailabilities;
   return typeof f === 'function' ? f(calendar) : [];
@@ -1645,16 +1649,10 @@ export function AdminDashboard({ initialCalendars }) {
   const performDeleteMessage = async (calId, msg) => {
     closeConfirmDialog();
     try {
-      let ok = false;
-      if (__fb()) {
-        await __fb().collection('calendars').doc(`cal_${calId}`).collection('messages').doc(msg.id).delete();
-        ok = true;
-      } else {
-        ok = await deleteMessageRest(calId, msg.id);
-      }
-      if (ok) {
-        deleteAllChatImagesFromStorage(msg);
-        showAdminToast('삭제완료', 'success');
+      const deleted = await writeAdminCollection('messages', calId, msg.id, null, 'delete', '관리자 채팅 삭제');
+      if (deleted?.success) {
+        if (!deleted.queued) deleteAllChatImagesFromStorage(msg);
+        showAdminToast(deleted.queued ? '연결되면 삭제됩니다.' : '삭제완료', deleted.queued ? 'info' : 'success');
         setMessagesMap(prev => ({
           ...prev,
           [calId]: (prev[calId] || []).filter(m => m.id !== msg.id)
