@@ -813,6 +813,8 @@ function CalendarApp() {
   // finishes (see updateCalendars' finally block), still gated by applyCalendarSnapshot's own
   // revision check so it can't clobber whatever this device's own save just committed.
   const pendingRemoteSnapshotRef = React.useRef(null);
+  // Prevent a foreground response that started before a save from overwriting the save.
+  const localWriteStartedAtRef = React.useRef({});
   const serverRevisionRef = React.useRef(loadLocalMeta());
 
   const applyServerCalendars = (serverCalendars, lastModified = Date.now()) => {
@@ -873,6 +875,7 @@ function CalendarApp() {
       }
 
       isSavingRef.current = true;
+      localWriteStartedAtRef.current[targetCalId] = now;
       previousCalendars = calendars;
       setCalendarsState(normalizedCalendars);
       const progressTitle = saveMode === 'polls'
@@ -1739,11 +1742,14 @@ function CalendarApp() {
   // `isMounted`/`applyLoadedCalendar` locals.
   const applyCalendarSnapshot = React.useCallback((cloudCal, cloudLastMod = Date.now(), cloudRevision = 0, forceApply = false) => {
     if (!cloudCal || cloudCal.id !== activeCalId) return false;
+    if (forceApply && isSavingRef.current) return false;
     const incomingRevision = Number(cloudRevision || 0) || 0;
     const currentMetaRevision = getMetaRevision(serverRevisionRef.current, activeCalId);
     if (!forceApply) {
       if (incomingRevision > 0 && currentMetaRevision > 0 && incomingRevision < currentMetaRevision) return false;
       if (incomingRevision <= 0 && cloudLastMod < getMetaLastModified(serverRevisionRef.current, activeCalId)) return false;
+    } else if (cloudLastMod < (localWriteStartedAtRef.current[activeCalId] || 0)) {
+      return false;
     }
     setIsInitialDataLoading(false);
     setCalendarsState(prevCals => {
@@ -2020,12 +2026,15 @@ function CalendarApp() {
     let lastRefreshAt = 0;
     const refreshFromResume = async () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      if (isSavingRef.current) return;
       const now = Date.now();
       if (now - lastRefreshAt < 1200) return;
       lastRefreshAt = now;
       if (activeCalId && isAllowedCalendarId(activeCalId)) {
         try {
+          const refreshStartedAt = Date.now();
           const fresh = await fetchSingleCalendarWithRest(activeCalId, 5000);
+          if (isSavingRef.current || refreshStartedAt <= (localWriteStartedAtRef.current[activeCalId] || 0)) return;
           if (isMounted && fresh?.calendar && applyCalendarSnapshot(fresh.calendar, fresh.lastModified || Date.now(), fresh.revision || fresh.calendar.revision || 0, true)) {
             if (activeView === 'calendar' || activeView === 'places' || activeView === 'settlement') {
               fetchPlacesFromFirestore(activeCalId).then(list => { if (isMounted) setPlacesSubcollection(list); }).catch(() => {});
@@ -4926,12 +4935,17 @@ function CalendarApp() {
 
   const handleSavePlace = (placeData) => {
     if (!activeCal || !Number.isFinite(placeData?.lat) || !Number.isFinite(placeData?.lng)) return false;
+    // A date modal can save two places back-to-back before the parent render has
+    // received the first state update. Always merge against the latest calendar
+    // ref so the second save cannot rebuild the places array from a stale snapshot
+    // and silently discard the first place.
+    const latestCal = calendarsRef.current.find(c => c.id === activeCal.id) || activeCal;
     const cleanName = sanitizeText(placeData?.name || '', 80);
     if (!cleanName) return false;
     const now = Date.now();
-    const existingPlaces = getCalendarPlaces(activeCal);
+    const existingPlaces = getCalendarPlaces(latestCal);
     let isEditing = !!placeData.id;
-    const categoryIds = new Set(getPlaceCategories(activeCal).map(c => c.id));
+    const categoryIds = new Set(getPlaceCategories(latestCal).map(c => c.id));
     const cleanCategoryId = categoryIds.has(placeData.categoryId) ? placeData.categoryId : 'etc';
     const cleanAddress = normalizePlaceAddressForSave(placeData.address || '', placeData.lat, placeData.lng);
     const cleanAlias = sanitizeText(placeData.alias || '', 80);
@@ -5010,7 +5024,7 @@ function CalendarApp() {
     }
     const prevPlace = isEditing ? existingPlaces.find(p => p.id === placeData.id) : null;
     const displayLabel = cleanAlias || cleanName || '장소';
-    const placeCats = getPlaceCategories(activeCal);
+    const placeCats = getPlaceCategories(latestCal);
     const catName = id => (placeCats.find(c => c.id === id) || {}).name || id || '-';
     let placeLogNote = displayLabel;
     if (isEditing && prevPlace) {
@@ -5031,15 +5045,15 @@ function CalendarApp() {
       if (cleanVisitDate) bits.push(`일자 ${cleanVisitDate}`);
       placeLogNote = sanitizeText(bits.join(' · '), 300);
     }
-    const placeActivityLog = createActivityLog(activeCal.id, isEditing ? 'place_update' : 'place_create', '', '', now, placeLogNote);
+    const placeActivityLog = createActivityLog(latestCal.id, isEditing ? 'place_update' : 'place_create', '', '', now, placeLogNote);
     const updatedCal = {
-      ...activeCal,
+      ...latestCal,
       places: nextPlaces,
       updatedAt: now,
       revision: (activeCal.revision || 0) + 1,
       activityLogs: placeActivityLog ? [...getCalendarActivityLogs(activeCal), placeActivityLog] : getCalendarActivityLogs(activeCal)
     };
-    const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+    const nextCalendars = calendarsRef.current.map(c => c.id === updatedCal.id ? updatedCal : c);
     setPlacesSubcollection(nextPlaces);
     const savedPlace = nextPlaces.find(place => place.id === (placeData.id || nextPlaces[nextPlaces.length - 1]?.id));
     return updateCalendars(
