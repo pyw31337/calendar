@@ -2485,6 +2485,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   const [isSettlementListOpen, setIsSettlementListOpen] = React.useState(false);
   const [isCreateSettlementOpen, setIsCreateSettlementOpen] = React.useState(false);
   const [editingSettlementCard, setEditingSettlementCard] = React.useState(null);
+  const settlementEditorRootRef = React.useRef(null);
   const sanitizeText = __deps.sanitizeText;
   const extractFirstUrl = __deps.extractFirstUrl;
   const formatChatHeaderTitle = __deps.formatChatHeaderTitle;
@@ -2511,8 +2512,51 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
 
   const handleOpenSettlementEditor = (card) => {
     setOpenMenuCardId(null);
-    setIsCreateSettlementOpen(true);
-    setEditingSettlementCard({ ...card });
+    if (typeof document === 'undefined' || typeof ReactDOM === 'undefined' || typeof ReactDOM.createRoot !== 'function') {
+      setIsCreateSettlementOpen(true);
+      setEditingSettlementCard({ ...card });
+      return;
+    }
+    const existingRoot = settlementEditorRootRef.current;
+    if (existingRoot) {
+      existingRoot.root.unmount();
+      existingRoot.host.remove();
+      settlementEditorRootRef.current = null;
+    }
+    const host = document.createElement('div');
+    host.setAttribute('data-settlement-editor-root', 'true');
+    document.body.appendChild(host);
+    const root = ReactDOM.createRoot(host);
+    const closeEditor = () => {
+      root.unmount();
+      host.remove();
+      if (settlementEditorRootRef.current?.root === root) settlementEditorRootRef.current = null;
+    };
+    settlementEditorRootRef.current = { root, host };
+    root.render(React.createElement(CreateSettlementModal, {
+      calendar: calendar,
+      initialData: { ...card },
+      onClose: closeEditor,
+      onDeleteCard: (cardId) => {
+        if (typeof onDeleteSettlementCard === 'function') onDeleteSettlementCard(cardId);
+        closeEditor();
+      },
+      onToggleStatus: (cardId) => {
+        if (typeof onToggleSettlementCardStatus === 'function') onToggleSettlementCardStatus(cardId);
+        closeEditor();
+      },
+      onSave: (updatedCard) => {
+        if (typeof onSaveSettlementCard === 'function') onSaveSettlementCard(updatedCard);
+        else if (calendar) {
+          if (!Array.isArray(calendar.settlementCards)) calendar.settlementCards = [];
+          const idx = calendar.settlementCards.findIndex(item => item.id === updatedCard.id);
+          if (idx >= 0) calendar.settlementCards[idx] = updatedCard;
+          else calendar.settlementCards.unshift(updatedCard);
+        }
+        closeEditor();
+      },
+      showToast: showToast
+    }));
   };
 
   const { isHeaderVisible, onScroll: handleSettlementScroll } = useScrollHideHeader();
