@@ -5967,7 +5967,7 @@ function CalendarApp() {
       onClose: () => setIsCreateSettlementOpen(false),
       onSave: handleSaveSettlementCard
     }),
-    editingSettlementCard && activeCal && canUseSettlement && /*#__PURE__*/React.createElement(CreateSettlementModal, {
+    editingSettlementCard && activeCal && /*#__PURE__*/React.createElement(CreateSettlementModal, {
       calendar: activeCal,
       initialData: editingSettlementCard,
       showToast: showToast,
