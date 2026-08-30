@@ -1157,9 +1157,19 @@ async function checkFirebaseStorageHealth() {
     // the high-quality upload.
     const probeRef = firebaseStorage.ref('chatImages/_health/probe.png');
     const blob = new Blob(['1'], { type: 'image/png' });
-    const probePromise = probeRef.put(blob);
-    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('PROBE_TIMEOUT')), 5000));
-    await Promise.race([probePromise, timeoutPromise]);
+    const probeTask = probeRef.put(blob);
+    let probeTimeoutId;
+    const timeoutPromise = new Promise((_, reject) => {
+      probeTimeoutId = setTimeout(() => {
+        try { probeTask.cancel(); } catch (_) {}
+        reject(new Error('PROBE_TIMEOUT'));
+      }, 5000);
+    });
+    try {
+      await Promise.race([probeTask, timeoutPromise]);
+    } finally {
+      clearTimeout(probeTimeoutId);
+    }
     isStorageDisabled = false;
     lastStorageHealthOk = true;
   } catch (e) {
