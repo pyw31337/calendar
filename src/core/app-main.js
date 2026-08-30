@@ -832,6 +832,7 @@ function CalendarApp() {
     let queueOperationId = '';
     let queuePayload = null;
     try {
+      if (isSavingRef.current) return false;
       if (!isAllowedCalendarId(targetCalId)) {
         showToast('캘린더 ID 오류', 'error');
         return false;
