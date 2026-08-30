@@ -2060,7 +2060,11 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
             }) : React.createElement('span', { style: { fontSize: '0.84rem', fontWeight: 800, color: 'var(--text-main)' } }, row.participantId || '참여자')
             ),
             React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 } },
-            React.createElement('span', { style: { fontSize: '0.82rem', color: 'var(--text-main)', whiteSpace: 'nowrap', marginRight: '2px' } }, `${getIndividualSettlementAmount(row.participantId).toLocaleString()} 원`),
+            React.createElement('span', { style: { fontSize: '0.78rem', color: getIndividualSettlementAmount(row.participantId) < 0 ? '#16A34A' : '#DC2626', whiteSpace: 'nowrap', marginRight: '2px', fontWeight: 800 } }, (() => {
+              const amount = getIndividualSettlementAmount(row.participantId);
+              if (amount === 0) return '정산 없음';
+              return `${Math.abs(amount).toLocaleString()}원 ${amount < 0 ? '받기' : '보내기'}`;
+            })()),
             React.createElement('button', {
               type: 'button', title: '참여자 메모 편집', 'aria-label': '참여자 메모 편집', onClick: () => handleEditParticipantRow(row),
               style: { width: '24px', height: '24px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', color: '#64748B', backgroundColor: 'transparent', border: '1px solid #CBD5E1', flexShrink: 0 }
@@ -3048,7 +3052,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                     style: { backgroundColor: activeParticipants[index]?.color || '#3B82F6' }
                   }), row.name
                 ),
-                React.createElement("strong", { className: "settlement-person-amount" }, `${row.amount.toLocaleString()}원`)
+                React.createElement("strong", { className: "settlement-person-amount", title: row.amount < 0 ? '공금에서 받을 금액' : row.amount > 0 ? '공금으로 보낼 금액' : '정산할 금액 없음' }, row.amount === 0 ? '정산 없음' : `${Math.abs(row.amount).toLocaleString()}원 ${row.amount < 0 ? '받기' : '보내기'}`)
               )))
 
           );
