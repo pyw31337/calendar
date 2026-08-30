@@ -3110,23 +3110,14 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                   title: "정산 수정",
                   'aria-label': '정산 수정',
                   'data-settlement-edit-button': 'true',
-                  onClickCapture: event => {
+                  // Open only on the completed click (not on mousedown/pointerup, which fire
+                  // before the browser's click event). Opening earlier let the newly-mounted
+                  // modal's full-viewport .modal-overlay (onClick={onClose}) end up under the
+                  // pointer by the time the same click gesture's terminal click event landed,
+                  // closing the editor an instant after it appeared -- the modal never opened.
+                  onClick: event => {
                     event.stopPropagation();
-                    setOpenMenuCardId(null);
-                    setIsCreateSettlementOpen(true);
-                    setEditingSettlementCard({ ...card });
-                  },
-                  onMouseDown: event => {
-                    event.stopPropagation();
-                    setOpenMenuCardId(null);
-                    setIsCreateSettlementOpen(true);
-                    setEditingSettlementCard({ ...card });
-                  },
-                  onPointerUp: event => {
-                    event.stopPropagation();
-                    setOpenMenuCardId(null);
-                    setIsCreateSettlementOpen(true);
-                    setEditingSettlementCard({ ...card });
+                    handleOpenSettlementEditor(card);
                   },
                   onKeyDown: event => {
                     if (event.key !== 'Enter' && event.key !== ' ') return;
@@ -3160,31 +3151,10 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                 },
                   React.createElement("button", {
                     type: "button",
-                    onMouseDown: event => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      setOpenMenuCardId(null);
-                      handleOpenSettlementEditor(card);
-                    },
-                    onPointerUp: event => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      setOpenMenuCardId(null);
-                      handleOpenSettlementEditor(card);
-                    },
+                    // Open only on click -- see the cog button above for why the earlier
+                    // mousedown/pointerup/touchend variants of this handler caused the editor
+                    // to open and immediately self-close within the same click gesture.
                     onClick: event => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      setOpenMenuCardId(null);
-                      handleOpenSettlementEditor(card);
-                    },
-                    onMouseUp: event => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      setOpenMenuCardId(null);
-                      handleOpenSettlementEditor(card);
-                    },
-                    onTouchEnd: event => {
                       event.preventDefault();
                       event.stopPropagation();
                       setOpenMenuCardId(null);
@@ -3606,12 +3576,8 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
           key: card.id,
           className: "settlement-list-card",
           type: "button",
-          onPointerUp: event => {
-            event.preventDefault();
-            event.stopPropagation();
-            setIsSettlementListOpen(false);
-            handleOpenSettlementEditor(card);
-          },
+          // Open only on click -- see the cog button's comment above for why an early
+          // pointerup handler here raced the editor's self-closing overlay.
           onClick: event => {
             event.preventDefault();
             event.stopPropagation();
