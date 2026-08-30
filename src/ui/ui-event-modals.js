@@ -2511,6 +2511,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
 
   const handleOpenSettlementEditor = (card) => {
     setOpenMenuCardId(null);
+    setIsCreateSettlementOpen(true);
     setEditingSettlementCard({ ...card });
   };
 
@@ -3519,7 +3520,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   ))),
 
   /* Create Settlement Layer Popup */
-  (isCreateSettlementOpen && canUseSettlement && React.createElement(CreateSettlementModalComp, {
+  (isCreateSettlementOpen && canUseSettlement && !editingSettlementCard && React.createElement(CreateSettlementModalComp, {
     calendar: calendar,
     onClose: () => setIsCreateSettlementOpen(false),
     onSave: (newCard) => {
@@ -3540,17 +3541,19 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   // an older module reference during live bundle refresh, which previously swallowed this
   // edit modal after the card button had already updated editingSettlementCard.
   (() => {
-    const editor = editingSettlementCard && React.createElement(CreateSettlementModal, {
+    const editor = isCreateSettlementOpen && editingSettlementCard && React.createElement(CreateSettlementModal, {
     calendar: calendar,
     initialData: editingSettlementCard,
-    onClose: () => setEditingSettlementCard(null),
+    onClose: () => { setEditingSettlementCard(null); setIsCreateSettlementOpen(false); },
     onDeleteCard: (cardId) => {
       if (typeof onDeleteSettlementCard === 'function') onDeleteSettlementCard(cardId);
       setEditingSettlementCard(null);
+      setIsCreateSettlementOpen(false);
     },
     onToggleStatus: (cardId) => {
       if (typeof onToggleSettlementCardStatus === 'function') onToggleSettlementCardStatus(cardId);
       setEditingSettlementCard(null);
+      setIsCreateSettlementOpen(false);
     },
     onSave: (updatedCard) => {
       if (typeof onSaveSettlementCard === 'function') {
@@ -3562,6 +3565,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
         else calendar.settlementCards.unshift(updatedCard);
       }
       setEditingSettlementCard(null);
+      setIsCreateSettlementOpen(false);
     },
     showToast: showToast
     });
