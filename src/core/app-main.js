@@ -8174,8 +8174,6 @@ async function backfillMeetingUploadSourcesForCalendar(calId, calendar, { maxMes
   }
   return { migrated, failed, scanned };
 }
-
-
 async function readClipboardImageFiles(showToast) {
   if (typeof navigator === 'undefined' || !navigator.clipboard) {
     if (typeof showToast === 'function') showToast('클립보드 접근을 지원하지 않는 브라우저입니다.', 'error');
