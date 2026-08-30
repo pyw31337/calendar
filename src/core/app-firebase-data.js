@@ -2400,10 +2400,8 @@ async function pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode,
       });
       if (commitRes.ok) {
         const logsToPersist = [...legacyActivityLogs, ...(Array.isArray(newActivityLogs) ? newActivityLogs : [])];
-        // The primary calendar document is the user-visible save. Legacy subcollections are
-        // Places are user-visible data. Complete their write before releasing the save,
-        // otherwise an older realtime snapshot can restore the previous date memo.
-        await persistLegacySubcollections(normalizedCal.id, logsToPersist, legacyPlaces, legacyConfirmedMeetings)
+        // Auxiliary legacy collections must never hold the primary save open.
+        void persistLegacySubcollections(normalizedCal.id, logsToPersist, legacyPlaces, legacyConfirmedMeetings)
           .catch(error => console.warn(`Auxiliary sync failed for ${normalizedCal.id}:`, error));
         return { ok: true, revision: nextDocRevision, auxiliaryPersistenceFailed: false };
       }
@@ -2524,7 +2522,7 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 4, 
 	        new Promise((_, reject) => setTimeout(() => { raceLost = true; reject(new Error('Firestore push timeout')); }, 8000))
 	      ]);
       const logsToPersist = [...legacyActivityLogs, ...(Array.isArray(newActivityLogs) ? newActivityLogs : [])];
-      await persistLegacySubcollections(normalizedCal.id, logsToPersist, legacyPlaces, legacyConfirmedMeetings)
+      void persistLegacySubcollections(normalizedCal.id, logsToPersist, legacyPlaces, legacyConfirmedMeetings)
         .catch(error => console.warn(`Auxiliary sync failed for ${normalizedCal.id}:`, error));
       return { ok: true, revision: committedRevision, auxiliaryPersistenceFailed: false };
     } catch (e) {
