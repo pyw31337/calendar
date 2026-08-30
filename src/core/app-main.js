@@ -803,14 +803,6 @@ function CalendarApp() {
   };
 
   const isSavingRef = React.useRef(false);
-  // A realtime snapshot that arrived while this device was mid-save (see the onSnapshot handler
-  // below) is stashed here instead of being dropped outright. A save can legitimately take
-  // several seconds (retries, REST fallback), and any change another device pushes to Firestore
-  // during that window used to be silently discarded with no way to recover it short of that
-  // other device pushing again -- this device would otherwise just sit on stale data until the
-  // next unrelated write happened to trigger another onSnapshot event. Replayed once the save
-  // finishes (see updateCalendars' finally block), still gated by applyCalendarSnapshot's own
-  // revision check so it can't clobber whatever this device's own save just committed.
   const pendingRemoteSnapshotRef = React.useRef(null);
   const localWriteStartedAtRef = React.useRef({});
   const serverRevisionRef = React.useRef(loadLocalMeta());
@@ -5042,7 +5034,6 @@ function CalendarApp() {
     };
     const nextCalendars = calendarsRef.current.map(c => c.id === updatedCal.id ? updatedCal : c);
     setPlacesSubcollection(nextPlaces);
-    const savedPlace = nextPlaces.find(place => place.id === (placeData.id || nextPlaces[nextPlaces.length - 1]?.id));
     return updateCalendars(
       nextCalendars,
       isEditing ? '장소 수정완료' : '장소 등록완료',
@@ -5050,7 +5041,10 @@ function CalendarApp() {
       updatedCal.id,
       'settings',
       placeActivityLog ? [placeActivityLog] : [],
-      { places: savedPlace ? [savedPlace] : [] }
+      // The places collection is the live source after migration. Persist the complete
+      // merged set, not only the just-edited item; otherwise a settings save can leave
+      // legacy places/date memos split between the calendar document and the subcollection.
+      { places: nextPlaces }
     );
   };
   const handleDeletePlace = async (placeId) => {
