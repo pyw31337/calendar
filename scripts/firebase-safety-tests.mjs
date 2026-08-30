@@ -18,6 +18,7 @@ const adminDashboardScript = fs.readFileSync('src/ui/ui-admin-dashboard.js', 'ut
 const sharedScript = fs.readFileSync('src/ui/ui-shared.js', 'utf8');
 const overlaysScript = fs.readFileSync('src/ui/ui-overlays.js', 'utf8');
 const firebaseDataScript = fs.readFileSync('src/core/app-firebase-data.js', 'utf8');
+const firebaseServicesScript = fs.readFileSync('src/core/firebase-services.js', 'utf8');
 const utilsScript = fs.readFileSync('assets/app-utils.js', 'utf8');
 const notificationScript = fs.readFileSync('assets/app-notifications.js', 'utf8');
 const writeQueueScript = fs.readFileSync('src/core/app-write-queue.js', 'utf8');
@@ -41,6 +42,7 @@ assert(/writeRootCollectionDocumentWithFallback/.test(firebaseDataScript) && /ro
 assert(/merge: Boolean\(options\?\.merge\)/.test(firebaseDataScript) && /Boolean\(payload\.merge\)/.test(mediaOutboxScript), 'queued root writes must preserve merge semantics during replay');
 assert(/writeRootCollectionDocumentWithFallback[\s\S]{0,900}FIRESTORE_WRITE_DEADLINE_MS/.test(firebaseDataScript), 'root collection writes must use the bounded write deadline');
 assert(/withWeatherTimeout/.test(weatherScript) && /WEATHER_FIRESTORE_TIMEOUT_MS/.test(weatherScript), 'weather cache reads and writes must be bounded');
+assert(firebaseServicesScript.includes('FIRESTORE_REST_TIMEOUT_MS = 9000') && firebaseServicesScript.includes('fetchWithTimeout'), 'Firebase REST reads must have a bounded timeout');
 assert(/writeSharedCollection/.test(sideMenuScript) && /기기 구독 삭제/.test(sideMenuScript), 'device subscription deletes must use the bounded collection write path');
 assert(/writeSharedCollection/.test(domainHelpersScript) && /기기 구독 등록/.test(domainHelpersScript) && /기기 구독 해제/.test(domainHelpersScript), 'push subscription registration and removal must use the bounded collection write path');
 assert(/writeAdminCollection/.test(adminDashboardScript) && /관리자 채팅 삭제/.test(adminDashboardScript), 'manual admin message deletes must use the bounded collection write path');

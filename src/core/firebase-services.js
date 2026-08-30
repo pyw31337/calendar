@@ -3,6 +3,20 @@
  * Loaded before app-main.js. Runtime deps: window.GATHER_FIREBASE_DEPS
  */
 function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
+  const FIRESTORE_REST_TIMEOUT_MS = 9000;
+  function fetchWithTimeout(url, init, timeoutMs) {
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    const timeout = Number(timeoutMs) > 0 ? Number(timeoutMs) : FIRESTORE_REST_TIMEOUT_MS;
+    let timer = null;
+    const request = fetch(url, controller ? { ...(init || {}), signal: controller.signal } : (init || {}));
+    const deadline = new Promise(function (_, reject) {
+      timer = setTimeout(function () {
+        if (controller) controller.abort();
+        reject(new Error('Firestore REST read timed out'));
+      }, timeout);
+    });
+    return Promise.race([request, deadline]).finally(function () { if (timer) clearTimeout(timer); });
+  }
   function isValidCalId(calId) {
     return typeof calId === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(calId);
   }
@@ -43,7 +57,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
   async function fetchChatMessagesRest(calId) {
     try {
       const url = 'https://firestore.googleapis.com/v1/projects/' + projectId() + '/databases/(default)/documents/calendars/cal_' + calId + '/messages?orderBy=timestamp%20desc&pageSize=' + liveLimit();
-      const res = await fetch(url, { cache: 'no-store' });
+      const res = await fetchWithTimeout(url, { cache: 'no-store' });
       if (!res.ok) return [];
       const data = await res.json();
       return (data.documents || []).map(function (doc) {
@@ -66,7 +80,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
       do {
         var url = 'https://firestore.googleapis.com/v1/projects/' + projectId() + '/databases/(default)/documents/calendars/cal_' + calId + '/messages?pageSize=300';
         if (pageToken) url += '&pageToken=' + encodeURIComponent(pageToken);
-        var res = await fetch(url, { cache: 'no-store' });
+        var res = await fetchWithTimeout(url, { cache: 'no-store' });
         if (!res.ok) return all;
         var data = await res.json();
         (data.documents || []).forEach(function (doc) {
@@ -98,7 +112,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     }
     try {
       const url = 'https://firestore.googleapis.com/v1/projects/' + projectId() + '/databases/(default)/documents/calendars/cal_' + calId + '/messages?orderBy=timestamp%20desc&pageSize=' + pageSize;
-      const res = await fetch(url, { cache: 'no-store' });
+      const res = await fetchWithTimeout(url, { cache: 'no-store' });
       if (!res.ok) return [];
       const data = await res.json();
       return (data.documents || []).map(function (doc) {
@@ -172,7 +186,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
       let pageToken = '';
       do {
         const query = '?pageSize=1000' + (pageToken ? '&pageToken=' + encodeURIComponent(pageToken) : '');
-        const res = await fetch('https://firestore.googleapis.com/v1/' + parent + '/messages' + query, { cache: 'no-store' });
+        const res = await fetchWithTimeout('https://firestore.googleapis.com/v1/' + parent + '/messages' + query, { cache: 'no-store' });
         if (!res.ok) return list;
         const data = await res.json();
         (data.documents || []).forEach(function (doc) {
@@ -202,7 +216,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     }
     try {
       const parent = 'projects/' + projectId() + '/databases/(default)/documents/calendars/cal_' + calId;
-      const res = await fetch('https://firestore.googleapis.com/v1/' + parent + ':runQuery', {
+      const res = await fetchWithTimeout('https://firestore.googleapis.com/v1/' + parent + ':runQuery', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, cache: 'no-store',
         body: JSON.stringify({ structuredQuery: { from: [{ collectionId: 'meetingPhotoIndex' }], where: { fieldFilter: {
           field: { fieldPath: 'date' }, op: 'EQUAL', value: { stringValue: String(date) }
@@ -250,7 +264,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
           aggregations: [{ alias: 'total', count: {} }]
         }
       };
-      const res = await fetch(url, {
+      const res = await fetchWithTimeout(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(aggBody)
@@ -305,7 +319,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
           }
         }
       };
-      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const res = await fetchWithTimeout(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       if (!res.ok) {
         console.warn('fetchMessagesByUploadSource rest status', res.status, uploadSource);
         return null;
@@ -359,7 +373,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
           aggregations: [{ alias: 'total', count: {} }]
         }
       };
-      const res = await fetch(url, {
+      const res = await fetchWithTimeout(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(aggBody)
@@ -439,7 +453,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
           aggregations: [{ alias: 'total', count: {} }]
         }
       };
-      const res = await fetch(url, {
+        const res = await fetchWithTimeout(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(aggBody)
@@ -504,7 +518,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
             }
           }
         };
-        const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const res = await fetchWithTimeout(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         if (res.ok) {
           const data = await res.json();
           const rows = Array.isArray(data) ? data : [data];
@@ -564,7 +578,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
           limit: size
         }
       };
-      const res = await fetch(url, {
+      const res = await fetchWithTimeout(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
