@@ -17,6 +17,7 @@ assert(script, 'assets/app-main.js not found');
 assert(writeQueueScript.includes("indexedDB.open(DB_NAME, DB_VERSION)") && writeQueueScript.includes("const DB_NAME = 'gather-calendar-write-queue'"), 'write queue must use a versioned IndexedDB store');
 assert(writeQueueScript.includes('MAX_PENDING_OPERATIONS = 100'), 'write queue must have a bounded pending operation limit');
 assert(!/localStorage\s*(?:\.|\[)/.test(writeQueueScript), 'write queue must not reintroduce localStorage persistence');
+assert(/type: 'collection-write'/.test(firebaseDataScript) && /skipQueue/.test(firebaseDataScript), 'collection writes must support bounded offline replay without recursive queueing');
 assert(/async function writeConfirmedMeetingsToFirestore[\s\S]{0,1800}if \(res\.ok\) return true;[\s\S]{0,700}if \(firebaseDb\)/.test(firebaseDataScript), 'confirmed meeting writes must fall back to SDK after a REST failure');
 assert(/writeConfirmedMeetingsToFirestore[\s\S]{0,2600}validDates[\s\S]{0,700}writes\.push\(\{ delete: documentName \}\)/.test(firebaseDataScript), 'confirmed meeting writes must remove stale subcollection documents');
 assert(/Failed to inspect stale confirmed meetings[\s\S]{0,260}validMeetings\.length === 0/.test(firebaseDataScript), 'confirmed meeting writes must not block valid updates on cleanup-read failure');

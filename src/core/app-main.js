@@ -561,6 +561,19 @@ function shouldQueueCalendarWriteFailure(error) {
 }
 
 async function replayQueuedCalendarWrite(operation) {
+  if (operation?.type === 'collection-write' && operation.payload) {
+    const payload = operation.payload;
+    const result = await writeCollectionDocumentWithFallback(
+      payload.collectionName,
+      operation.calendarId,
+      payload.docId || '',
+      payload.data,
+      payload.method || 'update',
+      payload.warnLabel || '대기 저장',
+      { deletePaths: payload.deletePaths || [], skipQueue: true }
+    );
+    return Boolean(result?.success);
+  }
   if (operation?.type !== 'calendar-snapshot' || !operation.payload?.calendar) return false;
   const payload = operation.payload;
   const result = await pushSingleCloudCalendar(

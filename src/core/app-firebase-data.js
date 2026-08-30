@@ -57,6 +57,7 @@ import {
   formatBytes,
   getDataUrlInfo,
 } from './app-domain-helpers.js';
+import { enqueueWriteOperation } from './app-write-queue.js';
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 const FIRESTORE_REQUEST_TIMEOUT_MS = 12000;
@@ -1520,7 +1521,28 @@ async function writeCollectionDocumentWithFallback(collectionName, calId, docId,
   }
   const restMethod = method === 'add' && options?.documentId ? 'set' : method;
   const restDocId = method === 'add' && options?.documentId ? options.documentId : docId;
-  return writeCollectionDocumentRest(cleanCollection, calId, restDocId, data, restMethod, cleanDeletePaths);
+  const restResult = await writeCollectionDocumentRest(cleanCollection, calId, restDocId, data, restMethod, cleanDeletePaths);
+  if (restResult || options?.skipQueue || !shouldQueueCollectionWrite()) return restResult;
+  const operationId = options?.queueId || `collection_${cleanCollection}_${calId}_${restDocId || Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const queued = await enqueueWriteOperation({
+    id: operationId,
+    type: 'collection-write',
+    calendarId: calId,
+    payload: {
+      collectionName: cleanCollection,
+      docId: restDocId,
+      data,
+      method: restMethod,
+      deletePaths: cleanDeletePaths,
+      warnLabel
+    },
+    lastError: `${warnLabel} network failure`
+  });
+  return queued ? { success: true, queued: true, id: restDocId || operationId, transport: 'queue' } : restResult;
+}
+
+function shouldQueueCollectionWrite() {
+  try { return typeof navigator !== 'undefined' && navigator.onLine === false; } catch (_) { return false; }
 }
 
 async function deleteMessageRest(calId, messageId) {
