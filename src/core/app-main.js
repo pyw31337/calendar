@@ -1235,6 +1235,7 @@ function CalendarApp() {
   const [isPollModalOpen, setIsPollModalOpen] = React.useState(false);
   const [expandedConfirmedDates, setExpandedConfirmedDates] = React.useState({});
   const [isCreateSettlementOpen, setIsCreateSettlementOpen] = React.useState(false);
+  const [editingSettlementCard, setEditingSettlementCard] = React.useState(null);
   const [editingPoll, setEditingPoll] = React.useState(null);
   const [voteTarget, setVoteTarget] = React.useState(null);
   const [isGuideOpen, setIsGuideOpen] = React.useState(false);
@@ -5966,6 +5967,15 @@ function CalendarApp() {
       onClose: () => setIsCreateSettlementOpen(false),
       onSave: handleSaveSettlementCard
     }),
+    editingSettlementCard && activeCal && canUseSettlement && /*#__PURE__*/React.createElement(CreateSettlementModal, {
+      calendar: activeCal,
+      initialData: editingSettlementCard,
+      showToast: showToast,
+      onClose: () => setEditingSettlementCard(null),
+      onDeleteCard: cardId => { handleDeleteSettlementCard(cardId); setEditingSettlementCard(null); },
+      onToggleStatus: cardId => { handleToggleSettlementCardStatus(cardId); setEditingSettlementCard(null); },
+      onSave: updatedCard => { handleSaveSettlementCard(updatedCard); setEditingSettlementCard(null); }
+    }),
     isAppSettingsOpen && /*#__PURE__*/React.createElement(AppSettingsModal, {
       onClose: () => setIsAppSettingsOpen(false),
       isDarkTheme: isDarkTheme,
@@ -6105,6 +6115,7 @@ function CalendarApp() {
           if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsShareOpen(true);
         },
         onOpenAppSettings: () => setIsAppSettingsOpen(true),
+        onOpenSettlementEditor: card => setEditingSettlementCard(card),
         onToggleSettlementCardStatus: handleToggleSettlementCardStatus,
         onDeleteSettlementCard: handleDeleteSettlementCard,
         onSaveSettlementCard: handleSaveSettlementCard,

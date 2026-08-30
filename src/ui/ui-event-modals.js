@@ -2479,7 +2479,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
   ));
 }
 
-export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenShare, onOpenAppSettings, onChangeView, onOpenCreateSettlement, onToggleSettlementCardStatus, onDeleteSettlementCard, onSaveSettlementCard, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null, showToast }) {
+export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenShare, onOpenAppSettings, onChangeView, onOpenCreateSettlement, onOpenSettlementEditor, onToggleSettlementCardStatus, onDeleteSettlementCard, onSaveSettlementCard, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null, showToast }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -2529,6 +2529,10 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
 
   const handleOpenSettlementEditor = (card) => {
     setOpenMenuCardId(null);
+    if (typeof onOpenSettlementEditor === 'function') {
+      onOpenSettlementEditor({ ...card });
+      return;
+    }
     if (typeof document === 'undefined' || typeof ReactDOM === 'undefined' || typeof ReactDOM.createRoot !== 'function') {
       setIsCreateSettlementOpen(true);
       setEditingSettlementCard({ ...card });
