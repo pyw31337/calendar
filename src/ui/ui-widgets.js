@@ -838,20 +838,26 @@ export function ParticipantPickerButton({ participant, onClick }) {
 
   return /*#__PURE__*/React.createElement("button", {
     type: "button",
+    // Compact inline capsule -- this sits *inside* flex rows next to a tag input, a comment
+    // input, or Save/Cancel buttons (never alone as a full-size form field), so it must not
+    // pick up .form-select's width:100%/44px-tall "rounded rectangle" sizing. Only the shared
+    // background/border/hover/focus look is reused from .form-select; participant-picker-button
+    // (below, in app.css) overrides the sizing to a small pill that shrink-wraps its content.
     className: "form-select participant-picker-button",
     onClick,
     style: {
-      padding: '10px 14px',
-      fontSize: '0.84rem',
+      padding: '4px 10px 4px 8px',
+      fontSize: '0.76rem',
       display: 'flex',
       alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: '8px',
-      height: '44px',
+      justifyContent: 'center',
+      gap: '6px',
+      width: 'auto',
+      height: '28px',
       boxSizing: 'border-box',
       flexShrink: 0
     }
-  }, ParticipantBackdrop ? /*#__PURE__*/React.createElement(ParticipantBackdrop, { participant, name: participant?.name || '작성자 선택', dotSize: 9 }) : /*#__PURE__*/React.createElement("span", { style: { color: participant?.color || 'var(--text-muted)', fontWeight: 800 } }, participant?.name || '작성자 선택'), /*#__PURE__*/React.createElement("span", { className: "form-select-chevron", "aria-hidden": "true" }, "⌄"));
+  }, ParticipantBackdrop ? /*#__PURE__*/React.createElement(ParticipantBackdrop, { participant, name: participant?.name || '작성자 선택', dotSize: 8 }) : /*#__PURE__*/React.createElement("span", { style: { color: participant?.color || 'var(--text-muted)', fontWeight: 800 } }, participant?.name || '작성자 선택'), /*#__PURE__*/React.createElement("span", { className: "form-select-chevron participant-picker-chevron", "aria-hidden": "true" }, "⌄"));
 }
 
 export function DateCapsuleBadge({ date, style = null }) {
