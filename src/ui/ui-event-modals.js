@@ -3664,6 +3664,9 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   // an older module reference during live bundle refresh, which previously swallowed this
   // edit modal after the card button had already updated editingSettlementCard.
   (() => {
+    // A card is only rendered in this view when it is already an allowed, visible
+    // settlement record. Do not re-apply the create-flow feature gate here: a stale
+    // gate value used to swallow the editor after the card button had handled the click.
     const editor = isCreateSettlementOpen && editingSettlementCard && React.createElement(CreateSettlementModal, {
     calendar: calendar,
     initialData: editingSettlementCard,
@@ -4102,7 +4105,10 @@ export function PollModal({ calendar, poll, onSave, onClose, showToast, onReques
   return ReactDOM.createPortal(modalEl, document.body);
 }
 
-  if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined') {
+  // The app shell is loaded after this lazy UI module. Keep an explicit reference
+  // so its top-level modal overlay never resolves to an empty registry wrapper.
+  window.__GATHER_CREATE_SETTLEMENT_MODAL__ = CreateSettlementModal;
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
     AnniversaryModal: AnniversaryModal,
     SettlementSummaryModal: SettlementSummaryModal,

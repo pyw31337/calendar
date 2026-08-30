@@ -622,7 +622,8 @@ function AdminUnifiedSearchModal(props) {
   return typeof C === 'function' ? React.createElement(C, props) : null;
 }
 function CreateSettlementModal(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CreateSettlementModal;
+  const C = window.__GATHER_CREATE_SETTLEMENT_MODAL__
+    || (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CreateSettlementModal);
   return typeof C === 'function' ? React.createElement(C, props) : null;
 }
 function getAllDirectMediaImageEntries(message) {
