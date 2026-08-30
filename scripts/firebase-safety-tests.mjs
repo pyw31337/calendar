@@ -66,6 +66,7 @@ assert(overlaysUi.includes('const isSafeMediaSrc = value =>') && overlaysUi.incl
 assert(fs.readFileSync('scripts/firebase-media-audit.mjs', 'utf8').includes('invalidCount'), 'media audit must report invalid image data without mutating production records');
 assert(/void persistLegacySubcollections\([\s\S]{0,260}\.catch\(/.test(firebaseDataScript), 'legacy subcollection writes must be detached from the primary save and handled in the background');
 assert(/options\?\.documentId[\s\S]{0,260}colRef\.doc\(options\.documentId\)\.set/.test(firebaseDataScript), 'retryable collection adds must support deterministic document ids');
+assert(/메시지 분할 저장'[\s\S]{0,120}documentId: `edit_/.test(sourceScript), 'edited message image chunks must use deterministic document ids');
 assert(!/checkProxyRateLimit\(\$\{bucketKey\}\) failed, allowing request[\s\S]{0,160}return true/.test(fs.readFileSync('functions/index.js', 'utf8')), 'proxy limiter must not fail open');
 const setChatNotifyPrefBody = script.match(/function setChatNotifyEnabledForCalendar\(calId, enabled\) \{([\s\S]*?)\n\}/)?.[1] || '';
 assert(!setChatNotifyPrefBody.includes('gather_chat_notify_pref_global_v1'), 'new chat notification writes must be calendar-scoped, not global');

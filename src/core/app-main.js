@@ -3084,7 +3084,7 @@ function CalendarApp() {
             imageUrls: chunkImages.map(r => r.imageUrl),
             thumbUrls: chunkImages.map(r => r.thumbUrl),
             timestamp: baseTimestamp + i
-          }, 'add', '메시지 분할 저장');
+          }, 'add', '메시지 분할 저장', { documentId: `edit_${encodeURIComponent(calId)}_${encodeURIComponent(id)}_${i}` });
           if (!sent) {
             ok = false;
             break;
