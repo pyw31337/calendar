@@ -3541,7 +3541,10 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   })),
 
   /* Edit Settlement Layer Popup */
-  (editingSettlementCard && React.createElement(CreateSettlementModalComp, {
+  // Use the local component directly here. The global component registry can briefly contain
+  // an older module reference during live bundle refresh, which previously swallowed this
+  // edit modal after the card button had already updated editingSettlementCard.
+  (editingSettlementCard && React.createElement(CreateSettlementModal, {
     calendar: calendar,
     initialData: editingSettlementCard,
     onClose: () => setEditingSettlementCard(null),
