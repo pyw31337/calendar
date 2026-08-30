@@ -3051,6 +3051,11 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                   title: "정산 수정",
                   'aria-label': '정산 수정',
                   'data-settlement-edit-button': 'true',
+                  onPointerDown: event => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    handleOpenSettlementEditor(card);
+                  },
                   onClick: event => {
                     event.preventDefault();
                     event.stopPropagation();
