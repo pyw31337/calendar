@@ -2452,7 +2452,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
     React.createElement('div', { className: 'modal-footer', style: { display: 'flex', justifyContent: 'flex-end', padding: '10px 14px', borderTop: '1px solid var(--border-subtle)' } },
       React.createElement('button', { type: 'button', className: 'btn btn-secondary', onClick: () => setIsSettlementCardPreviewOpen(false) }, '닫기')
     )
-  )));
+  ));
 }
 
 export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenShare, onOpenAppSettings, onChangeView, onOpenCreateSettlement, onToggleSettlementCardStatus, onDeleteSettlementCard, onSaveSettlementCard, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null, showToast }) {
