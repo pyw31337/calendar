@@ -3712,9 +3712,10 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     },
     showToast: showToast
     });
-    return editor && typeof document !== 'undefined' && ReactDOM.createPortal
-      ? ReactDOM.createPortal(editor, document.body)
-      : editor;
+    // This modal already belongs to the top-level settlement view. Rendering it
+    // directly avoids the separate ReactDOM portal path that can drop the editor
+    // after the click when the lazy UI modules are being assembled.
+    return editor;
   })()
   );
 }
