@@ -2544,7 +2544,12 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     const host = document.createElement('div');
     host.setAttribute('data-settlement-editor-root', 'true');
     document.body.appendChild(host);
-    const root = ReactDOM.createRoot(host);
+    const root = typeof ReactDOM.render === 'function'
+      ? {
+        render: element => ReactDOM.render(element, host),
+        unmount: () => ReactDOM.unmountComponentAtNode(host)
+      }
+      : ReactDOM.createRoot(host);
     const closeEditor = () => {
       root.unmount();
       host.remove();
