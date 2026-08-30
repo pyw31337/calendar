@@ -3043,6 +3043,11 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
               : -Math.abs(Number(item?.amount) || 0);
             cardPersonalTotals.set(name, (cardPersonalTotals.get(name) || 0) + signedAmount);
           });
+          const cardParticipantMemos = new Map();
+          (Array.isArray(card.participantRows) ? card.participantRows : []).forEach(row => {
+            const memo = String(row?.memo || '').trim();
+            if (memo) cardParticipantMemos.set(row.participantId, memo);
+          });
           const cardParticipantRows = calculateSettlementRows(
             Number(card.amount) || allTimeExpense,
             cardParticipantNames,
@@ -3105,23 +3110,14 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                   title: "정산 수정",
                   'aria-label': '정산 수정',
                   'data-settlement-edit-button': 'true',
-                  onClickCapture: event => {
+                  // Open only on the completed click (not on mousedown/pointerup, which fire
+                  // before the browser's click event). Opening earlier let the newly-mounted
+                  // modal's full-viewport .modal-overlay (onClick={onClose}) end up under the
+                  // pointer by the time the same click gesture's terminal click event landed,
+                  // closing the editor an instant after it appeared -- the modal never opened.
+                  onClick: event => {
                     event.stopPropagation();
-                    setOpenMenuCardId(null);
-                    setIsCreateSettlementOpen(true);
-                    setEditingSettlementCard({ ...card });
-                  },
-                  onMouseDown: event => {
-                    event.stopPropagation();
-                    setOpenMenuCardId(null);
-                    setIsCreateSettlementOpen(true);
-                    setEditingSettlementCard({ ...card });
-                  },
-                  onPointerUp: event => {
-                    event.stopPropagation();
-                    setOpenMenuCardId(null);
-                    setIsCreateSettlementOpen(true);
-                    setEditingSettlementCard({ ...card });
+                    handleOpenSettlementEditor(card);
                   },
                   onKeyDown: event => {
                     if (event.key !== 'Enter' && event.key !== ' ') return;
@@ -3155,31 +3151,10 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                 },
                   React.createElement("button", {
                     type: "button",
-                    onMouseDown: event => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      setOpenMenuCardId(null);
-                      handleOpenSettlementEditor(card);
-                    },
-                    onPointerUp: event => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      setOpenMenuCardId(null);
-                      handleOpenSettlementEditor(card);
-                    },
+                    // Open only on click -- see the cog button above for why the earlier
+                    // mousedown/pointerup/touchend variants of this handler caused the editor
+                    // to open and immediately self-close within the same click gesture.
                     onClick: event => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      setOpenMenuCardId(null);
-                      handleOpenSettlementEditor(card);
-                    },
-                    onMouseUp: event => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      setOpenMenuCardId(null);
-                      handleOpenSettlementEditor(card);
-                    },
-                    onTouchEnd: event => {
                       event.preventDefault();
                       event.stopPropagation();
                       setOpenMenuCardId(null);
@@ -3232,22 +3207,29 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
               React.createElement("strong", { className: "settlement-person-amount" }, `${(Number(card.amount) || allTimeExpense).toLocaleString()}원`)
             ), cardParticipantRows.length === 0
               ? React.createElement("div", { className: "settlement-person-card settlement-person-card-empty" }, "참여 멤버 없음")
-              : cardParticipantRows.map((row, index) => React.createElement("div", {
+              : cardParticipantRows.map((row, index) => {
+                const personalTotal = cardPersonalTotals.get(row.name) || 0;
+                const personalMemo = cardParticipantMemos.get(row.name) || '';
+                const personalColor = (activeParticipants.find(p => (typeof p === 'string' ? p : (p?.name || p?.id)) === row.name)?.color) || '#3B82F6';
+                return React.createElement("div", {
                 key: `${card.id}_${row.name}_${index}`,
                 className: "settlement-person-card"
               },
                 React.createElement("div", { className: "settlement-person-name" },
                   React.createElement("span", {
                     className: "settlement-person-dot",
-                    style: { backgroundColor: activeParticipants[index]?.color || '#3B82F6' }
+                    style: { backgroundColor: personalColor }
                   }),
                   React.createElement("span", { className: "settlement-person-name-text" }, row.name),
                   React.createElement('span', { className: `settlement-person-settlement-badge settlement-person-mobile-badge${row.amount < 0 ? ' is-refund' : ''}` }, row.amount < 0 ? '환급금' : row.amount > 0 ? '분담금' : '정산 없음')
                 ),
                 React.createElement("strong", { className: `settlement-person-amount${row.amount < 0 ? ' is-refund' : ''}`, title: row.amount < 0 ? '공금에서 받을 환급금' : row.amount > 0 ? '공금에 납부할 분담금' : '정산할 금액 없음' },
                   row.amount !== 0 && React.createElement('span', null, `${row.amount < 0 ? '-' : ''}${Math.abs(row.amount).toLocaleString()}원`)
-                )
-              )))
+                ),
+                personalTotal !== 0 && React.createElement('span', { className: 'settlement-person-detail-capsule' }, `개인지출 ${Math.abs(personalTotal).toLocaleString()}원`),
+                personalMemo && React.createElement('span', { className: 'settlement-person-detail-capsule settlement-person-memo-capsule', title: personalMemo }, personalMemo)
+                );
+              }))
 
           );
         })
@@ -3594,12 +3576,8 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
           key: card.id,
           className: "settlement-list-card",
           type: "button",
-          onPointerUp: event => {
-            event.preventDefault();
-            event.stopPropagation();
-            setIsSettlementListOpen(false);
-            handleOpenSettlementEditor(card);
-          },
+          // Open only on click -- see the cog button's comment above for why an early
+          // pointerup handler here raced the editor's self-closing overlay.
           onClick: event => {
             event.preventDefault();
             event.stopPropagation();
