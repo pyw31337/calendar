@@ -3091,6 +3091,16 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                     event.stopPropagation();
                     handleOpenSettlementEditor(card);
                   },
+                  onMouseUp: event => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    handleOpenSettlementEditor(card);
+                  },
+                  onTouchEnd: event => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    handleOpenSettlementEditor(card);
+                  },
                   onKeyDown: event => {
                     if (event.key !== 'Enter' && event.key !== ' ') return;
                     event.preventDefault();
@@ -3124,6 +3134,18 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                   React.createElement("button", {
                     type: "button",
                     onPointerUp: event => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setOpenMenuCardId(null);
+                      handleOpenSettlementEditor(card);
+                    },
+                    onMouseUp: event => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setOpenMenuCardId(null);
+                      handleOpenSettlementEditor(card);
+                    },
+                    onTouchEnd: event => {
                       event.preventDefault();
                       event.stopPropagation();
                       setOpenMenuCardId(null);
@@ -3539,6 +3561,18 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
           className: "settlement-list-card",
           type: "button",
           onPointerUp: event => {
+            event.preventDefault();
+            event.stopPropagation();
+            setIsSettlementListOpen(false);
+            handleOpenSettlementEditor(card);
+          },
+          onMouseUp: event => {
+            event.preventDefault();
+            event.stopPropagation();
+            setIsSettlementListOpen(false);
+            handleOpenSettlementEditor(card);
+          },
+          onTouchEnd: event => {
             event.preventDefault();
             event.stopPropagation();
             setIsSettlementListOpen(false);
