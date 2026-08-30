@@ -82,7 +82,7 @@ async function getAllOperations() {
 }
 
 export async function enqueueWriteOperation(operation) {
-  if (!operation || !operation.id || !operation.type || !operation.calendarId) return false;
+  if (!operation || !operation.id || !operation.type || (!operation.calendarId && operation.type !== 'root-collection-write')) return false;
   const db = await openQueueDb();
   if (!db) return false;
   const record = {

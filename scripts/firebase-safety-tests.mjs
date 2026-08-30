@@ -28,6 +28,7 @@ assert(writeQueueScript.includes("indexedDB.open(DB_NAME, DB_VERSION)") && write
 assert(writeQueueScript.includes('MAX_PENDING_OPERATIONS = 100'), 'write queue must have a bounded pending operation limit');
 assert(writeQueueScript.includes('MAX_OPERATION_PAYLOAD_BYTES') && writeQueueScript.includes('payload too large'), 'write queue must reject oversized payloads');
 assert(writeQueueScript.includes('nextAttemptAt') && writeQueueScript.includes('RETRY_BACKOFF_MAX_MS'), 'write queue must back off repeated failures');
+assert(/operation\.type !== 'root-collection-write'/.test(writeQueueScript), 'root collection writes must be queueable without a calendar id');
 assert(!/localStorage\s*(?:\.|\[)/.test(writeQueueScript), 'write queue must not reintroduce localStorage persistence');
 assert(/type: 'collection-write'/.test(firebaseDataScript) && /skipQueue/.test(firebaseDataScript), 'collection writes must support bounded offline replay without recursive queueing');
 assert(/media-chat-send/.test(sourceScript) && /originalBlob: image\.originalBlob/.test(sourceScript), 'offline chat images must be queued with their original and thumbnail blobs');
