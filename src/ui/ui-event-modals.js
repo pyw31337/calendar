@@ -2549,7 +2549,10 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     // The page owner already renders the editor alongside this summary. Use that
     // callback first so the card action and the modal always share one React tree;
     // the local state remains a fallback for standalone consumers of this component.
-    if (typeof onOpenSettlementEditor === 'function') onOpenSettlementEditor(card, CreateSettlementModalComp);
+    if (typeof onOpenSettlementEditor === 'function') {
+      onOpenSettlementEditor(card, CreateSettlementModalComp);
+      return;
+    }
     setIsCreateSettlementOpen(true);
     setEditingSettlementCard({ ...card });
   };
