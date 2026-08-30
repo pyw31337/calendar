@@ -1996,7 +1996,8 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
   const isAccountValid = cleanAccountDigits.length >= 8;
   const settlementSectionLabelStyle = { display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '6px', color: 'var(--text-muted)' };
 
-  return React.createElement('div', {
+  return React.createElement(React.Fragment, null,
+  React.createElement('div', {
     className: 'modal-overlay',
     onClick: onClose,
     style: { zIndex: 11000 }
@@ -2494,7 +2495,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
     React.createElement('div', { className: 'modal-footer', style: { display: 'flex', justifyContent: 'flex-end', padding: '10px 14px', borderTop: '1px solid var(--border-subtle)' } },
       React.createElement('button', { type: 'button', className: 'btn btn-secondary', onClick: () => setIsSettlementCardPreviewOpen(false) }, '닫기')
     )
-  ));
+  )));
 }
 
 export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenShare, onOpenAppSettings, onChangeView, onOpenCreateSettlement, onOpenSettlementEditor, onToggleSettlementCardStatus, onDeleteSettlementCard, onSaveSettlementCard, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null, showToast }) {

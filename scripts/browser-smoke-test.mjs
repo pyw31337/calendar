@@ -258,6 +258,55 @@ async function checkDeferredManual(browser, baseUrl) {
   }
 }
 
+async function checkSettlementModalEntryPoints(browser, baseUrl) {
+  for (const viewport of VIEWPORTS) {
+    const label = `[${viewport.name}] 정산 생성·수정 레이어`;
+    const context = await browser.newContext({
+      viewport: { width: viewport.width, height: viewport.height },
+      ...(BROWSER_NAME === 'firefox' ? {} : { isMobile: viewport.isMobile }),
+      hasTouch: viewport.hasTouch,
+      deviceScaleFactor: viewport.deviceScaleFactor || 1,
+      ...(BROWSER_NAME === 'chromium' && viewport.userAgent ? { userAgent: viewport.userAgent } : {})
+    });
+    const page = await context.newPage();
+    const errors = [];
+    page.on('console', msg => {
+      if (msg.type() !== 'error') return;
+      const loc = msg.location();
+      if (!isIgnorableConsoleError(msg.text(), loc?.url || '')) errors.push(msg.text());
+    });
+    page.on('pageerror', err => errors.push(err.message));
+    try {
+      await gotoBootReady(page, `${baseUrl}?id=kkot&view=settlement`);
+
+      const editButton = page.locator('button[data-settlement-edit-button="true"]').first();
+      await editButton.waitFor({ state: 'visible', timeout: 10000 });
+      await editButton.click();
+      const editDialog = page.locator('[role="dialog"]').filter({ hasText: '정산 수정' }).first();
+      await editDialog.waitFor({ state: 'visible', timeout: 5000 });
+      await editDialog.locator('button').filter({ hasText: '취소' }).first().click();
+      await editDialog.waitFor({ state: 'hidden', timeout: 5000 });
+
+      const menuButton = page.locator('button[aria-label$="메뉴 열기"]:visible, button[aria-label="메뉴"]:visible').first();
+      await menuButton.click();
+      const menu = page.locator('.admin-side-menu-overlay > .admin-side-menu:visible').last();
+      await menu.waitFor({ state: 'visible', timeout: 5000 });
+      await menu.locator('button.admin-side-menu-item').filter({ hasText: '정산 생성' }).first().click();
+      const createDialog = page.locator('[role="dialog"]').filter({ hasText: '정산 생성' }).first();
+      await createDialog.waitFor({ state: 'visible', timeout: 5000 });
+      await createDialog.locator('button').filter({ hasText: '취소' }).first().click();
+      await createDialog.waitFor({ state: 'hidden', timeout: 5000 });
+
+      if (errors.length) fail(label, `콘솔/페이지 오류 ${errors.length}건: ${errors.slice(0, 2).join(' | ')}`);
+      else pass(label);
+    } catch (err) {
+      fail(label, err.message);
+    } finally {
+      await context.close();
+    }
+  }
+}
+
 async function checkSideMenuNavigation(browser, baseUrl) {
   const sources = [
     ['', '메인'],
@@ -399,6 +448,7 @@ async function main() {
     await checkEmojiCategories(browser, baseUrl);
     await checkLightboxZoomControls(browser, baseUrl);
     await checkDeferredManual(browser, baseUrl);
+    await checkSettlementModalEntryPoints(browser, baseUrl);
     await checkSideMenuNavigation(browser, baseUrl);
 
     if (BROWSER_NAME === 'chromium') {
