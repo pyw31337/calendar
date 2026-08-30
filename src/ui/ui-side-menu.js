@@ -55,6 +55,10 @@ function __fb() {
   }
   return (typeof window !== 'undefined' && window.__gatherFirebaseDb) || null;
 }
+function writeSharedCollection(...args) {
+  const f = __gatherUiDeps().writeCollectionDocumentWithFallback;
+  return typeof f === 'function' ? f(...args) : null;
+}
 
 function getStoredChatParticipantId(...args) {
   const fn = (window.GATHER_APP_NOTIFICATIONS || {}).getStoredChatParticipantId;
@@ -861,10 +865,9 @@ export function AppSettingsModal({
     if (!row || !calendarId) return;
     const executeDelete = async () => {
       try {
-        const db = window.__gatherFirebaseDb;
-        if (!db) return;
-        await db.collection('calendars').doc('cal_' + calendarId).collection('push_subscriptions').doc(row.id).delete();
-        if (typeof showToast === 'function') showToast('기기 구독을 삭제했습니다.', 'success');
+        const deleted = await writeSharedCollection('push_subscriptions', calendarId, row.id, null, 'delete', '기기 구독 삭제');
+        if (!deleted?.success) throw new Error('Push subscription delete failed');
+        if (typeof showToast === 'function') showToast(deleted.queued ? '연결되면 기기 구독을 삭제합니다.' : '기기 구독을 삭제했습니다.', deleted.queued ? 'info' : 'success');
         await refreshPushMeta();
       } catch (e) {
         if (typeof showToast === 'function') showToast('삭제 실패', 'error');
