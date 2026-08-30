@@ -17,6 +17,13 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     });
     return Promise.race([request, deadline]).finally(function () { if (timer) clearTimeout(timer); });
   }
+  function withSdkTimeout(promise, timeoutMs) {
+    let timer = null;
+    const deadline = new Promise(function (_, reject) {
+      timer = setTimeout(function () { reject(new Error('Firestore SDK read timed out')); }, Number(timeoutMs) || FIRESTORE_REST_TIMEOUT_MS);
+    });
+    return Promise.race([promise, deadline]).finally(function () { if (timer) clearTimeout(timer); });
+  }
   function isValidCalId(calId) {
     return typeof calId === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(calId);
   }
@@ -101,8 +108,8 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     const firebaseDb = getDb();
     try {
       if (firebaseDb) {
-        const snap = await firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
-          .orderBy('timestamp', 'desc').limit(pageSize).get();
+        const snap = await withSdkTimeout(firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
+          .orderBy('timestamp', 'desc').limit(pageSize).get(), FIRESTORE_REST_TIMEOUT_MS);
         const list = [];
         snap.forEach(function (doc) { list.push(slimMessage({ id: doc.id, ...doc.data() })); });
         return list.reverse();
@@ -140,7 +147,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
         let q = firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
           .orderBy('timestamp', 'desc').limit(80);
         if (lastDoc) q = q.startAfter(lastDoc);
-        const snap = await q.get();
+        const snap = await withSdkTimeout(q.get(), FIRESTORE_REST_TIMEOUT_MS);
         if (snap.empty) break;
         snap.forEach(function (doc) {
           const msg = slimMessage({ id: doc.id, ...doc.data() });
@@ -169,7 +176,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     const firebaseDb = getDb();
     if (firebaseDb) {
       try {
-        const snap = await firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages').get({ source: 'server' });
+        const snap = await withSdkTimeout(firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages').get({ source: 'server' }), FIRESTORE_REST_TIMEOUT_MS);
         const list = [];
         snap.forEach(function (doc) {
           const msg = slimMessage({ id: doc.id, ...doc.data() });
@@ -207,8 +214,8 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     const db = getDb();
     if (db) {
       try {
-        const snap = await db.collection('calendars').doc('cal_' + calId).collection('meetingPhotoIndex')
-          .where('date', '==', String(date)).get({ source: 'server' });
+        const snap = await withSdkTimeout(db.collection('calendars').doc('cal_' + calId).collection('meetingPhotoIndex')
+          .where('date', '==', String(date)).get({ source: 'server' }), FIRESTORE_REST_TIMEOUT_MS);
         const list = [];
         snap.forEach(function (doc) { list.push({ id: doc.id, ...doc.data(), source: 'meeting-index' }); });
         return list;
@@ -238,7 +245,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
         const ref = firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
           .where('uploadSource', '==', uploadSource);
         if (typeof ref.count === 'function') {
-          const snap = await ref.count().get();
+          const snap = await withSdkTimeout(ref.count().get(), FIRESTORE_REST_TIMEOUT_MS);
           const n = Number(snap.data().count);
           if (Number.isFinite(n) && n >= 0) return n;
         }
@@ -295,8 +302,8 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     const firebaseDb = getDb();
     if (firebaseDb) {
       try {
-        const snap = await firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
-          .where('uploadSource', '==', uploadSource).get();
+        const snap = await withSdkTimeout(firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
+          .where('uploadSource', '==', uploadSource).get(), FIRESTORE_REST_TIMEOUT_MS);
         const list = [];
         snap.forEach(function (doc) { list.push(slimMessage({ id: doc.id, ...doc.data() })); });
         return list;
@@ -356,7 +363,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
       try {
         const ref = firebaseDb.collection('calendars').doc('cal_' + calId).collection(subName);
         if (typeof ref.count === 'function') {
-          const snap = await ref.count().get();
+          const snap = await withSdkTimeout(ref.count().get(), FIRESTORE_REST_TIMEOUT_MS);
           const n = Number(snap.data().count);
           if (Number.isFinite(n) && n >= 0) return n;
         }
@@ -427,7 +434,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
         const ref = firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
           .where('timestamp', '<=', ts);
         if (typeof ref.count === 'function') {
-          const snap = await ref.count().get();
+          const snap = await withSdkTimeout(ref.count().get(), FIRESTORE_REST_TIMEOUT_MS);
           const n = Number(snap.data().count);
           if (Number.isFinite(n) && n >= 0) return Math.max(0, n - excludedCount);
         }
@@ -494,8 +501,8 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     let docs = null;
     if (firebaseDb) {
       try {
-        const snap = await firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
-          .where('uploadSource', '==', 'gallery').get();
+        const snap = await withSdkTimeout(firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
+          .where('uploadSource', '==', 'gallery').get(), FIRESTORE_REST_TIMEOUT_MS);
         docs = [];
         snap.forEach(function (doc) { docs.push({ id: doc.id, ...doc.data() }); });
       } catch (err) {
@@ -552,8 +559,8 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     const firebaseDb = getDb();
     if (firebaseDb) {
       try {
-        const snap = await firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
-          .orderBy('timestamp', 'desc').startAfter(beforeTimestamp).limit(size).get();
+        const snap = await withSdkTimeout(firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
+          .orderBy('timestamp', 'desc').startAfter(beforeTimestamp).limit(size).get(), FIRESTORE_REST_TIMEOUT_MS);
         const list = [];
         snap.forEach(function (doc) { list.push(slimMessage({ id: doc.id, ...doc.data() })); });
         return list.reverse();
@@ -624,7 +631,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
         let q = firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
           .orderBy('timestamp', 'desc').limit(80);
         if (lastDoc) q = q.startAfter(lastDoc);
-        const snap = await q.get({ source: 'server' });
+        const snap = await withSdkTimeout(q.get({ source: 'server' }), FIRESTORE_REST_TIMEOUT_MS);
         if (snap.empty) break;
         snap.forEach(function (doc) {
           const msg = { id: doc.id, ...doc.data() };
