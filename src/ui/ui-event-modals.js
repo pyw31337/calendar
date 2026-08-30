@@ -3484,7 +3484,18 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
             React.createElement("span", { style: { color: isClosed ? 'var(--text-muted)' : '#16A34A', fontSize: '0.7rem', fontWeight: 800 } }, isClosed ? '마감됨' : '진행중')
           ),
           React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', color: 'var(--text-muted)', fontSize: '0.74rem' } },
-            React.createElement("span", null, participantNames.length > 0 ? `${participantNames.length}명 참여` : '참여자 없음'),
+            React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', minWidth: 0 } },
+              participantNames.length > 0
+                ? participantNames.map((name, index) => {
+                  const participant = settlementParticipants.find(item => (typeof item === 'string' ? item : (item?.name || item?.id)) === name);
+                  const color = typeof participant === 'object' ? participant?.color : null;
+                  return React.createElement('span', {
+                    key: `${card.id}_participant_${name}_${index}`,
+                    style: { display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 7px', borderRadius: '999px', backgroundColor: color ? `${color}1A` : 'var(--border-subtle)', color: color || 'var(--text-main)', fontSize: '0.7rem', fontWeight: 700, whiteSpace: 'nowrap' }
+                  }, name);
+                })
+                : React.createElement('span', null, '참여자 없음')
+            ),
             React.createElement("span", null, cardTime ? new Date(cardTime).toLocaleDateString('ko-KR') : '날짜 없음')
           )
         );
