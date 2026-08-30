@@ -16,6 +16,8 @@ const firestoreRules = fs.existsSync('firestore.rules') ? fs.readFileSync('fires
 assert(script, 'assets/app-main.js not found');
 assert(writeQueueScript.includes("indexedDB.open(DB_NAME, DB_VERSION)") && writeQueueScript.includes("const DB_NAME = 'gather-calendar-write-queue'"), 'write queue must use a versioned IndexedDB store');
 assert(writeQueueScript.includes('MAX_PENDING_OPERATIONS = 100'), 'write queue must have a bounded pending operation limit');
+assert(writeQueueScript.includes('MAX_OPERATION_PAYLOAD_BYTES') && writeQueueScript.includes('payload too large'), 'write queue must reject oversized payloads');
+assert(writeQueueScript.includes('nextAttemptAt') && writeQueueScript.includes('RETRY_BACKOFF_MAX_MS'), 'write queue must back off repeated failures');
 assert(!/localStorage\s*(?:\.|\[)/.test(writeQueueScript), 'write queue must not reintroduce localStorage persistence');
 assert(/type: 'collection-write'/.test(firebaseDataScript) && /skipQueue/.test(firebaseDataScript), 'collection writes must support bounded offline replay without recursive queueing');
 assert(/async function writeConfirmedMeetingsToFirestore[\s\S]{0,1800}if \(res\.ok\) return true;[\s\S]{0,700}if \(firebaseDb\)/.test(firebaseDataScript), 'confirmed meeting writes must fall back to SDK after a REST failure');

@@ -9,12 +9,28 @@ const DB_NAME = 'gather-calendar-write-queue';
 const DB_VERSION = 1;
 const STORE_NAME = 'operations';
 const MAX_PENDING_OPERATIONS = 100;
+const MAX_OPERATION_PAYLOAD_BYTES = 8 * 1024 * 1024;
+const RETRY_BACKOFF_BASE_MS = 3000;
+const RETRY_BACKOFF_MAX_MS = 120000;
 
 let dbPromise = null;
 let flushPromise = null;
 
 function canUseIndexedDb() {
   return typeof indexedDB !== 'undefined';
+}
+
+function estimateValueBytes(value, seen = new Set()) {
+  if (value === null || value === undefined) return 0;
+  if (typeof value === 'string') return value.length * 2;
+  if (typeof value !== 'object') return 8;
+  if (seen.has(value)) return 0;
+  seen.add(value);
+  if (typeof Blob !== 'undefined' && value instanceof Blob) return Number(value.size) || 0;
+  if (value instanceof ArrayBuffer) return value.byteLength;
+  if (ArrayBuffer.isView(value)) return value.byteLength;
+  if (Array.isArray(value)) return value.reduce((sum, item) => sum + estimateValueBytes(item, seen), 0);
+  return Object.entries(value).reduce((sum, [key, item]) => sum + key.length * 2 + estimateValueBytes(item, seen), 0);
 }
 
 function openQueueDb() {
@@ -78,6 +94,11 @@ export async function enqueueWriteOperation(operation) {
     attempts: Number(operation.attempts) || 0,
     lastError: String(operation.lastError || '').slice(0, 240)
   };
+  const payloadBytes = estimateValueBytes(record.payload);
+  if (payloadBytes > MAX_OPERATION_PAYLOAD_BYTES) {
+    console.warn(`[write-queue] payload too large: ${payloadBytes} bytes`);
+    return false;
+  }
   try {
     const current = await getAllOperations();
     if (!current.some(item => item.id === record.id) && current.length >= MAX_PENDING_OPERATIONS) {
@@ -122,6 +143,7 @@ export async function flushWriteQueue(handler) {
     const operations = await getAllOperations();
     for (const operation of operations) {
       if (typeof navigator !== 'undefined' && navigator.onLine === false) break;
+      if ((Number(operation.nextAttemptAt) || 0) > Date.now()) continue;
       try {
         const success = await handler(operation);
         if (success) {
@@ -134,7 +156,11 @@ export async function flushWriteQueue(handler) {
         const next = {
           ...operation,
           attempts: (Number(operation.attempts) || 0) + 1,
-          lastError: String(error?.message || error || '').slice(0, 240)
+          lastError: String(error?.message || error || '').slice(0, 240),
+          nextAttemptAt: Date.now() + Math.min(
+            RETRY_BACKOFF_MAX_MS,
+            RETRY_BACKOFF_BASE_MS * (2 ** Math.min(6, Number(operation.attempts) || 0))
+          )
         };
         await enqueueWriteOperation(next);
         break;
