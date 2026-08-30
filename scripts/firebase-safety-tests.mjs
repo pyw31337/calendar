@@ -22,6 +22,7 @@ assert(writeQueueScript.includes('nextAttemptAt') && writeQueueScript.includes('
 assert(!/localStorage\s*(?:\.|\[)/.test(writeQueueScript), 'write queue must not reintroduce localStorage persistence');
 assert(/type: 'collection-write'/.test(firebaseDataScript) && /skipQueue/.test(firebaseDataScript), 'collection writes must support bounded offline replay without recursive queueing');
 assert(/media-chat-send/.test(sourceScript) && /originalBlob: image\.originalBlob/.test(sourceScript), 'offline chat images must be queued with their original and thumbnail blobs');
+assert(/uploadSource: 'gallery'/.test(sourceScript) && /갤러리 사진은 연결되면 자동 등록됩니다/.test(sourceScript), 'offline gallery images must use the media outbox');
 assert(/async function writeConfirmedMeetingsToFirestore[\s\S]{0,1800}if \(res\.ok\) return true;[\s\S]{0,700}if \(firebaseDb\)/.test(firebaseDataScript), 'confirmed meeting writes must fall back to SDK after a REST failure');
 assert(/writeConfirmedMeetingsToFirestore[\s\S]{0,2600}validDates[\s\S]{0,700}writes\.push\(\{ delete: documentName \}\)/.test(firebaseDataScript), 'confirmed meeting writes must remove stale subcollection documents');
 assert(/Failed to inspect stale confirmed meetings[\s\S]{0,260}validMeetings\.length === 0/.test(firebaseDataScript), 'confirmed meeting writes must not block valid updates on cleanup-read failure');

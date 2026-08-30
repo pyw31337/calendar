@@ -1,0 +1,25 @@
+/* Replay helpers for media messages kept in the durable write queue. Firebase-specific work is
+ * injected by app-main so this module remains small and independently testable. */
+
+export async function replayQueuedMediaMessage(operation, { resolveImages, chunkImages, writeMessage } = {}) {
+  const payload = operation?.payload;
+  if (!payload || typeof resolveImages !== 'function' || typeof chunkImages !== 'function' || typeof writeMessage !== 'function') return false;
+  const compressed = (Array.isArray(payload.images) ? payload.images : []).map(image => ({ original: '', thumbnail: '', originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob }));
+  if (compressed.length === 0) return false;
+  const chunks = chunkImages(await resolveImages(operation.calendarId, compressed));
+  for (let i = 0; i < chunks.length; i += 1) {
+    const images = chunks[i];
+    const result = await writeMessage(operation.calendarId, {
+      participantId: payload.participantId || '',
+      text: i === 0 ? (payload.text || '') : '',
+      imageUrl: images[0].imageUrl,
+      thumbUrl: images[0].thumbUrl,
+      imageUrls: images.map(image => image.imageUrl),
+      thumbUrls: images.map(image => image.thumbUrl),
+      timestamp: (Number(payload.timestamp) || Date.now()) + i,
+      ...(payload.uploadSource ? { uploadSource: payload.uploadSource } : {})
+    }, `${operation.id}_${i}`);
+    if (!result?.success) return false;
+  }
+  return true;
+}

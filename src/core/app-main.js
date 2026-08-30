@@ -548,6 +548,7 @@ import {
   getCalendarAccentColor
 } from './app-firebase-data.js';
 import { enqueueWriteOperation, flushWriteQueue } from './app-write-queue.js';
+import { replayQueuedMediaMessage } from './app-media-outbox.js';
 
 var firebaseDb = (typeof window !== 'undefined' && window.GATHER_APP_FIREBASE_DATA && window.GATHER_APP_FIREBASE_DATA.firebaseDb) || null;
 var firebaseStorage = (typeof window !== 'undefined' && window.GATHER_APP_FIREBASE_DATA && window.GATHER_APP_FIREBASE_DATA.firebaseStorage) || null;
@@ -562,25 +563,11 @@ function shouldQueueCalendarWriteFailure(error) {
 }
 async function replayQueuedCalendarWrite(operation) {
   if (operation?.type === 'media-chat-send' && operation.payload) {
-    const payload = operation.payload;
-    const compressed = (Array.isArray(payload.images) ? payload.images : []).map(image => ({ original: '', thumbnail: '', originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob }));
-    if (compressed.length === 0) return false;
-    const resolvedImages = await resolveChatImageBatch(operation.calendarId, compressed);
-    const chunks = chunkResolvedImagesForMessages(resolvedImages);
-    for (let i = 0; i < chunks.length; i += 1) {
-      const chunkImages = chunks[i];
-      const result = await writeCollectionDocumentWithFallback('messages', operation.calendarId, '', {
-        participantId: payload.participantId,
-        text: i === 0 ? payload.text : '',
-        imageUrl: chunkImages[0].imageUrl,
-        thumbUrl: chunkImages[0].thumbUrl,
-        imageUrls: chunkImages.map(image => image.imageUrl),
-        thumbUrls: chunkImages.map(image => image.thumbUrl),
-        timestamp: payload.timestamp + i
-      }, 'add', '사진 대기 저장', { documentId: `${operation.id}_${i}`, skipQueue: true });
-      if (!result?.success) return false;
-    }
-    return true;
+    return replayQueuedMediaMessage(operation, {
+      resolveImages: resolveChatImageBatch,
+      chunkImages: chunkResolvedImagesForMessages,
+      writeMessage: (calendarId, data, documentId) => writeCollectionDocumentWithFallback('messages', calendarId, '', data, 'add', '사진 대기 저장', { documentId, skipQueue: true })
+    });
   }
   if (operation?.type === 'collection-write' && operation.payload) {
     const payload = operation.payload;
@@ -2903,7 +2890,24 @@ function CalendarApp() {
       setChatUploadProgress(null);
       return false;
     }
+    const fallbackParticipantId = chatParticipantId || getActiveParticipants(activeCal)[0]?.id || '';
     try {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false
+        && compressed.every(image => image?.originalBlob && image?.thumbnailBlob)) {
+        const queued = await enqueueWriteOperation({
+          id: `gallery_media_${activeCal.id}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          type: 'media-chat-send', calendarId: activeCal.id,
+          payload: {
+            participantId: fallbackParticipantId,
+            text: '갤러리 사진', timestamp: Date.now(), uploadSource: 'gallery',
+            images: compressed.map(image => ({ originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob }))
+          }
+        });
+        if (!queued) throw new Error('갤러리 사진 오프라인 저장 공간이 부족합니다.');
+        setChatUploadProgress({ pct: 100, remainingSec: 0, label: '연결 후 자동 등록 대기' });
+        showToast('오프라인입니다. 갤러리 사진은 연결되면 자동 등록됩니다.', 'info', 5000);
+        return true;
+      }
       const resolvedImages = await resolveChatImageBatch(activeCal.id, compressed, progress => {
         setChatUploadProgress({
           ...progress,
@@ -2912,7 +2916,6 @@ function CalendarApp() {
       });
       const chunks = chunkResolvedImagesForMessages(resolvedImages);
       const now = Date.now();
-      const fallbackParticipantId = chatParticipantId || getActiveParticipants(activeCal)[0]?.id || '';
       for (let i = 0; i < chunks.length; i += 1) {
         const chunkImages = chunks[i];
         const messageOperationId = `gallery_${activeCal.id}_${now}_${i}_${Math.random().toString(36).slice(2, 8)}`;
