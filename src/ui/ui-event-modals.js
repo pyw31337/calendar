@@ -65,6 +65,10 @@ function __fb() {
   }
   return (typeof window !== 'undefined' && window.__gatherFirebaseDb) || null;
 }
+function writeSharedCollection(...args) {
+  const f = __gatherUiDeps().writeCollectionDocumentWithFallback;
+  return typeof f === 'function' ? f(...args) : null;
+}
 
 function getStoredChatParticipantId(...args) {
   const fn = (window.GATHER_APP_NOTIFICATIONS || {}).getStoredChatParticipantId;
@@ -850,7 +854,8 @@ export function AnniversaryModal({
         annData.isCountDown = ddayMode === 'countdown';
       }
 
-      await __fb().collection('calendars').doc('cal_' + calendarId).collection('anniversaries').doc(anniversaryId).set(annData);
+      const saved = await writeSharedCollection('anniversaries', calendarId, anniversaryId, annData, 'set', '기념일 저장');
+      if (!saved?.success) throw new Error('Anniversary save failed');
       showToast(editingId ? '기념일이 수정되었습니다.' : '기념일이 등록되었습니다.', 'success');
 
       // Reset form
@@ -872,10 +877,12 @@ export function AnniversaryModal({
       try {
         const calendarId = calendar.id;
         const annSnapshot = JSON.parse(JSON.stringify(ann));
-        await __fb().collection('calendars').doc('cal_' + calendarId).collection('anniversaries').doc(ann.id).delete();
+        const deleted = await writeSharedCollection('anniversaries', calendarId, ann.id, null, 'delete', '기념일 삭제');
+        if (!deleted?.success) throw new Error('Anniversary delete failed');
         showToast('기념일이 삭제되었습니다.', 'delete', 5000, async () => {
           try {
-            await __fb().collection('calendars').doc('cal_' + calendarId).collection('anniversaries').doc(ann.id).set(annSnapshot);
+            const restored = await writeSharedCollection('anniversaries', calendarId, ann.id, annSnapshot, 'set', '기념일 복원');
+            if (!restored?.success) throw new Error('Anniversary restore failed');
             showToast('기념일 삭제를 되돌렸습니다.', 'success', 3000);
           } catch (restoreErr) {
             console.error('Anniversary restore error:', restoreErr);

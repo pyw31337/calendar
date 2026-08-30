@@ -10,6 +10,7 @@ function assert(condition, message) {
 const script = fs.readFileSync('assets/app-main.js', 'utf8');
 const sourceScript = fs.readFileSync('src/core/app-main.js', 'utf8');
 const memoScript = fs.readFileSync('src/ui/ui-memo-view.js', 'utf8');
+const eventModalScript = fs.readFileSync('src/ui/ui-event-modals.js', 'utf8');
 const firebaseDataScript = fs.readFileSync('src/core/app-firebase-data.js', 'utf8');
 const utilsScript = fs.readFileSync('assets/app-utils.js', 'utf8');
 const notificationScript = fs.readFileSync('assets/app-notifications.js', 'utf8');
@@ -27,6 +28,7 @@ assert(/media-chat-send/.test(sourceScript) && /originalBlob: image\.originalBlo
 assert(/uploadSource: 'gallery'/.test(sourceScript) && /갤러리 사진은 연결되면 자동 등록됩니다/.test(sourceScript), 'offline gallery images must use the media outbox');
 assert(/media-memo-save/.test(memoScript) && /메모와 사진을 자동 저장합니다/.test(memoScript), 'offline memo images must be queued with the memo payload');
 assert(/replayQueuedMemoSave/.test(sourceScript) && /imageUrls/.test(mediaOutboxScript), 'queued memo images must be replayed into the memo document');
+assert(/writeSharedCollection/.test(eventModalScript) && /기념일 저장/.test(eventModalScript), 'anniversary writes must use the bounded collection write path');
 assert(/async function writeConfirmedMeetingsToFirestore[\s\S]{0,1800}if \(res\.ok\) return true;[\s\S]{0,700}if \(firebaseDb\)/.test(firebaseDataScript), 'confirmed meeting writes must fall back to SDK after a REST failure');
 assert(/writeConfirmedMeetingsToFirestore[\s\S]{0,2600}validDates[\s\S]{0,700}writes\.push\(\{ delete: documentName \}\)/.test(firebaseDataScript), 'confirmed meeting writes must remove stale subcollection documents');
 assert(/Failed to inspect stale confirmed meetings[\s\S]{0,260}validMeetings\.length === 0/.test(firebaseDataScript), 'confirmed meeting writes must not block valid updates on cleanup-read failure');
