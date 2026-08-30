@@ -3091,6 +3091,11 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                   title: "정산 수정",
                   'aria-label': '정산 수정',
                   'data-settlement-edit-button': 'true',
+                  onMouseDown: event => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    handleOpenSettlementEditor(card);
+                  },
                   onPointerUp: event => {
                     event.preventDefault();
                     event.stopPropagation();
@@ -3143,6 +3148,12 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                 },
                   React.createElement("button", {
                     type: "button",
+                    onMouseDown: event => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setOpenMenuCardId(null);
+                      handleOpenSettlementEditor(card);
+                    },
                     onPointerUp: event => {
                       event.preventDefault();
                       event.stopPropagation();
@@ -3576,6 +3587,12 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
           key: card.id,
           className: "settlement-list-card",
           type: "button",
+          onMouseDown: event => {
+            event.preventDefault();
+            event.stopPropagation();
+            setIsSettlementListOpen(false);
+            handleOpenSettlementEditor(card);
+          },
           onPointerUp: event => {
             event.preventDefault();
             event.stopPropagation();
