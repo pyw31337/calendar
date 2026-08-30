@@ -2912,6 +2912,20 @@ select.form-select {
   line-height: 1;
   white-space: nowrap;
 }
+.settlement-running-balance {
+  display: block;
+  align-self: flex-end;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+@media (max-width: 767px) {
+  .settlement-running-balance {
+    display: none;
+  }
+}
 .settlement-person-settlement-badge.is-refund {
   background: rgba(22, 163, 74, 0.14);
   color: var(--status-green);

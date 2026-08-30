@@ -2657,7 +2657,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     .map(meeting => {
       const items = (Array.isArray(meeting.expenses) ? meeting.expenses : [])
         .filter(expense => Number.isFinite(Number(expense.amount)) && Number(expense.amount) !== 0)
-        .map(expense => {
+        .map((expense, index) => {
           const amount = Number(expense.amount || 0);
           const isIncome = isExpenseIncomeEntry(expense);
           return {
@@ -2666,7 +2666,8 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
             isIncome,
             category: getExpenseCategory(calendar, expense.categoryId),
             label: getExpenseLabel(expense) || '정산 항목',
-            url: getExpenseUrl(expense)
+            url: getExpenseUrl(expense),
+            ledgerKey: `${meeting.date}|${expense.id || index}|${expense.createdAt || ''}|${amount}`
           };
         });
       const expenseTotal = items.filter(item => !item.isIncome).reduce((sum, item) => sum + Math.abs(item.amount), 0);
@@ -2675,6 +2676,16 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     })
     .filter(row => row.items.length > 0);
   const allTimeItems = allTimeRows.flatMap(row => row.items.map(item => ({ ...item, date: row.meeting.date, meetingNote: row.meeting.note || '' })));
+  const settlementBalanceByKey = new Map();
+  let runningSettlementBalance = baseBudget;
+  allTimeItems.slice().sort((a, b) => {
+    const dateOrder = String(a.date || '').localeCompare(String(b.date || ''));
+    if (dateOrder !== 0) return dateOrder;
+    return (Number(a.createdAt) || 0) - (Number(b.createdAt) || 0);
+  }).forEach(item => {
+    runningSettlementBalance += item.isIncome ? Math.abs(item.amount) : -Math.abs(item.amount);
+    settlementBalanceByKey.set(item.ledgerKey, runningSettlementBalance);
+  });
   const allTimeIncome = baseBudget + allTimeItems.filter(item => item.isIncome).reduce((sum, item) => sum + Math.abs(item.amount), 0);
   const allTimeExpense = allTimeItems.filter(item => !item.isIncome).reduce((sum, item) => sum + Math.abs(item.amount), 0);
   const settlementParticipants = getActiveParticipants(calendar);
@@ -2717,7 +2728,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
           if (aOrder !== bOrder) return aOrder - bOrder;
           return (a.createdAt || 0) - (b.createdAt || 0);
         })
-        .map(expense => {
+        .map((expense, index) => {
           const amount = Number(expense.amount || 0);
           const isIncome = isExpenseIncomeEntry(expense);
           return {
@@ -2726,7 +2737,8 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
             isIncome,
             category: getExpenseCategory(calendar, expense.categoryId),
             label: getExpenseLabel(expense) || '정산 항목',
-            url: getExpenseUrl(expense)
+            url: getExpenseUrl(expense),
+            ledgerKey: `${meeting.date}|${expense.id || index}|${expense.createdAt || ''}|${amount}`
           };
         });
       const expenseTotal = items.filter(item => !item.isIncome).reduce((sum, item) => sum + Math.abs(item.amount), 0);
@@ -2884,7 +2896,9 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     style: { fontSize: '0.9rem', color: item.isIncome ? 'var(--status-green)' : '#DC2626', whiteSpace: 'nowrap' }
   }, item.isIncome ? '+' : '-', Math.abs(item.amount).toLocaleString(), "원")), /*#__PURE__*/React.createElement("span", {
     style: { fontSize: '0.86rem', color: 'var(--text-main)', fontWeight: 500, overflowWrap: 'anywhere' }
-  }, item.label), item.url && /*#__PURE__*/React.createElement("button", {
+  }, item.label), /*#__PURE__*/React.createElement("span", {
+    className: "settlement-running-balance"
+  }, `잔액 ${Number(settlementBalanceByKey.get(item.ledgerKey) || 0).toLocaleString()}원`), item.url && /*#__PURE__*/React.createElement("button", {
     type: "button",
     title: item.url,
     style: {
@@ -3071,16 +3085,6 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
             cardParticipantNames,
             cardPersonalTotals
           );
-          const cardPersonalPrepaid = Array.from(cardPersonalTotals.values())
-            .filter(amount => amount < 0)
-            .reduce((sum, amount) => sum + Math.abs(amount), 0);
-          const cardAdditionalCollection = cardParticipantRows
-            .filter(row => row.amount > 0)
-            .reduce((sum, row) => sum + row.amount, 0);
-          const cardRefund = cardParticipantRows
-            .filter(row => row.amount < 0)
-            .reduce((sum, row) => sum + Math.abs(row.amount), 0);
-          const cardCoveredTotal = cardPersonalPrepaid + cardAdditionalCollection - cardRefund;
 
           return React.createElement("div", {
             key: card.id,
@@ -3229,10 +3233,6 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                   row.amount !== 0 && React.createElement('span', null, `${row.amount < 0 ? '-' : ''}${Math.abs(row.amount).toLocaleString()}원`)
                 )
               )))
-            , cardPersonalPrepaid > 0 && React.createElement("div", {
-              className: "settlement-reconciliation-note",
-              style: { padding: '8px 10px', borderRadius: '10px', background: 'rgba(22, 163, 74, 0.08)', color: 'var(--text-main)', fontSize: '0.72rem', lineHeight: 1.5, fontWeight: 700 }
-            }, `개인 선납 ${cardPersonalPrepaid.toLocaleString()}원 + 추가 회수 ${cardAdditionalCollection.toLocaleString()}원 - 환급 ${cardRefund.toLocaleString()}원 = 총 충당 ${cardCoveredTotal.toLocaleString()}원`)
 
           );
         })
