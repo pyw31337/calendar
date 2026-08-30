@@ -1475,13 +1475,14 @@ async function writeCollectionDocumentRest(collectionName, calId, docId, data, m
     return patchRes.ok ? { success: true, id: cleanDocId, transport: 'rest' } : false;
   } catch (err) {
     console.warn('writeCollectionDocumentRest error:', err);
-    return false;
+    return { success: false, retryable: true, error: err };
   }
 }
 
 async function writeCollectionDocumentWithFallback(collectionName, calId, docId, data, method = 'update', warnLabel = 'write', options = {}) {
   const cleanCollection = sanitizeText(collectionName || '', 80);
   const cleanData = method === 'delete' ? null : sanitizeMessageForFirestore(data);
+  let sdkError = null;
   const cleanDeletePaths = Array.isArray(options?.deletePaths)
     ? [...new Set(options.deletePaths.map(path => sanitizeText(path || '', 120)).filter(Boolean))]
     : [];
@@ -1526,13 +1527,16 @@ async function writeCollectionDocumentWithFallback(collectionName, calId, docId,
       await withTimeout(colRef.doc(docId).update(updateData), FIRESTORE_REQUEST_TIMEOUT_MS, `${warnLabel} timeout`);
       return { success: true, id: docId, transport: 'sdk' };
     } catch (err) {
+      sdkError = err;
       console.warn(`Failed to ${warnLabel} for ${calId} via SDK, trying REST:`, err);
     }
   }
   const restMethod = method === 'add' && options?.documentId ? 'set' : method;
   const restDocId = method === 'add' && options?.documentId ? options.documentId : docId;
   const restResult = await writeCollectionDocumentRest(cleanCollection, calId, restDocId, data, restMethod, cleanDeletePaths);
-  if (restResult || options?.skipQueue || !shouldQueueCollectionWrite()) return restResult;
+  if (restResult?.success || options?.skipQueue || !shouldQueueCollectionWrite(restResult?.error || null, sdkError)) {
+    return restResult?.success ? restResult : false;
+  }
   const operationId = options?.queueId || `collection_${cleanCollection}_${calId}_${restDocId || Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const queued = await enqueueWriteOperation({
     id: operationId,
@@ -1551,8 +1555,11 @@ async function writeCollectionDocumentWithFallback(collectionName, calId, docId,
   return queued ? { success: true, queued: true, id: restDocId || operationId, transport: 'queue' } : restResult;
 }
 
-function shouldQueueCollectionWrite() {
-  try { return typeof navigator !== 'undefined' && navigator.onLine === false; } catch (_) { return false; }
+function shouldQueueCollectionWrite(...errors) {
+  try {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return true;
+  } catch (_) {}
+  return errors.some(error => /timeout|network|fetch|offline|연결|상태를 확인/i.test(String(error?.message || error || '')));
 }
 
 async function deleteMessageRest(calId, messageId) {
