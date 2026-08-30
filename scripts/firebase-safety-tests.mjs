@@ -67,7 +67,8 @@ assert(sharedUi.includes('const imageSrc = (() =>') && sharedUi.includes('imageS
 assert(overlaysUi.includes('const isSafeMediaSrc = value =>') && overlaysUi.includes('const primarySrc = isSafeMediaSrc(src);'), 'shared media thumbnails must reject malformed image URLs');
 assert(fs.readFileSync('scripts/firebase-media-audit.mjs', 'utf8').includes('invalidCount'), 'media audit must report invalid image data without mutating production records');
 assert(/void persistLegacySubcollections\([\s\S]{0,260}\.catch\(/.test(firebaseDataScript), 'legacy subcollection writes must be detached from the primary save and handled in the background');
-assert(/options\?\.documentId[\s\S]{0,260}colRef\.doc\(options\.documentId\)\.set/.test(firebaseDataScript), 'retryable collection adds must support deterministic document ids');
+assert(firebaseDataScript.includes("const addDocumentId = method === 'add'") && firebaseDataScript.includes('colRef.doc(addDocumentId).set'), 'collection adds must share one id across SDK and REST retries');
+assert(/const restMethod = method === 'add' \? 'set' : method/.test(firebaseDataScript), 'collection add REST fallback must use the shared document id');
 assert(/메시지 분할 저장'[\s\S]{0,120}documentId: `edit_/.test(sourceScript), 'edited message image chunks must use deterministic document ids');
 assert(!/checkProxyRateLimit\(\$\{bucketKey\}\) failed, allowing request[\s\S]{0,160}return true/.test(fs.readFileSync('functions/index.js', 'utf8')), 'proxy limiter must not fail open');
 const setChatNotifyPrefBody = script.match(/function setChatNotifyEnabledForCalendar\(calId, enabled\) \{([\s\S]*?)\n\}/)?.[1] || '';

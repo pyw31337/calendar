@@ -1484,6 +1484,12 @@ async function writeCollectionDocumentRest(collectionName, calId, docId, data, m
 async function writeCollectionDocumentWithFallback(collectionName, calId, docId, data, method = 'update', warnLabel = 'write', options = {}) {
   const cleanCollection = sanitizeText(collectionName || '', 80);
   const cleanData = method === 'delete' ? null : sanitizeMessageForFirestore(data);
+  // An add() can time out after Firestore has already committed it. Give every
+  // add attempt one shared id so SDK -> REST -> queue retries remain idempotent,
+  // including future callers that do not provide their own operation id.
+  const addDocumentId = method === 'add'
+    ? sanitizeText(options?.documentId || `add_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`, 120)
+    : '';
   const writeStartedAt = Date.now();
   const remainingWriteTime = () => Math.max(250, FIRESTORE_WRITE_DEADLINE_MS - (Date.now() - writeStartedAt));
   const attemptTimeout = () => Math.min(FIRESTORE_WRITE_ATTEMPT_TIMEOUT_MS, remainingWriteTime());
@@ -1495,15 +1501,8 @@ async function writeCollectionDocumentWithFallback(collectionName, calId, docId,
     try {
       const colRef = firebaseDb.collection('calendars').doc(`cal_${calId}`).collection(cleanCollection);
       if (method === 'add') {
-        // Callers that can derive a stable operation id must use a deterministic document id.
-        // Falling back from a timed-out SDK add() to REST add() otherwise creates two records
-        // when the original request eventually succeeds on a slow mobile connection.
-        if (options?.documentId) {
-          await withTimeout(colRef.doc(options.documentId).set(cleanData), attemptTimeout(), `${warnLabel} timeout`);
-          return { success: true, id: options.documentId, transport: 'sdk' };
-        }
-        const ref = await withTimeout(colRef.add(cleanData), attemptTimeout(), `${warnLabel} timeout`);
-        return { success: true, id: ref.id, transport: 'sdk' };
+        await withTimeout(colRef.doc(addDocumentId).set(cleanData), attemptTimeout(), `${warnLabel} timeout`);
+        return { success: true, id: addDocumentId, transport: 'sdk' };
       }
       if (method === 'delete') {
         await withTimeout(colRef.doc(docId).delete(), attemptTimeout(), `${warnLabel} timeout`);
@@ -1536,8 +1535,8 @@ async function writeCollectionDocumentWithFallback(collectionName, calId, docId,
       console.warn(`Failed to ${warnLabel} for ${calId} via SDK, trying REST:`, err);
     }
   }
-  const restMethod = method === 'add' && options?.documentId ? 'set' : method;
-  const restDocId = method === 'add' && options?.documentId ? options.documentId : docId;
+  const restMethod = method === 'add' ? 'set' : method;
+  const restDocId = method === 'add' ? addDocumentId : docId;
   const restResult = await writeCollectionDocumentRest(cleanCollection, calId, restDocId, data, restMethod, cleanDeletePaths, remainingWriteTime());
   if (restResult?.success || options?.skipQueue || !shouldQueueCollectionWrite(restResult?.error || null, sdkError)) {
     return restResult?.success ? restResult : false;
