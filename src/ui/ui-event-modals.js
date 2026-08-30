@@ -1422,11 +1422,10 @@ function calculateSettlementRows(totalExpense, participantNames, personalTotals 
   const names = Array.from(new Set((participantNames || []).map(name => String(name || '').trim()).filter(Boolean)));
   if (names.length === 0) return [];
   const total = Math.max(0, Math.round(Number(totalExpense) || 0));
-  const baseShare = Math.floor(total / names.length);
-  const remainder = total % names.length;
+  const baseShare = Math.round(total / names.length);
   return names.map((name, index) => ({
     name,
-    amount: baseShare + (index < remainder ? 1 : 0) + (Number(personalTotals.get(name)) || 0)
+    amount: baseShare + (Number(personalTotals.get(name)) || 0)
   }));
 }
 
@@ -3072,6 +3071,16 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
             cardParticipantNames,
             cardPersonalTotals
           );
+          const cardPersonalPrepaid = Array.from(cardPersonalTotals.values())
+            .filter(amount => amount < 0)
+            .reduce((sum, amount) => sum + Math.abs(amount), 0);
+          const cardAdditionalCollection = cardParticipantRows
+            .filter(row => row.amount > 0)
+            .reduce((sum, row) => sum + row.amount, 0);
+          const cardRefund = cardParticipantRows
+            .filter(row => row.amount < 0)
+            .reduce((sum, row) => sum + Math.abs(row.amount), 0);
+          const cardCoveredTotal = cardPersonalPrepaid + cardAdditionalCollection - cardRefund;
 
           return React.createElement("div", {
             key: card.id,
@@ -3220,6 +3229,10 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                   row.amount !== 0 && React.createElement('span', null, `${row.amount < 0 ? '-' : ''}${Math.abs(row.amount).toLocaleString()}원`)
                 )
               )))
+            , cardPersonalPrepaid > 0 && React.createElement("div", {
+              className: "settlement-reconciliation-note",
+              style: { padding: '8px 10px', borderRadius: '10px', background: 'rgba(22, 163, 74, 0.08)', color: 'var(--text-main)', fontSize: '0.72rem', lineHeight: 1.5, fontWeight: 700 }
+            }, `개인 선납 ${cardPersonalPrepaid.toLocaleString()}원 + 추가 회수 ${cardAdditionalCollection.toLocaleString()}원 - 환급 ${cardRefund.toLocaleString()}원 = 총 충당 ${cardCoveredTotal.toLocaleString()}원`)
 
           );
         })
