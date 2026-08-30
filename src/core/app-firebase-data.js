@@ -1551,6 +1551,7 @@ async function writeCollectionDocumentWithFallback(collectionName, calId, docId,
       collectionName: cleanCollection,
       docId: restDocId,
       data,
+      merge: Boolean(options?.merge),
       method: restMethod,
       deletePaths: cleanDeletePaths,
       warnLabel
@@ -1764,7 +1765,7 @@ async function writeRootCollectionDocumentWithFallback(collectionName, docId, da
     return false;
   } catch (error) {
     if (options?.skipQueue || !shouldQueueCollectionWrite(error)) return false;
-    const queued = await enqueueWriteOperation({ id: `root_${cleanCollection}_${cleanDocId}`, type: 'root-collection-write', calendarId: '', payload: { collectionName: cleanCollection, docId: cleanDocId, data, warnLabel } });
+    const queued = await enqueueWriteOperation({ id: `root_${cleanCollection}_${cleanDocId}`, type: 'root-collection-write', calendarId: '', payload: { collectionName: cleanCollection, docId: cleanDocId, data, merge: Boolean(options?.merge), warnLabel } });
     return queued ? { success: true, queued: true, id: cleanDocId, transport: 'queue' } : false;
   }
 }

@@ -37,6 +37,7 @@ assert(/media-memo-save/.test(memoScript) && /메모와 사진을 자동 저장�
 assert(/replayQueuedMemoSave/.test(sourceScript) && /imageUrls/.test(mediaOutboxScript), 'queued memo images must be replayed into the memo document');
 assert(/writeSharedCollection/.test(eventModalScript) && /기념일 저장/.test(eventModalScript), 'anniversary writes must use the bounded collection write path');
 assert(/writeRootCollectionDocumentWithFallback/.test(firebaseDataScript) && /root-collection-write/.test(firebaseDataScript), 'root image-share writes must have a bounded offline replay path');
+assert(/merge: Boolean\(options\?\.merge\)/.test(firebaseDataScript) && /Boolean\(payload\.merge\)/.test(mediaOutboxScript), 'queued root writes must preserve merge semantics during replay');
 assert(/withWeatherTimeout/.test(weatherScript) && /WEATHER_FIRESTORE_TIMEOUT_MS/.test(weatherScript), 'weather cache reads and writes must be bounded');
 assert(/writeSharedCollection/.test(sideMenuScript) && /기기 구독 삭제/.test(sideMenuScript), 'device subscription deletes must use the bounded collection write path');
 assert(/writeSharedCollection/.test(domainHelpersScript) && /기기 구독 등록/.test(domainHelpersScript) && /기기 구독 해제/.test(domainHelpersScript), 'push subscription registration and removal must use the bounded collection write path');

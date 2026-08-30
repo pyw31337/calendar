@@ -556,7 +556,7 @@ function shouldQueueCalendarWriteFailure(error) {
   return /timeout|network|fetch|offline|연결|상태를 확인/.test(message);
 }
 async function replayQueuedCalendarWrite(operation) {
-  if (operation?.type === 'root-collection-write' && operation.payload) return replayQueuedRootCollectionWrite(operation, { writeDocument: (collectionName, docId, data, label) => writeRootCollectionDocumentWithFallback(collectionName, docId, data, label, { skipQueue: true }) });
+  if (operation?.type === 'root-collection-write' && operation.payload) return replayQueuedRootCollectionWrite(operation, { writeDocument: (collectionName, docId, data, label, options) => writeRootCollectionDocumentWithFallback(collectionName, docId, data, label, { ...options, skipQueue: true }) });
   if (operation?.type === 'media-memo-save' && operation.payload) {
     return replayQueuedMemoSave(operation, {
       resolveImages: resolveMemoImageBatch,

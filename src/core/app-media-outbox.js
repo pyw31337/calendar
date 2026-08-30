@@ -48,6 +48,6 @@ export async function replayQueuedMemoSave(operation, { resolveImages, writeMemo
 export async function replayQueuedRootCollectionWrite(operation, { writeDocument } = {}) {
   const payload = operation?.payload;
   if (!payload?.collectionName || !payload.docId || typeof writeDocument !== 'function') return false;
-  const result = await writeDocument(payload.collectionName, payload.docId, payload.data, payload.warnLabel || '대기 저장');
+  const result = await writeDocument(payload.collectionName, payload.docId, payload.data, payload.warnLabel || '대기 저장', { merge: Boolean(payload.merge) });
   return Boolean(result?.success ?? result);
 }
