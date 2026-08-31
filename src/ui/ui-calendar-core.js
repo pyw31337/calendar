@@ -2778,16 +2778,18 @@ export function GlobalSearchModal({
   const isMobile = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 640px)').matches;
 
   const tabDefs = [
+    { key: 'all', label: '전체', count: Object.values(matches).reduce((total, items) => total + (Array.isArray(items) ? items.length : 0), 0) },
     { key: 'schedules', label: '일정', count: (matches.schedules || []).length },
     { key: 'chat', label: '채팅', count: (matches.chat || []).length },
     { key: 'photos', label: '사진', count: (matches.photos || []).length },
     { key: 'places', label: '장소', count: (matches.places || []).length },
+    { key: 'tags', label: '사진 태그', count: (matches.tags || []).length },
     { key: 'expenses', label: '정산', count: (matches.expenses || []).length },
     { key: 'memos', label: '메모', count: (matches.memos || []).length }
   ];
   const hasResults = tabDefs.some(t => t.count > 0);
 
-  const [activeTab, setActiveTab] = React.useState('schedules');
+  const [activeTab, setActiveTab] = React.useState('all');
   // Whenever the query (or its results) changes, jump to the first category that actually has
   // matches instead of leaving the user staring at an empty tab.
   React.useEffect(() => {
@@ -2798,7 +2800,44 @@ export function GlobalSearchModal({
       const firstNonEmpty = tabDefs.find(t => t.count > 0);
       return firstNonEmpty ? firstNonEmpty.key : prev;
     });
-  }, [q, matches.schedules.length, matches.chat.length, (matches.photos || []).length, (matches.places || []).length, matches.expenses.length, matches.memos.length]);
+  }, [q, matches.schedules.length, matches.chat.length, (matches.photos || []).length, (matches.places || []).length, (matches.tags || []).length, matches.expenses.length, matches.memos.length]);
+
+  // The default view is a single chronological result stream. Category tabs remain
+  // available for drilling down, but users no longer need to guess which tab contains
+  // a matching record. This is intentionally deterministic text search, not AI.
+  const allResults = React.useMemo(() => {
+    const rows = [];
+    (matches.schedules || []).forEach(item => rows.push({
+      id: `schedule_${item.date}_${item.participantId}`, badgeName: `일정 · ${item.participantName}`, badgeColor: item.participantColor,
+      timeStr: formatDateWithDayName(item.date), content: item.note || item.participantName,
+      onClick: () => { onSelectDate(item.date); onClose(); }, sortStamp: item.date
+    }));
+    (matches.chat || []).forEach(item => rows.push({
+      id: `chat_${item.id}`, badgeName: `채팅 · ${item.participantName}`, badgeColor: item.participantColor,
+      timeStr: formatLogTimestamp(item.timestamp), content: item.text || '사진/미디어',
+      onClick: () => { onOpenChatMessage?.(item.id); onClose(); }, sortStamp: String(item.timestamp || 0).padStart(14, '0')
+    }));
+    (matches.photos || []).forEach((item, idx) => rows.push({
+      id: `photo_${item.id || idx}`, badgeName: '사진', badgeColor: '#8B5CF6',
+      timeStr: item.date ? formatDateWithDayName(item.date) : '', content: item.tags || '일정 사진',
+      onClick: () => { if (item.date) onSelectDate(item.date); onClose(); }, sortStamp: item.date || ''
+    }));
+    (matches.places || []).forEach(item => rows.push({
+      id: `place_${item.id}`, badgeName: `장소 · ${item.alias || item.name}`, badgeColor: '#06B6D4',
+      timeStr: item.address || '', content: item.memo || item.name || '', onClick: () => onClose(), sortStamp: item.visitDate || ''
+    }));
+    (matches.expenses || []).forEach(item => rows.push({
+      id: `expense_${item.id}`, badgeName: item.categoryName, badgeColor: item.categoryColor,
+      timeStr: formatDateWithDayName(item.date), content: `${item.label || item.url || ''} · ${item.amount < 0 ? '+' : '-'}${Math.abs(Number(item.amount)).toLocaleString()}원`,
+      onClick: () => { onSelectDate(item.date); onClose(); }, sortStamp: item.date || ''
+    }));
+    (matches.memos || []).forEach(item => rows.push({
+      id: `memo_${item.id}`, badgeName: `메모 · ${item.participantName}`, badgeColor: item.participantColor,
+      timeStr: formatLogTimestamp(item.createdAt), content: [item.title, item.text].filter(Boolean).join(' · '),
+      onClick: () => { onOpenMemo?.(item.id); onClose(); }, sortStamp: String(item.createdAt || 0).padStart(14, '0')
+    }));
+    return rows.sort((a, b) => String(b.sortStamp || '').localeCompare(String(a.sortStamp || '')));
+  }, [matches, onClose, onOpenChatMessage, onOpenMemo, onSelectDate]);
 
   return /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",
@@ -2867,6 +2906,16 @@ export function GlobalSearchModal({
           timeStr: formatDateWithDayName(item.date),
           onClick: () => { onSelectDate(item.date); onClose(); }
         }, highlightKeyword(item.note || '', q)))
+      ),
+
+      q && hasResults && activeTab === 'all' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
+        allResults.slice(0, 100).map(item => /*#__PURE__*/React.createElement(SearchResultLogRow, {
+          key: item.id,
+          badgeName: item.badgeName,
+          badgeColor: item.badgeColor,
+          timeStr: item.timeStr,
+          onClick: item.onClick
+        }, highlightKeyword(item.content, q)))
       ),
 
       q && hasResults && activeTab === 'chat' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
