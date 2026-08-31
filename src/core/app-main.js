@@ -809,6 +809,8 @@ function CalendarApp() {
 
   const isSavingRef = React.useRef(false);
   const pendingRemoteSnapshotRef = React.useRef(null);
+  const pendingRemotePlacesRef = React.useRef(null);
+  const pendingRemoteMeetingsRef = React.useRef(null);
   const localWriteStartedAtRef = React.useRef({});
   const serverRevisionRef = React.useRef(loadLocalMeta());
   const applyServerCalendars = (serverCalendars, lastModified = Date.now()) => {
@@ -944,6 +946,12 @@ function CalendarApp() {
       if (pending && pending.calendar && pending.calendar.id === targetCalId) {
         applyCalendarSnapshot(pending.calendar, pending.lastModified, pending.revision, false);
       }
+      const pendingPlaces = pendingRemotePlacesRef.current;
+      pendingRemotePlacesRef.current = null;
+      if (Array.isArray(pendingPlaces)) setPlacesSubcollection(pendingPlaces);
+      const pendingMeetings = pendingRemoteMeetingsRef.current;
+      pendingRemoteMeetingsRef.current = null;
+      if (Array.isArray(pendingMeetings)) setConfirmedMeetingsSubcollection(pendingMeetings);
     }
   };
 
@@ -2262,9 +2270,12 @@ function CalendarApp() {
 
     const unsubPlaces = subscribePlaces(activeCalId, snapshot => {
         if (!isMounted) return;
-        if (isSavingRef.current) return;
         const list = [];
         snapshot.forEach(doc => list.push(doc.data()));
+        if (isSavingRef.current) {
+          if (!snapshot.metadata?.fromCache && !snapshot.metadata?.hasPendingWrites) pendingRemotePlacesRef.current = list;
+          return;
+        }
         setPlacesSubcollection(list);
       }, err => {
         console.warn(`Firestore places subscription error:`, err);
@@ -2280,7 +2291,14 @@ function CalendarApp() {
         // after the write starts would stomp the optimistic local state with stale data
         // (e.g. reverting an expense edit back to the old amount) before the server-confirmed
         // write has a chance to land in the subcollection.
-        if (isSavingRef.current) return;
+        if (isSavingRef.current) {
+          if (!snapshot.metadata.fromCache && !snapshot.metadata.hasPendingWrites) {
+            const list = [];
+            snapshot.forEach(doc => list.push(doc.data()));
+            pendingRemoteMeetingsRef.current = list;
+          }
+          return;
+        }
         // Also ignore cached snapshots that arrive right after a save finishes -- Firestore
         // persistence can replay a stale fromCache:true event for the subcollection even after
         // the SDK-level write transaction succeeded and we already have correct local state.

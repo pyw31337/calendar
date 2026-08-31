@@ -41,6 +41,7 @@ assert(writeQueueSource.includes("await deferOperation(operation, new Error('대
 const appMainSource = fs.readFileSync(new URL('../src/core/app-main.js', import.meta.url), 'utf8');
 assert(appMainSource.includes("console.info('[calendar-save]'"), 'calendar saves must emit an operation diagnostic');
 assert(appMainSource.includes("console.warn('[calendar-save-failed]'"), 'failed calendar saves must emit an operation diagnostic');
+assert(appMainSource.includes('pendingRemotePlacesRef') && appMainSource.includes('pendingRemoteMeetingsRef'), 'realtime subcollection snapshots must be retained during local saves');
 const mergedSettlementProbe = unionConfirmedMeetings({
   confirmedMeeting: [{
     date: '2026-08-29',
