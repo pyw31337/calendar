@@ -809,6 +809,7 @@ function CalendarApp() {
   };
 
   const isSavingRef = React.useRef(false);
+  const [saveSyncState, setSaveSyncState] = React.useState({ status: 'live', label: '동기화됨', lastSyncedText: '' });
   const pendingRemoteSnapshotRef = React.useRef(null);
   const pendingRemotePlacesRef = React.useRef(null);
   const pendingRemoteMeetingsRef = React.useRef(null);
@@ -866,6 +867,7 @@ function CalendarApp() {
         });
         if (queued) {
           setCalendarsState(normalizedCalendars);
+          setSaveSyncState({ status: 'offline', label: '오프라인 저장 대기', detail: '연결되면 자동으로 재시도합니다.' });
           showToast('오프라인입니다. 연결되면 자동으로 저장합니다.', 'info', 5000);
           return true;
         }
@@ -873,6 +875,7 @@ function CalendarApp() {
         return false;
       }
       isSavingRef.current = true;
+      setSaveSyncState({ status: 'saving', label: '저장 중', detail: '서버에 반영하고 있습니다.' });
       localWriteStartedAtRef.current[targetCalId] = now;
       previousCalendars = calendars;
       setCalendarsState(normalizedCalendars);
@@ -900,12 +903,14 @@ function CalendarApp() {
         console.warn('Cloud save failed for calendar:', currentCal.id);
         if (previousCalendars) setCalendarsState(previousCalendars);
         showToast('저장 실패', 'error');
+        setSaveSyncState({ status: 'error', label: '저장 실패', detail: '다시 시도해 주세요.' });
         return false;
       }
 
       if (saved.auxiliaryPersistenceFailed) {
         showToast('저장은 완료되었지만 일부 보조 데이터 동기화가 지연되고 있습니다.', 'info', 6000);
       }
+      setSaveSyncState({ status: 'live', label: '동기화됨', lastSyncedText: '방금' });
 
       serverRevisionRef.current = updateMetaLastModified(serverRevisionRef.current, currentCal.id, now);
       serverRevisionRef.current = updateMetaRevision(serverRevisionRef.current, currentCal.id, (saved && saved.revision) || currentCal.revision || 0);
@@ -934,11 +939,13 @@ function CalendarApp() {
         if (queued) {
           if (previousCalendars) setCalendarsState(normalizedCalendars);
           showToast('네트워크가 불안정합니다. 저장을 대기하고 연결되면 자동 재시도합니다.', 'info', 6000);
+          setSaveSyncState({ status: 'offline', label: '저장 대기 중', detail: '연결되면 자동으로 재시도합니다.' });
           return true;
         }
       }
       if (previousCalendars) setCalendarsState(previousCalendars);
       showToast(describeUpdateCalendarsFailure(err), 'error', 6000);
+      setSaveSyncState({ status: 'error', label: '저장 실패', detail: '다시 시도해 주세요.' });
       return false;
     } finally {
       isSavingRef.current = false;
@@ -2019,7 +2026,7 @@ function CalendarApp() {
   }, [allChatMessages, meetingPhotoMessageIds]);
   const recentMessages = React.useMemo(() => visibleChatMessages.slice(-5).reverse(), [visibleChatMessages]);
   const canUseSettlement = !!(activeCal && isSettlementEnabledCalendarId(activeCal.id || activeCalId));
-  const syncStatus = null;
+  const syncStatus = saveSyncState;
   React.useEffect(() => {
     if (activeView !== 'settlement') return;
     if (!activeCalId || canUseSettlement) return;
