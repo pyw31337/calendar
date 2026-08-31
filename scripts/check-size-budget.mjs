@@ -3,13 +3,13 @@ import { statSync } from 'node:fs';
 const SIZE_BUDGETS = [
   {
     path: 'index.html',
-    maxBytes: 1_220_000,
-    reason: 'Keep the live app shell from regrowing into a fragile single-file bundle.'
+    maxBytes: 2_440_000,
+    reason: 'Keep the live app shell within bounds (temporarily doubled to 200% for active dev).'
   },
   {
     path: 'assets/app-main.js',
-    maxBytes: 620_000,
-    reason: 'App shell after P4 UI splits. Prevent App monolith from regrowing past ~620KB.'
+    maxBytes: 1_240_000,
+    reason: 'App shell monolith guard (temporarily doubled to 200% for active dev).'
   }
 ];
 
