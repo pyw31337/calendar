@@ -2303,7 +2303,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
           marginTop: '6px',
           borderRadius: 'var(--radius-md)',
           border: isVideoOpen ? '1px solid var(--border-subtle)' : '1px solid var(--primary)',
-          backgroundColor: isVideoOpen ? 'var(--bg-secondary)' : 'color-mix(in srgb, var(--primary) 10%, transparent)',
+          backgroundColor: isVideoOpen ? 'var(--bg-secondary)' : 'var(--bg-primary)',
           color: isVideoOpen ? 'var(--text-muted)' : 'var(--primary)',
           fontSize: '0.76rem',
           fontWeight: 700,
