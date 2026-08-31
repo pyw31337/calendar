@@ -2008,6 +2008,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const ChatParticipantSheet = __comp.ChatParticipantSheet || __deps.ChatParticipantSheet;
   const LinkPreviewCard = __comp.LinkPreviewCard || __deps.LinkPreviewCard;
+  const ClickToPlayVideoCard = __comp.ClickToPlayVideoCard || __deps.ClickToPlayVideoCard;
   const TikTokEmbedWidget = __comp.TikTokEmbedWidget || __deps.TikTokEmbedWidget;
   const MessageCommentIcon = __comp.MessageCommentIcon || __deps.MessageCommentIcon;
   const ParticipantPickerButton = __comp.ParticipantPickerButton || __deps.ParticipantPickerButton;
@@ -2275,63 +2276,17 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       style: { marginTop: '8px', width: '100%' },
       "data-stop-card-open": "true",
       onClick: e => e.stopPropagation()
-    }, (() => {
-      if (memoMediaInfo?.type === 'tiktok-widget') {
-        return /*#__PURE__*/React.createElement(TikTokEmbedWidget, {
-          url: memoMediaInfo.url,
-          videoId: memoMediaInfo.videoId,
-          onFailed: () => {}
-        });
-      }
-      if (memoMediaInfo?.type === 'embed') {
-        const isPortrait = memoMediaInfo.orientation === 'portrait';
-        return /*#__PURE__*/React.createElement("div", {
-          style: {
-            width: '100%',
-            maxWidth: isPortrait ? '320px' : '100%',
-            margin: '0 auto',
-            borderRadius: 'var(--radius-md)',
-            overflow: 'hidden',
-            backgroundColor: 'var(--bg-primary)'
-          }
-        }, /*#__PURE__*/React.createElement("iframe", {
-          src: memoMediaInfo.url,
-          title: memo.title || '영상 재생',
-          loading: 'lazy',
-          allow: 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share',
-          allowFullScreen: true,
-          style: {
-            display: 'block',
-            width: '100%',
-            aspectRatio: isPortrait ? '9 / 16' : '16 / 9',
-            maxHeight: isPortrait ? 'min(72vh, 480px)' : 'min(54vh, 360px)',
-            border: '0',
-            borderRadius: 'var(--radius-md)'
-          }
-        }));
-      }
-      if (memoMediaInfo?.type === 'video') {
-        return /*#__PURE__*/React.createElement("video", {
-          src: memoMediaInfo.url,
-          controls: true,
-          playsInline: true,
-          preload: 'metadata',
-          style: {
-            display: 'block',
-            width: '100%',
-            maxHeight: '360px',
-            borderRadius: 'var(--radius-md)',
-            backgroundColor: 'var(--bg-primary)'
-          }
-        });
-      }
-      return /*#__PURE__*/React.createElement(LinkPreviewCard, {
-        url: memoFirstUrl,
-        fallbackTitle: memo.title || (memo.text ? removeFirstUrl(memo.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : ''),
-        cachedData: memo.linkPreview,
-        stretch: true
-      });
-    })()),
+    }, isVideoMedia ? /*#__PURE__*/React.createElement(ClickToPlayVideoCard, {
+      url: memoFirstUrl,
+      mediaInfo: memoMediaInfo,
+      fallbackTitle: memo.title || (memo.text ? removeFirstUrl(memo.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : ''),
+      cachedData: memo.linkPreview
+    }) : /*#__PURE__*/React.createElement(LinkPreviewCard, {
+      url: memoFirstUrl,
+      fallbackTitle: memo.title || (memo.text ? removeFirstUrl(memo.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : ''),
+      cachedData: memo.linkPreview,
+      stretch: true
+    })),
 
     /* Tags container if exists */
     /*#__PURE__*/React.createElement("div", {

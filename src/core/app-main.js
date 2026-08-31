@@ -10531,6 +10531,7 @@ function bindGatherUiDeps() {
     SettlementSummaryModal: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SettlementSummaryModal) || (typeof SettlementSummaryModal === 'function' ? SettlementSummaryModal : null),
     CreateSettlementModal: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CreateSettlementModal) || CreateSettlementModal,
     MemoTagInputRow: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MemoTagInputRow) || null,
+    ClickToPlayVideoCard: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ClickToPlayVideoCard) || null,
     getCalendarSettlementCards,
     getPlaceKakaoRouteUrl,
     getPlaceNaverRouteUrl,

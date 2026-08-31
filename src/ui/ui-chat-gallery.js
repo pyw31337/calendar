@@ -820,6 +820,7 @@ export function ChatGalleryModal({
   const SyncStatusChip = __comp.SyncStatusChip || __deps.SyncStatusChip;
   const SyncStatusBanner = __comp.SyncStatusBanner || __deps.SyncStatusBanner;
   const LinkPreviewCard = __deps.LinkPreviewCard || __comp.LinkPreviewCard;
+  const ClickToPlayVideoCard = __comp.ClickToPlayVideoCard || __deps.ClickToPlayVideoCard;
   const TikTokEmbedWidget = __comp.TikTokEmbedWidget || __deps.TikTokEmbedWidget;
   const MenuIcon = __deps.MenuIcon || __comp.MenuIcon;
   const MediaThumb = __comp.MediaThumb || __deps.MediaThumb;
@@ -1368,7 +1369,6 @@ export function ChatGalleryModal({
       const fallbackTitle = item.title || (item.text ? removeFirstUrl(item.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '');
 
       if (isVideoMedia) {
-        const isPortrait = mediaInfo.type === 'embed' && mediaInfo.orientation === 'portrait';
         return /*#__PURE__*/React.createElement("div", {
           key: item.messageId || item.url,
           style: {
@@ -1393,50 +1393,12 @@ export function ChatGalleryModal({
               whiteSpace: 'nowrap'
             }
           }, fallbackTitle),
-          mediaInfo.type === 'tiktok-widget'
-            ? /*#__PURE__*/React.createElement(TikTokEmbedWidget, {
-              url: mediaInfo.url,
-              videoId: mediaInfo.videoId,
-              onFailed: () => {}
-            })
-            : mediaInfo.type === 'embed'
-            ? /*#__PURE__*/React.createElement("div", {
-              style: {
-                width: '100%',
-                maxWidth: isPortrait ? '320px' : '100%',
-                margin: '0 auto',
-                borderRadius: 'var(--radius-md)',
-                overflow: 'hidden',
-                backgroundColor: 'var(--bg-primary)'
-              }
-            }, /*#__PURE__*/React.createElement("iframe", {
-              src: mediaInfo.url,
-              title: fallbackTitle || '영상 재생',
-              loading: 'lazy',
-              allow: 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share',
-              allowFullScreen: true,
-              style: {
-                display: 'block',
-                width: '100%',
-                aspectRatio: isPortrait ? '9 / 16' : '16 / 9',
-                maxHeight: isPortrait ? 'min(72vh, 480px)' : 'min(54vh, 360px)',
-                border: '0',
-                borderRadius: 'var(--radius-md)'
-              }
-            }))
-            : /*#__PURE__*/React.createElement("video", {
-              src: mediaInfo.url,
-              controls: true,
-              playsInline: true,
-              preload: 'metadata',
-              style: {
-                display: 'block',
-                width: '100%',
-                maxHeight: '360px',
-                borderRadius: 'var(--radius-md)',
-                backgroundColor: 'var(--bg-primary)'
-              }
-            })
+          /*#__PURE__*/React.createElement(ClickToPlayVideoCard, {
+            url: item.url,
+            mediaInfo: mediaInfo,
+            fallbackTitle: fallbackTitle,
+            cachedData: item.linkPreview
+          })
         );
       }
 

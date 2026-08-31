@@ -1888,6 +1888,215 @@ export function MemoTagInputRow({
   );
 }
 
+export function ClickToPlayVideoCard({ url, mediaInfo = null, fallbackTitle = '', cachedData = null }) {
+  const React = window.React;
+  const __deps = window.GATHER_UI_DEPS || {};
+  const __comp = window.GATHER_UI_COMPONENTS || {};
+  const TikTokEmbedWidget = __comp.TikTokEmbedWidget || __deps.TikTokEmbedWidget;
+
+  const [isPlaying, setIsPlaying] = React.useState(false);
+
+  const preview = useLinkPreview(url, cachedData);
+  const previewData = (preview && preview.status === 'success' && preview.data) ? preview.data : (cachedData || {});
+
+  const info = mediaInfo || (typeof GATHER_APP_UTILS !== 'undefined' && typeof GATHER_APP_UTILS.getDirectChatMediaInfo === 'function' ? GATHER_APP_UTILS.getDirectChatMediaInfo(url) : null);
+  const isTikTok = !!(info && info.type === 'tiktok-widget');
+  const isEmbed = !!(info && info.type === 'embed');
+  const isDirectVideo = !!(info && info.type === 'video');
+  const isPortrait = (isEmbed && info?.orientation === 'portrait') || isTikTok;
+
+  const title = previewData?.title || fallbackTitle || (isTikTok ? 'TikTok 영상' : '영상 재생');
+  const thumbnailUrl = previewData?.image || '';
+
+  // Active playing state for YouTube / direct video
+  if (isPlaying) {
+    if (isEmbed) {
+      const embedUrl = info.url + (info.url.includes('?') ? '&autoplay=1&playsinline=1' : '?autoplay=1&playsinline=1');
+      return /*#__PURE__*/React.createElement("div", {
+        style: {
+          width: '100%',
+          maxWidth: isPortrait ? '320px' : '100%',
+          margin: '0 auto',
+          borderRadius: 'var(--radius-md)',
+          overflow: 'hidden',
+          backgroundColor: '#000000',
+          boxSizing: 'border-box'
+        }
+      }, /*#__PURE__*/React.createElement("iframe", {
+        src: embedUrl,
+        title: title,
+        allow: 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share',
+        allowFullScreen: true,
+        style: {
+          display: 'block',
+          width: '100%',
+          aspectRatio: isPortrait ? '9 / 16' : '16 / 9',
+          maxHeight: isPortrait ? 'min(72vh, 480px)' : 'min(54vh, 360px)',
+          border: '0',
+          borderRadius: 'var(--radius-md)'
+        }
+      }));
+    }
+    if (isDirectVideo) {
+      return /*#__PURE__*/React.createElement("video", {
+        src: info.url,
+        controls: true,
+        autoPlay: true,
+        playsInline: true,
+        style: {
+          display: 'block',
+          width: '100%',
+          maxHeight: '360px',
+          borderRadius: 'var(--radius-md)',
+          backgroundColor: '#000000',
+          boxSizing: 'border-box'
+        }
+      });
+    }
+  }
+
+  // Click-to-Play Façade (Lightweight, zero iframes on load, perfectly sized)
+  const handlePlayClick = e => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isTikTok) {
+      // Direct open in TikTok for immediate high-res playback with audio
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } else {
+      setIsPlaying(true);
+    }
+  };
+
+  return /*#__PURE__*/React.createElement("div", {
+    onClick: handlePlayClick,
+    title: isTikTok ? 'TikTok에서 영상 보기 (새 탭에서 바로 재생)' : `${title} 재생`,
+    style: {
+      position: 'relative',
+      width: '100%',
+      maxWidth: '100%',
+      aspectRatio: isPortrait ? '9 / 16' : '16 / 9',
+      maxHeight: isPortrait ? 'min(62vh, 400px)' : 'min(45vh, 260px)',
+      borderRadius: 'var(--radius-md)',
+      overflow: 'hidden',
+      backgroundColor: '#0F172A',
+      cursor: 'pointer',
+      boxSizing: 'border-box',
+      border: '1px solid var(--border-subtle)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center'
+    }
+  },
+    /* Thumbnail Image */
+    thumbnailUrl ? /*#__PURE__*/React.createElement("img", {
+      src: thumbnailUrl,
+      alt: title,
+      loading: "lazy",
+      decoding: "async",
+      style: {
+        width: '100%',
+        height: '100%',
+        objectFit: 'cover',
+        display: 'block'
+      }
+    }) : /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: '100%',
+        height: '100%',
+        background: 'linear-gradient(135deg, #1E293B, #0F172A)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '16px',
+        boxSizing: 'border-box',
+        textAlign: 'center',
+        color: '#94A3B8',
+        fontSize: '0.8rem',
+        fontWeight: 600
+      }
+    }, title),
+
+    /* Dark gradient scrim at bottom */
+    /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: 'absolute',
+        inset: 0,
+        background: 'linear-gradient(to top, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.1) 45%, transparent 70%)',
+        pointerEvents: 'none'
+      }
+    }),
+
+    /* Platform Badge at Top-Left */
+    /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: 'absolute',
+        top: '8px',
+        left: '8px',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '4px',
+        padding: '3px 8px',
+        borderRadius: 'var(--radius-full)',
+        backgroundColor: isTikTok ? 'rgba(0,0,0,0.78)' : 'rgba(220, 38, 38, 0.92)',
+        color: '#FFFFFF',
+        fontSize: '0.68rem',
+        fontWeight: 800,
+        boxShadow: '0 2px 4px rgba(0,0,0,0.25)',
+        pointerEvents: 'none'
+      }
+    }, isTikTok ? 'TikTok' : (isPortrait ? 'Shorts' : 'YouTube')),
+
+    /* Center Play Button */
+    /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: 'absolute',
+        width: '46px',
+        height: '46px',
+        borderRadius: '50%',
+        backgroundColor: isTikTok ? '#FE2C55' : '#FF0000',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+        pointerEvents: 'none'
+      }
+    }, /*#__PURE__*/React.createElement("svg", {
+      viewBox: "0 0 24 24",
+      width: "22",
+      height: "22",
+      fill: "#FFFFFF",
+      style: { marginLeft: '3px' }
+    }, /*#__PURE__*/React.createElement("path", { d: "M8 5v14l11-7z" }))),
+
+    /* Bottom Info Bar */
+    /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: 'absolute',
+        bottom: '8px',
+        left: '10px',
+        right: '10px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        pointerEvents: 'none'
+      }
+    },
+      /* Video title preview */
+      /*#__PURE__*/React.createElement("div", {
+        style: {
+          color: '#FFFFFF',
+          fontSize: '0.74rem',
+          fontWeight: 700,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+          textShadow: '0 1px 3px rgba(0,0,0,0.9)'
+        }
+      }, isTikTok ? 'TikTok에서 바로 시청하기 ↗' : (title || '영상 재생'))
+    )
+  );
+}
+
   if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
     ResizableModalContainer: ResizableModalContainer,
@@ -1910,5 +2119,6 @@ export function MemoTagInputRow({
     ToggleSwitch: ToggleSwitch,
     Footer: Footer,
     MemoTagInputRow: MemoTagInputRow,
+    ClickToPlayVideoCard: ClickToPlayVideoCard,
   });
 }

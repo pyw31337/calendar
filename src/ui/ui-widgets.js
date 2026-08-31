@@ -787,15 +787,12 @@ export function TikTokEmbedWidget({ url, videoId, onFailed }) {
 
   return /*#__PURE__*/React.createElement('div', {
     ref: containerRef,
-    // overflow:hidden is a safety net -- the real width clamp is the .tiktok-embed !important
-    // rule in app.css, needed because embed.js sets its own inline pixel width on the iframe
-    // it generates once loaded, which otherwise overrides anything set here from React.
-    style: { width: 'min(88vw, 360px)', maxWidth: '500px', minWidth: '200px', margin: '0 auto', overflow: 'hidden' }
+    style: { width: '100%', maxWidth: '100%', minWidth: '0', margin: '0 auto', overflow: 'hidden', boxSizing: 'border-box' }
   }, /*#__PURE__*/React.createElement('blockquote', {
     className: 'tiktok-embed',
     cite: url,
     'data-video-id': videoId,
-    style: { maxWidth: '100%', minWidth: '200px', margin: '0 auto' }
+    style: { width: '100%', maxWidth: '100%', minWidth: '0', margin: '0 auto', boxSizing: 'border-box' }
   }, /*#__PURE__*/React.createElement('section', null)));
 }
 
