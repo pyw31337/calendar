@@ -1653,34 +1653,40 @@ export function DateModal({
       return;
     }
     setIsSavingExpense(true);
-    const finalAmount = expenseIsIncome ? -cleanAmount : cleanAmount;
-    const ok = await onSaveExpense(dateStr, {
-      id: editingExpenseId || undefined,
-      label,
-      amount: finalAmount,
-      categoryId: expenseCategoryInput,
-      payerId: expenseIsIncome ? '' : expensePayerInput
-    });
-    setIsSavingExpense(false);
-    if (ok !== false) {
-      showToast(editingExpenseId ? '정산 내역이 수정되었습니다.' : '정산 내역이 추가되었습니다.', 'success');
-      setEditingExpenseId(null);
-      setExpenseLabelInput('');
-      setExpenseAmountInput('');
-      setExpenseIsIncome(false);
-      setExpensePayerInput('');
-      setHasInteracted(false);
-      const resetExpCat = getExpenseCategories(calendar)[0]?.id || 'etc';
-      setExpenseCategoryInput(resetExpCat);
-      snapshotFormBaseline({
-        ...formBaselineRef.current,
-        editingExpenseId: null,
-        expenseLabelInput: '',
-        expenseAmountInput: '',
-        expenseIsIncome: false,
-        expenseCategoryInput: resetExpCat,
-        expensePayerInput: ''
+    try {
+      const finalAmount = expenseIsIncome ? -cleanAmount : cleanAmount;
+      const ok = await onSaveExpense(dateStr, {
+        id: editingExpenseId || undefined,
+        label,
+        amount: finalAmount,
+        categoryId: expenseCategoryInput,
+        payerId: expenseIsIncome ? '' : expensePayerInput
       });
+      if (ok !== false) {
+        showToast(editingExpenseId ? '정산 내역이 수정되었습니다.' : '정산 내역이 추가되었습니다.', 'success');
+        setEditingExpenseId(null);
+        setExpenseLabelInput('');
+        setExpenseAmountInput('');
+        setExpenseIsIncome(false);
+        setExpensePayerInput('');
+        setHasInteracted(false);
+        const resetExpCat = getExpenseCategories(calendar)[0]?.id || 'etc';
+        setExpenseCategoryInput(resetExpCat);
+        snapshotFormBaseline({
+          ...formBaselineRef.current,
+          editingExpenseId: null,
+          expenseLabelInput: '',
+          expenseAmountInput: '',
+          expenseIsIncome: false,
+          expenseCategoryInput: resetExpCat,
+          expensePayerInput: ''
+        });
+      }
+    } catch (err) {
+      console.error('Expense save failed:', err);
+      showToast('정산 내역 저장에 실패했습니다. 연결되면 다시 시도해 주세요.', 'error', 6000);
+    } finally {
+      setIsSavingExpense(false);
     }
   };
   const handleDeleteExpenseClick = (e, expenseId) => {
@@ -1697,34 +1703,41 @@ export function DateModal({
     // Confirm once only — parent handler must not show another dialog.
     onRequestConfirm('정산 내역 삭제', message, async () => {
       setIsSavingExpense(true);
-      const ok = await onDeleteExpense(dateStr, expenseId);
-      setIsSavingExpense(false);
-      if (ok === false) {
-        showToast('삭제에 실패했습니다.', 'error');
-        return;
-      }
-      showToast('정산 내역이 삭제되었습니다.', 'delete', 5000, async () => {
-        try {
-          setIsSavingExpense(true);
-          const restored = await onSaveExpense(dateStr, {
-            id: expenseSnapshot?.id || expenseId,
-            label: expenseSnapshot?.label || expenseSnapshot?.url || '',
-            amount: Number(expenseSnapshot?.amount) || 0,
-            categoryId: expenseSnapshot?.categoryId || expenseCategoryInput
-          });
-          setIsSavingExpense(false);
-          if (restored !== false) showToast('정산 삭제를 되돌렸습니다.', 'success', 3000);
-          else showToast('정산 복원 실패', 'error', 4000);
-        } catch (restoreErr) {
-          setIsSavingExpense(false);
-          console.error('Expense restore failed:', restoreErr);
-          showToast('정산 복원 실패', 'error', 4000);
+      try {
+        const ok = await onDeleteExpense(dateStr, expenseId);
+        if (ok === false) {
+          showToast('삭제에 실패했습니다.', 'error');
+          return;
         }
-      });
-      if (editingExpenseId === expenseId) {
-        setEditingExpenseId(null);
-        setExpenseLabelInput('');
-        setExpenseAmountInput('');
+        showToast('정산 내역이 삭제되었습니다.', 'delete', 5000, async () => {
+          setIsSavingExpense(true);
+          try {
+            const restored = await onSaveExpense(dateStr, {
+              id: expenseSnapshot?.id || expenseId,
+              label: expenseSnapshot?.label || expenseSnapshot?.url || '',
+              amount: Number(expenseSnapshot?.amount) || 0,
+              categoryId: expenseSnapshot?.categoryId || expenseCategoryInput,
+              payerId: expenseSnapshot?.payerId || ''
+            });
+            if (restored !== false) showToast('정산 삭제를 되돌렸습니다.', 'success', 3000);
+            else showToast('정산 복원 실패', 'error', 4000);
+          } catch (restoreErr) {
+            console.error('Expense restore failed:', restoreErr);
+            showToast('정산 복원 실패', 'error', 4000);
+          } finally {
+            setIsSavingExpense(false);
+          }
+        });
+        if (editingExpenseId === expenseId) {
+          setEditingExpenseId(null);
+          setExpenseLabelInput('');
+          setExpenseAmountInput('');
+        }
+      } catch (err) {
+        console.error('Expense delete failed:', err);
+        showToast('삭제에 실패했습니다. 연결되면 다시 시도해 주세요.', 'error', 6000);
+      } finally {
+        setIsSavingExpense(false);
       }
     });
   };
