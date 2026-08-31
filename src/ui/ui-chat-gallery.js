@@ -890,7 +890,6 @@ export function ChatGalleryModal({
   onLoadOlderChat = null,
   hasMoreMemos = false,
   onLoadMoreMemos = null,
-  totalGalleryCount = 0,
   isDarkTheme,
   onToggleTheme,
   fontScalePercent,
@@ -1241,7 +1240,11 @@ export function ChatGalleryModal({
   const [galleryViewMode, setGalleryViewMode] = React.useState('all'); // 'all' | 'date'
   const [galleryMonthDate, setGalleryMonthDate] = React.useState(() => new Date());
   const [collapsedGalleryDates, setCollapsedGalleryDates] = React.useState(() => new Set());
+  const [isGalleryPickerOpen, setIsGalleryPickerOpen] = React.useState(false);
+  const [pickerGalleryYear, setPickerGalleryYear] = React.useState(() => new Date().getFullYear());
+  const [pickerGalleryMonth, setPickerGalleryMonth] = React.useState(() => new Date().getMonth());
   const galleryMonthKey = `${galleryMonthDate.getFullYear()}-${String(galleryMonthDate.getMonth() + 1).padStart(2, '0')}`;
+  const monthNames = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
   const getGalleryItemDateKey = item => {
     const meetingDate = String(item?.meetingDate || '').trim();
     if (meetingDate && isValidDateString(meetingDate)) return meetingDate;
@@ -1254,22 +1257,16 @@ export function ChatGalleryModal({
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   };
-  const getGalleryItemSortDateMs = item => {
-    const dateKey = getGalleryItemDateKey(item);
-    if (dateKey) {
-      const [y, m, d] = dateKey.split('-').map(Number);
-      const ms = new Date(y, m - 1, d).getTime();
-      if (Number.isFinite(ms)) return ms;
-    }
-    return Number(item?.timestamp || 0);
-  };
-  // Sorts by the item's own content date (meeting date when tagged, else the date its timestamp
-  // falls on) -- "가장 최근일자의 사진부터". Only affects the flat ('전체' view mode) list; '일자'
-  // grouped view already buckets by date and sorts within each bucket independently.
+  // Most-recently-uploaded first. sharedPhotos/sharedLinks are already built this way (sorted by
+  // raw timestamp), so this only needs to preserve that order rather than re-sort by the item's
+  // content/meeting date -- sorting by content date let an item tagged with an older meeting date
+  // but uploaded just now sort as if it were old, which isn't what "최근 업로드" means. Only
+  // affects the flat ('전체' view mode) list; '일자' grouped view already buckets by date and
+  // sorts within each bucket independently.
   const sortGalleryFlatItems = items => {
     const list = (items || []).slice();
     if (!asPage) return list;
-    list.sort((a, b) => (getGalleryItemSortDateMs(b) - getGalleryItemSortDateMs(a)) || (Number(b?.timestamp || 0) - Number(a?.timestamp || 0)));
+    list.sort((a, b) => Number(b?.timestamp || 0) - Number(a?.timestamp || 0));
     return list;
   };
   const groupedGallerySections = React.useMemo(() => {
@@ -1315,6 +1312,16 @@ export function ChatGalleryModal({
     setGalleryMonthDate(new Date());
     setCollapsedGalleryDates(new Set());
   };
+  const openGalleryPicker = () => {
+    setPickerGalleryYear(galleryMonthDate.getFullYear());
+    setPickerGalleryMonth(galleryMonthDate.getMonth());
+    setIsGalleryPickerOpen(true);
+  };
+  const applyGalleryPicker = () => {
+    setGalleryMonthDate(new Date(pickerGalleryYear, pickerGalleryMonth, 1));
+    setCollapsedGalleryDates(new Set());
+    setIsGalleryPickerOpen(false);
+  };
   // Same month-nav module the settlement page's 월별보기 tab uses ('calendar-nav' class +
   // btn/calendar-month-nav-btn buttons) so the two pages stay visually and structurally
   // consistent instead of each keeping its own copy of this UI.
@@ -1323,7 +1330,9 @@ export function ChatGalleryModal({
     style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '6px', marginBottom: '10px', flexShrink: 0 }
   },
     /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-main)', fontWeight: 900, fontSize: '1rem' }
+      style: { display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-main)', fontWeight: 900, fontSize: '1rem', cursor: 'pointer', userSelect: 'none' },
+      onClick: openGalleryPicker,
+      title: "클릭하여 년월 이동"
     },
       `${galleryMonthDate.getFullYear()}년 ${galleryMonthDate.getMonth() + 1}월`,
       /*#__PURE__*/React.createElement("span", { style: { color: '#94A3B8', display: 'inline-flex', alignItems: 'center' } },
@@ -1563,6 +1572,22 @@ export function ChatGalleryModal({
       textAlign: 'center'
     }
   }, disabled ? loadingLabel : label);
+  // Distinguishes "haven't finished loading this calendar's history yet" from "genuinely no
+  // photos here" -- totalGalleryCount (a global, all-months count fetched once) used to stand in
+  // for this, which made an empty month falsely claim there was more to load via a '더보기'
+  // button that showLoadMore (driven by the same hasMoreOlderChat/loadingOlderChat pair used
+  // here) wasn't actually rendering. hasMoreOlderChat/loadingOlderChat are the real signal: once
+  // pagination reports nothing left to fetch, whatever's already in chatMessages/memos is the
+  // complete data set, so an empty result here means the month/gallery truly has none.
+  const describeGalleryPhotoEmptyState = emptyMessage => {
+    if (loadingOlderChat) return "이전 사진을 불러오는 중…";
+    if (hasMoreOlderChat) return "아직 모든 사진을 불러오지 않았습니다. 아래 더보기를 눌러 주세요.";
+    return emptyMessage;
+  };
+  const describeGalleryLinkEmptyState = emptyMessage => {
+    if (hasMoreOlderChat || hasMoreMemos) return "아직 모든 링크를 불러오지 않았습니다. 아래 더보기를 눌러 주세요.";
+    return emptyMessage;
+  };
   const renderGalleryContent = () => {
     if (galleryViewMode === 'date') {
       const isLinkMode = activeTab === 'links';
@@ -1594,12 +1619,8 @@ export function ChatGalleryModal({
         }, searchQuery
           ? "검색 결과가 없습니다."
           : (isLinkMode
-            ? "공유된 링크가 없습니다."
-            : ((hasMoreOlderChat || loadingOlderChat)
-              ? "이전 사진을 불러오는 중…"
-              : ((typeof totalGalleryCount === 'number' && totalGalleryCount > 0)
-                ? "사진 데이터를 아직 불러오지 못했습니다. 아래 더보기를 눌러 주세요."
-                : "공유된 사진이 없습니다."))))
+            ? describeGalleryLinkEmptyState("이 달에 공유된 링크가 없습니다.")
+            : describeGalleryPhotoEmptyState("이 달에 등록된 사진이 없습니다.")))
         // Same per-date section module the settlement page's 월별보기 tab uses for its daily
         // rows (icon + date label on the left, a pill badge + SectionToggleButton on the right),
         // re-skinned with a plain item count instead of a +/- amount.
@@ -1663,11 +1684,7 @@ export function ChatGalleryModal({
         style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: '0.88rem' }
       }, searchQuery
         ? "검색 결과가 없습니다."
-        : ((hasMoreOlderChat || loadingOlderChat)
-          ? "이전 사진을 불러오는 중…"
-          : ((typeof totalGalleryCount === 'number' && totalGalleryCount > 0)
-            ? "사진 데이터를 아직 불러오지 못했습니다. 아래 더보기를 눌러 주세요."
-            : "공유된 사진이 없습니다.")))
+        : describeGalleryPhotoEmptyState("공유된 사진이 없습니다."))
       : renderGalleryPhotoGrid(sortedPhotos, sortedPhotos),
       (hasMoreOlderChat || loadingOlderChat) && !(searchQuery || '').trim() && renderGalleryLoadMoreButton({
         label: '이전 사진·링크 더 보기',
@@ -2006,13 +2023,77 @@ export function ChatGalleryModal({
     style: {
       flex: 1, overflowY: 'auto',
       padding: asPage
-        ? ((isSearchOpen ? '168px' : '120px') + ' 20px 16px 20px')
+        ? ((isSearchOpen ? '180px' : '132px') + ' 20px 16px 20px')
         : '16px 20px',
       display: 'flex', flexDirection: 'column', gap: activeTab === 'links' ? '8px' : '12px', boxSizing: 'border-box',
       minWidth: 0
     }
   }, renderGalleryContent())));
-  return pastePreviewModal ? /*#__PURE__*/React.createElement(React.Fragment, null, galleryTree, pastePreviewModal) : galleryTree;
+  // Same '연월 선택' bottom sheet the settlement page's month-nav opens, portaled the same way
+  // (bottom-sheet rule: never nest under a transformed ancestor -- see the settlement page's own
+  // comment on this).
+  const galleryYearMonthPickerSheet = isGalleryPickerOpen && typeof document !== 'undefined' && ReactDOM.createPortal(
+    /*#__PURE__*/React.createElement("div", {
+      className: "bottom-sheet-overlay",
+      onClick: () => setIsGalleryPickerOpen(false),
+      style: { zIndex: 12000 }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "bottom-sheet",
+      onClick: e => e.stopPropagation()
+    },
+      /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-header" },
+        /*#__PURE__*/React.createElement("h4", null, "연월 선택"),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer' },
+          onClick: () => setIsGalleryPickerOpen(false)
+        }, "✕")
+      ),
+      /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-body" },
+        /*#__PURE__*/React.createElement("div", { style: { marginBottom: '16px' } },
+          /*#__PURE__*/React.createElement("label", {
+            style: { fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '8px' }
+          }, "년도"),
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '10px' } },
+            /*#__PURE__*/React.createElement("button", {
+              type: "button", className: "btn btn-secondary", style: { padding: '4px 10px', fontSize: '0.85rem' },
+              onClick: () => setPickerGalleryYear(y => y - 1)
+            }, "◀"),
+            /*#__PURE__*/React.createElement("span", {
+              style: { fontWeight: 800, fontSize: '1.1rem', minWidth: '60px', textAlign: 'center' }
+            }, pickerGalleryYear, "년"),
+            /*#__PURE__*/React.createElement("button", {
+              type: "button", className: "btn btn-secondary", style: { padding: '4px 10px', fontSize: '0.85rem' },
+              onClick: () => setPickerGalleryYear(y => y + 1)
+            }, "▶")
+          )
+        ),
+        /*#__PURE__*/React.createElement("div", { style: { marginBottom: '16px' } },
+          /*#__PURE__*/React.createElement("label", {
+            style: { fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '8px' }
+          }, "월"),
+          /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' } },
+            monthNames.map((name, idx) => /*#__PURE__*/React.createElement("button", {
+              key: idx, type: "button", onClick: () => setPickerGalleryMonth(idx),
+              style: {
+                padding: '6px 4px', borderRadius: 'var(--radius-sm)',
+                border: pickerGalleryMonth === idx ? '2px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
+                background: pickerGalleryMonth === idx ? 'rgba(99, 102, 241, 0.15)' : 'var(--bg-card)',
+                color: pickerGalleryMonth === idx ? 'var(--accent-primary)' : 'var(--text-main)',
+                fontWeight: pickerGalleryMonth === idx ? 800 : 500, fontSize: '0.82rem', cursor: 'pointer'
+              }
+            }, name))
+          )
+        ),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", className: "btn btn-primary", style: { width: '100%' },
+          onClick: applyGalleryPicker
+        }, pickerGalleryYear, "년 ", pickerGalleryMonth + 1, "월로 이동")
+      )
+    )),
+    document.body
+  );
+  return /*#__PURE__*/React.createElement(React.Fragment, null, galleryTree, pastePreviewModal, galleryYearMonthPickerSheet);
 }
 
   if (typeof window !== 'undefined') {
