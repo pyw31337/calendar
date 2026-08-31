@@ -51,3 +51,5 @@ jobs:
       - name: Live smoke
         run: npm run smoke:live
         continue-on-error: true
+        env:
+          EXPECTED_BUILD_SHA: ${{ github.sha }}

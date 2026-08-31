@@ -1,6 +1,7 @@
 const DEFAULT_BASE_URL = 'https://pyw31337.github.io/calendar/';
 const baseUrl = process.env.CALENDAR_LIVE_BASE_URL || DEFAULT_BASE_URL;
 const cacheBust = process.env.CALENDAR_LIVE_CACHE_BUST || Date.now().toString(36);
+const expectedBuildSha = String(process.env.EXPECTED_BUILD_SHA || '').trim();
 
 const pages = [
   '?id=kkot',
@@ -77,6 +78,13 @@ const indexText = await checkUrl(indexUrl, (html, url) => {
   if (!html.includes('<div id="root">')) throw new Error(`Missing root element: ${url}`);
   if (!isViteHtml(html) && !isClassicHtml(html)) {
     throw new Error(`Unrecognized deployment HTML (neither Vite nor classic): ${url}`);
+  }
+  if (expectedBuildSha) {
+    const match = html.match(/<meta\s+name="build-sha"\s+content="([^"]*)"/i);
+    if (!match || match[1] !== expectedBuildSha) {
+      throw new Error(`Deployed build SHA mismatch at ${url}: expected ${expectedBuildSha}, got ${match?.[1] || 'missing'}`);
+    }
+    console.log(`[live-smoke] build SHA verified ${expectedBuildSha}`);
   }
 });
 
