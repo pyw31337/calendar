@@ -2,7 +2,13 @@
  * Anniversary / Settlement / Poll modals (P4-18)
  */
 
-import { calculateSettlementPlan, calculateSettlementRows } from '../core/settlement-calculator.js';
+import {
+  calculateFundPrincipalBalance,
+  calculateSettlementPlan,
+  calculateSettlementRows,
+  doesSettlementEntryAffectPrincipal,
+  isSettlementClearingIncomeEntry
+} from '../core/settlement-calculator.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_CALENDAR_DATA = window.GATHER_APP_CALENDAR_DATA || {};
@@ -3029,11 +3035,14 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   const settlementBalanceByKey = new Map();
   let runningSettlementBalance = baseBudget;
   allTimeItems.slice().reverse().forEach(item => {
-    runningSettlementBalance += item.isIncome ? Math.abs(item.amount) : -Math.abs(item.amount);
+    if (doesSettlementEntryAffectPrincipal(item)) {
+      runningSettlementBalance += item.isIncome ? Math.abs(item.amount) : -Math.abs(item.amount);
+    }
     settlementBalanceByKey.set(item.ledgerKey, runningSettlementBalance);
   });
-  const allTimeIncome = baseBudget + allTimeItems.filter(item => item.isIncome).reduce((sum, item) => sum + Math.abs(item.amount), 0);
+  const allTimeIncome = baseBudget + allTimeItems.filter(item => item.isIncome && !isSettlementClearingIncomeEntry(item)).reduce((sum, item) => sum + Math.abs(item.amount), 0);
   const allTimeExpense = allTimeItems.filter(item => !item.isIncome).reduce((sum, item) => sum + Math.abs(item.amount), 0);
+  const allTimeCommonFundExpense = allTimeItems.filter(item => !item.isIncome && doesSettlementEntryAffectPrincipal(item)).reduce((sum, item) => sum + Math.abs(item.amount), 0);
   const settlementParticipants = getActiveParticipants(calendar);
   const getCalendarSettlementCards = __deps.getCalendarSettlementCards || (c => Array.isArray(c?.settlementCards) ? c.settlementCards : []);
   const customSettlementCards = getCalendarSettlementCards(calendar);
@@ -3053,7 +3062,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     return getSettlementCardTime(b) - getSettlementCardTime(a);
   });
   const visibleSettlementCards = sortedSettlementCards.filter(card => card?.status !== 'closed');
-  const overallBalance = allTimeIncome - allTimeExpense;
+  const overallBalance = allTimeIncome - allTimeCommonFundExpense;
 
   const targetPrefix = `${year}-${String(month + 1).padStart(2, '0')}-`;
   const rows = getConfirmedMeetings(calendar).slice().sort((a, b) => b.date.localeCompare(a.date))
@@ -3089,19 +3098,20 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   const allItems = rows.flatMap(row => row.items.map(item => ({ ...item, date: row.meeting.date, meetingNote: row.meeting.note || '' })));
   const incomeItems = allItems.filter(item => item.isIncome);
   const expenseItems = allItems.filter(item => !item.isIncome);
+  const principalIncomeItems = incomeItems.filter(item => !isSettlementClearingIncomeEntry(item));
 
   const displayIncome = activeTab === 'total'
     ? allTimeIncome
-    : incomeItems.reduce((sum, item) => sum + Math.abs(item.amount), 0);
+    : principalIncomeItems.reduce((sum, item) => sum + Math.abs(item.amount), 0);
 
   const displayExpense = activeTab === 'total'
     ? allTimeExpense
     : expenseItems.reduce((sum, item) => sum + Math.abs(item.amount), 0);
 
-  // 일자별보기(선택된 월)일 때는 그 달의 수입-지출 순액을, 누적보기일 때는 baseBudget까지 포함한
-  // 전체 기간 잔액을 보여준다 -- displayIncome/displayExpense가 이미 탭에 따라 그 값들을 계산해
-  // 두므로 둘의 차만 내면 두 경우 모두 올바른 값이 나온다.
-  const displayBalance = activeTab === 'total' ? overallBalance : (displayIncome - displayExpense);
+  const selectedMonthEnd = `${year}-${String(month + 1).padStart(2, '0')}-31`;
+  const balanceAtSelectedMonthEnd = calculateFundPrincipalBalance(baseBudget,
+    allTimeItems.filter(item => String(item.date || '') <= selectedMonthEnd));
+  const displayBalance = activeTab === 'total' ? overallBalance : balanceAtSelectedMonthEnd;
 
   const allTimeExpenseItems = allTimeItems.filter(item => !item.isIncome);
   const categoryTotals = categories.map(category => ({
@@ -3112,8 +3122,8 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
 
   const monthLabelPrefix = `${month + 1}월`;
   const metricCards = [
-    { label: activeTab === 'total' ? '총 수입·정산유입' : `${monthLabelPrefix} 수입·정산유입`, value: displayIncome, color: 'var(--status-green)', icon: React.createElement(BanknoteArrowUpIcon, { size: 16 }) },
-    { label: activeTab === 'total' ? '총 지출·개인선결제' : `${monthLabelPrefix} 지출·개인선결제`, value: displayExpense, color: '#DC2626', icon: React.createElement(BanknoteArrowDownIcon, { size: 16 }) },
+    { label: activeTab === 'total' ? '공금 누적수입' : `${monthLabelPrefix} 공금수입`, value: displayIncome, color: 'var(--status-green)', icon: React.createElement(BanknoteArrowUpIcon, { size: 16 }) },
+    { label: activeTab === 'total' ? '모임 전체지출' : `${monthLabelPrefix} 전체지출`, value: displayExpense, color: '#DC2626', icon: React.createElement(BanknoteArrowDownIcon, { size: 16 }) },
     { label: activeTab === 'total' ? '공금 원금 잔액' : `${monthLabelPrefix} 공금 잔액`, value: displayBalance, color: 'var(--text-main)', icon: React.createElement(PiggyBankIcon, { size: 16 }) }
   ];
 
@@ -3145,8 +3155,8 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     ctx.fillText(periodLabel, 40, 138);
 
     const rowsStats = [
-    { label: activeTab === 'total' ? '총 수입·정산유입' : `${monthLabelPrefix} 수입·정산유입`, value: displayIncome, color: 'var(--status-green)' },
-    { label: activeTab === 'total' ? '총 지출·개인선결제' : `${monthLabelPrefix} 지출·개인선결제`, value: displayExpense, color: '#DC2626' },
+    { label: activeTab === 'total' ? '공금 누적수입' : `${monthLabelPrefix} 공금수입`, value: displayIncome, color: 'var(--status-green)' },
+    { label: activeTab === 'total' ? '모임 전체지출' : `${monthLabelPrefix} 전체지출`, value: displayExpense, color: '#DC2626' },
     { label: activeTab === 'total' ? '공금 원금 잔액' : `${monthLabelPrefix} 공금 잔액`, value: displayBalance, color: '#0F172A' }
     ];
     let y = 230;
@@ -3231,19 +3241,21 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }
   }, /*#__PURE__*/React.createElement("div", {
     style: { minWidth: 0, display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }
-  }, categoryBadge(getDisplayCategory(item)), showDate && /*#__PURE__*/React.createElement("span", { className: "registered-at-text" }, formatDateWithDayName(item.date)), !item.isIncome && /*#__PURE__*/React.createElement("span", {
+  }, categoryBadge(getDisplayCategory(item)), showDate && /*#__PURE__*/React.createElement("span", { className: "registered-at-text" }, formatDateWithDayName(item.date)), /*#__PURE__*/React.createElement("span", {
     style: {
       display: 'inline-flex', alignItems: 'center', padding: '3px 8px', borderRadius: '999px',
-      backgroundColor: item.payerId ? 'rgba(37, 99, 235, 0.1)' : 'rgba(100, 116, 139, 0.12)',
-      color: item.payerId ? '#2563EB' : 'var(--text-muted)', fontSize: '0.68rem', fontWeight: 900
+      backgroundColor: doesSettlementEntryAffectPrincipal(item) ? 'rgba(22, 163, 74, 0.1)' : 'rgba(37, 99, 235, 0.1)',
+      color: doesSettlementEntryAffectPrincipal(item) ? '#15803D' : '#2563EB', fontSize: '0.68rem', fontWeight: 900
     }
-  }, item.payerId ? `${item.payerId} 선결제` : '공금 직접지출')), /*#__PURE__*/React.createElement("strong", {
+  }, item.isIncome
+    ? (isSettlementClearingIncomeEntry(item) ? '정산 경유입금 · 원금 영향 없음' : '공금 수입')
+    : (item.payerId ? `${item.payerId} 선결제 · 원금 영향 없음` : '공금 직접지출'))), /*#__PURE__*/React.createElement("strong", {
     style: { fontSize: '0.9rem', color: item.isIncome ? 'var(--status-green)' : '#DC2626', whiteSpace: 'nowrap' }
   }, item.isIncome ? '+' : '-', Math.abs(item.amount).toLocaleString(), "원")), /*#__PURE__*/React.createElement("span", {
     style: { fontSize: '0.86rem', color: 'var(--text-main)', fontWeight: 500, overflowWrap: 'anywhere' }
   }, item.label), /*#__PURE__*/React.createElement("span", {
     className: "settlement-running-balance"
-  }, `잔액\u00a0\u00a0\u00a0${Number(settlementBalanceByKey.get(item.ledgerKey) || 0).toLocaleString()}원`), item.url && /*#__PURE__*/React.createElement("button", {
+  }, `공금 원금\u00a0\u00a0${Number(settlementBalanceByKey.get(item.ledgerKey) || 0).toLocaleString()}원`), item.url && /*#__PURE__*/React.createElement("button", {
     type: "button",
     title: item.url,
     style: {
@@ -3664,6 +3676,9 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
       className: "settlement-metric-card-value",
       style: { color: card.color }
     }, card.value.toLocaleString(), "원")))),
+  /*#__PURE__*/React.createElement("div", {
+    style: { padding: '9px 12px', borderRadius: '10px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', color: 'var(--text-muted)', fontSize: '0.74rem', lineHeight: 1.5 }
+  }, "개인 선결제와 정산 경유금은 아래 장부에 모두 공개되지만 공금 원금에는 중복 반영되지 않습니다. 정산카드가 입금·환급 흐름을 자동 계산하므로 정산금을 수입 내역으로 다시 입력하지 않아도 됩니다."),
   activeTab === 'daily' && /*#__PURE__*/React.createElement("div", {
     className: "calendar-nav",
     style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '6px', marginBottom: '2px', flexShrink: 0 }

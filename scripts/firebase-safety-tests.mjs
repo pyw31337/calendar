@@ -1,7 +1,13 @@
 import fs from 'node:fs';
 import vm from 'node:vm';
 import { GATHER_APP_UTILS, omitUndefinedDeep } from '../src/core/app-utils.js';
-import { calculateSettlementPlan, calculateSettlementRows } from '../src/core/settlement-calculator.js';
+import {
+  calculateFundPrincipalBalance,
+  calculateSettlementPlan,
+  calculateSettlementRows,
+  doesSettlementEntryAffectPrincipal,
+  isSettlementClearingIncomeEntry
+} from '../src/core/settlement-calculator.js';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -53,6 +59,16 @@ const commonFundPlan = calculateSettlementPlan(
   100000
 );
 assert(commonFundPlan.participantFunded === 376000 && commonFundPlan.fundNetChange === -100000, 'common-fund-paid expenses must stay visible without being charged to participants twice');
+
+const fundLedgerProbe = [
+  { amount: -25000, label: '김효진 8월 회비', isIncome: true },
+  { amount: 476000, label: '모임 전체 지출', payerId: '박영우', isIncome: false },
+  { amount: -158667, label: '김현석 / 어메이징빌리지 정산금', isIncome: true },
+  { amount: 10000, label: '공금 직접 구입', isIncome: false }
+];
+assert(isSettlementClearingIncomeEntry(fundLedgerProbe[2]), 'legacy settlement-income labels must be classified as clearing transfers');
+assert(!doesSettlementEntryAffectPrincipal(fundLedgerProbe[1]) && doesSettlementEntryAffectPrincipal(fundLedgerProbe[3]), 'personal advances must not change principal while direct common-fund expenses do');
+assert(calculateFundPrincipalBalance(400000, fundLedgerProbe) === 415000, 'fund principal must ignore personal advances and settlement clearing transfers');
 
 // A newer embedded settlement edit must beat a stale date-keyed subcollection snapshot even
 // when both records share the same original confirmedAt timestamp.
