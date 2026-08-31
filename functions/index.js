@@ -879,6 +879,88 @@ exports.googlePlacesSearchProxy = functions.runWith({ secrets: ['GOOGLE_PLACES_A
   }
 });
 
+// Read-only Korean tourism lookup used to enrich a registered place with nearby
+// attractions, food and lodging.  The service key stays in Secret Manager; the
+// browser receives only normalized, display-safe fields.  If the key is not set,
+// the endpoint returns a structured "not configured" response so the UI can keep
+// working and the integration can be enabled/removed independently later.
+let TOUR_API_SERVICE_KEY = process.env.TOUR_API_SERVICE_KEY || '';
+// Keep the integration deployable before a key is supplied.  Production can use
+// Secret Manager via process.env; the legacy functions config fallback is useful
+// for this optional, removable integration and does not expose the key to clients.
+if (!TOUR_API_SERVICE_KEY) {
+  try { TOUR_API_SERVICE_KEY = functions.config()?.tourapi?.service_key || ''; } catch (_) {}
+}
+
+exports.tourApiSearchProxy = functions.https.onRequest(async (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  if (req.method !== 'GET') { res.status(405).json({ ok: false, message: 'Method not allowed' }); return; }
+  if (!TOUR_API_SERVICE_KEY) {
+    res.status(503).json({ ok: false, code: 'not_configured', message: 'TourAPI service key is not configured' });
+    return;
+  }
+  const lat = Number(req.query.lat);
+  const lng = Number(req.query.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    res.status(400).json({ ok: false, message: 'lat and lng are required' });
+    return;
+  }
+  const radius = Math.min(20000, Math.max(500, Number(req.query.radius) || 5000));
+  const contentTypeId = String(req.query.contentTypeId || '').trim();
+  if (contentTypeId && !/^(12|14|15|25|28|32|38|39)$/.test(contentTypeId)) {
+    res.status(400).json({ ok: false, message: 'invalid contentTypeId' });
+    return;
+  }
+  if (!(await checkProxyRateLimit('tourApi', req.ip, 60 * 1000, 30))) {
+    res.status(429).json({ ok: false, message: 'Too many requests' });
+    return;
+  }
+  try {
+    const params = new URLSearchParams({
+      serviceKey: TOUR_API_SERVICE_KEY,
+      MobileOS: 'ETC',
+      MobileApp: 'MoyeoraCalendar',
+      _type: 'json',
+      mapX: String(lng),
+      mapY: String(lat),
+      radius: String(radius),
+      arrange: 'C',
+      numOfRows: '30',
+      pageNo: '1'
+    });
+    if (contentTypeId) params.set('contentTypeId', contentTypeId);
+    const upstream = await fetch(`https://apis.data.go.kr/B551011/KorService2/locationBasedList2?${params.toString()}`);
+    if (!upstream.ok) {
+      res.status(502).json({ ok: false, message: 'TourAPI request failed' });
+      return;
+    }
+    const payload = await upstream.json();
+    const rawItems = payload?.response?.body?.items?.item || [];
+    const items = (Array.isArray(rawItems) ? rawItems : [rawItems]).filter(Boolean).map(item => ({
+      id: String(item.contentid || ''),
+      title: String(item.title || ''),
+      address: String(item.addr1 || item.addr2 || ''),
+      roadAddress: String(item.addr2 || ''),
+      lat: Number(item.mapy),
+      lng: Number(item.mapx),
+      imageUrl: String(item.firstimage || item.firstimage2 || ''),
+      contentTypeId: String(item.contenttypeid || ''),
+      category: String(item.cat3 || item.cat2 || item.cat1 || ''),
+      phone: String(item.tel || ''),
+      homepage: String(item.homepage || ''),
+      eventStartDate: String(item.eventstartdate || ''),
+      eventEndDate: String(item.eventenddate || ''),
+      modifiedAt: String(item.modifiedtime || '')
+    })).filter(item => item.id && Number.isFinite(item.lat) && Number.isFinite(item.lng));
+    res.status(200).json({ ok: true, source: 'tourapi', items });
+  } catch (err) {
+    console.error('tourApiSearchProxy failed:', err);
+    res.status(502).json({ ok: false, message: 'TourAPI request failed' });
+  }
+});
+
 // Public, unauthenticated: returns only {id, title, description} for every calendar, for the
 // GitHub Actions "Refresh Calendar OG Pages" job (scripts/generate-og-pages.mjs), which needs to
 // enumerate all calendars to regenerate their public share/OG preview pages. That's the same

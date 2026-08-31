@@ -756,7 +756,6 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
   const extractLeadingMemoDate = __deps.extractLeadingMemoDate || (window.GATHER_APP_UTILS || {}).extractLeadingMemoDate || (() => '');
   const autoGrowTextarea = __deps.autoGrowTextarea || (window.GATHER_APP_UTILS || {}).autoGrowTextarea || (() => {});
   const getPlaceCategoryIcon = __deps.getPlaceCategoryIcon || (window.GATHER_APP_UTILS || {}).getPlaceCategoryIcon || (() => '');
-  const fetchWithTimeout = __deps.fetchWithTimeout || (window.GATHER_APP_UTILS || {}).fetchWithTimeout || window.fetch;
   const firebaseConfig = __deps.firebaseConfig || window.firebaseConfig;
   const KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY = __deps.KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY || {};
 
@@ -768,6 +767,14 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
     name: editingPlace.name, address: editingPlace.address, lat: editingPlace.lat, lng: editingPlace.lng,
     categoryLabel: '', phone: '', url: ''
   } : null);
+  const [tourItems, setTourItems] = React.useState([]);
+  const [tourLoading, setTourLoading] = React.useState(false);
+  const tourGroups = React.useMemo(() => {
+    const api = window.GATHER_APP_PLACE_SEARCH;
+    return api && typeof api.groupTourItemsByType === 'function'
+      ? api.groupTourItemsByType(tourItems)
+      : (tourItems.length ? [{ key: 'etc', label: '주변 여행정보', items: tourItems }] : []);
+  }, [tourItems]);
   // Display alias (별칭) -- optional nickname shown in lists while official search name stays on the place record.
   const [alias, setAlias] = React.useState(editingPlace ? (editingPlace.alias || '') : '');
   // Reformats an existing multi-visit memo into one line per date entry on open (see
@@ -808,6 +815,42 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
   // slow tier (e.g. a cold-started googlePlacesSearchProxy) reads as "still working", not frozen.
   const [searchStage, setSearchStage] = React.useState(null);
   const SEARCH_TIER_LABELS = { kakao: '카카오에서 검색 중...', google: '해외 장소 데이터베이스 확인 중...', nominatim: '지도 데이터에서 주소 확인 중...' };
+  const [preferredProvider, setPreferredProvider] = React.useState(() => {
+    const api = window.GATHER_APP_PLACE_SEARCH;
+    return api?.getPlaceSearchSettings?.().preferred || 'auto';
+  });
+
+  const searchPlacesWithProviders = async (cleanQuery, options = {}) => {
+    const api = window.GATHER_APP_PLACE_SEARCH;
+    if (!api || typeof api.searchPlaces !== 'function') return { provider: null, results: [] };
+    return api.searchPlaces(cleanQuery, {
+      ...options,
+      firebaseConfig,
+      categoryMap: KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY,
+      onStage: setSearchStage
+    });
+  };
+
+  // Tourism enrichment is deliberately read-only and never blocks place saving.
+  // If the optional TourAPI secret is absent or the service is unavailable, the
+  // normal place workflow remains unchanged.
+  React.useEffect(() => {
+    const api = window.GATHER_APP_PLACE_SEARCH;
+    const lat = Number(selected?.lat);
+    const lng = Number(selected?.lng);
+    if (!api || typeof api.searchTourInfo !== 'function' || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+      setTourItems([]);
+      setTourLoading(false);
+      return undefined;
+    }
+    let active = true;
+    setTourLoading(true);
+    api.searchTourInfo(firebaseConfig, { lat, lng, radius: 5000 })
+      .then(items => { if (active) setTourItems(Array.isArray(items) ? items.slice(0, 6) : []); })
+      .catch(() => { if (active) setTourItems([]); })
+      .finally(() => { if (active) setTourLoading(false); });
+    return () => { active = false; };
+  }, [selected?.lat, selected?.lng, firebaseConfig?.projectId]);
 
   // Three-tier fallback chain, cheapest/most-reliable first: Kakao Local (키워드 검색) covers
   // domestic businesses very well and is effectively free at this app's scale, so it's tried
@@ -831,67 +874,8 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
       return;
     }
     setLoading(true);
-    if (!auto) setSearchStage('kakao');
     try {
-      let mapped = [];
-      try {
-        const kakaoUrl = `https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/kakaoLocalSearchProxy?query=${encodeURIComponent(cleanQuery)}`;
-        // 6s cap -- generous for a warm call, but stops a slow/cold hop from stalling the whole
-        // fallback chain far longer than any one tier should reasonably take (see fetchWithTimeout).
-        const kakaoRes = await fetchWithTimeout(kakaoUrl, 6000);
-        const kakaoJson = kakaoRes.ok ? await kakaoRes.json() : null;
-        if (kakaoJson?.ok && Array.isArray(kakaoJson.documents)) {
-          mapped = kakaoJson.documents.map((doc, idx) => ({
-            id: `kakao_${doc.id || idx}`,
-            name: doc.place_name || cleanQuery,
-            address: doc.road_address_name || doc.address_name || '',
-            lat: parseFloat(doc.y),
-            lng: parseFloat(doc.x),
-            categoryId: KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY[doc.category_group_code] || null,
-            categoryLabel: doc.category_name || '',
-            phone: doc.phone || '',
-            url: doc.place_url || ''
-          })).filter(r => Number.isFinite(r.lat) && Number.isFinite(r.lng));
-        }
-      } catch (err) {
-        console.error('Kakao local search failed, falling back to Google Places:', err);
-      }
-      if (mapped.length === 0 && !auto) {
-        setSearchStage('google');
-        try {
-          const googleUrl = `https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/googlePlacesSearchProxy?query=${encodeURIComponent(cleanQuery)}`;
-          const googleRes = await fetchWithTimeout(googleUrl, 6000);
-          const googleJson = googleRes.ok ? await googleRes.json() : null;
-          if (googleJson?.ok && Array.isArray(googleJson.places)) {
-            mapped = googleJson.places.map((p, idx) => ({
-              id: `google_${p.id || idx}`,
-              name: p.displayName?.text || cleanQuery,
-              address: p.formattedAddress || '',
-              lat: parseFloat(p.location?.latitude),
-              lng: parseFloat(p.location?.longitude),
-              categoryId: null
-            })).filter(r => Number.isFinite(r.lat) && Number.isFinite(r.lng));
-          }
-        } catch (err) {
-          console.error('Google Places search failed, falling back to Nominatim:', err);
-        }
-      }
-      if (mapped.length === 0 && !auto) {
-        // The as-you-type path skips this Nominatim fallback too -- it's meant as a last resort
-        // for addresses/landmarks neither Kakao nor Google Places turned up, not for partial
-        // business-name fragments typed mid-search.
-        setSearchStage('nominatim');
-        const res = await fetchWithTimeout(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cleanQuery)}&format=json&limit=8&accept-language=ko`, 6000);
-        const data = res.ok ? await res.json() : [];
-        mapped = (data || []).map((item, idx) => ({
-          id: `nominatim_${item.place_id || idx}`,
-          name: (item.display_name || '').split(',')[0] || cleanQuery,
-          address: item.display_name || '',
-          lat: parseFloat(item.lat),
-          lng: parseFloat(item.lon),
-          categoryId: null
-        })).filter(r => Number.isFinite(r.lat) && Number.isFinite(r.lng));
-      }
+      const { results: mapped } = await searchPlacesWithProviders(cleanQuery, { auto });
       setResults(mapped);
       if (mapped.length === 0 && !auto) showToast('검색 결과가 없습니다.', 'info');
     } catch (err) {
@@ -1101,6 +1085,23 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
           disabled: loading
         }, loading ? '검색중' : '검색')
       ),
+      /*#__PURE__*/React.createElement("label", { style: { display: 'flex', alignItems: 'center', gap: '7px', fontSize: '0.72rem', color: 'var(--text-muted)' } },
+        '검색 우선 제공자',
+        /*#__PURE__*/React.createElement("select", {
+          value: preferredProvider,
+          onChange: e => {
+            const value = e.target.value;
+            setPreferredProvider(value);
+            window.GATHER_APP_PLACE_SEARCH?.setPlaceSearchProvider?.(value);
+          },
+          style: { flex: 1, minWidth: 0, height: '32px', borderRadius: '7px', border: '1px solid var(--border-subtle)', background: 'var(--bg-primary)', color: 'var(--text-main)', fontSize: '0.74rem', padding: '0 7px' }
+        },
+          /*#__PURE__*/React.createElement("option", { value: 'auto' }, '자동 (카카오 → Google → 지도)'),
+          /*#__PURE__*/React.createElement("option", { value: 'kakao' }, '카카오 우선'),
+          /*#__PURE__*/React.createElement("option", { value: 'google' }, 'Google 우선'),
+          /*#__PURE__*/React.createElement("option", { value: 'nominatim' }, 'OpenStreetMap 우선')
+        )
+      ),
 
       /* Search progress -- only for a manual (non-auto) submit, see searchStage above. Google
          Places in particular can take several seconds on a cold start, so this exists to make
@@ -1182,6 +1183,28 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
             backgroundColor: 'var(--border-subtle)', color: 'var(--text-muted)', wordBreak: 'break-all', maxWidth: '100%'
           }
         }, selected.url)
+        , tourLoading && /*#__PURE__*/React.createElement("div", { style: { marginTop: '6px', fontSize: '0.74rem', color: 'var(--text-muted)' } }, '주변 투어 정보 불러오는 중...')
+        , tourItems.length > 0 && /*#__PURE__*/React.createElement("div", {
+          style: { marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(59,130,246,0.16)', display: 'flex', flexDirection: 'column', gap: '5px' }
+        },
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.76rem', fontWeight: 800, color: 'var(--accent-primary)' } }, '주변 투어 정보 (TourAPI)'),
+          tourGroups.map(group => /*#__PURE__*/React.createElement("div", { key: group.key, style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', marginTop: '2px' } }, group.label),
+            group.items.map(item => /*#__PURE__*/React.createElement("a", {
+              key: item.id,
+              href: item.homepage || `https://map.kakao.com/?q=${encodeURIComponent(item.title)}`,
+              target: '_blank',
+              rel: 'noreferrer',
+              style: { display: 'flex', alignItems: 'center', gap: '7px', color: 'var(--text-main)', textDecoration: 'none', fontSize: '0.76rem' }
+            },
+              item.imageUrl && /*#__PURE__*/React.createElement('img', { src: item.imageUrl, alt: '', loading: 'lazy', style: { width: '34px', height: '34px', objectFit: 'cover', borderRadius: '6px', flexShrink: 0 } }),
+              /*#__PURE__*/React.createElement('span', { style: { minWidth: 0 } },
+                /*#__PURE__*/React.createElement('span', { style: { display: 'block', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, item.title),
+                /*#__PURE__*/React.createElement('span', { style: { display: 'block', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, item.address)
+              )
+            ))
+          ))
+        )
       ),
 
       /* Alias (별칭) -- optional nickname; official search name stays as place.name */

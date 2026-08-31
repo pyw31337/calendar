@@ -810,7 +810,6 @@ export function DateModal({
   const sanitizeText = __deps.sanitizeText;
   const autoGrowTextarea = __deps.autoGrowTextarea;
   const getPlaceCategoryIcon = __deps.getPlaceCategoryIcon;
-  const fetchWithTimeout = __deps.fetchWithTimeout;
   const firebaseConfig = __deps.firebaseConfig || window.firebaseConfig;
   const KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY = __deps.KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY || {};
 
@@ -933,6 +932,17 @@ export function DateModal({
     return () => clearInterval(interval);
   }, [isPlaceLoading]);
 
+  const searchPlacesWithProviders = async (cleanQuery, options = {}) => {
+    const api = window.GATHER_APP_PLACE_SEARCH;
+    if (!api || typeof api.searchPlaces !== 'function') return { provider: null, results: [] };
+    return api.searchPlaces(cleanQuery, {
+      ...options,
+      firebaseConfig,
+      categoryMap: KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY,
+      onStage: setPlaceSearchStage
+    });
+  };
+
   // Registered places for this date
   const registeredPlaces = React.useMemo(() => {
     return getCalendarPlaces(calendar).filter(p => doesPlaceMatchDate(p, dateStr));
@@ -998,64 +1008,8 @@ export function DateModal({
       return;
     }
     setIsPlaceLoading(true);
-    if (!auto) setPlaceSearchStage('kakao');
     try {
-      let mapped = [];
-      try {
-        const kakaoUrl = `https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/kakaoLocalSearchProxy?query=${encodeURIComponent(cleanQuery)}`;
-        const kakaoRes = await fetchWithTimeout(kakaoUrl, 6000);
-        const kakaoJson = kakaoRes.ok ? await kakaoRes.json() : null;
-        if (kakaoJson?.ok && Array.isArray(kakaoJson.documents)) {
-          mapped = kakaoJson.documents.map((doc, idx) => ({
-            id: `kakao_${doc.id || idx}`,
-            name: doc.place_name || cleanQuery,
-            address: doc.road_address_name || doc.address_name || '',
-            lat: parseFloat(doc.y),
-            lng: parseFloat(doc.x),
-            categoryId: KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY[doc.category_group_code] || null,
-            categoryLabel: doc.category_name || '',
-            phone: doc.phone || '',
-            url: doc.place_url || ''
-          })).filter(r => Number.isFinite(r.lat) && Number.isFinite(r.lng));
-        }
-      } catch (err) {
-        console.error('Kakao local search failed, falling back to Google Places:', err);
-      }
-      if (mapped.length === 0 && !auto) {
-        setPlaceSearchStage('google');
-        try {
-          const googleUrl = `https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/googlePlacesSearchProxy?query=${encodeURIComponent(cleanQuery)}`;
-          const googleRes = await fetchWithTimeout(googleUrl, 6000);
-          const googleJson = googleRes.ok ? await googleRes.json() : null;
-          if (googleJson?.ok && Array.isArray(googleJson.places)) {
-            mapped = googleJson.places.map((p, idx) => ({
-              id: `google_${p.id || idx}`,
-              name: p.displayName?.text || cleanQuery,
-              address: p.formattedAddress || '',
-              lat: parseFloat(p.location?.latitude),
-              lng: parseFloat(p.location?.longitude),
-              categoryId: null,
-              categoryLabel: '', phone: '', url: ''
-            })).filter(r => Number.isFinite(r.lat) && Number.isFinite(r.lng));
-          }
-        } catch (err) {
-          console.error('Google Places search failed, falling back to Nominatim:', err);
-        }
-      }
-      if (mapped.length === 0 && !auto) {
-        setPlaceSearchStage('nominatim');
-        const res = await fetchWithTimeout(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cleanQuery)}&format=json&limit=8&accept-language=ko`, 6000);
-        const data = res.ok ? await res.json() : [];
-        mapped = data.map((doc, idx) => ({
-          id: `osm_${doc.place_id || idx}`,
-          name: doc.display_name?.split(',')[0] || cleanQuery,
-          address: doc.display_name || '',
-          lat: parseFloat(doc.lat),
-          lng: parseFloat(doc.lon),
-          categoryId: null,
-          categoryLabel: '', phone: '', url: ''
-        })).filter(r => Number.isFinite(r.lat) && Number.isFinite(r.lng));
-      }
+      const { results: mapped } = await searchPlacesWithProviders(cleanQuery, { auto });
       setPlaceResults(mapped);
       if (mapped.length === 0 && !auto) {
         showToast('검색 결과가 없습니다.', 'info');

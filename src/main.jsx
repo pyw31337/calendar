@@ -226,6 +226,7 @@ async function boot() {
       import('./core/app-calendar-data.js'),
       import('./core/app-chat-data.js'),
       import('./core/app-utils.js'),
+      import('./core/app-place-search.js'),
       import('./core/app-notifications.js'),
       import('./core/firebase-services.js')
     ]);
