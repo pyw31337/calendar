@@ -1210,6 +1210,12 @@ export function ChatGalleryModal({
 
   const displayPhotoTabCount = visiblePhotos.length;
   const [galleryViewMode, setGalleryViewMode] = React.useState('all'); // 'all' | 'date'
+  // '최신순' sorts by the item's own content date (meeting date when tagged, else the date its
+  // timestamp falls on) -- "가장 최근일자의 사진부터". '업로드순' sorts by raw upload timestamp,
+  // matching the order items were fetched in already. Only affects the flat ('전체' view mode)
+  // list; '일자' grouped view already buckets by date and sorts within each bucket independently,
+  // so it's unaffected either way. Scoped to asPage since the toggle to change it only exists there.
+  const [gallerySortMode, setGallerySortMode] = React.useState('latest'); // 'latest' | 'upload'
   const [galleryMonthDate, setGalleryMonthDate] = React.useState(() => new Date());
   const [collapsedGalleryDates, setCollapsedGalleryDates] = React.useState(() => new Set());
   const galleryMonthKey = `${galleryMonthDate.getFullYear()}-${String(galleryMonthDate.getMonth() + 1).padStart(2, '0')}`;
@@ -1224,6 +1230,25 @@ export function ChatGalleryModal({
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+  };
+  const getGalleryItemSortDateMs = item => {
+    const dateKey = getGalleryItemDateKey(item);
+    if (dateKey) {
+      const [y, m, d] = dateKey.split('-').map(Number);
+      const ms = new Date(y, m - 1, d).getTime();
+      if (Number.isFinite(ms)) return ms;
+    }
+    return Number(item?.timestamp || 0);
+  };
+  const sortGalleryFlatItems = items => {
+    const list = (items || []).slice();
+    if (!asPage) return list;
+    if (gallerySortMode === 'latest') {
+      list.sort((a, b) => (getGalleryItemSortDateMs(b) - getGalleryItemSortDateMs(a)) || (Number(b?.timestamp || 0) - Number(a?.timestamp || 0)));
+    } else {
+      list.sort((a, b) => Number(b?.timestamp || 0) - Number(a?.timestamp || 0));
+    }
+    return list;
   };
   const groupedGallerySections = React.useMemo(() => {
     if (galleryViewMode !== 'date') return [];
@@ -1552,10 +1577,11 @@ export function ChatGalleryModal({
       );
     }
     if (activeTab === 'links') {
+      const sortedLinks = sortGalleryFlatItems(filteredLinks);
       return /*#__PURE__*/React.createElement(React.Fragment, null,
-        filteredLinks.length === 0 ? /*#__PURE__*/React.createElement("div", {
+        sortedLinks.length === 0 ? /*#__PURE__*/React.createElement("div", {
           style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: '0.88rem' }
-        }, searchQuery ? "검색 결과가 없습니다." : "공유된 링크가 없습니다.") : renderGalleryLinkList(filteredLinks),
+        }, searchQuery ? "검색 결과가 없습니다." : "공유된 링크가 없습니다.") : renderGalleryLinkList(sortedLinks),
         (hasMoreOlderChat || hasMoreMemos) && !(searchQuery || '').trim() && renderGalleryLoadMoreButton({
           label: '이전 링크 더 보기',
           loadingLabel: '이전 링크를 불러오는 중…',
@@ -1567,8 +1593,9 @@ export function ChatGalleryModal({
         })
       );
     }
+    const sortedPhotos = sortGalleryFlatItems(visiblePhotos);
     return /*#__PURE__*/React.createElement(React.Fragment, null,
-      visiblePhotos.length === 0 ? /*#__PURE__*/React.createElement("div", {
+      sortedPhotos.length === 0 ? /*#__PURE__*/React.createElement("div", {
         style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: '0.88rem' }
       }, searchQuery
         ? "검색 결과가 없습니다."
@@ -1577,7 +1604,7 @@ export function ChatGalleryModal({
           : ((typeof totalGalleryCount === 'number' && totalGalleryCount > 0)
             ? "사진 데이터를 아직 불러오지 못했습니다. 아래 더보기를 눌러 주세요."
             : "공유된 사진이 없습니다.")))
-      : renderGalleryPhotoGrid(visiblePhotos, visiblePhotos),
+      : renderGalleryPhotoGrid(sortedPhotos, sortedPhotos),
       (hasMoreOlderChat || loadingOlderChat) && !(searchQuery || '').trim() && renderGalleryLoadMoreButton({
         label: '이전 사진·링크 더 보기',
         loadingLabel: '이전 사진을 불러오는 중…',
@@ -1620,40 +1647,6 @@ export function ChatGalleryModal({
           /*#__PURE__*/React.createElement("div", {
             style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }
           },
-            /*#__PURE__*/React.createElement("div", {
-              style: {
-                display: 'flex',
-                alignItems: 'center',
-                gap: '2px',
-                padding: '3px',
-                borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--border-subtle)',
-                backgroundColor: 'var(--bg-primary)',
-                flexShrink: 0
-              }
-            },
-              [
-                { key: 'all', label: '전체' },
-                { key: 'date', label: '일자' }
-              ].map(tab => /*#__PURE__*/React.createElement("button", {
-                key: tab.key,
-                type: "button",
-                onClick: () => setGalleryViewMode(tab.key),
-                style: {
-                  border: 'none',
-                  borderRadius: 'var(--radius-sm)',
-                  padding: '4px 10px',
-                  fontSize: '0.72rem',
-                  fontWeight: 800,
-                  lineHeight: 1,
-                  backgroundColor: galleryViewMode === tab.key ? '#4F46E5' : 'transparent',
-                  color: galleryViewMode === tab.key ? '#FFFFFF' : 'var(--text-muted)',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                  flexShrink: 0
-                }
-              }, tab.label))
-            ),
             /*#__PURE__*/React.createElement("button", {
               type: "button",
               onClick: () => setIsMenuOpen(true),
@@ -1813,14 +1806,82 @@ export function ChatGalleryModal({
       onClick: () => { setIsSearchOpen(false); setSearchQuery(''); },
       style: { border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px 6px', fontSize: '0.8rem', fontWeight: 700, flexShrink: 0 }
     }, "닫기")
-  }), /*#__PURE__*/React.createElement("div", {
+  }), asPage && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
+      padding: '7px 20px', borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)',
+      flexShrink: 0,
+      position: 'fixed', top: isSearchOpen ? '104px' : '56px', left: 0, right: 0, zIndex: 1008,
+      transition: 'transform 0.3s ease, top 0.3s ease',
+      transform: isHeaderVisible ? 'translateY(0)' : 'translateY(calc(-100% - 56px))'
+    }
+  },
+    /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex', alignItems: 'center', gap: '2px', padding: '3px',
+        borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)',
+        backgroundColor: 'var(--bg-card)', flexShrink: 0
+      }
+    },
+      [
+        { key: 'all', label: '전체' },
+        { key: 'date', label: '일자' }
+      ].map(tab => /*#__PURE__*/React.createElement("button", {
+        key: tab.key,
+        type: "button",
+        onClick: () => setGalleryViewMode(tab.key),
+        style: {
+          border: 'none',
+          borderRadius: 'var(--radius-sm)',
+          padding: '4px 10px',
+          fontSize: '0.72rem',
+          fontWeight: 800,
+          lineHeight: 1,
+          backgroundColor: galleryViewMode === tab.key ? '#4F46E5' : 'transparent',
+          color: galleryViewMode === tab.key ? '#FFFFFF' : 'var(--text-muted)',
+          cursor: 'pointer',
+          whiteSpace: 'nowrap',
+          flexShrink: 0
+        }
+      }, tab.label))
+    ),
+    /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex', alignItems: 'center', gap: '2px', padding: '3px',
+        borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)',
+        backgroundColor: 'var(--bg-card)', flexShrink: 0
+      }
+    },
+      [
+        { key: 'latest', label: '최신순' },
+        { key: 'upload', label: '업로드순' }
+      ].map(tab => /*#__PURE__*/React.createElement("button", {
+        key: tab.key,
+        type: "button",
+        onClick: () => setGallerySortMode(tab.key),
+        style: {
+          border: 'none',
+          borderRadius: 'var(--radius-sm)',
+          padding: '4px 10px',
+          fontSize: '0.72rem',
+          fontWeight: 800,
+          lineHeight: 1,
+          backgroundColor: gallerySortMode === tab.key ? '#4F46E5' : 'transparent',
+          color: gallerySortMode === tab.key ? '#FFFFFF' : 'var(--text-muted)',
+          cursor: 'pointer',
+          whiteSpace: 'nowrap',
+          flexShrink: 0
+        }
+      }, tab.label))
+    )
+  ), /*#__PURE__*/React.createElement("div", {
     className: asPage ? "gallery-page-tabs" : undefined,
     style: {
       display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', padding: '12px 20px 8px 20px',
       borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)',
       flexShrink: 0,
       ...(asPage ? {
-        position: 'fixed', top: isSearchOpen ? '104px' : '56px', left: 0, right: 0, zIndex: 1009,
+        position: 'fixed', top: isSearchOpen ? '148px' : '100px', left: 0, right: 0, zIndex: 1009,
         transition: 'transform 0.3s ease, top 0.3s ease',
         transform: isHeaderVisible ? 'translateY(0)' : 'translateY(calc(-100% - 56px))'
       } : {})
@@ -1868,7 +1929,7 @@ export function ChatGalleryModal({
     style: {
       flex: 1, overflowY: 'auto',
       padding: asPage
-        ? ((isSearchOpen ? '168px' : '120px') + ' 20px 16px 20px')
+        ? ((isSearchOpen ? '212px' : '164px') + ' 20px 16px 20px')
         : '16px 20px',
       display: 'flex', flexDirection: 'column', gap: activeTab === 'links' ? '8px' : '12px', boxSizing: 'border-box',
       minWidth: 0
