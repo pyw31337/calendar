@@ -2384,12 +2384,26 @@ async function pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode,
       let legacyConfirmedMeetings = [];
       let docCalendar = stripEmbeddedActivityLogsField(mergedCalendar);
       if (ENABLE_PLACES_SUBCOLLECTION_MIGRATION) {
+        // Build legacyPlaces with mergedCalendar.places as the highest-priority source:
+        // server (oldest) → auxiliaryData (caller-supplied delta) → mergedCalendar (final
+        // merged state). Last-writer-wins by id, so the most up-to-date version of each
+        // place always ends up in the subcollection write — fixes the bug where a new or
+        // edited place was stripped by stripEmbeddedPlacesField and never written to
+        // the subcollection because mergedCalendar.places was ignored entirely.
         const legacyPlacesById = new Map();
-        [...(Array.isArray(serverCalendar?.places) ? serverCalendar.places : []), ...(Array.isArray(auxiliaryData?.places) ? auxiliaryData.places : [])]
+        [...(Array.isArray(serverCalendar?.places) ? serverCalendar.places : []),
+          ...(Array.isArray(auxiliaryData?.places) ? auxiliaryData.places : []),
+          ...(Array.isArray(mergedCalendar?.places) ? mergedCalendar.places : [])]
           .forEach(p => { if (p?.id) legacyPlacesById.set(p.id, p); });
         legacyPlaces = Array.from(legacyPlacesById.values());
+        // Build legacyConfirmedMeetings with mergedCalendar.confirmedMeeting as the
+        // highest-priority source for the same reason — ensures newly added or edited
+        // expenses/notes are actually written to the subcollection instead of being
+        // overwritten by the stale serverCalendar or auxiliaryData arrays.
         const legacyMeetingsByDate = new Map();
-        [...(Array.isArray(serverCalendar?.confirmedMeeting) ? serverCalendar.confirmedMeeting : []), ...(Array.isArray(auxiliaryData?.confirmedMeetings) ? auxiliaryData.confirmedMeetings : [])]
+        [...(Array.isArray(serverCalendar?.confirmedMeeting) ? serverCalendar.confirmedMeeting : []),
+          ...(Array.isArray(auxiliaryData?.confirmedMeetings) ? auxiliaryData.confirmedMeetings : []),
+          ...(Array.isArray(mergedCalendar?.confirmedMeeting) ? mergedCalendar.confirmedMeeting : [])]
           .forEach(m => { if (m?.date) legacyMeetingsByDate.set(m.date, m); });
         legacyConfirmedMeetings = Array.from(legacyMeetingsByDate.values());
         docCalendar = stripEmbeddedConfirmedMeetingField(stripEmbeddedPlacesField(docCalendar));
@@ -2528,12 +2542,26 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 4, 
 	          // carry legacy-embedded copies of an entry already migrated on a prior save.
 	          let docCalendar = stripEmbeddedActivityLogsField(mergedCalendar);
 	          if (ENABLE_PLACES_SUBCOLLECTION_MIGRATION) {
+	            // Build legacyPlaces with mergedCalendar.places as the highest-priority source:
+	            // server (oldest) → auxiliaryData (caller-supplied delta) → mergedCalendar (final
+	            // merged state). Last-writer-wins by id, so the most up-to-date version of each
+	            // place always ends up in the subcollection write — fixes the bug where a new or
+	            // edited place was stripped by stripEmbeddedPlacesField and never written to
+	            // the subcollection because mergedCalendar.places was ignored entirely.
 	            const legacyPlacesById = new Map();
-            [...(Array.isArray(serverCalendar?.places) ? serverCalendar.places : []), ...(Array.isArray(auxiliaryData?.places) ? auxiliaryData.places : [])]
+            [...(Array.isArray(serverCalendar?.places) ? serverCalendar.places : []),
+              ...(Array.isArray(auxiliaryData?.places) ? auxiliaryData.places : []),
+              ...(Array.isArray(mergedCalendar?.places) ? mergedCalendar.places : [])]
 	              .forEach(p => { if (p?.id) legacyPlacesById.set(p.id, p); });
 	            legacyPlaces = Array.from(legacyPlacesById.values());
+	            // Build legacyConfirmedMeetings with mergedCalendar.confirmedMeeting as the
+	            // highest-priority source for the same reason — ensures newly added or edited
+	            // expenses/notes are actually written to the subcollection instead of being
+	            // overwritten by the stale serverCalendar or auxiliaryData arrays.
 	            const legacyMeetingsByDate = new Map();
-            [...(Array.isArray(serverCalendar?.confirmedMeeting) ? serverCalendar.confirmedMeeting : []), ...(Array.isArray(auxiliaryData?.confirmedMeetings) ? auxiliaryData.confirmedMeetings : [])]
+            [...(Array.isArray(serverCalendar?.confirmedMeeting) ? serverCalendar.confirmedMeeting : []),
+              ...(Array.isArray(auxiliaryData?.confirmedMeetings) ? auxiliaryData.confirmedMeetings : []),
+              ...(Array.isArray(mergedCalendar?.confirmedMeeting) ? mergedCalendar.confirmedMeeting : [])]
 	              .forEach(m => { if (m?.date) legacyMeetingsByDate.set(m.date, m); });
 	            legacyConfirmedMeetings = Array.from(legacyMeetingsByDate.values());
 	            docCalendar = stripEmbeddedConfirmedMeetingField(stripEmbeddedPlacesField(docCalendar));

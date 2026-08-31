@@ -3929,7 +3929,7 @@ function CalendarApp() {
 	    const nextExpenses = isEditing
 	      ? existingExpenses.map(e => e.id === expense.id ? { ...e, label: cleanLabel, url: cleanUrl, categoryId: cleanCategoryId, amount: cleanAmount, updatedAt: now, linkPreview: linkPreview || null } : e)
 	      : [...existingExpenses, { id: `exp_${activeCal.id}_${dateStr}_${now}_${Math.random().toString(36).slice(2, 7)}`, label: cleanLabel, url: cleanUrl, categoryId: cleanCategoryId, amount: cleanAmount, order: existingExpenses.length, createdAt: now, updatedAt: now, linkPreview: linkPreview || null }];
-    const nextConfirmedMeetings = meetings.map((m, i) => i === meetingIndex ? { ...m, expenses: nextExpenses, amount: null } : m);
+    const nextConfirmedMeetings = meetings.map((m, i) => i === meetingIndex ? { ...m, expenses: nextExpenses, updatedAt: now, amount: null } : m);
     // Expense/income entries have no participant selector of their own, so these logs carry an
     // empty participantId (matching how poll activity logs already handle system-level actions)
     // -- the admin log UI falls back to a generic '정산' label for that case.
