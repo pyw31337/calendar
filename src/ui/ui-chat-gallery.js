@@ -1362,54 +1362,94 @@ export function ChatGalleryModal({
       }
     });
   }));
-  const renderGalleryLinkList = items => /*#__PURE__*/React.createElement(React.Fragment, null,
-    (items || []).map(item => {
-      const mediaInfo = getDirectChatMediaInfo(item.url);
-      const isVideoMedia = !!(mediaInfo && (mediaInfo.type === 'embed' || mediaInfo.type === 'tiktok-widget' || mediaInfo.type === 'video'));
-      const fallbackTitle = item.title || (item.text ? removeFirstUrl(item.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '');
+  const GalleryLinkCard = ({ item }) => {
+    const [isVideoOpen, setIsVideoOpen] = React.useState(false);
+    const mediaInfo = getDirectChatMediaInfo(item.url);
+    const isVideoMedia = !!(mediaInfo && (mediaInfo.type === 'embed' || mediaInfo.type === 'tiktok-widget' || mediaInfo.type === 'video'));
+    const fallbackTitle = item.title || (item.text ? removeFirstUrl(item.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '');
+    const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
 
-      if (isVideoMedia) {
-        return /*#__PURE__*/React.createElement("div", {
-          key: item.messageId || item.url,
-          style: {
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px',
-            width: '100%',
-            backgroundColor: 'var(--bg-card)',
-            border: '1px solid var(--border-subtle)',
-            borderRadius: 'var(--radius-md)',
-            padding: '12px',
-            boxSizing: 'border-box'
-          }
-        },
-          fallbackTitle && /*#__PURE__*/React.createElement("div", {
-            style: {
-              fontSize: '0.9rem',
-              fontWeight: 700,
-              color: 'var(--text-main)',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap'
-            }
-          }, fallbackTitle),
-          /*#__PURE__*/React.createElement(ClickToPlayVideoCard, {
-            url: item.url,
-            mediaInfo: mediaInfo,
-            fallbackTitle: fallbackTitle,
-            cachedData: item.linkPreview
-          })
-        );
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px',
+        width: '100%',
+        backgroundColor: 'var(--bg-card)',
+        border: '1px solid var(--border-subtle)',
+        borderRadius: 'var(--radius-md)',
+        padding: '12px',
+        boxSizing: 'border-box'
       }
+    },
+      fallbackTitle && /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: '0.9rem',
+          fontWeight: 700,
+          color: 'var(--text-main)',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap'
+        }
+      }, fallbackTitle),
 
-      return /*#__PURE__*/React.createElement(LinkPreviewCard, {
-        key: item.messageId || item.url,
+      /* Primary Link Preview Card */
+      /*#__PURE__*/React.createElement(LinkPreviewCard, {
         url: item.url,
         fallbackTitle: fallbackTitle,
         cachedData: item.linkPreview,
         stretch: true
-      });
-    })
+      }),
+
+      /* Video Toggle Button for video media */
+      isVideoMedia && /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => setIsVideoOpen(prev => !prev),
+        style: {
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '6px',
+          width: '100%',
+          padding: '7px 0',
+          marginTop: '2px',
+          borderRadius: 'var(--radius-md)',
+          border: isVideoOpen ? '1px solid var(--border-subtle)' : '1px solid var(--primary)',
+          backgroundColor: isVideoOpen ? 'var(--bg-secondary)' : 'color-mix(in srgb, var(--primary) 10%, transparent)',
+          color: isVideoOpen ? 'var(--text-muted)' : 'var(--primary)',
+          fontSize: '0.78rem',
+          fontWeight: 700,
+          cursor: 'pointer'
+        }
+      },
+        isVideoOpen ? [
+          SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 14 }) : null,
+          " 영상 닫기"
+        ] : [
+          /*#__PURE__*/React.createElement("svg", {
+            viewBox: "0 0 24 24", width: "14", height: "14", fill: "currentColor"
+          }, /*#__PURE__*/React.createElement("path", { d: "M8 5v14l11-7z" })),
+          " 영상 바로보기"
+        ]
+      ),
+
+      /* Video Player when expanded */
+      isVideoMedia && isVideoOpen && /*#__PURE__*/React.createElement("div", {
+        style: { marginTop: '4px', width: '100%' }
+      }, /*#__PURE__*/React.createElement(ClickToPlayVideoCard, {
+        url: item.url,
+        mediaInfo: mediaInfo,
+        fallbackTitle: fallbackTitle,
+        cachedData: item.linkPreview
+      }))
+    );
+  };
+
+  const renderGalleryLinkList = items => /*#__PURE__*/React.createElement(React.Fragment, null,
+    (items || []).map(item => /*#__PURE__*/React.createElement(GalleryLinkCard, {
+      key: item.messageId || item.url,
+      item: item
+    }))
   );
   const renderGalleryLoadMoreButton = ({ loadingLabel, label, onClick, disabled }) => /*#__PURE__*/React.createElement("button", {
     type: "button",

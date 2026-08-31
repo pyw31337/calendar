@@ -2029,6 +2029,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
   const memoTextLineCount = displayMemoText ? displayMemoText.split(/\r?\n/).length : 0;
   const hasLongMemoText = displayMemoText.length > 280 || memoTextLineCount > 8;
   const [isMemoTextExpanded, setIsMemoTextExpanded] = React.useState(false);
+  const [isVideoOpen, setIsVideoOpen] = React.useState(false);
 
   // Comments: stored inline on the memo doc as a size-capped array (see hasValidMemoShape in
   // firestore.rules -- comments.size() <= 200, no per-comment shape lock). Composer mirrors the
@@ -2276,17 +2277,60 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       style: { marginTop: '8px', width: '100%' },
       "data-stop-card-open": "true",
       onClick: e => e.stopPropagation()
-    }, isVideoMedia ? /*#__PURE__*/React.createElement(ClickToPlayVideoCard, {
-      url: memoFirstUrl,
-      mediaInfo: memoMediaInfo,
-      fallbackTitle: memo.title || (memo.text ? removeFirstUrl(memo.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : ''),
-      cachedData: memo.linkPreview
-    }) : /*#__PURE__*/React.createElement(LinkPreviewCard, {
-      url: memoFirstUrl,
-      fallbackTitle: memo.title || (memo.text ? removeFirstUrl(memo.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : ''),
-      cachedData: memo.linkPreview,
-      stretch: true
-    })),
+    },
+      /* Link Preview Card shown primarily */
+      /*#__PURE__*/React.createElement(LinkPreviewCard, {
+        url: memoFirstUrl,
+        fallbackTitle: memo.title || (memo.text ? removeFirstUrl(memo.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : ''),
+        cachedData: memo.linkPreview,
+        stretch: true
+      }),
+
+      /* Video Toggle button if this URL is a video */
+      isVideoMedia && /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: e => {
+          e.stopPropagation();
+          setIsVideoOpen(prev => !prev);
+        },
+        style: {
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '6px',
+          width: '100%',
+          padding: '6px 0',
+          marginTop: '6px',
+          borderRadius: 'var(--radius-md)',
+          border: isVideoOpen ? '1px solid var(--border-subtle)' : '1px solid var(--primary)',
+          backgroundColor: isVideoOpen ? 'var(--bg-secondary)' : 'color-mix(in srgb, var(--primary) 10%, transparent)',
+          color: isVideoOpen ? 'var(--text-muted)' : 'var(--primary)',
+          fontSize: '0.76rem',
+          fontWeight: 700,
+          cursor: 'pointer'
+        }
+      },
+        isVideoOpen ? [
+          /*#__PURE__*/React.createElement(SmallXIcon, { size: 13 }),
+          " 영상 닫기"
+        ] : [
+          /*#__PURE__*/React.createElement("svg", {
+            viewBox: "0 0 24 24", width: "13", height: "13", fill: "currentColor"
+          }, /*#__PURE__*/React.createElement("path", { d: "M8 5v14l11-7z" })),
+          " 영상 바로보기"
+        ]
+      ),
+
+      /* Video Player when expanded */
+      isVideoMedia && isVideoOpen && /*#__PURE__*/React.createElement("div", {
+        style: { marginTop: '8px', width: '100%' }
+      }, /*#__PURE__*/React.createElement(ClickToPlayVideoCard, {
+        url: memoFirstUrl,
+        mediaInfo: memoMediaInfo,
+        fallbackTitle: memo.title || (memo.text ? removeFirstUrl(memo.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : ''),
+        cachedData: memo.linkPreview
+      }))
+    ),
 
     /* Tags container if exists */
     /*#__PURE__*/React.createElement("div", {
