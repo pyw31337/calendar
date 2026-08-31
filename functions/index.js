@@ -23,6 +23,22 @@ function parseMeetingDateTags(value) {
   return dates;
 }
 
+function getKstDateKey(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(date);
+  return `${parts.find(p => p.type === 'year').value}-${parts.find(p => p.type === 'month').value}-${parts.find(p => p.type === 'day').value}`;
+}
+
+function normalizeMeetingDateKey(value) {
+  const text = String(value || '').trim();
+  let match = text.match(/^(20\d{2})[-./](\d{1,2})[-./](\d{1,2})/);
+  if (match) return `${match[1]}-${String(match[2]).padStart(2, '0')}-${String(match[3]).padStart(2, '0')}`;
+  match = text.match(/^(\d{2})[.]?(\d{2})[.]?(\d{2})/);
+  if (match) return `20${match[1]}-${match[2]}-${match[3]}`;
+  return '';
+}
+
 function getMessageImageEntriesForIndex(message) {
   const urls = Array.isArray(message.imageUrls) && message.imageUrls.length
     ? message.imageUrls : (message.imageUrl ? [message.imageUrl] : []);
@@ -273,6 +289,14 @@ exports.onConfirmedMeetingWrite = functions.runWith({ secrets: ['VAPID_PRIVATE_K
     const calendarData = calendarSnap.data().calendar || {};
     const calendarTitle = calendarData.title || '모여라 캘린더';
     const dateLabel = context.params.dateId || after.date || '';
+    const meetingDateKey = normalizeMeetingDateKey(dateLabel);
+    // Historical confirmedMeeting documents can be rewritten during migration,
+    // reconciliation, or a late-arriving offline save. Never turn that maintenance
+    // write into a fresh notification for a meeting that has already passed.
+    if (meetingDateKey && meetingDateKey < getKstDateKey()) {
+      console.log('Skipping stale confirmed meeting notification:', meetingDateKey);
+      return;
+    }
     await broadcastCalendarPush(calendarDocId, {
       title: `${calendarTitle} · 모임 확정`,
       body: dateLabel ? `${dateLabel} 모임이 확정되었습니다` : '모임이 확정되었습니다',
