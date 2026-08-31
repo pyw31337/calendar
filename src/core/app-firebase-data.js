@@ -1997,6 +1997,14 @@ async function persistConfirmedMeetingsSubcollection(calendarId, meetings) {
   return retryLegacySubcollectionWrite(writeConfirmedMeetingsToFirestore, calendarId, meetings, 'Confirmed meetings');
 }
 
+export async function persistCalendarAuxiliaryData(calendarId, places = [], meetings = []) {
+  const [placesPersisted, meetingsPersisted] = await Promise.all([
+    persistPlacesSubcollection(calendarId, places),
+    persistConfirmedMeetingsSubcollection(calendarId, meetings)
+  ]);
+  return placesPersisted && meetingsPersisted;
+}
+
 // Writes a batch of activity log entries as individual documents, keyed by each log's own
 // `id` so retries/re-copies of the same entry are idempotent no-ops rather than duplicates.
 async function writeActivityLogsToFirestore(calendarId, logs) {
@@ -2508,14 +2516,19 @@ async function pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode,
         const logsToPersist = [...legacyActivityLogs, ...(Array.isArray(newActivityLogs) ? newActivityLogs : [])];
         // Places and confirmedMeetings are both merged into the live UI on read, so confirm both
         // writes before reporting success. Activity logs remain a best-effort auxiliary write.
-        const [placesPersisted, meetingsPersisted] = await Promise.all([
-          persistPlacesSubcollection(normalizedCal.id, legacyPlaces),
-          persistConfirmedMeetingsSubcollection(normalizedCal.id, legacyConfirmedMeetings)
-        ]);
+      const auxOk = await persistCalendarAuxiliaryData(normalizedCal.id, legacyPlaces, legacyConfirmedMeetings);
+      if (!auxOk) {
+        await enqueueWriteOperation({
+          id: `aux_${normalizedCal.id}_${nextDocRevision}`,
+          type: 'calendar-auxiliary-sync',
+          calendarId: normalizedCal.id,
+          payload: { places: legacyPlaces, meetings: legacyConfirmedMeetings },
+          lastError: '보조 데이터 동기화 지연'
+        });
+      }
         void persistLegacySubcollections(normalizedCal.id, logsToPersist)
           .catch(error => console.warn(`Auxiliary sync failed for ${normalizedCal.id}:`, error));
-        const auxOk = placesPersisted && meetingsPersisted;
-        return { ok: auxOk, revision: nextDocRevision, auxiliaryPersistenceFailed: !auxOk };
+      return { ok: auxOk, revision: nextDocRevision, auxiliaryPersistenceFailed: !auxOk };
       }
       const errorText = await commitRes.text();
       if (!isRetryableFirestoreConflict(errorText) || attempt === retryCount) {
@@ -2652,13 +2665,18 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 4, 
       const logsToPersist = [...legacyActivityLogs, ...(Array.isArray(newActivityLogs) ? newActivityLogs : [])];
       // Places and confirmedMeetings are both merged into the live UI on read, so confirm both
       // writes before reporting success. Activity logs remain a best-effort auxiliary write.
-      const [placesPersisted, meetingsPersisted] = await Promise.all([
-        persistPlacesSubcollection(normalizedCal.id, legacyPlaces),
-        persistConfirmedMeetingsSubcollection(normalizedCal.id, legacyConfirmedMeetings)
-      ]);
+      const auxOk = await persistCalendarAuxiliaryData(normalizedCal.id, legacyPlaces, legacyConfirmedMeetings);
+      if (!auxOk) {
+        await enqueueWriteOperation({
+          id: `aux_${normalizedCal.id}_${committedRevision || Date.now()}`,
+          type: 'calendar-auxiliary-sync',
+          calendarId: normalizedCal.id,
+          payload: { places: legacyPlaces, meetings: legacyConfirmedMeetings },
+          lastError: '보조 데이터 동기화 지연'
+        });
+      }
       void persistLegacySubcollections(normalizedCal.id, logsToPersist)
         .catch(error => console.warn(`Auxiliary sync failed for ${normalizedCal.id}:`, error));
-      const auxOk = placesPersisted && meetingsPersisted;
       return { ok: auxOk, revision: committedRevision, auxiliaryPersistenceFailed: !auxOk };
     } catch (e) {
       console.warn(`Firestore push notice for cal_${normalizedCal.id}:`, e);

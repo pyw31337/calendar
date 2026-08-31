@@ -506,6 +506,7 @@ import {
   getFirestoreRetryDelay,
   pushSingleCalendarWithRest,
   pushSingleCloudCalendar,
+  persistCalendarAuxiliaryData,
   loadLocalMeta,
   saveLocalMeta,
   getMetaLastModified,
@@ -582,6 +583,13 @@ async function replayQueuedCalendarWrite(operation) {
       { deletePaths: payload.deletePaths || [], skipQueue: true }
     );
     return Boolean(result?.success);
+  }
+  if (operation?.type === 'calendar-auxiliary-sync' && operation.payload) {
+    return persistCalendarAuxiliaryData(
+      operation.calendarId,
+      Array.isArray(operation.payload.places) ? operation.payload.places : [],
+      Array.isArray(operation.payload.meetings) ? operation.payload.meetings : []
+    );
   }
   if (operation?.type !== 'calendar-snapshot' || !operation.payload?.calendar) return false;
   const payload = operation.payload;
