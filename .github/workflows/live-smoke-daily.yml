@@ -25,7 +25,6 @@ jobs:
         run: npm run smoke:live
       - name: Firestore operations audit
         run: npm run ops:audit
-        continue-on-error: true
       - name: Media integrity audit
         run: npm run ops:media-audit
         continue-on-error: true
