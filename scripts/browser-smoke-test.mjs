@@ -323,7 +323,7 @@ async function checkSettlementModalEntryPoints(browser, baseUrl) {
     try {
       await gotoBootReady(page, `${baseUrl}?id=kkot&view=settlement`);
 
-      const editButton = page.locator('button[data-settlement-edit-button="true"]').first();
+      const editButton = page.locator('[data-settlement-edit-button="true"]').first();
       await editButton.waitFor({ state: 'visible', timeout: 10000 });
       await editButton.click();
       const editDialog = page.locator('[role="dialog"]').filter({ hasText: '정산 수정' }).first();

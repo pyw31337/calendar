@@ -3380,6 +3380,20 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
 
           return React.createElement("div", {
             key: card.id,
+            role: 'button',
+            tabIndex: 0,
+            title: '정산 수정',
+            'aria-label': '정산 수정',
+            'data-settlement-edit-button': 'true',
+            // Open only on click -- see the settlement-list-card button's comment below for why
+            // an early pointerup/mousedown handler here would race the editor's self-closing
+            // full-viewport overlay and close the modal within the same click gesture.
+            onClick: () => handleOpenSettlementEditor(card),
+            onKeyDown: event => {
+              if (event.key !== 'Enter' && event.key !== ' ') return;
+              event.preventDefault();
+              handleOpenSettlementEditor(card);
+            },
             style: {
               background: 'linear-gradient(90deg, var(--settlement-hero-start), var(--settlement-hero-end))',
               border: 'none',
@@ -3391,10 +3405,11 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
               opacity: isClosed ? 0.75 : 1,
               position: 'relative',
               boxShadow: 'none',
-              color: 'var(--settlement-hero-text)'
+              color: 'var(--settlement-hero-text)',
+              cursor: 'pointer'
             }
           },
-            /* Card Header: status top-left, settings top-right, title/account below. */
+            /* Card Header: status top-left, title/account below. */
             React.createElement("div", {
               style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '6px', position: 'relative' }
             },
@@ -3410,8 +3425,8 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
               /* Account info remains one copyable left-aligned row; only the account number is a capsule. */
               bankInfoText && React.createElement("span", {
                 role: 'button', tabIndex: 0, title: '계좌정보 복사', 'aria-label': '계좌정보 복사',
-                onClick: () => handleCopySettlementBankInfo(bankInfoText),
-                onKeyDown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCopySettlementBankInfo(bankInfoText); } },
+                onClick: event => { event.stopPropagation(); handleCopySettlementBankInfo(bankInfoText); },
+                onKeyDown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); handleCopySettlementBankInfo(bankInfoText); } },
                 style: {
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-start', flexWrap: 'wrap',
                   maxWidth: '100%', textAlign: 'left', fontSize: '0.78rem', color: 'var(--settlement-hero-text)',
@@ -3427,43 +3442,6 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                 }, displayAccountNumber),
                 card.depositorName && React.createElement("span", { style: { fontWeight: 500 } }, card.depositorName)
               ),
-
-              /* Cog Settings Button */
-              React.createElement("button", {
-                  type: "button",
-                  title: "정산 수정",
-                  'aria-label': '정산 수정',
-                  'data-settlement-edit-button': 'true',
-                  // Open only on the completed click (not on mousedown/pointerup, which fire
-                  // before the browser's click event). Opening earlier let the newly-mounted
-                  // modal's full-viewport .modal-overlay (onClick={onClose}) end up under the
-                  // pointer by the time the same click gesture's terminal click event landed,
-                  // closing the editor an instant after it appeared -- the modal never opened.
-                  onClick: event => {
-                    event.stopPropagation();
-                    handleOpenSettlementEditor(card);
-                  },
-                  onKeyDown: event => {
-                    if (event.key !== 'Enter' && event.key !== ' ') return;
-                    event.preventDefault();
-                    event.stopPropagation();
-                    handleOpenSettlementEditor(card);
-                  },
-                  style: {
-                    background: 'transparent', border: 'none', borderRadius: '0',
-                    width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: 'var(--settlement-hero-action-text)', cursor: 'pointer', padding: 0,
-                    position: 'absolute', top: '-4px', right: 0
-                  }
-                },
-                  React.createElement("svg", {
-                    xmlns: "http://www.w3.org/2000/svg", width: "16", height: "16", viewBox: "0 0 24 24",
-                    fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
-                  },
-                    React.createElement("circle", { cx: "12", cy: "12", r: "3" }),
-                    React.createElement("path", { d: "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" })
-                  )
-                ),
 
               /* Dropdown Settings Menu */
               isMenuOpen && React.createElement("div", {
