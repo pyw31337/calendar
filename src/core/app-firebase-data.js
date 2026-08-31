@@ -1911,20 +1911,14 @@ async function retryLegacySubcollectionWrite(writeFn, calendarId, items, label, 
   return false;
 }
 
-async function persistLegacySubcollections(calendarId, activityLogs, places, confirmedMeetings) {
-  const jobs = [];
-  if (Array.isArray(activityLogs) && activityLogs.length) {
-    jobs.push(retryLegacySubcollectionWrite(writeActivityLogsToFirestore, calendarId, activityLogs, 'Activity log'));
-  }
-  if (Array.isArray(places) && places.length) {
-    jobs.push(persistPlacesSubcollection(calendarId, places));
-  }
-  if (Array.isArray(confirmedMeetings) && confirmedMeetings.length) {
-    jobs.push(retryLegacySubcollectionWrite(writeConfirmedMeetingsToFirestore, calendarId, confirmedMeetings, 'Confirmed meetings'));
-  }
-  if (!jobs.length) return [];
-  const results = await Promise.all(jobs);
-  return results.map((ok, index) => ok ? null : index).filter(index => index !== null);
+// Activity logs only -- places and confirmedMeetings are each awaited directly by the caller
+// (persistPlacesSubcollection / persistConfirmedMeetingsSubcollection below) since both are
+// user-visible source-of-truth data that must be confirmed before a save resolves. Activity logs
+// stay fire-and-forget: they're an audit trail, not something a refresh needs to see immediately.
+async function persistLegacySubcollections(calendarId, activityLogs) {
+  if (!Array.isArray(activityLogs) || !activityLogs.length) return [];
+  const ok = await retryLegacySubcollectionWrite(writeActivityLogsToFirestore, calendarId, activityLogs, 'Activity log');
+  return ok ? [] : [0];
 }
 
 // Place reads are merged from this subcollection on every page load. A place save therefore
@@ -1934,6 +1928,17 @@ async function persistLegacySubcollections(calendarId, activityLogs, places, con
 async function persistPlacesSubcollection(calendarId, places) {
   if (!Array.isArray(places) || !places.length) return true;
   return retryLegacySubcollectionWrite(writePlacesToFirestore, calendarId, places, 'Places');
+}
+
+// Same reasoning as persistPlacesSubcollection immediately above -- confirmedMeetings.expenses
+// (settlement amounts) are merged from this subcollection on every page load exactly like
+// places are, so this write must also be confirmed before the save resolves. This used to be
+// folded into persistLegacySubcollections and fired off unawaited alongside activity logs (truly
+// best-effort audit data), which let a settlement edit report "저장완료" and then silently lose
+// the edit on refresh whenever this write was still in flight or failed.
+async function persistConfirmedMeetingsSubcollection(calendarId, meetings) {
+  if (!Array.isArray(meetings) || !meetings.length) return true;
+  return retryLegacySubcollectionWrite(writeConfirmedMeetingsToFirestore, calendarId, meetings, 'Confirmed meetings');
 }
 
 // Writes a batch of activity log entries as individual documents, keyed by each log's own
@@ -2419,12 +2424,16 @@ async function pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode,
       });
       if (commitRes.ok) {
         const logsToPersist = [...legacyActivityLogs, ...(Array.isArray(newActivityLogs) ? newActivityLogs : [])];
-        // Places are merged into the live UI on read, so confirm this write before reporting
-        // success. Activity logs and meetings remain best-effort auxiliary writes.
-        const placesPersisted = await persistPlacesSubcollection(normalizedCal.id, legacyPlaces);
-        void persistLegacySubcollections(normalizedCal.id, logsToPersist, [], legacyConfirmedMeetings)
+        // Places and confirmedMeetings are both merged into the live UI on read, so confirm both
+        // writes before reporting success. Activity logs remain a best-effort auxiliary write.
+        const [placesPersisted, meetingsPersisted] = await Promise.all([
+          persistPlacesSubcollection(normalizedCal.id, legacyPlaces),
+          persistConfirmedMeetingsSubcollection(normalizedCal.id, legacyConfirmedMeetings)
+        ]);
+        void persistLegacySubcollections(normalizedCal.id, logsToPersist)
           .catch(error => console.warn(`Auxiliary sync failed for ${normalizedCal.id}:`, error));
-        return { ok: placesPersisted, revision: nextDocRevision, auxiliaryPersistenceFailed: !placesPersisted };
+        const auxOk = placesPersisted && meetingsPersisted;
+        return { ok: auxOk, revision: nextDocRevision, auxiliaryPersistenceFailed: !auxOk };
       }
       const errorText = await commitRes.text();
       if (!isRetryableFirestoreConflict(errorText) || attempt === retryCount) {
@@ -2543,12 +2552,16 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 4, 
 	        new Promise((_, reject) => setTimeout(() => { raceLost = true; reject(new Error('Firestore push timeout')); }, 8000))
 	      ]);
       const logsToPersist = [...legacyActivityLogs, ...(Array.isArray(newActivityLogs) ? newActivityLogs : [])];
-      // Places are merged into the live UI on read, so confirm this write before reporting
-      // success. Activity logs and meetings remain best-effort auxiliary writes.
-      const placesPersisted = await persistPlacesSubcollection(normalizedCal.id, legacyPlaces);
-      void persistLegacySubcollections(normalizedCal.id, logsToPersist, [], legacyConfirmedMeetings)
+      // Places and confirmedMeetings are both merged into the live UI on read, so confirm both
+      // writes before reporting success. Activity logs remain a best-effort auxiliary write.
+      const [placesPersisted, meetingsPersisted] = await Promise.all([
+        persistPlacesSubcollection(normalizedCal.id, legacyPlaces),
+        persistConfirmedMeetingsSubcollection(normalizedCal.id, legacyConfirmedMeetings)
+      ]);
+      void persistLegacySubcollections(normalizedCal.id, logsToPersist)
         .catch(error => console.warn(`Auxiliary sync failed for ${normalizedCal.id}:`, error));
-      return { ok: placesPersisted, revision: committedRevision, auxiliaryPersistenceFailed: !placesPersisted };
+      const auxOk = placesPersisted && meetingsPersisted;
+      return { ok: auxOk, revision: committedRevision, auxiliaryPersistenceFailed: !auxOk };
     } catch (e) {
       console.warn(`Firestore push notice for cal_${normalizedCal.id}:`, e);
       // The transaction above has no cancellation hook, so on a timeout it can still land after

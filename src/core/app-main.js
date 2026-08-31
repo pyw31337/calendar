@@ -4912,7 +4912,7 @@ function CalendarApp() {
 
   const handleSavePlace = (placeData) => {
     if (!activeCal || !Number.isFinite(placeData?.lat) || !Number.isFinite(placeData?.lng)) return false;
-    const latestCal = calendarsRef.current.find(c => c.id === activeCal.id) || activeCal;
+    const latestCal = activeCalRef.current?.id === activeCal.id ? activeCalRef.current : activeCal;
     const cleanName = sanitizeText(placeData?.name || '', 80);
     if (!cleanName) return false;
     const now = Date.now();
@@ -5073,7 +5073,7 @@ function CalendarApp() {
             const { id: _pid, ...placeBody } = placeSnapshot;
             await writeCollectionDocumentWithFallback('places', calId, placeId, { ...placeBody, updatedAt: restoreNow }, 'set', '장소 복원');
           }
-          const latestCal = calendarsRef.current.find(c => c.id === calId) || updatedCal;
+          const latestCal = activeCalRef.current?.id === calId ? activeCalRef.current : updatedCal;
           const currentPlaces = getCalendarPlaces(latestCal);
           const restoredPlaces = currentPlaces.some(p => p.id === placeId)
             ? currentPlaces.map(p => p.id === placeId ? { ...placeSnapshot, updatedAt: restoreNow } : p)

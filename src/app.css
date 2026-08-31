@@ -1408,19 +1408,6 @@ button.form-select {
   height: 18px;
 }
 
-/* Participant picker button: a compact capsule that sits inline next to a tag input, comment
-   input, or Save/Cancel buttons (memo composer/edit, chat edit modal, comment composer) --
-   the only .form-select consumer that isn't a real full-width dropdown, so it needs its own
-   radius override (border-radius above is !important) on top of the compact sizing already
-   set inline in ParticipantPickerButton (src/ui/ui-widgets.js). */
-.participant-picker-button {
-  border-radius: var(--radius-full) !important;
-}
-.participant-picker-chevron {
-  width: 14px;
-  height: 14px;
-}
-
 .form-select:focus, .form-input:focus { border-color: var(--accent-primary); box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15); }
 
 /* Native <select> elements: replace the browser's default OS-styled dropdown arrow with the
