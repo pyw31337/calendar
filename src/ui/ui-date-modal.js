@@ -874,12 +874,19 @@ export function DateModal({
   // field's actions below it (see .date-modal-field-with-actions in app.css). Measured off the
   // textarea's own scrollHeight (its content height regardless of screen width) rather than a
   // viewport media query, since this is about the memo text itself overflowing, not the device.
+  // One-way latch: once the memo has needed a second line, keep the stacked layout for the rest
+  // of this editing session rather than re-measuring on every keystroke. Un-latching live caused
+  // a visible jump-jump-jump while typing near the wrap boundary -- switching to the stacked
+  // layout widens the textarea, which can make the very same text fit back on one line, flipping
+  // isPlaceMemoWrapped straight back to false on the next keystroke, which narrows it again and
+  // re-wraps it, and so on. Only the calls that load a fresh/different memo (see setPlaceMemo call
+  // sites) explicitly reset this back to false.
   const placeMemoTextareaRef = React.useRef(null);
   const [isPlaceMemoWrapped, setIsPlaceMemoWrapped] = React.useState(false);
   React.useLayoutEffect(() => {
     const el = placeMemoTextareaRef.current;
     if (!el) return;
-    setIsPlaceMemoWrapped(el.scrollHeight > 48);
+    if (el.scrollHeight > 48) setIsPlaceMemoWrapped(true);
   }, [placeMemo]);
   const [placeAlias, setPlaceAlias] = React.useState('');
   const [placeCategoryId, setPlaceCategoryId] = React.useState(() => getPlaceCategories(calendar)[0]?.id || 'etc');
@@ -961,6 +968,7 @@ export function DateModal({
 
     setSelectedPlace(null);
     setPlaceMemo('');
+    setIsPlaceMemoWrapped(false);
     setPlaceAlias('');
     setPlaceCategoryId(getPlaceCategories(calendar)[0]?.id || 'etc');
     setPlaceVisitStatus('visited');
@@ -1093,6 +1101,7 @@ export function DateModal({
       showToast(editingLinkedPlaceId ? '장소가 수정되었습니다.' : '장소가 추가되었습니다.', 'success');
       setSelectedPlace(null);
       setPlaceMemo('');
+      setIsPlaceMemoWrapped(false);
       setPlaceAlias('');
       setPlaceCategoryId(getPlaceCategories(calendar)[0]?.id || 'etc');
       setPlaceVisitStatus('visited');
@@ -1150,6 +1159,7 @@ export function DateModal({
     // memo stack (see app-main.js's handleSavePlace, memoOp:'upsert') without disturbing its other
     // dates' entries.
     setPlaceMemo('');
+    setIsPlaceMemoWrapped(false);
   };
 
   const handleSubmit = async (e) => {
@@ -2526,6 +2536,7 @@ export function DateModal({
                   setPlaceQuery('');
                   setPlaceAlias('');
                   setPlaceMemo('');
+                  setIsPlaceMemoWrapped(false);
                   setPlaceCategoryId(getPlaceCategories(calendar)[0]?.id || 'etc');
                   setPlaceVisitStatus('visited');
                 },
@@ -2603,6 +2614,7 @@ export function DateModal({
                 setPlaceQuery(place.name || '');
                 setPlaceAlias(place.alias || '');
                 setPlaceMemo(dateNote);
+                setIsPlaceMemoWrapped(false);
                 setPlaceCategoryId(catId);
                 setPlaceVisitStatus(visit);
                 setPlaceResults([]);
@@ -2657,6 +2669,7 @@ export function DateModal({
                         if (editingLinkedPlaceId === place.id) {
                           setEditingLinkedPlaceId(null); setSelectedPlace(null);
                           setPlaceQuery(''); setPlaceAlias(''); setPlaceMemo('');
+                          setIsPlaceMemoWrapped(false);
                         }
                       } else if (onDeletePlace) {
                         await Promise.resolve(onDeletePlace(place.id));
