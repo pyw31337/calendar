@@ -854,6 +854,9 @@ export function AppSettingsModal({
             deviceLabel: label.replace(/ · 이 기기$/, ''),
             lastSeenAt: d.lastSeenAt || d.updatedAt || d.createdAt || 0,
             participantId: d.participantId || '',
+            channels: d.channels || {},
+            lastPushAt: d.lastPushAt || 0,
+            lastPushStatus: d.lastPushStatus || '',
             isThis: isThisDevice
           });
         });
@@ -1201,7 +1204,9 @@ export function AppSettingsModal({
               /*#__PURE__*/React.createElement("div", { style: { fontWeight: 700, color: 'var(--text-main)' } },
                 row.deviceLabel, row.isThis ? ' (이 기기)' : ''),
               /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: '0.7rem', marginTop: '1px' } },
-                row.lastSeenAt ? ('최근 ' + new Date(row.lastSeenAt).toLocaleDateString('ko-KR')) : '')
+                row.lastSeenAt ? ('최근 연결 ' + new Date(row.lastSeenAt).toLocaleString('ko-KR')) : '',
+                row.lastPushStatus ? ` · 마지막 발송 ${row.lastPushStatus === 'sent' ? '성공' : '실패'}${row.lastPushAt ? ' (' + new Date(row.lastPushAt).toLocaleString('ko-KR') + ')' : ''}` : '',
+                row.channels && Object.keys(row.channels).length ? ` · 채널 ${Object.entries(row.channels).filter(([, enabled]) => enabled !== false).map(([key]) => key).join(',') || '없음'}` : '')
             ),
             /*#__PURE__*/React.createElement("button", {
               type: "button",

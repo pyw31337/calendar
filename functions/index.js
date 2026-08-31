@@ -122,13 +122,30 @@ async function broadcastCalendarPush(calendarDocId, payloadObj, options = {}) {
       endpoint: data.endpoint,
       keys: { auth: data.keys && data.keys.auth, p256dh: data.keys && data.keys.p256dh }
     };
+    const sentAt = Date.now();
     const p = webpush.sendNotification(pushSubscription, payload, { urgency: 'high' })
-      .then(() => console.log('Push ok', doc.id, channel))
+      .then(() => {
+        console.log('Push ok', doc.id, channel);
+        return doc.ref.set({
+          lastPushAt: sentAt,
+          lastPushStatus: 'sent',
+          lastPushChannel: channel,
+          lastPushError: null
+        }, { merge: true });
+      })
       .catch(err => {
         console.error('Push fail', doc.id, err && err.statusCode);
+        const status = err && err.statusCode ? `http-${err.statusCode}` : 'send-failed';
+        const record = doc.ref.set({
+          lastPushAt: sentAt,
+          lastPushStatus: status,
+          lastPushChannel: channel,
+          lastPushError: String(err && err.message || 'unknown').slice(0, 500)
+        }, { merge: true }).catch(() => {});
         if (err.statusCode === 410 || err.statusCode === 404 || err.statusCode === 400 || err.statusCode === 403) {
-          return doc.ref.delete();
+          return record.then(() => doc.ref.delete());
         }
+        return record;
       });
     promises.push(p);
   });
