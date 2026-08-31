@@ -949,6 +949,7 @@ export function ChatRoomView({
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
     setShowScrollToBottom(distanceFromBottom > 200);
     if (distanceFromBottom <= 200) setHasNewMessageBelow(false);
+    isAtBottomRef.current = distanceFromBottom <= 60;
   };
   const scrollToBottom = () => {
     if (chatMessagesContainerRef.current) {
@@ -959,6 +960,28 @@ export function ChatRoomView({
     scrollToBottom();
     setHasNewMessageBelow(false);
   };
+
+  // Message bubbles can grow taller AFTER they first render -- most notably a link preview
+  // card (useLinkPreview/LinkPreviewCard in ui-shared.js), which fetches OpenGraph data
+  // asynchronously and pops in a thumbnail/title card well after the initial send. The
+  // chatMessages.length-keyed scroll-to-bottom effect (app-main.js) only fires once when the
+  // message is first added, so that later growth used to push the bubble's bottom half under
+  // the fixed .chat-composer bar with nothing to re-scroll it into view. Track whether the
+  // user is (still) at the bottom and, if so, follow any subsequent height growth of the
+  // message list so a freshly-sent bubble never ends up hidden behind the input field.
+  const isAtBottomRef = React.useRef(true);
+  const messagesListInnerRef = React.useRef(null);
+  React.useEffect(() => {
+    const el = messagesListInnerRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => {
+      if (!isAtBottomRef.current) return;
+      const container = chatMessagesContainerRef.current;
+      if (container) container.scrollTop = container.scrollHeight;
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const canSendChatNow = () => !isChatSubmitting && (!!chatInput.trim() || chatImages.length > 0);
   const triggerChatSend = useChatSendGuard(onSend, canSendChatNow);
   const handleSendPointerDown = (event) => {
@@ -1729,14 +1752,16 @@ export function ChatRoomView({
     /*#__PURE__*/React.createElement("div", { style: { flex: 1, wordBreak: 'break-word' } },
       /*#__PURE__*/React.createElement("strong", null, "공지 "), renderTextWithUrlBadge(notice.text)
     )
-  ))), renderedMessages.length === 0 ? /*#__PURE__*/React.createElement("div", {
-    style: {
-      textAlign: 'center',
-      color: '#94A3B8',
-      fontSize: '0.85rem',
-      marginTop: '40px'
-    }
-  }, "\uC544\uC9C1 \uB4F1\uB85D\uB41C \uB300\uD654\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.") : renderedMessages), showScrollToBottom && !hasNewMessageBelow && /*#__PURE__*/React.createElement("button", {
+  ))), /*#__PURE__*/React.createElement("div", { ref: messagesListInnerRef },
+    renderedMessages.length === 0 ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: 'center',
+        color: '#94A3B8',
+        fontSize: '0.85rem',
+        marginTop: '40px'
+      }
+    }, "\uC544\uC9C1 \uB4F1\uB85D\uB41C \uB300\uD654\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.") : renderedMessages
+  )), showScrollToBottom && !hasNewMessageBelow && /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: scrollToBottom,
     "aria-label": "\uCD5C\uADFC \uB300\uD654\uB85C \uC774\uB3D9",
