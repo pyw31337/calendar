@@ -1483,6 +1483,11 @@ export function DateModal({
   const [draggingExpenseId, setDraggingExpenseId] = React.useState('');
   const [dragOverExpenseId, setDragOverExpenseId] = React.useState('');
   const expensePointerSortRef = React.useRef({ sourceId: '', targetId: '', startX: 0, startY: 0, active: false });
+  // Tapping a row in the (potentially long) expense list below edits it via the form up top --
+  // but that form can be well off-screen by then, so the edit silently "does nothing" from the
+  // user's point of view. Scroll the 지출 명목 field into view and focus it so the edit is
+  // immediately visible.
+  const expenseLabelFieldRef = React.useRef(null);
 
   React.useEffect(() => {
     setExpenseLabelInput('');
@@ -1638,6 +1643,12 @@ export function DateModal({
       expenseIsIncome: isIncome,
       expenseCategoryInput: cat,
       expensePayerInput: payer
+    });
+    requestAnimationFrame(() => {
+      const field = expenseLabelFieldRef.current;
+      if (!field) return;
+      field.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      field.querySelector('input')?.focus({ preventScroll: true });
     });
   };
   const handleSaveExpenseClick = async () => {
@@ -2806,7 +2817,7 @@ export function DateModal({
             style: { width: '100%', height: '42px' }
           })
         ),
-        /*#__PURE__*/React.createElement("div", null,
+        /*#__PURE__*/React.createElement("div", { ref: expenseLabelFieldRef },
           /*#__PURE__*/React.createElement("label", {
             style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }
           }, expenseIsIncome ? "수입 명목" : "지출 명목"),
