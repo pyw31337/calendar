@@ -2114,7 +2114,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
         ctx.fillText(nameText, PAD + 20, rowY);
         const nameWidth = ctx.measureText(nameText).width;
 
-        const badgeText = isRefund ? '(환급예정)' : '(입금요청)';
+        const badgeText = isRefund ? '환급예정' : '입금요청';
         ctx.font = '800 12px sans-serif';
         const badgePadX = 8;
         const badgeW = ctx.measureText(badgeText).width + badgePadX * 2;
