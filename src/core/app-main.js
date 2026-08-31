@@ -845,6 +845,8 @@ function CalendarApp() {
       }
 
       queueOperationId = `calendar_${targetCalId}_${now}_${Math.random().toString(36).slice(2, 8)}`;
+      const saveOperationId = queueOperationId;
+      auxiliaryData = { ...auxiliaryData, operationId: saveOperationId };
       queuePayload = {
         calendar: currentCal,
         lastModified: now,
@@ -884,6 +886,13 @@ function CalendarApp() {
         title: progressTitle,
         detail: `${currentCal.title || currentCal.id} 데이터를 Firebase에 반영하고 있습니다.`
       }, () => pushSingleCloudCalendar(currentCal, now, 4, normalizedCalendars, saveMode, newActivityLogs, auxiliaryData));
+      console.info('[calendar-save]', {
+        operationId: saveOperationId,
+        calendarId: currentCal.id,
+        saveMode,
+        revision: saved?.revision || null,
+        auxiliaryPersistenceFailed: Boolean(saved?.auxiliaryPersistenceFailed)
+      });
       if (!saved) {
         console.warn('Cloud save failed for calendar:', currentCal.id);
         if (previousCalendars) setCalendarsState(previousCalendars);
@@ -905,6 +914,12 @@ function CalendarApp() {
       return true;
     } catch (err) {
       console.error('updateCalendars failed:', err);
+      console.warn('[calendar-save-failed]', {
+        operationId: queueOperationId || null,
+        calendarId: targetCalId,
+        saveMode,
+        error: String(err?.message || err || '').slice(0, 240)
+      });
       if (shouldQueueCalendarWriteFailure(err)) {
         const queued = await enqueueWriteOperation({
           id: queueOperationId,

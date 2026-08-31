@@ -38,6 +38,9 @@ const { mergeCalendarSettingsDelta } = await import('../src/core/app-firebase-da
 const writeQueueSource = fs.readFileSync(new URL('../src/core/app-write-queue.js', import.meta.url), 'utf8');
 assert(writeQueueSource.includes('nextAttemptAt: Number(operation.nextAttemptAt) || 0'), 'queued operations must persist retry backoff metadata');
 assert(writeQueueSource.includes("await deferOperation(operation, new Error('대기 저장이 완료되지 않았습니다.'))"), 'false queue handler results must be deferred with backoff');
+const appMainSource = fs.readFileSync(new URL('../src/core/app-main.js', import.meta.url), 'utf8');
+assert(appMainSource.includes("console.info('[calendar-save]'"), 'calendar saves must emit an operation diagnostic');
+assert(appMainSource.includes("console.warn('[calendar-save-failed]'"), 'failed calendar saves must emit an operation diagnostic');
 const mergedSettlementProbe = unionConfirmedMeetings({
   confirmedMeeting: [{
     date: '2026-08-29',
