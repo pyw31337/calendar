@@ -3961,6 +3961,12 @@ function CalendarApp() {
 	    const categoryIds = new Set(getExpenseCategories(activeCal).map(category => category.id));
 	    const cleanCategoryId = categoryIds.has(expense?.categoryId) ? expense.categoryId : 'etc';
 	    const cleanAmount = Number.isFinite(expense?.amount) && expense.amount !== 0 ? Math.round(expense.amount) : 0;
+	    // 지출자(payer): empty/absent means 공금지출 (paid from the shared pool, the long-standing
+	    // default). A specific participant name means that person personally fronted the amount --
+	    // the settlement card ("정산카드") reads this to auto-derive who needs to be reimbursed
+	    // instead of requiring the same line item to be re-typed there by hand.
+	    const activeParticipantNames = new Set(getActiveParticipants(activeCal).map(p => p.name));
+	    const cleanPayerId = activeParticipantNames.has(expense?.payerId) ? expense.payerId : '';
     if ((!cleanLabel && !cleanUrl) || !cleanAmount) return false;
     
     // Link previews are display metadata, not part of the settlement write. Never block the
@@ -3985,8 +3991,8 @@ function CalendarApp() {
 	    const existingExpenses = Array.isArray(meeting.expenses) ? meeting.expenses : [];
 	    const isEditing = !!expense?.id;
 	    const nextExpenses = isEditing
-	      ? existingExpenses.map(e => e.id === expense.id ? { ...e, label: cleanLabel, url: cleanUrl, categoryId: cleanCategoryId, amount: cleanAmount, updatedAt: now, linkPreview: linkPreview || null } : e)
-	      : [...existingExpenses, { id: `exp_${activeCal.id}_${dateStr}_${now}_${Math.random().toString(36).slice(2, 7)}`, label: cleanLabel, url: cleanUrl, categoryId: cleanCategoryId, amount: cleanAmount, order: existingExpenses.length, createdAt: now, updatedAt: now, linkPreview: linkPreview || null }];
+	      ? existingExpenses.map(e => e.id === expense.id ? { ...e, label: cleanLabel, url: cleanUrl, categoryId: cleanCategoryId, amount: cleanAmount, payerId: cleanPayerId, updatedAt: now, linkPreview: linkPreview || null } : e)
+	      : [...existingExpenses, { id: `exp_${activeCal.id}_${dateStr}_${now}_${Math.random().toString(36).slice(2, 7)}`, label: cleanLabel, url: cleanUrl, categoryId: cleanCategoryId, amount: cleanAmount, payerId: cleanPayerId, order: existingExpenses.length, createdAt: now, updatedAt: now, linkPreview: linkPreview || null }];
     const nextConfirmedMeetings = meetings.map((m, i) => i === meetingIndex ? { ...m, expenses: nextExpenses, updatedAt: now, amount: null } : m);
     // Expense/income entries have no participant selector of their own, so these logs carry an
     // empty participantId (matching how poll activity logs already handle system-level actions)
@@ -4000,10 +4006,11 @@ function CalendarApp() {
       expenseLogNote = buildFieldChangeNote(cleanLabel || cleanUrl || '정산', [
         { key: '금액', before: fmtAmt(prevExp.amount), after: fmtAmt(cleanAmount) },
         { key: '명목', before: prevExp.label || prevExp.url || '', after: cleanLabel || cleanUrl },
-        { key: '카테고리', before: expCatName(prevExp.categoryId), after: expCatName(cleanCategoryId) }
+        { key: '카테고리', before: expCatName(prevExp.categoryId), after: expCatName(cleanCategoryId) },
+        { key: '지출자', before: prevExp.payerId || '공금지출', after: cleanPayerId || '공금지출' }
       ]);
     } else {
-      expenseLogNote = sanitizeText(`${fmtAmt(cleanAmount)} ${cleanLabel || cleanUrl} · ${expCatName(cleanCategoryId)}`, 300);
+      expenseLogNote = sanitizeText(`${fmtAmt(cleanAmount)} ${cleanLabel || cleanUrl} · ${expCatName(cleanCategoryId)}${cleanPayerId ? ` · ${cleanPayerId} 선결제` : ''}`, 300);
     }
     const expenseActivityLog = createActivityLog(activeCal.id, isEditing ? 'expense_update' : 'expense_create', dateStr, '', now, expenseLogNote);
     return commitConfirmedMeetings(nextConfirmedMeetings, '지출 저장완료', expenseActivityLog ? [expenseActivityLog] : []);

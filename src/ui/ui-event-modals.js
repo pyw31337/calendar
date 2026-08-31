@@ -1783,6 +1783,18 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
     return { totalExpense: exp, settlementPerPerson: perPerson };
   }, [checkedItems, participantRows.length]);
 
+  // Shared expenses that were tagged with a specific 지출자 (payer, not 공금지출) in the date
+  // modal's 정산 tab already represent a personal advance -- fold them in as if they were
+  // personalExpenses rows so the same amount never has to be re-typed here by hand.
+  const autoPersonalItems = React.useMemo(() => {
+    return Object.values(checkedItems)
+      .filter(item => item && !item.isIncome && String(item.payerId || '').trim())
+      .map(item => ({ ...item, participantId: String(item.payerId).trim() }));
+  }, [checkedItems]);
+  const unresolvedAutoPayers = React.useMemo(() => {
+    const rowNames = new Set(participantRows.map(row => row?.participantId).filter(Boolean));
+    return Array.from(new Set(autoPersonalItems.map(item => item.participantId).filter(name => !rowNames.has(name))));
+  }, [autoPersonalItems, participantRows]);
   const personalExpenseTotals = React.useMemo(() => {
     const totals = new Map();
     personalExpenses.forEach(item => {
@@ -1795,8 +1807,12 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
         : -Math.abs(Number(item?.amount) || 0);
       totals.set(participantId, (totals.get(participantId) || 0) + amount);
     });
+    autoPersonalItems.forEach(item => {
+      const amount = -Math.abs(Number(item.amount) || 0);
+      totals.set(item.participantId, (totals.get(item.participantId) || 0) + amount);
+    });
     return totals;
-  }, [personalExpenses]);
+  }, [personalExpenses, autoPersonalItems]);
 
   const hasSharedExpenses = Object.keys(checkedItems || {}).length > 0;
   const settlementRows = React.useMemo(() => calculateSettlementRows(
@@ -2548,12 +2564,15 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
             React.createElement('label', { style: { ...settlementSectionLabelStyle, marginBottom: 0 } }, '개인 지출 등록'),
             React.createElement('span', { style: { fontSize: '0.72rem', color: 'var(--text-muted)' } }, '총 지출에 포함된 금액 중 개인이 먼저 결제한 금액을 입력하세요.'),
             React.createElement('span', { style: { fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)' } },
-              `합계: ${Math.abs(personalExpenses.reduce((s, x) => {
-                const amount = x?.signedAmount ? (Number(x.amount) || 0) : -Math.abs(Number(x?.amount) || 0);
-                return s + amount;
-              }, 0)).toLocaleString()}원`
+              `합계: ${Math.abs(Array.from(personalExpenseTotals.values()).reduce((s, amount) => s + amount, 0)).toLocaleString()}원`
             )
           ),
+          autoPersonalItems.length > 0 && React.createElement('div', {
+            style: { fontSize: '0.72rem', color: 'var(--text-muted)', backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '8px', padding: '6px 10px' }
+          }, `일정의 정산 탭에서 지출자를 지정한 ${autoPersonalItems.length}건이 자동으로 반영되었습니다.`),
+          unresolvedAutoPayers.length > 0 && React.createElement('div', {
+            style: { fontSize: '0.72rem', color: '#DC2626', backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: '8px', padding: '6px 10px' }
+          }, `${unresolvedAutoPayers.join(', ')}이(가) 이 정산 카드의 참여자 목록(일반 탭)에 없어 정산 금액에 반영되지 않았습니다. 참여자로 추가해 주세요.`),
 
           React.createElement('div', {
             className: 'settlement-personal-expense-summary',
@@ -2624,6 +2643,34 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
               type: 'button', className: 'btn btn-secondary', onClick: handleSaveOrUpdatePersonalExpense,
               style: { width: '100%', height: '44px' }
             }, editingPeId ? '수정' : '추가')
+          ),
+
+          /* Auto-derived personal advances -- from shared expenses tagged with a 지출자 in the
+             date modal's 정산 탭. Read-only here: edit/delete the underlying expense there
+             instead, so this list never drifts out of sync with the logged line item. */
+          autoPersonalItems.length > 0 && React.createElement('div', {
+            style: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }
+          },
+            autoPersonalItems.map(item => {
+              const participant = activeParticipants.find(p => (typeof p === 'string' ? p : (p?.name || p?.id)) === item.participantId) || { name: item.participantId };
+              return React.createElement('div', {
+                key: `auto_${item.itemKey}`,
+                title: '이 항목은 일정의 정산 탭에서 관리됩니다.',
+                style: {
+                  padding: '10px 12px 11px', borderRadius: '10px',
+                  backgroundColor: '#F8FAFC',
+                  border: '1px dashed #CBD5E1',
+                  display: 'flex', flexDirection: 'column', gap: '5px'
+                }
+              },
+                React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', minHeight: '20px' } },
+                  ParticipantBackdrop ? React.createElement(ParticipantBackdrop, { participant, name: item.participantId, dotSize: 9 }) : React.createElement('span', { style: { color: participant.color || '#2563EB', fontWeight: 800 } }, `● ${item.participantId}`),
+                  React.createElement('span', { style: { fontSize: '0.68rem', color: '#94A3B8', fontWeight: 700 } }, `자동 · ${formatShortDateWithDay(item.date)}`)
+                ),
+                React.createElement('div', { style: { color: 'var(--text-main)', fontWeight: 700, fontSize: '0.8rem', overflowWrap: 'anywhere' } }, item.label || '지출 내역'),
+                React.createElement('strong', { style: { alignSelf: 'flex-start', color: '#DC2626', fontWeight: 800, fontSize: '0.86rem', marginTop: '1px' } }, `-${Math.abs(Number(item.amount) || 0).toLocaleString()}원`)
+              );
+            })
           ),
 
           /* Saved Personal Expenses List */
