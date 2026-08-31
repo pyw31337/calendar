@@ -104,12 +104,21 @@ export async function enqueueWriteOperation(operation) {
   }
   try {
     const current = await getAllOperations();
-    if (!current.some(item => item.id === record.id) && current.length >= MAX_PENDING_OPERATIONS) {
+    const supersededCalendarWrites = record.type === 'calendar-snapshot'
+      ? current.filter(item => item.type === 'calendar-snapshot' && item.calendarId === record.calendarId && item.id !== record.id)
+      : [];
+    const effectiveCount = current.length - supersededCalendarWrites.length;
+    if (!current.some(item => item.id === record.id) && effectiveCount >= MAX_PENDING_OPERATIONS) {
       console.warn('[write-queue] pending operation limit reached');
       return false;
     }
     const tx = db.transaction(STORE_NAME, 'readwrite');
-    tx.objectStore(STORE_NAME).put(record);
+    const store = tx.objectStore(STORE_NAME);
+    // A calendar-snapshot contains the complete latest calendar state. Keeping older
+    // snapshots for the same calendar would replay stale data after reconnect and can
+    // undo a newer offline edit. Auxiliary/media operations remain independent.
+    supersededCalendarWrites.forEach(item => store.delete(item.id));
+    store.put(record);
     await new Promise((resolve, reject) => {
       tx.oncomplete = resolve;
       tx.onerror = () => reject(tx.error || new Error('write queue transaction failed'));
