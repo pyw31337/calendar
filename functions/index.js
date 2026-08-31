@@ -402,6 +402,62 @@ async function fetchYouTubeOembedPreview(link) {
   }
 }
 
+function hashUrlForCache(url) {
+  let hash = 0xcbf29ce484222325n;
+  const prime = 0x100000001b3n;
+  for (let i = 0; i < url.length; i++) {
+    hash ^= BigInt(url.charCodeAt(i));
+    hash = BigInt.asUintN(64, hash * prime);
+  }
+  return hash.toString(16).padStart(16, '0');
+}
+
+async function fetchTikTokOembedPreview(link) {
+  try {
+    const u = new URL(link);
+    const host = u.hostname.replace(/^www\./, '').replace(/^m\./, '');
+    if (host !== 'tiktok.com') return null;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const res = await fetch(`https://www.tiktok.com/oembed?url=${encodeURIComponent(link)}`, {
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return {
+      ok: true,
+      title: (data.title || '').trim(),
+      description: data.author_name ? `${data.author_name} · TikTok` : '',
+      image: { medium: { url: data.thumbnail_url || '' } },
+      siteName: 'TikTok',
+      domain: 'tiktok.com'
+    };
+  } catch (err) {
+    console.error('TikTok oEmbed fetch failed:', err);
+    return null;
+  }
+}
+
+async function saveLinkPreviewToFirestore(url, preview) {
+  if (!preview || !preview.ok) return;
+  try {
+    const urlHash = hashUrlForCache(url);
+    const image = preview.image?.medium?.url || preview.image?.large?.url || preview.image?.thumbnail?.url || preview.icon?.url || (typeof preview.image === 'string' ? preview.image : '');
+    const data = {
+      url: String(url || '').slice(0, 2000),
+      title: String(preview.title || '').slice(0, 300),
+      description: String(preview.description || '').slice(0, 500),
+      image: String(image || '').slice(0, 2000),
+      siteName: String(preview.siteName || preview.domain || '').slice(0, 200),
+      fetchedAt: Date.now()
+    };
+    await admin.firestore().collection('linkPreviews').doc(urlHash).set(data, { merge: true });
+  } catch (err) {
+    console.error('saveLinkPreviewToFirestore failed:', err);
+  }
+}
+
 // Generic per-IP, per-endpoint sliding-window throttle for the public proxy functions below
 // (peekalinkProxy, kakaoLocalSearchProxy). Both proxies are unauthenticated by design (any
 // calendar guest needs to reach them without a login step), which also means anyone who finds
@@ -552,17 +608,45 @@ exports.peekalinkProxy = functions.runWith({ secrets: ['PEEKALINK_API_KEY'] }).h
     res.status(400).json({ ok: false, message: 'link is required' });
     return;
   }
-  // 20/hour per IP -- comfortably above any single real user's pace, well under the shared
-  // 50/hour Peekalink free-plan ceiling so one abusive caller can't exhaust it for everyone else.
+  // 0. Check Firestore shared cache first (avoids any network or rate limit)
+  try {
+    const urlHash = hashUrlForCache(link);
+    const cachedDoc = await admin.firestore().collection('linkPreviews').doc(urlHash).get();
+    if (cachedDoc.exists && cachedDoc.data()?.title && !looksLikeBlockedPreviewTitle(cachedDoc.data()?.title)) {
+      const d = cachedDoc.data();
+      res.status(200).json({
+        ok: true,
+        title: d.title || '',
+        description: d.description || '',
+        image: d.image ? { medium: { url: d.image } } : null,
+        siteName: d.siteName || '',
+        domain: d.siteName || ''
+      });
+      return;
+    }
+  } catch (_) {}
+
+  // 1. Free, official, unlimited platform oEmbeds (YouTube & TikTok) - bypass Peekalink rate limit!
+  const youtubePreview = await fetchYouTubeOembedPreview(link);
+  if (youtubePreview) {
+    await saveLinkPreviewToFirestore(link, youtubePreview);
+    res.status(200).json(youtubePreview);
+    return;
+  }
+
+  const tiktokPreview = await fetchTikTokOembedPreview(link);
+  if (tiktokPreview) {
+    await saveLinkPreviewToFirestore(link, tiktokPreview);
+    res.status(200).json(tiktokPreview);
+    return;
+  }
+
+  // 2. Generic web URLs: Rate limit check to protect Peekalink free quota (20/hour per IP)
   if (!(await checkProxyRateLimit('peekalink', req.ip, 60 * 60 * 1000, 20))) {
     res.status(429).json({ ok: false, message: 'Too many requests' });
     return;
   }
-  const youtubePreview = await fetchYouTubeOembedPreview(link);
-  if (youtubePreview) {
-    res.status(200).json(youtubePreview);
-    return;
-  }
+
   try {
     const peekalinkRes = await fetch('https://api.peekalink.io/', {
       method: 'POST',
@@ -575,6 +659,7 @@ exports.peekalinkProxy = functions.runWith({ secrets: ['PEEKALINK_API_KEY'] }).h
     if (peekalinkRes.ok) {
       const json = await peekalinkRes.json();
       if (json && json.ok && json.title && !looksLikeBlockedPreviewTitle(json.title)) {
+        await saveLinkPreviewToFirestore(link, json);
         res.status(200).json(json);
         return;
       }
@@ -583,9 +668,10 @@ exports.peekalinkProxy = functions.runWith({ secrets: ['PEEKALINK_API_KEY'] }).h
     console.error('Peekalink proxy request failed:', err);
   }
 
-  // If Peekalink failed or did not return valid title, fall back to our custom implementation
+  // 3. If Peekalink failed or did not return valid title, fall back to our custom implementation
   const fallback = await fetchFallbackPreview(link);
   if (fallback) {
+    await saveLinkPreviewToFirestore(link, fallback);
     res.status(200).json(fallback);
   } else {
     res.status(502).json({ ok: false, message: 'Link preview failed' });

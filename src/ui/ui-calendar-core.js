@@ -2008,6 +2008,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const ChatParticipantSheet = __comp.ChatParticipantSheet || __deps.ChatParticipantSheet;
   const LinkPreviewCard = __comp.LinkPreviewCard || __deps.LinkPreviewCard;
+  const TikTokEmbedWidget = __comp.TikTokEmbedWidget || __deps.TikTokEmbedWidget;
   const MessageCommentIcon = __comp.MessageCommentIcon || __deps.MessageCommentIcon;
   const ParticipantPickerButton = __comp.ParticipantPickerButton || __deps.ParticipantPickerButton;
   const MediaThumb = __comp.MediaThumb || __deps.MediaThumb;
@@ -2020,7 +2021,10 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
 
   const imageUrls = memo.imageUrls || [];
   const thumbUrls = memo.thumbUrls || [];
-  const displayMemoText = memo.text ? (memo.linkPreview ? removeFirstUrl(memo.text) : memo.text) : '';
+  const memoFirstUrl = extractFirstUrl(memo.text);
+  const memoMediaInfo = memoFirstUrl ? getDirectChatMediaInfo(memoFirstUrl) : null;
+  const isVideoMedia = !!(memoMediaInfo && (memoMediaInfo.type === 'embed' || memoMediaInfo.type === 'tiktok-widget' || memoMediaInfo.type === 'video'));
+  const displayMemoText = memo.text ? ((memo.linkPreview || isVideoMedia) ? removeFirstUrl(memo.text) : memo.text) : '';
   const memoTextLineCount = displayMemoText ? displayMemoText.split(/\r?\n/).length : 0;
   const hasLongMemoText = displayMemoText.length > 280 || memoTextLineCount > 8;
   const [isMemoTextExpanded, setIsMemoTextExpanded] = React.useState(false);
@@ -2266,10 +2270,68 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       }
     }, isMemoTextExpanded ? "접기" : "더 보기"),
 
-    /* Link Preview Card under the card content if applicable */
-    extractFirstUrl(memo.text) && /*#__PURE__*/React.createElement("div", {
-      style: { marginTop: '8px' }
-    }, /*#__PURE__*/React.createElement(LinkPreviewCard, { url: extractFirstUrl(memo.text), cachedData: memo.linkPreview, stretch: true })),
+    /* Media Embed or Link Preview Card under the card content if applicable */
+    memoFirstUrl && /*#__PURE__*/React.createElement("div", {
+      style: { marginTop: '8px', width: '100%' },
+      "data-stop-card-open": "true",
+      onClick: e => e.stopPropagation()
+    }, (() => {
+      if (memoMediaInfo?.type === 'tiktok-widget') {
+        return /*#__PURE__*/React.createElement(TikTokEmbedWidget, {
+          url: memoMediaInfo.url,
+          videoId: memoMediaInfo.videoId,
+          onFailed: () => {}
+        });
+      }
+      if (memoMediaInfo?.type === 'embed') {
+        const isPortrait = memoMediaInfo.orientation === 'portrait';
+        return /*#__PURE__*/React.createElement("div", {
+          style: {
+            width: '100%',
+            maxWidth: isPortrait ? '320px' : '100%',
+            margin: '0 auto',
+            borderRadius: 'var(--radius-md)',
+            overflow: 'hidden',
+            backgroundColor: 'var(--bg-primary)'
+          }
+        }, /*#__PURE__*/React.createElement("iframe", {
+          src: memoMediaInfo.url,
+          title: memo.title || '영상 재생',
+          loading: 'lazy',
+          allow: 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share',
+          allowFullScreen: true,
+          style: {
+            display: 'block',
+            width: '100%',
+            aspectRatio: isPortrait ? '9 / 16' : '16 / 9',
+            maxHeight: isPortrait ? 'min(72vh, 480px)' : 'min(54vh, 360px)',
+            border: '0',
+            borderRadius: 'var(--radius-md)'
+          }
+        }));
+      }
+      if (memoMediaInfo?.type === 'video') {
+        return /*#__PURE__*/React.createElement("video", {
+          src: memoMediaInfo.url,
+          controls: true,
+          playsInline: true,
+          preload: 'metadata',
+          style: {
+            display: 'block',
+            width: '100%',
+            maxHeight: '360px',
+            borderRadius: 'var(--radius-md)',
+            backgroundColor: 'var(--bg-primary)'
+          }
+        });
+      }
+      return /*#__PURE__*/React.createElement(LinkPreviewCard, {
+        url: memoFirstUrl,
+        fallbackTitle: memo.title || (memo.text ? removeFirstUrl(memo.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : ''),
+        cachedData: memo.linkPreview,
+        stretch: true
+      });
+    })()),
 
     /* Tags container if exists */
     /*#__PURE__*/React.createElement("div", {

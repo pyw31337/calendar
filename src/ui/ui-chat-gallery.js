@@ -820,6 +820,7 @@ export function ChatGalleryModal({
   const SyncStatusChip = __comp.SyncStatusChip || __deps.SyncStatusChip;
   const SyncStatusBanner = __comp.SyncStatusBanner || __deps.SyncStatusBanner;
   const LinkPreviewCard = __deps.LinkPreviewCard || __comp.LinkPreviewCard;
+  const TikTokEmbedWidget = __comp.TikTokEmbedWidget || __deps.TikTokEmbedWidget;
   const MenuIcon = __deps.MenuIcon || __comp.MenuIcon;
   const MediaThumb = __comp.MediaThumb || __deps.MediaThumb;
   const getMessageImageEntries = __deps.getMessageImageEntries;
@@ -952,7 +953,7 @@ export function ChatGalleryModal({
       extractAllUrlInfosLoose(body).forEach(info => {
         if (!info.url || seen.has(info.url) || getDirectChatMediaInfo(info.url)?.type === 'image') return;
         seen.add(info.url);
-        list.push({ url: info.url, timestamp: memo.updatedAt || memo.createdAt || 0, messageId: memo.id, text: body, linkPreview: !firstUrlSeen ? (memo.linkPreview || null) : null, source: 'memo' });
+        list.push({ url: info.url, timestamp: memo.updatedAt || memo.createdAt || 0, messageId: memo.id, title: memo.title || '', text: body, linkPreview: !firstUrlSeen ? (memo.linkPreview || null) : null, source: 'memo' });
         firstUrlSeen = true;
       });
     });
@@ -1057,9 +1058,10 @@ export function ChatGalleryModal({
     return sharedLinks.filter(item => {
       const matchText = (item.text || '').toLowerCase().includes(q) || (item.text || '').toLowerCase().includes(qNoHash);
       const matchUrl = (item.url || '').toLowerCase().includes(q) || (item.url || '').toLowerCase().includes(qNoHash);
+      const matchItemTitle = (item.title || '').toLowerCase().includes(q) || (item.title || '').toLowerCase().includes(qNoHash);
       const matchTitle = (item.linkPreview?.title || '').toLowerCase().includes(q) || (item.linkPreview?.title || '').toLowerCase().includes(qNoHash);
       const matchDesc = (item.linkPreview?.description || '').toLowerCase().includes(q) || (item.linkPreview?.description || '').toLowerCase().includes(qNoHash);
-      return matchText || matchUrl || matchTitle || matchDesc;
+      return matchText || matchUrl || matchItemTitle || matchTitle || matchDesc;
     });
   }, [sharedLinks, searchQuery]);
 
@@ -1360,13 +1362,92 @@ export function ChatGalleryModal({
     });
   }));
   const renderGalleryLinkList = items => /*#__PURE__*/React.createElement(React.Fragment, null,
-    (items || []).map(item => /*#__PURE__*/React.createElement(LinkPreviewCard, {
-      key: item.messageId || item.url,
-      url: item.url,
-      fallbackTitle: item.text ? removeFirstUrl(item.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '',
-      cachedData: item.linkPreview,
-      stretch: true
-    }))
+    (items || []).map(item => {
+      const mediaInfo = getDirectChatMediaInfo(item.url);
+      const isVideoMedia = !!(mediaInfo && (mediaInfo.type === 'embed' || mediaInfo.type === 'tiktok-widget' || mediaInfo.type === 'video'));
+      const fallbackTitle = item.title || (item.text ? removeFirstUrl(item.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '');
+
+      if (isVideoMedia) {
+        const isPortrait = mediaInfo.type === 'embed' && mediaInfo.orientation === 'portrait';
+        return /*#__PURE__*/React.createElement("div", {
+          key: item.messageId || item.url,
+          style: {
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+            width: '100%',
+            backgroundColor: 'var(--bg-card)',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: 'var(--radius-md)',
+            padding: '12px',
+            boxSizing: 'border-box'
+          }
+        },
+          fallbackTitle && /*#__PURE__*/React.createElement("div", {
+            style: {
+              fontSize: '0.9rem',
+              fontWeight: 700,
+              color: 'var(--text-main)',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            }
+          }, fallbackTitle),
+          mediaInfo.type === 'tiktok-widget'
+            ? /*#__PURE__*/React.createElement(TikTokEmbedWidget, {
+              url: mediaInfo.url,
+              videoId: mediaInfo.videoId,
+              onFailed: () => {}
+            })
+            : mediaInfo.type === 'embed'
+            ? /*#__PURE__*/React.createElement("div", {
+              style: {
+                width: '100%',
+                maxWidth: isPortrait ? '320px' : '100%',
+                margin: '0 auto',
+                borderRadius: 'var(--radius-md)',
+                overflow: 'hidden',
+                backgroundColor: 'var(--bg-primary)'
+              }
+            }, /*#__PURE__*/React.createElement("iframe", {
+              src: mediaInfo.url,
+              title: fallbackTitle || '영상 재생',
+              loading: 'lazy',
+              allow: 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share',
+              allowFullScreen: true,
+              style: {
+                display: 'block',
+                width: '100%',
+                aspectRatio: isPortrait ? '9 / 16' : '16 / 9',
+                maxHeight: isPortrait ? 'min(72vh, 480px)' : 'min(54vh, 360px)',
+                border: '0',
+                borderRadius: 'var(--radius-md)'
+              }
+            }))
+            : /*#__PURE__*/React.createElement("video", {
+              src: mediaInfo.url,
+              controls: true,
+              playsInline: true,
+              preload: 'metadata',
+              style: {
+                display: 'block',
+                width: '100%',
+                maxHeight: '360px',
+                borderRadius: 'var(--radius-md)',
+                backgroundColor: 'var(--bg-primary)'
+              }
+            })
+        );
+      }
+
+      return /*#__PURE__*/React.createElement(LinkPreviewCard, {
+        key: item.messageId || item.url,
+        url: item.url,
+        fallbackTitle: fallbackTitle,
+        cachedData: item.linkPreview,
+        stretch: true
+      });
+    })
   );
   const renderGalleryLoadMoreButton = ({ loadingLabel, label, onClick, disabled }) => /*#__PURE__*/React.createElement("button", {
     type: "button",

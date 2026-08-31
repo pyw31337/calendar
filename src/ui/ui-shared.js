@@ -1084,20 +1084,29 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = fals
   const __comp = window.GATHER_UI_COMPONENTS || {};
 
   const preview = useLinkPreview(url, cachedData);
-  if (!preview || preview.status === 'loading' || preview.status === 'error' || preview.status === 'empty' || !preview.data) return null;
+  const hasPreviewData = !!(preview && preview.status === 'success' && preview.data);
 
-  const { title, description, image, siteName } = preview.data;
+  if (!hasPreviewData && !fallbackTitle) return null;
+
+  const { title, description, image, siteName } = (hasPreviewData ? preview.data : {}) || {};
+  let host = '';
+  try {
+    host = new URL(url).hostname.replace(/^www\./i, '');
+  } catch (_) {}
+
   // Cached OpenGraph data is user/content supplied and older records may contain a malformed
   // image value. Do not let it become an invalid <img src>, which produces noisy browser errors
   // and can break page smoke checks. Valid network/data URLs still use the normal thumbnail.
   const imageSrc = (() => {
     const candidate = typeof image === 'string' ? image.trim() : '';
     const validator = GATHER_APP_UTILS.isRenderableImageUrl;
-    return typeof validator === 'function' && validator(candidate) ? candidate : '';
+    if (typeof validator === 'function' && validator(candidate)) return candidate;
+    if (!hasPreviewData && host) return `https://www.google.com/s2/favicons?sz=128&domain=${encodeURIComponent(host)}`;
+    return '';
   })();
   const isGenericTitle = !title || title === 'map.naver.com' || title === 'naver.me' || title.startsWith('map.naver');
-  const displayTitle = (isGenericTitle && fallbackTitle) ? fallbackTitle : (title || siteName);
-  const displayHost = (siteName && siteName !== displayTitle) ? siteName : '';
+  const displayTitle = (isGenericTitle && fallbackTitle) ? fallbackTitle : (title || fallbackTitle || siteName || host);
+  const displayHost = (siteName && siteName !== displayTitle) ? siteName : host;
 
   if (!displayTitle && !description) return null;
 
