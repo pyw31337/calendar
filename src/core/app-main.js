@@ -127,6 +127,7 @@ import {
   getSubscriptionHashId,
   subscribeUserToPush,
   ensurePushSubscriptionHealthy,
+  syncPushSubscriptionChannels,
   subscribeUserToPushWithPermission,
   unsubscribeUserFromPush,
   notifyNewChatMessage,
@@ -5730,10 +5731,11 @@ function CalendarApp() {
           setChatNotifyEnabledForCalendar(activeCalId, !!(next && next.chat));
           setMainChatNotifyEnabled(!!(next && next.chat));
         }
-        // Channel turned on → force re-register this device so server has channel prefs
-        if (next && next[key]) {
-          try { await handleForcePushReregister(); } catch (_) {}
-        }
+        // Persist both ON and OFF changes to this browser's subscription document.
+        // The server filters by that document, not by this tab's localStorage copy.
+        try {
+          await syncPushSubscriptionChannels(activeCalId, getCurrentChatParticipantId());
+        } catch (_) {}
       },
       calendarId: activeCalId,
       activeParticipantId: typeof getCurrentChatParticipantId === 'function' ? getCurrentChatParticipantId() : chatParticipantId,
@@ -6091,10 +6093,9 @@ function CalendarApp() {
           setChatNotifyEnabledForCalendar(activeCalId, !!(next && next.chat));
           setMainChatNotifyEnabled(!!(next && next.chat));
         }
-        // Channel turned on → force re-register this device so server has channel prefs
-        if (next && next[key]) {
-          try { await handleForcePushReregister(); } catch (_) {}
-        }
+        try {
+          await syncPushSubscriptionChannels(activeCalId, getCurrentChatParticipantId());
+        } catch (_) {}
       },
       calendarId: activeCalId,
       activeParticipantId: typeof getCurrentChatParticipantId === 'function' ? getCurrentChatParticipantId() : chatParticipantId,

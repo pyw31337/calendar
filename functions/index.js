@@ -214,12 +214,16 @@ function isAnniversaryToday(ann, y, m, d) {
 // `firebase deploy --only functions` to go live (unlike the rest of this app, which redeploys
 // automatically via GitHub Pages on merge to main).
 
-// Memo created → push (channel: memo)
-exports.onMemoCreate = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).firestore
+// Memo created or edited → push (channel: memo). A write trigger is required because
+// memo edits are saved as updates; the old create-only trigger silently missed them.
+exports.onMemoWrite = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).firestore
   .document('calendars/{calendarDocId}/memos/{memoId}')
-  .onCreate(async (snapshot, context) => {
+  .onWrite(async (change, context) => {
+    if (!change.after.exists) return;
+    const before = change.before.exists ? (change.before.data() || {}) : null;
+    const memo = change.after.data() || {};
+    if (before && JSON.stringify(before) === JSON.stringify(memo)) return;
     const calendarDocId = context.params.calendarDocId;
-    const memo = snapshot.data() || {};
     const db = admin.firestore();
     const calendarSnap = await db.collection('calendars').doc(calendarDocId).get();
     if (!calendarSnap.exists) return;
@@ -235,12 +239,17 @@ exports.onMemoCreate = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).fir
     }, { skipParticipantId: memo.participantId || memo.authorId || null, channel: 'memo' });
   });
 
-// Confirmed meeting write → schedule channel
-exports.onConfirmedMeetingCreate = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).firestore
+// Confirmed meeting created or edited → schedule channel. Settlement/schedule changes
+// are updates to the date document in normal operation, so create-only delivery was
+// insufficient for cross-browser users.
+exports.onConfirmedMeetingWrite = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).firestore
   .document('calendars/{calendarDocId}/confirmedMeetings/{dateId}')
-  .onCreate(async (snapshot, context) => {
+  .onWrite(async (change, context) => {
+    if (!change.after.exists) return;
+    const before = change.before.exists ? (change.before.data() || {}) : null;
+    const after = change.after.data() || {};
+    if (before && JSON.stringify(before) === JSON.stringify(after)) return;
     const calendarDocId = context.params.calendarDocId;
-    const after = snapshot.data() || {};
     const db = admin.firestore();
     const calendarSnap = await db.collection('calendars').doc(calendarDocId).get();
     if (!calendarSnap.exists) return;

@@ -988,6 +988,44 @@ async function ensurePushSubscriptionHealthy(calendarId, activeParticipantId) {
   }
 }
 
+// Keep the server-side channel filter in sync when a user changes only one of the
+// notification switches. Channel preferences live in localStorage for the UI, but
+// Cloud Functions read the copy stored on this browser's push subscription document.
+// Without this explicit update, turning a channel off/on had no effect until a full
+// re-subscription happened (and turning it off never re-subscribed at all).
+async function syncPushSubscriptionChannels(calendarId, activeParticipantId) {
+  if (!calendarId || !activeParticipantId) return { ok: false, reason: 'missing-participant' };
+  if (!isNotificationSupported() || Notification.permission !== 'granted') {
+    return { ok: false, reason: 'permission-not-granted' };
+  }
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
+    return { ok: false, reason: 'service-worker-unsupported' };
+  }
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    const subscription = registration.pushManager ? await registration.pushManager.getSubscription() : null;
+    if (!subscription || !window.__gatherFirebaseDb) return { ok: false, reason: 'no-browser-subscription' };
+    const channelPrefs = typeof getNotifyChannels === 'function' ? getNotifyChannels() : {};
+    const nowTs = Date.now();
+    const subId = getSubscriptionHashId(subscription.endpoint);
+    const saved = await writeSharedCollection('push_subscriptions', calendarId, subId, {
+      participantId: activeParticipantId,
+      updatedAt: nowTs,
+      lastSeenAt: nowTs,
+      channels: {
+        chat: channelPrefs.chat !== false,
+        memo: channelPrefs.memo !== false,
+        poll: channelPrefs.poll !== false,
+        schedule: channelPrefs.schedule !== false
+      }
+    }, 'set', '알림 채널 설정 동기화', { merge: true });
+    return saved?.success ? { ok: true, subId } : { ok: false, reason: 'subscription-update-failed' };
+  } catch (err) {
+    console.warn('Failed to sync push notification channels:', err);
+    return { ok: false, reason: err?.message || 'subscription-update-failed' };
+  }
+}
+
 async function subscribeUserToPushWithPermission(calendarId, activeParticipantId) {
   if (!isNotificationSupported()) {
     return { ok: false, reason: 'permission-not-granted' };
@@ -2219,6 +2257,7 @@ export {
   getSubscriptionHashId,
   subscribeUserToPush,
   ensurePushSubscriptionHealthy,
+  syncPushSubscriptionChannels,
   subscribeUserToPushWithPermission,
   unsubscribeUserFromPush,
   notifyNewChatMessage,
