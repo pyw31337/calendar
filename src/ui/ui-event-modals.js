@@ -3342,6 +3342,12 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
         style: { display: 'flex', flexDirection: 'column', gap: '10px' }
       },
         displayCards.map(card => {
+          // The synthetic 'default_settlement_card' below isn't a persisted record -- it's a
+          // stand-in aggregate view shown only while the calendar has never had a real
+          // settlement card created. Making it clickable let people "edit"/"delete" it, which
+          // silently no-oped (there was nothing to save/tombstone) and, once it was the only
+          // card left, made a just-deleted real card look like it had come back.
+          const isSyntheticDefaultCard = card.id === 'default_settlement_card';
           const isClosed = card.status === 'closed';
           const displayBankName = card.bankName === '기타' && card.otherBankName ? card.otherBankName : card.bankName;
           const displayAccountNumber = isClosed ? maskSettlementAccountNumber(card.accountNumber) : card.accountNumber;
@@ -3380,20 +3386,22 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
 
           return React.createElement("div", {
             key: card.id,
-            role: 'button',
-            tabIndex: 0,
-            title: '정산 수정',
-            'aria-label': '정산 수정',
-            'data-settlement-edit-button': 'true',
-            // Open only on click -- see the settlement-list-card button's comment below for why
-            // an early pointerup/mousedown handler here would race the editor's self-closing
-            // full-viewport overlay and close the modal within the same click gesture.
-            onClick: () => handleOpenSettlementEditor(card),
-            onKeyDown: event => {
-              if (event.key !== 'Enter' && event.key !== ' ') return;
-              event.preventDefault();
-              handleOpenSettlementEditor(card);
-            },
+            ...(isSyntheticDefaultCard ? {} : {
+              role: 'button',
+              tabIndex: 0,
+              title: '정산 수정',
+              'aria-label': '정산 수정',
+              'data-settlement-edit-button': 'true',
+              // Open only on click -- see the settlement-list-card button's comment below for why
+              // an early pointerup/mousedown handler here would race the editor's self-closing
+              // full-viewport overlay and close the modal within the same click gesture.
+              onClick: () => handleOpenSettlementEditor(card),
+              onKeyDown: event => {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                event.preventDefault();
+                handleOpenSettlementEditor(card);
+              }
+            }),
             style: {
               background: 'linear-gradient(90deg, var(--settlement-hero-start), var(--settlement-hero-end))',
               border: 'none',
@@ -3406,7 +3414,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
               position: 'relative',
               boxShadow: 'none',
               color: 'var(--settlement-hero-text)',
-              cursor: 'pointer'
+              cursor: isSyntheticDefaultCard ? 'default' : 'pointer'
             }
           },
             /* Card Header: status top-left, title/account below. */
