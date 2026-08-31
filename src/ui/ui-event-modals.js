@@ -1511,6 +1511,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
   })));
   const TrashIcon = __comp.TrashIcon || __deps.TrashIcon || (() => '🗑');
   const PencilIcon = __comp.PencilIcon || __deps.PencilIcon || (() => '✎');
+  const ImageDownIcon = __comp.ImageDownIcon || __deps.ImageDownIcon || (() => '⬇');
   const ParticipantBackdrop = __comp.ParticipantBackdrop || __deps.ParticipantBackdrop;
   const MainCalendarArrow = ({ direction }) => React.createElement('svg', {
     xmlns: 'http://www.w3.org/2000/svg', width: '20', height: '20', viewBox: '0 0 24 24',
@@ -2719,8 +2720,14 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
     style: { width: '92%', maxWidth: '430px', maxHeight: '88vh', display: 'flex', flexDirection: 'column' }
   },
     React.createElement('div', { className: 'modal-header', style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)' } },
-      React.createElement('h3', { style: { margin: 0, fontSize: '1rem', fontWeight: 900, color: 'var(--text-main)' } }, '정산 카드 미리보기'),
-      React.createElement('button', { type: 'button', onClick: () => setIsSettlementCardPreviewOpen(false), style: { border: 0, background: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1.2rem' } }, '✕')
+      React.createElement('h3', { style: { margin: 0, fontSize: '1rem', fontWeight: 900, color: 'var(--text-main)' } }, '정산카드'),
+      React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '10px' } },
+        React.createElement('button', {
+          type: 'button', title: '이미지로 다운로드', 'aria-label': '이미지로 다운로드', onClick: handleDownloadSettlementCardImage,
+          style: { display: 'flex', alignItems: 'center', gap: '4px', border: 0, background: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 700, padding: 0 }
+        }, React.createElement(ImageDownIcon, { size: 18 }), '다운로드'),
+        React.createElement('button', { type: 'button', onClick: () => setIsSettlementCardPreviewOpen(false), style: { border: 0, background: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1.2rem' } }, '✕')
+      )
     ),
     React.createElement('div', { className: 'modal-body', style: { overflowY: 'auto', padding: '14px', display: 'flex', flexDirection: 'column', gap: '12px', background: 'linear-gradient(145deg, #EEF2FF, #FDF2F8)' } },
       React.createElement('div', { style: { padding: '16px', borderRadius: '14px', background: 'linear-gradient(135deg, #4F46E5, #DB2777)', color: '#FFFFFF', boxShadow: '0 8px 20px rgba(79,70,229,0.18)' } },
