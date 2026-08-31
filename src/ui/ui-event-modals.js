@@ -2577,16 +2577,18 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
         React.createElement('div', {
           style: { display: 'flex', flexDirection: 'column', gap: '10px' }
         },
-          React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
-            React.createElement('label', { style: { ...settlementSectionLabelStyle, marginBottom: 0 } }, '개인 지출 등록'),
-            React.createElement('span', { style: { fontSize: '0.72rem', color: 'var(--text-muted)' } }, '총 지출에 포함된 금액 중 개인이 먼저 결제한 금액을 입력하세요.'),
+          React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' } },
+            React.createElement('label', { style: { ...settlementSectionLabelStyle, marginBottom: 0 } }, '추가 정산 조정 (예외)'),
             React.createElement('span', { style: { fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)' } },
               `합계: ${Math.abs(Array.from(personalExpenseTotals.values()).reduce((s, amount) => s + amount, 0)).toLocaleString()}원`
             )
           ),
+          React.createElement('div', {
+            style: { fontSize: '0.72rem', lineHeight: 1.5, color: '#92400E', backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '8px', padding: '7px 10px' }
+          }, '일정 지출과 연결할 수 없는 예외만 입력하세요. 일반 선결제는 일정의 정산 탭에서 결제자를 지정하면 자동 반영되므로 여기에 다시 입력하지 않습니다.'),
           autoPersonalItems.length > 0 && React.createElement('div', {
             style: { fontSize: '0.72rem', color: 'var(--text-muted)', backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '8px', padding: '6px 10px' }
-          }, `일정의 정산 탭에서 지출자를 지정한 ${autoPersonalItems.length}건이 자동으로 반영되었습니다.`),
+          }, `일정의 정산 탭에서 결제자를 지정한 ${autoPersonalItems.length}건이 자동으로 반영되었습니다.`),
           unresolvedAutoPayers.length > 0 && React.createElement('div', {
             style: { fontSize: '0.72rem', color: '#DC2626', backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: '8px', padding: '6px 10px' }
           }, `${unresolvedAutoPayers.join(', ')}이(가) 이 정산 카드의 참여자 목록(일반 탭)에 없어 정산 금액에 반영되지 않았습니다. 참여자로 추가해 주세요.`),
@@ -2630,7 +2632,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
           React.createElement('div', { style: { width: '100%', marginTop: '-6px', marginBottom: '-6px' } },
             React.createElement('input', {
               type: 'text', className: 'form-input', value: peDescriptionInput,
-              onChange: e => setPeDescriptionInput(e.target.value), placeholder: '지출 명목 (예: 개인 음료, 교통비)',
+              onChange: e => setPeDescriptionInput(e.target.value), placeholder: '조정 사유 (예: 영수증 없는 교통비, 할인·환불)',
               style: { width: '100%', height: '44px', borderRadius: '8px', fontSize: '0.84rem' },
               onKeyDown: e => { if (e.key === 'Enter') { e.preventDefault(); handleSaveOrUpdatePersonalExpense(); } }
             })

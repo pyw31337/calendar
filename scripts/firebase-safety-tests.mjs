@@ -180,6 +180,7 @@ const script = fs.readFileSync('assets/app-main.js', 'utf8');
 const sourceScript = fs.readFileSync('src/core/app-main.js', 'utf8');
 const memoScript = fs.readFileSync('src/ui/ui-memo-view.js', 'utf8');
 const eventModalScript = fs.readFileSync('src/ui/ui-event-modals.js', 'utf8');
+const dateModalScript = fs.readFileSync('src/ui/ui-date-modal.js', 'utf8');
 const weatherScript = fs.readFileSync('src/ui/ui-weather.js', 'utf8');
 const sideMenuScript = fs.readFileSync('src/ui/ui-side-menu.js', 'utf8');
 const calendarCoreScript = fs.readFileSync('src/ui/ui-calendar-core.js', 'utf8');
@@ -253,6 +254,10 @@ assert(fs.readFileSync('scripts/firebase-media-audit.mjs', 'utf8').includes('inv
 assert(/void persistLegacySubcollections\([\s\S]{0,260}\.catch\(/.test(firebaseDataScript), 'legacy subcollection writes must be detached from the primary save and handled in the background');
 assert(/participantRowsForSave = participantRows\.map[\s\S]{0,420}participantMemoInput[\s\S]{0,900}participantRows: participantRowsForSave\.map/.test(eventModalScript), 'settlement card save must commit a pending participant memo edit');
 assert(/const saved = typeof onSave === 'function' \? await onSave\(newCard\) : false[\s\S]{0,220}saved === false/.test(eventModalScript), 'settlement card modal must await persistence before reporting success or closing');
+assert(dateModalScript.includes("const EXPENSE_PAYER_UNSELECTED = '__expense_payer_unselected__'") && dateModalScript.includes("showToast('결제 재원을 선택해 주세요.'"), 'new expense entries must require an explicit payment source');
+assert(/expensePayerInput === EXPENSE_PAYER_FUND \? '' : expensePayerInput/.test(dateModalScript), 'the shared-fund UI choice must persist using the legacy empty payerId representation');
+assert(dateModalScript.includes("expense.payerId || EXPENSE_PAYER_FUND"), 'editing legacy expenses without payerId must preserve their shared-fund meaning');
+assert(eventModalScript.includes('추가 정산 조정 (예외)') && eventModalScript.includes('여기에 다시 입력하지 않습니다.'), 'manual settlement adjustments must warn against duplicating auto-linked personal advances');
 assert(firebaseDataScript.includes("const addDocumentId = method === 'add'") && firebaseDataScript.includes('colRef.doc(addDocumentId).set'), 'collection adds must share one id across SDK and REST retries');
 assert(/const restMethod = method === 'add' \? 'set' : method/.test(firebaseDataScript), 'collection add REST fallback must use the shared document id');
 assert(/const updateCalendars = async[\s\S]{0,420}if \(isSavingRef\.current\) return false/.test(sourceScript), 'calendar saves must reject duplicate in-flight submissions');
