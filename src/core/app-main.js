@@ -2250,8 +2250,21 @@ function CalendarApp() {
         });
       });
     const unsubMeetings = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('confirmedMeetings')
-      .onSnapshot(snapshot => {
+      .onSnapshot({ includeMetadataChanges: true }, snapshot => {
         if (!isMounted) return;
+        // Ignore snapshots that arrive while this device is mid-save, same as the places
+        // listener above -- a Firestore persistence-cached snapshot delivered immediately
+        // after the write starts would stomp the optimistic local state with stale data
+        // (e.g. reverting an expense edit back to the old amount) before the server-confirmed
+        // write has a chance to land in the subcollection.
+        if (isSavingRef.current) return;
+        // Also ignore cached snapshots that arrive right after a save finishes -- Firestore
+        // persistence can replay a stale fromCache:true event for the subcollection even after
+        // the SDK-level write transaction succeeded and we already have correct local state.
+        // Only fromCache:false (server-confirmed) snapshots should update subcollection state
+        // when there was a recent local write for this calendar.
+        const recentWriteAt = localWriteStartedAtRef.current[activeCalId] || 0;
+        if (snapshot.metadata.fromCache && Date.now() - recentWriteAt < 8000) return;
         const list = [];
         snapshot.forEach(doc => list.push(doc.data()));
         setConfirmedMeetingsSubcollection(list);
