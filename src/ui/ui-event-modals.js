@@ -2153,22 +2153,34 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
       participantRows.forEach(row => {
         const amount = getIndividualSettlementAmount(row.participantId);
         const isRefund = amount < 0;
+        // A participant's own memo (e.g. "26.08.31 입금완료") stands in for the default
+        // 환급예정/입금요청 status text once they've written one -- and once that memo marks
+        // the transfer as 완료 (done), the whole row dims to gray instead of the red/green
+        // pending-status colors.
+        const memoText = (row.memo || '').trim();
+        const isDone = memoText.includes('완료');
+        const rowTextColor = isDone ? '#64748B' : '#334155';
+        const amountColor = isDone ? '#64748B' : (isRefund ? '#16A34A' : '#DC2626');
         hLine(PAD + 20, W - PAD - 20, rowY - 22);
-        ctx.fillStyle = '#334155';
+        ctx.fillStyle = rowTextColor;
         ctx.font = '600 15px sans-serif';
         const nameText = `${row.participantId}님`;
         ctx.fillText(nameText, PAD + 20, rowY);
         const nameWidth = ctx.measureText(nameText).width;
 
-        const badgeText = isRefund ? '환급예정' : '입금요청';
         ctx.font = '800 12px sans-serif';
+        const badgeText = fitText(memoText || (isRefund ? '환급예정' : '입금요청'), 260);
         const badgePadX = 8;
         const badgeW = ctx.measureText(badgeText).width + badgePadX * 2;
         const badgeH = 18;
         const badgeX = PAD + 20 + nameWidth + 8;
         const badgeY = rowY - badgeH + 4;
         pillPath(badgeX, badgeY, badgeW, badgeH);
-        if (isRefund) {
+        if (isDone) {
+          ctx.fillStyle = '#E2E8F0';
+          ctx.fill();
+          ctx.fillStyle = '#64748B';
+        } else if (isRefund) {
           ctx.strokeStyle = '#16A34A';
           ctx.lineWidth = 1;
           ctx.stroke();
@@ -2180,7 +2192,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
         }
         ctx.fillText(badgeText, badgeX + badgePadX, badgeY + 13);
 
-        ctx.fillStyle = amount < 0 ? '#16A34A' : '#DC2626';
+        ctx.fillStyle = amountColor;
         ctx.font = '800 16px sans-serif';
         ctx.textAlign = 'right';
         ctx.fillText(`${amount < 0 ? '환급금 +' : '분담금 -'}${Math.abs(amount).toLocaleString()}원`, W - PAD - 20, rowY);
@@ -2726,16 +2738,25 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
           : participantRows.map(row => {
             const amount = getIndividualSettlementAmount(row.participantId);
             const isRefund = amount < 0;
-            return React.createElement('div', { key: `preview_${row.id}`, style: { display: 'flex', justifyContent: 'space-between', gap: '8px', padding: '7px 0', borderTop: '1px solid var(--border-subtle)', fontSize: '0.8rem' } },
-              React.createElement('span', { style: { display: 'inline-flex', alignItems: 'center', gap: '6px' } },
+            // A participant's own memo (e.g. "26.08.31 입금완료") stands in for the default
+            // 환급예정/입금요청 status text once they've written one -- and once that memo marks
+            // the transfer as 완료 (done), the whole row dims to gray instead of the red/green
+            // pending-status colors.
+            const memoText = (row.memo || '').trim();
+            const isDone = memoText.includes('완료');
+            const badgeText = memoText || (isRefund ? '환급예정' : '입금요청');
+            const badgeStyle = isDone
+              ? { display: 'inline-flex', alignItems: 'center', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', padding: '1px 8px', borderRadius: '999px', backgroundColor: '#E2E8F0', color: '#64748B', fontSize: '0.7rem', fontWeight: 800, whiteSpace: 'nowrap' }
+              : isRefund
+                ? { display: 'inline-flex', alignItems: 'center', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', padding: '1px 8px', borderRadius: '999px', border: '1px solid var(--status-green)', color: 'var(--status-green)', fontSize: '0.7rem', fontWeight: 800, whiteSpace: 'nowrap' }
+                : { display: 'inline-flex', alignItems: 'center', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', padding: '1px 8px', borderRadius: '999px', backgroundColor: '#DC2626', color: '#FFFFFF', fontSize: '0.7rem', fontWeight: 800, whiteSpace: 'nowrap' };
+            const rowTextColor = isDone ? '#64748B' : 'var(--text-main)';
+            return React.createElement('div', { key: `preview_${row.id}`, style: { display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: '8px', padding: '7px 0', borderTop: '1px solid var(--border-subtle)', fontSize: '0.8rem' } },
+              React.createElement('span', { style: { display: 'inline-flex', alignItems: 'center', gap: '6px', minWidth: 0, color: rowTextColor } },
                 `${row.participantId}님`,
-                React.createElement('span', {
-                  style: isRefund
-                    ? { display: 'inline-flex', alignItems: 'center', padding: '1px 8px', borderRadius: '999px', border: '1px solid var(--status-green)', color: 'var(--status-green)', fontSize: '0.7rem', fontWeight: 800, whiteSpace: 'nowrap' }
-                    : { display: 'inline-flex', alignItems: 'center', padding: '1px 8px', borderRadius: '999px', backgroundColor: '#DC2626', color: '#FFFFFF', fontSize: '0.7rem', fontWeight: 800, whiteSpace: 'nowrap' }
-                }, isRefund ? '환급예정' : '입금요청')
+                React.createElement('span', { style: badgeStyle }, badgeText)
               ),
-              React.createElement('strong', { style: { color: amount < 0 ? 'var(--status-green)' : '#DC2626', whiteSpace: 'nowrap' } }, `${amount < 0 ? '환급금 +' : '분담금 -'}${Math.abs(amount).toLocaleString()}원`)
+              React.createElement('strong', { style: { color: isDone ? '#64748B' : (amount < 0 ? 'var(--status-green)' : '#DC2626'), whiteSpace: 'nowrap' } }, `${amount < 0 ? '환급금 +' : '분담금 -'}${Math.abs(amount).toLocaleString()}원`)
             );
           })
       ),
