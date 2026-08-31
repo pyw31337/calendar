@@ -935,6 +935,8 @@ export function ChatGalleryModal({
   const removeFirstUrl = __deps.removeFirstUrl;
   const formatChatHeaderTitle = __deps.formatChatHeaderTitle;
   const SimpleBottomSheetPicker = __comp.SimpleBottomSheetPicker || __deps.SimpleBottomSheetPicker;
+  const CalendarCheckIcon = __comp.CalendarCheckIcon || __deps.CalendarCheckIcon;
+  const SectionToggleButton = __comp.SectionToggleButton || __deps.SectionToggleButton;
 
   const [activeTab, setActiveTab] = React.useState('photos'); // 'photos' | 'links'
   const [searchQuery, setSearchQuery] = React.useState('');
@@ -1309,25 +1311,59 @@ export function ChatGalleryModal({
     setGalleryMonthDate(prev => new Date(prev.getFullYear(), prev.getMonth() + offset, 1));
     setCollapsedGalleryDates(new Set());
   };
+  const goToGalleryToday = () => {
+    setGalleryMonthDate(new Date());
+    setCollapsedGalleryDates(new Set());
+  };
+  // Same month-nav module the settlement page's 월별보기 tab uses ('calendar-nav' class +
+  // btn/calendar-month-nav-btn buttons) so the two pages stay visually and structurally
+  // consistent instead of each keeping its own copy of this UI.
   const renderGalleryMonthNavigator = () => /*#__PURE__*/React.createElement("div", {
-    className: "gallery-date-month-nav",
-    role: "group",
-    "aria-label": "갤러리 월 이동"
+    className: "calendar-nav",
+    style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '6px', marginBottom: '10px', flexShrink: 0 }
   },
-    /*#__PURE__*/React.createElement("div", { className: "gallery-date-month-label" },
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-main)', fontWeight: 900, fontSize: '1rem' }
+    },
       `${galleryMonthDate.getFullYear()}년 ${galleryMonthDate.getMonth() + 1}월`,
-      /*#__PURE__*/React.createElement("span", { className: "gallery-date-month-caret", "aria-hidden": "true" }, "⌄")
+      /*#__PURE__*/React.createElement("span", { style: { color: '#94A3B8', display: 'inline-flex', alignItems: 'center' } },
+        /*#__PURE__*/React.createElement("svg", {
+          xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24",
+          fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round",
+          className: "icon icon-tabler icons-tabler-outline icon-tabler-chevron-down"
+        },
+          /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
+          /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" })
+        )
+      )
     ),
-    /*#__PURE__*/React.createElement("div", { className: "gallery-date-month-actions" },
+    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '6px' } },
       /*#__PURE__*/React.createElement("button", {
-        type: "button", onClick: () => moveGalleryMonth(-1),
-        className: "gallery-date-month-button", "aria-label": "이전 달"
-      }, "‹"),
-      /*#__PURE__*/React.createElement("span", { className: "gallery-date-month-calendar-icon", "aria-hidden": "true" }, "▣"),
+        type: "button", className: "btn btn-secondary calendar-month-nav-btn", title: "이전달", "aria-label": "이전달",
+        style: { padding: '8px' }, onClick: () => moveGalleryMonth(-1)
+      }, /*#__PURE__*/React.createElement("svg", {
+        xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24",
+        fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round",
+        style: { transform: 'rotate(90deg)' }, className: "icon icon-tabler icons-tabler-outline icon-tabler-chevron-down"
+      },
+        /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
+        /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" })
+      )),
       /*#__PURE__*/React.createElement("button", {
-        type: "button", onClick: () => moveGalleryMonth(1),
-        className: "gallery-date-month-button", "aria-label": "다음 달"
-      }, "›")
+        type: "button", className: "btn btn-secondary calendar-month-nav-btn", title: "오늘", "aria-label": "오늘",
+        style: { padding: '8px' }, onClick: goToGalleryToday
+      }, /*#__PURE__*/React.createElement(CalendarCheckIcon, null)),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button", className: "btn btn-secondary calendar-month-nav-btn", title: "다음달", "aria-label": "다음달",
+        style: { padding: '8px' }, onClick: () => moveGalleryMonth(1)
+      }, /*#__PURE__*/React.createElement("svg", {
+        xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24",
+        fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round",
+        style: { transform: 'rotate(-90deg)' }, className: "icon icon-tabler icons-tabler-outline icon-tabler-chevron-down"
+      },
+        /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
+        /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" })
+      ))
     )
   );
 
@@ -1564,32 +1600,40 @@ export function ChatGalleryModal({
               : ((typeof totalGalleryCount === 'number' && totalGalleryCount > 0)
                 ? "사진 데이터를 아직 불러오지 못했습니다. 아래 더보기를 눌러 주세요."
                 : "공유된 사진이 없습니다."))))
+        // Same per-date section module the settlement page's 월별보기 tab uses for its daily
+        // rows (icon + date label on the left, a pill badge + SectionToggleButton on the right),
+        // re-skinned with a plain item count instead of a +/- amount.
         : groupedGallerySections.map(section => {
           const isCollapsed = collapsedGalleryDates.has(section.dateKey);
           return /*#__PURE__*/React.createElement("section", {
           key: section.dateKey,
-          className: `gallery-date-section${isCollapsed ? ' is-collapsed' : ''}`
+          style: { border: '0', borderRadius: 'var(--radius-md)', padding: '12px', backgroundColor: 'var(--bg-primary)' }
         },
-            /*#__PURE__*/React.createElement("button", {
-              type: "button",
-              className: "gallery-date-section-header",
-              onClick: () => toggleGalleryDate(section.dateKey),
-              "aria-expanded": !isCollapsed,
-              "aria-controls": `gallery-date-items-${section.dateKey}`
+            /*#__PURE__*/React.createElement("div", {
+              style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: isCollapsed ? 0 : '10px' }
             },
-              /*#__PURE__*/React.createElement("span", { className: "gallery-date-section-title" },
-                /*#__PURE__*/React.createElement("span", { className: "gallery-date-calendar-icon", "aria-hidden": "true" }, "▣"),
-                section.label
-              ),
-              /*#__PURE__*/React.createElement("span", { className: "gallery-date-section-trailing" },
-                /*#__PURE__*/React.createElement("span", { className: "gallery-date-section-count" }, section.items.length),
-                /*#__PURE__*/React.createElement("span", { className: "gallery-date-section-count-label" }, "건"),
-                /*#__PURE__*/React.createElement("span", { className: "gallery-date-section-chevron", "aria-hidden": "true" }, isCollapsed ? '⌄' : '⌃')
+              /*#__PURE__*/React.createElement("strong", {
+                style: { fontSize: '0.92rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }
+              }, /*#__PURE__*/React.createElement(CalendarCheckIcon, null), section.label),
+              /*#__PURE__*/React.createElement("span", {
+                style: { display: 'inline-flex', alignItems: 'center', gap: '6px', marginLeft: 'auto', whiteSpace: 'nowrap' }
+              },
+                /*#__PURE__*/React.createElement("span", {
+                  style: {
+                    fontSize: '0.8rem', fontWeight: 900, color: '#FFFFFF',
+                    backgroundColor: 'var(--status-green)', padding: '4px 10px', borderRadius: '999px'
+                  }
+                }, section.items.length),
+                /*#__PURE__*/React.createElement(SectionToggleButton, {
+                  collapsed: isCollapsed,
+                  onToggle: () => toggleGalleryDate(section.dateKey),
+                  label: `${section.label} 사진`
+                })
               )
             ),
             !isCollapsed && /*#__PURE__*/React.createElement("div", {
               id: `gallery-date-items-${section.dateKey}`,
-              className: "gallery-date-section-items"
+              style: { display: 'flex', flexDirection: 'column', gap: '8px' }
             }, isLinkMode ? renderGalleryLinkList(section.items) : renderGalleryPhotoGrid(section.items, visiblePhotos))
           );
         }),
