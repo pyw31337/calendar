@@ -1622,6 +1622,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
   const [accountNumber, setAccountNumber] = React.useState(() => cardToEdit?.accountNumber || '');
   const [activeTab, setActiveTab] = React.useState('general');
   const [isSettlementCardPreviewOpen, setIsSettlementCardPreviewOpen] = React.useState(false);
+  const [settlementCardImageUrl, setSettlementCardImageUrl] = React.useState(null);
   const [expenseListHeight, setExpenseListHeight] = React.useState(160);
   const expenseResizeRef = React.useRef(null);
 
@@ -2011,6 +2012,151 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
   const cleanAccountDigits = (accountNumber || '').replace(/[^0-9]/g, '');
   const isAccountValid = cleanAccountDigits.length >= 8;
   const settlementSectionLabelStyle = { display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '6px', color: 'var(--text-muted)' };
+
+  // Settlement-card preview -> image, rendered client-side onto an offscreen canvas (same
+  // technique as the settlement-summary share image) so it can be saved as a plain jpg and
+  // shared outside the app without anyone needing account access.
+  const handleDownloadSettlementCardImage = () => {
+    const items = Object.values(checkedItems);
+    const W = 720;
+    const PAD = 40;
+    const HEADER_H = 190;
+    const ROW_H = 40;
+    const summaryBoxH = 74 + Math.max(1, participantRows.length) * ROW_H;
+    const bankBoxH = depositorName ? 108 : 86;
+    const listBoxH = 74 + Math.max(1, items.length) * ROW_H;
+    const H = HEADER_H + 34 + summaryBoxH + 20 + bankBoxH + 20 + listBoxH + 50;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = W;
+    canvas.height = H;
+    const ctx = canvas.getContext('2d');
+
+    const fitText = (text, maxWidth) => {
+      const str = String(text);
+      if (ctx.measureText(str).width <= maxWidth) return str;
+      let t = str;
+      while (t.length > 1 && ctx.measureText(`${t}…`).width > maxWidth) t = t.slice(0, -1);
+      return `${t}…`;
+    };
+    const hLine = (x1, x2, yy) => {
+      ctx.strokeStyle = '#F1F5F9';
+      ctx.beginPath();
+      ctx.moveTo(x1, yy);
+      ctx.lineTo(x2, yy);
+      ctx.stroke();
+    };
+
+    ctx.fillStyle = '#F5F3FF';
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.fillStyle = '#4F46E5';
+    ctx.fillRect(0, 0, W, HEADER_H);
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.font = '700 16px sans-serif';
+    ctx.fillText(cardToEdit?.status === 'closed' ? '마감된 정산' : '진행중인 정산', PAD, 50);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '900 30px sans-serif';
+    ctx.fillText(fitText(title || '1/N 간편 송금', W - PAD * 2), PAD, 96);
+    ctx.font = '700 17px sans-serif';
+    ctx.fillText('총 지출', PAD, HEADER_H - 30);
+    ctx.fillStyle = '#F0ABFC';
+    ctx.font = '900 30px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(`${totalExpense.toLocaleString()}원`, W - PAD, HEADER_H - 26);
+    ctx.textAlign = 'left';
+
+    let y = HEADER_H + 34;
+
+    // 기준 분담금
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(PAD, y, W - PAD * 2, summaryBoxH);
+    ctx.strokeStyle = '#E2E8F0';
+    ctx.strokeRect(PAD, y, W - PAD * 2, summaryBoxH);
+    ctx.fillStyle = '#64748B';
+    ctx.font = '700 14px sans-serif';
+    const summaryLabel = `기준 분담금: 약 ${settlementPerPerson.toLocaleString()}원 (총 지출 ÷ ${Math.max(1, participantRows.length)}명, 반올림 차액은 총무에게 반영)`;
+    ctx.fillText(fitText(summaryLabel, W - PAD * 2 - 40), PAD + 20, y + 32);
+
+    let rowY = y + 56;
+    if (participantRows.length === 0) {
+      ctx.fillStyle = '#94A3B8';
+      ctx.font = '500 14px sans-serif';
+      ctx.fillText('등록된 참여자가 없습니다.', PAD + 20, rowY);
+    } else {
+      participantRows.forEach(row => {
+        const amount = getIndividualSettlementAmount(row.participantId);
+        const share = Number(settlementRows.find(item => item.name === row.participantId)?.share || 0);
+        hLine(PAD + 20, W - PAD - 20, rowY - 22);
+        ctx.fillStyle = '#334155';
+        ctx.font = '600 15px sans-serif';
+        ctx.fillText(fitText(`${row.participantId}님 분담 몫 ${share.toLocaleString()}원`, 380), PAD + 20, rowY);
+        ctx.fillStyle = amount < 0 ? '#16A34A' : '#DC2626';
+        ctx.font = '800 16px sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText(`${amount < 0 ? '환급금 +' : '분담금 -'}${Math.abs(amount).toLocaleString()}원`, W - PAD - 20, rowY);
+        ctx.textAlign = 'left';
+        rowY += ROW_H;
+      });
+    }
+
+    y += summaryBoxH + 20;
+
+    // 송금계좌 정보
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(PAD, y, W - PAD * 2, bankBoxH);
+    ctx.strokeStyle = '#E2E8F0';
+    ctx.strokeRect(PAD, y, W - PAD * 2, bankBoxH);
+    ctx.fillStyle = '#64748B';
+    ctx.font = '700 14px sans-serif';
+    ctx.fillText('송금계좌 정보', PAD + 20, y + 30);
+    ctx.fillStyle = '#0F172A';
+    ctx.font = '800 18px sans-serif';
+    const bankLabel = `${bankName === '기타' ? (otherBankName || '기타') : bankName} ${accountNumber || '계좌번호 미입력'}`;
+    ctx.fillText(fitText(bankLabel, W - PAD * 2 - 40), PAD + 20, y + 60);
+    if (depositorName) {
+      ctx.fillStyle = '#64748B';
+      ctx.font = '500 14px sans-serif';
+      ctx.fillText(`예금주: ${depositorName}`, PAD + 20, y + 86);
+    }
+
+    y += bankBoxH + 20;
+
+    // 정산목록
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(PAD, y, W - PAD * 2, listBoxH);
+    ctx.strokeStyle = '#E2E8F0';
+    ctx.strokeRect(PAD, y, W - PAD * 2, listBoxH);
+    ctx.fillStyle = '#64748B';
+    ctx.font = '700 14px sans-serif';
+    ctx.fillText(`정산목록 (${items.length}건)`, PAD + 20, y + 30);
+
+    let listRowY = y + 56;
+    if (items.length === 0) {
+      ctx.fillStyle = '#94A3B8';
+      ctx.font = '500 14px sans-serif';
+      ctx.fillText('선택된 지출 항목이 없습니다.', PAD + 20, listRowY);
+    } else {
+      items.forEach(item => {
+        hLine(PAD + 20, W - PAD - 20, listRowY - 22);
+        ctx.fillStyle = '#334155';
+        ctx.font = '500 14px sans-serif';
+        ctx.fillText(fitText(`${formatShortDateWithDay(item.date)} · ${item.label || '정산 항목'}`, 420), PAD + 20, listRowY);
+        ctx.fillStyle = '#DC2626';
+        ctx.font = '800 15px sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText(`-${Math.abs(Number(item.amount) || 0).toLocaleString()}원`, W - PAD - 20, listRowY);
+        ctx.textAlign = 'left';
+        listRowY += ROW_H;
+      });
+    }
+
+    ctx.fillStyle = '#94A3B8';
+    ctx.font = '500 12px sans-serif';
+    ctx.fillText(`모여라 캘린더 · ${new Date().toLocaleDateString('ko-KR')} 생성`, PAD, H - 24);
+
+    setSettlementCardImageUrl(canvas.toDataURL('image/jpeg', 0.92));
+  };
 
   return React.createElement(React.Fragment, null,
   React.createElement('div', {
@@ -2508,10 +2654,42 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
             React.createElement('span', { style: { minWidth: 0, overflowWrap: 'anywhere' } }, `${formatShortDateWithDay(item.date)} · ${item.label || '정산 항목'}`),
             React.createElement('strong', { style: { color: '#DC2626', whiteSpace: 'nowrap' } }, `-${Math.abs(Number(item.amount) || 0).toLocaleString()}원`)
           ))
-      )
+      ),
+      React.createElement('button', {
+        type: 'button',
+        onClick: handleDownloadSettlementCardImage,
+        style: {
+          width: '100%', padding: '11px', borderRadius: '10px', border: 'none',
+          backgroundColor: '#0F172A', color: '#FFFFFF', fontSize: '0.84rem', fontWeight: 800, cursor: 'pointer'
+        }
+      }, '이미지로 다운받기')
     ),
     React.createElement('div', { className: 'modal-footer', style: { display: 'flex', justifyContent: 'flex-end', padding: '10px 14px', borderTop: '1px solid var(--border-subtle)' } },
       React.createElement('button', { type: 'button', className: 'btn btn-secondary', onClick: () => setIsSettlementCardPreviewOpen(false) }, '닫기')
+    )
+  )),
+  settlementCardImageUrl && React.createElement('div', {
+    className: 'modal-overlay',
+    onClick: () => setSettlementCardImageUrl(null),
+    style: { zIndex: 12500 }
+  }, React.createElement(ResizableModalContainer, {
+    className: 'modal-container',
+    onClick: e => e.stopPropagation(),
+    style: { width: '90%', maxWidth: '360px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }
+  },
+    React.createElement('img', { src: settlementCardImageUrl, alt: '정산 카드 이미지', decoding: 'async', style: { width: '100%', borderRadius: '10px', border: '1px solid var(--border-subtle)' } }),
+    React.createElement('div', { style: { fontSize: '0.76rem', color: 'var(--text-muted)', textAlign: 'center' } }, '이미지를 길게 눌러 저장하거나, 아래 버튼으로 다운로드하세요'),
+    React.createElement('div', { style: { display: 'flex', gap: '8px', width: '100%' } },
+      React.createElement('button', {
+        type: 'button', className: 'btn btn-secondary', style: { flex: 1 },
+        onClick: () => setSettlementCardImageUrl(null)
+      }, '닫기'),
+      React.createElement('a', {
+        href: settlementCardImageUrl,
+        download: `${title || '정산'}_정산카드.jpg`,
+        className: 'btn btn-primary',
+        style: { flex: 1, textAlign: 'center', textDecoration: 'none' }
+      }, '다운로드')
     )
   )));
 }
