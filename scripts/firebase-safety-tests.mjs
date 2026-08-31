@@ -24,6 +24,30 @@ assert(JSON.stringify(settlementSimulation.map(row => [row.name, row.share, row.
 ]), 'settlement calculation must treat personal prepayments as part of total expense and credit the owner remainder');
 assert(settlementSimulation.reduce((sum, row) => sum + row.amount, 0) === 0, 'settlement participant balances must sum to zero');
 
+// A newer embedded settlement edit must beat a stale date-keyed subcollection snapshot even
+// when both records share the same original confirmedAt timestamp.
+globalThis.window = {
+  GATHER_APP_CONFIG: {},
+  GATHER_APP_UTILS: {},
+  GATHER_APP_CONSTANTS: {},
+  GATHER_APP_CHAT_DATA: {},
+  location: { pathname: '/' }
+};
+const { unionConfirmedMeetings } = await import('../src/core/app-domain-helpers.js');
+const mergedSettlementProbe = unionConfirmedMeetings({
+  confirmedMeeting: [{
+    date: '2026-08-29',
+    confirmedAt: 100,
+    updatedAt: 300,
+    expenses: [{ id: 'expense_1', label: '시설이용료', amount: 135000, updatedAt: 300 }]
+  }]
+}, [{
+  date: '2026-08-29',
+  confirmedAt: 100,
+  expenses: [{ id: 'expense_1', label: '시설이용료', amount: 195000, updatedAt: 200 }]
+}]);
+assert(mergedSettlementProbe[0]?.expenses?.[0]?.amount === 135000, 'stale confirmedMeetings snapshot must not overwrite a newer embedded settlement edit');
+
 // The app's main logic lives in assets/app-main.js (externalized from index.html's inline
 // <script> -- see check-tab-wiring.mjs for the rationale).
 const script = fs.readFileSync('assets/app-main.js', 'utf8');

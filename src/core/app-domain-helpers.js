@@ -5,6 +5,7 @@
  * 청크로 분리해 app-main 청크의 번들 예산 압박을 줄이는 것이 이 분리의 목적.
  */
 import { GATHER_APP_UTILS } from './app-utils.js';
+import { GATHER_APP_CONFIG as MODULE_APP_CONFIG } from './app-config.js';
 const omitUndefinedDeep = GATHER_APP_UTILS.omitUndefinedDeep;
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
 // firebaseConfig/firebaseDb live in app-main.js (firebaseDb is mutable, reassigned by
@@ -505,7 +506,11 @@ function getPlaceExternalMapUrl(...args) {
   const f = (window.GATHER_APP_UTILS || {}).getPlaceExternalMapUrl;
   return typeof f === 'function' ? f(...args) : undefined;
 }
-const GATHER_APP_CONFIG = window.GATHER_APP_CONFIG || {};
+// Read critical persistence flags from the ESM binding, not only from a window side effect.
+// Vite may evaluate shared chunks before the bootstrap Promise.all has populated the global;
+// capturing an empty object here silently disabled confirmedMeetings subcollection writes while
+// reads still unioned that stale subcollection back into the UI.
+const GATHER_APP_CONFIG = MODULE_APP_CONFIG || window.GATHER_APP_CONFIG || {};
 const readConfigNumber = (key, fallback) => Number.isFinite(GATHER_APP_CONFIG[key]) ? GATHER_APP_CONFIG[key] : fallback;
 const readConfigObject = (key, fallback) => GATHER_APP_CONFIG[key] && typeof GATHER_APP_CONFIG[key] === 'object' ? GATHER_APP_CONFIG[key] : fallback;
 const ENABLE_FIRESTORE_SYNC = GATHER_APP_CONFIG.ENABLE_FIRESTORE_SYNC !== false; // Firestore is the only production source of truth.
@@ -1126,6 +1131,22 @@ function getConfirmedMeetings(calendar) {
 // unionActivityLogs/unionPlaces. Keyed by `date` (already the unique key this whole feature uses)
 // rather than a generated id.
 function unionConfirmedMeetings(calendar, subcollectionMeetings) {
+  const getMeetingFreshness = meeting => {
+    const ownStamp = Math.max(
+      Number(meeting?.updatedAt || 0) || 0,
+      Number(meeting?.confirmedAt || 0) || 0,
+      Number(meeting?.createdAt || 0) || 0
+    );
+    const expenseStamp = (Array.isArray(meeting?.expenses) ? meeting.expenses : []).reduce((latest, expense) => Math.max(
+      latest,
+      Number(expense?.updatedAt || expense?.deletedAt || expense?.createdAt || 0) || 0
+    ), 0);
+    const photoStamp = (Array.isArray(meeting?.photos) ? meeting.photos : []).reduce((latest, photo) => Math.max(
+      latest,
+      Number(photo?.updatedAt || photo?.deletedAt || photo?.createdAt || 0) || 0
+    ), 0);
+    return Math.max(ownStamp, expenseStamp, photoStamp);
+  };
   const byDate = new Map();
   getConfirmedMeetings(calendar).forEach(m => { if (m?.date) byDate.set(m.date, m); });
   (Array.isArray(subcollectionMeetings) ? subcollectionMeetings : []).forEach(subM => {
@@ -1134,12 +1155,9 @@ function unionConfirmedMeetings(calendar, subcollectionMeetings) {
     if (!existing) {
       byDate.set(subM.date, subM);
     } else {
-      const subConfirmed = subM.confirmed !== false;
-      const existingConfirmed = existing.confirmed !== false;
-      const subTime = Number(subM.confirmedAt || subM.updatedAt || 0);
-      const existingTime = Number(existing.confirmedAt || existing.updatedAt || 0);
-
-      if ((subConfirmed && !existingConfirmed) || (subTime >= existingTime)) {
+      const subTime = getMeetingFreshness(subM);
+      const existingTime = getMeetingFreshness(existing);
+      if (subTime >= existingTime) {
         byDate.set(subM.date, { ...existing, ...subM });
       } else {
         byDate.set(subM.date, { ...subM, ...existing });
