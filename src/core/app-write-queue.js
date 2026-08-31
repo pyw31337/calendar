@@ -94,6 +94,7 @@ export async function enqueueWriteOperation(operation) {
     payload: operation.payload || null,
     queuedAt: Number(operation.queuedAt) || Date.now(),
     attempts: Number(operation.attempts) || 0,
+    nextAttemptAt: Number(operation.nextAttemptAt) || 0,
     lastError: String(operation.lastError || '').slice(0, 240)
   };
   const payloadBytes = estimateValueBytes(record.payload);
@@ -135,6 +136,19 @@ async function removeOperation(id) {
   } catch (error) {
     console.warn('[write-queue] remove failed:', error);
   }
+}
+
+async function deferOperation(operation, error = null) {
+  const attempts = (Number(operation?.attempts) || 0) + 1;
+  return enqueueWriteOperation({
+    ...operation,
+    attempts,
+    lastError: String(error?.message || error || operation?.lastError || '대기 저장 실패').slice(0, 240),
+    nextAttemptAt: Date.now() + Math.min(
+      RETRY_BACKOFF_MAX_MS,
+      RETRY_BACKOFF_BASE_MS * (2 ** Math.min(6, attempts - 1))
+    )
+  });
 }
 
 async function acquireFlushLease() {
@@ -217,19 +231,11 @@ export async function flushWriteQueue(handler) {
             await removeOperation(operation.id);
             processed += 1;
           } else {
+            await deferOperation(operation, new Error('대기 저장이 완료되지 않았습니다.'));
             break;
           }
         } catch (error) {
-          const next = {
-            ...operation,
-            attempts: (Number(operation.attempts) || 0) + 1,
-            lastError: String(error?.message || error || '').slice(0, 240),
-            nextAttemptAt: Date.now() + Math.min(
-              RETRY_BACKOFF_MAX_MS,
-              RETRY_BACKOFF_BASE_MS * (2 ** Math.min(6, Number(operation.attempts) || 0))
-            )
-          };
-          await enqueueWriteOperation(next);
+          await deferOperation(operation, error);
           break;
         }
       }
