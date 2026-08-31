@@ -830,34 +830,38 @@ export function UrlCapsuleBadge({ url, style = null }) {
   }, href);
 }
 
-export function ParticipantPickerButton({ participant, onClick }) {
+// The single shared participant-select control -- solid color pill (participant's own color as
+// background, white bold name, small ▼) that opens ChatParticipantSheet. This is the chat
+// composer's original look; memo composer/edit, the chat edit modal, and the comment composer
+// all render this exact component (not a local copy) so a future style change only has to
+// happen here. Never re-implement this button inline at a call site -- import and use this.
+export function ParticipantPickerButton({ participant, onClick, placeholder = '작성자 선택' }) {
   const React = window.React;
-  const __deps = window.GATHER_UI_DEPS || {};
-  const __comp = window.GATHER_UI_COMPONENTS || {};
-  const ParticipantBackdrop = __comp.ParticipantBackdrop || __deps.ParticipantBackdrop;
 
   return /*#__PURE__*/React.createElement("button", {
     type: "button",
-    // Compact inline capsule -- this sits *inside* flex rows next to a tag input, a comment
-    // input, or Save/Cancel buttons (never alone as a full-size form field), so it must not
-    // pick up .form-select's width:100%/44px-tall "rounded rectangle" sizing. Only the shared
-    // background/border/hover/focus look is reused from .form-select; participant-picker-button
-    // (below, in app.css) overrides the sizing to a small pill that shrink-wraps its content.
-    className: "form-select participant-picker-button",
+    className: "participant-picker-button",
     onClick,
     style: {
-      padding: '4px 10px 4px 8px',
-      fontSize: '0.76rem',
+      backgroundColor: participant?.color || '#94A3B8',
+      color: '#FFFFFF',
+      border: 'none',
+      borderRadius: 'var(--radius-full)',
+      padding: '6px 14px',
+      fontSize: '0.8rem',
+      fontWeight: 'bold',
+      cursor: 'pointer',
+      whiteSpace: 'nowrap',
       display: 'flex',
       alignItems: 'center',
-      justifyContent: 'center',
       gap: '6px',
-      width: 'auto',
-      height: '28px',
+      height: '32px',
       boxSizing: 'border-box',
       flexShrink: 0
     }
-  }, ParticipantBackdrop ? /*#__PURE__*/React.createElement(ParticipantBackdrop, { participant, name: participant?.name || '작성자 선택', dotSize: 8 }) : /*#__PURE__*/React.createElement("span", { style: { color: participant?.color || 'var(--text-muted)', fontWeight: 800 } }, participant?.name || '작성자 선택'), /*#__PURE__*/React.createElement("span", { className: "form-select-chevron participant-picker-chevron", "aria-hidden": "true" }, "⌄"));
+  }, participant?.name || placeholder, /*#__PURE__*/React.createElement("span", {
+    style: { fontSize: '0.6rem' }
+  }, "▼"));
 }
 
 export function DateCapsuleBadge({ date, style = null }) {

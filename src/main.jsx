@@ -245,7 +245,16 @@ async function boot() {
       import('./ui/ui-shared.js'),
       import('./ui/ui-date-modal.js'),
       import('./ui/ui-event-modals.js'),
-      import('./ui/ui-calendar-core.js')
+      import('./ui/ui-calendar-core.js'),
+      // ChatParticipantSheet (the actual participant-selection bottom sheet, vs. the button
+      // that opens it) lives in this file, but it isn't chat-specific -- the memo composer/edit
+      // modal, the comment composer, and the chat message reassignment modal in
+      // ui-calendar-core.js all open it too. It used to load only via loadChatUi() (view=chat or
+      // gallery), so opening the picker from memo/comments/edit before ever visiting chat in the
+      // same session found window.GATHER_UI_COMPONENTS.ChatParticipantSheet unset and silently
+      // rendered nothing. Loading it here unconditionally, alongside every other always-on
+      // shared UI module, makes it available regardless of which view boots first.
+      import('./ui/ui-chat-sheets.js')
     ]);
     // Admin dashboard/modals are normally loaded only for a direct admin route. The main
     // screen can also request AdminModal from its side menu; that path uses loadAdminUi above.
