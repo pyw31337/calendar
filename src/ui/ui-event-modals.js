@@ -4062,15 +4062,20 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   (isCreateSettlementOpen && canUseSettlement && !editingSettlementCard && React.createElement(CreateSettlementModalComp, {
     calendar: calendar,
     onClose: () => setIsCreateSettlementOpen(false),
-    onSave: (newCard) => {
+    onSave: async (newCard) => {
+      let result = false;
       if (typeof onSaveSettlementCard === 'function') {
-        onSaveSettlementCard(newCard);
+        result = await onSaveSettlementCard(newCard);
       } else if (calendar) {
         if (!Array.isArray(calendar.settlementCards)) calendar.settlementCards = [];
         calendar.settlementCards.unshift(newCard);
+        result = true;
       }
-      setIsCreateSettlementOpen(false);
-      if (showToast) showToast(`'${newCard.title}' 정산 카드가 생성되었습니다!`, 'success');
+      if (result !== false) {
+        setIsCreateSettlementOpen(false);
+        if (showToast) showToast(`'${newCard.title}' 정산 카드가 생성되었습니다!`, 'success');
+      }
+      return result;
     },
     showToast: showToast
   })),
@@ -4087,27 +4092,42 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     calendar: calendar,
     initialData: editingSettlementCard,
     onClose: () => { setEditingSettlementCard(null); setIsCreateSettlementOpen(false); },
-    onDeleteCard: (cardId) => {
-      if (typeof onDeleteSettlementCard === 'function') onDeleteSettlementCard(cardId);
-      setEditingSettlementCard(null);
-      setIsCreateSettlementOpen(false);
+    onDeleteCard: async (cardId) => {
+      const result = typeof onDeleteSettlementCard === 'function'
+        ? await onDeleteSettlementCard(cardId)
+        : false;
+      if (result !== false) {
+        setEditingSettlementCard(null);
+        setIsCreateSettlementOpen(false);
+      }
+      return result;
     },
-    onToggleStatus: (cardId) => {
-      if (typeof onToggleSettlementCardStatus === 'function') onToggleSettlementCardStatus(cardId);
-      setEditingSettlementCard(null);
-      setIsCreateSettlementOpen(false);
+    onToggleStatus: async (cardId) => {
+      const result = typeof onToggleSettlementCardStatus === 'function'
+        ? await onToggleSettlementCardStatus(cardId)
+        : false;
+      if (result !== false) {
+        setEditingSettlementCard(null);
+        setIsCreateSettlementOpen(false);
+      }
+      return result;
     },
-    onSave: (updatedCard) => {
+    onSave: async (updatedCard) => {
+      let result = false;
       if (typeof onSaveSettlementCard === 'function') {
-        onSaveSettlementCard(updatedCard);
+        result = await onSaveSettlementCard(updatedCard);
       } else if (calendar) {
         if (!Array.isArray(calendar.settlementCards)) calendar.settlementCards = [];
         const idx = calendar.settlementCards.findIndex(c => c.id === updatedCard.id);
         if (idx >= 0) calendar.settlementCards[idx] = updatedCard;
         else calendar.settlementCards.unshift(updatedCard);
+        result = true;
       }
-      setEditingSettlementCard(null);
-      setIsCreateSettlementOpen(false);
+      if (result !== false) {
+        setEditingSettlementCard(null);
+        setIsCreateSettlementOpen(false);
+      }
+      return result;
     },
     showToast: showToast
     });
