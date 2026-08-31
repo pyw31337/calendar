@@ -2299,6 +2299,11 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       selectedId: composerParticipantId,
       onSelect: id => {
         setComposerParticipantId(id);
+        // Mirrors the chat composer's own onSelect (app-main.js) -- this is the same kind of
+        // "who am I posting as" pick, so it should update the remembered device default the
+        // same way. (The edit modal's picker just below is a one-off reassignment, like chat's
+        // own message-edit picker, and intentionally does not persist.)
+        setStoredChatParticipantId(calendar.id, id);
         setIsComposerPartOpen(false);
       },
       onClose: () => setIsComposerPartOpen(false)
