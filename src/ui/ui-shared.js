@@ -1133,13 +1133,22 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = fals
       display: 'flex',
       alignItems: 'flex-start',
       width: stretch ? '100%' : 'fit-content',
-      maxWidth: stretch ? '100%' : '280px',
+      // min(100%, 280px), not a plain 280px: the bubble this card sits in is fit-content-sized
+      // and can end up narrower than 280px (long participant badge, narrow phone, reply context),
+      // and overflow below is 'hidden' now specifically so a too-wide title/description gets
+      // truncated INSIDE whichever of the two is actually smaller instead of visually spilling
+      // out past the card's own right edge.
+      maxWidth: stretch ? '100%' : 'min(100%, 280px)',
       boxSizing: 'border-box',
       gap: '10px',
       marginTop: stretch ? '0px' : '6px',
       border: '1px solid var(--border-subtle)',
       borderRadius: 'var(--radius-md)',
-      overflow: 'visible',
+      // Was 'visible' -- with a nowrap+ellipsis title inside a flex child, 'visible' let the
+      // untruncated text render past this box's own edge (and the bubble's) instead of actually
+      // being clipped/ellipsized at it. 'hidden' is what makes the title/description's own
+      // overflow:hidden + text-overflow:ellipsis further down actually take effect.
+      overflow: 'hidden',
       textDecoration: 'none',
       color: 'inherit',
       backgroundColor: 'var(--bg-card)'
@@ -1166,7 +1175,7 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = fals
         minWidth: 0,
         maxWidth: stretch ? 'none' : (imageSrc ? '198px' : '270px'),
         flex: stretch ? '1 1 0' : '0 1 auto',
-        overflow: 'visible',
+        overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'flex-start',
