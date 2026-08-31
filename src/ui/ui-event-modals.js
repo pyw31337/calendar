@@ -2977,23 +2977,16 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   const settlementParticipants = getActiveParticipants(calendar);
   const getCalendarSettlementCards = __deps.getCalendarSettlementCards || (c => Array.isArray(c?.settlementCards) ? c.settlementCards : []);
   const customSettlementCards = getCalendarSettlementCards(calendar);
-  const allSettlementCards = customSettlementCards.length > 0 ? customSettlementCards : [{
-    id: 'default_settlement_card',
-    title: '1/N 간편 송금',
-    status: 'active',
-    participantCount: Math.max(1, settlementParticipants.length),
-    perPersonAmount: Math.round(allTimeExpense / Math.max(1, settlementParticipants.length)),
-    amount: allTimeExpense,
-    bankName: '토스뱅크',
-    depositorName: '',
-    accountNumber: ''
-  }];
   const getSettlementCardTime = card => {
     const value = card?.updatedAt || card?.createdAt || 0;
     const numeric = Number(value);
     return Number.isFinite(numeric) && numeric > 0 ? numeric : (Date.parse(value) || 0);
   };
-  const sortedSettlementCards = allSettlementCards.slice().sort((a, b) => {
+  // Real, persisted settlement cards only -- a calendar with none shows an empty state instead of
+  // a synthesized stand-in card. A synthesized '1/N 간편 송금' placeholder used to fill this gap,
+  // but it wasn't a real record: opening or deleting it silently no-oped, and after deleting a
+  // real card down to zero it reappeared with the same title/bank, looking like the delete failed.
+  const sortedSettlementCards = customSettlementCards.slice().sort((a, b) => {
     const aClosed = a?.status === 'closed';
     const bClosed = b?.status === 'closed';
     if (aClosed !== bClosed) return aClosed ? 1 : -1;
@@ -3341,13 +3334,14 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
       return React.createElement("div", {
         style: { display: 'flex', flexDirection: 'column', gap: '10px' }
       },
-        displayCards.map(card => {
-          // The synthetic 'default_settlement_card' below isn't a persisted record -- it's a
-          // stand-in aggregate view shown only while the calendar has never had a real
-          // settlement card created. Making it clickable let people "edit"/"delete" it, which
-          // silently no-oped (there was nothing to save/tombstone) and, once it was the only
-          // card left, made a just-deleted real card look like it had come back.
-          const isSyntheticDefaultCard = card.id === 'default_settlement_card';
+        displayCards.length === 0
+          ? React.createElement("div", {
+              style: {
+                padding: '28px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.84rem',
+                border: '1px dashed var(--border-subtle)', borderRadius: '18px'
+              }
+            }, "등록된 정산이 없습니다.")
+          : displayCards.map(card => {
           const isClosed = card.status === 'closed';
           const displayBankName = card.bankName === '기타' && card.otherBankName ? card.otherBankName : card.bankName;
           const displayAccountNumber = isClosed ? maskSettlementAccountNumber(card.accountNumber) : card.accountNumber;
@@ -3386,22 +3380,20 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
 
           return React.createElement("div", {
             key: card.id,
-            ...(isSyntheticDefaultCard ? {} : {
-              role: 'button',
-              tabIndex: 0,
-              title: '정산 수정',
-              'aria-label': '정산 수정',
-              'data-settlement-edit-button': 'true',
-              // Open only on click -- see the settlement-list-card button's comment below for why
-              // an early pointerup/mousedown handler here would race the editor's self-closing
-              // full-viewport overlay and close the modal within the same click gesture.
-              onClick: () => handleOpenSettlementEditor(card),
-              onKeyDown: event => {
-                if (event.key !== 'Enter' && event.key !== ' ') return;
-                event.preventDefault();
-                handleOpenSettlementEditor(card);
-              }
-            }),
+            role: 'button',
+            tabIndex: 0,
+            title: '정산 수정',
+            'aria-label': '정산 수정',
+            'data-settlement-edit-button': 'true',
+            // Open only on click -- see the settlement-list-card button's comment below for why
+            // an early pointerup/mousedown handler here would race the editor's self-closing
+            // full-viewport overlay and close the modal within the same click gesture.
+            onClick: () => handleOpenSettlementEditor(card),
+            onKeyDown: event => {
+              if (event.key !== 'Enter' && event.key !== ' ') return;
+              event.preventDefault();
+              handleOpenSettlementEditor(card);
+            },
             style: {
               background: 'linear-gradient(90deg, var(--settlement-hero-start), var(--settlement-hero-end))',
               border: 'none',
@@ -3414,7 +3406,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
               position: 'relative',
               boxShadow: 'none',
               color: 'var(--settlement-hero-text)',
-              cursor: isSyntheticDefaultCard ? 'default' : 'pointer'
+              cursor: 'pointer'
             }
           },
             /* Card Header: status top-left, title/account below. */
@@ -3876,7 +3868,11 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
       className: "modal-body",
       style: { overflowY: 'auto', padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }
     },
-      sortedSettlementCards.map(card => {
+      sortedSettlementCards.length === 0
+        ? React.createElement("div", {
+            style: { padding: '30px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }
+          }, "정산 목록이 없습니다.")
+        : sortedSettlementCards.map(card => {
         const isClosed = card?.status === 'closed';
         const cardTime = getSettlementCardTime(card);
         const participantNames = Array.isArray(card?.participantRows) && card.participantRows.length > 0
