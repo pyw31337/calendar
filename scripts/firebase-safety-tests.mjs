@@ -78,6 +78,22 @@ const staleSettingsProbe = {
 const fieldScopedSettingsProbe = mergeCalendarSettingsDelta(settingsServerProbe, staleSettingsProbe, ['title']);
 assert(fieldScopedSettingsProbe.title === '수정할 제목', 'declared settings field was not saved');
 assert(fieldScopedSettingsProbe.weatherLocation === '서울', 'title save overwrote an unrelated weather location');
+const concurrentMeetingProbe = mergeCalendarSettingsDelta({
+  id: 'kkot',
+  confirmedMeeting: [{ date: '2026-08-29', updatedAt: 100, expenses: [
+    { id: 'exp-a', label: '시설', amount: -135000, updatedAt: 200 },
+    { id: 'exp-deleted', label: '삭제대상', amount: -1000, updatedAt: 100, deletedAt: 300 }
+  ], photos: [] }]
+}, {
+  id: 'kkot',
+  confirmedMeeting: [{ date: '2026-08-29', updatedAt: 110, expenses: [
+    { id: 'exp-b', label: '식비', amount: -50000, updatedAt: 210 },
+    { id: 'exp-deleted', label: '삭제대상', amount: -1000, updatedAt: 90 }
+  ], photos: [] }]
+}, ['confirmedMeeting']);
+const mergedExpensesProbe = concurrentMeetingProbe.confirmedMeeting[0].expenses;
+assert(mergedExpensesProbe.some(expense => expense.id === 'exp-a') && mergedExpensesProbe.some(expense => expense.id === 'exp-b'), 'concurrent same-date expense edits were lost');
+assert(mergedExpensesProbe.find(expense => expense.id === 'exp-deleted')?.deletedAt, 'expense tombstone was resurrected');
 assert(fieldScopedSettingsProbe.pinnedNotices[0]?.id === 'notice_new', 'title save overwrote unrelated notices');
 assert(fieldScopedSettingsProbe.settlementCards[0]?.title === '최신 정산', 'title save regressed unrelated settlement cards');
 assert(fieldScopedSettingsProbe.confirmedMeeting[0]?.expenses?.[0]?.amount === 135000, 'title save regressed unrelated meeting settlement data');

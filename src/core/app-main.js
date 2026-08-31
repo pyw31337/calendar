@@ -3975,9 +3975,10 @@ function CalendarApp() {
     const deletedExpense = (Array.isArray(meeting.expenses) ? meeting.expenses : []).find(e => e.id === expenseId);
     if (!deletedExpense) return false;
     const previousMeetings = cloneConfirmedMeetings(existingMeetings);
-    const nextExpenses = (Array.isArray(meeting.expenses) ? meeting.expenses : []).filter(e => e.id !== expenseId);
     const now = Date.now();
-    const nextConfirmedMeetings = existingMeetings.map((m, i) => i === meetingIndex ? { ...m, expenses: nextExpenses } : m);
+    const nextExpenses = (Array.isArray(meeting.expenses) ? meeting.expenses : [])
+      .map(e => e.id === expenseId ? { ...e, deletedAt: now, updatedAt: now } : e);
+    const nextConfirmedMeetings = existingMeetings.map((m, i) => i === meetingIndex ? { ...m, expenses: nextExpenses, updatedAt: now } : m);
     const expenseLogNote = sanitizeText(
       `${deletedExpense.amount < 0 ? '+' : '-'}${Math.abs(Number(deletedExpense.amount) || 0).toLocaleString()}원 ${deletedExpense.label || deletedExpense.url || ''}`,
       120
@@ -4204,7 +4205,7 @@ function CalendarApp() {
     const previousMeetings = cloneConfirmedMeetings(existingMeetings);
     const now = Date.now();
     const nextConfirmedMeetings = existingMeetings.map((m, i) => i === meetingIndex
-      ? { ...m, photos: existingPhotos.filter(p => p !== deletedPhoto && p.id !== deletedPhoto.id && !photoMatchesUrl(p, imageUrl)) }
+      ? { ...m, photos: existingPhotos.map(p => (p === deletedPhoto || p.id === deletedPhoto.id || photoMatchesUrl(p, imageUrl)) ? { ...p, deletedAt: Date.now(), updatedAt: Date.now() } : p), updatedAt: Date.now() }
       : m);
     const targetDate = meeting.date || dateStr;
     const photoLog = createActivityLog(activeCal.id, 'photo_delete', targetDate, '', now, '일정 사진 삭제');

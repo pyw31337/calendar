@@ -591,10 +591,12 @@ function mergeConfirmedMeetings(serverList = [], incomingList = []) {
     const base = incomingStamp >= existingStamp ? { ...existing, ...normalized } : { ...normalized, ...existing };
     byDate.set(normalized.date, {
       ...base,
-      // The meeting timestamp determines the authoritative snapshot. Unioning arrays here
-      // would resurrect an expense/photo that a newer client intentionally deleted.
-      photos: base.photos,
-      expenses: base.expenses
+      // Merge independent edits by stable item IDs. Deleted items remain as tombstones so a
+      // stale client cannot resurrect them during a concurrent save.
+      photos: mergeConfirmedMeetingItems(existing.photos, normalized.photos,
+        photo => photo.id || photo.refKey || photo.mediaKey || photo.assetKey || photo.imageUrl || photo.thumbUrl),
+      expenses: mergeConfirmedMeetingItems(existing.expenses, normalized.expenses,
+        expense => expense.id || `${expense.label || ''}|${expense.url || ''}|${expense.amount ?? ''}|${expense.categoryId || ''}|${expense.createdAt ?? ''}`)
     });
   });
   return Array.from(byDate.values());
@@ -2173,6 +2175,7 @@ function normalizeConfirmedMeetingPhoto(photo) {
   const imageIndex = Number(photo.imageIndex);
   const createdAt = Number(photo.createdAt);
   const updatedAt = Number(photo.updatedAt);
+  const deletedAt = Number(photo.deletedAt);
   const meetingDate = sanitizeText(photo.meetingDate || '', 20);
   if (id) normalized.id = id;
   if (imageUrl) normalized.imageUrl = imageUrl;
@@ -2188,6 +2191,7 @@ function normalizeConfirmedMeetingPhoto(photo) {
   if (Number.isFinite(imageIndex)) normalized.imageIndex = Math.max(0, Math.round(imageIndex));
   if (Number.isFinite(createdAt)) normalized.createdAt = Math.max(0, Math.round(createdAt));
   if (Number.isFinite(updatedAt)) normalized.updatedAt = Math.max(0, Math.round(updatedAt));
+  if (Number.isFinite(deletedAt)) normalized.deletedAt = Math.max(0, Math.round(deletedAt));
   if (meetingDate && isValidDateString(meetingDate)) normalized.meetingDate = meetingDate;
   return Object.keys(normalized).length ? normalized : null;
 }
@@ -2202,6 +2206,7 @@ function normalizeConfirmedMeetingExpense(expense) {
   const order = Number(expense.order);
   const createdAt = Number(expense.createdAt);
   const updatedAt = Number(expense.updatedAt);
+  const deletedAt = Number(expense.deletedAt);
   if (id) normalized.id = id;
   if (label) normalized.label = label;
   if (url) normalized.url = url;
@@ -2210,6 +2215,7 @@ function normalizeConfirmedMeetingExpense(expense) {
   if (Number.isFinite(order)) normalized.order = Math.max(0, Math.round(order));
   if (Number.isFinite(createdAt)) normalized.createdAt = Math.max(0, Math.round(createdAt));
   if (Number.isFinite(updatedAt)) normalized.updatedAt = Math.max(0, Math.round(updatedAt));
+  if (Number.isFinite(deletedAt)) normalized.deletedAt = Math.max(0, Math.round(deletedAt));
   if (expense.linkPreview && typeof expense.linkPreview === 'object') {
     const lp = { ...expense.linkPreview };
     if (typeof lp.description === 'string' && lp.description.length > 280) lp.description = lp.description.slice(0, 280);
