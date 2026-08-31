@@ -2285,12 +2285,14 @@ function CalendarApp() {
       setHasMoreMemos(false);
       return;
     }
-    if (!firebaseDb) {
+    const liveDb = (typeof window !== 'undefined' && window.__gatherFirebaseDb) || firebaseDb;
+    if (!liveDb) {
       fetchMemosRest(activeCalId, memosLimit).then(list => {
+        if (!isMounted) return;
         setMemos(list);
         setHasMoreMemos(list.length >= memosLimit);
       });
-      return;
+      return () => { isMounted = false; };
     }
     let isMounted = true;
     let pinnedList = [];
@@ -2329,10 +2331,10 @@ function CalendarApp() {
 
     return () => {
       isMounted = false;
-      unsubscribePinned();
-      unsubscribeRecent();
+      if (typeof unsubscribePinned === 'function') unsubscribePinned();
+      if (typeof unsubscribeRecent === 'function') unsubscribeRecent();
     };
-  }, [activeCalId, memosLimit, firebaseDb]);
+  }, [activeCalId, memosLimit, firebaseDb, firebaseConnectionVersion]);
 
   // Dynamic body padding override for full-screen subviews (chat, settlement, memo)
   React.useEffect(() => {
@@ -2568,6 +2570,28 @@ function CalendarApp() {
     setGalleryPreviewMessages(dropMessage);
     invalidateGalleryItemCount(activeCalId);
     setGalleryCountRefreshToken(token => token + 1);
+  };
+  const patchLocalMemo = (memoId, patch) => {
+    if (!memoId || !patch) return;
+    setMemos(prev => (Array.isArray(prev) ? prev.map(m => m.id === memoId ? { ...m, ...patch } : m) : []));
+  };
+  const upsertLocalMemo = memo => {
+    if (!memo?.id) return;
+    setMemos(prev => {
+      const list = Array.isArray(prev) ? [...prev] : [];
+      const idx = list.findIndex(m => m.id === memo.id);
+      if (idx >= 0) {
+        list[idx] = { ...list[idx], ...memo };
+      } else {
+        list.unshift(memo);
+      }
+      list.sort((a, b) => (Number(b.createdAt) || Number(b.updatedAt) || 0) - (Number(a.createdAt) || Number(a.updatedAt) || 0));
+      return list;
+    });
+  };
+  const removeLocalMemo = memoId => {
+    if (!memoId) return;
+    setMemos(prev => (Array.isArray(prev) ? prev.filter(m => m.id !== memoId) : []));
   };
 
   React.useEffect(() => {
@@ -6164,6 +6188,9 @@ function CalendarApp() {
           if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsShareOpen(true);
         },
         onOpenAppSettings: () => setIsAppSettingsOpen(true),
+        onUpdateMemo: patchLocalMemo,
+        onUpsertMemo: upsertLocalMemo,
+        onDeleteMemo: removeLocalMemo,
         ...navMenuProps
       }),
       sharedAppOverlays
@@ -10503,6 +10530,7 @@ function bindGatherUiDeps() {
     SearchResultLogRow: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SearchResultLogRow) || (typeof SearchResultLogRow === 'function' ? SearchResultLogRow : null),
     SettlementSummaryModal: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SettlementSummaryModal) || (typeof SettlementSummaryModal === 'function' ? SettlementSummaryModal : null),
     CreateSettlementModal: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CreateSettlementModal) || CreateSettlementModal,
+    MemoTagInputRow: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MemoTagInputRow) || null,
     getCalendarSettlementCards,
     getPlaceKakaoRouteUrl,
     getPlaceNaverRouteUrl,

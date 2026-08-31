@@ -1835,6 +1835,59 @@ export function Footer() {
   );
 }
 
+export function MemoTagInputRow({
+  participant,
+  onOpenParticipant,
+  tags = [],
+  tagInput = '',
+  onTagInputChange,
+  onAddTag,
+  maxTags = 10
+}) {
+  const React = window.React;
+  const __deps = window.GATHER_UI_DEPS || {};
+  const ParticipantPickerButton = __deps.ParticipantPickerButton;
+
+  return /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }
+  },
+    ParticipantPickerButton && /*#__PURE__*/React.createElement(ParticipantPickerButton, {
+      participant: participant,
+      onClick: onOpenParticipant
+    }),
+    /*#__PURE__*/React.createElement("input", {
+      type: "text",
+      placeholder: tags.length >= maxTags ? `태그 최대 ${maxTags}개 도달` : `태그 입력 (${tags.length}/${maxTags})`,
+      value: tagInput,
+      onChange: e => onTagInputChange && onTagInputChange(e.target.value),
+      onKeyDown: e => {
+        if (e.nativeEvent.isComposing) return;
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          onAddTag && onAddTag();
+        }
+      },
+      maxLength: 100,
+      style: {
+        flex: 1, minWidth: 0, height: '28px', padding: '0 8px', borderRadius: '6px',
+        border: '1px solid var(--border-subtle)', background: 'var(--bg-primary)',
+        color: 'var(--text-main)', fontSize: '0.74rem'
+      }
+    }),
+    /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: onAddTag,
+      disabled: tags.length >= maxTags,
+      style: {
+        flexShrink: 0, height: '28px', padding: '0 10px', borderRadius: '6px',
+        border: '1px solid var(--border-subtle)', background: 'var(--border-subtle)',
+        color: 'var(--text-main)', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer',
+        opacity: tags.length >= maxTags ? 0.45 : 1
+      }
+    }, "태그저장")
+  );
+}
+
   if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
     ResizableModalContainer: ResizableModalContainer,
@@ -1856,5 +1909,6 @@ export function Footer() {
     OperationProgressOverlay: OperationProgressOverlay,
     ToggleSwitch: ToggleSwitch,
     Footer: Footer,
+    MemoTagInputRow: MemoTagInputRow,
   });
 }

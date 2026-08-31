@@ -738,7 +738,7 @@ function getAnniversaryDisplayColor(...args) {
 }
 
 
-export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMemos, onBack, showToast, isDarkTheme, onRequestConfirm, sharedMemo, onDismissSharedMemo, chatMessages, setActiveLightbox, onOpenShare, onOpenAppSettings, onChangeView, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null }) {
+export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMemos, onBack, showToast, isDarkTheme, onRequestConfirm, sharedMemo, onDismissSharedMemo, chatMessages, setActiveLightbox, onOpenShare, onOpenAppSettings, onChangeView, onUpdateMemo, onUpsertMemo, onDeleteMemo, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -944,10 +944,10 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       return;
     }
 
+    const stamp = Date.now();
+    const memoId = 'memo_' + stamp + '_' + Math.random().toString(36).slice(2, 8);
     try {
       const calendarId = calendar.id;
-      const stamp = Date.now();
-      const memoId = 'memo_' + stamp + '_' + Math.random().toString(36).slice(2, 8);
       const tagsArray = newTags.map(t => t.startsWith('#') ? t : '#' + t);
       const participantId = composerParticipantId || 'anonymous';
       if (typeof navigator !== 'undefined' && navigator.onLine === false && memoImagesCanBeQueued(newImages)) {
@@ -999,6 +999,8 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       };
       if (linkPreview) memoData.linkPreview = linkPreview;
 
+      if (typeof onUpsertMemo === 'function') onUpsertMemo(memoData);
+
       const saved = await writeMemoDocument('memos', calendarId, memoId, sanitizeMemoForFirestore(memoData), 'set', '메모 저장');
       if (!saved?.success) throw new Error('Memo save failed');
 
@@ -1027,6 +1029,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       setIsComposerExpanded(false);
     } catch (err) {
       console.error('Failed to save memo:', err);
+      if (typeof onDeleteMemo === 'function') onDeleteMemo(memoId);
       showToast('메모 저장 실패', 'error');
     } finally {
       setNewUploadProgress(null);
@@ -1087,6 +1090,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       const oldUrl = extractFirstUrl(editingMemo.text);
       if (url && oldUrl === url && editingMemo.linkPreview) linkPreview = editingMemo.linkPreview;
 
+      const createdAt = editingMemo.createdAt || editingMemo.updatedAt || stamp;
       const memoData = {
         ...editingMemo,
         participantId,
@@ -1097,9 +1101,13 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         color: editColor,
         isPinned: editIsPinned,
         tags: tagsArray,
+        createdAt,
         updatedAt: stamp,
         linkPreview: linkPreview || null
       };
+
+      if (typeof onUpsertMemo === 'function') onUpsertMemo(memoData);
+      else if (typeof onUpdateMemo === 'function') onUpdateMemo(editingMemo.id, memoData);
 
       const saved = await writeMemoDocument('memos', calendarId, editingMemo.id, sanitizeMemoForFirestore(memoData), 'set', '메모 수정');
       if (!saved?.success) throw new Error('Memo update failed');
@@ -1125,6 +1133,8 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       setEditingMemo(null);
     } catch (err) {
       console.error('Failed to update memo:', err);
+      if (typeof onUpsertMemo === 'function') onUpsertMemo(editingMemo);
+      else if (typeof onUpdateMemo === 'function') onUpdateMemo(editingMemo.id, editingMemo);
       showToast('메모 수정 실패', 'error');
     } finally {
       setEditUploadProgress(null);
@@ -1133,11 +1143,13 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
 
   const handleDeleteMemo = async (memo) => {
     const action = async () => {
+      const memoSnapshot = JSON.parse(JSON.stringify(memo));
       try {
         const calendarId = calendar.id;
         const stamp = Date.now();
         const participantId = getStoredChatParticipantId(calendarId, calendar) || 'anonymous';
-        const memoSnapshot = JSON.parse(JSON.stringify(memo));
+
+        if (typeof onDeleteMemo === 'function') onDeleteMemo(memo.id);
 
         const deleted = await writeMemoDocument('memos', calendarId, memo.id, null, 'delete', '메모 삭제');
         if (!deleted?.success) throw new Error('Memo delete failed');
@@ -1157,6 +1169,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         showToast('메모가 삭제되었습니다.', 'delete', 5000, async () => {
           try {
             const restoreStamp = Date.now();
+            if (typeof onUpsertMemo === 'function') onUpsertMemo(memoSnapshot);
             const restored = await writeMemoDocument('memos', calendarId, memo.id, sanitizeMemoForFirestore(memoSnapshot), 'set', '메모 복원');
             if (!restored?.success) throw new Error('Memo restore failed');
             const restoreNote = memoSnapshot.title
@@ -1175,12 +1188,14 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
             showToast('메모 삭제를 되돌렸습니다.', 'success', 3000);
           } catch (err) {
             console.error('Failed to restore deleted memo:', err);
+            if (typeof onDeleteMemo === 'function') onDeleteMemo(memo.id);
             showToast('메모 복원 실패', 'error', 4000);
           }
         });
         setEditingMemo(null);
       } catch (err) {
         console.error('Failed to delete memo:', err);
+        if (typeof onUpsertMemo === 'function') onUpsertMemo(memoSnapshot);
         showToast('메모 삭제 실패', 'error');
       }
     };
@@ -1215,21 +1230,26 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   };
 
   const handleTogglePin = async (memo) => {
+    const nextPinned = !memo.isPinned;
+    if (typeof onUpdateMemo === 'function') onUpdateMemo(memo.id, { isPinned: nextPinned });
     try {
-      const updated = await writeMemoDocument('memos', calendar.id, memo.id, { isPinned: !memo.isPinned }, 'update', '메모 고정 변경');
+      const updated = await writeMemoDocument('memos', calendar.id, memo.id, { isPinned: nextPinned }, 'update', '메모 고정 변경');
       if (!updated?.success) throw new Error('Memo pin update failed');
     } catch (err) {
       console.error('Failed to toggle memo pin:', err);
+      if (typeof onUpdateMemo === 'function') onUpdateMemo(memo.id, { isPinned: memo.isPinned });
       showToast('고정 상태 변경 실패', 'error');
     }
   };
 
   const handleMemoCommentsChange = async (memo, nextComments) => {
+    if (typeof onUpdateMemo === 'function') onUpdateMemo(memo.id, { comments: nextComments });
     try {
       const updated = await writeMemoDocument('memos', calendar.id, memo.id, { comments: nextComments }, 'update', '메모 댓글 저장');
       if (!updated?.success) throw new Error('Memo comment update failed');
     } catch (err) {
       console.error('Failed to update memo comments:', err);
+      if (typeof onUpdateMemo === 'function') onUpdateMemo(memo.id, { comments: memo.comments });
       showToast('댓글 저장 실패', 'error');
     }
   };
@@ -1295,13 +1315,15 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
 
     // Real-time Save to Firestore immediately for edit modal
     if (editingMemo) {
+      const calendarId = calendar.id;
+      const tagsArray = nextTags.map(t => t.startsWith('#') ? t : '#' + t);
+      if (typeof onUpdateMemo === 'function') onUpdateMemo(editingMemo.id, { tags: tagsArray });
       try {
-        const calendarId = calendar.id;
-        const tagsArray = nextTags.map(t => t.startsWith('#') ? t : '#' + t);
         const updated = await writeMemoDocument('memos', calendarId, editingMemo.id, { tags: tagsArray }, 'update', '태그 저장');
         if (!updated?.success) throw new Error('Memo tag update failed');
       } catch (err) {
         console.error('Failed to update tags in Firestore:', err);
+        if (typeof onUpdateMemo === 'function') onUpdateMemo(editingMemo.id, { tags: editTags });
         showToast('태그 저장 실패', 'error');
       }
     }
@@ -2175,13 +2197,15 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
                 e.stopPropagation();
                 const nextTags = editTags.filter(t => t !== tag);
                 if (editingMemo) {
+                  const calendarId = calendar.id;
+                  const tagsArray = nextTags.map(t => t.startsWith('#') ? t : '#' + t);
+                  if (typeof onUpdateMemo === 'function') onUpdateMemo(editingMemo.id, { tags: tagsArray });
                   try {
-                    const calendarId = calendar.id;
-                    const tagsArray = nextTags.map(t => t.startsWith('#') ? t : '#' + t);
                     const updated = await writeMemoDocument('memos', calendarId, editingMemo.id, { tags: tagsArray }, 'update', '태그 삭제');
                     if (!updated?.success) throw new Error('Memo tag delete failed');
                   } catch (err) {
                     console.error('Failed to delete tag in Firestore:', err);
+                    if (typeof onUpdateMemo === 'function') onUpdateMemo(editingMemo.id, { tags: editTags });
                     showToast('태그 삭제 실패', 'error');
                   }
                 }
