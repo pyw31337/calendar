@@ -532,6 +532,30 @@ runAppScript(concurrencyContext, `
   if (!settingsMerged.participants.some((participant) => participant.id === 'kkot_p9')) {
     throw new Error('stale settings removed newer participant');
   }
+  const latestPlace = { id: 'place-1', name: '최신 장소', updatedAt: 200 };
+  const serverWithSettings = {
+    ...kkot,
+    settlementCards: [{ id: 'card-1', updatedAt: 200, participantRows: [{ participantId: 'kkot_p1', amount: -135000 }] }],
+    places: [latestPlace],
+    expenseCategories: [{ id: 'cat-latest', name: '최신 카테고리' }],
+    settlementBaseBudget: 999000
+  };
+  const staleAvailability = {
+    id: 'kkot',
+    participants,
+    availabilities: [{ date: '2026-08-30', participantId: 'kkot_p1', updatedAt: 300 }],
+    settlementCards: [{ id: 'card-1', updatedAt: 100, participantRows: [{ participantId: 'kkot_p1', amount: -195000 }] }],
+    places: [{ id: 'place-1', name: '오래된 장소', updatedAt: 100 }],
+    expenseCategories: [{ id: 'cat-stale', name: '오래된 카테고리' }],
+    settlementBaseBudget: 1
+  };
+  const availabilityMerged = mergeCalendarAvailabilityDelta(serverWithSettings, staleAvailability, 301);
+  if (availabilityMerged.settlementCards?.[0]?.participantRows?.[0]?.amount !== -135000) {
+    throw new Error('availability save overwrote latest settlement data');
+  }
+  if (availabilityMerged.places?.[0]?.name !== '최신 장소' || availabilityMerged.expenseCategories?.[0]?.id !== 'cat-latest' || availabilityMerged.settlementBaseBudget !== 999000) {
+    throw new Error('availability save overwrote unrelated settings fields');
+  }
   let crossCalendarRefused = false;
   try {
     mergeCalendarRecord({ id: 'kkot' }, { id: 'cw' });

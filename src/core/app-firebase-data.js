@@ -563,15 +563,10 @@ function mergeCalendarAvailabilityDelta(serverCalendar, incomingCalendar, change
     activityLogs: mergeActivityLogs(base.activityLogs || [], incoming.activityLogs || [], base.id || incoming.id, participantIds),
     polls: base.polls || [],
     deletedActivityLogIds: mergeDeletedActivityLogIds(base.deletedActivityLogIds || [], incoming.deletedActivityLogIds || []),
-    // Preserve unrelated calendar-document fields when an availability-only write is
-    // performed. These fields used to disappear from the merged write payload, which was
-    // especially damaging for settlement cards because the next realtime snapshot then
-    // legitimately contained the previous/empty card set on other devices.
-    expenseCategories: incoming.expenseCategories !== undefined ? incoming.expenseCategories : base.expenseCategories,
-    settlementCards: incoming.settlementCards !== undefined ? incoming.settlementCards : base.settlementCards,
-    places: incoming.places !== undefined ? incoming.places : base.places,
-    placeCategories: incoming.placeCategories !== undefined ? incoming.placeCategories : base.placeCategories,
-    settlementBaseBudget: incoming.settlementBaseBudget !== undefined ? incoming.settlementBaseBudget : base.settlementBaseBudget,
+    // Availability writes are intentionally scoped to availability/activity fields. `base`
+    // is the latest server snapshot (or the incoming snapshot only when the document is new),
+    // so copying unrelated fields from `incoming` here would let a stale tab restore old
+    // settlement/place/category values after another device had just saved them.
     updatedAt: Math.max(base.updatedAt || 0, incoming.updatedAt || 0, changedAt || 0),
     revision: Math.max(base.revision || 0, incoming.revision || 0)
   };
