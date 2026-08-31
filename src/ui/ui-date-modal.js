@@ -1469,6 +1469,14 @@ export function DateModal({
   const [expenseLabelInput, setExpenseLabelInput] = React.useState('');
   const [expenseAmountInput, setExpenseAmountInput] = React.useState('');
   const [expenseCategoryInput, setExpenseCategoryInput] = React.useState(() => getExpenseCategories(calendar)[0]?.id || 'etc');
+  // 지출자(payer): '' means 공금지출 (paid from the shared pool). A participant name means that
+  // person personally fronted the amount -- the settlement card auto-derives who to reimburse
+  // from this instead of the same line item having to be re-typed there by hand.
+  const [expensePayerInput, setExpensePayerInput] = React.useState('');
+  const expensePayerOptions = React.useMemo(() => [
+    { value: '', label: '공금지출' },
+    ...activeParticipants.map(p => ({ value: p.name, label: p.name, color: p.color }))
+  ], [activeParticipants]);
   const [expenseIsIncome, setExpenseIsIncome] = React.useState(false);
   const [editingExpenseId, setEditingExpenseId] = React.useState(null);
   const [isSavingExpense, setIsSavingExpense] = React.useState(false);
@@ -1480,6 +1488,7 @@ export function DateModal({
     setExpenseLabelInput('');
     setExpenseAmountInput('');
     setExpenseCategoryInput(getExpenseCategories(calendar)[0]?.id || 'etc');
+    setExpensePayerInput('');
     setExpenseIsIncome(false);
     setEditingExpenseId(null);
     setDraggingExpenseId('');
@@ -1613,11 +1622,13 @@ export function DateModal({
     const isIncome = Number(expense.amount) < 0;
     const amountStr = Math.abs(Number(expense.amount)).toLocaleString();
     const cat = expense.categoryId || 'etc';
+    const payer = expense.payerId || '';
     setEditingExpenseId(eid);
     setExpenseLabelInput(label);
     setExpenseIsIncome(isIncome);
     setExpenseAmountInput(amountStr);
     setExpenseCategoryInput(cat);
+    setExpensePayerInput(payer);
     setHasInteracted(false);
     snapshotFormBaseline({
       ...formBaselineRef.current,
@@ -1625,7 +1636,8 @@ export function DateModal({
       expenseLabelInput: label,
       expenseAmountInput: amountStr,
       expenseIsIncome: isIncome,
-      expenseCategoryInput: cat
+      expenseCategoryInput: cat,
+      expensePayerInput: payer
     });
   };
   const handleSaveExpenseClick = async () => {
@@ -1646,7 +1658,8 @@ export function DateModal({
       id: editingExpenseId || undefined,
       label,
       amount: finalAmount,
-      categoryId: expenseCategoryInput
+      categoryId: expenseCategoryInput,
+      payerId: expenseIsIncome ? '' : expensePayerInput
     });
     setIsSavingExpense(false);
     if (ok !== false) {
@@ -1655,6 +1668,7 @@ export function DateModal({
       setExpenseLabelInput('');
       setExpenseAmountInput('');
       setExpenseIsIncome(false);
+      setExpensePayerInput('');
       setHasInteracted(false);
       const resetExpCat = getExpenseCategories(calendar)[0]?.id || 'etc';
       setExpenseCategoryInput(resetExpCat);
@@ -1664,7 +1678,8 @@ export function DateModal({
         expenseLabelInput: '',
         expenseAmountInput: '',
         expenseIsIncome: false,
-        expenseCategoryInput: resetExpCat
+        expenseCategoryInput: resetExpCat,
+        expensePayerInput: ''
       });
     }
   };
@@ -1942,7 +1957,8 @@ export function DateModal({
       String(expenseLabelInput || '') !== String(b.expenseLabelInput || '') ||
       String(expenseAmountInput || '') !== String(b.expenseAmountInput || '') ||
       !!expenseIsIncome !== !!b.expenseIsIncome ||
-      String(expenseCategoryInput || '') !== String(b.expenseCategoryInput || '')
+      String(expenseCategoryInput || '') !== String(b.expenseCategoryInput || '') ||
+      String(expensePayerInput || '') !== String(b.expensePayerInput || '')
     );
     if (dirty && typeof onRequestConfirm === 'function') {
       onRequestConfirm('닫기 확인', '저장하지 않은 내용이 있습니다. 닫으시겠습니까?', () => onClose());
@@ -2763,6 +2779,20 @@ export function DateModal({
             })
           )
         ),
+        !expenseIsIncome && /*#__PURE__*/React.createElement("div", null,
+          /*#__PURE__*/React.createElement("label", {
+            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }
+          }, "지출자"),
+          /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
+            title: "지출자 선택",
+            placeholder: "공금지출",
+            value: expensePayerInput,
+            disabled: isSavingExpense,
+            onSelect: setExpensePayerInput,
+            options: expensePayerOptions,
+            style: { width: '100%', height: '42px' }
+          })
+        ),
         /*#__PURE__*/React.createElement("div", null,
           /*#__PURE__*/React.createElement("label", {
             style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }
@@ -2806,6 +2836,7 @@ export function DateModal({
               setExpenseLabelInput('');
               setExpenseAmountInput('');
               setExpenseIsIncome(false);
+              setExpensePayerInput('');
             },
             onSubmit: handleSaveExpenseClick
           })
@@ -2934,7 +2965,19 @@ export function DateModal({
                     fontSize: '0.68rem',
                     fontWeight: 'bold'
                   }
-                }, expenseTime)
+                }, expenseTime),
+                expense.payerId && /*#__PURE__*/React.createElement("span", {
+                  style: {
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    padding: '3px 8px',
+                    borderRadius: '999px',
+                    backgroundColor: `${(activeParticipants.find(p => p.name === expense.payerId) || {}).color || '#64748B'}18`,
+                    color: (activeParticipants.find(p => p.name === expense.payerId) || {}).color || '#64748B',
+                    fontSize: '0.68rem',
+                    fontWeight: 900
+                  }
+                }, `${expense.payerId} 선결제`)
               ),
               /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', width: '100%', wordBreak: 'break-all' } },
                 expenseUrl ? /*#__PURE__*/React.createElement(React.Fragment, null,
