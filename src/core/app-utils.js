@@ -961,10 +961,35 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
     // Intentionally no-op: image failures are recoverable and must be retried on a later visit.
   }
 
+  // Shared chat-send guard factory. UI bundles may keep a local fallback for boot-order safety,
+  // but new callers should use this single implementation so lock release and rejection
+  // handling cannot drift between views.
+  export function useChatSendGuard(onSend, canSend = true) {
+    const React = window.React;
+    const lockRef = React.useRef(false);
+    return React.useCallback((...args) => {
+      const isAllowed = typeof canSend === 'function' ? canSend(...args) : Boolean(canSend);
+      if (!isAllowed || lockRef.current) return;
+      lockRef.current = true;
+      let result;
+      try {
+        result = onSend && onSend(...args);
+      } catch (error) {
+        console.error('chat send failed:', error);
+        setTimeout(() => { lockRef.current = false; }, 250);
+        return;
+      }
+      Promise.resolve(result).catch(error => {
+        console.error('chat send failed:', error);
+      }).finally(() => setTimeout(() => { lockRef.current = false; }, 250));
+    }, [onSend, canSend]);
+  }
+
   export const GATHER_APP_UTILS = Object.freeze({
     omitUndefinedDeep,
     getPersistentBrokenPhotoUrls,
     savePersistentBrokenPhotoUrl,
+    useChatSendGuard,
     getContrastTextColor,
     formatDateWithDayName,
     formatShortDateWithDayName,

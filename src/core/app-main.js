@@ -9033,6 +9033,8 @@ function useModalDirtyGuard(onClose, onRequestConfirm, message, active = true, g
 // CommentsSection's independent Send button/Ctrl+Enter shortcut get the same protection instead
 // of quietly missing it.
 function useChatSendGuard(onSend, canSend = true) {
+  const sharedGuard = window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.useChatSendGuard;
+  if (typeof sharedGuard === 'function') return sharedGuard(onSend, canSend);
   const lockRef = React.useRef(false);
   return (...args) => {
     const isAllowed = typeof canSend === 'function' ? canSend(...args) : Boolean(canSend);

@@ -30,6 +30,8 @@ function getTodayYmd() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 function useChatSendGuard(onSend, canSend = true) {
+  const sharedGuard = window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.useChatSendGuard;
+  if (typeof sharedGuard === 'function') return sharedGuard(onSend, canSend);
   const React = window.React;
   const lockRef = React.useRef(false);
   return React.useCallback((...args) => {

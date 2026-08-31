@@ -28,6 +28,8 @@ function getCalendarPlaces(calendar) {
   return typeof f === 'function' ? f(calendar) : [];
 }
 function useChatSendGuard(onSend, canSend = true) {
+  const sharedGuard = window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.useChatSendGuard;
+  if (typeof sharedGuard === 'function') return sharedGuard(onSend, canSend);
   const React = window.React;
   const lockRef = React.useRef(false);
   return React.useCallback((...args) => {
