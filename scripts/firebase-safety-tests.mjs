@@ -70,6 +70,13 @@ assert(isSettlementClearingIncomeEntry(fundLedgerProbe[2]), 'legacy settlement-i
 assert(!doesSettlementEntryAffectPrincipal(fundLedgerProbe[1]) && doesSettlementEntryAffectPrincipal(fundLedgerProbe[3]), 'personal advances must not change principal while direct common-fund expenses do');
 assert(calculateFundPrincipalBalance(400000, fundLedgerProbe) === 415000, 'fund principal must ignore personal advances and settlement clearing transfers');
 
+const personalOffsetProbe = [
+  { amount: 130000, label: '서준네 / 타요 카라반', payerId: '박영우', fundingType: 'personal', isIncome: false },
+  { amount: -130000, label: '서준네 / 타요 카라반 (자비부담)', participantId: '박영우', fundingType: 'personal', isIncome: true }
+];
+assert(personalOffsetProbe.every(item => !doesSettlementEntryAffectPrincipal(item)), 'personal expense and its attributed self-funded income must both stay outside the shared-fund balance');
+assert(calculateFundPrincipalBalance(0, personalOffsetProbe) === 0, 'a personal self-funded expense/income pair must offset without creating common-fund money');
+
 // A newer embedded settlement edit must beat a stale date-keyed subcollection snapshot even
 // when both records share the same original confirmedAt timestamp.
 globalThis.window = {
@@ -259,10 +266,12 @@ assert(fs.readFileSync('scripts/firebase-media-audit.mjs', 'utf8').includes('inv
 assert(/void persistLegacySubcollections\([\s\S]{0,260}\.catch\(/.test(firebaseDataScript), 'legacy subcollection writes must be detached from the primary save and handled in the background');
 assert(/participantRowsForSave = participantRows\.map[\s\S]{0,420}participantMemoInput[\s\S]{0,900}participantRows: participantRowsForSave\.map/.test(eventModalScript), 'settlement card save must commit a pending participant memo edit');
 assert(/const saved = typeof onSave === 'function' \? await onSave\(newCard\) : false[\s\S]{0,220}saved === false/.test(eventModalScript), 'settlement card modal must await persistence before reporting success or closing');
-assert(dateModalScript.includes("const EXPENSE_PAYER_UNSELECTED = '__expense_payer_unselected__'") && dateModalScript.includes("showToast('결제 재원을 선택해 주세요.'"), 'new expense entries must require an explicit payment source');
-assert(/expensePayerInput === EXPENSE_PAYER_FUND \? '' : expensePayerInput/.test(dateModalScript), 'the shared-fund UI choice must persist using the legacy empty payerId representation');
+assert(dateModalScript.includes("const EXPENSE_PAYER_UNSELECTED = '__expense_payer_unselected__'") && dateModalScript.includes("'수입 귀속을 선택해 주세요.'") && dateModalScript.includes("'결제 재원을 선택해 주세요.'"), 'new income and expense entries must require an explicit funding classification');
+assert(dateModalScript.includes("fundingType: isClearing ? 'settlement-clearing' : (isPersonal ? 'personal' : 'fund')"), 'income and expense entries must persist their explicit fund/personal/clearing classification');
 assert(dateModalScript.includes("expense.payerId || EXPENSE_PAYER_FUND"), 'editing legacy expenses without payerId must preserve their shared-fund meaning');
+assert(dateModalScript.includes("label: `${p.name} 자비부담 상계`"), 'income classification must expose a participant-attributed personal offset choice');
 assert(eventModalScript.includes('추가 정산 조정 (예외)') && eventModalScript.includes('여기에 다시 입력하지 않습니다.'), 'manual settlement adjustments must warn against duplicating auto-linked personal advances');
+assert(eventModalScript.includes('const overallBalance = calculateFundPrincipalBalance(baseBudget, allTimeItems);'), 'cumulative balance must use funding classification instead of treating personal-offset income as shared-fund money');
 assert(/const saved = await onSave\(text\.trim\(\), images, participantId\);[\s\S]{0,80}saved !== false/.test(calendarCoreScript), 'message edit modal must remain open when persistence reports failure');
 assert(editMessageSaveSource.includes('return saved;') && !/finally \{\s*setEditingMessage\(null\)/.test(editMessageSaveSource), 'message edit persistence must return its result without closing the editor on failure');
 assert(/Failed to update tags in Firestore:[\s\S]{0,220}return;[\s\S]{0,120}setEditTags\(nextTags\)/.test(memoScript), 'failed memo tag additions must not overwrite the rollback state');

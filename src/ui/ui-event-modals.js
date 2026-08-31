@@ -7,6 +7,8 @@ import {
   calculateSettlementPlan,
   calculateSettlementRows,
   doesSettlementEntryAffectPrincipal,
+  getSettlementEntryParticipantId,
+  isPersonalSettlementEntry,
   isSettlementClearingIncomeEntry
 } from '../core/settlement-calculator.js';
 
@@ -3058,7 +3060,6 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   });
   const allTimeIncome = baseBudget + allTimeItems.filter(item => item.isIncome && !isSettlementClearingIncomeEntry(item)).reduce((sum, item) => sum + Math.abs(item.amount), 0);
   const allTimeExpense = allTimeItems.filter(item => !item.isIncome).reduce((sum, item) => sum + Math.abs(item.amount), 0);
-  const allTimeCommonFundExpense = allTimeItems.filter(item => !item.isIncome && doesSettlementEntryAffectPrincipal(item)).reduce((sum, item) => sum + Math.abs(item.amount), 0);
   const settlementParticipants = getActiveParticipants(calendar);
   const getCalendarSettlementCards = __deps.getCalendarSettlementCards || (c => Array.isArray(c?.settlementCards) ? c.settlementCards : []);
   const customSettlementCards = getCalendarSettlementCards(calendar);
@@ -3078,7 +3079,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     return getSettlementCardTime(b) - getSettlementCardTime(a);
   });
   const visibleSettlementCards = sortedSettlementCards.filter(card => card?.status !== 'closed');
-  const overallBalance = allTimeIncome - allTimeCommonFundExpense;
+  const overallBalance = calculateFundPrincipalBalance(baseBudget, allTimeItems);
 
   const targetPrefix = `${year}-${String(month + 1).padStart(2, '0')}-`;
   const rows = getConfirmedMeetings(calendar).slice().sort((a, b) => b.date.localeCompare(a.date))
@@ -3138,9 +3139,9 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
 
   const monthLabelPrefix = `${month + 1}월`;
   const metricCards = [
-    { label: activeTab === 'total' ? '공금 누적수입' : `${monthLabelPrefix} 공금수입`, value: displayIncome, color: 'var(--status-green)', icon: React.createElement(BanknoteArrowUpIcon, { size: 16 }) },
-    { label: activeTab === 'total' ? '모임 전체지출' : `${monthLabelPrefix} 전체지출`, value: displayExpense, color: '#DC2626', icon: React.createElement(BanknoteArrowDownIcon, { size: 16 }) },
-    { label: activeTab === 'total' ? '공금 원금 잔액' : `${monthLabelPrefix} 공금 잔액`, value: displayBalance, color: 'var(--text-main)', icon: React.createElement(PiggyBankIcon, { size: 16 }) }
+    { label: activeTab === 'total' ? '누적 수입' : `${monthLabelPrefix} 수입`, value: displayIncome, color: 'var(--status-green)', icon: React.createElement(BanknoteArrowUpIcon, { size: 16 }) },
+    { label: activeTab === 'total' ? '누적 지출' : `${monthLabelPrefix} 지출`, value: displayExpense, color: '#DC2626', icon: React.createElement(BanknoteArrowDownIcon, { size: 16 }) },
+    { label: activeTab === 'total' ? '현재 잔액' : `${monthLabelPrefix} 잔액`, value: displayBalance, color: 'var(--text-main)', icon: React.createElement(PiggyBankIcon, { size: 16 }) }
   ];
 
   // Shareable result card -- rendered client-side onto an offscreen canvas so it can be saved
@@ -3171,9 +3172,9 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     ctx.fillText(periodLabel, 40, 138);
 
     const rowsStats = [
-    { label: activeTab === 'total' ? '공금 누적수입' : `${monthLabelPrefix} 공금수입`, value: displayIncome, color: 'var(--status-green)' },
-    { label: activeTab === 'total' ? '모임 전체지출' : `${monthLabelPrefix} 전체지출`, value: displayExpense, color: '#DC2626' },
-    { label: activeTab === 'total' ? '공금 원금 잔액' : `${monthLabelPrefix} 공금 잔액`, value: displayBalance, color: '#0F172A' }
+    { label: activeTab === 'total' ? '누적 수입' : `${monthLabelPrefix} 수입`, value: displayIncome, color: 'var(--status-green)' },
+    { label: activeTab === 'total' ? '누적 지출' : `${monthLabelPrefix} 지출`, value: displayExpense, color: '#DC2626' },
+    { label: activeTab === 'total' ? '현재 잔액' : `${monthLabelPrefix} 잔액`, value: displayBalance, color: '#0F172A' }
     ];
     let y = 230;
     rowsStats.forEach(stat => {
@@ -3264,14 +3265,16 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
       color: doesSettlementEntryAffectPrincipal(item) ? '#15803D' : '#2563EB', fontSize: '0.68rem', fontWeight: 900
     }
   }, item.isIncome
-    ? (isSettlementClearingIncomeEntry(item) ? '정산 경유입금 · 원금 영향 없음' : '공금 수입')
-    : (item.payerId ? `${item.payerId} 선결제 · 원금 영향 없음` : '공금 직접지출'))), /*#__PURE__*/React.createElement("strong", {
+    ? (isSettlementClearingIncomeEntry(item)
+        ? '정산 경유입금'
+        : (isPersonalSettlementEntry(item) ? `${getSettlementEntryParticipantId(item)} 자비부담 상계` : '공금 수입'))
+    : (isPersonalSettlementEntry(item) ? `${getSettlementEntryParticipantId(item)} 선결제` : '공금 직접지출'))), /*#__PURE__*/React.createElement("strong", {
     style: { fontSize: '0.9rem', color: item.isIncome ? 'var(--status-green)' : '#DC2626', whiteSpace: 'nowrap' }
   }, item.isIncome ? '+' : '-', Math.abs(item.amount).toLocaleString(), "원")), /*#__PURE__*/React.createElement("span", {
     style: { fontSize: '0.86rem', color: 'var(--text-main)', fontWeight: 500, overflowWrap: 'anywhere' }
   }, item.label), /*#__PURE__*/React.createElement("span", {
     className: "settlement-running-balance"
-  }, `공금 원금\u00a0\u00a0${Number(settlementBalanceByKey.get(item.ledgerKey) || 0).toLocaleString()}원`), item.url && /*#__PURE__*/React.createElement("button", {
+  }, `잔액\u00a0\u00a0${Number(settlementBalanceByKey.get(item.ledgerKey) || 0).toLocaleString()}원`), item.url && /*#__PURE__*/React.createElement("button", {
     type: "button",
     title: item.url,
     style: {
@@ -3650,18 +3653,6 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                 personalMemo && React.createElement('span', { className: 'settlement-person-detail-capsule settlement-person-memo-capsule', title: personalMemo }, personalMemo)
                 );
               })),
-              cardSettlementPlan && React.createElement('div', {
-                style: { display: 'flex', flexDirection: 'column', gap: '7px', padding: '11px 12px', borderRadius: '12px', background: 'rgba(15, 23, 42, 0.2)', color: 'var(--settlement-hero-text)', fontSize: '0.74rem', textAlign: 'left' }
-              },
-                React.createElement('strong', { style: { fontSize: '0.78rem' } }, '공금 관점 정산 흐름'),
-                React.createElement('span', null, `모임 지출 ${cardSettlementPlan.totalExpense.toLocaleString()}원 · 공금 직접지출 ${cardSettlementPlan.commonFundPaid.toLocaleString()}원 · 개인 선결제 ${cardSettlementPlan.participantFunded.toLocaleString()}원`),
-                Array.from(explicitPayerTotals.entries()).map(([name, amount]) => React.createElement('span', { key: `payer_${name}` }, `${name} 선결제 ${amount.toLocaleString()}원`)),
-                cardSettlementPlan.offsets.map(item => React.createElement('span', { key: `offset_${item.name}` }, `${item.name} 본인부담 상계 ${item.amount.toLocaleString()}원 (현금 이동 없음)`)),
-                cardSettlementPlan.contributions.map(item => React.createElement('span', { key: `in_${item.name}` }, `${item.name} → 공금 경유 입금 ${item.amount.toLocaleString()}원`)),
-                cardSettlementPlan.reimbursements.map(item => React.createElement('span', { key: `out_${item.name}` }, `공금 → ${item.name} 환급 ${item.amount.toLocaleString()}원`)),
-                React.createElement('strong', null, `정산 후 공금 원금 변동 ${cardSettlementPlan.fundNetChange === 0 ? '0원' : `${cardSettlementPlan.fundNetChange > 0 ? '+' : '-'}${Math.abs(cardSettlementPlan.fundNetChange).toLocaleString()}원`}`)
-              )
-
           );
         })
       );
@@ -3692,9 +3683,6 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
       className: "settlement-metric-card-value",
       style: { color: card.color }
     }, card.value.toLocaleString(), "원")))),
-  /*#__PURE__*/React.createElement("div", {
-    style: { padding: '9px 12px', borderRadius: '10px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', color: 'var(--text-muted)', fontSize: '0.74rem', lineHeight: 1.5 }
-  }, "개인 선결제와 정산 경유금은 아래 장부에 모두 공개되지만 공금 원금에는 중복 반영되지 않습니다. 정산카드가 입금·환급 흐름을 자동 계산하므로 정산금을 수입 내역으로 다시 입력하지 않아도 됩니다."),
   activeTab === 'daily' && /*#__PURE__*/React.createElement("div", {
     className: "calendar-nav",
     style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '6px', marginBottom: '2px', flexShrink: 0 }

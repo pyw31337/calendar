@@ -124,11 +124,25 @@ export function isSettlementClearingIncomeEntry(item) {
   return /(정산금|분담금|정산\s*입금)/.test(String(item?.label || ''));
 }
 
+export function getSettlementEntryParticipantId(item) {
+  return String(item?.participantId || item?.payerId || '').trim();
+}
+
+export function isPersonalSettlementEntry(item) {
+  if (item?.fundingType === 'personal') return true;
+  if (item?.fundingType === 'fund' || item?.fundingType === 'settlement-clearing') return false;
+  const isIncome = item?.isIncome === true || Number(item?.amount) < 0;
+  // Legacy expenses used payerId for a personal advance. Income records did not have an
+  // equivalent field, so only new income rows with an explicit participantId are personal.
+  return isIncome
+    ? Boolean(String(item?.participantId || '').trim())
+    : Boolean(String(item?.payerId || '').trim());
+}
+
 export function doesSettlementEntryAffectPrincipal(item) {
   const isIncome = item?.isIncome === true || Number(item?.amount) < 0;
-  return isIncome
-    ? !isSettlementClearingIncomeEntry(item)
-    : !String(item?.payerId || '').trim();
+  if (isPersonalSettlementEntry(item)) return false;
+  return isIncome ? !isSettlementClearingIncomeEntry(item) : true;
 }
 
 export function calculateFundPrincipalBalance(baseBudget, items = []) {
