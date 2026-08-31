@@ -1816,7 +1816,7 @@ function getDirectChatMediaInfo(url) {
         // YouTube session cookies -- nocookie mode deliberately can't identify a signed-in user at
         // all, which means it can never honor a YouTube Premium account's ad-free playback and
         // always serves the logged-out/ad-supported experience regardless of the viewer's account.
-        if (id) return { type: 'embed', provider: 'youtube', url: `https://www.youtube.com/embed/${encodeURIComponent(id)}`, orientation: 'landscape' };
+        if (id) return { type: 'embed', provider: 'youtube', url: `https://www.youtube.com/embed/${encodeURIComponent(id)}`, orientation: 'landscape', playsInline: true };
       }
       if (host === 'youtube.com' || host === 'm.youtube.com' || host === 'music.youtube.com') {
         const watchId = parsed.searchParams.get('v');
@@ -1824,17 +1824,21 @@ function getDirectChatMediaInfo(url) {
         const embedId = path.match(/\/embed\/([^/?#]+)/i)?.[1];
         const liveId = path.match(/\/live\/([^/?#]+)/i)?.[1];
         const id = watchId || shortsId || embedId || liveId;
-        if (id) return { type: 'embed', provider: 'youtube', url: `https://www.youtube.com/embed/${encodeURIComponent(id)}`, orientation: shortsId ? 'portrait' : 'landscape' };
+        if (id) return { type: 'embed', provider: 'youtube', url: `https://www.youtube.com/embed/${encodeURIComponent(id)}`, orientation: shortsId ? 'portrait' : 'landscape', playsInline: true };
       }
       if (host === 'vimeo.com' || host === 'player.vimeo.com') {
         const id = path.match(/(?:\/video)?\/(\d+)(?:$|[/?#])/i)?.[1] || path.match(/\/(\d+)(?:$|[/?#])/i)?.[1];
-        if (id) return { type: 'embed', provider: 'vimeo', url: `https://player.vimeo.com/video/${encodeURIComponent(id)}`, orientation: 'landscape' };
+        if (id) return { type: 'embed', provider: 'vimeo', url: `https://player.vimeo.com/video/${encodeURIComponent(id)}`, orientation: 'landscape', playsInline: true };
       }
-      // TikTok's official embed.js widget (see TikTokEmbedWidget below). Falls back to the
-      // link-preview card if it doesn't produce a player within a few seconds.
+      // TikTok's official embed.js widget (see TikTokEmbedWidget below) never actually plays
+      // inline here -- ClickToPlayVideoCard's façade for it just opens the TikTok app/site in a
+      // new tab (TikTok doesn't allow autoplaying its player embedded in a third-party page the
+      // way YouTube/Vimeo do). playsInline stays false so callers know not to advertise a
+      // "watch here" button for it. Falls back to the link-preview card if the widget itself
+      // doesn't produce a player within a few seconds.
       if (host === 'tiktok.com' || host === 'm.tiktok.com') {
         const videoId = path.match(/\/video\/(\d+)/)?.[1];
-        if (videoId) return { type: 'tiktok-widget', provider: 'tiktok', url: source, videoId };
+        if (videoId) return { type: 'tiktok-widget', provider: 'tiktok', url: source, videoId, playsInline: false };
       }
     } catch (e) {
       // Keep non-URL and unsupported providers on the regular link-preview path.
@@ -1864,7 +1868,7 @@ function getDirectChatMediaInfo(url) {
 
   for (const candidate of candidates) {
     const type = getExtensionType(candidate);
-    if (type) return { type, url: normalizedUrl };
+    if (type) return { type, url: normalizedUrl, playsInline: type === 'video' };
   }
   return null;
 }

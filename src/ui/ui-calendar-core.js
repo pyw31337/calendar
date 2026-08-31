@@ -2034,8 +2034,13 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
   const thumbUrls = memo.thumbUrls || [];
   const memoFirstUrl = extractFirstUrl(memo.text);
   const memoMediaInfo = memoFirstUrl ? getDirectChatMediaInfo(memoFirstUrl) : null;
-  const isVideoMedia = !!(memoMediaInfo && (memoMediaInfo.type === 'embed' || memoMediaInfo.type === 'tiktok-widget' || memoMediaInfo.type === 'video'));
-  const displayMemoText = memo.text ? ((memo.linkPreview || isVideoMedia) ? removeFirstUrl(memo.text) : memo.text) : '';
+  // Only media that actually plays inline here (YouTube/Vimeo embeds, direct video files) gets
+  // the "영상 바로보기" toggle -- TikTok's façade just opens a new tab instead of playing on this
+  // page, which read as the button lying/glitching. memoMediaInfo (any recognized media, not just
+  // the inline-playable ones) still governs stripping the raw URL out of the displayed text below,
+  // since the TikTok widget/preview card renders regardless of whether the toggle button does.
+  const isVideoMedia = !!(memoMediaInfo && memoMediaInfo.playsInline);
+  const displayMemoText = memo.text ? ((memo.linkPreview || memoMediaInfo) ? removeFirstUrl(memo.text) : memo.text) : '';
   const memoTextLineCount = displayMemoText ? displayMemoText.split(/\r?\n/).length : 0;
   const hasLongMemoText = displayMemoText.length > 280 || memoTextLineCount > 8;
   const [isMemoTextExpanded, setIsMemoTextExpanded] = React.useState(false);

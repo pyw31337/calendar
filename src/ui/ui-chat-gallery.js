@@ -768,6 +768,104 @@ function useClipboardHasImage(active) {
   return true;
 }
 
+// Module-level (not defined inside ChatGalleryModal's render body) on purpose: this used to be a
+// component defined inline in ChatGalleryModal, which meant React saw a brand-new component type
+// on every ChatGalleryModal re-render -- including the header show/hide state the scroll handler
+// below flips constantly on mobile -- and remounted every visible link card. That wiped each
+// card's local isVideoOpen state and tore down/rebuilt its DOM, which is what read as "the video
+// suddenly closes" and "the screen jumps" while scrolling with a video open. A stable module-level
+// function keeps each card's own state and DOM across ChatGalleryModal re-renders.
+function GalleryLinkCard({ item }) {
+  const React = window.React;
+  const __deps = window.GATHER_UI_DEPS || {};
+  const __comp = window.GATHER_UI_COMPONENTS || {};
+  const LinkPreviewCard = __deps.LinkPreviewCard || __comp.LinkPreviewCard;
+  const ClickToPlayVideoCard = __comp.ClickToPlayVideoCard || __deps.ClickToPlayVideoCard;
+  const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
+  const [isVideoOpen, setIsVideoOpen] = React.useState(false);
+  const mediaInfo = getDirectChatMediaInfo(item.url);
+  // Only media that actually plays inline here (YouTube/Vimeo embeds, direct video files) gets
+  // the "영상 바로보기" toggle -- TikTok's façade just opens a new tab instead of playing on this
+  // page, which read as the button lying/glitching.
+  const isVideoMedia = !!(mediaInfo && mediaInfo.playsInline);
+  const fallbackTitle = item.title || (item.text ? removeFirstUrl(item.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '');
+
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '8px',
+      width: '100%',
+      backgroundColor: 'var(--bg-card)',
+      border: '1px solid var(--border-subtle)',
+      borderRadius: 'var(--radius-md)',
+      padding: '12px',
+      boxSizing: 'border-box'
+    }
+  },
+    fallbackTitle && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: '0.9rem',
+        fontWeight: 700,
+        color: 'var(--text-main)',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap'
+      }
+    }, fallbackTitle),
+
+    /* Primary Link Preview Card */
+    /*#__PURE__*/React.createElement(LinkPreviewCard, {
+      url: item.url,
+      fallbackTitle: fallbackTitle,
+      cachedData: item.linkPreview,
+      stretch: true
+    }),
+
+    /* Video Toggle Button for video media */
+    isVideoMedia && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => setIsVideoOpen(prev => !prev),
+      style: {
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '6px',
+        width: '100%',
+        padding: '7px 0',
+        marginTop: '2px',
+        borderRadius: 'var(--radius-md)',
+        border: isVideoOpen ? '1px solid var(--border-subtle)' : '1px solid var(--primary)',
+        backgroundColor: isVideoOpen ? 'var(--bg-secondary)' : 'color-mix(in srgb, var(--primary) 10%, transparent)',
+        color: isVideoOpen ? 'var(--text-muted)' : 'var(--primary)',
+        fontSize: '0.78rem',
+        fontWeight: 700,
+        cursor: 'pointer'
+      }
+    },
+      isVideoOpen ? [
+        SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 14 }) : null,
+        " 영상 닫기"
+      ] : [
+        /*#__PURE__*/React.createElement("svg", {
+          viewBox: "0 0 24 24", width: "14", height: "14", fill: "currentColor"
+        }, /*#__PURE__*/React.createElement("path", { d: "M8 5v14l11-7z" })),
+        " 영상 바로보기"
+      ]
+    ),
+
+    /* Video Player when expanded */
+    isVideoMedia && isVideoOpen && /*#__PURE__*/React.createElement("div", {
+      style: { marginTop: '4px', width: '100%' }
+    }, /*#__PURE__*/React.createElement(ClickToPlayVideoCard, {
+      url: item.url,
+      mediaInfo: mediaInfo,
+      fallbackTitle: fallbackTitle,
+      cachedData: item.linkPreview
+    }))
+  );
+}
+
 export function ChatGalleryModal({
   chatMessages,
   memos = [],
@@ -819,8 +917,6 @@ export function ChatGalleryModal({
   const InlineSearchBar = __comp.InlineSearchBar || __deps.InlineSearchBar;
   const SyncStatusChip = __comp.SyncStatusChip || __deps.SyncStatusChip;
   const SyncStatusBanner = __comp.SyncStatusBanner || __deps.SyncStatusBanner;
-  const LinkPreviewCard = __deps.LinkPreviewCard || __comp.LinkPreviewCard;
-  const ClickToPlayVideoCard = __comp.ClickToPlayVideoCard || __deps.ClickToPlayVideoCard;
   const TikTokEmbedWidget = __comp.TikTokEmbedWidget || __deps.TikTokEmbedWidget;
   const MenuIcon = __deps.MenuIcon || __comp.MenuIcon;
   const MediaThumb = __comp.MediaThumb || __deps.MediaThumb;
@@ -1362,89 +1458,6 @@ export function ChatGalleryModal({
       }
     });
   }));
-  const GalleryLinkCard = ({ item }) => {
-    const [isVideoOpen, setIsVideoOpen] = React.useState(false);
-    const mediaInfo = getDirectChatMediaInfo(item.url);
-    const isVideoMedia = !!(mediaInfo && (mediaInfo.type === 'embed' || mediaInfo.type === 'tiktok-widget' || mediaInfo.type === 'video'));
-    const fallbackTitle = item.title || (item.text ? removeFirstUrl(item.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '');
-    const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
-
-    return /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '8px',
-        width: '100%',
-        backgroundColor: 'var(--bg-card)',
-        border: '1px solid var(--border-subtle)',
-        borderRadius: 'var(--radius-md)',
-        padding: '12px',
-        boxSizing: 'border-box'
-      }
-    },
-      fallbackTitle && /*#__PURE__*/React.createElement("div", {
-        style: {
-          fontSize: '0.9rem',
-          fontWeight: 700,
-          color: 'var(--text-main)',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap'
-        }
-      }, fallbackTitle),
-
-      /* Primary Link Preview Card */
-      /*#__PURE__*/React.createElement(LinkPreviewCard, {
-        url: item.url,
-        fallbackTitle: fallbackTitle,
-        cachedData: item.linkPreview,
-        stretch: true
-      }),
-
-      /* Video Toggle Button for video media */
-      isVideoMedia && /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: () => setIsVideoOpen(prev => !prev),
-        style: {
-          display: 'inline-flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '6px',
-          width: '100%',
-          padding: '7px 0',
-          marginTop: '2px',
-          borderRadius: 'var(--radius-md)',
-          border: isVideoOpen ? '1px solid var(--border-subtle)' : '1px solid var(--primary)',
-          backgroundColor: isVideoOpen ? 'var(--bg-secondary)' : 'color-mix(in srgb, var(--primary) 10%, transparent)',
-          color: isVideoOpen ? 'var(--text-muted)' : 'var(--primary)',
-          fontSize: '0.78rem',
-          fontWeight: 700,
-          cursor: 'pointer'
-        }
-      },
-        isVideoOpen ? [
-          SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 14 }) : null,
-          " 영상 닫기"
-        ] : [
-          /*#__PURE__*/React.createElement("svg", {
-            viewBox: "0 0 24 24", width: "14", height: "14", fill: "currentColor"
-          }, /*#__PURE__*/React.createElement("path", { d: "M8 5v14l11-7z" })),
-          " 영상 바로보기"
-        ]
-      ),
-
-      /* Video Player when expanded */
-      isVideoMedia && isVideoOpen && /*#__PURE__*/React.createElement("div", {
-        style: { marginTop: '4px', width: '100%' }
-      }, /*#__PURE__*/React.createElement(ClickToPlayVideoCard, {
-        url: item.url,
-        mediaInfo: mediaInfo,
-        fallbackTitle: fallbackTitle,
-        cachedData: item.linkPreview
-      }))
-    );
-  };
-
   const renderGalleryLinkList = items => /*#__PURE__*/React.createElement(React.Fragment, null,
     (items || []).map(item => /*#__PURE__*/React.createElement(GalleryLinkCard, {
       key: item.messageId || item.url,
