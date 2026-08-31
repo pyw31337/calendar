@@ -6281,7 +6281,6 @@ function CalendarApp() {
         onLoadOlderChat: loadOlderChatMessages,
         hasMoreMemos: hasMoreMemos,
         onLoadMoreMemos: () => setMemosLimit(prev => prev + MEMOS_PAGE_SIZE),
-        totalGalleryCount: totalGalleryCount,
         isDarkTheme: isDarkTheme,
         onToggleTheme: toggleTheme,
         fontScalePercent: fontScalePercent,
