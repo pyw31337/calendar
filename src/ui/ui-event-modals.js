@@ -2034,12 +2034,14 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
     const ROW_H = 40;
     const summaryBoxH = 74 + Math.max(1, participantRows.length) * ROW_H;
     const bankBoxH = depositorName ? 108 : 86;
-    const listBoxH = 74 + Math.max(1, items.length) * ROW_H;
-    const H = HEADER_H + 34 + summaryBoxH + 20 + bankBoxH + 20 + listBoxH + 50;
 
+    // Height depends on how many lines each item's label wraps to, which needs a live 2D
+    // context to measure -- create the canvas at a placeholder height first, measure, then
+    // resize it to the real height before drawing (resizing a canvas always clears it and
+    // resets its drawing state, which is fine since nothing has been drawn yet).
     const canvas = document.createElement('canvas');
     canvas.width = W;
-    canvas.height = H;
+    canvas.height = 10;
     const ctx = canvas.getContext('2d');
 
     const fitText = (text, maxWidth) => {
@@ -2049,6 +2051,50 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
       while (t.length > 1 && ctx.measureText(`${t}…`).width > maxWidth) t = t.slice(0, -1);
       return `${t}…`;
     };
+    const wrapText = (text, maxWidth) => {
+      const str = String(text);
+      if (!str) return [''];
+      if (ctx.measureText(str).width <= maxWidth) return [str];
+      const words = str.split(' ');
+      const lines = [];
+      let current = '';
+      words.forEach(word => {
+        const candidate = current ? `${current} ${word}` : word;
+        if (ctx.measureText(candidate).width <= maxWidth) {
+          current = candidate;
+          return;
+        }
+        if (current) lines.push(current);
+        if (ctx.measureText(word).width <= maxWidth) {
+          current = word;
+          return;
+        }
+        // Single word/run still too wide for one line (common for spaceless Korean text) --
+        // break it up character by character instead of overflowing or ellipsizing it away.
+        let chunk = '';
+        for (const ch of word) {
+          const nextChunk = chunk + ch;
+          if (ctx.measureText(nextChunk).width <= maxWidth) {
+            chunk = nextChunk;
+          } else {
+            if (chunk) lines.push(chunk);
+            chunk = ch;
+          }
+        }
+        current = chunk;
+      });
+      if (current) lines.push(current);
+      return lines.length ? lines : [''];
+    };
+
+    ctx.font = '500 14px sans-serif';
+    const itemLines = items.map(item => wrapText(`${formatShortDateWithDay(item.date)} · ${item.label || '정산 항목'}`, 420));
+    const itemRowUnits = items.length === 0 ? 1 : itemLines.reduce((sum, lines) => sum + Math.max(1, lines.length), 0);
+    const listBoxH = 74 + itemRowUnits * ROW_H;
+    const H = HEADER_H + 34 + summaryBoxH + 20 + bankBoxH + 20 + listBoxH + 50;
+
+    canvas.width = W;
+    canvas.height = H;
     const hLine = (x1, x2, yy) => {
       ctx.strokeStyle = '#F1F5F9';
       ctx.beginPath();
@@ -2180,17 +2226,18 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
       ctx.font = '500 14px sans-serif';
       ctx.fillText('선택된 지출 항목이 없습니다.', PAD + 20, listRowY);
     } else {
-      items.forEach(item => {
+      items.forEach((item, itemIndex) => {
+        const lines = itemLines[itemIndex];
         hLine(PAD + 20, W - PAD - 20, listRowY - 22);
         ctx.fillStyle = '#334155';
         ctx.font = '500 14px sans-serif';
-        ctx.fillText(fitText(`${formatShortDateWithDay(item.date)} · ${item.label || '정산 항목'}`, 420), PAD + 20, listRowY);
+        lines.forEach((line, lineIndex) => ctx.fillText(line, PAD + 20, listRowY + lineIndex * ROW_H));
         ctx.fillStyle = '#DC2626';
         ctx.font = '800 15px sans-serif';
         ctx.textAlign = 'right';
         ctx.fillText(`-${Math.abs(Number(item.amount) || 0).toLocaleString()}원`, W - PAD - 20, listRowY);
         ctx.textAlign = 'left';
-        listRowY += ROW_H;
+        listRowY += ROW_H * Math.max(1, lines.length);
       });
     }
 
