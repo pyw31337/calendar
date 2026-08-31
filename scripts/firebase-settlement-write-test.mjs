@@ -52,21 +52,21 @@ const final = { ...updated, settlementCards: [{ ...updated.settlementCards[0], t
 let cleanupError = null;
 
 try {
-  assert(await pushSingleCalendarWithRest(base, firstAt, 'settings', 18), 'seed settlement write failed');
-  assert(await pushSingleCalendarWithRest(updated, firstAt + 100, 'settings', 18), 'updated settlement write failed');
+  assert(await pushSingleCalendarWithRest(base, firstAt, 'settings', 18, [], { settingsFields: ['settlementCards'] }), 'seed settlement write failed');
+  assert(await pushSingleCalendarWithRest(updated, firstAt + 100, 'settings', 18, [], { settingsFields: ['settlementCards'] }), 'updated settlement write failed');
   const afterUpdate = await (await fetch(docUrl)).json();
   const afterUpdateCalendar = firestoreDocumentToJs(afterUpdate).calendar;
   const updatedCard = afterUpdateCalendar.settlementCards.find((card) => card.id === 'settlement_1');
   assert(updatedCard?.title === '저장 후 제목' && updatedCard?.totalAmount === 12500, 'updated settlement was not persisted');
   assert(updatedCard?.participantRows?.[0]?.memo === '저장 후 일정 메모', 'updated settlement participant memo was not persisted');
 
-  assert(await pushSingleCalendarWithRest(stale, firstAt - 100, 'settings', 18), 'stale settlement merge failed');
+  assert(await pushSingleCalendarWithRest(stale, firstAt - 100, 'settings', 18, [], { settingsFields: ['settlementCards'] }), 'stale settlement merge failed');
   const afterStale = await (await fetch(docUrl)).json();
   const staleCheckCard = firestoreDocumentToJs(afterStale).calendar.settlementCards.find((card) => card.id === 'settlement_1');
   assert(staleCheckCard?.title === '저장 후 제목' && staleCheckCard?.totalAmount === 12500, 'stale write regressed settlement data');
   assert(staleCheckCard?.participantRows?.[0]?.memo === '저장 후 일정 메모', 'stale write regressed settlement participant memo');
 
-  assert(await pushSingleCalendarWithRest(final, firstAt + 200, 'settings', 18), 'final settlement write failed');
+  assert(await pushSingleCalendarWithRest(final, firstAt + 200, 'settings', 18, [], { settingsFields: ['settlementCards'] }), 'final settlement write failed');
   const afterFinal = await (await fetch(docUrl)).json();
   const finalCard = firestoreDocumentToJs(afterFinal).calendar.settlementCards.find((card) => card.id === 'settlement_1');
   assert(finalCard?.title === '최종 저장 제목' && finalCard?.totalAmount === 13000, 'final settlement was not persisted');

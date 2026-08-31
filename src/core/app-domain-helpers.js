@@ -372,7 +372,19 @@ function getCalendarPlaces(calendar) {
 function unionPlaces(calendar, subcollectionPlaces) {
   const byId = new Map();
   getCalendarPlaces(calendar).forEach(p => { if (p?.id) byId.set(p.id, p); });
-  (Array.isArray(subcollectionPlaces) ? subcollectionPlaces : []).forEach(p => { if (p?.id) byId.set(p.id, p); });
+  (Array.isArray(subcollectionPlaces) ? subcollectionPlaces : []).forEach(place => {
+    if (!place?.id) return;
+    const existing = byId.get(place.id);
+    if (!existing) {
+      byId.set(place.id, place);
+      return;
+    }
+    const existingStamp = Number(existing.updatedAt || existing.createdAt || 0) || 0;
+    const incomingStamp = Number(place.updatedAt || place.createdAt || 0) || 0;
+    // Neither storage location is inherently authoritative during migration. A delayed
+    // subcollection listener must not roll a just-saved embedded place back to an older value.
+    byId.set(place.id, incomingStamp >= existingStamp ? place : existing);
+  });
   return deduplicateCalendarPlaces(Array.from(byId.values()));
 }
 

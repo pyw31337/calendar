@@ -176,7 +176,9 @@ async function runCalendarStress(target) {
         updatedAt: Date.now() + 900000,
         revision: 1
       };
-      return pushSingleCalendarWithRest(payload, payload.updatedAt, 'settings', 18);
+      return pushSingleCalendarWithRest(payload, payload.updatedAt, 'settings', 18, [], {
+        settingsFields: ['title', 'participants']
+      });
     }
 
     globalThis.__stressPromise = (async () => {

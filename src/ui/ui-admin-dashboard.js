@@ -1440,7 +1440,9 @@ export function AdminDashboard({ initialCalendars }) {
       revision: (cal.revision || 0) + 1
     };
 
-    const saved = await pushSingleCloudCalendar(stampedCal, now, 18, null, 'settings');
+    const saved = await pushSingleCloudCalendar(stampedCal, now, 18, null, 'settings', [], {
+      settingsFields: ['title', 'description', 'accentColor', 'participants', 'expenseCategories', 'placeCategories', 'settlementBaseBudget']
+    });
     if (saved) {
       setServerCalendars(prev => prev.map(c => c.id === selectedCalId ? stampedCal : c));
       showAdminToast('설정 저장완료', 'success');

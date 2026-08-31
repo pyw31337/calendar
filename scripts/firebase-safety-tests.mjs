@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import vm from 'node:vm';
-import { omitUndefinedDeep } from '../src/core/app-utils.js';
+import { GATHER_APP_UTILS, omitUndefinedDeep } from '../src/core/app-utils.js';
 import { calculateSettlementRows } from '../src/core/settlement-calculator.js';
 
 function assert(condition, message) {
@@ -28,12 +28,13 @@ assert(settlementSimulation.reduce((sum, row) => sum + row.amount, 0) === 0, 'se
 // when both records share the same original confirmedAt timestamp.
 globalThis.window = {
   GATHER_APP_CONFIG: {},
-  GATHER_APP_UTILS: {},
+  GATHER_APP_UTILS,
   GATHER_APP_CONSTANTS: {},
   GATHER_APP_CHAT_DATA: {},
   location: { pathname: '/' }
 };
-const { unionConfirmedMeetings } = await import('../src/core/app-domain-helpers.js');
+const { unionConfirmedMeetings, unionPlaces } = await import('../src/core/app-domain-helpers.js');
+const { mergeCalendarSettingsDelta } = await import('../src/core/app-firebase-data.js');
 const mergedSettlementProbe = unionConfirmedMeetings({
   confirmedMeeting: [{
     date: '2026-08-29',
@@ -47,6 +48,39 @@ const mergedSettlementProbe = unionConfirmedMeetings({
   expenses: [{ id: 'expense_1', label: '시설이용료', amount: 195000, updatedAt: 200 }]
 }]);
 assert(mergedSettlementProbe[0]?.expenses?.[0]?.amount === 135000, 'stale confirmedMeetings snapshot must not overwrite a newer embedded settlement edit');
+
+const mergedPlaceProbe = unionPlaces({
+  places: [{ id: 'place_1', name: '최신 장소명', lat: 37.5, lng: 127, updatedAt: 300 }]
+}, [{ id: 'place_1', name: '오래된 장소명', lat: 37.5, lng: 127, updatedAt: 200 }]);
+assert(mergedPlaceProbe[0]?.name === '최신 장소명', 'stale places snapshot must not overwrite a newer embedded place edit');
+
+const settingsServerProbe = {
+  id: 'kkot',
+  title: '최신 제목',
+  weatherLocation: '서울',
+  pinnedNotices: [{ id: 'notice_new', text: '최신 공지' }],
+  participants: [{ id: 'p1', name: '사용자', updatedAt: 300 }],
+  settlementCards: [{ id: 'card_1', title: '최신 정산', updatedAt: 300 }],
+  confirmedMeeting: [{ date: '2026-08-29', updatedAt: 300, expenses: [{ id: 'e1', amount: 135000, updatedAt: 300 }] }],
+  updatedAt: 300,
+  revision: 3
+};
+const staleSettingsProbe = {
+  ...settingsServerProbe,
+  title: '수정할 제목',
+  weatherLocation: '오래된 지역',
+  pinnedNotices: [{ id: 'notice_old', text: '오래된 공지' }],
+  settlementCards: [{ id: 'card_1', title: '오래된 정산', updatedAt: 200 }],
+  confirmedMeeting: [{ date: '2026-08-29', updatedAt: 200, expenses: [{ id: 'e1', amount: 195000, updatedAt: 200 }] }],
+  updatedAt: 400,
+  revision: 4
+};
+const fieldScopedSettingsProbe = mergeCalendarSettingsDelta(settingsServerProbe, staleSettingsProbe, ['title']);
+assert(fieldScopedSettingsProbe.title === '수정할 제목', 'declared settings field was not saved');
+assert(fieldScopedSettingsProbe.weatherLocation === '서울', 'title save overwrote an unrelated weather location');
+assert(fieldScopedSettingsProbe.pinnedNotices[0]?.id === 'notice_new', 'title save overwrote unrelated notices');
+assert(fieldScopedSettingsProbe.settlementCards[0]?.title === '최신 정산', 'title save regressed unrelated settlement cards');
+assert(fieldScopedSettingsProbe.confirmedMeeting[0]?.expenses?.[0]?.amount === 135000, 'title save regressed unrelated meeting settlement data');
 
 // The app's main logic lives in assets/app-main.js (externalized from index.html's inline
 // <script> -- see check-tab-wiring.mjs for the rationale).
@@ -466,7 +500,7 @@ runAppScript(concurrencyContext, `
     participants: participants.map((participant) => ({ ...participant, updatedAt: participant.updatedAt })),
     availabilities: []
   };
-  const settingsMerged = mergeCalendarSettingsDelta(withNewParticipant, staleSettings);
+  const settingsMerged = mergeCalendarSettingsDelta(withNewParticipant, staleSettings, ['title', 'participants']);
   if (!settingsMerged.participants.some((participant) => participant.id === 'kkot_p9')) {
     throw new Error('stale settings removed newer participant');
   }

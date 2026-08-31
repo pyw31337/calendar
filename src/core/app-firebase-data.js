@@ -636,7 +636,30 @@ function mergeSettlementCards(serverList = [], incomingList = []) {
   return Array.from(byId.values());
 }
 
-function mergeCalendarSettingsDelta(serverCalendar, incomingCalendar) {
+const CALENDAR_SETTINGS_FIELDS = new Set([
+  'title',
+  'description',
+  'accentColor',
+  'participants',
+  'expenseCategories',
+  'placeCategories',
+  'settlementBaseBudget',
+  'settlementCards',
+  'places',
+  'confirmedMeeting',
+  'weatherLocation',
+  'recentLocations',
+  'pinnedNotices',
+  'pinnedNotice'
+]);
+
+function normalizeSettingsFields(settingsFields) {
+  return new Set((Array.isArray(settingsFields) ? settingsFields : [])
+    .map(field => String(field || '').trim())
+    .filter(field => CALENDAR_SETTINGS_FIELDS.has(field)));
+}
+
+function mergeCalendarSettingsDelta(serverCalendar, incomingCalendar, settingsFields = []) {
   const server = cloneCalendar(serverCalendar) || {};
   const incoming = cloneCalendar(incomingCalendar) || {};
   if (server.id && incoming.id && server.id !== incoming.id) {
@@ -645,7 +668,8 @@ function mergeCalendarSettingsDelta(serverCalendar, incomingCalendar) {
   const calendarId = incoming.id || server.id;
   const serverActiveCount = getActiveParticipants(server).length;
   const incomingActiveCount = getActiveParticipants(incoming).length;
-  if (serverActiveCount > 0 && incomingActiveCount === 0) {
+  const intendedFields = normalizeSettingsFields(settingsFields);
+  if (intendedFields.has('participants') && serverActiveCount > 0 && incomingActiveCount === 0) {
     throw new Error(`Refusing to replace ${calendarId} participants with an empty settings payload`);
   }
 
@@ -665,22 +689,29 @@ function mergeCalendarSettingsDelta(serverCalendar, incomingCalendar) {
     );
   });
 
-  return {
+  const merged = {
     ...server,
-    ...incoming,
     id: calendarId,
-    participants: Array.from(participantMap.values()),
+    participants: intendedFields.has('participants') ? Array.from(participantMap.values()) : (server.participants || []),
     availabilities: server.availabilities || [],
     activityLogs: mergeActivityLogs(server.activityLogs || [], incoming.activityLogs || [], calendarId, new Set(Array.from(participantMap.values()).map(participant => participant.id))),
     polls: mergePolls(server.polls || [], incoming.polls || [], calendarId, new Set(Array.from(participantMap.values()).map(participant => participant.id))),
     deletedActivityLogIds: mergeDeletedActivityLogIds(server.deletedActivityLogIds || [], incoming.deletedActivityLogIds || []),
-    confirmedMeeting: mergeConfirmedMeetings(server.confirmedMeeting || [], incoming.confirmedMeeting || []),
-    expenseCategories: incoming.expenseCategories !== undefined ? incoming.expenseCategories : server.expenseCategories,
-    settlementCards: mergeSettlementCards(server.settlementCards || [], incoming.settlementCards || []),
-    places: incoming.places !== undefined ? incoming.places : server.places,
-    placeCategories: incoming.placeCategories !== undefined ? incoming.placeCategories : server.placeCategories,
-    settlementBaseBudget: incoming.settlementBaseBudget !== undefined ? incoming.settlementBaseBudget : server.settlementBaseBudget
+    confirmedMeeting: intendedFields.has('confirmedMeeting')
+      ? mergeConfirmedMeetings(server.confirmedMeeting || [], incoming.confirmedMeeting || [])
+      : (server.confirmedMeeting || []),
+    settlementCards: intendedFields.has('settlementCards')
+      ? mergeSettlementCards(server.settlementCards || [], incoming.settlementCards || [])
+      : (server.settlementCards || []),
+    places: intendedFields.has('places') && incoming.places !== undefined ? incoming.places : server.places,
+    updatedAt: Math.max(Number(server.updatedAt || 0) || 0, Number(incoming.updatedAt || 0) || 0),
+    revision: Math.max(Number(server.revision || 0) || 0, Number(incoming.revision || 0) || 0)
   };
+  intendedFields.forEach(field => {
+    if (field === 'participants' || field === 'confirmedMeeting' || field === 'settlementCards' || field === 'places') return;
+    if (Object.prototype.hasOwnProperty.call(incoming, field)) merged[field] = incoming[field];
+  });
+  return merged;
 }
 
 function mergeCalendarPollsDelta(serverCalendar, incomingCalendar, changedAt = 0) {
@@ -2366,7 +2397,7 @@ async function pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode,
         err.nonRetryable = true;
         throw err;
       } else if (saveMode === 'settings') {
-        nextCalendar = mergeCalendarSettingsDelta(serverCalendar, normalizedCal);
+        nextCalendar = mergeCalendarSettingsDelta(serverCalendar, normalizedCal, auxiliaryData?.settingsFields);
       } else if (saveMode === 'polls') {
         nextCalendar = mergeCalendarPollsDelta(serverCalendar, normalizedCal, lastModified);
       } else {
@@ -2528,7 +2559,7 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 4, 
 	          } else if (saveMode === 'replace') {
 	            throw new Error(`Refusing to replace existing calendar ${normalizedCal.id}`);
 	          } else if (saveMode === 'settings') {
-	            nextCalendar = mergeCalendarSettingsDelta(serverCalendar, normalizedCal);
+	            nextCalendar = mergeCalendarSettingsDelta(serverCalendar, normalizedCal, auxiliaryData?.settingsFields);
 	          } else if (saveMode === 'polls') {
 	            nextCalendar = mergeCalendarPollsDelta(serverCalendar, normalizedCal, lastModified);
 	          } else {

@@ -3828,15 +3828,24 @@ function CalendarApp() {
   const commitConfirmedMeetings = async (nextConfirmedMeetings, toastMessage = null, activityLogs = [], warnLabel = 'write', toastType = 'success') => {
     const previousMeetings = getConfirmedMeetings(activeCal);
     const previousByDate = new Map(previousMeetings.map(meeting => [meeting.date, JSON.stringify(meeting)]));
+    const mutationStamp = Date.now();
+    // Stamp the aggregate itself for every mutation, including deletes, reorder, undo and
+    // confirm/cancel. Child timestamps cannot describe removal, and an unchanged confirmedAt
+    // previously let an older subcollection snapshot win the read-side union after a save.
+    const stampedNextConfirmedMeetings = nextConfirmedMeetings.map(meeting => (
+      previousByDate.get(meeting.date) !== JSON.stringify(meeting)
+        ? { ...meeting, updatedAt: Math.max(Number(meeting.updatedAt || 0) || 0, mutationStamp) }
+        : meeting
+    ));
     // The subcollection is keyed by date. Persist only dates changed by this action instead of
     // rewriting every confirmed meeting whenever one expense/photo/note is edited.
-    const changedConfirmedMeetings = nextConfirmedMeetings.filter(meeting => {
+    const changedConfirmedMeetings = stampedNextConfirmedMeetings.filter(meeting => {
       return previousByDate.get(meeting.date) !== JSON.stringify(meeting);
     });
     const updatedCal = {
       ...activeCal,
-      confirmedMeeting: nextConfirmedMeetings,
-      updatedAt: Date.now(),
+      confirmedMeeting: stampedNextConfirmedMeetings,
+      updatedAt: mutationStamp,
       revision: (activeCal.revision || 0) + 1,
       activityLogs: activityLogs.length > 0 ? [...getCalendarActivityLogs(activeCal), ...activityLogs] : getCalendarActivityLogs(activeCal)
     };
@@ -3848,10 +3857,10 @@ function CalendarApp() {
       updatedCal.id,
       'settings',
       activityLogs,
-      { confirmedMeetings: changedConfirmedMeetings }
+      { confirmedMeetings: changedConfirmedMeetings, settingsFields: ['confirmedMeeting'] }
     );
     if (!calendarSaved) return false;
-    setConfirmedMeetingsSubcollection(nextConfirmedMeetings);
+    setConfirmedMeetingsSubcollection(stampedNextConfirmedMeetings);
     return true;
   };
   const handleConfirmMeeting = (dateStr, note) => {
@@ -3895,14 +3904,8 @@ function CalendarApp() {
     const meetingLog = createActivityLog(activeCal.id, action, dateStr, '', now, logNote);
     return commitConfirmedMeetings(nextConfirmedMeetings, isAlreadyConfirmed ? '모임 확정 취소' : '모임 확정', meetingLog ? [meetingLog] : []);
   };
-  // Saved via saveMode 'settings' like confirmedMeeting itself -- mergeCalendarSettingsDelta
-  // does a blind {...server, ...incoming} for fields it doesn't explicitly preserve/merge (see
-  // its handling of availabilities/polls for contrast), so two near-simultaneous 'settings'
-  // saves from different tabs (e.g. this and handleSetPinnedNotice) can still let a stale local
-  // confirmedMeeting/pinnedNotice/expenses snapshot overwrite a fresher one. Pre-existing pattern
-  // shared by every other settings-mode field in this app (title, description, ...); a real fix
-  // would need confirmedMeeting/pinnedNotice to get their own dedicated saveMode + delta-merge
-  // function the way availabilities and polls already do.
+  // Confirmed-meeting writes declare their field scope in commitConfirmedMeetings, so unrelated
+  // settings saves cannot carry a stale settlement snapshot back over this value.
   const handleSaveExpense = async (dateStr, expense) => {
     if (!activeCal || !isValidDateString(dateStr)) return false;
     const existingMeetings = getConfirmedMeetings(activeCal);
@@ -5075,7 +5078,7 @@ function CalendarApp() {
       // The places collection is the live source after migration. Persist the complete
       // merged set, not only the just-edited item; otherwise a settings save can leave
       // legacy places/date memos split between the calendar document and the subcollection.
-      { places: nextPlaces }
+      { places: nextPlaces, settingsFields: ['places'] }
     );
   };
   const handleDeletePlace = async (placeId) => {
@@ -5101,7 +5104,7 @@ function CalendarApp() {
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
     setPlacesSubcollection(nextPlaces);
-    const ok = await updateCalendars(nextCalendars, null, null, updatedCal.id, 'settings', placeActivityLog ? [placeActivityLog] : []);
+    const ok = await updateCalendars(nextCalendars, null, null, updatedCal.id, 'settings', placeActivityLog ? [placeActivityLog] : [], { places: nextPlaces, settingsFields: ['places'] });
     if (ok) {
       showUndoableDeleteToast('장소가 삭제되었습니다.', async () => {
         try {
@@ -5118,7 +5121,7 @@ function CalendarApp() {
           setPlacesSubcollection(restoredPlaces);
           const restoredCal = { ...latestCal, places: restoredPlaces, updatedAt: restoreNow, revision: (latestCal.revision || 0) + 1 };
           const next = calendarsRef.current.map(c => c.id === restoredCal.id ? restoredCal : c);
-          await updateCalendars(next, '장소 삭제를 되돌렸습니다.', 'success', restoredCal.id, 'settings');
+          await updateCalendars(next, '장소 삭제를 되돌렸습니다.', 'success', restoredCal.id, 'settings', [], { places: restoredPlaces, settingsFields: ['places'] });
         } catch (err) {
           console.error('handleDeletePlace undo failed:', err);
           showToast('장소 복원 실패', 'error', 4000);
@@ -5199,7 +5202,7 @@ function CalendarApp() {
       settlementCards: nextCards
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, '정산 카드 저장완료', 'success', updatedCal.id, 'settings');
+    return updateCalendars(nextCalendars, '정산 카드 저장완료', 'success', updatedCal.id, 'settings', [], { settingsFields: ['settlementCards'] });
   };
 
   const handleDeleteSettlementCard = cardId => {
@@ -5218,7 +5221,7 @@ function CalendarApp() {
       settlementCards: nextCards
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, '정산 카드가 삭제되었습니다.', 'info', updatedCal.id, 'settings');
+    return updateCalendars(nextCalendars, '정산 카드가 삭제되었습니다.', 'info', updatedCal.id, 'settings', [], { settingsFields: ['settlementCards'] });
   };
 
   const handleToggleSettlementCardStatus = cardId => {
@@ -5239,7 +5242,7 @@ function CalendarApp() {
       settlementCards: nextCards
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, '정산 상태가 변경되었습니다.', 'info', updatedCal.id, 'settings');
+    return updateCalendars(nextCalendars, '정산 상태가 변경되었습니다.', 'info', updatedCal.id, 'settings', [], { settingsFields: ['settlementCards'] });
   };
   const handleOpenVoteSheet = (poll, option) => {
     if (!guardLoadedCalendar('Firebase 데이터를 불러온 뒤 투표해 주세요.')) return false;
@@ -5356,7 +5359,9 @@ function CalendarApp() {
         return false;
       }
       const nextCalendars = calendars.map(c => c.id === stampedCal.id ? stampedCal : c);
-      return updateCalendars(nextCalendars, '설정 저장완료', 'success', stampedCal.id, 'settings');
+      return updateCalendars(nextCalendars, '설정 저장완료', 'success', stampedCal.id, 'settings', [], {
+        settingsFields: ['title', 'description', 'accentColor', 'participants', 'expenseCategories', 'placeCategories', 'settlementBaseBudget']
+      });
     }
   };
   const handleUpdateWeatherLocation = async (location) => {
@@ -5375,7 +5380,7 @@ function CalendarApp() {
       revision: (activeCal.revision || 0) + 1
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, '날씨 지역 설정 완료', 'success', updatedCal.id, 'settings');
+    return updateCalendars(nextCalendars, '날씨 지역 설정 완료', 'success', updatedCal.id, 'settings', [], { settingsFields: ['weatherLocation', 'recentLocations'] });
   };
   const handleDeleteRecentWeatherLocation = async (location) => {
     if (!guardLoadedCalendar()) return false;
@@ -5389,7 +5394,7 @@ function CalendarApp() {
       revision: (activeCal.revision || 0) + 1
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, '자주 찾는 지역이 삭제되었습니다.', 'delete', updatedCal.id, 'settings');
+    return updateCalendars(nextCalendars, '자주 찾는 지역이 삭제되었습니다.', 'delete', updatedCal.id, 'settings', [], { settingsFields: ['recentLocations'] });
   };
   const handleAddPinnedNotice = (text, authorName) => {
     if (!guardLoadedCalendar()) return false;
@@ -5405,7 +5410,7 @@ function CalendarApp() {
       revision: (activeCal.revision || 0) + 1
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    return updateCalendars(nextCalendars, '공지 등록완료', 'success', updatedCal.id, 'settings');
+    return updateCalendars(nextCalendars, '공지 등록완료', 'success', updatedCal.id, 'settings', [], { settingsFields: ['pinnedNotices', 'pinnedNotice'] });
   };
   const handleRemovePinnedNotice = (noticeId) => {
     if (!guardLoadedCalendar()) return false;
@@ -5426,7 +5431,7 @@ function CalendarApp() {
           pinnedNotice: null, updatedAt: now, revision: (activeCal.revision || 0) + 1
         };
         const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-        const ok = await updateCalendars(nextCalendars, null, null, updatedCal.id, 'settings');
+        const ok = await updateCalendars(nextCalendars, null, null, updatedCal.id, 'settings', [], { settingsFields: ['pinnedNotices', 'pinnedNotice'] });
         if (!ok) return;
         showUndoableDeleteToast('공지가 삭제되었습니다.', async () => {
           try {
@@ -5441,7 +5446,7 @@ function CalendarApp() {
               updatedAt: restoreNow, revision: (latestCal.revision || 0) + 1
             };
             const next = calendarsRef.current.map(c => c.id === restoredCal.id ? restoredCal : c);
-            await updateCalendars(next, '공지 삭제를 되돌렸습니다.', 'success', restoredCal.id, 'settings');
+            await updateCalendars(next, '공지 삭제를 되돌렸습니다.', 'success', restoredCal.id, 'settings', [], { settingsFields: ['pinnedNotices', 'pinnedNotice'] });
           } catch (err) {
             console.error('handleRemovePinnedNotice undo failed:', err);
             showToast('공지 복원 실패', 'error', 4000);
