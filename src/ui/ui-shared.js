@@ -1113,7 +1113,9 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = fals
     const candidate = typeof image === 'string' ? image.trim() : '';
     const validator = GATHER_APP_UTILS.isRenderableImageUrl;
     if (typeof validator === 'function' && validator(candidate)) return candidate;
-    if (!hasPreviewData && host) return `https://www.google.com/s2/favicons?sz=128&domain=${encodeURIComponent(host)}`;
+    // A missing preview used to trigger Google's favicon proxy as a decorative fallback.
+    // That endpoint can redirect to a 404 (notably in WebKit) and turns an otherwise valid text
+    // card into a console/network failure. Keep the deterministic text-only card instead.
     return '';
   })();
   const isGenericTitle = !title || title === 'map.naver.com' || title === 'naver.me' || title.startsWith('map.naver');
