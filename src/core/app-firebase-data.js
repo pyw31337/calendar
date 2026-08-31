@@ -591,11 +591,15 @@ function mergeConfirmedMeetings(serverList = [], incomingList = []) {
       byDate.set(normalized.date, normalized);
       return;
     }
+    const existingStamp = Number(existing.updatedAt || existing.confirmedAt || existing.createdAt || 0) || 0;
+    const incomingStamp = Number(normalized.updatedAt || normalized.confirmedAt || normalized.createdAt || 0) || 0;
+    const base = incomingStamp >= existingStamp ? { ...existing, ...normalized } : { ...normalized, ...existing };
     byDate.set(normalized.date, {
-      ...existing,
-      ...normalized,
-      photos: mergeConfirmedMeetingItems(existing.photos, normalized.photos, photo => photo.id || photo.refKey || photo.mediaKey || photo.assetKey || photo.imageUrl || photo.thumbUrl),
-      expenses: mergeConfirmedMeetingItems(existing.expenses, normalized.expenses, expense => expense.id || `${expense.label || ''}|${expense.url || ''}|${expense.amount ?? ''}|${expense.categoryId || ''}|${expense.createdAt ?? ''}`)
+      ...base,
+      // The meeting timestamp determines the authoritative snapshot. Unioning arrays here
+      // would resurrect an expense/photo that a newer client intentionally deleted.
+      photos: base.photos,
+      expenses: base.expenses
     });
   });
   return Array.from(byDate.values());
@@ -2174,7 +2178,13 @@ function mergeConfirmedMeetingItems(existingItems, incomingItems, keyGetter) {
     const key = typeof keyGetter === 'function' ? keyGetter(item) : '';
     if (!key) return;
     const current = byKey.get(key);
-    byKey.set(key, current ? { ...current, ...item } : item);
+    if (!current) {
+      byKey.set(key, item);
+      return;
+    }
+    const currentStamp = Number(current.updatedAt || current.deletedAt || current.createdAt || 0) || 0;
+    const incomingStamp = Number(item.updatedAt || item.deletedAt || item.createdAt || 0) || 0;
+    byKey.set(key, incomingStamp >= currentStamp ? { ...current, ...item } : current);
   };
   (Array.isArray(existingItems) ? existingItems : []).forEach(addItem);
   (Array.isArray(incomingItems) ? incomingItems : []).forEach(addItem);
