@@ -3081,11 +3081,12 @@ function CalendarApp() {
   };
 
   const handleSaveEditMessage = async (newText, newImages, newParticipantId) => {
-    if (!editingMessage) return;
+    if (!editingMessage) return false;
     const { id, calId } = editingMessage;
     const resolvedParticipantId = newParticipantId || editingMessage.participantId;
     const hasNewImages = (newImages || []).some(img => !img.isExisting);
     if (hasNewImages) setChatUploadProgress({ pct: 0, remainingSec: null });
+    let saved = false;
     try {
       let linkPreview = null;
       const url = extractFirstUrl(newText);
@@ -3205,6 +3206,7 @@ function CalendarApp() {
             showToast('수정 되돌리기 실패', 'error', 4000);
           }
         }, finalizeRemovedStorage);
+        saved = true;
       } else {
         showToast('수정 실패', 'error', 3000);
       }
@@ -3212,9 +3214,9 @@ function CalendarApp() {
       console.error('handleSaveEditMessage failed:', err);
       showToast(describeFirebaseWriteError(err, '수정 실패'), 'error', 4000);
     } finally {
-      setEditingMessage(null);
       setChatUploadProgress(null);
     }
+    return saved;
   };
 
   const handlePromoteInlineChatImage = async ({ url, meta, index = 0 }) => {
@@ -6070,18 +6072,9 @@ function CalendarApp() {
       initialData: editingSettlementCard,
       showToast: showToast,
       onClose: () => setEditingSettlementCard(null),
-      onDeleteCard: cardId => {
-        handleDeleteSettlementCard(cardId);
-        setEditingSettlementCard(null);
-      },
-      onToggleStatus: cardId => {
-        handleToggleSettlementCardStatus(cardId);
-        setEditingSettlementCard(null);
-      },
-      onSave: card => {
-        handleSaveSettlementCard(card);
-        setEditingSettlementCard(null);
-      }
+      onDeleteCard: handleDeleteSettlementCard,
+      onToggleStatus: handleToggleSettlementCardStatus,
+      onSave: handleSaveSettlementCard
     }),
     isAppSettingsOpen && /*#__PURE__*/React.createElement(AppSettingsModal, {
       onClose: () => setIsAppSettingsOpen(false),

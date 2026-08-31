@@ -1259,10 +1259,12 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
     try {
       const updated = await writeMemoDocument('memos', calendar.id, memo.id, { comments: nextComments }, 'update', '메모 댓글 저장');
       if (!updated?.success) throw new Error('Memo comment update failed');
+      return true;
     } catch (err) {
       console.error('Failed to update memo comments:', err);
       if (typeof onUpdateMemo === 'function') onUpdateMemo(memo.id, { comments: memo.comments });
       showToast('댓글 저장 실패', 'error');
+      return false;
     }
   };
 
@@ -1337,6 +1339,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         console.error('Failed to update tags in Firestore:', err);
         if (typeof onUpdateMemo === 'function') onUpdateMemo(editingMemo.id, { tags: editTags });
         showToast('태그 저장 실패', 'error');
+        return;
       }
     }
 
@@ -2213,6 +2216,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
                     console.error('Failed to delete tag in Firestore:', err);
                     if (typeof onUpdateMemo === 'function') onUpdateMemo(editingMemo.id, { tags: editTags });
                     showToast('태그 삭제 실패', 'error');
+                    return;
                   }
                 }
                 setEditTags(nextTags);

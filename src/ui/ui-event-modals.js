@@ -2744,17 +2744,31 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
       React.createElement('div', { style: { display: 'flex', gap: '6px', alignItems: 'center' } },
         isEditing && React.createElement('button', {
           type: 'button', className: 'btn btn-danger',
-          onClick: () => {
-            if (typeof onDeleteCard === 'function') onDeleteCard(cardToEdit.id);
-            if (onClose) onClose();
+          disabled: isSavingSettlementCard,
+          onClick: async () => {
+            if (typeof onDeleteCard !== 'function' || isSavingSettlementCard) return;
+            setIsSavingSettlementCard(true);
+            try {
+              const deleted = await Promise.resolve(onDeleteCard(cardToEdit.id));
+              if (deleted !== false && onClose) onClose();
+            } finally {
+              setIsSavingSettlementCard(false);
+            }
           },
           style: { borderRadius: '8px', fontSize: '0.8rem', fontWeight: 800 }
         }, '삭제'),
         isEditing && React.createElement('button', {
           type: 'button', className: 'btn btn-secondary',
-          onClick: () => {
-            if (typeof onToggleStatus === 'function') onToggleStatus(cardToEdit.id);
-            if (onClose) onClose();
+          disabled: isSavingSettlementCard,
+          onClick: async () => {
+            if (typeof onToggleStatus !== 'function' || isSavingSettlementCard) return;
+            setIsSavingSettlementCard(true);
+            try {
+              const changed = await Promise.resolve(onToggleStatus(cardToEdit.id));
+              if (changed !== false && onClose) onClose();
+            } finally {
+              setIsSavingSettlementCard(false);
+            }
           },
           style: { borderRadius: '8px', fontSize: '0.8rem', fontWeight: 800 }
         }, cardToEdit?.status === 'closed' ? '마감 해제' : '마감')

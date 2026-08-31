@@ -778,10 +778,13 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
     if (!onSaveTags || !confirmDeleteTag || isDeletingTag) return;
     setIsDeletingTag(true);
     try {
-      await onSaveTags(tagTokens.filter(t => t !== confirmDeleteTag).join(' '));
+      const saved = await onSaveTags(tagTokens.filter(t => t !== confirmDeleteTag).join(' '));
+      if (saved !== false) setConfirmDeleteTag(null);
+    } catch (err) {
+      console.error('Lightbox tag delete failed:', err);
+      if (typeof showToast === 'function') showToast('태그 삭제 실패', 'error');
     } finally {
       setIsDeletingTag(false);
-      setConfirmDeleteTag(null);
     }
   };
   const labelStyle = { opacity: 0.7, flexShrink: 0, minWidth: '52px' };

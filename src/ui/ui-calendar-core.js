@@ -2057,23 +2057,30 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
   const [commentParticipantId, setCommentParticipantId] = React.useState(() => getStoredChatParticipantId(calendar?.id, calendar));
   const [isCommentPartOpen, setIsCommentPartOpen] = React.useState(false);
   const [editingCommentId, setEditingCommentId] = React.useState(null);
+  const [isSavingComment, setIsSavingComment] = React.useState(false);
   const commentPart = (calendar?.participants || []).find(p => p.id === commentParticipantId);
 
-  const handleSaveComment = (e) => {
+  const handleSaveComment = async (e) => {
     e.stopPropagation();
     const text = commentText.trim();
-    if (!text || !commentParticipantId) return;
+    if (!text || !commentParticipantId || isSavingComment) return;
     const now = Date.now();
     const wasEditing = !!editingCommentId;
     const nextComments = editingCommentId
       ? comments.map(c => c.id === editingCommentId ? { ...c, text, participantId: commentParticipantId, updatedAt: now } : c)
       : [...comments, { id: `cmt_${now}_${Math.random().toString(36).slice(2, 8)}`, participantId: commentParticipantId, text, createdAt: now }];
-    onCommentsChange(nextComments);
-    setCommentText('');
-    setEditingCommentId(null);
-    setIsCommentComposerOpen(false);
-    if (typeof showToast === 'function') {
-      showToast(wasEditing ? '댓글이 수정되었습니다' : '댓글이 등록되었습니다', 'success');
+    setIsSavingComment(true);
+    try {
+      const saved = await Promise.resolve(onCommentsChange(nextComments));
+      if (saved === false) return;
+      setCommentText('');
+      setEditingCommentId(null);
+      setIsCommentComposerOpen(false);
+      if (typeof showToast === 'function') {
+        showToast(wasEditing ? '댓글이 수정되었습니다' : '댓글이 등록되었습니다', 'success');
+      }
+    } finally {
+      setIsSavingComment(false);
     }
   };
 
@@ -2096,18 +2103,19 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     const message = snippet
       ? `${authorName}님의 '${snippet}' 댓글을 삭제하시겠습니까?`
       : `${authorName}님의 댓글을 삭제하시겠습니까?`;
-    const doDelete = () => {
+    const doDelete = async () => {
       const previousComments = comments.slice();
-      onCommentsChange(previousComments.filter(c => c.id !== commentId));
+      const saved = await Promise.resolve(onCommentsChange(previousComments.filter(c => c.id !== commentId)));
+      if (saved === false) return;
       if (editingCommentId === commentId) {
         setEditingCommentId(null);
         setCommentText('');
         setIsCommentComposerOpen(false);
       }
       if (typeof showToast === 'function') {
-        showToast('댓글이 삭제되었습니다', 'delete', 5000, () => {
-          onCommentsChange(previousComments);
-          if (typeof showToast === 'function') showToast('댓글 삭제를 되돌렸습니다', 'success', 3000);
+        showToast('댓글이 삭제되었습니다', 'delete', 5000, async () => {
+          const restored = await Promise.resolve(onCommentsChange(previousComments));
+          if (restored !== false && typeof showToast === 'function') showToast('댓글 삭제를 되돌렸습니다', 'success', 3000);
         });
       }
     };
@@ -2464,13 +2472,13 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: handleSaveComment,
-        disabled: !commentText.trim() || !commentParticipantId,
+        disabled: !commentText.trim() || !commentParticipantId || isSavingComment,
         style: {
           flexShrink: 0, height: '30px', padding: '0 12px', borderRadius: '6px', border: 'none',
           backgroundColor: 'var(--accent-primary)', color: '#FFFFFF', fontSize: '0.78rem', fontWeight: 'bold',
-          cursor: 'pointer', opacity: (commentText.trim() && commentParticipantId) ? 1 : 0.5
+          cursor: isSavingComment ? 'wait' : 'pointer', opacity: (commentText.trim() && commentParticipantId && !isSavingComment) ? 1 : 0.5
         }
-      }, "저장")
+      }, isSavingComment ? "저장 중…" : "저장")
     ),
 
     isCommentPartOpen && /*#__PURE__*/React.createElement(ChatParticipantSheet, {
@@ -3054,8 +3062,8 @@ export function EditMessageModal({
     if ((!text.trim() && images.length === 0) || isSubmitting) return;
     setIsSubmitting(true);
     try {
-      await onSave(text.trim(), images, participantId);
-      onClose();
+      const saved = await onSave(text.trim(), images, participantId);
+      if (saved !== false) onClose();
     } catch (err) {
       console.error('EditMessageModal save error:', err);
     } finally {

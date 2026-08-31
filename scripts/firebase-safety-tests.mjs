@@ -178,6 +178,10 @@ assert(!deletedPlaceProbe.places.some(place => place.id === 'place_delete'), 'ex
 // <script> -- see check-tab-wiring.mjs for the rationale).
 const script = fs.readFileSync('assets/app-main.js', 'utf8');
 const sourceScript = fs.readFileSync('src/core/app-main.js', 'utf8');
+const editMessageSaveSource = sourceScript.slice(
+  sourceScript.indexOf('const handleSaveEditMessage'),
+  sourceScript.indexOf('const handlePromoteInlineChatImage')
+);
 const memoScript = fs.readFileSync('src/ui/ui-memo-view.js', 'utf8');
 const eventModalScript = fs.readFileSync('src/ui/ui-event-modals.js', 'utf8');
 const dateModalScript = fs.readFileSync('src/ui/ui-date-modal.js', 'utf8');
@@ -259,6 +263,17 @@ assert(dateModalScript.includes("const EXPENSE_PAYER_UNSELECTED = '__expense_pay
 assert(/expensePayerInput === EXPENSE_PAYER_FUND \? '' : expensePayerInput/.test(dateModalScript), 'the shared-fund UI choice must persist using the legacy empty payerId representation');
 assert(dateModalScript.includes("expense.payerId || EXPENSE_PAYER_FUND"), 'editing legacy expenses without payerId must preserve their shared-fund meaning');
 assert(eventModalScript.includes('추가 정산 조정 (예외)') && eventModalScript.includes('여기에 다시 입력하지 않습니다.'), 'manual settlement adjustments must warn against duplicating auto-linked personal advances');
+assert(/const saved = await onSave\(text\.trim\(\), images, participantId\);[\s\S]{0,80}saved !== false/.test(calendarCoreScript), 'message edit modal must remain open when persistence reports failure');
+assert(editMessageSaveSource.includes('return saved;') && !/finally \{\s*setEditingMessage\(null\)/.test(editMessageSaveSource), 'message edit persistence must return its result without closing the editor on failure');
+assert(/Failed to update tags in Firestore:[\s\S]{0,220}return;[\s\S]{0,120}setEditTags\(nextTags\)/.test(memoScript), 'failed memo tag additions must not overwrite the rollback state');
+assert(/Failed to delete tag in Firestore:[\s\S]{0,220}return;[\s\S]{0,120}setEditTags\(nextTags\)/.test(memoScript), 'failed memo tag deletions must not overwrite the rollback state');
+assert(/Lightbox tag delete failed:[\s\S]{0,180}finally[\s\S]{0,100}setIsDeletingTag\(false\)/.test(fs.readFileSync('src/ui/ui-lightbox.js', 'utf8')), 'failed lightbox tag deletion must retain the confirmation state for retry');
+assert(/const saved = await Promise\.resolve\(onCommentsChange\(nextComments\)\);[\s\S]{0,80}saved === false/.test(calendarCoreScript), 'memo comment editor must wait for persistence before clearing its input');
+assert(/const handleMemoCommentsChange[\s\S]{0,700}return true;[\s\S]{0,500}return false;/.test(memoScript), 'memo comment persistence must report success and failure to the editor');
+assert(/onDeleteCard: handleDeleteSettlementCard[\s\S]{0,120}onToggleStatus: handleToggleSettlementCardStatus[\s\S]{0,120}onSave: handleSaveSettlementCard/.test(sourceScript), 'settlement edit callbacks must return the underlying persistence promises');
+assert(/const deleted = await Promise\.resolve\(onDeleteCard\(cardToEdit\.id\)\);[\s\S]{0,100}deleted !== false/.test(eventModalScript), 'settlement deletion must not close the editor before persistence succeeds');
+assert(/const changed = await Promise\.resolve\(onToggleStatus\(cardToEdit\.id\)\);[\s\S]{0,100}changed !== false/.test(eventModalScript), 'settlement status changes must not close the editor before persistence succeeds');
+assert(/const deleted = await Promise\.resolve\(onDelete\(editingPlace\.id\)\);[\s\S]{0,80}deleted !== false/.test(fs.readFileSync('src/ui/ui-place-register.js', 'utf8')), 'place deletion must await persistence before closing the editor');
 assert(firebaseDataScript.includes("const addDocumentId = method === 'add'") && firebaseDataScript.includes('colRef.doc(addDocumentId).set'), 'collection adds must share one id across SDK and REST retries');
 assert(/const restMethod = method === 'add' \? 'set' : method/.test(firebaseDataScript), 'collection add REST fallback must use the shared document id');
 assert(/const updateCalendars = async[\s\S]{0,420}if \(isSavingRef\.current\) return false/.test(sourceScript), 'calendar saves must reject duplicate in-flight submissions');

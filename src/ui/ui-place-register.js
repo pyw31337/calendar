@@ -997,9 +997,17 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
   const handleDeleteClick = () => {
     if (!editingPlace) return;
     if (typeof onRequestConfirm === 'function') {
-      onRequestConfirm('장소 삭제', `"${editingPlace.name || '이 장소'}"를 삭제하시겠습니까?`, () => {
-        onDelete(editingPlace.id);
-        onClose();
+      onRequestConfirm('장소 삭제', `"${editingPlace.name || '이 장소'}"를 삭제하시겠습니까?`, async () => {
+        setSaving(true);
+        try {
+          const deleted = await Promise.resolve(onDelete(editingPlace.id));
+          if (deleted !== false) onClose();
+        } catch (err) {
+          console.error('[PlaceRegisterModal] Delete failed:', err);
+          showToast('장소 삭제 중 오류가 발생했습니다.', 'error');
+        } finally {
+          setSaving(false);
+        }
       });
     }
   };
