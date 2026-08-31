@@ -784,7 +784,7 @@ export function ChatParticipantSheet({ calendar, selectedId, onSelect, onClose }
       /*#__PURE__*/React.createElement("div", {
         className: "poll-voter-sheet-header"
       },
-        /*#__PURE__*/React.createElement("span", null, "참여자 선택"),
+        /*#__PURE__*/React.createElement("span", null, "작성자 선택"),
         /*#__PURE__*/React.createElement("button", {
           type: "button",
           onClick: onClose,
