@@ -918,17 +918,14 @@ export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalG
   const [lightbox, setLightbox] = React.useState(null);
   const brokenPhotoKeysRef = React.useRef((GATHER_APP_UTILS.getPersistentBrokenPhotoUrls || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.getPersistentBrokenPhotoUrls) || (() => new Set()))());
   const brokenPhotoUrlsRef = React.useRef((GATHER_APP_UTILS.getPersistentBrokenPhotoUrls || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.getPersistentBrokenPhotoUrls) || (() => new Set()))());
-  const [brokenPhotoRevision, setBrokenPhotoRevision] = React.useState(0);
+  // Keep a revision bump so a failed image can still be recorded for diagnostics, but do not
+  // remove the entry from the home-page grid.  MediaThumb already tries the full-size fallback;
+  // filtering a failed thumbnail here caused the grid to shrink below its fixed 12-item rule.
+  const [, setBrokenPhotoRevision] = React.useState(0);
   const normalizeBrokenPhotoUrl = value => {
     const url = String(value || '').trim();
     if (!url) return '';
     return url.split(/[?#]/)[0];
-  };
-  const isBrokenPhotoValue = value => {
-    const url = normalizeBrokenPhotoUrl(value);
-    if (!url) return false;
-    const persistent = (GATHER_APP_UTILS.getPersistentBrokenPhotoUrls || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.getPersistentBrokenPhotoUrls) || (() => new Set()))();
-    return brokenPhotoUrlsRef.current.has(url) || persistent.has(url);
   };
   const saveBrokenUrl = urlOrKey => {
     const saveFn = GATHER_APP_UTILS.savePersistentBrokenPhotoUrl || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.savePersistentBrokenPhotoUrl);
@@ -1037,11 +1034,9 @@ export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalG
     });
     return Array.from(byUrl.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
   }, [chatMessages, memos, calendar]);
-  const visibleEntries = React.useMemo(() => photoEntries.filter(entry => {
-    const key = entry.mediaKey || entry.refKey || entry.full || entry.thumb;
-    if (key && brokenPhotoKeysRef.current.has(key)) return false;
-    return !isBrokenPhotoValue(entry.full) && !isBrokenPhotoValue(entry.thumb);
-  }), [photoEntries, brokenPhotoRevision]);
+  const visibleEntries = React.useMemo(() => photoEntries.filter(entry => (
+    (entry && entry.thumb && String(entry.thumb)) || (entry && entry.full && String(entry.full))
+  )), [photoEntries]);
 
   const handleBrokenPhoto = (photo, brokenInfo = {}) => {
     markBrokenPhoto(photo, brokenInfo);
