@@ -82,6 +82,29 @@ assert(fieldScopedSettingsProbe.pinnedNotices[0]?.id === 'notice_new', 'title sa
 assert(fieldScopedSettingsProbe.settlementCards[0]?.title === '최신 정산', 'title save regressed unrelated settlement cards');
 assert(fieldScopedSettingsProbe.confirmedMeeting[0]?.expenses?.[0]?.amount === 135000, 'title save regressed unrelated meeting settlement data');
 
+const concurrentPlacesProbe = mergeCalendarSettingsDelta({
+  ...settingsServerProbe,
+  places: [
+    { id: 'place_a', name: 'A 최신', updatedAt: 500 },
+    { id: 'place_b', name: 'B 기존', updatedAt: 100 }
+  ]
+}, {
+  ...staleSettingsProbe,
+  places: [
+    { id: 'place_a', name: 'A 오래됨', updatedAt: 200 },
+    { id: 'place_b', name: 'B 수정', updatedAt: 600 }
+  ]
+}, ['places']);
+assert(concurrentPlacesProbe.places.find(place => place.id === 'place_a')?.name === 'A 최신', 'concurrent place save regressed another place');
+assert(concurrentPlacesProbe.places.find(place => place.id === 'place_b')?.name === 'B 수정', 'concurrent place save did not apply the edited place');
+const deletedPlaceProbe = mergeCalendarSettingsDelta(
+  { ...settingsServerProbe, places: [{ id: 'place_delete', name: '삭제 대상', updatedAt: 500 }] },
+  { ...staleSettingsProbe, places: [] },
+  ['places'],
+  ['place_delete']
+);
+assert(!deletedPlaceProbe.places.some(place => place.id === 'place_delete'), 'explicit place deletion was resurrected during merge');
+
 // The app's main logic lives in assets/app-main.js (externalized from index.html's inline
 // <script> -- see check-tab-wiring.mjs for the rationale).
 const script = fs.readFileSync('assets/app-main.js', 'utf8');
@@ -103,6 +126,10 @@ const writeQueueScript = fs.readFileSync('src/core/app-write-queue.js', 'utf8');
 const mediaOutboxScript = fs.readFileSync('src/core/app-media-outbox.js', 'utf8');
 const firestoreRules = fs.existsSync('firestore.rules') ? fs.readFileSync('firestore.rules', 'utf8') : '';
 assert(script, 'assets/app-main.js not found');
+const unsafeSendGuardFiles = fs.readdirSync('src/ui')
+  .filter(file => file.endsWith('.js'))
+  .filter(file => /function useChatSendGuard[\s\S]{0,500}Promise\.resolve\(onSend && onSend/.test(fs.readFileSync(`src/ui/${file}`, 'utf8')));
+assert(unsafeSendGuardFiles.length === 0, `chat send guard must catch synchronous throws before Promise wrapping: ${unsafeSendGuardFiles.join(', ')}`);
 assert(writeQueueScript.includes("indexedDB.open(DB_NAME, DB_VERSION)") && writeQueueScript.includes("const DB_NAME = 'gather-calendar-write-queue'"), 'write queue must use a versioned IndexedDB store');
 assert(writeQueueScript.includes("const LOCK_STORE_NAME = 'locks'") && writeQueueScript.includes('acquireFlushLease') && writeQueueScript.includes('renewFlushLease') && writeQueueScript.includes('releaseFlushLease'), 'write queue flush must use and renew an IndexedDB cross-tab lease');
 assert(writeQueueScript.includes('MAX_PENDING_OPERATIONS = 100'), 'write queue must have a bounded pending operation limit');
@@ -134,6 +161,7 @@ assert(/writeAdminCollection\('messages', calId, mToDelete\.id, null, 'delete', 
 assert(/activity log delete timeout/.test(firebaseDataScript) && /return \{ attempted:/.test(firebaseDataScript), 'PITR activity-log deletes must be bounded and report failures');
 assert(/FIRESTORE_WRITE_DEADLINE_MS = 7000/.test(firebaseDataScript) && /remainingWriteTime/.test(firebaseDataScript) && /attemptTimeout/.test(firebaseDataScript), 'collection writes must use one bounded SDK+REST deadline');
 assert(/role: 'status'/.test(sharedScript) && /pointerEvents: 'none'/.test(sharedScript) && !/position: 'fixed', inset: 0, backgroundColor: 'rgba\(15,23,42,0\.48\)'/.test(sharedScript), 'save progress must not block the entire application');
+assert(/onKeyDown: handlePlayKeyDown/.test(sharedScript) && /role: "button"/.test(sharedScript) && /tabIndex: 0/.test(sharedScript) && /"aria-label": playLabel/.test(sharedScript), 'video play facade must support keyboard and assistive technology activation');
 assert((overlaysScript.match(/role: 'status'/g) || []).length >= 2 && (overlaysScript.match(/pointerEvents: 'none'/g) || []).length >= 2 && !/position: 'fixed', inset: 0, backgroundColor: 'rgba\(15,23,42,0\.45\)'/.test(overlaysScript), 'image progress overlays must not block the entire application');
 assert(/async function writeConfirmedMeetingsToFirestore[\s\S]{0,1800}if \(res\.ok\) return true;[\s\S]{0,700}if \(firebaseDb\)/.test(firebaseDataScript), 'confirmed meeting writes must fall back to SDK after a REST failure');
 assert(/writeConfirmedMeetingsToFirestore[\s\S]{0,2600}validDates[\s\S]{0,700}writes\.push\(\{ delete: documentName \}\)/.test(firebaseDataScript), 'confirmed meeting writes must remove stale subcollection documents');

@@ -34,7 +34,17 @@ function useChatSendGuard(onSend, canSend = true) {
     const isAllowed = typeof canSend === 'function' ? canSend(...args) : Boolean(canSend);
     if (!isAllowed || lockRef.current) return;
     lockRef.current = true;
-    Promise.resolve(onSend && onSend(...args)).finally(() => {
+    let result;
+    try {
+      result = onSend && onSend(...args);
+    } catch (error) {
+      setTimeout(() => { lockRef.current = false; }, 250);
+      console.error('chat send failed:', error);
+      return;
+    }
+    Promise.resolve(result).catch(error => {
+      console.error('chat send failed:', error);
+    }).finally(() => {
       setTimeout(() => {
         lockRef.current = false;
       }, 250);

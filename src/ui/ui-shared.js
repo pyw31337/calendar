@@ -32,7 +32,17 @@ function useChatSendGuard(onSend, canSend = true) {
     const isAllowed = typeof canSend === 'function' ? canSend(...args) : Boolean(canSend);
     if (!isAllowed || lockRef.current) return;
     lockRef.current = true;
-    Promise.resolve(onSend && onSend(...args)).finally(() => {
+    let result;
+    try {
+      result = onSend && onSend(...args);
+    } catch (error) {
+      setTimeout(() => { lockRef.current = false; }, 250);
+      console.error('chat send failed:', error);
+      return;
+    }
+    Promise.resolve(result).catch(error => {
+      console.error('chat send failed:', error);
+    }).finally(() => {
       setTimeout(() => {
         lockRef.current = false;
       }, 250);
@@ -1966,9 +1976,18 @@ export function ClickToPlayVideoCard({ url, mediaInfo = null, fallbackTitle = ''
       setIsPlaying(true);
     }
   };
+  const handlePlayKeyDown = e => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    handlePlayClick(e);
+  };
+  const playLabel = isTikTok ? 'TikTok에서 영상 보기' : `${title} 재생`;
 
   return /*#__PURE__*/React.createElement("div", {
     onClick: handlePlayClick,
+    onKeyDown: handlePlayKeyDown,
+    role: "button",
+    tabIndex: 0,
+    "aria-label": playLabel,
     title: isTikTok ? 'TikTok에서 영상 보기 (새 탭에서 바로 재생)' : `${title} 재생`,
     style: {
       position: 'relative',

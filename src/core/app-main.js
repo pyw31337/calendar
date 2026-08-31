@@ -5104,7 +5104,11 @@ function CalendarApp() {
     };
     const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
     setPlacesSubcollection(nextPlaces);
-    const ok = await updateCalendars(nextCalendars, null, null, updatedCal.id, 'settings', placeActivityLog ? [placeActivityLog] : [], { places: nextPlaces, settingsFields: ['places'] });
+    const ok = await updateCalendars(nextCalendars, null, null, updatedCal.id, 'settings', placeActivityLog ? [placeActivityLog] : [], {
+      places: nextPlaces,
+      settingsFields: ['places'],
+      deletedPlaceIds: [placeId]
+    });
     if (ok) {
       showUndoableDeleteToast('장소가 삭제되었습니다.', async () => {
         try {

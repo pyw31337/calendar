@@ -636,6 +636,28 @@ function mergeSettlementCards(serverList = [], incomingList = []) {
   return Array.from(byId.values());
 }
 
+function mergePlaces(serverList = [], incomingList = [], deletedPlaceIds = []) {
+  const byId = new Map();
+  (Array.isArray(serverList) ? serverList : []).forEach(place => {
+    if (place?.id) byId.set(place.id, place);
+  });
+  (Array.isArray(incomingList) ? incomingList : []).forEach(place => {
+    if (!place?.id) return;
+    const existing = byId.get(place.id);
+    if (!existing) {
+      byId.set(place.id, place);
+      return;
+    }
+    const existingStamp = Number(existing.updatedAt || existing.createdAt || 0) || 0;
+    const incomingStamp = Number(place.updatedAt || place.createdAt || 0) || 0;
+    byId.set(place.id, incomingStamp >= existingStamp ? place : existing);
+  });
+  (Array.isArray(deletedPlaceIds) ? deletedPlaceIds : []).forEach(id => {
+    if (id) byId.delete(String(id));
+  });
+  return Array.from(byId.values());
+}
+
 const CALENDAR_SETTINGS_FIELDS = new Set([
   'title',
   'description',
@@ -659,7 +681,7 @@ function normalizeSettingsFields(settingsFields) {
     .filter(field => CALENDAR_SETTINGS_FIELDS.has(field)));
 }
 
-function mergeCalendarSettingsDelta(serverCalendar, incomingCalendar, settingsFields = []) {
+function mergeCalendarSettingsDelta(serverCalendar, incomingCalendar, settingsFields = [], deletedPlaceIds = []) {
   const server = cloneCalendar(serverCalendar) || {};
   const incoming = cloneCalendar(incomingCalendar) || {};
   if (server.id && incoming.id && server.id !== incoming.id) {
@@ -703,7 +725,9 @@ function mergeCalendarSettingsDelta(serverCalendar, incomingCalendar, settingsFi
     settlementCards: intendedFields.has('settlementCards')
       ? mergeSettlementCards(server.settlementCards || [], incoming.settlementCards || [])
       : (server.settlementCards || []),
-    places: intendedFields.has('places') && incoming.places !== undefined ? incoming.places : server.places,
+    places: intendedFields.has('places')
+      ? mergePlaces(server.places || [], incoming.places || [], deletedPlaceIds)
+      : server.places,
     updatedAt: Math.max(Number(server.updatedAt || 0) || 0, Number(incoming.updatedAt || 0) || 0),
     revision: Math.max(Number(server.revision || 0) || 0, Number(incoming.revision || 0) || 0)
   };
@@ -2397,7 +2421,7 @@ async function pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode,
         err.nonRetryable = true;
         throw err;
       } else if (saveMode === 'settings') {
-        nextCalendar = mergeCalendarSettingsDelta(serverCalendar, normalizedCal, auxiliaryData?.settingsFields);
+        nextCalendar = mergeCalendarSettingsDelta(serverCalendar, normalizedCal, auxiliaryData?.settingsFields, auxiliaryData?.deletedPlaceIds);
       } else if (saveMode === 'polls') {
         nextCalendar = mergeCalendarPollsDelta(serverCalendar, normalizedCal, lastModified);
       } else {
@@ -2436,6 +2460,8 @@ async function pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode,
           ...(Array.isArray(auxiliaryData?.places) ? auxiliaryData.places : []),
           ...(Array.isArray(mergedCalendar?.places) ? mergedCalendar.places : [])]
           .forEach(p => { if (p?.id) legacyPlacesById.set(p.id, p); });
+        (Array.isArray(auxiliaryData?.deletedPlaceIds) ? auxiliaryData.deletedPlaceIds : [])
+          .forEach(id => legacyPlacesById.delete(String(id)));
         legacyPlaces = Array.from(legacyPlacesById.values());
         // Build legacyConfirmedMeetings with mergedCalendar.confirmedMeeting as the
         // highest-priority source for the same reason — ensures newly added or edited
@@ -2559,7 +2585,7 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 4, 
 	          } else if (saveMode === 'replace') {
 	            throw new Error(`Refusing to replace existing calendar ${normalizedCal.id}`);
 	          } else if (saveMode === 'settings') {
-	            nextCalendar = mergeCalendarSettingsDelta(serverCalendar, normalizedCal, auxiliaryData?.settingsFields);
+	            nextCalendar = mergeCalendarSettingsDelta(serverCalendar, normalizedCal, auxiliaryData?.settingsFields, auxiliaryData?.deletedPlaceIds);
 	          } else if (saveMode === 'polls') {
 	            nextCalendar = mergeCalendarPollsDelta(serverCalendar, normalizedCal, lastModified);
 	          } else {
@@ -2594,6 +2620,8 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 4, 
               ...(Array.isArray(auxiliaryData?.places) ? auxiliaryData.places : []),
               ...(Array.isArray(mergedCalendar?.places) ? mergedCalendar.places : [])]
 	              .forEach(p => { if (p?.id) legacyPlacesById.set(p.id, p); });
+	            (Array.isArray(auxiliaryData?.deletedPlaceIds) ? auxiliaryData.deletedPlaceIds : [])
+	              .forEach(id => legacyPlacesById.delete(String(id)));
 	            legacyPlaces = Array.from(legacyPlacesById.values());
 	            // Build legacyConfirmedMeetings with mergedCalendar.confirmedMeeting as the
 	            // highest-priority source for the same reason — ensures newly added or edited

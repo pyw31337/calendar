@@ -88,6 +88,17 @@ function isIgnorableConsoleError(text, url = '') {
     'has been rejected because it is in a cross-site context', 'inline-speculation-rules']
     .some(marker => text.includes(marker));
 }
+function collectSameOriginAsset404(response, baseUrl, bucket) {
+  if (response.status() !== 404) return;
+  const resourceType = response.request().resourceType();
+  if (!['document', 'script', 'stylesheet', 'image', 'font', 'manifest'].includes(resourceType)) return;
+  try {
+    if (new URL(response.url()).origin !== new URL(baseUrl).origin) return;
+  } catch (_) {
+    return;
+  }
+  bucket.push(`${resourceType}: ${response.url()}`);
+}
 function mobileContextOptions(extra = {}) {
   return { viewport: { width: 390, height: 844 }, hasTouch: true,
     ...(BROWSER_NAME === 'firefox' ? {} : { isMobile: true }), ...extra };
@@ -132,6 +143,7 @@ async function checkPage(browser, baseUrl, viewport, calId, view) {
   const consoleErrors = [];
   const pageErrors = [];
   const failedRequests = [];
+  const asset404s = [];
   page.on('console', msg => { if (msg.type() === 'error') { const loc = msg.location(); if (!isIgnorableConsoleError(msg.text(), loc?.url || '')) consoleErrors.push(`${msg.text()}${loc?.url ? ` @${loc.url}:${loc.lineNumber || 0}` : ''}`); } });
   page.on('pageerror', err => {
     if (BROWSER_NAME === 'webkit' && /firestore\.googleapis\.com\/(?:google\.firestore\.v1\.Firestore\/(?:Listen|Write)\/channel|google\.firestore\.v1\.Firestore\/channel).*due to access control checks/i.test(err.message)) {
@@ -141,6 +153,7 @@ async function checkPage(browser, baseUrl, viewport, calId, view) {
     pageErrors.push(err.message);
   });
   page.on('requestfailed', request => failedRequests.push(`${request.url()} (${request.failure()?.errorText || 'failed'})`));
+  page.on('response', response => collectSameOriginAsset404(response, baseUrl, asset404s));
 
   const url = `${baseUrl}?id=${calId}${view.suffix}`;
   let bootError = null;
@@ -167,8 +180,9 @@ async function checkPage(browser, baseUrl, viewport, calId, view) {
 
   if (consoleErrors.length) fail(label, `콘솔 에러 ${consoleErrors.length}건: ${consoleErrors.slice(0, 2).join(' | ')}${failedRequests.length ? `; 요청 실패: ${failedRequests.filter(item => item.includes('ERR_INVALID_URL')).slice(0, 2).join(' | ') || failedRequests.slice(0, 2).join(' | ')}` : ''}`);
   if (pageErrors.length) fail(label, `처리되지 않은 JS 예외 ${pageErrors.length}건: ${pageErrors.slice(0, 2).join(' | ')}`);
+  if (asset404s.length) fail(label, `동일 출처 리소스 404 ${asset404s.length}건: ${asset404s.slice(0, 2).join(' | ')}`);
 
-  if (!consoleErrors.length && !pageErrors.length && overflow <= 2) pass(label);
+  if (!consoleErrors.length && !pageErrors.length && !asset404s.length && overflow <= 2) pass(label);
   await context.close();
 }
 
@@ -362,6 +376,7 @@ async function checkSideMenuNavigation(browser, baseUrl) {
         const consoleErrors = [];
         const pageErrors = [];
         const failedRequests = [];
+        const asset404s = [];
         page.on('console', msg => {
           if (msg.type() === 'error') {
             const loc = msg.location();
@@ -377,6 +392,7 @@ async function checkSideMenuNavigation(browser, baseUrl) {
           pageErrors.push(err.message);
         });
         page.on('requestfailed', request => failedRequests.push(`${request.url()} (${request.failure()?.errorText || 'failed'})`));
+        page.on('response', response => collectSameOriginAsset404(response, baseUrl, asset404s));
         try {
           await gotoBootReady(page, `${baseUrl}?id=${calId}${suffix}`);
           const menuButton = page.locator('button[aria-label$="메뉴 열기"]:visible, button[aria-label="메뉴"]:visible').first();
@@ -391,9 +407,9 @@ async function checkSideMenuNavigation(browser, baseUrl) {
           for (const destination of destinations) {
             await menu.locator('button.admin-side-menu-item').filter({ hasText: destination }).first().waitFor({ state: 'visible', timeout: 5000 });
           }
-          if (consoleErrors.length || pageErrors.length) {
+          if (consoleErrors.length || pageErrors.length || asset404s.length) {
             const details = [...consoleErrors, ...pageErrors].slice(0, 2).join(' | ');
-            fail(`${label}: ${sourceLabel}`, `메뉴 확인 후 콘솔/페이지 오류 ${consoleErrors.length + pageErrors.length}건: ${details}${failedRequests.length ? `; 요청 실패: ${failedRequests.filter(item => item.includes('ERR_INVALID_URL')).slice(0, 2).join(' | ') || failedRequests.slice(0, 2).join(' | ')}` : ''}`);
+            fail(`${label}: ${sourceLabel}`, `메뉴 확인 후 콘솔/페이지 오류 ${consoleErrors.length + pageErrors.length}건: ${details}${asset404s.length ? `; 동일 출처 리소스 404: ${asset404s.slice(0, 2).join(' | ')}` : ''}${failedRequests.length ? `; 요청 실패: ${failedRequests.filter(item => item.includes('ERR_INVALID_URL')).slice(0, 2).join(' | ') || failedRequests.slice(0, 2).join(' | ')}` : ''}`);
           } else {
             pass(`${label}: ${sourceLabel}`);
           }
