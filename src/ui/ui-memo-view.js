@@ -1728,9 +1728,8 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
             /*#__PURE__*/React.createElement("div", {
               style: { display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }
             },
-              /* Participant selection capsule button sits to the left of the tag input row
-                 (shared with the memo edit modal + chat edit modal) -- restored here after an
-                 unrelated refactor moved it down into its own actions row. */
+              /* Shared participant-select pill (ui-widgets.js) sits to the left of the tag
+                 input row. */
               /*#__PURE__*/React.createElement(ParticipantPickerButton, {
                 participant: composerPart,
                 onClick: () => setIsComposerPartOpen(true)
@@ -1770,8 +1769,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
               }, "저장")
             ),
 
-            /* Actions Row: swatches completely removed; the participant button now lives inline
-               with the tag input above -- see the restored layout there */
+            /* Actions Row */
             /*#__PURE__*/React.createElement("div", {
               style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '6px', gap: '8px', flexWrap: 'wrap' }
             },
@@ -2105,9 +2103,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         /*#__PURE__*/React.createElement("div", {
           style: { display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }
         },
-          /* Participant selection capsule button sits to the left of the tag input row (shared
-             with the new-memo composer + chat edit modal) -- restored here after an unrelated
-             refactor moved it down into its own footer row. */
+          /* Shared participant-select pill (ui-widgets.js) sits to the left of the tag input row. */
           /*#__PURE__*/React.createElement(ParticipantPickerButton, {
             participant: editPart,
             onClick: () => setIsEditPartOpen(true)
@@ -2147,8 +2143,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           }, "저장")
         )),
 
-        /* Footer Controls: Tag Badges row (Swatches dot menu removed completely; the participant
-           button now lives inline with the tag input above -- see the restored layout there) */
+        /* Footer Controls: Tag Badges row */
         /*#__PURE__*/React.createElement("div", {
           className: "memo-edit-modal-footer",
           style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px', gap: '8px', flexWrap: 'wrap' }

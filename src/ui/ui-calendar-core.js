@@ -1455,6 +1455,7 @@ export function CommentsSection({
   const Lightbox = __comp.Lightbox || __deps.Lightbox;
   const SectionToggleButton = __comp.SectionToggleButton || __deps.SectionToggleButton;
   const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
+  const ParticipantPickerButton = __comp.ParticipantPickerButton || __deps.ParticipantPickerButton;
   const getActiveParticipants = __deps.getActiveParticipants;
   const autoGrowTextarea = __deps.autoGrowTextarea;
 
@@ -1883,29 +1884,12 @@ export function CommentsSection({
         marginTop: '2px'
       }
     },
-      /* Left side: Participant select capsule button */
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: () => setIsChatSheetOpen(true),
-        style: {
-          backgroundColor: selectedParticipant?.color || '#94A3B8',
-          color: '#FFFFFF',
-          border: 'none',
-          borderRadius: 'var(--radius-full)',
-          padding: '6px 14px',
-          fontSize: '0.8rem',
-          fontWeight: 'bold',
-          cursor: 'pointer',
-          whiteSpace: 'nowrap',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          height: '32px',
-          flexShrink: 0
-        }
-      }, selectedParticipant?.name || '선택', /*#__PURE__*/React.createElement("span", {
-        style: { fontSize: '0.6rem' }
-      }, "▼")),
+      /* Left side: Participant select capsule button (shared component -- see ui-widgets.js) */
+      /*#__PURE__*/React.createElement(ParticipantPickerButton, {
+        participant: selectedParticipant,
+        placeholder: "선택",
+        onClick: () => setIsChatSheetOpen(true)
+      }),
 
       /* Right side: Camera button & Send button */
       /*#__PURE__*/React.createElement("div", {
