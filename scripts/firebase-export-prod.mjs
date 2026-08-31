@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import crypto from 'node:crypto';
 
 const PROJECT_ID = 'metro-live-2918e';
 const DATABASE = '(default)';
@@ -126,9 +127,12 @@ if (options.stdout) {
   await fs.mkdir(outDir, { recursive: true });
   const outFile = path.join(outDir, `calendar-prod-backup-${timestampForFile()}.json`);
   await fs.writeFile(outFile, json, 'utf8');
+  const checksum = crypto.createHash('sha256').update(json).digest('hex');
+  await fs.writeFile(`${outFile}.sha256`, `${checksum}  ${path.basename(outFile)}\n`, 'utf8');
   console.log(JSON.stringify({
     ok: true,
     output: outFile,
-    calendars: payload.summary
+    calendars: payload.summary,
+    sha256: checksum
   }, null, 2));
 }
