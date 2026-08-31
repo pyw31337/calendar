@@ -14,6 +14,7 @@ dist/
 
 # Local files
 .env
+.env.*
 booking_checker.log
 screenshots/
 screenshots_test/

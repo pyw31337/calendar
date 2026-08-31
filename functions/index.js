@@ -880,24 +880,17 @@ exports.googlePlacesSearchProxy = functions.runWith({ secrets: ['GOOGLE_PLACES_A
 });
 
 // Read-only Korean tourism lookup used to enrich a registered place with nearby
-// attractions, food and lodging.  The service key stays in Secret Manager; the
-// browser receives only normalized, display-safe fields.  If the key is not set,
-// the endpoint returns a structured "not configured" response so the UI can keep
-// working and the integration can be enabled/removed independently later.
-let TOUR_API_SERVICE_KEY = process.env.TOUR_API_SERVICE_KEY || '';
-// Keep the integration deployable before a key is supplied.  Production can use
-// Secret Manager via process.env; the legacy functions config fallback is useful
-// for this optional, removable integration and does not expose the key to clients.
-if (!TOUR_API_SERVICE_KEY) {
-  try { TOUR_API_SERVICE_KEY = functions.config()?.tourapi?.service_key || ''; } catch (_) {}
-}
-
+// attractions, food and lodging. Parameterized config keeps deployment valid even
+// before a key is supplied; the browser receives only normalized display-safe fields.
 exports.tourApiSearchProxy = functions.https.onRequest(async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
   if (req.method !== 'GET') { res.status(405).json({ ok: false, message: 'Method not allowed' }); return; }
-  if (!TOUR_API_SERVICE_KEY) {
+  // Optional integration: the key is read only at request time so deployment
+  // never prompts or fails when TourAPI is intentionally disabled.
+  const tourApiServiceKey = process.env.TOUR_API_SERVICE_KEY || '';
+  if (!tourApiServiceKey) {
     res.status(503).json({ ok: false, code: 'not_configured', message: 'TourAPI service key is not configured' });
     return;
   }
@@ -919,7 +912,7 @@ exports.tourApiSearchProxy = functions.https.onRequest(async (req, res) => {
   }
   try {
     const params = new URLSearchParams({
-      serviceKey: TOUR_API_SERVICE_KEY,
+      serviceKey: tourApiServiceKey,
       MobileOS: 'ETC',
       MobileApp: 'MoyeoraCalendar',
       _type: 'json',
