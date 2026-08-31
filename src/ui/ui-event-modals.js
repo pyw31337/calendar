@@ -3326,22 +3326,19 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     onScroll: handleSettlementScroll,
     style: { flex: '1 1 auto', overflowY: 'auto', padding: '72px 16px 16px', display: 'flex', flexDirection: 'column', gap: '14px' }
   },
-    /* 1. Settlement Cards (Positioned ABOVE metrics grid) */
+    /* 1. Settlement Cards (Positioned ABOVE metrics grid) -- no cards means no section at all,
+       not an empty-state placeholder; the 정산 목록 modal already covers "no settlement cards
+       exist yet" (정산 목록이 없습니다.), so this area only needs to exist when there's something
+       to show. */
     (() => {
       const activeParticipants = settlementParticipants;
       const displayCards = visibleSettlementCards;
+      if (displayCards.length === 0) return null;
 
       return React.createElement("div", {
         style: { display: 'flex', flexDirection: 'column', gap: '10px' }
       },
-        displayCards.length === 0
-          ? React.createElement("div", {
-              style: {
-                padding: '28px 16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.84rem',
-                border: '1px dashed var(--border-subtle)', borderRadius: '18px'
-              }
-            }, "등록된 정산이 없습니다.")
-          : displayCards.map(card => {
+        displayCards.map(card => {
           const isClosed = card.status === 'closed';
           const displayBankName = card.bankName === '기타' && card.otherBankName ? card.otherBankName : card.bankName;
           const displayAccountNumber = isClosed ? maskSettlementAccountNumber(card.accountNumber) : card.accountNumber;
