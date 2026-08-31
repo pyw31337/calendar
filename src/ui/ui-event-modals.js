@@ -2046,6 +2046,16 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
       ctx.lineTo(x2, yy);
       ctx.stroke();
     };
+    const pillPath = (x, yy, w, h) => {
+      const r = h / 2;
+      ctx.beginPath();
+      ctx.moveTo(x + r, yy);
+      ctx.arcTo(x + w, yy, x + w, yy + h, r);
+      ctx.arcTo(x + w, yy + h, x, yy + h, r);
+      ctx.arcTo(x, yy + h, x, yy, r);
+      ctx.arcTo(x, yy, x + w, yy, r);
+      ctx.closePath();
+    };
 
     ctx.fillStyle = '#F5F3FF';
     ctx.fillRect(0, 0, W, H);
@@ -2075,7 +2085,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
     ctx.strokeRect(PAD, y, W - PAD * 2, summaryBoxH);
     ctx.fillStyle = '#64748B';
     ctx.font = '700 14px sans-serif';
-    const summaryLabel = `기준 분담금: 약 ${settlementPerPerson.toLocaleString()}원 (총 지출 ÷ ${Math.max(1, participantRows.length)}명, 반올림 차액은 총무에게 반영)`;
+    const summaryLabel = `기준 분담금: 약 ${settlementPerPerson.toLocaleString()}원 (총 지출 ÷ ${Math.max(1, participantRows.length)}명)`;
     ctx.fillText(fitText(summaryLabel, W - PAD * 2 - 40), PAD + 20, y + 32);
 
     let rowY = y + 56;
@@ -2086,11 +2096,34 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
     } else {
       participantRows.forEach(row => {
         const amount = getIndividualSettlementAmount(row.participantId);
-        const share = Number(settlementRows.find(item => item.name === row.participantId)?.share || 0);
+        const isRefund = amount < 0;
         hLine(PAD + 20, W - PAD - 20, rowY - 22);
         ctx.fillStyle = '#334155';
         ctx.font = '600 15px sans-serif';
-        ctx.fillText(fitText(`${row.participantId}님 분담 몫 ${share.toLocaleString()}원`, 380), PAD + 20, rowY);
+        const nameText = `${row.participantId}님`;
+        ctx.fillText(nameText, PAD + 20, rowY);
+        const nameWidth = ctx.measureText(nameText).width;
+
+        const badgeText = isRefund ? '(환급예정)' : '(입금요청)';
+        ctx.font = '800 12px sans-serif';
+        const badgePadX = 8;
+        const badgeW = ctx.measureText(badgeText).width + badgePadX * 2;
+        const badgeH = 18;
+        const badgeX = PAD + 20 + nameWidth + 8;
+        const badgeY = rowY - badgeH + 4;
+        pillPath(badgeX, badgeY, badgeW, badgeH);
+        if (isRefund) {
+          ctx.strokeStyle = '#16A34A';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          ctx.fillStyle = '#16A34A';
+        } else {
+          ctx.fillStyle = '#DC2626';
+          ctx.fill();
+          ctx.fillStyle = '#FFFFFF';
+        }
+        ctx.fillText(badgeText, badgeX + badgePadX, badgeY + 13);
+
         ctx.fillStyle = amount < 0 ? '#16A34A' : '#DC2626';
         ctx.font = '800 16px sans-serif';
         ctx.textAlign = 'right';
@@ -2630,13 +2663,21 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
         )
       ),
       React.createElement('div', { style: { padding: '12px', borderRadius: '10px', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)' } },
-        React.createElement('div', { style: { fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '8px' } }, `기준 분담금: 약 ${settlementPerPerson.toLocaleString()}원 (총 지출 ÷ ${Math.max(1, participantRows.length)}명, 반올림 차액은 총무에게 반영)`),
+        React.createElement('div', { style: { fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '8px' } }, `기준 분담금: 약 ${settlementPerPerson.toLocaleString()}원 (총 지출 ÷ ${Math.max(1, participantRows.length)}명)`),
         participantRows.length === 0
           ? React.createElement('div', { style: { fontSize: '0.78rem', color: 'var(--text-muted)' } }, '등록된 참여자가 없습니다.')
           : participantRows.map(row => {
             const amount = getIndividualSettlementAmount(row.participantId);
+            const isRefund = amount < 0;
             return React.createElement('div', { key: `preview_${row.id}`, style: { display: 'flex', justifyContent: 'space-between', gap: '8px', padding: '7px 0', borderTop: '1px solid var(--border-subtle)', fontSize: '0.8rem' } },
-              React.createElement('span', null, `${row.participantId}님 분담 몫 ${Number(settlementRows.find(item => item.name === row.participantId)?.share || 0).toLocaleString()}원`),
+              React.createElement('span', { style: { display: 'inline-flex', alignItems: 'center', gap: '6px' } },
+                `${row.participantId}님`,
+                React.createElement('span', {
+                  style: isRefund
+                    ? { display: 'inline-flex', alignItems: 'center', padding: '1px 8px', borderRadius: '999px', border: '1px solid var(--status-green)', color: 'var(--status-green)', fontSize: '0.7rem', fontWeight: 800, whiteSpace: 'nowrap' }
+                    : { display: 'inline-flex', alignItems: 'center', padding: '1px 8px', borderRadius: '999px', backgroundColor: '#DC2626', color: '#FFFFFF', fontSize: '0.7rem', fontWeight: 800, whiteSpace: 'nowrap' }
+                }, isRefund ? '(환급예정)' : '(입금요청)')
+              ),
               React.createElement('strong', { style: { color: amount < 0 ? 'var(--status-green)' : '#DC2626', whiteSpace: 'nowrap' } }, `${amount < 0 ? '환급금 +' : '분담금 -'}${Math.abs(amount).toLocaleString()}원`)
             );
           })
