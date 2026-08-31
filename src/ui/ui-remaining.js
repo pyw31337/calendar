@@ -948,12 +948,26 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
 
   return /*#__PURE__*/React.createElement(React.Fragment, null,
     mediaInfo.type === 'tiktok-widget'
-      ? /*#__PURE__*/React.createElement(TikTokEmbedWidget, {
+      // Same "ancestor has no definite width" problem as the youtube/vimeo iframe box below --
+      // TikTokEmbedWidget's own width:100% resolves to auto against this fit-content bubble, so
+      // its container grows to whatever fixed pixel width TikTok's embed.js injects (its iframe
+      // ignores the parent entirely) instead of ever being capped. Give it the same real,
+      // vw-based starting width + percentage-relative cap the iframe branch uses -- TikTok clips
+      // are always portrait, so sized like the portrait embed case below (min 180px, max 500px).
+      ? /*#__PURE__*/React.createElement('div', {
+        style: {
+          width: 'min(70vw, 325px)',
+          maxWidth: 'min(100%, 500px)',
+          minWidth: '180px',
+          margin: '0 auto',
+          marginBottom
+        }
+      }, /*#__PURE__*/React.createElement(TikTokEmbedWidget, {
         key: mediaInfo.url,
         url: mediaInfo.url,
         videoId: mediaInfo.videoId,
         onFailed: () => setFailed(true)
-      })
+      }))
       : mediaInfo.type === 'image'
       ? /*#__PURE__*/React.createElement('img', {
         src: mediaInfo.url,
