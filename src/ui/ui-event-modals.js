@@ -2676,7 +2676,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
                   style: isRefund
                     ? { display: 'inline-flex', alignItems: 'center', padding: '1px 8px', borderRadius: '999px', border: '1px solid var(--status-green)', color: 'var(--status-green)', fontSize: '0.7rem', fontWeight: 800, whiteSpace: 'nowrap' }
                     : { display: 'inline-flex', alignItems: 'center', padding: '1px 8px', borderRadius: '999px', backgroundColor: '#DC2626', color: '#FFFFFF', fontSize: '0.7rem', fontWeight: 800, whiteSpace: 'nowrap' }
-                }, isRefund ? '(환급예정)' : '(입금요청)')
+                }, isRefund ? '환급예정' : '입금요청')
               ),
               React.createElement('strong', { style: { color: amount < 0 ? 'var(--status-green)' : '#DC2626', whiteSpace: 'nowrap' } }, `${amount < 0 ? '환급금 +' : '분담금 -'}${Math.abs(amount).toLocaleString()}원`)
             );
