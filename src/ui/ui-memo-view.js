@@ -1766,9 +1766,6 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
                 participant: composerPart,
                 onClick: () => setIsComposerPartOpen(true)
               }),
-              /*#__PURE__*/React.createElement("span", {
-                style: { fontSize: '0.74rem', fontWeight: 800, color: 'var(--text-muted)', flexShrink: 0 }
-              }, "태그입력"),
               /*#__PURE__*/React.createElement("input", {
                 type: "text",
                 placeholder: newTags.length >= 10 ? "태그 최대 10개 도달" : `태그 입력 (${newTags.length}/10)`,
@@ -2140,9 +2137,6 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
             participant: editPart,
             onClick: () => setIsEditPartOpen(true)
           }),
-          /*#__PURE__*/React.createElement("span", {
-            style: { fontSize: '0.74rem', fontWeight: 800, color: 'var(--text-muted)', flexShrink: 0 }
-          }, "태그입력"),
           /*#__PURE__*/React.createElement("input", {
             type: "text",
             placeholder: editTags.length >= 10 ? "태그 최대 10개 도달" : `태그 입력 (${editTags.length}/10)`,
