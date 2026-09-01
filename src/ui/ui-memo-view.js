@@ -80,6 +80,67 @@ function withMemoFirestoreTimeout(promise, timeoutMs = 12000) {
   ]);
 }
 
+function parseMemoShareUrl(value) {
+  const text = String(value || '').trim();
+  if (!text) return null;
+  let url;
+  try {
+    url = new URL(text);
+  } catch (_) {
+    return null;
+  }
+
+  // Only accept this app's public share route. This prevents arbitrary URLs
+  // pasted into a memo from becoming a cross-origin data fetch primitive.
+  const allowedHosts = new Set([
+    window.location.host,
+    'pyw31337.github.io'
+  ].filter(Boolean));
+  if (!allowedHosts.has(url.host)) return null;
+
+  const parts = url.pathname.split('/').filter(Boolean);
+  const shareIndex = parts.indexOf('share');
+  if (shareIndex < 0 || parts[shareIndex + 2] !== 'memo' || !parts[shareIndex + 3]) return null;
+  const calendarId = decodeURIComponent(parts[shareIndex + 1] || '');
+  const memoId = decodeURIComponent(parts[shareIndex + 3] || '');
+  const publicCalendarIds = GATHER_APP_CONFIG.PUBLIC_CALENDAR_IDS || [];
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(calendarId) || !/^[A-Za-z0-9_-]{1,128}$/.test(memoId)) return null;
+  if (publicCalendarIds.length > 0 && !publicCalendarIds.includes(calendarId)) return null;
+  return { calendarId, memoId, url: url.toString() };
+}
+
+function getMemoShareUrlFromText(value) {
+  const text = String(value || '').trim();
+  const match = text.match(/https?:\/\/[^\s]+/i);
+  if (!match) return null;
+  const candidate = match[0].replace(/[),.;!?]+$/, '');
+  const parsed = parseMemoShareUrl(candidate);
+  return parsed && text === candidate ? parsed : null;
+}
+
+async function fetchMemoForClone(share) {
+  if (!share) return null;
+  const db = __fb();
+  if (db) {
+    const snapshot = await withMemoFirestoreTimeout(
+      db.collection('calendars').doc(`cal_${share.calendarId}`).collection('memos').doc(share.memoId).get(),
+      9000
+    );
+    return snapshot?.exists ? { id: snapshot.id, ...snapshot.data() } : null;
+  }
+
+  const projectId = window.GATHER_FIREBASE_DEPS?.projectId || '';
+  if (!projectId) return null;
+  const response = await withMemoFirestoreTimeout(fetch(
+    `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/(default)/documents/calendars/cal_${encodeURIComponent(share.calendarId)}/memos/${encodeURIComponent(share.memoId)}`,
+    { cache: 'no-store' }
+  ), 9000);
+  if (!response.ok) return null;
+  const json = await response.json();
+  const decode = window.GATHER_FIREBASE_DEPS?.firestoreDocumentToJs;
+  return { id: share.memoId, ...(typeof decode === 'function' ? decode(json) : {}) };
+}
+
 function getStoredChatParticipantId(...args) {
   const fn = (window.GATHER_APP_NOTIFICATIONS || {}).getStoredChatParticipantId;
   return typeof fn === 'function' ? fn(...args) : '';
@@ -951,16 +1012,37 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   };
 
   const handleSaveMemo = async () => {
-    if (!newTitle.trim() && !newText.trim() && newImages.length === 0) {
-      showToast('제목, 내용, 사진 중 하나 이상 입력해 주세요.', 'error');
-      return;
-    }
-
-    const stamp = Date.now();
-    const memoId = 'memo_' + stamp + '_' + Math.random().toString(36).slice(2, 8);
+    let memoId = null;
     try {
       const calendarId = calendar.id;
-      const tagsArray = newTags.map(t => t.startsWith('#') ? t : '#' + t);
+      const sharedMemoShare = getMemoShareUrlFromText(newText);
+      let sourceMemo = null;
+      if (sharedMemoShare) {
+        showToast('공유 메모를 불러오는 중...', 'info', 12000);
+        sourceMemo = await fetchMemoForClone(sharedMemoShare);
+        if (!sourceMemo) {
+          showToast('공유 메모를 찾지 못했습니다. 링크가 만료되었거나 접근할 수 없습니다.', 'error', 5000);
+          return;
+        }
+      }
+
+      const title = sourceMemo ? String(sourceMemo.title || '') : newTitle.trim();
+      const text = sourceMemo ? String(sourceMemo.text || '') : newText.trim();
+      const sourceTags = sourceMemo
+        ? (Array.isArray(sourceMemo.tags) ? sourceMemo.tags : (sourceMemo.tags ? [sourceMemo.tags] : []))
+        : newTags;
+      const tagsArray = sourceTags
+        .map(tag => String(tag || '').trim())
+        .filter(Boolean)
+        .map(tag => tag.startsWith('#') ? tag : '#' + tag)
+        .slice(0, 10);
+      if (!title && !text && newImages.length === 0) {
+        showToast('복제할 제목이나 내용이 없는 메모입니다.', 'error');
+        return;
+      }
+
+      const stamp = Date.now();
+      memoId = 'memo_' + stamp + '_' + Math.random().toString(36).slice(2, 8);
       const participantId = composerParticipantId || 'anonymous';
       if (typeof navigator !== 'undefined' && navigator.onLine === false && memoImagesCanBeQueued(newImages)) {
         const queued = await enqueueMemoMediaSave({
@@ -969,7 +1051,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           calendarId,
           payload: {
             memoId,
-            memoData: sanitizeMemoForFirestore({ id: memoId, participantId, title: newTitle.trim(), text: newText.trim(), imageUrls: [], thumbUrls: [], color: newColor, isPinned: newIsPinned, tags: tagsArray, createdAt: stamp, updatedAt: stamp }),
+            memoData: sanitizeMemoForFirestore({ id: memoId, participantId, title, text, imageUrls: [], thumbUrls: [], color: newColor, isPinned: newIsPinned, tags: tagsArray, createdAt: stamp, updatedAt: stamp }),
             images: newImages.map(image => ({ originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob }))
           }
         });
@@ -999,8 +1081,8 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       const memoData = {
         id: memoId,
         participantId,
-        title: newTitle.trim(),
-        text: newText.trim(),
+        title,
+        text,
         imageUrls: uploadedUrls,
         thumbUrls: uploadedThumbs,
         color: newColor,
@@ -1017,7 +1099,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       if (!saved?.success) throw new Error('Memo save failed');
 
       // 3. Write Activity Log
-      const logNote = newTitle.trim() ? `제목: ${newTitle.trim()}` : (newText.trim() ? newText.trim().slice(0, 30) + '...' : '사진 첨부');
+      const logNote = title ? `제목: ${title}` : (text ? text.slice(0, 30) + '...' : '사진 첨부');
       const activityLog = createMemoActivityLog(calendarId, 'memo_create', participantId, stamp, logNote);
       if (activityLog) {
         const nextCal = {
@@ -1041,7 +1123,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       setIsComposerExpanded(false);
     } catch (err) {
       console.error('Failed to save memo:', err);
-      if (typeof onDeleteMemo === 'function') onDeleteMemo(memoId);
+      if (memoId && typeof onDeleteMemo === 'function') onDeleteMemo(memoId);
       showToast('메모 저장 실패', 'error');
     } finally {
       setNewUploadProgress(null);
