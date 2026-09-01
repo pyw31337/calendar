@@ -2005,6 +2005,26 @@ export function CctvIcon({ size = 14 }) {
   );
 }
 
+export function CakeIcon({ size = 18 }) {
+  const React = window.React;
+
+  return /*#__PURE__*/React.createElement('svg', {
+    xmlns: 'http://www.w3.org/2000/svg', width: String(size), height: String(size), viewBox: '0 0 24 24',
+    fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round',
+    'aria-hidden': 'true'
+  },
+    /*#__PURE__*/React.createElement('path', { d: 'M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M2 21h20' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M7 8v3' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M12 8v3' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M17 8v3' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M7 4h.01' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M12 4h.01' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M17 4h.01' })
+  );
+}
+
 export function DicesIcon({ size = 14 }) {
   const React = window.React;
 
@@ -2024,6 +2044,7 @@ export function DicesIcon({ size = 14 }) {
   if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
     MenuIcon: MenuIcon,
+    CakeIcon: CakeIcon,
     NotepadTextIcon: NotepadTextIcon,
     ChatSectionIcon: ChatSectionIcon,
     LinkIcon: LinkIcon,
