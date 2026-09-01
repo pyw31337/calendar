@@ -2132,9 +2132,83 @@ export function ClickToPlayVideoCard({ url, mediaInfo = null, fallbackTitle = ''
   );
 }
 
+// Wraps a fixed-height, independently-scrolling list (e.g. a participant roster or an expense
+// breakdown) that lives inside a modal body which itself scrolls -- without this, the list's own
+// scrollbar and the modal's outer scrollbar fight each other ("이중 스크롤"). Renders the list
+// (via `children`) at a user-adjustable height with a drag handle docked to its bottom edge, so
+// the list can be expanded to avoid the double-scroll instead of always defaulting to a fixed cap.
+export function ResizableListSection({
+  children,
+  initialHeight = 160,
+  minHeight = 96,
+  maxHeight = 480,
+  step = 24,
+  listClassName = '',
+  listStyle = {},
+  handleTitle = '드래그하여 목록 높이 조절',
+  handleAriaLabel = '목록 높이 조절'
+}) {
+  const React = window.React;
+  const [height, setHeight] = React.useState(initialHeight);
+  const resizeRef = React.useRef(null);
+  const clampHeight = h => Math.min(maxHeight, Math.max(minHeight, h));
+
+  const handleResizeStart = event => {
+    event.preventDefault();
+    event.stopPropagation();
+    resizeRef.current = { pointerId: event.pointerId, startY: event.clientY, startHeight: height };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  };
+  const handleResizeMove = event => {
+    const resize = resizeRef.current;
+    if (!resize || resize.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    setHeight(clampHeight(resize.startHeight + event.clientY - resize.startY));
+  };
+  const handleResizeEnd = event => {
+    if (resizeRef.current?.pointerId === event.pointerId) resizeRef.current = null;
+  };
+  const handleResizeKeyDown = event => {
+    const stepSize = event.shiftKey ? step * 2 : step;
+    if (!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const next = event.key === 'Home' ? minHeight : event.key === 'End' ? maxHeight : height + (event.key === 'ArrowDown' ? stepSize : -stepSize);
+    setHeight(clampHeight(next));
+  };
+
+  return /*#__PURE__*/React.createElement(React.Fragment, null,
+    /*#__PURE__*/React.createElement('div', {
+      className: listClassName,
+      style: { ...listStyle, height: `${height}px`, overflowY: 'auto', transition: resizeRef.current ? 'none' : 'height 120ms ease' }
+    }, children),
+    /*#__PURE__*/React.createElement('div', {
+      className: 'resizable-list-handle-row',
+      style: { display: 'flex', justifyContent: 'center', height: '24px', marginTop: '-8px', backgroundColor: 'rgba(0, 0, 0, 0.04)', borderRadius: '0 0 6px 6px', marginBottom: '8px' }
+    },
+      /*#__PURE__*/React.createElement('button', {
+        type: 'button',
+        className: 'resizable-list-handle',
+        title: handleTitle,
+        'aria-label': handleAriaLabel,
+        onPointerDown: handleResizeStart,
+        onPointerMove: handleResizeMove,
+        onPointerUp: handleResizeEnd,
+        onPointerCancel: handleResizeEnd,
+        onKeyDown: handleResizeKeyDown
+      },
+        /*#__PURE__*/React.createElement('svg', { width: '18', height: '18', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': 'true' },
+          /*#__PURE__*/React.createElement('path', { d: 'M8 9l4-4 4 4' }),
+          /*#__PURE__*/React.createElement('path', { d: 'M16 15l-4 4-4-4' })
+        )
+      )
+    )
+  );
+}
+
   if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
     ResizableModalContainer: ResizableModalContainer,
+    ResizableListSection: ResizableListSection,
     AutoGrowTextarea: AutoGrowTextarea,
     FormAddEditActionButtons: FormAddEditActionButtons,
     SegmentedToggle: SegmentedToggle,
