@@ -48,6 +48,18 @@
   --space-6: 24px;
   --space-8: 32px;
   --space-10: 40px;
+
+  /* Type scale. Inline styles across the app had drifted into 30+ near-duplicate fontSize
+     values (0.68/0.7/0.72/0.74/0.75/0.76/0.78rem, etc.) with no discrete steps -- these five
+     tokens cover the five most common clusters, each merging values within ~0.04rem (≤0.64px,
+     imperceptible) into whichever value in that cluster was already used most often. Rarer,
+     more widely-spread sizes (headings, one-off badges) are left alone since collapsing them
+     would be a real, unverified visual change rather than a no-op cleanup. */
+  --font-size-2xs: 0.62rem;
+  --font-size-xs: 0.68rem;
+  --font-size-sm: 0.72rem;
+  --font-size-md: 0.8rem;
+  --font-size-base: 0.85rem;
 }
 
 /* Dark theme: an explicit choice via the header toggle stamps data-theme="dark"/"light" on

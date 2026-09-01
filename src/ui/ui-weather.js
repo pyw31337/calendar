@@ -905,7 +905,7 @@ export function WeatherBadge({ weatherLocation }) {
   if (weather.loading) {
     return /*#__PURE__*/React.createElement("div", {
       style: {
-        fontSize: '0.72rem',
+        fontSize: 'var(--font-size-sm)',
         fontWeight: 'bold',
         color: 'var(--text-muted)',
         backgroundColor: 'var(--border-subtle)',
@@ -933,7 +933,7 @@ export function WeatherBadge({ weatherLocation }) {
     onClick: handleClick,
     title: `${cleanName} 날씨 상세 보기 (windy.com 이동)`,
     style: {
-      fontSize: '0.72rem',
+      fontSize: 'var(--font-size-sm)',
       fontWeight: 'bold',
       color: '#3B82F6',
       backgroundColor: 'rgba(59, 130, 246, 0.08)',
@@ -1063,7 +1063,7 @@ export function WeatherLocationModal({ onClose, onSelectLocation, onDeleteRecent
         style: { display: 'flex', flexDirection: 'column', gap: '6px' }
       },
         /*#__PURE__*/React.createElement("span", {
-          style: { fontSize: '0.72rem', fontWeight: 'bold', color: 'var(--text-muted)' }
+          style: { fontSize: 'var(--font-size-sm)', fontWeight: 'bold', color: 'var(--text-muted)' }
         }, "자주 찾는 지역"),
         /*#__PURE__*/React.createElement("div", {
           style: { display: 'flex', flexWrap: 'wrap', gap: '6px' }
@@ -1081,7 +1081,7 @@ export function WeatherLocationModal({ onClose, onSelectLocation, onDeleteRecent
                 },
                 style: {
                   padding: '6px 20px 6px 10px',
-                  fontSize: '0.74rem',
+                  fontSize: 'var(--font-size-sm)',
                   borderRadius: 'var(--radius-sm)',
                   border: '1px solid var(--border-subtle)',
                   backgroundColor: 'var(--bg-primary)',
@@ -1111,7 +1111,7 @@ export function WeatherLocationModal({ onClose, onSelectLocation, onDeleteRecent
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '0.56rem',
+                  fontSize: 'var(--font-size-2xs)',
                   fontWeight: 'bold',
                   cursor: 'pointer',
                   zIndex: 2,
@@ -1136,13 +1136,13 @@ export function WeatherLocationModal({ onClose, onSelectLocation, onDeleteRecent
           placeholder: "지역 이름 입력 (예: 서울, 파주)",
           value: query,
           onChange: e => setQuery(e.target.value),
-          style: { flex: 1, minWidth: 0, padding: '8px 12px', fontSize: '0.82rem', boxSizing: 'border-box' }
+          style: { flex: 1, minWidth: 0, padding: '8px 12px', fontSize: 'var(--font-size-md)', boxSizing: 'border-box' }
         }),
         /*#__PURE__*/React.createElement("button", {
           type: "submit",
           className: "btn btn-primary",
           disabled: loading,
-          style: { padding: '8px 14px', fontSize: '0.82rem', flexShrink: 0 }
+          style: { padding: '8px 14px', fontSize: 'var(--font-size-md)', flexShrink: 0 }
         }, loading ? "검색 중" : "검색")
       ),
 
@@ -1176,8 +1176,8 @@ export function WeatherLocationModal({ onClose, onSelectLocation, onDeleteRecent
               flexShrink: 0
             }
           },
-            /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.84rem', fontWeight: 'bold', color: 'var(--text-main)' } }, r.name),
-            /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: 'var(--text-muted)' } }, `${regionLabel} (${r.latitude.toFixed(3)}, ${r.longitude.toFixed(3)})`)
+            /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-base)', fontWeight: 'bold', color: 'var(--text-main)' } }, r.name),
+            /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } }, `${regionLabel} (${r.latitude.toFixed(3)}, ${r.longitude.toFixed(3)})`)
           );
         })
       )

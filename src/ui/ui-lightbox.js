@@ -795,7 +795,7 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
       padding: '34px 14px 12px',
       background: 'linear-gradient(to top, rgba(0,0,0,0.84) 0%, rgba(0,0,0,0.84) 55%, rgba(0,0,0,0.5) 82%, transparent)',
       borderRadius: '0 0 var(--radius-md) var(--radius-md)',
-      color: '#FFFFFF', fontSize: '0.76rem', lineHeight: 1.7,
+      color: '#FFFFFF', fontSize: 'var(--font-size-sm)', lineHeight: 1.7,
       display: 'flex', flexDirection: 'column', gap: '4px',
       pointerEvents: 'auto'
     },
@@ -827,7 +827,7 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
           /*#__PURE__*/React.createElement("span", {
             style: {
               display: 'inline-flex', alignItems: 'center', padding: '1px 8px', borderRadius: 'var(--radius-full)',
-              border: '1px solid #FFFFFF', color: '#FFFFFF', fontSize: '0.68rem', fontWeight: 800
+              border: '1px solid #FFFFFF', color: '#FFFFFF', fontSize: 'var(--font-size-xs)', fontWeight: 800
             }
           }, info.typeLabel),
           /*#__PURE__*/React.createElement("span", null, "/"),
@@ -846,7 +846,7 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
           onClick: () => onSearchTag && onSearchTag(tag),
           style: {
             display: 'inline-flex', alignItems: 'center', gap: '6px', borderRadius: 'var(--radius-full)',
-            padding: '3px 4px 3px 10px', fontSize: '0.72rem', fontWeight: 900, lineHeight: 1,
+            padding: '3px 4px 3px 10px', fontSize: 'var(--font-size-sm)', fontWeight: 900, lineHeight: 1,
             border: '1px solid #FFFFFF', color: '#FFFFFF', background: 'transparent',
             cursor: onSearchTag ? 'pointer' : 'default'
           }
@@ -870,7 +870,7 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
           flexShrink: 0, height: '30px', padding: '0 10px', borderRadius: 'var(--radius-full)',
           border: '1px solid rgba(255,255,255,0.32)', background: 'rgba(255,255,255,0.14)',
           color: '#FFFFFF', display: 'inline-flex', alignItems: 'center', gap: '5px',
-          cursor: 'pointer', fontSize: '0.72rem', fontWeight: 800, WebkitBackdropFilter: 'blur(6px)', backdropFilter: 'blur(6px)'
+          cursor: 'pointer', fontSize: 'var(--font-size-sm)', fontWeight: 800, WebkitBackdropFilter: 'blur(6px)', backdropFilter: 'blur(6px)'
         }
       }, /*#__PURE__*/React.createElement(LinkIcon, { size: 14 }), "URL")
     ),
@@ -895,7 +895,7 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
         style: {
           flex: 1, minWidth: 0, height: '28px', padding: '0 8px', borderRadius: 'var(--radius-sm)',
           border: '1px solid rgba(255,255,255,0.32)', background: 'rgba(255,255,255,0.14)',
-          color: '#FFFFFF', fontSize: '0.74rem'
+          color: '#FFFFFF', fontSize: 'var(--font-size-sm)'
         }
       }),
       /*#__PURE__*/React.createElement("button", {
@@ -905,7 +905,7 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
         style: {
           flexShrink: 0, height: '28px', padding: '0 10px', borderRadius: 'var(--radius-sm)',
           border: '1px solid rgba(255,255,255,0.32)', background: 'rgba(255,255,255,0.22)',
-          color: '#FFFFFF', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer',
+          color: '#FFFFFF', fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer',
           opacity: (isSavingTags || tagTokens.length >= 10) ? 0.45 : 1
         }
       }, isSavingTags ? '...' : '저장')
@@ -1686,7 +1686,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
         style: {
           width: '30px', height: '30px', borderRadius: '50%', border: 'none',
           background: 'rgba(15,23,42,0.62)', color: '#FFFFFF', display: 'flex',
-          alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '0.72rem',
+          alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 'var(--font-size-sm)',
           opacity: (isReplacingPhoto || isDeletingPhoto) ? 0.5 : 1
         }
       }, isDeletingPhoto ? '...' : /*#__PURE__*/React.createElement(TrashIcon, { size: 15 })),
@@ -1699,7 +1699,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
         style: {
           width: '30px', height: '30px', borderRadius: '50%', border: 'none',
           background: 'rgba(15,23,42,0.62)', color: '#FFFFFF', display: 'flex',
-          alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '0.72rem',
+          alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 'var(--font-size-sm)',
           opacity: (isReplacingPhoto || isDeletingPhoto) ? 0.5 : 1
         }
       }, isReplacingPhoto ? '...' : /*#__PURE__*/React.createElement(PencilIcon, { size: 15 }))
@@ -1739,7 +1739,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
           alignItems: 'center',
           justifyContent: 'center',
           cursor: 'pointer',
-          fontSize: '0.72rem',
+          fontSize: 'var(--font-size-sm)',
           opacity: zoomLevel <= ZOOM_MIN ? 0.5 : 1
         }
       }, /*#__PURE__*/React.createElement(ZoomOutIcon, { size: 14 })),
@@ -1760,7 +1760,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
           alignItems: 'center',
           justifyContent: 'center',
           cursor: zoomLevel === ZOOM_DEFAULT ? 'default' : 'pointer',
-          fontSize: '0.62rem',
+          fontSize: 'var(--font-size-2xs)',
           fontWeight: 900,
           opacity: zoomLevel === ZOOM_DEFAULT ? 0.7 : 1
         }
@@ -1782,7 +1782,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
           alignItems: 'center',
           justifyContent: 'center',
           cursor: 'pointer',
-          fontSize: '0.72rem',
+          fontSize: 'var(--font-size-sm)',
           opacity: zoomLevel >= ZOOM_MAX ? 0.5 : 1
         }
       }, /*#__PURE__*/React.createElement(ZoomInIcon, { size: 14 }))
@@ -2015,7 +2015,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     },
       /* Text indicator */
       /*#__PURE__*/React.createElement("span", {
-        style: { color: 'rgba(255, 255, 255, 0.75)', fontSize: '0.8rem', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }
+        style: { color: 'rgba(255, 255, 255, 0.75)', fontSize: 'var(--font-size-md)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }
       }, `${index + 1} / ${total}`),
       /* Dots container */
       /*#__PURE__*/React.createElement("div", {

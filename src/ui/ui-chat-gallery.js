@@ -850,7 +850,7 @@ function GalleryLinkCard({ item }) {
         border: isVideoOpen ? '1px solid var(--border-subtle)' : '1px solid var(--primary)',
         backgroundColor: isVideoOpen ? 'var(--bg-secondary)' : 'color-mix(in srgb, var(--primary) 10%, transparent)',
         color: isVideoOpen ? 'var(--text-muted)' : 'var(--primary)',
-        fontSize: '0.78rem',
+        fontSize: 'var(--font-size-md)',
         fontWeight: 700,
         cursor: 'pointer'
       }
@@ -1545,13 +1545,13 @@ export function ChatGalleryModal({
         type: "button",
         className: "btn btn-secondary",
         onClick: handleCancelPastePreview,
-        style: { flex: 1, height: '36px', fontSize: '0.85rem' }
+        style: { flex: 1, height: '36px', fontSize: 'var(--font-size-base)' }
       }, "취소"),
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "btn btn-action-dark",
         onClick: handleConfirmPastePreview,
-        style: { flex: 1, height: '36px', fontSize: '0.85rem' }
+        style: { flex: 1, height: '36px', fontSize: 'var(--font-size-base)' }
       }, "업로드")
     )
   )) : null;
@@ -1638,7 +1638,7 @@ export function ChatGalleryModal({
       borderRadius: 'var(--radius-md)',
       backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
       color: 'var(--text-main)',
-      fontSize: '0.85rem',
+      fontSize: 'var(--font-size-base)',
       fontWeight: 700,
       cursor: disabled ? 'wait' : 'pointer',
       textAlign: 'center'
@@ -1666,7 +1666,7 @@ export function ChatGalleryModal({
     style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '4px' }
   },
     /*#__PURE__*/React.createElement("label", {
-      style: { fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-muted)' }
+      style: { fontSize: 'var(--font-size-md)', fontWeight: 800, color: 'var(--text-muted)' }
     }, `등록된 사진 (${displayPhotoTabCount}장)`),
     /*#__PURE__*/React.createElement("div", {
       style: { display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }
@@ -1675,13 +1675,13 @@ export function ChatGalleryModal({
         type: "button",
         className: "btn btn-action btn-action-outline",
         onClick: handlePasteGalleryUpload,
-        style: { height: '36px', padding: '0 12px', borderRadius: 'var(--radius-md)', fontSize: '0.78rem', fontWeight: 900, cursor: 'pointer' }
+        style: { height: '36px', padding: '0 12px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: 'pointer' }
       }, "붙여넣기"),
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "btn btn-action btn-action-dark",
         onClick: handleUploadClick,
-        style: { height: '36px', padding: '0 12px', borderRadius: 'var(--radius-md)', fontSize: '0.78rem', fontWeight: 900, cursor: 'pointer' }
+        style: { height: '36px', padding: '0 12px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: 'pointer' }
       }, "추가")
     )
   );
@@ -1692,7 +1692,7 @@ export function ChatGalleryModal({
       style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }
     },
       /*#__PURE__*/React.createElement("label", {
-        style: { fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-muted)' }
+        style: { fontSize: 'var(--font-size-md)', fontWeight: 800, color: 'var(--text-muted)' }
       }, `등록된 링크 (${filteredLinks.length}개)`),
       /*#__PURE__*/React.createElement("div", {
         style: { display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }
@@ -1702,14 +1702,14 @@ export function ChatGalleryModal({
           className: "btn btn-action btn-action-outline",
           disabled: isSavingLink,
           onClick: handlePasteLinkFromClipboard,
-          style: { height: '36px', padding: '0 12px', borderRadius: 'var(--radius-md)', fontSize: '0.78rem', fontWeight: 900, cursor: isSavingLink ? 'wait' : 'pointer' }
+          style: { height: '36px', padding: '0 12px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: isSavingLink ? 'wait' : 'pointer' }
         }, "붙여넣기"),
         /*#__PURE__*/React.createElement("button", {
           type: "button",
           className: "btn btn-action btn-action-dark",
           disabled: isSavingLink,
           onClick: handleToggleAddLink,
-          style: { height: '36px', padding: '0 12px', borderRadius: 'var(--radius-md)', fontSize: '0.78rem', fontWeight: 900, cursor: isSavingLink ? 'wait' : 'pointer' }
+          style: { height: '36px', padding: '0 12px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: isSavingLink ? 'wait' : 'pointer' }
         }, isSavingLink ? "저장 중..." : (isAddingLink ? "취소" : "추가"))
       )
     ),
@@ -1723,7 +1723,7 @@ export function ChatGalleryModal({
         onChange: e => setLinkUrlInput(e.target.value),
         placeholder: "https://...",
         autoFocus: true,
-        style: { flex: 1, minWidth: 0, height: '40px', borderRadius: '8px', fontSize: '0.84rem' },
+        style: { flex: 1, minWidth: 0, height: '40px', borderRadius: '8px', fontSize: 'var(--font-size-base)' },
         onKeyDown: e => { if (e.key === 'Enter') { e.preventDefault(); handleSubmitLinkInput(); } }
       }),
       /*#__PURE__*/React.createElement("button", {
@@ -1731,7 +1731,7 @@ export function ChatGalleryModal({
         className: "btn btn-action btn-action-dark",
         disabled: isSavingLink,
         onClick: handleSubmitLinkInput,
-        style: { height: '40px', padding: '0 14px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 900, flexShrink: 0, cursor: isSavingLink ? 'wait' : 'pointer' }
+        style: { height: '40px', padding: '0 14px', borderRadius: '8px', fontSize: 'var(--font-size-md)', fontWeight: 900, flexShrink: 0, cursor: isSavingLink ? 'wait' : 'pointer' }
       }, "등록")
     )
   );
@@ -1762,7 +1762,7 @@ export function ChatGalleryModal({
       return /*#__PURE__*/React.createElement(React.Fragment, null,
         renderGalleryMonthNavigator(),
         groupedGallerySections.length === 0 ? /*#__PURE__*/React.createElement("div", {
-          style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: '0.88rem' }
+          style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: 'var(--font-size-base)' }
         }, searchQuery
           ? "검색 결과가 없습니다."
           : (isLinkMode
@@ -1788,7 +1788,7 @@ export function ChatGalleryModal({
               },
                 /*#__PURE__*/React.createElement("span", {
                   style: {
-                    fontSize: '0.8rem', fontWeight: 900, color: '#FFFFFF',
+                    fontSize: 'var(--font-size-md)', fontWeight: 900, color: '#FFFFFF',
                     backgroundColor: 'var(--status-green)', padding: '4px 10px', borderRadius: 'var(--radius-full)'
                   }
                 }, section.items.length),
@@ -1813,7 +1813,7 @@ export function ChatGalleryModal({
       return /*#__PURE__*/React.createElement(React.Fragment, null,
         renderLinkListHeader(),
         sortedLinks.length === 0 ? /*#__PURE__*/React.createElement("div", {
-          style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: '0.88rem' }
+          style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: 'var(--font-size-base)' }
         }, searchQuery ? "검색 결과가 없습니다." : "공유된 링크가 없습니다.") : renderGalleryLinkList(sortedLinks),
         (hasMoreOlderChat || hasMoreMemos) && !(searchQuery || '').trim() && renderGalleryLoadMoreButton({
           label: '이전 링크 더 보기',
@@ -1830,7 +1830,7 @@ export function ChatGalleryModal({
     return /*#__PURE__*/React.createElement(React.Fragment, null,
       renderPhotoListHeader(),
       sortedPhotos.length === 0 ? /*#__PURE__*/React.createElement("div", {
-        style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: '0.88rem' }
+        style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: 'var(--font-size-base)' }
       }, searchQuery
         ? "검색 결과가 없습니다."
         : describeGalleryPhotoEmptyState("공유된 사진이 없습니다."))
@@ -1895,7 +1895,7 @@ export function ChatGalleryModal({
                 type: "button",
                 onClick: () => setGalleryViewMode(tab.key),
                 style: {
-                  padding: '4px 10px', fontSize: '0.75rem', fontWeight: 800, borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer',
+                  padding: '4px 10px', fontSize: 'var(--font-size-sm)', fontWeight: 800, borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer',
                   backgroundColor: galleryViewMode === tab.key ? '#4F46E5' : 'transparent',
                   color: galleryViewMode === tab.key ? '#FFFFFF' : 'var(--text-muted)'
                 }
@@ -2013,7 +2013,7 @@ export function ChatGalleryModal({
           title: hasClipboardImage ? undefined : '클립보드에 붙여넣을 이미지가 없습니다.',
           style: {
             padding: '4px 10px',
-            fontSize: '0.76rem',
+            fontSize: 'var(--font-size-sm)',
             fontWeight: 900,
             borderRadius: 'var(--radius-md)',
             cursor: hasClipboardImage ? 'pointer' : 'default',
@@ -2058,7 +2058,7 @@ export function ChatGalleryModal({
     trailing: /*#__PURE__*/React.createElement("button", {
       type: "button",
       onClick: () => { setIsSearchOpen(false); setSearchQuery(''); },
-      style: { border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px 6px', fontSize: '0.8rem', fontWeight: 700, flexShrink: 0 }
+      style: { border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px 6px', fontSize: 'var(--font-size-md)', fontWeight: 700, flexShrink: 0 }
     }, "닫기")
   }), asPage && !isMobile && /*#__PURE__*/React.createElement("div", {
     className: "gallery-page-tabs",
@@ -2085,7 +2085,7 @@ export function ChatGalleryModal({
         background: activeTab === tab[0] ? 'var(--accent-primary)' : 'transparent',
         color: activeTab === tab[0] ? '#FFFFFF' : 'var(--text-muted)',
         fontWeight: 900,
-        fontSize: '0.86rem',
+        fontSize: 'var(--font-size-base)',
         cursor: 'pointer',
         display: 'flex',
         alignItems: 'center',
@@ -2096,7 +2096,7 @@ export function ChatGalleryModal({
       tab[1],
       /*#__PURE__*/React.createElement("span", {
         style: {
-          fontSize: '0.7rem',
+          fontSize: 'var(--font-size-xs)',
           fontWeight: 800,
           padding: '1px 7px',
           borderRadius: 'var(--radius-full)',
@@ -2134,7 +2134,7 @@ export function ChatGalleryModal({
               style: {
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '20px', height: '18px',
                 borderRadius: 'var(--radius-full)', backgroundColor: count >= 1 ? '#4F46E5' : '#E2E8F0',
-                color: count >= 1 ? '#FFFFFF' : '#475569', fontSize: '0.72rem', fontWeight: 'bold', padding: '0 6px', marginLeft: '4px'
+                color: count >= 1 ? '#FFFFFF' : '#475569', fontSize: 'var(--font-size-sm)', fontWeight: 'bold', padding: '0 6px', marginLeft: '4px'
               }
             }, String(count)))
         };
@@ -2159,7 +2159,7 @@ export function ChatGalleryModal({
         type: "button",
         onClick: () => setGalleryViewMode(tab.key),
         style: {
-          height: '100%', boxSizing: 'border-box', padding: '0 12px', fontSize: '0.8rem', fontWeight: 900,
+          height: '100%', boxSizing: 'border-box', padding: '0 12px', fontSize: 'var(--font-size-md)', fontWeight: 900,
           borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer',
           backgroundColor: galleryViewMode === tab.key ? '#4F46E5' : 'transparent',
           color: galleryViewMode === tab.key ? '#FFFFFF' : 'var(--text-muted)'
@@ -2201,25 +2201,25 @@ export function ChatGalleryModal({
       /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-body" },
         /*#__PURE__*/React.createElement("div", { style: { marginBottom: '16px' } },
           /*#__PURE__*/React.createElement("label", {
-            style: { fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '8px' }
+            style: { fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '8px' }
           }, "년도"),
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '10px' } },
             /*#__PURE__*/React.createElement("button", {
-              type: "button", className: "btn btn-secondary", style: { padding: '4px 10px', fontSize: '0.85rem' },
+              type: "button", className: "btn btn-secondary", style: { padding: '4px 10px', fontSize: 'var(--font-size-base)' },
               onClick: () => setPickerGalleryYear(y => y - 1)
             }, "◀"),
             /*#__PURE__*/React.createElement("span", {
               style: { fontWeight: 800, fontSize: '1.1rem', minWidth: '60px', textAlign: 'center' }
             }, pickerGalleryYear, "년"),
             /*#__PURE__*/React.createElement("button", {
-              type: "button", className: "btn btn-secondary", style: { padding: '4px 10px', fontSize: '0.85rem' },
+              type: "button", className: "btn btn-secondary", style: { padding: '4px 10px', fontSize: 'var(--font-size-base)' },
               onClick: () => setPickerGalleryYear(y => y + 1)
             }, "▶")
           )
         ),
         /*#__PURE__*/React.createElement("div", { style: { marginBottom: '16px' } },
           /*#__PURE__*/React.createElement("label", {
-            style: { fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '8px' }
+            style: { fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '8px' }
           }, "월"),
           /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' } },
             monthNames.map((name, idx) => /*#__PURE__*/React.createElement("button", {
@@ -2229,7 +2229,7 @@ export function ChatGalleryModal({
                 border: pickerGalleryMonth === idx ? '2px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
                 background: pickerGalleryMonth === idx ? 'rgba(99, 102, 241, 0.15)' : 'var(--bg-card)',
                 color: pickerGalleryMonth === idx ? 'var(--accent-primary)' : 'var(--text-main)',
-                fontWeight: pickerGalleryMonth === idx ? 800 : 500, fontSize: '0.82rem', cursor: 'pointer'
+                fontWeight: pickerGalleryMonth === idx ? 800 : 500, fontSize: 'var(--font-size-md)', cursor: 'pointer'
               }
             }, name))
           )

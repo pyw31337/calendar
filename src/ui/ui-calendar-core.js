@@ -1111,25 +1111,25 @@ export function CalendarGrid({
       /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-body" },
         /*#__PURE__*/React.createElement("div", { style: { marginBottom: '16px' } },
           /*#__PURE__*/React.createElement("label", {
-            style: { fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '8px' }
+            style: { fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '8px' }
           }, "\uB144\uB3C4"),
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '10px' } },
             /*#__PURE__*/React.createElement("button", {
-              type: "button", className: "btn btn-secondary", style: { padding: '4px 10px', fontSize: '0.85rem' },
+              type: "button", className: "btn btn-secondary", style: { padding: '4px 10px', fontSize: 'var(--font-size-base)' },
               onClick: () => setPickerYear(y => y - 1)
             }, "\u25C0"),
             /*#__PURE__*/React.createElement("span", {
               style: { fontWeight: 800, fontSize: '1.1rem', minWidth: '60px', textAlign: 'center' }
             }, pickerYear, "\uB144"),
             /*#__PURE__*/React.createElement("button", {
-              type: "button", className: "btn btn-secondary", style: { padding: '4px 10px', fontSize: '0.85rem' },
+              type: "button", className: "btn btn-secondary", style: { padding: '4px 10px', fontSize: 'var(--font-size-base)' },
               onClick: () => setPickerYear(y => y + 1)
             }, "\u25B6")
           )
         ),
         /*#__PURE__*/React.createElement("div", { style: { marginBottom: '16px' } },
           /*#__PURE__*/React.createElement("label", {
-            style: { fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '8px' }
+            style: { fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '8px' }
           }, "\uC6D4"),
           /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' } },
             MONTH_NAMES.map((name, idx) => /*#__PURE__*/React.createElement("button", {
@@ -1139,7 +1139,7 @@ export function CalendarGrid({
                 border: pickerMonth === idx ? '2px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
                 background: pickerMonth === idx ? 'rgba(99, 102, 241, 0.15)' : 'var(--bg-card)',
                 color: pickerMonth === idx ? 'var(--accent-primary)' : 'var(--text-main)',
-                fontWeight: pickerMonth === idx ? 800 : 500, fontSize: '0.82rem', cursor: 'pointer'
+                fontWeight: pickerMonth === idx ? 800 : 500, fontSize: 'var(--font-size-md)', cursor: 'pointer'
               }
             }, name))
           )
@@ -1268,7 +1268,7 @@ export function CalendarGrid({
           className: `day-corner-label${isHoliday ? ' is-holiday' : ''}${isAllAvailable ? ' is-all-available' : ''}`,
           title: cornerTitle,
           style: {
-            fontSize: '0.62rem',
+            fontSize: 'var(--font-size-2xs)',
             fontWeight: isHoliday || isAllAvailable ? 800 : 600,
             color: cornerColor,
             lineHeight: 1.2,
@@ -1336,7 +1336,7 @@ export function CalendarGrid({
         return /*#__PURE__*/React.createElement("div", {
           key: ann.id || aIdx,
           style: {
-            fontSize: '0.66rem',
+            fontSize: 'var(--font-size-2xs)',
             fontWeight: 'bold',
             color: displayColor,
             backgroundColor: `${displayColor}15`,
@@ -1382,7 +1382,7 @@ export function CalendarGrid({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: '0.64rem',
+            fontSize: 'var(--font-size-2xs)',
             flexShrink: 0
           }
         }, ann.icon === '🎂' && CakeIcon ? /*#__PURE__*/React.createElement(CakeIcon, { size: 11 }) : ann.icon);
@@ -1406,7 +1406,7 @@ export function CalendarGrid({
         color: '#FFFFFF',
         padding: '6px 12px',
         borderRadius: 'var(--radius-full)',
-        fontSize: '0.8rem',
+        fontSize: 'var(--font-size-md)',
         fontWeight: 800,
         boxShadow: '0 8px 20px rgba(0,0,0,0.28)',
         pointerEvents: 'none',
@@ -1655,7 +1655,7 @@ export function CommentsSection({
         background: 'none',
         border: 'none',
         color: '#3B82F6',
-        fontSize: '0.78rem',
+        fontSize: 'var(--font-size-md)',
         fontWeight: 800,
         cursor: 'pointer',
         padding: '4px 6px',
@@ -1678,7 +1678,7 @@ export function CommentsSection({
       minHeight: '48px'
     }
   }, messagesToShow.length === 0 ? /*#__PURE__*/React.createElement("div", {
-    style: { color: 'var(--text-muted)', fontSize: '0.85rem', padding: '8px 0', textAlign: 'center' }
+    style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-base)', padding: '8px 0', textAlign: 'center' }
   }, emptyChatMessage) : /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', flexDirection: 'column', gap: '10px' }
   }, messagesToShow.map(msg => {
@@ -1714,13 +1714,13 @@ export function CommentsSection({
         style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }
       },
         /*#__PURE__*/React.createElement('span', {
-          style: { backgroundColor: badgeColor, color: '#FFFFFF', padding: '3px 10px', borderRadius: 'var(--radius-full)', fontSize: '0.75rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
+          style: { backgroundColor: badgeColor, color: '#FFFFFF', padding: '3px 10px', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 'bold', whiteSpace: 'nowrap' }
         }, badgeName),
         /*#__PURE__*/React.createElement('div', {
           style: { display: 'flex', alignItems: 'center', gap: '6px' }
         },
           /*#__PURE__*/React.createElement('span', {
-            style: { fontSize: '0.72rem', color: 'var(--text-light)', whiteSpace: 'nowrap' }
+            style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-light)', whiteSpace: 'nowrap' }
           }, `${dateInfo.dateStr.replace('(', ' (')} ${dateInfo.timeStr}`),
           isMsgMe ? /*#__PURE__*/React.createElement('div', {
             className: 'msg-actions-group-inline',
@@ -1751,7 +1751,7 @@ export function CommentsSection({
         }),
         /* Bubble container */
         /*#__PURE__*/React.createElement('div', {
-          style: { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '10px 12px', fontSize: '0.85rem', lineHeight: '1.4', color: 'var(--text-main)', wordBreak: 'keep-all', overflowWrap: 'break-word', whiteSpace: 'pre-wrap', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', position: 'relative', zIndex: 1 }
+          style: { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '10px 12px', fontSize: 'var(--font-size-base)', lineHeight: '1.4', color: 'var(--text-main)', wordBreak: 'keep-all', overflowWrap: 'break-word', whiteSpace: 'pre-wrap', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', position: 'relative', zIndex: 1 }
         }, bubbleContent)
       )
     );
@@ -1767,7 +1767,7 @@ export function CommentsSection({
       borderRadius: 'var(--radius-md)',
       padding: '8px 0',
       marginTop: '4px',
-      fontSize: '0.85rem',
+      fontSize: 'var(--font-size-base)',
       fontWeight: 'bold',
       color: 'var(--text-main)',
       cursor: 'pointer',
@@ -1815,7 +1815,7 @@ export function CommentsSection({
         border: 'none',
         background: 'none',
         padding: '2px 4px',
-        fontSize: '0.85rem',
+        fontSize: 'var(--font-size-base)',
         lineHeight: '1.4',
         fontFamily: 'inherit',
         outline: 'none',
@@ -1973,7 +1973,7 @@ export function CommentsSection({
           style: {
             height: '32px',
             padding: '0 16px',
-            fontSize: '0.82rem',
+            fontSize: 'var(--font-size-md)',
             fontWeight: 'bold',
             backgroundColor: '#57606F',
             color: '#FFFFFF',
@@ -2264,7 +2264,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
        (same field LinkPreviewCard's cachedData reads), so this stays in sync with it. */
     displayMemoText && /*#__PURE__*/React.createElement("div", {
       style: {
-        fontSize: '0.82rem',
+        fontSize: 'var(--font-size-md)',
         color: 'var(--text-main)',
         lineHeight: '1.4',
         whiteSpace: 'pre-wrap',
@@ -2294,7 +2294,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         borderRadius: 'var(--radius-md)',
         background: 'var(--bg-primary)',
         color: 'var(--text-main)',
-        fontSize: '0.78rem',
+        fontSize: 'var(--font-size-md)',
         fontWeight: 800,
         cursor: 'pointer',
         textAlign: 'center'
@@ -2334,7 +2334,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
           border: isVideoOpen ? '1px solid var(--border-subtle)' : '1px solid var(--primary)',
           backgroundColor: isVideoOpen ? 'var(--bg-secondary)' : 'var(--bg-primary)',
           color: isVideoOpen ? 'var(--text-muted)' : 'var(--primary)',
-          fontSize: '0.76rem',
+          fontSize: 'var(--font-size-sm)',
           fontWeight: 700,
           cursor: 'pointer'
         }
@@ -2375,7 +2375,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
             color: '#FFFFFF',
             borderRadius: 'var(--radius-full)',
             padding: '3px 8px',
-            fontSize: '0.68rem',
+            fontSize: 'var(--font-size-xs)',
             fontWeight: 'bold',
             lineHeight: 1,
             whiteSpace: 'nowrap'
@@ -2391,7 +2391,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
           onSelectTag(tag);
         },
         style: {
-          fontSize: '0.68rem', fontWeight: '600',
+          fontSize: 'var(--font-size-xs)', fontWeight: '600',
           color: '#2563EB', backgroundColor: 'rgba(37, 99, 235, 0.08)',
           padding: '3px 8px', borderRadius: '4px',
           cursor: 'pointer', lineHeight: 1,
@@ -2428,7 +2428,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         style: {
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
           alignSelf: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px',
-          fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)'
+          fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--text-muted)'
         }
       },
         /*#__PURE__*/React.createElement("svg", {
@@ -2458,7 +2458,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
           style: { width: '8px', height: '8px', borderRadius: '50%', backgroundColor: author?.color || '#94A3B8', flexShrink: 0 }
         }),
         /*#__PURE__*/React.createElement("span", {
-          style: { flex: 1, minWidth: 0, fontSize: '0.78rem', color: 'var(--text-main)', wordBreak: 'break-word' }
+          style: { flex: 1, minWidth: 0, fontSize: 'var(--font-size-md)', color: 'var(--text-main)', wordBreak: 'break-word' }
         }, comment.text),
         /*#__PURE__*/React.createElement("button", {
           type: "button", onClick: e => handleStartEditComment(e, comment), title: "편집", "aria-label": "댓글 편집",
@@ -2494,7 +2494,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
           }
         },
         placeholder: "댓글을 입력하세요...",
-        style: { flex: 1, minWidth: 0, height: '30px', fontSize: '0.8rem', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0 8px', backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)', outline: 'none', boxSizing: 'border-box' }
+        style: { flex: 1, minWidth: 0, height: '30px', fontSize: 'var(--font-size-md)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0 8px', backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)', outline: 'none', boxSizing: 'border-box' }
       }),
       /*#__PURE__*/React.createElement("button", {
         type: "button",
@@ -2502,7 +2502,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         disabled: !commentText.trim() || !commentParticipantId || isSavingComment,
         style: {
           flexShrink: 0, height: '30px', padding: '0 12px', borderRadius: 'var(--radius-sm)', border: 'none',
-          backgroundColor: 'var(--accent-primary)', color: '#FFFFFF', fontSize: '0.78rem', fontWeight: 'bold',
+          backgroundColor: 'var(--accent-primary)', color: '#FFFFFF', fontSize: 'var(--font-size-md)', fontWeight: 'bold',
           cursor: isSavingComment ? 'wait' : 'pointer', opacity: (commentText.trim() && commentParticipantId && !isSavingComment) ? 1 : 0.5
         }
       }, isSavingComment ? "저장 중…" : "저장")
@@ -2584,7 +2584,7 @@ export function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCan
     onToggle: togglePollList,
     label: anyPollOpen ? "진행중 투표 접기" : "진행중 투표 펼치기"
   })), polls.length === 0 ? /*#__PURE__*/React.createElement("div", {
-    style: { color: 'var(--text-muted)', fontSize: '0.85rem', padding: '10px 0', textAlign: 'center' }
+    style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-base)', padding: '10px 0', textAlign: 'center' }
   }, "\uC544\uC9C1 \uC0DD\uC131\uB41C \uD22C\uD45C\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.") : /*#__PURE__*/React.createElement("div", {
     className: "polls-section"
   }, polls.map(poll => {
@@ -2626,7 +2626,7 @@ export function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCan
       key: className, className
     },
       /*#__PURE__*/React.createElement("span", {
-        style: { fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', whiteSpace: 'nowrap' }
+        style: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--text-muted)', whiteSpace: 'nowrap' }
       }, "미참여"),
       nonVoters.map(p => /*#__PURE__*/React.createElement(ParticipantBadge, {
         key: p.id,
@@ -2665,7 +2665,7 @@ export function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCan
     }, poll.title, poll.deadline && /*#__PURE__*/React.createElement("span", {
       className: closed ? 'poll-deadline-badge is-closed' : 'poll-deadline-badge is-open',
       style: {
-        fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: 'var(--radius-full)', whiteSpace: 'nowrap'
+        fontSize: 'var(--font-size-xs)', fontWeight: 800, padding: '2px 8px', borderRadius: 'var(--radius-full)', whiteSpace: 'nowrap'
       }
     }, closed ? '마감됨' : `마감 ${formatPollDeadline(poll.deadline)}`)), poll.description && /*#__PURE__*/React.createElement("div", {
       className: "poll-desc"
@@ -2900,7 +2900,7 @@ export function GlobalSearchModal({
       }),
 
       isLoadingFullHistory && /*#__PURE__*/React.createElement("div", {
-        style: { fontSize: '0.76rem', color: 'var(--text-muted)', marginTop: '8px' }
+        style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginTop: '8px' }
       }, "전체 기록에서 검색 중..."),
 
       q && hasResults && /*#__PURE__*/React.createElement("div", {
@@ -2918,7 +2918,7 @@ export function GlobalSearchModal({
                 borderRadius: 'var(--radius-full)',
                 backgroundColor: hasCount ? '#2563EB' : '#E2E8F0',
                 color: hasCount ? '#FFFFFF' : '#475569',
-                fontSize: '0.72rem', fontWeight: 'bold', padding: '0 6px', marginLeft: '4px'
+                fontSize: 'var(--font-size-sm)', fontWeight: 'bold', padding: '0 6px', marginLeft: '4px'
               }
             }, t.count))
           };
@@ -2926,8 +2926,8 @@ export function GlobalSearchModal({
         onSelect: setActiveTab
       }) : /*#__PURE__*/React.createElement(SearchCategoryTabs, { tabs: tabDefs, activeKey: activeTab, onSelect: setActiveTab, containerStyle: { width: '100%' } })),
 
-      !q && /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center' } }, "검색어를 입력해 주세요."),
-      q && !hasResults && /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center' } }, "검색 결과가 없습니다."),
+      !q && /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: 'var(--text-muted)', fontSize: 'var(--font-size-base)', textAlign: 'center' } }, "검색어를 입력해 주세요."),
+      q && !hasResults && /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: 'var(--text-muted)', fontSize: 'var(--font-size-base)', textAlign: 'center' } }, "검색 결과가 없습니다."),
 
       q && hasResults && activeTab === 'schedules' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
         matches.schedules.map(item => /*#__PURE__*/React.createElement(SearchResultLogRow, {
@@ -2997,7 +2997,7 @@ export function GlobalSearchModal({
             style: { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: 'var(--radius-sm)' }
           }),
           /*#__PURE__*/React.createElement("span", {
-            style: { fontSize: '0.68rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+            style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
           }, highlightKeyword(entry.tags || '', q))
         ))
       ),
@@ -3279,7 +3279,7 @@ export function EditMessageModal({
       resize: 'none',
       border: 'none',
       backgroundColor: 'transparent',
-      fontSize: '0.88rem',
+      fontSize: 'var(--font-size-base)',
       lineHeight: '1.45',
       fontFamily: 'inherit',
       outline: 'none',
@@ -3362,14 +3362,14 @@ export function EditMessageModal({
         className: "btn btn-secondary",
         disabled: isSubmitting,
         onClick: onClose,
-        style: { height: '44px', minHeight: '44px', fontSize: '0.85rem', padding: '0 16px' }
+        style: { height: '44px', minHeight: '44px', fontSize: 'var(--font-size-base)', padding: '0 16px' }
       }, "취소"),
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "btn btn-poll-create",
         disabled: isSubmitting || (!text.trim() && images.length === 0),
         onClick: handleSave,
-        style: { height: '44px', minHeight: '44px', fontSize: '0.85rem', padding: '0 16px', opacity: (text.trim() || images.length > 0) && !isSubmitting ? 1 : 0.6 }
+        style: { height: '44px', minHeight: '44px', fontSize: 'var(--font-size-base)', padding: '0 16px', opacity: (text.trim() || images.length > 0) && !isSubmitting ? 1 : 0.6 }
       }, isSubmitting ? '...' : "수정")
     )
   ))), isPartSheetOpen && /*#__PURE__*/React.createElement(ChatParticipantSheet, {

@@ -1069,7 +1069,7 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
               alignItems: 'center',
               justifyContent: 'center',
               color: 'rgba(255, 255, 255, 0.75)',
-              fontSize: '0.8rem',
+              fontSize: 'var(--font-size-md)',
               fontWeight: 800
             }
           }, /*#__PURE__*/React.createElement('span', null, '▶ 미니플레이어(PIP) 재생 중'));
@@ -1188,9 +1188,9 @@ export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = f
         ),
         /*#__PURE__*/React.createElement('div', { className: 'bottom-sheet-body' },
           /*#__PURE__*/React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '12px' } },
-            /*#__PURE__*/React.createElement('button', { type: 'button', className: 'btn btn-secondary', style: { padding: '4px 10px', fontSize: '0.85rem' }, onClick: () => setPYear(y => y - 1) }, '◀'),
+            /*#__PURE__*/React.createElement('button', { type: 'button', className: 'btn btn-secondary', style: { padding: '4px 10px', fontSize: 'var(--font-size-base)' }, onClick: () => setPYear(y => y - 1) }, '◀'),
             /*#__PURE__*/React.createElement('span', { style: { fontWeight: 800, fontSize: '1rem', minWidth: '60px', textAlign: 'center' } }, `${pYear}년`),
-            /*#__PURE__*/React.createElement('button', { type: 'button', className: 'btn btn-secondary', style: { padding: '4px 10px', fontSize: '0.85rem' }, onClick: () => setPYear(y => y + 1) }, '▶')
+            /*#__PURE__*/React.createElement('button', { type: 'button', className: 'btn btn-secondary', style: { padding: '4px 10px', fontSize: 'var(--font-size-base)' }, onClick: () => setPYear(y => y + 1) }, '▶')
           ),
           /*#__PURE__*/React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', marginBottom: '12px' } },
             DEADLINE_PICKER_MONTH_NAMES.map((name, idx) => /*#__PURE__*/React.createElement('button', {
@@ -1205,13 +1205,13 @@ export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = f
                 border: pMonth === idx ? '2px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
                 background: pMonth === idx ? 'rgba(99, 102, 241, 0.15)' : 'var(--bg-card)',
                 color: pMonth === idx ? 'var(--accent-primary)' : 'var(--text-main)',
-                fontWeight: pMonth === idx ? 800 : 500, fontSize: '0.8rem', cursor: 'pointer'
+                fontWeight: pMonth === idx ? 800 : 500, fontSize: 'var(--font-size-md)', cursor: 'pointer'
               }
             }, name))
           ),
           /*#__PURE__*/React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', marginBottom: '4px' } },
             ['일', '월', '화', '수', '목', '금', '토'].map(w => /*#__PURE__*/React.createElement('div', {
-              key: w, style: { textAlign: 'center', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)' }
+              key: w, style: { textAlign: 'center', fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--text-muted)' }
             }, w))
           ),
           /*#__PURE__*/React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', marginBottom: '14px' } },
@@ -1226,13 +1226,13 @@ export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = f
                   border: isSelected ? '2px solid var(--accent-primary)' : '1px solid transparent',
                   background: isSelected ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
                   color: isSelected ? 'var(--accent-primary)' : 'var(--text-main)',
-                  fontWeight: isSelected ? 800 : 500, fontSize: '0.8rem', cursor: 'pointer'
+                  fontWeight: isSelected ? 800 : 500, fontSize: 'var(--font-size-md)', cursor: 'pointer'
                 }
               }, day);
             })
           ),
           !dateOnly && /*#__PURE__*/React.createElement('div', { style: { marginBottom: '14px' } },
-            /*#__PURE__*/React.createElement('label', { style: { fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' } }, '시간'),
+            /*#__PURE__*/React.createElement('label', { style: { fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' } }, '시간'),
             /*#__PURE__*/React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
               /*#__PURE__*/React.createElement('input', {
                 type: 'number', inputMode: 'numeric', className: 'form-input', style: { flex: '1 1 0%', minWidth: 0, textAlign: 'center' },
@@ -1335,7 +1335,7 @@ export function PlacesSection({ calendar, onViewAll }) {
         /*#__PURE__*/React.createElement("button", {
           type: "button",
           onClick: e => { e.stopPropagation(); onViewAll(); },
-          style: { background: 'none', border: 'none', color: '#3B82F6', fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer', padding: '4px 6px' }
+          style: { background: 'none', border: 'none', color: '#3B82F6', fontSize: 'var(--font-size-md)', fontWeight: 800, cursor: 'pointer', padding: '4px 6px' }
         }, "전체보기"),
         /*#__PURE__*/React.createElement(SectionToggleButton, {
           collapsed,
@@ -1359,7 +1359,7 @@ export function PlacesSection({ calendar, onViewAll }) {
         : /*#__PURE__*/React.createElement("div", {
             style: {
               position: 'absolute', inset: 0, display: 'flex', alignItems: 'center',
-              justifyContent: 'center', fontSize: '0.8rem', fontWeight: 700,
+              justifyContent: 'center', fontSize: 'var(--font-size-md)', fontWeight: 700,
               color: 'var(--text-muted)', letterSpacing: '-0.02em'
             }
           }, "지도 준비 중…"),
@@ -1369,7 +1369,7 @@ export function PlacesSection({ calendar, onViewAll }) {
           position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 500, width: '100%',
           backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
           border: 'none', borderRadius: '0 0 var(--radius-md) var(--radius-md)', padding: '8px 0',
-          fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text-main)',
+          fontSize: 'var(--font-size-base)', fontWeight: 'bold', color: 'var(--text-main)',
           cursor: 'pointer', textAlign: 'center'
         }
       }, "장소 더보기")
@@ -1444,7 +1444,7 @@ export function ImageUrlModal({ imageUrl, onClose, showToast, onEnsureShareUrl }
   }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))), /*#__PURE__*/React.createElement("div", {
     className: "modal-body"
   }, /*#__PURE__*/React.createElement("label", {
-    style: { fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-muted)' }
+    style: { fontSize: 'var(--font-size-base)', fontWeight: 700, color: 'var(--text-muted)' }
   }, isGenerating ? "공유 가능한 이미지 URL 생성 중" : "선택한 사진의 원본 이미지 URL"), /*#__PURE__*/React.createElement("input", {
     type: "text",
     className: "form-input",
@@ -1452,7 +1452,7 @@ export function ImageUrlModal({ imageUrl, onClose, showToast, onEnsureShareUrl }
     value: isGenerating ? '공유 URL을 생성하고 있습니다...' : (isInlineImageUrl ? '공유 가능한 HTTPS URL을 생성할 수 없습니다.' : resolvedUrl || ''),
     readOnly: true
   }), errorText && /*#__PURE__*/React.createElement("div", {
-    style: { fontSize: '0.78rem', color: '#EF4444', fontWeight: 700 }
+    style: { fontSize: 'var(--font-size-md)', color: '#EF4444', fontWeight: 700 }
   }, errorText, " Storage 업로드 권한 또는 네트워크 상태를 확인해 주세요."), /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "btn btn-primary",

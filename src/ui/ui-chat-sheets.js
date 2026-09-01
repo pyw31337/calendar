@@ -851,7 +851,7 @@ export function NotificationPermissionHelpModal({ onClose, onRetry, showToast })
   }, /*#__PURE__*/React.createElement("span", {
     style: { display: 'inline-flex', width: '34px', height: '34px', borderRadius: 'var(--radius-sm)', background: '#2563EB', color: '#FFFFFF', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }
   }, /*#__PURE__*/React.createElement(BellIcon, null)), /*#__PURE__*/React.createElement("div", {
-    style: { fontSize: '0.86rem', lineHeight: 1.55, fontWeight: 700 }
+    style: { fontSize: 'var(--font-size-base)', lineHeight: 1.55, fontWeight: 700 }
   }, browserLabel, "에서 현재 알림 권한 상태는 ", /*#__PURE__*/React.createElement("strong", null, statusLabel), "입니다. 채팅알림을 받으려면 이 사이트의 알림 권한이 허용되어야 합니다.")),
   isPermissionBlocked && /*#__PURE__*/React.createElement("div", {
     style: {
@@ -860,7 +860,7 @@ export function NotificationPermissionHelpModal({ onClose, onRetry, showToast })
       background: 'rgba(239, 68, 68, 0.1)',
       color: '#B91C1C',
       border: '1px solid rgba(239, 68, 68, 0.22)',
-      fontSize: '0.8rem',
+      fontSize: 'var(--font-size-md)',
       fontWeight: 800,
       lineHeight: 1.5
     }
@@ -872,7 +872,7 @@ export function NotificationPermissionHelpModal({ onClose, onRetry, showToast })
       background: 'rgba(16, 185, 129, 0.1)',
       color: '#047857',
       border: '1px solid rgba(16, 185, 129, 0.22)',
-      fontSize: '0.8rem',
+      fontSize: 'var(--font-size-md)',
       fontWeight: 800,
       lineHeight: 1.5
     }
@@ -886,18 +886,18 @@ export function NotificationPermissionHelpModal({ onClose, onRetry, showToast })
   }), /*#__PURE__*/React.createElement("span", {
     style: { display: 'flex', flexDirection: 'column', minWidth: 0 }
   }, /*#__PURE__*/React.createElement("strong", {
-    style: { fontSize: '0.78rem', color: 'var(--text-main)', lineHeight: 1.25 }
+    style: { fontSize: 'var(--font-size-md)', color: 'var(--text-main)', lineHeight: 1.25 }
   }, item.label), /*#__PURE__*/React.createElement("span", {
-    style: { fontSize: '0.68rem', color: 'var(--text-muted)', lineHeight: 1.25, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+    style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', lineHeight: 1.25, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
   }, item.detail))))), /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', flexDirection: 'column', gap: '8px' }
   }, steps.map((step, idx) => /*#__PURE__*/React.createElement("div", {
     key: step,
-    style: { display: 'grid', gridTemplateColumns: '28px minmax(0, 1fr)', gap: '8px', alignItems: 'start', padding: '10px 12px', borderRadius: 'var(--radius-md)', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', color: 'var(--text-main)', fontSize: '0.86rem', lineHeight: 1.45 }
+    style: { display: 'grid', gridTemplateColumns: '28px minmax(0, 1fr)', gap: '8px', alignItems: 'start', padding: '10px 12px', borderRadius: 'var(--radius-md)', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', color: 'var(--text-main)', fontSize: 'var(--font-size-base)', lineHeight: 1.45 }
   }, /*#__PURE__*/React.createElement("span", {
-    style: { display: 'inline-flex', width: '22px', height: '22px', borderRadius: '50%', background: '#0F172A', color: '#FFFFFF', alignItems: 'center', justifyContent: 'center', fontSize: '0.72rem', fontWeight: 900 }
+    style: { display: 'inline-flex', width: '22px', height: '22px', borderRadius: '50%', background: '#0F172A', color: '#FFFFFF', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--font-size-sm)', fontWeight: 900 }
   }, idx + 1), /*#__PURE__*/React.createElement("span", null, step)))), /*#__PURE__*/React.createElement("p", {
-    style: { margin: 0, color: 'var(--text-muted)', fontSize: '0.78rem', lineHeight: 1.5 }
+    style: { margin: 0, color: 'var(--text-muted)', fontSize: 'var(--font-size-md)', lineHeight: 1.5 }
   }, "참고: 브라우저가 이미 알림을 차단한 상태에서는 보안 정책상 웹페이지가 설정을 자동으로 바꿀 수 없습니다. 대신 위 경로로 권한을 허용한 뒤 다시 시도해 주세요.")), /*#__PURE__*/React.createElement("div", {
     className: "modal-footer"
   }, /*#__PURE__*/React.createElement("button", {

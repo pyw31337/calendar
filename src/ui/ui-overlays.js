@@ -755,13 +755,13 @@ export function ImageUploadOverlay({ pct, remainingSec, label, current, total })
           backgroundColor: 'var(--bg-primary)',
           color: 'var(--text-muted)',
           border: '1px solid var(--border-subtle)',
-          fontSize: '0.72rem',
+          fontSize: 'var(--font-size-sm)',
           fontWeight: 900,
           lineHeight: 1
         }
       }, queueText)
     ),
-    /*#__PURE__*/React.createElement('div', { style: { fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.45 } },
+    /*#__PURE__*/React.createElement('div', { style: { fontSize: 'var(--font-size-md)', color: 'var(--text-muted)', lineHeight: 1.45 } },
       `${clamped}%${remainingText ? ` · ${remainingText}` : ''}${hasQueue ? ' · 순차 저장 중' : ''}`),
     /*#__PURE__*/React.createElement('div', { style: { height: '8px', borderRadius: 'var(--radius-full)', backgroundColor: 'var(--border-subtle)', overflow: 'hidden' } },
       /*#__PURE__*/React.createElement('div', { style: { height: '100%', width: `${clamped}%`, backgroundColor: '#4F46E5', transition: 'width 0.2s ease', borderRadius: 'var(--radius-full)' } })
@@ -796,15 +796,15 @@ export function ImageProcessingOverlay({ current, total, fileName, pct, remainin
           backgroundColor: 'var(--bg-primary)',
           color: 'var(--text-muted)',
           border: '1px solid var(--border-subtle)',
-          fontSize: '0.72rem',
+          fontSize: 'var(--font-size-sm)',
           fontWeight: 900,
           lineHeight: 1
         }
       }, queueText)
     ),
-    /*#__PURE__*/React.createElement('div', { style: { fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.45, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } },
+    /*#__PURE__*/React.createElement('div', { style: { fontSize: 'var(--font-size-md)', color: 'var(--text-muted)', lineHeight: 1.45, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } },
       `${clamped}%${remainingText ? ` · ${remainingText}` : ''}`),
-    fileName && /*#__PURE__*/React.createElement('div', { style: { fontSize: '0.72rem', color: 'var(--text-light)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, fileName),
+    fileName && /*#__PURE__*/React.createElement('div', { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-light)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, fileName),
     /*#__PURE__*/React.createElement('div', { style: { height: '8px', borderRadius: 'var(--radius-full)', backgroundColor: 'var(--border-subtle)', overflow: 'hidden' } },
       /*#__PURE__*/React.createElement('div', { style: { height: '100%', width: `${clamped}%`, backgroundColor: '#4F46E5', transition: 'width 0.2s ease', borderRadius: 'var(--radius-full)' } })
     )
@@ -933,7 +933,7 @@ export function EmojiPickerSheet({ onSelect, onClose }) {
     onSelect(emoji);
   };
   const renderGroup = (label, emojis, key) => /*#__PURE__*/React.createElement('div', { key, style: { marginBottom: '10px' } },
-    /*#__PURE__*/React.createElement('div', { style: { fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-light)', margin: '4px 6px' } }, label),
+    /*#__PURE__*/React.createElement('div', { style: { fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--text-light)', margin: '4px 6px' } }, label),
     /*#__PURE__*/React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, 38px)', justifyContent: 'space-between' } },
       emojis.map((e, i) => /*#__PURE__*/React.createElement(EmojiGridButton, { key: `${key}-${i}`, emoji: e, onSelect: handlePick }))
     )
@@ -1069,11 +1069,11 @@ class AppErrorBoundary extends ReactComponentBase {
       React.createElement('div', { style: { display: 'flex', gap: '10px', justifyContent: 'center' } },
         React.createElement('button', {
           onClick: () => this.setState({ hasError: false, error: null }),
-          style: { padding: '8px 16px', background: '#F1F5F9', color: '#475569', border: '1px solid #CBD5E1', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }
+          style: { padding: '8px 16px', background: '#F1F5F9', color: '#475569', border: '1px solid #CBD5E1', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: 'var(--font-size-base)' }
         }, '다시 시도'),
         React.createElement('button', {
           onClick: () => window.location.reload(),
-          style: { padding: '8px 16px', background: '#4F46E5', color: '#FFFFFF', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }
+          style: { padding: '8px 16px', background: '#4F46E5', color: '#FFFFFF', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: 'var(--font-size-base)' }
         }, '새로고침')
       )
       );

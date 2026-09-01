@@ -1295,7 +1295,7 @@ export function AdminModal({
         type: "button",
         onClick: () => setActiveTab('settings'),
         style: {
-          padding: '12px 8px', fontSize: '0.88rem', fontWeight: 'bold', whiteSpace: 'nowrap',
+          padding: '12px 8px', fontSize: 'var(--font-size-base)', fontWeight: 'bold', whiteSpace: 'nowrap',
           color: activeTab === 'settings' ? '#2563EB' : '#64748B',
           border: 'none', background: 'none',
           borderBottom: activeTab === 'settings' ? '3px solid #2563EB' : '3px solid transparent',
@@ -1306,7 +1306,7 @@ export function AdminModal({
         type: "button",
         onClick: () => setActiveTab('anniversary'),
         style: {
-          padding: '12px 6px', fontSize: '0.82rem', fontWeight: 'bold', whiteSpace: 'nowrap',
+          padding: '12px 6px', fontSize: 'var(--font-size-md)', fontWeight: 'bold', whiteSpace: 'nowrap',
           color: activeTab === 'anniversary' ? '#2563EB' : '#64748B',
           border: 'none', background: 'none',
           borderBottom: activeTab === 'anniversary' ? '3px solid #2563EB' : '3px solid transparent',
@@ -1318,7 +1318,7 @@ export function AdminModal({
         type: "button",
         onClick: () => setActiveTab('recovery'),
         style: {
-          padding: '12px 8px', fontSize: '0.88rem', fontWeight: 'bold', whiteSpace: 'nowrap',
+          padding: '12px 8px', fontSize: 'var(--font-size-base)', fontWeight: 'bold', whiteSpace: 'nowrap',
           color: activeTab === 'recovery' ? '#2563EB' : '#64748B',
           border: 'none', background: 'none',
           borderBottom: activeTab === 'recovery' ? '3px solid #2563EB' : '3px solid transparent',
@@ -1330,7 +1330,7 @@ export function AdminModal({
         type: "button",
         onClick: () => setActiveTab('logs'),
         style: {
-          padding: '12px 8px', fontSize: '0.88rem', fontWeight: 'bold', whiteSpace: 'nowrap',
+          padding: '12px 8px', fontSize: 'var(--font-size-base)', fontWeight: 'bold', whiteSpace: 'nowrap',
           color: activeTab === 'logs' ? '#2563EB' : '#64748B',
           border: 'none', background: 'none',
           borderBottom: activeTab === 'logs' ? '3px solid #2563EB' : '3px solid transparent',
@@ -1360,7 +1360,7 @@ export function AdminModal({
 
             /* Input: Title */
             /*#__PURE__*/React.createElement("div", { style: { marginBottom: '10px' } },
-              /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "캘린더명"),
+              /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "캘린더명"),
               /*#__PURE__*/React.createElement("input", {
                 type: "text", className: "form-input", style: { width: '100%' },
                 value: title, disabled: isSubmitting, maxLength: 80,
@@ -1370,7 +1370,7 @@ export function AdminModal({
 
             /* Input: Description */
             /*#__PURE__*/React.createElement("div", { style: { marginBottom: '14px' } },
-              /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "캘린더 설명"),
+              /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "캘린더 설명"),
               /*#__PURE__*/React.createElement("input", {
                 type: "text", className: "form-input", style: { width: '100%' },
                 value: description, disabled: isSubmitting, maxLength: 160,
@@ -1382,7 +1382,7 @@ export function AdminModal({
             /*#__PURE__*/React.createElement("div", {
               style: { borderTop: '1px solid var(--border-subtle)', paddingTop: '12px' }
             },
-              /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' } }, `참여자 설정 (${participants.filter(p => !isTombstone(p)).length}명)`),
+              /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' } }, `참여자 설정 (${participants.filter(p => !isTombstone(p)).length}명)`),
 
               /* Add Row */
               /*#__PURE__*/React.createElement("div", {
@@ -1424,7 +1424,7 @@ export function AdminModal({
                   }),
                   /* Name input */
                   /*#__PURE__*/React.createElement("input", {
-                    type: "text", className: "form-input", style: { flex: 1, minWidth: 0, height: '30px', fontSize: '0.82rem' },
+                    type: "text", className: "form-input", style: { flex: 1, minWidth: 0, height: '30px', fontSize: 'var(--font-size-md)' },
                     value: p.name, disabled: isSubmitting, maxLength: 40,
                     onInput: e => updateParticipant(p.id, { name: e.target.value }),
                     onChange: e => updateParticipant(p.id, { name: e.target.value })
@@ -1467,7 +1467,7 @@ export function AdminModal({
             /*#__PURE__*/React.createElement("div", {
               style: { display: 'flex', flexDirection: 'column', gap: '8px' }
             },
-              getCalendarPolls(calendar).length === 0 ? /*#__PURE__*/React.createElement("div", { style: { padding: '16px', color: 'var(--text-light)', fontSize: '0.8rem', textAlign: 'center' } }, "현재 등록된 투표가 없습니다. 새 투표를 생성해 주세요.") :
+              getCalendarPolls(calendar).length === 0 ? /*#__PURE__*/React.createElement("div", { style: { padding: '16px', color: 'var(--text-light)', fontSize: 'var(--font-size-md)', textAlign: 'center' } }, "현재 등록된 투표가 없습니다. 새 투표를 생성해 주세요.") :
               getCalendarPolls(calendar).map(poll => /*#__PURE__*/React.createElement("div", {
                 key: poll.id,
                 className: 'admin-log-row poll-list-row settings-poll-row',
@@ -1475,8 +1475,8 @@ export function AdminModal({
               },
                 /* Left info */
                 /*#__PURE__*/React.createElement("div", { className: "admin-poll-row-main", style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px', minWidth: 0, flex: '1 1 160px' } },
-                  /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text-main)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' } }, poll.title),
-                  /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: 'var(--text-muted)' } }, `${getActivePollOptions(poll).length}개 옵션 · 총 ${getPollTotalVoteCount(poll)}표${poll.deadline ? ` · 마감 ${formatPollDeadline(poll.deadline)}${isPollClosed(poll) ? ' (마감됨)' : ''}` : ''}`)
+                  /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-base)', fontWeight: 'bold', color: 'var(--text-main)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' } }, poll.title),
+                  /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } }, `${getActivePollOptions(poll).length}개 옵션 · 총 ${getPollTotalVoteCount(poll)}표${poll.deadline ? ` · 마감 ${formatPollDeadline(poll.deadline)}${isPollClosed(poll) ? ' (마감됨)' : ''}` : ''}`)
                 ),
                 /* Right actions */
                 /*#__PURE__*/React.createElement("div", { className: "admin-poll-row-actions", style: { display: 'flex', gap: '6px' } },
@@ -1486,7 +1486,7 @@ export function AdminModal({
                     onClick: () => { setEditingPoll(poll); setIsPollModalOpen(true); },
                     style: {
                       backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)',
-                      padding: '4px 10px', fontSize: '0.75rem', cursor: 'pointer', color: 'var(--text-main)'
+                      padding: '4px 10px', fontSize: 'var(--font-size-sm)', cursor: 'pointer', color: 'var(--text-main)'
                     }
                   }, "수정"),
                   /* Delete button */
@@ -1529,7 +1529,7 @@ export function AdminModal({
       },
         /* Info alert */
         /*#__PURE__*/React.createElement("div", {
-          style: { backgroundColor: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: 'var(--radius-md)', padding: '12px 14px', color: '#92400E', fontSize: '0.8rem', lineHeight: '1.5' }
+          style: { backgroundColor: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: 'var(--radius-md)', padding: '12px 14px', color: '#92400E', fontSize: 'var(--font-size-md)', lineHeight: '1.5' }
         },
           /*#__PURE__*/React.createElement("span", { style: { fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '4px', verticalAlign: 'middle' } }, /*#__PURE__*/React.createElement(AlertTriangleIcon, null), "시점 복구 안내 (데이터 롤백): "),
           "선택한 마일스톤 시점으로 캘린더 데이터를 되돌립니다. 지정한 복구 시점 이후에 수행된 변경 사항이 해당 상태로 복원됩니다."
@@ -1542,7 +1542,7 @@ export function AdminModal({
           /*#__PURE__*/React.createElement("button", {
             type: "button",
             className: "btn btn-primary",
-            style: { flex: '1 1 180px', justifyContent: 'center', padding: '12px 16px', fontWeight: 800, fontSize: '0.84rem' },
+            style: { flex: '1 1 180px', justifyContent: 'center', padding: '12px 16px', fontWeight: 800, fontSize: 'var(--font-size-base)' },
             onClick: () => {
               const blob = new Blob([JSON.stringify(calendar, null, 2)], { type: 'application/json' });
               const url = URL.createObjectURL(blob);
@@ -1563,7 +1563,7 @@ export function AdminModal({
               className: "form-select",
               value: exportCategory,
               onChange: e => setExportCategory(e.target.value),
-              style: { flex: 1, minWidth: 0, fontSize: '0.82rem', borderRadius: '8px', padding: '10px' }
+              style: { flex: 1, minWidth: 0, fontSize: 'var(--font-size-md)', borderRadius: '8px', padding: '10px' }
             },
               /*#__PURE__*/React.createElement("option", { value: "full" }, "전체 데이터 (JSON)"),
               /*#__PURE__*/React.createElement("option", { value: "calendar" }, "캘린더 일정 (.ics)"),
@@ -1577,7 +1577,7 @@ export function AdminModal({
               type: "button",
               className: "btn btn-secondary",
               onClick: handleExportSelectedData,
-              style: { fontSize: '0.82rem', fontWeight: 800, whiteSpace: 'nowrap', borderRadius: '8px', padding: '10px 14px' }
+              style: { fontSize: 'var(--font-size-md)', fontWeight: 800, whiteSpace: 'nowrap', borderRadius: '8px', padding: '10px 14px' }
             }, "내보내기")
           )
         ),
@@ -1592,7 +1592,7 @@ export function AdminModal({
           /*#__PURE__*/React.createElement("div", {
             style: { display: 'flex', flexDirection: 'column', gap: '8px', minHeight: '360px', paddingRight: '4px' }
           },
-            activityLogsSorted.length === 0 ? /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: 'var(--text-light)', fontSize: '0.82rem', textAlign: 'center' } }, "기록된 활동 로그가 없어 복구 기능을 이용할 수 없습니다.") :
+            activityLogsSorted.length === 0 ? /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: 'var(--text-light)', fontSize: 'var(--font-size-md)', textAlign: 'center' } }, "기록된 활동 로그가 없어 복구 기능을 이용할 수 없습니다.") :
             activityLogsSorted.map(log => {
               const resolveParticipant = __deps.resolveLogParticipant || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.resolveLogParticipant) || ((l, map) => (map && map[l.participantId]) || { name: '시스템', color: '#94A3B8' });
               const formatNote = __deps.formatDetailedLogNote || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.formatDetailedLogNote) || (l => l.note || '');
@@ -1630,7 +1630,7 @@ export function AdminModal({
                   /* Action Badge */
                   /*#__PURE__*/React.createElement("span", {
                     style: {
-                      fontSize: '0.68rem', fontWeight: 'bold', padding: '2px 6px', borderRadius: '4px',
+                      fontSize: 'var(--font-size-xs)', fontWeight: 'bold', padding: '2px 6px', borderRadius: '4px',
                       backgroundColor: actionBadgeBg, color: actionBadgeColor, border: `1px solid ${actionBadgeColor}30`,
                       whiteSpace: 'nowrap'
                     }
@@ -1639,12 +1639,12 @@ export function AdminModal({
                   /*#__PURE__*/React.createElement(ParticipantBadge, { participant: p }),
                   log.date && /*#__PURE__*/React.createElement("span", {
                     className: "recent-log-date",
-                    style: { fontSize: '0.78rem' }
+                    style: { fontSize: 'var(--font-size-md)' }
                   }, formatShortDateWithDayName(log.date)),
                   /* Description text */
                   detailedNote && /*#__PURE__*/React.createElement("span", {
                     className: "recent-log-note",
-                    style: { fontSize: '0.78rem' }
+                    style: { fontSize: 'var(--font-size-md)' }
                   }, detailedNote)
                 ),
                 /* Right: registered-at timestamp + rollback button */
@@ -1656,7 +1656,7 @@ export function AdminModal({
                     className: "recovery-restore-btn",
                     style: {
                       backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)',
-                      padding: '6px 10px', fontSize: '0.72rem', fontWeight: 'bold', cursor: 'pointer', color: 'var(--accent-primary)', whiteSpace: 'nowrap'
+                      padding: '6px 10px', fontSize: 'var(--font-size-sm)', fontWeight: 'bold', cursor: 'pointer', color: 'var(--accent-primary)', whiteSpace: 'nowrap'
                     }
                   }, "이 시점으로 복구")
                 )
@@ -1692,7 +1692,7 @@ export function AdminModal({
             type: "button",
             onClick: () => setLogCategoryFilter(chip.id),
             style: {
-              padding: '5px 12px', borderRadius: 'var(--radius-full)', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap',
+              padding: '5px 12px', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap',
               border: logCategoryFilter === chip.id ? '1px solid #0F172A' : '1px solid var(--border-subtle)',
               backgroundColor: logCategoryFilter === chip.id ? '#0F172A' : 'var(--bg-card)',
               color: logCategoryFilter === chip.id ? '#FFFFFF' : 'var(--text-muted)'
@@ -1707,7 +1707,7 @@ export function AdminModal({
           value: logSearchQuery,
           onChange: e => setLogSearchQuery(e.target.value),
           placeholder: "활동 로그 검색 (참여자, 내용, 일자 등)",
-          style: { width: '100%', borderRadius: '8px', fontSize: '0.8rem' }
+          style: { width: '100%', borderRadius: '8px', fontSize: 'var(--font-size-md)' }
         }),
 
         (() => {
@@ -1755,7 +1755,7 @@ export function AdminModal({
 
           if (filteredLogs.length === 0) {
             return /*#__PURE__*/React.createElement("div", {
-              style: { textAlign: 'center', color: 'var(--text-light)', fontSize: '0.85rem', padding: '24px 0' }
+              style: { textAlign: 'center', color: 'var(--text-light)', fontSize: 'var(--font-size-base)', padding: '24px 0' }
             }, "조건에 해당되는 활동 로그가 없습니다.");
           }
           return /*#__PURE__*/React.createElement("div", {
@@ -1780,13 +1780,13 @@ export function AdminModal({
               className: "recent-log-left"
             }, /*#__PURE__*/React.createElement(ParticipantBadge, { participant: participant }), /*#__PURE__*/React.createElement("span", {
               className: "recent-log-action",
-              style: { color: actionColor, fontWeight: 'bold', fontSize: '0.75rem' }
+              style: { color: actionColor, fontWeight: 'bold', fontSize: 'var(--font-size-sm)' }
             }, "[", actionLabel, "]"), /*#__PURE__*/React.createElement("span", {
               className: "recent-log-date",
-              style: { fontSize: '0.78rem', color: '#475569' }
+              style: { fontSize: 'var(--font-size-md)', color: '#475569' }
             }, logDateText || null), noteText && /*#__PURE__*/React.createElement("span", {
               className: "recent-log-note",
-              style: { fontSize: '0.78rem', color: 'var(--text-muted)', fontStyle: 'italic' }
+              style: { fontSize: 'var(--font-size-md)', color: 'var(--text-muted)', fontStyle: 'italic' }
             }, "\"", noteText, "\"")), /*#__PURE__*/React.createElement("div", {
               className: "recent-log-right"
             }, /*#__PURE__*/React.createElement("span", {
@@ -1954,7 +1954,7 @@ export function AdminUnifiedSearchResultsView({
         style: { position: 'absolute', left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'baseline', whiteSpace: 'nowrap' }
       },
         /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-main)' } }, "통합 검색결과"),
-        /*#__PURE__*/React.createElement("span", { style: { fontWeight: 500, marginLeft: '10px', fontSize: '0.78rem', color: 'var(--text-muted)' } },
+        /*#__PURE__*/React.createElement("span", { style: { fontWeight: 500, marginLeft: '10px', fontSize: 'var(--font-size-md)', color: 'var(--text-muted)' } },
           `"${query}" · ${grandTotal}건 · 캘린더 ${calendarCount}개`
         )
       ),
@@ -2000,7 +2000,7 @@ export function AdminUnifiedSearchResultsView({
         type: "button",
         onClick: () => { onCalFilterChange('all'); onDateStartChange(''); onDateEndChange(''); },
         className: "btn btn-secondary",
-        style: { height: '44px', boxSizing: 'border-box', padding: '0 12px', fontSize: '0.78rem', flexShrink: 0 }
+        style: { height: '44px', boxSizing: 'border-box', padding: '0 12px', fontSize: 'var(--font-size-md)', flexShrink: 0 }
       }, "초기화")
     ),
 
@@ -2008,7 +2008,7 @@ export function AdminUnifiedSearchResultsView({
 
     /*#__PURE__*/React.createElement("div", { style: { padding: '20px', display: 'flex', flexDirection: 'column', gap: '8px' } },
       grandTotal === 0 ? /*#__PURE__*/React.createElement("div", {
-        style: { textAlign: 'center', color: 'var(--text-light)', fontSize: '0.88rem', padding: '40px 0' }
+        style: { textAlign: 'center', color: 'var(--text-light)', fontSize: 'var(--font-size-base)', padding: '40px 0' }
       }, "검색 결과가 없습니다.") : null,
 
       activeTab === 'schedules' && allMatches.schedules.map(item => /*#__PURE__*/React.createElement(SearchResultLogRow, {
@@ -2035,8 +2035,8 @@ export function AdminUnifiedSearchResultsView({
         style: { padding: 0, border: 0, background: 'none', cursor: 'pointer', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '4px', font: 'inherit' }
       },
         /*#__PURE__*/React.createElement("img", { src: entry.thumb, loading: 'lazy', decoding: 'async', referrerPolicy: 'no-referrer', style: { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: 'var(--radius-sm)' } }),
-        /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700 } }, entry.calendarLabel),
-        /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.7rem', color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, highlightKeyword(entry.tags || '', q))
+        /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', fontWeight: 700 } }, entry.calendarLabel),
+        /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, highlightKeyword(entry.tags || '', q))
       ))),
 
       activeTab === 'expenses' && allMatches.expenses.map(exp => /*#__PURE__*/React.createElement(SearchResultLogRow, {
@@ -2055,7 +2055,7 @@ export function AdminUnifiedSearchResultsView({
         onClick: () => window.open(getAdminSearchResultTargetUrl('memos', memo), '_blank', 'noopener')
       },
         memo.title && /*#__PURE__*/React.createElement("div", { style: { fontWeight: 500, marginBottom: '2px' } }, highlightKeyword(memo.title, q)),
-        memo.text && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.7rem', color: 'var(--text-light)' } }, highlightKeyword(memo.text.length > 100 ? memo.text.slice(0, 100) + '...' : memo.text, q))
+        memo.text && /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-light)' } }, highlightKeyword(memo.text.length > 100 ? memo.text.slice(0, 100) + '...' : memo.text, q))
       ))
     )
   );
@@ -2097,20 +2097,20 @@ export function AdminCreateCalendarModal({ onCreate, onClose }) {
     },
       /*#__PURE__*/React.createElement("h3", { style: { fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)' } }, "+ 새 캘린더 생성"),
       /*#__PURE__*/React.createElement("div", null,
-        /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "캘린더 ID (예: kkot, cw, trip)"),
+        /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "캘린더 ID (예: kkot, cw, trip)"),
         /*#__PURE__*/React.createElement("input", {
           type: "text", className: "form-input", style: { width: '100%' }, autoFocus: true,
           value: id, onChange: e => setId(e.target.value), disabled: isSubmitting
         })
       ),
       /*#__PURE__*/React.createElement("div", null,
-        /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "캘린더 제목"),
+        /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "캘린더 제목"),
         /*#__PURE__*/React.createElement("input", {
           type: "text", className: "form-input", style: { width: '100%' }, placeholder: `${id} 모임 캘린더`,
           value: title, onChange: e => setTitle(e.target.value), disabled: isSubmitting
         })
       ),
-      error && /*#__PURE__*/React.createElement("div", { style: { color: '#DC2626', fontSize: '0.82rem' } }, error),
+      error && /*#__PURE__*/React.createElement("div", { style: { color: '#DC2626', fontSize: 'var(--font-size-md)' } }, error),
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', marginTop: '4px' } },
         /*#__PURE__*/React.createElement("button", {
           type: "button", className: "btn btn-secondary", style: { flex: 1, height: '44px' },
@@ -2151,14 +2151,14 @@ export function AdminRestorePhraseModal({ onConfirm, onClose }) {
       style: { maxWidth: '380px', padding: '20px', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', gap: '12px' }
     },
       /*#__PURE__*/React.createElement("h3", { style: { fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)' } }, "운영 데이터 복구 확인"),
-      /*#__PURE__*/React.createElement("p", { style: { fontSize: '0.85rem', color: '#475569', lineHeight: '1.5' } },
+      /*#__PURE__*/React.createElement("p", { style: { fontSize: 'var(--font-size-base)', color: '#475569', lineHeight: '1.5' } },
         '백업 JSON 복구는 현재 운영 데이터를 교체합니다. 계속하려면 아래에 "운영 데이터 복구"를 정확히 입력하세요.'
       ),
       /*#__PURE__*/React.createElement("input", {
         type: "text", className: "form-input", style: { width: '100%' }, autoFocus: true,
         value: phrase, onChange: e => setPhrase(e.target.value), placeholder: "운영 데이터 복구"
       }),
-      error && /*#__PURE__*/React.createElement("div", { style: { color: '#DC2626', fontSize: '0.82rem' } }, error),
+      error && /*#__PURE__*/React.createElement("div", { style: { color: '#DC2626', fontSize: 'var(--font-size-md)' } }, error),
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', marginTop: '4px' } },
         /*#__PURE__*/React.createElement("button", {
           type: "button", className: "btn btn-secondary", style: { flex: 1, height: '44px' }, onClick: onClose
@@ -2208,7 +2208,7 @@ export function AdminUnifiedSearchModal({ onClose, onSearch }) {
       }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))
     ),
     /*#__PURE__*/React.createElement("div", { className: "modal-body" },
-      /*#__PURE__*/React.createElement("p", { style: { fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0 0 10px' } },
+      /*#__PURE__*/React.createElement("p", { style: { fontSize: 'var(--font-size-md)', color: 'var(--text-muted)', margin: '0 0 10px' } },
         "모든 캘린더의 일정, 대화, 투표, 사진 태그를 한번에 검색합니다."
       ),
       /*#__PURE__*/React.createElement("input", {

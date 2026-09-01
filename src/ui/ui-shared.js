@@ -1010,7 +1010,7 @@ export function SegmentedToggle({ options, value, onChange, disabled, style, ari
         flex: 1, minWidth: 0,
         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
         padding: '12px 16px', border: 'none', cursor: disabled ? 'default' : 'pointer', borderRadius: 'var(--radius-sm)',
-        fontSize: '0.78rem', fontWeight: value === opt.value ? 900 : 500, whiteSpace: 'nowrap',
+        fontSize: 'var(--font-size-md)', fontWeight: value === opt.value ? 900 : 500, whiteSpace: 'nowrap',
         backgroundColor: value === opt.value ? (opt.activeColor || 'var(--accent-primary)') : 'transparent',
         color: value === opt.value ? '#FFFFFF' : 'var(--text-muted)'
       }
@@ -1188,7 +1188,7 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = fals
     },
       displayTitle && /*#__PURE__*/React.createElement('div', {
         style: {
-          fontSize: '0.8rem',
+          fontSize: 'var(--font-size-md)',
           fontWeight: 700,
           lineHeight: 1.25,
           color: 'var(--text-main)',
@@ -1199,7 +1199,7 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = fals
       }, displayTitle),
       description && /*#__PURE__*/React.createElement('div', {
         style: {
-          fontSize: '0.72rem',
+          fontSize: 'var(--font-size-sm)',
           lineHeight: 1.3,
           color: 'var(--text-muted)',
           overflow: 'hidden',
@@ -1210,7 +1210,7 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = fals
       }, description),
       displayHost && /*#__PURE__*/React.createElement('div', {
         style: {
-          fontSize: '0.66rem',
+          fontSize: 'var(--font-size-2xs)',
           lineHeight: 1.2,
           color: 'var(--text-light)'
         }
@@ -1234,9 +1234,9 @@ export function LinkPreviewProgressOverlay({ progress, remainingSec }) {
         style: { width: '100%', maxWidth: '360px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)' }
       },
         /*#__PURE__*/React.createElement("h3", { style: { fontSize: '1rem', fontWeight: 800, textAlign: 'center', margin: 0, color: 'var(--text-main)' } }, "링크 미리보기 가져오는 중"),
-        /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center' } }, "웹페이지 정보를 분석하고 있습니다."),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-md)', color: 'var(--text-muted)', textAlign: 'center' } }, "웹페이지 정보를 분석하고 있습니다."),
         /*#__PURE__*/React.createElement("div", {
-          style: { display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', fontWeight: 700 }
+          style: { display: 'flex', justifyContent: 'space-between', fontSize: 'var(--font-size-sm)', fontWeight: 700 }
         },
           /*#__PURE__*/React.createElement("span", { style: { color: 'var(--text-muted)' } }, "진행 상태"),
           /*#__PURE__*/React.createElement("span", { style: { color: 'var(--accent-primary)' } }, `${progress}% (약 ${remainingSec}초 남음)`)
@@ -1316,7 +1316,7 @@ export function AdminLoginGate({ children }) {
       style: { maxWidth: '320px', padding: '28px', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', gap: '14px' }
     },
       /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(LockIcon, null), "관리자 인증"),
-      /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.82rem', color: 'var(--text-muted)' } }, "비밀번호를 입력해 주세요."),
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-md)', color: 'var(--text-muted)' } }, "비밀번호를 입력해 주세요."),
       /*#__PURE__*/React.createElement("input", {
         type: "password",
         className: "form-input",
@@ -1326,7 +1326,7 @@ export function AdminLoginGate({ children }) {
         onChange: e => setPasswordInput(e.target.value),
         placeholder: "비밀번호"
       }),
-      error && /*#__PURE__*/React.createElement("div", { style: { color: '#DC2626', fontSize: '0.82rem' } }, error),
+      error && /*#__PURE__*/React.createElement("div", { style: { color: '#DC2626', fontSize: 'var(--font-size-md)' } }, error),
       /*#__PURE__*/React.createElement("button", {
         type: "submit",
         className: "btn btn-primary",
@@ -1384,7 +1384,7 @@ export function DonutChart({ segments, size = 84, strokeWidth = 14 }) {
       style: {
         position: 'absolute', bottom: `calc(100% + 6px)`, left: '50%', transform: 'translateX(-50%)',
         backgroundColor: 'rgba(15, 23, 42, 0.94)', color: '#FFFFFF', borderRadius: 'var(--radius-sm)',
-        padding: '4px 8px', fontSize: '0.66rem', fontWeight: 700, whiteSpace: 'nowrap',
+        padding: '4px 8px', fontSize: 'var(--font-size-2xs)', fontWeight: 700, whiteSpace: 'nowrap',
         pointerEvents: 'none', zIndex: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.25)'
       }
     }, `${activeSeg.label} · ${activeSeg.value}${activeSeg.unit || '건'} (${total > 0 ? Math.round(activeSeg.value / total * 100) : 0}%)`)
@@ -1590,7 +1590,7 @@ export function StickyVideoBox({ stickyVideo, onClose, onGoToChat }) {
     style: {
       flex: 1,
       padding: '6px 8px',
-      fontSize: '0.72rem',
+      fontSize: 'var(--font-size-sm)',
       fontWeight: '700',
       color: '#FFFFFF',
       backgroundColor: 'rgba(255,255,255,0.14)',
@@ -1608,7 +1608,7 @@ export function StickyVideoBox({ stickyVideo, onClose, onGoToChat }) {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      fontSize: '0.85rem',
+      fontSize: 'var(--font-size-base)',
       color: '#FFFFFF',
       backgroundColor: 'rgba(255,255,255,0.14)',
       border: 'none',
@@ -1704,11 +1704,11 @@ export function OperationProgressOverlay({ title, detail, pct }) {
     style: { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '16px 18px', width: '100%', textAlign: 'left', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }
   },
     /*#__PURE__*/React.createElement('div', { style: { fontWeight: 900, fontSize: '0.9rem', color: 'var(--text-main)', marginBottom: '4px' } }, title || '작업 처리 중...'),
-    /*#__PURE__*/React.createElement('div', { style: { fontSize: '0.76rem', color: 'var(--text-muted)', marginBottom: '10px', lineHeight: 1.4 } }, detail || '서버에 반영하고 있습니다.'),
+    /*#__PURE__*/React.createElement('div', { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginBottom: '10px', lineHeight: 1.4 } }, detail || '서버에 반영하고 있습니다.'),
     /*#__PURE__*/React.createElement('div', { style: { height: '9px', borderRadius: 'var(--radius-full)', backgroundColor: 'var(--border-subtle)', overflow: 'hidden' } },
       /*#__PURE__*/React.createElement('div', { style: { height: '100%', width: `${clamped}%`, background: 'linear-gradient(90deg, #4F46E5, #EC4899)', transition: 'width 0.35s ease', borderRadius: 'var(--radius-full)' } })
     ),
-    /*#__PURE__*/React.createElement('div', { style: { marginTop: '6px', color: 'var(--text-muted)', fontSize: '0.7rem', fontWeight: 800 } }, `${Math.round(clamped)}% · 다른 화면은 계속 사용할 수 있습니다.`)
+    /*#__PURE__*/React.createElement('div', { style: { marginTop: '6px', color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)', fontWeight: 800 } }, `${Math.round(clamped)}% · 다른 화면은 계속 사용할 수 있습니다.`)
   ));
 }
 
@@ -1869,7 +1869,7 @@ export function MemoTagInputRow({
       style: {
         flex: 1, minWidth: 0, height: '28px', padding: '0 8px', borderRadius: 'var(--radius-sm)',
         border: '1px solid var(--border-subtle)', background: 'var(--bg-primary)',
-        color: 'var(--text-main)', fontSize: '0.74rem'
+        color: 'var(--text-main)', fontSize: 'var(--font-size-sm)'
       }
     }),
     /*#__PURE__*/React.createElement("button", {
@@ -1879,7 +1879,7 @@ export function MemoTagInputRow({
       style: {
         flexShrink: 0, height: '28px', padding: '0 10px', borderRadius: 'var(--radius-sm)',
         border: '1px solid var(--border-subtle)', background: 'var(--border-subtle)',
-        color: 'var(--text-main)', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer',
+        color: 'var(--text-main)', fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer',
         opacity: tags.length >= maxTags ? 0.45 : 1
       }
     }, "태그저장")
@@ -2018,7 +2018,7 @@ export function ClickToPlayVideoCard({ url, mediaInfo = null, fallbackTitle = ''
         boxSizing: 'border-box',
         textAlign: 'center',
         color: 'var(--text-light)',
-        fontSize: '0.8rem',
+        fontSize: 'var(--font-size-md)',
         fontWeight: 600
       }
     }, title),
@@ -2046,7 +2046,7 @@ export function ClickToPlayVideoCard({ url, mediaInfo = null, fallbackTitle = ''
         borderRadius: 'var(--radius-full)',
         backgroundColor: isTikTok ? 'rgba(0,0,0,0.78)' : 'rgba(220, 38, 38, 0.92)',
         color: '#FFFFFF',
-        fontSize: '0.68rem',
+        fontSize: 'var(--font-size-xs)',
         fontWeight: 800,
         boxShadow: '0 2px 4px rgba(0,0,0,0.25)',
         pointerEvents: 'none'
@@ -2092,7 +2092,7 @@ export function ClickToPlayVideoCard({ url, mediaInfo = null, fallbackTitle = ''
       /*#__PURE__*/React.createElement("div", {
         style: {
           color: '#FFFFFF',
-          fontSize: '0.74rem',
+          fontSize: 'var(--font-size-sm)',
           fontWeight: 700,
           overflow: 'hidden',
           textOverflow: 'ellipsis',
