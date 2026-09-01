@@ -1088,7 +1088,11 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
             borderRadius: '10px',
             backgroundColor: 'var(--bg-primary)'
           }
-        }), shouldRenderChatLinkPreview(firstUrl) && /*#__PURE__*/React.createElement(LinkPreviewCard, {
+        }), firstUrl && /*#__PURE__*/React.createElement(LinkPreviewCard, {
+          // Direct video embeds (especially YouTube) still get a metadata card below the
+          // player. Previously shouldRenderChatLinkPreview() rejected every media URL, so
+          // those links showed only a blank/plain video block while ordinary web links showed
+          // title and thumbnail. The card is supplemental; the iframe remains unchanged.
           url: firstUrl,
           fallbackTitle: text ? removeFirstUrl(text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '',
           cachedData: linkPreview
