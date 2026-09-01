@@ -95,7 +95,7 @@ function DateModalVideoCard({ video }) {
         border: isVideoOpen ? '1px solid var(--border-subtle)' : '1px solid var(--primary)',
         backgroundColor: isVideoOpen ? 'var(--bg-secondary)' : 'var(--bg-primary)',
         color: isVideoOpen ? 'var(--text-muted)' : 'var(--primary)',
-        fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer'
+        fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer'
       }
     }, isVideoOpen ? [
       SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { key: 'close', size: 13 }) : null,
@@ -2298,7 +2298,7 @@ export function DateModal({
   }, titleParts.rest)), holidayLabelText && /*#__PURE__*/React.createElement("span", {
     className: "holiday-tag",
     style: {
-      fontSize: '0.72rem',
+      fontSize: 'var(--font-size-sm)',
       fontWeight: 'bold',
       padding: '3px 8px',
       borderRadius: 'var(--radius-sm)',
@@ -2348,7 +2348,7 @@ export function DateModal({
         background: activeTab === 'participant' ? 'var(--accent-primary)' : 'transparent',
         color: activeTab === 'participant' ? '#FFFFFF' : 'var(--text-muted)',
         fontWeight: 800,
-        fontSize: '0.8rem',
+        fontSize: 'var(--font-size-md)',
         cursor: 'pointer',
         display: 'flex',
         alignItems: 'center',
@@ -2370,7 +2370,7 @@ export function DateModal({
         background: activeTab === 'meeting' ? 'var(--accent-primary)' : 'transparent',
         color: activeTab === 'meeting' ? '#FFFFFF' : 'var(--text-muted)',
         fontWeight: 800,
-        fontSize: '0.8rem',
+        fontSize: 'var(--font-size-md)',
         cursor: 'pointer',
         display: 'flex',
         alignItems: 'center',
@@ -2392,7 +2392,7 @@ export function DateModal({
         background: activeTab === 'settlement' ? 'var(--accent-primary)' : 'transparent',
         color: activeTab === 'settlement' ? '#FFFFFF' : 'var(--text-muted)',
         fontWeight: 800,
-        fontSize: '0.8rem',
+        fontSize: 'var(--font-size-md)',
         cursor: 'pointer',
         display: 'flex',
         alignItems: 'center',
@@ -2414,7 +2414,7 @@ export function DateModal({
         background: activeTab === 'photo' ? 'var(--accent-primary)' : 'transparent',
         color: activeTab === 'photo' ? '#FFFFFF' : 'var(--text-muted)',
         fontWeight: 800,
-        fontSize: '0.8rem',
+        fontSize: 'var(--font-size-md)',
         cursor: 'pointer',
         display: 'flex',
         alignItems: 'center',
@@ -2455,7 +2455,7 @@ export function DateModal({
             border: `1px solid ${displayColor}30`,
             borderLeft: `4px solid ${displayColor}`,
             borderRadius: 'var(--radius-md)',
-            fontSize: '0.82rem',
+            fontSize: 'var(--font-size-md)',
             fontWeight: 'bold'
           }
         }, ann.icon === '🎂' && CakeIcon ? /*#__PURE__*/React.createElement(CakeIcon, { size: 14 }) : ann.icon, " ", ann.title);
@@ -2465,7 +2465,7 @@ export function DateModal({
         /* Participant Picker Button */
         /*#__PURE__*/React.createElement("div", null,
           /*#__PURE__*/React.createElement("label", {
-            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '6px', color: 'var(--text-muted)' }
+            style: { display: 'block', fontSize: 'var(--font-size-md)', fontWeight: 700, marginBottom: '6px', color: 'var(--text-muted)' }
           }, "참여자 선택"),
           /*#__PURE__*/React.createElement("button", {
             type: "button",
@@ -2517,7 +2517,7 @@ export function DateModal({
         /* Note Input Field */
         /*#__PURE__*/React.createElement("div", null,
           /*#__PURE__*/React.createElement("label", {
-            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '6px', color: 'var(--text-muted)' }
+            style: { display: 'block', fontSize: 'var(--font-size-md)', fontWeight: 700, marginBottom: '6px', color: 'var(--text-muted)' }
           }, "메모 입력 (선택)"),
           /*#__PURE__*/React.createElement("div", { className: "date-modal-field-with-actions", style: { display: 'flex', gap: '8px' } },
             /*#__PURE__*/React.createElement("input", {
@@ -2553,7 +2553,7 @@ export function DateModal({
         style: { marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '6px' }
       },
         /*#__PURE__*/React.createElement("label", {
-          style: { fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '2px' }
+          style: { fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '2px' }
         }, `참석 명단 (${dateEntries.length}명 가능)`),
         /* List */
         /*#__PURE__*/React.createElement(ResizableListSection, {
@@ -2604,7 +2604,7 @@ export function DateModal({
                 className: "date-modal-attendance-name",
                 style: {
                   fontWeight: 800,
-                  fontSize: '0.85rem',
+                  fontSize: 'var(--font-size-base)',
                   color: part.color || 'var(--text-main)',
                   minWidth: 0,
                   cursor: 'pointer',
@@ -2618,7 +2618,7 @@ export function DateModal({
             entry.note && /*#__PURE__*/React.createElement("div", {
               className: "date-modal-attendance-note",
               style: {
-                fontSize: '0.78rem',
+                fontSize: 'var(--font-size-md)',
                 color: 'var(--text-main)',
                 minWidth: 0,
                 lineHeight: 1.4,
@@ -2698,7 +2698,7 @@ export function DateModal({
         /* Search Field */
         /*#__PURE__*/React.createElement("div", null,
           /*#__PURE__*/React.createElement("label", {
-            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '6px', color: 'var(--text-muted)' }
+            style: { display: 'block', fontSize: 'var(--font-size-md)', fontWeight: 700, marginBottom: '6px', color: 'var(--text-muted)' }
           }, "장소 검색"),
           /*#__PURE__*/React.createElement("div", { className: "date-modal-field-with-actions", style: { display: 'flex', gap: '8px' } },
             /*#__PURE__*/React.createElement("input", {
@@ -2734,7 +2734,7 @@ export function DateModal({
             backgroundColor: 'var(--bg-primary)', display: 'flex', flexDirection: 'column', gap: '6px'
           }
         },
-          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', fontWeight: 700 } },
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', fontSize: 'var(--font-size-sm)', fontWeight: 700 } },
             /*#__PURE__*/React.createElement("span", { style: { color: 'var(--text-muted)' } },
               placeSearchStage === 'kakao' ? "카카오 로컬 정보 분석 중..." :
               placeSearchStage === 'google' ? "구글 장소 분석 중..." :
@@ -2757,7 +2757,7 @@ export function DateModal({
           }
         },
           /*#__PURE__*/React.createElement("div", {
-            style: { fontSize: '0.72rem', fontWeight: 800, color: 'var(--accent-primary)', padding: '2px 6px' }
+            style: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--accent-primary)', padding: '2px 6px' }
           }, "이미 등록된 장소"),
           existingPlaceSuggestions.map(p => /*#__PURE__*/React.createElement("button", {
             key: p.id,
@@ -2766,8 +2766,8 @@ export function DateModal({
             style: { textAlign: 'left', padding: '8px 10px', borderRadius: 'var(--radius-sm)', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '2px' },
             className: "place-result-item"
           },
-            /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-main)' } }, p.alias || p.name),
-            /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: 'var(--text-muted)' } }, getDisplayPlaceAddress(p) || p.name)
+            /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-main)' } }, p.alias || p.name),
+            /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } }, getDisplayPlaceAddress(p) || p.name)
           ))
         ),
 
@@ -2784,8 +2784,8 @@ export function DateModal({
           style: { textAlign: 'left', padding: '8px 10px', borderRadius: 'var(--radius-sm)', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '2px' },
           className: "place-result-item"
         },
-          /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-main)' } }, r.name),
-          /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: 'var(--text-muted)' } }, getDisplayPlaceAddress(r))
+          /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-main)' } }, r.name),
+          /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } }, getDisplayPlaceAddress(r))
         ))),
 
         /* Selected place preview card */
@@ -2796,25 +2796,25 @@ export function DateModal({
           }
         },
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' } },
-            /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.86rem', fontWeight: 800, color: 'var(--text-main)' } }, selectedPlace.name),
-            selectedPlace.categoryLabel && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.7rem', color: 'var(--text-muted)' } }, selectedPlace.categoryLabel)
+            /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-base)', fontWeight: 800, color: 'var(--text-main)' } }, selectedPlace.name),
+            selectedPlace.categoryLabel && /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' } }, selectedPlace.categoryLabel)
           ),
-          selectedPlace.address && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.76rem', color: 'var(--text-muted)' } }, getDisplayPlaceAddress(selectedPlace)),
-          selectedPlace.phone && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.76rem', color: 'var(--text-muted)' } }, `☎ ${selectedPlace.phone}`),
+          selectedPlace.address && /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } }, getDisplayPlaceAddress(selectedPlace)),
+          selectedPlace.phone && /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } }, `☎ ${selectedPlace.phone}`),
           duplicatePlace && /*#__PURE__*/React.createElement("div", {
             style: { marginTop: '6px', padding: '9px 10px', borderRadius: '8px', backgroundColor: 'rgba(245, 158, 11, 0.12)', border: '1px solid rgba(245, 158, 11, 0.35)' }
           },
-            /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', fontWeight: 700, color: '#92400E', lineHeight: 1.45 } }, `기존 ${duplicatePlace.alias || duplicatePlace.name} 과 동일한 업체입니다. 병합하시겠습니까?`),
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-md)', fontWeight: 700, color: '#92400E', lineHeight: 1.45 } }, `기존 ${duplicatePlace.alias || duplicatePlace.name} 과 동일한 업체입니다. 병합하시겠습니까?`),
             /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '6px', marginTop: '7px' } },
-              /*#__PURE__*/React.createElement("button", { type: 'button', onClick: () => setSelectedPlace(prev => ({ ...prev, mergeTargetId: duplicatePlace.id })), style: { border: 0, borderRadius: 'var(--radius-sm)', padding: '5px 10px', background: 'var(--accent-primary)', color: '#fff', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer' } }, '병합'),
-              /*#__PURE__*/React.createElement("button", { type: 'button', onClick: () => setSelectedPlace(prev => ({ ...prev, duplicateDismissed: true })), style: { border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '5px 10px', background: 'var(--bg-card)', color: 'var(--text-muted)', fontSize: '0.74rem', cursor: 'pointer' } }, '별도 등록')
+              /*#__PURE__*/React.createElement("button", { type: 'button', onClick: () => setSelectedPlace(prev => ({ ...prev, mergeTargetId: duplicatePlace.id })), style: { border: 0, borderRadius: 'var(--radius-sm)', padding: '5px 10px', background: 'var(--accent-primary)', color: '#fff', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' } }, '병합'),
+              /*#__PURE__*/React.createElement("button", { type: 'button', onClick: () => setSelectedPlace(prev => ({ ...prev, duplicateDismissed: true })), style: { border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '5px 10px', background: 'var(--bg-card)', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', cursor: 'pointer' } }, '별도 등록')
             )
           )
         ),
 
         selectedPlace && /*#__PURE__*/React.createElement("div", null,
           /*#__PURE__*/React.createElement("label", {
-            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }
+            style: { display: 'block', fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }
           }, "별칭 (선택)"),
           /*#__PURE__*/React.createElement("input", {
             type: "text", className: "form-input", placeholder: "목록에 표시할 별칭 (예: 도은네 집)",
@@ -2824,7 +2824,7 @@ export function DateModal({
         ),
         /*#__PURE__*/React.createElement("div", null,
           /*#__PURE__*/React.createElement("label", {
-            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }
+            style: { display: 'block', fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }
           }, "카테고리"),
           /*#__PURE__*/React.createElement("div", { style: { width: '100%' } },
             /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
@@ -2838,7 +2838,7 @@ export function DateModal({
         ),
         /*#__PURE__*/React.createElement("div", null,
           /*#__PURE__*/React.createElement("label", {
-            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }
+            style: { display: 'block', fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }
           }, "장소 메모 입력"),
           /*#__PURE__*/React.createElement("div", {
             className: "date-modal-field-with-actions",
@@ -2885,11 +2885,11 @@ export function DateModal({
       /* List of registered places for this date */
       /*#__PURE__*/React.createElement("div", { style: { marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '6px' } },
         /*#__PURE__*/React.createElement("label", {
-          style: { fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '2px' }
+          style: { fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '2px' }
         }, `등록된 장소 (${registeredPlaces.length}곳)`),
         /* List */
         registeredPlaces.length === 0 ? /*#__PURE__*/React.createElement("div", {
-          style: { textAlign: 'center', color: 'var(--text-muted)', padding: '24px 0', fontSize: '0.82rem', border: '1px dashed var(--border-subtle)', borderRadius: 'var(--radius-md)' }
+          style: { textAlign: 'center', color: 'var(--text-muted)', padding: '24px 0', fontSize: 'var(--font-size-md)', border: '1px dashed var(--border-subtle)', borderRadius: 'var(--radius-md)' }
         }, "등록된 장소가 없습니다.") : /*#__PURE__*/React.createElement("div", {
           className: "date-modal-places-list",
           style: { display: 'flex', flexDirection: 'column', gap: '8px', flex: '1 1 auto', minHeight: '80px', overflow: 'visible', paddingBottom: '20px' }
@@ -2927,15 +2927,15 @@ export function DateModal({
             /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
               /*#__PURE__*/React.createElement("span", {
                 style: {
-                  fontSize: '0.64rem', fontWeight: 900, padding: '2px 8px', borderRadius: 'var(--radius-full)',
+                  fontSize: 'var(--font-size-2xs)', fontWeight: 900, padding: '2px 8px', borderRadius: 'var(--radius-full)',
                   backgroundColor: `${catColor}18`, color: catColor
                 }
               }, catName)
             ),
             /* Name & Address — prefer alias when set */
-            /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-main)' } }, place.alias || place.name),
-            place.alias && place.name && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: 'var(--text-muted)' } }, place.name),
-            place.address && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.74rem', color: 'var(--text-muted)' } }, getDisplayPlaceAddress(place)),
+            /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: 'var(--font-size-base)', color: 'var(--text-main)' } }, place.alias || place.name),
+            place.alias && place.name && /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } }, place.name),
+            place.address && /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } }, getDisplayPlaceAddress(place)),
             /* Memo — in DateModal's '장소' tab, show ONLY the memo entry for THIS dateStr; the
                full per-place history (every date's entry) is shown on the 장소 페이지 instead. */
             place.memo && (() => {
@@ -2943,7 +2943,7 @@ export function DateModal({
               if (!dateNote) return null;
               const memoDate = typeof toMemoDateFormat === 'function' ? toMemoDateFormat(dateStr) : dateStr;
               return /*#__PURE__*/React.createElement("div", {
-                style: { fontSize: '0.78rem', color: 'var(--text-main)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.45 }
+                style: { fontSize: 'var(--font-size-md)', color: 'var(--text-main)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.45 }
               }, renderTextWithUrlBadge(`${memoDate} ${dateNote}`));
             })(),
             !adminMode && /*#__PURE__*/React.createElement("div", {
@@ -3054,7 +3054,7 @@ export function DateModal({
       /*#__PURE__*/React.createElement("div", {
         style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', marginBottom: '12px' }
       },
-        /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' } }, "총 정산 요약"),
+        /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-muted)' } }, "총 정산 요약"),
         (() => {
           const hasSettlementData = expenses.length > 0;
           const netAmount = -expenseTotal;
@@ -3067,7 +3067,7 @@ export function DateModal({
               justifyContent: 'center',
               verticalAlign: 'middle',
               lineHeight: 1,
-              fontSize: '0.78rem',
+              fontSize: 'var(--font-size-md)',
               fontWeight: 600,
               padding: '3px 9px',
               borderRadius: 'var(--radius-full)',
@@ -3084,7 +3084,7 @@ export function DateModal({
       !adminMode && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
         /*#__PURE__*/React.createElement("div", null,
           /*#__PURE__*/React.createElement("label", {
-            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }
+            style: { display: 'block', fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }
           }, "구분 / 카테고리"),
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
             /*#__PURE__*/React.createElement(SegmentedToggle, {
@@ -3113,7 +3113,7 @@ export function DateModal({
         ),
         !expenseIsIncome && /*#__PURE__*/React.createElement("div", null,
           /*#__PURE__*/React.createElement("label", {
-            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }
+            style: { display: 'block', fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }
           }, "지출자"),
           /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
             title: "지출자 선택",
@@ -3127,7 +3127,7 @@ export function DateModal({
         ),
         /*#__PURE__*/React.createElement("div", { ref: expenseLabelFieldRef },
           /*#__PURE__*/React.createElement("label", {
-            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }
+            style: { display: 'block', fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }
           }, expenseIsIncome ? "수입 명목" : "지출 명목"),
           /*#__PURE__*/React.createElement("input", {
             type: "text",
@@ -3142,7 +3142,7 @@ export function DateModal({
         ),
         /*#__PURE__*/React.createElement("div", null,
           /*#__PURE__*/React.createElement("label", {
-            style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }
+            style: { display: 'block', fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }
           }, expenseIsIncome ? "수입 금액" : "지출 금액"),
           /*#__PURE__*/React.createElement("div", { className: "date-modal-field-with-actions", style: { display: 'flex', gap: '8px' } },
           /*#__PURE__*/React.createElement("input", {
@@ -3282,7 +3282,7 @@ export function DateModal({
                     borderRadius: 'var(--radius-full)',
                     backgroundColor: `${categoryColor}18`,
                     color: categoryColor,
-                    fontSize: '0.68rem',
+                    fontSize: 'var(--font-size-xs)',
                     fontWeight: 900
                   }
                 }, getExpenseCategoryIcon(expenseCategory), getExpenseCategoryIcon(expenseCategory) ? '\u00A0' : '', categoryName),
@@ -3294,7 +3294,7 @@ export function DateModal({
                     borderRadius: 'var(--radius-full)',
                     backgroundColor: 'rgba(79, 70, 229, 0.08)',
                     color: '#4F46E5',
-                    fontSize: '0.68rem',
+                    fontSize: 'var(--font-size-xs)',
                     fontWeight: 'bold'
                   }
                 }, expenseTime),
@@ -3306,12 +3306,12 @@ export function DateModal({
                     borderRadius: 'var(--radius-full)',
                     backgroundColor: `${(activeParticipants.find(p => p.name === expense.payerId) || {}).color || '#64748B'}18`,
                     color: (activeParticipants.find(p => p.name === expense.payerId) || {}).color || '#64748B',
-                    fontSize: '0.68rem',
+                    fontSize: 'var(--font-size-xs)',
                     fontWeight: 900
                   }
                 }, `${expense.payerId} 선결제`)
               ),
-              /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', width: '100%', wordBreak: 'break-all' } },
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-base)', fontWeight: 'bold', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', width: '100%', wordBreak: 'break-all' } },
                 expenseUrl ? /*#__PURE__*/React.createElement(React.Fragment, null,
                   expenseLabel,
                   /*#__PURE__*/React.createElement(UrlCapsuleBadge, { url: expenseUrl })
@@ -3347,7 +3347,7 @@ export function DateModal({
         style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }
       },
         /*#__PURE__*/React.createElement("label", {
-          style: { fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-muted)' }
+          style: { fontSize: 'var(--font-size-md)', fontWeight: 800, color: 'var(--text-muted)' }
         }, `등록된 사진 (${visibleMeetingImages.length}장)`),
         !adminMode && /*#__PURE__*/React.createElement("div", {
           style: { display: 'flex', alignItems: 'center', gap: '6px' }
@@ -3362,7 +3362,7 @@ export function DateModal({
               height: '36px',
               padding: '0 12px',
               borderRadius: 'var(--radius-md)',
-              fontSize: '0.78rem',
+              fontSize: 'var(--font-size-md)',
               fontWeight: 900,
               cursor: isSavingMeetingPhotos ? 'wait' : 'pointer'
             }
@@ -3376,7 +3376,7 @@ export function DateModal({
               height: '36px',
               padding: '0 12px',
               borderRadius: 'var(--radius-md)',
-              fontSize: '0.78rem',
+              fontSize: 'var(--font-size-md)',
               fontWeight: 900,
               cursor: isSavingMeetingPhotos ? 'wait' : 'pointer'
             }
@@ -3385,7 +3385,7 @@ export function DateModal({
       ),
       /* Empty State or Photo Grid */
       visibleMeetingPhotos.length === 0 ? /*#__PURE__*/React.createElement("div", {
-        style: { textAlign: 'center', color: 'var(--text-muted)', padding: '24px 0', fontSize: '0.82rem', border: '1px dashed var(--border-subtle)', borderRadius: 'var(--radius-md)' }
+        style: { textAlign: 'center', color: 'var(--text-muted)', padding: '24px 0', fontSize: 'var(--font-size-md)', border: '1px dashed var(--border-subtle)', borderRadius: 'var(--radius-md)' }
       }, "등록된 사진이 없습니다.") : /*#__PURE__*/React.createElement(React.Fragment, null,
         visibleMeetingImages.length === 0 ? null : /*#__PURE__*/React.createElement("div", {
         style: {
@@ -3518,13 +3518,13 @@ export function DateModal({
         type: "button",
         className: "btn btn-secondary",
         onClick: handleCancelPastePreview,
-        style: { flex: 1, height: '36px', fontSize: '0.85rem' }
+        style: { flex: 1, height: '36px', fontSize: 'var(--font-size-base)' }
       }, "취소"),
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "btn btn-action-dark",
         onClick: handleConfirmPastePreview,
-        style: { flex: 1, height: '36px', fontSize: '0.85rem' }
+        style: { flex: 1, height: '36px', fontSize: 'var(--font-size-base)' }
       }, "업로드")
     )
   )) : null;

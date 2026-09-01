@@ -969,7 +969,7 @@ export function AppSettingsModal({
               "날씨 지역"
             ),
             /*#__PURE__*/React.createElement("span", {
-              style: { fontSize: '0.82rem', color: 'var(--text-muted)', fontWeight: 600, flexShrink: 0 }
+              style: { fontSize: 'var(--font-size-md)', color: 'var(--text-muted)', fontWeight: 600, flexShrink: 0 }
             }, "현재 : ", /*#__PURE__*/React.createElement("span", { style: { color: 'var(--text-main)', fontWeight: 700 } }, currentWeatherName))
           ),
           /*#__PURE__*/React.createElement("form", {
@@ -984,7 +984,7 @@ export function AppSettingsModal({
               style: {
                 flex: 1, minWidth: 0, padding: '10px 12px', borderRadius: 'var(--radius-md)',
                 border: '1px solid var(--border-subtle)', background: 'var(--bg-primary)',
-                color: 'var(--text-main)', fontSize: '0.88rem', outline: 'none'
+                color: 'var(--text-main)', fontSize: 'var(--font-size-base)', outline: 'none'
               }
             }),
             /*#__PURE__*/React.createElement("button", {
@@ -992,7 +992,7 @@ export function AppSettingsModal({
               disabled: weatherLoading,
               style: {
                 flexShrink: 0, padding: '10px 14px', borderRadius: 'var(--radius-md)', border: 'none',
-                background: '#0f172a', color: '#fff', fontWeight: 700, fontSize: '0.82rem',
+                background: '#0f172a', color: '#fff', fontWeight: 700, fontSize: 'var(--font-size-md)',
                 cursor: weatherLoading ? 'wait' : 'pointer'
               }
             }, weatherLoading ? '검색중' : '검색')
@@ -1005,7 +1005,7 @@ export function AppSettingsModal({
               type: "button",
               onClick: () => pickWeatherLocation(loc),
               style: {
-                padding: '5px 10px', fontSize: '0.72rem', borderRadius: 'var(--radius-sm)',
+                padding: '5px 10px', fontSize: 'var(--font-size-sm)', borderRadius: 'var(--radius-sm)',
                 border: '1px solid var(--border-subtle)', background: 'var(--bg-primary)',
                 color: 'var(--text-main)', cursor: 'pointer'
               }
@@ -1021,7 +1021,7 @@ export function AppSettingsModal({
               style: {
                 textAlign: 'left', padding: '8px 10px', borderRadius: '8px',
                 border: '1px solid var(--border-subtle)', background: 'var(--bg-primary)',
-                color: 'var(--text-main)', cursor: 'pointer', fontSize: '0.82rem'
+                color: 'var(--text-main)', cursor: 'pointer', fontSize: 'var(--font-size-md)'
               }
             }, loc.name, loc.admin1 ? ' · ' + loc.admin1 : ''))
           )
@@ -1053,7 +1053,7 @@ export function AppSettingsModal({
             /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-icon" }, BellIcon && /*#__PURE__*/React.createElement(BellIcon, null)), "알림허용"),
           ToggleSwitch && /*#__PURE__*/React.createElement(ToggleSwitch, { checked: !!isMasterNotifyEnabled, onChange: onToggleMasterNotify, label: "알림허용" })
         ),
-        /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.45, padding: '0 2px 8px' } },
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', lineHeight: 1.45, padding: '0 2px 8px' } },
           isNotifPermissionGranted ? "브라우저 알림이 허용된 상태입니다. 아래에서 종류별로 켤 수 있습니다." : "스위치를 켜면 브라우저 알림 허용 요청이 표시됩니다."),
         /*#__PURE__*/React.createElement("div", {
           style: {
@@ -1066,7 +1066,7 @@ export function AppSettingsModal({
             key: ch.key, className: "admin-side-menu-setting-row",
             style: { padding: '10px 2px' }
           },
-            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label", style: { fontSize: '0.88rem' } }, ch.label),
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label", style: { fontSize: 'var(--font-size-base)' } }, ch.label),
             ToggleSwitch && /*#__PURE__*/React.createElement(ToggleSwitch, {
               checked: !!(notifyChannels && notifyChannels[ch.key]),
               onChange: () => onToggleNotifyChannel && onToggleNotifyChannel(ch.key),
@@ -1075,7 +1075,7 @@ export function AppSettingsModal({
           ))
         ),
         Array.isArray(helpSteps) && helpSteps.length > 0 && /*#__PURE__*/React.createElement("div", {
-          style: { marginTop: '10px', padding: '12px', borderRadius: '12px', background: 'var(--bg-primary)', border: 'none', fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.5 }
+          style: { marginTop: '10px', padding: '12px', borderRadius: '12px', background: 'var(--bg-primary)', border: 'none', fontSize: 'var(--font-size-md)', color: 'var(--text-muted)', lineHeight: 1.5 }
         },
           /*#__PURE__*/React.createElement("div", { style: { fontWeight: 800, color: 'var(--text-main)', marginBottom: '6px' } }, "설정 안내"),
           /*#__PURE__*/React.createElement("ol", { style: { margin: 0, paddingLeft: '18px' } },
@@ -1118,9 +1118,9 @@ export function NotificationOnboardingModal({ onClose, isMasterNotifyEnabled, on
           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-setting-label", style: { fontWeight: 800 } }, "알림허용"),
           ToggleSwitch && /*#__PURE__*/React.createElement(ToggleSwitch, { checked: !!isMasterNotifyEnabled, onChange: onToggleMasterNotify, label: "알림허용" })
         ),
-        /*#__PURE__*/React.createElement("p", { style: { margin: 0, fontSize: '0.84rem', color: 'var(--text-main)', lineHeight: 1.55 } },
+        /*#__PURE__*/React.createElement("p", { style: { margin: 0, fontSize: 'var(--font-size-base)', color: 'var(--text-main)', lineHeight: 1.55 } },
           "채팅·메모·일정·투표 등 새 소식이 등록될 때 알림을 받으려면 알림허용이 필요합니다."),
-        /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.5 } },
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-md)', color: 'var(--text-muted)', lineHeight: 1.5 } },
           /*#__PURE__*/React.createElement("div", { style: { fontWeight: 800, color: 'var(--text-main)', marginBottom: '6px' } }, (browserLabel || '브라우저') + " 설정 안내"),
           /*#__PURE__*/React.createElement("ol", { style: { margin: 0, paddingLeft: '18px' } },
             (helpSteps || []).map((step, i) => /*#__PURE__*/React.createElement("li", { key: i, style: { marginBottom: '4px' } }, step))
@@ -1183,7 +1183,7 @@ export function SharedAppNavBlock({
         height: "auto",
         minHeight: "auto",
         padding: "0",
-        fontSize: "0.6rem",
+        fontSize: "var(--font-size-2xs)",
         fontWeight: 500,
         lineHeight: 1.2,
         borderRadius: "0",

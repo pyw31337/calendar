@@ -794,7 +794,7 @@ export function SearchCategoryTabs({ tabs, activeKey, onSelect, containerStyle, 
       style: {
         minWidth: 0,
         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-        padding: tabPadding || '10px 4px', fontSize: '0.82rem', fontWeight: 800,
+        padding: tabPadding || '10px 4px', fontSize: 'var(--font-size-md)', fontWeight: 800,
         background: 'none', border: 'none', cursor: 'pointer',
         color: activeKey === tab.key ? '#2563EB' : '#64748B',
         borderBottom: activeKey === tab.key ? '3px solid #2563EB' : '3px solid transparent',
@@ -816,7 +816,7 @@ export function SearchCategoryTabs({ tabs, activeKey, onSelect, containerStyle, 
           borderRadius: 'var(--radius-full)',
           backgroundColor: tab.color || tab.badgeColor || '#2563EB',
           color: '#FFFFFF',
-          fontSize: '0.68rem',
+          fontSize: 'var(--font-size-xs)',
           fontWeight: 'bold',
           padding: '0 6px',
           boxSizing: 'border-box',
@@ -876,7 +876,7 @@ export function SimpleBottomSheetPicker({ title, value, options, onSelect, place
         onClick: () => { if (!opt.disabled) { onSelect(opt.value); setIsOpen(false); } },
         style: opt.disabled ? { opacity: 0.45, cursor: 'not-allowed' } : undefined
       }, opt.color ? /*#__PURE__*/React.createElement(ParticipantBackdrop, { participant: opt, name: opt.label }) : opt.label,
-        opt.disabled ? /*#__PURE__*/React.createElement("span", { style: { marginLeft: 'auto', fontSize: '0.72rem', color: 'var(--text-light)' } }, "추가됨") : null))
+        opt.disabled ? /*#__PURE__*/React.createElement("span", { style: { marginLeft: 'auto', fontSize: 'var(--font-size-sm)', color: 'var(--text-light)' } }, "추가됨") : null))
     )
   ));
   return /*#__PURE__*/React.createElement(React.Fragment, null,
@@ -1090,7 +1090,7 @@ export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalG
         onClick: e => { e.stopPropagation(); openGalleryPage(); },
         style: {
           border: 'none', background: 'transparent', cursor: 'pointer',
-          color: '#3B82F6', fontSize: '0.82rem', fontWeight: 700, padding: '4px 6px', flexShrink: 0
+          color: '#3B82F6', fontSize: 'var(--font-size-md)', fontWeight: 700, padding: '4px 6px', flexShrink: 0
         }
       }, "전체보기"),
       /*#__PURE__*/React.createElement(SectionToggleButton, {
@@ -1130,7 +1130,7 @@ export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalG
           borderRadius: 'var(--radius-md)',
           padding: '8px 0',
           marginTop: '10px',
-          fontSize: '0.85rem',
+          fontSize: 'var(--font-size-base)',
           fontWeight: 'bold',
           color: 'var(--text-main)',
           cursor: 'pointer',
@@ -1389,7 +1389,7 @@ export function SummaryList({
   })), !collapsedSections.all && (sortedAllDates.length === 0 ? /*#__PURE__*/React.createElement("div", {
     style: {
       color: 'var(--text-muted)',
-      fontSize: '0.85rem',
+      fontSize: 'var(--font-size-base)',
       padding: '10px 0'
     }
   }, "\uC544\uC9C1 \uCC38\uC5EC\uC790 \uC804\uC6D0\uC774 \uAC00\uB2A5\uD55C \uB0A0\uC9DC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4. \uCE98\uB9B0\uB354\uC5D0\uC11C \uB0A0\uC9DC\uB97C \uC120\uD0DD\uD558\uC5EC \uAC00\uB2A5 \uC5EC\uBD80\uB97C \uD45C\uAE30\uD574\uBCF4\uC138\uC694!") : /*#__PURE__*/React.createElement("div", null, sortedAllDates.slice(0, allListLimit).map(d => {
@@ -1468,7 +1468,7 @@ export function SummaryList({
           width: '100%', marginTop: '4px', marginBottom: '6px', padding: '10px 0',
           border: 'none', borderRadius: 'var(--radius-md)',
           backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
-          color: 'var(--text-main)', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', textAlign: 'center'
+          color: 'var(--text-main)', fontSize: 'var(--font-size-base)', fontWeight: 700, cursor: 'pointer', textAlign: 'center'
         }
       }, `더보기 (총 ${total}개 중 ${shown}개)`);
     })())))), anyBeforeConfirmed && isConfirmedVisible && /*#__PURE__*/React.createElement("div", {
@@ -1585,7 +1585,7 @@ export function SummaryList({
           width: '100%', marginTop: '4px', marginBottom: '6px', padding: '10px 0',
           border: 'none', borderRadius: 'var(--radius-md)',
           backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
-          color: 'var(--text-main)', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', textAlign: 'center'
+          color: 'var(--text-main)', fontSize: 'var(--font-size-base)', fontWeight: 700, cursor: 'pointer', textAlign: 'center'
         }
       }, `더보기 (총 ${total}개 중 ${shown}개)`);
     })()))));

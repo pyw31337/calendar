@@ -822,7 +822,7 @@ function getDeps() { return window.GATHER_UI_DEPS || {}; }
     }, React.createElement(SmallXIcon, { size: 20 }))), React.createElement('div', {
       className: 'modal-body'
     }, React.createElement('label', {
-      style: { fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-muted)' }
+      style: { fontSize: 'var(--font-size-base)', fontWeight: 700, color: 'var(--text-muted)' }
     }, shareLabel), React.createElement('input', {
       type: 'text',
       className: 'form-input',
@@ -847,7 +847,7 @@ function getDeps() { return window.GATHER_UI_DEPS || {}; }
         style: { borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }
       }),
       React.createElement('span', {
-        style: { fontSize: '0.76rem', color: 'var(--text-muted)' }
+        style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' }
       }, 'QR코드를 카메라로 스캔해 접속하세요')
     ),
 
@@ -859,7 +859,7 @@ function getDeps() { return window.GATHER_UI_DEPS || {}; }
       }
     },
       React.createElement('label', {
-        style: { fontSize: '0.84rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }
+        style: { fontSize: 'var(--font-size-base)', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }
       }, React.createElement('span', { style: { fontSize: '0.95rem' } }, '💬'), '카카오톡 & 앱으로 공유하기'),
       React.createElement('div', {
         style: { display: 'flex', gap: '6px', flexWrap: 'wrap' }
@@ -880,7 +880,7 @@ function getDeps() { return window.GATHER_UI_DEPS || {}; }
           style: {
             flex: '1 1 100%', height: '38px', borderRadius: '8px',
             backgroundColor: '#FEE500', color: '#191919', border: 'none',
-            fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer',
+            fontSize: 'var(--font-size-md)', fontWeight: 800, cursor: 'pointer',
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
           }
         }, '💬 카카오톡 / 모바일 앱으로 공유하기'),
@@ -897,7 +897,7 @@ function getDeps() { return window.GATHER_UI_DEPS || {}; }
           style: {
             flex: '1 1 100%', height: '36px', borderRadius: '8px',
             backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)', border: '1px solid var(--border-subtle)',
-            fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer',
+            fontSize: 'var(--font-size-md)', fontWeight: 700, cursor: 'pointer',
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px'
           }
         }, '✉️ 카톡용 초대 메시지문 복사')

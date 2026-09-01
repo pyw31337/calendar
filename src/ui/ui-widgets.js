@@ -744,14 +744,14 @@ export function SearchResultLogRow({ badgeName, badgeColor, timeStr, calendarLab
   },
     /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', flexWrap: 'wrap' } },
       badgeName && /*#__PURE__*/React.createElement("span", {
-        style: { backgroundColor: badgeColor || '#94A3B8', color: '#FFFFFF', padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: '0.7rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
+        style: { backgroundColor: badgeColor || '#94A3B8', color: '#FFFFFF', padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 'bold', whiteSpace: 'nowrap' }
       }, badgeName),
       calendarLabel && /*#__PURE__*/React.createElement("span", {
-        style: { fontSize: '0.68rem', color: 'var(--text-light)', fontWeight: 700 }
+        style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-light)', fontWeight: 700 }
       }, calendarLabel)
     ),
-    /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.84rem', color: 'var(--text-main)', lineHeight: 1.45, wordBreak: 'break-word' } }, children),
-    timeStr && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '6px' } }, timeStr)
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-base)', color: 'var(--text-main)', lineHeight: 1.45, wordBreak: 'break-word' } }, children),
+    timeStr && /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: '6px' } }, timeStr)
   );
 }
 
@@ -825,7 +825,7 @@ export function UrlCapsuleBadge({ url, style = null }) {
       alignItems: 'center',
       padding: '3px 10px',
       borderRadius: 'var(--radius-full)',
-      fontSize: '0.72rem',
+      fontSize: 'var(--font-size-sm)',
       fontWeight: 600,
       border: 0,
       backgroundColor: 'var(--border-subtle)',
@@ -857,7 +857,7 @@ export function ParticipantPickerButton({ participant, onClick, placeholder = 'ì
       border: 'none',
       borderRadius: 'var(--radius-full)',
       padding: '6px 14px',
-      fontSize: '0.8rem',
+      fontSize: 'var(--font-size-md)',
       fontWeight: 'bold',
       cursor: 'pointer',
       whiteSpace: 'nowrap',
@@ -869,7 +869,7 @@ export function ParticipantPickerButton({ participant, onClick, placeholder = 'ì
       flexShrink: 0
     }
   }, participant?.name || placeholder, /*#__PURE__*/React.createElement("span", {
-    style: { fontSize: '0.6rem' }
+    style: { fontSize: 'var(--font-size-2xs)' }
   }, "â–¼"));
 }
 
@@ -904,7 +904,7 @@ export function DateCapsuleBadge({ date, style = null }) {
       alignItems: 'center',
       padding: '2px 8px',
       borderRadius: 'var(--radius-full)',
-      fontSize: '0.72rem',
+      fontSize: 'var(--font-size-sm)',
       fontWeight: 700,
       backgroundColor: 'rgba(99, 102, 241, 0.12)',
       color: '#4338CA',

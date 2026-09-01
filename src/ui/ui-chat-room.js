@@ -1222,11 +1222,11 @@ export function ChatRoomView({
       }
     },
       /*#__PURE__*/React.createElement("span", {
-        style: { fontSize: '0.72rem', fontWeight: 700, color: qp?.color || '#64748B' }
+        style: { fontSize: 'var(--font-size-sm)', fontWeight: 700, color: qp?.color || '#64748B' }
       }, qp?.name || '알수없음'),
       /*#__PURE__*/React.createElement("span", {
         style: {
-          fontSize: '0.78rem',
+          fontSize: 'var(--font-size-md)',
           color: 'var(--text-main)',
           opacity: 0.75,
           display: '-webkit-box',
@@ -1264,7 +1264,7 @@ export function ChatRoomView({
         /*#__PURE__*/React.createElement("span", {
           style: {
             position: 'relative', zIndex: 2, backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5',
-            borderRadius: '12px', padding: '3px 12px', fontSize: '0.72rem', color: '#EF4444', fontWeight: 'bold'
+            borderRadius: '12px', padding: '3px 12px', fontSize: 'var(--font-size-sm)', color: '#EF4444', fontWeight: 'bold'
           }
         }, '여기까지 읽으셨습니다')
       ));
@@ -1302,7 +1302,7 @@ export function ChatRoomView({
             border: '1px solid var(--border-subtle)',
             borderRadius: '12px',
             padding: '3px 12px',
-            fontSize: '0.72rem',
+            fontSize: 'var(--font-size-sm)',
             color: 'var(--text-muted)',
             fontWeight: 'bold'
           }
@@ -1353,7 +1353,7 @@ export function ChatRoomView({
         color: '#FFFFFF',
         padding: '3px 8px',
         borderRadius: 'var(--radius-full)',
-        fontSize: '0.78rem',
+        fontSize: 'var(--font-size-md)',
         fontWeight: 'bold',
         flexShrink: 0,
         alignSelf: 'flex-start',
@@ -1447,7 +1447,7 @@ export function ChatRoomView({
         /* Timestamp */
         /*#__PURE__*/React.createElement("span", {
           style: {
-            fontSize: '0.68rem',
+            fontSize: 'var(--font-size-xs)',
             color: 'var(--text-light)',
             lineHeight: '1.25',
             textAlign: 'right'
@@ -1610,7 +1610,7 @@ export function ChatRoomView({
       /* Timestamp */
       /*#__PURE__*/React.createElement("span", {
         style: {
-          fontSize: '0.68rem',
+          fontSize: 'var(--font-size-xs)',
           color: 'var(--text-light)',
           lineHeight: '1.25',
           textAlign: 'left'
@@ -1802,7 +1802,7 @@ export function ChatRoomView({
       paddingBottom: `${Math.max(152, composerHeight + 24) + viewportBottom}px`
     }
   }, (loadingOlderChat || hasMoreOlderChat) && /*#__PURE__*/React.createElement("div", {
-    style: { textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)', padding: '8px 0 12px' }
+    style: { textAlign: 'center', fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', padding: '8px 0 12px' }
   }, loadingOlderChat ? '이전 대화를 불러오는 중…' : (hasMoreOlderChat ? '위로 스크롤하면 이전 대화가 로드됩니다' : '')), noticePanelMode === 'add' && /*#__PURE__*/React.createElement("div", {
     style: {
       position: 'sticky', top: 0, zIndex: 6,
@@ -1846,13 +1846,13 @@ export function ChatRoomView({
     }
   },
     pinnedNotices.length === 0 ? /*#__PURE__*/React.createElement("div", {
-      style: { fontSize: '0.82rem', color: 'var(--text-muted)', textAlign: 'center', padding: '6px 0' }
+      style: { fontSize: 'var(--font-size-md)', color: 'var(--text-muted)', textAlign: 'center', padding: '6px 0' }
     }, "등록된 공지가 없습니다.") : pinnedNotices.map(notice => /*#__PURE__*/React.createElement("div", {
       key: notice.id,
       style: {
         display: 'flex', alignItems: 'flex-start', gap: '8px',
         backgroundColor: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: 'var(--radius-md)',
-        padding: '10px 12px', fontSize: '0.82rem', color: '#92400E', lineHeight: '1.5'
+        padding: '10px 12px', fontSize: 'var(--font-size-md)', color: '#92400E', lineHeight: '1.5'
       }
     },
       /*#__PURE__*/React.createElement("div", { style: { flex: 1, wordBreak: 'break-word' } }, renderTextWithUrlBadge(notice.text)),
@@ -1885,7 +1885,7 @@ export function ChatRoomView({
     style: {
       display: 'flex', alignItems: 'flex-start', gap: '8px',
       backgroundColor: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: 'var(--radius-md)',
-      padding: '10px 12px', fontSize: '0.82rem', color: '#92400E', lineHeight: '1.5'
+      padding: '10px 12px', fontSize: 'var(--font-size-md)', color: '#92400E', lineHeight: '1.5'
     }
   },
     /*#__PURE__*/React.createElement("div", { style: { flex: 1, wordBreak: 'break-word' } },
@@ -1896,7 +1896,7 @@ export function ChatRoomView({
       style: {
         textAlign: 'center',
         color: 'var(--text-light)',
-        fontSize: '0.85rem',
+        fontSize: 'var(--font-size-base)',
         marginTop: '40px'
       }
     }, "\uC544\uC9C1 \uB4F1\uB85D\uB41C \uB300\uD654\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.") : renderedMessages
@@ -1950,7 +1950,7 @@ export function ChatRoomView({
       border: 'none',
       boxShadow: '0 4px 12px rgba(79,70,229,0.35)',
       cursor: 'pointer',
-      fontSize: '0.82rem',
+      fontSize: 'var(--font-size-md)',
       fontWeight: 700,
       whiteSpace: 'nowrap',
       zIndex: 51
@@ -2020,11 +2020,11 @@ export function ChatRoomView({
           style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, flex: 1 }
         },
           /*#__PURE__*/React.createElement("span", {
-            style: { fontSize: '0.72rem', fontWeight: 800, color: 'var(--reply-accent)' }
+            style: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--reply-accent)' }
           }, `${participantsMap[chatReplyTarget.participantId]?.name || '알수없음'}님에게 답장`),
           /*#__PURE__*/React.createElement("span", {
             style: {
-              fontSize: '0.8rem',
+              fontSize: 'var(--font-size-md)',
               color: 'var(--text-main)',
               opacity: 0.75,
               whiteSpace: 'nowrap',
@@ -2090,7 +2090,7 @@ export function ChatRoomView({
           border: 'none',
           background: 'none',
           padding: '2px 4px',
-          fontSize: '0.85rem',
+          fontSize: 'var(--font-size-base)',
           lineHeight: '1.4',
           fontFamily: 'inherit',
           outline: 'none',
@@ -2221,7 +2221,7 @@ export function ChatRoomView({
             style: {
               height: '32px',
               padding: '0 16px',
-              fontSize: '0.82rem',
+              fontSize: 'var(--font-size-md)',
               fontWeight: 'bold',
               backgroundColor: '#57606F',
               color: '#FFFFFF',
@@ -2305,7 +2305,7 @@ export function ChatRoomView({
     trailing: /*#__PURE__*/React.createElement(React.Fragment, null,
       searchQuery && /*#__PURE__*/React.createElement("span", {
         style: {
-          fontSize: '0.76rem', color: 'var(--text-muted)', flexShrink: 0,
+          fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', flexShrink: 0,
           minWidth: '36px', textAlign: 'center', fontVariantNumeric: 'tabular-nums'
         }
       }, searchMatchIds.length > 0 ? `${clampedFocusIdx + 1}/${searchMatchIds.length}` : '0/0'),
@@ -2354,7 +2354,7 @@ export function ChatRoomView({
         onClick: () => { setIsSearchOpen(false); setSearchQuery(''); setSearchFocusIndex(0); },
         style: {
           border: 'none', background: 'none', cursor: 'pointer',
-          color: 'var(--text-muted)', padding: '4px 6px', fontSize: '0.8rem',
+          color: 'var(--text-muted)', padding: '4px 6px', fontSize: 'var(--font-size-md)',
           fontWeight: 700, flexShrink: 0
         }
       }, "닫기")

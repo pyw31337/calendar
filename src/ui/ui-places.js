@@ -1437,7 +1437,7 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
 
   if (loadError) {
     return /*#__PURE__*/React.createElement("div", {
-      style: { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-light)', fontSize: '0.8rem', backgroundColor: '#F1F5F9' }
+      style: { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-light)', fontSize: 'var(--font-size-md)', backgroundColor: '#F1F5F9' }
     }, "지도를 불러오지 못했습니다.");
   }
 
@@ -1451,7 +1451,7 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
     // internals inside their own stacking context so the button's z-index actually applies.
     style: { width: '100%', height: '100%', backgroundColor: 'var(--border-subtle)', position: 'relative', zIndex: 1 }
   }, !ready && /*#__PURE__*/React.createElement("div", {
-    style: { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-light)', fontSize: '0.8rem' }
+    style: { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-light)', fontSize: 'var(--font-size-md)' }
   }, "지도를 불러오는 중..."));
 }
 
@@ -1877,7 +1877,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
             type: "button",
             onClick: () => setVisitFilter('all'),
             style: {
-              padding: '4px 10px', fontSize: '0.75rem', fontWeight: 800, borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer',
+              padding: '4px 10px', fontSize: 'var(--font-size-sm)', fontWeight: 800, borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer',
               backgroundColor: visitFilter === 'all' ? '#4F46E5' : 'transparent',
               color: visitFilter === 'all' ? '#FFFFFF' : 'var(--text-muted)'
             }
@@ -1886,7 +1886,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
             type: "button",
             onClick: () => setVisitFilter('visited'),
             style: {
-              padding: '4px 10px', fontSize: '0.75rem', fontWeight: 800, borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer',
+              padding: '4px 10px', fontSize: 'var(--font-size-sm)', fontWeight: 800, borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer',
               backgroundColor: visitFilter === 'visited' ? '#4F46E5' : 'transparent',
               color: visitFilter === 'visited' ? '#FFFFFF' : 'var(--text-muted)'
             }
@@ -1895,7 +1895,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
             type: "button",
             onClick: () => setVisitFilter('planned'),
             style: {
-              padding: '4px 10px', fontSize: '0.75rem', fontWeight: 800, borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer',
+              padding: '4px 10px', fontSize: 'var(--font-size-sm)', fontWeight: 800, borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer',
               backgroundColor: visitFilter === 'planned' ? '#4F46E5' : 'transparent',
               color: visitFilter === 'planned' ? '#FFFFFF' : 'var(--text-muted)'
             }
@@ -1926,7 +1926,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
       trailing: listSearchQuery ? /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: () => setListSearchQuery(''),
-        style: { border: 'none', background: 'none', color: 'var(--text-muted)', fontSize: '0.8rem', cursor: 'pointer', fontWeight: 600, flexShrink: 0 }
+        style: { border: 'none', background: 'none', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)', cursor: 'pointer', fontWeight: 600, flexShrink: 0 }
       }, "초기화") : null
     }),
 
@@ -2059,7 +2059,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
           onSelect: setCategoryFilter,
           containerStyle: { backgroundColor: 'var(--bg-card)' },
           tabPadding: '12px 4px',
-          tabTextStyle: { fontSize: '0.85rem', fontWeight: 700 },
+          tabTextStyle: { fontSize: 'var(--font-size-base)', fontWeight: 700 },
           countBadgeClassName: "section-count-badge"
         })
       ),
@@ -2080,7 +2080,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
                   borderRadius: 'var(--radius-full)',
                   backgroundColor: searchedPlaces.length >= 1 ? '#2563EB' : '#E2E8F0',
                   color: searchedPlaces.length >= 1 ? '#FFFFFF' : '#475569',
-                  fontSize: '0.72rem', fontWeight: 'bold', padding: '0 6px', marginLeft: '4px'
+                  fontSize: 'var(--font-size-sm)', fontWeight: 'bold', padding: '0 6px', marginLeft: '4px'
                 }
               }, searchedPlaces.length))
             },
@@ -2096,7 +2096,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
                       borderRadius: 'var(--radius-full)',
                       backgroundColor: cCount >= 1 ? (category.color || '#2563EB') : '#E2E8F0',
                       color: cCount >= 1 ? '#FFFFFF' : '#475569',
-                      fontSize: '0.72rem', fontWeight: 'bold', padding: '0 6px', marginLeft: '4px'
+                      fontSize: 'var(--font-size-sm)', fontWeight: 'bold', padding: '0 6px', marginLeft: '4px'
                     }
                   }, cCount)
                 )
@@ -2128,7 +2128,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
               height: '100%',
               boxSizing: 'border-box',
               padding: '0 12px',
-              fontSize: '0.8rem',
+              fontSize: 'var(--font-size-md)',
               fontWeight: 900,
               borderRadius: 'var(--radius-sm)',
               border: 'none',
@@ -2145,7 +2145,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
               height: '100%',
               boxSizing: 'border-box',
               padding: '0 12px',
-              fontSize: '0.8rem',
+              fontSize: 'var(--font-size-md)',
               fontWeight: 900,
               borderRadius: 'var(--radius-sm)',
               border: 'none',
@@ -2172,7 +2172,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
         }
       },
         filteredPlaces.length === 0 ? /*#__PURE__*/React.createElement("div", {
-          style: { padding: '30px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }
+          style: { padding: '30px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-base)' }
         }, places.length === 0 ? "등록된 장소가 없습니다. 우측 상단 아이콘을 눌러 추가해 보세요." : "검색 조건에 맞는 장소가 없습니다.") :
         filteredPlaces.map(place => {
           const category = categoryMap[place.categoryId] || categoryMap.etc;
@@ -2253,7 +2253,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
               /*#__PURE__*/React.createElement("span", {
                 style: {
                   display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '3px 8px 3px 3px', borderRadius: 'var(--radius-full)',
-                  backgroundColor: `${category.color}18`, color: category.color, fontSize: '0.68rem', fontWeight: 900
+                  backgroundColor: `${category.color}18`, color: category.color, fontSize: 'var(--font-size-xs)', fontWeight: 900
                 }
               },
                 /*#__PURE__*/React.createElement("span", {
@@ -2273,19 +2273,19 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
               ),
               /*#__PURE__*/React.createElement("span", {
                 style: {
-                  fontSize: '0.66rem', fontWeight: 700, padding: '2px 7px', borderRadius: 'var(--radius-full)',
+                  fontSize: 'var(--font-size-2xs)', fontWeight: 700, padding: '2px 7px', borderRadius: 'var(--radius-full)',
                   backgroundColor: (derivePlaceVisitStatus ? derivePlaceVisitStatus(place) : place.visitStatus) === 'planned' ? 'rgba(59, 130, 246, 0.12)' : 'rgba(16, 185, 129, 0.12)',
                   color: (derivePlaceVisitStatus ? derivePlaceVisitStatus(place) : place.visitStatus) === 'planned' ? '#2563EB' : 'var(--status-green)'
                 }
               }, (derivePlaceVisitStatus ? derivePlaceVisitStatus(place) : place.visitStatus) === 'planned' ? '방문예정' : '방문'),
-              displayVisitEntries.length > 0 && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700 } }, `총 ${countPlaceVisits ? countPlaceVisits(place, displayVisitEntries, category) : displayVisitEntries.length}회 ${(derivePlaceVisitStatus ? derivePlaceVisitStatus(place) : place.visitStatus) === 'planned' ? '방문예정' : '방문'}`)
+              displayVisitEntries.length > 0 && /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', fontWeight: 700 } }, `총 ${countPlaceVisits ? countPlaceVisits(place, displayVisitEntries, category) : displayVisitEntries.length}회 ${(derivePlaceVisitStatus ? derivePlaceVisitStatus(place) : place.visitStatus) === 'planned' ? '방문예정' : '방문'}`)
             ),
             
             /* Name & Address -- alias is the list display name when set; official name shown underneath */
             /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 } },
-              /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-main)' } }, (place.alias || place.name || '이름 없음')),
-              place.alias && place.name && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: 'var(--text-muted)' } }, place.name),
-              place.address && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.74rem', color: 'var(--text-muted)' } }, getDisplayPlaceAddress(place))
+              /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: 'var(--font-size-base)', color: 'var(--text-main)' } }, (place.alias || place.name || '이름 없음')),
+              place.alias && place.name && /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } }, place.name),
+              place.address && /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } }, getDisplayPlaceAddress(place))
             ),
             
             /* Visits history log (one row per date, newest first) or plain dateless memo --
@@ -2305,7 +2305,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
                       key: idx,
                       style: { display: 'flex', flexDirection: 'column', gap: '6px', backgroundColor: 'var(--bg-primary)', borderRadius: 'var(--radius-md)', padding: '8px 10px' }
                     },
-                      /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)' } }, formatPlaceBadgeDate(entry.date) || entry.date),
+                      /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--text-muted)' } }, formatPlaceBadgeDate(entry.date) || entry.date),
                       /*#__PURE__*/React.createElement("input", {
                         type: "text",
                         value: editingMemoEntryText,
@@ -2321,19 +2321,19 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
                             handleCancelEditPlaceMemoEntry();
                           }
                         },
-                        style: { width: '100%', height: '32px', fontSize: '0.8rem', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0 8px', backgroundColor: 'var(--bg-card)', color: 'var(--text-main)', outline: 'none', boxSizing: 'border-box' }
+                        style: { width: '100%', height: '32px', fontSize: 'var(--font-size-md)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0 8px', backgroundColor: 'var(--bg-card)', color: 'var(--text-main)', outline: 'none', boxSizing: 'border-box' }
                       }),
                       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '6px', justifyContent: 'flex-end' } },
                         /*#__PURE__*/React.createElement("button", {
                           type: "button",
                           onClick: e => { e.stopPropagation(); handleCancelEditPlaceMemoEntry(); },
-                          style: { height: '28px', padding: '0 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', background: 'none', color: 'var(--text-muted)', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer' }
+                          style: { height: '28px', padding: '0 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', background: 'none', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' }
                         }, "취소"),
                         /*#__PURE__*/React.createElement("button", {
                           type: "button",
                           onClick: e => { e.stopPropagation(); handleSavePlaceMemoEntry(place, entry); },
                           disabled: !editingMemoEntryText.trim(),
-                          style: { height: '28px', padding: '0 10px', borderRadius: 'var(--radius-sm)', border: 'none', backgroundColor: 'var(--accent-primary)', color: '#FFFFFF', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer', opacity: editingMemoEntryText.trim() ? 1 : 0.5 }
+                          style: { height: '28px', padding: '0 10px', borderRadius: 'var(--radius-sm)', border: 'none', backgroundColor: 'var(--accent-primary)', color: '#FFFFFF', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer', opacity: editingMemoEntryText.trim() ? 1 : 0.5 }
                         }, "수정")
                       )
                     );
@@ -2354,7 +2354,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
                       /*#__PURE__*/React.createElement("div", {
                         style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }
                       },
-                        /*#__PURE__*/React.createElement("span", { className: "place-visit-entry-date", style: { fontWeight: 700, fontSize: '0.74rem', color: 'var(--text-main)' } }, formatPlaceBadgeDate(entry.date) || entry.date),
+                        /*#__PURE__*/React.createElement("span", { className: "place-visit-entry-date", style: { fontWeight: 700, fontSize: 'var(--font-size-sm)', color: 'var(--text-main)' } }, formatPlaceBadgeDate(entry.date) || entry.date),
                         /*#__PURE__*/React.createElement("div", {
                           style: { display: 'flex', alignItems: 'center', gap: '8px' }
                         },
@@ -2370,7 +2370,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
                       ),
                       /* Line 2: Memo note full width below */
                       entry.note && /*#__PURE__*/React.createElement("div", {
-                        style: { fontSize: '0.74rem', color: 'var(--text-main)', wordBreak: 'break-word', lineHeight: 1.45, width: '100%' }
+                        style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-main)', wordBreak: 'break-word', lineHeight: 1.45, width: '100%' }
                       }, entry.note)
                     );
                   }
@@ -2386,8 +2386,8 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
                     className: "place-visit-entry-row-desktop",
                     style: { display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'var(--bg-primary)', borderRadius: 'var(--radius-md)', padding: '6px 10px', cursor: 'pointer' }
                   },
-                    /*#__PURE__*/React.createElement("span", { className: "place-visit-entry-date", style: { flexShrink: 0, fontWeight: 700, fontSize: '0.74rem' } }, formatPlaceBadgeDate(entry.date) || entry.date),
-                    /*#__PURE__*/React.createElement("span", { style: { flex: 1, minWidth: 0, fontSize: '0.74rem', color: 'var(--text-main)', wordBreak: 'break-word' } }, entry.note),
+                    /*#__PURE__*/React.createElement("span", { className: "place-visit-entry-date", style: { flexShrink: 0, fontWeight: 700, fontSize: 'var(--font-size-sm)' } }, formatPlaceBadgeDate(entry.date) || entry.date),
+                    /*#__PURE__*/React.createElement("span", { style: { flex: 1, minWidth: 0, fontSize: 'var(--font-size-sm)', color: 'var(--text-main)', wordBreak: 'break-word' } }, entry.note),
                     /*#__PURE__*/React.createElement("button", {
                       type: "button", onClick: (e) => { e.stopPropagation(); handleStartEditPlaceMemoEntry(place, entry); }, title: "메모 편집", "aria-label": "메모 편집",
                       style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)', flexShrink: 0 }
@@ -2398,7 +2398,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
                     }, /*#__PURE__*/React.createElement(TrashIcon, { size: 12 }))
                   );
                 }))
-              : memoWithoutDate && /*#__PURE__*/React.createElement("div", { className: "place-memo-stack", style: { fontSize: '0.74rem', color: 'var(--text-main)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' } }, renderTextWithUrlBadge(memoWithoutDate))
+              : memoWithoutDate && /*#__PURE__*/React.createElement("div", { className: "place-memo-stack", style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-main)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' } }, renderTextWithUrlBadge(memoWithoutDate))
           );
         })
       )

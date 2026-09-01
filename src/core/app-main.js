@@ -6992,12 +6992,12 @@ function CalendarApp() {
       },
         /* Date YY.MM.DD */
         /*#__PURE__*/React.createElement("span", {
-          style: { fontSize: '0.7rem', fontWeight: 800, color: '#FFFFFF', lineHeight: 1.1, textShadow: '0 1px 2px rgba(0,0,0,0.15)' }
+          style: { fontSize: 'var(--font-size-xs)', fontWeight: 800, color: '#FFFFFF', lineHeight: 1.1, textShadow: '0 1px 2px rgba(0,0,0,0.15)' }
         }, yyMMdd),
         /* Day Name */
         /*#__PURE__*/React.createElement("span", {
           style: {
-            fontSize: '0.86rem',
+            fontSize: 'var(--font-size-base)',
             fontWeight: 800,
             color: shortDayName === '일' ? '#B7F34A' : '#FFFFFF',
             marginTop: '2px',
@@ -7012,7 +7012,7 @@ function CalendarApp() {
             color: '#F472B6',
             padding: '2px 8px',
             borderRadius: 'var(--radius-full)',
-            fontSize: '0.68rem',
+            fontSize: 'var(--font-size-xs)',
             fontWeight: 800,
             marginTop: '4px',
             whiteSpace: 'nowrap',
@@ -7086,7 +7086,7 @@ function CalendarApp() {
                   backgroundColor: pColor,
                   color: '#FFFFFF',
                   fontWeight: 700,
-                  fontSize: '0.75rem',
+                  fontSize: 'var(--font-size-sm)',
                   lineHeight: '140%',
                   padding: '4px 10px',
                   borderRadius: 'var(--radius-full)',
@@ -7140,10 +7140,10 @@ function CalendarApp() {
           }
         },
           /*#__PURE__*/React.createElement("span", {
-            style: { color: '#F472B6', fontSize: '0.7rem', fontWeight: 800, lineHeight: 1.2 }
+            style: { color: '#F472B6', fontSize: 'var(--font-size-xs)', fontWeight: 800, lineHeight: 1.2 }
           }, ddayText),
           /*#__PURE__*/React.createElement("span", {
-            style: { color: '#FFFFFF', fontSize: '0.76rem', fontWeight: 800, lineHeight: 1.2, marginTop: '1px' }
+            style: { color: '#FFFFFF', fontSize: 'var(--font-size-sm)', fontWeight: 800, lineHeight: 1.2, marginTop: '1px' }
           }, "일정보기")
         )
       );

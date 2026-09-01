@@ -1549,7 +1549,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           title: selectedTag,
           style: {
             padding: '6px 12px', borderRadius: '16px', backgroundColor: 'var(--bg-primary)',
-            border: '1px solid var(--border-subtle)', color: '#3B82F6', fontSize: '0.75rem',
+            border: '1px solid var(--border-subtle)', color: '#3B82F6', fontSize: 'var(--font-size-sm)',
             fontWeight: 'bold', cursor: 'pointer', flexShrink: 0,
             maxWidth: '35vw', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
           }
@@ -1557,7 +1557,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         /*#__PURE__*/React.createElement("button", {
           type: "button",
           onClick: () => { setIsSearchOpen(false); setSearchQuery(''); setSelectedTag(''); },
-          style: { border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px 6px', fontSize: '0.8rem', fontWeight: 700, flexShrink: 0 }
+          style: { border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px 6px', fontSize: 'var(--font-size-md)', fontWeight: 700, flexShrink: 0 }
         }, "닫기")
       )
     }),
@@ -1661,7 +1661,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '0 4px' }
         },
           /*#__PURE__*/React.createElement("span", {
-            style: { fontSize: '0.72rem', fontWeight: 800, color: '#4F46E5', letterSpacing: '0.05em', textTransform: 'uppercase' }
+            style: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: '#4F46E5', letterSpacing: '0.05em', textTransform: 'uppercase' }
           }, "공유된 메모"),
           /*#__PURE__*/React.createElement("button", {
             type: "button",
@@ -1711,7 +1711,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
             onClick: () => setIsComposerExpanded(true),
             style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', color: 'var(--text-muted)' }
           },
-            /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.88rem' } }, "새로운 메모를 남겨보세요..."),
+            /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-base)' } }, "새로운 메모를 남겨보세요..."),
             /*#__PURE__*/React.createElement("span", { style: { display: 'flex', gap: '8px', color: 'var(--text-muted)', marginLeft: 'auto' } }, 
               /* Photo icon shortcut */
               /*#__PURE__*/React.createElement("svg", {
@@ -1786,7 +1786,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
                   borderImage: 'none',
                   outline: 'none',
                   resize: 'none',
-                  fontSize: '0.88rem',
+                  fontSize: 'var(--font-size-base)',
                   color: 'var(--text-main)',
                   width: '100%',
                   paddingBottom: '28px',
@@ -1883,7 +1883,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
                 style: {
                   flex: 1, minWidth: 0, height: '28px', padding: '0 8px', borderRadius: 'var(--radius-sm)',
                   border: '1px solid var(--border-subtle)', background: 'var(--bg-primary)',
-                  color: 'var(--text-main)', fontSize: '0.74rem'
+                  color: 'var(--text-main)', fontSize: 'var(--font-size-sm)'
                 }
               }),
               /*#__PURE__*/React.createElement("button", {
@@ -1893,7 +1893,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
                 style: {
                   flexShrink: 0, height: '28px', padding: '0 10px', borderRadius: 'var(--radius-sm)',
                   border: '1px solid var(--border-subtle)', background: 'var(--border-subtle)',
-                  color: 'var(--text-main)', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer',
+                  color: 'var(--text-main)', fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer',
                   opacity: newTags.length >= 10 ? 0.45 : 1
                 }
               }, "저장")
@@ -1912,7 +1912,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
                   key: tag,
                   style: {
                     display: 'inline-flex', alignItems: 'center', gap: '6px', borderRadius: 'var(--radius-full)',
-                    padding: '3px 4px 3px 10px', fontSize: '0.72rem', fontWeight: 900, lineHeight: 1,
+                    padding: '3px 4px 3px 10px', fontSize: 'var(--font-size-sm)', fontWeight: 900, lineHeight: 1,
                     border: '1px solid var(--border-subtle)', color: 'var(--text-main)', background: 'var(--bg-primary)'
                   }
                 }, `#${tag}`, /*#__PURE__*/React.createElement("button", {
@@ -1972,7 +1972,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       },
         /* Label */
         /*#__PURE__*/React.createElement("div", {
-          style: { fontSize: '0.72rem', fontWeight: 'bold', color: 'var(--text-muted)', letterSpacing: '0.05em', textTransform: 'uppercase' }
+          style: { fontSize: 'var(--font-size-sm)', fontWeight: 'bold', color: 'var(--text-muted)', letterSpacing: '0.05em', textTransform: 'uppercase' }
         }, "고정됨"),
         /* Grid */
         /*#__PURE__*/React.createElement("div", {
@@ -2002,7 +2002,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       },
         /* Label */
         pinnedMemos.length > 0 && /*#__PURE__*/React.createElement("div", {
-          style: { fontSize: '0.72rem', fontWeight: 'bold', color: 'var(--text-muted)', letterSpacing: '0.05em', textTransform: 'uppercase' }
+          style: { fontSize: 'var(--font-size-sm)', fontWeight: 'bold', color: 'var(--text-muted)', letterSpacing: '0.05em', textTransform: 'uppercase' }
         }, "메모 목록"),
         /* Grid */
         /*#__PURE__*/React.createElement("div", {
@@ -2039,7 +2039,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           border: '1px solid var(--border-subtle)',
           borderRadius: 'var(--radius-md)',
           padding: '10px 0',
-          fontSize: '0.85rem',
+          fontSize: 'var(--font-size-base)',
           fontWeight: 'bold',
           color: 'var(--text-main)',
           cursor: 'pointer',
@@ -2050,7 +2050,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
 
       /* Empty State */
       filteredMemos.length === 0 && /*#__PURE__*/React.createElement("div", {
-        style: { padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.88rem' }
+        style: { padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-base)' }
       }, "등록된 메모가 없거나 검색 조건과 일치하는 메모가 없습니다. 📝")
     ),
 
@@ -2153,7 +2153,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
               borderImage: 'none',
               outline: 'none',
               resize: 'none',
-              fontSize: '0.82rem',
+              fontSize: 'var(--font-size-md)',
               color: 'var(--text-main)',
               width: '100%',
               paddingBottom: '28px',
@@ -2254,7 +2254,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
             style: {
               flex: 1, minWidth: 0, height: '28px', padding: '0 8px', borderRadius: 'var(--radius-sm)',
               border: '1px solid var(--border-subtle)', background: 'var(--bg-primary)',
-              color: 'var(--text-main)', fontSize: '0.74rem'
+              color: 'var(--text-main)', fontSize: 'var(--font-size-sm)'
             }
           }),
           /*#__PURE__*/React.createElement("button", {
@@ -2264,7 +2264,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
             style: {
               flexShrink: 0, height: '28px', padding: '0 10px', borderRadius: 'var(--radius-sm)',
               border: '1px solid var(--border-subtle)', background: 'var(--border-subtle)',
-              color: 'var(--text-main)', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer',
+              color: 'var(--text-main)', fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer',
               opacity: editTags.length >= 10 ? 0.45 : 1
             }
           }, "저장")
@@ -2288,7 +2288,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
                 gap: '6px',
                 borderRadius: 'var(--radius-full)',
                 padding: '3px 4px 3px 10px',
-                fontSize: '0.72rem',
+                fontSize: 'var(--font-size-sm)',
                 fontWeight: 900,
                 lineHeight: 1,
                 border: '1px solid var(--border-subtle)',
