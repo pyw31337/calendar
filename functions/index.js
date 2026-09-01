@@ -773,6 +773,26 @@ async function incrementKakaoLocalSearchStat() {
   }
 }
 
+// Shared server-side cache for repeatable external lookups. Cache keys are hashes so
+// provider queries (including API keys) never appear in Firestore document paths.
+function externalCacheRef(provider, key) {
+  const digest = crypto.createHash('sha256').update(`${provider}:${key}`).digest('hex');
+  return admin.firestore().collection('externalApiCache').doc(`${provider}_${digest}`);
+}
+async function readExternalCache(provider, key) {
+  try {
+    const snap = await externalCacheRef(provider, key).get();
+    const data = snap.exists ? snap.data() : null;
+    if (data && data.expiresAt > Date.now() && data.payload) return data.payload;
+  } catch (_) {}
+  return null;
+}
+async function writeExternalCache(provider, key, payload, ttlMs) {
+  try {
+    await externalCacheRef(provider, key).set({ payload, cachedAt: Date.now(), expiresAt: Date.now() + ttlMs }, { merge: true });
+  } catch (err) { console.warn(`external cache write failed (${provider}):`, err); }
+}
+
 exports.kakaoLocalSearchProxy = functions.runWith({ secrets: ['KAKAO_REST_API_KEY'] }).https.onRequest(async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -786,6 +806,9 @@ exports.kakaoLocalSearchProxy = functions.runWith({ secrets: ['KAKAO_REST_API_KE
     res.status(429).json({ ok: false, message: 'Too many requests' });
     return;
   }
+  const cacheKey = query.toLocaleLowerCase('ko-KR');
+  const cached = await readExternalCache('kakaoSearch', cacheKey);
+  if (cached) { res.status(200).json(cached); return; }
   try {
     const kakaoRes = await fetch(`https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(query)}&size=10`, {
       headers: { Authorization: `KakaoAK ${KAKAO_REST_API_KEY}` }
@@ -798,7 +821,9 @@ exports.kakaoLocalSearchProxy = functions.runWith({ secrets: ['KAKAO_REST_API_KE
       return;
     }
     const json = await kakaoRes.json();
-    res.status(200).json({ ok: true, documents: json.documents || [] });
+    const result = { ok: true, documents: json.documents || [] };
+    await writeExternalCache('kakaoSearch', cacheKey, result, 24 * 60 * 60 * 1000);
+    res.status(200).json(result);
   } catch (err) {
     console.error('kakaoLocalSearchProxy failed:', err);
     res.status(502).json({ ok: false, message: 'Kakao local search request failed' });
@@ -852,6 +877,9 @@ exports.googlePlacesSearchProxy = functions.runWith({ secrets: ['GOOGLE_PLACES_A
     res.status(429).json({ ok: false, message: 'Too many requests' });
     return;
   }
+  const cacheKey = query.toLocaleLowerCase('ko-KR');
+  const cached = await readExternalCache('googlePlacesSearch', cacheKey);
+  if (cached) { res.status(200).json(cached); return; }
   try {
     // FieldMask is deliberately limited to Essentials/Pro-tier fields (id/name/address/location)
     // -- requesting Enterprise-tier fields (phone, website, opening hours, etc.) would bump every
@@ -873,7 +901,9 @@ exports.googlePlacesSearchProxy = functions.runWith({ secrets: ['GOOGLE_PLACES_A
       return;
     }
     const json = await googleRes.json();
-    res.status(200).json({ ok: true, places: json.places || [] });
+    const result = { ok: true, places: json.places || [] };
+    await writeExternalCache('googlePlacesSearch', cacheKey, result, 24 * 60 * 60 * 1000);
+    res.status(200).json(result);
   } catch (err) {
     console.error('googlePlacesSearchProxy failed:', err);
     res.status(502).json({ ok: false, message: 'Google Places search request failed' });
@@ -919,6 +949,9 @@ exports.tourApiSearchProxy = functions.https.onRequest(async (req, res) => {
     res.status(429).json({ ok: false, message: 'Too many requests' });
     return;
   }
+  const cacheKey = `${lat.toFixed(5)}:${lng.toFixed(5)}:${radius}:${contentTypeId || 'all'}`;
+  const cached = await readExternalCache('tourApiSearch', cacheKey);
+  if (cached) { res.status(200).json(cached); return; }
   try {
     const params = new URLSearchParams({
       serviceKey: tourApiServiceKey,
@@ -956,7 +989,9 @@ exports.tourApiSearchProxy = functions.https.onRequest(async (req, res) => {
       eventEndDate: String(item.eventenddate || ''),
       modifiedAt: String(item.modifiedtime || '')
     })).filter(item => item.id && Number.isFinite(item.lat) && Number.isFinite(item.lng));
-    res.status(200).json({ ok: true, source: 'tourapi', items });
+    const result = { ok: true, source: 'tourapi', items };
+    await writeExternalCache('tourApiSearch', cacheKey, result, 7 * 24 * 60 * 60 * 1000);
+    res.status(200).json(result);
   } catch (err) {
     console.error('tourApiSearchProxy failed:', err);
     res.status(502).json({ ok: false, message: 'TourAPI request failed' });
