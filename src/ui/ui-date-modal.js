@@ -754,6 +754,7 @@ export function DateModal({
   dateStr,
   calendar,
   chatMessages = [],
+  memos = [],
   setActiveLightbox,
   initialTab = null,
   adminMode = false,
@@ -795,6 +796,7 @@ export function DateModal({
   const SegmentedToggle = __deps.SegmentedToggle;
   const SimpleBottomSheetPicker = __comp.SimpleBottomSheetPicker || __deps.SimpleBottomSheetPicker;
   const MediaThumb = __comp.MediaThumb || __deps.MediaThumb;
+  const LinkPreviewCard = __comp.LinkPreviewCard || __deps.LinkPreviewCard;
   const SectionCountBadge = __comp.SectionCountBadge || __deps.SectionCountBadge;
   const SyncStatusChip = __comp.SyncStatusChip || __deps.SyncStatusChip;
   const SyncStatusBanner = __comp.SyncStatusBanner || __deps.SyncStatusBanner;
@@ -1386,10 +1388,38 @@ export function DateModal({
       }
     });
 
-    return [...directPhotos, ...chatPhotos].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-  }, [confirmedMeetingEntry, chatMessages, allMeetingPhotoMessages, chatMessagesWithFetchedSources, indexedMeetingPhotos, dateStr]);
+    const memoPhotos = [];
+    const targetDate = dateStr;
+    (Array.isArray(memos) ? memos : []).forEach(memo => {
+      if (!memo || isTombstone(memo)) return;
+      const tags = Array.isArray(memo.tags) ? memo.tags.join(' ') : String(memo.tags || '');
+      const parsedDates = typeof parseFlexibleDateTokens === 'function' ? parseFlexibleDateTokens(tags) : [];
+      if (!(parsedDates.includes(targetDate) || (targetTag && tags.includes(targetTag)))) return;
+      const asMsg = { id: memo.id, text: memo.text || '', imageUrl: memo.imageUrl, imageUrls: memo.imageUrls, thumbUrl: memo.thumbUrl, thumbUrls: memo.thumbUrls };
+      const imageEntries = typeof getMessageImageEntries === 'function' ? getMessageImageEntries(asMsg) : [];
+      imageEntries.forEach((entry, idx) => {
+        const full = entry.full || entry.thumb;
+        const key = entry.mediaKey || entry.refKey || `memo:${memo.id}:${idx}`;
+        if (full && !directKeys.has(key)) {
+          directKeys.add(key);
+          memoPhotos.push({ id: `memo_photo_${memo.id}_${idx}`, imageUrl: full, thumbUrl: entry.thumb || full, createdAt: memo.updatedAt || memo.createdAt || 0, source: 'memo-tag', sourceMemoId: memo.id, sourceImageIndex: idx, tags, assetKey: key, mediaKey: key, refKey: `memo:${memo.id}:${idx}` });
+        }
+      });
+      const direct = typeof getMessageDirectMediaEntry === 'function' ? getMessageDirectMediaEntry(asMsg) : null;
+      if (direct?.url && !directKeys.has(`memo:${memo.id}:video`)) {
+        directKeys.add(`memo:${memo.id}:video`);
+        memoPhotos.push({ id: `memo_video_${memo.id}`, directMediaUrl: direct.url, type: direct.type || 'embed', imageUrl: direct.thumbnail || '', thumbUrl: direct.thumbnail || '', createdAt: memo.updatedAt || memo.createdAt || 0, source: 'memo-tag', sourceMemoId: memo.id, tags, mediaKey: `memo:${memo.id}:video`, refKey: `memo:${memo.id}:video` });
+      }
+    });
+    return [...directPhotos, ...chatPhotos, ...memoPhotos].sort((a, b) => {
+      const av = a.directMediaUrl ? 0 : 1;
+      const bv = b.directMediaUrl ? 0 : 1;
+      return av - bv || (b.createdAt || 0) - (a.createdAt || 0);
+    });
+  }, [confirmedMeetingEntry, chatMessages, memos, allMeetingPhotoMessages, chatMessagesWithFetchedSources, indexedMeetingPhotos, dateStr]);
   const visibleMeetingPhotos = React.useMemo(
     () => meetingPhotos.filter(photo => {
+      if (photo.directMediaUrl) return true;
       const key = photo.refKey || photo.mediaKey || photo.id || photo.imageUrl || photo.thumbUrl;
       if (key && brokenMeetingPhotoKeysRef.current.has(key)) return false;
       return !isBrokenMeetingPhotoValue(photo.imageUrl)
@@ -1398,6 +1428,8 @@ export function DateModal({
     }),
     [meetingPhotos, brokenMeetingPhotoRevision]
   );
+  const visibleMeetingVideos = visibleMeetingPhotos.filter(photo => photo.directMediaUrl);
+  const visibleMeetingImages = visibleMeetingPhotos.filter(photo => !photo.directMediaUrl);
   const handleBrokenMeetingPhoto = (photo, brokenInfo = {}) => {
     markBrokenMeetingPhoto(photo, brokenInfo);
   };
@@ -3214,13 +3246,20 @@ export function DateModal({
       /* Empty State or Photo Grid */
       visibleMeetingPhotos.length === 0 ? /*#__PURE__*/React.createElement("div", {
         style: { textAlign: 'center', color: 'var(--text-muted)', padding: '24px 0', fontSize: '0.82rem', border: '1px dashed var(--border-subtle)', borderRadius: 'var(--radius-md)' }
-      }, "등록된 사진이 없습니다.") : /*#__PURE__*/React.createElement("div", {
+      }, "등록된 사진이 없습니다.") : /*#__PURE__*/React.createElement(React.Fragment, null,
+        visibleMeetingVideos.length > 0 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' } },
+          visibleMeetingVideos.map(video => /*#__PURE__*/React.createElement("div", { key: video.id, style: { border: '1px solid var(--border-subtle)', borderRadius: '10px', padding: '8px', background: 'var(--bg-card)' } },
+            LinkPreviewCard && /*#__PURE__*/React.createElement(LinkPreviewCard, { url: video.directMediaUrl, stretch: true }),
+            /*#__PURE__*/React.createElement("button", { type: 'button', onClick: () => window.open(video.directMediaUrl, '_blank', 'noopener,noreferrer'), style: { width: '100%', marginTop: '6px', border: 'none', borderRadius: '8px', padding: '8px', background: 'var(--bg-primary)', color: 'var(--primary)', fontWeight: 800, cursor: 'pointer' } }, '▶ 영상 바로보기')
+          ))
+        ),
+        visibleMeetingImages.length === 0 ? null : /*#__PURE__*/React.createElement("div", {
         style: {
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(76px, 1fr))',
           gap: '8px'
         }
-      }, visibleMeetingPhotos.map((photo, index) => /*#__PURE__*/React.createElement("div", {
+      }, visibleMeetingImages.map((photo, index) => /*#__PURE__*/React.createElement("div", {
         key: photo.id || `${photo.imageUrl}_${index}`,
         style: { position: 'relative', minWidth: 0 }
       },
@@ -3243,9 +3282,9 @@ export function DateModal({
               // route through source:'meeting' + sourceMessageId/sourceImageIndex/
               // meetingDate/photoId (see handleDeletePhoto/handleSaveImageTags in app-main.js).
               setActiveLightbox({
-                urls: visibleMeetingPhotos.map(p => p.imageUrl || p.thumbUrl),
+                urls: visibleMeetingImages.map(p => p.imageUrl || p.thumbUrl),
                 index,
-                meta: visibleMeetingPhotos.map(p => ({
+                meta: visibleMeetingImages.map(p => ({
                   timestamp: p.createdAt,
                   tags: p.tags,
                   source: p.source || 'meeting',
@@ -3277,6 +3316,7 @@ export function DateModal({
           }
         }),
       )))
+      )
     )
   ))));
 

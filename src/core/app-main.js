@@ -5783,6 +5783,7 @@ function CalendarApp() {
       dateStr: selectedDate,
       calendar: activeCal,
       chatMessages: displayChatMessages,
+      memos: memos,
       onSave: handleSaveAvailability,
       onDelete: handleDeleteAvailability,
       onReorderAvailability: handleReorderAvailability,
