@@ -1680,7 +1680,10 @@ export function PollVoterSheet({ calendar, pollId, optionId, onSelect, onClose }
   const option = getActivePollOptions(poll).find(item => item.id === optionId);
   if (!poll || !option) return null;
   const selectedIds = new Set(getPollOptionVoterIds(poll, option.id));
-  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  // Bottom-sheet rule: portal to document.body so a `position: fixed` sheet never gets trapped
+  // by a transformed ancestor (e.g. a poll card's hover lift) -- see ChatParticipantSheet's
+  // matching comment for the full explanation.
+  return ReactDOM.createPortal(/*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",
     onClick: onClose,
     style: {
@@ -1712,7 +1715,7 @@ export function PollVoterSheet({ calendar, pollId, optionId, onSelect, onClose }
     style: { backgroundColor: participant.color }
   }), participant.name), selectedIds.has(participant.id) && /*#__PURE__*/React.createElement("span", {
     style: { color: '#2563EB', fontWeight: 900 }
-  }, "\u2713"))))));
+  }, "\u2713")))))), document.body);
 }
 
 export function OperationProgressOverlay({ title, detail, pct }) {

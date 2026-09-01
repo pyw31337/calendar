@@ -766,7 +766,14 @@ export function ChatParticipantSheet({ calendar, selectedId, onSelect, onClose }
   const SmallXIcon = __deps.SmallXIcon;
 
   const participants = getActiveParticipants(calendar);
-  return /*#__PURE__*/React.createElement(React.Fragment, null,
+  // Bottom-sheet rule: never render a `position: fixed` sheet as a plain in-tree child --
+  // any ancestor with `transform` (e.g. .memo-card's :hover lift, or ResizableModalContainer)
+  // becomes that fixed element's containing block instead of the viewport, so it renders
+  // trapped near wherever the trigger button happens to sit rather than docked to the bottom
+  // of the screen. Portal straight to document.body like SimpleBottomSheetPicker already does,
+  // so every current and future caller (chat/memo composer, memo edit, memo comment, ...) is
+  // immune regardless of what it's nested inside.
+  return ReactDOM.createPortal(/*#__PURE__*/React.createElement(React.Fragment, null,
     /* Overlay */
     /*#__PURE__*/React.createElement("div", {
       className: "modal-overlay",
@@ -817,7 +824,7 @@ export function ChatParticipantSheet({ calendar, selectedId, onSelect, onClose }
         ))
       )
     )
-  );
+  ), document.body);
 }
 
 export function NotificationPermissionHelpModal({ onClose, onRetry, showToast }) {
