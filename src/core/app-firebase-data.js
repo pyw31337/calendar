@@ -2211,9 +2211,6 @@ function normalizeConfirmedMeetingExpense(expense) {
   const url = sanitizeText(expense.url || '', 220);
   const categoryId = sanitizeText(expense.categoryId || '', 80);
   const payerId = sanitizeText(expense.payerId || '', 80);
-  const participantId = sanitizeText(expense.participantId || '', 80);
-  const fundingType = ['fund', 'personal', 'settlement-clearing'].includes(expense.fundingType) ? expense.fundingType : '';
-  const flowType = expense.flowType === 'settlement-clearing' ? expense.flowType : '';
   const amount = Number(expense.amount);
   const order = Number(expense.order);
   const createdAt = Number(expense.createdAt);
@@ -2224,9 +2221,6 @@ function normalizeConfirmedMeetingExpense(expense) {
   if (url) normalized.url = url;
   if (categoryId) normalized.categoryId = categoryId;
   if (payerId) normalized.payerId = payerId;
-  if (participantId) normalized.participantId = participantId;
-  if (fundingType) normalized.fundingType = fundingType;
-  if (flowType) normalized.flowType = flowType;
   if (Number.isFinite(amount)) normalized.amount = Math.round(amount);
   if (Number.isFinite(order)) normalized.order = Math.max(0, Math.round(order));
   if (Number.isFinite(createdAt)) normalized.createdAt = Math.max(0, Math.round(createdAt));

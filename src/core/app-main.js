@@ -3980,15 +3980,6 @@ function CalendarApp() {
 	    // instead of requiring the same line item to be re-typed there by hand.
 	    const activeParticipantNames = new Set(getActiveParticipants(activeCal).map(p => p.name));
 	    const cleanPayerId = activeParticipantNames.has(expense?.payerId) ? expense.payerId : '';
-      const cleanParticipantId = activeParticipantNames.has(expense?.participantId) ? expense.participantId : '';
-      const isIncome = cleanAmount < 0;
-      const requestedFundingType = ['fund', 'personal', 'settlement-clearing'].includes(expense?.fundingType)
-        ? expense.fundingType
-        : '';
-      const cleanFundingType = requestedFundingType || (isIncome
-        ? (expense?.flowType === 'settlement-clearing' ? 'settlement-clearing' : (cleanParticipantId ? 'personal' : 'fund'))
-        : (cleanPayerId ? 'personal' : 'fund'));
-      const cleanFlowType = isIncome && cleanFundingType === 'settlement-clearing' ? 'settlement-clearing' : '';
     if ((!cleanLabel && !cleanUrl) || !cleanAmount) return false;
     
     // Link previews are display metadata, not part of the settlement write. Never block the
@@ -4013,8 +4004,8 @@ function CalendarApp() {
 	    const existingExpenses = Array.isArray(meeting.expenses) ? meeting.expenses : [];
 	    const isEditing = !!expense?.id;
 	    const nextExpenses = isEditing
-	      ? existingExpenses.map(e => e.id === expense.id ? { ...e, label: cleanLabel, url: cleanUrl, categoryId: cleanCategoryId, amount: cleanAmount, payerId: isIncome ? '' : cleanPayerId, participantId: isIncome ? cleanParticipantId : '', fundingType: cleanFundingType, flowType: cleanFlowType, updatedAt: now, linkPreview: linkPreview || null } : e)
-	      : [...existingExpenses, { id: `exp_${activeCal.id}_${dateStr}_${now}_${Math.random().toString(36).slice(2, 7)}`, label: cleanLabel, url: cleanUrl, categoryId: cleanCategoryId, amount: cleanAmount, payerId: isIncome ? '' : cleanPayerId, participantId: isIncome ? cleanParticipantId : '', fundingType: cleanFundingType, flowType: cleanFlowType, order: existingExpenses.length, createdAt: now, updatedAt: now, linkPreview: linkPreview || null }];
+	      ? existingExpenses.map(e => e.id === expense.id ? { ...e, label: cleanLabel, url: cleanUrl, categoryId: cleanCategoryId, amount: cleanAmount, payerId: cleanPayerId, updatedAt: now, linkPreview: linkPreview || null } : e)
+	      : [...existingExpenses, { id: `exp_${activeCal.id}_${dateStr}_${now}_${Math.random().toString(36).slice(2, 7)}`, label: cleanLabel, url: cleanUrl, categoryId: cleanCategoryId, amount: cleanAmount, payerId: cleanPayerId, order: existingExpenses.length, createdAt: now, updatedAt: now, linkPreview: linkPreview || null }];
     const nextConfirmedMeetings = meetings.map((m, i) => i === meetingIndex ? { ...m, expenses: nextExpenses, updatedAt: now, amount: null } : m);
     // Expense/income entries have no participant selector of their own, so these logs carry an
     // empty participantId (matching how poll activity logs already handle system-level actions)
