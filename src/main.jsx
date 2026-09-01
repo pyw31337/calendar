@@ -127,10 +127,27 @@ async function loadFirebaseSdk() {
   if (typeof window.firebase === 'undefined' || typeof window.firebase.firestore !== 'function') {
     await loadScriptWithRetry('vendor/firebase-firestore-compat.js', 30000);
   }
-  if (typeof window.firebase === 'undefined' || typeof window.firebase.storage !== 'function') {
-    await loadScriptWithRetry('vendor/firebase-storage-compat.js', 15000);
-  }
 }
+
+// Storage is upload-only and is not required to render or read any screen. Loading it during
+// every cold start added another script request to the critical path, even for read-only users.
+// Keep one shared lazy loader so the first image upload can initialize it without racing or
+// duplicating requests.
+let firebaseStorageSdkLoadPromise = null;
+function loadFirebaseStorageSdk() {
+  if (typeof window.firebase !== 'undefined' && typeof window.firebase.storage === 'function') {
+    return Promise.resolve();
+  }
+  if (!firebaseStorageSdkLoadPromise) {
+    firebaseStorageSdkLoadPromise = loadScriptWithRetry('vendor/firebase-storage-compat.js', 15000)
+      .catch(err => {
+        firebaseStorageSdkLoadPromise = null;
+        throw err;
+      });
+  }
+  return firebaseStorageSdkLoadPromise;
+}
+window.__gatherLoadFirebaseStorageSdk = loadFirebaseStorageSdk;
 
 // Admin UI is not needed for the initial calendar view, but it is also reachable from
 // the main screen's side menu. Keep it lazy while exposing the same loader to app-main so

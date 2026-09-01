@@ -455,6 +455,7 @@ import {
   lastStorageHealthCheckAt,
   lastStorageHealthOk,
   STORAGE_HEALTH_RECHECK_COOLDOWN_MS,
+  ensureFirebaseStorageReady,
   checkFirebaseStorageHealth,
   fetchSingleCalendarWithRest,
   fetchRecentMessagesRest,
@@ -1350,8 +1351,9 @@ function CalendarApp() {
   const [totalChatCount, setTotalChatCount] = React.useState(null);
   const [totalMemoCount, setTotalMemoCount] = React.useState(null);
   const [totalGalleryCount, setTotalGalleryCount] = React.useState(null);
-  const [galleryCountRefreshToken, setGalleryCountRefreshToken] = React.useState(0);
   const [galleryPreviewMessages, setGalleryPreviewMessages] = React.useState([]);
+  const CHAT_INITIAL_MESSAGE_LIMIT = readConfigNumber('CHAT_INITIAL_MESSAGE_LIMIT', 5);
+  const [chatLiveLimit, setChatLiveLimit] = React.useState(CHAT_INITIAL_MESSAGE_LIMIT);
   const loadingOlderChatRef = React.useRef(false);
   const allChatMessages = React.useMemo(() => {
     const byId = new Map();
@@ -1464,18 +1466,23 @@ function CalendarApp() {
     allChatMessages.forEach(m => { if (m?.id) byId.set(m.id, m); });
     return Array.from(byId.values()).sort((a, b) => Number(a.timestamp || 0) - Number(b.timestamp || 0));
   }, [allChatMessages, fullChatMessages]);
+  const galleryChatMessages = React.useMemo(() => {
+    const byId = new Map();
+    (galleryPreviewMessages || []).forEach(m => { if (m?.id) byId.set(m.id, m); });
+    displayChatMessages.forEach(m => { if (m?.id) byId.set(m.id, m); });
+    return Array.from(byId.values()).sort((a, b) => Number(a.timestamp || 0) - Number(b.timestamp || 0));
+  }, [displayChatMessages, galleryPreviewMessages]);
   React.useEffect(() => {
     // Search results must be complete even when the search modal is opened from the calendar
     // view. Previously the full-history hydration only ran for chat/gallery routes, so a search
     // opened from the main page silently searched the bounded realtime window instead.
-    if (!activeCalId || (activeView !== 'chat' && activeView !== 'gallery' && !isGlobalSearchOpen) || fullChatHistoryByCalendar[activeCalId] !== undefined) return;
+    if (!activeCalId || !isGlobalSearchOpen || fullChatHistoryByCalendar[activeCalId] !== undefined) return;
     const liveFirebaseDb = (typeof window !== 'undefined' && window.__gatherFirebaseDb) || firebaseDb;
     if (!liveFirebaseDb) {
       let cancelled = false;
       fetchAllChatMessagesRest(activeCalId).then(list => {
         if (cancelled) return;
         setFullChatHistoryByCalendar(prev => ({ ...prev, [activeCalId]: Array.isArray(list) ? list : [] }));
-        setHasMoreOlderChat(false);
       }).catch(err => console.warn('full REST chat history load failed:', err));
       return () => { cancelled = true; };
     }
@@ -1484,10 +1491,9 @@ function CalendarApp() {
       if (cancelled) return;
       const list = snapshot.docs.map(doc => slimMessageForClient({ id: doc.id, ...doc.data() }));
       setFullChatHistoryByCalendar(prev => ({ ...prev, [activeCalId]: list }));
-      setHasMoreOlderChat(false);
     }).catch(err => console.warn('full chat history load failed:', err));
     return () => { cancelled = true; };
-  }, [activeCalId, activeView, isGlobalSearchOpen, firebaseDb, firebaseConnectionVersion, fullChatHistoryByCalendar]);
+  }, [activeCalId, isGlobalSearchOpen, firebaseDb, firebaseConnectionVersion, fullChatHistoryByCalendar]);
   // The chat embed the user tapped play on -- { key, embedUrl, provider, orientation, title } |
   // null. Once set, it's rendered through a SINGLE always-mounted portal iframe (StickyVideoBox)
   // that never unmounts across view/tab switches, so playback genuinely never stops -- only its
@@ -2194,6 +2200,22 @@ function CalendarApp() {
   // other participants' messages stop showing up until a manual reload.
   const lastChatSnapshotAtRef = React.useRef(0);
 
+  // Render the newest five messages first. On capable networks, widen the realtime window after
+  // the critical first paint; on save-data/2G/3G connections keep the compact window and let the
+  // existing cursor-based "older messages" control fetch history in small pages on demand.
+  React.useEffect(() => {
+    setChatLiveLimit(CHAT_INITIAL_MESSAGE_LIMIT);
+    if (activeView !== 'chat') return undefined;
+    const connection = typeof navigator !== 'undefined'
+      ? (navigator.connection || navigator.mozConnection || navigator.webkitConnection)
+      : null;
+    const effectiveType = String(connection?.effectiveType || '').toLowerCase();
+    const constrained = Boolean(connection?.saveData) || effectiveType === 'slow-2g' || effectiveType === '2g' || effectiveType === '3g';
+    if (constrained) return undefined;
+    const timer = setTimeout(() => setChatLiveLimit(CHAT_LIVE_MESSAGE_LIMIT), 700);
+    return () => clearTimeout(timer);
+  }, [activeCalId, activeView, CHAT_INITIAL_MESSAGE_LIMIT]);
+
   // Real-time messages listener
   // Full window on chat/gallery; compact window elsewhere (main CommentsSection only needs ~5).
   React.useEffect(() => {
@@ -2201,11 +2223,11 @@ function CalendarApp() {
       setChatMessages([]);
       return;
     }
-    const chatLimit = (activeView === 'chat' || activeView === 'gallery')
-      ? CHAT_LIVE_MESSAGE_LIMIT
-      : CHAT_LIVE_MESSAGE_LIMIT;
+    const chatLimit = activeView === 'chat'
+      ? chatLiveLimit
+      : activeView === 'gallery' ? Math.min(12, CHAT_LIVE_MESSAGE_LIMIT) : CHAT_INITIAL_MESSAGE_LIMIT;
     if (!firebaseDb) {
-      fetchChatMessagesRest(activeCalId).then(list => setChatMessages(list.slice(-chatLimit)));
+      fetchRecentChatMessages(activeCalId, chatLimit).then(list => setChatMessages(list));
       return;
     }
     let isMounted = true;
@@ -2228,7 +2250,6 @@ function CalendarApp() {
         list.reverse();
         setChatMessages(list);
         invalidateGalleryItemCount(activeCalId);
-        setGalleryCountRefreshToken(token => token + 1);
 
         // Browser notification for a genuinely new incoming message from someone else --
         // skip the very first snapshot (that's just the existing history loading, not a
@@ -2243,7 +2264,7 @@ function CalendarApp() {
         if (latest) lastNotifiedMessageId = latest.id;
       }, err => {
         console.warn(`Firestore chat history subscription error:`, err);
-        fetchChatMessagesRest(activeCalId).then(list => {
+        fetchRecentChatMessages(activeCalId, chatLimit).then(list => {
           if (isMounted) setChatMessages(list);
         });
       });
@@ -2256,7 +2277,7 @@ function CalendarApp() {
   // render. Without this dependency, a page that initially fell back to REST never
   // attached onSnapshot until a full reload, so messages from other users appeared
   // only after refreshing.
-  }, [activeCalId, activeView, firebaseDb, firebaseConnectionVersion]);
+  }, [activeCalId, activeView, chatLiveLimit, firebaseDb, firebaseConnectionVersion, CHAT_INITIAL_MESSAGE_LIMIT]);
 
   // Chat listener watchdog: self-heals a silently stalled onSnapshot stream. Checks periodically
   // whether the listener above has gone quiet for too long and, if so, pulls the same recent
@@ -2267,7 +2288,7 @@ function CalendarApp() {
   // every tick); only starts actually re-fetching once the stream has genuinely stopped.
   React.useEffect(() => {
     if (!activeCalId || !firebaseDb) return undefined;
-    const chatLimit = CHAT_LIVE_MESSAGE_LIMIT;
+    const chatLimit = activeView === 'chat' ? chatLiveLimit : CHAT_INITIAL_MESSAGE_LIMIT;
     const STALE_AFTER_MS = 9000;
     const CHECK_INTERVAL_MS = 5000;
     let isMounted = true;
@@ -2287,7 +2308,6 @@ function CalendarApp() {
           return merged;
         });
         invalidateGalleryItemCount(activeCalId);
-        setGalleryCountRefreshToken(token => token + 1);
       } catch (err) {
         console.warn('Chat listener watchdog reconcile notice:', err);
       } finally {
@@ -2306,11 +2326,11 @@ function CalendarApp() {
       isMounted = false;
       clearInterval(timer);
     };
-  }, [activeCalId, firebaseDb]);
+  }, [activeCalId, activeView, chatLiveLimit, firebaseDb, CHAT_INITIAL_MESSAGE_LIMIT]);
 
   // Anniversaries: full collection (no orderBy) + client sort so docs without createdAt still show.
   React.useEffect(() => {
-    if (!activeCalId) return;
+    if (!activeCalId || activeView !== 'calendar') return;
     let isMounted = true;
     const sortAnns = list => {
       const arr = Array.isArray(list) ? list.slice() : [];
@@ -2337,11 +2357,12 @@ function CalendarApp() {
         });
       });
     return () => { isMounted = false; unsub(); };
-  }, [activeCalId, firebaseDb, firebaseConnectionVersion]);
+  }, [activeCalId, activeView, firebaseDb, firebaseConnectionVersion]);
 
   // Places + confirmed meetings: calendar / places / settlement only
   React.useEffect(() => {
-    if (!activeCalId) return;
+    const needsPlacesData = activeView === 'calendar' || activeView === 'places' || activeView === 'settlement';
+    if (!activeCalId || !needsPlacesData) return;
     let isMounted = true;
 
     // Instant REST fetch on boot guarantees zero-lag server truth across all devices and browsers
@@ -2416,7 +2437,7 @@ function CalendarApp() {
       unsubPlaces();
       unsubMeetings();
     };
-  }, [activeCalId, firebaseDb, firebaseConnectionVersion]);
+  }, [activeCalId, activeView, firebaseDb, firebaseConnectionVersion]);
 
   // Memos: paginated newest-first load (rather than subscribing to the entire collection at
   // once, which would download/re-sync thousands of memos on every open as a calendar grows).
@@ -2435,16 +2456,20 @@ function CalendarApp() {
       setHasMoreMemos(false);
       return;
     }
+    // Gallery needs a paginated memo window for memo-attached photos/links; other routes only
+    // need the latest memo for their summary badge/snippet.
+    const needsMemoCollection = activeView === 'memo' || activeView === 'gallery' || isGlobalSearchOpen;
+    const effectiveMemosLimit = needsMemoCollection ? memosLimit : 1;
+    let isMounted = true;
     const liveDb = (typeof window !== 'undefined' && window.__gatherFirebaseDb) || firebaseDb;
     if (!liveDb) {
-      fetchMemosRest(activeCalId, memosLimit).then(list => {
+      fetchMemosRest(activeCalId, effectiveMemosLimit).then(list => {
         if (!isMounted) return;
         setMemos(list);
-        setHasMoreMemos(list.length >= memosLimit);
+        setHasMoreMemos(needsMemoCollection && list.length >= effectiveMemosLimit);
       });
       return () => { isMounted = false; };
     }
-    let isMounted = true;
     let pinnedList = [];
     let recentList = [];
     const applyMerged = () => {
@@ -2454,27 +2479,27 @@ function CalendarApp() {
       setMemos(Array.from(byId.values()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)));
     };
 
-    const unsubscribePinned = subscribeMemos(activeCalId, { where: ['isPinned', '==', true] }, snapshot => {
+    const unsubscribePinned = needsMemoCollection ? subscribeMemos(activeCalId, { where: ['isPinned', '==', true] }, snapshot => {
         if (!isMounted) return;
         pinnedList = [];
         snapshot.forEach(doc => pinnedList.push({ id: doc.id, ...doc.data() }));
         applyMerged();
       }, err => {
         console.warn(`Firestore pinned memos subscription error:`, err);
-      });
+      }) : null;
 
-    const unsubscribeRecent = subscribeMemos(activeCalId, { orderBy: 'createdAt', direction: 'desc', limit: memosLimit }, snapshot => {
+    const unsubscribeRecent = subscribeMemos(activeCalId, { orderBy: 'createdAt', direction: 'desc', limit: effectiveMemosLimit }, snapshot => {
         if (!isMounted) return;
         recentList = [];
         snapshot.forEach(doc => recentList.push({ id: doc.id, ...doc.data() }));
-        setHasMoreMemos(recentList.length >= memosLimit);
+        setHasMoreMemos(needsMemoCollection && recentList.length >= effectiveMemosLimit);
         applyMerged();
       }, err => {
         console.warn(`Firestore memos subscription error:`, err);
-        fetchMemosRest(activeCalId, memosLimit).then(list => {
+        fetchMemosRest(activeCalId, effectiveMemosLimit).then(list => {
           if (!isMounted) return;
           recentList = list;
-          setHasMoreMemos(list.length >= memosLimit);
+          setHasMoreMemos(needsMemoCollection && list.length >= effectiveMemosLimit);
           applyMerged();
         });
       });
@@ -2484,7 +2509,7 @@ function CalendarApp() {
       if (typeof unsubscribePinned === 'function') unsubscribePinned();
       if (typeof unsubscribeRecent === 'function') unsubscribeRecent();
     };
-  }, [activeCalId, memosLimit, firebaseDb, firebaseConnectionVersion]);
+  }, [activeCalId, activeView, isGlobalSearchOpen, memosLimit, firebaseDb, firebaseConnectionVersion]);
 
   // Dynamic body padding override for full-screen subviews (chat, settlement, memo)
   React.useEffect(() => {
@@ -2565,15 +2590,18 @@ function CalendarApp() {
     if (!activeCalId || isInitialDataLoading) return;
     let cancelled = false;
     (async () => {
-      const [msgCount, memoCount, galCount] = await Promise.all([
+      const [msgCount, memoCount] = await Promise.all([
         fetchSubcollectionCount(activeCalId, 'messages', { excludeUploadSources: ['meeting', 'gallery'] }),
-        fetchSubcollectionCount(activeCalId, 'memos'),
-        fetchGalleryItemCount(activeCalId)
+        fetchSubcollectionCount(activeCalId, 'memos')
       ]);
       if (cancelled) return;
       if (msgCount != null) setTotalChatCount(msgCount);
       if (memoCount != null) setTotalMemoCount(memoCount);
-      if (galCount != null) setTotalGalleryCount(galCount);
+      // Historical migrations are maintenance work, not part of an end-user request path. They
+      // remain available behind an explicit maintenance flag instead of scanning up to 120 chat
+      // documents on every calendar visit.
+      const runMaintenance = new URLSearchParams(window.location.search).get('maintenance') === '1';
+      if (!runMaintenance) return;
       try {
         if (!window.__gatherB64MigDone) window.__gatherB64MigDone = Object.create(null);
         if (!window.__gatherB64MigDone[activeCalId]) {
@@ -2593,7 +2621,7 @@ function CalendarApp() {
       } catch (e) { console.warn('base64 migration skipped', e); }
     })();
     return () => { cancelled = true; };
-  }, [activeCalId, isInitialDataLoading, galleryCountRefreshToken]);
+  }, [activeCalId, isInitialDataLoading]);
 
   // Main-screen chat preview safety net:
   // if the count says chat history exists but the live recent window is still empty,
@@ -2621,7 +2649,7 @@ function CalendarApp() {
   React.useEffect(() => {
     // Same reasoning as above -- wait for the initial calendar document load to finish before
     // spending a paginated Firestore scan on gallery-preview thumbnails.
-    if (!activeCalId || activeView !== 'calendar' || isInitialDataLoading) return;
+    if (!activeCalId || (activeView !== 'calendar' && activeView !== 'gallery') || isInitialDataLoading) return;
     let cancelled = false;
     (async () => {
       // Keeps paging through history until at least 12 photos have been found (matching the
@@ -2711,7 +2739,6 @@ function CalendarApp() {
     setOlderChatMessages(upsertMessage);
     setGalleryPreviewMessages(upsertMessage);
     invalidateGalleryItemCount(activeCalId);
-    setGalleryCountRefreshToken(token => token + 1);
   };
   const removeLocalChatMessage = messageId => {
     const dropMessage = prev => prev.filter(m => m.id !== messageId);
@@ -2719,7 +2746,6 @@ function CalendarApp() {
     setOlderChatMessages(dropMessage);
     setGalleryPreviewMessages(dropMessage);
     invalidateGalleryItemCount(activeCalId);
-    setGalleryCountRefreshToken(token => token + 1);
   };
   const patchLocalMemo = (memoId, patch) => {
     if (!memoId || !patch) return;
@@ -3470,7 +3496,7 @@ function CalendarApp() {
         return { shareUrl, imageUrl: null };
       }
 
-      if (!getLiveFirebaseStorage()) throw new Error('Firebase Storage is not available');
+      if (!(getLiveFirebaseStorage() || await ensureFirebaseStorageReady())) throw new Error('Firebase Storage is not available');
       const uploaded = await uploadInlineChatImageToStorage(activeCalId, url, meta?.thumb || url, index, updateProgress, 12000);
       if (!uploaded?.imageUrl) throw new Error('Image upload failed');
       setChatUploadProgress({ pct: 100, remainingSec: 0, label: 'URL 생성완료' });
@@ -6552,7 +6578,7 @@ function CalendarApp() {
     return withStickyVideo(/*#__PURE__*/React.createElement(React.Fragment, null,
       /*#__PURE__*/React.createElement(ChatGalleryModal, {
         calendar: activeCal,
-        chatMessages: displayChatMessages,
+        chatMessages: galleryChatMessages,
         memos: memos,
         asPage: true,
         onClose: () => changeView('calendar'),
@@ -8457,7 +8483,7 @@ async function dataUrlToBlob(dataUrl) {
 }
 
 async function uploadInlineChatImageToStorage(calendarId, imageUrl, thumbUrl, index = 0, onBytes, timeoutMs = 45000) {
-  if (!getLiveFirebaseStorage()) return null;
+  if (!(getLiveFirebaseStorage() || await ensureFirebaseStorageReady())) return null;
   if (onBytes) onBytes(`${index}-prepare`, 1, 10);
   const originalBlob = await dataUrlToBlob(imageUrl);
   if (onBytes) onBytes(`${index}-prepare`, 5, 10);
@@ -8473,7 +8499,7 @@ async function uploadInlineChatImageToStorage(calendarId, imageUrl, thumbUrl, in
 }
 
 async function migrateBase64ChatImagesForCalendar(calId, { maxMessages = 40 } = {}) {
-  if (!calId || !firebaseDb || !getLiveFirebaseStorage()) return { migrated: 0, failed: 0, scanned: 0 };
+  if (!calId || !firebaseDb || !(getLiveFirebaseStorage() || await ensureFirebaseStorageReady())) return { migrated: 0, failed: 0, scanned: 0 };
   const storageOk = await checkFirebaseStorageHealth();
   if (!storageOk) return { migrated: 0, failed: 0, scanned: 0, reason: 'storage-unavailable' };
   let migrated = 0, failed = 0, scanned = 0;
@@ -8750,8 +8776,9 @@ function isStorageDownloadUrl(url) {
 }
 
 async function deleteChatImageFromStorage(url) {
-  const storage = getLiveFirebaseStorage();
-  if (!storage || !isStorageDownloadUrl(url)) return;
+  if (!isStorageDownloadUrl(url)) return;
+  const storage = getLiveFirebaseStorage() || await ensureFirebaseStorageReady();
+  if (!storage) return;
   try {
     await storage.refFromURL(url).delete();
   } catch (e) {

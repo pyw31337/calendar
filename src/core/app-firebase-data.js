@@ -1143,7 +1143,7 @@ function attemptFirebaseInit() {
     // falls back to embedding a compressed base64 image directly in the message document if this
     // is unavailable (bucket not provisioned on this project/plan, offline, etc.), so a Storage
     // outage degrades image quality/cost rather than breaking the chat feature outright.
-    if (!firebaseStorage && firebase.apps.length) {
+    if (!firebaseStorage && firebase.apps.length && typeof firebase.storage === 'function') {
       firebaseStorage = firebase.storage();
     }
     if (firebaseStorage && typeof window !== 'undefined') {
@@ -1193,8 +1193,7 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined' && !firebas
   // these no longer point at www.gstatic.com.
   const FIREBASE_SDK_URLS = [
     'vendor/firebase-app-compat.js',
-    'vendor/firebase-firestore-compat.js',
-    'vendor/firebase-storage-compat.js'
+    'vendor/firebase-firestore-compat.js'
   ];
   const loadFirebaseScriptOnce = (src, timeoutMs) => new Promise((resolve, reject) => {
     let settled = false;
@@ -1208,8 +1207,7 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined' && !firebas
   });
   const needsFirebaseSdkReload = () => (
     typeof firebase === 'undefined' ||
-    typeof firebase.firestore !== 'function' ||
-    typeof firebase.storage !== 'function'
+    typeof firebase.firestore !== 'function'
   );
   let bgAttempts = 0;
   const bgRetryTimer = setInterval(async () => {
@@ -1257,12 +1255,30 @@ let lastStorageHealthOk = null; // null = never checked yet
 // rest of the session even though Storage is actually fine moments later.
 const STORAGE_HEALTH_RECHECK_COOLDOWN_MS = 20000;
 
+async function ensureFirebaseStorageReady() {
+  if (firebaseStorage) return firebaseStorage;
+  try {
+    const loader = typeof window !== 'undefined' && window.__gatherLoadFirebaseStorageSdk;
+    if (typeof loader === 'function') await loader();
+    if (typeof firebase === 'undefined' || typeof firebase.storage !== 'function') return null;
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    firebaseStorage = firebase.storage();
+    if (typeof window !== 'undefined') window.__gatherFirebaseStorage = firebaseStorage;
+    notifyFirebaseStateChange();
+    return firebaseStorage;
+  } catch (e) {
+    console.warn('Firebase Storage lazy init notice:', e);
+    return null;
+  }
+}
+
 async function checkFirebaseStorageHealth() {
   const now = Date.now();
   if (lastStorageHealthOk === true) return true;
   if (lastStorageHealthOk === false && (now - lastStorageHealthCheckAt) < STORAGE_HEALTH_RECHECK_COOLDOWN_MS) {
     return false;
   }
+  if (!firebaseStorage) await ensureFirebaseStorageReady();
   if (!firebaseStorage) {
     lastStorageHealthOk = false;
     lastStorageHealthCheckAt = now;
@@ -1301,11 +1317,6 @@ async function checkFirebaseStorageHealth() {
   lastStorageHealthCheckAt = now;
   return !isStorageDisabled;
 }
-
-// Run health check early
-setTimeout(() => {
-  checkFirebaseStorageHealth().catch(() => {});
-}, 1000);
 
 // Mobile browsers aggressively suspend a backgrounded tab's network activity, and Firestore's
 // realtime "listen" stream can come back stale/dead when the tab is foregrounded again. We only
@@ -3680,6 +3691,7 @@ export {
   firebaseInitError,
   firebaseRetryExhausted,
   firebaseStorage,
+  ensureFirebaseStorageReady,
   isStorageDisabled,
   lastStorageHealthCheckAt,
   lastStorageHealthOk,

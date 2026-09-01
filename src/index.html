@@ -44,7 +44,6 @@
          mobile browsers do not depend on a third-party CDN or duplicate the SDK scripts. -->
     <script src="vendor/firebase-app-compat.js?v=20260828-storage-fix2" defer></script>
     <script src="vendor/firebase-firestore-compat.js?v=20260828-storage-fix2" defer></script>
-    <script src="vendor/firebase-storage-compat.js?v=20260828-storage-fix2" defer></script>
     <!-- Firebase SDK scripts are loaded from main.jsx (loadFirebaseSdk), vendored under
          vendor/ (same origin) instead of from www.gstatic.com -- a real device consistently got
          `window.firebase undefined` even after every retry/timeout adjustment tried, tracing back
@@ -61,7 +60,6 @@
          guards for the library not being loaded yet), so nothing here needs them before first
          paint or before the app boots -- if jsdelivr.net is ever slow or unreachable for a
          visitor, that no longer holds up Firebase SDK loading or anything else. -->
-    <script async src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
     <script async src="https://cdn.jsdelivr.net/npm/korean-lunar-calendar/dist/korean-lunar-calendar.min.js"></script>
     <script async src="https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode.js"></script>
   </head>

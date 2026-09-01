@@ -1210,34 +1210,36 @@ export function ChatGalleryModal({
     if (key && brokenPhotoKeysRef.current.has(key)) return false;
     return !isBrokenPhotoValue(photo.full) && !isBrokenPhotoValue(photo.thumb);
   }), [filteredPhotos, brokenPhotoRevision]);
+  const [photoRenderLimit, setPhotoRenderLimit] = React.useState(12);
+  const renderedPhotos = React.useMemo(
+    () => asPage ? visiblePhotos.slice(0, photoRenderLimit) : visiblePhotos,
+    [asPage, visiblePhotos, photoRenderLimit]
+  );
+  const hasLocallyHiddenPhotos = renderedPhotos.length < visiblePhotos.length;
+  const loadMorePhotos = () => {
+    if (hasLocallyHiddenPhotos) {
+      setPhotoRenderLimit(limit => limit + 20);
+      return;
+    }
+    if (typeof onLoadOlderChat === 'function' && hasMoreOlderChat && !loadingOlderChat) onLoadOlderChat();
+  };
 
   const handleBrokenPhoto = (photo, brokenInfo = {}) => {
     markBrokenPhoto(photo, brokenInfo);
   };
 
+  const searchHydratedRef = React.useRef('');
   React.useEffect(() => {
-    if (!searchQuery.trim()) return;
+    const query = searchQuery.trim();
+    if (!query || searchHydratedRef.current === query) return;
+    searchHydratedRef.current = query;
     if (typeof onLoadOlderChat === 'function' && hasMoreOlderChat && !loadingOlderChat) {
       onLoadOlderChat();
     }
     if (typeof onLoadMoreMemos === 'function' && hasMoreMemos) {
       onLoadMoreMemos();
     }
-  }, [searchQuery, hasMoreOlderChat, loadingOlderChat, hasMoreMemos, (chatMessages || []).length, (memos || []).length]);
-
-  React.useEffect(() => {
-    if (!asPage || (searchQuery || '').trim() || activeTab !== 'photos') return;
-    if (typeof onLoadOlderChat !== 'function' || !hasMoreOlderChat || loadingOlderChat) return;
-    if ((visiblePhotos || []).length >= 60) return;
-    onLoadOlderChat();
-  }, [asPage, searchQuery, activeTab, hasMoreOlderChat, loadingOlderChat, (visiblePhotos || []).length, (chatMessages || []).length]);
-
-  React.useEffect(() => {
-    if (!asPage || (searchQuery || '').trim() || activeTab !== 'links') return;
-    if ((sharedLinks || []).length >= 50) return;
-    if (typeof onLoadOlderChat === 'function' && hasMoreOlderChat && !loadingOlderChat) onLoadOlderChat();
-    if (typeof onLoadMoreMemos === 'function' && hasMoreMemos) onLoadMoreMemos();
-  }, [asPage, searchQuery, activeTab, hasMoreOlderChat, loadingOlderChat, hasMoreMemos, (sharedLinks || []).length, (chatMessages || []).length, (memos || []).length]);
+  }, [searchQuery, hasMoreOlderChat, loadingOlderChat, hasMoreMemos, onLoadOlderChat, onLoadMoreMemos]);
 
   const displayPhotoTabCount = visiblePhotos.length;
   const [galleryViewMode, setGalleryViewMode] = React.useState('all'); // 'all' | 'date'
@@ -1274,7 +1276,7 @@ export function ChatGalleryModal({
   };
   const groupedGallerySections = React.useMemo(() => {
     if (galleryViewMode !== 'date') return [];
-    const sourceItems = activeTab === 'links' ? filteredLinks : visiblePhotos;
+    const sourceItems = activeTab === 'links' ? filteredLinks : renderedPhotos;
     const groups = new Map();
     (sourceItems || []).forEach((item, idx) => {
       const key = getGalleryItemDateKey(item) || '__unknown__';
@@ -1297,7 +1299,7 @@ export function ChatGalleryModal({
           .sort((a, b) => (Number(b.item?.timestamp || 0) - Number(a.item?.timestamp || 0)) || (a.idx - b.idx))
           .map(entry => entry.item)
       }));
-  }, [galleryViewMode, activeTab, filteredLinks, visiblePhotos, galleryMonthKey]);
+  }, [galleryViewMode, activeTab, filteredLinks, renderedPhotos, galleryMonthKey]);
 
   const toggleGalleryDate = dateKey => {
     setCollapsedGalleryDates(prev => {
@@ -1738,7 +1740,7 @@ export function ChatGalleryModal({
       const isLinkMode = activeTab === 'links';
       const showLoadMore = isLinkMode
         ? (hasMoreOlderChat || hasMoreMemos)
-        : (hasMoreOlderChat || loadingOlderChat);
+        : (hasLocallyHiddenPhotos || hasMoreOlderChat || loadingOlderChat);
       const loadMoreNode = showLoadMore && !(searchQuery || '').trim() && (
         isLinkMode
           ? renderGalleryLoadMoreButton({
@@ -1754,7 +1756,7 @@ export function ChatGalleryModal({
               label: '이전 사진·링크 더 보기',
               loadingLabel: '이전 사진을 불러오는 중…',
               disabled: !!loadingOlderChat,
-              onClick: () => { if (typeof onLoadOlderChat === 'function' && !loadingOlderChat) onLoadOlderChat(); }
+              onClick: loadMorePhotos
             })
       );
       return /*#__PURE__*/React.createElement(React.Fragment, null,
@@ -1800,7 +1802,7 @@ export function ChatGalleryModal({
             !isCollapsed && /*#__PURE__*/React.createElement("div", {
               id: `gallery-date-items-${section.dateKey}`,
               style: { display: 'flex', flexDirection: 'column', gap: '8px' }
-            }, isLinkMode ? renderGalleryLinkList(section.items) : renderGalleryPhotoGrid(section.items, visiblePhotos))
+            }, isLinkMode ? renderGalleryLinkList(section.items) : renderGalleryPhotoGrid(section.items, renderedPhotos))
           );
         }),
         loadMoreNode
@@ -1824,7 +1826,7 @@ export function ChatGalleryModal({
         })
       );
     }
-    const sortedPhotos = sortGalleryFlatItems(visiblePhotos);
+    const sortedPhotos = sortGalleryFlatItems(renderedPhotos);
     return /*#__PURE__*/React.createElement(React.Fragment, null,
       renderPhotoListHeader(),
       sortedPhotos.length === 0 ? /*#__PURE__*/React.createElement("div", {
@@ -1833,11 +1835,11 @@ export function ChatGalleryModal({
         ? "검색 결과가 없습니다."
         : describeGalleryPhotoEmptyState("공유된 사진이 없습니다."))
       : renderGalleryPhotoGrid(sortedPhotos, sortedPhotos),
-      (hasMoreOlderChat || loadingOlderChat) && !(searchQuery || '').trim() && renderGalleryLoadMoreButton({
-        label: '이전 사진·링크 더 보기',
+      (hasLocallyHiddenPhotos || hasMoreOlderChat || loadingOlderChat) && !(searchQuery || '').trim() && renderGalleryLoadMoreButton({
+        label: hasLocallyHiddenPhotos ? '사진 더 보기' : '이전 사진·링크 더 보기',
         loadingLabel: '이전 사진을 불러오는 중…',
-        disabled: !!loadingOlderChat,
-        onClick: () => { if (typeof onLoadOlderChat === 'function' && !loadingOlderChat) onLoadOlderChat(); }
+        disabled: !!loadingOlderChat && !hasLocallyHiddenPhotos,
+        onClick: loadMorePhotos
       })
     );
   };

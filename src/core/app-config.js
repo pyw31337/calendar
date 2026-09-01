@@ -11,8 +11,13 @@ export const GATHER_APP_CONFIG = Object.freeze({
   SETTLEMENT_ENABLED_CALENDAR_IDS: Object.freeze(['kkot', 'cw', 'jhair']),
   FIREBASE_LOAD_TIMEOUT_MS: 10000,
   FIREBASE_LOAD_MAX_ATTEMPTS: 3,
-  MEMOS_PAGE_SIZE: 30,
-  CHAT_LIVE_MESSAGE_LIMIT: 30,
+  MEMOS_PAGE_SIZE: 20,
+  // Keep the first realtime read tiny so chat becomes interactive quickly on old/3G devices.
+  // A healthy connection expands this window shortly after first paint; older history remains
+  // cursor-paginated and is never downloaded as one unbounded collection read.
+  CHAT_INITIAL_MESSAGE_LIMIT: 5,
+  CHAT_LIVE_MESSAGE_LIMIT: 20,
+  CHAT_OLDER_PAGE_SIZE: 20,
   ADMIN_MESSAGE_LIVE_LIMIT: 50,
   ADMIN_MEMO_LIVE_LIMIT: 50,
   GLOBAL_SEARCH_HISTORY_LIMIT: 100,

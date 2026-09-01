@@ -131,35 +131,63 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     }
   }
 
-  // Unlike fetchRecentChatMessages (which deliberately serves a recent chat window), this is a
-  // correctness path for gallery media. The gallery must not silently omit an older photo just
-  // because many text messages were posted after it, so page through the complete collection.
-  // The caller still limits how many thumbnails it renders; this function only guarantees that
-  // the source set used for choosing those thumbnails is exhaustive.
-  async function fetchRecentGalleryMessages(calId) {
+  // Page only until enough media has been found for the preview. The previous implementation
+  // downloaded the entire messages collection just to render twelve thumbnails, which became
+  // progressively slower and more expensive as a calendar grew.
+  async function fetchRecentGalleryMessages(calId, desiredMediaCount) {
     if (!isValidCalId(calId)) return [];
+    const target = Math.max(1, Math.min(60, Number(desiredMediaCount) || 12));
+    const pageSize = 40;
+    const mediaCount = function (msg) {
+      return imageEntries(msg).length + (directEntry(msg) ? 1 : 0);
+    };
     const firebaseDb = getDb();
-    if (!firebaseDb) return fetchAllChatMessagesRest(calId);
-    try {
+    if (firebaseDb) try {
       const collected = [];
+      let found = 0;
       let lastDoc = null;
-      while (true) {
+      while (found < target) {
         let q = firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
-          .orderBy('timestamp', 'desc').limit(80);
+          .orderBy('timestamp', 'desc').limit(pageSize);
         if (lastDoc) q = q.startAfter(lastDoc);
         const snap = await withSdkTimeout(q.get(), FIRESTORE_REST_TIMEOUT_MS);
         if (snap.empty) break;
         snap.forEach(function (doc) {
+          if (found >= target) return;
           const msg = slimMessage({ id: doc.id, ...doc.data() });
           collected.push(msg);
+          found += mediaCount(msg);
         });
         lastDoc = snap.docs[snap.docs.length - 1];
-        if (snap.size < 80) break;
+        if (snap.size < pageSize) break;
       }
       return collected.reverse();
     } catch (err) {
       console.warn('fetchRecentGalleryMessages sdk', err);
-      return fetchAllChatMessagesRest(calId);
+    }
+    try {
+      const collected = [];
+      let found = 0;
+      let pageToken = '';
+      while (found < target) {
+        let url = 'https://firestore.googleapis.com/v1/projects/' + projectId() + '/databases/(default)/documents/calendars/cal_' + calId + '/messages?orderBy=timestamp%20desc&pageSize=' + pageSize;
+        if (pageToken) url += '&pageToken=' + encodeURIComponent(pageToken);
+        const res = await fetchWithTimeout(url, { cache: 'no-store' });
+        if (!res.ok) break;
+        const data = await res.json();
+        (data.documents || []).forEach(function (doc) {
+          if (found >= target) return;
+          const msg = slimMessage({ id: doc.name.split('/').pop(), ...docToJs(doc) });
+          collected.push(msg);
+          found += mediaCount(msg);
+        });
+        pageToken = data.nextPageToken || '';
+        if (!pageToken) break;
+      }
+      return collected.reverse();
+    } catch (err) {
+      console.warn('fetchRecentGalleryMessages rest', err);
+      return [];
     }
   }
 
