@@ -1035,7 +1035,7 @@ export function ItemEditDeleteActions({ onEdit, onDelete, editTitle = '수정', 
       title: editTitle, "aria-label": editTitle,
       style: {
         width: '22px', height: '22px', border: '1px solid var(--border-subtle)',
-        backgroundColor: 'var(--bg-card)', borderRadius: '6px',
+        backgroundColor: 'var(--bg-card)', borderRadius: 'var(--radius-sm)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         cursor: 'pointer', padding: 0, color: 'var(--text-muted)'
       }
@@ -1242,14 +1242,14 @@ export function LinkPreviewProgressOverlay({ progress, remainingSec }) {
           /*#__PURE__*/React.createElement("span", { style: { color: 'var(--accent-primary)' } }, `${progress}% (약 ${remainingSec}초 남음)`)
         ),
         /*#__PURE__*/React.createElement("div", {
-          style: { width: '100%', height: '8px', backgroundColor: 'var(--border-subtle)', borderRadius: '999px', overflow: 'hidden' }
+          style: { width: '100%', height: '8px', backgroundColor: 'var(--border-subtle)', borderRadius: 'var(--radius-full)', overflow: 'hidden' }
         },
           /*#__PURE__*/React.createElement("div", {
             style: {
               width: `${progress}%`,
               height: '100%',
               backgroundColor: 'var(--accent-primary)',
-              borderRadius: '999px',
+              borderRadius: 'var(--radius-full)',
               transition: 'width 0.1s linear'
             }
           })
@@ -1315,7 +1315,7 @@ export function AdminLoginGate({ children }) {
       className: "modal-container",
       style: { maxWidth: '320px', padding: '28px', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', gap: '14px' }
     },
-      /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.1rem', fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(LockIcon, null), "관리자 인증"),
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(LockIcon, null), "관리자 인증"),
       /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.82rem', color: 'var(--text-muted)' } }, "비밀번호를 입력해 주세요."),
       /*#__PURE__*/React.createElement("input", {
         type: "password",
@@ -1383,7 +1383,7 @@ export function DonutChart({ segments, size = 84, strokeWidth = 14 }) {
     activeSeg && /*#__PURE__*/React.createElement("div", {
       style: {
         position: 'absolute', bottom: `calc(100% + 6px)`, left: '50%', transform: 'translateX(-50%)',
-        backgroundColor: 'rgba(15, 23, 42, 0.94)', color: '#FFFFFF', borderRadius: '6px',
+        backgroundColor: 'rgba(15, 23, 42, 0.94)', color: '#FFFFFF', borderRadius: 'var(--radius-sm)',
         padding: '4px 8px', fontSize: '0.66rem', fontWeight: 700, whiteSpace: 'nowrap',
         pointerEvents: 'none', zIndex: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.25)'
       }
@@ -1867,7 +1867,7 @@ export function MemoTagInputRow({
       },
       maxLength: 100,
       style: {
-        flex: 1, minWidth: 0, height: '28px', padding: '0 8px', borderRadius: '6px',
+        flex: 1, minWidth: 0, height: '28px', padding: '0 8px', borderRadius: 'var(--radius-sm)',
         border: '1px solid var(--border-subtle)', background: 'var(--bg-primary)',
         color: 'var(--text-main)', fontSize: '0.74rem'
       }
@@ -1877,7 +1877,7 @@ export function MemoTagInputRow({
       onClick: onAddTag,
       disabled: tags.length >= maxTags,
       style: {
-        flexShrink: 0, height: '28px', padding: '0 10px', borderRadius: '6px',
+        flexShrink: 0, height: '28px', padding: '0 10px', borderRadius: 'var(--radius-sm)',
         border: '1px solid var(--border-subtle)', background: 'var(--border-subtle)',
         color: 'var(--text-main)', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer',
         opacity: tags.length >= maxTags ? 0.45 : 1
@@ -2017,7 +2017,7 @@ export function ClickToPlayVideoCard({ url, mediaInfo = null, fallbackTitle = ''
         padding: '16px',
         boxSizing: 'border-box',
         textAlign: 'center',
-        color: '#94A3B8',
+        color: 'var(--text-muted)',
         fontSize: '0.8rem',
         fontWeight: 600
       }

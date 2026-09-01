@@ -1282,7 +1282,7 @@ export function AdminModal({
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: () => { if (!isSubmitting) requestClose(); },
-        style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }
+        style: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }
       }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))
     ),
 
@@ -1467,7 +1467,7 @@ export function AdminModal({
             /*#__PURE__*/React.createElement("div", {
               style: { display: 'flex', flexDirection: 'column', gap: '8px' }
             },
-              getCalendarPolls(calendar).length === 0 ? /*#__PURE__*/React.createElement("div", { style: { padding: '16px', color: '#94A3B8', fontSize: '0.8rem', textAlign: 'center' } }, "현재 등록된 투표가 없습니다. 새 투표를 생성해 주세요.") :
+              getCalendarPolls(calendar).length === 0 ? /*#__PURE__*/React.createElement("div", { style: { padding: '16px', color: 'var(--text-muted)', fontSize: '0.8rem', textAlign: 'center' } }, "현재 등록된 투표가 없습니다. 새 투표를 생성해 주세요.") :
               getCalendarPolls(calendar).map(poll => /*#__PURE__*/React.createElement("div", {
                 key: poll.id,
                 className: 'admin-log-row poll-list-row settings-poll-row',
@@ -1476,7 +1476,7 @@ export function AdminModal({
                 /* Left info */
                 /*#__PURE__*/React.createElement("div", { className: "admin-poll-row-main", style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px', minWidth: 0, flex: '1 1 160px' } },
                   /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text-main)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' } }, poll.title),
-                  /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: '#64748B' } }, `${getActivePollOptions(poll).length}개 옵션 · 총 ${getPollTotalVoteCount(poll)}표${poll.deadline ? ` · 마감 ${formatPollDeadline(poll.deadline)}${isPollClosed(poll) ? ' (마감됨)' : ''}` : ''}`)
+                  /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: 'var(--text-muted)' } }, `${getActivePollOptions(poll).length}개 옵션 · 총 ${getPollTotalVoteCount(poll)}표${poll.deadline ? ` · 마감 ${formatPollDeadline(poll.deadline)}${isPollClosed(poll) ? ' (마감됨)' : ''}` : ''}`)
                 ),
                 /* Right actions */
                 /*#__PURE__*/React.createElement("div", { className: "admin-poll-row-actions", style: { display: 'flex', gap: '6px' } },
@@ -1485,7 +1485,7 @@ export function AdminModal({
                     type: "button",
                     onClick: () => { setEditingPoll(poll); setIsPollModalOpen(true); },
                     style: {
-                      backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '6px',
+                      backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)',
                       padding: '4px 10px', fontSize: '0.75rem', cursor: 'pointer', color: 'var(--text-main)'
                     }
                   }, "수정"),
@@ -1592,7 +1592,7 @@ export function AdminModal({
           /*#__PURE__*/React.createElement("div", {
             style: { display: 'flex', flexDirection: 'column', gap: '8px', minHeight: '360px', paddingRight: '4px' }
           },
-            activityLogsSorted.length === 0 ? /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: '#94A3B8', fontSize: '0.82rem', textAlign: 'center' } }, "기록된 활동 로그가 없어 복구 기능을 이용할 수 없습니다.") :
+            activityLogsSorted.length === 0 ? /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: 'var(--text-muted)', fontSize: '0.82rem', textAlign: 'center' } }, "기록된 활동 로그가 없어 복구 기능을 이용할 수 없습니다.") :
             activityLogsSorted.map(log => {
               const resolveParticipant = __deps.resolveLogParticipant || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.resolveLogParticipant) || ((l, map) => (map && map[l.participantId]) || { name: '시스템', color: '#94A3B8' });
               const formatNote = __deps.formatDetailedLogNote || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.formatDetailedLogNote) || (l => l.note || '');
@@ -1655,7 +1655,7 @@ export function AdminModal({
                     onClick: (e) => { e.stopPropagation(); handleRestoreToLog(log); },
                     className: "recovery-restore-btn",
                     style: {
-                      backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '6px',
+                      backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)',
                       padding: '6px 10px', fontSize: '0.72rem', fontWeight: 'bold', cursor: 'pointer', color: 'var(--accent-primary)', whiteSpace: 'nowrap'
                     }
                   }, "이 시점으로 복구")
@@ -1692,7 +1692,7 @@ export function AdminModal({
             type: "button",
             onClick: () => setLogCategoryFilter(chip.id),
             style: {
-              padding: '5px 12px', borderRadius: '999px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap',
+              padding: '5px 12px', borderRadius: 'var(--radius-full)', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap',
               border: logCategoryFilter === chip.id ? '1px solid #0F172A' : '1px solid var(--border-subtle)',
               backgroundColor: logCategoryFilter === chip.id ? '#0F172A' : 'var(--bg-card)',
               color: logCategoryFilter === chip.id ? '#FFFFFF' : 'var(--text-muted)'
@@ -1755,7 +1755,7 @@ export function AdminModal({
 
           if (filteredLogs.length === 0) {
             return /*#__PURE__*/React.createElement("div", {
-              style: { textAlign: 'center', color: '#94A3B8', fontSize: '0.85rem', padding: '24px 0' }
+              style: { textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', padding: '24px 0' }
             }, "조건에 해당되는 활동 로그가 없습니다.");
           }
           return /*#__PURE__*/React.createElement("div", {
@@ -1786,7 +1786,7 @@ export function AdminModal({
               style: { fontSize: '0.78rem', color: '#475569' }
             }, logDateText || null), noteText && /*#__PURE__*/React.createElement("span", {
               className: "recent-log-note",
-              style: { fontSize: '0.78rem', color: '#64748B', fontStyle: 'italic' }
+              style: { fontSize: '0.78rem', color: 'var(--text-muted)', fontStyle: 'italic' }
             }, "\"", noteText, "\"")), /*#__PURE__*/React.createElement("div", {
               className: "recent-log-right"
             }, /*#__PURE__*/React.createElement("span", {
@@ -1942,19 +1942,19 @@ export function AdminUnifiedSearchResultsView({
     /*#__PURE__*/React.createElement("div", {
       style: {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        height: '56px', padding: '0 16px', borderBottom: '1px solid #E2E8F0',
+        height: '56px', padding: '0 16px', borderBottom: '1px solid var(--border-subtle)',
         position: 'sticky', top: 0, backgroundColor: 'var(--bg-card)', zIndex: 5
       }
     },
       /*#__PURE__*/React.createElement("button", {
         type: "button", onClick: onBack, "aria-label": "뒤로가기",
-        style: { background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', color: '#0F172A', padding: 0, flexShrink: 0 }
+        style: { background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', color: 'var(--text-main)', padding: 0, flexShrink: 0 }
       }, /*#__PURE__*/React.createElement(BackArrowIcon, { size: 22 })),
       /*#__PURE__*/React.createElement("div", {
         style: { position: 'absolute', left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'baseline', whiteSpace: 'nowrap' }
       },
-        /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '0.95rem', color: '#0F172A' } }, "통합 검색결과"),
-        /*#__PURE__*/React.createElement("span", { style: { fontWeight: 500, marginLeft: '10px', fontSize: '0.78rem', color: '#64748B' } },
+        /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-main)' } }, "통합 검색결과"),
+        /*#__PURE__*/React.createElement("span", { style: { fontWeight: 500, marginLeft: '10px', fontSize: '0.78rem', color: 'var(--text-muted)' } },
           `"${query}" · ${grandTotal}건 · 캘린더 ${calendarCount}개`
         )
       ),
@@ -1971,7 +1971,7 @@ export function AdminUnifiedSearchResultsView({
     isFilterPanelOpen && /*#__PURE__*/React.createElement("div", {
       style: {
         display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px',
-        padding: '12px 20px', borderBottom: '1px solid #E2E8F0', backgroundColor: '#F8FAFC'
+        padding: '12px 20px', borderBottom: '1px solid var(--border-subtle)', backgroundColor: '#F8FAFC'
       }
     },
       /*#__PURE__*/React.createElement("div", { style: { minWidth: '140px', flex: '1 1 140px' } },
@@ -1990,7 +1990,7 @@ export function AdminUnifiedSearchResultsView({
           value: dateStart, onChange: onDateStartChange, dateOnly: true, placeholder: "시작일"
         })
       ),
-      /*#__PURE__*/React.createElement("span", { style: { color: '#94A3B8', fontWeight: 700 } }, "~"),
+      /*#__PURE__*/React.createElement("span", { style: { color: 'var(--text-muted)', fontWeight: 700 } }, "~"),
       /*#__PURE__*/React.createElement("div", { style: { minWidth: '120px', flex: '1 1 120px' } },
         /*#__PURE__*/React.createElement(DeadlineDateTimePicker, {
           value: dateEnd, onChange: onDateEndChange, dateOnly: true, placeholder: "종료일"
@@ -2008,7 +2008,7 @@ export function AdminUnifiedSearchResultsView({
 
     /*#__PURE__*/React.createElement("div", { style: { padding: '20px', display: 'flex', flexDirection: 'column', gap: '8px' } },
       grandTotal === 0 ? /*#__PURE__*/React.createElement("div", {
-        style: { textAlign: 'center', color: '#94A3B8', fontSize: '0.88rem', padding: '40px 0' }
+        style: { textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.88rem', padding: '40px 0' }
       }, "검색 결과가 없습니다.") : null,
 
       activeTab === 'schedules' && allMatches.schedules.map(item => /*#__PURE__*/React.createElement(SearchResultLogRow, {
@@ -2034,9 +2034,9 @@ export function AdminUnifiedSearchResultsView({
         onClick: () => window.open(getAdminSearchResultTargetUrl('tags', entry), '_blank', 'noopener'),
         style: { padding: 0, border: 0, background: 'none', cursor: 'pointer', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '4px', font: 'inherit' }
       },
-        /*#__PURE__*/React.createElement("img", { src: entry.thumb, loading: 'lazy', decoding: 'async', referrerPolicy: 'no-referrer', style: { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: '6px' } }),
-        /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.68rem', color: '#94A3B8', fontWeight: 700 } }, entry.calendarLabel),
-        /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.7rem', color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, highlightKeyword(entry.tags || '', q))
+        /*#__PURE__*/React.createElement("img", { src: entry.thumb, loading: 'lazy', decoding: 'async', referrerPolicy: 'no-referrer', style: { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: 'var(--radius-sm)' } }),
+        /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700 } }, entry.calendarLabel),
+        /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.7rem', color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, highlightKeyword(entry.tags || '', q))
       ))),
 
       activeTab === 'expenses' && allMatches.expenses.map(exp => /*#__PURE__*/React.createElement(SearchResultLogRow, {
@@ -2055,7 +2055,7 @@ export function AdminUnifiedSearchResultsView({
         onClick: () => window.open(getAdminSearchResultTargetUrl('memos', memo), '_blank', 'noopener')
       },
         memo.title && /*#__PURE__*/React.createElement("div", { style: { fontWeight: 500, marginBottom: '2px' } }, highlightKeyword(memo.title, q)),
-        memo.text && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.7rem', color: '#94A3B8' } }, highlightKeyword(memo.text.length > 100 ? memo.text.slice(0, 100) + '...' : memo.text, q))
+        memo.text && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.7rem', color: 'var(--text-muted)' } }, highlightKeyword(memo.text.length > 100 ? memo.text.slice(0, 100) + '...' : memo.text, q))
       ))
     )
   );
@@ -2095,16 +2095,16 @@ export function AdminCreateCalendarModal({ onCreate, onClose }) {
       className: "modal-container",
       style: { maxWidth: '360px', padding: '20px', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', gap: '12px' }
     },
-      /*#__PURE__*/React.createElement("h3", { style: { fontSize: '1.05rem', fontWeight: 800, color: '#0F172A' } }, "+ 새 캘린더 생성"),
+      /*#__PURE__*/React.createElement("h3", { style: { fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)' } }, "+ 새 캘린더 생성"),
       /*#__PURE__*/React.createElement("div", null,
-        /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#64748B', marginBottom: '4px' } }, "캘린더 ID (예: kkot, cw, trip)"),
+        /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "캘린더 ID (예: kkot, cw, trip)"),
         /*#__PURE__*/React.createElement("input", {
           type: "text", className: "form-input", style: { width: '100%' }, autoFocus: true,
           value: id, onChange: e => setId(e.target.value), disabled: isSubmitting
         })
       ),
       /*#__PURE__*/React.createElement("div", null,
-        /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#64748B', marginBottom: '4px' } }, "캘린더 제목"),
+        /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "캘린더 제목"),
         /*#__PURE__*/React.createElement("input", {
           type: "text", className: "form-input", style: { width: '100%' }, placeholder: `${id} 모임 캘린더`,
           value: title, onChange: e => setTitle(e.target.value), disabled: isSubmitting
@@ -2150,7 +2150,7 @@ export function AdminRestorePhraseModal({ onConfirm, onClose }) {
       className: "modal-container",
       style: { maxWidth: '380px', padding: '20px', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', gap: '12px' }
     },
-      /*#__PURE__*/React.createElement("h3", { style: { fontSize: '1.05rem', fontWeight: 800, color: '#0F172A' } }, "운영 데이터 복구 확인"),
+      /*#__PURE__*/React.createElement("h3", { style: { fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)' } }, "운영 데이터 복구 확인"),
       /*#__PURE__*/React.createElement("p", { style: { fontSize: '0.85rem', color: '#475569', lineHeight: '1.5' } },
         '백업 JSON 복구는 현재 운영 데이터를 교체합니다. 계속하려면 아래에 "운영 데이터 복구"를 정확히 입력하세요.'
       ),
@@ -2204,11 +2204,11 @@ export function AdminUnifiedSearchModal({ onClose, onSearch }) {
       ),
       /*#__PURE__*/React.createElement("button", {
         onClick: onClose,
-        style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }
+        style: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }
       }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))
     ),
     /*#__PURE__*/React.createElement("div", { className: "modal-body" },
-      /*#__PURE__*/React.createElement("p", { style: { fontSize: '0.8rem', color: '#64748B', margin: '0 0 10px' } },
+      /*#__PURE__*/React.createElement("p", { style: { fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0 0 10px' } },
         "모든 캘린더의 일정, 대화, 투표, 사진 태그를 한번에 검색합니다."
       ),
       /*#__PURE__*/React.createElement("input", {

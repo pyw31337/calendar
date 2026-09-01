@@ -952,7 +952,7 @@ export function AppSettingsModal({
     },
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border-subtle)' } },
         /*#__PURE__*/React.createElement("span", { style: { fontWeight: 900, fontSize: '0.98rem' } }, "설정"),
-        /*#__PURE__*/React.createElement("button", { type: "button", onClick: onClose, style: { background: 'none', border: 'none', cursor: 'pointer', color: '#64748B', display: 'flex' } },
+        /*#__PURE__*/React.createElement("button", { type: "button", onClick: onClose, style: { background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' } },
           SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }) : "✕")
       ),
       /*#__PURE__*/React.createElement("div", { style: { padding: '12px 16px 20px', display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '70vh', overflowY: 'auto' } },
@@ -982,7 +982,7 @@ export function AppSettingsModal({
               onChange: e => setWeatherQuery(e.target.value),
               placeholder: "지역 이름 검색 (예: 구로구)",
               style: {
-                flex: 1, minWidth: 0, padding: '10px 12px', borderRadius: '10px',
+                flex: 1, minWidth: 0, padding: '10px 12px', borderRadius: 'var(--radius-md)',
                 border: '1px solid var(--border-subtle)', background: 'var(--bg-primary)',
                 color: 'var(--text-main)', fontSize: '0.88rem', outline: 'none'
               }
@@ -991,7 +991,7 @@ export function AppSettingsModal({
               type: "submit",
               disabled: weatherLoading,
               style: {
-                flexShrink: 0, padding: '10px 14px', borderRadius: '10px', border: 'none',
+                flexShrink: 0, padding: '10px 14px', borderRadius: 'var(--radius-md)', border: 'none',
                 background: '#0f172a', color: '#fff', fontWeight: 700, fontSize: '0.82rem',
                 cursor: weatherLoading ? 'wait' : 'pointer'
               }
@@ -1005,7 +1005,7 @@ export function AppSettingsModal({
               type: "button",
               onClick: () => pickWeatherLocation(loc),
               style: {
-                padding: '5px 10px', fontSize: '0.72rem', borderRadius: '6px',
+                padding: '5px 10px', fontSize: '0.72rem', borderRadius: 'var(--radius-sm)',
                 border: '1px solid var(--border-subtle)', background: 'var(--bg-primary)',
                 color: 'var(--text-main)', cursor: 'pointer'
               }
@@ -1107,7 +1107,7 @@ export function NotificationOnboardingModal({ onClose, isMasterNotifyEnabled, on
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border-subtle)' } },
         /*#__PURE__*/React.createElement("span", { style: { fontWeight: 900, fontSize: '0.98rem', display: 'flex', alignItems: 'center', gap: '6px' } },
           BellIcon && /*#__PURE__*/React.createElement(BellIcon, null), "알림 허용 안내"),
-        /*#__PURE__*/React.createElement("button", { type: "button", onClick: onClose, style: { background: 'none', border: 'none', cursor: 'pointer', color: '#64748B', display: 'flex' } },
+        /*#__PURE__*/React.createElement("button", { type: "button", onClick: onClose, style: { background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' } },
           SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }) : "✕")
       ),
       /*#__PURE__*/React.createElement("div", { style: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' } },

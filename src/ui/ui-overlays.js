@@ -751,7 +751,7 @@ export function ImageUploadOverlay({ pct, remainingSec, label, current, total })
           alignItems: 'center',
           justifyContent: 'center',
           padding: '4px 10px',
-          borderRadius: '9999px',
+          borderRadius: 'var(--radius-full)',
           backgroundColor: 'var(--bg-primary)',
           color: 'var(--text-muted)',
           border: '1px solid var(--border-subtle)',
@@ -792,7 +792,7 @@ export function ImageProcessingOverlay({ current, total, fileName, pct, remainin
           alignItems: 'center',
           justifyContent: 'center',
           padding: '4px 10px',
-          borderRadius: '9999px',
+          borderRadius: 'var(--radius-full)',
           backgroundColor: 'var(--bg-primary)',
           color: 'var(--text-muted)',
           border: '1px solid var(--border-subtle)',
@@ -933,7 +933,7 @@ export function EmojiPickerSheet({ onSelect, onClose }) {
     onSelect(emoji);
   };
   const renderGroup = (label, emojis, key) => /*#__PURE__*/React.createElement('div', { key, style: { marginBottom: '10px' } },
-    /*#__PURE__*/React.createElement('div', { style: { fontSize: '0.75rem', fontWeight: 700, color: '#94A3B8', margin: '4px 6px' } }, label),
+    /*#__PURE__*/React.createElement('div', { style: { fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', margin: '4px 6px' } }, label),
     /*#__PURE__*/React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, 38px)', justifyContent: 'space-between' } },
       emojis.map((e, i) => /*#__PURE__*/React.createElement(EmojiGridButton, { key: `${key}-${i}`, emoji: e, onSelect: handlePick }))
     )
@@ -1025,7 +1025,7 @@ export function EmojiPickerSheet({ onSelect, onClose }) {
       /*#__PURE__*/React.createElement('h4', null, '이모티콘'),
       /*#__PURE__*/React.createElement('button', {
         type: 'button', onClick: onClose,
-        style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer' }
+        style: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer' }
       }, '✕')
     ),
     /*#__PURE__*/React.createElement('div', { style: { overflowY: 'auto', padding: '10px 14px 20px' } },
@@ -1059,13 +1059,13 @@ class AppErrorBoundary extends ReactComponentBase {
           maxWidth: '600px',
           background: '#FFFFFF',
           borderRadius: '16px',
-          border: '1px solid #E2E8F0',
+          border: '1px solid var(--border-subtle)',
           boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.08)'
         }
       },
       React.createElement('div', { style: { fontSize: '2.5rem', marginBottom: '12px' } }, '⚠️'),
-      React.createElement('h3', { style: { marginBottom: '8px', color: '#0F172A', fontSize: '1.1rem', fontWeight: 700 } }, '화면 섹션을 불러오는 중 오류가 발생했습니다.'),
-      React.createElement('p', { style: { marginBottom: '16px', color: '#64748B', fontSize: '0.875rem', wordBreak: 'break-word' } }, (this.state.error && this.state.error.message) || '알 수 없는 오류가 발생했습니다.'),
+      React.createElement('h3', { style: { marginBottom: '8px', color: 'var(--text-main)', fontSize: '1.1rem', fontWeight: 700 } }, '화면 섹션을 불러오는 중 오류가 발생했습니다.'),
+      React.createElement('p', { style: { marginBottom: '16px', color: 'var(--text-muted)', fontSize: '0.875rem', wordBreak: 'break-word' } }, (this.state.error && this.state.error.message) || '알 수 없는 오류가 발생했습니다.'),
       React.createElement('div', { style: { display: 'flex', gap: '10px', justifyContent: 'center' } },
         React.createElement('button', {
           onClick: () => this.setState({ hasError: false, error: null }),

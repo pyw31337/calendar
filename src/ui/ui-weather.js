@@ -1082,7 +1082,7 @@ export function WeatherLocationModal({ onClose, onSelectLocation, onDeleteRecent
                 style: {
                   padding: '6px 20px 6px 10px',
                   fontSize: '0.74rem',
-                  borderRadius: '6px',
+                  borderRadius: 'var(--radius-sm)',
                   border: '1px solid var(--border-subtle)',
                   backgroundColor: 'var(--bg-primary)',
                   color: 'var(--text-main)',

@@ -1106,7 +1106,7 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
           key: p.id,
           type: "button",
           onClick: () => handleSelectExistingPlace(p),
-          style: { textAlign: 'left', padding: '8px 10px', borderRadius: '6px', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '2px' },
+          style: { textAlign: 'left', padding: '8px 10px', borderRadius: 'var(--radius-sm)', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '2px' },
           className: "place-result-item"
         },
           /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-main)' } }, p.alias || p.name),
@@ -1121,7 +1121,7 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
         key: r.id,
         type: "button",
         onClick: () => handleSelectResult(r),
-        style: { textAlign: 'left', padding: '8px 10px', borderRadius: '6px', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '2px' }
+        style: { textAlign: 'left', padding: '8px 10px', borderRadius: 'var(--radius-sm)', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '2px' }
       },
         /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-main)' } }, r.name),
         /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.72rem', color: 'var(--text-muted)' } }, r.address)
@@ -1147,8 +1147,8 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
         },
           /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', fontWeight: 700, color: '#92400E', lineHeight: 1.45 } }, `기존 ${duplicatePlace.alias || duplicatePlace.name} 과 동일한 업체입니다. 병합하시겠습니까?`),
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '6px', marginTop: '7px' } },
-            /*#__PURE__*/React.createElement("button", { type: 'button', onClick: () => setSelected(prev => ({ ...prev, mergeTargetId: duplicatePlace.id })), style: { border: 0, borderRadius: '6px', padding: '5px 10px', background: 'var(--accent-primary)', color: '#fff', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer' } }, '병합'),
-            /*#__PURE__*/React.createElement("button", { type: 'button', onClick: () => setSelected(prev => ({ ...prev, duplicateDismissed: true })), style: { border: '1px solid var(--border-subtle)', borderRadius: '6px', padding: '5px 10px', background: 'var(--bg-card)', color: 'var(--text-muted)', fontSize: '0.74rem', cursor: 'pointer' } }, '별도 등록')
+            /*#__PURE__*/React.createElement("button", { type: 'button', onClick: () => setSelected(prev => ({ ...prev, mergeTargetId: duplicatePlace.id })), style: { border: 0, borderRadius: 'var(--radius-sm)', padding: '5px 10px', background: 'var(--accent-primary)', color: '#fff', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer' } }, '병합'),
+            /*#__PURE__*/React.createElement("button", { type: 'button', onClick: () => setSelected(prev => ({ ...prev, duplicateDismissed: true })), style: { border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '5px 10px', background: 'var(--bg-card)', color: 'var(--text-muted)', fontSize: '0.74rem', cursor: 'pointer' } }, '별도 등록')
           )
         ),
         selected.url && /*#__PURE__*/React.createElement("button", {
@@ -1175,7 +1175,7 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
               rel: 'noreferrer',
               style: { display: 'flex', alignItems: 'center', gap: '7px', color: 'var(--text-main)', textDecoration: 'none', fontSize: '0.76rem' }
             },
-              item.imageUrl && /*#__PURE__*/React.createElement('img', { src: item.imageUrl, alt: '', loading: 'lazy', style: { width: '34px', height: '34px', objectFit: 'cover', borderRadius: '6px', flexShrink: 0 } }),
+              item.imageUrl && /*#__PURE__*/React.createElement('img', { src: item.imageUrl, alt: '', loading: 'lazy', style: { width: '34px', height: '34px', objectFit: 'cover', borderRadius: 'var(--radius-sm)', flexShrink: 0 } }),
               /*#__PURE__*/React.createElement('span', { style: { minWidth: 0 } },
                 /*#__PURE__*/React.createElement('span', { style: { display: 'block', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, item.title),
                 /*#__PURE__*/React.createElement('span', { style: { display: 'block', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, item.address)
@@ -1188,7 +1188,7 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
       /* Alias (별칭) -- optional nickname; official search name stays as place.name */
       selected && /*#__PURE__*/React.createElement("div", null,
         /*#__PURE__*/React.createElement("label", {
-          style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '4px' }
+          style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' }
         }, "별칭 (선택)"),
         /*#__PURE__*/React.createElement("input", {
           type: "text",
@@ -1206,7 +1206,7 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
 
       /* Category picker */
       /*#__PURE__*/React.createElement("div", null,
-        /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '4px' } }, "카테고리"),
+        /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "카테고리"),
         /*#__PURE__*/React.createElement("div", { style: { width: '100%' } },
           /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
             title: "카테고리 선택",
@@ -1220,7 +1220,7 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
 
       /* Memo field */
       /*#__PURE__*/React.createElement("div", null,
-        /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#64748B', marginBottom: '4px' } }, "메모"),
+        /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "메모"),
         /*#__PURE__*/React.createElement(AutoGrowTextarea, {
           textareaRef: memoTextareaRef,
           className: "form-input",
