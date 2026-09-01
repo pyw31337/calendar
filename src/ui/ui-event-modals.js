@@ -2,7 +2,7 @@
  * Anniversary / Settlement / Poll modals (P4-18)
  */
 
-import { calculateSettlementPlan, calculateSettlementRows } from '../core/settlement-calculator.js';
+import { calculateSettlementRows } from '../core/settlement-calculator.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_CALENDAR_DATA = window.GATHER_APP_CALENDAR_DATA || {};
@@ -1718,9 +1718,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
         if (!exp) return;
         const textToTest = (exp.label || exp.title || exp.note || exp.category || '').toLowerCase();
         if (textToTest.includes('이월') || textToTest.includes('전년이월') || textToTest.includes('전월이월')) return;
-        // The reference must survive a later amount correction. Older cards used
-        // a key with the amount appended; hydration below accepts both formats.
-        const key = `${dateStr}_${exp.id || idx}`;
+        const key = `${dateStr}_${exp.id || idx}_${exp.amount || 0}`;
         list.push({ ...exp, date: dateStr, itemKey: key, isIncome: Number(exp.amount || 0) < 0 });
       });
     });
@@ -1740,8 +1738,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
     if (savedKeys.length === 0) return;
     const initialChecked = {};
     monthlyExpenses.forEach(item => {
-      const legacyPrefix = `${item.itemKey}_`;
-      if (savedKeys.includes(item.itemKey) || savedKeys.some(key => String(key).startsWith(legacyPrefix))) initialChecked[item.itemKey] = item;
+      if (savedKeys.includes(item.itemKey)) initialChecked[item.itemKey] = item;
     });
     if (Object.keys(initialChecked).length > 0) {
       setCheckedItems(prev => ({ ...initialChecked, ...prev }));
@@ -2018,14 +2015,6 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
       // expenses; never persist a manually editable per-participant amount.
       participantRows: participantRowsForSave.map(row => ({ id: row.id, participantId: row.participantId, memo: row.memo || '' })),
       personalExpenses: personalExpenses,
-      expenseSnapshots: Object.values(checkedItems).map(item => ({
-        id: item.id || item.itemKey,
-        date: item.date || '',
-        label: item.label || item.title || item.note || '지출 내역',
-        amount: Math.abs(Number(item.amount) || 0),
-        categoryId: item.categoryId || '',
-        payerId: String(item.payerId || '').trim()
-      })),
       amount: totalExpense,
       perPersonAmount: settlementPerPerson,
       bankName: bankName,
@@ -3126,9 +3115,9 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
 
   const monthLabelPrefix = `${month + 1}월`;
   const metricCards = [
-    { label: activeTab === 'total' ? '총 수입·정산유입' : `${monthLabelPrefix} 수입·정산유입`, value: displayIncome, color: 'var(--status-green)', icon: React.createElement(BanknoteArrowUpIcon, { size: 16 }) },
-    { label: activeTab === 'total' ? '총 지출·개인선결제' : `${monthLabelPrefix} 지출·개인선결제`, value: displayExpense, color: '#DC2626', icon: React.createElement(BanknoteArrowDownIcon, { size: 16 }) },
-    { label: activeTab === 'total' ? '공금 원금 잔액' : `${monthLabelPrefix} 공금 잔액`, value: displayBalance, color: 'var(--text-main)', icon: React.createElement(PiggyBankIcon, { size: 16 }) }
+    { label: activeTab === 'total' ? '총 수입' : `${monthLabelPrefix} 수입`, value: displayIncome, color: 'var(--status-green)', icon: React.createElement(BanknoteArrowUpIcon, { size: 16 }) },
+    { label: activeTab === 'total' ? '총 지출' : `${monthLabelPrefix} 지출`, value: displayExpense, color: '#DC2626', icon: React.createElement(BanknoteArrowDownIcon, { size: 16 }) },
+    { label: activeTab === 'total' ? '현재 잔액' : `${monthLabelPrefix} 잔액`, value: displayBalance, color: 'var(--text-main)', icon: React.createElement(PiggyBankIcon, { size: 16 }) }
   ];
 
   // Shareable result card -- rendered client-side onto an offscreen canvas so it can be saved
@@ -3159,9 +3148,9 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     ctx.fillText(periodLabel, 40, 138);
 
     const rowsStats = [
-    { label: activeTab === 'total' ? '총 수입·정산유입' : `${monthLabelPrefix} 수입·정산유입`, value: displayIncome, color: 'var(--status-green)' },
-    { label: activeTab === 'total' ? '총 지출·개인선결제' : `${monthLabelPrefix} 지출·개인선결제`, value: displayExpense, color: '#DC2626' },
-    { label: activeTab === 'total' ? '공금 원금 잔액' : `${monthLabelPrefix} 공금 잔액`, value: displayBalance, color: '#0F172A' }
+      { label: activeTab === 'total' ? '총 수입' : `${monthLabelPrefix} 수입`, value: displayIncome, color: 'var(--status-green)' },
+      { label: activeTab === 'total' ? '총 지출' : `${monthLabelPrefix} 지출`, value: displayExpense, color: '#DC2626' },
+      { label: activeTab === 'total' ? '현재 잔액' : `${monthLabelPrefix} 잔액`, value: displayBalance, color: '#0F172A' }
     ];
     let y = 230;
     rowsStats.forEach(stat => {
@@ -3245,13 +3234,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }
   }, /*#__PURE__*/React.createElement("div", {
     style: { minWidth: 0, display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }
-  }, categoryBadge(getDisplayCategory(item)), showDate && /*#__PURE__*/React.createElement("span", { className: "registered-at-text" }, formatDateWithDayName(item.date)), !item.isIncome && /*#__PURE__*/React.createElement("span", {
-    style: {
-      display: 'inline-flex', alignItems: 'center', padding: '3px 8px', borderRadius: '999px',
-      backgroundColor: item.payerId ? 'rgba(37, 99, 235, 0.1)' : 'rgba(100, 116, 139, 0.12)',
-      color: item.payerId ? '#2563EB' : 'var(--text-muted)', fontSize: '0.68rem', fontWeight: 900
-    }
-  }, item.payerId ? `${item.payerId} 선결제` : '공금 직접지출')), /*#__PURE__*/React.createElement("strong", {
+  }, categoryBadge(getDisplayCategory(item)), showDate && /*#__PURE__*/React.createElement("span", { className: "registered-at-text" }, formatDateWithDayName(item.date))), /*#__PURE__*/React.createElement("strong", {
     style: { fontSize: '0.9rem', color: item.isIncome ? 'var(--status-green)' : '#DC2626', whiteSpace: 'nowrap' }
   }, item.isIncome ? '+' : '-', Math.abs(item.amount).toLocaleString(), "원")), /*#__PURE__*/React.createElement("span", {
     style: { fontSize: '0.86rem', color: 'var(--text-main)', fontWeight: 500, overflowWrap: 'anywhere' }
@@ -3443,44 +3426,17 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
               : -Math.abs(Number(item?.amount) || 0);
             cardPersonalTotals.set(name, (cardPersonalTotals.get(name) || 0) + signedAmount);
           });
-          const savedExpenseSnapshots = Array.isArray(card.expenseSnapshots) ? card.expenseSnapshots : [];
-          const checkedKeys = Array.isArray(card.checkedItemKeys) ? card.checkedItemKeys.map(String) : [];
-          const referencedExpenseItems = savedExpenseSnapshots.length > 0
-            ? savedExpenseSnapshots
-            : allTimeItems.filter(item => {
-                const stableKey = `${item.date}_${item.id || ''}`;
-                return checkedKeys.some(key => key === stableKey || key.startsWith(`${stableKey}_`));
-              });
-          const hasExplicitFunding = referencedExpenseItems.length > 0;
-          const explicitPayerTotals = new Map();
-          let explicitCommonFundPaid = 0;
-          referencedExpenseItems.forEach(item => {
-            const amount = Math.abs(Number(item?.amount) || 0);
-            const payer = String(item?.payerId || '').trim();
-            if (payer) explicitPayerTotals.set(payer, (explicitPayerTotals.get(payer) || 0) + amount);
-            else explicitCommonFundPaid += amount;
-          });
-          if (hasExplicitFunding) {
-            cardPersonalTotals.forEach((signedAmount, name) => {
-              if (signedAmount < 0) explicitPayerTotals.set(name, (explicitPayerTotals.get(name) || 0) + Math.abs(signedAmount));
-            });
-          }
           const cardParticipantMemos = new Map();
           (Array.isArray(card.participantRows) ? card.participantRows : []).forEach(row => {
             const memo = String(row?.memo || '').trim();
             if (memo) cardParticipantMemos.set(row.participantId, memo);
           });
-          const cardTotalExpense = Number(card.amount) || referencedExpenseItems.reduce((sum, item) => sum + Math.abs(Number(item?.amount) || 0), 0) || allTimeExpense;
-          const cardSettlementPlan = hasExplicitFunding
-            ? calculateSettlementPlan(cardTotalExpense, cardParticipantNames, explicitPayerTotals, explicitCommonFundPaid)
-            : null;
-          const cardParticipantRows = cardSettlementPlan?.rows || calculateSettlementRows(
-            cardTotalExpense,
+          const cardParticipantRows = calculateSettlementRows(
+            Number(card.amount) || allTimeExpense,
             cardParticipantNames,
             cardPersonalTotals,
             card.depositorName
           );
-          const displayedPayerTotals = hasExplicitFunding ? explicitPayerTotals : new Map(Array.from(cardPersonalTotals, ([name, amount]) => [name, Math.abs(Math.min(0, amount))]));
 
           return React.createElement("div", {
             key: card.id,
@@ -3610,11 +3566,11 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
               className: "settlement-person-grid"
             }, React.createElement("div", { className: "settlement-person-card settlement-total-card" },
               React.createElement("div", { className: "settlement-person-name" }, "총 지출"),
-              React.createElement("strong", { className: "settlement-person-amount" }, `${cardTotalExpense.toLocaleString()}원`)
+              React.createElement("strong", { className: "settlement-person-amount" }, `${(Number(card.amount) || allTimeExpense).toLocaleString()}원`)
             ), cardParticipantRows.length === 0
               ? React.createElement("div", { className: "settlement-person-card settlement-person-card-empty" }, "참여 멤버 없음")
               : cardParticipantRows.map((row, index) => {
-                const personalTotal = displayedPayerTotals.get(row.name) || 0;
+                const personalTotal = cardPersonalTotals.get(row.name) || 0;
                 const personalMemo = cardParticipantMemos.get(row.name) || '';
                 const personalColor = (activeParticipants.find(p => (typeof p === 'string' ? p : (p?.name || p?.id)) === row.name)?.color) || '#3B82F6';
                 return React.createElement("div", {
@@ -3632,21 +3588,10 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                 React.createElement("strong", { className: `settlement-person-amount${row.amount < 0 ? ' is-refund' : ''}`, title: row.amount < 0 ? '공금에서 받을 환급금' : row.amount > 0 ? '공금에 납부할 분담금' : '정산할 금액 없음' },
                   row.amount !== 0 && React.createElement('span', null, `${row.amount < 0 ? '+' : '-'}${Math.abs(row.amount).toLocaleString()}원`)
                 ),
-                personalTotal !== 0 && React.createElement('span', { className: 'settlement-person-detail-capsule' }, `선결제 ${Math.abs(personalTotal).toLocaleString()}원`),
+                personalTotal !== 0 && React.createElement('span', { className: 'settlement-person-detail-capsule' }, `개인지출 ${Math.abs(personalTotal).toLocaleString()}원`),
                 personalMemo && React.createElement('span', { className: 'settlement-person-detail-capsule settlement-person-memo-capsule', title: personalMemo }, personalMemo)
                 );
-              })),
-              cardSettlementPlan && React.createElement('div', {
-                style: { display: 'flex', flexDirection: 'column', gap: '7px', padding: '11px 12px', borderRadius: '12px', background: 'rgba(15, 23, 42, 0.2)', color: 'var(--settlement-hero-text)', fontSize: '0.74rem', textAlign: 'left' }
-              },
-                React.createElement('strong', { style: { fontSize: '0.78rem' } }, '공금 관점 정산 흐름'),
-                React.createElement('span', null, `모임 지출 ${cardSettlementPlan.totalExpense.toLocaleString()}원 · 공금 직접지출 ${cardSettlementPlan.commonFundPaid.toLocaleString()}원 · 개인 선결제 ${cardSettlementPlan.participantFunded.toLocaleString()}원`),
-                Array.from(explicitPayerTotals.entries()).map(([name, amount]) => React.createElement('span', { key: `payer_${name}` }, `${name} 선결제 ${amount.toLocaleString()}원`)),
-                cardSettlementPlan.offsets.map(item => React.createElement('span', { key: `offset_${item.name}` }, `${item.name} 본인부담 상계 ${item.amount.toLocaleString()}원 (현금 이동 없음)`)),
-                cardSettlementPlan.contributions.map(item => React.createElement('span', { key: `in_${item.name}` }, `${item.name} → 공금 경유 입금 ${item.amount.toLocaleString()}원`)),
-                cardSettlementPlan.reimbursements.map(item => React.createElement('span', { key: `out_${item.name}` }, `공금 → ${item.name} 환급 ${item.amount.toLocaleString()}원`)),
-                React.createElement('strong', null, `정산 후 공금 원금 변동 ${cardSettlementPlan.fundNetChange === 0 ? '0원' : `${cardSettlementPlan.fundNetChange > 0 ? '+' : '-'}${Math.abs(cardSettlementPlan.fundNetChange).toLocaleString()}원`}`)
-              )
+              }))
 
           );
         })

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import vm from 'node:vm';
 import { GATHER_APP_UTILS, omitUndefinedDeep } from '../src/core/app-utils.js';
-import { calculateSettlementPlan, calculateSettlementRows } from '../src/core/settlement-calculator.js';
+import { calculateSettlementRows } from '../src/core/settlement-calculator.js';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -23,36 +23,6 @@ assert(JSON.stringify(settlementSimulation.map(row => [row.name, row.share, row.
   ['조광석', 178667, 178667]
 ]), 'settlement calculation must treat personal prepayments as part of total expense and credit the owner remainder');
 assert(settlementSimulation.reduce((sum, row) => sum + row.amount, 0) === 0, 'settlement participant balances must sum to zero');
-
-const explicitFundPlan = calculateSettlementPlan(
-  476000,
-  ['박영우', '김현석', '조광석'],
-  new Map([['박영우', 476000]]),
-  0
-);
-assert(JSON.stringify(explicitFundPlan.rows.map(row => [row.name, row.share, row.paid, row.amount])) === JSON.stringify([
-  ['박영우', 158666, 476000, -317334],
-  ['김현석', 158667, 0, 158667],
-  ['조광석', 158667, 0, 158667]
-]), 'explicit settlement plan must expose the participant who actually advanced the expense');
-assert(explicitFundPlan.clearingTotal === 317334 && explicitFundPlan.fundNetChange === 0, 'personal settlement transfers must clear through the fund without changing fund principal');
-
-const multiplePayerPlan = calculateSettlementPlan(
-  476000,
-  ['박영우', '김현석', '조광석'],
-  new Map([['박영우', 300000], ['김현석', 176000]]),
-  0
-);
-assert(multiplePayerPlan.reimbursements.length === 2 && multiplePayerPlan.contributions.length === 1, 'multiple payers must be reimbursed independently instead of inferring the account owner as payer');
-assert(multiplePayerPlan.rows.reduce((sum, row) => sum + row.amount, 0) === 0, 'multiple-payer settlement must balance to zero');
-
-const commonFundPlan = calculateSettlementPlan(
-  476000,
-  ['박영우', '김현석', '조광석'],
-  new Map([['박영우', 376000]]),
-  100000
-);
-assert(commonFundPlan.participantFunded === 376000 && commonFundPlan.fundNetChange === -100000, 'common-fund-paid expenses must stay visible without being charged to participants twice');
 
 // A newer embedded settlement edit must beat a stale date-keyed subcollection snapshot even
 // when both records share the same original confirmedAt timestamp.
