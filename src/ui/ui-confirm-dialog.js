@@ -729,7 +729,7 @@ function getAnniversaryDisplayColor(...args) {
 
 function getDeps() { return window.GATHER_UI_DEPS || {}; }
 
-  export function ConfirmDialog({ title, message, onConfirm, onCancel, showPasswordInput }) {
+  export function ConfirmDialog({ title, message, onConfirm, onCancel, showPasswordInput, alertOnly }) {
     const React = window.React;
     if (!React) return null;
     const deps = getDeps();
@@ -789,13 +789,18 @@ function getDeps() { return window.GATHER_UI_DEPS || {}; }
       errorMsg && React.createElement('div', { style: { color: '#EF4444', fontSize: '0.72rem', marginTop: '4px', fontWeight: 'bold' } }, errorMsg)
     ),
     React.createElement('div', { className: 'confirm-dialog-actions', style: { display: 'flex', gap: '10px', justifyContent: 'center' } },
-      React.createElement('button', {
+      // alertOnly is a plain single-button notice (e.g. "현재 진행중인 투표가 없습니다") --
+      // there's nothing to confirm/cancel between, so skip the 취소 button and the danger-red
+      // styling that only makes sense for an actual destructive confirmation.
+      !alertOnly && React.createElement('button', {
         type: 'button', className: 'btn btn-secondary', onClick: onCancel,
         style: { flex: 1, height: '44px', minHeight: '44px', fontSize: '0.85rem' }
       }, '취소'),
       React.createElement('button', {
-        type: 'button', className: 'btn btn-danger', onClick: handleConfirmClick,
-        style: { flex: 1, height: '44px', minHeight: '44px', fontSize: '0.85rem', backgroundColor: '#EF4444', color: '#FFFFFF', border: 'none', borderRadius: 'var(--radius-md)', fontWeight: 'bold', cursor: 'pointer' }
+        type: 'button', className: alertOnly ? 'btn btn-primary' : 'btn btn-danger', onClick: handleConfirmClick,
+        style: alertOnly
+          ? { flex: 1, height: '44px', minHeight: '44px', fontSize: '0.85rem' }
+          : { flex: 1, height: '44px', minHeight: '44px', fontSize: '0.85rem', backgroundColor: '#EF4444', color: '#FFFFFF', border: 'none', borderRadius: 'var(--radius-md)', fontWeight: 'bold', cursor: 'pointer' }
       }, '확인')
     )));
   }

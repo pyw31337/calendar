@@ -821,6 +821,16 @@ function CalendarApp() {
       showPasswordInput
     });
   };
+  // Single-button notice (no confirm/cancel choice), reusing the same dialog chrome --
+  // e.g. "현재 진행중인 투표가 없습니다" when the 헤더 투표 메뉴 is clicked with nothing to jump to.
+  const showAlert = (title, message) => {
+    setConfirmDialog({
+      title,
+      message,
+      onConfirm: () => setConfirmDialog(null),
+      alertOnly: true
+    });
+  };
 
   const isSavingRef = React.useRef(false);
   const [saveSyncState, setSaveSyncState] = React.useState({ status: 'live', label: '동기화됨', lastSyncedText: '' });
@@ -5859,7 +5869,8 @@ function CalendarApp() {
       message: confirmDialog.message,
       onConfirm: confirmDialog.onConfirm,
       onCancel: () => setConfirmDialog(null),
-      showPasswordInput: confirmDialog.showPasswordInput
+      showPasswordInput: confirmDialog.showPasswordInput,
+      alertOnly: confirmDialog.alertOnly
     }),
     editingMessage && /*#__PURE__*/React.createElement(EditMessageModal, {
       message: editingMessage,
@@ -6645,6 +6656,12 @@ function CalendarApp() {
   }
 
   const mainMenuPollCount = getCalendarPolls(activeCal).filter(poll => !isPollClosed(poll) && !poll.hidden).length;
+  // Whether the 진행중 투표 section has anything to render at all -- mirrors PollList's own
+  // "polls" filter (ui-calendar-core.js), which keeps closed-but-not-hidden polls visible there
+  // (shown dimmed with a winning-option badge) rather than excluding them like mainMenuPollCount
+  // does. Used both to decide whether to render that section and whether the header 투표 메뉴 click
+  // should scroll to it or show a "없습니다" alert instead.
+  const hasVisiblePolls = getCalendarPolls(activeCal).some(poll => !poll.hidden);
   const mainMenuChatCount = (typeof totalChatCount === 'number' && totalChatCount >= 0)
     ? totalChatCount
     : visibleChatMessages.length;
@@ -6764,6 +6781,10 @@ function CalendarApp() {
     type: "button",
     className: "main-menu-item",
     onClick: () => {
+      if (!hasVisiblePolls) {
+        showAlert('진행중 투표', '현재 진행중인 투표가 없습니다.');
+        return;
+      }
       setPollsExpandSignal(prev => prev + 1);
       scrollToSection(pollsSectionRef);
     }
@@ -7148,7 +7169,7 @@ function CalendarApp() {
     },
     onMoveAvailability: handleMoveAvailability,
     onParticipantClick: handleParticipantClick
-  })), /*#__PURE__*/React.createElement("div", {
+  })), hasVisiblePolls && /*#__PURE__*/React.createElement("div", {
     ref: pollsSectionRef,
     className: "calendar-card",
     style: {
