@@ -2868,6 +2868,17 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     setCollapsedDailyRows(prev => ({ ...prev, [date]: !prev[date] }));
   };
   const settlementSearchNeedle = settlementSearchQuery.trim().toLowerCase();
+  const highlightSettlement = text => {
+    const value = String(text || '');
+    return settlementSearchNeedle ? highlightTextWithYellowMarker(value, settlementSearchNeedle) : value;
+  };
+  const filterSettlementRow = row => {
+    if (!settlementSearchNeedle) return row;
+    const meetingText = [row.meeting?.date, row.meeting?.note].filter(Boolean).join(' ').toLowerCase();
+    const meetingMatches = meetingText.includes(settlementSearchNeedle);
+    const items = meetingMatches ? row.items : row.items.filter(item => [item.label, item.category?.name, item.category?.id, item.url].filter(Boolean).join(' ').toLowerCase().includes(settlementSearchNeedle));
+    return { ...row, items, expenseTotal: items.filter(item => !item.isIncome).reduce((sum, item) => sum + Math.abs(item.amount), 0), incomeTotal: items.filter(item => item.isIncome).reduce((sum, item) => sum + Math.abs(item.amount), 0) };
+  };
   const matchesSettlementSearch = row => {
     if (!settlementSearchNeedle) return true;
     const haystack = [
@@ -2900,7 +2911,8 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
       return { meeting, items, expenseTotal, incomeTotal, net: incomeTotal - expenseTotal };
     })
     .filter(row => row.items.length > 0)
-    .filter(matchesSettlementSearch);
+    .map(filterSettlementRow)
+    .filter(row => row.items.length > 0);
   const allTimeItems = allTimeRows.flatMap(row => row.items.map(item => ({ ...item, date: row.meeting.date, meetingNote: row.meeting.note || '' })));
   const settlementBalanceByKey = new Map();
   let runningSettlementBalance = baseBudget;
@@ -2961,7 +2973,8 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
       return { meeting, items, expenseTotal, incomeTotal, net: incomeTotal - expenseTotal };
     })
     .filter(row => row.items.length > 0)
-    .filter(matchesSettlementSearch);
+    .map(filterSettlementRow)
+    .filter(row => row.items.length > 0);
 
   const allItems = rows.flatMap(row => row.items.map(item => ({ ...item, date: row.meeting.date, meetingNote: row.meeting.note || '' })));
   const incomeItems = allItems.filter(item => item.isIncome);
@@ -3112,7 +3125,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     style: { fontSize: '0.9rem', color: item.isIncome ? 'var(--status-green)' : '#DC2626', whiteSpace: 'nowrap' }
   }, item.isIncome ? '+' : '-', Math.abs(item.amount).toLocaleString(), "원")), /*#__PURE__*/React.createElement("span", {
     style: { fontSize: '0.86rem', color: 'var(--text-main)', fontWeight: 500, overflowWrap: 'anywhere' }
-  }, item.label), /*#__PURE__*/React.createElement("span", {
+  }, highlightSettlement(item.label)), /*#__PURE__*/React.createElement("span", {
     className: "settlement-running-balance"
   }, `잔액\u00a0\u00a0\u00a0${Number(settlementBalanceByKey.get(item.ledgerKey) || 0).toLocaleString()}원`), item.url && /*#__PURE__*/React.createElement("button", {
     type: "button",
@@ -3269,7 +3282,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   /*#__PURE__*/React.createElement("div", {
     className: "settlement-page-body",
     onScroll: handleSettlementScroll,
-    style: { flex: '1 1 auto', overflowY: 'auto', padding: '72px 16px 16px', display: 'flex', flexDirection: 'column', gap: '14px' }
+    style: { flex: '1 1 auto', overflowY: 'auto', padding: `${isSettlementSearchOpen ? 124 : 72}px 16px 16px`, display: 'flex', flexDirection: 'column', gap: '14px' }
   },
     /* 1. Settlement Cards (Positioned ABOVE metrics grid) -- no cards means no section at all,
        not an empty-state placeholder; the 정산 목록 modal already covers "no settlement cards
