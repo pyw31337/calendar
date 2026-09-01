@@ -34,7 +34,7 @@ globalThis.window = {
   location: { pathname: '/' }
 };
 const { unionConfirmedMeetings, unionPlaces } = await import('../src/core/app-domain-helpers.js');
-const { mergeCalendarSettingsDelta } = await import('../src/core/app-firebase-data.js');
+const { mergeCalendarSettingsDelta, mergeCalendarAvailabilityDelta } = await import('../src/core/app-firebase-data.js');
 const writeQueueSource = fs.readFileSync(new URL('../src/core/app-write-queue.js', import.meta.url), 'utf8');
 assert(writeQueueSource.includes('nextAttemptAt: Number(operation.nextAttemptAt) || 0'), 'queued operations must persist retry backoff metadata');
 assert(writeQueueSource.includes("await deferOperation(operation, new Error('대기 저장이 완료되지 않았습니다.'))"), 'false queue handler results must be deferred with backoff');
@@ -42,6 +42,45 @@ const appMainSource = fs.readFileSync(new URL('../src/core/app-main.js', import.
 assert(appMainSource.includes("console.info('[calendar-save]'"), 'calendar saves must emit an operation diagnostic');
 assert(appMainSource.includes("console.warn('[calendar-save-failed]'"), 'failed calendar saves must emit an operation diagnostic');
 assert(appMainSource.includes('pendingRemotePlacesRef') && appMainSource.includes('pendingRemoteMeetingsRef'), 'realtime subcollection snapshots must be retained during local saves');
+
+// Dragging the attendee list re-sends the SAME set of entries for that date in a new order, no
+// content change. Regression guard for a bug where the merge always fell back to the server's
+// stale (pre-reorder) order -- Map.set() on an existing key updates its value but never moves it,
+// so every attendee-list reorder was silently discarded on the very next save.
+{
+  const reorderBase = {
+    id: 'kkot',
+    participants: [
+      { id: 'p1', name: 'P1', color: '#EF4444', updatedAt: 1 },
+      { id: 'p2', name: 'P2', color: '#EF4444', updatedAt: 1 },
+      { id: 'p3', name: 'P3', color: '#EF4444', updatedAt: 1 },
+      { id: 'p4', name: 'P4', color: '#EF4444', updatedAt: 1 }
+    ],
+    availabilities: [
+      { date: '2026-08-29', participantId: 'p1', updatedAt: 1 },
+      { date: '2026-08-29', participantId: 'p2', updatedAt: 1 },
+      { date: '2026-08-29', participantId: 'p3', updatedAt: 1 },
+      { date: '2026-08-29', participantId: 'p4', updatedAt: 1 }
+    ],
+    updatedAt: 1,
+    revision: 1
+  };
+  const reorderedIncoming = { ...reorderBase, availabilities: [reorderBase.availabilities[3], reorderBase.availabilities[0], reorderBase.availabilities[2], reorderBase.availabilities[1]] };
+  const reordered = mergeCalendarAvailabilityDelta(reorderBase, reorderedIncoming, 2);
+  const reorderedIds = reordered.availabilities.map((item) => item.participantId);
+  assert(JSON.stringify(reorderedIds) === JSON.stringify(['p4', 'p1', 'p3', 'p2']), 'attendee list reorder must be preserved by mergeCalendarAvailabilityDelta');
+
+  // A single device's save can also carry just its own delta for a date it doesn't fully know
+  // about yet (e.g. two participants saving their own availability independently, each unaware
+  // of the other) -- that must still append in encounter order rather than being mistaken for a
+  // reorder and scattering the date's other, untouched entries.
+  let partialBase = { id: 'kkot', participants: reorderBase.participants, availabilities: [], updatedAt: 1, revision: 1 };
+  for (const participant of reorderBase.participants) {
+    const partialIncoming = { ...partialBase, availabilities: [{ date: '2026-08-29', participantId: participant.id, updatedAt: 1 }] };
+    partialBase = mergeCalendarAvailabilityDelta(partialBase, partialIncoming, 1);
+  }
+  assert(JSON.stringify(partialBase.availabilities.map((item) => item.participantId)) === JSON.stringify(['p1', 'p2', 'p3', 'p4']), 'independent single-entry availability saves must append in encounter order, not be treated as a reorder');
+}
 const mergedSettlementProbe = unionConfirmedMeetings({
   confirmedMeeting: [{
     date: '2026-08-29',

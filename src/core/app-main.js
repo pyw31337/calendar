@@ -757,7 +757,23 @@ function CalendarApp() {
     void flushPendingWrites();
     const handleOnline = () => { void flushPendingWrites(); };
     window.addEventListener('online', handleOnline);
-    return () => window.removeEventListener('online', handleOnline);
+    // A write only ever gets queued here because it looked network-related (a timeout, a fetch
+    // failure -- see shouldQueueCollectionWrite/shouldQueueCalendarWriteFailure), NOT because the
+    // browser was actually marked offline. `navigator.onLine` stays true through exactly this kind
+    // of transient flakiness, so the 'online' listener above never fires to retry it -- without a
+    // periodic sweep, a queued send/edit/delete/upload just sits there, invisible, until the user
+    // happens to reload the page (and even then only gets ONE retry attempt, which can fail again
+    // under the same flaky connection -- explaining reports of needing several reloads before a
+    // delete/send/upload "sticks"). Skipped while the tab is hidden since there's no one to show
+    // the resulting toast to and it would only burn battery/data in the background.
+    const retryTimer = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      void flushPendingWrites();
+    }, 20000);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      clearInterval(retryTimer);
+    };
   }, [flushPendingWrites]);
   const firebaseConnectionVersion = React.useSyncExternalStore(
     subscribeFirebaseStateChange,
@@ -2908,6 +2924,12 @@ function CalendarApp() {
       // actually written here so it can be inserted locally right away regardless of listener
       // health; the listener/watchdog will just reconcile over the same id later.
       const sentMessagesForOptimisticInsert = [];
+      // See handleDeleteChatMessagePhoto's comment on `.queued` -- true means the write only
+      // reached the durable retry queue (network-related SDK+REST failure), not Firestore itself.
+      // The optimistic insert below still makes it LOOK sent immediately, so without this flag
+      // the sender would have no way to know it isn't actually saved yet and might, per the
+      // user's own worry, send it again believing the first attempt silently failed.
+      let sendWasQueued = false;
       if (imageCount > 0 && typeof navigator !== 'undefined' && navigator.onLine === false
         && chatImages.every(image => image?.originalBlob && image?.thumbnailBlob)) {
         const queued = await enqueueWriteOperation({
@@ -2943,6 +2965,7 @@ function CalendarApp() {
           const sent = await writeCollectionDocumentWithFallback('messages', activeCalId, '', messageData, 'add', '채팅 저장', { documentId: messageOperationId });
           firstSentMessageId = sent?.id || null;
           if (sent?.id) sentMessagesForOptimisticInsert.push({ ...messageData, id: sent.id });
+          if (sent?.queued) sendWasQueued = true;
           return Boolean(sent);
         })();
         if (ok) setChatUploadProgress({ pct: 100, remainingSec: 0, label: '전송 완료' });
@@ -2980,6 +3003,7 @@ function CalendarApp() {
           if (!sent) throw new Error(`Chat send failed for chunk ${i + 1}/${chunks.length}`);
           if (i === 0) firstSentMessageId = sent.id || null;
           if (sent.id) sentMessagesForOptimisticInsert.push({ ...messageData, id: sent.id });
+          if (sent.queued) sendWasQueued = true;
         }
         ok = true;
         setChatUploadProgress({ pct: 100, remainingSec: 0, label: '전송 완료', current: imageCount, total: imageCount });
@@ -3004,7 +3028,12 @@ function CalendarApp() {
         if (!firebaseDb) {
           fetchChatMessagesRest(activeCalId).then(list => setChatMessages(list));
         }
-        // No success toast here -- the new message is immediately visible in the chat feed.
+        // No success toast in the normal case -- the new message is immediately visible in the
+        // chat feed. A queued send is the one exception: it looks identical in the feed (via the
+        // optimistic insert above) but hasn't actually reached the server yet, so say so.
+        if (sendWasQueued) {
+          showToast('네트워크가 불안정하여 전송을 대기열에 저장했습니다. 연결되면 자동으로 반영됩니다.', 'info', 6000);
+        }
       } else {
         showRetryableUploadToast('등록 실패', () => handleSendChatMessage(), 5000);
       }
@@ -3077,6 +3106,7 @@ function CalendarApp() {
       });
       const chunks = chunkResolvedImagesForMessages(resolvedImages);
       const now = Date.now();
+      let anyQueued = false;
       for (let i = 0; i < chunks.length; i += 1) {
         const chunkImages = chunks[i];
         const messageOperationId = `gallery_${activeCal.id}_${now}_${i}_${Math.random().toString(36).slice(2, 8)}`;
@@ -3101,9 +3131,21 @@ function CalendarApp() {
         };
         const sent = await writeCollectionDocumentWithFallback('messages', activeCal.id, '', messageData, 'add', '갤러리 저장', { documentId: messageOperationId });
         if (!sent) throw new Error(`Gallery upload save failed ${i + 1}/${chunks.length}`);
+        if (sent.queued) anyQueued = true;
+        // Same reasoning as handleSendChatMessage's optimistic insert -- the gallery grid reads
+        // from this same chatMessages state, and waiting on the realtime listener alone left a
+        // freshly-pasted/uploaded photo invisible in the grid until a manual reload.
+        if (sent.id) upsertLocalChatMessage({ ...messageData, id: sent.id });
       }
       setChatUploadProgress({ pct: 100, remainingSec: 0, label: '갤러리 업로드 완료' });
-      showToast('갤러리에 사진이 추가되었습니다.', 'success');
+      // See handleDeleteChatMessagePhoto's comment on `.queued` -- a queued write hasn't actually
+      // reached Firestore yet, so claiming "추가되었습니다" here would be the exact same
+      // misleading signal that made a deleted photo look like it hadn't been deleted.
+      if (anyQueued) {
+        showToast('네트워크가 불안정하여 업로드를 대기열에 저장했습니다. 연결되면 자동으로 반영됩니다.', 'info', 6000);
+      } else {
+        showToast('갤러리에 사진이 추가되었습니다.', 'success');
+      }
       return true;
     } catch (err) {
       console.error('handleUploadGalleryImages failed:', err);
@@ -3138,6 +3180,9 @@ function CalendarApp() {
     try {
       const sent = await writeCollectionDocumentWithFallback('messages', activeCal.id, '', messageData, 'add', '갤러리 링크 저장', { documentId: messageOperationId });
       if (!sent) throw new Error('Gallery link save failed');
+      // Same reasoning as handleUploadGalleryImages -- don't wait on the realtime listener to
+      // echo this back before it shows up in the gallery's 링크 tab.
+      if (sent.id) upsertLocalChatMessage({ ...messageData, id: sent.id });
       if (shouldFetchLinkPreviewForChatUrl(cleanUrl)) {
         const sentId = sent.id || messageOperationId;
         void fetchLinkPreview(cleanUrl).then(async result => {
@@ -3145,7 +3190,10 @@ function CalendarApp() {
           await writeCollectionDocumentWithFallback('messages', activeCal.id, sentId, { linkPreview: result.data }, 'update', '갤러리 링크 미리보기 후처리');
         }).catch(error => console.warn('Background gallery link preview failed:', error));
       }
-      return true;
+      // 'queued' (not a plain boolean) tells the caller (ui-chat-gallery.js) this only reached
+      // the durable retry queue, not Firestore itself yet -- see handleDeleteChatMessagePhoto's
+      // comment on `.queued` for why claiming plain success here would be misleading.
+      return sent.queued ? 'queued' : true;
     } catch (err) {
       console.error('handleAddGalleryLink failed:', err);
       showToast('링크 저장 실패', 'error');
@@ -3165,6 +3213,9 @@ function CalendarApp() {
       const deleted = await writeCollectionDocumentWithFallback('messages', calId, id, null, 'delete', '메시지 삭제');
       const ok = Boolean(deleted);
       if (ok) {
+        // See handleDeleteChatMessagePhoto's matching comment -- `deleted.queued` means this was
+        // only durably saved for a later automatic retry, not actually removed on the server yet.
+        const wasQueued = Boolean(deleted?.queued);
         removeLocalChatMessage(id);
         await unlinkMeetingPhotoReferences(id, null);
         if (!firebaseDb) {
@@ -3191,7 +3242,9 @@ function CalendarApp() {
             showToast('메시지 복원 실패', 'error', 4000);
           }
         };
-        if (firebaseDb) {
+        if (wasQueued) {
+          showToast('네트워크가 불안정하여 삭제를 대기열에 저장했습니다. 연결되면 자동으로 반영됩니다.', 'info', 6000);
+        } else if (firebaseDb) {
           showUndoableDeleteToast('메시지가 삭제되었습니다.', restoreMessage, finalizeStorage, 5000);
         } else {
           showToast('삭제완료', 'delete', 3000, null, finalizeStorage);
@@ -3278,6 +3331,8 @@ function CalendarApp() {
       let ok = false;
       const updateResult = await writeCollectionDocumentWithFallback('messages', calId, id, data, 'update', '메시지 수정');
       ok = Boolean(updateResult);
+      // See handleDeleteChatMessagePhoto's comment on `.queued`.
+      let editWasQueued = Boolean(updateResult?.queued);
       if (ok && extraChunks.length > 0) {
         const baseTimestamp = (editingMessage.timestamp || Date.now()) + 1;
         for (let i = 0; i < extraChunks.length; i++) {
@@ -3295,6 +3350,7 @@ function CalendarApp() {
             ok = false;
             break;
           }
+          if (sent.queued) editWasQueued = true;
         }
       }
       if (ok) {
@@ -3325,18 +3381,22 @@ function CalendarApp() {
         if (!firebaseDb) {
           fetchChatMessagesRest(calId).then(list => setChatMessages(list));
         }
-        showToast('메시지가 수정되었습니다.', 'success', 5000, async () => {
-          try {
-            const restoreData = sanitizeMessageForFirestore(previousRestore);
-            const restored = await writeCollectionDocumentWithFallback('messages', calId, id, restoreData, 'update', '메시지 복원');
-            if (!restored) throw new Error('Message restore failed');
-            patchLocalChatMessage(id, restoreData);
-            showToast('메시지 수정을 되돌렸습니다.', 'success', 3000);
-          } catch (err) {
-            console.error('handleSaveEditMessage undo failed:', err);
-            showToast('수정 되돌리기 실패', 'error', 4000);
-          }
-        }, finalizeRemovedStorage);
+        if (editWasQueued) {
+          showToast('네트워크가 불안정하여 수정을 대기열에 저장했습니다. 연결되면 자동으로 반영됩니다.', 'info', 6000);
+        } else {
+          showToast('메시지가 수정되었습니다.', 'success', 5000, async () => {
+            try {
+              const restoreData = sanitizeMessageForFirestore(previousRestore);
+              const restored = await writeCollectionDocumentWithFallback('messages', calId, id, restoreData, 'update', '메시지 복원');
+              if (!restored) throw new Error('Message restore failed');
+              patchLocalChatMessage(id, restoreData);
+              showToast('메시지 수정을 되돌렸습니다.', 'success', 3000);
+            } catch (err) {
+              console.error('handleSaveEditMessage undo failed:', err);
+              showToast('수정 되돌리기 실패', 'error', 4000);
+            }
+          }, finalizeRemovedStorage);
+        }
         saved = true;
       } else {
         showToast('수정 실패', 'error', 3000);
@@ -4642,10 +4702,19 @@ function CalendarApp() {
       deleteChatImageFromStorage(target.full);
       if (target.thumb !== target.full) deleteChatImageFromStorage(target.thumb);
     };
+    // `writeCollectionDocumentWithFallback` can also return { queued: true } when neither the
+    // SDK nor REST attempt could complete in time (see FIRESTORE_WRITE_DEADLINE_MS/
+    // shouldQueueCollectionWrite) -- the operation is durably saved for a later automatic retry,
+    // but it has NOT actually reached Firestore yet. Callers used to treat that identically to a
+    // real success, showing "사진이 삭제되었습니다." even though the photo was still sitting on
+    // the server -- exactly the confusing "it says deleted but it's still there" symptom this is
+    // fixing. Surface the truth instead so the user knows to wait rather than repeat the action.
+    let wasQueued;
     try {
       if (nextUrls.length === 0 && !remainingText) {
         const deleted = await writeCollectionDocumentWithFallback('messages', activeCalId, messageId, null, 'delete', '메시지 삭제');
         if (!deleted) throw new Error('Message delete failed');
+        wasQueued = Boolean(deleted?.queued);
         removeLocalChatMessage(messageId);
       } else {
         const deletePaths = nextUrls.length === 0 ? ['imageUrl', 'thumbUrl'] : [];
@@ -4658,6 +4727,7 @@ function CalendarApp() {
         });
         const ok = await writeCollectionDocumentWithFallback('messages', activeCalId, messageId, data, 'update', '사진 삭제', { deletePaths });
         if (!ok) throw new Error('Photo delete update failed');
+        wasQueued = Boolean(ok?.queued);
         patchLocalChatMessage(messageId, data);
       }
 
@@ -4724,7 +4794,9 @@ function CalendarApp() {
         if (!meetingCleanupOk) return;
         finalizeStorageDeletion();
       };
-      if (canUndo) {
+      if (wasQueued) {
+        showToast('네트워크가 불안정하여 삭제를 대기열에 저장했습니다. 연결되면 자동으로 반영됩니다.', 'info', 6000);
+      } else if (canUndo) {
         showUndoableDeleteToast('사진이 삭제되었습니다.', restoreDeletedPhoto, expireStorageDeletion, 5000);
       } else {
         showToast('사진이 삭제되었습니다.', 'delete', 5000, null, expireStorageDeletion);

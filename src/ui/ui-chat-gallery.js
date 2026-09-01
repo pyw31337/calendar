@@ -1437,7 +1437,11 @@ export function ChatGalleryModal({
     try {
       const ok = await onAddLink(url);
       if (ok !== false) {
-        if (showToast) showToast('링크가 추가되었습니다.', 'success');
+        if (showToast) {
+          showToast(ok === 'queued'
+            ? '네트워크가 불안정하여 링크를 대기열에 저장했습니다. 연결되면 자동으로 반영됩니다.'
+            : '링크가 추가되었습니다.', ok === 'queued' ? 'info' : 'success');
+        }
         setLinkUrlInput('');
         setIsAddingLink(false);
         setActiveTab('links');
@@ -1464,7 +1468,11 @@ export function ChatGalleryModal({
     try {
       const ok = await onAddLink(url);
       if (ok !== false) {
-        if (showToast) showToast('링크가 추가되었습니다.', 'success');
+        if (showToast) {
+          showToast(ok === 'queued'
+            ? '네트워크가 불안정하여 링크를 대기열에 저장했습니다. 연결되면 자동으로 반영됩니다.'
+            : '링크가 추가되었습니다.', ok === 'queued' ? 'info' : 'success');
+        }
         setActiveTab('links');
       }
     } finally {
@@ -2061,6 +2069,9 @@ export function ChatGalleryModal({
       transform: isHeaderVisible ? 'translateY(0)' : 'translateY(calc(-100% - 56px))'
     }
   }, [['photos', '사진'], ['links', '링크']].map(tab => {
+    const count = tab[0] === 'photos'
+      ? ((searchQuery || '').trim() ? visiblePhotos.length : displayPhotoTabCount)
+      : filteredLinks.length;
     return /*#__PURE__*/React.createElement("button", {
       key: tab[0],
       type: "button",
@@ -2079,7 +2090,21 @@ export function ChatGalleryModal({
         justifyContent: 'center',
         gap: '6px'
       }
-    }, tab[1]);
+    },
+      tab[1],
+      /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: '0.7rem',
+          fontWeight: 800,
+          padding: '1px 7px',
+          borderRadius: '999px',
+          backgroundColor: activeTab === tab[0] ? 'rgba(255,255,255,0.22)' : 'var(--border-subtle)',
+          color: activeTab === tab[0] ? '#FFFFFF' : 'var(--text-muted)',
+          minWidth: '18px',
+          textAlign: 'center'
+        }
+      }, String(count))
+    );
   })), asPage && isMobile && /*#__PURE__*/React.createElement("div", {
     className: "gallery-page-tabs-mobile",
     style: {
@@ -2096,10 +2121,22 @@ export function ChatGalleryModal({
     /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
       title: "탭 선택",
       value: activeTab,
-      options: [['photos', '사진'], ['links', '링크']].map(tab => ({
-        value: tab[0],
-        label: tab[1]
-      })),
+      options: [['photos', '사진'], ['links', '링크']].map(tab => {
+        const count = tab[0] === 'photos'
+          ? ((searchQuery || '').trim() ? visiblePhotos.length : displayPhotoTabCount)
+          : filteredLinks.length;
+        return {
+          value: tab[0],
+          label: /*#__PURE__*/React.createElement(React.Fragment, null, `${tab[1]} `,
+            /*#__PURE__*/React.createElement("span", {
+              style: {
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '20px', height: '18px',
+                borderRadius: '9999px', backgroundColor: count >= 1 ? '#4F46E5' : '#E2E8F0',
+                color: count >= 1 ? '#FFFFFF' : '#475569', fontSize: '0.72rem', fontWeight: 'bold', padding: '0 6px', marginLeft: '4px'
+              }
+            }, String(count)))
+        };
+      }),
       onSelect: setActiveTab
     }),
     /* View-mode toggle: 전체 | 일자 -- same pill as the PC header filter, just relocated
