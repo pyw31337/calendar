@@ -744,7 +744,7 @@ export function SearchResultLogRow({ badgeName, badgeColor, timeStr, calendarLab
   },
     /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', flexWrap: 'wrap' } },
       badgeName && /*#__PURE__*/React.createElement("span", {
-        style: { backgroundColor: badgeColor || '#94A3B8', color: getContrastTextColor(badgeColor || '#94A3B8'), padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: '0.7rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
+        style: { backgroundColor: badgeColor || '#94A3B8', color: '#FFFFFF', padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: '0.7rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
       }, badgeName),
       calendarLabel && /*#__PURE__*/React.createElement("span", {
         style: { fontSize: '0.68rem', color: '#94A3B8', fontWeight: 700 }

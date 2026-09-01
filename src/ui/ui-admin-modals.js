@@ -1636,7 +1636,7 @@ export function AdminModal({
                   }, actionLabel),
                   /* User */
                   /*#__PURE__*/React.createElement("span", {
-                    style: { backgroundColor: p.color, color: getContrastTextColor(p.color), padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: '0.7rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
+                    style: { backgroundColor: p.color, color: '#FFFFFF', padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: '0.7rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
                   }, p.name),
                   log.date && /*#__PURE__*/React.createElement("span", {
                     className: "recent-log-date",
@@ -1783,7 +1783,7 @@ export function AdminModal({
               className: "participant-badge",
               style: {
                 backgroundColor: participant.color,
-                color: getContrastTextColor(participant.color),
+                color: '#FFFFFF',
                 fontSize: '0.72rem',
                 padding: '2px 8px'
               }
