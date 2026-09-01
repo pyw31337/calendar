@@ -1405,7 +1405,7 @@ export function DateModal({
           memoPhotos.push({ id: `memo_photo_${memo.id}_${idx}`, imageUrl: full, thumbUrl: entry.thumb || full, createdAt: memo.updatedAt || memo.createdAt || 0, source: 'memo-tag', sourceMemoId: memo.id, sourceImageIndex: idx, tags, assetKey: key, mediaKey: key, refKey: `memo:${memo.id}:${idx}` });
         }
       });
-      const direct = typeof getMessageDirectMediaEntry === 'function' ? getMessageDirectMediaEntry(asMsg) : null;
+      const direct = typeof getMessageDirectMediaEntry === 'function' ? getMessageDirectMediaEntry(asMsg, { allowVideo: true }) : null;
       if (direct?.url && !directKeys.has(`memo:${memo.id}:video`)) {
         directKeys.add(`memo:${memo.id}:video`);
         memoPhotos.push({ id: `memo_video_${memo.id}`, directMediaUrl: direct.url, type: direct.type || 'embed', imageUrl: direct.thumbnail || '', thumbUrl: direct.thumbnail || '', createdAt: memo.updatedAt || memo.createdAt || 0, source: 'memo-tag', sourceMemoId: memo.id, tags, mediaKey: `memo:${memo.id}:video`, refKey: `memo:${memo.id}:video` });

@@ -2085,10 +2085,10 @@ function getMediaIdentityKeys(photo = {}, opts = {}) {
   return { assetKey: key, mediaKey: key, refKey: key };
 }
 
-function getMessageDirectMediaEntry(msg) {
+function getMessageDirectMediaEntry(msg, options = {}) {
   const firstUrl = extractFirstUrl(msg?.text || '');
   const mediaInfo = getDirectChatMediaInfo(firstUrl);
-  if (!mediaInfo || mediaInfo.type !== 'image') return null;
+  if (!mediaInfo || (mediaInfo.type !== 'image' && !(options && options.allowVideo))) return null;
   const sourceHint = msg?.uploadSource === 'memo' ? 'memo' : 'chat';
   const keys = getMediaIdentityKeys({
     messageId: msg.id,

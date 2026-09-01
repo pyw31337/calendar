@@ -845,6 +845,8 @@ export function ChatRoomView({
   }, [calendar]);
 
   const [viewportBottom, setViewportBottom] = React.useState(0);
+  const [composerHeight, setComposerHeight] = React.useState(0);
+  const chatComposerRef = React.useRef(null);
   const [isInputFocused, setIsInputFocused] = React.useState(false);
   // 'closed' (default -- nothing shown) | 'list' (existing notices + 공지 추가) | 'add' (textarea)
   const [noticePanelMode, setNoticePanelMode] = React.useState('closed');
@@ -1119,6 +1121,21 @@ export function ChatRoomView({
     }
   }, [viewportBottom]);
 
+  // Reserve the actual composer height so a tall reply preview can never cover the last bubble.
+  React.useEffect(() => {
+    const el = chatComposerRef.current;
+    if (!el) return;
+    const measure = () => setComposerHeight(Math.ceil(el.getBoundingClientRect().height));
+    measure();
+    if (typeof ResizeObserver === 'function') {
+      const observer = new ResizeObserver(measure);
+      observer.observe(el);
+      return () => observer.disconnect();
+    }
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [chatReplyTarget, chatInput, chatImages, isInputFocused, viewportBottom]);
+
   const fileInputRefChat = React.useRef(null);
   const [imageProcessingChat, setImageProcessingChat] = React.useState(null);
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = React.useState(false);
@@ -1200,7 +1217,7 @@ export function ChatRoomView({
         marginBottom: '6px',
         borderRadius: '8px',
         borderLeft: `3px solid ${qp?.color || '#94A3B8'}`,
-        backgroundColor: 'rgba(148,163,184,0.14)',
+        backgroundColor: 'rgba(148, 163, 184, 0.1)',
         cursor: onJumpToChatMessage ? 'pointer' : 'default'
       }
     },
@@ -1782,7 +1799,7 @@ export function ChatRoomView({
       // `bottom: viewportBottom` below) -- without adding that same amount here, scrolling to
       // scrollHeight still leaves the newest bubble sitting right where the keyboard now covers
       // it, since the reserved bottom space never grew to match.
-      paddingBottom: `${152 + viewportBottom}px`
+      paddingBottom: `${Math.max(152, composerHeight + 24) + viewportBottom}px`
     }
   }, (loadingOlderChat || hasMoreOlderChat) && /*#__PURE__*/React.createElement("div", {
     style: { textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)', padding: '8px 0 12px' }
@@ -1950,6 +1967,7 @@ export function ChatRoomView({
     "stroke-linejoin": "round"
   }, /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" })))), /*#__PURE__*/React.createElement("div", {
     className: "chat-composer",
+    ref: chatComposerRef,
     style: {
       position: 'fixed',
       left: 0,
@@ -1995,7 +2013,7 @@ export function ChatRoomView({
           borderRadius: '8px',
           border: `1px solid ${participantsMap[chatReplyTarget.participantId]?.color || '#94A3B8'}`,
           borderLeft: `3px solid ${participantsMap[chatReplyTarget.participantId]?.color || '#94A3B8'}`,
-          backgroundColor: 'var(--bg-primary)'
+          backgroundColor: 'rgba(148, 163, 184, 0.1)'
         }
       },
         /*#__PURE__*/React.createElement("div", {
