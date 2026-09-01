@@ -815,10 +815,6 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
   // slow tier (e.g. a cold-started googlePlacesSearchProxy) reads as "still working", not frozen.
   const [searchStage, setSearchStage] = React.useState(null);
   const SEARCH_TIER_LABELS = { kakao: '카카오에서 검색 중...', google: '해외 장소 데이터베이스 확인 중...', nominatim: '지도 데이터에서 주소 확인 중...' };
-  const [preferredProvider, setPreferredProvider] = React.useState(() => {
-    const api = window.GATHER_APP_PLACE_SEARCH;
-    return api?.getPlaceSearchSettings?.().preferred || 'auto';
-  });
 
   const searchPlacesWithProviders = async (cleanQuery, options = {}) => {
     const api = window.GATHER_APP_PLACE_SEARCH;
@@ -1085,24 +1081,6 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
           disabled: loading
         }, loading ? '검색중' : '검색')
       ),
-      /*#__PURE__*/React.createElement("label", { style: { display: 'flex', alignItems: 'center', gap: '7px', fontSize: '0.72rem', color: 'var(--text-muted)' } },
-        '검색 우선 제공자',
-        /*#__PURE__*/React.createElement("select", {
-          value: preferredProvider,
-          onChange: e => {
-            const value = e.target.value;
-            setPreferredProvider(value);
-            window.GATHER_APP_PLACE_SEARCH?.setPlaceSearchProvider?.(value);
-          },
-          style: { flex: 1, minWidth: 0, height: '32px', borderRadius: '7px', border: '1px solid var(--border-subtle)', background: 'var(--bg-primary)', color: 'var(--text-main)', fontSize: '0.74rem', padding: '0 7px' }
-        },
-          /*#__PURE__*/React.createElement("option", { value: 'auto' }, '자동 (카카오 → Google → 지도)'),
-          /*#__PURE__*/React.createElement("option", { value: 'kakao' }, '카카오 우선'),
-          /*#__PURE__*/React.createElement("option", { value: 'google' }, 'Google 우선'),
-          /*#__PURE__*/React.createElement("option", { value: 'nominatim' }, 'OpenStreetMap 우선')
-        )
-      ),
-
       /* Search progress -- only for a manual (non-auto) submit, see searchStage above. Google
          Places in particular can take several seconds on a cold start, so this exists to make
          that wait read as "still working" instead of a frozen button label. */

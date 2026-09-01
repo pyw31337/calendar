@@ -1016,7 +1016,9 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
     let memoId = null;
     try {
       const calendarId = calendar.id;
-      const sharedMemoShare = getMemoShareUrlFromText(newText);
+      // A share URL is accepted in either the title or body field. Once detected, the source
+      // memo is cloned as a complete record so users do not have to paste the link into the body.
+      const sharedMemoShare = getMemoShareUrlFromText(newText) || getMemoShareUrlFromText(newTitle);
       let sourceMemo = null;
       if (sharedMemoShare) {
         showToast('공유 메모를 불러오는 중...', 'info', 12000);
@@ -1044,7 +1046,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
 
       const stamp = Date.now();
       memoId = 'memo_' + stamp + '_' + Math.random().toString(36).slice(2, 8);
-      const participantId = composerParticipantId || 'anonymous';
+      const participantId = sourceMemo?.participantId || composerParticipantId || 'anonymous';
       if (typeof navigator !== 'undefined' && navigator.onLine === false && memoImagesCanBeQueued(newImages)) {
         const queued = await enqueueMemoMediaSave({
           id: `memo_media_${calendarId}_${memoId}`,
@@ -1052,7 +1054,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           calendarId,
           payload: {
             memoId,
-            memoData: sanitizeMemoForFirestore({ id: memoId, participantId, title, text, imageUrls: [], thumbUrls: [], color: newColor, isPinned: newIsPinned, tags: tagsArray, createdAt: stamp, updatedAt: stamp }),
+            memoData: sanitizeMemoForFirestore({ id: memoId, participantId, title, text, imageUrls: sourceMemo?.imageUrls || [], thumbUrls: sourceMemo?.thumbUrls || [], color: sourceMemo?.color || newColor, isPinned: sourceMemo?.isPinned ?? newIsPinned, tags: tagsArray, createdAt: stamp, updatedAt: stamp, linkPreview: sourceMemo?.linkPreview || null }),
             images: newImages.map(image => ({ originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob }))
           }
         });
@@ -1065,8 +1067,8 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
 
       // 1. Upload attachments (Storage upload with inline-base64 fallback + progress,
       // exactly the same module chat uses -- see resolveMemoImageBatch/resolveImageBatch)
-      let uploadedUrls = [];
-      let uploadedThumbs = [];
+      let uploadedUrls = Array.isArray(sourceMemo?.imageUrls) ? sourceMemo.imageUrls.slice() : [];
+      let uploadedThumbs = Array.isArray(sourceMemo?.thumbUrls) ? sourceMemo.thumbUrls.slice() : [];
       if (newImages.length > 0) {
         setNewUploadProgress({ pct: 0, remainingSec: null });
         const resolved = await resolveMemoImageBatch(calendarId, newImages, setNewUploadProgress);
@@ -1086,13 +1088,13 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         text,
         imageUrls: uploadedUrls,
         thumbUrls: uploadedThumbs,
-        color: newColor,
-        isPinned: newIsPinned,
+        color: sourceMemo?.color || newColor,
+        isPinned: sourceMemo?.isPinned ?? newIsPinned,
         tags: tagsArray,
         createdAt: stamp,
         updatedAt: stamp
       };
-      if (linkPreview) memoData.linkPreview = linkPreview;
+      memoData.linkPreview = sourceMemo?.linkPreview || linkPreview || null;
 
       if (typeof onUpsertMemo === 'function') onUpsertMemo(memoData);
 
