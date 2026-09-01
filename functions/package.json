@@ -11,8 +11,8 @@
     "node": "22"
   },
   "dependencies": {
-    "firebase-admin": "^11.8.0",
-    "firebase-functions": "^5.1.1",
+    "firebase-admin": "^14.3.0",
+    "firebase-functions": "^7.3.2",
     "korean-lunar-calendar": "^0.4.0",
     "web-push": "^3.6.7"
   },
