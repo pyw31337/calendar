@@ -777,6 +777,10 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
 
   const firstUrl = extractFirstUrl(text);
   const mediaInfo = getDirectChatMediaInfo(firstUrl);
+  // When a message also contains uploaded images, the surrounding bubble is sized by that
+  // image row. Stretch its link previews to the same width; standalone text links retain their
+  // compact intrinsic card width.
+  const hasAttachedImages = !!(message && getMessageImageEntries(message).length > 0);
   // A bubble with several plain webpage links (not a multi-image-link message, which is handled
   // separately below) used to only ever preview firstUrl -- every other link in the same message
   // was left as plain clickable text with no card. firstUrl always leads the list (and keeps its
@@ -916,7 +920,8 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
         key: url,
         url,
         fallbackTitle: (idx === 0 && text) ? removeFirstUrl(text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '',
-        cachedData: idx === 0 ? linkPreview : undefined
+        cachedData: idx === 0 ? linkPreview : undefined,
+        stretch: hasAttachedImages
       }))
     );
   }
