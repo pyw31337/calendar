@@ -3835,6 +3835,40 @@ function CalendarApp() {
     }
     return ok;
   };
+  // Reorders the 참석 명단 (attendee) rows shown for one date in DateModal, dragged via the
+  // same pointer-sort UI as the settlement expense list (see moveExpense/beginExpensePointerSort
+  // in ui-date-modal.js). availabilities has no per-entry order field -- display order is just
+  // array order in calendar.availabilities -- so this reorders only the slots this date's active
+  // entries already occupy in that array, leaving every other date's entries' positions (and
+  // their own updatedAt) untouched.
+  const handleReorderAvailability = (dateStr, orderedParticipantIds) => {
+    if (!activeCal || !isValidDateString(dateStr) || !Array.isArray(orderedParticipantIds) || orderedParticipantIds.length < 2) return false;
+    const existing = activeCal.availabilities || [];
+    const dateIndices = [];
+    existing.forEach((entry, i) => { if (entry.date === dateStr && !isTombstone(entry)) dateIndices.push(i); });
+    if (dateIndices.length < 2) return false;
+    const entryByParticipant = new Map();
+    dateIndices.forEach(i => entryByParticipant.set(existing[i].participantId, existing[i]));
+    const orderedEntries = [];
+    orderedParticipantIds.forEach(participantId => {
+      if (entryByParticipant.has(participantId)) {
+        orderedEntries.push(entryByParticipant.get(participantId));
+        entryByParticipant.delete(participantId);
+      }
+    });
+    // Any active entry not named in orderedParticipantIds (shouldn't happen from the UI, but
+    // keeps this defensive against a stale/partial id list) keeps its relative place at the end.
+    entryByParticipant.forEach(entry => orderedEntries.push(entry));
+    if (orderedEntries.length !== dateIndices.length) return false;
+    const unchanged = dateIndices.every((idx, i) => existing[idx].participantId === orderedEntries[i].participantId);
+    if (unchanged) return true;
+    const nextAvail = [...existing];
+    dateIndices.forEach((idx, i) => { nextAvail[idx] = orderedEntries[i]; });
+    const now = Date.now();
+    const updatedCal = { ...activeCal, updatedAt: now, revision: (activeCal.revision || 0) + 1, availabilities: nextAvail };
+    const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+    return updateCalendars(nextCalendars, null, null, updatedCal.id, 'availability', []);
+  };
   const handleDeleteAllForDate = async dateStr => {
     if (!activeCal || !isValidDateString(dateStr)) return false;
     const now = Date.now();
@@ -5573,6 +5607,7 @@ function CalendarApp() {
       chatMessages: displayChatMessages,
       onSave: handleSaveAvailability,
       onDelete: handleDeleteAvailability,
+      onReorderAvailability: handleReorderAvailability,
       onDeleteDate: handleDeleteAllForDate,
       onConfirmMeeting: handleConfirmMeeting,
       onSaveExpense: handleSaveExpense,

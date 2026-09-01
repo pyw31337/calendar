@@ -4640,6 +4640,9 @@ textarea.form-input {
     padding: 10px 10px 10px 10px !important;
     padding-right: 48px !important;
   }
+  .date-modal-attendance-row.date-modal-attendance-row--reorderable {
+    padding-right: 78px !important;
+  }
   .date-modal-attendance-note {
     padding-left: 16px !important;
     font-size: 0.74rem !important;
@@ -4917,6 +4920,10 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
     justify-content: center !important;
   }
   .date-modal-attendance-row { padding-right: 44px !important; }
+  /* Three actions (drag handle + edit + delete) need more room than the default two-button
+     44px reserve above -- only applies once there's more than one attendee to reorder (see
+     canReorder in ui-date-modal.js), so a single-attendee date still gets the tighter 44px. */
+  .date-modal-attendance-row.date-modal-attendance-row--reorderable { padding-right: 78px !important; }
   .date-modal-attendance-note {
     padding-left: 16px !important;
     width: 100% !important;
