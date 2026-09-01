@@ -2424,7 +2424,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         onClick: e => e.stopPropagation(),
         style: {
           display: 'flex', alignItems: 'center', gap: '8px',
-          backgroundColor: 'rgba(148, 163, 184, 0.14)', borderRadius: 'var(--radius-sm)', padding: '6px 8px'
+          backgroundColor: 'rgb(248, 250, 252)', borderRadius: 'var(--radius-sm)', padding: '6px 8px'
         }
       },
         /*#__PURE__*/React.createElement("span", {
