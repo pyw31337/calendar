@@ -2983,11 +2983,6 @@ select.form-select {
   margin-bottom: -12px;
   opacity: 0.8;
 }
-@media (max-width: 767px) {
-  .settlement-running-balance {
-    display: none;
-  }
-}
 .settlement-person-settlement-badge.is-refund {
   background: rgba(22, 163, 74, 0.14);
   color: var(--status-green);
