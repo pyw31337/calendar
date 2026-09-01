@@ -3042,6 +3042,45 @@ function CalendarApp() {
     }
   };
 
+  // 링크 tab's own '추가'/'붙여넣기' (see ui-chat-gallery.js's onAddLink) -- a "link" in the
+  // gallery isn't its own stored entity, it's just a URL that sharedLinks finds inside some chat
+  // message's or memo's text. Adding one directly here means writing a small gallery-only text
+  // message containing that URL, same uploadSource:'gallery' pattern handleUploadGalleryImages
+  // uses for a directly-uploaded photo, so it shows up in the gallery's 링크 tab without also
+  // appearing as a message in the chat feed.
+  const handleAddGalleryLink = async url => {
+    if (!guardLoadedCalendar()) return false;
+    const cleanUrl = String(url || '').trim();
+    if (!cleanUrl) {
+      showToast('올바른 링크를 입력해 주세요.', 'error');
+      return false;
+    }
+    const fallbackParticipantId = chatParticipantId || getActiveParticipants(activeCal)[0]?.id || '';
+    const messageOperationId = `gallery_link_${activeCal.id}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const messageData = {
+      participantId: fallbackParticipantId,
+      text: cleanUrl,
+      timestamp: Date.now(),
+      uploadSource: 'gallery'
+    };
+    try {
+      const sent = await writeCollectionDocumentWithFallback('messages', activeCal.id, '', messageData, 'add', '갤러리 링크 저장', { documentId: messageOperationId });
+      if (!sent) throw new Error('Gallery link save failed');
+      if (shouldFetchLinkPreviewForChatUrl(cleanUrl)) {
+        const sentId = sent.id || messageOperationId;
+        void fetchLinkPreview(cleanUrl).then(async result => {
+          if (result?.status !== 'success') return;
+          await writeCollectionDocumentWithFallback('messages', activeCal.id, sentId, { linkPreview: result.data }, 'update', '갤러리 링크 미리보기 후처리');
+        }).catch(error => console.warn('Background gallery link preview failed:', error));
+      }
+      return true;
+    } catch (err) {
+      console.error('handleAddGalleryLink failed:', err);
+      showToast('링크 저장 실패', 'error');
+      return false;
+    }
+  };
+
   const handleDeleteMessage = (msg) => {
     setDeletingMessage({ ...msg, calId: activeCalId });
   };
@@ -6340,6 +6379,7 @@ function CalendarApp() {
         asPage: true,
         onClose: () => changeView('calendar'),
         onUploadImages: handleUploadGalleryImages,
+        onAddLink: handleAddGalleryLink,
         onOpenShare: () => {
           if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsShareOpen(true);
         },
@@ -6672,6 +6712,7 @@ function CalendarApp() {
     chatMessages: chatMessages,
     onClose: () => setIsGalleryOpen(false),
     onUploadImages: handleUploadGalleryImages,
+    onAddLink: handleAddGalleryLink,
     onOpenShare: () => {
       if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsShareOpen(true);
     },
