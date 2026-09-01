@@ -885,6 +885,7 @@ export function ChatGalleryModal({
   asPage = false,
   onClose,
   onUploadImages = null,
+  onAddLink = null,
   onOpenShare = null,
   setActiveLightbox,
   hasMoreOlderChat = false,
@@ -1411,6 +1412,65 @@ export function ChatGalleryModal({
     event.target.value = '';
     await uploadFiles(files);
   };
+
+  // 링크 tab's '추가'/'붙여넣기' -- unlike photos (uploaded as their own message), a "link" here
+  // is just a URL that happens to appear in some chat message's or memo's text (see sharedLinks
+  // above), so adding one directly means creating a small gallery-only text message containing
+  // that URL -- onAddLink (wired to handleAddGalleryLink in app-main.js) writes it the same way
+  // handleUploadGalleryImages writes an uploaded photo, with uploadSource:'gallery' so it doesn't
+  // also show up as a message in the chat feed.
+  const [isAddingLink, setIsAddingLink] = React.useState(false);
+  const [linkUrlInput, setLinkUrlInput] = React.useState('');
+  const [isSavingLink, setIsSavingLink] = React.useState(false);
+  const handleToggleAddLink = () => {
+    setIsAddingLink(prev => !prev);
+    setLinkUrlInput('');
+  };
+  const handleSubmitLinkInput = async () => {
+    if (typeof onAddLink !== 'function' || isSavingLink) return;
+    const url = extractFirstUrl(linkUrlInput);
+    if (!url) {
+      if (showToast) showToast('올바른 링크(URL)를 입력해 주세요.', 'error');
+      return;
+    }
+    setIsSavingLink(true);
+    try {
+      const ok = await onAddLink(url);
+      if (ok !== false) {
+        if (showToast) showToast('링크가 추가되었습니다.', 'success');
+        setLinkUrlInput('');
+        setIsAddingLink(false);
+        setActiveTab('links');
+      }
+    } finally {
+      setIsSavingLink(false);
+    }
+  };
+  const handlePasteLinkFromClipboard = async () => {
+    if (typeof onAddLink !== 'function' || isSavingLink) return;
+    let text;
+    try {
+      text = await navigator.clipboard.readText();
+    } catch (err) {
+      if (showToast) showToast('클립보드를 읽을 수 없습니다. 브라우저 권한을 확인해 주세요.', 'error');
+      return;
+    }
+    const url = extractFirstUrl(text);
+    if (!url) {
+      if (showToast) showToast('클립보드에 붙여넣을 링크가 없습니다.', 'error');
+      return;
+    }
+    setIsSavingLink(true);
+    try {
+      const ok = await onAddLink(url);
+      if (ok !== false) {
+        if (showToast) showToast('링크가 추가되었습니다.', 'success');
+        setActiveTab('links');
+      }
+    } finally {
+      setIsSavingLink(false);
+    }
+  };
   // Lets '이미지 업로드' accept a clipboard-pasted image too, not just the file picker -- active
   // for as long as the 갤러리 페이지 is open. Routes through the same preview/confirm modal as
   // the 붙여넣기 button (handlePasteGalleryUpload) rather than uploading straight from the paste
@@ -1590,6 +1650,81 @@ export function ChatGalleryModal({
     if (hasMoreOlderChat || hasMoreMemos) return "아직 모든 링크를 불러오지 않았습니다. 아래 더보기를 눌러 주세요.";
     return emptyMessage;
   };
+  // Count + 붙여넣기/추가 header shown above the flat (전체) list -- same module the date modal's
+  // own 사진 tab uses (label left, action buttons right), reused here for visual consistency.
+  const renderPhotoListHeader = () => /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '4px' }
+  },
+    /*#__PURE__*/React.createElement("label", {
+      style: { fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-muted)' }
+    }, `등록된 사진 (${displayPhotoTabCount}장)`),
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }
+    },
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "btn btn-action btn-action-outline",
+        onClick: handlePasteGalleryUpload,
+        style: { height: '36px', padding: '0 12px', borderRadius: '10px', fontSize: '0.78rem', fontWeight: 900, cursor: 'pointer' }
+      }, "붙여넣기"),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "btn btn-action btn-action-dark",
+        onClick: handleUploadClick,
+        style: { height: '36px', padding: '0 12px', borderRadius: '10px', fontSize: '0.78rem', fontWeight: 900, cursor: 'pointer' }
+      }, "추가")
+    )
+  );
+  const renderLinkListHeader = () => /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '4px' }
+  },
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }
+    },
+      /*#__PURE__*/React.createElement("label", {
+        style: { fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-muted)' }
+      }, `등록된 링크 (${filteredLinks.length}개)`),
+      /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }
+      },
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          className: "btn btn-action btn-action-outline",
+          disabled: isSavingLink,
+          onClick: handlePasteLinkFromClipboard,
+          style: { height: '36px', padding: '0 12px', borderRadius: '10px', fontSize: '0.78rem', fontWeight: 900, cursor: isSavingLink ? 'wait' : 'pointer' }
+        }, "붙여넣기"),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          className: "btn btn-action btn-action-dark",
+          disabled: isSavingLink,
+          onClick: handleToggleAddLink,
+          style: { height: '36px', padding: '0 12px', borderRadius: '10px', fontSize: '0.78rem', fontWeight: 900, cursor: isSavingLink ? 'wait' : 'pointer' }
+        }, isSavingLink ? "저장 중..." : (isAddingLink ? "취소" : "추가"))
+      )
+    ),
+    isAddingLink && /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', gap: '8px', alignItems: 'center', width: '100%' }
+    },
+      /*#__PURE__*/React.createElement("input", {
+        type: "url",
+        className: "form-input",
+        value: linkUrlInput,
+        onChange: e => setLinkUrlInput(e.target.value),
+        placeholder: "https://...",
+        autoFocus: true,
+        style: { flex: 1, minWidth: 0, height: '40px', borderRadius: '8px', fontSize: '0.84rem' },
+        onKeyDown: e => { if (e.key === 'Enter') { e.preventDefault(); handleSubmitLinkInput(); } }
+      }),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "btn btn-action btn-action-dark",
+        disabled: isSavingLink,
+        onClick: handleSubmitLinkInput,
+        style: { height: '40px', padding: '0 14px', borderRadius: '8px', fontSize: '0.78rem', fontWeight: 900, flexShrink: 0, cursor: isSavingLink ? 'wait' : 'pointer' }
+      }, "등록")
+    )
+  );
   const renderGalleryContent = () => {
     if (galleryViewMode === 'date') {
       const isLinkMode = activeTab === 'links';
@@ -1666,6 +1801,7 @@ export function ChatGalleryModal({
     if (activeTab === 'links') {
       const sortedLinks = sortGalleryFlatItems(filteredLinks);
       return /*#__PURE__*/React.createElement(React.Fragment, null,
+        renderLinkListHeader(),
         sortedLinks.length === 0 ? /*#__PURE__*/React.createElement("div", {
           style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: '0.88rem' }
         }, searchQuery ? "검색 결과가 없습니다." : "공유된 링크가 없습니다.") : renderGalleryLinkList(sortedLinks),
@@ -1682,6 +1818,7 @@ export function ChatGalleryModal({
     }
     const sortedPhotos = sortGalleryFlatItems(visiblePhotos);
     return /*#__PURE__*/React.createElement(React.Fragment, null,
+      renderPhotoListHeader(),
       sortedPhotos.length === 0 ? /*#__PURE__*/React.createElement("div", {
         style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: '0.88rem' }
       }, searchQuery
@@ -1924,9 +2061,6 @@ export function ChatGalleryModal({
       transform: isHeaderVisible ? 'translateY(0)' : 'translateY(calc(-100% - 56px))'
     }
   }, [['photos', '사진'], ['links', '링크']].map(tab => {
-    const count = tab[0] === 'photos'
-      ? ((searchQuery || '').trim() ? visiblePhotos.length : displayPhotoTabCount)
-      : filteredLinks.length;
     return /*#__PURE__*/React.createElement("button", {
       key: tab[0],
       type: "button",
@@ -1945,21 +2079,7 @@ export function ChatGalleryModal({
         justifyContent: 'center',
         gap: '6px'
       }
-    },
-      tab[1],
-      /*#__PURE__*/React.createElement("span", {
-        style: {
-          fontSize: '0.7rem',
-          fontWeight: 800,
-          padding: '1px 7px',
-          borderRadius: '999px',
-          backgroundColor: activeTab === tab[0] ? 'rgba(255,255,255,0.22)' : 'var(--border-subtle)',
-          color: activeTab === tab[0] ? '#FFFFFF' : 'var(--text-muted)',
-          minWidth: '18px',
-          textAlign: 'center'
-        }
-      }, String(count))
-    );
+    }, tab[1]);
   })), asPage && isMobile && /*#__PURE__*/React.createElement("div", {
     className: "gallery-page-tabs-mobile",
     style: {
@@ -1976,22 +2096,10 @@ export function ChatGalleryModal({
     /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
       title: "탭 선택",
       value: activeTab,
-      options: [['photos', '사진'], ['links', '링크']].map(tab => {
-        const count = tab[0] === 'photos'
-          ? ((searchQuery || '').trim() ? visiblePhotos.length : displayPhotoTabCount)
-          : filteredLinks.length;
-        return {
-          value: tab[0],
-          label: /*#__PURE__*/React.createElement(React.Fragment, null, `${tab[1]} `,
-            /*#__PURE__*/React.createElement("span", {
-              style: {
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '20px', height: '18px',
-                borderRadius: '9999px', backgroundColor: count >= 1 ? '#4F46E5' : '#E2E8F0',
-                color: count >= 1 ? '#FFFFFF' : '#475569', fontSize: '0.72rem', fontWeight: 'bold', padding: '0 6px', marginLeft: '4px'
-              }
-            }, String(count)))
-        };
-      }),
+      options: [['photos', '사진'], ['links', '링크']].map(tab => ({
+        value: tab[0],
+        label: tab[1]
+      })),
       onSelect: setActiveTab
     }),
     /* View-mode toggle: 전체 | 일자 -- same pill as the PC header filter, just relocated
