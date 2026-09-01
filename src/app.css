@@ -3080,10 +3080,14 @@ select.form-select {
 .settlement-expense-option-amount.is-income {
   color: var(--status-green);
 }
-.settlement-expense-resize-row {
+/* Shared drag handle docked below any list that resizes independently of the modal it sits in
+   (see ResizableListSection in ui-shared.js) -- used by the settlement expense list, the date
+   modal's attendance list, and any other nested scrollable list that would otherwise double-
+   scroll against its parent modal. */
+.resizable-list-handle-row {
   pointer-events: none;
 }
-.settlement-expense-resize-handle {
+.resizable-list-handle {
   width: 32px;
   height: 24px;
   padding: 2px;
@@ -3099,8 +3103,8 @@ select.form-select {
   touch-action: none;
   user-select: none;
 }
-.settlement-expense-resize-handle:hover,
-.settlement-expense-resize-handle:focus-visible {
+.resizable-list-handle:hover,
+.resizable-list-handle:focus-visible {
   color: #2563EB;
   background: rgba(219, 234, 254, 0.7);
   outline: none;

@@ -1501,6 +1501,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer || ((props) => React.createElement('div', props, props.children));
+  const ResizableListSection = __comp.ResizableListSection || __deps.ResizableListSection;
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon || (() => '×');
   const SimpleBottomSheetPicker = __comp.SimpleBottomSheetPicker || __deps.SimpleBottomSheetPicker || ((props) => React.createElement('select', {
     value: props.value ?? '',
@@ -1636,8 +1637,6 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
   const [activeTab, setActiveTab] = React.useState('general');
   const [isSettlementCardPreviewOpen, setIsSettlementCardPreviewOpen] = React.useState(false);
   const [settlementCardImageUrl, setSettlementCardImageUrl] = React.useState(null);
-  const [expenseListHeight, setExpenseListHeight] = React.useState(160);
-  const expenseResizeRef = React.useRef(null);
 
   const [personalExpenses, setPersonalExpenses] = React.useState(() => {
     if (Array.isArray(cardToEdit?.personalExpenses) && cardToEdit.personalExpenses.length > 0) {
@@ -1668,30 +1667,6 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
     return {};
   });
   const checkedItemsHydratedRef = React.useRef(false);
-
-  const clampExpenseListHeight = (height) => Math.min(480, Math.max(96, height));
-  const handleExpenseResizeStart = (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    expenseResizeRef.current = { pointerId: event.pointerId, startY: event.clientY, startHeight: expenseListHeight };
-    event.currentTarget.setPointerCapture?.(event.pointerId);
-  };
-  const handleExpenseResizeMove = (event) => {
-    const resize = expenseResizeRef.current;
-    if (!resize || resize.pointerId !== event.pointerId) return;
-    event.preventDefault();
-    setExpenseListHeight(clampExpenseListHeight(resize.startHeight + event.clientY - resize.startY));
-  };
-  const handleExpenseResizeEnd = (event) => {
-    if (expenseResizeRef.current?.pointerId === event.pointerId) expenseResizeRef.current = null;
-  };
-  const handleExpenseResizeKeyDown = (event) => {
-    const step = event.shiftKey ? 48 : 24;
-    if (!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const nextHeight = event.key === 'Home' ? 96 : event.key === 'End' ? 480 : expenseListHeight + (event.key === 'ArrowDown' ? step : -step);
-    setExpenseListHeight(clampExpenseListHeight(nextHeight));
-  };
 
   const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
   const confirmed = getConfirmedMeetings(calendar);
@@ -2425,10 +2400,13 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
               }, React.createElement(MainCalendarArrow, { direction: 'right' }))
             )
           ),
-          React.createElement('div', {
-            style: {
-              height: `${expenseListHeight}px`, minHeight: '96px', maxHeight: '480px', overflowY: 'auto', border: '1px solid var(--border-subtle)', borderRadius: '8px 8px 0 0', padding: '6px', display: 'flex', flexDirection: 'column', gap: '4px', backgroundColor: 'var(--bg-card)', transition: expenseResizeRef.current ? 'none' : 'height 120ms ease'
-            }
+          React.createElement(ResizableListSection, {
+            initialHeight: 160,
+            minHeight: 96,
+            maxHeight: 480,
+            listStyle: { minHeight: '96px', border: '1px solid var(--border-subtle)', borderRadius: '8px 8px 0 0', padding: '6px', display: 'flex', flexDirection: 'column', gap: '4px', backgroundColor: 'var(--bg-card)' },
+            handleTitle: '드래그하여 지출 항목 높이 조절',
+            handleAriaLabel: '지출 항목 목록 높이 조절'
           },
             monthlyExpenses.length === 0 ? React.createElement('div', { style: { padding: '16px', textAlign: 'center', fontSize: '0.78rem', color: 'var(--text-muted)' } }, '해당 월에 등록된 내역이 없습니다.')
               : monthlyExpenses.map(item => {
@@ -2453,27 +2431,6 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
                   )
                 );
               })
-          ),
-          React.createElement('div', {
-            className: 'settlement-expense-resize-row',
-            style: { display: 'flex', justifyContent: 'center', height: '24px', marginTop: '-8px', backgroundColor: 'rgba(0, 0, 0, 0.04)', borderRadius: '0 0 6px 6px', marginBottom: '8px' }
-          },
-            React.createElement('button', {
-              type: 'button',
-              className: 'settlement-expense-resize-handle',
-              title: '드래그하여 지출 항목 높이 조절',
-              'aria-label': '지출 항목 목록 높이 조절',
-              onPointerDown: handleExpenseResizeStart,
-              onPointerMove: handleExpenseResizeMove,
-              onPointerUp: handleExpenseResizeEnd,
-              onPointerCancel: handleExpenseResizeEnd,
-              onKeyDown: handleExpenseResizeKeyDown
-            },
-              React.createElement('svg', { width: '18', height: '18', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': 'true' },
-                React.createElement('path', { d: 'M8 9l4-4 4 4' }),
-                React.createElement('path', { d: 'M16 15l-4 4-4-4' })
-              )
-            )
           )
         ),
         /* Personal Expense Editor Block */

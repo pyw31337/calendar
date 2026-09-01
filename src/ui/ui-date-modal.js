@@ -844,6 +844,7 @@ export function DateModal({
   const ParticipantBackdrop = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ParticipantBackdrop) || __deps.ParticipantBackdrop;
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer || (function Shell(p) { return React.createElement('div', p, p.children); });
+  const ResizableListSection = __comp.ResizableListSection || __deps.ResizableListSection;
   const AutoGrowTextarea = __deps.AutoGrowTextarea;
   const FormAddEditActionButtons = __deps.FormAddEditActionButtons;
   const GamifiedConfirmButtonContent = __deps.GamifiedConfirmButtonContent;
@@ -2555,19 +2556,22 @@ export function DateModal({
           style: { fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '2px' }
         }, `참석 명단 (${dateEntries.length}명 가능)`),
         /* List */
-        /*#__PURE__*/React.createElement("div", {
-          className: "date-modal-attendance-list",
-          style: {
+        /*#__PURE__*/React.createElement(ResizableListSection, {
+          initialHeight: 260,
+          minHeight: 120,
+          maxHeight: 500,
+          listClassName: "date-modal-attendance-list",
+          listStyle: {
             display: 'flex',
             flexDirection: 'column',
             gap: '8px',
-            maxHeight: '260px',
-            overflowY: 'auto',
             padding: '8px',
             backgroundColor: 'var(--bg-primary)',
             border: '1px solid var(--border-subtle)',
-            borderRadius: 'var(--radius-md)'
-          }
+            borderRadius: 'var(--radius-md) var(--radius-md) 0 0'
+          },
+          handleTitle: '드래그하여 참석자 목록 높이 조절',
+          handleAriaLabel: '참석자 목록 높이 조절'
         }, dateEntries.map((entry, entryIndex) => {
           const part = activeParticipants.find(p => p.id === entry.participantId);
           if (!part) return null;
