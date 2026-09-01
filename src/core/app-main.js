@@ -6349,7 +6349,8 @@ function CalendarApp() {
       calendar: activeCal,
       showToast: showToast,
       onClose: () => setIsCreateSettlementOpen(false),
-      onSave: handleSaveSettlementCard
+      onSave: handleSaveSettlementCard,
+      onRequestConfirm: showConfirmDialog
     }),
     editingSettlementCard && activeCal && /*#__PURE__*/React.createElement(CreateSettlementModal, {
       calendar: activeCal,
@@ -6358,7 +6359,8 @@ function CalendarApp() {
       onClose: () => setEditingSettlementCard(null),
       onDeleteCard: handleDeleteSettlementCard,
       onToggleStatus: handleToggleSettlementCardStatus,
-      onSave: handleSaveSettlementCard
+      onSave: handleSaveSettlementCard,
+      onRequestConfirm: showConfirmDialog
     }),
     isAppSettingsOpen && /*#__PURE__*/React.createElement(AppSettingsModal, {
       onClose: () => setIsAppSettingsOpen(false),
@@ -6506,6 +6508,7 @@ function CalendarApp() {
           setEditingSettlementCard(card ? { ...card } : null);
         },
         showToast: showToast,
+        onRequestConfirm: showConfirmDialog,
         ...navMenuProps,
         onOpenCreateSettlement: undefined
       }),
