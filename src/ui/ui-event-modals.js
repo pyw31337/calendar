@@ -2759,6 +2759,8 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   const SharedAppNavBlock = __comp.SharedAppNavBlock || __deps.SharedAppNavBlock || (function Shell(p) { return React.createElement('div', p, p.children); });
   const ThreeLinesIcon = __comp.ThreeLinesIcon || __deps.ThreeLinesIcon || (function () { return '☰'; });
   const WeatherBadge = __comp.WeatherBadge || __deps.WeatherBadge || (function () { return null; });
+  const InlineSearchBar = __comp.InlineSearchBar || __deps.InlineSearchBar;
+  const SearchIcon = __comp.SearchIcon || __deps.SearchIcon || (function () { return '⌕'; });
   const CreateSettlementModalComp = __comp.CreateSettlementModal || CreateSettlementModal;
   const [isSettlementMenuOpen, setIsSettlementMenuOpen] = React.useState(false);
   const [isSettlementListOpen, setIsSettlementListOpen] = React.useState(false);
@@ -2804,6 +2806,8 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
 
   const { isHeaderVisible, onScroll: handleSettlementScroll } = useScrollHideHeader();
   const [activeTab, setActiveTab] = React.useState('total');
+  const [settlementSearchQuery, setSettlementSearchQuery] = React.useState('');
+  const [isSettlementSearchOpen, setIsSettlementSearchOpen] = React.useState(false);
   const [openMenuCardId, setOpenMenuCardId] = React.useState(null);
   const [collapsedDailyRows, setCollapsedDailyRows] = React.useState({});
   const categories = getExpenseCategories(calendar);
@@ -2863,6 +2867,16 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   const toggleDailyRow = date => {
     setCollapsedDailyRows(prev => ({ ...prev, [date]: !prev[date] }));
   };
+  const settlementSearchNeedle = settlementSearchQuery.trim().toLowerCase();
+  const matchesSettlementSearch = row => {
+    if (!settlementSearchNeedle) return true;
+    const haystack = [
+      row.meeting?.date,
+      row.meeting?.note,
+      ...(row.items || []).flatMap(item => [item.label, item.category?.name, item.category?.id, item.url])
+    ].filter(Boolean).join(' ').toLowerCase();
+    return haystack.includes(settlementSearchNeedle);
+  };
 
   const allTimeRows = getConfirmedMeetings(calendar).slice().sort((a, b) => b.date.localeCompare(a.date))
     .map(meeting => {
@@ -2885,7 +2899,8 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
       const incomeTotal = items.filter(item => item.isIncome).reduce((sum, item) => sum + Math.abs(item.amount), 0);
       return { meeting, items, expenseTotal, incomeTotal, net: incomeTotal - expenseTotal };
     })
-    .filter(row => row.items.length > 0);
+    .filter(row => row.items.length > 0)
+    .filter(matchesSettlementSearch);
   const allTimeItems = allTimeRows.flatMap(row => row.items.map(item => ({ ...item, date: row.meeting.date, meetingNote: row.meeting.note || '' })));
   const settlementBalanceByKey = new Map();
   let runningSettlementBalance = baseBudget;
@@ -2945,7 +2960,8 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
       const incomeTotal = items.filter(item => item.isIncome).reduce((sum, item) => sum + Math.abs(item.amount), 0);
       return { meeting, items, expenseTotal, incomeTotal, net: incomeTotal - expenseTotal };
     })
-    .filter(row => row.items.length > 0);
+    .filter(row => row.items.length > 0)
+    .filter(matchesSettlementSearch);
 
   const allItems = rows.flatMap(row => row.items.map(item => ({ ...item, date: row.meeting.date, meetingNote: row.meeting.note || '' })));
   const incomeItems = allItems.filter(item => item.isIncome);
@@ -3229,18 +3245,25 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
       fontSize: '1.05rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '8px', margin: 0, color: 'var(--text-main)',
       position: 'absolute', left: '50%', transform: 'translateX(-50%)', pointerEvents: 'none'
     }
-  }, formatChatHeaderTitle(calendar?.title), " 정산"), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: () => setIsSettlementMenuOpen(true),
-    title: "메뉴",
-    "aria-label": "메뉴",
-    style: {
-      marginLeft: 'auto',
-      width: '32px', height: '32px', borderRadius: '50%', border: 'none',
-      backgroundColor: 'transparent', cursor: 'pointer', display: 'flex',
-      alignItems: 'center', justifyContent: 'center', color: '#64748B', padding: 0
-    }
-  }, ThreeLinesIcon ? /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 20 }) : /*#__PURE__*/React.createElement(ShareIcon, { size: 16 }))),
+  }, formatChatHeaderTitle(calendar?.title), " 정산"), /*#__PURE__*/React.createElement("div", { style: { marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '4px' } },
+    /*#__PURE__*/React.createElement("button", {
+      type: "button", onClick: () => setIsSettlementSearchOpen(value => !value),
+      title: "정산 검색", "aria-label": "정산 검색",
+      style: { width: '32px', height: '32px', borderRadius: '50%', border: 'none', backgroundColor: isSettlementSearchOpen ? 'var(--bg-primary)' : 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', padding: 0 }
+    }, /*#__PURE__*/React.createElement(SearchIcon, { size: 19 })),
+    /*#__PURE__*/React.createElement("button", {
+      type: "button", onClick: () => setIsSettlementMenuOpen(true),
+      title: "메뉴", "aria-label": "메뉴",
+      style: { width: '32px', height: '32px', borderRadius: '50%', border: 'none', backgroundColor: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B', padding: 0 }
+    }, ThreeLinesIcon ? /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 20 }) : /*#__PURE__*/React.createElement(ShareIcon, { size: 16 }))
+  )),
+
+  isSettlementSearchOpen && InlineSearchBar && /*#__PURE__*/React.createElement(InlineSearchBar, {
+    value: settlementSearchQuery,
+    placeholder: "정산 항목, 날짜 또는 카테고리 검색...",
+    onChange: event => setSettlementSearchQuery(event.target.value),
+    trailing: settlementSearchQuery ? /*#__PURE__*/React.createElement("button", { type: "button", onClick: () => setSettlementSearchQuery(''), style: { border: 'none', background: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontWeight: 700 } }, "초기화") : null
+  }),
 
   /*#__PURE__*/React.createElement("div", {
     className: "settlement-page-body",

@@ -827,6 +827,7 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
   const ImageThumbRemoveButton = __comp.ImageThumbRemoveButton || __deps.ImageThumbRemoveButton;
   const ImageUploadOverlay = __comp.ImageUploadOverlay || __deps.ImageUploadOverlay;
   const InlineSearchBar = __comp.InlineSearchBar || __deps.InlineSearchBar;
+  const SearchIcon = __comp.SearchIcon || __deps.SearchIcon || (function SearchFallback() { return '⌕'; });
   const LinkPreviewCard = __deps.LinkPreviewCard || __comp.LinkPreviewCard;
   const LinkPreviewProgressOverlay = __deps.LinkPreviewProgressOverlay;
   const MemoCard = __deps.MemoCard;
@@ -1503,6 +1504,17 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       /*#__PURE__*/React.createElement("div", {
         style: { display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }
       },
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          onClick: () => setIsSearchOpen(value => !value),
+          title: "메모 검색",
+          "aria-label": "메모 검색",
+          style: {
+            background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
+            color: 'var(--text-muted)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--radius-md)'
+          }
+        }, /*#__PURE__*/React.createElement(SearchIcon, { size: 20 })),
         /*#__PURE__*/React.createElement("button", {
           type: "button",
           onClick: () => setIsMemoMenuOpen(true),
