@@ -2012,7 +2012,7 @@ export function CommentsSection({
   }));
 }
 
-export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onSelectTag, onCommentsChange, getBorderColor, onRequestConfirm, showToast }) {
+export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onSelectTag, onCommentsChange, getBorderColor, onRequestConfirm, showToast, effectivePinned }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -2231,14 +2231,15 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         e.stopPropagation();
         onTogglePin();
       },
+      title: effectivePinned && !memo.isPinned ? "최근 활동 고정 해제" : undefined,
       style: {
         position: 'absolute', top: '10px', right: '10px',
         background: 'none', border: 'none', cursor: 'pointer',
-        color: memo.isPinned ? '#F59E0B' : '#64748B',
-        opacity: memo.isPinned ? 1 : 0.2
+        color: effectivePinned ? '#F59E0B' : '#64748B',
+        opacity: effectivePinned ? 1 : 0.2
       },
       className: "memo-card-pin-btn"
-    }, memo.isPinned ?
+    }, effectivePinned ?
       /* ON state filled pin SVG */
       /*#__PURE__*/React.createElement("svg", {
         xmlns: "http://www.w3.org/2000/svg", width: "16", height: "16", viewBox: "0 0 24 24", fill: "currentColor", className: "icon icon-tabler icon-tabler-filled icon-tabler-pin"

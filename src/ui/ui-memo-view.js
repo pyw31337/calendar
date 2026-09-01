@@ -80,6 +80,34 @@ function withMemoFirestoreTimeout(promise, timeoutMs = 12000) {
   ]);
 }
 
+// "최근 활동" auto-pin: ideally this would only surface memos with an UNREAD comment, but
+// participants aren't authenticated individuals here (see getStoredChatParticipantId -- it's a
+// per-browser preference, not a login), so there's no reliable way to know who has or hasn't
+// seen a given comment. A fixed time window after the most recent comment is the practical
+// substitute -- a memo stays pinned for a while after activity regardless of who's looking.
+//
+// Known gap: this only considers memos already present in the `memos` prop. app-main.js loads
+// memos as isPinned-unbounded + createdAt-paginated (see its memo subscription effect) -- there's
+// no query keyed on comment recency, so a memo created long ago that just received a comment
+// won't surface here on a fresh page load unless it's also within the paginated recent window
+// or the user pages back to it. Fixing that would need a denormalized lastCommentAt field (a
+// firestore.rules change, deployed separately from the app) rather than a client-only change.
+const RECENT_MEMO_ACTIVITY_WINDOW_MS = 6 * 60 * 60 * 1000;
+
+function getLatestMemoCommentTimestamp(memo) {
+  const comments = memo?.comments || [];
+  let latest = 0;
+  for (const c of comments) {
+    const t = Number(c?.createdAt) || 0;
+    if (t > latest) latest = t;
+  }
+  return latest;
+}
+
+function getMemoRecentActivityDismissalStorageKey(calendarId) {
+  return `gather_memo_recent_activity_dismissed_${calendarId || 'default'}`;
+}
+
 function parseMemoShareUrl(value) {
   const text = String(value || '').trim();
   if (!text) return null;
@@ -842,6 +870,35 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
   const [selectedTag, setSelectedTag] = React.useState('');
   // Header hides on scroll-down / reappears on scroll-up, matching the chat room header exactly.
   const { isHeaderVisible, onScroll: handleMemoScroll } = useScrollHideHeader();
+
+  // "최근 활동" auto-pin (see RECENT_MEMO_ACTIVITY_WINDOW_MS above). recentActivityNow ticks
+  // every minute purely so a memo whose 6-hour window lapses with no other interaction on the
+  // page still drops out of the section on its own, instead of only re-evaluating on the next
+  // unrelated re-render.
+  const [recentActivityNow, setRecentActivityNow] = React.useState(() => Date.now());
+  React.useEffect(() => {
+    const id = setInterval(() => setRecentActivityNow(Date.now()), 60000);
+    return () => clearInterval(id);
+  }, []);
+  // Turning a "최근 활동" auto-pin off doesn't have a real isPinned field to flip (that would
+  // re-pin every browser looking at this calendar, not just dismiss it for this one) -- it's
+  // remembered locally instead, keyed by the exact comment timestamp that triggered the pin, so
+  // a genuinely new comment afterward (different timestamp) naturally re-pins it.
+  const [dismissedRecentActivity, setDismissedRecentActivity] = React.useState(() => {
+    try {
+      const raw = localStorage.getItem(getMemoRecentActivityDismissalStorageKey(calendar?.id));
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) { return {}; }
+  });
+  const dismissRecentActivity = (memoId, timestamp) => {
+    setDismissedRecentActivity(prev => {
+      const next = { ...prev, [memoId]: timestamp };
+      try {
+        localStorage.setItem(getMemoRecentActivityDismissalStorageKey(calendar?.id), JSON.stringify(next));
+      } catch (e) { /* best-effort only */ }
+      return next;
+    });
+  };
     const SharedSideMenuFooter = (__comp && __comp.SharedSideMenuFooter) || (window.GATHER_UI_DEPS || {}).SharedSideMenuFooter;
   const SharedAppNavBlock = (__comp && __comp.SharedAppNavBlock) || (window.GATHER_UI_DEPS || {}).SharedAppNavBlock;
   const ThreeLinesIcon = (__comp && __comp.ThreeLinesIcon) || (window.GATHER_UI_DEPS || {}).ThreeLinesIcon;
@@ -1326,7 +1383,27 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
     setEditParticipantId(memo.participantId || '');
   };
 
+  // A memo counts as auto-pinned by recent activity only when it isn't ALSO manually pinned
+  // (manual pin already puts it in 고정됨, so 최근 활동 would be a redundant, confusing second
+  // reason) and its window hasn't lapsed or been locally dismissed.
+  const isMemoRecentlyActive = (memo) => {
+    if (memo.isPinned) return false;
+    const latest = getLatestMemoCommentTimestamp(memo);
+    if (!latest) return false;
+    if (recentActivityNow - latest >= RECENT_MEMO_ACTIVITY_WINDOW_MS) return false;
+    if (dismissedRecentActivity[memo.id] === latest) return false;
+    return true;
+  };
+  const isMemoEffectivelyPinned = (memo) => !!memo.isPinned || isMemoRecentlyActive(memo);
+
   const handleTogglePin = async (memo) => {
+    // Turning off a 최근 활동 auto-pin (memo isn't actually isPinned) is a local-only dismissal,
+    // not a write -- there's nothing in Firestore to flip back, and writing isPinned:false would
+    // be a no-op that could race with another device's own read of the same untouched field.
+    if (isMemoRecentlyActive(memo)) {
+      dismissRecentActivity(memo.id, getLatestMemoCommentTimestamp(memo));
+      return;
+    }
     const nextPinned = !memo.isPinned;
     if (typeof onUpdateMemo === 'function') onUpdateMemo(memo.id, { isPinned: nextPinned });
     try {
@@ -1451,10 +1528,49 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   });
 
   const pinnedMemos = filteredMemos.filter(m => m.isPinned);
-  const otherMemos = filteredMemos.filter(m => !m.isPinned);
+  const recentActivityMemos = filteredMemos.filter(m => isMemoRecentlyActive(m));
+  const otherMemos = filteredMemos.filter(m => !m.isPinned && !isMemoRecentlyActive(m));
 
   const composerPart = (calendar.participants || []).find(p => p.id === composerParticipantId);
   const editPart = (calendar.participants || []).find(p => p.id === editParticipantId);
+
+  // FLIP animation for memos moving between/within the 고정됨/최근 활동/메모 목록 sections (pin
+  // toggled, or a memo's 최근 활동 window starts/lapses). Each MemoCard's root div already has a
+  // stable `id="memo-<id>"` (used elsewhere for deep-link scrolling), so this reads positions
+  // straight off the DOM instead of needing a separate ref-registration prop threaded through
+  // MemoCard. useLayoutEffect runs after the DOM reflects the new grouping but before the browser
+  // paints: cardRectsRef still holds each card's position from the end of the *previous* run, so
+  // comparing against it and animating the delta is a standard FLIP with no separate "before"
+  // measurement pass.
+  const cardRectsRef = React.useRef({});
+  const memoSectionOrderKey = [...pinnedMemos, ...recentActivityMemos, ...otherMemos].map(m => m.id).join(',');
+  React.useLayoutEffect(() => {
+    const prevRects = cardRectsRef.current;
+    const nextRects = {};
+    filteredMemos.forEach(memo => {
+      const node = document.getElementById(`memo-${memo.id}`);
+      if (!node) return;
+      const rect = node.getBoundingClientRect();
+      nextRects[memo.id] = rect;
+      const prev = prevRects[memo.id];
+      if (!prev) return;
+      const dx = prev.left - rect.left;
+      const dy = prev.top - rect.top;
+      if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+      node.style.transition = 'none';
+      node.style.transform = `translate(${dx}px, ${dy}px)`;
+      // Force a reflow so the browser registers the jump-back transform above before the
+      // transition-enabled reset below is applied, otherwise the two writes get batched into one
+      // and there's nothing to animate from.
+      void node.offsetHeight;
+      node.style.transition = 'transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.2s ease';
+      node.style.transform = '';
+      window.setTimeout(() => {
+        if (node.isConnected) node.style.transition = 'box-shadow 0.2s ease';
+      }, 360);
+    });
+    cardRectsRef.current = nextRects;
+  }, [memoSectionOrderKey]);
 
   return /*#__PURE__*/React.createElement("div", {
     className: "memo-view-container",
@@ -1683,7 +1799,8 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           onCommentsChange: (nextComments) => handleMemoCommentsChange(sharedMemo, nextComments),
           getBorderColor: getBorderColor,
           onRequestConfirm: onRequestConfirm,
-          showToast: showToast
+          showToast: showToast,
+          effectivePinned: isMemoEffectivelyPinned(sharedMemo)
         })
       ),
 
@@ -1964,8 +2081,8 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           )
       ),
 
-      /* MEMOS SECTIONS (Pinned vs Normal) */
-      
+      /* MEMOS SECTIONS (Pinned / Recent Activity / Normal) */
+
       /* 1. Pinned Memos Section */
       pinnedMemos.length > 0 && /*#__PURE__*/React.createElement("div", {
         style: { display: 'flex', flexDirection: 'column', gap: '8px' }
@@ -1992,16 +2109,50 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           onCommentsChange: (nextComments) => handleMemoCommentsChange(memo, nextComments),
           getBorderColor: getBorderColor,
           onRequestConfirm: onRequestConfirm,
-          showToast: showToast
+          showToast: showToast,
+          effectivePinned: true
         })))
       ),
 
-      /* 2. Other Memos Section */
-      otherMemos.length > 0 && /*#__PURE__*/React.createElement("div", {
+      /* 2. Recent Activity Section -- memos with a comment in the last 6h, auto-pinned the same
+         way as 고정됨 above (pin icon shows ON) but toggling it off just dismisses this one
+         activity window locally instead of writing isPinned (see isMemoRecentlyActive). */
+      recentActivityMemos.length > 0 && /*#__PURE__*/React.createElement("div", {
         style: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: pinnedMemos.length > 0 ? '12px' : '0' }
       },
         /* Label */
-        pinnedMemos.length > 0 && /*#__PURE__*/React.createElement("div", {
+        /*#__PURE__*/React.createElement("div", {
+          style: { fontSize: 'var(--font-size-sm)', fontWeight: 'bold', color: 'var(--text-muted)', letterSpacing: '0.05em', textTransform: 'uppercase' }
+        }, "최근 활동"),
+        /* Grid */
+        /*#__PURE__*/React.createElement("div", {
+          style: {
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+            gap: '12px'
+          }
+        }, recentActivityMemos.map(memo => /*#__PURE__*/React.createElement(MemoCard, {
+          key: memo.id,
+          memo: memo,
+          calendar: calendar,
+          onOpenEdit: handleOpenEdit,
+          onTogglePin: () => handleTogglePin(memo),
+          onShare: () => setSharingMemo(memo),
+          onSelectTag: (tag) => { setSelectedTag(tag); setIsSearchOpen(true); },
+          onCommentsChange: (nextComments) => handleMemoCommentsChange(memo, nextComments),
+          getBorderColor: getBorderColor,
+          onRequestConfirm: onRequestConfirm,
+          showToast: showToast,
+          effectivePinned: true
+        })))
+      ),
+
+      /* 3. Other Memos Section */
+      otherMemos.length > 0 && /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: (pinnedMemos.length > 0 || recentActivityMemos.length > 0) ? '12px' : '0' }
+      },
+        /* Label */
+        (pinnedMemos.length > 0 || recentActivityMemos.length > 0) && /*#__PURE__*/React.createElement("div", {
           style: { fontSize: 'var(--font-size-sm)', fontWeight: 'bold', color: 'var(--text-muted)', letterSpacing: '0.05em', textTransform: 'uppercase' }
         }, "메모 목록"),
         /* Grid */
@@ -2022,7 +2173,8 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           onCommentsChange: (nextComments) => handleMemoCommentsChange(memo, nextComments),
           getBorderColor: getBorderColor,
           onRequestConfirm: onRequestConfirm,
-          showToast: showToast
+          showToast: showToast,
+          effectivePinned: false
         })))
       ),
 
