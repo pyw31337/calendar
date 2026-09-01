@@ -17,7 +17,8 @@ export async function replayQueuedMediaMessage(operation, { resolveImages, chunk
       imageUrls: images.map(image => image.imageUrl),
       thumbUrls: images.map(image => image.thumbUrl),
       timestamp: (Number(payload.timestamp) || Date.now()) + i,
-      ...(payload.uploadSource ? { uploadSource: payload.uploadSource } : {})
+      ...(payload.uploadSource ? { uploadSource: payload.uploadSource } : {}),
+      ...(i === 0 && payload.replyTo ? { replyTo: payload.replyTo } : {})
     }, `${operation.id}_${i}`);
     if (!result?.success) return false;
   }

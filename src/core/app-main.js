@@ -1399,6 +1399,11 @@ function CalendarApp() {
   const [chatUploadProgress, setChatUploadProgress] = React.useState(null);
   const chatTextareaRef = React.useRef(null);
   const [chatImages, setChatImages] = React.useState([]);
+  // The message a reply-in-progress is quoting -- { id, participantId, text, imageCount } | null.
+  // Snapshotted from the target message at the moment "답장" is tapped (see ChatRoomView), not
+  // kept live, so editing/deleting the original afterward doesn't retroactively change what the
+  // reply's quote card shows -- same snapshot-at-reply-time behavior as KakaoTalk/Slack/Discord.
+  const [chatReplyTarget, setChatReplyTarget] = React.useState(null);
   const [activeLightbox, setActiveLightbox] = React.useState(null); // { urls: string[], index: number } | null
   const [isGalleryOpen, setIsGalleryOpen] = React.useState(false);
   const [placesInitialQuery, setPlacesInitialQuery] = React.useState('');
@@ -2811,6 +2816,12 @@ function CalendarApp() {
       showToast('메시지 내용 또는 사진을 입력해 주세요.', 'error');
       return;
     }
+    const replyToPayload = chatReplyTarget ? {
+      id: String(chatReplyTarget.id || ''),
+      participantId: String(chatReplyTarget.participantId || ''),
+      text: String(chatReplyTarget.text || ''),
+      imageCount: Number(chatReplyTarget.imageCount) || 0
+    } : null;
     setIsChatSubmitting(true);
     setChatUploadProgress({
       pct: 3,
@@ -2838,12 +2849,14 @@ function CalendarApp() {
             participantId: chatParticipantId,
             text: chatInput.trim(),
             timestamp: Date.now(),
-            images: chatImages.map(image => ({ originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob }))
+            images: chatImages.map(image => ({ originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob })),
+            ...(replyToPayload ? { replyTo: replyToPayload } : {})
           }
         });
         if (!queued) throw new Error('사진 오프라인 저장 공간이 부족합니다.');
         setChatInput('');
         setChatImages([]);
+        setChatReplyTarget(null);
         showToast('오프라인입니다. 사진은 연결되면 자동 전송됩니다.', 'info', 5000);
         return;
       }
@@ -2855,6 +2868,7 @@ function CalendarApp() {
           timestamp: Date.now()
         };
         if (linkPreview) messageData.linkPreview = linkPreview;
+        if (replyToPayload) messageData.replyTo = replyToPayload;
         setChatUploadProgress({ pct: 90, remainingSec: 1, label: '채팅 저장 중...' });
         ok = await (async () => {
           const sent = await writeCollectionDocumentWithFallback('messages', activeCalId, '', messageData, 'add', '채팅 저장', { documentId: messageOperationId });
@@ -2891,6 +2905,7 @@ function CalendarApp() {
             timestamp: baseTimestamp + i
           };
           if (i === 0 && linkPreview) messageData.linkPreview = linkPreview;
+          if (i === 0 && replyToPayload) messageData.replyTo = replyToPayload;
           const sent = await writeCollectionDocumentWithFallback('messages', activeCalId, '', messageData, 'add', '채팅 저장', { documentId: messageOperationId });
           if (!sent) throw new Error(`Chat send failed for chunk ${i + 1}/${chunks.length}`);
           if (i === 0) firstSentMessageId = sent.id || null;
@@ -2910,6 +2925,7 @@ function CalendarApp() {
         }
         setChatInput('');
         setChatImages([]);
+        setChatReplyTarget(null);
         if (chatTextareaRef.current) {
           chatTextareaRef.current.style.height = '34px';
         }
@@ -6171,6 +6187,8 @@ function CalendarApp() {
       chatTextareaRef: chatTextareaRef,
       chatImage: chatImages,
       setChatImage: setChatImages,
+      chatReplyTarget: chatReplyTarget,
+      setChatReplyTarget: setChatReplyTarget,
       activeLightbox: activeLightbox,
       setActiveLightbox: setActiveLightbox,
       onSend: handleSendChatMessage,

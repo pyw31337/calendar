@@ -123,6 +123,22 @@ service cloud.firestore {
           && (data.uploadSource == 'gallery' || data.uploadSource == 'meeting')
         );
       }
+      // Kakao-style reply quote: set only at creation time (never patched), a small snapshot of
+      // the message being replied to -- just enough for the reply bubble to show a 1-2 line
+      // quote card and jump back to the original (see ChatRoomView's reply button / handleSend-
+      // ChatMessage's replyToPayload). id/participantId identify+link back to the original
+      // message; text/imageCount are copied at reply time so the quote doesn't change if the
+      // original is later edited or deleted.
+      function hasValidReplyTo(data) {
+        return !('replyTo' in data) || (
+          data.replyTo is map
+          && data.replyTo.keys().hasOnly(['id', 'participantId', 'text', 'imageCount'])
+          && data.replyTo.id is string && data.replyTo.id.size() <= 200
+          && data.replyTo.participantId is string && data.replyTo.participantId.size() <= 160
+          && data.replyTo.text is string && data.replyTo.text.size() <= 300
+          && data.replyTo.imageCount is number && data.replyTo.imageCount >= 0 && data.replyTo.imageCount <= 50
+        );
+      }
       function hasValidMessageMediaMetadataPatch() {
         return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['imageShareUrls', 'imageTags', 'directMediaTags'])
           && (!('imageShareUrls' in request.resource.data) || (request.resource.data.imageShareUrls is list && request.resource.data.imageShareUrls.size() <= 50))
@@ -141,14 +157,15 @@ service cloud.firestore {
           // previously missing from this hasOnly() list, which made every single one of those
           // writes fail the security rules outright (Missing or insufficient permissions),
           // regardless of image count or size.
-          && request.resource.data.keys().hasOnly(['participantId', 'text', 'timestamp', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageTags', 'uploadSource', 'linkPreview'])
+          && request.resource.data.keys().hasOnly(['participantId', 'text', 'timestamp', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageTags', 'uploadSource', 'linkPreview', 'replyTo'])
           && request.resource.data.participantId is string
           && request.resource.data.participantId.size() <= 160
           && request.resource.data.timestamp is number
           && hasValidMessageText(request.resource.data)
           && hasValidMessageImages(request.resource.data)
           && hasValidUploadSource(request.resource.data)
-          && hasValidLinkPreview(request.resource.data);
+          && hasValidLinkPreview(request.resource.data)
+          && hasValidReplyTo(request.resource.data);
         allow update: if isCalendarDoc(calendarDocId)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageShareUrls', 'imageTags', 'directMediaTags', 'participantId', 'linkPreview'])
           && (
