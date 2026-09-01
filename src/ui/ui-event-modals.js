@@ -3966,6 +3966,7 @@ export function PollModal({ calendar, poll, onSave, onClose, showToast, onReques
     inputValue: `${option.text}${option.url ? ' ' + option.url : ''}`
   })));
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [isHidden, setIsHidden] = React.useState(!!poll?.hidden);
   const [draggingOptionId, setDraggingOptionId] = React.useState('');
   const [dragOverOptionId, setDragOverOptionId] = React.useState('');
   const newOptionInputRef = React.useRef(null);
@@ -3975,6 +3976,7 @@ export function PollModal({ calendar, poll, onSave, onClose, showToast, onReques
     description,
     deadlineInput,
     newOption,
+    isHidden,
     options.map(option => [
       option.id,
       option.inputValue ?? `${option.text}${option.url ? ' ' + option.url : ''}`,
@@ -4129,6 +4131,7 @@ export function PollModal({ calendar, poll, onSave, onClose, showToast, onReques
         deadline: deadlineInput ? new Date(deadlineInput).getTime() : null,
         options: normalizedOptions,
         votes: poll?.votes || {},
+        hidden: isHidden,
         createdAt: poll?.createdAt || now,
         updatedAt: Date.now()
       }));
@@ -4309,10 +4312,19 @@ export function PollModal({ calendar, poll, onSave, onClose, showToast, onReques
     }
     }, /*#__PURE__*/React.createElement(TrashIcon, { size: 20 })))))), /*#__PURE__*/React.createElement("div", {
     className: "modal-footer"
-  }, /*#__PURE__*/React.createElement("button", {
+  },
+    isEditing && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "btn btn-secondary",
+      disabled: isSubmitting,
+      style: { marginRight: 'auto' },
+      onClick: () => { if (!isSubmitting) setIsHidden(prev => !prev); }
+    }, isHidden ? "\uBCF4\uC784" : "\uC228\uAE40"),
+    /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "btn btn-secondary",
     disabled: isSubmitting,
+    style: { background: 'none', border: 'none' },
     onClick: () => {
       if (!isSubmitting) onClose();
     }

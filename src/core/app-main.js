@@ -6670,7 +6670,7 @@ function CalendarApp() {
     ));
   }
 
-  const mainMenuPollCount = getCalendarPolls(activeCal).filter(poll => !isPollClosed(poll)).length;
+  const mainMenuPollCount = getCalendarPolls(activeCal).filter(poll => !isPollClosed(poll) && !poll.hidden).length;
   const mainMenuChatCount = (typeof totalChatCount === 'number' && totalChatCount >= 0)
     ? totalChatCount
     : visibleChatMessages.length;

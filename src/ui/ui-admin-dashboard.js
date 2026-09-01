@@ -2794,6 +2794,7 @@ export function AdminDashboard({ initialCalendars }) {
               /* Left */
               /*#__PURE__*/React.createElement("div", { className: "admin-poll-row-main" },
                 /*#__PURE__*/React.createElement("span", { className: "admin-poll-row-title", style: { fontSize: '0.86rem', fontWeight: 'bold', color: 'var(--text-main)' } }, poll.title),
+                poll.hidden && /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.68rem', fontWeight: 800, color: '#64748B', backgroundColor: '#F1F5F9', border: '1px solid #E2E8F0', borderRadius: 'var(--radius-full)', padding: '1px 8px', marginLeft: '6px' } }, "숨김"),
                 /*#__PURE__*/React.createElement("span", { className: "admin-poll-row-meta", style: { fontSize: '0.72rem', color: '#64748B' } }, `${getActivePollOptions(poll).length}개 선택 항목 · 총 ${getPollTotalVoteCount(poll)}표${poll.deadline ? ` · 마감 ${formatPollDeadline(poll.deadline)}${isPollClosed(poll) ? ' (마감됨)' : ''}` : ''}`)
               ),
               /* Right */

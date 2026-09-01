@@ -1759,11 +1759,12 @@ select.form-select {
 }
 .day-number-today::after { animation-delay: 1.2s; }
 @keyframes day-number-today-ripple {
-  /* scale(2.6) of a 16-24px circle (~5-8px radius growth) never reached a day-cell's edge in
-     testing -- overflow: visible on .day-cell.today was already working, the ripple itself just
-     wasn't big enough to need it. Scaled up so it visibly crosses into neighboring cells. */
+  /* scale(4.2) still stopped short of a real desktop cell's edge (~150px wide, vs. the ~24px
+     circle it grows from) -- verified against the actual rendered cell width via Playwright, not
+     just a narrower approximation. scale(7) reliably crosses into the neighboring cell at both
+     desktop (24px circle / ~150px cell) and mobile (16px circle / much narrower cell) sizes. */
   0% { transform: scale(1); opacity: 0.55; }
-  100% { transform: scale(4.2); opacity: 0; }
+  100% { transform: scale(7); opacity: 0; }
 }
 
 .badges-container { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; }
