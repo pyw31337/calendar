@@ -1424,25 +1424,15 @@ export function DateModal({
   const [expenseLabelInput, setExpenseLabelInput] = React.useState('');
   const [expenseAmountInput, setExpenseAmountInput] = React.useState('');
   const [expenseCategoryInput, setExpenseCategoryInput] = React.useState(() => getExpenseCategories(calendar)[0]?.id || 'etc');
-  // The picker needs a UI-only "not chosen yet" state. Persisted '' still means the shared fund
-  // paid directly, while a participant name means that person personally fronted the amount.
-  // Keeping those meanings separate prevents a brand-new, untouched form from silently recording
-  // a personal-card payment as a shared-fund expense.
-  const EXPENSE_PAYER_UNSELECTED = '__expense_payer_unselected__';
-  const EXPENSE_PAYER_FUND = '__expense_payer_fund__';
-  const EXPENSE_PAYER_CLEARING = '__expense_payer_clearing__';
-  const [expensePayerInput, setExpensePayerInput] = React.useState(EXPENSE_PAYER_UNSELECTED);
+  // 지출자(payer): '' means 공금지출 (paid from the shared pool). A participant name means that
+  // person personally fronted the amount -- the settlement card auto-derives who to reimburse
+  // from this instead of the same line item having to be re-typed there by hand.
+  const [expensePayerInput, setExpensePayerInput] = React.useState('');
+  const expensePayerOptions = React.useMemo(() => [
+    { value: '', label: '공금지출' },
+    ...activeParticipants.map(p => ({ value: p.name, label: p.name, color: p.color }))
+  ], [activeParticipants]);
   const [expenseIsIncome, setExpenseIsIncome] = React.useState(false);
-  const expensePayerOptions = React.useMemo(() => expenseIsIncome
-    ? [
-        { value: EXPENSE_PAYER_FUND, label: '공금 수입' },
-        { value: EXPENSE_PAYER_CLEARING, label: '정산 경유 입금' },
-        ...activeParticipants.map(p => ({ value: p.name, label: `${p.name} 자비부담 상계`, color: p.color }))
-      ]
-    : [
-        { value: EXPENSE_PAYER_FUND, label: '공금 직접지출' },
-        ...activeParticipants.map(p => ({ value: p.name, label: `${p.name} 선결제`, color: p.color }))
-      ], [activeParticipants, expenseIsIncome]);
   const [editingExpenseId, setEditingExpenseId] = React.useState(null);
   const [isSavingExpense, setIsSavingExpense] = React.useState(false);
   const [draggingExpenseId, setDraggingExpenseId] = React.useState('');
@@ -1465,7 +1455,7 @@ export function DateModal({
     setExpenseLabelInput('');
     setExpenseAmountInput('');
     setExpenseCategoryInput(getExpenseCategories(calendar)[0]?.id || 'etc');
-    setExpensePayerInput(EXPENSE_PAYER_UNSELECTED);
+    setExpensePayerInput('');
     setExpenseIsIncome(false);
     setEditingExpenseId(null);
     setDraggingExpenseId('');
@@ -1599,14 +1589,7 @@ export function DateModal({
     const isIncome = Number(expense.amount) < 0;
     const amountStr = Math.abs(Number(expense.amount)).toLocaleString();
     const cat = expense.categoryId || 'etc';
-    // Existing records without payerId are legacy/shared-fund entries, not incomplete drafts.
-    const payer = isIncome
-      ? (expense.flowType === 'settlement-clearing' || expense.fundingType === 'settlement-clearing'
-          ? EXPENSE_PAYER_CLEARING
-          : (expense.fundingType === 'personal' && expense.participantId
-              ? expense.participantId
-              : EXPENSE_PAYER_FUND))
-      : (expense.payerId || EXPENSE_PAYER_FUND);
+    const payer = expense.payerId || '';
     setEditingExpenseId(eid);
     setExpenseLabelInput(label);
     setExpenseIsIncome(isIncome);
@@ -1642,25 +1625,15 @@ export function DateModal({
       showToast('금액을 입력해 주세요.', 'error');
       return;
     }
-    if (expensePayerInput === EXPENSE_PAYER_UNSELECTED) {
-      showToast(expenseIsIncome ? '수입 귀속을 선택해 주세요.' : '결제 재원을 선택해 주세요.', 'error');
-      return;
-    }
     setIsSavingExpense(true);
     try {
       const finalAmount = expenseIsIncome ? -cleanAmount : cleanAmount;
-      const isFund = expensePayerInput === EXPENSE_PAYER_FUND;
-      const isClearing = expenseIsIncome && expensePayerInput === EXPENSE_PAYER_CLEARING;
-      const isPersonal = !isFund && !isClearing;
       const ok = await onSaveExpense(dateStr, {
         id: editingExpenseId || undefined,
         label,
         amount: finalAmount,
         categoryId: expenseCategoryInput,
-        payerId: !expenseIsIncome && isPersonal ? expensePayerInput : '',
-        participantId: expenseIsIncome && isPersonal ? expensePayerInput : '',
-        fundingType: isClearing ? 'settlement-clearing' : (isPersonal ? 'personal' : 'fund'),
-        flowType: isClearing ? 'settlement-clearing' : ''
+        payerId: expenseIsIncome ? '' : expensePayerInput
       });
       if (ok !== false) {
         showToast(editingExpenseId ? '정산 내역이 수정되었습니다.' : '정산 내역이 추가되었습니다.', 'success');
@@ -1668,7 +1641,7 @@ export function DateModal({
         setExpenseLabelInput('');
         setExpenseAmountInput('');
         setExpenseIsIncome(false);
-        setExpensePayerInput(EXPENSE_PAYER_UNSELECTED);
+        setExpensePayerInput('');
         setHasInteracted(false);
         const resetExpCat = getExpenseCategories(calendar)[0]?.id || 'etc';
         setExpenseCategoryInput(resetExpCat);
@@ -1679,7 +1652,7 @@ export function DateModal({
           expenseAmountInput: '',
           expenseIsIncome: false,
           expenseCategoryInput: resetExpCat,
-          expensePayerInput: EXPENSE_PAYER_UNSELECTED
+          expensePayerInput: ''
         });
       }
     } catch (err) {
@@ -1717,10 +1690,7 @@ export function DateModal({
               label: expenseSnapshot?.label || expenseSnapshot?.url || '',
               amount: Number(expenseSnapshot?.amount) || 0,
               categoryId: expenseSnapshot?.categoryId || expenseCategoryInput,
-              payerId: expenseSnapshot?.payerId || '',
-              participantId: expenseSnapshot?.participantId || '',
-              fundingType: expenseSnapshot?.fundingType || '',
-              flowType: expenseSnapshot?.flowType || ''
+              payerId: expenseSnapshot?.payerId || ''
             });
             if (restored !== false) showToast('정산 삭제를 되돌렸습니다.', 'success', 3000);
             else showToast('정산 복원 실패', 'error', 4000);
@@ -2949,10 +2919,7 @@ export function DateModal({
               ariaLabel: "수입/지출 전환",
               disabled: isSavingExpense,
               value: expenseIsIncome ? 'income' : 'expense',
-              onChange: v => {
-                setExpenseIsIncome(v === 'income');
-                setExpensePayerInput(EXPENSE_PAYER_UNSELECTED);
-              },
+              onChange: v => setExpenseIsIncome(v === 'income'),
               options: [
                 { value: 'income', label: '+ 수입', activeColor: 'var(--status-green)' },
                 { value: 'expense', label: '- 지출', activeColor: '#DC2626' }
@@ -2972,24 +2939,19 @@ export function DateModal({
             })
           )
         ),
-        /*#__PURE__*/React.createElement("div", null,
+        !expenseIsIncome && /*#__PURE__*/React.createElement("div", null,
           /*#__PURE__*/React.createElement("label", {
             style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }
-          }, expenseIsIncome ? "수입 귀속" : "결제 재원"),
+          }, "지출자"),
           /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
-            title: expenseIsIncome ? "수입 귀속 선택" : "결제 재원 선택",
-            placeholder: expenseIsIncome ? "수입 귀속 선택" : "결제 재원 선택",
+            title: "지출자 선택",
+            placeholder: "공금지출",
             value: expensePayerInput,
             disabled: isSavingExpense,
             onSelect: setExpensePayerInput,
             options: expensePayerOptions,
             style: { width: '100%', height: '42px' }
-          }),
-          /*#__PURE__*/React.createElement("div", {
-            style: { marginTop: '6px', fontSize: '0.72rem', lineHeight: 1.45, color: 'var(--text-muted)' }
-          }, expenseIsIncome
-            ? "회비처럼 실제 공금이 늘면 ‘공금 수입’, 개인이 스스로 부담해 개인지출과 상계하면 해당 이름, 정산 송금이면 ‘정산 경유 입금’을 선택하세요."
-            : "공금통장에서 바로 결제했으면 ‘공금 직접지출’, 개인 카드로 먼저 결제했으면 결제자 이름을 선택하세요.")
+          })
         ),
         /*#__PURE__*/React.createElement("div", { ref: expenseLabelFieldRef },
           /*#__PURE__*/React.createElement("label", {
@@ -3034,7 +2996,7 @@ export function DateModal({
               setExpenseLabelInput('');
               setExpenseAmountInput('');
               setExpenseIsIncome(false);
-              setExpensePayerInput(EXPENSE_PAYER_UNSELECTED);
+              setExpensePayerInput('');
             },
             onSubmit: handleSaveExpenseClick
           })
@@ -3164,20 +3126,18 @@ export function DateModal({
                     fontWeight: 'bold'
                   }
                 }, expenseTime),
-                (expense.payerId || expense.participantId || expense.flowType === 'settlement-clearing') && /*#__PURE__*/React.createElement("span", {
+                expense.payerId && /*#__PURE__*/React.createElement("span", {
                   style: {
                     display: 'inline-flex',
                     alignItems: 'center',
                     padding: '3px 8px',
                     borderRadius: '999px',
-                    backgroundColor: `${(activeParticipants.find(p => p.name === (expense.payerId || expense.participantId)) || {}).color || '#64748B'}18`,
-                    color: (activeParticipants.find(p => p.name === (expense.payerId || expense.participantId)) || {}).color || '#64748B',
+                    backgroundColor: `${(activeParticipants.find(p => p.name === expense.payerId) || {}).color || '#64748B'}18`,
+                    color: (activeParticipants.find(p => p.name === expense.payerId) || {}).color || '#64748B',
                     fontSize: '0.68rem',
                     fontWeight: 900
                   }
-                }, Number(expense.amount) < 0
-                  ? (expense.flowType === 'settlement-clearing' ? '정산 경유 입금' : `${expense.participantId} 자비부담 상계`)
-                  : `${expense.payerId} 선결제`)
+                }, `${expense.payerId} 선결제`)
               ),
               /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', width: '100%', wordBreak: 'break-all' } },
                 expenseUrl ? /*#__PURE__*/React.createElement(React.Fragment, null,

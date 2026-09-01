@@ -2936,9 +2936,7 @@ select.form-select {
 }
 @media (max-width: 767px) {
   .settlement-running-balance {
-    display: block;
-    font-size: 0.64rem;
-    padding: 6px 10px;
+    display: none;
   }
 }
 .settlement-person-settlement-badge.is-refund {
