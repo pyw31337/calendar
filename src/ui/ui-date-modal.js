@@ -775,6 +775,7 @@ export function DateModal({
   loadingOlderChat = false,
   onSavePlace,
   onDeletePlace,
+  onReorderPlaces,
   onDelete,
   onDeleteDate,
   onRequestConfirm,
@@ -948,8 +949,25 @@ export function DateModal({
 
   // Registered places for this date
   const registeredPlaces = React.useMemo(() => {
-    return getCalendarPlaces(calendar).filter(p => doesPlaceMatchDate(p, dateStr));
+    return getCalendarPlaces(calendar).filter(p => doesPlaceMatchDate(p, dateStr)).slice().sort((a, b) => {
+      const ao = Number.isFinite(Number(a.order)) ? Number(a.order) : Number.POSITIVE_INFINITY;
+      const bo = Number.isFinite(Number(b.order)) ? Number(b.order) : Number.POSITIVE_INFINITY;
+      return ao !== bo ? ao - bo : (a.createdAt || 0) - (b.createdAt || 0);
+    });
   }, [calendar, dateStr]);
+  const [draggingPlaceId, setDraggingPlaceId] = React.useState('');
+  const [dragOverPlaceId, setDragOverPlaceId] = React.useState('');
+  const movePlace = async (sourceId, targetId) => {
+    if (!onReorderPlaces || !sourceId || !targetId || sourceId === targetId) return false;
+    const sourceIdx = registeredPlaces.findIndex(p => p.id === sourceId);
+    const targetIdx = registeredPlaces.findIndex(p => p.id === targetId);
+    if (sourceIdx < 0 || targetIdx < 0) return false;
+    const next = [...registeredPlaces];
+    const [moved] = next.splice(sourceIdx, 1);
+    next.splice(targetIdx, 0, moved);
+    const ok = await Promise.resolve(onReorderPlaces(dateStr, next.map(p => p.id)));
+    return ok !== false;
+  };
 
   // Places already registered on THIS calendar (any date, e.g. a place first visited weeks ago)
   // matching the current search text -- '장소 검색' below only queries Kakao/Google/Nominatim's
@@ -2798,6 +2816,8 @@ export function DateModal({
           const catName = category.name || '기타';
           return /*#__PURE__*/React.createElement("div", {
             key: place.id,
+            className: `date-modal-place-row${draggingPlaceId === place.id ? ' is-dragging' : ''}${dragOverPlaceId === place.id ? ' is-drop-target' : ''}`,
+            "data-place-id": place.id,
             style: {
               display: 'flex',
               flexDirection: 'column',
@@ -2807,6 +2827,17 @@ export function DateModal({
               border: '1px solid var(--border-subtle)',
               borderRadius: 'var(--radius-md)',
               position: 'relative'
+            },
+            onDragOver: event => { event.preventDefault(); if (draggingPlaceId && draggingPlaceId !== place.id) setDragOverPlaceId(place.id); },
+            onDrop: async event => {
+              event.preventDefault();
+              const sourceId = draggingPlaceId;
+              setDraggingPlaceId(''); setDragOverPlaceId('');
+              if (sourceId && sourceId !== place.id) {
+                const ok = await movePlace(sourceId, place.id);
+                if (ok === false) showToast('장소 순서 변경에 실패했습니다.', 'error');
+                else showToast('장소 순서가 변경되었습니다.', 'success');
+              }
             }
           },
             /* Category Tag */
@@ -2833,8 +2864,19 @@ export function DateModal({
               }, renderTextWithUrlBadge(`${memoDate} ${dateNote}`));
             })(),
             !adminMode && /*#__PURE__*/React.createElement("div", {
-              style: { position: 'absolute', top: '10px', right: '10px' }
-            }, /*#__PURE__*/React.createElement(ItemEditDeleteActions, {
+              style: { position: 'absolute', top: '10px', right: '10px', display: 'flex', alignItems: 'center', gap: '4px' }
+            }, /*#__PURE__*/React.createElement("button", {
+              type: 'button',
+              draggable: true,
+              title: '드래그하여 순서 변경',
+              'aria-label': '장소 순서 변경',
+              onDragStart: event => { event.stopPropagation(); setDraggingPlaceId(place.id); event.dataTransfer.effectAllowed = 'move'; },
+              onDragEnd: () => { setDraggingPlaceId(''); setDragOverPlaceId(''); },
+              // HTML drag-and-drop is intentionally used here: it works with a mouse/trackpad,
+              // while touch users can still reorder through the same control on browsers that
+              // promote draggable elements to a native long-press drag gesture.
+              style: { height: '22px', padding: '0 6px', border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)', borderRadius: '6px', cursor: 'grab', color: 'var(--text-muted)', fontSize: '0.65rem', fontWeight: 700 }
+            }, '드래그'), /*#__PURE__*/React.createElement(ItemEditDeleteActions, {
               onEdit: () => {
                 const sp = { name: place.name, address: place.address || '', lat: place.lat, lng: place.lng, categoryId: place.categoryId || 'etc' };
                 // Prefill with ONLY this date's note, not the place's whole memo history -- this

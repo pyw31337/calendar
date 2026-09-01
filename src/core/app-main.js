@@ -4312,6 +4312,36 @@ function CalendarApp() {
     return commitConfirmedMeetings(nextConfirmedMeetings, '지출 순서 저장완료');
   };
 
+  const handleReorderPlaces = (dateStr, orderedPlaceIds) => {
+    if (!activeCal || !isValidDateString(dateStr) || !Array.isArray(orderedPlaceIds) || orderedPlaceIds.length < 2) return false;
+    const existingPlaces = getCalendarPlaces(activeCal);
+    const visiblePlaces = existingPlaces.filter(place => doesPlaceMatchDate(place, dateStr));
+    if (visiblePlaces.length < 2) return false;
+    const byId = new Map(existingPlaces.map(place => [place.id, place]));
+    const orderedVisible = orderedPlaceIds.map(id => byId.get(id)).filter(Boolean);
+    if (orderedVisible.length !== visiblePlaces.length) return false;
+    const visibleIds = new Set(visiblePlaces.map(place => place.id));
+    const nextPlaces = existingPlaces.slice();
+    let visibleIndex = 0;
+    const now = Date.now();
+    nextPlaces.forEach((place, index) => {
+      if (!visibleIds.has(place.id)) return;
+      const ordered = orderedVisible[visibleIndex++];
+      nextPlaces[index] = { ...place, order: existingPlaces.indexOf(ordered), updatedAt: now };
+    });
+    const same = visiblePlaces.every(place => place.id === orderedVisible[visiblePlaces.indexOf(place)]?.id);
+    if (same) return true;
+    const updatedCal = {
+      ...activeCal, places: nextPlaces, updatedAt: now,
+      revision: (activeCal.revision || 0) + 1
+    };
+    const nextCalendars = calendarsRef.current.map(c => c.id === updatedCal.id ? updatedCal : c);
+    setPlacesSubcollection(nextPlaces);
+    return updateCalendars(nextCalendars, '장소 순서 저장완료', 'success', updatedCal.id, 'settings', [], {
+      places: nextPlaces, settingsFields: ['places']
+    });
+  };
+
   // 일정 사진은 메시지 컬렉션에 저장해서 이미지 편집/교체/태그 공유를 한 곳에서
   // 처리하지만, `uploadSource: 'meeting'` 규칙으로 채팅과는 완전히 분리한다. 아래
   // confirmedMeeting.photos 는 실제 본문이 아니라 이 메시지를 가리키는 참조만
@@ -5805,6 +5835,7 @@ function CalendarApp() {
       initialTab: dateModalInitialTab,
       onSavePlace: handleSavePlace,
       onDeletePlace: handleDeletePlace,
+      onReorderPlaces: handleReorderPlaces,
       showToast: showToast,
       onRequestConfirm: showConfirmDialog,
       syncStatus: syncStatus,
