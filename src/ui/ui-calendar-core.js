@@ -1009,7 +1009,7 @@ export function CalendarGrid({
     className: "month-display-year-short"
   }, `${String(year).slice(2)}\uB144 `), `${month + 1}\uC6D4`), /*#__PURE__*/React.createElement("span", {
     style: {
-      color: 'var(--text-muted)',
+      color: 'var(--text-light)',
       display: 'inline-flex',
       alignItems: 'center'
     }
@@ -1720,7 +1720,7 @@ export function CommentsSection({
           style: { display: 'flex', alignItems: 'center', gap: '6px' }
         },
           /*#__PURE__*/React.createElement('span', {
-            style: { fontSize: '0.72rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }
+            style: { fontSize: '0.72rem', color: 'var(--text-light)', whiteSpace: 'nowrap' }
           }, `${dateInfo.dateStr.replace('(', ' (')} ${dateInfo.timeStr}`),
           isMsgMe ? /*#__PURE__*/React.createElement('div', {
             className: 'msg-actions-group-inline',
@@ -1734,7 +1734,7 @@ export function CommentsSection({
             /* Delete Button */
             /*#__PURE__*/React.createElement('button', {
               type: 'button', onClick: () => onDeleteMessage && onDeleteMessage(msg), title: '삭제',
-              style: { width: '22px', height: '22px', border: 'none', background: 'none', padding: 0, cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }
+              style: { width: '22px', height: '22px', border: 'none', background: 'none', padding: 0, cursor: 'pointer', color: 'var(--text-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }
             }, /*#__PURE__*/React.createElement(TrashIcon, { size: 14 }))
           ) : null
         )

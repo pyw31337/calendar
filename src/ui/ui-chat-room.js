@@ -1390,7 +1390,7 @@ export function ChatRoomView({
             background: 'none',
             padding: 0,
             cursor: 'pointer',
-            color: 'var(--text-muted)',
+            color: 'var(--text-light)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'flex-end'
@@ -1408,7 +1408,7 @@ export function ChatRoomView({
             background: 'none',
             padding: 0,
             cursor: 'pointer',
-            color: 'var(--text-muted)',
+            color: 'var(--text-light)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'flex-end'
@@ -1448,7 +1448,7 @@ export function ChatRoomView({
         /*#__PURE__*/React.createElement("span", {
           style: {
             fontSize: '0.68rem',
-            color: 'var(--text-muted)',
+            color: 'var(--text-light)',
             lineHeight: '1.25',
             textAlign: 'right'
           }
@@ -1601,7 +1601,7 @@ export function ChatRoomView({
           background: 'none',
           padding: 0,
           cursor: 'pointer',
-          color: 'var(--text-muted)',
+          color: 'var(--text-light)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'flex-start'
@@ -1611,7 +1611,7 @@ export function ChatRoomView({
       /*#__PURE__*/React.createElement("span", {
         style: {
           fontSize: '0.68rem',
-          color: 'var(--text-muted)',
+          color: 'var(--text-light)',
           lineHeight: '1.25',
           textAlign: 'left'
         }
@@ -1895,7 +1895,7 @@ export function ChatRoomView({
     renderedMessages.length === 0 ? /*#__PURE__*/React.createElement("div", {
       style: {
         textAlign: 'center',
-        color: 'var(--text-muted)',
+        color: 'var(--text-light)',
         fontSize: '0.85rem',
         marginTop: '40px'
       }
@@ -2044,7 +2044,7 @@ export function ChatRoomView({
             background: 'none',
             padding: 0,
             cursor: 'pointer',
-            color: 'var(--text-muted)',
+            color: 'var(--text-light)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',

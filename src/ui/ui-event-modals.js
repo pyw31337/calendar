@@ -2490,7 +2490,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
               },
                 React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', minHeight: '20px' } },
                   ParticipantBackdrop ? React.createElement(ParticipantBackdrop, { participant, name: item.participantId, dotSize: 9 }) : React.createElement('span', { style: { color: participant.color || '#2563EB', fontWeight: 800 } }, `● ${item.participantId}`),
-                  React.createElement('span', { style: { fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700 } }, `자동 · ${formatShortDateWithDay(item.date)}`)
+                  React.createElement('span', { style: { fontSize: '0.68rem', color: 'var(--text-light)', fontWeight: 700 } }, `자동 · ${formatShortDateWithDay(item.date)}`)
                 ),
                 React.createElement('div', { style: { color: 'var(--text-main)', fontWeight: 700, fontSize: '0.8rem', overflowWrap: 'anywhere' } }, item.label || '지출 내역'),
                 React.createElement('strong', { style: { alignSelf: 'flex-start', color: '#DC2626', fontWeight: 800, fontSize: '0.86rem', marginTop: '1px' } }, `-${Math.abs(Number(item.amount) || 0).toLocaleString()}원`)
@@ -2519,7 +2519,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
                     type: 'button',
                     onClick: (e) => handleDeletePersonalExpenseItem(item.id, e),
                     title: '항목 삭제',
-                    style: { background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px 4px' }
+                    style: { background: 'none', border: 'none', color: 'var(--text-light)', cursor: 'pointer', padding: '2px 4px' }
                   }, React.createElement(TrashIcon, { size: 14 }))
                 ),
                 item.description ? React.createElement('div', { style: { color: 'var(--text-main)', fontWeight: 700, fontSize: '0.8rem', overflowWrap: 'anywhere' } }, item.description) : null,
@@ -3108,7 +3108,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   }, item.url));
 
   const emptyContent = /*#__PURE__*/React.createElement("div", {
-    style: { padding: '30px 12px', color: 'var(--text-muted)', fontSize: '0.88rem', textAlign: 'center' }
+    style: { padding: '30px 12px', color: 'var(--text-light)', fontSize: '0.88rem', textAlign: 'center' }
   }, "등록된 정산 내역이 없습니다.");
 
   const totalContent = /*#__PURE__*/React.createElement("div", {
@@ -3118,7 +3118,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   }, /*#__PURE__*/React.createElement("h4", {
     style: { margin: '0 0 10px', fontSize: '0.92rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '6px' }
   }, /*#__PURE__*/React.createElement(ChartBarIcon, null), "카테고리별 지출"), categoryTotals.length === 0 ? /*#__PURE__*/React.createElement("div", {
-    style: { color: 'var(--text-muted)', fontSize: '0.82rem' }
+    style: { color: 'var(--text-light)', fontSize: '0.82rem' }
   }, "아직 지출 항목이 없습니다.") : categoryTotals.map(item => /*#__PURE__*/React.createElement("div", {
     key: item.category.id,
     style: { display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr) auto', gap: '8px', alignItems: 'center', marginTop: '8px' }
@@ -3495,7 +3495,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     className: "month-display-year-short"
   }, `${String(year).slice(2)}년 `), `${month + 1}월`, /*#__PURE__*/React.createElement("span", {
     style: {
-      color: 'var(--text-muted)',
+      color: 'var(--text-light)',
       display: 'inline-flex',
       alignItems: 'center'
     }

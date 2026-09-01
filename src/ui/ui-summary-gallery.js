@@ -876,7 +876,7 @@ export function SimpleBottomSheetPicker({ title, value, options, onSelect, place
         onClick: () => { if (!opt.disabled) { onSelect(opt.value); setIsOpen(false); } },
         style: opt.disabled ? { opacity: 0.45, cursor: 'not-allowed' } : undefined
       }, opt.color ? /*#__PURE__*/React.createElement(ParticipantBackdrop, { participant: opt, name: opt.label }) : opt.label,
-        opt.disabled ? /*#__PURE__*/React.createElement("span", { style: { marginLeft: 'auto', fontSize: '0.72rem', color: 'var(--text-muted)' } }, "추가됨") : null))
+        opt.disabled ? /*#__PURE__*/React.createElement("span", { style: { marginLeft: 'auto', fontSize: '0.72rem', color: 'var(--text-light)' } }, "추가됨") : null))
     )
   ));
   return /*#__PURE__*/React.createElement(React.Fragment, null,
@@ -899,7 +899,7 @@ export function SimpleBottomSheetPicker({ title, value, options, onSelect, place
         "stroke-linecap": "round",
         "stroke-linejoin": "round",
         className: "icon icon-tabler icons-tabler-outline icon-tabler-chevron-down",
-        style: { flexShrink: 0, color: 'var(--text-muted)' }
+        style: { flexShrink: 0, color: 'var(--text-light)' }
       }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
         /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" }))
     ),

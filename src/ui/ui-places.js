@@ -1150,7 +1150,7 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
       actionsEl.style.alignItems = 'center';
       actionsEl.style.gap = '2px';
       actionsEl.style.flexShrink = '0';
-      const popupActionBtnStyle = { width: '22px', height: '22px', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0' };
+      const popupActionBtnStyle = { width: '22px', height: '22px', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0' };
 
       const businessInfoBtn = document.createElement('button');
       businessInfoBtn.type = 'button';
@@ -1437,7 +1437,7 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
 
   if (loadError) {
     return /*#__PURE__*/React.createElement("div", {
-      style: { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.8rem', backgroundColor: '#F1F5F9' }
+      style: { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-light)', fontSize: '0.8rem', backgroundColor: '#F1F5F9' }
     }, "지도를 불러오지 못했습니다.");
   }
 
@@ -1451,7 +1451,7 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
     // internals inside their own stacking context so the button's z-index actually applies.
     style: { width: '100%', height: '100%', backgroundColor: 'var(--border-subtle)', position: 'relative', zIndex: 1 }
   }, !ready && /*#__PURE__*/React.createElement("div", {
-    style: { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }
+    style: { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-light)', fontSize: '0.8rem' }
   }, "지도를 불러오는 중..."));
 }
 
@@ -1966,7 +1966,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
           "aria-label": mapExpanded ? '지도 축소' : '지도 확대',
           title: mapExpanded ? '지도 축소' : '지도 확대',
           style: {
-            background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)',
+            background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-light)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px'
           }
         }, mapExpanded ? /*#__PURE__*/React.createElement("svg", {
@@ -2014,7 +2014,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
           title: "드래그하여 지도 높이 조절",
           style: {
             width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'ns-resize', color: 'var(--text-muted)', userSelect: 'none', touchAction: 'none'
+            cursor: 'ns-resize', color: 'var(--text-light)', userSelect: 'none', touchAction: 'none'
           }
         },
           /* Lucide-style split diagonal resizing arrows */
@@ -2226,7 +2226,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
                 title: "업체보기",
                 style: {
                   width: '28px', height: '28px',
-                  background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)',
+                  background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-light)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
                   position: 'relative', zIndex: 11
                 }
@@ -2241,7 +2241,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
                 title: "장소 수정",
                 style: {
                   width: '28px', height: '28px',
-                  background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)',
+                  background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-light)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
                   position: 'relative', zIndex: 11
                 }
