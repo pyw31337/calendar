@@ -730,21 +730,16 @@ function getAnniversaryDisplayColor(...args) {
 export function UserManualOverlay({ calendar, onClose }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
+  const __comp = window.GATHER_UI_COMPONENTS || {};
   const SmallXIcon = __deps.SmallXIcon;
   const MenuIcon = __deps.MenuIcon;
+  const ParticipantBadge = __comp.ParticipantBadge || __deps.ParticipantBadge;
 
   const participants = getActiveParticipants(calendar || {});
   const sampleParticipant = participants[0] || { name: '박영우', color: '#EF4444' };
   const sampleParticipant2 = participants[1] || { name: '김유리', color: '#F97316' };
   const sampleParticipant3 = participants[2] || { name: '송은혜', color: '#06B6D4' };
-  const participantBadge = (participant, text) => /*#__PURE__*/React.createElement("span", {
-    className: "participant-badge",
-    style: {
-      backgroundColor: participant.color,
-      color: '#FFFFFF',
-      boxShadow: 'none'
-    }
-  }, text || participant.name);
+  const participantBadge = participant => /*#__PURE__*/React.createElement(ParticipantBadge, { participant, style: { boxShadow: 'none' } });
   const StepIcon = ({ children }) => /*#__PURE__*/React.createElement("div", {
     style: {
       width: '42px',

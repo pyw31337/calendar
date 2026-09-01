@@ -873,6 +873,24 @@ export function ParticipantPickerButton({ participant, onClick, placeholder = '�
   }, "▼"));
 }
 
+// The single shared "참여자 뱃지" -- a solid pill showing a participant's name on their own color,
+// white text. .participant-badge (app.css) already carries the real padding/radius/font-size, so
+// this component exists to stop call sites from re-typing (and quietly drifting from) those same
+// values inline -- before this, the day-cell grid, the admin dashboard rows, the admin activity
+// log, and the user manual examples each had their own near-but-not-quite copy (0.68rem here,
+// 0.7rem there, 0.72rem elsewhere, all meant to be the exact same badge). Pass `children` only
+// when the badge needs more than the bare name (e.g. an inline remove button); otherwise it
+// renders participant.name.
+export function ParticipantBadge({ participant, style, className = '', children, ...rest }) {
+  const React = window.React;
+  if (!participant) return null;
+  return /*#__PURE__*/React.createElement("span", {
+    className: `participant-badge${className ? ' ' + className : ''}`,
+    style: { backgroundColor: participant.color || '#94A3B8', color: '#FFFFFF', ...style },
+    ...rest
+  }, children || participant.name);
+}
+
 export function DateCapsuleBadge({ date, style = null }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -902,6 +920,7 @@ export function DateCapsuleBadge({ date, style = null }) {
     TikTokEmbedWidget: TikTokEmbedWidget,
     UrlCapsuleBadge: UrlCapsuleBadge,
     ParticipantPickerButton: ParticipantPickerButton,
+    ParticipantBadge: ParticipantBadge,
     DateCapsuleBadge: DateCapsuleBadge,
   });
 }

@@ -762,6 +762,7 @@ export function AdminDashboard({ initialCalendars }) {
   const AdminUnifiedSearchResultsView = __comp.AdminUnifiedSearchResultsView || __deps.AdminUnifiedSearchResultsView;
   const AlertTriangleIcon = __comp.AlertTriangleIcon || __deps.AlertTriangleIcon;
   const CalendarCogIcon = __comp.CalendarCogIcon || __deps.CalendarCogIcon;
+  const ParticipantBadge = __comp.ParticipantBadge || __deps.ParticipantBadge;
   const ChartBarIcon = __comp.ChartBarIcon || __deps.ChartBarIcon;
   const ChartPieIcon = __comp.ChartPieIcon || __deps.ChartPieIcon;
   const ChatSectionIcon = __comp.ChatSectionIcon || __deps.ChatSectionIcon;
@@ -2454,9 +2455,7 @@ export function AdminDashboard({ initialCalendars }) {
               /*#__PURE__*/React.createElement("div", {
                 style: { display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '12px' }
               },
-                stat.participants.slice(0, 10).map(p => /*#__PURE__*/React.createElement("span", {
-                  key: p.id, style: { backgroundColor: p.color, color: '#FFFFFF', padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: '0.68rem', fontWeight: 'bold' }
-                }, p.name))
+                stat.participants.slice(0, 10).map(p => /*#__PURE__*/React.createElement(ParticipantBadge, { key: p.id, participant: p }))
               ),
               /* 일정 데이터 5000건 캡 사용량 -- 캘린더 문서별로 독립적으로 적용됨 (전체 합산이 아님) */
               /*#__PURE__*/React.createElement("div", { style: { marginTop: '12px' } },
@@ -2955,9 +2954,7 @@ export function AdminDashboard({ initialCalendars }) {
                     /*#__PURE__*/React.createElement("span", {
                       style: { fontSize: '0.68rem', fontWeight: 'bold', padding: '2px 6px', borderRadius: '4px', backgroundColor: badgeBg, color: badgeColor, border: `1px solid ${badgeColor}30`, whiteSpace: 'nowrap' }
                     }, actLabel),
-                    /*#__PURE__*/React.createElement("span", {
-                      style: { backgroundColor: p.color, color: '#FFFFFF', padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: '0.7rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
-                    }, p.name),
+                    /*#__PURE__*/React.createElement(ParticipantBadge, { participant: p }),
                     log.date && /*#__PURE__*/React.createElement("span", {
                       style: { fontSize: '0.8rem', fontWeight: 'bold', color: '#475569' }
                     }, formatShortDateWithDayName(log.date))
@@ -3081,9 +3078,7 @@ export function AdminDashboard({ initialCalendars }) {
               /* Line 1: participant badge (calendar is now implied by the header's calendar select) */
               /*#__PURE__*/React.createElement("div", { className: "admin-chat-header" },
                 /* Participant badge */
-                /*#__PURE__*/React.createElement("span", {
-                  style: { backgroundColor: p.color, color: '#FFFFFF', padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: '0.72rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
-                }, p.name)
+                /*#__PURE__*/React.createElement(ParticipantBadge, { participant: p })
               ),
               /* Line 2: full message text, wrapped rather than truncated on narrow screens */
               /*#__PURE__*/React.createElement("span", {
