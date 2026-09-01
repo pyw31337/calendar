@@ -641,6 +641,10 @@ function loadLeafletMarkerCluster(...args) {
   const f = __gatherUiDeps().loadLeafletMarkerCluster || GATHER_APP_UTILS.loadLeafletMarkerCluster;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function loadMapLibreLeaflet(...args) {
+  const f = __gatherUiDeps().loadMapLibreLeaflet || GATHER_APP_UTILS.loadMapLibreLeaflet;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
 function buildPlaceMarkerHtml(...args) {
   const f = __gatherUiDeps().buildPlaceMarkerHtml || GATHER_APP_UTILS.buildPlaceMarkerHtml;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -718,6 +722,149 @@ function getAnniversaryDisplayColor(...args) {
   return typeof f === 'function' ? f(...args) : undefined;
 }
 
+// A deliberately quiet basemap: enough coastline, water, major roads and broad place names to
+// orient the user, but no POIs, buildings, shops, transit labels or neighbourhood-level noise.
+// The source is isolated behind a normal MapLibre style object so moving it to our own PMTiles
+// archive later only requires replacing `sources.openmaptiles`, not rewriting the map UI.
+const MINIMAL_MONO_MAP_STYLE = {
+  version: 8,
+  name: 'Gather Minimal Mono',
+  glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
+  sources: {
+    openmaptiles: {
+      type: 'vector',
+      url: 'https://tiles.openfreemap.org/planet',
+      attribution: 'OpenFreeMap &copy; OpenMapTiles Data from OpenStreetMap'
+    }
+  },
+  layers: [
+    {
+      id: 'background',
+      type: 'background',
+      paint: { 'background-color': '#f4f4f1' }
+    },
+    {
+      id: 'water',
+      type: 'fill',
+      source: 'openmaptiles',
+      'source-layer': 'water',
+      paint: { 'fill-color': '#dfe3e4', 'fill-antialias': true }
+    },
+    {
+      id: 'parks',
+      type: 'fill',
+      source: 'openmaptiles',
+      'source-layer': 'park',
+      minzoom: 8,
+      paint: { 'fill-color': '#eaebe7', 'fill-opacity': 0.7 }
+    },
+    {
+      id: 'waterways',
+      type: 'line',
+      source: 'openmaptiles',
+      'source-layer': 'waterway',
+      minzoom: 9,
+      paint: { 'line-color': '#d2d8da', 'line-width': 0.8, 'line-opacity': 0.75 }
+    },
+    {
+      id: 'major-road-casing',
+      type: 'line',
+      source: 'openmaptiles',
+      'source-layer': 'transportation',
+      minzoom: 7,
+      filter: ['in', ['get', 'class'], ['literal', ['motorway', 'trunk', 'primary', 'secondary']]],
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: {
+        'line-color': '#d8d8d5',
+        'line-width': ['interpolate', ['linear'], ['zoom'], 7, 1.2, 13, 4, 18, 9],
+        'line-opacity': 0.65
+      }
+    },
+    {
+      id: 'major-roads',
+      type: 'line',
+      source: 'openmaptiles',
+      'source-layer': 'transportation',
+      minzoom: 7,
+      filter: ['in', ['get', 'class'], ['literal', ['motorway', 'trunk', 'primary', 'secondary']]],
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: {
+        'line-color': '#ffffff',
+        'line-width': ['interpolate', ['linear'], ['zoom'], 7, 0.6, 13, 2.5, 18, 6.5],
+        'line-opacity': 0.9
+      }
+    },
+    {
+      id: 'country-boundaries',
+      type: 'line',
+      source: 'openmaptiles',
+      'source-layer': 'boundary',
+      filter: ['==', ['get', 'admin_level'], 2],
+      paint: { 'line-color': '#babdbd', 'line-width': 1, 'line-opacity': 0.65 }
+    },
+    {
+      id: 'regional-boundaries',
+      type: 'line',
+      source: 'openmaptiles',
+      'source-layer': 'boundary',
+      minzoom: 7,
+      filter: ['in', ['get', 'admin_level'], ['literal', [3, 4]]],
+      paint: {
+        'line-color': '#c9cbca',
+        'line-width': 0.7,
+        'line-opacity': 0.55,
+        'line-dasharray': [3, 3]
+      }
+    },
+    {
+      id: 'country-labels',
+      type: 'symbol',
+      source: 'openmaptiles',
+      'source-layer': 'place',
+      maxzoom: 7,
+      filter: ['==', ['get', 'class'], 'country'],
+      layout: {
+        'text-field': ['coalesce', ['get', 'name:ko'], ['get', 'name']],
+        'text-font': ['Noto Sans Regular'],
+        'text-size': 11,
+        'text-letter-spacing': 0.08
+      },
+      paint: { 'text-color': '#85898b', 'text-halo-color': '#f4f4f1', 'text-halo-width': 1 }
+    },
+    {
+      id: 'region-labels',
+      type: 'symbol',
+      source: 'openmaptiles',
+      'source-layer': 'place',
+      minzoom: 5,
+      maxzoom: 11,
+      filter: ['==', ['get', 'class'], 'state'],
+      layout: {
+        'text-field': ['coalesce', ['get', 'name:ko'], ['get', 'name']],
+        'text-font': ['Noto Sans Regular'],
+        'text-size': 10,
+        'text-letter-spacing': 0.05
+      },
+      paint: { 'text-color': '#96999a', 'text-halo-color': '#f4f4f1', 'text-halo-width': 1 }
+    },
+    {
+      id: 'city-labels',
+      type: 'symbol',
+      source: 'openmaptiles',
+      'source-layer': 'place',
+      minzoom: 5,
+      filter: ['in', ['get', 'class'], ['literal', ['city', 'town']]],
+      layout: {
+        'text-field': ['coalesce', ['get', 'name:ko'], ['get', 'name']],
+        'text-font': ['Noto Sans Regular'],
+        'text-size': ['interpolate', ['linear'], ['zoom'], 5, 10, 11, 13],
+        'text-max-width': 8
+      },
+      paint: { 'text-color': '#737779', 'text-halo-color': '#f4f4f1', 'text-halo-width': 1.2 }
+    }
+  ]
+};
+
 
 export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom = false, resizeSignal, preferDomesticBounds = false, focusPlace = null, onSelectDate }) {
   const React = window.React;
@@ -726,6 +873,7 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
   const getPlaceCategories = __deps.getPlaceCategories;
   const loadLeaflet = __deps.loadLeaflet;
   const loadLeafletMarkerCluster = __deps.loadLeafletMarkerCluster;
+  const loadMapLibreLeaflet = __deps.loadMapLibreLeaflet;
   const buildPlaceMarkerHtml = __deps.buildPlaceMarkerHtml;
   const panMapToFitMarkerPopup = __deps.panMapToFitMarkerPopup;
   const centerMapOnMarkerAndPopup = __deps.centerMapOnMarkerAndPopup;
@@ -771,34 +919,53 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
       mapRef.current = map;
       try { map.invalidateSize({ animate: false }); } catch (e) {}
 
-      // MapTiler is optional. Never ship a shared fallback key in the client: once that public
-      // key is revoked, origin-restricted, or over quota, MapTiler returns a 403 PNG whose only
-      // visible content is "Invalid key". Use a deliberately configured key when present and
-      // fail over to the standard OSM layer on tile errors; without a configured key, start on
-      // OSM immediately.
-      const maptilerKey = (typeof window !== 'undefined'
-        && (window.MAPTILER_API_KEY || (window.GATHER_APP_CONFIG && window.GATHER_APP_CONFIG.maptilerApiKey))) || '';
+      // Paint a lightweight raster fallback immediately, then replace it with the intentionally
+      // sparse vector style once its lazy chunk is ready. This avoids a blank map on 3G/old
+      // devices while still allowing individual vector layers (POIs, buildings, minor roads,
+      // transit labels) to be omitted entirely. If WebGL or the vector source fails, the raster
+      // layer simply stays in place instead of turning the whole map into an error panel.
       const addOpenStreetMapLayer = () => L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         maxNativeZoom: 19,
+        className: 'places-map-raster-fallback',
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       }).addTo(map);
-      if (maptilerKey) {
-        const maptilerLayer = L.tileLayer(`https://api.maptiler.com/maps/positron/256/{z}/{x}/{y}.png?key=${encodeURIComponent(maptilerKey)}`, {
-          maxZoom: 19,
-          maxNativeZoom: 19,
-          attribution: '&copy; <a href="https://www.maptiler.com/copyright/">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        });
-        let switchedToFallback = false;
-        maptilerLayer.on('tileerror', () => {
-          if (switchedToFallback || cancelled || !mapRef.current) return;
-          switchedToFallback = true;
-          try { map.removeLayer(maptilerLayer); } catch (_) {}
-          addOpenStreetMapLayer();
-        });
-        maptilerLayer.addTo(map);
-      } else {
-        addOpenStreetMapLayer();
+      const rasterFallbackLayer = addOpenStreetMapLayer();
+      if (typeof loadMapLibreLeaflet === 'function') {
+        try {
+          await loadMapLibreLeaflet();
+          if (!cancelled && mapRef.current && L.maplibreGL) {
+            const monoVectorLayer = L.maplibreGL({
+              style: MINIMAL_MONO_MAP_STYLE,
+              className: 'places-map-vector-basemap',
+              attribution: '<a href="https://openfreemap.org/">OpenFreeMap</a> &copy; <a href="https://www.openmaptiles.org/">OpenMapTiles</a> Data from <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+              interactive: false,
+              padding: 0.08
+            }).addTo(map);
+            const vectorMap = monoVectorLayer.getMaplibreMap();
+            let vectorReady = false;
+            const vectorLoadTimer = window.setTimeout(() => {
+              if (vectorReady || cancelled) return;
+              try { map.removeLayer(monoVectorLayer); } catch (_) {}
+            }, 12000);
+            // `load` only means that the style JSON parsed; it can fire even when every vector
+            // tile request is failing. `idle` confirms the first visible tile set is actually
+            // complete before we remove the already-rendered raster safety layer.
+            vectorMap.once('idle', () => {
+              vectorReady = true;
+              window.clearTimeout(vectorLoadTimer);
+              if (cancelled || !mapRef.current) return;
+              try { map.removeLayer(rasterFallbackLayer); } catch (_) {}
+            });
+            vectorMap.on('error', () => {
+              if (vectorReady || cancelled) return;
+              window.clearTimeout(vectorLoadTimer);
+              try { map.removeLayer(monoVectorLayer); } catch (_) {}
+            });
+          }
+        } catch (err) {
+          console.warn('Minimal vector basemap unavailable, keeping raster fallback:', err);
+        }
       }
       try { map.invalidateSize({ animate: false }); } catch (e) {}
 

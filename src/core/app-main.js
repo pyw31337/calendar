@@ -10463,45 +10463,25 @@ const DEADLINE_PICKER_MONTH_NAMES = ['1월', '2월', '3월', '4월', '5월', '6�
 // Summary List - Displays both "Partial Availability" (N+ members) and "Full Availability" lists
 
 
-// Leaflet is a UMD/global-style library (not an ES module), so unlike loadHeicTo's dynamic
-// import(), it has to be lazy-loaded via a plain <script> tag injection -- mirrors the same
-// memoized-promise + multi-CDN-fallback shape though, reusing loadScriptOnce from the HEIC
-// loading code above.
+// Keep all map libraries in Vite's own lazy chunks. They are fetched from the same origin only
+// after somebody opens the places map, so a slow/filtered network cannot break the rest of the
+// app and the map no longer depends on unpkg/jsDelivr being reachable at runtime.
 let leafletLoadPromise = null;
-const LEAFLET_JS_CDN_URLS = [
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
-  'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js'
-];
-const LEAFLET_CSS_CDN_URLS = [
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-  'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css'
-];
-function loadLeafletCss() {
-  if (document.getElementById('leaflet-css-link')) return;
-  const link = document.createElement('link');
-  link.id = 'leaflet-css-link';
-  link.rel = 'stylesheet';
-  link.href = LEAFLET_CSS_CDN_URLS[0];
-  document.head.appendChild(link);
-}
-function loadLeaflet(timeoutMs = 15000) {
+function loadLeaflet() {
   if (window.L) return Promise.resolve(window.L);
   if (leafletLoadPromise) return leafletLoadPromise;
   leafletLoadPromise = (async () => {
-    loadLeafletCss();
-    let lastErr = null;
-    for (const src of LEAFLET_JS_CDN_URLS) {
-      try {
-        await loadScriptOnce(src, timeoutMs);
-        if (window.L) return window.L;
-        lastErr = new Error('leaflet script loaded but window.L missing');
-      } catch (err) {
-        lastErr = err;
-      }
-    }
-    leafletLoadPromise = null; // allow retrying on a later call instead of caching the failure forever
-    throw lastErr || new Error('leaflet failed to load from all CDNs');
-  })();
+    const [leafletModule] = await Promise.all([
+      import('leaflet'),
+      import('leaflet/dist/leaflet.css')
+    ]);
+    const L = leafletModule.default || leafletModule;
+    window.L = L;
+    return L;
+  })().catch(err => {
+    leafletLoadPromise = null;
+    throw err;
+  });
   return leafletLoadPromise;
 }
 
@@ -10513,37 +10493,42 @@ function loadLeaflet(timeoutMs = 15000) {
 // Best-effort: if this plugin fails to load, the map still works with ungrouped markers (see the
 // clusterAvailable fallback in PlaceMapView below) rather than failing the whole map.
 let leafletMarkerClusterLoadPromise = null;
-const LEAFLET_MARKERCLUSTER_JS_CDN_URLS = [
-  'https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js',
-  'https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js'
-];
-function loadLeafletMarkerClusterCss() {
-  if (document.getElementById('leaflet-markercluster-css-link')) return;
-  const link = document.createElement('link');
-  link.id = 'leaflet-markercluster-css-link';
-  link.rel = 'stylesheet';
-  link.href = 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css';
-  document.head.appendChild(link);
-}
-function loadLeafletMarkerCluster(timeoutMs = 15000) {
+function loadLeafletMarkerCluster() {
   if (window.L && window.L.markerClusterGroup) return Promise.resolve();
   if (leafletMarkerClusterLoadPromise) return leafletMarkerClusterLoadPromise;
   leafletMarkerClusterLoadPromise = (async () => {
-    loadLeafletMarkerClusterCss();
-    let lastErr = null;
-    for (const src of LEAFLET_MARKERCLUSTER_JS_CDN_URLS) {
-      try {
-        await loadScriptOnce(src, timeoutMs);
-        if (window.L && window.L.markerClusterGroup) return;
-        lastErr = new Error('leaflet.markercluster script loaded but L.markerClusterGroup missing');
-      } catch (err) {
-        lastErr = err;
-      }
-    }
+    await loadLeaflet();
+    await Promise.all([
+      import('leaflet.markercluster'),
+      import('leaflet.markercluster/dist/MarkerCluster.css')
+    ]);
+    if (!window.L.markerClusterGroup) throw new Error('leaflet.markercluster loaded without markerClusterGroup');
+  })().catch(err => {
     leafletMarkerClusterLoadPromise = null;
-    throw lastErr || new Error('leaflet.markercluster failed to load from all CDNs');
-  })();
+    throw err;
+  });
   return leafletMarkerClusterLoadPromise;
+}
+
+let mapLibreLeafletLoadPromise = null;
+function loadMapLibreLeaflet() {
+  if (window.L && window.L.maplibreGL) return Promise.resolve(window.L);
+  if (mapLibreLeafletLoadPromise) return mapLibreLeafletLoadPromise;
+  mapLibreLeafletLoadPromise = (async () => {
+    const L = await loadLeaflet();
+    const [mapLibreModule] = await Promise.all([
+      import('maplibre-gl'),
+      import('maplibre-gl/dist/maplibre-gl.css')
+    ]);
+    window.maplibregl = mapLibreModule.default || mapLibreModule;
+    await import('@maplibre/maplibre-gl-leaflet');
+    if (!L.maplibreGL) throw new Error('MapLibre Leaflet bridge loaded without maplibreGL');
+    return L;
+  })().catch(err => {
+    mapLibreLeafletLoadPromise = null;
+    throw err;
+  });
+  return mapLibreLeafletLoadPromise;
 }
 
 
@@ -11027,6 +11012,7 @@ function bindGatherUiDeps() {
     getPlaceExternalMapUrl: typeof getPlaceExternalMapUrl === 'function' ? getPlaceExternalMapUrl : null,
     loadLeaflet: typeof loadLeaflet === 'function' ? loadLeaflet : null,
     loadLeafletMarkerCluster: typeof loadLeafletMarkerCluster === 'function' ? loadLeafletMarkerCluster : null,
+    loadMapLibreLeaflet: typeof loadMapLibreLeaflet === 'function' ? loadMapLibreLeaflet : null,
     buildPlaceMarkerHtml: typeof buildPlaceMarkerHtml === 'function' ? buildPlaceMarkerHtml : null,
     panMapToFitMarkerPopup: typeof panMapToFitMarkerPopup === 'function' ? panMapToFitMarkerPopup : null,
     centerMapOnMarkerAndPopup: typeof centerMapOnMarkerAndPopup === 'function' ? centerMapOnMarkerAndPopup : null,

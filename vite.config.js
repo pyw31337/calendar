@@ -24,6 +24,30 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {
+            // Leaflet/MapLibre are only needed by the places map. Keep their sizeable renderer,
+            // bridge and CSS in a lazy chunk so calendar/chat/memo startup never pays for maps.
+            if (
+              id.includes('/leaflet/') ||
+              id.includes('/leaflet.markercluster/') ||
+              id.includes('/maplibre-gl/') ||
+              id.includes('/@maplibre/') ||
+              id.includes('/@mapbox/') ||
+              id.includes('/@types/geojson/') ||
+              id.includes('/csscolorparser/') ||
+              id.includes('/earcut/') ||
+              id.includes('/geojson-vt/') ||
+              id.includes('/gl-matrix/') ||
+              id.includes('/grid-index/') ||
+              id.includes('/kdbush/') ||
+              id.includes('/murmurhash-js/') ||
+              id.includes('/pbf/') ||
+              id.includes('/potpack/') ||
+              id.includes('/quickselect/') ||
+              id.includes('/supercluster/') ||
+              id.includes('/tinyqueue/') ||
+              id.includes('/vt-pbf/') ||
+              id.includes('/@maplibre/maplibre-gl-style-spec/')
+            ) return 'vendor-map';
             if (id.includes('react-dom')) return 'vendor-react-dom';
             if (id.includes('react')) return 'vendor-react';
             return 'vendor';
