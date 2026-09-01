@@ -738,7 +738,7 @@ export function SearchResultLogRow({ badgeName, badgeColor, timeStr, calendarLab
     onClick,
     style: {
       display: 'block', width: '100%', boxSizing: 'border-box', textAlign: 'left',
-      padding: '10px 12px', borderRadius: '10px', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0',
+      padding: '10px 12px', borderRadius: 'var(--radius-md)', backgroundColor: '#F8FAFC', border: '1px solid var(--border-subtle)',
       cursor: onClick ? 'pointer' : 'default', font: 'inherit'
     }
   },
@@ -747,11 +747,11 @@ export function SearchResultLogRow({ badgeName, badgeColor, timeStr, calendarLab
         style: { backgroundColor: badgeColor || '#94A3B8', color: '#FFFFFF', padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: '0.7rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
       }, badgeName),
       calendarLabel && /*#__PURE__*/React.createElement("span", {
-        style: { fontSize: '0.68rem', color: '#94A3B8', fontWeight: 700 }
+        style: { fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700 }
       }, calendarLabel)
     ),
-    /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.84rem', color: '#0F172A', lineHeight: 1.45, wordBreak: 'break-word' } }, children),
-    timeStr && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.7rem', color: '#94A3B8', marginTop: '6px' } }, timeStr)
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.84rem', color: 'var(--text-main)', lineHeight: 1.45, wordBreak: 'break-word' } }, children),
+    timeStr && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '6px' } }, timeStr)
   );
 }
 
@@ -828,7 +828,7 @@ export function UrlCapsuleBadge({ url, style = null }) {
       fontSize: '0.72rem',
       fontWeight: 600,
       border: 0,
-      backgroundColor: '#E2E8F0',
+      backgroundColor: 'var(--border-subtle)',
       color: '#475569',
       cursor: 'pointer',
       wordBreak: 'break-all',

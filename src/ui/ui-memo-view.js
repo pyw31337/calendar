@@ -1477,7 +1477,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         boxShadow: isHeaderVisible ? 'none' : '0 2px 8px rgba(0,0,0,0.12)',
         transition: 'box-shadow 0.2s ease',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        cursor: 'pointer', color: '#64748B', zIndex: 1020
+        cursor: 'pointer', color: 'var(--text-muted)', zIndex: 1020
       }
     }, /*#__PURE__*/React.createElement(BackArrowIcon, { size: 22 })),
 
@@ -1667,7 +1667,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
             type: "button",
             onClick: () => { if (onDismissSharedMemo) onDismissSharedMemo(); },
             title: "닫기",
-            style: { background: 'none', border: 'none', cursor: 'pointer', color: '#64748B', display: 'flex', alignItems: 'center', flexShrink: 0 }
+            style: { background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', flexShrink: 0 }
           }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 18 }))
         ),
         /* Reuses MemoCard itself (same images/link-preview/text/pin/comments rendering as the
@@ -1712,7 +1712,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
             style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', color: 'var(--text-muted)' }
           },
             /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.88rem' } }, "새로운 메모를 남겨보세요..."),
-            /*#__PURE__*/React.createElement("span", { style: { display: 'flex', gap: '8px', color: '#64748B', marginLeft: 'auto' } }, 
+            /*#__PURE__*/React.createElement("span", { style: { display: 'flex', gap: '8px', color: 'var(--text-muted)', marginLeft: 'auto' } }, 
               /* Photo icon shortcut */
               /*#__PURE__*/React.createElement("svg", {
                 xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
@@ -1849,7 +1849,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
               /*#__PURE__*/React.createElement("img", {
                 src: img.thumbnail,
                 decoding: 'async',
-                style: { width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px', border: '1px solid var(--border-subtle)' }
+                style: { width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }
               }),
               /* Remove button (shared with chat's attachment thumbnail) */
               /*#__PURE__*/React.createElement(ImageThumbRemoveButton, {
@@ -1881,7 +1881,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
                 },
                 maxLength: 100,
                 style: {
-                  flex: 1, minWidth: 0, height: '28px', padding: '0 8px', borderRadius: '6px',
+                  flex: 1, minWidth: 0, height: '28px', padding: '0 8px', borderRadius: 'var(--radius-sm)',
                   border: '1px solid var(--border-subtle)', background: 'var(--bg-primary)',
                   color: 'var(--text-main)', fontSize: '0.74rem'
                 }
@@ -1891,7 +1891,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
                 onClick: handleAddNewTag,
                 disabled: newTags.length >= 10,
                 style: {
-                  flexShrink: 0, height: '28px', padding: '0 10px', borderRadius: '6px',
+                  flexShrink: 0, height: '28px', padding: '0 10px', borderRadius: 'var(--radius-sm)',
                   border: '1px solid var(--border-subtle)', background: 'var(--border-subtle)',
                   color: 'var(--text-main)', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer',
                   opacity: newTags.length >= 10 ? 0.45 : 1
@@ -1972,7 +1972,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       },
         /* Label */
         /*#__PURE__*/React.createElement("div", {
-          style: { fontSize: '0.72rem', fontWeight: 'bold', color: '#64748B', letterSpacing: '0.05em', textTransform: 'uppercase' }
+          style: { fontSize: '0.72rem', fontWeight: 'bold', color: 'var(--text-muted)', letterSpacing: '0.05em', textTransform: 'uppercase' }
         }, "고정됨"),
         /* Grid */
         /*#__PURE__*/React.createElement("div", {
@@ -2002,7 +2002,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       },
         /* Label */
         pinnedMemos.length > 0 && /*#__PURE__*/React.createElement("div", {
-          style: { fontSize: '0.72rem', fontWeight: 'bold', color: '#64748B', letterSpacing: '0.05em', textTransform: 'uppercase' }
+          style: { fontSize: '0.72rem', fontWeight: 'bold', color: 'var(--text-muted)', letterSpacing: '0.05em', textTransform: 'uppercase' }
         }, "메모 목록"),
         /* Grid */
         /*#__PURE__*/React.createElement("div", {
@@ -2109,7 +2109,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
             type: "button",
             onClick: () => setSharingMemo(editingMemo),
             title: "메모 공유",
-            style: { background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', padding: '4px', marginRight: '6px' }
+            style: { background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px', marginRight: '6px' }
           }, /*#__PURE__*/React.createElement("svg", {
             xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
           }, /*#__PURE__*/React.createElement("path", { d: "M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" }), /*#__PURE__*/React.createElement("polyline", { points: "16 6 12 2 8 6" }), /*#__PURE__*/React.createElement("line", { x1: "12", y1: "2", x2: "12", y2: "15" }))),
@@ -2183,7 +2183,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
             
             /* File Upload label icon */
             /*#__PURE__*/React.createElement("label", {
-              style: { display: 'flex', alignItems: 'center', cursor: 'pointer', color: '#64748B', padding: '4px' },
+              style: { display: 'flex', alignItems: 'center', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px' },
               title: "사진 추가"
             }, 
               /*#__PURE__*/React.createElement("input", {
@@ -2221,7 +2221,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           /*#__PURE__*/React.createElement("img", {
             src: img.thumbnail,
             decoding: 'async',
-            style: { width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px', border: '1px solid var(--border-subtle)' }
+            style: { width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }
           }),
           /* Remove button (shared with chat's attachment thumbnail) */
           /*#__PURE__*/React.createElement(ImageThumbRemoveButton, {
@@ -2252,7 +2252,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
             },
             maxLength: 100,
             style: {
-              flex: 1, minWidth: 0, height: '28px', padding: '0 8px', borderRadius: '6px',
+              flex: 1, minWidth: 0, height: '28px', padding: '0 8px', borderRadius: 'var(--radius-sm)',
               border: '1px solid var(--border-subtle)', background: 'var(--bg-primary)',
               color: 'var(--text-main)', fontSize: '0.74rem'
             }
@@ -2262,7 +2262,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
             onClick: handleAddEditTag,
             disabled: editTags.length >= 10,
             style: {
-              flexShrink: 0, height: '28px', padding: '0 10px', borderRadius: '6px',
+              flexShrink: 0, height: '28px', padding: '0 10px', borderRadius: 'var(--radius-sm)',
               border: '1px solid var(--border-subtle)', background: 'var(--border-subtle)',
               color: 'var(--text-main)', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer',
               opacity: editTags.length >= 10 ? 0.45 : 1

@@ -1009,7 +1009,7 @@ export function CalendarGrid({
     className: "month-display-year-short"
   }, `${String(year).slice(2)}\uB144 `), `${month + 1}\uC6D4`), /*#__PURE__*/React.createElement("span", {
     style: {
-      color: '#94A3B8',
+      color: 'var(--text-muted)',
       display: 'inline-flex',
       alignItems: 'center'
     }
@@ -1104,7 +1104,7 @@ export function CalendarGrid({
         /*#__PURE__*/React.createElement("h4", null, "\uC5F0\uC6D4 \uC120\uD0DD"),
         /*#__PURE__*/React.createElement("button", {
           type: "button",
-          style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer' },
+          style: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer' },
           onClick: () => setIsPickerOpen(false)
         }, "\u2715")
       ),
@@ -1405,7 +1405,7 @@ export function CalendarGrid({
         backgroundColor: touchDragBadge.color,
         color: '#FFFFFF',
         padding: '6px 12px',
-        borderRadius: '999px',
+        borderRadius: 'var(--radius-full)',
         fontSize: '0.8rem',
         fontWeight: 800,
         boxShadow: '0 8px 20px rgba(0,0,0,0.28)',
@@ -1720,7 +1720,7 @@ export function CommentsSection({
           style: { display: 'flex', alignItems: 'center', gap: '6px' }
         },
           /*#__PURE__*/React.createElement('span', {
-            style: { fontSize: '0.72rem', color: '#94A3B8', whiteSpace: 'nowrap' }
+            style: { fontSize: '0.72rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }
           }, `${dateInfo.dateStr.replace('(', ' (')} ${dateInfo.timeStr}`),
           isMsgMe ? /*#__PURE__*/React.createElement('div', {
             className: 'msg-actions-group-inline',
@@ -1729,12 +1729,12 @@ export function CommentsSection({
             /* Edit Button */
             /*#__PURE__*/React.createElement('button', {
               type: 'button', onClick: () => onEditMessage && onEditMessage(msg), title: '편집',
-              style: { width: '22px', height: '22px', border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, color: '#64748B' }
+              style: { width: '22px', height: '22px', border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, color: 'var(--text-muted)' }
             }, editSvg),
             /* Delete Button */
             /*#__PURE__*/React.createElement('button', {
               type: 'button', onClick: () => onDeleteMessage && onDeleteMessage(msg), title: '삭제',
-              style: { width: '22px', height: '22px', border: 'none', background: 'none', padding: 0, cursor: 'pointer', color: '#94A3B8', display: 'flex', alignItems: 'center', justifyContent: 'center' }
+              style: { width: '22px', height: '22px', border: 'none', background: 'none', padding: 0, cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }
             }, /*#__PURE__*/React.createElement(TrashIcon, { size: 14 }))
           ) : null
         )
@@ -1922,7 +1922,7 @@ export function CommentsSection({
             justifyContent: 'center',
             flexShrink: 0,
             padding: 0,
-            color: '#64748B'
+            color: 'var(--text-muted)'
           }
         }, /*#__PURE__*/React.createElement(EmojiPickerIcon, null)),
         /* Camera/Image Button */
@@ -1942,7 +1942,7 @@ export function CommentsSection({
             justifyContent: 'center',
             flexShrink: 0,
             padding: 0,
-            color: '#64748B'
+            color: 'var(--text-muted)'
           }
         }, /*#__PURE__*/React.createElement("svg", {
           xmlns: "http://www.w3.org/2000/svg",
@@ -2138,7 +2138,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         alt: "메모 첨부 이미지",
         loading: 'lazy',
         decoding: 'async',
-        style: { width: '100%', maxHeight: '140px', objectFit: 'cover', borderRadius: '6px', marginBottom: '8px' }
+        style: { width: '100%', maxHeight: '140px', objectFit: 'cover', borderRadius: 'var(--radius-sm)', marginBottom: '8px' }
       });
     }
 
@@ -2220,7 +2220,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       style: {
         position: 'absolute', top: '10px', right: '34px',
         background: 'none', border: 'none', cursor: 'pointer',
-        color: '#64748B', opacity: 0.2,
+        color: 'var(--text-muted)', opacity: 0.2,
         display: 'flex', alignItems: 'center'
       },
       className: "memo-card-share-btn"
@@ -2462,11 +2462,11 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         }, comment.text),
         /*#__PURE__*/React.createElement("button", {
           type: "button", onClick: e => handleStartEditComment(e, comment), title: "편집", "aria-label": "댓글 편집",
-          style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: '#64748B', flexShrink: 0 }
+          style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)', flexShrink: 0 }
         }, /*#__PURE__*/React.createElement(PencilIcon, { size: 12 })),
         /*#__PURE__*/React.createElement("button", {
           type: "button", onClick: e => handleDeleteComment(e, comment), title: "삭제", "aria-label": "댓글 삭제",
-          style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: '#64748B', flexShrink: 0 }
+          style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)', flexShrink: 0 }
         }, /*#__PURE__*/React.createElement(TrashIcon, { size: 12 }))
       );
     })),
@@ -2494,14 +2494,14 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
           }
         },
         placeholder: "댓글을 입력하세요...",
-        style: { flex: 1, minWidth: 0, height: '30px', fontSize: '0.8rem', border: '1px solid var(--border-subtle)', borderRadius: '6px', padding: '0 8px', backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)', outline: 'none', boxSizing: 'border-box' }
+        style: { flex: 1, minWidth: 0, height: '30px', fontSize: '0.8rem', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0 8px', backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)', outline: 'none', boxSizing: 'border-box' }
       }),
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: handleSaveComment,
         disabled: !commentText.trim() || !commentParticipantId || isSavingComment,
         style: {
-          flexShrink: 0, height: '30px', padding: '0 12px', borderRadius: '6px', border: 'none',
+          flexShrink: 0, height: '30px', padding: '0 12px', borderRadius: 'var(--radius-sm)', border: 'none',
           backgroundColor: 'var(--accent-primary)', color: '#FFFFFF', fontSize: '0.78rem', fontWeight: 'bold',
           cursor: isSavingComment ? 'wait' : 'pointer', opacity: (commentText.trim() && commentParticipantId && !isSavingComment) ? 1 : 0.5
         }
@@ -2885,7 +2885,7 @@ export function GlobalSearchModal({
       ),
       /*#__PURE__*/React.createElement("button", {
         onClick: onClose,
-        style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }
+        style: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }
       }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))
     ),
     /*#__PURE__*/React.createElement("div", { className: "modal-body" },
@@ -2915,7 +2915,7 @@ export function GlobalSearchModal({
             label: /*#__PURE__*/React.createElement(React.Fragment, null, `${t.label} `, /*#__PURE__*/React.createElement("span", {
               style: {
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '20px', height: '18px',
-                borderRadius: '9999px',
+                borderRadius: 'var(--radius-full)',
                 backgroundColor: hasCount ? '#2563EB' : '#E2E8F0',
                 color: hasCount ? '#FFFFFF' : '#475569',
                 fontSize: '0.72rem', fontWeight: 'bold', padding: '0 6px', marginLeft: '4px'
@@ -2926,8 +2926,8 @@ export function GlobalSearchModal({
         onSelect: setActiveTab
       }) : /*#__PURE__*/React.createElement(SearchCategoryTabs, { tabs: tabDefs, activeKey: activeTab, onSelect: setActiveTab, containerStyle: { width: '100%' } })),
 
-      !q && /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: '#94A3B8', fontSize: '0.85rem', textAlign: 'center' } }, "검색어를 입력해 주세요."),
-      q && !hasResults && /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: '#94A3B8', fontSize: '0.85rem', textAlign: 'center' } }, "검색 결과가 없습니다."),
+      !q && /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center' } }, "검색어를 입력해 주세요."),
+      q && !hasResults && /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center' } }, "검색 결과가 없습니다."),
 
       q && hasResults && activeTab === 'schedules' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
         matches.schedules.map(item => /*#__PURE__*/React.createElement(SearchResultLogRow, {
@@ -2997,7 +2997,7 @@ export function GlobalSearchModal({
             style: { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: 'var(--radius-sm)' }
           }),
           /*#__PURE__*/React.createElement("span", {
-            style: { fontSize: '0.68rem', color: '#64748B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+            style: { fontSize: '0.68rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
           }, highlightKeyword(entry.tags || '', q))
         ))
       ),
@@ -3215,7 +3215,7 @@ export function EditMessageModal({
   }, "채팅 수정"), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => { if (!isSubmitting) requestClose(); },
-    style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }
+    style: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }
   }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))),
   // .modal-body handles the actual grow-then-scroll behavior (flex:1 1 auto, min-height:0,
   // overflow-y:auto, capped by .modal-container's own visualViewport-aware max-height set in
@@ -3315,7 +3315,7 @@ export function EditMessageModal({
         justifyContent: 'center',
         flexShrink: 0,
         padding: 0,
-        color: '#64748B'
+        color: 'var(--text-muted)'
       }
     }, /*#__PURE__*/React.createElement(EmojiPickerIcon, null)),
     /*#__PURE__*/React.createElement("button", {

@@ -816,13 +816,13 @@ function getDeps() { return window.GATHER_UI_DEPS || {}; }
     }, shareTitle), React.createElement('button', {
       onClick: onClose,
       style: {
-        background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem',
+        background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem',
         cursor: 'pointer', display: 'flex', alignItems: 'center'
       }
     }, React.createElement(SmallXIcon, { size: 20 }))), React.createElement('div', {
       className: 'modal-body'
     }, React.createElement('label', {
-      style: { fontSize: '0.85rem', fontWeight: 700, color: '#64748B' }
+      style: { fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-muted)' }
     }, shareLabel), React.createElement('input', {
       type: 'text',
       className: 'form-input',

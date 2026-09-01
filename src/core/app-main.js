@@ -7016,7 +7016,7 @@ function CalendarApp() {
             backgroundColor: 'rgba(26, 16, 47, 0.85)',
             color: '#F472B6',
             padding: '2px 8px',
-            borderRadius: '999px',
+            borderRadius: 'var(--radius-full)',
             fontSize: '0.68rem',
             fontWeight: 800,
             marginTop: '4px',
@@ -7094,7 +7094,7 @@ function CalendarApp() {
                   fontSize: '0.75rem',
                   lineHeight: '140%',
                   padding: '4px 10px',
-                  borderRadius: '999px',
+                  borderRadius: 'var(--radius-full)',
                   boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
                   border: '1px solid rgba(255, 255, 255, 0.1)'
                 },
@@ -7132,7 +7132,7 @@ function CalendarApp() {
           },
           style: {
             backgroundColor: 'rgba(26, 16, 47, 0.88)',
-            borderRadius: '10px',
+            borderRadius: 'var(--radius-md)',
             padding: '6px 14px',
             display: 'flex',
             flexDirection: 'column',
@@ -9238,7 +9238,7 @@ function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) 
       display: 'block',
       width: '100%',
       aspectRatio: '1',
-      borderRadius: '6px',
+      borderRadius: 'var(--radius-sm)',
       cursor: 'pointer',
       objectFit: 'cover'
     }

@@ -2301,7 +2301,7 @@ export function DateModal({
       fontSize: '0.72rem',
       fontWeight: 'bold',
       padding: '3px 8px',
-      borderRadius: '6px',
+      borderRadius: 'var(--radius-sm)',
       backgroundColor: '#FEF2F2',
       color: '#EF4444',
       border: '1px solid #FEE2E2',
@@ -2589,7 +2589,7 @@ export function DateModal({
               paddingRight: adminMode ? '12px' : (canReorder ? '78px' : '44px'),
               backgroundColor: 'var(--bg-card)',
               border: '1px solid var(--border-subtle)',
-              borderRadius: '10px',
+              borderRadius: 'var(--radius-md)',
               position: 'relative'
             }
           },
@@ -2645,7 +2645,7 @@ export function DateModal({
                 title: "드래그하여 순서 변경",
                 style: {
                   width: '22px', height: '22px', border: '1px solid var(--border-subtle)',
-                  backgroundColor: 'var(--bg-card)', borderRadius: '6px',
+                  backgroundColor: 'var(--bg-card)', borderRadius: 'var(--radius-sm)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   cursor: 'grab', padding: 0, color: 'var(--text-muted)',
                   touchAction: 'none', userSelect: 'none'
@@ -2742,7 +2742,7 @@ export function DateModal({
             ),
             /*#__PURE__*/React.createElement("span", { style: { color: 'var(--accent-primary)' } }, `${searchProgress}% (${estRemainingSeconds}초 남음)`)
           ),
-          /*#__PURE__*/React.createElement("div", { style: { width: '100%', height: '6px', backgroundColor: 'var(--border-subtle)', borderRadius: '999px', overflow: 'hidden' } },
+          /*#__PURE__*/React.createElement("div", { style: { width: '100%', height: '6px', backgroundColor: 'var(--border-subtle)', borderRadius: 'var(--radius-full)', overflow: 'hidden' } },
             /*#__PURE__*/React.createElement("div", { style: { width: `${searchProgress}%`, height: '100%', backgroundColor: 'var(--accent-primary)', transition: 'width 0.1s linear' } })
           )
         ),
@@ -2763,7 +2763,7 @@ export function DateModal({
             key: p.id,
             type: "button",
             onClick: () => handleSelectExistingPlace(p),
-            style: { textAlign: 'left', padding: '8px 10px', borderRadius: '6px', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '2px' },
+            style: { textAlign: 'left', padding: '8px 10px', borderRadius: 'var(--radius-sm)', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '2px' },
             className: "place-result-item"
           },
             /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-main)' } }, p.alias || p.name),
@@ -2781,7 +2781,7 @@ export function DateModal({
           key: r.id,
           type: "button",
           onClick: () => handleSelectResult(r),
-          style: { textAlign: 'left', padding: '8px 10px', borderRadius: '6px', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '2px' },
+          style: { textAlign: 'left', padding: '8px 10px', borderRadius: 'var(--radius-sm)', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '2px' },
           className: "place-result-item"
         },
           /*#__PURE__*/React.createElement("span", { style: { fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-main)' } }, r.name),
@@ -2806,8 +2806,8 @@ export function DateModal({
           },
             /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.78rem', fontWeight: 700, color: '#92400E', lineHeight: 1.45 } }, `기존 ${duplicatePlace.alias || duplicatePlace.name} 과 동일한 업체입니다. 병합하시겠습니까?`),
             /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '6px', marginTop: '7px' } },
-              /*#__PURE__*/React.createElement("button", { type: 'button', onClick: () => setSelectedPlace(prev => ({ ...prev, mergeTargetId: duplicatePlace.id })), style: { border: 0, borderRadius: '6px', padding: '5px 10px', background: 'var(--accent-primary)', color: '#fff', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer' } }, '병합'),
-              /*#__PURE__*/React.createElement("button", { type: 'button', onClick: () => setSelectedPlace(prev => ({ ...prev, duplicateDismissed: true })), style: { border: '1px solid var(--border-subtle)', borderRadius: '6px', padding: '5px 10px', background: 'var(--bg-card)', color: 'var(--text-muted)', fontSize: '0.74rem', cursor: 'pointer' } }, '별도 등록')
+              /*#__PURE__*/React.createElement("button", { type: 'button', onClick: () => setSelectedPlace(prev => ({ ...prev, mergeTargetId: duplicatePlace.id })), style: { border: 0, borderRadius: 'var(--radius-sm)', padding: '5px 10px', background: 'var(--accent-primary)', color: '#fff', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer' } }, '병합'),
+              /*#__PURE__*/React.createElement("button", { type: 'button', onClick: () => setSelectedPlace(prev => ({ ...prev, duplicateDismissed: true })), style: { border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '5px 10px', background: 'var(--bg-card)', color: 'var(--text-muted)', fontSize: '0.74rem', cursor: 'pointer' } }, '별도 등록')
             )
           )
         ),
@@ -2894,7 +2894,7 @@ export function DateModal({
           className: "date-modal-places-list",
           style: { display: 'flex', flexDirection: 'column', gap: '8px', flex: '1 1 auto', minHeight: '80px', overflow: 'visible', paddingBottom: '20px' }
         }, registeredPlaces.map(place => {
-          const category = getPlaceCategoryById(calendar, place.categoryId) || { id: 'etc', name: '기타', color: 'var(--text-muted)' };
+          const category = getPlaceCategoryById(calendar, place.categoryId) || { id: 'etc', name: '기타', color: '#64748B' };
           const catColor = category.color || '#64748B';
           const catName = category.name || '기타';
           return /*#__PURE__*/React.createElement("div", {
@@ -2927,7 +2927,7 @@ export function DateModal({
             /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
               /*#__PURE__*/React.createElement("span", {
                 style: {
-                  fontSize: '0.64rem', fontWeight: 900, padding: '2px 8px', borderRadius: '999px',
+                  fontSize: '0.64rem', fontWeight: 900, padding: '2px 8px', borderRadius: 'var(--radius-full)',
                   backgroundColor: `${catColor}18`, color: catColor
                 }
               }, catName)
@@ -2959,7 +2959,7 @@ export function DateModal({
               // HTML drag-and-drop is intentionally used here: it works with a mouse/trackpad,
               // while touch users can still reorder through the same control on browsers that
               // promote draggable elements to a native long-press drag gesture.
-              style: { width: '22px', height: '22px', padding: 0, border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)', borderRadius: '6px', cursor: 'grab', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'none', userSelect: 'none' }
+              style: { width: '22px', height: '22px', padding: 0, border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)', borderRadius: 'var(--radius-sm)', cursor: 'grab', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'none', userSelect: 'none' }
             }, /*#__PURE__*/React.createElement(LineHeightIcon, { size: 12 })), /*#__PURE__*/React.createElement(ItemEditDeleteActions, {
               onEdit: () => {
                 const sp = { name: place.name, address: place.address || '', lat: place.lat, lng: place.lng, categoryId: place.categoryId || 'etc' };
@@ -3070,7 +3070,7 @@ export function DateModal({
               fontSize: '0.78rem',
               fontWeight: 600,
               padding: '3px 9px',
-              borderRadius: '999px',
+              borderRadius: 'var(--radius-full)',
               whiteSpace: 'nowrap',
               backgroundColor: isNegative ? '#FEF2F2' : '#F0FDF4',
               border: `1px solid ${isNegative ? '#FCA5A5' : '#BBF7D0'}`,
@@ -3188,7 +3188,7 @@ export function DateModal({
         expenses.map(expense => {
           const { time: expenseTime, rest: expenseLabel } = extractExpenseTimePrefix(getExpenseLabel(expense));
           const expenseUrl = getExpenseUrl(expense);
-          const expenseCategory = getDisplayExpenseCategory(calendar, expense) || { id: 'etc', name: '기타', color: 'var(--text-muted)' };
+          const expenseCategory = getDisplayExpenseCategory(calendar, expense) || { id: 'etc', name: '기타', color: '#64748B' };
           const categoryColor = expenseCategory.color || '#64748B';
           const categoryName = expenseCategory.name || '기타';
           return /*#__PURE__*/React.createElement("div", {
@@ -3242,7 +3242,7 @@ export function DateModal({
                 title: "드래그하여 순서 변경",
                 style: {
                   width: '22px', height: '22px', border: '1px solid var(--border-subtle)',
-                  backgroundColor: 'var(--bg-card)', borderRadius: '6px',
+                  backgroundColor: 'var(--bg-card)', borderRadius: 'var(--radius-sm)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   cursor: 'grab', padding: 0, color: 'var(--text-muted)',
                   touchAction: 'none', userSelect: 'none'
@@ -3260,7 +3260,7 @@ export function DateModal({
                   height: '22px',
                   border: 'none',
                   background: 'none',
-                  borderRadius: '6px',
+                  borderRadius: 'var(--radius-sm)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -3279,7 +3279,7 @@ export function DateModal({
                     alignItems: 'center',
                     gap: '5px',
                     padding: '3px 8px',
-                    borderRadius: '999px',
+                    borderRadius: 'var(--radius-full)',
                     backgroundColor: `${categoryColor}18`,
                     color: categoryColor,
                     fontSize: '0.68rem',
@@ -3291,7 +3291,7 @@ export function DateModal({
                     display: 'inline-flex',
                     alignItems: 'center',
                     padding: '3px 8px',
-                    borderRadius: '999px',
+                    borderRadius: 'var(--radius-full)',
                     backgroundColor: 'rgba(79, 70, 229, 0.08)',
                     color: '#4F46E5',
                     fontSize: '0.68rem',
@@ -3303,7 +3303,7 @@ export function DateModal({
                     display: 'inline-flex',
                     alignItems: 'center',
                     padding: '3px 8px',
-                    borderRadius: '999px',
+                    borderRadius: 'var(--radius-full)',
                     backgroundColor: `${(activeParticipants.find(p => p.name === expense.payerId) || {}).color || '#64748B'}18`,
                     color: (activeParticipants.find(p => p.name === expense.payerId) || {}).color || '#64748B',
                     fontSize: '0.68rem',
@@ -3361,7 +3361,7 @@ export function DateModal({
             style: {
               height: '36px',
               padding: '0 12px',
-              borderRadius: '10px',
+              borderRadius: 'var(--radius-md)',
               fontSize: '0.78rem',
               fontWeight: 900,
               cursor: isSavingMeetingPhotos ? 'wait' : 'pointer'
@@ -3375,7 +3375,7 @@ export function DateModal({
             style: {
               height: '36px',
               padding: '0 12px',
-              borderRadius: '10px',
+              borderRadius: 'var(--radius-md)',
               fontSize: '0.78rem',
               fontWeight: 900,
               cursor: isSavingMeetingPhotos ? 'wait' : 'pointer'
@@ -3444,7 +3444,7 @@ export function DateModal({
             aspectRatio: '1 / 1',
             objectFit: 'cover',
             display: 'block',
-            borderRadius: '10px',
+            borderRadius: 'var(--radius-md)',
             backgroundColor: 'var(--bg-primary)',
             cursor: 'pointer'
           }
@@ -3511,7 +3511,7 @@ export function DateModal({
       key: i,
       src: url,
       alt: "붙여넣을 이미지 미리보기",
-      style: { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: '10px', backgroundColor: 'var(--bg-primary)' }
+      style: { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)' }
     }))),
     /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '10px', justifyContent: 'center' } },
       /*#__PURE__*/React.createElement("button", {

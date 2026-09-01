@@ -784,7 +784,7 @@ export function SearchCategoryTabs({ tabs, activeKey, onSelect, containerStyle, 
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("div", {
-    style: { display: 'grid', gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))`, overflow: 'hidden', borderBottom: '1px solid #E2E8F0', ...containerStyle }
+    style: { display: 'grid', gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))`, overflow: 'hidden', borderBottom: '1px solid var(--border-subtle)', ...containerStyle }
   }, tabs.map(tab => {
     const count = Number(tab.count || 0);
     return /*#__PURE__*/React.createElement("button", {
@@ -813,7 +813,7 @@ export function SearchCategoryTabs({ tabs, activeKey, onSelect, containerStyle, 
           lineHeight: 1,
           minWidth: '20px',
           height: '18px',
-          borderRadius: '9999px',
+          borderRadius: 'var(--radius-full)',
           backgroundColor: tab.color || tab.badgeColor || '#2563EB',
           color: '#FFFFFF',
           fontSize: '0.68rem',
@@ -863,7 +863,7 @@ export function SimpleBottomSheetPicker({ title, value, options, onSelect, place
       /*#__PURE__*/React.createElement("h4", null, title),
       /*#__PURE__*/React.createElement("button", {
         type: "button",
-        style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer' },
+        style: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer' },
         onClick: () => setIsOpen(false)
       }, "✕")
     ),
@@ -876,7 +876,7 @@ export function SimpleBottomSheetPicker({ title, value, options, onSelect, place
         onClick: () => { if (!opt.disabled) { onSelect(opt.value); setIsOpen(false); } },
         style: opt.disabled ? { opacity: 0.45, cursor: 'not-allowed' } : undefined
       }, opt.color ? /*#__PURE__*/React.createElement(ParticipantBackdrop, { participant: opt, name: opt.label }) : opt.label,
-        opt.disabled ? /*#__PURE__*/React.createElement("span", { style: { marginLeft: 'auto', fontSize: '0.72rem', color: '#94A3B8' } }, "추가됨") : null))
+        opt.disabled ? /*#__PURE__*/React.createElement("span", { style: { marginLeft: 'auto', fontSize: '0.72rem', color: 'var(--text-muted)' } }, "추가됨") : null))
     )
   ));
   return /*#__PURE__*/React.createElement(React.Fragment, null,
@@ -899,7 +899,7 @@ export function SimpleBottomSheetPicker({ title, value, options, onSelect, place
         "stroke-linecap": "round",
         "stroke-linejoin": "round",
         className: "icon icon-tabler icons-tabler-outline icon-tabler-chevron-down",
-        style: { flexShrink: 0, color: '#94A3B8' }
+        style: { flexShrink: 0, color: 'var(--text-muted)' }
       }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
         /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" }))
     ),

@@ -856,7 +856,7 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
           onClick: e => { e.stopPropagation(); setConfirmDeleteTag(tag); },
           style: {
             width: '17px', height: '17px', border: 0, borderRadius: '50%',
-            background: '#FFFFFF', color: '#0F172A', display: 'inline-flex',
+            background: '#FFFFFF', color: 'var(--text-main)', display: 'inline-flex',
             alignItems: 'center', justifyContent: 'center', padding: 0, cursor: 'pointer',
             flexShrink: 0
           }
@@ -893,7 +893,7 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
         placeholder: tagTokens.length >= 10 ? "태그 최대 10개 도달" : `태그 입력 (${tagTokens.length}/10)`,
         maxLength: 100,
         style: {
-          flex: 1, minWidth: 0, height: '28px', padding: '0 8px', borderRadius: '6px',
+          flex: 1, minWidth: 0, height: '28px', padding: '0 8px', borderRadius: 'var(--radius-sm)',
           border: '1px solid rgba(255,255,255,0.32)', background: 'rgba(255,255,255,0.14)',
           color: '#FFFFFF', fontSize: '0.74rem'
         }
@@ -903,7 +903,7 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
         onClick: handleSaveTags,
         disabled: isSavingTags || tagTokens.length >= 10,
         style: {
-          flexShrink: 0, height: '28px', padding: '0 10px', borderRadius: '6px',
+          flexShrink: 0, height: '28px', padding: '0 10px', borderRadius: 'var(--radius-sm)',
           border: '1px solid rgba(255,255,255,0.32)', background: 'rgba(255,255,255,0.22)',
           color: '#FFFFFF', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer',
           opacity: (isSavingTags || tagTokens.length >= 10) ? 0.45 : 1

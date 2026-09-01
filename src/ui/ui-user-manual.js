@@ -800,12 +800,12 @@ export function UserManualOverlay({ calendar, onClose }) {
         style: { border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', overflow: 'hidden', background: 'var(--bg-card)' }
       }, /*#__PURE__*/React.createElement("div", {
         style: { padding: '13px 16px', background: '#F5EAFE', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 900 }
-      }, "26.08.22(토)", /*#__PURE__*/React.createElement("span", { style: { color: '#64748B' } }, "×")), /*#__PURE__*/React.createElement("div", {
+      }, "26.08.22(토)", /*#__PURE__*/React.createElement("span", { style: { color: 'var(--text-muted)' } }, "×")), /*#__PURE__*/React.createElement("div", {
         style: { padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }
-      }, /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.75rem', fontWeight: 900, color: '#64748B' } }, "참여자 선택"), /*#__PURE__*/React.createElement("div", {
-        style: { height: '42px', border: '1px solid var(--border-subtle)', borderRadius: '999px', display: 'flex', alignItems: 'center', padding: '0 14px', gap: '8px', fontWeight: 800 }
-      }, /*#__PURE__*/React.createElement("span", { style: { width: 9, height: 9, borderRadius: '50%', backgroundColor: sampleParticipant.color } }), sampleParticipant.name), /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.75rem', fontWeight: 900, color: '#64748B' } }, "메모 입력"), /*#__PURE__*/React.createElement("div", {
-        style: { border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '11px 12px', color: '#64748B', fontSize: '0.82rem' }
+      }, /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.75rem', fontWeight: 900, color: 'var(--text-muted)' } }, "참여자 선택"), /*#__PURE__*/React.createElement("div", {
+        style: { height: '42px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-full)', display: 'flex', alignItems: 'center', padding: '0 14px', gap: '8px', fontWeight: 800 }
+      }, /*#__PURE__*/React.createElement("span", { style: { width: 9, height: 9, borderRadius: '50%', backgroundColor: sampleParticipant.color } }), sampleParticipant.name), /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.75rem', fontWeight: 900, color: 'var(--text-muted)' } }, "메모 입력"), /*#__PURE__*/React.createElement("div", {
+        style: { border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '11px 12px', color: 'var(--text-muted)', fontSize: '0.82rem' }
       }, "예: 1시 이후 가능, 차량 운전 가능"), /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "btn btn-primary",
@@ -821,11 +821,11 @@ export function UserManualOverlay({ calendar, onClose }) {
       }, /*#__PURE__*/React.createElement("div", {
         style: { border: '1px solid var(--status-green)', background: '#ECFDF5', borderRadius: 'var(--radius-md)', padding: '12px', display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'center' }
       }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", { style: { color: 'var(--status-green)', fontWeight: 900, marginBottom: '7px' } }, "전원 참석 가능"), /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '5px' } }, participantBadge(sampleParticipant), participantBadge(sampleParticipant2), participantBadge(sampleParticipant3))), /*#__PURE__*/React.createElement("span", {
-        style: { padding: '6px 10px', borderRadius: '999px', background: 'var(--status-green)', color: '#FFFFFF', fontSize: '0.75rem', fontWeight: 900, whiteSpace: 'nowrap' }
+        style: { padding: '6px 10px', borderRadius: 'var(--radius-full)', background: 'var(--status-green)', color: '#FFFFFF', fontSize: '0.75rem', fontWeight: 900, whiteSpace: 'nowrap' }
       }, "전원")), /*#__PURE__*/React.createElement("div", {
         style: { border: '1px solid transparent', background: 'linear-gradient(var(--bg-card), var(--bg-card)) padding-box, var(--accent-gradient) border-box', borderRadius: 'var(--radius-md)', padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }
       }, /*#__PURE__*/React.createElement("strong", { style: { color: '#4F46E5' } }, "[모임확정] 26.08.22 (토)"), /*#__PURE__*/React.createElement("span", {
-        style: { padding: '5px 10px', borderRadius: '999px', background: 'linear-gradient(135deg, #6366F1, #EC4899)', color: '#FFFFFF', fontWeight: 900, fontSize: '0.75rem' }
+        style: { padding: '5px 10px', borderRadius: 'var(--radius-full)', background: 'linear-gradient(135deg, #6366F1, #EC4899)', color: '#FFFFFF', fontWeight: 900, fontSize: '0.75rem' }
       }, "D-11")))
     }
   ];
@@ -865,7 +865,7 @@ export function UserManualOverlay({ calendar, onClose }) {
   }, /*#__PURE__*/React.createElement("header", {
     style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', marginBottom: '20px' }
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: { display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 10px', borderRadius: '999px', background: 'rgba(79, 70, 229, 0.1)', color: '#4F46E5', fontSize: '0.78rem', fontWeight: 900, marginBottom: '10px' }
+    style: { display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 10px', borderRadius: 'var(--radius-full)', background: 'rgba(79, 70, 229, 0.1)', color: '#4F46E5', fontSize: '0.78rem', fontWeight: 900, marginBottom: '10px' }
   }, "빠른 안내"), /*#__PURE__*/React.createElement("h2", {
     style: { margin: 0, fontSize: 'clamp(1.45rem, 4vw, 2.2rem)', lineHeight: 1.12, letterSpacing: '-0.04em', fontWeight: 950 }
   }, "사용 방법"), /*#__PURE__*/React.createElement("p", {
@@ -874,7 +874,7 @@ export function UserManualOverlay({ calendar, onClose }) {
     type: "button",
     onClick: onClose,
     "aria-label": "사용자 매뉴얼 닫기",
-    style: { width: '42px', height: '42px', borderRadius: '50%', border: '1px solid var(--border-subtle)', background: 'var(--bg-primary)', color: '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }
+    style: { width: '42px', height: '42px', borderRadius: '50%', border: '1px solid var(--border-subtle)', background: 'var(--bg-primary)', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }
   }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))), /*#__PURE__*/React.createElement("div", {
     style: { display: 'grid', gridTemplateColumns: '1fr', gap: '10px' }, className: 'manual-steps'
   }, stepCards.map(step => /*#__PURE__*/React.createElement("article", {

@@ -1150,7 +1150,7 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
       actionsEl.style.alignItems = 'center';
       actionsEl.style.gap = '2px';
       actionsEl.style.flexShrink = '0';
-      const popupActionBtnStyle = { width: '22px', height: '22px', border: 'none', background: 'none', cursor: 'pointer', color: '#94A3B8', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0' };
+      const popupActionBtnStyle = { width: '22px', height: '22px', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0' };
 
       const businessInfoBtn = document.createElement('button');
       businessInfoBtn.type = 'button';
@@ -1437,7 +1437,7 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
 
   if (loadError) {
     return /*#__PURE__*/React.createElement("div", {
-      style: { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8', fontSize: '0.8rem', backgroundColor: '#F1F5F9' }
+      style: { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.8rem', backgroundColor: '#F1F5F9' }
     }, "지도를 불러오지 못했습니다.");
   }
 
@@ -1449,9 +1449,9 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
     // sibling elements outside the map (like the map-expand grip button below) and win despite
     // the button's explicit z-index. Giving the container a z-index here contains Leaflet's
     // internals inside their own stacking context so the button's z-index actually applies.
-    style: { width: '100%', height: '100%', backgroundColor: '#E2E8F0', position: 'relative', zIndex: 1 }
+    style: { width: '100%', height: '100%', backgroundColor: 'var(--border-subtle)', position: 'relative', zIndex: 1 }
   }, !ready && /*#__PURE__*/React.createElement("div", {
-    style: { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8', fontSize: '0.8rem' }
+    style: { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }
   }, "지도를 불러오는 중..."));
 }
 
@@ -1849,7 +1849,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
           width: '36px', height: '36px',
           borderRadius: '50%', backgroundColor: 'transparent', border: 'none',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          cursor: 'pointer', color: '#64748B'
+          cursor: 'pointer', color: 'var(--text-muted)'
         }
       }, /*#__PURE__*/React.createElement(BackArrowIcon, { size: 22 })),
       
@@ -1909,7 +1909,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
           "aria-label": "장소 메뉴 열기",
           style: {
             background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
-            color: '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center'
+            color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center'
           }
         }, /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 22 }))
       )
@@ -1966,7 +1966,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
           "aria-label": mapExpanded ? '지도 축소' : '지도 확대',
           title: mapExpanded ? '지도 축소' : '지도 확대',
           style: {
-            background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8',
+            background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px'
           }
         }, mapExpanded ? /*#__PURE__*/React.createElement("svg", {
@@ -2014,7 +2014,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
           title: "드래그하여 지도 높이 조절",
           style: {
             width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'ns-resize', color: '#94A3B8', userSelect: 'none', touchAction: 'none'
+            cursor: 'ns-resize', color: 'var(--text-muted)', userSelect: 'none', touchAction: 'none'
           }
         },
           /* Lucide-style split diagonal resizing arrows */
@@ -2077,7 +2077,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
               label: /*#__PURE__*/React.createElement(React.Fragment, null, "전체 ", /*#__PURE__*/React.createElement("span", {
                 style: {
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '20px', height: '18px',
-                  borderRadius: '9999px',
+                  borderRadius: 'var(--radius-full)',
                   backgroundColor: searchedPlaces.length >= 1 ? '#2563EB' : '#E2E8F0',
                   color: searchedPlaces.length >= 1 ? '#FFFFFF' : '#475569',
                   fontSize: '0.72rem', fontWeight: 'bold', padding: '0 6px', marginLeft: '4px'
@@ -2093,7 +2093,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
                   /*#__PURE__*/React.createElement("span", {
                     style: {
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '20px', height: '18px',
-                      borderRadius: '9999px',
+                      borderRadius: 'var(--radius-full)',
                       backgroundColor: cCount >= 1 ? (category.color || '#2563EB') : '#E2E8F0',
                       color: cCount >= 1 ? '#FFFFFF' : '#475569',
                       fontSize: '0.72rem', fontWeight: 'bold', padding: '0 6px', marginLeft: '4px'
@@ -2226,7 +2226,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
                 title: "업체보기",
                 style: {
                   width: '28px', height: '28px',
-                  background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8',
+                  background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
                   position: 'relative', zIndex: 11
                 }
@@ -2241,7 +2241,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
                 title: "장소 수정",
                 style: {
                   width: '28px', height: '28px',
-                  background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8',
+                  background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
                   position: 'relative', zIndex: 11
                 }
@@ -2252,7 +2252,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
             /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', paddingRight: '64px' } },
               /*#__PURE__*/React.createElement("span", {
                 style: {
-                  display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '3px 8px 3px 3px', borderRadius: '999px',
+                  display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '3px 8px 3px 3px', borderRadius: 'var(--radius-full)',
                   backgroundColor: `${category.color}18`, color: category.color, fontSize: '0.68rem', fontWeight: 900
                 }
               },
@@ -2321,19 +2321,19 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
                             handleCancelEditPlaceMemoEntry();
                           }
                         },
-                        style: { width: '100%', height: '32px', fontSize: '0.8rem', border: '1px solid var(--border-subtle)', borderRadius: '6px', padding: '0 8px', backgroundColor: 'var(--bg-card)', color: 'var(--text-main)', outline: 'none', boxSizing: 'border-box' }
+                        style: { width: '100%', height: '32px', fontSize: '0.8rem', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0 8px', backgroundColor: 'var(--bg-card)', color: 'var(--text-main)', outline: 'none', boxSizing: 'border-box' }
                       }),
                       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '6px', justifyContent: 'flex-end' } },
                         /*#__PURE__*/React.createElement("button", {
                           type: "button",
                           onClick: e => { e.stopPropagation(); handleCancelEditPlaceMemoEntry(); },
-                          style: { height: '28px', padding: '0 10px', borderRadius: '6px', border: '1px solid var(--border-subtle)', background: 'none', color: 'var(--text-muted)', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer' }
+                          style: { height: '28px', padding: '0 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', background: 'none', color: 'var(--text-muted)', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer' }
                         }, "취소"),
                         /*#__PURE__*/React.createElement("button", {
                           type: "button",
                           onClick: e => { e.stopPropagation(); handleSavePlaceMemoEntry(place, entry); },
                           disabled: !editingMemoEntryText.trim(),
-                          style: { height: '28px', padding: '0 10px', borderRadius: '6px', border: 'none', backgroundColor: 'var(--accent-primary)', color: '#FFFFFF', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer', opacity: editingMemoEntryText.trim() ? 1 : 0.5 }
+                          style: { height: '28px', padding: '0 10px', borderRadius: 'var(--radius-sm)', border: 'none', backgroundColor: 'var(--accent-primary)', color: '#FFFFFF', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer', opacity: editingMemoEntryText.trim() ? 1 : 0.5 }
                         }, "수정")
                       )
                     );
@@ -2360,11 +2360,11 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
                         },
                           /*#__PURE__*/React.createElement("button", {
                             type: "button", onClick: (e) => { e.stopPropagation(); handleStartEditPlaceMemoEntry(place, entry); }, title: "메모 편집", "aria-label": "메모 편집",
-                            style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: '#64748B' }
+                            style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }
                           }, /*#__PURE__*/React.createElement(PencilIcon, { size: 14 })),
                           /*#__PURE__*/React.createElement("button", {
                             type: "button", onClick: (e) => { e.stopPropagation(); handleDeletePlaceMemoEntry(place, entry); }, title: "메모 삭제", "aria-label": "메모 삭제",
-                            style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: '#64748B' }
+                            style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }
                           }, /*#__PURE__*/React.createElement(TrashIcon, { size: 14 }))
                         )
                       ),
@@ -2390,11 +2390,11 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
                     /*#__PURE__*/React.createElement("span", { style: { flex: 1, minWidth: 0, fontSize: '0.74rem', color: 'var(--text-main)', wordBreak: 'break-word' } }, entry.note),
                     /*#__PURE__*/React.createElement("button", {
                       type: "button", onClick: (e) => { e.stopPropagation(); handleStartEditPlaceMemoEntry(place, entry); }, title: "메모 편집", "aria-label": "메모 편집",
-                      style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: '#64748B', flexShrink: 0 }
+                      style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)', flexShrink: 0 }
                     }, /*#__PURE__*/React.createElement(PencilIcon, { size: 12 })),
                     /*#__PURE__*/React.createElement("button", {
                       type: "button", onClick: (e) => { e.stopPropagation(); handleDeletePlaceMemoEntry(place, entry); }, title: "메모 삭제", "aria-label": "메모 삭제",
-                      style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: '#64748B', flexShrink: 0 }
+                      style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)', flexShrink: 0 }
                     }, /*#__PURE__*/React.createElement(TrashIcon, { size: 12 }))
                   );
                 }))

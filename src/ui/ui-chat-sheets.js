@@ -882,7 +882,7 @@ export function NotificationPermissionHelpModal({ onClose, onRetry, showToast })
     key: item.label,
     style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 11px', borderRadius: 'var(--radius-md)', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', minWidth: 0 }
   }, /*#__PURE__*/React.createElement("span", {
-    style: { width: '9px', height: '9px', borderRadius: '999px', background: item.ok ? 'var(--status-green)' : '#EF4444', flexShrink: 0 }
+    style: { width: '9px', height: '9px', borderRadius: 'var(--radius-full)', background: item.ok ? 'var(--status-green)' : '#EF4444', flexShrink: 0 }
   }), /*#__PURE__*/React.createElement("span", {
     style: { display: 'flex', flexDirection: 'column', minWidth: 0 }
   }, /*#__PURE__*/React.createElement("strong", {

@@ -1303,7 +1303,7 @@ export function ChatRoomView({
             borderRadius: '12px',
             padding: '3px 12px',
             fontSize: '0.72rem',
-            color: '#64748B',
+            color: 'var(--text-muted)',
             fontWeight: 'bold'
           }
         }, formatChatDividerDate(msg.timestamp))
@@ -1390,7 +1390,7 @@ export function ChatRoomView({
             background: 'none',
             padding: 0,
             cursor: 'pointer',
-            color: '#94A3B8',
+            color: 'var(--text-muted)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'flex-end'
@@ -1408,7 +1408,7 @@ export function ChatRoomView({
             background: 'none',
             padding: 0,
             cursor: 'pointer',
-            color: '#94A3B8',
+            color: 'var(--text-muted)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'flex-end'
@@ -1435,20 +1435,20 @@ export function ChatRoomView({
             height: '24px',
             border: '1px solid var(--border-subtle)',
             backgroundColor: 'var(--bg-primary)',
-            borderRadius: '6px',
+            borderRadius: 'var(--radius-sm)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
             padding: 0,
-            color: '#64748B'
+            color: 'var(--text-muted)'
           }
         }, /*#__PURE__*/React.createElement(PencilIcon, { size: 12 })),
         /* Timestamp */
         /*#__PURE__*/React.createElement("span", {
           style: {
             fontSize: '0.68rem',
-            color: '#94A3B8',
+            color: 'var(--text-muted)',
             lineHeight: '1.25',
             textAlign: 'right'
           }
@@ -1601,7 +1601,7 @@ export function ChatRoomView({
           background: 'none',
           padding: 0,
           cursor: 'pointer',
-          color: '#94A3B8',
+          color: 'var(--text-muted)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'flex-start'
@@ -1611,7 +1611,7 @@ export function ChatRoomView({
       /*#__PURE__*/React.createElement("span", {
         style: {
           fontSize: '0.68rem',
-          color: '#94A3B8',
+          color: 'var(--text-muted)',
           lineHeight: '1.25',
           textAlign: 'left'
         }
@@ -1653,7 +1653,7 @@ export function ChatRoomView({
       alignItems: 'center',
       justifyContent: 'center',
       cursor: 'pointer',
-      color: '#64748B',
+      color: 'var(--text-muted)',
       zIndex: 1020
     }
   }, /*#__PURE__*/React.createElement(BackArrowIcon, { size: 22 })),
@@ -1679,7 +1679,7 @@ export function ChatRoomView({
       alignItems: 'center',
       justifyContent: 'center',
       cursor: 'pointer',
-      color: '#64748B',
+      color: 'var(--text-muted)',
       zIndex: 1020
     }
   }, /*#__PURE__*/React.createElement("svg", {
@@ -1720,7 +1720,7 @@ export function ChatRoomView({
       alignItems: 'center',
       justifyContent: 'center',
       cursor: 'pointer',
-      color: '#64748B',
+      color: 'var(--text-muted)',
       zIndex: 1000
     }
   }, /*#__PURE__*/React.createElement(MegaphoneIcon, { size: 18 })), /*#__PURE__*/React.createElement("div", {
@@ -1866,7 +1866,7 @@ export function ChatRoomView({
     /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
       /*#__PURE__*/React.createElement("button", {
         type: "button",
-        style: { flex: 1, border: '1px solid #0F172A', borderRadius: '10px', padding: '10px', fontWeight: 800, cursor: 'pointer', backgroundColor: '#0F172A', color: '#FFFFFF' },
+        style: { flex: 1, border: '1px solid #0F172A', borderRadius: 'var(--radius-md)', padding: '10px', fontWeight: 800, cursor: 'pointer', backgroundColor: '#0F172A', color: '#FFFFFF' },
         onClick: () => { setNoticeInput(''); setNoticePanelMode('add'); }
       }, "공지 추가"),
       /*#__PURE__*/React.createElement("button", {
@@ -1895,7 +1895,7 @@ export function ChatRoomView({
     renderedMessages.length === 0 ? /*#__PURE__*/React.createElement("div", {
       style: {
         textAlign: 'center',
-        color: '#94A3B8',
+        color: 'var(--text-muted)',
         fontSize: '0.85rem',
         marginTop: '40px'
       }
@@ -1918,7 +1918,7 @@ export function ChatRoomView({
       alignItems: 'center',
       justifyContent: 'center',
       cursor: 'pointer',
-      color: '#64748B',
+      color: 'var(--text-muted)',
       zIndex: 50
     }
   }, /*#__PURE__*/React.createElement("svg", {
@@ -2044,7 +2044,7 @@ export function ChatRoomView({
             background: 'none',
             padding: 0,
             cursor: 'pointer',
-            color: '#94A3B8',
+            color: 'var(--text-muted)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -2170,7 +2170,7 @@ export function ChatRoomView({
               justifyContent: 'center',
               flexShrink: 0,
               padding: 0,
-              color: '#64748B'
+              color: 'var(--text-muted)'
             }
           }, /*#__PURE__*/React.createElement(EmojiPickerIcon, null)),
           /* Camera/Image Button */
@@ -2190,7 +2190,7 @@ export function ChatRoomView({
               justifyContent: 'center',
               flexShrink: 0,
               padding: 0,
-              color: '#64748B'
+              color: 'var(--text-muted)'
             }
           }, /*#__PURE__*/React.createElement("svg", {
             xmlns: "http://www.w3.org/2000/svg",

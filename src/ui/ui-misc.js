@@ -949,7 +949,7 @@ export function InlineSearchBar({
       className: "inline-search-capsule",
       style: {
         flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '8px',
-        height: '36px', padding: '0 12px', borderRadius: '999px', border: 'none',
+        height: '36px', padding: '0 12px', borderRadius: 'var(--radius-full)', border: 'none',
         backgroundColor: 'var(--bg-primary)', boxSizing: 'border-box'
       }
     },
@@ -1013,11 +1013,11 @@ export function MemoShareModal({ memo, calendarId, onClose, showToast }) {
     style: { fontSize: '1.1rem', fontWeight: 800 }
   }, "메모 공유 URL"), /*#__PURE__*/React.createElement("button", {
     onClick: onClose,
-    style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }
+    style: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }
   }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))), /*#__PURE__*/React.createElement("div", {
     className: "modal-body"
   }, /*#__PURE__*/React.createElement("label", {
-    style: { fontSize: '0.85rem', fontWeight: 700, color: '#64748B' }
+    style: { fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-muted)' }
   }, memo.title ? `"${memo.title}" 메모 전용 공유 URL` : '이 메모 전용 공유 URL'), /*#__PURE__*/React.createElement("input", {
     type: "text",
     className: "form-input",

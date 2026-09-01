@@ -880,7 +880,7 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
         decoding: 'async',
         referrerPolicy: 'no-referrer',
         onClick: () => setActiveLightbox && setActiveLightbox({ urls, index: idx, meta }),
-        style: { display: 'block', width: '100%', aspectRatio: '1', borderRadius: '6px', cursor: setActiveLightbox ? 'pointer' : 'default', objectFit: 'cover' }
+        style: { display: 'block', width: '100%', aspectRatio: '1', borderRadius: 'var(--radius-sm)', cursor: setActiveLightbox ? 'pointer' : 'default', objectFit: 'cover' }
       })))),
       // Capped to the same maxW as the grid above -- a fit-content chat bubble sizes itself to
       // whichever child is widest, so an uncapped caption longer than the grid would stretch the
@@ -946,7 +946,7 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
     // leaving a gap to its right. width:'100%' above already shrinks it safely when narrower.
     maxWidth,
     maxHeight,
-    borderRadius: '10px',
+    borderRadius: 'var(--radius-md)',
     backgroundColor: 'var(--bg-primary)',
     objectFit: 'contain',
     marginBottom
@@ -1062,7 +1062,7 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
               ...embedBoxStyle,
               aspectRatio: isPortraitEmbed ? '9 / 16' : '16 / 9',
               maxHeight: isPortraitEmbed ? 'min(72vh, 620px)' : 'min(54vh, 430px)',
-              borderRadius: '10px',
+              borderRadius: 'var(--radius-md)',
               backgroundColor: '#000',
               overflow: 'hidden',
               display: 'flex',
@@ -1091,7 +1091,7 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
             aspectRatio: isPortraitEmbed ? '9 / 16' : '16 / 9',
             maxHeight: isPortraitEmbed ? 'min(72vh, 620px)' : 'min(54vh, 430px)',
             border: '0',
-            borderRadius: '10px',
+            borderRadius: 'var(--radius-md)',
             backgroundColor: 'var(--bg-primary)'
           }
         }), firstUrl && /*#__PURE__*/React.createElement(LinkPreviewCard, {
@@ -1182,7 +1182,7 @@ export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = f
           /*#__PURE__*/React.createElement('h4', null, dateOnly ? '날짜 선택' : '날짜/시간 선택'),
           /*#__PURE__*/React.createElement('button', {
             type: 'button',
-            style: { background: 'none', border: 'none', color: '#64748B', fontSize: '1.2rem', cursor: 'pointer' },
+            style: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer' },
             onClick: () => setIsOpen(false)
           }, '✕')
         ),
@@ -1436,7 +1436,7 @@ export function ImageUrlModal({ imageUrl, onClose, showToast, onEnsureShareUrl }
     style: {
       background: 'none',
       border: 'none',
-      color: '#64748B',
+      color: 'var(--text-muted)',
       cursor: 'pointer',
       display: 'flex',
       alignItems: 'center'
@@ -1444,7 +1444,7 @@ export function ImageUrlModal({ imageUrl, onClose, showToast, onEnsureShareUrl }
   }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))), /*#__PURE__*/React.createElement("div", {
     className: "modal-body"
   }, /*#__PURE__*/React.createElement("label", {
-    style: { fontSize: '0.85rem', fontWeight: 700, color: '#64748B' }
+    style: { fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-muted)' }
   }, isGenerating ? "공유 가능한 이미지 URL 생성 중" : "선택한 사진의 원본 이미지 URL"), /*#__PURE__*/React.createElement("input", {
     type: "text",
     className: "form-input",
