@@ -3536,7 +3536,12 @@ function CalendarApp() {
         ? getDirectMediaTagsForUrl(verifiedMessage, meta.directMediaUrl)
         : (Array.isArray(verifiedMessage.imageTags) ? verifiedMessage.imageTags[imageIndex] : '');
       if (String(verifiedTags || '') !== cleanTags) throw new Error('Image tags verification mismatch');
-      upsertLocalChatMessage(verifiedMessage);
+      // Patch-only, not upsertLocalChatMessage -- this message may live only in olderChatMessages
+      // (an older photo scrolled up to and tagged, not in the live chatMessages window). Upserting
+      // it would insert a copy into chatMessages too, growing that "live recent window" array and
+      // tripping the chat-view scroll-to-bottom effect keyed on chatMessages.length (see below),
+      // yanking the chat down to the latest message right after closing the Lightbox.
+      patchLocalChatMessage(messageId, verifiedMessage);
       const now = Date.now();
       const added = nextTokens.filter(t => !prevTokens.includes(t));
       const removed = prevTokens.filter(t => !nextTokens.includes(t));
@@ -3557,7 +3562,6 @@ function CalendarApp() {
       showToast('태그 저장 실패', 'error');
       return false;
     }
-    patchLocalChatMessage(messageId, data);
     const sourceEntry = isDirectMedia ? null : getMessageImageEntries(sourceMessage)[imageIndex];
     const imageUrl = String(meta?.imageUrl || meta?.directMediaUrl || sourceEntry?.full || sourceEntry?.thumb || '').trim();
     const thumbUrl = String(meta?.thumb || sourceEntry?.thumb || imageUrl).trim();
