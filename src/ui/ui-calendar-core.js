@@ -756,6 +756,7 @@ export function CalendarGrid({
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const CalendarCheckIcon = __comp.CalendarCheckIcon || __deps.CalendarCheckIcon;
   const CoinIcon = __comp.CoinIcon || __deps.CoinIcon;
+  const CakeIcon = __comp.CakeIcon || __deps.CakeIcon;
   const getActiveParticipants = __deps.getActiveParticipants;
 
   const year = monthDate.getFullYear();
@@ -1354,7 +1355,7 @@ export function CalendarGrid({
             width: '100%',
             boxSizing: 'border-box'
           }
-        }, ann.icon, " ", ann.title);
+        }, ann.icon === '🎂' && CakeIcon ? /*#__PURE__*/React.createElement(CakeIcon, { size: 12 }) : ann.icon, " ", ann.title);
       })),
 
       /* Mobile Anniversary Icon Badge (mobile-only, circular icons containing emoji with participant color) */
@@ -1387,7 +1388,7 @@ export function CalendarGrid({
             fontSize: '0.64rem',
             flexShrink: 0
           }
-        }, ann.icon);
+        }, ann.icon === '🎂' && CakeIcon ? /*#__PURE__*/React.createElement(CakeIcon, { size: 11 }) : ann.icon);
       }))
     );
   })));

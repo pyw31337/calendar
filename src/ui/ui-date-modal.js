@@ -852,6 +852,7 @@ export function DateModal({
   const SegmentedToggle = __deps.SegmentedToggle;
   const SimpleBottomSheetPicker = __comp.SimpleBottomSheetPicker || __deps.SimpleBottomSheetPicker;
   const MediaThumb = __comp.MediaThumb || __deps.MediaThumb;
+  const CakeIcon = __comp.CakeIcon || __deps.CakeIcon;
   const LinkPreviewCard = __comp.LinkPreviewCard || __deps.LinkPreviewCard;
   const SectionCountBadge = __comp.SectionCountBadge || __deps.SectionCountBadge;
   const SyncStatusChip = __comp.SyncStatusChip || __deps.SyncStatusChip;
@@ -2456,7 +2457,7 @@ export function DateModal({
             fontSize: '0.82rem',
             fontWeight: 'bold'
           }
-        }, ann.icon, " ", ann.title);
+        }, ann.icon === '🎂' && CakeIcon ? /*#__PURE__*/React.createElement(CakeIcon, { size: 14 }) : ann.icon, " ", ann.title);
       })),
 
       !adminMode && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '10px' } },
