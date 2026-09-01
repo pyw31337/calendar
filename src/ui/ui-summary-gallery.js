@@ -918,10 +918,12 @@ export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalG
   const [lightbox, setLightbox] = React.useState(null);
   const brokenPhotoKeysRef = React.useRef((GATHER_APP_UTILS.getPersistentBrokenPhotoUrls || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.getPersistentBrokenPhotoUrls) || (() => new Set()))());
   const brokenPhotoUrlsRef = React.useRef((GATHER_APP_UTILS.getPersistentBrokenPhotoUrls || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.getPersistentBrokenPhotoUrls) || (() => new Set()))());
-  // Keep a revision bump so a failed image can still be recorded for diagnostics, but do not
-  // remove the entry from the home-page grid.  MediaThumb already tries the full-size fallback;
-  // filtering a failed thumbnail here caused the grid to shrink below its fixed 12-item rule.
-  const [, setBrokenPhotoRevision] = React.useState(0);
+  // A confirmed-broken entry (MediaThumb already tried the full-size fallback -- this only fires
+  // once both attempts failed) is a dead, unclickable placeholder with no way to recover it from
+  // this read-only preview widget, so it is dropped from the grid rather than shown. The revision
+  // bump re-runs the visibleEntries filter below so a newly-discovered broken photo disappears
+  // immediately instead of waiting for a fresh page load.
+  const [brokenPhotoRevision, setBrokenPhotoRevision] = React.useState(0);
   const normalizeBrokenPhotoUrl = value => {
     const url = String(value || '').trim();
     if (!url) return '';
@@ -1034,9 +1036,19 @@ export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalG
     });
     return Array.from(byUrl.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
   }, [chatMessages, memos, calendar]);
+  const isKnownBrokenPhoto = entry => {
+    const key = entry?.mediaKey || entry?.refKey || entry?.key;
+    if (key && brokenPhotoKeysRef.current.has(key)) return true;
+    return [entry?.full, entry?.thumb].map(normalizeBrokenPhotoUrl).filter(Boolean)
+      .some(url => brokenPhotoUrlsRef.current.has(url));
+  };
+  // brokenPhotoRevision is read only to re-run this filter once markBrokenPhoto records a
+  // newly-discovered broken entry, so a dead placeholder disappears immediately instead of
+  // lingering until the next full reload.
   const visibleEntries = React.useMemo(() => photoEntries.filter(entry => (
-    (entry && entry.thumb && String(entry.thumb)) || (entry && entry.full && String(entry.full))
-  )), [photoEntries]);
+    ((entry && entry.thumb && String(entry.thumb)) || (entry && entry.full && String(entry.full)))
+    && !isKnownBrokenPhoto(entry)
+  )), [photoEntries, brokenPhotoRevision]);
 
   const handleBrokenPhoto = (photo, brokenInfo = {}) => {
     markBrokenPhoto(photo, brokenInfo);
