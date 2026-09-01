@@ -1372,7 +1372,7 @@ function CalendarApp() {
       }
     })();
     return () => { isMounted = false; };
-  }, [activeCalId, firebaseDb]);
+  }, [activeCalId, firebaseDb, firebaseConnectionVersion]);
   const [anniversaries, setAnniversaries] = React.useState([]);
   // Live subcollection state for places/confirmedMeeting (see unionPlaces/unionConfirmedMeetings
   // and the effect below) -- unlike activityLogs (only fetched on-demand for the recovery UI),
@@ -1930,7 +1930,7 @@ function CalendarApp() {
       if (retryTimeoutId) clearTimeout(retryTimeoutId);
       if (unsubscribe) unsubscribe();
     };
-  }, [activeCalId, cloudReloadToken, restoreActiveCalendarFromCache, applyCalendarSnapshot]);
+  }, [activeCalId, cloudReloadToken, firebaseConnectionVersion, restoreActiveCalendarFromCache, applyCalendarSnapshot]);
 
   // Mobile browsers routinely freeze a tab while it is backgrounded. Firestore can then
   // resume with a cached snapshot without promptly reopening its listen stream. Recreating
@@ -2253,7 +2253,7 @@ function CalendarApp() {
         });
       });
     return () => { isMounted = false; unsub(); };
-  }, [activeCalId, firebaseDb]);
+  }, [activeCalId, firebaseDb, firebaseConnectionVersion]);
 
   // Places + confirmed meetings: calendar / places / settlement only
   React.useEffect(() => {
@@ -2332,7 +2332,7 @@ function CalendarApp() {
       unsubPlaces();
       unsubMeetings();
     };
-  }, [activeCalId, firebaseDb]);
+  }, [activeCalId, firebaseDb, firebaseConnectionVersion]);
 
   // Memos: paginated newest-first load (rather than subscribing to the entire collection at
   // once, which would download/re-sync thousands of memos on every open as a calendar grows).
