@@ -116,26 +116,3 @@ export function calculateSettlementPlan(totalExpense, participantNames, payerTot
     fundNetChange: -fundPaid
   };
 }
-
-export function isSettlementClearingIncomeEntry(item) {
-  const isIncome = item?.isIncome === true || Number(item?.amount) < 0;
-  if (!isIncome) return false;
-  if (item?.flowType === 'settlement-clearing') return true;
-  return /(정산금|분담금|정산\s*입금)/.test(String(item?.label || ''));
-}
-
-export function doesSettlementEntryAffectPrincipal(item) {
-  const isIncome = item?.isIncome === true || Number(item?.amount) < 0;
-  return isIncome
-    ? !isSettlementClearingIncomeEntry(item)
-    : !String(item?.payerId || '').trim();
-}
-
-export function calculateFundPrincipalBalance(baseBudget, items = []) {
-  return (Array.isArray(items) ? items : []).reduce((balance, item) => {
-    if (!doesSettlementEntryAffectPrincipal(item)) return balance;
-    const amount = Math.abs(Number(item?.amount) || 0);
-    const isIncome = item?.isIncome === true || Number(item?.amount) < 0;
-    return balance + (isIncome ? amount : -amount);
-  }, Math.max(0, Math.round(Number(baseBudget) || 0)));
-}
