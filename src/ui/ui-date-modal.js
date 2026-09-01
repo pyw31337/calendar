@@ -1205,7 +1205,21 @@ export function DateModal({
   const isConfirmed = isDateConfirmedMeeting(calendar, dateStr);
   const confirmedMeetingEntry = getConfirmedMeetings(calendar).find(m => m.date === dateStr) || null;
   const getMessageImageEntries = __deps.getMessageImageEntries;
-  const parseFlexibleDateTokens = __deps.parseFlexibleDateTokens;
+  const parseFlexibleDateTokens = __deps.parseFlexibleDateTokens || (text => {
+    const found = new Set();
+    const source = String(text || '');
+    const add = (yearRaw, monthRaw, dayRaw) => {
+      let year = Number(yearRaw); const month = Number(monthRaw); const day = Number(dayRaw);
+      if (year < 100) year += 2000;
+      if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day) || year < 2000 || year > 2099 || month < 1 || month > 12 || day < 1 || day > 31) return;
+      const date = new Date(year, month - 1, day);
+      if (date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day) found.add(`${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`);
+    };
+    source.replace(/(?:^|[^\d])(\d{2,4})\s*[.\-/]\s*(\d{1,2})\s*[.\-/]\s*(\d{1,2})(?=$|[^\d])/g, (_, y, m, d) => { add(y, m, d); return _; });
+    source.replace(/(?:^|[^\d])(\d{4})(\d{2})(\d{2})(?=$|[^\d])/g, (_, y, m, d) => { add(y, m, d); return _; });
+    source.replace(/(?:^|[^\d])(\d{2})(\d{2})(\d{2})(?=$|[^\d])/g, (_, y, m, d) => { add(y, m, d); return _; });
+    return Array.from(found);
+  });
   const dateStrToHashtag = __deps.dateStrToHashtag;
 
   // A 일정 사진's sourceMessageId can point at a chat message older than whatever's currently
