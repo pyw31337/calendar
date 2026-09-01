@@ -1291,7 +1291,7 @@ export function CalendarGrid({
           className: "participant-badge",
           style: {
             backgroundColor: p.color,
-            color: getContrastTextColor(p.color),
+            color: '#FFFFFF',
             cursor: 'pointer'
           },
           draggable: true,
@@ -1406,7 +1406,7 @@ export function CalendarGrid({
         top: `${touchDragBadge.y}px`,
         transform: 'translate(-50%, -130%)',
         backgroundColor: touchDragBadge.color,
-        color: getContrastTextColor(touchDragBadge.color),
+        color: '#FFFFFF',
         padding: '6px 12px',
         borderRadius: '999px',
         fontSize: '0.8rem',
@@ -2630,7 +2630,7 @@ export function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCan
       nonVoters.map(p => /*#__PURE__*/React.createElement("span", {
         key: p.id,
         className: "participant-badge",
-        style: { backgroundColor: p.color, color: getContrastTextColor(p.color), opacity: 0.65, fontSize: '0.7rem' }
+        style: { backgroundColor: p.color, color: '#FFFFFF', opacity: 0.65, fontSize: '0.7rem' }
       }, p.name))
     );
 
@@ -2720,7 +2720,7 @@ export function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCan
         className: "poll-voter-badges"
       }, voterIds.map(participantId => {
         const participant = participantsMap[participantId];
-        const textColor = getContrastTextColor(participant.color);
+        const textColor = '#FFFFFF';
         return /*#__PURE__*/React.createElement("span", {
           key: participantId,
           className: "poll-voter-badge",

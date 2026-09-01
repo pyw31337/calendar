@@ -1705,8 +1705,15 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
       }, isReplacingPhoto ? '...' : /*#__PURE__*/React.createElement(PencilIcon, { size: 15 }))
     ),
     isDesktop && /*#__PURE__*/React.createElement("div", {
+      // top: 0 pins this to the row's own top edge explicitly -- without it, this absolutely
+      // positioned group has no top of its own, so its vertical position falls back to the
+      // flex row's alignItems:center "static position", which is computed against the row's
+      // in-flow content. The edit/delete button group (this row's only in-flow child) only
+      // renders at 100% zoom, so the row's effective height collapses to 0 the moment you zoom
+      // away from 100% -- shifting where "centered" lands and making this group visibly jump.
       style: {
         position: 'absolute',
+        top: 0,
         left: '50%',
         transform: 'translateX(-50%)',
         display: 'flex',

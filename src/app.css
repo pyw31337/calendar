@@ -1759,8 +1759,11 @@ select.form-select {
 }
 .day-number-today::after { animation-delay: 1.2s; }
 @keyframes day-number-today-ripple {
+  /* scale(2.6) of a 16-24px circle (~5-8px radius growth) never reached a day-cell's edge in
+     testing -- overflow: visible on .day-cell.today was already working, the ripple itself just
+     wasn't big enough to need it. Scaled up so it visibly crosses into neighboring cells. */
   0% { transform: scale(1); opacity: 0.55; }
-  100% { transform: scale(2.6); opacity: 0; }
+  100% { transform: scale(4.2); opacity: 0; }
 }
 
 .badges-container { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; }

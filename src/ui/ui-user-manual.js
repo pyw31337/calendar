@@ -741,7 +741,7 @@ export function UserManualOverlay({ calendar, onClose }) {
     className: "participant-badge",
     style: {
       backgroundColor: participant.color,
-      color: getContrastTextColor(participant.color),
+      color: '#FFFFFF',
       boxShadow: 'none'
     }
   }, text || participant.name);
