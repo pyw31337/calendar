@@ -771,22 +771,34 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
       mapRef.current = map;
       try { map.invalidateSize({ animate: false }); } catch (e) {}
 
-      // MapTiler Official Positron Style (Clean, bright, monotone map with native Korean labels)
-      const maptilerKey = (typeof window !== 'undefined' && (window.MAPTILER_API_KEY || (window.GATHER_APP_CONFIG && window.GATHER_APP_CONFIG.maptilerApiKey))) || 'b45noTvSyt7Z3EozaXIa';
+      // MapTiler is optional. Never ship a shared fallback key in the client: once that public
+      // key is revoked, origin-restricted, or over quota, MapTiler returns a 403 PNG whose only
+      // visible content is "Invalid key". Use a deliberately configured key when present and
+      // fail over to the standard OSM layer on tile errors; without a configured key, start on
+      // OSM immediately.
+      const maptilerKey = (typeof window !== 'undefined'
+        && (window.MAPTILER_API_KEY || (window.GATHER_APP_CONFIG && window.GATHER_APP_CONFIG.maptilerApiKey))) || '';
+      const addOpenStreetMapLayer = () => L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        maxNativeZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      }).addTo(map);
       if (maptilerKey) {
-        L.tileLayer(`https://api.maptiler.com/maps/positron/256/{z}/{x}/{y}.png?key=${encodeURIComponent(maptilerKey)}`, {
+        const maptilerLayer = L.tileLayer(`https://api.maptiler.com/maps/positron/256/{z}/{x}/{y}.png?key=${encodeURIComponent(maptilerKey)}`, {
           maxZoom: 19,
           maxNativeZoom: 19,
           attribution: '&copy; <a href="https://www.maptiler.com/copyright/">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        }).addTo(map);
+        });
+        let switchedToFallback = false;
+        maptilerLayer.on('tileerror', () => {
+          if (switchedToFallback || cancelled || !mapRef.current) return;
+          switchedToFallback = true;
+          try { map.removeLayer(maptilerLayer); } catch (_) {}
+          addOpenStreetMapLayer();
+        });
+        maptilerLayer.addTo(map);
       } else {
-        // 100% Permanent Free OpenStreetMap Tiles (Native Korean place names, maxNativeZoom 19)
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          maxZoom: 19,
-          maxNativeZoom: 19,
-          subdomains: 'abc',
-          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        }).addTo(map);
+        addOpenStreetMapLayer();
       }
       try { map.invalidateSize({ animate: false }); } catch (e) {}
 
