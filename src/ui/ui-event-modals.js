@@ -3259,6 +3259,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   )),
 
   isSettlementSearchOpen && InlineSearchBar && /*#__PURE__*/React.createElement(InlineSearchBar, {
+    fixed: true,
     value: settlementSearchQuery,
     placeholder: "정산 항목, 날짜 또는 카테고리 검색...",
     onChange: event => setSettlementSearchQuery(event.target.value),
@@ -3730,9 +3731,20 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
         }, "✕")
       )
     ),
-    /* Group 1: 정산 생성 + 정산 목록 */
+    /* Group 1: 정산 검색 + 정산 생성 + 정산 목록 */
     React.createElement("div", { className: "admin-side-menu-list", style: { borderBottom: 'none', paddingTop: '6px' } },
-      /* 1. 정산 생성 */
+      /* 1. 정산 검색 */
+      React.createElement("button", {
+        type: "button",
+        className: "admin-side-menu-item",
+        onClick: () => { setIsSettlementMenuOpen(false); setIsSettlementSearchOpen(true); }
+      },
+        React.createElement("span", { className: "admin-side-menu-item-icon" }, React.createElement(SearchIcon, { size: 20 })),
+        React.createElement("span", { className: "admin-side-menu-item-copy" },
+          React.createElement("span", { className: "admin-side-menu-item-title", style: { fontWeight: 700, color: "var(--text-main)" } }, "정산 검색")
+        )
+      ),
+      /* 2. 정산 생성 */
       React.createElement("button", {
         type: "button",
         className: "admin-side-menu-item",
@@ -3749,7 +3761,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
         )
       ),
 
-      /* 2. 정산 목록 */
+      /* 3. 정산 목록 */
       React.createElement("button", {
         type: "button",
         className: "admin-side-menu-item",
