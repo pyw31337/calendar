@@ -1423,15 +1423,12 @@ export function DateModal({
   const [expenseLabelInput, setExpenseLabelInput] = React.useState('');
   const [expenseAmountInput, setExpenseAmountInput] = React.useState('');
   const [expenseCategoryInput, setExpenseCategoryInput] = React.useState(() => getExpenseCategories(calendar)[0]?.id || 'etc');
-  // The picker needs a UI-only "not chosen yet" state. Persisted '' still means the shared fund
-  // paid directly, while a participant name means that person personally fronted the amount.
-  // Keeping those meanings separate prevents a brand-new, untouched form from silently recording
-  // a personal-card payment as a shared-fund expense.
-  const EXPENSE_PAYER_UNSELECTED = '__expense_payer_unselected__';
-  const EXPENSE_PAYER_FUND = '__expense_payer_fund__';
-  const [expensePayerInput, setExpensePayerInput] = React.useState(EXPENSE_PAYER_UNSELECTED);
+  // 지출자(payer): '' means 공금지출 (paid from the shared pool). A participant name means that
+  // person personally fronted the amount -- the settlement card auto-derives who to reimburse
+  // from this instead of the same line item having to be re-typed there by hand.
+  const [expensePayerInput, setExpensePayerInput] = React.useState('');
   const expensePayerOptions = React.useMemo(() => [
-    { value: EXPENSE_PAYER_FUND, label: '공금 직접지출' },
+    { value: '', label: '공금지출' },
     ...activeParticipants.map(p => ({ value: p.name, label: p.name, color: p.color }))
   ], [activeParticipants]);
   const [expenseIsIncome, setExpenseIsIncome] = React.useState(false);
@@ -1450,7 +1447,7 @@ export function DateModal({
     setExpenseLabelInput('');
     setExpenseAmountInput('');
     setExpenseCategoryInput(getExpenseCategories(calendar)[0]?.id || 'etc');
-    setExpensePayerInput(EXPENSE_PAYER_UNSELECTED);
+    setExpensePayerInput('');
     setExpenseIsIncome(false);
     setEditingExpenseId(null);
     setDraggingExpenseId('');
@@ -1584,8 +1581,7 @@ export function DateModal({
     const isIncome = Number(expense.amount) < 0;
     const amountStr = Math.abs(Number(expense.amount)).toLocaleString();
     const cat = expense.categoryId || 'etc';
-    // Existing records without payerId are legacy/shared-fund entries, not incomplete drafts.
-    const payer = isIncome ? EXPENSE_PAYER_UNSELECTED : (expense.payerId || EXPENSE_PAYER_FUND);
+    const payer = expense.payerId || '';
     setEditingExpenseId(eid);
     setExpenseLabelInput(label);
     setExpenseIsIncome(isIncome);
@@ -1621,10 +1617,6 @@ export function DateModal({
       showToast('금액을 입력해 주세요.', 'error');
       return;
     }
-    if (!expenseIsIncome && expensePayerInput === EXPENSE_PAYER_UNSELECTED) {
-      showToast('결제 재원을 선택해 주세요.', 'error');
-      return;
-    }
     setIsSavingExpense(true);
     try {
       const finalAmount = expenseIsIncome ? -cleanAmount : cleanAmount;
@@ -1633,7 +1625,7 @@ export function DateModal({
         label,
         amount: finalAmount,
         categoryId: expenseCategoryInput,
-        payerId: expenseIsIncome || expensePayerInput === EXPENSE_PAYER_FUND ? '' : expensePayerInput
+        payerId: expenseIsIncome ? '' : expensePayerInput
       });
       if (ok !== false) {
         showToast(editingExpenseId ? '정산 내역이 수정되었습니다.' : '정산 내역이 추가되었습니다.', 'success');
@@ -1641,7 +1633,7 @@ export function DateModal({
         setExpenseLabelInput('');
         setExpenseAmountInput('');
         setExpenseIsIncome(false);
-        setExpensePayerInput(EXPENSE_PAYER_UNSELECTED);
+        setExpensePayerInput('');
         setHasInteracted(false);
         const resetExpCat = getExpenseCategories(calendar)[0]?.id || 'etc';
         setExpenseCategoryInput(resetExpCat);
@@ -1652,7 +1644,7 @@ export function DateModal({
           expenseAmountInput: '',
           expenseIsIncome: false,
           expenseCategoryInput: resetExpCat,
-          expensePayerInput: EXPENSE_PAYER_UNSELECTED
+          expensePayerInput: ''
         });
       }
     } catch (err) {
@@ -2270,11 +2262,11 @@ export function DateModal({
             border: '1px solid var(--border-subtle)',
             borderRadius: 'var(--radius-md)'
           }
-        }, dateEntries.map((entry, entryIndex) => {
+        }, dateEntries.map(entry => {
           const part = activeParticipants.find(p => p.id === entry.participantId);
           if (!part) return null;
           return /*#__PURE__*/React.createElement("div", {
-            key: entry.id || `${entry.participantId || 'participant'}_${entryIndex}`,
+            key: entry.id,
             className: "date-modal-attendance-row",
             style: {
               display: 'flex',
@@ -2768,19 +2760,16 @@ export function DateModal({
         !expenseIsIncome && /*#__PURE__*/React.createElement("div", null,
           /*#__PURE__*/React.createElement("label", {
             style: { display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }
-          }, "결제 재원"),
+          }, "지출자"),
           /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
-            title: "결제 재원 선택",
-            placeholder: "결제 재원 선택",
+            title: "지출자 선택",
+            placeholder: "공금지출",
             value: expensePayerInput,
             disabled: isSavingExpense,
             onSelect: setExpensePayerInput,
             options: expensePayerOptions,
             style: { width: '100%', height: '42px' }
-          }),
-          /*#__PURE__*/React.createElement("div", {
-            style: { marginTop: '6px', fontSize: '0.72rem', lineHeight: 1.45, color: 'var(--text-muted)' }
-          }, "공금통장에서 바로 결제했으면 ‘공금 직접지출’, 개인 카드로 먼저 결제했으면 결제자 이름을 선택하세요.")
+          })
         ),
         /*#__PURE__*/React.createElement("div", { ref: expenseLabelFieldRef },
           /*#__PURE__*/React.createElement("label", {
@@ -2825,7 +2814,7 @@ export function DateModal({
               setExpenseLabelInput('');
               setExpenseAmountInput('');
               setExpenseIsIncome(false);
-              setExpensePayerInput(EXPENSE_PAYER_UNSELECTED);
+              setExpensePayerInput('');
             },
             onSubmit: handleSaveExpenseClick
           })
