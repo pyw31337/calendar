@@ -1428,6 +1428,55 @@ select.form-select {
 
 .color-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 
+/* Comment author dots are intentionally compact on memo cards. Keep the author's
+   name discoverable on hover, keyboard focus, and touch (focus) without changing
+   the card's layout. */
+.memo-comment-author-dot {
+  position: relative;
+  display: inline-block;
+  outline: none;
+}
+.memo-comment-author-dot::after {
+  content: attr(data-author-name);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 7px);
+  transform: translateX(-50%) translateY(3px);
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 20;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: #0F172A;
+  color: #FFFFFF;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.2;
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.22);
+  transition: opacity 0.14s ease, transform 0.14s ease;
+}
+.memo-comment-author-dot::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 2px);
+  transform: translateX(-50%) translateY(3px);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 20;
+  border: 4px solid transparent;
+  border-top-color: #0F172A;
+  transition: opacity 0.14s ease, transform 0.14s ease;
+}
+.memo-comment-author-dot:hover::after,
+.memo-comment-author-dot:hover::before,
+.memo-comment-author-dot:focus-visible::after,
+.memo-comment-author-dot:focus-visible::before {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
 .participant-add-row,
 .participant-edit-row {
   width: 100%;

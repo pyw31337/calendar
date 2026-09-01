@@ -2428,6 +2428,12 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         }
       },
         /*#__PURE__*/React.createElement("span", {
+          className: "memo-comment-author-dot",
+          role: "img",
+          tabIndex: 0,
+          "aria-label": `${author?.name || '알 수 없는 작성자'} 작성자`,
+          "data-author-name": author?.name || '알 수 없는 작성자',
+          title: author?.name || '알 수 없는 작성자',
           style: { width: '8px', height: '8px', borderRadius: '50%', backgroundColor: author?.color || '#94A3B8', flexShrink: 0 }
         }),
         /*#__PURE__*/React.createElement("span", {
