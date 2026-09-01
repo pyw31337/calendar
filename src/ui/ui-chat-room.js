@@ -1636,12 +1636,6 @@ export function ChatRoomView({
     }
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",
-    onClick: () => { setIsSearchOpen(true); setSearchQuery(''); },
-    title: "대화 검색",
-    "aria-label": "대화 검색",
-    style: { background: 'none', border: 'none', cursor: 'pointer', padding: '6px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--radius-md)' }
-  }, /*#__PURE__*/React.createElement(HeaderSearchIcon, { size: 20 })), /*#__PURE__*/React.createElement("button", {
-    type: "button",
     onClick: onBack,
     "aria-label": "뒤로가기",
     style: {
@@ -1769,9 +1763,9 @@ export function ChatRoomView({
     style: { display: 'flex', alignItems: 'center', gap: '2px' }
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",
-    onClick: () => setIsChatSideMenuOpen(true),
-    title: "채팅 메뉴",
-    "aria-label": "채팅 메뉴 열기",
+    onClick: () => { setIsSearchOpen(true); setSearchQuery(''); },
+    title: "대화 검색",
+    "aria-label": "대화 검색",
     style: {
       background: 'none',
       border: 'none',
@@ -1783,6 +1777,12 @@ export function ChatRoomView({
       justifyContent: 'center',
       borderRadius: 'var(--radius-md)'
     }
+  }, /*#__PURE__*/React.createElement(HeaderSearchIcon, { size: 20 })), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => setIsChatSideMenuOpen(true),
+    title: "채팅 메뉴",
+    "aria-label": "채팅 메뉴 열기",
+    style: { background: 'none', border: 'none', cursor: 'pointer', padding: '6px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--radius-md)' }
   }, /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 22 })))), /*#__PURE__*/React.createElement("div", {
     style: { flex: 1, position: 'relative', minHeight: 0 }
   }, /*#__PURE__*/React.createElement("div", {
