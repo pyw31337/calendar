@@ -1260,57 +1260,6 @@ export function LinkPreviewProgressOverlay({ progress, remainingSec }) {
   );
 }
 
-export function DeleteConfirmModal({
-  message,
-  calendar,
-  onConfirm,
-  onCancel
-}) {
-  const React = window.React;
-  const __deps = window.GATHER_UI_DEPS || {};
-  const __comp = window.GATHER_UI_COMPONENTS || {};
-  const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer || (function Shell(p) { return React.createElement('div', p, p.children); });
-
-  const participants = getActiveParticipants(calendar);
-  const p = participants.find(part => part.id === message.participantId);
-  const name = p?.name || '알수없음';
-
-  let contentText = message.text || '';
-  if (contentText.length > 20) {
-    contentText = contentText.substring(0, 20) + '...';
-  } else if (!contentText && message.imageUrl) {
-    contentText = '사진';
-  }
-
-  return /*#__PURE__*/React.createElement("div", {
-    className: "modal-overlay",
-    onClick: onCancel,
-    style: { zIndex: 30000 }
-  }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
-    className: "modal-container",
-    onClick: e => e.stopPropagation(),
-    style: { maxWidth: '320px', padding: '20px', borderRadius: 'var(--radius-md)' }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: { textAlign: 'center', marginBottom: '20px' }
-  }, /*#__PURE__*/React.createElement("h3", {
-    style: { fontSize: '1.05rem', fontWeight: 800, marginBottom: '8px', color: 'var(--text-main)' }
-  }, "채팅 삭제"), /*#__PURE__*/React.createElement("p", {
-    style: { fontSize: '0.88rem', color: 'var(--text-muted)', lineHeight: '1.5' }
-  }, `${name}님의 "${contentText}" 내용을 삭제하시겠습니까?`)), /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', gap: '8px', justifyContent: 'center' }
-  }, /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    className: "btn btn-secondary",
-    onClick: onCancel,
-    style: { flex: 1, height: '36px', fontSize: '0.85rem' }
-  }, "취소"), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    className: "btn btn-danger",
-    onClick: onConfirm,
-    style: { flex: 1, height: '36px', fontSize: '0.85rem', backgroundColor: '#EF4444', color: '#FFFFFF', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }
-  }, "확인"))));
-}
-
 export function AdminLoginGate({ children }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -1669,56 +1618,76 @@ export function StickyVideoBox({ stickyVideo, onClose, onGoToChat }) {
   }, '✕'))), hostRef.current);
 }
 
-export function PollVoterSheet({ calendar, pollId, optionId, onSelect, onClose }) {
+// Shared "\uCC38\uC5EC\uC790 \uC120\uD0DD" bottom sheet -- portaled to document.body (see stopPropagation comment
+// below), lists active participants as color-dot + name rows with a checkmark on the selected
+// one(s). ChatParticipantSheet (ui-chat-sheets.js, single-select "\uC791\uC131\uC790 \uC120\uD0DD") and PollVoterSheet
+// (below, multi-voter "\uD22C\uD45C\uC790 \uC120\uD0DD") used to each hand-roll this exact same sheet -- differing only
+// in title text and selection semantics -- so this is the one place their shared chrome lives.
+export function ParticipantSelectSheet({ calendar, participants, title, isOptionSelected, onSelect, onClose }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
+  const ParticipantBackdrop = __comp.ParticipantBackdrop || __deps.ParticipantBackdrop;
+
+  const list = participants || getActiveParticipants(calendar);
+  // Bottom-sheet rule: portal to document.body so a `position: fixed` sheet never gets trapped
+  // by a transformed ancestor (e.g. a poll card's hover lift, or a memo card's :hover lift).
+  return ReactDOM.createPortal(/*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "modal-overlay",
+    // Portaled elements replay their synthetic events through the React component tree, not
+    // the DOM tree, so this click would otherwise still bubble up to whatever ancestor
+    // component (e.g. a poll card's or memo card's "tap to open" handler) rendered this sheet.
+    onClick: e => { e.stopPropagation(); onClose(); },
+    style: {
+      alignItems: 'flex-end',
+      backgroundColor: 'rgba(15, 23, 42, 0.68)',
+      zIndex: 11000
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "poll-voter-sheet",
+    style: { zIndex: 11001 }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "poll-voter-sheet-header"
+  }, /*#__PURE__*/React.createElement("span", null, title), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: onClose,
+    style: { background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }
+  }, /*#__PURE__*/React.createElement(SmallXIcon, null))), /*#__PURE__*/React.createElement("div", {
+    style: { display: 'grid', gap: '8px', padding: '14px 20px 24px' }
+  }, list.map(participant => /*#__PURE__*/React.createElement("button", {
+    key: participant.id,
+    type: "button",
+    className: "poll-voter-option",
+    onClick: () => onSelect(participant.id)
+  }, /*#__PURE__*/React.createElement(ParticipantBackdrop, { participant: participant, name: participant.name, dotSize: 10, style: { gap: '10px' } }),
+  isOptionSelected(participant.id) && /*#__PURE__*/React.createElement("span", {
+    style: { color: '#2563EB', fontWeight: 900 }
+  }, "\u2713")))))), document.body);
+}
+
+export function PollVoterSheet({ calendar, pollId, optionId, onSelect, onClose }) {
+  const React = window.React;
+  const __deps = window.GATHER_UI_DEPS || {};
+  const __comp = window.GATHER_UI_COMPONENTS || {};
+  const SharedParticipantSelectSheet = __comp.ParticipantSelectSheet || __deps.ParticipantSelectSheet || ParticipantSelectSheet;
 
   const participants = getActiveParticipants(calendar);
   const poll = getCalendarPolls(calendar).find(item => item.id === pollId);
   const option = getActivePollOptions(poll).find(item => item.id === optionId);
   if (!poll || !option) return null;
   const selectedIds = new Set(getPollOptionVoterIds(poll, option.id));
-  // Bottom-sheet rule: portal to document.body so a `position: fixed` sheet never gets trapped
-  // by a transformed ancestor (e.g. a poll card's hover lift) -- see ChatParticipantSheet's
-  // matching comment for the full explanation.
-  return ReactDOM.createPortal(/*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
-    className: "modal-overlay",
-    // Portaled elements replay their synthetic events through the React component tree, not
-    // the DOM tree, so this click would otherwise still bubble up to whatever ancestor
-    // component (e.g. a poll card's "tap to open" handler) rendered this sheet.
-    onClick: e => { e.stopPropagation(); onClose(); },
-    style: {
-      alignItems: 'flex-end',
-      backgroundColor: 'rgba(15, 23, 42, 0.68)'
-    }
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "poll-voter-sheet"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "poll-voter-sheet-header"
-  }, /*#__PURE__*/React.createElement("span", null, "\uD22C\uD45C\uC790 \uC120\uD0DD"), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: onClose,
-    style: { background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }
-  }, /*#__PURE__*/React.createElement(SmallXIcon, null))), /*#__PURE__*/React.createElement("div", {
-    style: { display: 'grid', gap: '8px', padding: '14px 20px 24px' }
-  }, participants.map(participant => /*#__PURE__*/React.createElement("button", {
-    key: participant.id,
-    type: "button",
-    className: "poll-voter-option",
-    onClick: () => {
-      setStoredChatParticipantId(calendar?.id, participant.id);
-      onSelect(participant.id);
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: { display: 'inline-flex', alignItems: 'center', gap: '10px' }
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "color-dot",
-    style: { backgroundColor: participant.color }
-  }), participant.name), selectedIds.has(participant.id) && /*#__PURE__*/React.createElement("span", {
-    style: { color: '#2563EB', fontWeight: 900 }
-  }, "\u2713")))))), document.body);
+  return /*#__PURE__*/React.createElement(SharedParticipantSelectSheet, {
+    calendar: calendar,
+    participants: participants,
+    title: "\uD22C\uD45C\uC790 \uC120\uD0DD",
+    isOptionSelected: id => selectedIds.has(id),
+    onSelect: id => {
+      setStoredChatParticipantId(calendar?.id, id);
+      onSelect(id);
+    },
+    onClose: onClose
+  });
 }
 
 export function OperationProgressOverlay({ title, detail, pct }) {
@@ -2221,12 +2190,12 @@ export function ResizableListSection({
     SyncStatusBanner: SyncStatusBanner,
     LinkPreviewCard: LinkPreviewCard,
     LinkPreviewProgressOverlay: LinkPreviewProgressOverlay,
-    DeleteConfirmModal: DeleteConfirmModal,
     AdminLoginGate: AdminLoginGate,
     DonutChart: DonutChart,
     ColorSwatchPicker: ColorSwatchPicker,
     StickyVideoBox: StickyVideoBox,
     PollVoterSheet: PollVoterSheet,
+    ParticipantSelectSheet: ParticipantSelectSheet,
     OperationProgressOverlay: OperationProgressOverlay,
     ToggleSwitch: ToggleSwitch,
     Footer: Footer,

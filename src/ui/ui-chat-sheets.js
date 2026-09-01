@@ -762,74 +762,16 @@ function getAnniversaryDisplayColor(...args) {
 export function ChatParticipantSheet({ calendar, selectedId, onSelect, onClose }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
-  const ParticipantBackdrop = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ParticipantBackdrop) || __deps.ParticipantBackdrop;
-  const SmallXIcon = __deps.SmallXIcon;
+  const __comp = window.GATHER_UI_COMPONENTS || {};
+  const ParticipantSelectSheet = __comp.ParticipantSelectSheet || __deps.ParticipantSelectSheet;
 
-  const participants = getActiveParticipants(calendar);
-  // Bottom-sheet rule: never render a `position: fixed` sheet as a plain in-tree child --
-  // any ancestor with `transform` (e.g. .memo-card's :hover lift, or ResizableModalContainer)
-  // becomes that fixed element's containing block instead of the viewport, so it renders
-  // trapped near wherever the trigger button happens to sit rather than docked to the bottom
-  // of the screen. Portal straight to document.body like SimpleBottomSheetPicker already does,
-  // so every current and future caller (chat/memo composer, memo edit, memo comment, ...) is
-  // immune regardless of what it's nested inside.
-  return ReactDOM.createPortal(/*#__PURE__*/React.createElement(React.Fragment, null,
-    /* Overlay */
-    /*#__PURE__*/React.createElement("div", {
-      className: "modal-overlay",
-      // React replays a portaled element's synthetic events through the *component* tree it
-      // was rendered from, not the DOM tree it's mounted in -- so without stopPropagation this
-      // click still bubbles up to whatever ancestor component (e.g. a memo card's "tap to open
-      // edit" handler) rendered this sheet, even though the overlay itself sits under
-      // document.body, nowhere near that ancestor in the actual DOM.
-      onClick: e => { e.stopPropagation(); onClose(); },
-      style: {
-        alignItems: 'flex-end',
-        backgroundColor: 'rgba(15, 23, 42, 0.68)',
-        zIndex: 11000
-      }
-    }),
-    /* Bottom Sheet */
-    /*#__PURE__*/React.createElement("div", {
-      className: "poll-voter-sheet",
-      style: { zIndex: 11001 }
-    },
-      /* Header */
-      /*#__PURE__*/React.createElement("div", {
-        className: "poll-voter-sheet-header"
-      },
-        /*#__PURE__*/React.createElement("span", null, "작성자 선택"),
-        /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          onClick: onClose,
-          style: { background: 'none', border: 'none', color: '#64748B', cursor: 'pointer', padding: '4px' }
-        }, /*#__PURE__*/React.createElement(SmallXIcon, null))
-      ),
-      /* List */
-      /*#__PURE__*/React.createElement("div", {
-        style: { display: 'grid', gap: '8px', padding: '14px 20px 24px' }
-      },
-        participants.map(participant => /*#__PURE__*/React.createElement("button", {
-          key: participant.id,
-          type: "button",
-          className: "poll-voter-option",
-          onClick: () => {
-            onSelect(participant.id);
-            onClose();
-          }
-        },
-          /* Left content: dot + name */
-          ParticipantBackdrop ? /*#__PURE__*/React.createElement(ParticipantBackdrop, { participant: participant, name: participant.name, dotSize: 10, style: { gap: '10px' } }) : /*#__PURE__*/React.createElement("span", {
-            style: { display: 'inline-flex', alignItems: 'center', gap: '10px', color: participant.color, fontWeight: 700 }
-          }, /*#__PURE__*/React.createElement("span", { className: "color-dot", style: { backgroundColor: participant.color } }), participant.name),
-          /* Right content: checkmark if selected */
-          selectedId === participant.id && /*#__PURE__*/React.createElement("span", {
-            style: { color: '#2563EB', fontWeight: 900 }
-          }, "✓")
-        ))
-      )
-    )
-  ), document.body);
+  return /*#__PURE__*/React.createElement(ParticipantSelectSheet, {
+    calendar: calendar,
+    title: "작성자 선택",
+    isOptionSelected: id => selectedId === id,
+    onSelect: id => { onSelect(id); onClose(); },
+    onClose: onClose
+  });
 }
 
 export function NotificationPermissionHelpModal({ onClose, onRetry, showToast }) {
