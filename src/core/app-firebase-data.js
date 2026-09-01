@@ -539,10 +539,11 @@ function mergeCalendarAvailabilityDelta(serverCalendar, incomingCalendar, change
   }
   const participantIds = new Set(getActiveParticipants(base).map(participant => participant.id));
   const availabilityMap = new Map();
+  const keyOf = availability => `${availability.date}_${availability.participantId}`;
 
   (base.availabilities || []).forEach((availability) => {
     if (availability?.date && availability?.participantId && isValidDateString(availability.date)) {
-      availabilityMap.set(`${availability.date}_${availability.participantId}`, availability);
+      availabilityMap.set(keyOf(availability), availability);
     }
   });
 
@@ -550,8 +551,60 @@ function mergeCalendarAvailabilityDelta(serverCalendar, incomingCalendar, change
     if (!availability?.date || !availability?.participantId) return;
     if (!isValidDateString(availability.date)) return;
     if (participantIds.size > 0 && !participantIds.has(availability.participantId)) return;
-    const key = `${availability.date}_${availability.participantId}`;
+    const key = keyOf(availability);
     availabilityMap.set(key, mergeAvailabilityRecord(availabilityMap.get(key), availability));
+  });
+
+  // Re-sequence the output order per date group. Map.set() on an existing key updates its value
+  // but never moves it, so reading availabilityMap.values() directly always fell back to `base`'s
+  // insertion order -- silently discarding every attendee-list reorder (dragging the list sends
+  // the SAME set of entries back in a new order, no content change) on the very next save.
+  //
+  // Only trust `incoming`'s order for a date when it names the EXACT SAME set of participants
+  // `base` already has for that date -- i.e. this really was a pure reorder. A single device's
+  // save often carries just its own delta (e.g. one participant's new availability for a date,
+  // unaware of others who already saved that same date), and blindly following such a partial
+  // `incoming`'s order would scatter that date's other, untouched entries instead of leaving them
+  // where `base` had them. When the sets don't match, `base`'s order is kept for entries it
+  // already had, and anything only `incoming` mentions (a genuinely new entry) is appended after.
+  const baseKeysByDate = new Map();
+  (base.availabilities || []).forEach(availability => {
+    if (!availability?.date || !availability?.participantId || !isValidDateString(availability.date)) return;
+    if (!baseKeysByDate.has(availability.date)) baseKeysByDate.set(availability.date, new Set());
+    baseKeysByDate.get(availability.date).add(keyOf(availability));
+  });
+  const incomingKeysByDate = new Map();
+  (incoming.availabilities || []).forEach(availability => {
+    if (!availability?.date || !availability?.participantId) return;
+    if (!isValidDateString(availability.date)) return;
+    if (participantIds.size > 0 && !participantIds.has(availability.participantId)) return;
+    if (!incomingKeysByDate.has(availability.date)) incomingKeysByDate.set(availability.date, new Set());
+    incomingKeysByDate.get(availability.date).add(keyOf(availability));
+  });
+  const isPureReorderForDate = date => {
+    const baseSet = baseKeysByDate.get(date);
+    const incomingSet = incomingKeysByDate.get(date);
+    if (!baseSet || !incomingSet || baseSet.size !== incomingSet.size) return false;
+    for (const key of baseSet) { if (!incomingSet.has(key)) return false; }
+    return true;
+  };
+
+  const orderedKeys = [];
+  const seenKeys = new Set();
+  const appendKey = key => {
+    if (seenKeys.has(key) || !availabilityMap.has(key)) return;
+    seenKeys.add(key);
+    orderedKeys.push(key);
+  };
+  (incoming.availabilities || []).forEach(availability => {
+    if (!availability?.date || !availability?.participantId) return;
+    if (isPureReorderForDate(availability.date)) appendKey(keyOf(availability));
+  });
+  (base.availabilities || []).forEach(availability => {
+    if (availability?.date && availability?.participantId) appendKey(keyOf(availability));
+  });
+  (incoming.availabilities || []).forEach(availability => {
+    if (availability?.date && availability?.participantId) appendKey(keyOf(availability));
   });
 
   return {
@@ -559,7 +612,7 @@ function mergeCalendarAvailabilityDelta(serverCalendar, incomingCalendar, change
     title: base.title || incoming.title,
     description: base.description || incoming.description,
     participants: base.participants || [],
-    availabilities: Array.from(availabilityMap.values()),
+    availabilities: orderedKeys.map(key => availabilityMap.get(key)),
     activityLogs: mergeActivityLogs(base.activityLogs || [], incoming.activityLogs || [], base.id || incoming.id, participantIds),
     polls: base.polls || [],
     deletedActivityLogIds: mergeDeletedActivityLogIds(base.deletedActivityLogIds || [], incoming.deletedActivityLogIds || []),
