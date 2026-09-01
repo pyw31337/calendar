@@ -1095,7 +1095,8 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
           // title and thumbnail. The card is supplemental; the iframe remains unchanged.
           url: firstUrl,
           fallbackTitle: text ? removeFirstUrl(text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '',
-          cachedData: linkPreview
+          cachedData: linkPreview,
+          stretch: true
         }));
       })(),
     remainingText ? /*#__PURE__*/React.createElement('div', null, parseTextWithLinks(remainingText, searchQuery)) : null
