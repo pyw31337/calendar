@@ -2060,6 +2060,12 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
   const [editingCommentId, setEditingCommentId] = React.useState(null);
   const [isSavingComment, setIsSavingComment] = React.useState(false);
   const commentPart = (calendar?.participants || []).find(p => p.id === commentParticipantId);
+  // Long comment threads otherwise push the composer far below the fold -- collapse to the most
+  // recent COMMENT_COLLAPSE_LIMIT by default, with a toggle above the list to see the rest.
+  const COMMENT_COLLAPSE_LIMIT = 3;
+  const [isCommentsExpanded, setIsCommentsExpanded] = React.useState(false);
+  const hasMoreComments = comments.length > COMMENT_COLLAPSE_LIMIT;
+  const visibleComments = (!hasMoreComments || isCommentsExpanded) ? comments : comments.slice(-COMMENT_COLLAPSE_LIMIT);
 
   const handleSaveComment = async (e) => {
     e.stopPropagation();
@@ -2418,7 +2424,24 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     /* Comment list -- gray capsule rows: participant-color dot, text, edit/delete */
     comments.length > 0 && /*#__PURE__*/React.createElement("div", {
       style: { display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '8px' }
-    }, comments.map(comment => {
+    },
+      hasMoreComments && /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: e => { e.stopPropagation(); setIsCommentsExpanded(v => !v); },
+        style: {
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+          alignSelf: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px',
+          fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)'
+        }
+      },
+        /*#__PURE__*/React.createElement("svg", {
+          width: "12", height: "12", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2",
+          strokeLinecap: "round", strokeLinejoin: "round",
+          style: { transform: isCommentsExpanded ? 'none' : 'rotate(180deg)' }
+        }, /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" })),
+        isCommentsExpanded ? '댓글 접기' : `댓글 더보기 (${comments.length - COMMENT_COLLAPSE_LIMIT}개)`
+      ),
+      visibleComments.map(comment => {
       const author = (calendar?.participants || []).find(p => p.id === comment.participantId);
       return /*#__PURE__*/React.createElement("div", {
         key: comment.id,

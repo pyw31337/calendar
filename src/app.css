@@ -1687,7 +1687,10 @@ select.form-select {
   opacity: 0.28;
   filter: saturate(0.55);
 }
-.day-cell.today { border-color: var(--accent-primary); background: #EEF2FF; }
+/* overflow: visible + a z-index bump so the today badge's ripple (see .day-number-today below)
+   can spread past this cell's own boundary into neighboring cells instead of being clipped by
+   .day-cell's overflow: hidden, and paints above those neighbors rather than under them. */
+.day-cell.today { border-color: var(--accent-primary); background: #EEF2FF; overflow: visible; z-index: 2; }
 
 .day-cell.all-available {
   background: #ECFDF5;
