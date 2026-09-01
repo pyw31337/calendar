@@ -5022,6 +5022,14 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
   min-width: 0;
 }
 @media (max-width: 640px) {
+  /* Keep every actionable control inside a modal at a reliable 36px touch height on phones.
+     This covers compact icon/action buttons as well as full-width actions without changing the
+     surrounding page/header controls or their visual sizing. */
+  .modal-body button,
+  .modal-body [role="button"] {
+    min-height: 36px;
+  }
+
   .modal-body {
     padding-left: 18px;
     padding-right: 18px;
