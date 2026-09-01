@@ -4573,8 +4573,8 @@ textarea.form-input {
 /* The raster layer is only the instant/legacy-device fallback for the sparse vector map. Wash
    it back so pins remain the visual hierarchy even while the MapLibre chunk is still loading. */
 .places-map-raster-fallback .leaflet-tile {
-  filter: grayscale(100%) saturate(0%) contrast(62%) brightness(1.22) opacity(58%);
-  -webkit-filter: grayscale(100%) saturate(0%) contrast(62%) brightness(1.22) opacity(58%);
+  filter: grayscale(100%) saturate(0%) contrast(70%) brightness(1.27) opacity(64%);
+  -webkit-filter: grayscale(100%) saturate(0%) contrast(70%) brightness(1.27) opacity(64%);
 }
 :root[data-theme="dark"] .places-map-raster-fallback .leaflet-tile {
   filter: grayscale(100%) invert(90%) contrast(62%) brightness(0.72) opacity(65%);

@@ -741,14 +741,14 @@ const MINIMAL_MONO_MAP_STYLE = {
     {
       id: 'background',
       type: 'background',
-      paint: { 'background-color': '#f4f4f1' }
+      paint: { 'background-color': '#f8f8f6' }
     },
     {
       id: 'water',
       type: 'fill',
       source: 'openmaptiles',
       'source-layer': 'water',
-      paint: { 'fill-color': '#dfe3e4', 'fill-antialias': true }
+      paint: { 'fill-color': '#e7eaeb', 'fill-antialias': true }
     },
     {
       id: 'parks',
@@ -756,7 +756,7 @@ const MINIMAL_MONO_MAP_STYLE = {
       source: 'openmaptiles',
       'source-layer': 'park',
       minzoom: 8,
-      paint: { 'fill-color': '#eaebe7', 'fill-opacity': 0.7 }
+      paint: { 'fill-color': '#f0f1ed', 'fill-opacity': 0.72 }
     },
     {
       id: 'waterways',
@@ -764,7 +764,7 @@ const MINIMAL_MONO_MAP_STYLE = {
       source: 'openmaptiles',
       'source-layer': 'waterway',
       minzoom: 9,
-      paint: { 'line-color': '#d2d8da', 'line-width': 0.8, 'line-opacity': 0.75 }
+      paint: { 'line-color': '#dce1e2', 'line-width': 0.8, 'line-opacity': 0.78 }
     },
     {
       id: 'major-road-casing',
@@ -775,7 +775,7 @@ const MINIMAL_MONO_MAP_STYLE = {
       filter: ['in', ['get', 'class'], ['literal', ['motorway', 'trunk', 'primary', 'secondary']]],
       layout: { 'line-cap': 'round', 'line-join': 'round' },
       paint: {
-        'line-color': '#d8d8d5',
+        'line-color': '#e1e1de',
         'line-width': ['interpolate', ['linear'], ['zoom'], 7, 1.2, 13, 4, 18, 9],
         'line-opacity': 0.65
       }
@@ -829,7 +829,7 @@ const MINIMAL_MONO_MAP_STYLE = {
         'text-size': 11,
         'text-letter-spacing': 0.08
       },
-      paint: { 'text-color': '#85898b', 'text-halo-color': '#f4f4f1', 'text-halo-width': 1 }
+      paint: { 'text-color': '#74797b', 'text-halo-color': '#f8f8f6', 'text-halo-width': 1.1 }
     },
     {
       id: 'region-labels',
@@ -845,7 +845,7 @@ const MINIMAL_MONO_MAP_STYLE = {
         'text-size': 10,
         'text-letter-spacing': 0.05
       },
-      paint: { 'text-color': '#96999a', 'text-halo-color': '#f4f4f1', 'text-halo-width': 1 }
+      paint: { 'text-color': '#818688', 'text-halo-color': '#f8f8f6', 'text-halo-width': 1.1 }
     },
     {
       id: 'city-labels',
@@ -860,7 +860,7 @@ const MINIMAL_MONO_MAP_STYLE = {
         'text-size': ['interpolate', ['linear'], ['zoom'], 5, 10, 11, 13],
         'text-max-width': 8
       },
-      paint: { 'text-color': '#737779', 'text-halo-color': '#f4f4f1', 'text-halo-width': 1.2 }
+      paint: { 'text-color': '#62686a', 'text-halo-color': '#f8f8f6', 'text-halo-width': 1.25 }
     }
   ]
 };
