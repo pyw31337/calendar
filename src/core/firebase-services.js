@@ -209,6 +209,55 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     }
   }
 
+  // DateModal must find tagged memos independently from the memo page's recent-item window.
+  // Tags are stored as an array, but legacy values are not perfectly normalized (some include
+  // the leading # and some do not), so scan the bounded subcollection and compare normalized
+  // tokens instead of relying on one array-contains query that would miss older shapes.
+  async function fetchMemosByTag(calId, memoTag) {
+    if (!isValidCalId(calId) || !memoTag) return [];
+    const needle = String(memoTag).trim().replace(/^#/, '').toLowerCase();
+    const hasTag = function (memo) {
+      const values = Array.isArray(memo.tags) ? memo.tags : [memo.tags];
+      return values.some(function (value) {
+        return String(value || '').trim().replace(/^#/, '').toLowerCase() === needle;
+      });
+    };
+    const firebaseDb = getDb();
+    if (firebaseDb) {
+      try {
+        const snap = await withSdkTimeout(firebaseDb.collection('calendars').doc('cal_' + calId).collection('memos').get({ source: 'server' }), FIRESTORE_REST_TIMEOUT_MS);
+        const list = [];
+        snap.forEach(function (doc) {
+          const memo = { id: doc.id, ...doc.data() };
+          if (hasTag(memo)) list.push(memo);
+        });
+        return list;
+      } catch (err) {
+        console.warn('fetchMemosByTag sdk', memoTag, err);
+      }
+    }
+    try {
+      const parent = 'projects/' + projectId() + '/databases/(default)/documents/calendars/cal_' + calId;
+      const list = [];
+      let pageToken = '';
+      do {
+        const query = '?pageSize=1000' + (pageToken ? '&pageToken=' + encodeURIComponent(pageToken) : '');
+        const res = await fetchWithTimeout('https://firestore.googleapis.com/v1/' + parent + '/memos' + query, { cache: 'no-store' });
+        if (!res.ok) return list;
+        const data = await res.json();
+        (data.documents || []).forEach(function (doc) {
+          const memo = { id: doc.name.split('/').pop(), ...docToJs(doc) };
+          if (hasTag(memo)) list.push(memo);
+        });
+        pageToken = data.nextPageToken || '';
+      } while (pageToken);
+      return list;
+    } catch (err) {
+      console.warn('fetchMemosByTag rest', memoTag, err);
+      return [];
+    }
+  }
+
   async function fetchMeetingPhotoIndex(calId, date) {
     if (!isValidCalId(calId) || !date) return [];
     const db = getDb();
@@ -714,6 +763,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     fetchRecentChatMessages: fetchRecentChatMessages,
     fetchRecentGalleryMessages: fetchRecentGalleryMessages,
     fetchMessagesByImageTag: fetchMessagesByImageTag,
+    fetchMemosByTag: fetchMemosByTag,
     fetchMeetingPhotoIndex: fetchMeetingPhotoIndex,
     fetchSubcollectionCount: fetchSubcollectionCount,
     fetchOlderChatMessages: fetchOlderChatMessages,

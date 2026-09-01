@@ -63,6 +63,60 @@ function getFooterFamilyLinks() {
   return __gatherUiDeps().FOOTER_FAMILY_LINKS || [];
 }
 
+// Stable component type so opening/closing a video does not reset when DateModal refreshes its
+// live date-tag queries. It intentionally mirrors MemoCard's preview + toggle + inline player.
+function DateModalVideoCard({ video }) {
+  const React = window.React;
+  const __deps = window.GATHER_UI_DEPS || {};
+  const __comp = window.GATHER_UI_COMPONENTS || {};
+  const LinkPreviewCard = __comp.LinkPreviewCard || __deps.LinkPreviewCard;
+  const ClickToPlayVideoCard = __comp.ClickToPlayVideoCard || __deps.ClickToPlayVideoCard;
+  const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
+  const [isVideoOpen, setIsVideoOpen] = React.useState(false);
+  const mediaInfo = getDirectChatMediaInfo(video.directMediaUrl);
+  const fallbackTitle = video.title || '영상';
+
+  return /*#__PURE__*/React.createElement("div", {
+    style: { width: '100%', boxSizing: 'border-box' }
+  },
+    LinkPreviewCard && /*#__PURE__*/React.createElement(LinkPreviewCard, {
+      url: video.directMediaUrl,
+      fallbackTitle,
+      cachedData: video.linkPreview,
+      stretch: true
+    }),
+    /*#__PURE__*/React.createElement("button", {
+      type: 'button',
+      onClick: () => setIsVideoOpen(value => !value),
+      "aria-expanded": isVideoOpen,
+      style: {
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+        width: '100%', padding: '6px 0', marginTop: '6px', borderRadius: 'var(--radius-md)',
+        border: isVideoOpen ? '1px solid var(--border-subtle)' : '1px solid var(--primary)',
+        backgroundColor: isVideoOpen ? 'var(--bg-secondary)' : 'var(--bg-primary)',
+        color: isVideoOpen ? 'var(--text-muted)' : 'var(--primary)',
+        fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer'
+      }
+    }, isVideoOpen ? [
+      SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { key: 'close', size: 13 }) : null,
+      ' 영상 닫기'
+    ] : [
+      /*#__PURE__*/React.createElement("svg", { key: 'play', viewBox: '0 0 24 24', width: '13', height: '13', fill: 'currentColor' },
+        /*#__PURE__*/React.createElement("path", { d: 'M8 5v14l11-7z' })
+      ),
+      ' 영상 바로보기'
+    ]),
+    isVideoOpen && ClickToPlayVideoCard && /*#__PURE__*/React.createElement("div", {
+      style: { marginTop: '8px', width: '100%' }
+    }, /*#__PURE__*/React.createElement(ClickToPlayVideoCard, {
+      url: video.directMediaUrl,
+      mediaInfo,
+      fallbackTitle,
+      cachedData: video.linkPreview
+    }))
+  );
+}
+
 /* __fb() bridge */
 function __fb() {
   const deps = __gatherUiDeps();
@@ -769,6 +823,7 @@ export function DateModal({
   onDeleteMeetingPhoto,
   onFindChatMessageById,
   onFetchDateTaggedMessages,
+  onFetchDateTaggedMemos,
   onFetchMeetingPhotoIndex,
   onLoadOlderChat,
   hasMoreOlderChat = false,
@@ -1279,6 +1334,7 @@ export function DateModal({
   // Query the server by the date tag immediately. The date photo list must not depend on the
   // user opening Gallery or loading older chat pages first.
   const [fetchedTaggedMessages, setFetchedTaggedMessages] = React.useState([]);
+  const [fetchedTaggedMemos, setFetchedTaggedMemos] = React.useState([]);
   const [indexedMeetingPhotos, setIndexedMeetingPhotos] = React.useState([]);
   const fetchedDateTagRef = React.useRef('');
   React.useEffect(() => {
@@ -1303,6 +1359,19 @@ export function DateModal({
     const refreshTimer = setInterval(refresh, 6000);
     return () => { cancelled = true; clearInterval(refreshTimer); };
   }, [dateStr, dateStrToHashtag, onFetchDateTaggedMessages]);
+  React.useEffect(() => {
+    const targetTag = typeof dateStrToHashtag === 'function' ? dateStrToHashtag(dateStr) : '';
+    if (!targetTag || typeof onFetchDateTaggedMemos !== 'function') return;
+    let cancelled = false;
+    Promise.resolve(onFetchDateTaggedMemos(targetTag)).then(items => {
+      if (!cancelled && Array.isArray(items)) setFetchedTaggedMemos(items);
+    }).catch(err => console.warn('date-tagged memo fetch failed:', err));
+    return () => { cancelled = true; };
+  // The App passes a small calendar-scoped callback inline. Depending on that function identity
+  // would cancel a still-running server scan on every unrelated App render (badge/chat updates),
+  // making the video briefly appear and then disappear. DateModal is remounted per calendar;
+  // dateStr is the actual query key that should restart this effect.
+  }, [dateStr, dateStrToHashtag]);
   React.useEffect(() => {
     if (typeof onFetchMeetingPhotoIndex !== 'function' || !dateStr) return;
     let cancelled = false;
@@ -1422,7 +1491,11 @@ export function DateModal({
 
     const memoPhotos = [];
     const targetDate = dateStr;
-    (Array.isArray(memos) ? memos : []).forEach(memo => {
+    const taggedMemoMap = new Map();
+    [...(Array.isArray(memos) ? memos : []), ...fetchedTaggedMemos].forEach(memo => {
+      if (memo?.id) taggedMemoMap.set(memo.id, memo);
+    });
+    taggedMemoMap.forEach(memo => {
       if (!memo || isTombstone(memo)) return;
       const tags = Array.isArray(memo.tags) ? memo.tags.join(' ') : String(memo.tags || '');
       const parsedDates = typeof parseFlexibleDateTokens === 'function' ? parseFlexibleDateTokens(tags) : [];
@@ -1442,9 +1515,10 @@ export function DateModal({
         }
       });
       const direct = typeof getMessageDirectMediaEntry === 'function' ? getMessageDirectMediaEntry(asMsg, { allowVideo: true }) : null;
-      if (direct?.url && !directKeys.has(`memo:${memo.id}:video`)) {
+      const directMediaUrl = extractFirstUrl(asMsg.text) || direct?.directMediaUrl || direct?.full || '';
+      if (direct?.directMediaUrl && directMediaUrl && !directKeys.has(`memo:${memo.id}:video`)) {
         directKeys.add(`memo:${memo.id}:video`);
-        memoPhotos.push({ id: `memo_video_${memo.id}`, directMediaUrl: direct.url, type: direct.type || 'embed', imageUrl: direct.thumbnail || '', thumbUrl: direct.thumbnail || '', createdAt: memo.updatedAt || memo.createdAt || 0, source: 'memo-tag', sourceMemoId: memo.id, tags, mediaKey: `memo:${memo.id}:video`, refKey: `memo:${memo.id}:video` });
+        memoPhotos.push({ id: `memo_video_${memo.id}`, directMediaUrl, imageUrl: '', thumbUrl: '', title: memo.title || '', linkPreview: memo.linkPreview || null, createdAt: memo.updatedAt || memo.createdAt || 0, source: 'memo-tag', sourceMemoId: memo.id, tags, mediaKey: `memo:${memo.id}:video`, refKey: `memo:${memo.id}:video` });
       }
     });
     return [...directPhotos, ...chatPhotos, ...memoPhotos].sort((a, b) => {
@@ -1452,7 +1526,7 @@ export function DateModal({
       const bv = b.directMediaUrl ? 0 : 1;
       return av - bv || (b.createdAt || 0) - (a.createdAt || 0);
     });
-  }, [confirmedMeetingEntry, chatMessages, memos, allMeetingPhotoMessages, chatMessagesWithFetchedSources, indexedMeetingPhotos, dateStr]);
+  }, [confirmedMeetingEntry, chatMessages, memos, fetchedTaggedMemos, allMeetingPhotoMessages, chatMessagesWithFetchedSources, indexedMeetingPhotos, dateStr]);
   const visibleMeetingPhotos = React.useMemo(
     () => meetingPhotos.filter(photo => {
       if (photo.directMediaUrl) return true;
@@ -3269,7 +3343,7 @@ export function DateModal({
       },
         /*#__PURE__*/React.createElement("label", {
           style: { fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-muted)' }
-        }, `등록된 사진 (${visibleMeetingPhotos.length}장)`),
+        }, `등록된 사진 (${visibleMeetingImages.length}장)`),
         !adminMode && /*#__PURE__*/React.createElement("div", {
           style: { display: 'flex', alignItems: 'center', gap: '6px' }
         },
@@ -3308,11 +3382,9 @@ export function DateModal({
       visibleMeetingPhotos.length === 0 ? /*#__PURE__*/React.createElement("div", {
         style: { textAlign: 'center', color: 'var(--text-muted)', padding: '24px 0', fontSize: '0.82rem', border: '1px dashed var(--border-subtle)', borderRadius: 'var(--radius-md)' }
       }, "등록된 사진이 없습니다.") : /*#__PURE__*/React.createElement(React.Fragment, null,
-        visibleMeetingVideos.length > 0 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' } },
-          visibleMeetingVideos.map(video => /*#__PURE__*/React.createElement("div", { key: video.id, style: { border: '1px solid var(--border-subtle)', borderRadius: '10px', padding: '8px', background: 'var(--bg-card)' } },
-            LinkPreviewCard && /*#__PURE__*/React.createElement(LinkPreviewCard, { url: video.directMediaUrl, stretch: true }),
-            /*#__PURE__*/React.createElement("button", { type: 'button', onClick: () => window.open(video.directMediaUrl, '_blank', 'noopener,noreferrer'), style: { width: '100%', marginTop: '6px', border: 'none', borderRadius: '8px', padding: '8px', background: 'var(--bg-primary)', color: 'var(--primary)', fontWeight: 800, cursor: 'pointer' } }, '▶ 영상 바로보기')
-          ))
+        visibleMeetingVideos.length > 0 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '14px' } },
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-muted)' } }, `영상 (${visibleMeetingVideos.length}개)`),
+          visibleMeetingVideos.map(video => /*#__PURE__*/React.createElement(DateModalVideoCard, { key: video.id, video }))
         ),
         visibleMeetingImages.length === 0 ? null : /*#__PURE__*/React.createElement("div", {
         style: {

@@ -1408,6 +1408,15 @@ async function fetchMessagesByImageTag() {
   return [];
 }
 
+async function fetchMemosByTag() {
+  const svc = window.GATHER_FIREBASE_SERVICES;
+  if (svc && typeof svc.fetchMemosByTag === 'function' && !svc.isScaffold) {
+    return svc.fetchMemosByTag.apply(null, arguments);
+  }
+  console.warn('fetchMemosByTag: GATHER_FIREBASE_SERVICES missing');
+  return [];
+}
+
 async function fetchMeetingPhotoIndex() {
   const svc = window.GATHER_FIREBASE_SERVICES;
   if (svc && typeof svc.fetchMeetingPhotoIndex === 'function' && !svc.isScaffold) {
@@ -3683,6 +3692,7 @@ export {
   fetchRecentChatMessages,
   fetchRecentGalleryMessages,
   fetchMessagesByImageTag,
+  fetchMemosByTag,
   fetchMeetingPhotoIndex,
   CHAT_OLDER_PAGE_SIZE,
   MAX_OLDER_CHAT_MESSAGES,
