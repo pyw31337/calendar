@@ -212,11 +212,11 @@ assert(/withWeatherTimeout/.test(weatherScript) && /WEATHER_FIRESTORE_TIMEOUT_MS
 assert(/withWeatherTimeout\(fetch\(/.test(weatherScript), 'weather external requests must be bounded');
 assert(/hadServiceWorkerControllerAtStartup[\s\S]{0,900}controllerchange[\s\S]{0,180}hadServiceWorkerControllerAtStartup/.test(domainHelpersScript), 'first service worker install must not reload and destroy the app boot');
 assert(/isAppleWebKit/.test(firebaseDataScript) && /experimentalAutoDetectLongPolling: isAppleWebKit/.test(firebaseDataScript), 'Safari/WebKit must avoid forced Firestore long polling');
-assert(/withSideMenuTimeout/.test(sideMenuScript) && /push_subscriptions.*get\(\)/s.test(sideMenuScript), 'push device reads must be bounded');
+assert(!/push_subscriptions.*get\(\)/s.test(sideMenuScript), 'settings must not fetch implementation-level push device inventory');
 assert(firebaseServicesScript.includes('FIRESTORE_REST_TIMEOUT_MS = 9000') && firebaseServicesScript.includes('fetchWithTimeout') && firebaseServicesScript.includes('withSdkTimeout'), 'Firebase SDK and REST reads must have bounded timeouts');
 assert(/fetchFirestoreRequest/.test(firebaseDataScript) && /image share read timeout/.test(firebaseDataScript), 'Firestore fallback and share reads must have bounded timeouts');
 assert(calendarCoreScript.includes('withFirestoreReadTimeout') && calendarCoreScript.includes('Firestore search read timed out'), 'full-history search reads must have a bounded timeout');
-assert(/writeSharedCollection/.test(sideMenuScript) && /기기 구독 삭제/.test(sideMenuScript), 'device subscription deletes must use the bounded collection write path');
+assert(!/등록된 기기|기기 구독 삭제/.test(sideMenuScript), 'settings must not expose implementation-level push device management');
 assert(/writeSharedCollection/.test(domainHelpersScript) && /기기 구독 등록/.test(domainHelpersScript) && /기기 구독 해제/.test(domainHelpersScript), 'push subscription registration and removal must use the bounded collection write path');
 assert(/writeAdminCollection/.test(adminDashboardScript) && /관리자 채팅 삭제/.test(adminDashboardScript), 'manual admin message deletes must use the bounded collection write path');
 assert(/writeAdminCollection\('messages', calId, mToDelete\.id, null, 'delete', 'PITR 메시지 삭제'\)/.test(adminDashboardScript) && /logDeleteResult\?\.failed/.test(adminDashboardScript), 'PITR must bound message deletes and reject partial activity-log cleanup');

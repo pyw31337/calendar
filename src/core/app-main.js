@@ -1241,25 +1241,6 @@ function CalendarApp() {
     if (typeof setNotifGuideSeen === 'function') setNotifGuideSeen(true);
   };
 
-  const handleForcePushReregister = async () => {
-    if (!activeCalId) return { ok: false, reason: 'missing-calendar' };
-    const participantId = getCurrentChatParticipantId();
-    if (!participantId) return { ok: false, reason: 'missing-participant' };
-    if (!isNotificationSupported() || Notification.permission !== 'granted') {
-      return { ok: false, reason: 'permission-not-granted' };
-    }
-    try {
-      const result = await ensurePushSubscriptionHealthy(activeCalId, participantId);
-      if (result && result.ok) {
-        setMainNotifPermission(isNotificationSupported() ? Notification.permission : 'unsupported');
-        setMainChatNotifyEnabled(isChatNotifyEnabledForCalendar(activeCalId));
-      }
-      return result;
-    } catch (err) {
-      return { ok: false, reason: err?.message || 'push-reregister-failed' };
-    }
-  };
-
   const [adminActivityLogs, setAdminActivityLogs] = React.useState([]);
   const [isShareOpen, setIsShareOpen] = React.useState(false);
   const [isChatShareOpen, setIsChatShareOpen] = React.useState(false);
@@ -6056,8 +6037,6 @@ function CalendarApp() {
         } catch (_) {}
       },
       calendarId: activeCalId,
-      activeParticipantId: typeof getCurrentChatParticipantId === 'function' ? getCurrentChatParticipantId() : chatParticipantId,
-      onForcePushReregister: handleForcePushReregister,
       weatherLocation: activeCal && activeCal.weatherLocation,
       recentLocations: (activeCal && activeCal.recentLocations) || [],
       onUpdateWeatherLocation: handleUpdateWeatherLocation,
@@ -6407,8 +6386,6 @@ function CalendarApp() {
         } catch (_) {}
       },
       calendarId: activeCalId,
-      activeParticipantId: typeof getCurrentChatParticipantId === 'function' ? getCurrentChatParticipantId() : chatParticipantId,
-      onForcePushReregister: handleForcePushReregister,
       weatherLocation: activeCal && activeCal.weatherLocation,
       recentLocations: (activeCal && activeCal.recentLocations) || [],
       onUpdateWeatherLocation: handleUpdateWeatherLocation,

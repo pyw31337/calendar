@@ -77,11 +77,6 @@ function withSideMenuTimeout(promise, timeoutMs = SIDE_MENU_REQUEST_TIMEOUT_MS) 
     if (timer) clearTimeout(timer);
   });
 }
-function writeSharedCollection(...args) {
-  const f = __gatherUiDeps().writeCollectionDocumentWithFallback;
-  return typeof f === 'function' ? f(...args) : null;
-}
-
 function getStoredChatParticipantId(...args) {
   const fn = (window.GATHER_APP_NOTIFICATIONS || {}).getStoredChatParticipantId;
   return typeof fn === 'function' ? fn(...args) : '';
@@ -767,8 +762,6 @@ export function AppSettingsModal({
   notifyChannels, onToggleNotifyChannel, helpSteps,
   weatherLocation = null, recentLocations = [], onUpdateWeatherLocation, onDeleteRecentLocation, showToast,
   calendarId = null,
-  activeParticipantId = null,
-  onForcePushReregister = null,
   calendar = null,
   onRequestConfirm = null,
   onRequestDataRefresh = null
@@ -784,12 +777,6 @@ export function AppSettingsModal({
   const BellIcon = __deps.BellIcon;
   const MapCogIcon = __deps.MapCogIcon;
   const translateKoreanToEnglish = __deps.translateKoreanToEnglish;
-  const getNotificationDiagnostics = (window.GATHER_APP_NOTIFICATIONS || {}).getNotificationDiagnostics
-    || (window.GATHER_APP_DOMAIN_HELPERS || {}).getNotificationDiagnostics;
-  const getOrCreateDeviceId = (window.GATHER_APP_NOTIFICATIONS || {}).getOrCreateDeviceId
-    || (window.GATHER_APP_DOMAIN_HELPERS || {}).getOrCreateDeviceId;
-  const getDeviceLabel = (window.GATHER_APP_NOTIFICATIONS || {}).getDeviceLabel
-    || (window.GATHER_APP_DOMAIN_HELPERS || {}).getDeviceLabel;
   const channels = [
     { key: 'chat', label: '채팅 알림' },
     { key: 'memo', label: '메모 알림' },
@@ -800,110 +787,12 @@ export function AppSettingsModal({
   const [weatherResults, setWeatherResults] = React.useState([]);
   const [weatherLoading, setWeatherLoading] = React.useState(false);
   const currentWeatherName = (weatherLocation && weatherLocation.name) || '서울';
-  const [pushBusy, setPushBusy] = React.useState(false);
-  const [pushStatus, setPushStatus] = React.useState(null); // { ok, reason, subId }
-  const [deviceRows, setDeviceRows] = React.useState([]);
   const [backupBusy, setBackupBusy] = React.useState(false);
   const [localConfirmDialog, setLocalConfirmDialog] = React.useState(null);
   const backupFileInputRef = React.useRef(null);
-  const myDeviceId = React.useMemo(() => (typeof getOrCreateDeviceId === 'function' ? getOrCreateDeviceId() : null), []);
   const currentCalendar = calendar && typeof calendar === 'object' ? calendar : null;
   const currentCalendarId = currentCalendar?.id || calendarId || '';
   const canUseBackup = !!currentCalendar && !!currentCalendarId;
-
-  const refreshPushMeta = React.useCallback(async () => {
-    const diag = typeof getNotificationDiagnostics === 'function' ? getNotificationDiagnostics() : null;
-    let status;
-    try {
-      if (typeof Notification === 'undefined' || Notification.permission !== 'granted') {
-        status = { ok: false, reason: 'permission', diag };
-      } else if (!('serviceWorker' in navigator) || !navigator.serviceWorker) {
-        status = { ok: false, reason: 'no-sw', diag };
-      } else {
-        const reg = await navigator.serviceWorker.ready;
-        const sub = reg.pushManager ? await reg.pushManager.getSubscription() : null;
-        if (!sub) status = { ok: false, reason: 'no-sub', diag };
-        else status = { ok: true, reason: 'subscribed', subId: String(sub.endpoint || '').slice(-24), diag };
-      }
-    } catch (e) {
-      status = { ok: false, reason: e?.message || 'error', diag };
-    }
-    setPushStatus(status);
-
-    // Device list from Firestore
-    try {
-      const db = typeof window !== 'undefined' ? window.__gatherFirebaseDb : null;
-      if (db && calendarId) {
-        const snap = await withSideMenuTimeout(db.collection('calendars').doc('cal_' + calendarId).collection('push_subscriptions').get());
-        const rows = [];
-        snap.forEach(doc => {
-          const d = doc.data() || {};
-          const isThisDevice = myDeviceId && d.deviceId === myDeviceId;
-          let label = d.deviceLabel || '';
-          if (!label || label === '알 수 없는 기기') {
-            const currentLabel = (typeof getDeviceLabel === 'function') ? getDeviceLabel() : null;
-            if (isThisDevice && currentLabel) {
-              label = currentLabel;
-            } else {
-              return; // Hide legacy unknown device entries
-            }
-          }
-          rows.push({
-            id: doc.id,
-            deviceId: d.deviceId || '',
-            deviceLabel: label.replace(/ · 이 기기$/, ''),
-            lastSeenAt: d.lastSeenAt || d.updatedAt || d.createdAt || 0,
-            participantId: d.participantId || '',
-            channels: d.channels || {},
-            lastPushAt: d.lastPushAt || 0,
-            lastPushStatus: d.lastPushStatus || '',
-            isThis: isThisDevice
-          });
-        });
-        rows.sort((a, b) => (b.lastSeenAt || 0) - (a.lastSeenAt || 0));
-        setDeviceRows(rows);
-      }
-    } catch (e) {
-      console.warn('push device list', e);
-    }
-  }, [calendarId, myDeviceId]);
-
-  React.useEffect(() => { refreshPushMeta(); }, [refreshPushMeta]);
-
-  const handleForceReregister = async () => {
-    if (pushBusy) return;
-    setPushBusy(true);
-    try {
-      if (typeof onForcePushReregister === 'function') {
-        const r = await onForcePushReregister();
-        if (typeof showToast === 'function') {
-          showToast(r && r.ok ? '이 기기 알림 구독을 다시 등록했습니다.' : ('구독 실패: ' + (r && r.reason || 'unknown')), r && r.ok ? 'success' : 'error');
-        }
-      }
-      await refreshPushMeta();
-    } finally {
-      setPushBusy(false);
-    }
-  };
-
-  const handleDeleteDevice = async (row) => {
-    if (!row || !calendarId) return;
-    const executeDelete = async () => {
-      try {
-        const deleted = await writeSharedCollection('push_subscriptions', calendarId, row.id, null, 'delete', '기기 구독 삭제');
-        if (!deleted?.success) throw new Error('Push subscription delete failed');
-        if (typeof showToast === 'function') showToast(deleted.queued ? '연결되면 기기 구독을 삭제합니다.' : '기기 구독을 삭제했습니다.', deleted.queued ? 'info' : 'success');
-        await refreshPushMeta();
-      } catch (e) {
-        if (typeof showToast === 'function') showToast('삭제 실패', 'error');
-      }
-    };
-    const confirm = typeof onRequestConfirm === 'function' ? onRequestConfirm : (title, message, onConfirm) => {
-      if (typeof ConfirmDialog !== 'function') return;
-      setLocalConfirmDialog({ title, message, onConfirm });
-    };
-    confirm('기기 구독 삭제', `${row.deviceLabel || '이 기기'}의 알림 구독을 삭제할까요?`, executeDelete);
-  };
 
   const handleDownloadBackup = async () => {
     if (backupBusy) return;
@@ -1183,39 +1072,6 @@ export function AppSettingsModal({
               onChange: () => onToggleNotifyChannel && onToggleNotifyChannel(ch.key),
               label: ch.label
             })
-          ))
-        ),
-        deviceRows.length > 0 && /*#__PURE__*/React.createElement("div", {
-          style: {
-            marginTop: '10px', padding: '12px 14px', borderRadius: '12px', background: 'var(--bg-primary)',
-            border: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', gap: '6px'
-          }
-        },
-          /*#__PURE__*/React.createElement("div", { style: { fontWeight: 800, fontSize: '0.82rem', color: 'var(--text-main)', marginBottom: '2px' } },
-            "등록된 기기 (", deviceRows.length, ")"),
-          deviceRows.map(row => /*#__PURE__*/React.createElement("div", {
-            key: row.id,
-            style: {
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
-              padding: '6px 0', borderTop: '1px solid var(--border-subtle)', fontSize: '0.78rem'
-            }
-          },
-            /*#__PURE__*/React.createElement("div", { style: { minWidth: 0 } },
-              /*#__PURE__*/React.createElement("div", { style: { fontWeight: 700, color: 'var(--text-main)' } },
-                row.deviceLabel, row.isThis ? ' (이 기기)' : ''),
-              /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: '0.7rem', marginTop: '1px' } },
-                row.lastSeenAt ? ('최근 연결 ' + new Date(row.lastSeenAt).toLocaleString('ko-KR')) : '',
-                row.lastPushStatus ? ` · 마지막 발송 ${row.lastPushStatus === 'sent' ? '성공' : '실패'}${row.lastPushAt ? ' (' + new Date(row.lastPushAt).toLocaleString('ko-KR') + ')' : ''}` : '',
-                row.channels && Object.keys(row.channels).length ? ` · 채널 ${Object.entries(row.channels).filter(([, enabled]) => enabled !== false).map(([key]) => key).join(',') || '없음'}` : '')
-            ),
-            /*#__PURE__*/React.createElement("button", {
-              type: "button",
-              onClick: () => handleDeleteDevice(row),
-              style: {
-                flexShrink: 0, border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.12)',
-                color: '#EF4444', borderRadius: '6px', padding: '3px 8px', fontWeight: 700, fontSize: '0.7rem', cursor: 'pointer'
-              }
-            }, "삭제")
           ))
         ),
         Array.isArray(helpSteps) && helpSteps.length > 0 && /*#__PURE__*/React.createElement("div", {
