@@ -3379,9 +3379,13 @@ export function DateModal({
         )
       ),
       /* Empty State or Photo Grid */
-      visibleMeetingImages.length === 0 ? /*#__PURE__*/React.createElement("div", {
+      visibleMeetingPhotos.length === 0 ? /*#__PURE__*/React.createElement("div", {
         style: { textAlign: 'center', color: 'var(--text-muted)', padding: '24px 0', fontSize: '0.82rem', border: '1px dashed var(--border-subtle)', borderRadius: 'var(--radius-md)' }
       }, "등록된 사진이 없습니다.") : /*#__PURE__*/React.createElement(React.Fragment, null,
+        visibleMeetingVideos.length > 0 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '14px' } },
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-muted)' } }, `영상 (${visibleMeetingVideos.length}개)`),
+          visibleMeetingVideos.map(video => /*#__PURE__*/React.createElement(DateModalVideoCard, { key: video.id, video }))
+        ),
         visibleMeetingImages.length === 0 ? null : /*#__PURE__*/React.createElement("div", {
         style: {
           display: 'grid',
