@@ -1496,7 +1496,7 @@ function formatBankAccountNumber(bankName, value) {
   return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7, 11)}-${digits.slice(11, 14)}`;
 }
 
-export function CreateSettlementModal({ calendar, initialData, onClose, onSave, onDeleteCard, onToggleStatus, showToast }) {
+export function CreateSettlementModal({ calendar, initialData, onClose, onSave, onDeleteCard, onToggleStatus, showToast, onRequestConfirm }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -1634,6 +1634,10 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
   const [otherBankName, setOtherBankName] = React.useState(() => cardToEdit?.otherBankName || '');
   const [depositorName, setDepositorName] = React.useState(() => cardToEdit?.depositorName || '');
   const [accountNumber, setAccountNumber] = React.useState(() => cardToEdit?.accountNumber || '');
+  // Display-only masking of the account number field within this editing session -- not saved
+  // anywhere (accountNumber itself, the value actually submitted, is never touched by this).
+  // Starts visible: masking is something a user opts into per-visit, not a stored preference.
+  const [isAccountNumberHidden, setIsAccountNumberHidden] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState('general');
   const [isSettlementCardPreviewOpen, setIsSettlementCardPreviewOpen] = React.useState(false);
   const [settlementCardImageUrl, setSettlementCardImageUrl] = React.useState(null);
@@ -2341,20 +2345,40 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
       ),
       React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
         React.createElement('label', { style: { fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-muted)' } }, '계좌번호'),
-        React.createElement('div', { style: { position: 'relative', width: '100%' } },
-          React.createElement('input', {
-            type: 'text', inputMode: 'numeric', className: 'form-input', value: accountNumber,
-            onChange: handleAccountNumberChange, placeholder: bankName === '기타' ? '계좌번호 입력 (숫자와 - 직접 입력)' : '계좌번호 입력 (숫자만 입력 시 하이픈 자동생성)',
-            style: { width: '100%', height: '44px', borderRadius: '8px', fontSize: 'var(--font-size-md)', paddingRight: bankName !== '기타' && isAccountValid ? '36px' : '12px' }
-          }),
-          bankName !== '기타' && isAccountValid && React.createElement('div', {
-            style: {
-              position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              width: '20px', height: '20px', borderRadius: '50%', backgroundColor: 'var(--status-green)', color: '#FFFFFF',
-              fontSize: 'var(--font-size-sm)', fontWeight: 900, pointerEvents: 'none'
+        React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', width: '100%' } },
+          React.createElement('div', { style: { position: 'relative', flex: 1, minWidth: 0 } },
+            React.createElement('input', {
+              type: 'text', inputMode: 'numeric', className: 'form-input',
+              value: isAccountNumberHidden ? maskSettlementAccountNumber(accountNumber) : accountNumber,
+              readOnly: isAccountNumberHidden,
+              onChange: handleAccountNumberChange, placeholder: bankName === '기타' ? '계좌번호 입력 (숫자와 - 직접 입력)' : '계좌번호 입력 (숫자만 입력 시 하이픈 자동생성)',
+              style: { width: '100%', height: '44px', borderRadius: '8px', fontSize: 'var(--font-size-md)', paddingRight: !isAccountNumberHidden && bankName !== '기타' && isAccountValid ? '36px' : '12px' }
+            }),
+            !isAccountNumberHidden && bankName !== '기타' && isAccountValid && React.createElement('div', {
+              style: {
+                position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: '20px', height: '20px', borderRadius: '50%', backgroundColor: 'var(--status-green)', color: '#FFFFFF',
+                fontSize: 'var(--font-size-sm)', fontWeight: 900, pointerEvents: 'none'
+              }
+            }, '✓')
+          ),
+          /* 숨김 masks the account number on-screen for this editing session only (accountNumber
+             itself, what actually gets saved, is untouched). Reversing it back to 보임 needs an
+             admin password -- same "hiding is self-serve, showing needs verification" rule as the
+             투표 수정 modal's 숨김/보임 toggle. */
+          React.createElement('button', {
+            type: 'button', className: 'btn btn-secondary', style: { flexShrink: 0, height: '44px', padding: '0 14px', fontSize: 'var(--font-size-md)' },
+            onClick: () => {
+              if (isAccountNumberHidden) {
+                if (onRequestConfirm) {
+                  onRequestConfirm('계좌번호 확인', '계좌번호를 보려면 어드민 비밀번호를 입력하세요.', () => setIsAccountNumberHidden(false), true);
+                }
+              } else {
+                setIsAccountNumberHidden(true);
+              }
             }
-          }, '✓')
+          }, isAccountNumberHidden ? '보임' : '숨김')
         )
       ),
       ),
@@ -2698,7 +2722,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
   )));
 }
 
-export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenShare, onOpenAppSettings, onChangeView, onOpenCreateSettlement, onOpenSettlementEditor, onToggleSettlementCardStatus, onDeleteSettlementCard, onSaveSettlementCard, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null, showToast }) {
+export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenShare, onOpenAppSettings, onChangeView, onOpenCreateSettlement, onOpenSettlementEditor, onToggleSettlementCardStatus, onDeleteSettlementCard, onSaveSettlementCard, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null, showToast, onRequestConfirm }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -3868,7 +3892,8 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
       }
       return result;
     },
-    showToast: showToast
+    showToast: showToast,
+    onRequestConfirm: onRequestConfirm
   })),
 
   /* Edit Settlement Layer Popup */
@@ -3920,7 +3945,8 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
       }
       return result;
     },
-    showToast: showToast
+    showToast: showToast,
+    onRequestConfirm: onRequestConfirm
     });
     // This modal already belongs to the top-level settlement view. Rendering it
     // directly avoids the separate ReactDOM portal path that can drop the editor
@@ -4318,7 +4344,19 @@ export function PollModal({ calendar, poll, onSave, onClose, showToast, onReques
       className: "btn btn-secondary",
       disabled: isSubmitting,
       style: { marginRight: 'auto' },
-      onClick: () => { if (!isSubmitting) setIsHidden(prev => !prev); }
+      onClick: () => {
+        if (isSubmitting) return;
+        // \uC228\uAE40 is self-serve (anyone can declutter their own view), but reversing it back to
+        // \uBCF4\uC784 needs an admin password -- otherwise a poll someone deliberately hid could be
+        // un-hidden by whoever next opens this modal.
+        if (isHidden) {
+          if (onRequestConfirm) {
+            onRequestConfirm('\uD22C\uD45C \uBCF4\uC784', '\uC228\uAE40 \uCC98\uB9AC\uB41C \uD22C\uD45C\uB97C \uB2E4\uC2DC \uBCF4\uC774\uAC8C \uD558\uB824\uBA74 \uC5B4\uB4DC\uBBFC \uBE44\uBC00\uBC88\uD638\uB97C \uC785\uB825\uD558\uC138\uC694.', () => setIsHidden(false), true);
+          }
+        } else {
+          setIsHidden(true);
+        }
+      }
     }, isHidden ? "\uBCF4\uC784" : "\uC228\uAE40"),
     /*#__PURE__*/React.createElement("button", {
     type: "button",
