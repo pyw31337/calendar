@@ -2535,7 +2535,10 @@ export function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCan
   // Closed (deadline-passed) polls stay in 진행중 투표 rather than disappearing -- they're shown
   // with a "confirmed" treatment (dimmed card + winning-option badge) instead of being filtered
   // out, so the group can still see what was decided without having to dig through poll history.
-  const polls = getCalendarPolls(calendar);
+  // Explicitly hidden polls (poll.hidden, toggled from the poll edit modal) are the one case that
+  // does disappear from here -- they still show in 캘린더 설정 > 일반's unfiltered poll list, so
+  // the toggle can be reversed there.
+  const polls = getCalendarPolls(calendar).filter(poll => !poll.hidden);
   const participants = getActiveParticipants(calendar);
   const participantsMap = participants.reduce((acc, participant) => {
     acc[participant.id] = participant;
