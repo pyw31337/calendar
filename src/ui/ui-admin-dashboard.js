@@ -2174,7 +2174,7 @@ export function AdminDashboard({ initialCalendars }) {
               /*#__PURE__*/React.createElement("svg", {
                 xmlns: "http://www.w3.org/2000/svg", width: "18", height: "18", viewBox: "0 0 24 24",
                 fill: "none", stroke: "currentColor", "stroke-width": "2", "stroke-linecap": "round", "stroke-linejoin": "round",
-                className: "icon icon-tabler icons-tabler-outline icon-tabler-chevron-down", style: { flexShrink: 0, color: 'var(--text-muted)' }
+                className: "icon icon-tabler icons-tabler-outline icon-tabler-chevron-down", style: { flexShrink: 0, color: 'var(--text-light)' }
               }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
                  /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" }))
             ),
@@ -2441,7 +2441,7 @@ export function AdminDashboard({ initialCalendars }) {
               ),
               /* 일정 등록 비중: 가장 일정이 많은 캘린더를 100% 기준으로 비교합니다. */
               /*#__PURE__*/React.createElement("div", {
-                style: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '8px', fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700, marginTop: '4px' }
+                style: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '8px', fontSize: '0.68rem', color: 'var(--text-light)', fontWeight: 700, marginTop: '4px' }
               },
                 /*#__PURE__*/React.createElement("span", null, "등록 일정 비교 (최다 기준)"),
                 /*#__PURE__*/React.createElement("span", null, `${stat.schedules.length.toLocaleString()}건 / 최다 캘린더 ${dashboard.maxSchedules.toLocaleString()}건`)
@@ -2459,7 +2459,7 @@ export function AdminDashboard({ initialCalendars }) {
               ),
               /* 일정 데이터 5000건 캡 사용량 -- 캘린더 문서별로 독립적으로 적용됨 (전체 합산이 아님) */
               /*#__PURE__*/React.createElement("div", { style: { marginTop: '12px' } },
-                /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700 } },
+                /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', fontSize: '0.68rem', color: 'var(--text-light)', fontWeight: 700 } },
                   React.createElement("span", null, "일정 데이터 사용량"),
                   React.createElement("span", { style: { color: availabilityCapColor, fontWeight: 800 } }, `${availabilityCount.toLocaleString()} / 5,000건 (${availabilityCapPercent}%)`)
                 ),

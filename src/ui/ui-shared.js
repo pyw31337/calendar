@@ -2017,7 +2017,7 @@ export function ClickToPlayVideoCard({ url, mediaInfo = null, fallbackTitle = ''
         padding: '16px',
         boxSizing: 'border-box',
         textAlign: 'center',
-        color: 'var(--text-muted)',
+        color: 'var(--text-light)',
         fontSize: '0.8rem',
         fontWeight: 600
       }

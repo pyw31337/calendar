@@ -1340,7 +1340,7 @@ export function ChatGalleryModal({
       title: "클릭하여 년월 이동"
     },
       `${galleryMonthDate.getFullYear()}년 ${galleryMonthDate.getMonth() + 1}월`,
-      /*#__PURE__*/React.createElement("span", { style: { color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center' } },
+      /*#__PURE__*/React.createElement("span", { style: { color: 'var(--text-light)', display: 'inline-flex', alignItems: 'center' } },
         /*#__PURE__*/React.createElement("svg", {
           xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24",
           fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round",

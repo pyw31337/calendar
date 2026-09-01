@@ -1467,7 +1467,7 @@ export function AdminModal({
             /*#__PURE__*/React.createElement("div", {
               style: { display: 'flex', flexDirection: 'column', gap: '8px' }
             },
-              getCalendarPolls(calendar).length === 0 ? /*#__PURE__*/React.createElement("div", { style: { padding: '16px', color: 'var(--text-muted)', fontSize: '0.8rem', textAlign: 'center' } }, "현재 등록된 투표가 없습니다. 새 투표를 생성해 주세요.") :
+              getCalendarPolls(calendar).length === 0 ? /*#__PURE__*/React.createElement("div", { style: { padding: '16px', color: 'var(--text-light)', fontSize: '0.8rem', textAlign: 'center' } }, "현재 등록된 투표가 없습니다. 새 투표를 생성해 주세요.") :
               getCalendarPolls(calendar).map(poll => /*#__PURE__*/React.createElement("div", {
                 key: poll.id,
                 className: 'admin-log-row poll-list-row settings-poll-row',
@@ -1592,7 +1592,7 @@ export function AdminModal({
           /*#__PURE__*/React.createElement("div", {
             style: { display: 'flex', flexDirection: 'column', gap: '8px', minHeight: '360px', paddingRight: '4px' }
           },
-            activityLogsSorted.length === 0 ? /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: 'var(--text-muted)', fontSize: '0.82rem', textAlign: 'center' } }, "기록된 활동 로그가 없어 복구 기능을 이용할 수 없습니다.") :
+            activityLogsSorted.length === 0 ? /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: 'var(--text-light)', fontSize: '0.82rem', textAlign: 'center' } }, "기록된 활동 로그가 없어 복구 기능을 이용할 수 없습니다.") :
             activityLogsSorted.map(log => {
               const resolveParticipant = __deps.resolveLogParticipant || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.resolveLogParticipant) || ((l, map) => (map && map[l.participantId]) || { name: '시스템', color: '#94A3B8' });
               const formatNote = __deps.formatDetailedLogNote || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.formatDetailedLogNote) || (l => l.note || '');
@@ -1755,7 +1755,7 @@ export function AdminModal({
 
           if (filteredLogs.length === 0) {
             return /*#__PURE__*/React.createElement("div", {
-              style: { textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', padding: '24px 0' }
+              style: { textAlign: 'center', color: 'var(--text-light)', fontSize: '0.85rem', padding: '24px 0' }
             }, "조건에 해당되는 활동 로그가 없습니다.");
           }
           return /*#__PURE__*/React.createElement("div", {
@@ -1990,7 +1990,7 @@ export function AdminUnifiedSearchResultsView({
           value: dateStart, onChange: onDateStartChange, dateOnly: true, placeholder: "시작일"
         })
       ),
-      /*#__PURE__*/React.createElement("span", { style: { color: 'var(--text-muted)', fontWeight: 700 } }, "~"),
+      /*#__PURE__*/React.createElement("span", { style: { color: 'var(--text-light)', fontWeight: 700 } }, "~"),
       /*#__PURE__*/React.createElement("div", { style: { minWidth: '120px', flex: '1 1 120px' } },
         /*#__PURE__*/React.createElement(DeadlineDateTimePicker, {
           value: dateEnd, onChange: onDateEndChange, dateOnly: true, placeholder: "종료일"
@@ -2008,7 +2008,7 @@ export function AdminUnifiedSearchResultsView({
 
     /*#__PURE__*/React.createElement("div", { style: { padding: '20px', display: 'flex', flexDirection: 'column', gap: '8px' } },
       grandTotal === 0 ? /*#__PURE__*/React.createElement("div", {
-        style: { textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.88rem', padding: '40px 0' }
+        style: { textAlign: 'center', color: 'var(--text-light)', fontSize: '0.88rem', padding: '40px 0' }
       }, "검색 결과가 없습니다.") : null,
 
       activeTab === 'schedules' && allMatches.schedules.map(item => /*#__PURE__*/React.createElement(SearchResultLogRow, {
@@ -2055,7 +2055,7 @@ export function AdminUnifiedSearchResultsView({
         onClick: () => window.open(getAdminSearchResultTargetUrl('memos', memo), '_blank', 'noopener')
       },
         memo.title && /*#__PURE__*/React.createElement("div", { style: { fontWeight: 500, marginBottom: '2px' } }, highlightKeyword(memo.title, q)),
-        memo.text && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.7rem', color: 'var(--text-muted)' } }, highlightKeyword(memo.text.length > 100 ? memo.text.slice(0, 100) + '...' : memo.text, q))
+        memo.text && /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.7rem', color: 'var(--text-light)' } }, highlightKeyword(memo.text.length > 100 ? memo.text.slice(0, 100) + '...' : memo.text, q))
       ))
     )
   );
