@@ -762,6 +762,7 @@ export function DateModal({
   onSaveExpense,
   onDeleteExpense,
   onReorderExpenses,
+  onReorderAvailability,
   onAddMeetingPhotos,
   onDeletePhoto,
   onDeleteMeetingPhoto,
@@ -1437,6 +1438,13 @@ export function DateModal({
   const [draggingExpenseId, setDraggingExpenseId] = React.useState('');
   const [dragOverExpenseId, setDragOverExpenseId] = React.useState('');
   const expensePointerSortRef = React.useRef({ sourceId: '', targetId: '', startX: 0, startY: 0, active: false });
+  // 참석 명단 drag-to-reorder -- same pointer-sort pattern as the 정산 expense list above (see
+  // beginExpensePointerSort/moveExpense), keyed by participantId instead of an expense id since
+  // an availability entry's natural identity within one date is (date, participantId).
+  const [draggingParticipantId, setDraggingParticipantId] = React.useState('');
+  const [dragOverParticipantId, setDragOverParticipantId] = React.useState('');
+  const [isReorderingAttendance, setIsReorderingAttendance] = React.useState(false);
+  const attendancePointerSortRef = React.useRef({ sourceId: '', targetId: '', startX: 0, startY: 0, active: false });
   // Tapping a row in the (potentially long) expense list below edits it via the form up top --
   // but that form can be well off-screen by then, so the edit silently "does nothing" from the
   // user's point of view. Scroll the 지출 명목 field into view and focus it so the edit is
@@ -1867,6 +1875,160 @@ export function DateModal({
   };
   const resetExpensePointerSort = () => expenseDragHandlersRef.current.reset();
 
+  const moveAttendee = async (sourceParticipantId, targetParticipantId) => {
+    if (!onReorderAvailability || !sourceParticipantId || !targetParticipantId || sourceParticipantId === targetParticipantId) return false;
+    const sourceIdx = dateEntries.findIndex(en => en.participantId === sourceParticipantId);
+    const targetIdx = dateEntries.findIndex(en => en.participantId === targetParticipantId);
+    if (sourceIdx < 0 || targetIdx < 0) return false;
+    const nextEntries = [...dateEntries];
+    const [moved] = nextEntries.splice(sourceIdx, 1);
+    nextEntries.splice(targetIdx, 0, moved);
+    const orderedParticipantIds = nextEntries.map(en => en.participantId);
+    const result = await Promise.resolve(onReorderAvailability(dateStr, orderedParticipantIds));
+    return result !== false;
+  };
+
+  const attendanceDragHandlersRef = React.useRef({});
+
+  // Same interrupted-gesture safety net as the expense pointer-sort cleanup above -- if DateModal
+  // closes mid-drag, finish()/reset() (fired by pointerup/pointercancel) never runs, so the
+  // document-level listeners must be torn down here instead of being left attached forever.
+  React.useEffect(() => () => {
+    const ref = attendancePointerSortRef.current;
+    const handlers = attendanceDragHandlersRef.current;
+    if (ref && ref.active && handlers) {
+      document.removeEventListener('pointermove', handlers.onMove);
+      document.removeEventListener('pointerup', handlers.onUp);
+      document.removeEventListener('pointercancel', handlers.onCancel);
+    }
+  }, []);
+
+  attendanceDragHandlersRef.current.update = e => {
+    const ref = attendancePointerSortRef.current;
+    if (!ref.active) return;
+    if (e.cancelable) e.preventDefault();
+    const deltaY = e.clientY - ref.startY;
+    const row = document.querySelector(`.attendance-sortable-row[data-participant-id="${ref.sourceId}"]`);
+    if (row) {
+      row.style.transform = `translateY(${deltaY}px) scale(1.02)`;
+      row.style.pointerEvents = 'none';
+    }
+    const rows = Array.from(document.querySelectorAll('.date-modal-attendance-list .attendance-sortable-row'));
+    let nextTargetId = '';
+    for (const r of rows) {
+      const id = r.getAttribute('data-participant-id');
+      if (!id || id === ref.sourceId) continue;
+      const rect = r.getBoundingClientRect();
+      if (e.clientY >= rect.top && e.clientY <= rect.bottom) {
+        nextTargetId = id;
+        break;
+      }
+    }
+    if (nextTargetId !== ref.targetId) {
+      if (ref.targetId) {
+        const prev = document.querySelector(`.attendance-sortable-row[data-participant-id="${ref.targetId}"]`);
+        if (prev) prev.style.borderColor = 'var(--border-subtle)';
+      }
+      ref.targetId = nextTargetId;
+      if (nextTargetId) {
+        const next = document.querySelector(`.attendance-sortable-row[data-participant-id="${nextTargetId}"]`);
+        if (next) next.style.borderColor = 'var(--accent-primary)';
+      }
+      setDragOverParticipantId(nextTargetId || '');
+    }
+  };
+
+  attendanceDragHandlersRef.current.finish = async () => {
+    const ref = attendancePointerSortRef.current;
+    if (!ref.active) return;
+    const sourceId = ref.sourceId;
+    const targetId = ref.targetId;
+    document.removeEventListener('pointermove', attendanceDragHandlersRef.current.onMove);
+    document.removeEventListener('pointerup', attendanceDragHandlersRef.current.onUp);
+    document.removeEventListener('pointercancel', attendanceDragHandlersRef.current.onCancel);
+    ref.active = false;
+    const row = document.querySelector(`.attendance-sortable-row[data-participant-id="${sourceId}"]`);
+    if (row) {
+      row.style.zIndex = '';
+      row.style.boxShadow = '';
+      row.style.transform = '';
+      row.style.transition = '';
+      row.style.pointerEvents = '';
+      row.style.opacity = '';
+    }
+    if (targetId) {
+      const targetRow = document.querySelector(`.attendance-sortable-row[data-participant-id="${targetId}"]`);
+      if (targetRow) targetRow.style.borderColor = 'var(--border-subtle)';
+    }
+    setDraggingParticipantId('');
+    setDragOverParticipantId('');
+    attendancePointerSortRef.current = { sourceId: '', targetId: '', startX: 0, startY: 0, active: false };
+    if (sourceId && targetId && sourceId !== targetId) {
+      setIsReorderingAttendance(true);
+      try {
+        const ok = await moveAttendee(sourceId, targetId);
+        if (ok === false) showToast('순서 변경에 실패했습니다.', 'error');
+        else showToast('순서가 변경되었습니다.', 'success');
+      } finally {
+        setIsReorderingAttendance(false);
+      }
+    }
+  };
+
+  attendanceDragHandlersRef.current.reset = () => {
+    const ref = attendancePointerSortRef.current;
+    document.removeEventListener('pointermove', attendanceDragHandlersRef.current.onMove);
+    document.removeEventListener('pointerup', attendanceDragHandlersRef.current.onUp);
+    document.removeEventListener('pointercancel', attendanceDragHandlersRef.current.onCancel);
+    const sourceId = ref.sourceId;
+    const targetId = ref.targetId;
+    ref.active = false;
+    const row = document.querySelector(`.attendance-sortable-row[data-participant-id="${sourceId}"]`);
+    if (row) {
+      row.style.zIndex = '';
+      row.style.boxShadow = '';
+      row.style.transform = '';
+      row.style.transition = '';
+      row.style.pointerEvents = '';
+      row.style.opacity = '';
+    }
+    if (targetId) {
+      const targetRow = document.querySelector(`.attendance-sortable-row[data-participant-id="${targetId}"]`);
+      if (targetRow) targetRow.style.borderColor = 'var(--border-subtle)';
+    }
+    setDraggingParticipantId('');
+    setDragOverParticipantId('');
+    attendancePointerSortRef.current = { sourceId: '', targetId: '', startX: 0, startY: 0, active: false };
+  };
+
+  attendanceDragHandlersRef.current.onMove = e => attendanceDragHandlersRef.current.update(e);
+  attendanceDragHandlersRef.current.onUp = e => attendanceDragHandlersRef.current.finish(e);
+  attendanceDragHandlersRef.current.onCancel = () => attendanceDragHandlersRef.current.reset();
+
+  const beginAttendancePointerSort = (e, participantId) => {
+    if (isReorderingAttendance || dateEntries.length <= 1) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
+    const row = e.currentTarget.closest('.attendance-sortable-row');
+    if (!row) return;
+    row.style.zIndex = '1000';
+    row.style.boxShadow = '0 8px 20px rgba(0,0,0,0.12)';
+    row.style.transform = 'scale(1.02)';
+    row.style.transition = 'none';
+    row.style.pointerEvents = 'none';
+    row.style.opacity = '0.92';
+    attendancePointerSortRef.current = {
+      sourceId: participantId, targetId: '', startX: e.clientX, startY: e.clientY, active: true, pointerId: e.pointerId
+    };
+    setDraggingParticipantId(participantId);
+    setDragOverParticipantId('');
+    document.addEventListener('pointermove', attendanceDragHandlersRef.current.onMove, { passive: false });
+    document.addEventListener('pointerup', attendanceDragHandlersRef.current.onUp);
+    document.addEventListener('pointercancel', attendanceDragHandlersRef.current.onCancel);
+  };
+
   // Close-confirm only when form differs from last committed baseline.
   // Baseline: mount (real defaults), edit-load, successful save.
   const formBaselineRef = React.useRef(null);
@@ -2251,6 +2413,7 @@ export function DateModal({
         }, `참석 명단 (${dateEntries.length}명 가능)`),
         /* List */
         /*#__PURE__*/React.createElement("div", {
+          className: "date-modal-attendance-list",
           style: {
             display: 'flex',
             flexDirection: 'column',
@@ -2262,19 +2425,21 @@ export function DateModal({
             border: '1px solid var(--border-subtle)',
             borderRadius: 'var(--radius-md)'
           }
-        }, dateEntries.map(entry => {
+        }, dateEntries.map((entry, entryIndex) => {
           const part = activeParticipants.find(p => p.id === entry.participantId);
           if (!part) return null;
+          const canReorder = !adminMode && dateEntries.length > 1;
           return /*#__PURE__*/React.createElement("div", {
-            key: entry.id,
-            className: "date-modal-attendance-row",
+            key: entry.id || `${entry.participantId || 'participant'}_${entryIndex}`,
+            "data-participant-id": entry.participantId,
+            className: `date-modal-attendance-row attendance-sortable-row poll-sortable-row${canReorder ? ' date-modal-attendance-row--reorderable' : ''}${draggingParticipantId === entry.participantId ? ' is-dragging' : ''}${dragOverParticipantId === entry.participantId ? ' is-drop-target' : ''}`,
             style: {
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'stretch',
               gap: '4px',
               padding: '10px 12px',
-              paddingRight: adminMode ? '12px' : '44px',
+              paddingRight: adminMode ? '12px' : (canReorder ? '78px' : '44px'),
               backgroundColor: 'var(--bg-card)',
               border: '1px solid var(--border-subtle)',
               borderRadius: '10px',
@@ -2324,11 +2489,28 @@ export function DateModal({
             }, renderTextWithUrlBadge(entry.note)),
             !adminMode && /*#__PURE__*/React.createElement("div", {
               className: "date-modal-attendance-actions",
-              style: { position: 'absolute', top: '8px', right: '8px' }
-            }, /*#__PURE__*/React.createElement(ItemEditDeleteActions, {
-              onEdit: () => handleEditClick(entry),
-              onDelete: () => handleDeleteClick(entry)
-            }))
+              style: { position: 'absolute', top: '8px', right: '8px', display: 'flex', alignItems: 'center', gap: '4px' }
+            },
+              canReorder && /*#__PURE__*/React.createElement("button", {
+                type: "button",
+                className: "poll-drag-handle",
+                disabled: isReorderingAttendance,
+                title: "드래그하여 순서 변경",
+                style: {
+                  width: '22px', height: '22px', border: '1px solid var(--border-subtle)',
+                  backgroundColor: 'var(--bg-card)', borderRadius: '6px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'grab', padding: 0, color: 'var(--text-muted)',
+                  touchAction: 'none', userSelect: 'none'
+                },
+                onClick: event => { event.preventDefault(); event.stopPropagation(); },
+                onPointerDown: event => beginAttendancePointerSort(event, entry.participantId)
+              }, /*#__PURE__*/React.createElement(LineHeightIcon, { size: 12 })),
+              /*#__PURE__*/React.createElement(ItemEditDeleteActions, {
+                onEdit: () => handleEditClick(entry),
+                onDelete: () => handleDeleteClick(entry)
+              })
+            )
           );
         })
       ),

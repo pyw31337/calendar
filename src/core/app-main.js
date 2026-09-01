@@ -1399,6 +1399,11 @@ function CalendarApp() {
   const [chatUploadProgress, setChatUploadProgress] = React.useState(null);
   const chatTextareaRef = React.useRef(null);
   const [chatImages, setChatImages] = React.useState([]);
+  // The message a reply-in-progress is quoting -- { id, participantId, text, imageCount } | null.
+  // Snapshotted from the target message at the moment "답장" is tapped (see ChatRoomView), not
+  // kept live, so editing/deleting the original afterward doesn't retroactively change what the
+  // reply's quote card shows -- same snapshot-at-reply-time behavior as KakaoTalk/Slack/Discord.
+  const [chatReplyTarget, setChatReplyTarget] = React.useState(null);
   const [activeLightbox, setActiveLightbox] = React.useState(null); // { urls: string[], index: number } | null
   const [isGalleryOpen, setIsGalleryOpen] = React.useState(false);
   const [placesInitialQuery, setPlacesInitialQuery] = React.useState('');
@@ -2811,6 +2816,12 @@ function CalendarApp() {
       showToast('메시지 내용 또는 사진을 입력해 주세요.', 'error');
       return;
     }
+    const replyToPayload = chatReplyTarget ? {
+      id: String(chatReplyTarget.id || ''),
+      participantId: String(chatReplyTarget.participantId || ''),
+      text: String(chatReplyTarget.text || ''),
+      imageCount: Number(chatReplyTarget.imageCount) || 0
+    } : null;
     setIsChatSubmitting(true);
     setChatUploadProgress({
       pct: 3,
@@ -2838,12 +2849,14 @@ function CalendarApp() {
             participantId: chatParticipantId,
             text: chatInput.trim(),
             timestamp: Date.now(),
-            images: chatImages.map(image => ({ originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob }))
+            images: chatImages.map(image => ({ originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob })),
+            ...(replyToPayload ? { replyTo: replyToPayload } : {})
           }
         });
         if (!queued) throw new Error('사진 오프라인 저장 공간이 부족합니다.');
         setChatInput('');
         setChatImages([]);
+        setChatReplyTarget(null);
         showToast('오프라인입니다. 사진은 연결되면 자동 전송됩니다.', 'info', 5000);
         return;
       }
@@ -2855,6 +2868,7 @@ function CalendarApp() {
           timestamp: Date.now()
         };
         if (linkPreview) messageData.linkPreview = linkPreview;
+        if (replyToPayload) messageData.replyTo = replyToPayload;
         setChatUploadProgress({ pct: 90, remainingSec: 1, label: '채팅 저장 중...' });
         ok = await (async () => {
           const sent = await writeCollectionDocumentWithFallback('messages', activeCalId, '', messageData, 'add', '채팅 저장', { documentId: messageOperationId });
@@ -2891,6 +2905,7 @@ function CalendarApp() {
             timestamp: baseTimestamp + i
           };
           if (i === 0 && linkPreview) messageData.linkPreview = linkPreview;
+          if (i === 0 && replyToPayload) messageData.replyTo = replyToPayload;
           const sent = await writeCollectionDocumentWithFallback('messages', activeCalId, '', messageData, 'add', '채팅 저장', { documentId: messageOperationId });
           if (!sent) throw new Error(`Chat send failed for chunk ${i + 1}/${chunks.length}`);
           if (i === 0) firstSentMessageId = sent.id || null;
@@ -2910,6 +2925,7 @@ function CalendarApp() {
         }
         setChatInput('');
         setChatImages([]);
+        setChatReplyTarget(null);
         if (chatTextareaRef.current) {
           chatTextareaRef.current.style.height = '34px';
         }
@@ -3520,7 +3536,12 @@ function CalendarApp() {
         ? getDirectMediaTagsForUrl(verifiedMessage, meta.directMediaUrl)
         : (Array.isArray(verifiedMessage.imageTags) ? verifiedMessage.imageTags[imageIndex] : '');
       if (String(verifiedTags || '') !== cleanTags) throw new Error('Image tags verification mismatch');
-      upsertLocalChatMessage(verifiedMessage);
+      // Patch-only, not upsertLocalChatMessage -- this message may live only in olderChatMessages
+      // (an older photo scrolled up to and tagged, not in the live chatMessages window). Upserting
+      // it would insert a copy into chatMessages too, growing that "live recent window" array and
+      // tripping the chat-view scroll-to-bottom effect keyed on chatMessages.length (see below),
+      // yanking the chat down to the latest message right after closing the Lightbox.
+      patchLocalChatMessage(messageId, verifiedMessage);
       const now = Date.now();
       const added = nextTokens.filter(t => !prevTokens.includes(t));
       const removed = prevTokens.filter(t => !nextTokens.includes(t));
@@ -3541,7 +3562,6 @@ function CalendarApp() {
       showToast('태그 저장 실패', 'error');
       return false;
     }
-    patchLocalChatMessage(messageId, data);
     const sourceEntry = isDirectMedia ? null : getMessageImageEntries(sourceMessage)[imageIndex];
     const imageUrl = String(meta?.imageUrl || meta?.directMediaUrl || sourceEntry?.full || sourceEntry?.thumb || '').trim();
     const thumbUrl = String(meta?.thumb || sourceEntry?.thumb || imageUrl).trim();
@@ -3818,6 +3838,40 @@ function CalendarApp() {
       }, null, 5000);
     }
     return ok;
+  };
+  // Reorders the 참석 명단 (attendee) rows shown for one date in DateModal, dragged via the
+  // same pointer-sort UI as the settlement expense list (see moveExpense/beginExpensePointerSort
+  // in ui-date-modal.js). availabilities has no per-entry order field -- display order is just
+  // array order in calendar.availabilities -- so this reorders only the slots this date's active
+  // entries already occupy in that array, leaving every other date's entries' positions (and
+  // their own updatedAt) untouched.
+  const handleReorderAvailability = (dateStr, orderedParticipantIds) => {
+    if (!activeCal || !isValidDateString(dateStr) || !Array.isArray(orderedParticipantIds) || orderedParticipantIds.length < 2) return false;
+    const existing = activeCal.availabilities || [];
+    const dateIndices = [];
+    existing.forEach((entry, i) => { if (entry.date === dateStr && !isTombstone(entry)) dateIndices.push(i); });
+    if (dateIndices.length < 2) return false;
+    const entryByParticipant = new Map();
+    dateIndices.forEach(i => entryByParticipant.set(existing[i].participantId, existing[i]));
+    const orderedEntries = [];
+    orderedParticipantIds.forEach(participantId => {
+      if (entryByParticipant.has(participantId)) {
+        orderedEntries.push(entryByParticipant.get(participantId));
+        entryByParticipant.delete(participantId);
+      }
+    });
+    // Any active entry not named in orderedParticipantIds (shouldn't happen from the UI, but
+    // keeps this defensive against a stale/partial id list) keeps its relative place at the end.
+    entryByParticipant.forEach(entry => orderedEntries.push(entry));
+    if (orderedEntries.length !== dateIndices.length) return false;
+    const unchanged = dateIndices.every((idx, i) => existing[idx].participantId === orderedEntries[i].participantId);
+    if (unchanged) return true;
+    const nextAvail = [...existing];
+    dateIndices.forEach((idx, i) => { nextAvail[idx] = orderedEntries[i]; });
+    const now = Date.now();
+    const updatedCal = { ...activeCal, updatedAt: now, revision: (activeCal.revision || 0) + 1, availabilities: nextAvail };
+    const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
+    return updateCalendars(nextCalendars, null, null, updatedCal.id, 'availability', []);
   };
   const handleDeleteAllForDate = async dateStr => {
     if (!activeCal || !isValidDateString(dateStr)) return false;
@@ -5548,6 +5602,7 @@ function CalendarApp() {
       chatMessages: displayChatMessages,
       onSave: handleSaveAvailability,
       onDelete: handleDeleteAvailability,
+      onReorderAvailability: handleReorderAvailability,
       onDeleteDate: handleDeleteAllForDate,
       onConfirmMeeting: handleConfirmMeeting,
       onSaveExpense: handleSaveExpense,
@@ -6162,6 +6217,8 @@ function CalendarApp() {
       chatTextareaRef: chatTextareaRef,
       chatImage: chatImages,
       setChatImage: setChatImages,
+      chatReplyTarget: chatReplyTarget,
+      setChatReplyTarget: setChatReplyTarget,
       activeLightbox: activeLightbox,
       setActiveLightbox: setActiveLightbox,
       onSend: handleSendChatMessage,

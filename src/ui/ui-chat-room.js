@@ -743,6 +743,8 @@ export function ChatRoomView({
   chatTextareaRef,
   chatImage: chatImages,
   setChatImage: setChatImages,
+  chatReplyTarget = null,
+  setChatReplyTarget,
   activeLightbox,
   setActiveLightbox,
   onSend,
@@ -802,6 +804,7 @@ export function ChatRoomView({
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
   const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
   const PencilIcon = __comp.PencilIcon || __deps.PencilIcon;
+  const ReplyIcon = __comp.ReplyIcon || __deps.ReplyIcon;
   const ThreeLinesIcon = __comp.ThreeLinesIcon || __deps.ThreeLinesIcon;
   const MegaphoneIcon = __comp.MegaphoneIcon || __deps.MegaphoneIcon;
   const EmojiPickerIcon = __comp.EmojiPickerIcon || __deps.EmojiPickerIcon;
@@ -994,6 +997,32 @@ export function ChatRoomView({
     triggerChatSend();
   };
 
+  // Reply-in-progress ("답장"): tapping a bubble's reply button snapshots just enough of that
+  // message to render the quote card (see renderReplyQuoteCard below) and to link back to it by
+  // id -- not the live message object, so a later edit/delete of the original doesn't retroactively
+  // change what the reply's quote shows (same behavior as KakaoTalk/Slack/Discord replies).
+  const handleStartReply = (msg, imageCount) => {
+    if (typeof setChatReplyTarget !== 'function' || !msg) return;
+    const text = String(msg.text || '').trim();
+    setChatReplyTarget({
+      id: msg.id,
+      participantId: msg.participantId,
+      text: text.length > 200 ? text.slice(0, 200) : text,
+      imageCount: imageCount || 0
+    });
+    if (onRevealChatInput) onRevealChatInput();
+    requestAnimationFrame(() => chatTextareaRef.current && chatTextareaRef.current.focus());
+  };
+  const handleCancelReply = () => {
+    if (typeof setChatReplyTarget === 'function') setChatReplyTarget(null);
+  };
+  const replyQuoteLabel = (replyTo) => {
+    if (!replyTo) return '';
+    if (replyTo.text) return replyTo.text;
+    const count = Number(replyTo.imageCount) || 0;
+    return count > 1 ? `사진 ${count}장` : '사진';
+  };
+
   // Note: chat notification on/off is fully owned by the App-level handleMainToggleNotifications,
   // reached here via the isChatNotifyEnabled/onToggleChatNotifications props (passed straight
   // through to ChatSideMenu) -- including the iOS false-positive-permission probe and the
@@ -1151,6 +1180,46 @@ export function ChatRoomView({
     return acc;
   }, {});
   const selectedParticipant = participants.find(p => p.id === chatParticipantId);
+  // Kakao-style reply quote card, rendered at the top of a bubble when msg.replyTo is set --
+  // shows the quoted sender + a 1-2 line snippet of what they said, and jumps back to that
+  // original bubble (scroll + highlight, paginating through older history if needed) on tap.
+  const renderReplyQuoteCard = (replyTo) => {
+    if (!replyTo) return null;
+    const qp = participantsMap[replyTo.participantId];
+    return /*#__PURE__*/React.createElement("div", {
+      onClick: e => {
+        e.stopPropagation();
+        if (onJumpToChatMessage && replyTo.id) onJumpToChatMessage(replyTo.id);
+      },
+      style: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '2px',
+        padding: '6px 8px',
+        marginBottom: '6px',
+        borderRadius: '8px',
+        borderLeft: `3px solid ${qp?.color || '#94A3B8'}`,
+        backgroundColor: 'rgba(148,163,184,0.14)',
+        cursor: onJumpToChatMessage ? 'pointer' : 'default'
+      }
+    },
+      /*#__PURE__*/React.createElement("span", {
+        style: { fontSize: '0.72rem', fontWeight: 700, color: qp?.color || '#64748B' }
+      }, qp?.name || '알수없음'),
+      /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: '0.78rem',
+          color: 'var(--text-main)',
+          opacity: 0.75,
+          display: '-webkit-box',
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: 'vertical',
+          overflow: 'hidden',
+          wordBreak: 'break-word'
+        }
+      }, replyQuoteLabel(replyTo))
+    );
+  };
   let lastDateStr = '';
   let readMarkerInserted = false;
   const renderedMessages = [];
@@ -1287,25 +1356,47 @@ export function ChatRoomView({
         padding: '2px 0'
       }
     },
-      /* Top: Delete button */
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "msg-actions-group",
-        onClick: () => onDeleteMessage && onDeleteMessage(msg),
-        title: "삭제",
-        style: {
-          width: '24px',
-          height: '24px',
-          border: 'none',
-          background: 'none',
-          padding: 0,
-          cursor: 'pointer',
-          color: '#94A3B8',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'flex-end'
-        }
-      }, /*#__PURE__*/React.createElement(TrashIcon, { size: 13 })),
+      /* Top: Reply + Delete buttons */
+      /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', alignItems: 'center', gap: '4px' }
+      },
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          className: "msg-actions-group",
+          onClick: () => handleStartReply(msg, msgImageCount),
+          title: "답장",
+          style: {
+            width: '24px',
+            height: '24px',
+            border: 'none',
+            background: 'none',
+            padding: 0,
+            cursor: 'pointer',
+            color: '#94A3B8',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'flex-end'
+          }
+        }, /*#__PURE__*/React.createElement(ReplyIcon, { size: 15 })),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          className: "msg-actions-group",
+          onClick: () => onDeleteMessage && onDeleteMessage(msg),
+          title: "삭제",
+          style: {
+            width: '24px',
+            height: '24px',
+            border: 'none',
+            background: 'none',
+            padding: 0,
+            cursor: 'pointer',
+            color: '#94A3B8',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'flex-end'
+          }
+        }, /*#__PURE__*/React.createElement(TrashIcon, { size: 13 }))
+      ),
       /* Bottom: Edit button + Timestamp */
       /*#__PURE__*/React.createElement("div", {
         style: {
@@ -1375,7 +1466,7 @@ export function ChatRoomView({
         // identically across Chrome/Whale/Safari/Firefox, unlike relying purely on width math.
         overflow: 'hidden'
       }
-    }, renderChatMessageBody(msg, setActiveLightbox, chatMediaStyle, searchQuery, stickyVideoKey, onActivateVideo)), /*#__PURE__*/React.createElement("div", {
+    }, renderReplyQuoteCard(msg.replyTo), renderChatMessageBody(msg, setActiveLightbox, chatMediaStyle, searchQuery, stickyVideoKey, onActivateVideo)), /*#__PURE__*/React.createElement("div", {
       style: {
         position: 'absolute',
         right: '-7px',
@@ -1433,7 +1524,7 @@ export function ChatRoomView({
         // identically across Chrome/Whale/Safari/Firefox, unlike relying purely on width math.
         overflow: 'hidden'
       }
-    }, renderChatMessageBody(msg, setActiveLightbox, chatMediaStyle, searchQuery, stickyVideoKey, onActivateVideo)), /*#__PURE__*/React.createElement("div", {
+    }, renderReplyQuoteCard(msg.replyTo), renderChatMessageBody(msg, setActiveLightbox, chatMediaStyle, searchQuery, stickyVideoKey, onActivateVideo)), /*#__PURE__*/React.createElement("div", {
       style: {
         position: 'absolute',
         left: '-7px',
@@ -1479,7 +1570,26 @@ export function ChatRoomView({
         padding: '2px 0'
       }
     },
-      /* Timestamp only, no edit/delete for other participants */
+      /* Reply button (no edit/delete for other participants) */
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "msg-actions-group",
+        onClick: () => handleStartReply(msg, msgImageCount),
+        title: "답장",
+        style: {
+          width: '24px',
+          height: '24px',
+          border: 'none',
+          background: 'none',
+          padding: 0,
+          cursor: 'pointer',
+          color: '#94A3B8',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'flex-start'
+        }
+      }, /*#__PURE__*/React.createElement(ReplyIcon, { size: 15 })),
+      /* Timestamp */
       /*#__PURE__*/React.createElement("span", {
         style: {
           fontSize: '0.68rem',
@@ -1529,7 +1639,7 @@ export function ChatRoomView({
       zIndex: 1020
     }
   }, /*#__PURE__*/React.createElement(BackArrowIcon, { size: 22 })),
-  !(isHeaderVisible || viewportBottom > 80 || isInputFocused || !!(chatInput && String(chatInput).trim()) || (chatImages && chatImages.length > 0)) && /*#__PURE__*/React.createElement("button", {
+  !(isHeaderVisible || viewportBottom > 80 || isInputFocused || !!(chatInput && String(chatInput).trim()) || (chatImages && chatImages.length > 0) || !!chatReplyTarget) && /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "chat-keyboard-reopen-btn",
     onClick: () => {
@@ -1839,9 +1949,9 @@ export function ChatRoomView({
       padding: '12px 16px',
       zIndex: isEmojiPickerOpen ? 13050 : 1012,
       flexShrink: 0,
-      transform: (isHeaderVisible || viewportBottom > 80 || isInputFocused || !!(chatInput && String(chatInput).trim()) || (chatImages && chatImages.length > 0)) ? 'translateY(0)' : 'translateY(calc(100% + 12px))',
-      opacity: (isHeaderVisible || viewportBottom > 80 || isInputFocused || !!(chatInput && String(chatInput).trim()) || (chatImages && chatImages.length > 0)) ? 1 : 0,
-      pointerEvents: (isHeaderVisible || viewportBottom > 80 || isInputFocused || !!(chatInput && String(chatInput).trim()) || (chatImages && chatImages.length > 0)) ? 'auto' : 'none',
+      transform: (isHeaderVisible || viewportBottom > 80 || isInputFocused || !!(chatInput && String(chatInput).trim()) || (chatImages && chatImages.length > 0) || !!chatReplyTarget) ? 'translateY(0)' : 'translateY(calc(100% + 12px))',
+      opacity: (isHeaderVisible || viewportBottom > 80 || isInputFocused || !!(chatInput && String(chatInput).trim()) || (chatImages && chatImages.length > 0) || !!chatReplyTarget) ? 1 : 0,
+      pointerEvents: (isHeaderVisible || viewportBottom > 80 || isInputFocused || !!(chatInput && String(chatInput).trim()) || (chatImages && chatImages.length > 0) || !!chatReplyTarget) ? 'auto' : 'none',
       transition: 'transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.18s ease, bottom 0.12s ease-out'
     }
   },
@@ -1859,6 +1969,57 @@ export function ChatRoomView({
         width: '100%'
       }
     },
+      /* Reply preview: shown above the textarea while replying to a specific bubble. The
+         snippet mirrors renderReplyQuoteCard's label so what you see here is exactly what
+         lands on the sent message's own quote card. */
+      chatReplyTarget && /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: 'flex',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          gap: '8px',
+          padding: '6px 8px',
+          borderRadius: '8px',
+          borderLeft: `3px solid ${participantsMap[chatReplyTarget.participantId]?.color || '#94A3B8'}`,
+          backgroundColor: 'var(--bg-primary)'
+        }
+      },
+        /*#__PURE__*/React.createElement("div", {
+          style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, flex: 1 }
+        },
+          /*#__PURE__*/React.createElement("span", {
+            style: { fontSize: '0.72rem', fontWeight: 700, color: '#4F46E5' }
+          }, `${participantsMap[chatReplyTarget.participantId]?.name || '알수없음'}님에게 답장`),
+          /*#__PURE__*/React.createElement("span", {
+            style: {
+              fontSize: '0.8rem',
+              color: 'var(--text-main)',
+              opacity: 0.75,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis'
+            }
+          }, replyQuoteLabel(chatReplyTarget))
+        ),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          onClick: handleCancelReply,
+          "aria-label": "답장 취소",
+          style: {
+            width: '22px',
+            height: '22px',
+            border: 'none',
+            background: 'none',
+            padding: 0,
+            cursor: 'pointer',
+            color: '#94A3B8',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0
+          }
+        }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 16 }))
+      ),
       /* Textarea at top */
       /*#__PURE__*/React.createElement("textarea", {
         ref: chatTextareaRef,
@@ -1873,7 +2034,7 @@ export function ChatRoomView({
               setIsInputFocused(true);
               return;
             }
-            if ((chatInput && String(chatInput).trim()) || (chatImages && chatImages.length > 0)) {
+            if ((chatInput && String(chatInput).trim()) || (chatImages && chatImages.length > 0) || chatReplyTarget) {
               setIsInputFocused(true);
               return;
             }

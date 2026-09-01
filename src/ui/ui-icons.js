@@ -835,6 +835,19 @@ export function PencilIcon({ size = 12 } = {}) {
   );
 }
 
+export function ReplyIcon({ size = 14 } = {}) {
+  const React = window.React;
+
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg", width: String(size), height: String(size), viewBox: "0 0 24 24",
+    fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+  },
+    /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
+    /*#__PURE__*/React.createElement("path", { d: "M9 13l-4 -4l4 -4" }),
+    /*#__PURE__*/React.createElement("path", { d: "M5 9h7a4 4 0 1 1 0 8h-1" })
+  );
+}
+
 export function BuildingIcon({ size = 14 } = {}) {
   const React = window.React;
 
@@ -2016,6 +2029,7 @@ export function DicesIcon({ size = 14 }) {
     LinkIcon: LinkIcon,
     MessageCommentIcon: MessageCommentIcon,
     PencilIcon: PencilIcon,
+    ReplyIcon: ReplyIcon,
     BuildingIcon: BuildingIcon,
     BackArrowIcon: BackArrowIcon,
     SunIcon: SunIcon,
