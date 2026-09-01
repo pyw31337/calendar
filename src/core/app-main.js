@@ -2169,6 +2169,14 @@ function CalendarApp() {
     }
   }, [activeCalId, calendars]);
 
+  // Tracks the last time the chat onSnapshot listener actually delivered a snapshot (own writes,
+  // someone else's writes, or the initial history load all count). The watchdog effect below
+  // compares against this to detect a listener that has silently stopped receiving updates --
+  // a known field failure mode (see the long-polling notes above attemptFirebaseInit) where the
+  // realtime stream goes quiet while everything else keeps working, so creates/edits/deletes and
+  // other participants' messages stop showing up until a manual reload.
+  const lastChatSnapshotAtRef = React.useRef(0);
+
   // Real-time messages listener
   // Full window on chat/gallery; compact window elsewhere (main CommentsSection only needs ~5).
   React.useEffect(() => {
@@ -2184,6 +2192,9 @@ function CalendarApp() {
       return;
     }
     let isMounted = true;
+    // Reset the watchdog clock on every (re)subscribe so it waits a full grace period for this
+    // fresh listener's own first snapshot instead of immediately judging it stale.
+    lastChatSnapshotAtRef.current = Date.now();
 
     // Subscribe to chat room history. Queried newest-first + limit so the window
     // tracks the most recent messages as new ones arrive, then reversed back to
@@ -2192,6 +2203,7 @@ function CalendarApp() {
     let lastNotifiedMessageId = null;
     const unsubscribeChat = subscribeMessages(activeCalId, { orderBy: 'timestamp', direction: 'desc', limit: chatLimit }, snapshot => {
         if (!isMounted) return;
+        lastChatSnapshotAtRef.current = Date.now();
         const list = [];
         snapshot.forEach(doc => {
           list.push(slimMessageForClient({ id: doc.id, ...doc.data() }));
@@ -2228,6 +2240,56 @@ function CalendarApp() {
   // attached onSnapshot until a full reload, so messages from other users appeared
   // only after refreshing.
   }, [activeCalId, activeView, firebaseDb, firebaseConnectionVersion]);
+
+  // Chat listener watchdog: self-heals a silently stalled onSnapshot stream. Checks periodically
+  // whether the listener above has gone quiet for too long and, if so, pulls the same recent
+  // window directly (SDK read with a REST fallback baked into fetchRecentChatMessages) and
+  // reconciles it into local state -- picking up creates/edits/deletes and other participants'
+  // messages without requiring a manual page reload. Cheap while the listener is healthy (the
+  // timestamp keeps getting refreshed by real snapshots, so the check below is a no-op almost
+  // every tick); only starts actually re-fetching once the stream has genuinely stopped.
+  React.useEffect(() => {
+    if (!activeCalId || !firebaseDb) return undefined;
+    const chatLimit = CHAT_LIVE_MESSAGE_LIMIT;
+    const STALE_AFTER_MS = 9000;
+    const CHECK_INTERVAL_MS = 5000;
+    let isMounted = true;
+    let reconciling = false;
+    const reconcile = async () => {
+      if (reconciling) return;
+      reconciling = true;
+      try {
+        const fresh = await fetchRecentChatMessages(activeCalId, chatLimit);
+        if (!isMounted || !Array.isArray(fresh) || fresh.length === 0) return;
+        const freshIds = new Set(fresh.map(m => m.id));
+        const oldestFreshTimestamp = Number(fresh[0].timestamp) || 0;
+        setChatMessages(prev => {
+          const keepOlder = prev.filter(m => !freshIds.has(m.id) && (Number(m.timestamp) || 0) < oldestFreshTimestamp);
+          const merged = [...keepOlder, ...fresh];
+          merged.sort((a, b) => (Number(a.timestamp) || 0) - (Number(b.timestamp) || 0) || String(a.id || '').localeCompare(String(b.id || '')));
+          return merged;
+        });
+        invalidateGalleryItemCount(activeCalId);
+        setGalleryCountRefreshToken(token => token + 1);
+      } catch (err) {
+        console.warn('Chat listener watchdog reconcile notice:', err);
+      } finally {
+        // Whether or not the fetch found anything new, treat a completed reconcile as "caught
+        // up" so the watchdog doesn't hammer the network every single tick while the realtime
+        // stream stays stuck -- it'll try again after another full stale interval.
+        lastChatSnapshotAtRef.current = Date.now();
+        reconciling = false;
+      }
+    };
+    const timer = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      if (Date.now() - lastChatSnapshotAtRef.current > STALE_AFTER_MS) void reconcile();
+    }, CHECK_INTERVAL_MS);
+    return () => {
+      isMounted = false;
+      clearInterval(timer);
+    };
+  }, [activeCalId, firebaseDb]);
 
   // Anniversaries: full collection (no orderBy) + client sort so docs without createdAt still show.
   React.useEffect(() => {
@@ -2839,6 +2901,13 @@ function CalendarApp() {
       let linkPreview = null;
       let firstSentMessageId = null;
       let ok = false;
+      // The realtime onSnapshot listener is the only thing that would otherwise surface a just-
+      // sent message -- and it has been observed in the field to silently stop delivering updates
+      // (see the watchdog effect and the long-polling notes above attemptFirebaseInit), leaving a
+      // sent message invisible in the sender's own feed until a manual reload. Collect what was
+      // actually written here so it can be inserted locally right away regardless of listener
+      // health; the listener/watchdog will just reconcile over the same id later.
+      const sentMessagesForOptimisticInsert = [];
       if (imageCount > 0 && typeof navigator !== 'undefined' && navigator.onLine === false
         && chatImages.every(image => image?.originalBlob && image?.thumbnailBlob)) {
         const queued = await enqueueWriteOperation({
@@ -2873,6 +2942,7 @@ function CalendarApp() {
         ok = await (async () => {
           const sent = await writeCollectionDocumentWithFallback('messages', activeCalId, '', messageData, 'add', '채팅 저장', { documentId: messageOperationId });
           firstSentMessageId = sent?.id || null;
+          if (sent?.id) sentMessagesForOptimisticInsert.push({ ...messageData, id: sent.id });
           return Boolean(sent);
         })();
         if (ok) setChatUploadProgress({ pct: 100, remainingSec: 0, label: '전송 완료' });
@@ -2909,12 +2979,14 @@ function CalendarApp() {
           const sent = await writeCollectionDocumentWithFallback('messages', activeCalId, '', messageData, 'add', '채팅 저장', { documentId: messageOperationId });
           if (!sent) throw new Error(`Chat send failed for chunk ${i + 1}/${chunks.length}`);
           if (i === 0) firstSentMessageId = sent.id || null;
+          if (sent.id) sentMessagesForOptimisticInsert.push({ ...messageData, id: sent.id });
         }
         ok = true;
         setChatUploadProgress({ pct: 100, remainingSec: 0, label: '전송 완료', current: imageCount, total: imageCount });
       }
 
       if (ok) {
+        sentMessagesForOptimisticInsert.forEach(msg => upsertLocalChatMessage(msg));
         if (firstSentMessageId && chatLinkUrl && shouldFetchLinkPreviewForChatUrl(chatLinkUrl)) {
           void fetchLinkPreview(chatLinkUrl).then(async result => {
             if (result?.status !== 'success') return;

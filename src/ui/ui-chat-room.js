@@ -1770,7 +1770,12 @@ export function ChatRoomView({
       overflowY: 'auto',
       padding: '16px',
       paddingTop: isSearchOpen ? '124px' : '72px',
-      paddingBottom: '152px'
+      // Static 152px alone only clears the composer at its rest position. Once the virtual
+      // keyboard opens, the fixed .chat-composer rides up by viewportBottom px (see its own
+      // `bottom: viewportBottom` below) -- without adding that same amount here, scrolling to
+      // scrollHeight still leaves the newest bubble sitting right where the keyboard now covers
+      // it, since the reserved bottom space never grew to match.
+      paddingBottom: `${152 + viewportBottom}px`
     }
   }, (loadingOlderChat || hasMoreOlderChat) && /*#__PURE__*/React.createElement("div", {
     style: { textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)', padding: '8px 0 12px' }
