@@ -2978,9 +2978,9 @@ select.form-select {
   white-space: nowrap;
   background: rgba(0, 0, 0, 0.04);
   padding: 8px 12px;
-  border-radius: 10px 0 0 0;
+  border-radius: 10px 0 10px 0;
   margin-right: -12px;
-  margin-bottom: -12px;
+  margin-bottom: -10px;
   opacity: 0.8;
 }
 .settlement-person-settlement-badge.is-refund {

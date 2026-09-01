@@ -2456,7 +2456,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
           ),
           React.createElement('div', {
             className: 'settlement-expense-resize-row',
-            style: { display: 'flex', justifyContent: 'center', height: '20px', marginTop: '-8px', backgroundColor: 'rgba(0, 0, 0, 0.04)', borderRadius: '0 0 6px 6px', marginBottom: '8px' }
+            style: { display: 'flex', justifyContent: 'center', height: '24px', marginTop: '-8px', backgroundColor: 'rgba(0, 0, 0, 0.04)', borderRadius: '0 0 6px 6px', marginBottom: '8px' }
           },
             React.createElement('button', {
               type: 'button',

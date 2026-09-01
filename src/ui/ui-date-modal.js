@@ -1427,7 +1427,11 @@ export function DateModal({
       const tags = Array.isArray(memo.tags) ? memo.tags.join(' ') : String(memo.tags || '');
       const parsedDates = typeof parseFlexibleDateTokens === 'function' ? parseFlexibleDateTokens(tags) : [];
       if (!(parsedDates.includes(targetDate) || (targetTag && tags.includes(targetTag)))) return;
-      const asMsg = { id: memo.id, text: memo.text || '', imageUrl: memo.imageUrl, imageUrls: memo.imageUrls, thumbUrl: memo.thumbUrl, thumbUrls: memo.thumbUrls };
+      // Memo link previews may be persisted separately from the body text (especially for
+      // older memos). Include every supported URL field when resolving direct video media so
+      // date-tagged memo videos are not silently omitted from the meeting photo tab.
+      const memoDirectUrl = memo.linkPreview?.url || memo.url || memo.videoUrl || '';
+      const asMsg = { id: memo.id, text: [memo.text || '', memoDirectUrl].filter(Boolean).join(' '), imageUrl: memo.imageUrl, imageUrls: memo.imageUrls, thumbUrl: memo.thumbUrl, thumbUrls: memo.thumbUrls };
       const imageEntries = typeof getMessageImageEntries === 'function' ? getMessageImageEntries(asMsg) : [];
       imageEntries.forEach((entry, idx) => {
         const full = entry.full || entry.thumb;
@@ -2867,6 +2871,7 @@ export function DateModal({
               style: { position: 'absolute', top: '10px', right: '10px', display: 'flex', alignItems: 'center', gap: '4px' }
             }, /*#__PURE__*/React.createElement("button", {
               type: 'button',
+              className: 'poll-drag-handle',
               draggable: true,
               title: '드래그하여 순서 변경',
               'aria-label': '장소 순서 변경',
@@ -2875,8 +2880,8 @@ export function DateModal({
               // HTML drag-and-drop is intentionally used here: it works with a mouse/trackpad,
               // while touch users can still reorder through the same control on browsers that
               // promote draggable elements to a native long-press drag gesture.
-              style: { height: '22px', padding: '0 6px', border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)', borderRadius: '6px', cursor: 'grab', color: 'var(--text-muted)', fontSize: '0.65rem', fontWeight: 700 }
-            }, '드래그'), /*#__PURE__*/React.createElement(ItemEditDeleteActions, {
+              style: { width: '22px', height: '22px', padding: 0, border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)', borderRadius: '6px', cursor: 'grab', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'none', userSelect: 'none' }
+            }, /*#__PURE__*/React.createElement(LineHeightIcon, { size: 12 })), /*#__PURE__*/React.createElement(ItemEditDeleteActions, {
               onEdit: () => {
                 const sp = { name: place.name, address: place.address || '', lat: place.lat, lng: place.lng, categoryId: place.categoryId || 'etc' };
                 // Prefill with ONLY this date's note, not the place's whole memo history -- this
