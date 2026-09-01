@@ -1685,7 +1685,10 @@ export function PollVoterSheet({ calendar, pollId, optionId, onSelect, onClose }
   // matching comment for the full explanation.
   return ReactDOM.createPortal(/*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",
-    onClick: onClose,
+    // Portaled elements replay their synthetic events through the React component tree, not
+    // the DOM tree, so this click would otherwise still bubble up to whatever ancestor
+    // component (e.g. a poll card's "tap to open" handler) rendered this sheet.
+    onClick: e => { e.stopPropagation(); onClose(); },
     style: {
       alignItems: 'flex-end',
       backgroundColor: 'rgba(15, 23, 42, 0.68)'

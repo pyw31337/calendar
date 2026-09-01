@@ -850,7 +850,11 @@ export function SimpleBottomSheetPicker({ title, value, options, onSelect, place
   const selected = safeOptions.find(o => o.value === value);
   const sheet = isOpen && /*#__PURE__*/React.createElement("div", {
     className: "bottom-sheet-overlay",
-    onClick: () => setIsOpen(false)
+    // This sheet is portaled to document.body below, so its synthetic click still bubbles up
+    // the React component tree (not the DOM tree) to whatever ancestor rendered it -- without
+    // stopPropagation, a click meant only to dismiss this sheet can also trigger an ancestor
+    // card's own "tap to open" handler.
+    onClick: e => { e.stopPropagation(); setIsOpen(false); }
   }, /*#__PURE__*/React.createElement("div", {
     className: "bottom-sheet",
     onClick: e => e.stopPropagation()

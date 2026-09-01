@@ -777,7 +777,12 @@ export function ChatParticipantSheet({ calendar, selectedId, onSelect, onClose }
     /* Overlay */
     /*#__PURE__*/React.createElement("div", {
       className: "modal-overlay",
-      onClick: onClose,
+      // React replays a portaled element's synthetic events through the *component* tree it
+      // was rendered from, not the DOM tree it's mounted in -- so without stopPropagation this
+      // click still bubbles up to whatever ancestor component (e.g. a memo card's "tap to open
+      // edit" handler) rendered this sheet, even though the overlay itself sits under
+      // document.body, nowhere near that ancestor in the actual DOM.
+      onClick: e => { e.stopPropagation(); onClose(); },
       style: {
         alignItems: 'flex-end',
         backgroundColor: 'rgba(15, 23, 42, 0.68)',
