@@ -819,6 +819,7 @@ export function AdminModal({
   const CalendarExportIcon = __comp.CalendarExportIcon || __deps.CalendarExportIcon;
   const CalendarGrid = __comp.CalendarGrid || __deps.CalendarGrid;
   const ColorSwatchPicker = __comp.ColorSwatchPicker || __deps.ColorSwatchPicker;
+  const ParticipantBadge = __comp.ParticipantBadge || __deps.ParticipantBadge;
   const DateModal = __comp.DateModal || __deps.DateModal;
   const HourglassIcon = __comp.HourglassIcon || __deps.HourglassIcon;
   const LogIcon = __comp.LogIcon || __deps.LogIcon;
@@ -1635,9 +1636,7 @@ export function AdminModal({
                     }
                   }, actionLabel),
                   /* User */
-                  /*#__PURE__*/React.createElement("span", {
-                    style: { backgroundColor: p.color, color: '#FFFFFF', padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: '0.7rem', fontWeight: 'bold', whiteSpace: 'nowrap' }
-                  }, p.name),
+                  /*#__PURE__*/React.createElement(ParticipantBadge, { participant: p }),
                   log.date && /*#__PURE__*/React.createElement("span", {
                     className: "recent-log-date",
                     style: { fontSize: '0.78rem' }
@@ -1779,15 +1778,7 @@ export function AdminModal({
               onClick: () => handleTimelineRowClick(log)
             }, /*#__PURE__*/React.createElement("div", {
               className: "recent-log-left"
-            }, /*#__PURE__*/React.createElement("span", {
-              className: "participant-badge",
-              style: {
-                backgroundColor: participant.color,
-                color: '#FFFFFF',
-                fontSize: '0.72rem',
-                padding: '2px 8px'
-              }
-            }, participant.name), /*#__PURE__*/React.createElement("span", {
+            }, /*#__PURE__*/React.createElement(ParticipantBadge, { participant: participant }), /*#__PURE__*/React.createElement("span", {
               className: "recent-log-action",
               style: { color: actionColor, fontWeight: 'bold', fontSize: '0.75rem' }
             }, "[", actionLabel, "]"), /*#__PURE__*/React.createElement("span", {

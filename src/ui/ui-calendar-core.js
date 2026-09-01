@@ -757,6 +757,7 @@ export function CalendarGrid({
   const CalendarCheckIcon = __comp.CalendarCheckIcon || __deps.CalendarCheckIcon;
   const CoinIcon = __comp.CoinIcon || __deps.CoinIcon;
   const CakeIcon = __comp.CakeIcon || __deps.CakeIcon;
+  const ParticipantBadge = __comp.ParticipantBadge || __deps.ParticipantBadge;
   const getActiveParticipants = __deps.getActiveParticipants;
 
   const year = monthDate.getFullYear();
@@ -1286,14 +1287,10 @@ export function CalendarGrid({
       }, entries.map(e => {
         const p = participantsMap[e.participantId];
         if (!p) return null;
-        return /*#__PURE__*/React.createElement("span", {
+        return /*#__PURE__*/React.createElement(ParticipantBadge, {
           key: p.id,
-          className: "participant-badge",
-          style: {
-            backgroundColor: p.color,
-            color: '#FFFFFF',
-            cursor: 'pointer'
-          },
+          participant: p,
+          style: { cursor: 'pointer' },
           draggable: true,
           onDragStart: event => {
             event.stopPropagation();
@@ -2525,6 +2522,7 @@ export function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCan
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const PollSectionIcon = __comp.PollSectionIcon || __deps.PollSectionIcon;
+  const ParticipantBadge = __comp.ParticipantBadge || __deps.ParticipantBadge;
   const SectionCountBadge = __comp.SectionCountBadge || __deps.SectionCountBadge;
   const SectionToggleButton = __comp.SectionToggleButton || __deps.SectionToggleButton;
   const SettingsIcon = __comp.SettingsIcon || __deps.SettingsIcon;
@@ -2630,11 +2628,11 @@ export function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCan
       /*#__PURE__*/React.createElement("span", {
         style: { fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', whiteSpace: 'nowrap' }
       }, "미참여"),
-      nonVoters.map(p => /*#__PURE__*/React.createElement("span", {
+      nonVoters.map(p => /*#__PURE__*/React.createElement(ParticipantBadge, {
         key: p.id,
-        className: "participant-badge",
-        style: { backgroundColor: p.color, color: '#FFFFFF', opacity: 0.65, fontSize: '0.7rem' }
-      }, p.name))
+        participant: p,
+        style: { opacity: 0.65 }
+      }))
     );
 
     const togglePollOptions = (event) => {
