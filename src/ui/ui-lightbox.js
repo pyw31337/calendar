@@ -1663,7 +1663,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
 
   // Shared by both the carousel's "current" slot and the single-image layout below --
   // left-aligned edit/delete buttons plus centered zoom controls on the same row.
-  const renderPhotoActions = () => (showInfo && zoomLevel === ZOOM_DEFAULT && (canEditPhoto || isDesktop)) && /*#__PURE__*/React.createElement("div", {
+  const renderPhotoActions = () => (showInfo && (canEditPhoto || isDesktop)) && /*#__PURE__*/React.createElement("div", {
     style: {
       position: 'absolute',
       top: '8px',
@@ -1677,7 +1677,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     },
     onClick: e => e.stopPropagation()
   },
-    /*#__PURE__*/React.createElement("div", {
+    zoomLevel === ZOOM_DEFAULT && /*#__PURE__*/React.createElement("div", {
       style: { display: 'flex', alignItems: 'center', gap: '6px', pointerEvents: 'auto' }
     },
       canEditPhoto && onDeletePhoto && /*#__PURE__*/React.createElement("button", {
