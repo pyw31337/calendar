@@ -1,4 +1,5 @@
 const functions = require('firebase-functions');
+const { defineString } = require('firebase-functions/params');
 const admin = require('firebase-admin');
 const crypto = require('crypto');
 const webpush = require('web-push');
@@ -882,6 +883,10 @@ exports.googlePlacesSearchProxy = functions.runWith({ secrets: ['GOOGLE_PLACES_A
 // Read-only Korean tourism lookup used to enrich a registered place with nearby
 // attractions, food and lodging. Parameterized config keeps deployment valid even
 // before a key is supplied; the browser receives only normalized display-safe fields.
+const TOUR_API_SERVICE_KEY_PARAM = defineString('TOUR_API_SERVICE_KEY', {
+  description: 'Optional Korea TourAPI service key for place enrichment'
+});
+
 exports.tourApiSearchProxy = functions.https.onRequest(async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -889,7 +894,11 @@ exports.tourApiSearchProxy = functions.https.onRequest(async (req, res) => {
   if (req.method !== 'GET') { res.status(405).json({ ok: false, message: 'Method not allowed' }); return; }
   // Optional integration: the key is read only at request time so deployment
   // never prompts or fails when TourAPI is intentionally disabled.
-  const tourApiServiceKey = process.env.TOUR_API_SERVICE_KEY || '';
+  const rawTourApiKey = process.env.TOUR_API_SERVICE_KEY || TOUR_API_SERVICE_KEY_PARAM.value() || '';
+  // data.go.kr displays the key URL-encoded; decode exactly once before
+  // URLSearchParams applies request encoding.
+  let tourApiServiceKey = rawTourApiKey;
+  try { tourApiServiceKey = decodeURIComponent(rawTourApiKey); } catch (_) {}
   if (!tourApiServiceKey) {
     res.status(503).json({ ok: false, code: 'not_configured', message: 'TourAPI service key is not configured' });
     return;
