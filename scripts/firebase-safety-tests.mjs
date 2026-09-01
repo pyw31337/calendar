@@ -42,6 +42,11 @@ const appMainSource = fs.readFileSync(new URL('../src/core/app-main.js', import.
 assert(appMainSource.includes("console.info('[calendar-save]'"), 'calendar saves must emit an operation diagnostic');
 assert(appMainSource.includes("console.warn('[calendar-save-failed]'"), 'failed calendar saves must emit an operation diagnostic');
 assert(appMainSource.includes('pendingRemotePlacesRef') && appMainSource.includes('pendingRemoteMeetingsRef'), 'realtime subcollection snapshots must be retained during local saves');
+// A rendered link is a read path: it must never fan out into Firestore/Peekalink requests just
+// because a chat, memo, or gallery card mounted. Preview fetching belongs to explicit write flows.
+const linkPreviewHook = appMainSource.match(/function useLinkPreview\(url, cachedData\) \{([\s\S]*?)\n\}/)?.[1] || '';
+assert(linkPreviewHook && !/fetchLinkPreview\s*\(/.test(linkPreviewHook), 'link preview render hook must not fetch external previews');
+assert(appMainSource.includes('Render-time link previews are intentionally read-only'), 'link preview render path must document its no-fetch contract');
 
 // Dragging the attendee list re-sends the SAME set of entries for that date in a new order, no
 // content change. Regression guard for a bug where the merge always fell back to the server's
@@ -187,6 +192,7 @@ const notificationScript = fs.readFileSync('assets/app-notifications.js', 'utf8'
 const writeQueueScript = fs.readFileSync('src/core/app-write-queue.js', 'utf8');
 const mediaOutboxScript = fs.readFileSync('src/core/app-media-outbox.js', 'utf8');
 const firestoreRules = fs.existsSync('firestore.rules') ? fs.readFileSync('firestore.rules', 'utf8') : '';
+const functionsSource = fs.existsSync('functions/index.js') ? fs.readFileSync('functions/index.js', 'utf8') : '';
 assert(script, 'assets/app-main.js not found');
 const unsafeSendGuardFiles = fs.readdirSync('src/ui')
   .filter(file => file.endsWith('.js'))
@@ -213,6 +219,11 @@ assert(/withWeatherTimeout\(fetch\(/.test(weatherScript), 'weather external requ
 assert(/hadServiceWorkerControllerAtStartup[\s\S]{0,900}controllerchange[\s\S]{0,180}hadServiceWorkerControllerAtStartup/.test(domainHelpersScript), 'first service worker install must not reload and destroy the app boot');
 assert(/isAppleWebKit/.test(firebaseDataScript) && /experimentalAutoDetectLongPolling: isAppleWebKit/.test(firebaseDataScript), 'Safari/WebKit must avoid forced Firestore long polling');
 assert(!/push_subscriptions.*get\(\)/s.test(sideMenuScript), 'settings must not fetch implementation-level push device inventory');
+assert(functionsSource.includes('parsePublicHttpUrl') && functionsSource.includes('metadata.google.internal'), 'public proxies must validate URLs and block cloud metadata SSRF targets');
+assert(functionsSource.includes("timeoutSeconds: 15") && functionsSource.includes("maxInstances: 20") && functionsSource.includes("memory: '256MB'"), 'public proxy functions must have bounded runtime resources');
+assert(functionsSource.includes('setPublicCacheHeaders') && functionsSource.includes('stale-while-revalidate'), 'public proxy responses must advertise bounded browser/shared caching');
+assert(/collection\('push_subscriptions'\)\.limit\(500\)/.test(functionsSource), 'push fan-out must have a bounded subscription query');
+assert(/new AbortController\(\)[\s\S]{0,220}api\.peekalink\.io/.test(functionsSource), 'paid link preview requests must have an upstream timeout');
 assert(firebaseServicesScript.includes('FIRESTORE_REST_TIMEOUT_MS = 9000') && firebaseServicesScript.includes('fetchWithTimeout') && firebaseServicesScript.includes('withSdkTimeout'), 'Firebase SDK and REST reads must have bounded timeouts');
 assert(/fetchFirestoreRequest/.test(firebaseDataScript) && /image share read timeout/.test(firebaseDataScript), 'Firestore fallback and share reads must have bounded timeouts');
 assert(calendarCoreScript.includes('withFirestoreReadTimeout') && calendarCoreScript.includes('Firestore search read timed out'), 'full-history search reads must have a bounded timeout');

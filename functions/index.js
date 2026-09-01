@@ -113,7 +113,9 @@ async function broadcastCalendarPush(calendarDocId, payloadObj, options = {}) {
   const db = admin.firestore();
   const skipParticipantId = options.skipParticipantId || null;
   const channel = options.channel || 'chat'; // chat | memo | poll | schedule
-  const subSnap = await db.collection('calendars').doc(calendarDocId).collection('push_subscriptions').get();
+  // Cap fan-out so a compromised/abnormally large subscription set cannot create an
+  // unbounded push-send and Firestore-write bill in one trigger invocation.
+  const subSnap = await db.collection('calendars').doc(calendarDocId).collection('push_subscriptions').limit(500).get();
   if (subSnap.empty) {
     console.log('No push subscriptions for', calendarDocId);
     return { sent: 0 };
@@ -509,6 +511,30 @@ async function saveLinkPreviewToFirestore(url, preview) {
   }
 }
 
+// Public proxy endpoints must never become an open SSRF relay. Accept only ordinary web URLs,
+// reject embedded credentials, and block loopback/private/cloud-metadata host spellings.
+function parsePublicHttpUrl(value) {
+  if (typeof value !== 'string' || value.trim().length === 0 || value.trim().length > 2000) return null;
+  try {
+    const url = new URL(value.trim());
+    const host = url.hostname.toLowerCase();
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) return null;
+    if (host === 'localhost' || host === 'localhost.localdomain' || host === 'metadata.google.internal'
+      || host === 'metadata.google.com' || host.endsWith('.internal')
+      || /^(127\.|10\.|192\.168\.|169\.254\.|0\.)/.test(host)
+      || /^172\.(1[6-9]|2\d|3[01])\./.test(host)
+      || host === '::1' || host.startsWith('fc') || host.startsWith('fd')) return null;
+    return url;
+  } catch (_) { return null; }
+}
+
+function setPublicCacheHeaders(res, maxAge = 300) {
+  res.set('Cache-Control', `public, max-age=${maxAge}, stale-while-revalidate=${maxAge}`);
+  res.set('X-Content-Type-Options', 'nosniff');
+}
+
+const PUBLIC_PROXY_RUNTIME = { timeoutSeconds: 15, memory: '256MB', maxInstances: 20 };
+
 // Generic per-IP, per-endpoint sliding-window throttle for the public proxy functions below
 // (peekalinkProxy, kakaoLocalSearchProxy). Both proxies are unauthenticated by design (any
 // calendar guest needs to reach them without a login step), which also means anyone who finds
@@ -642,11 +668,12 @@ async function fetchFallbackPreview(link) {
   }
 }
 
-exports.peekalinkProxy = functions.runWith({ secrets: ['PEEKALINK_API_KEY'] }).https.onRequest(async (req, res) => {
+exports.peekalinkProxy = functions.runWith({ ...PUBLIC_PROXY_RUNTIME, secrets: ['PEEKALINK_API_KEY'] }).https.onRequest(async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.set('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') {
+    setPublicCacheHeaders(res, 86400);
     res.status(204).send('');
     return;
   }
@@ -655,13 +682,16 @@ exports.peekalinkProxy = functions.runWith({ secrets: ['PEEKALINK_API_KEY'] }).h
     return;
   }
   const link = req.body && req.body.link;
-  if (!link || typeof link !== 'string') {
+  const parsedLink = parsePublicHttpUrl(link);
+  if (!parsedLink) {
     res.status(400).json({ ok: false, message: 'link is required' });
     return;
   }
+  setPublicCacheHeaders(res, 300);
+  const normalizedLink = parsedLink.toString();
   // 0. Check Firestore shared cache first (avoids any network or rate limit)
   try {
-    const urlHash = hashUrlForCache(link);
+    const urlHash = hashUrlForCache(normalizedLink);
     const cachedDoc = await admin.firestore().collection('linkPreviews').doc(urlHash).get();
     if (cachedDoc.exists && cachedDoc.data()?.title && !looksLikeBlockedPreviewTitle(cachedDoc.data()?.title)) {
       const d = cachedDoc.data();
@@ -678,16 +708,16 @@ exports.peekalinkProxy = functions.runWith({ secrets: ['PEEKALINK_API_KEY'] }).h
   } catch (_) {}
 
   // 1. Free, official, unlimited platform oEmbeds (YouTube & TikTok) - bypass Peekalink rate limit!
-  const youtubePreview = await fetchYouTubeOembedPreview(link);
+  const youtubePreview = await fetchYouTubeOembedPreview(normalizedLink);
   if (youtubePreview) {
-    await saveLinkPreviewToFirestore(link, youtubePreview);
+    await saveLinkPreviewToFirestore(normalizedLink, youtubePreview);
     res.status(200).json(youtubePreview);
     return;
   }
 
-  const tiktokPreview = await fetchTikTokOembedPreview(link);
+  const tiktokPreview = await fetchTikTokOembedPreview(normalizedLink);
   if (tiktokPreview) {
-    await saveLinkPreviewToFirestore(link, tiktokPreview);
+    await saveLinkPreviewToFirestore(normalizedLink, tiktokPreview);
     res.status(200).json(tiktokPreview);
     return;
   }
@@ -699,18 +729,22 @@ exports.peekalinkProxy = functions.runWith({ secrets: ['PEEKALINK_API_KEY'] }).h
   }
 
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
     const peekalinkRes = await fetch('https://api.peekalink.io/', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${PEEKALINK_API_KEY}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ link })
+      body: JSON.stringify({ link: normalizedLink }),
+      signal: controller.signal
     });
+    clearTimeout(timeoutId);
     if (peekalinkRes.ok) {
       const json = await peekalinkRes.json();
       if (json && json.ok && json.title && !looksLikeBlockedPreviewTitle(json.title)) {
-        await saveLinkPreviewToFirestore(link, json);
+        await saveLinkPreviewToFirestore(normalizedLink, json);
         res.status(200).json(json);
         return;
       }
@@ -720,9 +754,9 @@ exports.peekalinkProxy = functions.runWith({ secrets: ['PEEKALINK_API_KEY'] }).h
   }
 
   // 3. If Peekalink failed or did not return valid title, fall back to our custom implementation
-  const fallback = await fetchFallbackPreview(link);
+  const fallback = await fetchFallbackPreview(normalizedLink);
   if (fallback) {
-    await saveLinkPreviewToFirestore(link, fallback);
+    await saveLinkPreviewToFirestore(normalizedLink, fallback);
     res.status(200).json(fallback);
   } else {
     res.status(502).json({ ok: false, message: 'Link preview failed' });
@@ -793,13 +827,14 @@ async function writeExternalCache(provider, key, payload, ttlMs) {
   } catch (err) { console.warn(`external cache write failed (${provider}):`, err); }
 }
 
-exports.kakaoLocalSearchProxy = functions.runWith({ secrets: ['KAKAO_REST_API_KEY'] }).https.onRequest(async (req, res) => {
+exports.kakaoLocalSearchProxy = functions.runWith({ ...PUBLIC_PROXY_RUNTIME, secrets: ['KAKAO_REST_API_KEY'] }).https.onRequest(async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  if (req.method === 'OPTIONS') { setPublicCacheHeaders(res, 86400); res.status(204).send(''); return; }
   if (req.method !== 'GET') { res.status(405).json({ ok: false, message: 'Method not allowed' }); return; }
   const query = String(req.query.query || '').trim().slice(0, 200);
   if (!query) { res.status(400).json({ ok: false, message: 'query is required' }); return; }
+  setPublicCacheHeaders(res, 300);
   // 30/minute per IP -- generous for a real person typing/refining a place search, but stops a
   // scripted caller from burning through the free daily quota this whole app shares.
   if (!(await checkProxyRateLimit('kakao', req.ip, 60 * 1000, 30))) {
@@ -862,13 +897,14 @@ async function incrementGooglePlacesSearchStat() {
   }
 }
 
-exports.googlePlacesSearchProxy = functions.runWith({ secrets: ['GOOGLE_PLACES_API_KEY'] }).https.onRequest(async (req, res) => {
+exports.googlePlacesSearchProxy = functions.runWith({ ...PUBLIC_PROXY_RUNTIME, secrets: ['GOOGLE_PLACES_API_KEY'] }).https.onRequest(async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  if (req.method === 'OPTIONS') { setPublicCacheHeaders(res, 86400); res.status(204).send(''); return; }
   if (req.method !== 'GET') { res.status(405).json({ ok: false, message: 'Method not allowed' }); return; }
   const query = String(req.query.query || '').trim().slice(0, 200);
   if (!query) { res.status(400).json({ ok: false, message: 'query is required' }); return; }
+  setPublicCacheHeaders(res, 300);
   // 30/minute per IP -- same ceiling as kakaoLocalSearchProxy. This proxy is only ever reached
   // after a Kakao search already came back empty (see handleSearch's fallback chain), so real
   // traffic here is inherently lower than Kakao's, but the cap still exists to stop a scripted
@@ -917,10 +953,10 @@ const TOUR_API_SERVICE_KEY_PARAM = defineString('TOUR_API_SERVICE_KEY', {
   description: 'Optional Korea TourAPI service key for place enrichment'
 });
 
-exports.tourApiSearchProxy = functions.https.onRequest(async (req, res) => {
+exports.tourApiSearchProxy = functions.runWith(PUBLIC_PROXY_RUNTIME).https.onRequest(async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  if (req.method === 'OPTIONS') { setPublicCacheHeaders(res, 86400); res.status(204).send(''); return; }
   if (req.method !== 'GET') { res.status(405).json({ ok: false, message: 'Method not allowed' }); return; }
   // Optional integration: the key is read only at request time so deployment
   // never prompts or fails when TourAPI is intentionally disabled.
@@ -933,6 +969,7 @@ exports.tourApiSearchProxy = functions.https.onRequest(async (req, res) => {
     res.status(503).json({ ok: false, code: 'not_configured', message: 'TourAPI service key is not configured' });
     return;
   }
+  setPublicCacheHeaders(res, 300);
   const lat = Number(req.query.lat);
   const lng = Number(req.query.lng);
   if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {

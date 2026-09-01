@@ -785,8 +785,8 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
   // separately below) used to only ever preview firstUrl -- every other link in the same message
   // was left as plain clickable text with no card. firstUrl always leads the list (and keeps its
   // message-level cachedData below) so a single-link message renders byte-identical to before;
-  // any further distinct URLs extractAllUrlInfos finds are appended, each getting its own live-
-  // fetched (globally cached by URL, see fetchLinkPreview) preview card.
+  // any further distinct URLs extractAllUrlInfos finds are appended, each using persisted preview
+  // metadata when available (rendering never scrapes a URL; see useLinkPreview's read-only path).
   const allPreviewUrls = React.useMemo(() => {
     const list = firstUrl ? [firstUrl] : [];
     extractAllUrlInfos(text).forEach(info => {

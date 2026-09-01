@@ -1928,15 +1928,12 @@ function CalendarApp() {
     // start and only fall back to the explicit fetch/retry loop if it hasn't come through yet --
     // this keeps the retry safety net for a genuinely stuck listener without doubling up network
     // calls on every normal calendar open.
-    // Cache miss: fetch in parallel with onSnapshot (no artificial delay).
-    let fallbackTimeoutId = null;
-    if (!cacheHit) {
-      runInitialLoad();
-    } else {
-      fallbackTimeoutId = setTimeout(() => {
-        if (isMounted && !hasLoadedCloudCalendar) runInitialLoad();
-      }, 1500);
-    }
+    // Always give onSnapshot a head start, including on a cache miss. Starting the explicit
+    // server fetch in parallel would double the initial calendar document read for normal opens;
+    // it is only a recovery path when the listener has not delivered within the grace window.
+    let fallbackTimeoutId = setTimeout(() => {
+      if (isMounted && !hasLoadedCloudCalendar) runInitialLoad();
+    }, cacheHit ? 1500 : 2500);
 
     return () => {
       isMounted = false;
@@ -2065,10 +2062,8 @@ function CalendarApp() {
           const fresh = await fetchSingleCalendarWithRest(activeCalId, 5000);
           if (isSavingRef.current || refreshStartedAt <= (localWriteStartedAtRef.current[activeCalId] || 0)) return;
           if (isMounted && fresh?.calendar && applyCalendarSnapshot(fresh.calendar, fresh.lastModified || Date.now(), fresh.revision || fresh.calendar.revision || 0, true)) {
-            if (activeView === 'calendar' || activeView === 'places' || activeView === 'settlement') {
-              fetchPlacesFromFirestore(activeCalId).then(list => { if (isMounted) setPlacesSubcollection(list); }).catch(() => {});
-              fetchConfirmedMeetingsFromFirestore(activeCalId).then(list => { if (isMounted) setConfirmedMeetingsSubcollection(list); }).catch(() => {});
-            }
+            // Places and confirmed meetings are already covered by their scoped realtime
+            // listeners. Do not repeat full collection reads on every focus/online resume.
             if (activeView === 'memo') {
               fetchMemosRest(activeCalId, memosLimit).then(list => {
                 if (isMounted) {
@@ -2323,13 +2318,15 @@ function CalendarApp() {
       arr.sort((a, b) => (Number(b.createdAt) || Number(b.updatedAt) || 0) - (Number(a.createdAt) || Number(a.updatedAt) || 0));
       return arr;
     };
-    fetchAnniversariesRest(activeCalId).then(list => {
-      if (isMounted && Array.isArray(list) && list.length > 0) {
-        setAnniversaries(prev => (prev && prev.length > 0 ? prev : sortAnns(list)));
-      }
-    }).catch(() => {});
-
-    if (!firebaseDb) return () => { isMounted = false; };
+    // The realtime listener delivers the initial server snapshot and keeps it fresh. Avoid a
+    // second REST collection read on every calendar open; REST remains the fallback when the
+    // Firebase SDK is unavailable.
+    if (!firebaseDb) {
+      fetchAnniversariesRest(activeCalId).then(list => {
+        if (isMounted && Array.isArray(list) && list.length > 0) setAnniversaries(sortAnns(list));
+      }).catch(() => {});
+      return () => { isMounted = false; };
+    }
 
     const unsub = subscribeAnniversaries(activeCalId, snapshot => {
         if (!isMounted) return;
@@ -2351,22 +2348,20 @@ function CalendarApp() {
     if (!activeCalId || !needsPlacesData) return;
     let isMounted = true;
 
-    // Instant REST fetch on boot guarantees zero-lag server truth across all devices and browsers
+    // REST is only a fallback when the SDK is unavailable. With an active SDK, the listeners
+    // below deliver the initial server snapshot; doing both would double every collection read.
     const refreshConfirmedMeetings = () => fetchConfirmedMeetingsFromFirestore(activeCalId).then(list => {
       if (isMounted && Array.isArray(list)) setConfirmedMeetingsSubcollection(list);
-    }).catch(() => {});
-    refreshConfirmedMeetings();
-
-    fetchPlacesFromFirestore(activeCalId).then(list => {
-      if (isMounted && Array.isArray(list) && list.length > 0) {
-        setPlacesSubcollection(list);
-      }
     }).catch(() => {});
 
     // REST is a request/response fallback, not a realtime transport. Poll only when the SDK
     // channel is unavailable so an open popup still sees another device's completed meeting
     // photo upload without requiring a manual refresh.
     if (!firebaseDb) {
+      refreshConfirmedMeetings();
+      fetchPlacesFromFirestore(activeCalId).then(list => {
+        if (isMounted && Array.isArray(list) && list.length > 0) setPlacesSubcollection(list);
+      }).catch(() => {});
       const refreshTimer = setInterval(refreshConfirmedMeetings, 6000);
       return () => { isMounted = false; clearInterval(refreshTimer); };
     }
@@ -7684,6 +7679,11 @@ async function fetchLinkPreview(url) {
   linkPreviewInflight.set(url, promise);
   return promise;
 }
+// Render-time link previews are intentionally read-only.  A missing preview must not cause every
+// visitor (or every remount on a slow mobile connection) to fan out into Firestore + the external
+// Peekalink proxy.  Preview metadata is hydrated by the write paths below when a link is created
+// or explicitly changed; older records stay useful through the deterministic title/host fallback
+// in LinkPreviewCard.  `fetchLinkPreview` remains available to those explicit write paths.
 function useLinkPreview(url, cachedData) {
   const [state, setState] = React.useState(() => {
     if (cachedData) return { status: 'success', data: cachedData };
@@ -7700,14 +7700,10 @@ function useLinkPreview(url, cachedData) {
       setState(cached);
       return;
     }
-    let cancelled = false;
-    setState({ status: 'loading' });
-    fetchLinkPreview(url).then(result => {
-      if (!cancelled) setState(result);
-    }).catch(() => {});
-    return () => {
-      cancelled = true;
-    };
+    // No network work here.  This effect deliberately leaves the state empty so cards render
+    // immediately with their persisted data (when present) or their local fallback title.
+    // Calling fetchLinkPreview from this hook would multiply API/Firestore reads by every
+    // rendered link and was the dominant source of avoidable billing on read-heavy screens.
   }, [url, cachedData]);
   return state;
 }
