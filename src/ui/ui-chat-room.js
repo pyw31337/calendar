@@ -1979,12 +1979,14 @@ export function ChatRoomView({
          lands on the sent message's own quote card. */
       chatReplyTarget && /*#__PURE__*/React.createElement("div", {
         style: {
+          '--reply-accent': participantsMap[chatReplyTarget.participantId]?.color || '#94A3B8',
           display: 'flex',
           alignItems: 'flex-start',
           justifyContent: 'space-between',
           gap: '8px',
           padding: '6px 8px',
           borderRadius: '8px',
+          border: `1px solid ${participantsMap[chatReplyTarget.participantId]?.color || '#94A3B8'}`,
           borderLeft: `3px solid ${participantsMap[chatReplyTarget.participantId]?.color || '#94A3B8'}`,
           backgroundColor: 'var(--bg-primary)'
         }
@@ -1993,7 +1995,7 @@ export function ChatRoomView({
           style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, flex: 1 }
         },
           /*#__PURE__*/React.createElement("span", {
-            style: { fontSize: '0.72rem', fontWeight: 700, color: '#4F46E5' }
+            style: { fontSize: '0.72rem', fontWeight: 800, color: 'var(--reply-accent)' }
           }, `${participantsMap[chatReplyTarget.participantId]?.name || '알수없음'}님에게 답장`),
           /*#__PURE__*/React.createElement("span", {
             style: {
