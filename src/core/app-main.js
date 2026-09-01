@@ -2218,7 +2218,11 @@ function CalendarApp() {
       isMounted = false;
       if (unsubscribeChat) unsubscribeChat();
     };
-  }, [activeCalId, activeView, firebaseDb]);
+  // Re-run when the Firebase bootstrap/retry loop recovers the SDK after the first
+  // render. Without this dependency, a page that initially fell back to REST never
+  // attached onSnapshot until a full reload, so messages from other users appeared
+  // only after refreshing.
+  }, [activeCalId, activeView, firebaseDb, firebaseConnectionVersion]);
 
   // Anniversaries: full collection (no orderBy) + client sort so docs without createdAt still show.
   React.useEffect(() => {
