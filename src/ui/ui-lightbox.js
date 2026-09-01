@@ -1009,13 +1009,11 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
   React.useEffect(() => { setZoomLevel(ZOOM_DEFAULT); setPanOffset({ x: 0, y: 0 }); }, [index]);
   const handleZoomIn = e => {
     e.stopPropagation();
-    setShowInfo(false);
     setPanOffset({ x: 0, y: 0 });
     setZoomLevel(prev => Math.min(ZOOM_MAX, prev + ZOOM_STEP));
   };
   const handleZoomOut = e => {
     e.stopPropagation();
-    setShowInfo(false);
     setPanOffset({ x: 0, y: 0 });
     setZoomLevel(prev => Math.max(ZOOM_MIN, prev - ZOOM_STEP));
   };
@@ -1025,7 +1023,6 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     e.stopPropagation();
     setPanOffset({ x: 0, y: 0 });
     setZoomLevel(ZOOM_DEFAULT);
-    setShowInfo(true);
   };
   // Clamped so the image can't be dragged entirely off-screen -- bounds come from the actual
   // rendered (post-scale) image box vs. the lightbox's own viewport cap (92vw / 82vh, matching

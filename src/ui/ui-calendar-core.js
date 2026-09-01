@@ -1246,7 +1246,7 @@ export function CalendarGrid({
           }
         },
           /*#__PURE__*/React.createElement("span", {
-            className: "day-number",
+            className: isToday ? "day-number day-number-today" : "day-number",
             style: isToday ? {
               backgroundColor: '#3B82F6',
               color: '#FFFFFF',
