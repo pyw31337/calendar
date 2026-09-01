@@ -827,7 +827,7 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
   const ImageThumbRemoveButton = __comp.ImageThumbRemoveButton || __deps.ImageThumbRemoveButton;
   const ImageUploadOverlay = __comp.ImageUploadOverlay || __deps.ImageUploadOverlay;
   const InlineSearchBar = __comp.InlineSearchBar || __deps.InlineSearchBar;
-  const SearchIcon = __comp.SearchIcon || __deps.SearchIcon || (function SearchFallback() { return '⌕'; });
+  const SearchIcon = ({ size = 20 }) => /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true }, /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /*#__PURE__*/React.createElement("path", { d: "m21 21-4.3-4.3" }));
   const LinkPreviewCard = __deps.LinkPreviewCard || __comp.LinkPreviewCard;
   const LinkPreviewProgressOverlay = __deps.LinkPreviewProgressOverlay;
   const MemoCard = __deps.MemoCard;

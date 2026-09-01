@@ -798,6 +798,7 @@ export function ChatRoomView({
   memoLastTitleWord = null
 }) {
   const React = window.React;
+  const HeaderSearchIcon = ({ size = 20 }) => /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true }, /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /*#__PURE__*/React.createElement("path", { d: "m21 21-4.3-4.3" }));
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const BackArrowIcon = __comp.BackArrowIcon || __deps.BackArrowIcon;
@@ -1617,6 +1618,12 @@ export function ChatRoomView({
       transition: 'bottom 0.12s ease-out'
     }
   }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => { setIsSearchOpen(true); setSearchQuery(''); },
+    title: "대화 검색",
+    "aria-label": "대화 검색",
+    style: { background: 'none', border: 'none', cursor: 'pointer', padding: '6px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--radius-md)' }
+  }, /*#__PURE__*/React.createElement(HeaderSearchIcon, { size: 20 })), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: onBack,
     "aria-label": "뒤로가기",
