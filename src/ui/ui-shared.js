@@ -1090,7 +1090,7 @@ export function GamifiedConfirmButtonContent({ label }) {
   );
 }
 
-export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = false }) {
+export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = false, stretchWidth = null }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -1134,13 +1134,13 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = fals
     style: {
       display: 'flex',
       alignItems: 'flex-start',
-      width: stretch ? '100%' : 'fit-content',
+      width: stretchWidth || (stretch ? '100%' : 'fit-content'),
       // min(100%, 280px), not a plain 280px: the bubble this card sits in is fit-content-sized
       // and can end up narrower than 280px (long participant badge, narrow phone, reply context),
       // and overflow below is 'hidden' now specifically so a too-wide title/description gets
       // truncated INSIDE whichever of the two is actually smaller instead of visually spilling
       // out past the card's own right edge.
-      maxWidth: stretch ? '100%' : 'min(100%, 280px)',
+      maxWidth: stretchWidth || (stretch ? '100%' : 'min(100%, 280px)'),
       boxSizing: 'border-box',
       gap: '10px',
       marginTop: stretch ? '0px' : '6px',

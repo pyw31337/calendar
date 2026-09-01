@@ -921,7 +921,8 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
         url,
         fallbackTitle: (idx === 0 && text) ? removeFirstUrl(text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '',
         cachedData: idx === 0 ? linkPreview : undefined,
-        stretch: hasAttachedImages
+        stretch: hasAttachedImages,
+        stretchWidth: hasAttachedImages ? (style.maxWidth || '420px') : null
       }))
     );
   }
@@ -1302,20 +1303,11 @@ export function PlacesSection({ calendar, onViewAll }) {
       }
     }, { root: null, rootMargin: '160px 0px', threshold: 0.01 });
     io.observe(el);
-    let idleId = null, idleTimer = null;
-    if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
-      idleId = window.requestIdleCallback(() => {
-        if (!done) { done = true; setMapShouldMount(true); io.disconnect(); }
-      }, { timeout: 2500 });
-    } else {
-      idleTimer = setTimeout(() => {
-        if (!done) { done = true; setMapShouldMount(true); io.disconnect(); }
-      }, 2000);
-    }
+    // Do not force-mount the map during idle time. On a long calendar page this downloaded
+    // Leaflet, marker clustering, tiles, and marker icons even when the user never scrolled to
+    // the places section. IntersectionObserver already starts it 160px before it becomes visible.
     return () => {
       io.disconnect();
-      if (idleId != null && typeof window.cancelIdleCallback === 'function') window.cancelIdleCallback(idleId);
-      if (idleTimer) clearTimeout(idleTimer);
     };
   }, [collapsed, mapShouldMount]);
 
