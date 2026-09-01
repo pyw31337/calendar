@@ -250,10 +250,6 @@ function LinkPreviewProgressOverlay(props) {
   const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LinkPreviewProgressOverlay;
   return typeof C === 'function' ? React.createElement(C, props) : null;
 }
-function DeleteConfirmModal(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DeleteConfirmModal;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
 function AdminLoginGate(props) {
   const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminLoginGate;
   return typeof C === 'function' ? React.createElement(C, props) : null;
@@ -1429,7 +1425,6 @@ function CalendarApp() {
       changeView('places');
     }
   };
-  const [deletingMessage, setDeletingMessage] = React.useState(null); // {id, participantId, text, calId}
   const [editingMessage, setEditingMessage] = React.useState(null); // {id, participantId, text, imageUrl, thumbUrl, calId}
 
   const getActiveViewFromURL = () => {
@@ -3210,10 +3205,20 @@ function CalendarApp() {
   };
 
   const handleDeleteMessage = (msg) => {
-    setDeletingMessage({ ...msg, calId: activeCalId });
+    const deletingMessage = { ...msg, calId: activeCalId };
+    const participants = getActiveParticipants(activeCal);
+    const author = participants.find(p => p.id === msg.participantId);
+    const authorName = author?.name || '알수없음';
+    let contentText = msg.text || '';
+    if (contentText.length > 20) {
+      contentText = contentText.substring(0, 20) + '...';
+    } else if (!contentText && msg.imageUrl) {
+      contentText = '사진';
+    }
+    showConfirmDialog('채팅 삭제', `${authorName}님의 "${contentText}" 내용을 삭제하시겠습니까?`, () => handleConfirmDeleteMessage(deletingMessage));
   };
 
-  const handleConfirmDeleteMessage = async () => {
+  const handleConfirmDeleteMessage = async (deletingMessage) => {
     if (!deletingMessage) return;
     const { id, calId } = deletingMessage;
     const sourceSnapshot = JSON.parse(JSON.stringify(deletingMessage));
@@ -3263,8 +3268,6 @@ function CalendarApp() {
     } catch (err) {
       console.error('handleConfirmDeleteMessage failed:', err);
       showToast('삭제 실패', 'error', 3000);
-    } finally {
-      setDeletingMessage(null);
     }
   };
 
@@ -5857,12 +5860,6 @@ function CalendarApp() {
       onConfirm: confirmDialog.onConfirm,
       onCancel: () => setConfirmDialog(null),
       showPasswordInput: confirmDialog.showPasswordInput
-    }),
-    deletingMessage && /*#__PURE__*/React.createElement(DeleteConfirmModal, {
-      message: deletingMessage,
-      calendar: activeCal,
-      onConfirm: handleConfirmDeleteMessage,
-      onCancel: () => setDeletingMessage(null)
     }),
     editingMessage && /*#__PURE__*/React.createElement(EditMessageModal, {
       message: editingMessage,
@@ -10859,7 +10856,6 @@ function bindGatherUiDeps() {
     MegaphoneIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MegaphoneIcon) || (typeof MegaphoneIcon === 'function' ? MegaphoneIcon : null),
     CctvIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CctvIcon) || (typeof CctvIcon === 'function' ? CctvIcon : null),
     DicesIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DicesIcon) || (typeof DicesIcon === 'function' ? DicesIcon : null),
-    DeleteConfirmModal: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DeleteConfirmModal) || (typeof DeleteConfirmModal === 'function' ? DeleteConfirmModal : null),
     AdminLoginGate: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminLoginGate) || (typeof AdminLoginGate === 'function' ? AdminLoginGate : null),
     StickyVideoBox: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.StickyVideoBox) || (typeof StickyVideoBox === 'function' ? StickyVideoBox : null),
     PollVoterSheet: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PollVoterSheet) || (typeof PollVoterSheet === 'function' ? PollVoterSheet : null),
