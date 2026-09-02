@@ -1540,7 +1540,10 @@ export function SummaryList({
         fontWeight: 800,
         color: isPast ? '#94A3B8' : 'var(--status-green)',
         fontSize: '0.95rem',
-        flexShrink: 0
+        minWidth: 0,
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap'
       }
     }, formattedDateStr), /*#__PURE__*/React.createElement("span", {
       className: `date-item-badge ${isPast ? 'is-past' : 'is-all'}`,
@@ -1659,7 +1662,10 @@ export function SummaryList({
         fontWeight: 800,
         color: isPast ? '#94A3B8' : '#FFFFFF',
         fontSize: '0.95rem',
-        flexShrink: 0
+        minWidth: 0,
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap'
       }
     }, isPast ? formatDateWithDayName(d) : formatConfirmedMeetingLabel(d)), /*#__PURE__*/React.createElement("span", {
       className: `date-item-badge dday-badge ${isPast ? 'is-past' : 'is-confirmed'}`,
@@ -1852,7 +1858,7 @@ export function HistoryView({
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: '8px' } },
             /*#__PURE__*/React.createElement("span", {
               className: "confirmed-meeting-date",
-              style: { fontWeight: 800, color: isPast ? '#94A3B8' : '#FFFFFF', fontSize: '0.95rem', flexShrink: 0 }
+              style: { fontWeight: 800, color: isPast ? '#94A3B8' : '#FFFFFF', fontSize: '0.95rem', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
             }, isPast ? formatDateWithDayName(d) : formatConfirmedMeetingLabel(d)),
             /*#__PURE__*/React.createElement("span", { className: `date-item-badge dday-badge ${isPast ? 'is-past' : 'is-confirmed'}`, style: { flexShrink: 0 } }, ddayLabel)
           ),
