@@ -730,6 +730,18 @@ function getAnniversaryDisplayColor(...args) {
   return typeof f === 'function' ? f(...args) : undefined;
 }
 
+const ANNIVERSARY_CATEGORY_OPTIONS = [
+  { value: 'birthday', label: '생일' },
+  { value: 'event', label: '행사' },
+  { value: 'festival', label: '축제' },
+  { value: 'other', label: '기타' }
+];
+const ANNIVERSARY_CATEGORY_TITLE_LABEL = {
+  birthday: '생일 이름',
+  event: '행사 이름',
+  festival: '축제 이름',
+  other: '기념일 이름'
+};
 
 export function AnniversaryModal({
   calendar,
@@ -761,21 +773,33 @@ export function AnniversaryModal({
   const getActiveParticipants = __deps.getActiveParticipants;
   const [activeTab, setActiveTab] = React.useState('list'); // 'list', 'add', 'bulk'
   const [editingId, setEditingId] = React.useState(null); // null when registering a new anniversary
-  
+
+  const todayStr = () => {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  };
+
   // Add Anniversary form states
   const [newTitle, setNewTitle] = React.useState('');
-  const [newType, setNewType] = React.useState('yearly'); // 'yearly', 'dday'
-  // Yearly options
+  const [newCategory, setNewCategory] = React.useState('birthday'); // 'birthday' | 'event' | 'festival' | 'other'
+  const [dayMode, setDayMode] = React.useState('single'); // 'single' (하루), 'range' (연일)
+  const [repeatYearly, setRepeatYearly] = React.useState(true); // single-day only: recurs every year
+  const [newType, setNewType] = React.useState('yearly'); // 'yearly', 'dday' -- kept only for editing legacy D-Day entries
+  // Yearly / recurring single-day options
   const [yearlyMonth, setYearlyMonth] = React.useState(() => new Date().getMonth() + 1);
   const [yearlyDay, setYearlyDay] = React.useState(() => new Date().getDate());
   const [isLunar, setIsLunar] = React.useState(false);
   const [isLeap, setIsLeap] = React.useState(false);
-  // D-Day options
-  const [targetDate, setTargetDate] = React.useState(() => {
-    const today = new Date();
-    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-  });
+  // Non-repeating single-day option (full date, since there's no recurrence to infer a year from)
+  const [onceDate, setOnceDate] = React.useState(() => todayStr());
+  // Multi-day (연일) range options
+  const [rangeStartDate, setRangeStartDate] = React.useState(() => todayStr());
+  const [rangeEndDate, setRangeEndDate] = React.useState(() => todayStr());
+  // D-Day options -- the 종류 selector that created these has been removed; only reachable now
+  // by editing an anniversary that was already saved as type 'dday' before this change.
+  const [targetDate, setTargetDate] = React.useState(() => todayStr());
   const [ddayMode, setDdayMode] = React.useState('countdown'); // 'countdown', 'milestone'
+  const [isLegacyDdayEdit, setIsLegacyDdayEdit] = React.useState(false);
 
   // Migrated bulk register availability states
   const [bulkParticipantId, setBulkParticipantId] = React.useState('');
@@ -794,11 +818,17 @@ export function AnniversaryModal({
   });
   const anniversaryDirtySnapshot = () => JSON.stringify([
     newTitle,
+    newCategory,
+    dayMode,
+    repeatYearly,
     newType,
     yearlyMonth,
     yearlyDay,
     isLunar,
     isLeap,
+    onceDate,
+    rangeStartDate,
+    rangeEndDate,
     targetDate,
     ddayMode,
     bulkParticipantId,
@@ -822,16 +852,36 @@ export function AnniversaryModal({
   const handleEditClick = (ann) => {
     setEditingId(ann.id);
     setNewTitle(ann.title || '');
-    setNewType(ann.type || 'yearly');
-    if (ann.type === 'yearly') {
+    setNewCategory(ann.category || 'birthday');
+    if (ann.type === 'dday') {
+      // Pre-existing D-Day entries can no longer be created from this form, but must still be
+      // editable in place rather than silently losing their targetDate/isCountDown fields.
+      setIsLegacyDdayEdit(true);
+      setNewType('dday');
+      setTargetDate(ann.targetDate || todayStr());
+      setDdayMode(ann.isCountDown ? 'countdown' : 'milestone');
+    } else if (ann.type === 'range') {
+      setIsLegacyDdayEdit(false);
+      setDayMode('range');
+      setRangeStartDate(ann.startDate || todayStr());
+      setRangeEndDate(ann.endDate || todayStr());
+    } else if (ann.type === 'once') {
+      setIsLegacyDdayEdit(false);
+      setDayMode('single');
+      setRepeatYearly(false);
+      setOnceDate(ann.date || todayStr());
+      setIsLunar(!!ann.isLunar);
+      setIsLeap(!!ann.isLeap);
+    } else {
+      // 'yearly' (also the default for any legacy entry saved before the type field existed)
+      setIsLegacyDdayEdit(false);
+      setDayMode('single');
+      setRepeatYearly(true);
       const parts = (ann.date || `${new Date().getMonth() + 1}-${new Date().getDate()}`).split('-');
       setYearlyMonth(Number(parts[0]) || (new Date().getMonth() + 1));
       setYearlyDay(Number(parts[1]) || new Date().getDate());
       setIsLunar(!!ann.isLunar);
       setIsLeap(!!ann.isLeap);
-    } else {
-      setTargetDate(ann.targetDate || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`);
-      setDdayMode(ann.isCountDown ? 'countdown' : 'milestone');
     }
     setActiveTab('add');
   };
@@ -839,6 +889,10 @@ export function AnniversaryModal({
   const handleSaveAnniversary = async () => {
     if (!newTitle.trim()) {
       showToast('기념일 제목을 입력해 주세요.', 'error');
+      return;
+    }
+    if (!isLegacyDdayEdit && dayMode === 'range' && rangeStartDate > rangeEndDate) {
+      showToast('시작일자가 종료일자보다 늦습니다.', 'error');
       return;
     }
 
@@ -854,18 +908,29 @@ export function AnniversaryModal({
         id: anniversaryId,
         calendarId,
         title: newTitle.trim(),
-        type: newType,
+        category: newCategory,
         createdAt: createdAt,
         updatedAt: stamp
       };
 
-      if (newType === 'yearly') {
+      if (isLegacyDdayEdit) {
+        annData.type = 'dday';
+        annData.targetDate = targetDate;
+        annData.isCountDown = ddayMode === 'countdown';
+      } else if (dayMode === 'range') {
+        annData.type = 'range';
+        annData.startDate = rangeStartDate;
+        annData.endDate = rangeEndDate;
+      } else if (repeatYearly) {
+        annData.type = 'yearly';
         annData.date = `${String(yearlyMonth).padStart(2, '0')}-${String(yearlyDay).padStart(2, '0')}`;
         annData.isLunar = isLunar;
         annData.isLeap = isLunar ? isLeap : false;
       } else {
-        annData.targetDate = targetDate;
-        annData.isCountDown = ddayMode === 'countdown';
+        annData.type = 'once';
+        annData.date = onceDate;
+        annData.isLunar = isLunar;
+        annData.isLeap = isLunar ? isLeap : false;
       }
 
       const saved = await writeSharedCollection('anniversaries', calendarId, anniversaryId, annData, 'set', '기념일 저장');
@@ -874,10 +939,17 @@ export function AnniversaryModal({
 
       // Reset form
       setNewTitle('');
+      setNewCategory('birthday');
+      setDayMode('single');
+      setRepeatYearly(true);
       setIsLunar(false);
       setIsLeap(false);
       setYearlyMonth(new Date().getMonth() + 1);
       setYearlyDay(new Date().getDate());
+      setOnceDate(todayStr());
+      setRangeStartDate(todayStr());
+      setRangeEndDate(todayStr());
+      setIsLegacyDdayEdit(false);
       setEditingId(null);
       setActiveTab('list');
     } catch (err) {
@@ -991,6 +1063,38 @@ export function AnniversaryModal({
     return `${elapsed}일째`;
   };
 
+  const getOnceDisplay = (ann) => {
+    const parts = (ann.date || '').split('-');
+    const y = Number(parts[0]);
+    const m = Number(parts[1]);
+    const d = Number(parts[2]);
+    const label = (y && m && d) ? `${y}년 ${m}월 ${d}일` : (ann.date || '');
+    return ann.isLunar ? `음력 ${label}${ann.isLeap ? ' (윤달)' : ''}` : label;
+  };
+
+  const getAnniversaryTypeLabel = (ann) => {
+    if (ann.type === 'yearly') return '매년 반복';
+    if (ann.type === 'once') return '단발성';
+    if (ann.type === 'range') return '기간';
+    return getDDayBadge(ann);
+  };
+
+  const getAnniversaryDateDisplay = (ann) => {
+    if (ann.type === 'yearly') return getYearlyDisplay(ann);
+    if (ann.type === 'once') return getOnceDisplay(ann);
+    if (ann.type === 'range') return `${ann.startDate} ~ ${ann.endDate}`;
+    return `기준일: ${ann.targetDate}`;
+  };
+
+  const getAnniversaryBadgeStyle = (ann) => {
+    const map = {
+      yearly: { bg: 'rgba(59,130,246,0.1)', fg: '#3B82F6' },
+      once: { bg: 'rgba(16,185,129,0.1)', fg: '#10B981' },
+      range: { bg: 'rgba(139,92,246,0.1)', fg: '#8B5CF6' }
+    };
+    return map[ann.type] || { bg: 'rgba(245,158,11,0.1)', fg: '#F59E0B' }; // legacy dday
+  };
+
   const anniversaryPanelInner = /*#__PURE__*/React.createElement(React.Fragment, null,
     /* Modal Navigation Tabs */
     /*#__PURE__*/React.createElement("div", {
@@ -1012,9 +1116,12 @@ export function AnniversaryModal({
           if (id === 'add') {
             setEditingId(null);
             setNewTitle('');
+            setNewCategory('birthday');
+            setDayMode('single');
+            setRepeatYearly(true);
             setIsLunar(false);
             setIsLeap(false);
-            setNewType('yearly');
+            setIsLegacyDdayEdit(false);
           }
         },
         style: {
@@ -1067,15 +1174,15 @@ export function AnniversaryModal({
                 /*#__PURE__*/React.createElement("span", {
                   style: {
                     fontSize: 'var(--font-size-xs)', padding: '1px 6px', borderRadius: '4px',
-                    backgroundColor: ann.type === 'yearly' ? 'rgba(59,130,246,0.1)' : 'rgba(245,158,11,0.1)',
-                    color: ann.type === 'yearly' ? '#3B82F6' : '#F59E0B',
+                    backgroundColor: getAnniversaryBadgeStyle(ann).bg,
+                    color: getAnniversaryBadgeStyle(ann).fg,
                     fontWeight: 700
                   }
-                }, ann.type === 'yearly' ? '매년 반복' : getDDayBadge(ann))
+                }, getAnniversaryTypeLabel(ann))
               ),
               /* Date details */
               /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } },
-                ann.type === 'yearly' ? getYearlyDisplay(ann) : `기준일: ${ann.targetDate}`
+                getAnniversaryDateDisplay(ann)
               )
             ),
 
@@ -1113,9 +1220,28 @@ export function AnniversaryModal({
         activeTab === 'add' && /*#__PURE__*/React.createElement("div", {
           style: { display: 'flex', flexDirection: 'column', gap: '12px' }
         },
+          /* Category Field */
+          /*#__PURE__*/React.createElement("div", null,
+            /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "카테고리"),
+            /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
+              title: "카테고리 선택",
+              placeholder: "카테고리 선택",
+              value: newCategory,
+              disabled: isLegacyDdayEdit,
+              onSelect: v => {
+                setNewCategory(v);
+                if (v === 'birthday') {
+                  setDayMode('single');
+                  setRepeatYearly(true);
+                }
+              },
+              options: ANNIVERSARY_CATEGORY_OPTIONS
+            })
+          ),
+
           /* Title Field */
           /*#__PURE__*/React.createElement("div", null,
-            /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "기념일 이름"),
+            /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, ANNIVERSARY_CATEGORY_TITLE_LABEL[newCategory] || '기념일 이름'),
             /*#__PURE__*/React.createElement("input", {
               type: "text",
               className: "form-input",
@@ -1127,84 +1253,13 @@ export function AnniversaryModal({
             })
           ),
 
-          /* Type switcher */
-          /*#__PURE__*/React.createElement("div", null,
-            /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "종류"),
-            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
-              [['yearly', '매년 특정일자 반복 (생일 등)'], ['dday', '기준일 D-Day (커플, 시험 등)']].map(([typeVal, label]) => /*#__PURE__*/React.createElement("label", {
-                key: typeVal,
-                className: "anniversary-type-option",
-                style: {
-                  flex: 1,
-                  backgroundColor: newType === typeVal ? 'rgba(59,130,246,0.06)' : 'var(--bg-primary)',
-                  border: '1px solid ' + (newType === typeVal ? '#3B82F6' : 'var(--border-subtle)'),
-                  borderRadius: 'var(--radius-md)',
-                  padding: '8px 10px',
-                  fontSize: 'var(--font-size-sm)',
-                  cursor: 'pointer',
-                  fontWeight: newType === typeVal ? 'bold' : 'normal'
-                }
-              },
-                /*#__PURE__*/React.createElement("input", {
-                  type: "radio",
-                  name: "annType",
-                  value: typeVal,
-                  checked: newType === typeVal,
-                  onChange: () => setNewType(typeVal),
-                  style: { margin: 0 }
-                }),
-                label
-              ))
-            )
-          ),
-
-          /* Cond 1: Yearly details fields */
-          newType === 'yearly' && /*#__PURE__*/React.createElement("div", {
+          /* Legacy D-Day edit notice + fields (only reachable by editing a pre-existing D-Day anniversary) */
+          isLegacyDdayEdit && /*#__PURE__*/React.createElement("div", {
             style: { display: 'flex', flexDirection: 'column', gap: '10px', padding: '10px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)' }
           },
-            /* Month / Day picker */
-            /*#__PURE__*/React.createElement("div", null,
-              /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginBottom: '3px' } }, "월 / 일"),
-              /*#__PURE__*/React.createElement(DeadlineDateTimePicker, {
-                dateOnly: true,
-                value: `${new Date().getFullYear()}-${String(yearlyMonth).padStart(2, '0')}-${String(yearlyDay).padStart(2, '0')}`,
-                onChange: v => {
-                  const [, mm, dd] = v.split('-');
-                  setYearlyMonth(Number(mm));
-                  setYearlyDay(Number(dd));
-                }
-              })
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', lineHeight: '1.4' } },
+              "이전 방식(기준일 D-Day)으로 등록된 항목입니다. 날짜와 표기 방식만 수정할 수 있습니다."
             ),
-            /* Lunar / Leap month settings */
-            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '14px', marginTop: '4px', flexWrap: 'wrap' } },
-              /* Solar/lunar toggle */
-              /*#__PURE__*/React.createElement(SegmentedToggle, {
-                ariaLabel: "양력/음력 전환",
-                value: isLunar ? 'lunar' : 'solar',
-                onChange: v => setIsLunar(v === 'lunar'),
-                options: [{ value: 'solar', label: '양력' }, { value: 'lunar', label: '음력' }]
-              }),
-              /* Leap month toggle */
-              isLunar && /*#__PURE__*/React.createElement("button", {
-                type: "button",
-                role: "switch",
-                "aria-checked": isLeap,
-                onClick: () => setIsLeap(!isLeap),
-                style: {
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
-                  padding: '12px 16px', border: '1px solid var(--border-subtle)', cursor: 'pointer',
-                  borderRadius: 'var(--radius-sm)', fontSize: 'var(--font-size-md)', fontWeight: isLeap ? 900 : 500,
-                  whiteSpace: 'nowrap', backgroundColor: isLeap ? 'var(--accent-primary)' : 'transparent',
-                  color: isLeap ? '#FFFFFF' : 'var(--text-muted)'
-                }
-              }, "윤달")
-            )
-          ),
-
-          /* Cond 2: D-Day details fields */
-          newType === 'dday' && /*#__PURE__*/React.createElement("div", {
-            style: { display: 'flex', flexDirection: 'column', gap: '10px', padding: '10px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)' }
-          },
             /* Target date picker */
             /*#__PURE__*/React.createElement("div", null,
               /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginBottom: '3px' } }, "시작일자 / 기준일자"),
@@ -1247,6 +1302,102 @@ export function AnniversaryModal({
                   }),
                   /*#__PURE__*/React.createElement("span", { style: { lineHeight: '1.25' } }, modeLabel, /*#__PURE__*/React.createElement("br"), modeSub)
                 ))
+              )
+            )
+          ),
+
+          /* Day mode (하루 / 연일) + date fields -- hidden while editing a legacy D-Day entry */
+          !isLegacyDdayEdit && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '10px' } },
+            /*#__PURE__*/React.createElement(SegmentedToggle, {
+              ariaLabel: "하루/연일 전환",
+              value: dayMode,
+              onChange: v => setDayMode(v),
+              options: [{ value: 'single', label: '하루' }, { value: 'range', label: '연일' }]
+            }),
+
+            /* Single day (하루) fields */
+            dayMode === 'single' && /*#__PURE__*/React.createElement("div", {
+              style: { display: 'flex', flexDirection: 'column', gap: '10px', padding: '10px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)' }
+            },
+              /* Date picker */
+              /*#__PURE__*/React.createElement("div", null,
+                /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginBottom: '3px' } }, repeatYearly ? "월 / 일" : "날짜"),
+                /*#__PURE__*/React.createElement(DeadlineDateTimePicker, {
+                  dateOnly: true,
+                  value: repeatYearly
+                    ? `${new Date().getFullYear()}-${String(yearlyMonth).padStart(2, '0')}-${String(yearlyDay).padStart(2, '0')}`
+                    : onceDate,
+                  onChange: v => {
+                    if (repeatYearly) {
+                      const [, mm, dd] = v.split('-');
+                      setYearlyMonth(Number(mm));
+                      setYearlyDay(Number(dd));
+                    } else {
+                      setOnceDate(v.slice(0, 10));
+                    }
+                  }
+                })
+              ),
+              /* Lunar / Leap / Repeat settings */
+              /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '14px', marginTop: '4px', flexWrap: 'wrap' } },
+                /* Solar/lunar toggle */
+                /*#__PURE__*/React.createElement(SegmentedToggle, {
+                  ariaLabel: "양력/음력 전환",
+                  value: isLunar ? 'lunar' : 'solar',
+                  onChange: v => setIsLunar(v === 'lunar'),
+                  options: [{ value: 'solar', label: '양력' }, { value: 'lunar', label: '음력' }]
+                }),
+                /* Leap month toggle */
+                isLunar && /*#__PURE__*/React.createElement("button", {
+                  type: "button",
+                  role: "switch",
+                  "aria-checked": isLeap,
+                  onClick: () => setIsLeap(!isLeap),
+                  style: {
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                    padding: '12px 16px', border: '1px solid var(--border-subtle)', cursor: 'pointer',
+                    borderRadius: 'var(--radius-sm)', fontSize: 'var(--font-size-md)', fontWeight: isLeap ? 900 : 500,
+                    whiteSpace: 'nowrap', backgroundColor: isLeap ? 'var(--accent-primary)' : 'transparent',
+                    color: isLeap ? '#FFFFFF' : 'var(--text-muted)'
+                  }
+                }, "윤달"),
+                /* Repeat yearly checkbox */
+                /*#__PURE__*/React.createElement("label", {
+                  style: {
+                    display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer',
+                    fontSize: 'var(--font-size-md)', color: 'var(--text-main)', fontWeight: repeatYearly ? 700 : 500
+                  }
+                },
+                  /*#__PURE__*/React.createElement("input", {
+                    type: "checkbox",
+                    checked: repeatYearly,
+                    onChange: e => setRepeatYearly(e.target.checked),
+                    style: { margin: 0 }
+                  }),
+                  "반복"
+                )
+              )
+            ),
+
+            /* Multi day (연일) fields */
+            dayMode === 'range' && /*#__PURE__*/React.createElement("div", {
+              style: { display: 'flex', gap: '8px', flexWrap: 'wrap', padding: '10px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)' }
+            },
+              /*#__PURE__*/React.createElement("div", { style: { flex: '1 1 130px' } },
+                /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginBottom: '3px' } }, "시작일자"),
+                /*#__PURE__*/React.createElement(DeadlineDateTimePicker, {
+                  dateOnly: true,
+                  value: rangeStartDate,
+                  onChange: v => setRangeStartDate(v.slice(0, 10))
+                })
+              ),
+              /*#__PURE__*/React.createElement("div", { style: { flex: '1 1 130px' } },
+                /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginBottom: '3px' } }, "종료일자"),
+                /*#__PURE__*/React.createElement(DeadlineDateTimePicker, {
+                  dateOnly: true,
+                  value: rangeEndDate,
+                  onChange: v => setRangeEndDate(v.slice(0, 10))
+                })
               )
             )
           ),
