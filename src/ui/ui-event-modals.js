@@ -161,6 +161,14 @@ function searchPlaces(...args) {
   const f = window.GATHER_APP_PLACE_SEARCH && window.GATHER_APP_PLACE_SEARCH.searchPlaces;
   return typeof f === 'function' ? f(...args) : Promise.resolve({ provider: null, results: [] });
 }
+// Opens Kakao Map centered on a specific point with a labeled marker -- a plain link URL, no API
+// key needed. getPlaceKakaoRouteUrl exists as a cross-file bridge but has no real implementation
+// anywhere in the app (always resolves to undefined), so this builds the link directly instead.
+function getKakaoMapLinkUrl(place) {
+  if (!place || !Number.isFinite(place.lat) || !Number.isFinite(place.lng)) return null;
+  const label = encodeURIComponent(place.alias || place.name || '장소');
+  return `https://map.kakao.com/link/map/${label},${place.lat},${place.lng}`;
+}
 function getExpenseCategories(...args) {
   const f = __gatherUiDeps().getExpenseCategories || GATHER_APP_UTILS.getExpenseCategories;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -448,6 +456,10 @@ function pushSingleCloudCalendar(...args) {
 }
 function resolveMemoImageBatch(...args) {
   const f = __gatherUiDeps().resolveMemoImageBatch || GATHER_APP_UTILS.resolveMemoImageBatch;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
+function resolveAnniversaryImageBatch(...args) {
+  const f = __gatherUiDeps().resolveAnniversaryImageBatch || GATHER_APP_UTILS.resolveAnniversaryImageBatch;
   return typeof f === 'function' ? f(...args) : undefined;
 }
 function sanitizeMemoForFirestore(...args) {
@@ -783,6 +795,7 @@ export function AnniversaryModal({
   const ConfettiIcon = __comp.ConfettiIcon || __deps.ConfettiIcon;
   const TicketsPlaneIcon = __comp.TicketsPlaneIcon || __deps.TicketsPlaneIcon;
   const MessageCircleMoreIcon = __comp.MessageCircleMoreIcon || __deps.MessageCircleMoreIcon;
+  const MapPinIcon = __comp.MapPinIcon || __deps.MapPinIcon;
   const ANNIVERSARY_CATEGORY_ICONS = {
     birthday: CakeIcon, event: BalloonIcon, festival: ConfettiIcon, travel: TicketsPlaneIcon, other: MessageCircleMoreIcon
   };
@@ -824,6 +837,13 @@ export function AnniversaryModal({
   const [isPlaceSearching, setIsPlaceSearching] = React.useState(false);
   const [placeResults, setPlaceResults] = React.useState([]);
   const [selectedPlace, setSelectedPlace] = React.useState(null);
+  // Photos (all categories) -- { original, thumbnail, originalBlob, thumbnailBlob } for a newly
+  // picked/pasted photo not yet uploaded, or { isExisting: true, original, thumbnail } for one
+  // already saved on this anniversary (same shape MemoView uses for its image attachments).
+  const [photos, setPhotos] = React.useState([]);
+  const [photoProcessing, setPhotoProcessing] = React.useState(null);
+  const [photoUploadProgress, setPhotoUploadProgress] = React.useState(null);
+  const photoFileInputRef = React.useRef(null);
 
   // Migrated bulk register availability states
   const [bulkParticipantId, setBulkParticipantId] = React.useState('');
@@ -855,6 +875,7 @@ export function AnniversaryModal({
     rangeEndDate,
     newDescription,
     selectedPlace,
+    photos.length,
     targetDate,
     ddayMode,
     bulkParticipantId,
@@ -883,6 +904,7 @@ export function AnniversaryModal({
     setSelectedPlace(ann.place || null);
     setPlaceQuery('');
     setPlaceResults([]);
+    setPhotos(Array.isArray(ann.photos) ? ann.photos.map(p => ({ isExisting: true, original: p.url, thumbnail: p.thumbUrl || p.url })) : []);
     if (ann.type === 'dday') {
       // Pre-existing D-Day entries can no longer be created from this form, but must still be
       // editable in place rather than silently losing their targetDate/isCountDown fields.
@@ -916,6 +938,25 @@ export function AnniversaryModal({
     setActiveTab('add');
   };
 
+  const handleAttachPhotoFiles = async (files) => {
+    if (!files || files.length === 0) return;
+    await appendChatImageFiles({
+      files,
+      currentCount: photos.length,
+      setImageProcessing: setPhotoProcessing,
+      setChatImages: setPhotos,
+      showToast
+    });
+    setPhotoProcessing(null);
+  };
+  const handlePhotoPaste = e => {
+    const pastedFiles = getImageFilesFromClipboardEvent(e);
+    if (pastedFiles.length === 0) return;
+    e.preventDefault();
+    handleAttachPhotoFiles(pastedFiles);
+  };
+  const [isSavingAnniversary, setIsSavingAnniversary] = React.useState(false);
+
   const handleSaveAnniversary = async () => {
     if (!newTitle.trim()) {
       showToast('기념일 제목을 입력해 주세요.', 'error');
@@ -925,6 +966,7 @@ export function AnniversaryModal({
       showToast('시작일자가 종료일자보다 늦습니다.', 'error');
       return;
     }
+    setIsSavingAnniversary(true);
 
     try {
       const stamp = Date.now();
@@ -945,6 +987,13 @@ export function AnniversaryModal({
       if (newDescription.trim()) annData.description = newDescription.trim();
       if (!isLegacyDdayEdit && ANNIVERSARY_CATEGORIES_WITH_PLACE.has(newCategory) && selectedPlace) {
         annData.place = selectedPlace;
+      }
+      if (photos.length > 0) {
+        const resolvedPhotos = await resolveAnniversaryImageBatch(calendarId, photos, setPhotoUploadProgress);
+        annData.photos = (resolvedPhotos || [])
+          .filter(Boolean)
+          .map(p => ({ url: p.imageUrl, thumbUrl: p.thumbUrl }));
+        setPhotoUploadProgress(null);
       }
 
       if (isLegacyDdayEdit) {
@@ -988,11 +1037,15 @@ export function AnniversaryModal({
       setPlaceQuery('');
       setPlaceResults([]);
       setSelectedPlace(null);
+      setPhotos([]);
       setEditingId(null);
       setActiveTab('list');
     } catch (err) {
       console.error('Anniversary save error:', err);
       showToast('기념일 저장 실패', 'error');
+      setPhotoUploadProgress(null);
+    } finally {
+      setIsSavingAnniversary(false);
     }
   };
 
@@ -1130,14 +1183,14 @@ export function AnniversaryModal({
   const getAnniversaryTypeLabel = (ann) => {
     if (ann.type === 'yearly') return '매년 반복';
     if (ann.type === 'once') return '단발성';
-    if (ann.type === 'range') return '기간';
+    if (ann.type === 'range') return ANNIVERSARY_CATEGORY_OPTIONS.find(o => o.value === ann.category)?.label || '기간';
     return getDDayBadge(ann);
   };
 
   const getAnniversaryDateDisplay = (ann) => {
     if (ann.type === 'yearly') return getYearlyDisplay(ann);
     if (ann.type === 'once') return getOnceDisplay(ann);
-    if (ann.type === 'range') return `${ann.startDate} ~ ${ann.endDate}`;
+    if (ann.type === 'range') return `${formatDateWithDayName(ann.startDate)} ~ ${formatDateWithDayName(ann.endDate)}`;
     return `기준일: ${ann.targetDate}`;
   };
 
@@ -1148,6 +1201,113 @@ export function AnniversaryModal({
       range: { bg: 'rgba(139,92,246,0.1)', fg: '#8B5CF6' }
     };
     return map[ann.type] || { bg: 'rgba(245,158,11,0.1)', fg: '#F59E0B' }; // legacy dday
+  };
+
+  const renderAnniversaryRow = (ann) => /*#__PURE__*/React.createElement("div", {
+    key: ann.id,
+    style: {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '10px 12px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)',
+      backgroundColor: 'var(--bg-primary)'
+    }
+  },
+    /* Left info */
+    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 } },
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
+        ANNIVERSARY_CATEGORY_ICONS[ann.category] && /*#__PURE__*/React.createElement(ANNIVERSARY_CATEGORY_ICONS[ann.category], { size: 16 }),
+        /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: 'var(--font-size-base)', color: 'var(--text-main)' } }, ann.title),
+        /* Badge */
+        /*#__PURE__*/React.createElement("span", {
+          style: {
+            fontSize: 'var(--font-size-xs)', padding: '1px 6px', borderRadius: '4px',
+            backgroundColor: getAnniversaryBadgeStyle(ann).bg,
+            color: getAnniversaryBadgeStyle(ann).fg,
+            fontWeight: 700
+          }
+        }, getAnniversaryTypeLabel(ann))
+      ),
+      /* Date details */
+      /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } },
+        getAnniversaryDateDisplay(ann)
+      ),
+      /* Place (if set) */
+      ann.place && (() => {
+        const mapUrl = getKakaoMapLinkUrl(ann.place);
+        const label = `[${ann.place.alias || ann.place.name}] ${getDisplayPlaceAddress(ann.place) || ''}`.trim();
+        return /*#__PURE__*/React.createElement("span", { style: { display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } },
+          MapPinIcon && /*#__PURE__*/React.createElement(MapPinIcon, { size: 14 }),
+          mapUrl
+            ? /*#__PURE__*/React.createElement("a", {
+                href: mapUrl, target: "_blank", rel: "noreferrer",
+                onClick: e => e.stopPropagation(),
+                style: { color: 'var(--text-muted)', textDecoration: 'underline' }
+              }, label)
+            : /*#__PURE__*/React.createElement("span", null, label)
+        );
+      })(),
+      /* Description (URLs rendered as capsule badges) */
+      ann.description && /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-main)', marginTop: '2px' } },
+        renderTextWithUrlBadge(ann.description)
+      ),
+      /* Photos (if any) */
+      Array.isArray(ann.photos) && ann.photos.length > 0 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '4px', marginTop: '4px', flexWrap: 'wrap' } },
+        ann.photos.map((photo, idx) => /*#__PURE__*/React.createElement("img", {
+          key: idx, src: photo.thumbUrl || photo.url, alt: `사진 ${idx + 1}`,
+          style: { width: '40px', height: '40px', objectFit: 'cover', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }
+        }))
+      )
+    ),
+
+    /* Action Buttons */
+    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '6px', flexShrink: 0 } },
+      /* Edit button */
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => handleEditClick(ann),
+        style: {
+          background: 'none', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)',
+          padding: '4px 8px', fontSize: 'var(--font-size-sm)', color: 'var(--text-main)', cursor: 'pointer'
+        }
+      }, "수정"),
+      /* Delete button */
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => handleDeleteAnniversary(ann),
+        style: {
+          background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: 'var(--radius-sm)',
+          padding: '4px 8px', fontSize: 'var(--font-size-sm)', color: '#EF4444', cursor: 'pointer'
+        }
+      }, "삭제")
+    )
+  );
+
+  // Groups the list by category, in ANNIVERSARY_CATEGORY_OPTIONS order, with a header (icon +
+  // label + count) above each non-empty group -- legacy items with no category field group under
+  // 생일 (getAnniversaryCategoryBadge falls back the same way for their calendar badge color).
+  const renderGroupedAnniversaryList = () => {
+    const groups = new Map(ANNIVERSARY_CATEGORY_OPTIONS.map(o => [o.value, []]));
+    anniversaries.forEach(ann => {
+      const key = groups.has(ann.category) ? ann.category : 'birthday';
+      groups.get(key).push(ann);
+    });
+    return ANNIVERSARY_CATEGORY_OPTIONS.map(opt => {
+      const items = groups.get(opt.value);
+      if (!items.length) return null;
+      const OptIcon = ANNIVERSARY_CATEGORY_ICONS[opt.value];
+      return /*#__PURE__*/React.createElement("div", { key: opt.value, style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
+        /*#__PURE__*/React.createElement("div", {
+          style: {
+            display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--font-size-sm)',
+            fontWeight: 800, color: 'var(--text-muted)', paddingTop: '4px'
+          }
+        },
+          OptIcon && /*#__PURE__*/React.createElement(OptIcon, { size: 16 }),
+          opt.label,
+          /*#__PURE__*/React.createElement("span", { style: { color: 'var(--text-light)', fontWeight: 500 } }, `(${items.length})`)
+        ),
+        items.map(renderAnniversaryRow)
+      );
+    });
   };
 
   const anniversaryPanelInner = /*#__PURE__*/React.createElement(React.Fragment, null,
@@ -1181,6 +1341,7 @@ export function AnniversaryModal({
             setPlaceQuery('');
             setPlaceResults([]);
             setSelectedPlace(null);
+            setPhotos([]);
           }
         },
         style: {
@@ -1217,65 +1378,7 @@ export function AnniversaryModal({
         activeTab === 'list' && /*#__PURE__*/React.createElement("div", {
           style: { display: 'flex', flexDirection: 'column', gap: '8px' }
         },
-          anniversaries.length > 0 ? anniversaries.map(ann => /*#__PURE__*/React.createElement("div", {
-            key: ann.id,
-            style: {
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '10px 12px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)',
-              backgroundColor: 'var(--bg-primary)'
-            }
-          },
-            /* Left info */
-            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 } },
-              /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
-                ANNIVERSARY_CATEGORY_ICONS[ann.category] && /*#__PURE__*/React.createElement(ANNIVERSARY_CATEGORY_ICONS[ann.category], { size: 16 }),
-                /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: 'var(--font-size-base)', color: 'var(--text-main)' } }, ann.title),
-                /* Badge */
-                /*#__PURE__*/React.createElement("span", {
-                  style: {
-                    fontSize: 'var(--font-size-xs)', padding: '1px 6px', borderRadius: '4px',
-                    backgroundColor: getAnniversaryBadgeStyle(ann).bg,
-                    color: getAnniversaryBadgeStyle(ann).fg,
-                    fontWeight: 700
-                  }
-                }, getAnniversaryTypeLabel(ann))
-              ),
-              /* Date details */
-              /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } },
-                getAnniversaryDateDisplay(ann)
-              ),
-              /* Place (if set) */
-              ann.place && /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } },
-                `📍 ${ann.place.name || getDisplayPlaceAddress(ann.place)}`
-              ),
-              /* Description (URLs rendered as capsule badges) */
-              ann.description && /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-main)', marginTop: '2px' } },
-                renderTextWithUrlBadge(ann.description)
-              )
-            ),
-
-            /* Action Buttons */
-            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '6px', flexShrink: 0 } },
-              /* Edit button */
-              /*#__PURE__*/React.createElement("button", {
-                type: "button",
-                onClick: () => handleEditClick(ann),
-                style: {
-                  background: 'none', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)',
-                  padding: '4px 8px', fontSize: 'var(--font-size-sm)', color: 'var(--text-main)', cursor: 'pointer'
-                }
-              }, "수정"),
-              /* Delete button */
-              /*#__PURE__*/React.createElement("button", {
-                type: "button",
-                onClick: () => handleDeleteAnniversary(ann),
-                style: {
-                  background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: 'var(--radius-sm)',
-                  padding: '4px 8px', fontSize: 'var(--font-size-sm)', color: '#EF4444', cursor: 'pointer'
-                }
-              }, "삭제")
-            )
-          ))
+          anniversaries.length > 0 ? renderGroupedAnniversaryList()
           : /*#__PURE__*/React.createElement("div", {
             style: {
               textAlign: 'center', padding: '30px 10px', color: 'var(--text-muted)',
@@ -1335,8 +1438,68 @@ export function AnniversaryModal({
               placeholder: "설명을 입력하세요. 링크를 함께 적으면 URL 뱃지로 표시됩니다.",
               value: newDescription,
               onChange: e => setNewDescription(e.target.value),
+              onPaste: handlePhotoPaste,
               maxLength: 500
             })
+          ),
+
+          /* Photo Field (all categories) -- paste an image anywhere in this field, or upload */
+          /*#__PURE__*/React.createElement("div", { onPaste: handlePhotoPaste },
+            /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "사진"),
+            /*#__PURE__*/React.createElement("input", {
+              ref: photoFileInputRef,
+              type: "file",
+              accept: "image/*",
+              multiple: true,
+              style: { display: 'none' },
+              onChange: e => { handleAttachPhotoFiles(e.target.files); e.target.value = ''; }
+            }),
+            /*#__PURE__*/React.createElement("div", {
+              tabIndex: 0,
+              style: {
+                display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px',
+                padding: '10px', border: '1px dashed var(--border-subtle)', borderRadius: 'var(--radius-md)',
+                backgroundColor: 'var(--bg-primary)', minHeight: '64px'
+              }
+            },
+              photos.map((photo, idx) => /*#__PURE__*/React.createElement("div", {
+                key: idx, style: { position: 'relative', width: '56px', height: '56px', flexShrink: 0 }
+              },
+                /*#__PURE__*/React.createElement("img", {
+                  src: photo.thumbnail || photo.original, alt: `사진 ${idx + 1}`,
+                  style: { width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }
+                }),
+                /*#__PURE__*/React.createElement("button", {
+                  type: "button",
+                  onClick: () => setPhotos(prev => prev.filter((_, i) => i !== idx)),
+                  "aria-label": "사진 삭제",
+                  style: {
+                    position: 'absolute', top: '-6px', right: '-6px', width: '18px', height: '18px', borderRadius: '50%',
+                    border: 'none', backgroundColor: 'rgba(0,0,0,0.65)', color: '#FFFFFF', fontSize: '11px',
+                    lineHeight: '18px', textAlign: 'center', cursor: 'pointer', padding: 0
+                  }
+                }, "✕")
+              )),
+              /*#__PURE__*/React.createElement("button", {
+                type: "button",
+                onClick: () => photoFileInputRef.current && photoFileInputRef.current.click(),
+                style: {
+                  width: '56px', height: '56px', flexShrink: 0, display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', justifyContent: 'center', gap: '2px', border: '1px solid var(--border-subtle)',
+                  borderRadius: 'var(--radius-sm)', backgroundColor: 'var(--bg-card)', color: 'var(--text-muted)',
+                  cursor: 'pointer', fontSize: 'var(--font-size-xs)'
+                }
+              }, "+", /*#__PURE__*/React.createElement("span", null, "업로드")),
+              photoProcessing && /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } },
+                `처리 중... (${photoProcessing.current}/${photoProcessing.total})`
+              ),
+              photoUploadProgress && /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } },
+                `업로드 중... ${photoUploadProgress.pct}%`
+              ),
+              photos.length === 0 && !photoProcessing && /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-light)' } },
+                "이 영역에 이미지를 붙여넣거나 업로드 버튼을 눌러주세요"
+              )
+            )
           ),
 
           /* Place Field (행사/축제 only) */
@@ -1558,8 +1721,9 @@ export function AnniversaryModal({
             type: "button",
             className: "btn btn-primary",
             onClick: handleSaveAnniversary,
+            disabled: isSavingAnniversary,
             style: { width: '100%', justifyContent: 'center', padding: '10px', fontSize: 'var(--font-size-md)', marginTop: '6px' }
-          }, editingId ? "기념일 수정 완료" : "기념일 등록")
+          }, isSavingAnniversary ? "저장 중..." : (editingId ? "기념일 수정 완료" : "기념일 등록"))
         ),
 
         /* TAB 3: Bulk Repeating Schedule Register */
