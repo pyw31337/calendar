@@ -10344,9 +10344,64 @@ function getAnniversariesForDate(dateStr, anniversariesList) {
           }
         }
       }
+    } else if (ann.type === 'once') {
+      // Non-repeating single-day anniversary (a specific YYYY-MM-DD, optionally lunar).
+      if (!ann.date || typeof ann.date !== 'string') return;
+      const [onceY, onceM, onceD] = ann.date.split('-').map(Number);
+      if (!Number.isFinite(onceY) || !Number.isFinite(onceM) || !Number.isFinite(onceD)) return;
+      const catBadge = getAnniversaryCategoryBadge(ann.category);
+      if (ann.isLunar) {
+        try {
+          const cal = new KoreanLunarCalendar();
+          cal.setLunarDate(onceY, onceM, onceD, !!ann.isLeap);
+          const solar = cal.getSolarCalendar();
+          if (solar && solar.year === y && solar.month === m && solar.day === d) {
+            results.push({
+              id: ann.id,
+              title: `${ann.title || ''} (음)`,
+              badgeColor: catBadge.badgeColor,
+              icon: catBadge.icon
+            });
+          }
+        } catch (e) {
+          console.warn('Lunar date calculation failed for', ann.title, e);
+        }
+      } else if (onceY === y && onceM === m && onceD === d) {
+        results.push({
+          id: ann.id,
+          title: `${ann.title || ''}`,
+          badgeColor: catBadge.badgeColor,
+          icon: catBadge.icon
+        });
+      }
+    } else if (ann.type === 'range') {
+      // Multi-day (연일) event/festival spanning a start/end date range.
+      if (!ann.startDate || !ann.endDate) return;
+      if (dateStr >= ann.startDate && dateStr <= ann.endDate) {
+        const catBadge = getAnniversaryCategoryBadge(ann.category);
+        results.push({
+          id: ann.id,
+          title: `${ann.title || ''}`,
+          badgeColor: catBadge.badgeColor,
+          icon: catBadge.icon
+        });
+      }
     }
   });
   return results;
+}
+
+// Badge color/icon for the newer category-tagged anniversary types ('once', 'range'). Legacy
+// 'yearly'/'dday' entries predate the category field and keep their original hardcoded look above
+// so nothing already saved changes appearance.
+function getAnniversaryCategoryBadge(category) {
+  const map = {
+    birthday: { badgeColor: '#EF4444', icon: '🎂' },
+    event: { badgeColor: '#3B82F6', icon: '📅' },
+    festival: { badgeColor: '#F59E0B', icon: '🎉' },
+    other: { badgeColor: '#6B7280', icon: '📌' }
+  };
+  return map[category] || map.other;
 }
 
 // Anniversary badges default to a generic type color, but when the title names an active
