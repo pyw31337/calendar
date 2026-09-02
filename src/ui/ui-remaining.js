@@ -1291,15 +1291,6 @@ export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = f
   );
 }
 
-// Opens Kakao Map centered on a specific point with a labeled marker -- a plain link URL, no API
-// key needed. See the identical helper in ui-summary-gallery.js for why this is a local copy
-// instead of a cross-file bridge dependency.
-function getKakaoMapLinkUrl(place) {
-  if (!place || !Number.isFinite(place.lat) || !Number.isFinite(place.lng)) return null;
-  const label = encodeURIComponent(place.alias || place.name || '장소');
-  return `https://map.kakao.com/link/map/${label},${place.lat},${place.lng}`;
-}
-
 function handleSectionHeaderKeyDown(event, onToggle) {
   if (event.key !== 'Enter' && event.key !== ' ') return;
   event.preventDefault();
@@ -1313,7 +1304,7 @@ export function PlacesSection({ calendar, onViewAll, onSelectPlace }) {
   const PlaceSectionIcon = __comp.PlaceSectionIcon || __deps.PlaceSectionIcon;
   const PlaceCategoryMarkerIcon = __comp.PlaceCategoryMarkerIcon || __deps.PlaceCategoryMarkerIcon;
   const SectionToggleButton = __comp.SectionToggleButton || __deps.SectionToggleButton;
-  const StoreInfoIcon = __comp.StoreInfoIcon || __deps.StoreInfoIcon;
+  const BuildingIcon = __comp.BuildingIcon || __deps.BuildingIcon;
   const getCalendarPlaces = __deps.getCalendarPlaces;
 
   // Unlike the other main-screen preview sections, collapsed here still shows 2 cards (not 0) --
@@ -1376,7 +1367,6 @@ export function PlacesSection({ calendar, onViewAll, onSelectPlace }) {
       const visitStatus = derivePlaceVisitStatus ? derivePlaceVisitStatus(place) : place.visitStatus;
       const visitLabel = visitStatus === 'planned' ? '방문예정' : '방문';
       const visitCount = countPlaceVisits ? countPlaceVisits(place, dated, category) : dated.length;
-      const kakaoMapUrl = getKakaoMapLinkUrl(place);
       const openPlace = () => {
         if (typeof onSelectPlace === 'function') onSelectPlace(place);
         else if (typeof onViewAll === 'function') onViewAll();
@@ -1427,11 +1417,20 @@ export function PlacesSection({ calendar, onViewAll, onSelectPlace }) {
           visitCount > 0 && /*#__PURE__*/React.createElement("span", {
             style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', fontWeight: 700 }
           }, `총 ${visitCount}회 ${visitLabel}`),
-          kakaoMapUrl && /*#__PURE__*/React.createElement("a", {
-            href: kakaoMapUrl, target: "_blank", rel: "noreferrer", title: "카카오맵에서 업체정보 보기",
-            onClick: e => e.stopPropagation(),
-            style: { marginLeft: 'auto', flexShrink: 0, display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }
-          }, StoreInfoIcon && /*#__PURE__*/React.createElement(StoreInfoIcon, { size: 14 }))
+          /* Same icon + getPlaceExternalMapUrl + window.open behavior as the 업체보기 button
+             on the full Places page's own list row (see ui-places.js) -- kept in sync by
+             calling the identical shared bridge function rather than re-deriving a URL here. */
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            title: "업체보기",
+            onClick: event => {
+              event.preventDefault();
+              event.stopPropagation();
+              const url = getPlaceExternalMapUrl(place);
+              if (url) window.open(url, '_blank', 'noopener,noreferrer');
+            },
+            style: { marginLeft: 'auto', flexShrink: 0, display: 'flex', alignItems: 'center', background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--text-light)' }
+          }, BuildingIcon && /*#__PURE__*/React.createElement(BuildingIcon, { size: 14, style: { pointerEvents: 'none' } }))
         ),
         /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 } },
           /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: 'var(--font-size-base)', color: 'var(--text-main)' } }, place.alias || place.name || '이름 없음'),
@@ -1439,7 +1438,8 @@ export function PlacesSection({ calendar, onViewAll, onSelectPlace }) {
         ),
         latestEntry
           ? /*#__PURE__*/React.createElement("div", {
-              style: { display: 'flex', alignItems: 'center', gap: '8px', borderTop: '1px solid var(--border-subtle)', paddingTop: '6px', marginTop: '4px' }
+              className: "place-preview-visit-row",
+              style: { borderTop: '1px solid var(--border-subtle)', paddingTop: '6px', marginTop: '4px' }
             },
               /*#__PURE__*/React.createElement("span", { style: { flexShrink: 0, fontWeight: 700, fontSize: 'var(--font-size-sm)' } }, formatPlaceBadgeDate(latestEntry.date) || latestEntry.date),
               /*#__PURE__*/React.createElement("span", { style: { flex: 1, minWidth: 0, fontSize: 'var(--font-size-sm)', color: 'var(--text-main)', wordBreak: 'break-word' } }, latestEntry.note)

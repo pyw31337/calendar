@@ -1034,6 +1034,21 @@ export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalG
 
   const [collapsed, setCollapsed] = React.useState(false);
   const [lightbox, setLightbox] = React.useState(null);
+  // Mobile shows a tighter 3x3 grid instead of the desktop 6-wide layout, so the thumbnail cap
+  // needs to track the same breakpoint the CSS grid switches on (see .gallery-thumb-grid).
+  const [isMobile, setIsMobile] = React.useState(() => typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 639px)').matches);
+  React.useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return undefined;
+    const mq = window.matchMedia('(max-width: 639px)');
+    const handleChange = () => setIsMobile(mq.matches);
+    handleChange();
+    if (mq.addEventListener) mq.addEventListener('change', handleChange);
+    else if (mq.addListener) mq.addListener(handleChange);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener('change', handleChange);
+      else if (mq.removeListener) mq.removeListener(handleChange);
+    };
+  }, []);
   const brokenPhotoKeysRef = React.useRef((GATHER_APP_UTILS.getPersistentBrokenPhotoUrls || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.getPersistentBrokenPhotoUrls) || (() => new Set()))());
   const brokenPhotoUrlsRef = React.useRef((GATHER_APP_UTILS.getPersistentBrokenPhotoUrls || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.getPersistentBrokenPhotoUrls) || (() => new Set()))());
   // A confirmed-broken entry (MediaThumb already tried the full-size fallback -- this only fires
@@ -1174,7 +1189,7 @@ export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalG
 
   const displayedEntries = visibleEntries
     .filter(e => (e && ((e.thumb && String(e.thumb)) || (e.full && String(e.full)))))
-    .slice(0, 18);
+    .slice(0, isMobile ? 9 : 18);
   const openGalleryPage = () => { if (typeof onViewAll === 'function') onViewAll(); };
   const handleGalleryTitleKeyDown = event => handleSectionHeaderKeyDown(event, () => setCollapsed(prev => !prev));
 
@@ -1213,7 +1228,8 @@ export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalG
     ),
     !collapsed && displayedEntries.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null,
       /*#__PURE__*/React.createElement("div", {
-        style: { display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '6px', marginTop: '12px' }
+        className: "gallery-thumb-grid",
+        style: { display: 'grid', gap: '6px', marginTop: '12px' }
       },
         displayedEntries.map((entry, idx) => /*#__PURE__*/React.createElement(MediaThumb, {
           key: entry.mediaKey || entry.refKey || entry.full || entry.thumb,
