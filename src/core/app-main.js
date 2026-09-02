@@ -7349,56 +7349,59 @@ function CalendarApp() {
     onCancelVote: handleCancelVote,
     onRequestConfirm: showConfirmDialog,
     expandSignal: pollsExpandSignal
-  })), /*#__PURE__*/React.createElement("div", {
-    className: "calendar-card",
-    style: {
-      padding: '16px'
-    }
-  }, /*#__PURE__*/React.createElement(CommentsSection, {
-    calendar: activeCal,
-    recentMessages: recentMessages,
-    chatMessages: visibleChatMessages,
-    totalChatCount: totalChatCount,
-    chatInput: chatInput,
-    setChatInput: setChatInput,
-    chatParticipantId: chatParticipantId,
-    setChatParticipantId: setChatParticipantId,
-    isChatSheetOpen: isChatSheetOpen,
-    setIsChatSheetOpen: setIsChatSheetOpen,
-    isChatSubmitting: isChatSubmitting,
-    chatTextareaRef: chatTextareaRef,
-    chatImage: chatImages,
-    setChatImage: setChatImages,
-    activeLightbox: activeLightbox,
-    setActiveLightbox: setActiveLightbox,
-    onSend: handleSendChatMessage,
-    onDeleteMessage: handleDeleteMessage,
-    onEditMessage: handleEditMessage,
-    onMore: () => changeView('chat'),
-    showToast: showToast,
-    onPromoteImageUrl: handlePromoteInlineChatImage,
-    onSaveImageTags: handleSaveImageTags,
-    onSearchTag: handleSearchTag,
-    onDeletePhoto: handleDeletePhoto,
-    onReplacePhoto: handleReplacePhoto,
-    onJumpToChatMessage: handleJumpToChatMessage,
-    onJumpToMemo: handleJumpToMemo,
-    onJumpToMeetingDate: handleJumpToMeetingDate,
-    onGetChatMessageOrdinal: handleGetChatMessageOrdinal,
-    onGetGalleryPhotoOrdinal: handleGetGalleryPhotoOrdinal,
-    onRequestConfirm: showConfirmDialog
-  })), /*#__PURE__*/React.createElement(MemoPreviewSection, {
-    memos: memos,
-    calendar: activeCal,
-    onViewAll: () => changeView('memo'),
-    onOpenEdit: memo => handleJumpToMemo(memo.id),
-    onTogglePin: handleTogglePinFromMemoPreview,
-    onSelectTag: handleJumpToMemoTag,
-    onShare: memo => setPreviewSharingMemo(memo),
-    onCommentsChange: handleMemoCommentsChangeFromMemoPreview,
-    onRequestConfirm: showConfirmDialog,
-    showToast: showToast
-  }), /*#__PURE__*/React.createElement(SummaryList, {
+  })), /*#__PURE__*/React.createElement("div", { className: "chat-memo-row" },
+    /*#__PURE__*/React.createElement("div", {
+      className: "calendar-card",
+      style: {
+        padding: '16px'
+      }
+    }, /*#__PURE__*/React.createElement(CommentsSection, {
+      calendar: activeCal,
+      recentMessages: recentMessages,
+      chatMessages: visibleChatMessages,
+      totalChatCount: totalChatCount,
+      chatInput: chatInput,
+      setChatInput: setChatInput,
+      chatParticipantId: chatParticipantId,
+      setChatParticipantId: setChatParticipantId,
+      isChatSheetOpen: isChatSheetOpen,
+      setIsChatSheetOpen: setIsChatSheetOpen,
+      isChatSubmitting: isChatSubmitting,
+      chatTextareaRef: chatTextareaRef,
+      chatImage: chatImages,
+      setChatImage: setChatImages,
+      activeLightbox: activeLightbox,
+      setActiveLightbox: setActiveLightbox,
+      onSend: handleSendChatMessage,
+      onDeleteMessage: handleDeleteMessage,
+      onEditMessage: handleEditMessage,
+      onMore: () => changeView('chat'),
+      showToast: showToast,
+      onPromoteImageUrl: handlePromoteInlineChatImage,
+      onSaveImageTags: handleSaveImageTags,
+      onSearchTag: handleSearchTag,
+      onDeletePhoto: handleDeletePhoto,
+      onReplacePhoto: handleReplacePhoto,
+      onJumpToChatMessage: handleJumpToChatMessage,
+      onJumpToMemo: handleJumpToMemo,
+      onJumpToMeetingDate: handleJumpToMeetingDate,
+      onGetChatMessageOrdinal: handleGetChatMessageOrdinal,
+      onGetGalleryPhotoOrdinal: handleGetGalleryPhotoOrdinal,
+      onRequestConfirm: showConfirmDialog
+    })),
+    /*#__PURE__*/React.createElement(MemoPreviewSection, {
+      memos: memos,
+      calendar: activeCal,
+      onViewAll: () => changeView('memo'),
+      onOpenEdit: memo => handleJumpToMemo(memo.id),
+      onTogglePin: handleTogglePinFromMemoPreview,
+      onSelectTag: handleJumpToMemoTag,
+      onShare: memo => setPreviewSharingMemo(memo),
+      onCommentsChange: handleMemoCommentsChangeFromMemoPreview,
+      onRequestConfirm: showConfirmDialog,
+      showToast: showToast
+    })
+  ), /*#__PURE__*/React.createElement(SummaryList, {
     calendar: activeCal,
     onSelectDate: d => {
       if (!guardLoadedCalendar()) return;

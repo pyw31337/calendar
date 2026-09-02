@@ -797,6 +797,77 @@ export function CalendarGrid({
   const [pickerYear, setPickerYear] = React.useState(year);
   const [pickerMonth, setPickerMonth] = React.useState(month);
 
+  // Water-ripple hover effect (replaces the old bordered-box hover): a single delegated
+  // pointer listener on the whole grid, not one per cell, updates --mx/--my (the pointer's
+  // position within whichever cell it's currently over) so that cell's CSS radial-gradient
+  // glow can track it, and spawns a one-shot expanding ring positioned at the entry point
+  // whenever the pointer crosses into a new cell -- entry angle/position naturally falls out
+  // of where within the cell that first coordinate lands. Reading clientX/Y and writing the
+  // custom properties straight to the DOM (not through React state) keeps this at native
+  // mousemove frequency without triggering a re-render on every pixel of movement.
+  const daysGridRef = React.useRef(null);
+  React.useEffect(() => {
+    const grid = daysGridRef.current;
+    if (!grid || typeof window === 'undefined') return undefined;
+    if (window.matchMedia && window.matchMedia('(hover: none)').matches) return undefined;
+    let lastCell = null;
+    const updatePosition = (cell, clientX, clientY) => {
+      const rect = cell.getBoundingClientRect();
+      const mx = ((clientX - rect.left) / rect.width) * 100;
+      const my = ((clientY - rect.top) / rect.height) * 100;
+      cell.style.setProperty('--mx', `${mx}%`);
+      cell.style.setProperty('--my', `${my}%`);
+    };
+    const spawnRipple = cell => {
+      cell.classList.remove('is-rippling');
+      // Force a reflow so re-adding the class restarts the CSS animation even if the same
+      // cell is re-entered before the previous ripple finished.
+      void cell.offsetWidth;
+      cell.classList.add('is-rippling');
+    };
+    const handleMove = (clientX, clientY, target) => {
+      const cell = target && target.closest ? target.closest('.day-cell') : null;
+      if (!cell || !grid.contains(cell)) {
+        if (lastCell) { lastCell.classList.remove('is-rippling'); }
+        lastCell = null;
+        return;
+      }
+      if (cell !== lastCell) {
+        if (lastCell) lastCell.classList.remove('is-rippling');
+        updatePosition(cell, clientX, clientY);
+        spawnRipple(cell);
+        lastCell = cell;
+      } else {
+        updatePosition(cell, clientX, clientY);
+      }
+    };
+    const onMouseMove = e => handleMove(e.clientX, e.clientY, e.target);
+    const onMouseLeave = () => {
+      if (lastCell) lastCell.classList.remove('is-rippling');
+      lastCell = null;
+    };
+    const onTouchMove = e => {
+      const touch = e.touches && e.touches[0];
+      if (!touch) return;
+      handleMove(touch.clientX, touch.clientY, document.elementFromPoint(touch.clientX, touch.clientY));
+    };
+    const onAnimationEnd = e => {
+      if (e.animationName === 'day-cell-ripple-wave') e.target.classList.remove('is-rippling');
+    };
+    grid.addEventListener('mousemove', onMouseMove);
+    grid.addEventListener('mouseleave', onMouseLeave);
+    grid.addEventListener('touchmove', onTouchMove, { passive: true });
+    grid.addEventListener('touchend', onMouseLeave);
+    grid.addEventListener('animationend', onAnimationEnd);
+    return () => {
+      grid.removeEventListener('mousemove', onMouseMove);
+      grid.removeEventListener('mouseleave', onMouseLeave);
+      grid.removeEventListener('touchmove', onTouchMove);
+      grid.removeEventListener('touchend', onMouseLeave);
+      grid.removeEventListener('animationend', onAnimationEnd);
+    };
+  }, [monthDate]);
+
   // Touch equivalent of the desktop-only HTML5 draggable/onDragStart/onDrop badge-move below --
   // native Drag-and-Drop never fires from touch input on any mobile browser, so without this a
   // participant badge simply couldn't be moved between dates on a phone at all. Implemented as a
@@ -1247,7 +1318,8 @@ export function CalendarGrid({
   }, "\uAE08"), /*#__PURE__*/React.createElement("div", {
     className: "weekday-label sat"
   }, "\uD1A0")), /*#__PURE__*/React.createElement("div", {
-    className: "days-grid"
+    className: "days-grid",
+    ref: daysGridRef
   }, [days.map(({
     dayNum,
     dateStr,
@@ -1425,6 +1497,7 @@ export function CalendarGrid({
         return /*#__PURE__*/React.createElement("div", {
           key: ann.id || aIdx,
           style: {
+            height: '24px',
             backgroundColor: `${displayColor}22`,
             padding: '3px 8px',
             borderRadius: 'var(--radius-sm)',
@@ -1678,7 +1751,7 @@ export function CommentsSection({
   // 문서로 저장되지만 채팅 피드에는 노출되지 않아야 함 -- ChatRoomView(ui-chat-room.js)의
   // 같은 필터를 이 메인화면 채팅 미리보기 위젯에도 동일하게 적용.
   const messagesToShow = isCollapsed
-    ? previewRecentMessages.slice(-1)
+    ? previewRecentMessages.slice(-3)
     : previewRecentMessages;
 
   return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("section", {

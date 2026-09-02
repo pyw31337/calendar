@@ -1174,7 +1174,7 @@ export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalG
 
   const displayedEntries = visibleEntries
     .filter(e => (e && ((e.thumb && String(e.thumb)) || (e.full && String(e.full)))))
-    .slice(0, 12);
+    .slice(0, 18);
   const openGalleryPage = () => { if (typeof onViewAll === 'function') onViewAll(); };
   const handleGalleryTitleKeyDown = event => handleSectionHeaderKeyDown(event, () => setCollapsed(prev => !prev));
 
