@@ -770,6 +770,8 @@ export function AnniversaryModal({
   showToast,
   onRequestConfirm,
   onBulkRegister,
+  onAnniversarySaved,
+  onAnniversaryDeleted,
   isDarkTheme,
   embedded = false
 }) {
@@ -802,6 +804,8 @@ export function AnniversaryModal({
   const getActiveParticipants = __deps.getActiveParticipants;
   const [activeTab, setActiveTab] = React.useState('list'); // 'list', 'add', 'bulk'
   const [editingId, setEditingId] = React.useState(null); // null when registering a new anniversary
+  // 목록 tab's category filter -- 'all' or one of ANNIVERSARY_CATEGORY_OPTIONS' values.
+  const [listCategoryFilter, setListCategoryFilter] = React.useState('all');
 
   const todayStr = () => {
     const today = new Date();
@@ -1018,6 +1022,12 @@ export function AnniversaryModal({
 
       const saved = await writeSharedCollection('anniversaries', calendarId, anniversaryId, annData, 'set', '기념일 저장');
       if (!saved?.success) throw new Error('Anniversary save failed');
+      // Patch local state immediately rather than waiting on the realtime listener -- a write
+      // that falls through to the REST fallback (see writeCollectionDocumentWithFallback) never
+      // touches the Firestore SDK's own local persistence cache, so a listener whose live
+      // connection is stuck (blocked/throttled WebChannel, seen on some browsers/networks) can
+      // keep serving that stale cache indefinitely, surviving even a full page reload.
+      if (typeof onAnniversarySaved === 'function') onAnniversarySaved(annData);
       showToast(editingId ? '기념일이 수정되었습니다.' : '기념일이 등록되었습니다.', 'success');
 
       // Reset form
@@ -1049,6 +1059,37 @@ export function AnniversaryModal({
     }
   };
 
+  // Places already registered on this calendar matching the search text, shown above the live
+  // Kakao/Google/Nominatim results -- mirrors DateModal's "이미 등록된 장소" suggestions
+  // (ui-date-modal.js), since a private/informal or previously hand-fixed place otherwise has no
+  // way to surface here even though the live geocoders find nothing for it.
+  const existingPlaceSuggestions = React.useMemo(() => {
+    const trimmed = placeQuery.trim();
+    if (selectedPlace && selectedPlace.name === trimmed) return [];
+    if (trimmed.length < 2) return [];
+    const q = trimmed.toLowerCase();
+    return getCalendarPlaces(calendar)
+      .filter(p => (p.name || '').toLowerCase().includes(q) || (p.alias || '').toLowerCase().includes(q))
+      .slice(0, 8);
+  }, [placeQuery, selectedPlace, calendar]);
+
+  const handleSelectExistingAnniversaryPlace = (place) => {
+    setSelectedPlace({
+      id: place.id,
+      provider: 'existing',
+      name: place.alias || place.name,
+      address: place.address || '',
+      lat: place.lat,
+      lng: place.lng,
+      categoryId: place.categoryId || null,
+      categoryLabel: '',
+      phone: '',
+      url: ''
+    });
+    setPlaceResults([]);
+    setPlaceQuery('');
+  };
+
   const handleAnniversaryPlaceSearch = async () => {
     const q = placeQuery.trim();
     if (!q || isPlaceSearching) return;
@@ -1073,10 +1114,12 @@ export function AnniversaryModal({
         const annSnapshot = JSON.parse(JSON.stringify(ann));
         const deleted = await writeSharedCollection('anniversaries', calendarId, ann.id, null, 'delete', '기념일 삭제');
         if (!deleted?.success) throw new Error('Anniversary delete failed');
+        if (typeof onAnniversaryDeleted === 'function') onAnniversaryDeleted(ann.id);
         showToast('기념일이 삭제되었습니다.', 'delete', 5000, async () => {
           try {
             const restored = await writeSharedCollection('anniversaries', calendarId, ann.id, annSnapshot, 'set', '기념일 복원');
             if (!restored?.success) throw new Error('Anniversary restore failed');
+            if (typeof onAnniversarySaved === 'function') onAnniversarySaved(annSnapshot);
             showToast('기념일 삭제를 되돌렸습니다.', 'success', 3000);
           } catch (restoreErr) {
             console.error('Anniversary restore error:', restoreErr);
@@ -1240,7 +1283,7 @@ export function AnniversaryModal({
             ? /*#__PURE__*/React.createElement("a", {
                 href: mapUrl, target: "_blank", rel: "noreferrer",
                 onClick: e => e.stopPropagation(),
-                style: { color: 'var(--text-muted)', textDecoration: 'underline' }
+                style: { color: 'var(--text-muted)', textDecoration: 'none' }
               }, label)
             : /*#__PURE__*/React.createElement("span", null, label)
         );
@@ -1290,7 +1333,10 @@ export function AnniversaryModal({
       const key = groups.has(ann.category) ? ann.category : 'birthday';
       groups.get(key).push(ann);
     });
-    return ANNIVERSARY_CATEGORY_OPTIONS.map(opt => {
+    const visibleOptions = listCategoryFilter === 'all'
+      ? ANNIVERSARY_CATEGORY_OPTIONS
+      : ANNIVERSARY_CATEGORY_OPTIONS.filter(o => o.value === listCategoryFilter);
+    return visibleOptions.map(opt => {
       const items = groups.get(opt.value);
       if (!items.length) return null;
       const OptIcon = ANNIVERSARY_CATEGORY_ICONS[opt.value];
@@ -1370,6 +1416,39 @@ export function AnniversaryModal({
       }
     }),
 
+    /* 목록 tab's category filter row -- lets 생일/행사/축제/여행/기타 be viewed separately
+       instead of always scrolling through every group. */
+    activeTab === 'list' && anniversaries.length > 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex', gap: '6px', padding: '10px 12px 0', overflowX: 'auto', flexShrink: 0
+      }
+    },
+      [{ value: 'all', label: '전체' }, ...ANNIVERSARY_CATEGORY_OPTIONS].map(opt => {
+        const count = opt.value === 'all'
+          ? anniversaries.length
+          : anniversaries.filter(a => (a.category || 'birthday') === opt.value).length;
+        if (opt.value !== 'all' && count === 0) return null;
+        const isActive = listCategoryFilter === opt.value;
+        return /*#__PURE__*/React.createElement("button", {
+          key: opt.value,
+          type: "button",
+          onClick: () => setListCategoryFilter(opt.value),
+          style: {
+            flexShrink: 0,
+            border: 'none',
+            borderRadius: 'var(--radius-full)',
+            padding: '6px 12px',
+            background: isActive ? 'var(--accent-primary)' : 'var(--bg-primary)',
+            color: isActive ? '#FFFFFF' : 'var(--text-muted)',
+            fontWeight: 700,
+            fontSize: 'var(--font-size-sm)',
+            cursor: 'pointer',
+            whiteSpace: 'nowrap'
+          }
+        }, `${opt.label} (${count})`);
+      })
+    ),
+
     /* Modal Scrollable Body */
 
       /* Modal Body */
@@ -1378,13 +1457,23 @@ export function AnniversaryModal({
         activeTab === 'list' && /*#__PURE__*/React.createElement("div", {
           style: { display: 'flex', flexDirection: 'column', gap: '8px' }
         },
-          anniversaries.length > 0 ? renderGroupedAnniversaryList()
-          : /*#__PURE__*/React.createElement("div", {
-            style: {
-              textAlign: 'center', padding: '30px 10px', color: 'var(--text-muted)',
-              fontSize: 'var(--font-size-md)', lineHeight: '1.5'
-            }
-          }, "등록된 기념일이 없습니다. 매년 돌아오는 생일이나 D-Day를 등록해 보세요. 🎂")
+          anniversaries.length === 0
+            ? /*#__PURE__*/React.createElement("div", {
+                style: {
+                  textAlign: 'center', padding: '30px 10px', color: 'var(--text-muted)',
+                  fontSize: 'var(--font-size-md)', lineHeight: '1.5'
+                }
+              }, "등록된 기념일이 없습니다. 매년 돌아오는 생일이나 D-Day를 등록해 보세요. 🎂")
+            : (() => {
+                const grouped = renderGroupedAnniversaryList();
+                const hasAny = grouped.some(Boolean);
+                return hasAny ? grouped : /*#__PURE__*/React.createElement("div", {
+                  style: {
+                    textAlign: 'center', padding: '30px 10px', color: 'var(--text-muted)',
+                    fontSize: 'var(--font-size-md)', lineHeight: '1.5'
+                  }
+                }, "해당 카테고리에 등록된 기념일이 없습니다.");
+              })()
         ),
 
         /* TAB 2: Register / Edit */
@@ -1524,6 +1613,26 @@ export function AnniversaryModal({
                 disabled: isPlaceSearching,
                 onClick: handleAnniversaryPlaceSearch
               }, isPlaceSearching ? "검색 중..." : "검색")
+            ),
+            existingPlaceSuggestions.length > 0 && /*#__PURE__*/React.createElement("div", {
+              style: {
+                marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '160px', overflowY: 'auto',
+                border: '1px solid rgba(79, 70, 229, 0.35)', borderRadius: 'var(--radius-md)', padding: '6px', backgroundColor: 'rgba(79, 70, 229, 0.06)'
+              }
+            },
+              /*#__PURE__*/React.createElement("div", {
+                style: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--accent-primary)', padding: '2px 6px' }
+              }, "이미 등록된 장소"),
+              existingPlaceSuggestions.map(p => /*#__PURE__*/React.createElement("button", {
+                key: p.id,
+                type: "button",
+                onClick: () => handleSelectExistingAnniversaryPlace(p),
+                style: { textAlign: 'left', padding: '8px 10px', borderRadius: 'var(--radius-sm)', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '2px' },
+                className: "place-result-item"
+              },
+                /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-main)' } }, p.alias || p.name),
+                /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } }, getDisplayPlaceAddress(p) || p.name)
+              ))
             ),
             placeResults.length > 0 && /*#__PURE__*/React.createElement("div", {
               style: {

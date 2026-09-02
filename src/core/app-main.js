@@ -2375,9 +2375,31 @@ function CalendarApp() {
     return () => { isMounted = false; unsub(); };
   }, [activeCalId, activeView, firebaseDb, firebaseConnectionVersion]);
 
-  // Places + confirmed meetings: calendar / places / settlement only
+  // Patches local state immediately after a confirmed-successful write instead of waiting on
+  // the realtime listener above. A write that falls through to the REST fallback (see
+  // writeCollectionDocumentWithFallback) never touches the Firestore SDK's own local persistence
+  // cache, so if that listener's live connection is stuck (a blocked/throttled WebChannel, seen
+  // on some browsers/networks), it can keep serving the stale cache indefinitely -- surviving
+  // even a full page reload, since IndexedDB persistence carries the stale snapshot across reloads.
+  const handleAnniversarySaved = (annData) => {
+    if (!annData?.id) return;
+    setAnniversaries(prev => {
+      const list = Array.isArray(prev) ? prev.slice() : [];
+      const idx = list.findIndex(a => a.id === annData.id);
+      if (idx >= 0) list[idx] = { ...list[idx], ...annData };
+      else list.unshift(annData);
+      list.sort((a, b) => (Number(b.createdAt) || Number(b.updatedAt) || 0) - (Number(a.createdAt) || Number(a.updatedAt) || 0));
+      return list;
+    });
+  };
+  const handleAnniversaryDeleted = (annId) => {
+    if (!annId) return;
+    setAnniversaries(prev => (Array.isArray(prev) ? prev.filter(a => a.id !== annId) : []));
+  };
+
+  // Places + confirmed meetings: calendar / places / settlement / history only
   React.useEffect(() => {
-    const needsPlacesData = activeView === 'calendar' || activeView === 'places' || activeView === 'settlement';
+    const needsPlacesData = activeView === 'calendar' || activeView === 'places' || activeView === 'settlement' || activeView === 'history';
     if (!activeCalId || !needsPlacesData) return;
     let isMounted = true;
 
@@ -5931,12 +5953,7 @@ function CalendarApp() {
       showToast: showToast
     }),
     isAdminOpen && /*#__PURE__*/React.createElement(AdminModal, {
-      anniversaries: anniversaries,
       initialTab: adminInitialTab,
-      onOpenAnniversarySettings: () => {
-        setIsAdminOpen(false);
-        setIsAnniversariesOpen(true);
-      },
       calendar: { ...activeCal, activityLogs: unionActivityLogs(activeCal, adminActivityLogs) },
       allCalendars: calendars,
       onSelectCalendar: handleSelectCalendar,
@@ -5947,7 +5964,6 @@ function CalendarApp() {
       onDeleteMessage: handleDeleteMessage,
       onDeleteAvailability: handleDeleteAvailability,
       onDeleteAllForDate: handleDeleteAllForDate,
-      onBulkRegister: handleBulkRegisterAvailability,
       onRequestConfirm: showConfirmDialog,
       onClose: () => { setIsAdminOpen(false); setAdminInitialTab('settings'); },
       showToast: showToast,
@@ -7041,6 +7057,8 @@ function CalendarApp() {
     showToast: showToast,
     onRequestConfirm: showConfirmDialog,
     onBulkRegister: handleBulkRegisterAvailability,
+    onAnniversarySaved: handleAnniversarySaved,
+    onAnniversaryDeleted: handleAnniversaryDeleted,
     isDarkTheme: isDarkTheme
   }), /*#__PURE__*/React.createElement("div", {
     ref: calendarSectionRef
@@ -7320,7 +7338,11 @@ function CalendarApp() {
     onGetChatMessageOrdinal: handleGetChatMessageOrdinal,
     onGetGalleryPhotoOrdinal: handleGetGalleryPhotoOrdinal,
     onRequestConfirm: showConfirmDialog
-  })), /*#__PURE__*/React.createElement(SummaryList, {
+  })), /*#__PURE__*/React.createElement(MemoPreviewSection, {
+    memos: memos,
+    onViewAll: () => changeView('memo'),
+    onJumpToMemo: handleJumpToMemo
+  }), /*#__PURE__*/React.createElement(SummaryList, {
     calendar: activeCal,
     onSelectDate: d => {
       if (!guardLoadedCalendar()) return;
@@ -7870,7 +7892,7 @@ function ImageUrlModal(props) {
   return typeof C === 'function' ? React.createElement(C, props) : null;
 }
 
-function renderChatMessageBody(msg, setActiveLightbox, singleImageStyle = {}, searchQuery = '', stickyVideoKey = null, onActivateVideo = null) {
+function renderChatMessageBody(msg, setActiveLightbox, singleImageStyle = {}, searchQuery = '', stickyVideoKey = null, onActivateVideo = null, linkPreviewOnly = false) {
   const msgImages = renderChatMessageImages(msg, setActiveLightbox, singleImageStyle);
   // A fit-content chat bubble sizes itself to whichever of its children is widest. When there's
   // a multi-image grid above, cap the caption text below it to that same grid width -- otherwise
@@ -7888,7 +7910,8 @@ function renderChatMessageBody(msg, setActiveLightbox, singleImageStyle = {}, se
       message: msg,
       stickyVideoKey,
       onActivateVideo,
-      textMaxWidth
+      textMaxWidth,
+      linkPreviewOnly
     }) : null
   );
 }
@@ -9859,6 +9882,10 @@ function SummaryList(props) {
   const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SummaryList;
   return typeof C === 'function' ? React.createElement(C, props) : null;
 }
+function MemoPreviewSection(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MemoPreviewSection;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 
 
 
@@ -11232,6 +11259,7 @@ function bindGatherUiDeps() {
     SearchCategoryTabs: typeof SearchCategoryTabs === 'function' ? SearchCategoryTabs : null,
     SimpleBottomSheetPicker: typeof SimpleBottomSheetPicker === 'function' ? SimpleBottomSheetPicker : null,
     PhotoGallery: typeof PhotoGallery === 'function' ? PhotoGallery : null,
+    MemoPreviewSection: typeof MemoPreviewSection === 'function' ? MemoPreviewSection : null,
     SummaryList: typeof SummaryList === 'function' ? SummaryList : null,
     getActiveAvailabilities: typeof getActiveAvailabilities === 'function' ? getActiveAvailabilities : null,
     getCalendarPolls: typeof getCalendarPolls === 'function' ? getCalendarPolls : null,

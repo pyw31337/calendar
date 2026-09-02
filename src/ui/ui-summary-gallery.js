@@ -907,6 +907,125 @@ export function SimpleBottomSheetPicker({ title, value, options, onSelect, place
   );
 }
 
+// Comments are stored inline on the memo doc (see MemoCard in ui-calendar-core.js), so the
+// latest-comment timestamp is derived straight from that array rather than relying on the
+// denormalized memo.lastCommentAt field, which has known gaps for memos outside the page's
+// currently-loaded window (see ui-memo-view.js's own comment on RECENT_MEMO_ACTIVITY_WINDOW_MS).
+function getLatestMemoPreviewCommentTimestamp(memo) {
+  const comments = memo?.comments || [];
+  let latest = 0;
+  for (const c of comments) {
+    const t = Number(c?.createdAt) || 0;
+    if (t > latest) latest = t;
+  }
+  return latest;
+}
+
+export function MemoPreviewSection({ memos = [], onViewAll, onJumpToMemo }) {
+  const React = window.React;
+  const __deps = window.GATHER_UI_DEPS || {};
+  const __comp = window.GATHER_UI_COMPONENTS || {};
+  const MemoSectionIcon = __comp.MemoSectionIcon || __deps.MemoSectionIcon;
+  const MessageCommentIcon = __comp.MessageCommentIcon || __deps.MessageCommentIcon;
+  const MediaThumb = __comp.MediaThumb || __deps.MediaThumb;
+  const sanitizeText = __deps.sanitizeText;
+
+  const [collapsed, setCollapsed] = React.useState(true);
+
+  const sortedMemos = React.useMemo(() => {
+    const list = (memos || []).filter(m => m && !isTombstone(m));
+    return list.slice().sort((a, b) => {
+      const aComment = getLatestMemoPreviewCommentTimestamp(a);
+      const bComment = getLatestMemoPreviewCommentTimestamp(b);
+      if (aComment !== bComment) return bComment - aComment;
+      const aCreated = a.updatedAt || a.createdAt || 0;
+      const bCreated = b.updatedAt || b.createdAt || 0;
+      return bCreated - aCreated;
+    });
+  }, [memos]);
+
+  if (sortedMemos.length === 0) return null;
+
+  const displayedMemos = sortedMemos.slice(0, collapsed ? 1 : 3);
+  const openMemoPage = () => { if (typeof onViewAll === 'function') onViewAll(); };
+  const handleTitleKeyDown = event => handleSectionHeaderKeyDown(event, () => setCollapsed(prev => !prev));
+
+  return /*#__PURE__*/React.createElement("section", { className: "summary-card" },
+    /*#__PURE__*/React.createElement("div", {
+      className: `summary-title is-toggleable${collapsed ? ' is-collapsed' : ''}`,
+      role: "button",
+      tabIndex: 0,
+      "aria-expanded": !collapsed,
+      "data-no-press-feedback": true,
+      onClick: () => setCollapsed(prev => !prev),
+      onKeyDown: handleTitleKeyDown,
+      style: { display: 'flex', alignItems: 'center', gap: '6px', width: '100%', color: '#2563EB', cursor: 'pointer' }
+    },
+      /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0, color: '#2563EB' }
+      },
+        /*#__PURE__*/React.createElement(MemoSectionIcon, null),
+        /*#__PURE__*/React.createElement("span", null, "메모"),
+        /*#__PURE__*/React.createElement(SectionCountBadge, { count: sortedMemos.length })
+      ),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: e => { e.stopPropagation(); openMemoPage(); },
+        style: { background: 'none', border: 'none', color: '#3B82F6', fontSize: 'var(--font-size-md)', fontWeight: 800, cursor: 'pointer', padding: '4px 6px', flexShrink: 0 }
+      }, "전체보기"),
+      /*#__PURE__*/React.createElement(SectionToggleButton, {
+        collapsed,
+        onToggle: () => setCollapsed(prev => !prev),
+        label: collapsed ? '메모 펼치기' : '메모 접기'
+      })
+    ),
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }
+    }, displayedMemos.map(memo => {
+      const imageUrls = memo.imageUrls || [];
+      const thumbUrls = memo.thumbUrls || [];
+      const thumbSrc = thumbUrls[0] || imageUrls[0] || '';
+      const commentCount = (memo.comments || []).length;
+      const rawText = String(memo.text || memo.content || memo.body || '').trim();
+      const previewText = sanitizeText ? sanitizeText(rawText, 80) : rawText.slice(0, 80);
+      return /*#__PURE__*/React.createElement("div", {
+        key: memo.id,
+        "data-memo-preview-id": memo.id,
+        role: "button",
+        tabIndex: 0,
+        onClick: () => { if (typeof onJumpToMemo === 'function') onJumpToMemo(memo.id); },
+        onKeyDown: e => {
+          if (e.key !== 'Enter' && e.key !== ' ') return;
+          e.preventDefault();
+          if (typeof onJumpToMemo === 'function') onJumpToMemo(memo.id);
+        },
+        style: {
+          display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px',
+          border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)',
+          backgroundColor: 'var(--bg-card)', cursor: 'pointer'
+        }
+      },
+        thumbSrc && /*#__PURE__*/React.createElement(MediaThumb, {
+          src: thumbSrc,
+          fallbackSrc: imageUrls[0] || thumbSrc,
+          alt: "메모 첨부 이미지",
+          loading: 'lazy',
+          decoding: 'async',
+          style: { width: '44px', height: '44px', objectFit: 'cover', borderRadius: 'var(--radius-sm)', flexShrink: 0 }
+        }),
+        /*#__PURE__*/React.createElement("div", { style: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' } },
+          /*#__PURE__*/React.createElement("span", {
+            style: { fontSize: 'var(--font-size-base)', color: 'var(--text-main)', wordBreak: 'break-word', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }
+          }, previewText || '(내용 없음)')
+        ),
+        commentCount > 0 && /*#__PURE__*/React.createElement("div", {
+          style: { display: 'flex', alignItems: 'center', gap: '3px', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', fontWeight: 700, flexShrink: 0 }
+        }, MessageCommentIcon ? /*#__PURE__*/React.createElement(MessageCommentIcon, { size: 14 }) : null, commentCount)
+      );
+    }))
+  );
+}
+
 export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalGalleryCount, onViewAll, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag, onDeletePhoto, onReplacePhoto, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, onJumpToGallery, onGetChatMessageOrdinal, onGetGalleryPhotoOrdinal, onRequestConfirm }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -1254,6 +1373,10 @@ export function SummaryList({
   const isConfirmedVisible = false;
   const anyBeforeAll = isPartialVisible;
   const anyBeforeConfirmed = isPartialVisible || isAllVisible;
+
+  // Nothing to show (common now that 모임 확정 always renders false here -- see above) -- an
+  // empty .summary-card shell used to still take up a visible gap on the main screen below chat.
+  if (!isPartialVisible && !isAllVisible && !isConfirmedVisible) return null;
 
   return /*#__PURE__*/React.createElement("div", {
     className: "summary-card",
@@ -1843,6 +1966,7 @@ export function HistoryView({
     SimpleBottomSheetPicker: SimpleBottomSheetPicker,
     ParticipantBackdrop: ParticipantBackdrop,
     PhotoGallery: PhotoGallery,
+    MemoPreviewSection: MemoPreviewSection,
     SummaryList: SummaryList,
     HistoryView: HistoryView,
   });

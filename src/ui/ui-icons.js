@@ -1956,6 +1956,23 @@ export function PlaceSectionIcon({ size = 20 } = {}) {
   }));
 }
 
+export function MemoSectionIcon({ size = 20 } = {}) {
+  const React = window.React;
+
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: String(size),
+    height: String(size),
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "strokeWidth": "2",
+    "strokeLinecap": "round",
+    "strokeLinejoin": "round"
+  }, /*#__PURE__*/React.createElement("path", { d: "M12 20h9" }),
+    /*#__PURE__*/React.createElement("path", { d: "M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" }));
+}
+
 export function ThreeLinesIcon({ size = 18 } = {}) {
   const React = window.React;
 
@@ -2221,6 +2238,7 @@ export function MapPinIcon({ size = 24 } = {}) {
     TrashIcon: TrashIcon,
     ImageDownIcon: ImageDownIcon,
     PlaceSectionIcon: PlaceSectionIcon,
+    MemoSectionIcon: MemoSectionIcon,
     ThreeLinesIcon: ThreeLinesIcon,
     PlaceCategoryMarkerIcon: PlaceCategoryMarkerIcon,
     CctvIcon: CctvIcon,

@@ -1471,22 +1471,16 @@ export function CommentsSection({
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const ChatSectionIcon = __comp.ChatSectionIcon || __deps.ChatSectionIcon;
-  const EmojiPickerIcon = __comp.EmojiPickerIcon || __deps.EmojiPickerIcon;
-  const EmojiPickerSheet = __comp.EmojiPickerSheet || __deps.EmojiPickerSheet;
-  const ImageProcessingOverlay = __comp.ImageProcessingOverlay || __deps.ImageProcessingOverlay;
   const Lightbox = __comp.Lightbox || __deps.Lightbox;
   const SectionToggleButton = __comp.SectionToggleButton || __deps.SectionToggleButton;
   const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
-  const ParticipantPickerButton = __comp.ParticipantPickerButton || __deps.ParticipantPickerButton;
   const getActiveParticipants = __deps.getActiveParticipants;
-  const autoGrowTextarea = __deps.autoGrowTextarea;
 
   const participants = getActiveParticipants(calendar);
   const participantsMap = participants.reduce((acc, p) => {
     acc[p.id] = p;
     return acc;
   }, {});
-  const selectedParticipant = participants.find(p => p.id === chatParticipantId);
   const meetingPhotoMessageIds = React.useMemo(() => {
     const ids = new Set();
     const meetings = typeof getConfirmedMeetings === 'function' ? getConfirmedMeetings(calendar) : [];
@@ -1513,34 +1507,7 @@ export function CommentsSection({
       ? recentMessages.filter(msg => msg && msg.uploadSource !== 'meeting' && msg.uploadSource !== 'gallery' && !meetingPhotoMessageIds.has(msg.id))
       : [];
   }, [recentMessages, meetingPhotoMessageIds]);
-  const fileInputRef = React.useRef(null);
   const [isCollapsed, setIsCollapsed] = React.useState(true); // default closed
-  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = React.useState(false);
-  const canSendChatNow = () => !isChatSubmitting && (!!chatInput.trim() || chatImages.length > 0);
-  const triggerChatSend = useChatSendGuard(onSend, canSendChatNow);
-  const handleSendPointerDown = (event) => {
-    if (!canSendChatNow()) return;
-    event.preventDefault();
-    event.stopPropagation();
-    triggerChatSend();
-  };
-  const handleSendClick = () => {
-    triggerChatSend();
-  };
-  const insertEmojiIntoChatInput = (emoji) => {
-    const textarea = chatTextareaRef.current;
-    const start = textarea ? (textarea.selectionStart ?? chatInput.length) : chatInput.length;
-    const end = textarea ? (textarea.selectionEnd ?? chatInput.length) : chatInput.length;
-    const next = chatInput.slice(0, start) + emoji + chatInput.slice(end);
-    setChatInput(next);
-    if (textarea) {
-      requestAnimationFrame(() => {
-        textarea.focus();
-        const pos = start + emoji.length;
-        textarea.setSelectionRange(pos, pos);
-      });
-    }
-  };
   const revealedMsgId = useTapRevealedMsgId();
 
   // Total chat count + read/unread badge, tracked locally per calendar (no server-side
@@ -1581,52 +1548,6 @@ export function CommentsSection({
       event.stopPropagation();
     }
     if (typeof onMore === 'function') onMore();
-  };
-
-  const [imageProcessing, setImageProcessing] = React.useState(null);
-
-  const handleFileChange = async (e) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    try {
-      await appendChatImageFiles({
-        files,
-        currentCount: chatImages.length,
-        setImageProcessing,
-        setChatImages,
-        showToast
-      });
-    } catch (err) {
-      // Belt-and-suspenders: processImageFilesSequentially already isolates per-file
-      // failures, but this guards against anything unexpected (a browser/environment
-      // quirk we haven't seen) surfacing as silent total failure with no feedback at all.
-      console.error('handleFileChange unexpected error:', err);
-      if (showToast) showToast('사진 첨부 중 오류', 'error', 5000);
-    } finally {
-      setImageProcessing(null);
-      e.target.value = '';
-    }
-  };
-
-  const handlePasteImages = async (e) => {
-    const pastedFiles = getImageFilesFromClipboardEvent(e);
-    if (pastedFiles.length === 0) return;
-    e.preventDefault();
-    e.stopPropagation();
-    try {
-      await appendChatImageFiles({
-        files: pastedFiles,
-        currentCount: chatImages.length,
-        setImageProcessing,
-        setChatImages,
-        showToast
-      });
-    } catch (err) {
-      console.error('handlePasteImages unexpected error:', err);
-      if (showToast) showToast('붙여넣은 사진 첨부 중 오류', 'error', 5000);
-    } finally {
-      setImageProcessing(null);
-    }
   };
 
   // 일정탭('meeting')/갤러리페이지('gallery')에서 올린 사진은 참조용 실제 채팅 메시지
@@ -1701,7 +1622,7 @@ export function CommentsSection({
     const badgeName = p?.name || '알수없음';
 
     /* === SHARED ELEMENTS === */
-    const bubbleContent = renderChatMessageBody(msg, setActiveLightbox, { maxWidth: '120px', maxHeight: '90px', isMiniChat: true });
+    const bubbleContent = renderChatMessageBody(msg, setActiveLightbox, { maxWidth: '120px', maxHeight: '90px', isMiniChat: true }, '', null, null, true);
 
     const editSvg = /*#__PURE__*/React.createElement('svg', { xmlns: 'http://www.w3.org/2000/svg', width: '12', height: '12', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2.5', strokeLinecap: 'round', strokeLinejoin: 'round' },
       /*#__PURE__*/React.createElement('path', { stroke: 'none', d: 'M0 0h24v24H0z', fill: 'none' }),
@@ -1787,218 +1708,6 @@ export function CommentsSection({
     }
   }, "이전 채팅 더보기")
   )),
-  /* Input row */
-  /*#__PURE__*/React.createElement("div", {
-    "data-chat-input-panel": "1",
-    style: {
-      backgroundColor: 'var(--bg-card)',
-      border: '1px solid var(--border-subtle)',
-      borderRadius: 'var(--radius-md)',
-      padding: '12px',
-      marginTop: '12px',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '10px',
-      boxSizing: 'border-box',
-      position: 'relative',
-      zIndex: isEmojiPickerOpen ? 13050 : 'auto'
-    }
-  },
-    /* Textarea at top */
-    /*#__PURE__*/React.createElement("textarea", {
-      ref: chatTextareaRef,
-      placeholder: "채팅을 입력하세요...",
-      value: chatInput,
-      maxLength: 5000,
-      onChange: e => { setChatInput(e.target.value); autoGrowTextarea(e.target, 100); },
-      onPaste: handlePasteImages,
-      onKeyDown: e => {
-        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-          e.preventDefault();
-          triggerChatSend();
-        }
-      },
-      style: {
-        width: '100%',
-        height: '44px',
-        minHeight: '44px',
-        maxHeight: '100px',
-        resize: 'none',
-        border: 'none',
-        background: 'none',
-        padding: '2px 4px',
-        fontSize: 'var(--font-size-base)',
-        lineHeight: '1.4',
-        fontFamily: 'inherit',
-        outline: 'none',
-        boxSizing: 'border-box',
-        overflowY: 'auto'
-      }
-    }),
-
-    /* Attached Images Preview (between Textarea and Action Row) */
-    chatImages.length > 0 ? /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px', alignSelf: 'flex-start' }
-    }, chatImages.map((img, index) => /*#__PURE__*/React.createElement("div", {
-      key: index,
-      style: { position: 'relative', display: 'inline-block' }
-    }, /*#__PURE__*/React.createElement("img", {
-      src: img.thumbnail,
-      alt: `첨부 미리보기 ${index + 1}`,
-      decoding: 'async',
-      style: {
-        width: '60px',
-        height: '60px',
-        objectFit: 'cover',
-        borderRadius: 'var(--radius-md)',
-        display: 'block'
-      }
-    }), /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      onClick: () => setChatImages(prev => prev.filter((_, idx) => idx !== index)),
-      style: {
-        position: 'absolute',
-        top: '-6px',
-        right: '-6px',
-        width: '18px',
-        height: '18px',
-        borderRadius: '50%',
-        backgroundColor: '#475569',
-        border: 'none',
-        cursor: 'pointer',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 0,
-        color: '#FFFFFF'
-      }
-    }, /*#__PURE__*/React.createElement("svg", {
-      xmlns: "http://www.w3.org/2000/svg",
-      width: "10",
-      height: "10",
-      viewBox: "0 0 24 24",
-      fill: "none",
-      stroke: "#FFFFFF",
-      strokeWidth: "3",
-      strokeLinecap: "round",
-      strokeLinejoin: "round"
-    }, /*#__PURE__*/React.createElement("line", { x1: "18", y1: "6", x2: "6", y2: "18" }), /*#__PURE__*/React.createElement("line", { x1: "6", y1: "6", x2: "18", y2: "18" })))))) : null,
-
-    /* Hidden File Input */
-    /*#__PURE__*/React.createElement("input", {
-      ref: fileInputRef,
-      type: "file",
-      accept: "image/jpeg, image/png, image/gif, image/webp, image/heic, image/heif, image/*",
-      multiple: true,
-      style: { position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 },
-      onChange: handleFileChange
-    }),
-
-    /* Action Row (Select box, Camera, Send) at bottom */
-    /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        width: '100%',
-        borderTop: '1px solid var(--border-subtle)',
-        paddingTop: '8px',
-        marginTop: '2px'
-      }
-    },
-      /* Left side: Participant select capsule button (shared component -- see ui-widgets.js) */
-      /*#__PURE__*/React.createElement(ParticipantPickerButton, {
-        participant: selectedParticipant,
-        placeholder: "선택",
-        onClick: () => setIsChatSheetOpen(true)
-      }),
-
-      /* Right side: Camera button & Send button */
-      /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', alignItems: 'center', gap: '8px' }
-      },
-        /* Emoji Button */
-        /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          onClick: () => setIsEmojiPickerOpen(true),
-          title: "이모티콘",
-          style: {
-            width: '32px',
-            height: '32px',
-            borderRadius: '50%',
-            border: '1px solid var(--border-subtle)',
-            backgroundColor: 'var(--bg-card)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-            padding: 0,
-            color: 'var(--text-muted)'
-          }
-        }, /*#__PURE__*/React.createElement(EmojiPickerIcon, null)),
-        /* Camera/Image Button */
-        /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          onClick: () => fileInputRef.current && fileInputRef.current.click(),
-          title: "사진 첨부",
-          style: {
-            width: '32px',
-            height: '32px',
-            borderRadius: '50%',
-            border: '1px solid var(--border-subtle)',
-            backgroundColor: 'var(--bg-card)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-            padding: 0,
-            color: 'var(--text-muted)'
-          }
-        }, /*#__PURE__*/React.createElement("svg", {
-          xmlns: "http://www.w3.org/2000/svg",
-          width: "18",
-          height: "18",
-          viewBox: "0 0 24 24",
-          fill: "none",
-          stroke: "currentColor",
-          strokeWidth: "2",
-          strokeLinecap: "round",
-          strokeLinejoin: "round"
-        },
-          /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
-          /*#__PURE__*/React.createElement("path", { d: "M15 8h.01" }),
-          /*#__PURE__*/React.createElement("path", { d: "M12.5 21h-6.5a3 3 0 0 1 -3 -3v-12a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v6.5" }),
-          /*#__PURE__*/React.createElement("path", { d: "M3 16l5 -5c.928 -.893 2.072 -.893 3 0l4 4" }),
-          /*#__PURE__*/React.createElement("path", { d: "M14 14l1 -1c.67 -.644 1.45 -.824 2.182 -.54" }),
-          /*#__PURE__*/React.createElement("path", { d: "M16 19h6" }),
-          /*#__PURE__*/React.createElement("path", { d: "M19 16v6" })
-        )),
-
-        /* Send Button */
-        /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          disabled: isChatSubmitting || (!chatInput.trim() && chatImages.length === 0),
-          onPointerDown: handleSendPointerDown,
-          onClick: handleSendClick,
-          style: {
-            height: '32px',
-            padding: '0 16px',
-            fontSize: 'var(--font-size-md)',
-            fontWeight: 'bold',
-            backgroundColor: '#57606F',
-            color: '#FFFFFF',
-            border: 'none',
-            borderRadius: '16px',
-            cursor: 'pointer',
-            whiteSpace: 'nowrap',
-            opacity: (chatInput.trim() || chatImages.length > 0) && !isChatSubmitting ? 1 : 0.6
-          }
-        }, isChatSubmitting ? '...' : '전송')
-      )
-    )
-  ),
   activeLightbox ? /*#__PURE__*/React.createElement(Lightbox, {
     urls: activeLightbox.urls,
     index: activeLightbox.index,
@@ -2017,11 +1726,7 @@ export function CommentsSection({
     onGetChatMessageOrdinal,
     onGetGalleryPhotoOrdinal,
     onRequestConfirm
-  }) : null), imageProcessing && /*#__PURE__*/React.createElement(ImageProcessingOverlay, imageProcessing),
-  isEmojiPickerOpen && /*#__PURE__*/React.createElement(EmojiPickerSheet, {
-    onSelect: insertEmojiIntoChatInput,
-    onClose: () => setIsEmojiPickerOpen(false)
-  }));
+  }) : null));
 }
 
 export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onSelectTag, onCommentsChange, getBorderColor, onRequestConfirm, showToast, effectivePinned }) {
