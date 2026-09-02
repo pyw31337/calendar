@@ -1711,15 +1711,8 @@ export function CommentsSection({
       label: isCollapsed ? "채팅 펼치기" : "채팅 접기"
     })
   )),
-  /* List Background Panel -- one continuous gray canvas the individual white message
-     bubbles float on, instead of each message having its own separate gray card */
   /*#__PURE__*/React.createElement("div", {
-    style: {
-      backgroundColor: 'var(--bg-primary)',
-      borderRadius: 'var(--radius-md)',
-      padding: '12px',
-      minHeight: '48px'
-    }
+    style: { minHeight: '48px' }
   }, messagesToShow.length === 0 ? /*#__PURE__*/React.createElement("div", {
     style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-base)', padding: '8px 0', textAlign: 'center' }
   }, emptyChatMessage) : /*#__PURE__*/React.createElement("div", {
@@ -1782,21 +1775,10 @@ export function CommentsSection({
           ) : null
         )
       ),
-      /* Full-width bubble with top tail pointing to name badge */
-      /*#__PURE__*/React.createElement('div', { style: { position: 'relative', marginTop: '2px' } },
-        /* Outer tail (border color) */
-        /*#__PURE__*/React.createElement('div', {
-          style: { position: 'absolute', top: '-7px', left: '18px', width: 0, height: 0, borderLeft: '7px solid transparent', borderRight: '7px solid transparent', borderBottom: '7px solid var(--border-subtle)', zIndex: 2 }
-        }),
-        /* Inner tail (white fill) */
-        /*#__PURE__*/React.createElement('div', {
-          style: { position: 'absolute', top: '-5px', left: '19px', width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderBottom: '6px solid var(--bg-card)', zIndex: 3 }
-        }),
-        /* Bubble container */
-        /*#__PURE__*/React.createElement('div', {
-          style: { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '10px 12px', fontSize: 'var(--font-size-base)', lineHeight: '1.4', color: 'var(--text-main)', wordBreak: 'keep-all', overflowWrap: 'break-word', whiteSpace: 'pre-wrap', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', position: 'relative', zIndex: 1 }
-        }, bubbleContent)
-      )
+      /* Full-width bordered box (name/timestamp row above, message text below) */
+      /*#__PURE__*/React.createElement('div', {
+        style: { marginTop: '2px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '10px 12px', fontSize: 'var(--font-size-base)', lineHeight: '1.4', color: 'var(--text-main)', wordBreak: 'keep-all', overflowWrap: 'break-word', whiteSpace: 'pre-wrap' }
+      }, bubbleContent)
     );
   }),
   /* Full Width "이전 채팅 더보기" Button at bottom of list */
