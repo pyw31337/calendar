@@ -3485,12 +3485,16 @@ select.form-select {
 .confirmed-meeting-banner .memo-capsule-badge,
 .date-item-btn.confirmed-meeting-card .url-capsule-badge,
 .confirmed-meeting-surface .url-capsule-badge,
-.confirmed-meeting-banner .url-capsule-badge,
+.confirmed-meeting-banner .url-capsule-badge {
+  mix-blend-mode: normal !important;
+  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.10);
+}
+/* Place box inside a confirmed-meeting card keeps no drop shadow at all. */
 .date-item-btn.confirmed-meeting-card .place-memo-stack,
 .confirmed-meeting-surface .place-memo-stack,
 .confirmed-meeting-banner .place-memo-stack {
   mix-blend-mode: normal !important;
-  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.10);
+  box-shadow: none !important;
 }
 :root[data-theme="dark"] .date-item-btn.confirmed-meeting-card .memo-capsule-badge.is-past,
 .date-item-btn.confirmed-meeting-card .memo-capsule-badge.is-past {
@@ -3504,34 +3508,22 @@ select.form-select {
 :root[data-theme="dark"] .confirmed-meeting-banner .memo-capsule-badge,
 :root[data-theme="dark"] .date-item-btn.confirmed-meeting-card .url-capsule-badge,
 :root[data-theme="dark"] .confirmed-meeting-surface .url-capsule-badge,
-:root[data-theme="dark"] .confirmed-meeting-banner .url-capsule-badge,
+:root[data-theme="dark"] .confirmed-meeting-banner .url-capsule-badge {
+  mix-blend-mode: normal !important;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.22);
+}
 :root[data-theme="dark"] .date-item-btn.confirmed-meeting-card .place-memo-stack,
 :root[data-theme="dark"] .confirmed-meeting-surface .place-memo-stack,
 :root[data-theme="dark"] .confirmed-meeting-banner .place-memo-stack {
   mix-blend-mode: normal !important;
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.22);
-}
-
-/* History page rows keep the plain date-item-btn pastel tint (no vivid gradient -- that's
-   reserved for the main-screen SummaryList preview), so .confirmed-meeting-surface's white
-   text/border rules -- tuned for that gradient -- need to be re-overridden here. Same
-   specificity as those rules, so source order (this block coming later) decides the winner. */
-.history-meeting-card .confirmed-meeting-date {
-  color: var(--text-main) !important;
-  text-shadow: none;
-}
-.history-meeting-card.is-past .confirmed-meeting-date {
-  color: #94A3B8 !important;
-}
-.history-meeting-card .memo-capsule-badge {
-  border-color: currentColor !important;
+  box-shadow: none !important;
 }
 
 /* Capsule Memo Badge */
 .memo-capsule-badge {
   display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px;
-  border-radius: var(--radius-full); font-size: 0.75rem; font-weight: 700;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1); line-height: 1;
+  border-radius: 10px; font-size: 0.75rem; font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1); line-height: 120%;
 }
 .confirmed-meeting-banner .memo-capsule-badge,
 .confirmed-meeting-surface .memo-capsule-badge {

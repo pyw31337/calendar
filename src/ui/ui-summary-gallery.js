@@ -946,7 +946,7 @@ function getMemoPreviewBorderColor(colorVal) {
 // back to navigating to the memo page (this section owns no edit modal or tag-search UI of its
 // own); onTogglePin/onCommentsChange are real writes (see handleTogglePinFromMemoPreview /
 // handleMemoCommentsChangeFromMemoPreview in app-main.js) since MemoCard calls them unconditionally.
-export function MemoPreviewSection({ memos = [], calendar = null, onViewAll, onOpenEdit, onTogglePin, onSelectTag, onCommentsChange, onRequestConfirm, showToast }) {
+export function MemoPreviewSection({ memos = [], totalMemoCount = null, calendar = null, onViewAll, onOpenEdit, onTogglePin, onSelectTag, onCommentsChange, onRequestConfirm, showToast }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -970,6 +970,7 @@ export function MemoPreviewSection({ memos = [], calendar = null, onViewAll, onO
   if (sortedMemos.length === 0) return null;
 
   const displayedMemos = sortedMemos.slice(0, collapsed ? 1 : 3);
+  const displayMemoCount = (typeof totalMemoCount === 'number' && totalMemoCount >= sortedMemos.length) ? totalMemoCount : sortedMemos.length;
   const openMemoPage = () => { if (typeof onViewAll === 'function') onViewAll(); };
   const handleTitleKeyDown = event => handleSectionHeaderKeyDown(event, () => setCollapsed(prev => !prev));
 
@@ -989,7 +990,7 @@ export function MemoPreviewSection({ memos = [], calendar = null, onViewAll, onO
       },
         /*#__PURE__*/React.createElement(MemoSectionIcon, null),
         /*#__PURE__*/React.createElement("span", null, "메모"),
-        /*#__PURE__*/React.createElement(SectionCountBadge, { count: sortedMemos.length })
+        /*#__PURE__*/React.createElement(SectionCountBadge, { count: displayMemoCount })
       ),
       /*#__PURE__*/React.createElement("button", {
         type: "button",
@@ -1233,24 +1234,7 @@ export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalG
           onBroken: (e, brokenInfo) => handleBrokenPhoto(entry, brokenInfo),
           style: { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }
         }))
-      ),
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: openGalleryPage,
-        style: {
-          width: '100%',
-          backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
-          border: 'none',
-          borderRadius: 'var(--radius-md)',
-          padding: '8px 0',
-          marginTop: '10px',
-          fontSize: 'var(--font-size-base)',
-          fontWeight: 'bold',
-          color: 'var(--text-main)',
-          cursor: 'pointer',
-          textAlign: 'center'
-        }
-      }, "갤러리 더보기")
+      )
     ),
     lightbox && /*#__PURE__*/React.createElement(Lightbox, {
       urls: lightbox.urls,
@@ -1852,7 +1836,7 @@ export function HistoryView({
         const datePlaces = getCalendarPlaces(calendar).filter(p => doesPlaceMatchDate(p, d));
         return /*#__PURE__*/React.createElement("button", {
           key: d,
-          className: `date-item-btn ${isPast ? 'is-past' : 'is-confirmed'} history-meeting-card confirmed-meeting-surface`,
+          className: `date-item-btn ${isPast ? 'is-past' : 'is-confirmed'} confirmed-meeting-card confirmed-meeting-surface`,
           onClick: () => onSelectDate(d),
           style: { flexDirection: 'column', alignItems: 'flex-start' }
         },

@@ -7371,6 +7371,7 @@ function CalendarApp() {
     onRequestConfirm: showConfirmDialog
   })), /*#__PURE__*/React.createElement(MemoPreviewSection, {
     memos: memos,
+    totalMemoCount: totalMemoCount,
     calendar: activeCal,
     onViewAll: () => changeView('memo'),
     onOpenEdit: memo => handleJumpToMemo(memo.id),
