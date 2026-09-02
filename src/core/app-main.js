@@ -10260,7 +10260,53 @@ function uploadMemoImageAssets(calendarId, compressed, index, onBytes, timeoutMs
   });
 }
 
+// Same shape/behavior as uploadMemoImageAssets, just its own Storage path -- anniversary photos
+// are a distinct content type from memo attachments even though the upload mechanics are
+// identical.
+function uploadAnniversaryImageAssets(calendarId, compressed, index, onBytes, timeoutMs = 45000) {
+  return new Promise((resolve) => {
+    const storage = getLiveFirebaseStorage();
+    if (!storage || !compressed?.originalBlob || !compressed?.thumbnailBlob) {
+      resolve(null);
+      return;
+    }
+    const stamp = Date.now();
+    const rand = Math.random().toString(36).slice(2, 8);
+    const basePath = `anniversaryImages/${calendarId}/${stamp}_${rand}_${index}`;
+    const originalMeta = getUploadImageBlobMeta(compressed.originalBlob, 'jpg');
+    const thumbMeta = getUploadImageBlobMeta(compressed.thumbnailBlob, originalMeta.ext === 'png' ? 'png' : 'jpg');
+    const originalRef = storage.ref(`${basePath}_original_${compressed.originalBlob.size}b.${originalMeta.ext}`);
+    const thumbRef = storage.ref(`${basePath}_thumb_${compressed.thumbnailBlob.size}b.${thumbMeta.ext}`);
 
+    const runUploadOnce = (blob, ref, taskKey, contentType) => uploadBlobWithWatchdog({
+      ref, blob, contentType, taskKey, onBytes, timeoutMs
+    });
+    const runUpload = async (blob, ref, taskKey, contentType) => {
+      const first = await runUploadOnce(blob, ref, taskKey, contentType);
+      if (first) return first;
+      return runUploadOnce(blob, ref, taskKey, contentType);
+    };
+
+    Promise.all([
+      runUpload(compressed.originalBlob, originalRef, `${index}-orig`, originalMeta.contentType),
+      runUpload(compressed.thumbnailBlob, thumbRef, `${index}-thumb`, thumbMeta.contentType)
+    ]).then(async ([imageUrl, thumbUrl]) => {
+      if (imageUrl && thumbUrl) resolve({ imageUrl, thumbUrl });
+      else {
+        await Promise.allSettled([
+          originalRef.delete().catch(() => {}),
+          thumbRef.delete().catch(() => {})
+        ]);
+        console.warn('Anniversary image Storage upload failed');
+        resolve(null);
+      }
+    });
+  });
+}
+
+async function resolveAnniversaryImageBatch(calendarId, compressedList, onProgress) {
+  return resolveImageBatch(calendarId, compressedList, onProgress, uploadAnniversaryImageAssets);
+}
 
 function getAnniversariesForDate(dateStr, anniversariesList) {
   if (!dateStr || !Array.isArray(anniversariesList)) return [];
@@ -11249,6 +11295,7 @@ function bindGatherUiDeps() {
     pushSingleCloudCalendar: typeof pushSingleCloudCalendar === 'function' ? pushSingleCloudCalendar : null,
     readClipboardImageFiles: typeof readClipboardImageFiles === 'function' ? readClipboardImageFiles : null,
     resolveMemoImageBatch: typeof resolveMemoImageBatch === 'function' ? resolveMemoImageBatch : null,
+    resolveAnniversaryImageBatch: typeof resolveAnniversaryImageBatch === 'function' ? resolveAnniversaryImageBatch : null,
     sanitizeMemoForFirestore: typeof sanitizeMemoForFirestore === 'function' ? sanitizeMemoForFirestore : null,
     setAdminSession: typeof setAdminSession === 'function' ? setAdminSession : null,
     sha256Hex: typeof sha256Hex === 'function' ? sha256Hex : null,
