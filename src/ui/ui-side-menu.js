@@ -1133,7 +1133,7 @@ export function NotificationOnboardingModal({ onClose, isMasterNotifyEnabled, on
 }
 
 
-/** 공통 앱 네비: 채팅 / 정산 / 갤러리 / 장소 / 메모 */
+/** 공통 앱 네비: 채팅 / 정산 / 갤러리 / 장소 / 메모 / 히스토리 */
 export function SharedAppNavBlock({
   onClose,
   onChangeView,
@@ -1144,6 +1144,7 @@ export function SharedAppNavBlock({
   galleryCount = 0,
   placeCount = 0,
   memoCount = 0,
+  historyCount = 0,
   chatLastAuthor = null,
   settlementLastDate = null,
   galleryLastDate = null,
@@ -1151,6 +1152,9 @@ export function SharedAppNavBlock({
   memoLastTitleWord = null
 }) {
   const React = window.React;
+  const __deps = window.GATHER_UI_DEPS || {};
+  const __comp = window.GATHER_UI_COMPONENTS || {};
+  const FolderClockIcon = __comp.FolderClockIcon || __deps.FolderClockIcon;
   const go = (view) => {
     if (typeof onChangeView === 'function') onChangeView(view);
     if (typeof onClose === 'function') onClose();
@@ -1254,6 +1258,13 @@ export function SharedAppNavBlock({
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title", style: { display: "flex", alignItems: "center", gap: "6px" } }, "메모", badge(memoCount))
       ),
       metaPill(memoLastTitleWord)
+    ),
+    /* 8. 히스토리 */
+    /*#__PURE__*/React.createElement("button", { type: "button", className: "admin-side-menu-item", onClick: () => go("history") },
+      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, FolderClockIcon ? /*#__PURE__*/React.createElement(FolderClockIcon, { size: 20 }) : null),
+      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title", style: { display: "flex", alignItems: "center", gap: "6px" } }, "히스토리", badge(historyCount))
+      )
     )
   );
 }
@@ -1351,6 +1362,7 @@ export function MainSideMenu({
   placeCount = 0,
   chatCount = 0,
   memoCount = 0,
+  historyCount = 0,
   settlementCount = 0,
   settlementBadge = null,
   chatLastAuthor = null,
@@ -1503,6 +1515,7 @@ export function MainSideMenu({
       galleryCount: galleryCount,
       placeCount: placeCount,
       memoCount: memoCount,
+      historyCount: historyCount,
       chatLastAuthor: chatLastAuthor,
       settlementLastDate: settlementLastDate,
       galleryLastDate: galleryLastDate,

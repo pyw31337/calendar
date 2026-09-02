@@ -3105,6 +3105,7 @@ select.form-select {
    scroll against its parent modal. */
 .resizable-list-handle-row {
   pointer-events: none;
+  height: 24px;
 }
 .resizable-list-handle {
   width: 32px;
@@ -5056,6 +5057,12 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
   .modal-body button,
   .modal-body [role="button"] {
     min-height: 36px;
+  }
+
+  /* The resizable-list drag handle button above gets stretched to 36px by the blanket rule
+     above; match the row's own background height to it so the two never mismatch. */
+  .resizable-list-handle-row {
+    height: 36px;
   }
 
   /* ...except the small icon-only edit/delete/drag-reorder buttons packed into the attendance

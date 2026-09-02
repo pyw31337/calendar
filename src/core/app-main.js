@@ -6184,6 +6184,7 @@ function CalendarApp() {
     : ((typeof totalGalleryCount === 'number' && totalGalleryCount > 0) ? totalGalleryCount : 0);
   const navMemoCount = (typeof totalMemoCount === 'number' && totalMemoCount >= 0) ? totalMemoCount : (memos || []).length;
   const navPlaceCount = (activeCal && Array.isArray(activeCal.places)) ? activeCal.places.filter(p => p && !p.deletedAt).length : 0;
+  const navHistoryCount = activeCal ? getTrulyConfirmedMeetings(activeCal).filter(m => isValidDateString(m?.date)).length : 0;
   const navSettlementBadge = canUseSettlement && activeCal && typeof calculateSettlementBalance === 'function' && typeof formatBalanceBadge === 'function'
     ? formatBalanceBadge(calculateSettlementBalance(activeCal))
     : null;
@@ -6378,6 +6379,7 @@ function CalendarApp() {
     galleryCount: navGalleryCount,
     placeCount: navPlaceCount,
     memoCount: navMemoCount,
+    historyCount: navHistoryCount,
     chatLastAuthor: navChatLastAuthor,
     settlementLastDate: navSettlementLastDate,
     galleryLastDate: navGalleryLastDate,
@@ -6705,6 +6707,30 @@ function CalendarApp() {
     ));
   }
 
+  if (activeView === 'history') {
+    return withStickyVideo(/*#__PURE__*/React.createElement(React.Fragment, null,
+      /*#__PURE__*/React.createElement(HistoryView, {
+        calendar: activeCal,
+        onBack: () => changeView('calendar'),
+        onSelectDate: (dateStr) => {
+          setSelectedDate(dateStr);
+          setIsModalOpen(true);
+        },
+        isDarkTheme: isDarkTheme,
+        onToggleTheme: toggleTheme,
+        fontScalePercent: fontScalePercent,
+        onDecreaseFont: () => setFontScalePercent(prev => Math.max(80, prev - 10)),
+        onIncreaseFont: () => setFontScalePercent(prev => Math.min(130, prev + 10)),
+        isChatNotifyEnabled: mainNotifPermission === 'granted' && mainChatNotifyEnabled,
+        onToggleChatNotifications: handleMainToggleNotifications,
+        onOpenAppSettings: () => setIsAppSettingsOpen(true),
+        syncStatus: syncStatus,
+        ...navMenuProps
+      }),
+      sharedAppOverlays
+    ));
+  }
+
   const mainMenuPollCount = getCalendarPolls(activeCal).filter(poll => !isPollClosed(poll) && !poll.hidden).length;
   // Whether the 진행중 투표 section has anything to render at all -- mirrors PollList's own
   // "polls" filter (ui-calendar-core.js), which keeps closed-but-not-hidden polls visible there
@@ -6877,6 +6903,7 @@ function CalendarApp() {
     placeCount: mainMenuPlaceCount,
     chatCount: mainMenuChatCount,
     memoCount: mainMenuMemoCount,
+    historyCount: navHistoryCount,
     settlementCount: Array.isArray(activeCal && activeCal.expenses)
       ? activeCal.expenses.filter(e => e && !e.deletedAt).length
       : 0,
@@ -10869,6 +10896,10 @@ function PlaceMapView(props) {
 }
 function PlacesView(props) {
   const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlacesView;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function HistoryView(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.HistoryView;
   return typeof C === 'function' ? React.createElement(C, props) : null;
 }
 

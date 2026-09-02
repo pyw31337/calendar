@@ -2169,10 +2169,10 @@ export function ResizableListSection({
     }, children),
     /*#__PURE__*/React.createElement('div', {
       className: 'resizable-list-handle-row',
-      // 36px, not 24px -- on mobile (see the `.modal-body button { min-height: 36px }` touch-
-      // target rule in app.css) the handle button inside is stretched to 36px regardless of its
-      // own 24px CSS height, so a 24px row background clipped/mismatched around it.
-      style: { display: 'flex', justifyContent: 'center', height: '36px', marginTop: '-8px', backgroundColor: 'rgba(0, 0, 0, 0.04)', borderRadius: '0 0 6px 6px', marginBottom: '8px' }
+      // Row height itself is left to CSS (see .resizable-list-handle-row in app.css) so it can
+      // track the handle button's actual rendered height at each breakpoint -- 24px on desktop,
+      // 36px under the mobile `.modal-body button { min-height: 36px }` touch-target rule.
+      style: { display: 'flex', justifyContent: 'center', marginTop: '-8px', backgroundColor: 'rgba(0, 0, 0, 0.04)', borderRadius: '0 0 6px 6px', marginBottom: '8px' }
     },
       /*#__PURE__*/React.createElement('button', {
         type: 'button',
