@@ -149,6 +149,14 @@ function getDisplayPlaceAddress(...args) {
   const f = __gatherUiDeps().getDisplayPlaceAddress || GATHER_APP_UTILS.getDisplayPlaceAddress;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function parsePlaceMemoEntries(...args) {
+  const f = __gatherUiDeps().parsePlaceMemoEntries || GATHER_APP_UTILS.parsePlaceMemoEntries;
+  return typeof f === 'function' ? f(...args) : [];
+}
+function derivePlaceVisitStatus(...args) {
+  const f = __gatherUiDeps().derivePlaceVisitStatus || GATHER_APP_UTILS.derivePlaceVisitStatus;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
 function getExpenseCategories(...args) {
   const f = __gatherUiDeps().getExpenseCategories || GATHER_APP_UTILS.getExpenseCategories;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -1279,50 +1287,38 @@ export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = f
   );
 }
 
+function handleSectionHeaderKeyDown(event, onToggle) {
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+  event.preventDefault();
+  onToggle();
+}
+
 export function PlacesSection({ calendar, onViewAll }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
-  const PlaceMapView = __comp.PlaceMapView || __deps.PlaceMapView;
   const PlaceSectionIcon = __comp.PlaceSectionIcon || __deps.PlaceSectionIcon;
+  const PlaceCategoryMarkerIcon = __comp.PlaceCategoryMarkerIcon || __deps.PlaceCategoryMarkerIcon;
   const SectionCountBadge = __comp.SectionCountBadge || __deps.SectionCountBadge;
   const SectionToggleButton = __comp.SectionToggleButton || __deps.SectionToggleButton;
   const getCalendarPlaces = __deps.getCalendarPlaces;
 
-  const [collapsed, setCollapsed] = React.useState(false);
-  const [mapShouldMount, setMapShouldMount] = React.useState(false);
-  const mapHostRef = React.useRef(null);
+  // Unlike the other main-screen preview sections, collapsed here still shows 2 cards (not 0) --
+  // the toggle only widens 2 -> 4, it never hides the section entirely.
+  const [collapsed, setCollapsed] = React.useState(true);
   const places = getCalendarPlaces(calendar);
-  const handleSectionTitleKeyDown = event => {
-    if (event.key !== 'Enter' && event.key !== ' ') return;
-    event.preventDefault();
-    setCollapsed(prev => !prev);
-  };
+  const categoryMap = React.useMemo(() => {
+    const categories = getPlaceCategories(calendar) || [];
+    return categories.reduce((acc, c) => { acc[c.id] = c; return acc; }, {});
+  }, [calendar]);
+  const sortedPlaces = React.useMemo(() => {
+    return places.slice().sort((a, b) => ((b.createdAt || b.updatedAt || 0) - (a.createdAt || a.updatedAt || 0)));
+  }, [places]);
+  const handleSectionTitleKeyDown = event => handleSectionHeaderKeyDown(event, () => setCollapsed(prev => !prev));
 
-  React.useEffect(() => {
-    if (collapsed || mapShouldMount) return undefined;
-    const el = mapHostRef.current;
-    if (!el || typeof IntersectionObserver === 'undefined') {
-      const t = setTimeout(() => setMapShouldMount(true), 400);
-      return () => clearTimeout(t);
-    }
-    let done = false;
-    const io = new IntersectionObserver((entries) => {
-      if (done) return;
-      if (entries.some(e => e.isIntersecting || (e.intersectionRatio || 0) > 0)) {
-        done = true;
-        setMapShouldMount(true);
-        io.disconnect();
-      }
-    }, { root: null, rootMargin: '160px 0px', threshold: 0.01 });
-    io.observe(el);
-    // Do not force-mount the map during idle time. On a long calendar page this downloaded
-    // Leaflet, marker clustering, tiles, and marker icons even when the user never scrolled to
-    // the places section. IntersectionObserver already starts it 160px before it becomes visible.
-    return () => {
-      io.disconnect();
-    };
-  }, [collapsed, mapShouldMount]);
+  if (places.length === 0) return null;
+
+  const displayedPlaces = sortedPlaces.slice(0, collapsed ? 2 : 4);
 
   return /*#__PURE__*/React.createElement("section", { className: "summary-card" },
     /*#__PURE__*/React.createElement("div", {
@@ -1340,7 +1336,7 @@ export function PlacesSection({ calendar, onViewAll }) {
       },
         /*#__PURE__*/React.createElement(PlaceSectionIcon, null),
         /*#__PURE__*/React.createElement("span", null, "장소"),
-        places.length > 0 && /*#__PURE__*/React.createElement(SectionCountBadge, { count: places.length })
+        /*#__PURE__*/React.createElement(SectionCountBadge, { count: places.length })
       ),
       /*#__PURE__*/React.createElement("div", {
         style: { marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }
@@ -1353,40 +1349,77 @@ export function PlacesSection({ calendar, onViewAll }) {
         /*#__PURE__*/React.createElement(SectionToggleButton, {
           collapsed,
           onToggle: () => setCollapsed(prev => !prev),
-          label: collapsed ? '지도 펼치기' : '지도 접기'
+          label: collapsed ? '장소 펼치기' : '장소 접기'
         })
       )
     ),
-    !collapsed && /*#__PURE__*/React.createElement("div", {
-      ref: mapHostRef,
-      style: {
-        position: 'relative', width: '100%', aspectRatio: '4 / 3',
-        borderRadius: 'var(--radius-sm)', overflow: 'hidden', marginTop: '12px',
-        backgroundColor: 'color-mix(in srgb, var(--bg-primary) 92%, #94a3b8)'
-      }
-    },
-      mapShouldMount
-        ? /*#__PURE__*/React.createElement(PlaceMapView, {
-            places, calendar, resizeSignal: collapsed, preferDomesticBounds: true
-          })
-        : /*#__PURE__*/React.createElement("div", {
-            style: {
-              position: 'absolute', inset: 0, display: 'flex', alignItems: 'center',
-              justifyContent: 'center', fontSize: 'var(--font-size-md)', fontWeight: 700,
-              color: 'var(--text-muted)', letterSpacing: '-0.02em'
-            }
-          }, "지도 준비 중…"),
-      places.length > 0 && /*#__PURE__*/React.createElement("button", {
-        type: "button", onClick: onViewAll,
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }
+    }, displayedPlaces.map(place => {
+      const category = categoryMap[place.categoryId] || categoryMap.etc || { color: '#94A3B8', name: '기타' };
+      const memoEntries = parsePlaceMemoEntries(place.memo);
+      const dated = sortVisitEntriesRecentFirst(memoEntries.filter(e => e.date));
+      const latestEntry = dated[0] || null;
+      const memoWithoutDate = memoEntries.filter(e => !e.date).map(e => e.note).join('\n');
+      const visitStatus = derivePlaceVisitStatus ? derivePlaceVisitStatus(place) : place.visitStatus;
+      return /*#__PURE__*/React.createElement("div", {
+        key: place.id,
+        "data-place-preview-id": place.id,
+        role: "button",
+        tabIndex: 0,
+        onClick: () => { if (typeof onViewAll === 'function') onViewAll(); },
+        onKeyDown: e => {
+          if (e.key !== 'Enter' && e.key !== ' ') return;
+          e.preventDefault();
+          if (typeof onViewAll === 'function') onViewAll();
+        },
         style: {
-          position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 500, width: '100%',
-          backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
-          border: 'none', borderRadius: '0 0 var(--radius-md) var(--radius-md)', padding: '8px 0',
-          fontSize: 'var(--font-size-base)', fontWeight: 'bold', color: 'var(--text-main)',
-          cursor: 'pointer', textAlign: 'center'
+          display: 'flex', flexDirection: 'column', gap: '4px', padding: '10px 12px',
+          border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)',
+          backgroundColor: 'var(--bg-card)', cursor: 'pointer'
         }
-      }, "장소 더보기")
-    )
+      },
+        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' } },
+          /*#__PURE__*/React.createElement("span", {
+            style: {
+              display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '3px 8px 3px 3px', borderRadius: 'var(--radius-full)',
+              backgroundColor: `${category.color}18`, color: category.color, fontSize: 'var(--font-size-xs)', fontWeight: 900
+            }
+          },
+            /*#__PURE__*/React.createElement("span", {
+              style: {
+                width: '16px', height: '16px', borderRadius: '50%', flexShrink: 0,
+                backgroundColor: visitStatus === 'planned' ? '#FFFFFF' : category.color,
+                border: visitStatus === 'planned' ? `1px solid ${category.color}` : 'none',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box'
+              }
+            }, PlaceCategoryMarkerIcon ? /*#__PURE__*/React.createElement(PlaceCategoryMarkerIcon, {
+              category, size: 10, strokeColor: visitStatus === 'planned' ? category.color : '#fff'
+            }) : null),
+            category.name
+          ),
+          /*#__PURE__*/React.createElement("span", {
+            style: {
+              fontSize: 'var(--font-size-2xs)', fontWeight: 700, padding: '2px 7px', borderRadius: 'var(--radius-full)',
+              backgroundColor: visitStatus === 'planned' ? 'rgba(59, 130, 246, 0.12)' : 'rgba(16, 185, 129, 0.12)',
+              color: visitStatus === 'planned' ? '#2563EB' : 'var(--status-green)'
+            }
+          }, visitStatus === 'planned' ? '방문예정' : '방문')
+        ),
+        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 } },
+          /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: 'var(--font-size-base)', color: 'var(--text-main)' } }, place.alias || place.name || '이름 없음'),
+          place.address && /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } }, getDisplayPlaceAddress(place))
+        ),
+        latestEntry
+          ? /*#__PURE__*/React.createElement("div", {
+              style: { display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'var(--bg-primary)', borderRadius: 'var(--radius-md)', padding: '6px 10px', marginTop: '2px' }
+            },
+              /*#__PURE__*/React.createElement("span", { style: { flexShrink: 0, fontWeight: 700, fontSize: 'var(--font-size-sm)' } }, formatPlaceBadgeDate(latestEntry.date) || latestEntry.date),
+              /*#__PURE__*/React.createElement("span", { style: { flex: 1, minWidth: 0, fontSize: 'var(--font-size-sm)', color: 'var(--text-main)', wordBreak: 'break-word' } }, latestEntry.note)
+            )
+          : memoWithoutDate && /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-main)', marginTop: '2px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' } }, renderTextWithUrlBadge(memoWithoutDate))
+      );
+    }))
   );
 }
 
