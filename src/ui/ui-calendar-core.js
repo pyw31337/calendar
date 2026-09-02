@@ -744,18 +744,15 @@ function getAnniversaryDisplayColor(...args) {
 // start and its end at a glance instead of only the start.
 function ANNIVERSARY_BADGE_TEXT_STYLE(displayColor) {
   return {
-    flex: 1,
+    flex: '0 1 auto',
     minWidth: 0,
     fontSize: 'var(--font-size-2xs)',
     fontWeight: 800,
     color: displayColor,
     lineHeight: 1.3,
-    display: '-webkit-box',
-    WebkitLineClamp: 2,
-    WebkitBoxOrient: 'vertical',
+    whiteSpace: 'nowrap',
     overflow: 'hidden',
-    textAlign: 'left',
-    textAlignLast: 'right'
+    textOverflow: 'ellipsis'
   };
 }
 
@@ -993,6 +990,15 @@ export function CalendarGrid({
       });
       byId.forEach(bar => bars.push(bar));
     }
+    // A festival spanning multiple week rows produces one bar segment per row above -- number
+    // them in row order (0, 1, 2...) per festival id so alternating weeks can alternate their
+    // icon+text alignment (1st week left, 2nd week right, 3rd week left, ...).
+    const spanIndexById = new Map();
+    bars.forEach(bar => {
+      const nextIndex = spanIndexById.has(bar.id) ? spanIndexById.get(bar.id) + 1 : 0;
+      spanIndexById.set(bar.id, nextIndex);
+      bar.spanIndex = nextIndex;
+    });
     return bars;
   }, [days.map(d => d.dateStr).join('|'), anniversaries]);
   // Dates covered by a festival bar reserve extra bottom space in their own day-cell (see the
@@ -1423,10 +1429,14 @@ export function CalendarGrid({
             padding: '3px 8px',
             borderRadius: 'var(--radius-sm)',
             display: 'flex',
-            alignItems: 'flex-start',
+            alignItems: 'center',
+            // Single-day anniversary badges always stay left-aligned (only a multi-week
+            // festival bar alternates left/right by week -- see festivalBars below).
+            justifyContent: 'flex-start',
             gap: '4px',
             width: '100%',
-            boxSizing: 'border-box'
+            boxSizing: 'border-box',
+            color: displayColor
           }
         }, renderAnniversaryIcon(ann, 12), /*#__PURE__*/React.createElement("span", {
           style: ANNIVERSARY_BADGE_TEXT_STYLE(displayColor)
@@ -1503,9 +1513,14 @@ export function CalendarGrid({
         borderRadius: 'var(--radius-sm)',
         padding: '3px 8px',
         display: 'flex',
-        alignItems: 'flex-start',
+        alignItems: 'center',
+        // Icon+text renders as one content-sized chunk (not stretched to fill the bar) so this
+        // justifyContent can actually move it -- alternates left/right by which week of the
+        // festival's span this bar segment is (see spanIndex in festivalBars above).
+        justifyContent: bar.spanIndex % 2 === 0 ? 'flex-start' : 'flex-end',
         gap: '4px',
-        boxSizing: 'border-box'
+        boxSizing: 'border-box',
+        color: displayColor
       }
     }, renderAnniversaryIcon(bar, 12), /*#__PURE__*/React.createElement("span", {
       style: ANNIVERSARY_BADGE_TEXT_STYLE(displayColor)
@@ -1630,7 +1645,6 @@ export function CommentsSection({
   React.useEffect(() => {
     setLastReadTimestamp(getChatLastReadTimestamp(calendar.id));
   }, [calendar.id]);
-  const hasUnreadChat = latestChatTimestamp > lastReadTimestamp;
   const toggleCommentsSection = () => {
     setIsCollapsed(prev => {
       const next = !prev;
@@ -1684,10 +1698,7 @@ export function CommentsSection({
   }, /*#__PURE__*/React.createElement("div", {
     className: "summary-title",
     style: { color: '#2563EB', marginBottom: 0, display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }
-  }, /*#__PURE__*/React.createElement(ChatSectionIcon, null), "채팅", totalChatCount > 0 && /*#__PURE__*/React.createElement("span", {
-    title: hasUnreadChat ? '읽지 않은 채팅이 있습니다' : '모두 읽었습니다',
-    className: `main-menu-badge${hasUnreadChat ? ' is-unread' : ''}`
-  }, totalChatCount)),
+  }, /*#__PURE__*/React.createElement(ChatSectionIcon, null), "채팅"),
   /*#__PURE__*/React.createElement("div", {
     style: { marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }
   },
@@ -1821,7 +1832,7 @@ export function CommentsSection({
   }) : null));
 }
 
-export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onSelectTag, onCommentsChange, getBorderColor, onRequestConfirm, showToast, effectivePinned }) {
+export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onSelectTag, onCommentsChange, getBorderColor, onRequestConfirm, showToast, effectivePinned, hidePinButton = false }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -2015,27 +2026,27 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     },
     className: "memo-card-hover"
   },
-    /* Share button -- sits immediately left of the pin toggle, same absolute-positioned/
-       unstyled-button pattern, same 16px icon size, stroke weight and color as the pin's
-       neutral ("off") state -- including its 0.2 opacity, which is what actually reads as
-       "weight" at a glance (the stroke-width/color values were already identical; the visual
-       mismatch was the pin's off-state being much fainter than a full-opacity share icon). */
+    /* Share button -- sits immediately left of the pin toggle (when the pin is shown), same
+       absolute-positioned/unstyled-button pattern, same 16px icon size, stroke weight and color
+       as the pin's neutral ("off") state -- including its 0.2 opacity, which is what actually
+       reads as "weight" at a glance (the stroke-width/color values were already identical; the
+       visual mismatch was the pin's off-state being much fainter than a full-opacity share
+       icon). Main-screen preview cards hide the pin (hidePinButton) so the share button takes
+       its slot instead. */
     /*#__PURE__*/React.createElement("button", {
       onClick: (e) => {
         e.stopPropagation();
         if (onShare) onShare(memo);
       },
       title: "메모 공유",
-      style: {
-        position: 'absolute', top: '10px', right: '34px',
-        background: 'none', border: 'none', cursor: 'pointer',
-        color: 'var(--text-muted)', opacity: 0.2,
-        display: 'flex', alignItems: 'center'
-      },
+      style: hidePinButton
+        ? { position: 'absolute', top: '12px', right: '18px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', opacity: 0.2, display: 'flex', alignItems: 'center' }
+        : { position: 'absolute', top: '10px', right: '34px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', opacity: 0.2, display: 'flex', alignItems: 'center' },
       className: "memo-card-share-btn"
     }, /*#__PURE__*/React.createElement(ShareIcon, { size: 16 })),
-    /* Pin action toggle button (stops click propagation so it doesn't open edit modal!) */
-    /*#__PURE__*/React.createElement("button", {
+    /* Pin action toggle button (stops click propagation so it doesn't open edit modal!) --
+       hidden entirely on the main-screen preview (hidePinButton), which has no "고정" concept. */
+    !hidePinButton && /*#__PURE__*/React.createElement("button", {
       onClick: (e) => {
         e.stopPropagation();
         onTogglePin();
@@ -2060,9 +2071,9 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M15 4.5l-4 4l-4 1.5l-1.5 1.5l7 7l1.5 -1.5l1.5 -4l4 -4" }), /*#__PURE__*/React.createElement("path", { d: "M9 15l-4.5 4.5" }), /*#__PURE__*/React.createElement("path", { d: "M14.5 4l5.5 5.5" }))
     ),
 
-    /* Title if exists -- paddingRight now clears both the share and pin icons (44px) */
+    /* Title if exists -- paddingRight clears the share icon (and pin icon, when shown) */
     memo.title && /*#__PURE__*/React.createElement("div", {
-      style: { fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-main)', marginBottom: '8px', paddingRight: '44px', wordBreak: 'break-all' }
+      style: { fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-main)', marginBottom: '8px', paddingRight: hidePinButton ? '30px' : '44px', wordBreak: 'break-all' }
     }, memo.title),
 
     /* Images */
@@ -2122,7 +2133,8 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         url: memoFirstUrl,
         fallbackTitle: memo.title || (memo.text ? removeFirstUrl(memo.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : ''),
         cachedData: memo.linkPreview,
-        stretch: true
+        stretch: true,
+        noBorder: true
       }),
 
       /* Video Toggle button if this URL is a video */

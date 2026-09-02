@@ -157,6 +157,10 @@ function derivePlaceVisitStatus(...args) {
   const f = __gatherUiDeps().derivePlaceVisitStatus || GATHER_APP_UTILS.derivePlaceVisitStatus;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function countPlaceVisits(...args) {
+  const f = __gatherUiDeps().countPlaceVisits || GATHER_APP_UTILS.countPlaceVisits;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
 function getExpenseCategories(...args) {
   const f = __gatherUiDeps().getExpenseCategories || GATHER_APP_UTILS.getExpenseCategories;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -1287,20 +1291,29 @@ export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = f
   );
 }
 
+// Opens Kakao Map centered on a specific point with a labeled marker -- a plain link URL, no API
+// key needed. See the identical helper in ui-summary-gallery.js for why this is a local copy
+// instead of a cross-file bridge dependency.
+function getKakaoMapLinkUrl(place) {
+  if (!place || !Number.isFinite(place.lat) || !Number.isFinite(place.lng)) return null;
+  const label = encodeURIComponent(place.alias || place.name || '장소');
+  return `https://map.kakao.com/link/map/${label},${place.lat},${place.lng}`;
+}
+
 function handleSectionHeaderKeyDown(event, onToggle) {
   if (event.key !== 'Enter' && event.key !== ' ') return;
   event.preventDefault();
   onToggle();
 }
 
-export function PlacesSection({ calendar, onViewAll }) {
+export function PlacesSection({ calendar, onViewAll, onSelectPlace }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const PlaceSectionIcon = __comp.PlaceSectionIcon || __deps.PlaceSectionIcon;
   const PlaceCategoryMarkerIcon = __comp.PlaceCategoryMarkerIcon || __deps.PlaceCategoryMarkerIcon;
-  const SectionCountBadge = __comp.SectionCountBadge || __deps.SectionCountBadge;
   const SectionToggleButton = __comp.SectionToggleButton || __deps.SectionToggleButton;
+  const ExternalLinkIcon = __comp.ExternalLinkIcon || __deps.ExternalLinkIcon;
   const getCalendarPlaces = __deps.getCalendarPlaces;
 
   // Unlike the other main-screen preview sections, collapsed here still shows 2 cards (not 0) --
@@ -1335,8 +1348,7 @@ export function PlacesSection({ calendar, onViewAll }) {
         style: { display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0, color: '#2563EB' }
       },
         /*#__PURE__*/React.createElement(PlaceSectionIcon, null),
-        /*#__PURE__*/React.createElement("span", null, "장소"),
-        /*#__PURE__*/React.createElement(SectionCountBadge, { count: places.length })
+        /*#__PURE__*/React.createElement("span", null, "장소")
       ),
       /*#__PURE__*/React.createElement("div", {
         style: { marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }
@@ -1362,16 +1374,23 @@ export function PlacesSection({ calendar, onViewAll }) {
       const latestEntry = dated[0] || null;
       const memoWithoutDate = memoEntries.filter(e => !e.date).map(e => e.note).join('\n');
       const visitStatus = derivePlaceVisitStatus ? derivePlaceVisitStatus(place) : place.visitStatus;
+      const visitLabel = visitStatus === 'planned' ? '방문예정' : '방문';
+      const visitCount = countPlaceVisits ? countPlaceVisits(place, dated, category) : dated.length;
+      const kakaoMapUrl = getKakaoMapLinkUrl(place);
+      const openPlace = () => {
+        if (typeof onSelectPlace === 'function') onSelectPlace(place);
+        else if (typeof onViewAll === 'function') onViewAll();
+      };
       return /*#__PURE__*/React.createElement("div", {
         key: place.id,
         "data-place-preview-id": place.id,
         role: "button",
         tabIndex: 0,
-        onClick: () => { if (typeof onViewAll === 'function') onViewAll(); },
+        onClick: openPlace,
         onKeyDown: e => {
           if (e.key !== 'Enter' && e.key !== ' ') return;
           e.preventDefault();
-          if (typeof onViewAll === 'function') onViewAll();
+          openPlace();
         },
         style: {
           display: 'flex', flexDirection: 'column', gap: '4px', padding: '10px 12px',
@@ -1404,7 +1423,15 @@ export function PlacesSection({ calendar, onViewAll }) {
               backgroundColor: visitStatus === 'planned' ? 'rgba(249, 115, 22, 0.12)' : 'rgba(16, 185, 129, 0.12)',
               color: visitStatus === 'planned' ? '#EA580C' : 'var(--status-green)'
             }
-          }, visitStatus === 'planned' ? '방문예정' : '방문')
+          }, visitLabel),
+          visitCount > 0 && /*#__PURE__*/React.createElement("span", {
+            style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', fontWeight: 700 }
+          }, `총 ${visitCount}회 ${visitLabel}`),
+          kakaoMapUrl && /*#__PURE__*/React.createElement("a", {
+            href: kakaoMapUrl, target: "_blank", rel: "noreferrer", title: "카카오맵에서 업체정보 보기",
+            onClick: e => e.stopPropagation(),
+            style: { marginLeft: 'auto', flexShrink: 0, display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }
+          }, ExternalLinkIcon && /*#__PURE__*/React.createElement(ExternalLinkIcon, { size: 15 }))
         ),
         /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 } },
           /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: 'var(--font-size-base)', color: 'var(--text-main)' } }, place.alias || place.name || '이름 없음'),

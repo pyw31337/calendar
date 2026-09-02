@@ -1090,7 +1090,7 @@ export function GamifiedConfirmButtonContent({ label }) {
   );
 }
 
-export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = false, stretchWidth = null }) {
+export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = false, stretchWidth = null, noBorder = false }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -1144,7 +1144,7 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = fals
       boxSizing: 'border-box',
       gap: '10px',
       marginTop: stretch ? '0px' : '6px',
-      border: '1px solid var(--border-subtle)',
+      border: noBorder ? 'none' : '1px solid var(--border-subtle)',
       borderRadius: 'var(--radius-md)',
       // Was 'visible' -- with a nowrap+ellipsis title inside a flex child, 'visible' let the
       // untruncated text render past this box's own edge (and the bubble's) instead of actually
