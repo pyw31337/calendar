@@ -758,7 +758,6 @@ export function CalendarGrid({
   const CoinIcon = __comp.CoinIcon || __deps.CoinIcon;
   const CakeIcon = __comp.CakeIcon || __deps.CakeIcon;
   const ParticipantBadge = __comp.ParticipantBadge || __deps.ParticipantBadge;
-  const AttendeeDotGroup = __comp.AttendeeDotGroup || __deps.AttendeeDotGroup;
   const getActiveParticipants = __deps.getActiveParticipants;
 
   const year = monthDate.getFullYear();
@@ -948,6 +947,7 @@ export function CalendarGrid({
     acc[p.id] = p;
     return acc;
   }, {}), [calendar.participants]);
+  const totalPartCount = Object.keys(participantsMap).length;
   const holidayMap = React.useMemo(() => {
     const map = {};
     [year - 1, year, year + 1].forEach(y => {
@@ -1007,7 +1007,30 @@ export function CalendarGrid({
     className: "month-display-year-full"
   }, `${year}\uB144 `), /*#__PURE__*/React.createElement("span", {
     className: "month-display-year-short"
-  }, `${String(year).slice(2)}\uB144 `), `${month + 1}\uC6D4`)), /*#__PURE__*/React.createElement("div", {
+  }, `${String(year).slice(2)}\uB144 `), `${month + 1}\uC6D4`), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: 'var(--text-light)',
+      display: 'inline-flex',
+      alignItems: 'center'
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "24",
+    height: "24",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "2",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+    className: "icon icon-tabler icons-tabler-outline icon-tabler-chevron-down"
+  }, /*#__PURE__*/React.createElement("path", {
+    stroke: "none",
+    d: "M0 0h24v24H0z",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M6 9l6 6l6 -6"
+  })))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       gap: '6px'
@@ -1039,12 +1062,12 @@ export function CalendarGrid({
     d: "M6 9l6 6l6 -6"
   }))), /*#__PURE__*/React.createElement("button", {
     type: "button",
-    className: "btn btn-secondary calendar-month-nav-btn calendar-today-btn",
+    className: "btn btn-secondary calendar-month-nav-btn",
     title: "\uC624\uB298",
     "aria-label": "\uC624\uB298",
-    style: { padding: '8px 12px', display: 'inline-flex', alignItems: 'center', gap: '4px' },
+    style: { padding: '8px' },
     onClick: onToday
-  }, /*#__PURE__*/React.createElement(CalendarCheckIcon, null), /*#__PURE__*/React.createElement("span", null, "\uC624\uB298")), /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement(CalendarCheckIcon, null)), /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "btn btn-secondary calendar-month-nav-btn",
     title: "\uB2E4\uC74C\uB2EC",
@@ -1155,6 +1178,8 @@ export function CalendarGrid({
     const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
     const isToday = isCurrentMonth && dateStr === todayStr;
     const entries = (availMap[dateStr] || []).filter(e => participantsMap[e.participantId]);
+    const uniqueActiveParts = new Set(entries.map(e => e.participantId));
+    const isAllAvailable = totalPartCount > 0 && uniqueActiveParts.size === totalPartCount;
     const holidayNames = holidayMap[dateStr];
     const isHoliday = !!holidayNames && holidayNames.length > 0;
     const lunarLabel = lunarLabelMap[dateStr];
@@ -1163,21 +1188,21 @@ export function CalendarGrid({
       const entry = getConfirmedMeetings(calendar).find(m => m.date === dateStr);
       return entry && Array.isArray(entry.expenses) && entry.expenses.length > 0;
     })();
-    const solarTermName = !isHoliday ? solarTermMap[dateStr] : null;
+    const solarTermName = !isHoliday && !isAllAvailable ? solarTermMap[dateStr] : null;
     const cellAnns = getAnniversariesForDate(dateStr, anniversaries);
     // Only one badge shows next to the date number: holiday name takes priority (it's
     // tied to the red date styling), then '확정' if this date has been promoted to a
-    // confirmed meeting, then the solar term. "Everyone available" no longer gets its own
-    // separate corner label/cell tint -- only confirmed dates get the sky-blue treatment now.
-    const cornerText = isHoliday ? holidayNames.join('·') : isConfirmed ? '확정' : solarTermName;
-    const cornerColor = isHoliday ? '#EF4444' : isConfirmed ? '#1D4ED8' : '#94A3B8';
+    // confirmed meeting, then '전원' if everyone's available that day (replacing a solar
+    // term that would otherwise be shown), then the solar term.
+    const cornerText = isHoliday ? holidayNames.join('·') : isConfirmed ? '확정' : isAllAvailable ? '전원' : solarTermName;
+    const cornerColor = isHoliday ? '#EF4444' : isConfirmed ? '#7C3AED' : isAllAvailable ? 'var(--status-green)' : '#94A3B8';
     const cornerTitle = isHoliday ? (lunarLabel ? `${holidayNames.join(', ')} (${lunarLabel})` : holidayNames.join(', ')) : undefined;
     const columnDow = idx % 7; // 0=Sun .. 6=Sat, since each week row starts on Sunday
     const isSunday = columnDow === 0;
     const isTouchDropTarget = isTouchDragging && touchDropTargetDate === dateStr;
     return /*#__PURE__*/React.createElement("div", {
       key: idx,
-      className: `day-cell ${isCurrentMonth ? '' : 'other-month'} ${isConfirmed ? 'confirmed-meeting' : ''}`,
+      className: `day-cell ${isCurrentMonth ? '' : 'other-month'} ${isConfirmed ? 'confirmed-meeting' : isAllAvailable ? 'all-available' : ''}`,
       "data-date-str": dateStr,
       style: isTouchDropTarget
         ? { "--cell-index": idx, outline: '2px solid var(--accent-primary)', outlineOffset: '-2px' }
@@ -1224,11 +1249,11 @@ export function CalendarGrid({
           /*#__PURE__*/React.createElement("span", {
             className: isToday ? "day-number day-number-today" : "day-number",
             style: isToday ? {
-              border: '2px solid #3B82F6',
-              color: '#3B82F6',
+              backgroundColor: '#3B82F6',
+              color: '#FFFFFF',
               borderRadius: '50%',
               fontWeight: '800',
-              boxSizing: 'border-box',
+              boxShadow: '0 2px 4px rgba(59, 130, 246, 0.4)',
               flexShrink: 0
             } : isHoliday || isSunday ? {
               color: '#EF4444',
@@ -1240,11 +1265,11 @@ export function CalendarGrid({
         ),
         /* Right: Holiday / status label */
         cornerText && /*#__PURE__*/React.createElement("span", {
-          className: `day-corner-label${isHoliday ? ' is-holiday' : ''}${isConfirmed ? ' is-confirmed' : ''}`,
+          className: `day-corner-label${isHoliday ? ' is-holiday' : ''}${isAllAvailable ? ' is-all-available' : ''}`,
           title: cornerTitle,
           style: {
             fontSize: 'var(--font-size-2xs)',
-            fontWeight: isHoliday || isConfirmed ? 800 : 600,
+            fontWeight: isHoliday || isAllAvailable ? 800 : 600,
             color: cornerColor,
             lineHeight: 1.2,
             minWidth: 0,
@@ -1256,42 +1281,43 @@ export function CalendarGrid({
         }, cornerText)
       ),
 
-      /* Middle: Schedule badges container -- personal-color Circles that expand into a
-         name Capsule on hover/touch/click (see AttendeeDotGroup, the shared badge module). */
+      /* Middle: Schedule badges container */
       /*#__PURE__*/React.createElement("div", {
         className: "badges-container"
-      }, /*#__PURE__*/React.createElement(AttendeeDotGroup, {
-        maxPerRow: 4,
-        onActivate: p => {
-          if (typeof onParticipantClick === 'function') {
-            onParticipantClick(p.name, dateStr);
-          } else if (typeof onSelectDate === 'function') {
-            onSelectDate(dateStr);
-          }
-        },
-        items: entries.map(e => {
-          const p = participantsMap[e.participantId];
-          if (!p) return null;
-          return {
-            id: e.id,
-            participant: p,
-            draggable: true,
-            onDragStart: event => {
-              event.stopPropagation();
-              event.dataTransfer.setData('text/plain', JSON.stringify({
-                entryReferId: e.id,
-                sourceDate: dateStr,
-                participantId: e.participantId,
-                participantName: p.name
-              }));
-            },
-            onTouchStart: event => { event.stopPropagation(); handleBadgeTouchStart(event, e, p, dateStr); },
-            onTouchMove: event => { event.stopPropagation(); handleBadgeTouchMove(event); },
-            onTouchEnd: event => { event.stopPropagation(); handleBadgeTouchEnd(event); },
-            onTouchCancel: event => { event.stopPropagation(); handleBadgeTouchCancel(); },
-            onClickGuard: () => !justTouchDraggedRef.current
-          };
-        }).filter(Boolean)
+      }, entries.map(e => {
+        const p = participantsMap[e.participantId];
+        if (!p) return null;
+        return /*#__PURE__*/React.createElement(ParticipantBadge, {
+          key: p.id,
+          participant: p,
+          style: { cursor: 'pointer' },
+          draggable: true,
+          onDragStart: event => {
+            event.stopPropagation();
+            event.dataTransfer.setData('text/plain', JSON.stringify({
+              entryReferId: e.id,
+              sourceDate: dateStr,
+              participantId: e.participantId,
+              participantName: p.name
+            }));
+          },
+          onTouchStart: event => { event.stopPropagation(); handleBadgeTouchStart(event, e, p, dateStr); },
+          onTouchMove: event => { event.stopPropagation(); handleBadgeTouchMove(event); },
+          onTouchEnd: event => { event.stopPropagation(); handleBadgeTouchEnd(event); },
+          onTouchCancel: event => { event.stopPropagation(); handleBadgeTouchCancel(); },
+          onClick: event => {
+            event.stopPropagation();
+            if (justTouchDraggedRef.current) return;
+            if (typeof onParticipantClick === 'function') {
+              onParticipantClick(p.name, dateStr);
+            } else if (typeof onSelectDate === 'function') {
+              onSelectDate(dateStr);
+            }
+          },
+          title: e.note ? `${p.name}: ${e.note}` : p.name
+        }, /*#__PURE__*/React.createElement("span", {
+          className: "badge-name"
+        }, p.name));
       })),
 
       /* PC Anniversary Badge (desktop-only, soft banner cards at the bottom of schedules) */
@@ -1362,20 +1388,7 @@ export function CalendarGrid({
         }, ann.icon === '🎂' && CakeIcon ? /*#__PURE__*/React.createElement(CakeIcon, { size: 11 }) : ann.icon);
       }))
     );
-  })), /*#__PURE__*/React.createElement("div", {
-    className: "calendar-legend"
-  },
-    /*#__PURE__*/React.createElement("span", { className: "legend-item" },
-      /*#__PURE__*/React.createElement("span", { className: "legend-icon legend-icon-today" }), "오늘"),
-    /*#__PURE__*/React.createElement("span", { className: "legend-item" },
-      /*#__PURE__*/React.createElement("span", { className: "legend-icon legend-icon-confirmed" }), "확정"),
-    /*#__PURE__*/React.createElement("span", { className: "legend-item" },
-      /*#__PURE__*/React.createElement("span", { className: "legend-icon legend-icon-holiday" }), "공휴일"),
-    /*#__PURE__*/React.createElement("span", { className: "legend-item" },
-      /*#__PURE__*/React.createElement("span", { className: "legend-icon-attendee-group" },
-        /*#__PURE__*/React.createElement("span", { className: "legend-icon legend-icon-attendee" }),
-        /*#__PURE__*/React.createElement("span", { className: "legend-icon legend-icon-attendee legend-icon-attendee-2" })), "참석자")
-  ));
+  })));
 
   // Floating badge that follows the finger while a touch drag is active (see
   // handleBadgeTouchStart above) -- portaled straight to <body> so it renders above everything
