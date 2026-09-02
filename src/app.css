@@ -3350,6 +3350,16 @@ select.form-select {
   background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
   color: var(--text-main); cursor: pointer; transition: all 0.2s ease; margin-bottom: 10px; text-align: left;
   gap: 10px;
+  /* Root cause of the 히스토리/모임확정 list rows rendering with their text sliced in half: this
+     card sits inside a `display:flex; flex-direction:column` scrollable list container (see the
+     History page and SummaryList), and .confirmed-meeting-card below sets `overflow: hidden` on
+     this same element -- per the flexbox spec, a flex item's *automatic* min-height resolves to 0
+     (instead of its content height) whenever the item itself has a non-visible `overflow`. With
+     enough rows to exceed the list container's height, flexbox then shrinks every row towards that
+     0 floor to force them all to fit, instead of leaving them full height and letting the
+     container's own overflow-y:auto scroll -- clipping each row's text at whatever sliver of
+     height it got shrunk to. flex-shrink:0 keeps every row at its natural content height. */
+  flex-shrink: 0;
 }
 @media (min-width: 640px) {
   .date-item-btn {
