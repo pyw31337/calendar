@@ -3073,7 +3073,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
   )));
 }
 
-export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenShare, onOpenAppSettings, onChangeView, onOpenCreateSettlement, onOpenSettlementEditor, onToggleSettlementCardStatus, onDeleteSettlementCard, onSaveSettlementCard, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null, showToast, onRequestConfirm }) {
+export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenShare, onOpenAppSettings, onChangeView, onOpenCreateSettlement, onOpenSettlementEditor, onToggleSettlementCardStatus, onDeleteSettlementCard, onSaveSettlementCard, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, historyCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null, showToast, onRequestConfirm }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -4131,6 +4131,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
       galleryCount: galleryCount,
       placeCount: placeCount,
       memoCount: memoCount,
+      historyCount: historyCount,
       chatLastAuthor: chatLastAuthor,
       settlementLastDate: settlementLastDate,
       galleryLastDate: galleryLastDate,

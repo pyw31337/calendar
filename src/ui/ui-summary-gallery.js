@@ -1247,7 +1247,11 @@ export function SummaryList({
   // appear between two sections that both render.
   const isPartialVisible = thresholdN > 0 && sortedPartialDates.length > 0;
   const isAllVisible = sortedAllDates.length > 0;
-  const isConfirmedVisible = confirmedDates.length > 0;
+  // '모임 확정' moved off the main screen entirely, onto its own 히스토리 page (see HistoryView
+  // below) -- forcing this false hides the section (and its divider, gated on the same flag)
+  // without touching the JSX below it, so there's no risk of a stray unbalanced paren from
+  // hand-editing that large nested block.
+  const isConfirmedVisible = false;
   const anyBeforeAll = isPartialVisible;
   const anyBeforeConfirmed = isPartialVisible || isAllVisible;
 
@@ -1591,6 +1595,246 @@ export function SummaryList({
     })()))));
 }
 
+// Opens Kakao Map centered on a specific point with a labeled marker -- a plain link URL, no API
+// key needed (unlike Kakao's search/local APIs). getPlaceKakaoRouteUrl exists as a cross-file
+// bridge but has no real implementation anywhere in the app, so it always resolves to undefined;
+// building the well-known link format directly here avoids depending on that dead reference.
+function getKakaoMapLinkUrl(place) {
+  if (!place || !Number.isFinite(place.lat) || !Number.isFinite(place.lng)) return null;
+  const label = encodeURIComponent(place.alias || place.name || '장소');
+  return `https://map.kakao.com/link/map/${label},${place.lat},${place.lng}`;
+}
+
+// Full-page '히스토리' view -- every confirmed meeting date (모임 확정), moved off the main
+// calendar screen onto its own page. Each card also folds in whatever place(s) were registered
+// for that date (see doesPlaceMatchDate), since a confirmed meeting's place is exactly the kind
+// of detail worth keeping alongside its history entry.
+export function HistoryView({
+  calendar, onBack, onSelectDate, onChangeView, onOpenAppSettings,
+  chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, historyCount = 0,
+  chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null,
+  showSettlement = true, onOpenCreateSettlement,
+  isDarkTheme, onToggleTheme, fontScalePercent, onDecreaseFont, onIncreaseFont,
+  isChatNotifyEnabled, onToggleChatNotifications, syncStatus = null
+}) {
+  const React = window.React;
+  const __deps = window.GATHER_UI_DEPS || {};
+  const __comp = window.GATHER_UI_COMPONENTS || {};
+  const BackArrowIcon = __comp.BackArrowIcon || __deps.BackArrowIcon;
+  const ThreeLinesIcon = __comp.ThreeLinesIcon || __deps.ThreeLinesIcon;
+  const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
+  const SearchIcon = __comp.SearchIcon || __deps.SearchIcon;
+  const FolderClockIcon = __comp.FolderClockIcon || __deps.FolderClockIcon;
+  const InlineSearchBar = __comp.InlineSearchBar || __deps.InlineSearchBar;
+  const WeatherBadge = __comp.WeatherBadge || __deps.WeatherBadge;
+  const SharedAppNavBlock = __comp.SharedAppNavBlock || __deps.SharedAppNavBlock;
+  const SharedSideMenuFooter = __comp.SharedSideMenuFooter || __deps.SharedSideMenuFooter;
+
+  const [isMenuOpen, setIsMenuOpen] = React.useState(false);
+  const [isSearchOpen, setIsSearchOpen] = React.useState(false);
+  const [searchQuery, setSearchQuery] = React.useState('');
+
+  const activeParticipants = getActiveParticipants(calendar);
+  const participantsMap = activeParticipants.reduce((acc, p) => { acc[p.id] = p; return acc; }, {});
+  const availabilities = getActiveAvailabilities(calendar);
+  const dateMap = availabilities.reduce((acc, e) => {
+    if (!acc[e.date]) acc[e.date] = [];
+    acc[e.date].push(e);
+    return acc;
+  }, {});
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+  const allConfirmedDates = [...getTrulyConfirmedMeetings(calendar).filter(m => isValidDateString(m?.date)).map(m => m.date)]
+    .sort((a, b) => b.localeCompare(a));
+
+  const q = searchQuery.trim().toLowerCase();
+  const confirmedDates = !q ? allConfirmedDates : allConfirmedDates.filter(d => {
+    const dateEntries = (dateMap[d] || []).filter(e => participantsMap[e.participantId]);
+    const namesMatch = dateEntries.some(e => (participantsMap[e.participantId]?.name || '').toLowerCase().includes(q));
+    const memoMatch = dateEntries.some(e => (e.note || '').toLowerCase().includes(q));
+    const placeMatch = getCalendarPlaces(calendar).filter(p => doesPlaceMatchDate(p, d)).some(p =>
+      (p.alias || p.name || '').toLowerCase().includes(q) || (p.address || '').toLowerCase().includes(q)
+    );
+    return d.includes(q) || namesMatch || memoMatch || placeMatch;
+  });
+
+  return /*#__PURE__*/React.createElement("div", {
+    className: "places-view-container",
+    style: {
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: 'var(--bg-primary)',
+      display: 'flex', flexDirection: 'column',
+      width: '100%', maxWidth: '100%', overflowX: 'hidden'
+    }
+  },
+    /*#__PURE__*/React.createElement("div", {
+      className: "places-view-header",
+      style: {
+        position: 'relative', height: '56px',
+        backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0 16px', zIndex: 1010, flexShrink: 0
+      }
+    },
+      /*#__PURE__*/React.createElement("button", {
+        type: "button", onClick: onBack, "aria-label": "뒤로가기",
+        style: {
+          width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'transparent', border: 'none',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)'
+        }
+      }, BackArrowIcon ? /*#__PURE__*/React.createElement(BackArrowIcon, { size: 22 }) : "←"),
+      /*#__PURE__*/React.createElement("div", {
+        style: {
+          position: 'absolute', left: '50%', transform: 'translateX(-50%)',
+          display: 'flex', alignItems: 'center', fontWeight: 800, fontSize: '0.95rem',
+          color: 'var(--text-main)', whiteSpace: 'nowrap', pointerEvents: 'none'
+        }
+      }, calendar.title, " 히스토리"),
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", onClick: () => setIsSearchOpen(v => !v), title: "모임 검색", "aria-label": "모임 검색",
+          style: { background: 'none', border: 'none', cursor: 'pointer', padding: '6px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }
+        }, SearchIcon ? /*#__PURE__*/React.createElement(SearchIcon, null) : "🔍"),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", onClick: () => setIsMenuOpen(true), title: "메뉴", "aria-label": "메뉴 열기",
+          style: { background: 'none', border: 'none', cursor: 'pointer', padding: '6px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }
+        }, ThreeLinesIcon ? /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 22 }) : "≡")
+      )
+    ),
+    isSearchOpen && InlineSearchBar && /*#__PURE__*/React.createElement(InlineSearchBar, {
+      value: searchQuery,
+      placeholder: "날짜·참여자·메모·장소 검색...",
+      onChange: e => setSearchQuery(e.target.value),
+      trailing: searchQuery ? /*#__PURE__*/React.createElement("button", {
+        type: "button", onClick: () => setSearchQuery(''),
+        style: { border: 'none', background: 'none', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)', cursor: 'pointer', fontWeight: 600, flexShrink: 0 }
+      }, "초기화") : null
+    }),
+    /*#__PURE__*/React.createElement("div", {
+      style: { flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }
+    },
+      confirmedDates.length === 0 ? /*#__PURE__*/React.createElement("div", {
+        style: { textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)' }
+      }, q ? "검색 결과가 없습니다." : "아직 확정된 모임이 없습니다.") : confirmedDates.map(d => {
+        const dateEntries = (dateMap[d] || []).filter(e => participantsMap[e.participantId] && !isTombstone(e));
+        const memoEntries = dateEntries.filter(e => e.note && e.note.trim().length > 0);
+        const isPast = d < todayStr;
+        const ddayLabel = isPast ? '지난 모임' : (() => {
+          const dday = calculateDday(d);
+          return dday <= 0 ? 'D-DAY' : `D-${dday}`;
+        })();
+        const datePlaces = getCalendarPlaces(calendar).filter(p => doesPlaceMatchDate(p, d));
+        return /*#__PURE__*/React.createElement("button", {
+          key: d,
+          className: `date-item-btn ${isPast ? 'is-past' : 'is-confirmed'} confirmed-meeting-card confirmed-meeting-surface`,
+          onClick: () => onSelectDate(d),
+          style: { flexDirection: 'column', alignItems: 'flex-start' }
+        },
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: '8px' } },
+            /*#__PURE__*/React.createElement("span", {
+              className: "confirmed-meeting-date",
+              style: { fontWeight: 800, color: isPast ? '#94A3B8' : '#FFFFFF', fontSize: '0.95rem', flexShrink: 0 }
+            }, isPast ? formatDateWithDayName(d) : formatConfirmedMeetingLabel(d)),
+            /*#__PURE__*/React.createElement("span", { className: `date-item-badge dday-badge ${isPast ? 'is-past' : 'is-confirmed'}`, style: { flexShrink: 0 } }, ddayLabel)
+          ),
+          memoEntries.length > 0 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' } },
+            memoEntries.map(e => {
+              const p = participantsMap[e.participantId];
+              if (!p) return null;
+              const memoUrl = extractFirstUrl(e.note);
+              const memoText = memoUrl ? removeFirstUrl(e.note) : e.note.trim();
+              if (!memoText) return null;
+              return /*#__PURE__*/React.createElement("span", {
+                key: e.participantId || p.id,
+                className: `memo-capsule-badge ${isPast ? 'is-past' : ''}`,
+                style: isPast
+                  ? { backgroundColor: 'transparent', background: 'transparent', color: p.color, border: `1px solid ${p.color}`, boxShadow: 'none' }
+                  : { backgroundColor: p.color, color: getContrastTextColor(p.color) },
+                title: `${p.name}: ${memoText}`
+              }, memoText);
+            })
+          ),
+          datePlaces.length > 0 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '2px', width: '100%' } },
+            datePlaces.map(place => {
+              const mapUrl = getKakaoMapLinkUrl(place);
+              const label = `📍 ${place.alias || place.name}${place.address ? ' · ' + getDisplayPlaceAddress(place) : ''}`;
+              return mapUrl
+                ? /*#__PURE__*/React.createElement("a", {
+                    key: place.id, href: mapUrl, target: "_blank", rel: "noreferrer",
+                    onClick: e => e.stopPropagation(),
+                    style: { fontSize: 'var(--font-size-sm)', color: isPast ? '#94A3B8' : 'rgba(255,255,255,0.9)', textDecoration: 'underline', wordBreak: 'break-word' }
+                  }, label)
+                : /*#__PURE__*/React.createElement("span", {
+                    key: place.id,
+                    style: { fontSize: 'var(--font-size-sm)', color: isPast ? '#94A3B8' : 'rgba(255,255,255,0.9)', wordBreak: 'break-word' }
+                  }, label);
+            })
+          )
+        );
+      })
+    ),
+
+    isMenuOpen && /*#__PURE__*/React.createElement("div", {
+      className: "admin-side-menu-overlay", style: { zIndex: 12000 }, onClick: () => setIsMenuOpen(false)
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "admin-side-menu", onClick: e => e.stopPropagation(), role: "dialog", "aria-label": "히스토리 메뉴"
+    },
+      /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-header" },
+        /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-brand" },
+          /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-copy" },
+            /*#__PURE__*/React.createElement("button", {
+              type: "button", className: "admin-side-menu-title", title: "메인 화면으로 이동", "aria-label": "메인 화면으로 이동",
+              onClick: () => { setIsMenuOpen(false); if (typeof onChangeView === 'function') onChangeView('calendar'); else if (typeof onBack === 'function') onBack(); },
+              style: { background: 'none', border: 'none', padding: 0, margin: 0, color: 'var(--text-main)', fontSize: '1.05rem', fontWeight: 800, cursor: 'pointer' }
+            }, "히스토리")
+          )
+        ),
+        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 } },
+          WeatherBadge ? /*#__PURE__*/React.createElement(WeatherBadge, { weatherLocation: calendar && calendar.weatherLocation }) : null,
+          /*#__PURE__*/React.createElement("button", {
+            type: "button", className: "admin-side-menu-close-btn", title: "메뉴 닫기", "aria-label": "메뉴 닫기",
+            onClick: () => setIsMenuOpen(false)
+          }, SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }) : "✕")
+        )
+      ),
+      /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list" },
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", className: "admin-side-menu-item",
+          onClick: () => { setIsMenuOpen(false); setIsSearchOpen(true); }
+        },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, SearchIcon ? /*#__PURE__*/React.createElement(SearchIcon, null) : "🔍"),
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "모임 검색"),
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "확정된 모임 날짜·장소 검색")
+          )
+        )
+      ),
+      typeof SharedAppNavBlock === 'function' && /*#__PURE__*/React.createElement(SharedAppNavBlock, {
+        onClose: () => setIsMenuOpen(false),
+        onChangeView: onChangeView,
+        onOpenCreateSettlement: onOpenCreateSettlement,
+        showSettlement: showSettlement,
+        chatCount: chatCount,
+        settlementBadge: settlementBadge,
+        galleryCount: galleryCount,
+        placeCount: placeCount,
+        memoCount: memoCount,
+        historyCount: historyCount,
+        chatLastAuthor: chatLastAuthor,
+        settlementLastDate: settlementLastDate,
+        galleryLastDate: galleryLastDate,
+        placeLastName: placeLastName,
+        memoLastTitleWord: memoLastTitleWord
+      }),
+      typeof SharedSideMenuFooter === 'function' && /*#__PURE__*/React.createElement(SharedSideMenuFooter, {
+        onClose: () => setIsMenuOpen(false),
+        onOpenSettings: onOpenAppSettings
+      })
+    ))
+  );
+}
+
   if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
     SectionCountBadge: SectionCountBadge,
@@ -1600,5 +1844,6 @@ export function SummaryList({
     ParticipantBackdrop: ParticipantBackdrop,
     PhotoGallery: PhotoGallery,
     SummaryList: SummaryList,
+    HistoryView: HistoryView,
   });
 }
