@@ -473,9 +473,22 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
       .trim();
   }
 
+  function reorderReverseGeocodedAddress(address) {
+    // Nominatim/Google reverse-geocode results are comma-separated from most specific to
+    // least specific (place, subdistrict, city, province, country[, postal code]) -- the
+    // opposite of Korean domestic order. Detect that shape and flip it before the road/lot
+    // trimming below, which assumes forward (province -> city -> ... -> place) order.
+    if (!address.includes(',')) return address;
+    const segments = address.split(',').map(seg => seg.trim()).filter(Boolean)
+      .filter(seg => !/^(대한민국|남한|south\s*korea|korea,?\s*republic\s+of|republic\s+of\s+korea|rok)$/i.test(seg))
+      .filter(seg => !/^\d{3,6}(-\d{4})?$/.test(seg));
+    return segments.length > 1 ? segments.reverse().join(' ') : address;
+  }
+
   function normalizeDomesticKoreanAddress(address) {
     let s = stripKoreaCountryPrefix(address);
     if (!s) return '';
+    s = reorderReverseGeocodedAddress(s);
     const regionPairs = [
       [/^서울특별시(?=\s|$)/, '서울'], [/^부산광역시(?=\s|$)/, '부산'], [/^대구광역시(?=\s|$)/, '대구'],
       [/^인천광역시(?=\s|$)/, '인천'], [/^광주광역시(?=\s|$)/, '광주'], [/^대전광역시(?=\s|$)/, '대전'],

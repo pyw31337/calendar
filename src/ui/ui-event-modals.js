@@ -1049,6 +1049,37 @@ export function AnniversaryModal({
     }
   };
 
+  // Places already registered on this calendar matching the search text, shown above the live
+  // Kakao/Google/Nominatim results -- mirrors DateModal's "이미 등록된 장소" suggestions
+  // (ui-date-modal.js), since a private/informal or previously hand-fixed place otherwise has no
+  // way to surface here even though the live geocoders find nothing for it.
+  const existingPlaceSuggestions = React.useMemo(() => {
+    const trimmed = placeQuery.trim();
+    if (selectedPlace && selectedPlace.name === trimmed) return [];
+    if (trimmed.length < 2) return [];
+    const q = trimmed.toLowerCase();
+    return getCalendarPlaces(calendar)
+      .filter(p => (p.name || '').toLowerCase().includes(q) || (p.alias || '').toLowerCase().includes(q))
+      .slice(0, 8);
+  }, [placeQuery, selectedPlace, calendar]);
+
+  const handleSelectExistingAnniversaryPlace = (place) => {
+    setSelectedPlace({
+      id: place.id,
+      provider: 'existing',
+      name: place.alias || place.name,
+      address: place.address || '',
+      lat: place.lat,
+      lng: place.lng,
+      categoryId: place.categoryId || null,
+      categoryLabel: '',
+      phone: '',
+      url: ''
+    });
+    setPlaceResults([]);
+    setPlaceQuery('');
+  };
+
   const handleAnniversaryPlaceSearch = async () => {
     const q = placeQuery.trim();
     if (!q || isPlaceSearching) return;
@@ -1240,7 +1271,7 @@ export function AnniversaryModal({
             ? /*#__PURE__*/React.createElement("a", {
                 href: mapUrl, target: "_blank", rel: "noreferrer",
                 onClick: e => e.stopPropagation(),
-                style: { color: 'var(--text-muted)', textDecoration: 'underline' }
+                style: { color: 'var(--text-muted)', textDecoration: 'none' }
               }, label)
             : /*#__PURE__*/React.createElement("span", null, label)
         );
@@ -1524,6 +1555,26 @@ export function AnniversaryModal({
                 disabled: isPlaceSearching,
                 onClick: handleAnniversaryPlaceSearch
               }, isPlaceSearching ? "검색 중..." : "검색")
+            ),
+            existingPlaceSuggestions.length > 0 && /*#__PURE__*/React.createElement("div", {
+              style: {
+                marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '160px', overflowY: 'auto',
+                border: '1px solid rgba(79, 70, 229, 0.35)', borderRadius: 'var(--radius-md)', padding: '6px', backgroundColor: 'rgba(79, 70, 229, 0.06)'
+              }
+            },
+              /*#__PURE__*/React.createElement("div", {
+                style: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--accent-primary)', padding: '2px 6px' }
+              }, "이미 등록된 장소"),
+              existingPlaceSuggestions.map(p => /*#__PURE__*/React.createElement("button", {
+                key: p.id,
+                type: "button",
+                onClick: () => handleSelectExistingAnniversaryPlace(p),
+                style: { textAlign: 'left', padding: '8px 10px', borderRadius: 'var(--radius-sm)', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '2px' },
+                className: "place-result-item"
+              },
+                /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-main)' } }, p.alias || p.name),
+                /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } }, getDisplayPlaceAddress(p) || p.name)
+              ))
             ),
             placeResults.length > 0 && /*#__PURE__*/React.createElement("div", {
               style: {
