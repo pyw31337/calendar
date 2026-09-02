@@ -2214,8 +2214,20 @@ function CalendarApp() {
       ? chatLiveLimit
       : activeView === 'gallery' ? Math.min(12, CHAT_LIVE_MESSAGE_LIMIT) : CHAT_INITIAL_MESSAGE_LIMIT;
     if (!firebaseDb) {
-      fetchRecentChatMessages(activeCalId, chatLimit).then(list => setChatMessages(list));
-      return;
+      // No live SDK channel at all (not just a stalled stream -- see the watchdog below for
+      // that case) -- without this poll, a device stuck on this path never saw the other
+      // participant's messages until a manual reload, since fetchRecentChatMessages only ran
+      // once per mount/dependency change.
+      let cancelled = false;
+      const poll = () => {
+        if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+        fetchRecentChatMessages(activeCalId, chatLimit).then(list => {
+          if (!cancelled) setChatMessages(list);
+        });
+      };
+      poll();
+      const pollTimer = setInterval(poll, 6000);
+      return () => { cancelled = true; clearInterval(pollTimer); };
     }
     let isMounted = true;
     // Reset the watchdog clock on every (re)subscribe so it waits a full grace period for this
@@ -2276,8 +2288,11 @@ function CalendarApp() {
   React.useEffect(() => {
     if (!activeCalId || !firebaseDb) return undefined;
     const chatLimit = activeView === 'chat' ? chatLiveLimit : CHAT_INITIAL_MESSAGE_LIMIT;
-    const STALE_AFTER_MS = 9000;
-    const CHECK_INTERVAL_MS = 5000;
+    // Tightened from 9000/5000: on a connection where the realtime stream never recovers (see
+    // the long-polling notes above attemptFirebaseInit), this fallback is the only thing that
+    // ever shows the other participant's message, and 9-14s felt like "it's broken" in a chat UI.
+    const STALE_AFTER_MS = 4000;
+    const CHECK_INTERVAL_MS = 2000;
     let isMounted = true;
     let reconciling = false;
     const reconcile = async () => {

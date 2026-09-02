@@ -1,9 +1,14 @@
 name: Browser Matrix Smoke
 
+# Loads real production calendar data (kkot/cw/jhair) through a real JS engine in each of 3
+# browsers. Weekly (was daily) -- this app has only a couple of active users and near-zero write
+# volume, so a full 3-browser pass every single day was pure Firestore-read overhead with no
+# corresponding increase in bugs caught. workflow_dispatch still allows an on-demand run any time
+# (e.g. right after a risky UI change) without waiting for the weekly schedule.
 on:
   workflow_dispatch:
   schedule:
-    - cron: '30 1 * * *'
+    - cron: '30 1 * * 1'
 
 permissions:
   contents: read

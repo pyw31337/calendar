@@ -1164,8 +1164,13 @@ export function AdminDashboard({ initialCalendars }) {
     if (activeTab !== 'logs' || !selectedCalId) return;
 
     if (__fb()) {
+      // adminMessageLimit starts at ADMIN_MESSAGE_LIVE_LIMIT and only grows via the "더 보기"
+      // button below -- without this .limit(), the query above was already fetching (and then
+      // live-syncing forever) every message in the calendar's whole history the moment the 채팅
+      // tab opened, regardless of what the load-more UI showed.
       const unsub = __fb().collection('calendars').doc(`cal_${selectedCalId}`).collection('messages')
         .orderBy('timestamp', 'desc')
+        .limit(adminMessageLimit)
         .onSnapshot(snapshot => {
           const list = [];
           snapshot.forEach(doc => {
@@ -1190,14 +1195,15 @@ export function AdminDashboard({ initialCalendars }) {
         console.error(`Failed REST message fetch for ${selectedCalId}:`, e);
       }
     })();
-  }, [selectedCalId, __fb(), activeTab]);
+  }, [selectedCalId, __fb(), activeTab, adminMessageLimit]);
 
-  // 2b. Load memos (same live-listener pattern as messages above, same 2000 cap) -- powers the
-  // 통합검색 메모 탭
+  // 2b. Load memos (same live-listener pattern as messages above, same cap -- see adminMemoLimit)
+  // -- powers the 통합검색 메모 탭
   React.useEffect(() => {
     if (activeTab !== 'logs' || !selectedCalId || !__fb()) return;
     const unsub = __fb().collection('calendars').doc(`cal_${selectedCalId}`).collection('memos')
       .orderBy('createdAt', 'desc')
+      .limit(adminMemoLimit)
       .onSnapshot(snapshot => {
         const list = [];
         snapshot.forEach(doc => {
@@ -1209,7 +1215,7 @@ export function AdminDashboard({ initialCalendars }) {
         console.error(`Failed to load memos for ${selectedCalId}:`, err);
       });
     return () => unsub();
-  }, [selectedCalId, __fb(), activeTab]);
+  }, [selectedCalId, __fb(), activeTab, adminMemoLimit]);
 
   // Link-preview cache stats only on metrics tab (egress rule)
   React.useEffect(() => {

@@ -25,6 +25,16 @@ jobs:
         run: npm run smoke:live
       - name: Firestore operations audit
         run: npm run ops:audit
+      # Full pagination scan of every message/memo/meeting doc across all 3 calendars -- real
+      # Firestore read cost, unlike the two cheap steps above. Only a handful of people ever use
+      # this app, so broken media links are not going to pile up hour-to-hour; weekly (Mondays,
+      # or any manual workflow_dispatch run) is enough to catch a regression without paying for
+      # a full-history scan every single day.
       - name: Media integrity audit
-        run: npm run ops:media-audit
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "$(date -u +%u)" = "1" ]; then
+            npm run ops:media-audit
+          else
+            echo "Skipping media audit -- runs weekly on Mondays (UTC), today is not Monday."
+          fi
         continue-on-error: true
