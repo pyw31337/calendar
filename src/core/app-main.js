@@ -2382,9 +2382,9 @@ function CalendarApp() {
     setAnniversaries(prev => (Array.isArray(prev) ? prev.filter(a => a.id !== annId) : []));
   };
 
-  // Places + confirmed meetings: calendar / places / settlement only
+  // Places + confirmed meetings: calendar / places / settlement / history only
   React.useEffect(() => {
-    const needsPlacesData = activeView === 'calendar' || activeView === 'places' || activeView === 'settlement';
+    const needsPlacesData = activeView === 'calendar' || activeView === 'places' || activeView === 'settlement' || activeView === 'history';
     if (!activeCalId || !needsPlacesData) return;
     let isMounted = true;
 
