@@ -858,6 +858,7 @@ export function DateModal({
   const ConfettiIcon = __comp.ConfettiIcon || __deps.ConfettiIcon;
   const TicketsPlaneIcon = __comp.TicketsPlaneIcon || __deps.TicketsPlaneIcon;
   const MessageCircleMoreIcon = __comp.MessageCircleMoreIcon || __deps.MessageCircleMoreIcon;
+  const MapPinIcon = __comp.MapPinIcon || __deps.MapPinIcon;
   // Legacy D-Day badges (ann.type === 'dday') keep their plain emoji exactly as before; only the
   // newer category-tagged types (yearly/once/range) swap their category emoji for its icon component.
   const renderAnniversaryIcon = (ann, size) => {
@@ -865,6 +866,25 @@ export function DateModal({
     const iconMap = { '🎂': CakeIcon, '🎈': BalloonIcon, '🎉': ConfettiIcon, '✈️': TicketsPlaneIcon, '💬': MessageCircleMoreIcon };
     const Icon = iconMap[ann.icon];
     return Icon ? /*#__PURE__*/React.createElement(Icon, { size }) : ann.icon;
+  };
+  // Same date-display convention as the anniversary settings modal's list tab (ui-event-modals.js)
+  const getAnnBannerDateDisplay = (ann) => {
+    if (ann.type === 'yearly' || ann.type === 'once') {
+      const parts = (ann.date || '').split('-');
+      const label = ann.type === 'yearly'
+        ? `${Number(parts[0]) || 1}월 ${Number(parts[1]) || 1}일`
+        : (parts.length === 3 ? `${parts[0]}년 ${Number(parts[1])}월 ${Number(parts[2])}일` : ann.date || '');
+      return ann.isLunar ? `음력 ${label}${ann.isLeap ? ' (윤달)' : ''}` : label;
+    }
+    if (ann.type === 'range') return `${formatDateWithDayName(ann.startDate)} ~ ${formatDateWithDayName(ann.endDate)}`;
+    return ann.targetDate ? `기준일: ${ann.targetDate}` : '';
+  };
+  // Same as ui-event-modals.js's getKakaoMapLinkUrl -- see that file's comment for why this
+  // isn't going through the (dead) getPlaceKakaoRouteUrl bridge.
+  const getAnnBannerKakaoMapLinkUrl = (place) => {
+    if (!place || !Number.isFinite(place.lat) || !Number.isFinite(place.lng)) return null;
+    const label = encodeURIComponent(place.alias || place.name || '장소');
+    return `https://map.kakao.com/link/map/${label},${place.lat},${place.lng}`;
   };
   const LinkPreviewCard = __comp.LinkPreviewCard || __deps.LinkPreviewCard;
   const SectionCountBadge = __comp.SectionCountBadge || __deps.SectionCountBadge;
@@ -1024,6 +1044,13 @@ export function DateModal({
       return ao !== bo ? ao - bo : (a.createdAt || 0) - (b.createdAt || 0);
     });
   }, [calendar, dateStr]);
+  // Which anniversary banners (keyed by ann.id) are expanded to show 기간/장소/설명/사진 detail.
+  const [expandedAnnBannerIds, setExpandedAnnBannerIds] = React.useState(() => new Set());
+  const toggleAnnBannerExpanded = (id) => setExpandedAnnBannerIds(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
   const [draggingPlaceId, setDraggingPlaceId] = React.useState('');
   const [dragOverPlaceId, setDragOverPlaceId] = React.useState('');
   const movePlace = async (sourceId, targetId) => {
@@ -2455,12 +2482,15 @@ export function DateModal({
         style: { display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '14px' }
       }, dateAnns.map((ann, aIdx) => {
         const displayColor = getAnniversaryDisplayColor(ann, calendar);
+        const bannerKey = ann.id || aIdx;
+        const isExpanded = expandedAnnBannerIds.has(bannerKey);
+        const hasDetail = !!(ann.place || ann.description || getAnnBannerDateDisplay(ann));
+        const photos = Array.isArray(ann.photos) ? ann.photos : [];
+        const thumbSize = isExpanded ? 64 : 22;
         return /*#__PURE__*/React.createElement("div", {
-          key: ann.id || aIdx,
+          key: bannerKey,
           style: {
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
+            display: 'flex', flexDirection: 'column', gap: '8px',
             padding: '10px 14px',
             backgroundColor: `${displayColor}12`,
             color: displayColor,
@@ -2470,7 +2500,65 @@ export function DateModal({
             fontSize: 'var(--font-size-md)',
             fontWeight: 'bold'
           }
-        }, renderAnniversaryIcon(ann, 14), " ", ann.title);
+        },
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+            renderAnniversaryIcon(ann, 14), " ",
+            /*#__PURE__*/React.createElement("span", { style: { flex: 1, minWidth: 0 } }, ann.title),
+            photos.length > 0 && MediaThumb && /*#__PURE__*/React.createElement(MediaThumb, {
+              src: photos[0].thumbUrl || photos[0].url,
+              fallbackSrc: photos[0].url || photos[0].thumbUrl,
+              alt: "기념일 사진",
+              onClick: e => {
+                e.stopPropagation();
+                if (typeof setActiveLightbox === 'function') {
+                  setActiveLightbox({
+                    urls: photos.map(p => p.url || p.thumbUrl),
+                    index: 0,
+                    meta: photos.map(() => ({}))
+                  });
+                }
+              },
+              style: {
+                width: `${thumbSize}px`, height: `${thumbSize}px`, borderRadius: '6px', objectFit: 'cover',
+                cursor: 'pointer', flexShrink: 0, transition: 'width 150ms ease, height 150ms ease'
+              }
+            }),
+            hasDetail && /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              onClick: e => { e.stopPropagation(); toggleAnnBannerExpanded(bannerKey); },
+              "aria-label": isExpanded ? "기념일 상세 접기" : "기념일 상세 펼치기",
+              style: { background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', padding: '2px', display: 'flex', alignItems: 'center', flexShrink: 0 }
+            }, /*#__PURE__*/React.createElement("svg", {
+              width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor",
+              strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+            }, isExpanded
+              ? /*#__PURE__*/React.createElement("path", { d: "M18 15l-6-6-6 6" })
+              : /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6 6-6" })
+            ))
+          ),
+          isExpanded && /*#__PURE__*/React.createElement("div", {
+            style: { display: 'flex', flexDirection: 'column', gap: '4px', fontSize: 'var(--font-size-sm)', fontWeight: 500 }
+          },
+            getAnnBannerDateDisplay(ann) && /*#__PURE__*/React.createElement("div", null, getAnnBannerDateDisplay(ann)),
+            ann.place && (() => {
+              const mapUrl = getAnnBannerKakaoMapLinkUrl(ann.place);
+              const label = `[${ann.place.alias || ann.place.name}] ${getDisplayPlaceAddress(ann.place) || ''}`.trim();
+              return /*#__PURE__*/React.createElement("div", { style: { display: 'inline-flex', alignItems: 'center', gap: '4px' } },
+                MapPinIcon && /*#__PURE__*/React.createElement(MapPinIcon, { size: 14 }),
+                mapUrl
+                  ? /*#__PURE__*/React.createElement("a", {
+                      href: mapUrl, target: "_blank", rel: "noreferrer",
+                      onClick: e => e.stopPropagation(),
+                      style: { color: 'inherit', textDecoration: 'underline' }
+                    }, label)
+                  : /*#__PURE__*/React.createElement("span", null, label)
+              );
+            })(),
+            ann.description && /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-main)' } },
+              renderTextWithUrlBadge(ann.description)
+            )
+          )
+        );
       })),
 
       !adminMode && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '10px' } },
