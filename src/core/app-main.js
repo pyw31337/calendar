@@ -10492,7 +10492,10 @@ function getAnniversariesForDate(dateStr, anniversariesList) {
         });
       }
     } else if (ann.type === 'range') {
-      // Multi-day (연일) event/festival spanning a start/end date range.
+      // Multi-day (연일) event/festival spanning a start/end date range. type/startDate/endDate
+      // are kept on the result (unlike the other branches above) so the calendar grid can tell
+      // a spanning festival apart from a single-day anniversary and render it as one connected
+      // bar across the days it covers instead of a separate badge repeated on each day.
       if (!ann.startDate || !ann.endDate) return;
       if (dateStr >= ann.startDate && dateStr <= ann.endDate) {
         const catBadge = getAnniversaryCategoryBadge(ann.category);
@@ -10500,7 +10503,10 @@ function getAnniversariesForDate(dateStr, anniversariesList) {
           id: ann.id,
           title: `${ann.title || ''}`,
           badgeColor: catBadge.badgeColor,
-          icon: catBadge.icon
+          icon: catBadge.icon,
+          type: 'range',
+          startDate: ann.startDate,
+          endDate: ann.endDate
         });
       }
     }
