@@ -5058,6 +5058,14 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
     min-height: 36px;
   }
 
+  /* ...except the small icon-only edit/delete/drag-reorder buttons packed into the attendance
+     row's absolutely-positioned corner (see .date-modal-attendance-actions in ui-date-modal.js)
+     -- the row's own padding-right is calibrated for their intended 22px height, and letting the
+     blanket 36px touch rule above stretch them made them stick out past the row's edge. */
+  .date-modal-attendance-actions button {
+    min-height: 22px;
+  }
+
   .modal-body {
     padding-left: 18px;
     padding-right: 18px;

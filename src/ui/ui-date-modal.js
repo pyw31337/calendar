@@ -2557,8 +2557,8 @@ export function DateModal({
         }, `참석 명단 (${dateEntries.length}명 가능)`),
         /* List */
         /*#__PURE__*/React.createElement(ResizableListSection, {
-          initialHeight: 260,
-          minHeight: 120,
+          initialHeight: 'auto',
+          minHeight: 72,
           maxHeight: 500,
           listClassName: "date-modal-attendance-list",
           listStyle: {
