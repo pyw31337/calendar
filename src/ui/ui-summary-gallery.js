@@ -1852,7 +1852,7 @@ export function HistoryView({
         const datePlaces = getCalendarPlaces(calendar).filter(p => doesPlaceMatchDate(p, d));
         return /*#__PURE__*/React.createElement("button", {
           key: d,
-          className: `date-item-btn ${isPast ? 'is-past' : 'is-confirmed'} confirmed-meeting-card confirmed-meeting-surface`,
+          className: `date-item-btn ${isPast ? 'is-past' : 'is-confirmed'} history-meeting-card confirmed-meeting-surface`,
           onClick: () => onSelectDate(d),
           style: { flexDirection: 'column', alignItems: 'flex-start' }
         },

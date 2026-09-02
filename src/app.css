@@ -3512,6 +3512,21 @@ select.form-select {
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.22);
 }
 
+/* History page rows keep the plain date-item-btn pastel tint (no vivid gradient -- that's
+   reserved for the main-screen SummaryList preview), so .confirmed-meeting-surface's white
+   text/border rules -- tuned for that gradient -- need to be re-overridden here. Same
+   specificity as those rules, so source order (this block coming later) decides the winner. */
+.history-meeting-card .confirmed-meeting-date {
+  color: var(--text-main) !important;
+  text-shadow: none;
+}
+.history-meeting-card.is-past .confirmed-meeting-date {
+  color: #94A3B8 !important;
+}
+.history-meeting-card .memo-capsule-badge {
+  border-color: currentColor !important;
+}
+
 /* Capsule Memo Badge */
 .memo-capsule-badge {
   display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px;
