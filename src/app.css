@@ -1015,6 +1015,16 @@ summary.is-pressing,
   gap: 10px;
   text-align: center;
 }
+@media (max-width: 639px) {
+  /* Below 640px the last main-screen section (places, in .gallery-places-row) has no bottom
+     margin of its own -- only the row's first child does, for the stack-vs-side-by-side split
+     -- so this footer's usual -20px pull-up left it touching that section instead of just
+     trimming the gap. A small positive margin here restores breathing room on mobile only;
+     desktop is unaffected since the row itself carries margin-bottom there. */
+  .app-footer {
+    margin-top: 12px;
+  }
+}
 .app-footer-copyright {
   font-size: 0.7rem;
   color: var(--text-muted);
@@ -2269,6 +2279,34 @@ select.form-select {
   }
   .chat-memo-row > *:first-child {
     margin-bottom: 0;
+  }
+}
+
+/* Places preview card's visit-note row: date and note text wrap onto their own lines on
+   mobile (date first, note below) since the row is too narrow there for them side by side;
+   at/above the shared 640px breakpoint they sit on one line like everywhere else. */
+.place-preview-visit-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+@media (min-width: 640px) {
+  .place-preview-visit-row {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+  }
+}
+
+/* Gallery preview thumbnails: 3 columns (9 shown, see PhotoGallery's isMobile-gated slice)
+   below the shared 640px breakpoint, 6 columns (18 shown) at/above it. */
+.gallery-thumb-grid {
+  grid-template-columns: repeat(3, 1fr);
+}
+@media (min-width: 640px) {
+  .gallery-thumb-grid {
+    grid-template-columns: repeat(6, 1fr);
   }
 }
 
