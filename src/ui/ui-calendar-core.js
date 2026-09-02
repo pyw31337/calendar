@@ -1981,6 +1981,13 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     }
   };
 
+  const handleCancelComment = e => {
+    if (e) e.stopPropagation();
+    setEditingCommentId(null);
+    setCommentText('');
+    setIsCommentComposerOpen(false);
+  };
+
   const handleStartEditComment = (e, comment) => {
     e.stopPropagation();
     setEditingCommentId(comment.id);
@@ -2366,16 +2373,18 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       );
     })),
 
-    /* Comment composer -- same shape as the tag-input module: participant picker + input + save */
+    /* Comment composer -- same shape as the tag-input module: participant picker + input + save,
+       plus a cancel button. On mobile this stacks into two rows (input alone, then picker left /
+       cancel+save right); at/above 640px .comment-composer-footer collapses via display:contents
+       so its two children rejoin the input as ordinary siblings in one row (see .comment-composer
+       rules in app.css) -- same DOM, no separate mobile/desktop render branch needed. */
     isCommentComposerOpen && /*#__PURE__*/React.createElement("div", {
+      className: "comment-composer",
       onClick: e => e.stopPropagation(),
-      style: { display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px' }
+      style: { marginTop: '8px' }
     },
-      /*#__PURE__*/React.createElement(ParticipantPickerButton, {
-        participant: commentPart,
-        onClick: () => setIsCommentPartOpen(true)
-      }),
       /*#__PURE__*/React.createElement("input", {
+        className: "comment-composer-input",
         type: "text",
         value: commentText,
         onChange: e => setCommentText(e.target.value),
@@ -2389,18 +2398,35 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
           }
         },
         placeholder: "댓글을 입력하세요...",
-        style: { flex: 1, minWidth: 0, height: '30px', fontSize: 'var(--font-size-md)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0 8px', backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)', outline: 'none', boxSizing: 'border-box' }
+        style: { width: '100%', height: '30px', fontSize: 'var(--font-size-md)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0 8px', backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)', outline: 'none', boxSizing: 'border-box' }
       }),
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: handleSaveComment,
-        disabled: !commentText.trim() || !commentParticipantId || isSavingComment,
-        style: {
-          flexShrink: 0, height: '30px', padding: '0 12px', borderRadius: 'var(--radius-sm)', border: 'none',
-          backgroundColor: 'var(--accent-primary)', color: '#FFFFFF', fontSize: 'var(--font-size-md)', fontWeight: 'bold',
-          cursor: isSavingComment ? 'wait' : 'pointer', opacity: (commentText.trim() && commentParticipantId && !isSavingComment) ? 1 : 0.5
-        }
-      }, isSavingComment ? "저장 중…" : "저장")
+      /*#__PURE__*/React.createElement("div", { className: "comment-composer-footer" },
+        /*#__PURE__*/React.createElement(ParticipantPickerButton, {
+          participant: commentPart,
+          onClick: () => setIsCommentPartOpen(true)
+        }),
+        /*#__PURE__*/React.createElement("div", { className: "comment-composer-buttons" },
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            onClick: handleCancelComment,
+            style: {
+              flexShrink: 0, height: '30px', padding: '0 12px', borderRadius: 'var(--radius-sm)',
+              border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)', color: 'var(--text-muted)',
+              fontSize: 'var(--font-size-md)', fontWeight: 'bold', cursor: 'pointer'
+            }
+          }, "취소"),
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            onClick: handleSaveComment,
+            disabled: !commentText.trim() || !commentParticipantId || isSavingComment,
+            style: {
+              flexShrink: 0, height: '30px', padding: '0 12px', borderRadius: 'var(--radius-sm)', border: 'none',
+              backgroundColor: 'var(--accent-primary)', color: '#FFFFFF', fontSize: 'var(--font-size-md)', fontWeight: 'bold',
+              cursor: isSavingComment ? 'wait' : 'pointer', opacity: (commentText.trim() && commentParticipantId && !isSavingComment) ? 1 : 0.5
+            }
+          }, isSavingComment ? "저장 중…" : "저장")
+        )
+      )
     ),
 
     isCommentPartOpen && /*#__PURE__*/React.createElement(ChatParticipantSheet, {

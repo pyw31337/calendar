@@ -2310,6 +2310,46 @@ select.form-select {
   }
 }
 
+/* Memo comment composer (MemoCard, shared by main-screen memo preview and the
+   full memo page): input on its own line with the author picker/cancel/save
+   below it on mobile; on desktop the footer reflows via display:contents into
+   the original single-row [picker, input, buttons] order. */
+.comment-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.comment-composer-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.comment-composer-buttons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+@media (min-width: 640px) {
+  .comment-composer {
+    flex-direction: row;
+    align-items: center;
+  }
+  .comment-composer-footer {
+    display: contents;
+  }
+  .comment-composer-input {
+    order: 2;
+  }
+  .comment-composer-footer .participant-picker-button {
+    order: 1;
+  }
+  .comment-composer-buttons {
+    order: 3;
+  }
+}
+
 .summary-title { font-size: 1.05rem; font-weight: 800; color: var(--text-main); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
 @media (min-width: 640px) {
   .summary-title { font-size: 1.15rem; margin-bottom: 16px; }
