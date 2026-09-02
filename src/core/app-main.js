@@ -7305,7 +7305,11 @@ function CalendarApp() {
     onGetChatMessageOrdinal: handleGetChatMessageOrdinal,
     onGetGalleryPhotoOrdinal: handleGetGalleryPhotoOrdinal,
     onRequestConfirm: showConfirmDialog
-  })), /*#__PURE__*/React.createElement(SummaryList, {
+  })), /*#__PURE__*/React.createElement(MemoPreviewSection, {
+    memos: memos,
+    onViewAll: () => changeView('memo'),
+    onJumpToMemo: handleJumpToMemo
+  }), /*#__PURE__*/React.createElement(SummaryList, {
     calendar: activeCal,
     onSelectDate: d => {
       if (!guardLoadedCalendar()) return;
@@ -9845,6 +9849,10 @@ function SummaryList(props) {
   const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SummaryList;
   return typeof C === 'function' ? React.createElement(C, props) : null;
 }
+function MemoPreviewSection(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MemoPreviewSection;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 
 
 
@@ -11218,6 +11226,7 @@ function bindGatherUiDeps() {
     SearchCategoryTabs: typeof SearchCategoryTabs === 'function' ? SearchCategoryTabs : null,
     SimpleBottomSheetPicker: typeof SimpleBottomSheetPicker === 'function' ? SimpleBottomSheetPicker : null,
     PhotoGallery: typeof PhotoGallery === 'function' ? PhotoGallery : null,
+    MemoPreviewSection: typeof MemoPreviewSection === 'function' ? MemoPreviewSection : null,
     SummaryList: typeof SummaryList === 'function' ? SummaryList : null,
     getActiveAvailabilities: typeof getActiveAvailabilities === 'function' ? getActiveAvailabilities : null,
     getCalendarPolls: typeof getCalendarPolls === 'function' ? getCalendarPolls : null,
