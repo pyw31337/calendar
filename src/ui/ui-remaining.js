@@ -767,7 +767,7 @@ function getAnniversaryDisplayColor(...args) {
 }
 
 
-export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPreview, style = {}, message = null, stickyVideoKey = null, onActivateVideo = null, textMaxWidth = null }) {
+export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox, linkPreview, style = {}, message = null, stickyVideoKey = null, onActivateVideo = null, textMaxWidth = null, linkPreviewOnly = false }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -776,7 +776,10 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
   const extractFirstUrl = __deps.extractFirstUrl;
 
   const firstUrl = extractFirstUrl(text);
-  const mediaInfo = getDirectChatMediaInfo(firstUrl);
+  // linkPreviewOnly (the main-screen chat quick-preview) always shows a plain link-preview card,
+  // never the interactive embed/inline-video treatment the full chat room gives the same URL --
+  // nulling mediaInfo up front makes every check below naturally take that already-existing path.
+  const mediaInfo = linkPreviewOnly ? null : getDirectChatMediaInfo(firstUrl);
   // When a message also contains uploaded images, the surrounding bubble is sized by that
   // image row. Stretch its link previews to the same width; standalone text links retain their
   // compact intrinsic card width.
@@ -795,8 +798,18 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
     return list;
   }, [text, firstUrl]);
   const previewUrls = React.useMemo(
-    () => allPreviewUrls.filter(url => shouldRenderChatLinkPreview(url)),
-    [allPreviewUrls]
+    () => allPreviewUrls.filter(url => {
+      // shouldRenderChatLinkPreview excludes embeddable URLs (youtube/vimeo/tiktok/...) since
+      // those normally render as an interactive embed instead of a card -- but linkPreviewOnly
+      // just nulled mediaInfo to skip that embed entirely, so here it must allow those same URLs
+      // through to the card instead, still respecting the plain host-skip list.
+      if (linkPreviewOnly) {
+        const host = getChatLinkPreviewHost(url);
+        return !(host && CHAT_LINK_PREVIEW_SKIP_HOSTS.has(host));
+      }
+      return shouldRenderChatLinkPreview(url);
+    }),
+    [allPreviewUrls, linkPreviewOnly]
   );
   const [failed, setFailed] = React.useState(false);
   React.useEffect(() => {

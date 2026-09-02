@@ -1255,6 +1255,10 @@ export function SummaryList({
   const anyBeforeAll = isPartialVisible;
   const anyBeforeConfirmed = isPartialVisible || isAllVisible;
 
+  // Nothing to show (common now that 모임 확정 always renders false here -- see above) -- an
+  // empty .summary-card shell used to still take up a visible gap on the main screen below chat.
+  if (!isPartialVisible && !isAllVisible && !isConfirmedVisible) return null;
+
   return /*#__PURE__*/React.createElement("div", {
     className: "summary-card",
     style: {

@@ -7855,7 +7855,7 @@ function ImageUrlModal(props) {
   return typeof C === 'function' ? React.createElement(C, props) : null;
 }
 
-function renderChatMessageBody(msg, setActiveLightbox, singleImageStyle = {}, searchQuery = '', stickyVideoKey = null, onActivateVideo = null) {
+function renderChatMessageBody(msg, setActiveLightbox, singleImageStyle = {}, searchQuery = '', stickyVideoKey = null, onActivateVideo = null, linkPreviewOnly = false) {
   const msgImages = renderChatMessageImages(msg, setActiveLightbox, singleImageStyle);
   // A fit-content chat bubble sizes itself to whichever of its children is widest. When there's
   // a multi-image grid above, cap the caption text below it to that same grid width -- otherwise
@@ -7873,7 +7873,8 @@ function renderChatMessageBody(msg, setActiveLightbox, singleImageStyle = {}, se
       message: msg,
       stickyVideoKey,
       onActivateVideo,
-      textMaxWidth
+      textMaxWidth,
+      linkPreviewOnly
     }) : null
   );
 }
