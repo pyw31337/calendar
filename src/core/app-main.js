@@ -7352,8 +7352,7 @@ function CalendarApp() {
   })), /*#__PURE__*/React.createElement("div", {
     className: "calendar-card",
     style: {
-      padding: '16px',
-      marginTop: '-12px'
+      padding: '16px'
     }
   }, /*#__PURE__*/React.createElement(CommentsSection, {
     calendar: activeCal,

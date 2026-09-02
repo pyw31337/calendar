@@ -115,19 +115,20 @@ if (/setActiveTab\('calendar'\)|activeTab === 'calendar'/.test(adminModals)) {
 }
 
 const adminModalTabHandlers = [...adminModals.matchAll(/setActiveTab\('([^']+)'\)/g)].map(match => match[1]);
-// 일반 / 복구 / 로그 -- 기념일 tab was split out into its own top-level side-menu entry
+// 일반 / 투표 / 복구 / 로그 -- 기념일 tab was split out into its own top-level side-menu entry
 // (기념일 설정, see MainSideMenu in ui-side-menu.js) since nesting it here was accumulating
-// too many sub-tabs inside a single settings modal.
-const allowedAdminModalTabs = new Set(['settings', 'recovery', 'logs']);
+// too many sub-tabs inside a single settings modal. 투표 was later split out of the 일반 tab
+// into its own tab for the same reason.
+const allowedAdminModalTabs = new Set(['settings', 'polls', 'recovery', 'logs']);
 const unexpectedAdminModalTabs = adminModalTabHandlers.filter(tab => !allowedAdminModalTabs.has(tab));
 if (unexpectedAdminModalTabs.length > 0) {
   fail(`Calendar settings modal has unexpected tab handler(s): ${unexpectedAdminModalTabs.join(', ')}`);
 }
-if (adminModalTabHandlers.length !== 3) {
-  fail(`Calendar settings modal must render exactly 3 tabs (settings/recovery/logs), found ${adminModalTabHandlers.length}.`);
+if (adminModalTabHandlers.length !== 4) {
+  fail(`Calendar settings modal must render exactly 4 tabs (settings/polls/recovery/logs), found ${adminModalTabHandlers.length}.`);
 }
 
-for (const requiredTab of ["setActiveTab('settings')", "setActiveTab('recovery')", "setActiveTab('logs')"]) {
+for (const requiredTab of ["setActiveTab('settings')", "setActiveTab('polls')", "setActiveTab('recovery')", "setActiveTab('logs')"]) {
   if (!adminModals.includes(requiredTab)) {
     fail(`Calendar settings modal is missing required tab handler: ${requiredTab}`);
   }
