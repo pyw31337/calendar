@@ -275,9 +275,14 @@ exports.onMemoWrite = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).fire
     }, { skipParticipantId: memo.participantId || memo.authorId || null, channel: 'memo' });
   });
 
-// Confirmed meeting created or edited → schedule channel. Settlement/schedule changes
-// are updates to the date document in normal operation, so create-only delivery was
-// insufficient for cross-browser users.
+// Meeting confirmed (the 확정 button, not a settlement/participant edit) → schedule channel.
+// The document is also written by unrelated actions -- settlement note/price edits and
+// participant-only registration on a date with no confirmedMeeting entry yet both create or
+// rewrite this same doc with confirmed:false, and editing settlement on an already-confirmed
+// meeting rewrites it without touching `confirmed` at all. Notifying on every write there
+// falsely announced "모임이 확정되었습니다" for those cases. Only a genuine
+// not-confirmed -> confirmed transition (client sets confirmed:true exclusively via
+// handleConfirmMeeting, the actual 확정 button) should page everyone.
 exports.onConfirmedMeetingWrite = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).firestore
   .document('calendars/{calendarDocId}/confirmedMeetings/{dateId}')
   .onWrite(async (change, context) => {
@@ -285,6 +290,9 @@ exports.onConfirmedMeetingWrite = functions.runWith({ secrets: ['VAPID_PRIVATE_K
     const before = change.before.exists ? (change.before.data() || {}) : null;
     const after = change.after.data() || {};
     if (before && JSON.stringify(before) === JSON.stringify(after)) return;
+    const wasConfirmed = !!before && before.confirmed !== false;
+    const isConfirmed = after.confirmed !== false;
+    if (!isConfirmed || wasConfirmed) return;
     const calendarDocId = context.params.calendarDocId;
     const db = admin.firestore();
     const calendarSnap = await db.collection('calendars').doc(calendarDocId).get();
