@@ -1711,8 +1711,15 @@ export function CommentsSection({
       label: isCollapsed ? "채팅 펼치기" : "채팅 접기"
     })
   )),
+  /* List Background Panel -- one continuous gray canvas the individual white message
+     bubbles float on, instead of each message having its own separate gray card */
   /*#__PURE__*/React.createElement("div", {
-    style: { minHeight: '48px' }
+    style: {
+      backgroundColor: 'var(--bg-primary)',
+      borderRadius: 'var(--radius-md)',
+      padding: '12px',
+      minHeight: '48px'
+    }
   }, messagesToShow.length === 0 ? /*#__PURE__*/React.createElement("div", {
     style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-base)', padding: '8px 0', textAlign: 'center' }
   }, emptyChatMessage) : /*#__PURE__*/React.createElement("div", {
@@ -1775,30 +1782,23 @@ export function CommentsSection({
           ) : null
         )
       ),
-      /* Full-width bordered box (name/timestamp row above, message text below) */
-      /*#__PURE__*/React.createElement('div', {
-        style: { marginTop: '2px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '10px 12px', fontSize: 'var(--font-size-base)', lineHeight: '1.4', color: 'var(--text-main)', wordBreak: 'keep-all', overflowWrap: 'break-word', whiteSpace: 'pre-wrap' }
-      }, bubbleContent)
+      /* Full-width bubble with top tail pointing to name badge */
+      /*#__PURE__*/React.createElement('div', { style: { position: 'relative', marginTop: '2px' } },
+        /* Outer tail (border color) */
+        /*#__PURE__*/React.createElement('div', {
+          style: { position: 'absolute', top: '-7px', left: '18px', width: 0, height: 0, borderLeft: '7px solid transparent', borderRight: '7px solid transparent', borderBottom: '7px solid var(--border-subtle)', zIndex: 2 }
+        }),
+        /* Inner tail (white fill) */
+        /*#__PURE__*/React.createElement('div', {
+          style: { position: 'absolute', top: '-5px', left: '19px', width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderBottom: '6px solid var(--bg-card)', zIndex: 3 }
+        }),
+        /* Bubble container */
+        /*#__PURE__*/React.createElement('div', {
+          style: { backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '10px 12px', fontSize: 'var(--font-size-base)', lineHeight: '1.4', color: 'var(--text-main)', wordBreak: 'keep-all', overflowWrap: 'break-word', whiteSpace: 'pre-wrap', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', position: 'relative', zIndex: 1 }
+        }, bubbleContent)
+      )
     );
-  }),
-  /* Full Width "이전 채팅 더보기" Button at bottom of list */
-  (messagesToShow.length > 0 || (totalChatCountProp || 0) > 0) && typeof onMore === 'function' && /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: onMore,
-    style: {
-      width: '100%',
-      backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
-      border: 'none',
-      borderRadius: 'var(--radius-md)',
-      padding: '8px 0',
-      marginTop: '4px',
-      fontSize: 'var(--font-size-base)',
-      fontWeight: 'bold',
-      color: 'var(--text-main)',
-      cursor: 'pointer',
-      textAlign: 'center'
-    }
-  }, "이전 채팅 더보기")
+  })
   )),
   activeLightbox ? /*#__PURE__*/React.createElement(Lightbox, {
     urls: activeLightbox.urls,
@@ -2001,7 +2001,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       }
     },
     style: {
-      backgroundColor: memo.color || 'var(--bg-card)',
+      backgroundColor: memo.color || 'var(--bg-primary)',
       border: '0',
       borderRadius: 'var(--radius-md)',
       padding: '12px',
@@ -2141,8 +2141,8 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
           padding: '6px 0',
           marginTop: '6px',
           borderRadius: 'var(--radius-md)',
-          border: isVideoOpen ? '1px solid var(--border-subtle)' : '1px solid var(--primary)',
-          backgroundColor: isVideoOpen ? 'var(--bg-secondary)' : 'var(--bg-primary)',
+          border: 'none',
+          backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
           color: isVideoOpen ? 'var(--text-muted)' : 'var(--primary)',
           fontSize: 'var(--font-size-sm)',
           fontWeight: 700,
@@ -2228,9 +2228,9 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       }, /*#__PURE__*/React.createElement(MessageCommentIcon, { size: 18 }))
     ),
 
-    /* Comment list -- gray capsule rows: participant-color dot, text, edit/delete */
+    /* Comment list -- no background, thin divider line between rows instead */
     comments.length > 0 && /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '8px' }
+      style: { display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '8px' }
     },
       hasMoreComments && /*#__PURE__*/React.createElement("button", {
         type: "button",
@@ -2248,14 +2248,14 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         }, /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" })),
         isCommentsExpanded ? '댓글 접기' : `댓글 더보기 (${comments.length - COMMENT_COLLAPSE_LIMIT}개)`
       ),
-      visibleComments.map(comment => {
+      visibleComments.map((comment, commentIdx) => {
       const author = (calendar?.participants || []).find(p => p.id === comment.participantId);
       return /*#__PURE__*/React.createElement("div", {
         key: comment.id,
         onClick: e => e.stopPropagation(),
         style: {
-          display: 'flex', alignItems: 'center', gap: '8px',
-          backgroundColor: 'rgb(248, 250, 252)', borderRadius: 'var(--radius-sm)', padding: '6px 8px'
+          display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 2px',
+          borderTop: commentIdx > 0 ? '1px solid var(--border-subtle)' : 'none'
         }
       },
         /*#__PURE__*/React.createElement("span", {

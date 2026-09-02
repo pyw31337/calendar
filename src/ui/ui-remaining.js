@@ -1375,8 +1375,8 @@ export function PlacesSection({ calendar, onViewAll }) {
         },
         style: {
           display: 'flex', flexDirection: 'column', gap: '4px', padding: '10px 12px',
-          border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)',
-          backgroundColor: 'var(--bg-card)', cursor: 'pointer'
+          borderRadius: 'var(--radius-md)',
+          backgroundColor: 'var(--bg-primary)', cursor: 'pointer'
         }
       },
         /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' } },
