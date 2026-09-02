@@ -1634,10 +1634,11 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
   const [otherBankName, setOtherBankName] = React.useState(() => cardToEdit?.otherBankName || '');
   const [depositorName, setDepositorName] = React.useState(() => cardToEdit?.depositorName || '');
   const [accountNumber, setAccountNumber] = React.useState(() => cardToEdit?.accountNumber || '');
-  // Display-only masking of the account number field within this editing session -- not saved
-  // anywhere (accountNumber itself, the value actually submitted, is never touched by this).
-  // Starts visible: masking is something a user opts into per-visit, not a stored preference.
-  const [isAccountNumberHidden, setIsAccountNumberHidden] = React.useState(false);
+  // Persisted on the settlement card itself (isAccountNumberHidden, saved alongside
+  // accountNumber below) rather than being a local-only display toggle -- it needs to survive
+  // reopening this modal and to mask the account number everywhere else the card is shown
+  // (SettlementSummaryModal's card list, the card-image canvas export below), not just here.
+  const [isAccountNumberHidden, setIsAccountNumberHidden] = React.useState(() => !!cardToEdit?.isAccountNumberHidden);
   const [activeTab, setActiveTab] = React.useState('general');
   const [isSettlementCardPreviewOpen, setIsSettlementCardPreviewOpen] = React.useState(false);
   const [settlementCardImageUrl, setSettlementCardImageUrl] = React.useState(null);
@@ -1920,6 +1921,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
       otherBankName: bankName === '기타' ? otherBankName.trim() : '',
       depositorName: depositorName.trim(),
       accountNumber: accountNumber.trim(),
+      isAccountNumberHidden: isAccountNumberHidden,
       monthStr: monthStr,
       checkedItemKeys: Object.keys(checkedItems)
     };
@@ -2131,7 +2133,8 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
     ctx.fillText('송금계좌 정보', PAD + 20, y + 30);
     ctx.fillStyle = '#0F172A';
     ctx.font = '800 18px sans-serif';
-    const bankLabel = `${bankName === '기타' ? (otherBankName || '기타') : bankName} ${accountNumber || '계좌번호 미입력'}`;
+    const cardImageAccountNumber = isAccountNumberHidden ? maskSettlementAccountNumber(accountNumber) : accountNumber;
+    const bankLabel = `${bankName === '기타' ? (otherBankName || '기타') : bankName} ${cardImageAccountNumber || '계좌번호 미입력'}`;
     ctx.fillText(fitText(bankLabel, W - PAD * 2 - 40), PAD + 20, y + 60);
     if (depositorName) {
       ctx.fillStyle = '#64748B';
@@ -2363,10 +2366,12 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
               }
             }, '✓')
           ),
-          /* 숨김 masks the account number on-screen for this editing session only (accountNumber
-             itself, what actually gets saved, is untouched). Reversing it back to 보임 needs an
-             admin password -- same "hiding is self-serve, showing needs verification" rule as the
-             투표 수정 modal's 숨김/보임 toggle. */
+          /* 숨김 masks the account number on-screen and persists isAccountNumberHidden on the card
+             itself, so every other place the card is shown (settlement list, card image export,
+             live preview) also masks it. accountNumber, what actually gets saved, is untouched --
+             only the display is masked. Reversing it back to 보임 needs an admin password -- same
+             "hiding is self-serve, showing needs verification" rule as the 투표 수정 modal's
+             숨김/보임 toggle. */
           React.createElement('button', {
             type: 'button', className: 'btn btn-secondary', style: { flexShrink: 0, height: '44px', padding: '0 14px', fontSize: 'var(--font-size-md)' },
             onClick: () => {
@@ -2671,7 +2676,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
       ),
       React.createElement('div', { style: { padding: '12px', borderRadius: 'var(--radius-md)', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)' } },
         React.createElement('div', { style: { fontSize: 'var(--font-size-md)', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '7px' } }, '송금계좌 정보'),
-        React.createElement('div', { style: { fontSize: 'var(--font-size-base)', fontWeight: 800, color: 'var(--text-main)' } }, `${bankName === '기타' ? otherBankName || '기타' : bankName} ${accountNumber || '계좌번호 미입력'}`),
+        React.createElement('div', { style: { fontSize: 'var(--font-size-base)', fontWeight: 800, color: 'var(--text-main)' } }, `${bankName === '기타' ? otherBankName || '기타' : bankName} ${(isAccountNumberHidden ? maskSettlementAccountNumber(accountNumber) : accountNumber) || '계좌번호 미입력'}`),
         depositorName && React.createElement('div', { style: { marginTop: '3px', fontSize: 'var(--font-size-md)', color: 'var(--text-muted)' } }, `예금주: ${depositorName}`)
       ),
       React.createElement('div', { style: { padding: '12px', borderRadius: 'var(--radius-md)', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)' } },
@@ -3280,7 +3285,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
         displayCards.map(card => {
           const isClosed = card.status === 'closed';
           const displayBankName = card.bankName === '기타' && card.otherBankName ? card.otherBankName : card.bankName;
-          const displayAccountNumber = isClosed ? maskSettlementAccountNumber(card.accountNumber) : card.accountNumber;
+          const displayAccountNumber = (isClosed || card.isAccountNumberHidden) ? maskSettlementAccountNumber(card.accountNumber) : card.accountNumber;
           const bankInfoText = [displayBankName, displayAccountNumber, card.depositorName].filter(Boolean).join(' ');
           const isMenuOpen = openMenuCardId === card.id;
           const cardParticipantNames = Array.from(new Set(
