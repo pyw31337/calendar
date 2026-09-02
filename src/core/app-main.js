@@ -2827,6 +2827,37 @@ function CalendarApp() {
     if (!memoId) return;
     setMemos(prev => (Array.isArray(prev) ? prev.filter(m => m.id !== memoId) : []));
   };
+  // Mirrors ui-memo-view.js's own handleTogglePin/handleMemoCommentsChange so the main-screen
+  // memo preview (which now renders the real MemoCard, not a bespoke row -- see
+  // MemoPreviewSection) can pin/comment inline instead of crashing: MemoCard calls onTogglePin()
+  // and onCommentsChange() unconditionally, with no typeof guard, so these must be real handlers.
+  const handleTogglePinFromMemoPreview = async (memo) => {
+    const nextPinned = !memo.isPinned;
+    patchLocalMemo(memo.id, { isPinned: nextPinned });
+    try {
+      const updated = await writeCollectionDocumentWithFallback('memos', activeCal.id, memo.id, { isPinned: nextPinned }, 'update', '메모 고정 변경');
+      if (!updated?.success) throw new Error('Memo pin update failed');
+    } catch (err) {
+      console.error('Failed to toggle memo pin:', err);
+      patchLocalMemo(memo.id, { isPinned: memo.isPinned });
+      showToast('고정 상태 변경 실패', 'error');
+    }
+  };
+  const handleMemoCommentsChangeFromMemoPreview = async (memo, nextComments) => {
+    let latest = 0;
+    for (const c of (nextComments || [])) { const t = Number(c?.createdAt) || 0; if (t > latest) latest = t; }
+    patchLocalMemo(memo.id, { comments: nextComments, lastCommentAt: latest });
+    try {
+      const updated = await writeCollectionDocumentWithFallback('memos', activeCal.id, memo.id, { comments: nextComments, lastCommentAt: latest }, 'update', '메모 댓글 저장');
+      if (!updated?.success) throw new Error('Memo comment update failed');
+      return true;
+    } catch (err) {
+      console.error('Failed to update memo comments:', err);
+      patchLocalMemo(memo.id, { comments: memo.comments, lastCommentAt: memo.lastCommentAt });
+      showToast('댓글 저장 실패', 'error');
+      return false;
+    }
+  };
 
   React.useEffect(() => {
     if (activeView === 'chat' && chatMessagesContainerRef.current) {
@@ -7340,8 +7371,14 @@ function CalendarApp() {
     onRequestConfirm: showConfirmDialog
   })), /*#__PURE__*/React.createElement(MemoPreviewSection, {
     memos: memos,
+    calendar: activeCal,
     onViewAll: () => changeView('memo'),
-    onJumpToMemo: handleJumpToMemo
+    onOpenEdit: memo => handleJumpToMemo(memo.id),
+    onTogglePin: handleTogglePinFromMemoPreview,
+    onSelectTag: () => changeView('memo'),
+    onCommentsChange: handleMemoCommentsChangeFromMemoPreview,
+    onRequestConfirm: showConfirmDialog,
+    showToast: showToast
   }), /*#__PURE__*/React.createElement(SummaryList, {
     calendar: activeCal,
     onSelectDate: d => {

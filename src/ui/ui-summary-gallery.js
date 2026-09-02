@@ -921,14 +921,37 @@ function getLatestMemoPreviewCommentTimestamp(memo) {
   return latest;
 }
 
-export function MemoPreviewSection({ memos = [], onViewAll, onJumpToMemo }) {
+// Same curated pastel palette MemoView's own composer/edit color picker uses (see MEMO_COLORS in
+// ui-memo-view.js) -- duplicated here as a tiny pure lookup (not imported) so this preview's
+// MemoCard instances tint their border the same as the memo page's, without pulling in MemoView's
+// much larger edit-modal state.
+const MEMO_PREVIEW_BORDER_COLORS = {
+  'var(--bg-card)': 'var(--border-subtle)',
+  'rgba(239, 68, 68, 0.12)': 'rgba(239, 68, 68, 0.3)',
+  'rgba(245, 158, 11, 0.12)': 'rgba(245, 158, 11, 0.3)',
+  'rgba(234, 179, 8, 0.12)': 'rgba(234, 179, 8, 0.3)',
+  'rgba(16, 185, 129, 0.12)': 'rgba(16, 185, 129, 0.3)',
+  'rgba(6, 182, 212, 0.12)': 'rgba(6, 182, 212, 0.3)',
+  'rgba(59, 130, 246, 0.12)': 'rgba(59, 130, 246, 0.3)',
+  'rgba(139, 92, 246, 0.12)': 'rgba(139, 92, 246, 0.3)',
+  'rgba(236, 72, 153, 0.12)': 'rgba(236, 72, 153, 0.3)'
+};
+function getMemoPreviewBorderColor(colorVal) {
+  return MEMO_PREVIEW_BORDER_COLORS[colorVal] || 'var(--border-subtle)';
+}
+
+// Renders the actual memo-page MemoCard (same title/image-grid/tags/comments/pin/share look and
+// behavior as the 메모 page), not a bespoke compact row, per the product decision that the
+// main-screen memo preview should look and act like a real memo card. onOpenEdit/onSelectTag fall
+// back to navigating to the memo page (this section owns no edit modal or tag-search UI of its
+// own); onTogglePin/onCommentsChange are real writes (see handleTogglePinFromMemoPreview /
+// handleMemoCommentsChangeFromMemoPreview in app-main.js) since MemoCard calls them unconditionally.
+export function MemoPreviewSection({ memos = [], calendar = null, onViewAll, onOpenEdit, onTogglePin, onSelectTag, onCommentsChange, onRequestConfirm, showToast }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const MemoSectionIcon = __comp.MemoSectionIcon || __deps.MemoSectionIcon;
-  const MessageCommentIcon = __comp.MessageCommentIcon || __deps.MessageCommentIcon;
-  const MediaThumb = __comp.MediaThumb || __deps.MediaThumb;
-  const sanitizeText = __deps.sanitizeText;
+  const MemoCard = __comp.MemoCard || __deps.MemoCard;
 
   const [collapsed, setCollapsed] = React.useState(true);
 
@@ -980,49 +1003,21 @@ export function MemoPreviewSection({ memos = [], onViewAll, onJumpToMemo }) {
       })
     ),
     /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }
-    }, displayedMemos.map(memo => {
-      const imageUrls = memo.imageUrls || [];
-      const thumbUrls = memo.thumbUrls || [];
-      const thumbSrc = thumbUrls[0] || imageUrls[0] || '';
-      const commentCount = (memo.comments || []).length;
-      const rawText = String(memo.text || memo.content || memo.body || '').trim();
-      const previewText = sanitizeText ? sanitizeText(rawText, 80) : rawText.slice(0, 80);
-      return /*#__PURE__*/React.createElement("div", {
-        key: memo.id,
-        "data-memo-preview-id": memo.id,
-        role: "button",
-        tabIndex: 0,
-        onClick: () => { if (typeof onJumpToMemo === 'function') onJumpToMemo(memo.id); },
-        onKeyDown: e => {
-          if (e.key !== 'Enter' && e.key !== ' ') return;
-          e.preventDefault();
-          if (typeof onJumpToMemo === 'function') onJumpToMemo(memo.id);
-        },
-        style: {
-          display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px',
-          border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)',
-          backgroundColor: 'var(--bg-card)', cursor: 'pointer'
-        }
-      },
-        thumbSrc && /*#__PURE__*/React.createElement(MediaThumb, {
-          src: thumbSrc,
-          fallbackSrc: imageUrls[0] || thumbSrc,
-          alt: "메모 첨부 이미지",
-          loading: 'lazy',
-          decoding: 'async',
-          style: { width: '44px', height: '44px', objectFit: 'cover', borderRadius: 'var(--radius-sm)', flexShrink: 0 }
-        }),
-        /*#__PURE__*/React.createElement("div", { style: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' } },
-          /*#__PURE__*/React.createElement("span", {
-            style: { fontSize: 'var(--font-size-base)', color: 'var(--text-main)', wordBreak: 'break-word', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }
-          }, previewText || '(내용 없음)')
-        ),
-        commentCount > 0 && /*#__PURE__*/React.createElement("div", {
-          style: { display: 'flex', alignItems: 'center', gap: '3px', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', fontWeight: 700, flexShrink: 0 }
-        }, MessageCommentIcon ? /*#__PURE__*/React.createElement(MessageCommentIcon, { size: 14 }) : null, commentCount)
-      );
-    }))
+      style: { display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '12px' }
+    }, MemoCard ? displayedMemos.map(memo => /*#__PURE__*/React.createElement(MemoCard, {
+      key: memo.id,
+      memo: memo,
+      calendar: calendar,
+      onOpenEdit: onOpenEdit,
+      onTogglePin: () => { if (typeof onTogglePin === 'function') onTogglePin(memo); },
+      onShare: undefined,
+      onSelectTag: onSelectTag,
+      onCommentsChange: nextComments => (typeof onCommentsChange === 'function' ? onCommentsChange(memo, nextComments) : false),
+      getBorderColor: getMemoPreviewBorderColor,
+      onRequestConfirm: onRequestConfirm,
+      showToast: showToast,
+      effectivePinned: !!memo.isPinned
+    })) : null)
   );
 }
 
