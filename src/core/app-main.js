@@ -10253,11 +10253,12 @@ function getAnniversariesForDate(dateStr, anniversariesList) {
             cal.setLunarDate(y, lunarM, lunarD, !!ann.isLeap);
             const solar = cal.getSolarCalendar();
             if (solar && solar.year === y && solar.month === m && solar.day === d) {
+              const yearlyCatBadge = getAnniversaryCategoryBadge(ann.category);
               results.push({
                 id: ann.id,
                 title: `${ann.title || ''} (음)`,
-                badgeColor: '#EF4444',
-                icon: '🎂'
+                badgeColor: yearlyCatBadge.badgeColor,
+                icon: yearlyCatBadge.icon
               });
             }
           }
@@ -10267,11 +10268,12 @@ function getAnniversariesForDate(dateStr, anniversariesList) {
       } else {
         const [solarM, solarD] = ann.date.split('-').map(Number);
         if (solarM === m && solarD === d) {
+          const yearlyCatBadge = getAnniversaryCategoryBadge(ann.category);
           results.push({
             id: ann.id,
             title: `${ann.title || ''}`,
-            badgeColor: '#EF4444',
-            icon: '🎂'
+            badgeColor: yearlyCatBadge.badgeColor,
+            icon: yearlyCatBadge.icon
           });
         }
       }
@@ -10397,11 +10399,14 @@ function getAnniversariesForDate(dateStr, anniversariesList) {
 function getAnniversaryCategoryBadge(category) {
   const map = {
     birthday: { badgeColor: '#EF4444', icon: '🎂' },
-    event: { badgeColor: '#3B82F6', icon: '📅' },
+    event: { badgeColor: '#3B82F6', icon: '🎈' },
     festival: { badgeColor: '#F59E0B', icon: '🎉' },
-    other: { badgeColor: '#6B7280', icon: '📌' }
+    travel: { badgeColor: '#10B981', icon: '✈️' },
+    other: { badgeColor: '#6B7280', icon: '💬' }
   };
-  return map[category] || map.other;
+  // No category (anniversaries saved before this field existed) keeps the original cake/red
+  // look every 'yearly' anniversary had prior to categories -- never map.other here.
+  return map[category] || map.birthday;
 }
 
 // Anniversary badges default to a generic type color, but when the title names an active

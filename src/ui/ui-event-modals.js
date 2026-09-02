@@ -157,6 +157,10 @@ function getDisplayPlaceAddress(...args) {
   const f = __gatherUiDeps().getDisplayPlaceAddress || GATHER_APP_UTILS.getDisplayPlaceAddress;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function searchPlaces(...args) {
+  const f = window.GATHER_APP_PLACE_SEARCH && window.GATHER_APP_PLACE_SEARCH.searchPlaces;
+  return typeof f === 'function' ? f(...args) : Promise.resolve({ provider: null, results: [] });
+}
 function getExpenseCategories(...args) {
   const f = __gatherUiDeps().getExpenseCategories || GATHER_APP_UTILS.getExpenseCategories;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -734,14 +738,18 @@ const ANNIVERSARY_CATEGORY_OPTIONS = [
   { value: 'birthday', label: '생일' },
   { value: 'event', label: '행사' },
   { value: 'festival', label: '축제' },
+  { value: 'travel', label: '여행' },
   { value: 'other', label: '기타' }
 ];
 const ANNIVERSARY_CATEGORY_TITLE_LABEL = {
   birthday: '생일 이름',
   event: '행사 이름',
   festival: '축제 이름',
+  travel: '여행 이름',
   other: '기념일 이름'
 };
+// 장소 검색은 모임/약속 성격이 있는 카테고리에서만 의미가 있다 (생일/여행/기타는 제외)
+const ANNIVERSARY_CATEGORIES_WITH_PLACE = new Set(['event', 'festival']);
 
 export function AnniversaryModal({
   calendar,
@@ -770,6 +778,14 @@ export function AnniversaryModal({
     return React.createElement('option', { key: String(item.value), value: item.value }, item.label ?? item.value);
   })));
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon || (function () { return '×'; });
+  const CakeIcon = __comp.CakeIcon || __deps.CakeIcon;
+  const BalloonIcon = __comp.BalloonIcon || __deps.BalloonIcon;
+  const ConfettiIcon = __comp.ConfettiIcon || __deps.ConfettiIcon;
+  const TicketsPlaneIcon = __comp.TicketsPlaneIcon || __deps.TicketsPlaneIcon;
+  const MessageCircleMoreIcon = __comp.MessageCircleMoreIcon || __deps.MessageCircleMoreIcon;
+  const ANNIVERSARY_CATEGORY_ICONS = {
+    birthday: CakeIcon, event: BalloonIcon, festival: ConfettiIcon, travel: TicketsPlaneIcon, other: MessageCircleMoreIcon
+  };
   const getActiveParticipants = __deps.getActiveParticipants;
   const [activeTab, setActiveTab] = React.useState('list'); // 'list', 'add', 'bulk'
   const [editingId, setEditingId] = React.useState(null); // null when registering a new anniversary
@@ -800,6 +816,14 @@ export function AnniversaryModal({
   const [targetDate, setTargetDate] = React.useState(() => todayStr());
   const [ddayMode, setDdayMode] = React.useState('countdown'); // 'countdown', 'milestone'
   const [isLegacyDdayEdit, setIsLegacyDdayEdit] = React.useState(false);
+  // Description (all categories) -- free text, may contain URLs (shown as capsule badges wherever displayed)
+  const [newDescription, setNewDescription] = React.useState('');
+  // Place (행사/축제 only)
+  const [isCategorySheetOpen, setIsCategorySheetOpen] = React.useState(false);
+  const [placeQuery, setPlaceQuery] = React.useState('');
+  const [isPlaceSearching, setIsPlaceSearching] = React.useState(false);
+  const [placeResults, setPlaceResults] = React.useState([]);
+  const [selectedPlace, setSelectedPlace] = React.useState(null);
 
   // Migrated bulk register availability states
   const [bulkParticipantId, setBulkParticipantId] = React.useState('');
@@ -829,6 +853,8 @@ export function AnniversaryModal({
     onceDate,
     rangeStartDate,
     rangeEndDate,
+    newDescription,
+    selectedPlace,
     targetDate,
     ddayMode,
     bulkParticipantId,
@@ -853,6 +879,10 @@ export function AnniversaryModal({
     setEditingId(ann.id);
     setNewTitle(ann.title || '');
     setNewCategory(ann.category || 'birthday');
+    setNewDescription(ann.description || '');
+    setSelectedPlace(ann.place || null);
+    setPlaceQuery('');
+    setPlaceResults([]);
     if (ann.type === 'dday') {
       // Pre-existing D-Day entries can no longer be created from this form, but must still be
       // editable in place rather than silently losing their targetDate/isCountDown fields.
@@ -912,6 +942,10 @@ export function AnniversaryModal({
         createdAt: createdAt,
         updatedAt: stamp
       };
+      if (newDescription.trim()) annData.description = newDescription.trim();
+      if (!isLegacyDdayEdit && ANNIVERSARY_CATEGORIES_WITH_PLACE.has(newCategory) && selectedPlace) {
+        annData.place = selectedPlace;
+      }
 
       if (isLegacyDdayEdit) {
         annData.type = 'dday';
@@ -950,11 +984,32 @@ export function AnniversaryModal({
       setRangeStartDate(todayStr());
       setRangeEndDate(todayStr());
       setIsLegacyDdayEdit(false);
+      setNewDescription('');
+      setPlaceQuery('');
+      setPlaceResults([]);
+      setSelectedPlace(null);
       setEditingId(null);
       setActiveTab('list');
     } catch (err) {
       console.error('Anniversary save error:', err);
       showToast('기념일 저장 실패', 'error');
+    }
+  };
+
+  const handleAnniversaryPlaceSearch = async () => {
+    const q = placeQuery.trim();
+    if (!q || isPlaceSearching) return;
+    setIsPlaceSearching(true);
+    setPlaceResults([]);
+    try {
+      const { results } = await searchPlaces(q);
+      setPlaceResults(Array.isArray(results) ? results : []);
+      if (!results || results.length === 0) showToast('검색 결과가 없습니다.', 'error');
+    } catch (err) {
+      console.error('Anniversary place search error:', err);
+      showToast('장소 검색에 실패했습니다.', 'error');
+    } finally {
+      setIsPlaceSearching(false);
     }
   };
 
@@ -1122,6 +1177,10 @@ export function AnniversaryModal({
             setIsLunar(false);
             setIsLeap(false);
             setIsLegacyDdayEdit(false);
+            setNewDescription('');
+            setPlaceQuery('');
+            setPlaceResults([]);
+            setSelectedPlace(null);
           }
         },
         style: {
@@ -1169,6 +1228,7 @@ export function AnniversaryModal({
             /* Left info */
             /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 } },
               /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
+                ANNIVERSARY_CATEGORY_ICONS[ann.category] && /*#__PURE__*/React.createElement(ANNIVERSARY_CATEGORY_ICONS[ann.category], { size: 16 }),
                 /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: 'var(--font-size-base)', color: 'var(--text-main)' } }, ann.title),
                 /* Badge */
                 /*#__PURE__*/React.createElement("span", {
@@ -1183,6 +1243,14 @@ export function AnniversaryModal({
               /* Date details */
               /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } },
                 getAnniversaryDateDisplay(ann)
+              ),
+              /* Place (if set) */
+              ann.place && /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } },
+                `📍 ${ann.place.name || getDisplayPlaceAddress(ann.place)}`
+              ),
+              /* Description (URLs rendered as capsule badges) */
+              ann.description && /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-main)', marginTop: '2px' } },
+                renderTextWithUrlBadge(ann.description)
               )
             ),
 
@@ -1223,20 +1291,25 @@ export function AnniversaryModal({
           /* Category Field */
           /*#__PURE__*/React.createElement("div", null,
             /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "카테고리"),
-            /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
-              title: "카테고리 선택",
-              placeholder: "카테고리 선택",
-              value: newCategory,
+            /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              className: "form-select",
               disabled: isLegacyDdayEdit,
-              onSelect: v => {
-                setNewCategory(v);
-                if (v === 'birthday') {
-                  setDayMode('single');
-                  setRepeatYearly(true);
-                }
-              },
-              options: ANNIVERSARY_CATEGORY_OPTIONS
-            })
+              style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', width: '100%', textAlign: 'left', cursor: isLegacyDdayEdit ? 'default' : 'pointer' },
+              onClick: () => { if (!isLegacyDdayEdit) setIsCategorySheetOpen(true); }
+            },
+              /*#__PURE__*/React.createElement("span", { style: { display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 } },
+                ANNIVERSARY_CATEGORY_ICONS[newCategory] && /*#__PURE__*/React.createElement(ANNIVERSARY_CATEGORY_ICONS[newCategory], { size: 18 }),
+                /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, fontSize: 'var(--font-size-md)', color: 'var(--text-main)' } },
+                  ANNIVERSARY_CATEGORY_OPTIONS.find(o => o.value === newCategory)?.label || '카테고리 선택'
+                )
+              ),
+              /*#__PURE__*/React.createElement("svg", {
+                xmlns: "http://www.w3.org/2000/svg", width: "16", height: "16", viewBox: "0 0 24 24",
+                fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round",
+                className: "form-select-chevron", "aria-hidden": "true"
+              }, /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" }))
+            )
           ),
 
           /* Title Field */
@@ -1251,6 +1324,75 @@ export function AnniversaryModal({
               onChange: e => setNewTitle(e.target.value),
               maxLength: 50
             })
+          ),
+
+          /* Description Field (all categories) */
+          /*#__PURE__*/React.createElement("div", null,
+            /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "설명"),
+            /*#__PURE__*/React.createElement("textarea", {
+              className: "form-input",
+              style: { width: '100%', minHeight: '64px', resize: 'vertical', fontFamily: 'inherit' },
+              placeholder: "설명을 입력하세요. 링크를 함께 적으면 URL 뱃지로 표시됩니다.",
+              value: newDescription,
+              onChange: e => setNewDescription(e.target.value),
+              maxLength: 500
+            })
+          ),
+
+          /* Place Field (행사/축제 only) */
+          !isLegacyDdayEdit && ANNIVERSARY_CATEGORIES_WITH_PLACE.has(newCategory) && /*#__PURE__*/React.createElement("div", null,
+            /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "장소"),
+            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
+              /*#__PURE__*/React.createElement("input", {
+                type: "text",
+                className: "form-input",
+                style: { flex: 1 },
+                placeholder: "지명, 도로명 주소, 또는 업체명 검색",
+                value: placeQuery,
+                onChange: e => setPlaceQuery(e.target.value),
+                onKeyDown: e => {
+                  if (e.key === 'Enter') { e.preventDefault(); handleAnniversaryPlaceSearch(); }
+                }
+              }),
+              /*#__PURE__*/React.createElement("button", {
+                type: "button",
+                className: "btn btn-poll-create btn-action btn-action-dark",
+                style: { padding: '0 16px', fontWeight: 800 },
+                disabled: isPlaceSearching,
+                onClick: handleAnniversaryPlaceSearch
+              }, isPlaceSearching ? "검색 중..." : "검색")
+            ),
+            placeResults.length > 0 && /*#__PURE__*/React.createElement("div", {
+              style: {
+                marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '160px', overflowY: 'auto',
+                border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '6px', backgroundColor: 'var(--bg-primary)'
+              }
+            }, placeResults.map(r => /*#__PURE__*/React.createElement("button", {
+              key: r.id,
+              type: "button",
+              onClick: () => { setSelectedPlace(r); setPlaceResults([]); setPlaceQuery(''); },
+              style: { textAlign: 'left', padding: '8px 10px', borderRadius: 'var(--radius-sm)', border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '2px' },
+              className: "place-result-item"
+            },
+              /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-main)' } }, r.name),
+              /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } }, getDisplayPlaceAddress(r))
+            ))),
+            selectedPlace && /*#__PURE__*/React.createElement("div", {
+              style: {
+                marginTop: '6px', padding: '10px 12px', borderRadius: 'var(--radius-md)', backgroundColor: 'rgba(59, 130, 246, 0.08)',
+                border: '1px solid rgba(59, 130, 246, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px'
+              }
+            },
+              /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 } },
+                /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-base)', fontWeight: 800, color: 'var(--text-main)' } }, selectedPlace.name),
+                /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } }, getDisplayPlaceAddress(selectedPlace))
+              ),
+              /*#__PURE__*/React.createElement("button", {
+                type: "button",
+                onClick: () => setSelectedPlace(null),
+                style: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1rem', cursor: 'pointer', flexShrink: 0 }
+              }, "✕")
+            )
           ),
 
           /* Legacy D-Day edit notice + fields (only reachable by editing a pre-existing D-Day anniversary) */
@@ -1306,9 +1448,10 @@ export function AnniversaryModal({
             )
           ),
 
-          /* Day mode (하루 / 연일) + date fields -- hidden while editing a legacy D-Day entry */
+          /* Day mode (하루 / 연일) + date fields -- hidden while editing a legacy D-Day entry.
+             생일은 정의상 항상 하루이므로 이 토글 자체를 표시하지 않는다. */
           !isLegacyDdayEdit && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '10px' } },
-            /*#__PURE__*/React.createElement(SegmentedToggle, {
+            newCategory !== 'birthday' && /*#__PURE__*/React.createElement(SegmentedToggle, {
               ariaLabel: "하루/연일 전환",
               value: dayMode,
               onChange: v => setDayMode(v),
@@ -1361,20 +1504,28 @@ export function AnniversaryModal({
                     color: isLeap ? '#FFFFFF' : 'var(--text-muted)'
                   }
                 }, "윤달"),
-                /* Repeat yearly checkbox */
-                /*#__PURE__*/React.createElement("label", {
+                /* Repeat yearly toggle -- styled to match the 양력/음력 SegmentedToggle exactly
+                   (same outer padding/border and inner button padding) instead of a native checkbox */
+                /*#__PURE__*/React.createElement("div", {
+                  role: "group", "aria-label": "반복 여부",
                   style: {
-                    display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer',
-                    fontSize: 'var(--font-size-md)', color: 'var(--text-main)', fontWeight: repeatYearly ? 700 : 500
+                    display: 'flex', alignItems: 'stretch', padding: '3px', boxSizing: 'border-box',
+                    border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', flexShrink: 0
                   }
                 },
-                  /*#__PURE__*/React.createElement("input", {
-                    type: "checkbox",
-                    checked: repeatYearly,
-                    onChange: e => setRepeatYearly(e.target.checked),
-                    style: { margin: 0 }
-                  }),
-                  "반복"
+                  /*#__PURE__*/React.createElement("button", {
+                    type: "button",
+                    role: "switch",
+                    "aria-checked": repeatYearly,
+                    onClick: () => setRepeatYearly(!repeatYearly),
+                    style: {
+                      minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                      padding: '12px 16px', border: 'none', cursor: 'pointer', borderRadius: 'var(--radius-sm)',
+                      fontSize: 'var(--font-size-md)', fontWeight: repeatYearly ? 900 : 500, whiteSpace: 'nowrap',
+                      backgroundColor: repeatYearly ? 'var(--accent-primary)' : 'transparent',
+                      color: repeatYearly ? '#FFFFFF' : 'var(--text-muted)'
+                    }
+                  }, "반복")
                 )
               )
             ),
@@ -1570,6 +1721,47 @@ export function AnniversaryModal({
     )
   ));
 
+  // Category picker sheet -- built as a bespoke bottom sheet (reusing the shared
+  // .bottom-sheet-* classes for visual consistency) rather than SimpleBottomSheetPicker, since
+  // each row needs a leading category icon that picker doesn't support.
+  const categorySheet = isCategorySheetOpen && /*#__PURE__*/React.createElement("div", {
+    className: "bottom-sheet-overlay",
+    onClick: () => setIsCategorySheetOpen(false)
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bottom-sheet",
+    onClick: e => e.stopPropagation()
+  },
+    /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-header" },
+      /*#__PURE__*/React.createElement("h4", null, "카테고리 선택"),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        style: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer' },
+        onClick: () => setIsCategorySheetOpen(false)
+      }, "✕")
+    ),
+    /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-body" },
+      ANNIVERSARY_CATEGORY_OPTIONS.map(opt => {
+        const OptIcon = ANNIVERSARY_CATEGORY_ICONS[opt.value];
+        return /*#__PURE__*/React.createElement("button", {
+          key: opt.value,
+          type: "button",
+          className: "bottom-sheet-item",
+          onClick: () => {
+            setNewCategory(opt.value);
+            if (opt.value === 'birthday') {
+              setDayMode('single');
+              setRepeatYearly(true);
+            }
+            setIsCategorySheetOpen(false);
+          }
+        },
+          OptIcon && /*#__PURE__*/React.createElement(OptIcon, { size: 20 }),
+          /*#__PURE__*/React.createElement("span", null, opt.label)
+        );
+      })
+    )
+  ));
+
   return /*#__PURE__*/React.createElement(React.Fragment, null,
     embedded
       ? portalContent
@@ -1578,7 +1770,10 @@ export function AnniversaryModal({
         : portalContent),
     bulkParticipantSheet && typeof document !== 'undefined' && ReactDOM.createPortal
       ? ReactDOM.createPortal(bulkParticipantSheet, document.body)
-      : bulkParticipantSheet
+      : bulkParticipantSheet,
+    categorySheet && typeof document !== 'undefined' && ReactDOM.createPortal
+      ? ReactDOM.createPortal(categorySheet, document.body)
+      : categorySheet
   );
 }
 

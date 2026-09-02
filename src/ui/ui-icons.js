@@ -2061,11 +2061,82 @@ export function KakaoTalkIcon({ size = 20 } = {}) {
   );
 }
 
+// 기념일 카테고리 아이콘 -- 생일(CakeIcon, 기존), 행사, 축제, 여행, 기타. 등록 폼의 카테고리
+// 선택지와 캘린더 뱃지/목록 탭에서 공통으로 재사용된다.
+export function BalloonIcon({ size = 18 } = {}) {
+  const React = window.React;
+  return /*#__PURE__*/React.createElement('svg', {
+    xmlns: 'http://www.w3.org/2000/svg', width: String(size), height: String(size), viewBox: '0 0 24 24',
+    fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round',
+    'aria-hidden': 'true'
+  },
+    /*#__PURE__*/React.createElement('path', { d: 'M12 16v1a2 2 0 0 0 2 2h1a2 2 0 0 1 2 2v1' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M12 6a2 2 0 0 1 2 2' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M18 8c0 4-3.5 8-6 8s-6-4-6-8a6 6 0 0 1 12 0' })
+  );
+}
+
+export function ConfettiIcon({ size = 18 } = {}) {
+  const React = window.React;
+  return /*#__PURE__*/React.createElement('svg', {
+    xmlns: 'http://www.w3.org/2000/svg', width: String(size), height: String(size), viewBox: '0 0 24 24',
+    fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round',
+    'aria-hidden': 'true'
+  },
+    /*#__PURE__*/React.createElement('path', { stroke: 'none', d: 'M0 0h24v24H0z', fill: 'none' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M4 5h2' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M5 4v2' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M11.5 4l-.5 2' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M18 5h2' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M19 4v2' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M15 9l-1 1' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M18 13l2 -.5' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M18 19h2' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M19 18v2' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M14 16.518l-6.518 -6.518l-4.39 9.58a1 1 0 0 0 1.329 1.329l9.579 -4.39' })
+  );
+}
+
+export function TicketsPlaneIcon({ size = 18 } = {}) {
+  const React = window.React;
+  return /*#__PURE__*/React.createElement('svg', {
+    xmlns: 'http://www.w3.org/2000/svg', width: String(size), height: String(size), viewBox: '0 0 24 24',
+    fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round',
+    'aria-hidden': 'true'
+  },
+    /*#__PURE__*/React.createElement('path', { d: 'M10.5 17h1.227a2 2 0 0 0 1.345-.52L18 12' }),
+    /*#__PURE__*/React.createElement('path', { d: 'm12 13.5 3.794.506' }),
+    /*#__PURE__*/React.createElement('path', { d: 'm3.173 8.18 11-5a2 2 0 0 1 2.647.993L18.56 8' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M6 10V8' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M6 14v1' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M6 19v2' }),
+    /*#__PURE__*/React.createElement('rect', { x: '2', y: '8', width: '20', height: '13', rx: '2' })
+  );
+}
+
+export function MessageCircleMoreIcon({ size = 18 } = {}) {
+  const React = window.React;
+  return /*#__PURE__*/React.createElement('svg', {
+    xmlns: 'http://www.w3.org/2000/svg', width: String(size), height: String(size), viewBox: '0 0 24 24',
+    fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round',
+    'aria-hidden': 'true'
+  },
+    /*#__PURE__*/React.createElement('path', { d: 'M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M8 12h.01' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M12 12h.01' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M16 12h.01' })
+  );
+}
+
   if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
     KakaoTalkIcon: KakaoTalkIcon,
     MenuIcon: MenuIcon,
     CakeIcon: CakeIcon,
+    BalloonIcon: BalloonIcon,
+    ConfettiIcon: ConfettiIcon,
+    TicketsPlaneIcon: TicketsPlaneIcon,
+    MessageCircleMoreIcon: MessageCircleMoreIcon,
     NotepadTextIcon: NotepadTextIcon,
     ChatSectionIcon: ChatSectionIcon,
     LinkIcon: LinkIcon,
