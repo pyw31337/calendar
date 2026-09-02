@@ -1270,7 +1270,7 @@ export function AdminModal({
 
     /* Tab Menu Bar */
     /*#__PURE__*/React.createElement("div", {
-      style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', flexShrink: 0, minWidth: 0 }
+      style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', flexShrink: 0, minWidth: 0 }
     },
       /* Tab 1: General settings */
       /*#__PURE__*/React.createElement("button", {
@@ -1284,7 +1284,19 @@ export function AdminModal({
           cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
         }
       }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(CalendarCogIcon, null)), "일반"),
-      /* Tab 2: Log-based recovery */
+      /* Tab 2: Poll management */
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => setActiveTab('polls'),
+        style: {
+          padding: '12px 8px', fontSize: 'var(--font-size-base)', fontWeight: 'bold', whiteSpace: 'nowrap',
+          color: activeTab === 'polls' ? '#2563EB' : '#64748B',
+          border: 'none', background: 'none',
+          borderBottom: activeTab === 'polls' ? '3px solid #2563EB' : '3px solid transparent',
+          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
+        }
+      }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(PollSectionIcon, null)), "투표"),
+      /* Tab 3: Log-based recovery */
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: () => setActiveTab('recovery'),
@@ -1310,10 +1322,12 @@ export function AdminModal({
       }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(LogIcon, null)), "로그")
     ),
 
-    /* Modal Scrollable Body */
+    /* Modal Scrollable Body -- single scroll container shared by every tab, flush against the
+       modal's edges (no padding here) so the scrollbar always sits on the true boundary; each
+       tab's own content wrapper below carries the visible 16px padding instead. */
     /*#__PURE__*/React.createElement("div", {
       className: "modal-body",
-      style: { flex: activeTab === 'logs' ? '0 0 auto' : 1, overflowY: 'auto', padding: activeTab === 'logs' ? '0px' : '20px', display: 'flex', flexDirection: 'column', gap: '20px' }
+      style: { flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: '0px' }
     },
       /* ========================================== */
       /* TAB 2: CALENDAR & POLLS SETTINGS           */
@@ -1321,7 +1335,7 @@ export function AdminModal({
       activeTab === 'settings' && /*#__PURE__*/React.createElement(React.Fragment, null,
         /* Grid split: Left is Calendar settings, Right is Poll management */
         /*#__PURE__*/React.createElement("div", {
-          style: { display: 'flex', gap: '20px', flexDirection: 'column' }
+          style: { display: 'flex', gap: '20px', flexDirection: 'column', padding: '16px' }
         },
           /* Section 1: Calendar Profile & Participants */
           /*#__PURE__*/React.createElement("div", {
@@ -1416,61 +1430,68 @@ export function AdminModal({
               onClick: handleSubmitSettings,
               style: { marginTop: '16px', width: '100%', height: '44px', fontWeight: 'bold' }
             }, isSubmitting ? "저장 중..." : "설정 저장")
+          )
+        )
+      ),
+
+      /* ========================================== */
+      /* TAB: POLL MANAGEMENT                       */
+      /* ========================================== */
+      activeTab === 'polls' && /*#__PURE__*/React.createElement("div", {
+        style: { padding: '16px' }
+      },
+        /* Polls Creation & List */
+        /*#__PURE__*/React.createElement("div", {
+          style: { border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '16px', backgroundColor: 'var(--bg-card)' }
+        },
+          /* Header */
+          /*#__PURE__*/React.createElement("div", {
+            style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '6px' }
+          },
+            /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-main)', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(PollSectionIcon, null), "투표 설정"),
+            /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              className: "btn btn-poll-create",
+              onClick: () => { setEditingPoll(null); setIsPollModalOpen(true); }
+            }, "+ 새 투표")
           ),
 
-          /* Section 2: Polls Creation & List */
+          /* Poll list container */
           /*#__PURE__*/React.createElement("div", {
-            style: { border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '16px', backgroundColor: 'var(--bg-card)' }
+            style: { display: 'flex', flexDirection: 'column', gap: '8px' }
           },
-            /* Header */
-            /*#__PURE__*/React.createElement("div", {
-              style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '6px' }
+            getCalendarPolls(calendar).length === 0 ? /*#__PURE__*/React.createElement("div", { style: { padding: '16px', color: 'var(--text-light)', fontSize: 'var(--font-size-md)', textAlign: 'center' } }, "현재 등록된 투표가 없습니다. 새 투표를 생성해 주세요.") :
+            getCalendarPolls(calendar).map(poll => /*#__PURE__*/React.createElement("div", {
+              key: poll.id,
+              className: 'admin-log-row poll-list-row settings-poll-row',
+              style: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px 8px', borderRadius: 'var(--radius-md)', padding: '10px 12px' }
             },
-              /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-main)', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' } }, /*#__PURE__*/React.createElement(PollSectionIcon, null), "투표 설정"),
-              /*#__PURE__*/React.createElement("button", {
-                type: "button",
-                className: "btn btn-poll-create",
-                onClick: () => { setEditingPoll(null); setIsPollModalOpen(true); }
-              }, "+ 새 투표")
-            ),
-
-            /* Poll list container */
-            /*#__PURE__*/React.createElement("div", {
-              style: { display: 'flex', flexDirection: 'column', gap: '8px' }
-            },
-              getCalendarPolls(calendar).length === 0 ? /*#__PURE__*/React.createElement("div", { style: { padding: '16px', color: 'var(--text-light)', fontSize: 'var(--font-size-md)', textAlign: 'center' } }, "현재 등록된 투표가 없습니다. 새 투표를 생성해 주세요.") :
-              getCalendarPolls(calendar).map(poll => /*#__PURE__*/React.createElement("div", {
-                key: poll.id,
-                className: 'admin-log-row poll-list-row settings-poll-row',
-                style: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px 8px', borderRadius: 'var(--radius-md)', padding: '10px 12px' }
-              },
-                /* Left info */
-                /*#__PURE__*/React.createElement("div", { className: "admin-poll-row-main", style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px', minWidth: 0, flex: '1 1 160px' } },
-                  /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-base)', fontWeight: 'bold', color: 'var(--text-main)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' } }, poll.title),
-                  /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } }, `${getActivePollOptions(poll).length}개 옵션 · 총 ${getPollTotalVoteCount(poll)}표${poll.deadline ? ` · 마감 ${formatPollDeadline(poll.deadline)}${isPollClosed(poll) ? ' (마감됨)' : ''}` : ''}`)
-                ),
-                /* Right actions */
-                /*#__PURE__*/React.createElement("div", { className: "admin-poll-row-actions", style: { display: 'flex', gap: '6px' } },
-                  /* Edit button */
-                  /*#__PURE__*/React.createElement("button", {
-                    type: "button",
-                    onClick: () => { setEditingPoll(poll); setIsPollModalOpen(true); },
-                    style: {
-                      backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)',
-                      padding: '4px 10px', fontSize: 'var(--font-size-sm)', cursor: 'pointer', color: 'var(--text-main)'
-                    }
-                  }, "수정"),
-                  /* Delete button */
-                  /*#__PURE__*/React.createElement("button", {
-                    type: "button",
-                    className: "btn btn-danger",
-                    title: "삭제",
-                    onClick: () => handleDeletePollFromAdmin(poll),
-                    style: { width: '30px', height: '30px', padding: 0, flexShrink: 0 }
-                  }, /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }))
-                )
-              ))
-            )
+              /* Left info */
+              /*#__PURE__*/React.createElement("div", { className: "admin-poll-row-main", style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px', minWidth: 0, flex: '1 1 160px' } },
+                /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-base)', fontWeight: 'bold', color: 'var(--text-main)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' } }, poll.title),
+                /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } }, `${getActivePollOptions(poll).length}개 옵션 · 총 ${getPollTotalVoteCount(poll)}표${poll.deadline ? ` · 마감 ${formatPollDeadline(poll.deadline)}${isPollClosed(poll) ? ' (마감됨)' : ''}` : ''}`)
+              ),
+              /* Right actions */
+              /*#__PURE__*/React.createElement("div", { className: "admin-poll-row-actions", style: { display: 'flex', gap: '6px' } },
+                /* Edit button */
+                /*#__PURE__*/React.createElement("button", {
+                  type: "button",
+                  onClick: () => { setEditingPoll(poll); setIsPollModalOpen(true); },
+                  style: {
+                    backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)',
+                    padding: '4px 10px', fontSize: 'var(--font-size-sm)', cursor: 'pointer', color: 'var(--text-main)'
+                  }
+                }, "수정"),
+                /* Delete button */
+                /*#__PURE__*/React.createElement("button", {
+                  type: "button",
+                  className: "btn btn-danger",
+                  title: "삭제",
+                  onClick: () => handleDeletePollFromAdmin(poll),
+                  style: { width: '30px', height: '30px', padding: 0, flexShrink: 0 }
+                }, /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }))
+              )
+            ))
           )
         )
       ),
@@ -1479,7 +1500,7 @@ export function AdminModal({
       /* TAB 3: POINT-IN-TIME LOG RECOVERY         */
       /* ========================================== */
       activeTab === 'recovery' && /*#__PURE__*/React.createElement("div", {
-        style: { flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }
+        style: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }
       },
         /* Info alert */
         /*#__PURE__*/React.createElement("div", {
@@ -1624,7 +1645,7 @@ export function AdminModal({
     /* TAB 4: CHAT/SCHEDULE ACTIVITY AUDIT LOG    */
     /* ========================================== */
     activeTab === 'logs' && /*#__PURE__*/React.createElement("div", {
-      style: { flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: '16px' }
+      style: { padding: '16px' }
     },
       /*#__PURE__*/React.createElement("div", {
         style: { display: 'flex', flexDirection: 'column', gap: '12px' }
