@@ -770,6 +770,8 @@ export function AnniversaryModal({
   showToast,
   onRequestConfirm,
   onBulkRegister,
+  onAnniversarySaved,
+  onAnniversaryDeleted,
   isDarkTheme,
   embedded = false
 }) {
@@ -1018,6 +1020,12 @@ export function AnniversaryModal({
 
       const saved = await writeSharedCollection('anniversaries', calendarId, anniversaryId, annData, 'set', '기념일 저장');
       if (!saved?.success) throw new Error('Anniversary save failed');
+      // Patch local state immediately rather than waiting on the realtime listener -- a write
+      // that falls through to the REST fallback (see writeCollectionDocumentWithFallback) never
+      // touches the Firestore SDK's own local persistence cache, so a listener whose live
+      // connection is stuck (blocked/throttled WebChannel, seen on some browsers/networks) can
+      // keep serving that stale cache indefinitely, surviving even a full page reload.
+      if (typeof onAnniversarySaved === 'function') onAnniversarySaved(annData);
       showToast(editingId ? '기념일이 수정되었습니다.' : '기념일이 등록되었습니다.', 'success');
 
       // Reset form
@@ -1104,10 +1112,12 @@ export function AnniversaryModal({
         const annSnapshot = JSON.parse(JSON.stringify(ann));
         const deleted = await writeSharedCollection('anniversaries', calendarId, ann.id, null, 'delete', '기념일 삭제');
         if (!deleted?.success) throw new Error('Anniversary delete failed');
+        if (typeof onAnniversaryDeleted === 'function') onAnniversaryDeleted(ann.id);
         showToast('기념일이 삭제되었습니다.', 'delete', 5000, async () => {
           try {
             const restored = await writeSharedCollection('anniversaries', calendarId, ann.id, annSnapshot, 'set', '기념일 복원');
             if (!restored?.success) throw new Error('Anniversary restore failed');
+            if (typeof onAnniversarySaved === 'function') onAnniversarySaved(annSnapshot);
             showToast('기념일 삭제를 되돌렸습니다.', 'success', 3000);
           } catch (restoreErr) {
             console.error('Anniversary restore error:', restoreErr);

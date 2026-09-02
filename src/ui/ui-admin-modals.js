@@ -796,6 +796,8 @@ export function AdminModal({
   onDeleteAvailability,
   onDeleteAllForDate,
   onBulkRegister,
+  onAnniversarySaved,
+  onAnniversaryDeleted,
   onRequestConfirm,
   onClose,
   showToast,
@@ -1519,6 +1521,8 @@ export function AdminModal({
               showToast: showToast,
               onRequestConfirm: onRequestConfirm,
               onBulkRegister: onBulkRegister,
+              onAnniversarySaved: onAnniversarySaved,
+              onAnniversaryDeleted: onAnniversaryDeleted,
               isDarkTheme: isDarkTheme
             })
           : /*#__PURE__*/React.createElement("div", { style: { padding: '20px', color: 'var(--text-muted)' } }, "기념일 모듈을 불러올 수 없습니다.")

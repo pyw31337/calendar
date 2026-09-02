@@ -2360,6 +2360,28 @@ function CalendarApp() {
     return () => { isMounted = false; unsub(); };
   }, [activeCalId, activeView, firebaseDb, firebaseConnectionVersion]);
 
+  // Patches local state immediately after a confirmed-successful write instead of waiting on
+  // the realtime listener above. A write that falls through to the REST fallback (see
+  // writeCollectionDocumentWithFallback) never touches the Firestore SDK's own local persistence
+  // cache, so if that listener's live connection is stuck (a blocked/throttled WebChannel, seen
+  // on some browsers/networks), it can keep serving the stale cache indefinitely -- surviving
+  // even a full page reload, since IndexedDB persistence carries the stale snapshot across reloads.
+  const handleAnniversarySaved = (annData) => {
+    if (!annData?.id) return;
+    setAnniversaries(prev => {
+      const list = Array.isArray(prev) ? prev.slice() : [];
+      const idx = list.findIndex(a => a.id === annData.id);
+      if (idx >= 0) list[idx] = { ...list[idx], ...annData };
+      else list.unshift(annData);
+      list.sort((a, b) => (Number(b.createdAt) || Number(b.updatedAt) || 0) - (Number(a.createdAt) || Number(a.updatedAt) || 0));
+      return list;
+    });
+  };
+  const handleAnniversaryDeleted = (annId) => {
+    if (!annId) return;
+    setAnniversaries(prev => (Array.isArray(prev) ? prev.filter(a => a.id !== annId) : []));
+  };
+
   // Places + confirmed meetings: calendar / places / settlement only
   React.useEffect(() => {
     const needsPlacesData = activeView === 'calendar' || activeView === 'places' || activeView === 'settlement';
@@ -5933,6 +5955,8 @@ function CalendarApp() {
       onDeleteAvailability: handleDeleteAvailability,
       onDeleteAllForDate: handleDeleteAllForDate,
       onBulkRegister: handleBulkRegisterAvailability,
+      onAnniversarySaved: handleAnniversarySaved,
+      onAnniversaryDeleted: handleAnniversaryDeleted,
       onRequestConfirm: showConfirmDialog,
       onClose: () => { setIsAdminOpen(false); setAdminInitialTab('settings'); },
       showToast: showToast,
@@ -7026,6 +7050,8 @@ function CalendarApp() {
     showToast: showToast,
     onRequestConfirm: showConfirmDialog,
     onBulkRegister: handleBulkRegisterAvailability,
+    onAnniversarySaved: handleAnniversarySaved,
+    onAnniversaryDeleted: handleAnniversaryDeleted,
     isDarkTheme: isDarkTheme
   }), /*#__PURE__*/React.createElement("div", {
     ref: calendarSectionRef
