@@ -2041,8 +2041,29 @@ export function DicesIcon({ size = 14 }) {
   );
 }
 
+// Speech-bubble "TALK" glyph used next to KakaoTalk share actions -- a plain black bubble with
+// white lettering (not the yellow app-icon artwork) so it reads correctly on both light and dark
+// button backgrounds without needing separate light/dark asset variants.
+export function KakaoTalkIcon({ size = 20 } = {}) {
+  const React = window.React;
+  return /*#__PURE__*/React.createElement('svg', {
+    xmlns: 'http://www.w3.org/2000/svg', width: String(size), height: String(size), viewBox: '0 0 512 512',
+    'aria-hidden': 'true'
+  },
+    /*#__PURE__*/React.createElement('path', {
+      fill: '#000',
+      d: 'M256 96C114.6 96 0 182.9 0 290c0 68.5 46.5 128.8 116.7 163.4c-5.1 19-19.5 72.6-22.4 83.9c-3.5 13.9 5.1 13.7 10.7 10c4.4-2.9 70.6-47.9 99.2-67.4c16.7 2.4 34 3.7 51.8 3.7c141.4 0 256-86.9 256-194S397.4 96 256 96'
+    }),
+    /*#__PURE__*/React.createElement('text', {
+      x: '256', y: '318', fill: '#fff', fontFamily: 'Arial, Helvetica, sans-serif', fontWeight: '700',
+      fontSize: '110', letterSpacing: '2', textAnchor: 'middle'
+    }, 'TALK')
+  );
+}
+
   if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
+    KakaoTalkIcon: KakaoTalkIcon,
     MenuIcon: MenuIcon,
     CakeIcon: CakeIcon,
     NotepadTextIcon: NotepadTextIcon,
