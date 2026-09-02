@@ -1313,7 +1313,7 @@ export function PlacesSection({ calendar, onViewAll, onSelectPlace }) {
   const PlaceSectionIcon = __comp.PlaceSectionIcon || __deps.PlaceSectionIcon;
   const PlaceCategoryMarkerIcon = __comp.PlaceCategoryMarkerIcon || __deps.PlaceCategoryMarkerIcon;
   const SectionToggleButton = __comp.SectionToggleButton || __deps.SectionToggleButton;
-  const ExternalLinkIcon = __comp.ExternalLinkIcon || __deps.ExternalLinkIcon;
+  const StoreInfoIcon = __comp.StoreInfoIcon || __deps.StoreInfoIcon;
   const getCalendarPlaces = __deps.getCalendarPlaces;
 
   // Unlike the other main-screen preview sections, collapsed here still shows 2 cards (not 0) --
@@ -1431,7 +1431,7 @@ export function PlacesSection({ calendar, onViewAll, onSelectPlace }) {
             href: kakaoMapUrl, target: "_blank", rel: "noreferrer", title: "카카오맵에서 업체정보 보기",
             onClick: e => e.stopPropagation(),
             style: { marginLeft: 'auto', flexShrink: 0, display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }
-          }, ExternalLinkIcon && /*#__PURE__*/React.createElement(ExternalLinkIcon, { size: 15 }))
+          }, StoreInfoIcon && /*#__PURE__*/React.createElement(StoreInfoIcon, { size: 14 }))
         ),
         /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 } },
           /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: 'var(--font-size-base)', color: 'var(--text-main)' } }, place.alias || place.name || '이름 없음'),
