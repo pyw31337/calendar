@@ -804,6 +804,8 @@ export function AnniversaryModal({
   const getActiveParticipants = __deps.getActiveParticipants;
   const [activeTab, setActiveTab] = React.useState('list'); // 'list', 'add', 'bulk'
   const [editingId, setEditingId] = React.useState(null); // null when registering a new anniversary
+  // 목록 tab's category filter -- 'all' or one of ANNIVERSARY_CATEGORY_OPTIONS' values.
+  const [listCategoryFilter, setListCategoryFilter] = React.useState('all');
 
   const todayStr = () => {
     const today = new Date();
@@ -1331,7 +1333,10 @@ export function AnniversaryModal({
       const key = groups.has(ann.category) ? ann.category : 'birthday';
       groups.get(key).push(ann);
     });
-    return ANNIVERSARY_CATEGORY_OPTIONS.map(opt => {
+    const visibleOptions = listCategoryFilter === 'all'
+      ? ANNIVERSARY_CATEGORY_OPTIONS
+      : ANNIVERSARY_CATEGORY_OPTIONS.filter(o => o.value === listCategoryFilter);
+    return visibleOptions.map(opt => {
       const items = groups.get(opt.value);
       if (!items.length) return null;
       const OptIcon = ANNIVERSARY_CATEGORY_ICONS[opt.value];
@@ -1411,6 +1416,39 @@ export function AnniversaryModal({
       }
     }),
 
+    /* 목록 tab's category filter row -- lets 생일/행사/축제/여행/기타 be viewed separately
+       instead of always scrolling through every group. */
+    activeTab === 'list' && anniversaries.length > 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex', gap: '6px', padding: '10px 12px 0', overflowX: 'auto', flexShrink: 0
+      }
+    },
+      [{ value: 'all', label: '전체' }, ...ANNIVERSARY_CATEGORY_OPTIONS].map(opt => {
+        const count = opt.value === 'all'
+          ? anniversaries.length
+          : anniversaries.filter(a => (a.category || 'birthday') === opt.value).length;
+        if (opt.value !== 'all' && count === 0) return null;
+        const isActive = listCategoryFilter === opt.value;
+        return /*#__PURE__*/React.createElement("button", {
+          key: opt.value,
+          type: "button",
+          onClick: () => setListCategoryFilter(opt.value),
+          style: {
+            flexShrink: 0,
+            border: 'none',
+            borderRadius: 'var(--radius-full)',
+            padding: '6px 12px',
+            background: isActive ? 'var(--accent-primary)' : 'var(--bg-primary)',
+            color: isActive ? '#FFFFFF' : 'var(--text-muted)',
+            fontWeight: 700,
+            fontSize: 'var(--font-size-sm)',
+            cursor: 'pointer',
+            whiteSpace: 'nowrap'
+          }
+        }, `${opt.label} (${count})`);
+      })
+    ),
+
     /* Modal Scrollable Body */
 
       /* Modal Body */
@@ -1419,13 +1457,23 @@ export function AnniversaryModal({
         activeTab === 'list' && /*#__PURE__*/React.createElement("div", {
           style: { display: 'flex', flexDirection: 'column', gap: '8px' }
         },
-          anniversaries.length > 0 ? renderGroupedAnniversaryList()
-          : /*#__PURE__*/React.createElement("div", {
-            style: {
-              textAlign: 'center', padding: '30px 10px', color: 'var(--text-muted)',
-              fontSize: 'var(--font-size-md)', lineHeight: '1.5'
-            }
-          }, "등록된 기념일이 없습니다. 매년 돌아오는 생일이나 D-Day를 등록해 보세요. 🎂")
+          anniversaries.length === 0
+            ? /*#__PURE__*/React.createElement("div", {
+                style: {
+                  textAlign: 'center', padding: '30px 10px', color: 'var(--text-muted)',
+                  fontSize: 'var(--font-size-md)', lineHeight: '1.5'
+                }
+              }, "등록된 기념일이 없습니다. 매년 돌아오는 생일이나 D-Day를 등록해 보세요. 🎂")
+            : (() => {
+                const grouped = renderGroupedAnniversaryList();
+                const hasAny = grouped.some(Boolean);
+                return hasAny ? grouped : /*#__PURE__*/React.createElement("div", {
+                  style: {
+                    textAlign: 'center', padding: '30px 10px', color: 'var(--text-muted)',
+                    fontSize: 'var(--font-size-md)', lineHeight: '1.5'
+                  }
+                }, "해당 카테고리에 등록된 기념일이 없습니다.");
+              })()
         ),
 
         /* TAB 2: Register / Edit */
