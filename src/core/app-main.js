@@ -2453,9 +2453,11 @@ function CalendarApp() {
     }
     let pinnedList = [];
     let recentList = [];
+    let recentActivityList = [];
     const applyMerged = () => {
       const byId = new Map();
       pinnedList.forEach(m => byId.set(m.id, m));
+      recentActivityList.forEach(m => byId.set(m.id, m));
       recentList.forEach(m => byId.set(m.id, m));
       setMemos(Array.from(byId.values()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)));
     };
@@ -2467,6 +2469,22 @@ function CalendarApp() {
         applyMerged();
       }, err => {
         console.warn(`Firestore pinned memos subscription error:`, err);
+      }) : null;
+
+    // 최근 활동 (see RECENT_MEMO_ACTIVITY_WINDOW_MS in ui-memo-view.js) needs any memo with a
+    // recent comment loaded even when it's well outside the recent-by-createdAt window below --
+    // an old memo that just got a comment otherwise wouldn't be in `memos` at all until someone
+    // pages back to it. Ordered by lastCommentAt (set alongside `comments` whenever a comment is
+    // added/edited/deleted) rather than filtered by a time cutoff, since a snapshot listener
+    // doesn't re-fire just because wall-clock time passed a cutoff -- ui-memo-view.js's own
+    // isMemoRecentlyActive does the actual 6-hour cutoff check against this loaded set.
+    const unsubscribeRecentActivity = needsMemoCollection ? subscribeMemos(activeCalId, { orderBy: 'lastCommentAt', direction: 'desc', limit: 30 }, snapshot => {
+        if (!isMounted) return;
+        recentActivityList = [];
+        snapshot.forEach(doc => recentActivityList.push({ id: doc.id, ...doc.data() }));
+        applyMerged();
+      }, err => {
+        console.warn(`Firestore recent-activity memos subscription error:`, err);
       }) : null;
 
     const unsubscribeRecent = subscribeMemos(activeCalId, { orderBy: 'createdAt', direction: 'desc', limit: effectiveMemosLimit }, snapshot => {
@@ -2488,6 +2506,7 @@ function CalendarApp() {
     return () => {
       isMounted = false;
       if (typeof unsubscribePinned === 'function') unsubscribePinned();
+      if (typeof unsubscribeRecentActivity === 'function') unsubscribeRecentActivity();
       if (typeof unsubscribeRecent === 'function') unsubscribeRecent();
     };
   }, [activeCalId, activeView, isGlobalSearchOpen, memosLimit, firebaseDb, firebaseConnectionVersion]);

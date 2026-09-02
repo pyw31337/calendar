@@ -232,7 +232,12 @@ service cloud.firestore {
           && (!('imageUrls' in data) || (data.imageUrls is list && data.imageUrls.size() <= 50))
           && (!('thumbUrls' in data) || (data.thumbUrls is list && data.thumbUrls.size() <= 50))
           && (!('tags' in data) || (data.tags is list && data.tags.size() <= 50))
-          && (!('comments' in data) || (data.comments is list && data.comments.size() <= 200));
+          && (!('comments' in data) || (data.comments is list && data.comments.size() <= 200))
+          // Denormalized copy of the newest comment's createdAt (see 최근 활동 / RECENT_MEMO_ACTIVITY_WINDOW_MS
+          // in ui-memo-view.js) so a memo with fresh activity can be queried without loading its
+          // whole comments array. No hasOnly() lock above means this was already writable before
+          // this line existed -- it just adds the same type check every other optional field gets.
+          && (!('lastCommentAt' in data) || data.lastCommentAt is number);
       }
       match /memos/{memoId} {
         allow read: if isCalendarDoc(calendarDocId);
