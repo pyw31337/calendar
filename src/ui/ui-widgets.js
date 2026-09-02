@@ -891,6 +891,79 @@ export function ParticipantBadge({ participant, style, className = '', children,
   }, children || participant.name);
 }
 
+// Shared "이름뱃지" interaction module: a row of small personal-color Circles that each expand
+// into a name-bearing Capsule on hover/touch/click, one at a time, sliding their row siblings
+// apart as they grow. Built once here so every future participant/attendee display (calendar day
+// cells today, anything else later) reuses the same open/close rules instead of re-implementing
+// them:
+//   - hover-in (desktop) or a tap opens that Circle as a Capsule; hover-out (rollout) or a tap
+//     anywhere outside the group closes it back to a Circle.
+//   - only one Capsule is open per group at a time -- moving to a different Circle closes the
+//     previous one and opens the new one.
+//   - a second tap/click on an already-open Capsule is treated as "activate" (calls onActivate),
+//     so touch users can still drill into a participant after the reveal tap.
+//   - items wrap at `maxPerRow` (default 4) so 8 attendees lay out as two rows of 4.
+export function AttendeeDotGroup({ items = [], maxPerRow = 4, onActivate, className = '' }) {
+  const React = window.React;
+  const [activeId, setActiveId] = React.useState(null);
+  const rootRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (activeId == null) return undefined;
+    const closeIfOutside = event => {
+      if (rootRef.current && !rootRef.current.contains(event.target)) {
+        setActiveId(null);
+      }
+    };
+    document.addEventListener('pointerdown', closeIfOutside, true);
+    return () => document.removeEventListener('pointerdown', closeIfOutside, true);
+  }, [activeId]);
+
+  if (!items.length) return null;
+
+  const rows = [];
+  for (let i = 0; i < items.length; i += maxPerRow) {
+    rows.push(items.slice(i, i + maxPerRow));
+  }
+
+  return /*#__PURE__*/React.createElement("div", {
+    ref: rootRef,
+    className: `attendee-dot-group${className ? ' ' + className : ''}`
+  }, rows.map((row, rowIdx) => /*#__PURE__*/React.createElement("div", {
+    key: rowIdx,
+    className: "attendee-dot-row"
+  }, row.map(item => {
+    const { id, participant, ...rest } = item;
+    if (!participant) return null;
+    const isActive = activeId === id;
+    return /*#__PURE__*/React.createElement("span", {
+      key: id,
+      className: `attendee-dot${isActive ? ' is-active' : ''}`,
+      style: { backgroundColor: participant.color || '#94A3B8' },
+      title: participant.name,
+      onMouseEnter: () => setActiveId(id),
+      onMouseLeave: () => setActiveId(prev => (prev === id ? null : prev)),
+      onTouchStart: rest.onTouchStart,
+      onClick: event => {
+        event.stopPropagation();
+        if (typeof rest.onClickGuard === 'function' && rest.onClickGuard(event) === false) return;
+        if (isActive) {
+          if (typeof onActivate === 'function') onActivate(participant, item);
+          return;
+        }
+        setActiveId(id);
+      },
+      draggable: rest.draggable,
+      onDragStart: rest.onDragStart,
+      onTouchMove: rest.onTouchMove,
+      onTouchEnd: rest.onTouchEnd,
+      onTouchCancel: rest.onTouchCancel
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "attendee-dot-name"
+    }, participant.name));
+  }))));
+}
+
 export function DateCapsuleBadge({ date, style = null }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -921,6 +994,7 @@ export function DateCapsuleBadge({ date, style = null }) {
     UrlCapsuleBadge: UrlCapsuleBadge,
     ParticipantPickerButton: ParticipantPickerButton,
     ParticipantBadge: ParticipantBadge,
+    AttendeeDotGroup: AttendeeDotGroup,
     DateCapsuleBadge: DateCapsuleBadge,
   });
 }
