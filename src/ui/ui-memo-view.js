@@ -1417,14 +1417,20 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   };
 
   const handleMemoCommentsChange = async (memo, nextComments) => {
-    if (typeof onUpdateMemo === 'function') onUpdateMemo(memo.id, { comments: nextComments });
+    // lastCommentAt is a denormalized copy of the newest comment's createdAt (0 once every
+    // comment is deleted). It exists purely so app-main.js's memo subscription can load an old
+    // memo that just received a comment even when it's well outside the paginated recent-by-
+    // createdAt window -- see the lastCommentAt-ordered query there. Comparing memo.comments
+    // itself (the array) isn't queryable in Firestore the way a plain field is.
+    const nextLastCommentAt = getLatestMemoCommentTimestamp({ comments: nextComments });
+    if (typeof onUpdateMemo === 'function') onUpdateMemo(memo.id, { comments: nextComments, lastCommentAt: nextLastCommentAt });
     try {
-      const updated = await writeMemoDocument('memos', calendar.id, memo.id, { comments: nextComments }, 'update', '메모 댓글 저장');
+      const updated = await writeMemoDocument('memos', calendar.id, memo.id, { comments: nextComments, lastCommentAt: nextLastCommentAt }, 'update', '메모 댓글 저장');
       if (!updated?.success) throw new Error('Memo comment update failed');
       return true;
     } catch (err) {
       console.error('Failed to update memo comments:', err);
-      if (typeof onUpdateMemo === 'function') onUpdateMemo(memo.id, { comments: memo.comments });
+      if (typeof onUpdateMemo === 'function') onUpdateMemo(memo.id, { comments: memo.comments, lastCommentAt: memo.lastCommentAt });
       showToast('댓글 저장 실패', 'error');
       return false;
     }
