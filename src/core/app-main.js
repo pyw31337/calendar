@@ -1419,6 +1419,9 @@ function CalendarApp() {
   const [activeLightbox, setActiveLightbox] = React.useState(null); // { urls: string[], index: number } | null
   const [isGalleryOpen, setIsGalleryOpen] = React.useState(false);
   const [placesInitialQuery, setPlacesInitialQuery] = React.useState('');
+  const [placesInitialFocusId, setPlacesInitialFocusId] = React.useState(null);
+  const [memoInitialTag, setMemoInitialTag] = React.useState('');
+  const [previewSharingMemo, setPreviewSharingMemo] = React.useState(null);
   // Clicking a #해시태그 in the lightbox's image-info panel closes the lightbox and opens the
   // global search prefilled with that tag -- shared by every Lightbox instance in the app.
   // GlobalSearchModal is only mounted in the default (calendar) tree, not in the separate
@@ -5379,6 +5382,18 @@ function CalendarApp() {
     }, 350);
   };
 
+  const handleJumpToMemoTag = tag => {
+    if (!tag) return;
+    setMemoInitialTag(tag);
+    changeView('memo');
+  };
+
+  const handleJumpToPlace = placeId => {
+    if (!placeId) return;
+    setPlacesInitialFocusId(placeId);
+    changeView('places');
+  };
+
   const handleJumpToGallery = (messageId, imageIndex, imageUrl) => {
     setActiveLightbox(null);
     changeView('gallery');
@@ -6654,6 +6669,8 @@ function CalendarApp() {
         onUpdateMemo: patchLocalMemo,
         onUpsertMemo: upsertLocalMemo,
         onDeleteMemo: removeLocalMemo,
+        memoInitialTag: memoInitialTag,
+        setMemoInitialTag: setMemoInitialTag,
         ...navMenuProps
       }),
       isMemoShareOpen && activeCal && /*#__PURE__*/React.createElement(ShareModal, {
@@ -6747,6 +6764,8 @@ function CalendarApp() {
         onRequestConfirm: showConfirmDialog,
         placesInitialQuery: placesInitialQuery,
         setPlacesInitialQuery: setPlacesInitialQuery,
+        placesInitialFocusId: placesInitialFocusId,
+        setPlacesInitialFocusId: setPlacesInitialFocusId,
         isDarkTheme: isDarkTheme,
         onToggleTheme: toggleTheme,
         fontScalePercent: fontScalePercent,
@@ -7371,12 +7390,12 @@ function CalendarApp() {
     onRequestConfirm: showConfirmDialog
   })), /*#__PURE__*/React.createElement(MemoPreviewSection, {
     memos: memos,
-    totalMemoCount: totalMemoCount,
     calendar: activeCal,
     onViewAll: () => changeView('memo'),
     onOpenEdit: memo => handleJumpToMemo(memo.id),
     onTogglePin: handleTogglePinFromMemoPreview,
-    onSelectTag: () => changeView('memo'),
+    onSelectTag: handleJumpToMemoTag,
+    onShare: memo => setPreviewSharingMemo(memo),
     onCommentsChange: handleMemoCommentsChangeFromMemoPreview,
     onRequestConfirm: showConfirmDialog,
     showToast: showToast
@@ -7387,29 +7406,39 @@ function CalendarApp() {
       setSelectedDate(d);
       setIsModalOpen(true);
     }
-  }), /*#__PURE__*/React.createElement(PhotoGallery, {
-    chatMessages: (galleryPreviewMessages && galleryPreviewMessages.length > 0) ? galleryPreviewMessages : allChatMessages,
-    memos: memos,
-    calendar: activeCal,
-    totalGalleryCount: mainMenuGalleryCount,
-    onViewAll: () => changeView('gallery'),
-    showToast: showToast,
-    onPromoteImageUrl: handlePromoteInlineChatImage,
-    onSaveImageTags: handleSaveImageTags,
-    onSearchTag: handleSearchTag,
-    onDeletePhoto: handleDeletePhoto,
-    onReplacePhoto: handleReplacePhoto,
-    onJumpToChatMessage: handleJumpToChatMessage,
-    onJumpToMemo: handleJumpToMemo,
-    onJumpToMeetingDate: handleJumpToMeetingDate,
-    onJumpToGallery: handleJumpToGallery,
-    onGetChatMessageOrdinal: handleGetChatMessageOrdinal,
-    onGetGalleryPhotoOrdinal: handleGetGalleryPhotoOrdinal,
-    onRequestConfirm: showConfirmDialog
-  }), /*#__PURE__*/React.createElement(PlacesSection, {
-    calendar: activeCal,
-    onViewAll: () => changeView('places')
-  }), /*#__PURE__*/React.createElement(Footer, null)));
+  }), /*#__PURE__*/React.createElement("div", { className: "gallery-places-row" },
+    /*#__PURE__*/React.createElement(PhotoGallery, {
+      chatMessages: (galleryPreviewMessages && galleryPreviewMessages.length > 0) ? galleryPreviewMessages : allChatMessages,
+      memos: memos,
+      calendar: activeCal,
+      totalGalleryCount: mainMenuGalleryCount,
+      onViewAll: () => changeView('gallery'),
+      showToast: showToast,
+      onPromoteImageUrl: handlePromoteInlineChatImage,
+      onSaveImageTags: handleSaveImageTags,
+      onSearchTag: handleSearchTag,
+      onDeletePhoto: handleDeletePhoto,
+      onReplacePhoto: handleReplacePhoto,
+      onJumpToChatMessage: handleJumpToChatMessage,
+      onJumpToMemo: handleJumpToMemo,
+      onJumpToMeetingDate: handleJumpToMeetingDate,
+      onJumpToGallery: handleJumpToGallery,
+      onGetChatMessageOrdinal: handleGetChatMessageOrdinal,
+      onGetGalleryPhotoOrdinal: handleGetGalleryPhotoOrdinal,
+      onRequestConfirm: showConfirmDialog
+    }),
+    /*#__PURE__*/React.createElement(PlacesSection, {
+      calendar: activeCal,
+      onViewAll: () => changeView('places'),
+      onSelectPlace: place => handleJumpToPlace(place.id)
+    })
+  ), /*#__PURE__*/React.createElement(Footer, null),
+  previewSharingMemo && activeCal && /*#__PURE__*/React.createElement(MemoShareModal, {
+    memo: previewSharingMemo,
+    calendarId: activeCal.id,
+    onClose: () => setPreviewSharingMemo(null),
+    showToast: showToast
+  })));
 }
 
 // ---- Korean public holidays, substitute holidays, and 24 solar terms ----

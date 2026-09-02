@@ -946,7 +946,7 @@ function getMemoPreviewBorderColor(colorVal) {
 // back to navigating to the memo page (this section owns no edit modal or tag-search UI of its
 // own); onTogglePin/onCommentsChange are real writes (see handleTogglePinFromMemoPreview /
 // handleMemoCommentsChangeFromMemoPreview in app-main.js) since MemoCard calls them unconditionally.
-export function MemoPreviewSection({ memos = [], totalMemoCount = null, calendar = null, onViewAll, onOpenEdit, onTogglePin, onSelectTag, onCommentsChange, onRequestConfirm, showToast }) {
+export function MemoPreviewSection({ memos = [], calendar = null, onViewAll, onOpenEdit, onTogglePin, onSelectTag, onShare, onCommentsChange, onRequestConfirm, showToast }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -970,7 +970,6 @@ export function MemoPreviewSection({ memos = [], totalMemoCount = null, calendar
   if (sortedMemos.length === 0) return null;
 
   const displayedMemos = sortedMemos.slice(0, collapsed ? 1 : 3);
-  const displayMemoCount = (typeof totalMemoCount === 'number' && totalMemoCount >= sortedMemos.length) ? totalMemoCount : sortedMemos.length;
   const openMemoPage = () => { if (typeof onViewAll === 'function') onViewAll(); };
   const handleTitleKeyDown = event => handleSectionHeaderKeyDown(event, () => setCollapsed(prev => !prev));
 
@@ -989,8 +988,7 @@ export function MemoPreviewSection({ memos = [], totalMemoCount = null, calendar
         style: { display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0, color: '#2563EB' }
       },
         /*#__PURE__*/React.createElement(MemoSectionIcon, null),
-        /*#__PURE__*/React.createElement("span", null, "메모"),
-        /*#__PURE__*/React.createElement(SectionCountBadge, { count: displayMemoCount })
+        /*#__PURE__*/React.createElement("span", null, "메모")
       ),
       /*#__PURE__*/React.createElement("button", {
         type: "button",
@@ -1011,13 +1009,14 @@ export function MemoPreviewSection({ memos = [], totalMemoCount = null, calendar
       calendar: calendar,
       onOpenEdit: onOpenEdit,
       onTogglePin: () => { if (typeof onTogglePin === 'function') onTogglePin(memo); },
-      onShare: undefined,
+      onShare: () => { if (typeof onShare === 'function') onShare(memo); },
       onSelectTag: onSelectTag,
       onCommentsChange: nextComments => (typeof onCommentsChange === 'function' ? onCommentsChange(memo, nextComments) : false),
       getBorderColor: getMemoPreviewBorderColor,
       onRequestConfirm: onRequestConfirm,
       showToast: showToast,
-      effectivePinned: !!memo.isPinned
+      effectivePinned: !!memo.isPinned,
+      hidePinButton: true
     })) : null)
   );
 }
@@ -1173,7 +1172,6 @@ export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalG
     markBrokenPhoto(photo, brokenInfo);
   };
 
-  const badgeCount = visibleEntries.length;
   const displayedEntries = visibleEntries
     .filter(e => (e && ((e.thumb && String(e.thumb)) || (e.full && String(e.full)))))
     .slice(0, 12);
@@ -1197,8 +1195,7 @@ export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalG
         style: { display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0, color: '#2563EB' }
       },
         /*#__PURE__*/React.createElement(GalleryIcon, null),
-        /*#__PURE__*/React.createElement("span", null, "갤러리"),
-        badgeCount > 0 && /*#__PURE__*/React.createElement(SectionCountBadge, { count: badgeCount })
+        /*#__PURE__*/React.createElement("span", null, "갤러리")
       ),
       /*#__PURE__*/React.createElement("button", {
         type: "button",
@@ -1216,7 +1213,7 @@ export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalG
     ),
     !collapsed && displayedEntries.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null,
       /*#__PURE__*/React.createElement("div", {
-        style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(80px, 100%), 1fr))', gap: '6px', marginTop: '12px' }
+        style: { display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '6px', marginTop: '12px' }
       },
         displayedEntries.map((entry, idx) => /*#__PURE__*/React.createElement(MediaThumb, {
           key: entry.mediaKey || entry.refKey || entry.full || entry.thumb,

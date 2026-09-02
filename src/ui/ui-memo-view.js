@@ -839,7 +839,7 @@ function getAnniversaryDisplayColor(...args) {
 }
 
 
-export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMemos, onBack, showToast, isDarkTheme, onRequestConfirm, sharedMemo, onDismissSharedMemo, chatMessages, setActiveLightbox, onOpenShare, onOpenAppSettings, onChangeView, onUpdateMemo, onUpsertMemo, onDeleteMemo, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, historyCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null }) {
+export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMemos, onBack, showToast, isDarkTheme, onRequestConfirm, sharedMemo, onDismissSharedMemo, chatMessages, setActiveLightbox, onOpenShare, onOpenAppSettings, onChangeView, onUpdateMemo, onUpsertMemo, onDeleteMemo, memoInitialTag, setMemoInitialTag, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, historyCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -868,6 +868,14 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
 
   const [searchQuery, setSearchQuery] = React.useState('');
   const [selectedTag, setSelectedTag] = React.useState('');
+  // A hashtag clicked on the main-screen memo preview (see MemoPreviewSection's onSelectTag in
+  // app-main.js) carries the tag straight into this page's own filter instead of the unrelated
+  // cross-content global search overlay.
+  React.useEffect(() => {
+    if (!memoInitialTag) return;
+    setSelectedTag(memoInitialTag);
+    if (typeof setMemoInitialTag === 'function') setMemoInitialTag('');
+  }, [memoInitialTag, setMemoInitialTag]);
   // Header hides on scroll-down / reappears on scroll-up, matching the chat room header exactly.
   const { isHeaderVisible, onScroll: handleMemoScroll } = useScrollHideHeader();
 
