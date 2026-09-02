@@ -1626,24 +1626,62 @@ export function ChatGalleryModal({
       item: item
     }))
   );
-  const renderGalleryLoadMoreButton = ({ loadingLabel, label, onClick, disabled }) => /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: onClick,
-    disabled: !!disabled,
-    style: {
-      width: '100%',
-      marginTop: '4px',
-      padding: '12px 0',
-      border: 'none',
-      borderRadius: 'var(--radius-md)',
-      backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
-      color: 'var(--text-main)',
-      fontSize: 'var(--font-size-base)',
-      fontWeight: 700,
-      cursor: disabled ? 'wait' : 'pointer',
-      textAlign: 'center'
-    }
-  }, disabled ? loadingLabel : label);
+  // "이전 사진/링크 더 보기": a real component (not a plain render-helper function) so it can use
+  // its own IntersectionObserver to auto-fire onClick once the user scrolls near it, instead of
+  // requiring an explicit tap. A sentinel div sits 300px above the visible button so the next
+  // page starts loading just before the user actually reaches the bottom.
+  //
+  // Auto-fire is gated by an "armed" flag, not just by `disabled` -- a page that happens to add
+  // no net-new content (a stretch of text-only chat history with no photos, or a page shorter
+  // than the 300px lookahead) leaves the sentinel sitting in the trigger zone with nothing having
+  // moved, so gating on `disabled` alone would re-fire the instant it clears and hammer Firestore
+  // in a tight loop for as long as that page keeps coming back empty. Requiring one genuine
+  // `scroll` event to re-arm means auto-load fires at most once per scroll gesture regardless of
+  // whether that page grew the list -- a manual tap on the button always still works.
+  const GalleryLoadMoreButton = ({ loadingLabel, label, onClick, disabled }) => {
+    const sentinelRef = React.useRef(null);
+    const armedRef = React.useRef(true);
+    React.useEffect(() => {
+      const onScroll = () => { armedRef.current = true; };
+      window.addEventListener('scroll', onScroll, { passive: true, capture: true });
+      return () => window.removeEventListener('scroll', onScroll, { capture: true });
+    }, []);
+    React.useEffect(() => {
+      const node = sentinelRef.current;
+      if (!node || disabled || typeof IntersectionObserver !== 'function') return undefined;
+      const observer = new IntersectionObserver(entries => {
+        if (!armedRef.current) return;
+        if (entries.some(entry => entry.isIntersecting)) {
+          armedRef.current = false;
+          onClick();
+        }
+      }, { rootMargin: '300px 0px' });
+      observer.observe(node);
+      return () => observer.disconnect();
+    }, [disabled, onClick]);
+    return /*#__PURE__*/React.createElement(React.Fragment, null,
+      /*#__PURE__*/React.createElement("div", { ref: sentinelRef, "aria-hidden": "true" }),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: onClick,
+        disabled: !!disabled,
+        style: {
+          width: '100%',
+          marginTop: '4px',
+          padding: '12px 0',
+          border: 'none',
+          borderRadius: 'var(--radius-md)',
+          backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
+          color: 'var(--text-main)',
+          fontSize: 'var(--font-size-base)',
+          fontWeight: 700,
+          cursor: disabled ? 'wait' : 'pointer',
+          textAlign: 'center'
+        }
+      }, disabled ? loadingLabel : label)
+    );
+  };
+  const renderGalleryLoadMoreButton = props => /*#__PURE__*/React.createElement(GalleryLoadMoreButton, props);
   // Distinguishes "haven't finished loading this calendar's history yet" from "genuinely no
   // photos here" -- totalGalleryCount (a global, all-months count fetched once) used to stand in
   // for this, which made an empty month falsely claim there was more to load via a '더보기'
@@ -1744,7 +1782,7 @@ export function ChatGalleryModal({
       const loadMoreNode = showLoadMore && !(searchQuery || '').trim() && (
         isLinkMode
           ? renderGalleryLoadMoreButton({
-              label: '이전 링크 더 보기',
+              label: `이전 링크 더 보기 (${filteredLinks.length}개 불러옴)`,
               loadingLabel: '이전 링크를 불러오는 중…',
               disabled: !!loadingOlderChat,
               onClick: () => {
@@ -1753,7 +1791,7 @@ export function ChatGalleryModal({
               }
             })
           : renderGalleryLoadMoreButton({
-              label: '이전 사진·링크 더 보기',
+              label: `이전 사진 더 보기 (${visiblePhotos.length}장 불러옴)`,
               loadingLabel: '이전 사진을 불러오는 중…',
               disabled: !!loadingOlderChat,
               onClick: loadMorePhotos
@@ -1816,7 +1854,7 @@ export function ChatGalleryModal({
           style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: 'var(--font-size-base)' }
         }, searchQuery ? "검색 결과가 없습니다." : "공유된 링크가 없습니다.") : renderGalleryLinkList(sortedLinks),
         (hasMoreOlderChat || hasMoreMemos) && !(searchQuery || '').trim() && renderGalleryLoadMoreButton({
-          label: '이전 링크 더 보기',
+          label: `이전 링크 더 보기 (${filteredLinks.length}개 불러옴)`,
           loadingLabel: '이전 링크를 불러오는 중…',
           disabled: !!loadingOlderChat,
           onClick: () => {
@@ -1836,7 +1874,7 @@ export function ChatGalleryModal({
         : describeGalleryPhotoEmptyState("공유된 사진이 없습니다."))
       : renderGalleryPhotoGrid(sortedPhotos, sortedPhotos),
       (hasLocallyHiddenPhotos || hasMoreOlderChat || loadingOlderChat) && !(searchQuery || '').trim() && renderGalleryLoadMoreButton({
-        label: hasLocallyHiddenPhotos ? '사진 더 보기' : '이전 사진·링크 더 보기',
+        label: hasLocallyHiddenPhotos ? `사진 더 보기 (${visiblePhotos.length}장 불러옴)` : `이전 사진 더 보기 (${visiblePhotos.length}장 불러옴)`,
         loadingLabel: '이전 사진을 불러오는 중…',
         disabled: !!loadingOlderChat && !hasLocallyHiddenPhotos,
         onClick: loadMorePhotos
