@@ -800,11 +800,16 @@ export function CalendarGrid({
   // Water-ripple hover effect (replaces the old bordered-box hover): a single delegated
   // pointer listener on the whole grid, not one per cell, updates --mx/--my (the pointer's
   // position within whichever cell it's currently over) so that cell's CSS radial-gradient
-  // glow can track it, and spawns a one-shot expanding ring positioned at the entry point
-  // whenever the pointer crosses into a new cell -- entry angle/position naturally falls out
-  // of where within the cell that first coordinate lands. Reading clientX/Y and writing the
-  // custom properties straight to the DOM (not through React state) keeps this at native
-  // mousemove frequency without triggering a re-render on every pixel of movement.
+  // glow can track it. Ripples themselves follow the classic "material ripple" codepen
+  // technique (https://codepen.io/LukeDiamantopoulos/pen/xXpaRj): a real span is appended
+  // to the cell, sized/positioned in JS so it can grow to fully cover the cell, then a class
+  // toggle drives its CSS transform/opacity transition; the span removes itself on
+  // transitionend rather than living as a fixed-size pseudo-element. The origin is snapped to
+  // whichever edge of the cell the pointer's entry coordinate is closest to, so the ripple
+  // reads as entering from that boundary rather than blooming from an arbitrary point inside
+  // the cell. Reading clientX/Y and writing the custom properties straight to the DOM (not
+  // through React state) keeps this at native mousemove frequency without triggering a
+  // re-render on every pixel of movement.
   const daysGridRef = React.useRef(null);
   React.useEffect(() => {
     const grid = daysGridRef.current;
@@ -818,24 +823,53 @@ export function CalendarGrid({
       cell.style.setProperty('--mx', `${mx}%`);
       cell.style.setProperty('--my', `${my}%`);
     };
-    const spawnRipple = cell => {
-      cell.classList.remove('is-rippling');
-      // Force a reflow so re-adding the class restarts the CSS animation even if the same
-      // cell is re-entered before the previous ripple finished.
-      void cell.offsetWidth;
-      cell.classList.add('is-rippling');
+    const spawnRipple = (cell, clientX, clientY) => {
+      const rect = cell.getBoundingClientRect();
+      let x = clientX - rect.left;
+      let y = clientY - rect.top;
+      // Snap the origin onto whichever edge the pointer is nearest to -- that's the boundary
+      // it actually crossed to enter this cell -- instead of leaving it at the raw entry
+      // sample, which can land a few px inside depending on mousemove timing.
+      const distLeft = x;
+      const distRight = rect.width - x;
+      const distTop = y;
+      const distBottom = rect.height - y;
+      const minDist = Math.min(distLeft, distRight, distTop, distBottom);
+      if (minDist === distLeft) x = 0;
+      else if (minDist === distRight) x = rect.width;
+      else if (minDist === distTop) y = 0;
+      else y = rect.height;
+      // The ripple must grow large enough to fully cover the cell from this origin, so size it
+      // to the farthest of the four corners.
+      const maxDist = Math.max(
+        Math.hypot(x, y),
+        Math.hypot(rect.width - x, y),
+        Math.hypot(x, rect.height - y),
+        Math.hypot(rect.width - x, rect.height - y)
+      );
+      const diameter = maxDist * 2;
+      const ripple = document.createElement('span');
+      ripple.className = 'day-cell-ripple';
+      ripple.style.width = `${diameter}px`;
+      ripple.style.height = `${diameter}px`;
+      ripple.style.left = `${x - maxDist}px`;
+      ripple.style.top = `${y - maxDist}px`;
+      ripple.addEventListener('transitionend', () => ripple.remove(), { once: true });
+      cell.appendChild(ripple);
+      // Force layout before adding the active class so the scale/opacity transition actually
+      // runs instead of starting from its already-active end state.
+      void ripple.offsetWidth;
+      ripple.classList.add('is-active');
     };
     const handleMove = (clientX, clientY, target) => {
       const cell = target && target.closest ? target.closest('.day-cell') : null;
       if (!cell || !grid.contains(cell)) {
-        if (lastCell) { lastCell.classList.remove('is-rippling'); }
         lastCell = null;
         return;
       }
       if (cell !== lastCell) {
-        if (lastCell) lastCell.classList.remove('is-rippling');
         updatePosition(cell, clientX, clientY);
-        spawnRipple(cell);
+        spawnRipple(cell, clientX, clientY);
         lastCell = cell;
       } else {
         updatePosition(cell, clientX, clientY);
@@ -843,7 +877,6 @@ export function CalendarGrid({
     };
     const onMouseMove = e => handleMove(e.clientX, e.clientY, e.target);
     const onMouseLeave = () => {
-      if (lastCell) lastCell.classList.remove('is-rippling');
       lastCell = null;
     };
     const onTouchMove = e => {
@@ -851,20 +884,15 @@ export function CalendarGrid({
       if (!touch) return;
       handleMove(touch.clientX, touch.clientY, document.elementFromPoint(touch.clientX, touch.clientY));
     };
-    const onAnimationEnd = e => {
-      if (e.animationName === 'day-cell-ripple-wave') e.target.classList.remove('is-rippling');
-    };
     grid.addEventListener('mousemove', onMouseMove);
     grid.addEventListener('mouseleave', onMouseLeave);
     grid.addEventListener('touchmove', onTouchMove, { passive: true });
     grid.addEventListener('touchend', onMouseLeave);
-    grid.addEventListener('animationend', onAnimationEnd);
     return () => {
       grid.removeEventListener('mousemove', onMouseMove);
       grid.removeEventListener('mouseleave', onMouseLeave);
       grid.removeEventListener('touchmove', onTouchMove);
       grid.removeEventListener('touchend', onMouseLeave);
-      grid.removeEventListener('animationend', onAnimationEnd);
     };
   }, [monthDate]);
 
@@ -1070,6 +1098,19 @@ export function CalendarGrid({
       spanIndexById.set(bar.id, nextIndex);
       bar.spanIndex = nextIndex;
     });
+    // Total segment count per festival id lets each segment know whether it's the true start,
+    // the true end, or a middle link of the chain -- used below to round only the edge that
+    // isn't visually continuing into another row (see the border-radius comment near
+    // FESTIVAL_BAR_HEIGHT's use).
+    const totalSegmentsById = new Map();
+    bars.forEach(bar => {
+      totalSegmentsById.set(bar.id, (totalSegmentsById.get(bar.id) || 0) + 1);
+    });
+    bars.forEach(bar => {
+      bar.totalSegments = totalSegmentsById.get(bar.id);
+      bar.isFirstSegment = bar.spanIndex === 0;
+      bar.isLastSegment = bar.spanIndex === bar.totalSegments - 1;
+    });
     return bars;
   }, [days.map(d => d.dateStr).join('|'), anniversaries]);
   // Dates covered by a festival bar reserve extra bottom space in their own day-cell (see the
@@ -1086,8 +1127,8 @@ export function CalendarGrid({
     });
     return set;
   }, [festivalBars]);
-  // Tall enough for the badge's title to wrap onto 2 lines (see ANNIVERSARY_BADGE_TEXT_STYLE).
-  const FESTIVAL_BAR_HEIGHT = 36;
+  // Matches the single-line ellipsis title in ANNIVERSARY_BADGE_TEXT_STYLE.
+  const FESTIVAL_BAR_HEIGHT = 24;
   const availMap = React.useMemo(() => getActiveAvailabilities(calendar).reduce((acc, entry) => {
     if (!acc[entry.date]) acc[entry.date] = [];
     acc[entry.date].push(entry);
@@ -1583,8 +1624,19 @@ export function CalendarGrid({
         width: '100%',
         height: `${FESTIVAL_BAR_HEIGHT}px`,
         backgroundColor: `${displayColor}22`,
-        borderRadius: 'var(--radius-sm)',
-        padding: '3px 8px',
+        // A festival spanning multiple week rows reads as one continuous bar broken across
+        // rows: only the true start segment rounds its left corners and only the true end
+        // segment rounds its right corners -- every edge where the bar actually continues into
+        // another row stays square, and a single-row festival (totalSegments === 1) keeps the
+        // plain all-around radius since there's nothing to visually connect to.
+        borderRadius: bar.totalSegments === 1
+          ? 'var(--radius-sm)'
+          : bar.isFirstSegment
+            ? '8px 0 0 8px'
+            : bar.isLastSegment
+              ? '0 8px 8px 0'
+              : '0',
+        padding: bar.totalSegments > 1 && bar.isLastSegment ? '3px 10px 3px 8px' : '3px 8px',
         display: 'flex',
         alignItems: 'center',
         // Icon+text renders as one content-sized chunk (not stretched to fill the bar) so this
