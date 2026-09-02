@@ -808,6 +808,62 @@ export function TikTokEmbedWidget({ url, videoId, onFailed }) {
   }, /*#__PURE__*/React.createElement('section', null)));
 }
 
+// Shared "Capsule" shape-switching module: every pill-shaped badge in the app that wraps
+// arbitrary-length text (a memo note, a URL, ...) should read as a capsule while its content
+// fits on one line, and switch to a gently-rounded box once it wraps to two or more lines --
+// a full capsule around multi-line text looks like a mistake (the round ends stop meaning
+// anything once there's a second line), while a 10px radius box reads fine at any height.
+// There's no pure-CSS way to ask "did this text wrap past one line", so this measures the
+// rendered element's height against its own line-height and flips a boolean once it's grown
+// past ~1.5 lines. Attach the returned ref to the element carrying the text; read `isMultiline`
+// to choose the border-radius.
+export function useCapsuleAutoRadius(text) {
+  const React = window.React;
+  const ref = React.useRef(null);
+  const [isMultiline, setIsMultiline] = React.useState(false);
+  React.useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    const measure = () => {
+      const cs = window.getComputedStyle(el);
+      let lineHeight = parseFloat(cs.lineHeight);
+      if (!Number.isFinite(lineHeight) || lineHeight <= 0) {
+        lineHeight = (parseFloat(cs.fontSize) || 14) * 1.3;
+      }
+      setIsMultiline(el.scrollHeight > lineHeight * 1.5);
+    };
+    measure();
+    if (typeof ResizeObserver === 'function') {
+      const ro = new ResizeObserver(measure);
+      ro.observe(el);
+      return () => ro.disconnect();
+    }
+    return undefined;
+  }, [text]);
+  return [ref, isMultiline];
+}
+
+// Generic reusable capsule-or-rounded-box text badge built on useCapsuleAutoRadius above --
+// the module every new "capsule" badge should render through instead of hardcoding
+// border-radius: var(--radius-full) inline.
+export function CapsuleTextBadge({ text, title, tag = 'span', style = null, className = '', onClick, children }) {
+  const React = window.React;
+  const [ref, isMultiline] = useCapsuleAutoRadius(text);
+  if (!text && !children) return null;
+  return /*#__PURE__*/React.createElement(tag, {
+    ref,
+    title: title != null ? title : text,
+    className: className || undefined,
+    onClick,
+    style: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      borderRadius: isMultiline ? '10px' : 'var(--radius-full)',
+      ...(style || {})
+    }
+  }, children || text);
+}
+
 export function UrlCapsuleBadge({ url, style = null }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -815,8 +871,10 @@ export function UrlCapsuleBadge({ url, style = null }) {
   const sanitizeText = __deps.sanitizeText;
 
   const href = sanitizeText(url || '', 500);
+  const [ref, isMultiline] = useCapsuleAutoRadius(href);
   if (!href) return null;
   return /*#__PURE__*/React.createElement("button", {
+    ref,
     type: "button",
     title: href,
     onClick: e => { e.stopPropagation(); window.open(href, '_blank', 'noopener,noreferrer'); },
@@ -824,7 +882,7 @@ export function UrlCapsuleBadge({ url, style = null }) {
       display: 'inline-flex',
       alignItems: 'center',
       padding: '3px 10px',
-      borderRadius: 'var(--radius-full)',
+      borderRadius: isMultiline ? '10px' : 'var(--radius-full)',
       fontSize: 'var(--font-size-sm)',
       fontWeight: 600,
       border: 0,
@@ -919,6 +977,8 @@ export function DateCapsuleBadge({ date, style = null }) {
     SearchResultLogRow: SearchResultLogRow,
     TikTokEmbedWidget: TikTokEmbedWidget,
     UrlCapsuleBadge: UrlCapsuleBadge,
+    CapsuleTextBadge: CapsuleTextBadge,
+    useCapsuleAutoRadius: useCapsuleAutoRadius,
     ParticipantPickerButton: ParticipantPickerButton,
     ParticipantBadge: ParticipantBadge,
     DateCapsuleBadge: DateCapsuleBadge,

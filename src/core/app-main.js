@@ -311,6 +311,10 @@ function DateCapsuleBadge(props) {
   const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DateCapsuleBadge;
   return typeof C === 'function' ? React.createElement(C, props) : null;
 }
+function CapsuleTextBadge(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CapsuleTextBadge;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 
 // 입력필드 표시 규칙: 일반 텍스트 / YY.MM.DD 날짜 / URL 분리
 function tokenizeRichFieldText(text) {
@@ -7132,8 +7136,10 @@ function CalendarApp() {
               const noteTextOnly = entryUrl ? removeFirstUrl(entry.note) : entry.note.trim();
               if (!noteTextOnly) return null;
               const pColor = (p && p.color) ? p.color : '#6366F1';
-              return /*#__PURE__*/React.createElement("span", {
+              return /*#__PURE__*/React.createElement(CapsuleTextBadge, {
                 key: entry.participantId,
+                text: noteTextOnly,
+                title: `${p.name}: ${noteTextOnly}`,
                 className: "memo-capsule-badge",
                 style: {
                   backgroundColor: pColor,
@@ -7142,12 +7148,10 @@ function CalendarApp() {
                   fontSize: 'var(--font-size-sm)',
                   lineHeight: '140%',
                   padding: '4px 10px',
-                  borderRadius: 'var(--radius-full)',
                   boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
                   border: '1px solid rgba(255, 255, 255, 0.1)'
-                },
-                title: `${p.name}: ${noteTextOnly}`
-              }, noteTextOnly);
+                }
+              });
             })
           )
         ),
