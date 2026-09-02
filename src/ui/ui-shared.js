@@ -2121,9 +2121,22 @@ export function ResizableListSection({
   handleAriaLabel = '목록 높이 조절'
 }) {
   const React = window.React;
-  const [height, setHeight] = React.useState(initialHeight);
+  // initialHeight: 'auto' sizes the list to however tall its content actually is on first
+  // mount (clamped to [minHeight, maxHeight]) instead of always opening at the same fixed
+  // guess -- a 1-row list opens compact, an 8-row one opens tall enough to show everyone
+  // without immediately needing the drag handle. Only measured once on mount (not on every
+  // content change) so it never fights a resize the user has already made by hand.
+  const isAutoInitial = initialHeight === 'auto';
+  const [height, setHeight] = React.useState(isAutoInitial ? minHeight : initialHeight);
+  const listRef = React.useRef(null);
   const resizeRef = React.useRef(null);
   const clampHeight = h => Math.min(maxHeight, Math.max(minHeight, h));
+  // Empty dependency array is deliberate: measure once against whatever content is present at
+  // mount time only, so a later content change doesn't fight a resize the user already made.
+  React.useLayoutEffect(() => {
+    if (!isAutoInitial || !listRef.current) return;
+    setHeight(clampHeight(listRef.current.scrollHeight));
+  }, []);
 
   const handleResizeStart = event => {
     event.preventDefault();
@@ -2150,12 +2163,16 @@ export function ResizableListSection({
 
   return /*#__PURE__*/React.createElement(React.Fragment, null,
     /*#__PURE__*/React.createElement('div', {
+      ref: listRef,
       className: listClassName,
       style: { ...listStyle, height: `${height}px`, overflowY: 'auto', transition: resizeRef.current ? 'none' : 'height 120ms ease' }
     }, children),
     /*#__PURE__*/React.createElement('div', {
       className: 'resizable-list-handle-row',
-      style: { display: 'flex', justifyContent: 'center', height: '24px', marginTop: '-8px', backgroundColor: 'rgba(0, 0, 0, 0.04)', borderRadius: '0 0 6px 6px', marginBottom: '8px' }
+      // 36px, not 24px -- on mobile (see the `.modal-body button { min-height: 36px }` touch-
+      // target rule in app.css) the handle button inside is stretched to 36px regardless of its
+      // own 24px CSS height, so a 24px row background clipped/mismatched around it.
+      style: { display: 'flex', justifyContent: 'center', height: '36px', marginTop: '-8px', backgroundColor: 'rgba(0, 0, 0, 0.04)', borderRadius: '0 0 6px 6px', marginBottom: '8px' }
     },
       /*#__PURE__*/React.createElement('button', {
         type: 'button',
