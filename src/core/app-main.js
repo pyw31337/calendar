@@ -5938,12 +5938,7 @@ function CalendarApp() {
       showToast: showToast
     }),
     isAdminOpen && /*#__PURE__*/React.createElement(AdminModal, {
-      anniversaries: anniversaries,
       initialTab: adminInitialTab,
-      onOpenAnniversarySettings: () => {
-        setIsAdminOpen(false);
-        setIsAnniversariesOpen(true);
-      },
       calendar: { ...activeCal, activityLogs: unionActivityLogs(activeCal, adminActivityLogs) },
       allCalendars: calendars,
       onSelectCalendar: handleSelectCalendar,
@@ -5954,9 +5949,6 @@ function CalendarApp() {
       onDeleteMessage: handleDeleteMessage,
       onDeleteAvailability: handleDeleteAvailability,
       onDeleteAllForDate: handleDeleteAllForDate,
-      onBulkRegister: handleBulkRegisterAvailability,
-      onAnniversarySaved: handleAnniversarySaved,
-      onAnniversaryDeleted: handleAnniversaryDeleted,
       onRequestConfirm: showConfirmDialog,
       onClose: () => { setIsAdminOpen(false); setAdminInitialTab('settings'); },
       showToast: showToast,

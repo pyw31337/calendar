@@ -782,9 +782,7 @@ function getAnniversaryDisplayColor(...args) {
 
 
 export function AdminModal({
-  anniversaries = [],
   initialTab = 'settings',
-  onOpenAnniversarySettings,
   calendar,
   allCalendars,
   onSelectCalendar,
@@ -795,9 +793,6 @@ export function AdminModal({
   onDeleteMessage,
   onDeleteAvailability,
   onDeleteAllForDate,
-  onBulkRegister,
-  onAnniversarySaved,
-  onAnniversaryDeleted,
   onRequestConfirm,
   onClose,
   showToast,
@@ -832,7 +827,6 @@ export function AdminModal({
   const SettingsIcon = __comp.SettingsIcon || __deps.SettingsIcon;
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
   const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
-  const AnniversaryModal = __comp.AnniversaryModal || __deps.AnniversaryModal;
   const getActiveParticipants = typeof __deps.getActiveParticipants === 'function'
     ? __deps.getActiveParticipants
     : (typeof GATHER_APP_UTILS !== 'undefined' && typeof GATHER_APP_UTILS.getActiveParticipants === 'function'
@@ -843,23 +837,9 @@ export function AdminModal({
     : (typeof GATHER_APP_UTILS !== 'undefined' && typeof GATHER_APP_UTILS.sanitizeText === 'function'
       ? GATHER_APP_UTILS.sanitizeText
       : function (s, n) { var v = String(s == null ? '' : s); return typeof n === 'number' ? v.slice(0, n) : v; });
-    const CakeTabIcon = ({ size = 18 }) => /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg", width: size, height: size, viewBox: "0 0 24 24",
-    fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true"
-  },
-    /*#__PURE__*/React.createElement("path", { d: "M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8" }),
-    /*#__PURE__*/React.createElement("path", { d: "M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1" }),
-    /*#__PURE__*/React.createElement("path", { d: "M2 21h20" }),
-    /*#__PURE__*/React.createElement("path", { d: "M7 8v3" }),
-    /*#__PURE__*/React.createElement("path", { d: "M12 8v3" }),
-    /*#__PURE__*/React.createElement("path", { d: "M17 8v3" }),
-    /*#__PURE__*/React.createElement("path", { d: "M7 4h.01" }),
-    /*#__PURE__*/React.createElement("path", { d: "M12 4h.01" }),
-    /*#__PURE__*/React.createElement("path", { d: "M17 4h.01" })
-  );
 
-  const [activeTab, setActiveTab] = React.useState(initialTab === 'anniversary' ? 'anniversary' : (initialTab || 'settings'));
-  React.useEffect(() => { if (initialTab) setActiveTab(initialTab === 'anniversary' ? 'anniversary' : initialTab); }, [initialTab]);
+  const [activeTab, setActiveTab] = React.useState(initialTab || 'settings');
+  React.useEffect(() => { if (initialTab) setActiveTab(initialTab); }, [initialTab]);
 
   const [exportCategory, setExportCategory] = React.useState('full');
   const [logCategoryFilter, setLogCategoryFilter] = React.useState('all');
@@ -1290,7 +1270,7 @@ export function AdminModal({
 
     /* Tab Menu Bar */
     /*#__PURE__*/React.createElement("div", {
-      style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', flexShrink: 0, minWidth: 0 }
+      style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', flexShrink: 0, minWidth: 0 }
     },
       /* Tab 1: General settings */
       /*#__PURE__*/React.createElement("button", {
@@ -1304,17 +1284,6 @@ export function AdminModal({
           cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
         }
       }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(CalendarCogIcon, null)), "일반"),
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: () => setActiveTab('anniversary'),
-        style: {
-          padding: '12px 6px', fontSize: 'var(--font-size-md)', fontWeight: 'bold', whiteSpace: 'nowrap',
-          color: activeTab === 'anniversary' ? '#2563EB' : '#64748B',
-          border: 'none', background: 'none',
-          borderBottom: activeTab === 'anniversary' ? '3px solid #2563EB' : '3px solid transparent',
-          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px'
-        }
-      }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(CakeTabIcon, { size: 18 })), "기념일"),
       /* Tab 2: Log-based recovery */
       /*#__PURE__*/React.createElement("button", {
         type: "button",
@@ -1509,25 +1478,6 @@ export function AdminModal({
       /* ========================================== */
       /* TAB 3: POINT-IN-TIME LOG RECOVERY         */
       /* ========================================== */
-      activeTab === 'anniversary' && /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', flexDirection: 'column', gap: '0', margin: '-20px', minHeight: '320px' }
-      },
-        AnniversaryModal
-          ? /*#__PURE__*/React.createElement(AnniversaryModal, {
-              calendar: calendar,
-              anniversaries: anniversaries || [],
-              embedded: true,
-              onClose: () => {},
-              showToast: showToast,
-              onRequestConfirm: onRequestConfirm,
-              onBulkRegister: onBulkRegister,
-              onAnniversarySaved: onAnniversarySaved,
-              onAnniversaryDeleted: onAnniversaryDeleted,
-              isDarkTheme: isDarkTheme
-            })
-          : /*#__PURE__*/React.createElement("div", { style: { padding: '20px', color: 'var(--text-muted)' } }, "기념일 모듈을 불러올 수 없습니다.")
-      ),
-
       activeTab === 'recovery' && /*#__PURE__*/React.createElement("div", {
         style: { flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }
       },

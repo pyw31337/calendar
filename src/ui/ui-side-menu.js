@@ -1502,6 +1502,18 @@ export function MainSideMenu({
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "캘린더 설정")
         )
+      ),
+      /* 기념일 설정 -- split out of 캘린더 설정's own tab bar (that modal was accumulating too
+         many sub-tabs) into its own top-level menu entry, right below it. */
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "admin-side-menu-item",
+        onClick: () => handle(onOpenAnniversaries)
+      },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement(GiftIcon, null)),
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "기념일 설정")
+        )
       )
     ),
     /* Group 2: 채팅 / 정산 / 갤러리 / 장소 / 메모 */
