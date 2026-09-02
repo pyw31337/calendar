@@ -1877,7 +1877,12 @@ export function HistoryView({
               }, memoText);
             })
           ),
-          datePlaces.length > 0 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '2px', width: '100%' } },
+          datePlaces.length > 0 && /*#__PURE__*/React.createElement("div", {
+            style: {
+              display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '2px', width: '100%',
+              ...(isPast ? {} : { mixBlendMode: 'luminosity' })
+            }
+          },
             datePlaces.map(place => {
               const mapUrl = getKakaoMapLinkUrl(place);
               const placeName = place.alias || place.name;
@@ -1887,7 +1892,9 @@ export function HistoryView({
                 className: "place-memo-stack",
                 style: {
                   display: 'flex', alignItems: 'flex-start', gap: '6px',
-                  backgroundColor: 'rgba(255, 255, 255, 0.92)', borderRadius: 'var(--radius-md)',
+                  backgroundColor: isPast ? 'rgba(255, 255, 255, 0.92)' : '#333',
+                  borderRadius: isPast ? 0 : 'var(--radius-md)',
+                  borderTop: isPast ? '1px solid rgba(0, 0, 0, 0.05)' : 'none',
                   padding: '7px 10px', width: '100%', boxSizing: 'border-box'
                 }
               },
@@ -1897,10 +1904,10 @@ export function HistoryView({
                     ? /*#__PURE__*/React.createElement("a", {
                         href: mapUrl, target: "_blank", rel: "noreferrer",
                         onClick: e => e.stopPropagation(),
-                        style: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--text-main)', textDecoration: 'none', wordBreak: 'break-word' }
+                        style: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: isPast ? 'var(--text-main)' : '#fff', textDecoration: 'none', wordBreak: 'break-word' }
                       }, placeName)
-                    : /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--text-main)', wordBreak: 'break-word' } }, placeName),
-                  address && /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', wordBreak: 'break-word' } }, address)
+                    : /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: isPast ? 'var(--text-main)' : '#fff', wordBreak: 'break-word' } }, placeName),
+                  address && /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-xs)', color: isPast ? 'var(--text-muted)' : '#fff', wordBreak: 'break-word' } }, address)
                 )
               );
             })
