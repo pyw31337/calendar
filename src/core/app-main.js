@@ -2303,9 +2303,21 @@ function CalendarApp() {
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
       if (Date.now() - lastChatSnapshotAtRef.current > STALE_AFTER_MS) void reconcile();
     }, CHECK_INTERVAL_MS);
+    // Some mobile browsers (observed on Samsung Internet) suspend the page's timers and the
+    // Firestore onSnapshot stream together while backgrounded, then resume the tab without
+    // promptly redelivering a fresh snapshot -- the periodic check above can then sit waiting
+    // up to CHECK_INTERVAL_MS behind a `lastChatSnapshotAtRef` that never advanced while hidden,
+    // and in practice never catches up until a manual reload. Reconciling immediately the moment
+    // the page becomes visible again -- rather than only on the next interval tick -- closes
+    // that gap; it's cheap when the stream was actually healthy since `reconciling` is a no-op.
+    const handleVisible = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') void reconcile();
+    };
+    document.addEventListener('visibilitychange', handleVisible);
     return () => {
       isMounted = false;
       clearInterval(timer);
+      document.removeEventListener('visibilitychange', handleVisible);
     };
   }, [activeCalId, activeView, chatLiveLimit, firebaseDb, CHAT_INITIAL_MESSAGE_LIMIT]);
 

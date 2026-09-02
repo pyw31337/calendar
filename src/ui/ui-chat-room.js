@@ -904,16 +904,25 @@ export function ChatRoomView({
   // (scrolled away from the bottom), replacing the generic button with a labeled pill so a new
   // message doesn't go unnoticed. Clears once the user scrolls back near the bottom themselves.
   const [hasNewMessageBelow, setHasNewMessageBelow] = React.useState(false);
-  const prevMessageCountRef = React.useRef(visibleChatMessages.length);
+  // Track the id of the newest (last) message rather than the array's length -- scrolling up
+  // triggers onLoadOlderChat, which prepends older history and also grows this array's length,
+  // but doesn't change what's actually newest. A length-only check fired the banner on every
+  // such page of history even though nothing new had arrived at the bottom; comparing the last
+  // message's id only fires when a message is genuinely appended at the end.
+  const lastVisibleMsgIdRef = React.useRef(
+    visibleChatMessages.length ? visibleChatMessages[visibleChatMessages.length - 1].id : null
+  );
   React.useEffect(() => {
-    const increased = visibleChatMessages.length > prevMessageCountRef.current;
-    prevMessageCountRef.current = visibleChatMessages.length;
-    if (!increased) return;
+    const last = visibleChatMessages.length ? visibleChatMessages[visibleChatMessages.length - 1] : null;
+    const lastId = last ? last.id : null;
+    const appended = lastId != null && lastId !== lastVisibleMsgIdRef.current;
+    lastVisibleMsgIdRef.current = lastId;
+    if (!appended) return;
     const el = chatMessagesContainerRef.current;
     if (!el) return;
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
     if (distanceFromBottom > 200) setHasNewMessageBelow(true);
-  }, [visibleChatMessages.length]);
+  }, [visibleChatMessages]);
   // Confetti burst around a newly-sent bubble -- only for messages I just sent myself (not
   // ones arriving from other participants, and not the initial batch on mount). Anchors the
   // burst to the actual bubble's on-screen position via its data-msg-row-id, same pattern as
