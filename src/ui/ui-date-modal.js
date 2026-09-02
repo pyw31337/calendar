@@ -854,6 +854,18 @@ export function DateModal({
   const SimpleBottomSheetPicker = __comp.SimpleBottomSheetPicker || __deps.SimpleBottomSheetPicker;
   const MediaThumb = __comp.MediaThumb || __deps.MediaThumb;
   const CakeIcon = __comp.CakeIcon || __deps.CakeIcon;
+  const BalloonIcon = __comp.BalloonIcon || __deps.BalloonIcon;
+  const ConfettiIcon = __comp.ConfettiIcon || __deps.ConfettiIcon;
+  const TicketsPlaneIcon = __comp.TicketsPlaneIcon || __deps.TicketsPlaneIcon;
+  const MessageCircleMoreIcon = __comp.MessageCircleMoreIcon || __deps.MessageCircleMoreIcon;
+  // Legacy D-Day badges (ann.type === 'dday') keep their plain emoji exactly as before; only the
+  // newer category-tagged types (yearly/once/range) swap their category emoji for its icon component.
+  const renderAnniversaryIcon = (ann, size) => {
+    if (ann.type === 'dday') return ann.icon;
+    const iconMap = { '🎂': CakeIcon, '🎈': BalloonIcon, '🎉': ConfettiIcon, '✈️': TicketsPlaneIcon, '💬': MessageCircleMoreIcon };
+    const Icon = iconMap[ann.icon];
+    return Icon ? /*#__PURE__*/React.createElement(Icon, { size }) : ann.icon;
+  };
   const LinkPreviewCard = __comp.LinkPreviewCard || __deps.LinkPreviewCard;
   const SectionCountBadge = __comp.SectionCountBadge || __deps.SectionCountBadge;
   const SyncStatusChip = __comp.SyncStatusChip || __deps.SyncStatusChip;
@@ -2458,7 +2470,7 @@ export function DateModal({
             fontSize: 'var(--font-size-md)',
             fontWeight: 'bold'
           }
-        }, ann.icon === '🎂' && CakeIcon ? /*#__PURE__*/React.createElement(CakeIcon, { size: 14 }) : ann.icon, " ", ann.title);
+        }, renderAnniversaryIcon(ann, 14), " ", ann.title);
       })),
 
       !adminMode && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '10px' } },

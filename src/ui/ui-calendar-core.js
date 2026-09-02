@@ -757,7 +757,19 @@ export function CalendarGrid({
   const CalendarCheckIcon = __comp.CalendarCheckIcon || __deps.CalendarCheckIcon;
   const CoinIcon = __comp.CoinIcon || __deps.CoinIcon;
   const CakeIcon = __comp.CakeIcon || __deps.CakeIcon;
+  const BalloonIcon = __comp.BalloonIcon || __deps.BalloonIcon;
+  const ConfettiIcon = __comp.ConfettiIcon || __deps.ConfettiIcon;
+  const TicketsPlaneIcon = __comp.TicketsPlaneIcon || __deps.TicketsPlaneIcon;
+  const MessageCircleMoreIcon = __comp.MessageCircleMoreIcon || __deps.MessageCircleMoreIcon;
   const ParticipantBadge = __comp.ParticipantBadge || __deps.ParticipantBadge;
+  // Legacy D-Day badges (ann.type === 'dday') keep their plain emoji exactly as before; only the
+  // newer category-tagged types (yearly/once/range) swap their category emoji for its icon component.
+  const renderAnniversaryIcon = (ann, size) => {
+    if (ann.type === 'dday') return ann.icon;
+    const iconMap = { '🎂': CakeIcon, '🎈': BalloonIcon, '🎉': ConfettiIcon, '✈️': TicketsPlaneIcon, '💬': MessageCircleMoreIcon };
+    const Icon = iconMap[ann.icon];
+    return Icon ? /*#__PURE__*/React.createElement(Icon, { size }) : ann.icon;
+  };
   const getActiveParticipants = __deps.getActiveParticipants;
 
   const year = monthDate.getFullYear();
@@ -1352,7 +1364,7 @@ export function CalendarGrid({
             width: '100%',
             boxSizing: 'border-box'
           }
-        }, ann.icon === '🎂' && CakeIcon ? /*#__PURE__*/React.createElement(CakeIcon, { size: 12 }) : ann.icon, " ", ann.title);
+        }, renderAnniversaryIcon(ann, 12), " ", ann.title);
       })),
 
       /* Mobile Anniversary Icon Badge (mobile-only, circular icons containing emoji with participant color) */
@@ -1385,7 +1397,7 @@ export function CalendarGrid({
             fontSize: 'var(--font-size-2xs)',
             flexShrink: 0
           }
-        }, ann.icon === '🎂' && CakeIcon ? /*#__PURE__*/React.createElement(CakeIcon, { size: 11 }) : ann.icon);
+        }, renderAnniversaryIcon(ann, 11));
       }))
     );
   })));
