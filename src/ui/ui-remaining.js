@@ -1401,8 +1401,8 @@ export function PlacesSection({ calendar, onViewAll }) {
           /*#__PURE__*/React.createElement("span", {
             style: {
               fontSize: 'var(--font-size-2xs)', fontWeight: 700, padding: '2px 7px', borderRadius: 'var(--radius-full)',
-              backgroundColor: visitStatus === 'planned' ? 'rgba(59, 130, 246, 0.12)' : 'rgba(16, 185, 129, 0.12)',
-              color: visitStatus === 'planned' ? '#2563EB' : 'var(--status-green)'
+              backgroundColor: visitStatus === 'planned' ? 'rgba(249, 115, 22, 0.12)' : 'rgba(16, 185, 129, 0.12)',
+              color: visitStatus === 'planned' ? '#EA580C' : 'var(--status-green)'
             }
           }, visitStatus === 'planned' ? '방문예정' : '방문')
         ),
@@ -1412,12 +1412,12 @@ export function PlacesSection({ calendar, onViewAll }) {
         ),
         latestEntry
           ? /*#__PURE__*/React.createElement("div", {
-              style: { display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'var(--bg-primary)', borderRadius: 'var(--radius-md)', padding: '6px 10px', marginTop: '2px' }
+              style: { display: 'flex', alignItems: 'center', gap: '8px', borderTop: '1px solid var(--border-subtle)', paddingTop: '6px', marginTop: '4px' }
             },
               /*#__PURE__*/React.createElement("span", { style: { flexShrink: 0, fontWeight: 700, fontSize: 'var(--font-size-sm)' } }, formatPlaceBadgeDate(latestEntry.date) || latestEntry.date),
               /*#__PURE__*/React.createElement("span", { style: { flex: 1, minWidth: 0, fontSize: 'var(--font-size-sm)', color: 'var(--text-main)', wordBreak: 'break-word' } }, latestEntry.note)
             )
-          : memoWithoutDate && /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-main)', marginTop: '2px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' } }, renderTextWithUrlBadge(memoWithoutDate))
+          : memoWithoutDate && /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-main)', borderTop: '1px solid var(--border-subtle)', paddingTop: '6px', marginTop: '4px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' } }, renderTextWithUrlBadge(memoWithoutDate))
       );
     }))
   );
