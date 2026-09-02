@@ -1251,6 +1251,8 @@ function CalendarApp() {
   const [isShareOpen, setIsShareOpen] = React.useState(false);
   const [isChatShareOpen, setIsChatShareOpen] = React.useState(false);
   const [isPlacesShareOpen, setIsPlacesShareOpen] = React.useState(false);
+  const [isMemoShareOpen, setIsMemoShareOpen] = React.useState(false);
+  const [isGalleryShareOpen, setIsGalleryShareOpen] = React.useState(false);
   const [isMainSideMenuOpen, setIsMainSideMenuOpen] = React.useState(false);
   const confirmedMeetingAnimationTimersRef = React.useRef(new Map());
   const [isNotificationHelpOpen, setIsNotificationHelpOpen] = React.useState(false);
@@ -6575,13 +6577,19 @@ function CalendarApp() {
           window.history.replaceState({}, '', url);
         },
         onOpenShare: () => {
-          if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsShareOpen(true);
+          if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsMemoShareOpen(true);
         },
         onOpenAppSettings: () => setIsAppSettingsOpen(true),
         onUpdateMemo: patchLocalMemo,
         onUpsertMemo: upsertLocalMemo,
         onDeleteMemo: removeLocalMemo,
         ...navMenuProps
+      }),
+      isMemoShareOpen && activeCal && /*#__PURE__*/React.createElement(ShareModal, {
+        calendar: activeCal,
+        shareType: "memo",
+        showToast: showToast,
+        onClose: () => setIsMemoShareOpen(false)
       }),
       sharedAppOverlays
     ));
@@ -6599,7 +6607,7 @@ function CalendarApp() {
         onUploadImages: handleUploadGalleryImages,
         onAddLink: handleAddGalleryLink,
         onOpenShare: () => {
-          if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsShareOpen(true);
+          if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsGalleryShareOpen(true);
         },
         setActiveLightbox: setActiveLightbox,
         onDeletePhoto: handleDeletePhoto,
@@ -6640,6 +6648,12 @@ function CalendarApp() {
         onGetGalleryPhotoOrdinal: handleGetGalleryPhotoOrdinal,
         onRequestConfirm: showConfirmDialog
       }) : null,
+      isGalleryShareOpen && activeCal && /*#__PURE__*/React.createElement(ShareModal, {
+        calendar: activeCal,
+        shareType: "gallery",
+        showToast: showToast,
+        onClose: () => setIsGalleryShareOpen(false)
+      }),
       sharedAppOverlays
     ));
   }
@@ -6954,11 +6968,16 @@ function CalendarApp() {
     onUploadImages: handleUploadGalleryImages,
     onAddLink: handleAddGalleryLink,
     onOpenShare: () => {
-      if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsShareOpen(true);
+      if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsGalleryShareOpen(true);
     },
     setActiveLightbox: setActiveLightbox,
     onDeletePhoto: handleDeletePhoto,
     showToast: showToast
+  }), isGalleryShareOpen && activeCal && /*#__PURE__*/React.createElement(ShareModal, {
+    calendar: activeCal,
+    shareType: "gallery",
+    showToast: showToast,
+    onClose: () => setIsGalleryShareOpen(false)
   }), isGuideOpen && /*#__PURE__*/React.createElement(UserManualOverlay, {
     calendar: activeCal,
     onClose: () => setIsGuideOpen(false)
@@ -9005,6 +9024,10 @@ function ShieldCheckIcon(props) {
   const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ShieldCheckIcon;
   return typeof C === 'function' ? React.createElement(C, props) : null;
 }
+function KakaoTalkIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.KakaoTalkIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 function CalendarExportIcon(props) {
   const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CalendarExportIcon;
   return typeof C === 'function' ? React.createElement(C, props) : null;
@@ -10972,6 +10995,7 @@ function bindGatherUiDeps() {
     RefreshIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.RefreshIcon) || (typeof RefreshIcon === 'function' ? RefreshIcon : null),
     SettingsIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SettingsIcon) || (typeof SettingsIcon === 'function' ? SettingsIcon : null),
     ShieldCheckIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ShieldCheckIcon) || (typeof ShieldCheckIcon === 'function' ? ShieldCheckIcon : null),
+    KakaoTalkIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.KakaoTalkIcon) || (typeof KakaoTalkIcon === 'function' ? KakaoTalkIcon : null),
     SmallXIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SmallXIcon) || (typeof SmallXIcon === 'function' ? SmallXIcon : null),
     TrophyIcon: (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.TrophyIcon) || (typeof TrophyIcon === 'function' ? TrophyIcon : null),
     MemoCard: typeof MemoCard === 'function' ? MemoCard : null,

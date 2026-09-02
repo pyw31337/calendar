@@ -746,6 +746,9 @@ function getDeps() { return window.GATHER_UI_DEPS || {}; }
     const SmallXIcon = deps.SmallXIcon || function (p) {
       return React.createElement('span', { style: { fontSize: (p && p.size) || 20 } }, '\u00d7');
     };
+    const KakaoTalkIcon = deps.KakaoTalkIcon || function () {
+      return React.createElement('span', { style: { fontSize: '0.95rem' } }, '\ud83d\udcac');
+    };
     const copyTextToClipboard = deps.copyTextToClipboard || async function (text) {
       try {
         if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -772,6 +775,7 @@ function getDeps() { return window.GATHER_UI_DEPS || {}; }
       if (shareType === 'places') return getViewShareUrl(calendar.id, 'places');
       if (shareType === 'memo') return getViewShareUrl(calendar.id, 'memo');
       if (shareType === 'gallery') return getViewShareUrl(calendar.id, 'gallery');
+      if (shareType === 'settlement') return getViewShareUrl(calendar.id, 'settlement');
       return getCalendarShareUrl(calendar.id);
     }, [calendar, shareType, customUrl]);
 
@@ -860,7 +864,7 @@ function getDeps() { return window.GATHER_UI_DEPS || {}; }
     },
       React.createElement('label', {
         style: { fontSize: 'var(--font-size-base)', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }
-      }, React.createElement('span', { style: { fontSize: '0.95rem' } }, '💬'), '카카오톡 & 앱으로 공유하기'),
+      }, React.createElement(KakaoTalkIcon, { size: 18 }), '카카오톡으로 공유하기'),
       React.createElement('div', {
         style: { display: 'flex', gap: '6px', flexWrap: 'wrap' }
       },
@@ -883,7 +887,7 @@ function getDeps() { return window.GATHER_UI_DEPS || {}; }
             fontSize: 'var(--font-size-md)', fontWeight: 800, cursor: 'pointer',
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
           }
-        }, '💬 카카오톡 / 모바일 앱으로 공유하기'),
+        }, React.createElement(KakaoTalkIcon, { size: 16 }), '카카오톡 공유'),
 
         /* Custom Share Invitation Text Copy Button */
         React.createElement('button', {
@@ -900,7 +904,7 @@ function getDeps() { return window.GATHER_UI_DEPS || {}; }
             fontSize: 'var(--font-size-md)', fontWeight: 700, cursor: 'pointer',
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px'
           }
-        }, '✉️ 카톡용 초대 메시지문 복사')
+        }, '✉️ 초대 메시지 복사')
       )
     ))));
   }
