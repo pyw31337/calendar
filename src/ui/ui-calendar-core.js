@@ -950,6 +950,44 @@ export function CalendarGrid({
       isCurrentMonth: false
     });
   }
+  // Multi-day (연일) festival/event anniversaries render as one connected bar spanning the day
+  // cells they cover within a week row, instead of a separate badge repeated on each day -- a
+  // bar can't visually cross a week-row boundary in a grid, so each row gets its own segment of
+  // a given festival. Rendered as extra .days-grid children with explicit grid placement (see
+  // festivalBars.map below) rather than nested inside any single day-cell, since day-cell has
+  // overflow:hidden and would clip a bar extending past its own box into the grid gap.
+  const festivalBars = React.useMemo(() => {
+    const bars = [];
+    const rowCount = Math.ceil(days.length / 7);
+    for (let row = 0; row < rowCount; row++) {
+      const rowDays = days.slice(row * 7, row * 7 + 7);
+      const byId = new Map();
+      rowDays.forEach((day, col) => {
+        getAnniversariesForDate(day.dateStr, anniversaries).forEach(ann => {
+          if (ann.type !== 'range') return;
+          if (!byId.has(ann.id)) byId.set(ann.id, { ...ann, row, startCol: col, endCol: col });
+          else byId.get(ann.id).endCol = col;
+        });
+      });
+      byId.forEach(bar => bars.push(bar));
+    }
+    return bars;
+  }, [days.map(d => d.dateStr).join('|'), anniversaries]);
+  // Dates covered by a festival bar reserve extra bottom space in their own day-cell (see the
+  // spacer div below) so a same-day regular anniversary badge stacks on the line above the bar
+  // instead of being covered by it -- the bar is a separate overlay, not part of that cell's own
+  // flex flow, so without this the two would render on top of each other.
+  const festivalCoveredDates = React.useMemo(() => {
+    const set = new Set();
+    festivalBars.forEach(bar => {
+      for (let col = bar.startCol; col <= bar.endCol; col++) {
+        const day = days[bar.row * 7 + col];
+        if (day) set.add(day.dateStr);
+      }
+    });
+    return set;
+  }, [festivalBars]);
+  const FESTIVAL_BAR_HEIGHT = 22;
   const availMap = React.useMemo(() => getActiveAvailabilities(calendar).reduce((acc, entry) => {
     if (!acc[entry.date]) acc[entry.date] = [];
     acc[entry.date].push(entry);
@@ -1181,7 +1219,7 @@ export function CalendarGrid({
     className: "weekday-label sat"
   }, "\uD1A0")), /*#__PURE__*/React.createElement("div", {
     className: "days-grid"
-  }, days.map(({
+  }, [days.map(({
     dayNum,
     dateStr,
     isCurrentMonth
@@ -1201,7 +1239,10 @@ export function CalendarGrid({
       return entry && Array.isArray(entry.expenses) && entry.expenses.length > 0;
     })();
     const solarTermName = !isHoliday && !isAllAvailable ? solarTermMap[dateStr] : null;
-    const cellAnns = getAnniversariesForDate(dateStr, anniversaries);
+    // Range-type (연일 festival/event) anniversaries are excluded here -- they render as a
+    // connected bar overlay (see festivalBars above) instead of a per-day badge.
+    const cellAnns = getAnniversariesForDate(dateStr, anniversaries).filter(ann => ann.type !== 'range');
+    const isFestivalCovered = festivalCoveredDates.has(dateStr);
     // Only one badge shows next to the date number: holiday name takes priority (it's
     // tied to the red date styling), then '확정' if this date has been promoted to a
     // confirmed meeting, then '전원' if everyone's available that day (replacing a solar
@@ -1216,9 +1257,16 @@ export function CalendarGrid({
       key: idx,
       className: `day-cell ${isCurrentMonth ? '' : 'other-month'} ${isConfirmed ? 'confirmed-meeting' : isAllAvailable ? 'all-available' : ''}`,
       "data-date-str": dateStr,
-      style: isTouchDropTarget
-        ? { "--cell-index": idx, outline: '2px solid var(--accent-primary)', outlineOffset: '-2px' }
-        : { "--cell-index": idx },
+      // Explicit grid placement (rather than relying on auto-flow) so a festival-bar overlay
+      // (see festivalBars below), which must also use explicit placement to span multiple
+      // columns, can share this exact cell instead of the grid's auto-placement treating the
+      // bar's reserved cells as occupied and shifting every subsequent day-cell over.
+      style: {
+        gridRowStart: Math.floor(idx / 7) + 1,
+        gridColumnStart: (idx % 7) + 1,
+        ...(isTouchDropTarget ? { outline: '2px solid var(--accent-primary)', outlineOffset: '-2px' } : {}),
+        "--cell-index": idx
+      },
       onClick: () => onSelectDate(dateStr),
       onDragOver: event => {
         event.preventDefault();
@@ -1350,11 +1398,10 @@ export function CalendarGrid({
           style: {
             fontSize: 'var(--font-size-2xs)',
             fontWeight: 'bold',
-            color: displayColor,
-            backgroundColor: `${displayColor}15`,
-            borderLeft: `2px solid ${displayColor}`,
-            padding: '2px 6px',
-            borderRadius: '4px',
+            color: '#FFFFFF',
+            backgroundColor: displayColor,
+            padding: '3px 8px',
+            borderRadius: 'var(--radius-sm)',
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
@@ -1398,9 +1445,57 @@ export function CalendarGrid({
             flexShrink: 0
           }
         }, renderAnniversaryIcon(ann, 11));
-      }))
+      })),
+
+      /* Reserves room at the bottom of this cell for the festival-bar overlay drawn as a
+         separate .days-grid child (see festivalBars below) -- unconditional on cellAnns so it
+         also protects plain attendee badges from being covered, not just other anniversaries. */
+      isFestivalCovered && /*#__PURE__*/React.createElement("div", { style: { height: `${FESTIVAL_BAR_HEIGHT}px`, flexShrink: 0, width: '100%' } })
     );
-  })));
+  }), festivalBars.map(bar => {
+    const displayColor = getAnniversaryDisplayColor(bar, calendar);
+    return /*#__PURE__*/React.createElement("div", {
+      key: `festival-bar-${bar.id}-${bar.row}`,
+      style: {
+        gridRowStart: bar.row + 1,
+        gridColumnStart: bar.startCol + 1,
+        gridColumnEnd: bar.endCol + 2,
+        display: 'flex',
+        alignItems: 'flex-end',
+        pointerEvents: 'none',
+        boxSizing: 'border-box',
+        // .day-cell has position:relative, so it always paints in the positioned-elements
+        // layer above any position:static sibling regardless of DOM order -- without also
+        // being positioned here, this bar would render invisibly underneath every day-cell.
+        position: 'relative',
+        zIndex: 1,
+        // A grid item's automatic minimum width defaults to its content's min-content size
+        // (here, the unwrapped title text) unless overridden -- without this, a long title
+        // forces its spanned column(s) wide enough to fit the whole word, squeezing every
+        // other column in the row down to a sliver. minWidth:0 lets the item shrink to the
+        // track's actual size and leaves the inner pill's own overflow/ellipsis to truncate it.
+        minWidth: 0
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: '100%',
+        height: `${FESTIVAL_BAR_HEIGHT}px`,
+        backgroundColor: displayColor,
+        color: '#FFFFFF',
+        fontWeight: 'bold',
+        fontSize: 'var(--font-size-2xs)',
+        borderRadius: 'var(--radius-sm)',
+        padding: '0 8px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '4px',
+        overflow: 'hidden',
+        whiteSpace: 'nowrap',
+        textOverflow: 'ellipsis',
+        boxSizing: 'border-box'
+      }
+    }, renderAnniversaryIcon(bar, 12), " ", bar.title));
+  })]));
 
   // Floating badge that follows the finger while a touch drag is active (see
   // handleBadgeTouchStart above) -- portaled straight to <body> so it renders above everything
