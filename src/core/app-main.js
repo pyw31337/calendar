@@ -2686,9 +2686,12 @@ function CalendarApp() {
       setHasMoreOlderChat(false);
       return;
     }
+    // Falls back to "now" when there's no local message to anchor the query on yet (e.g. the
+    // gallery/chat is opened before the live listener's first snapshot has arrived) -- silently
+    // returning here left onLoadOlderChat a no-op with no loading state and no error, which from
+    // the "이전 사진/링크 더 보기" button looked exactly like a stuck/broken button.
     const oldest = allChatMessages[0];
-    const beforeTs = oldest && oldest.timestamp;
-    if (!beforeTs) return;
+    const beforeTs = (oldest && oldest.timestamp) || Date.now();
     loadingOlderChatRef.current = true;
     setLoadingOlderChat(true);
     const container = chatMessagesContainerRef.current;
