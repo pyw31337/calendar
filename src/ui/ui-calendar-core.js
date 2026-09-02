@@ -737,6 +737,28 @@ function getAnniversaryDisplayColor(...args) {
 }
 
 
+// Shared text style for anniversary/festival badges: pale tinted background (set by the
+// caller) with the category color itself as the text color, wrapping up to 2 lines when the
+// title doesn't fit -- text-align/text-align-last left-aligns the first line and right-aligns
+// the (possibly different) last line, so a title cut across two lines still shows both its
+// start and its end at a glance instead of only the start.
+function ANNIVERSARY_BADGE_TEXT_STYLE(displayColor) {
+  return {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 'var(--font-size-2xs)',
+    fontWeight: 800,
+    color: displayColor,
+    lineHeight: 1.3,
+    display: '-webkit-box',
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: 'vertical',
+    overflow: 'hidden',
+    textAlign: 'left',
+    textAlignLast: 'right'
+  };
+}
+
 export function CalendarGrid({
   anniversaries = [],
   calendar,
@@ -987,7 +1009,8 @@ export function CalendarGrid({
     });
     return set;
   }, [festivalBars]);
-  const FESTIVAL_BAR_HEIGHT = 22;
+  // Tall enough for the badge's title to wrap onto 2 lines (see ANNIVERSARY_BADGE_TEXT_STYLE).
+  const FESTIVAL_BAR_HEIGHT = 36;
   const availMap = React.useMemo(() => getActiveAvailabilities(calendar).reduce((acc, entry) => {
     if (!acc[entry.date]) acc[entry.date] = [];
     acc[entry.date].push(entry);
@@ -1396,22 +1419,18 @@ export function CalendarGrid({
         return /*#__PURE__*/React.createElement("div", {
           key: ann.id || aIdx,
           style: {
-            fontSize: 'var(--font-size-2xs)',
-            fontWeight: 'bold',
-            color: '#FFFFFF',
-            backgroundColor: displayColor,
+            backgroundColor: `${displayColor}22`,
             padding: '3px 8px',
             borderRadius: 'var(--radius-sm)',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
             display: 'flex',
-            alignItems: 'center',
+            alignItems: 'flex-start',
             gap: '4px',
             width: '100%',
             boxSizing: 'border-box'
           }
-        }, renderAnniversaryIcon(ann, 12), " ", ann.title);
+        }, renderAnniversaryIcon(ann, 12), /*#__PURE__*/React.createElement("span", {
+          style: ANNIVERSARY_BADGE_TEXT_STYLE(displayColor)
+        }, ann.title));
       })),
 
       /* Mobile Anniversary Icon Badge (mobile-only, circular icons containing emoji with participant color) */
@@ -1480,21 +1499,17 @@ export function CalendarGrid({
       style: {
         width: '100%',
         height: `${FESTIVAL_BAR_HEIGHT}px`,
-        backgroundColor: displayColor,
-        color: '#FFFFFF',
-        fontWeight: 'bold',
-        fontSize: 'var(--font-size-2xs)',
+        backgroundColor: `${displayColor}22`,
         borderRadius: 'var(--radius-sm)',
-        padding: '0 8px',
+        padding: '3px 8px',
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         gap: '4px',
-        overflow: 'hidden',
-        whiteSpace: 'nowrap',
-        textOverflow: 'ellipsis',
         boxSizing: 'border-box'
       }
-    }, renderAnniversaryIcon(bar, 12), " ", bar.title));
+    }, renderAnniversaryIcon(bar, 12), /*#__PURE__*/React.createElement("span", {
+      style: ANNIVERSARY_BADGE_TEXT_STYLE(displayColor)
+    }, bar.title)));
   })]));
 
   // Floating badge that follows the finger while a touch drag is active (see

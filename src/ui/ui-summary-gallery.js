@@ -1749,6 +1749,7 @@ export function HistoryView({
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
   const SearchIcon = __comp.SearchIcon || __deps.SearchIcon;
   const FolderClockIcon = __comp.FolderClockIcon || __deps.FolderClockIcon;
+  const MapPinIcon = __comp.MapPinIcon || __deps.MapPinIcon;
   const InlineSearchBar = __comp.InlineSearchBar || __deps.InlineSearchBar;
   const WeatherBadge = __comp.WeatherBadge || __deps.WeatherBadge;
   const SharedAppNavBlock = __comp.SharedAppNavBlock || __deps.SharedAppNavBlock;
@@ -1879,20 +1880,32 @@ export function HistoryView({
               }, memoText);
             })
           ),
-          datePlaces.length > 0 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '2px', width: '100%' } },
+          datePlaces.length > 0 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '2px', width: '100%' } },
             datePlaces.map(place => {
               const mapUrl = getKakaoMapLinkUrl(place);
-              const label = `📍 ${place.alias || place.name}${place.address ? ' · ' + getDisplayPlaceAddress(place) : ''}`;
-              return mapUrl
-                ? /*#__PURE__*/React.createElement("a", {
-                    key: place.id, href: mapUrl, target: "_blank", rel: "noreferrer",
-                    onClick: e => e.stopPropagation(),
-                    style: { fontSize: 'var(--font-size-sm)', color: isPast ? '#94A3B8' : 'rgba(255,255,255,0.9)', textDecoration: 'underline', wordBreak: 'break-word' }
-                  }, label)
-                : /*#__PURE__*/React.createElement("span", {
-                    key: place.id,
-                    style: { fontSize: 'var(--font-size-sm)', color: isPast ? '#94A3B8' : 'rgba(255,255,255,0.9)', wordBreak: 'break-word' }
-                  }, label);
+              const placeName = place.alias || place.name;
+              const address = place.address ? getDisplayPlaceAddress(place) : '';
+              return /*#__PURE__*/React.createElement("div", {
+                key: place.id,
+                className: "place-memo-stack",
+                style: {
+                  display: 'flex', alignItems: 'flex-start', gap: '6px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.92)', borderRadius: 'var(--radius-md)',
+                  padding: '7px 10px', width: '100%', boxSizing: 'border-box'
+                }
+              },
+                MapPinIcon && /*#__PURE__*/React.createElement(MapPinIcon, { size: 14, style: { flexShrink: 0, marginTop: '2px', color: '#7C3AED' } }),
+                /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0 } },
+                  mapUrl
+                    ? /*#__PURE__*/React.createElement("a", {
+                        href: mapUrl, target: "_blank", rel: "noreferrer",
+                        onClick: e => e.stopPropagation(),
+                        style: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--text-main)', textDecoration: 'none', wordBreak: 'break-word' }
+                      }, placeName)
+                    : /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--text-main)', wordBreak: 'break-word' } }, placeName),
+                  address && /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', wordBreak: 'break-word' } }, address)
+                )
+              );
             })
           )
         );
