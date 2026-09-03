@@ -4746,19 +4746,14 @@ select.form-select {
 .btn-gamified-confirm .gamified-confirm-label { position: relative; z-index: 3; }
 .btn-meeting-confirm-plain { background: transparent; }
 
-/* Uniform electric border — transform-rotate conic + SVG feDisplacementMap crackle */
-.gamified-electric-svg-defs {
-  position: absolute !important;
-  width: 0 !important;
-  height: 0 !important;
-  overflow: hidden !important;
-  pointer-events: none !important;
-}
+/* Uniform electric border — transform-rotate conic (works without @property; Safari/Firefox/Whale) */
 .gamified-border-electric {
   position: absolute;
-  /* Keep ring inside the button so overflow:hidden clips cleanly (modal scrollbar stable). */
-  inset: 0;
-  border-radius: var(--radius-md);
+  inset: -3px;
+  /* Sits 3px outside .btn-gamified-confirm (border-radius: var(--radius-md), 10px) -- +3px
+     keeps the glow ring concentric with the button's own rounded corners instead of drifting
+     out of alignment with it. */
+  border-radius: calc(var(--radius-md) + 3px);
   pointer-events: none;
   z-index: 2;
   overflow: hidden;
@@ -4772,9 +4767,7 @@ select.form-select {
     linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
-  /* SVG turbulence displace + pink/purple/cyan glow */
   filter:
-    url(#gamified-electric-displace)
     drop-shadow(0 0 3px rgba(103, 232, 249, 0.95))
     drop-shadow(0 0 10px rgba(192, 132, 252, 0.7));
 }
@@ -4786,7 +4779,6 @@ select.form-select {
   width: 220%;
   height: 220%;
   transform: translate(-50%, -50%);
-  pointer-events: none;
   background: conic-gradient(
     from 0deg,
     transparent 0deg,
@@ -4804,7 +4796,6 @@ select.form-select {
   padding: 2px;
   opacity: 0.9;
   filter:
-    url(#gamified-electric-displace)
     drop-shadow(0 0 2px rgba(255, 255, 255, 0.85))
     drop-shadow(0 0 8px rgba(236, 72, 153, 0.6));
 }
@@ -4829,22 +4820,8 @@ select.form-select {
   .gamified-border-electric::before,
   .gamified-border-electric-secondary::before,
   .btn-gamified-confirm,
-  .btn-gamified-confirm::before,
-  .gamified-shiny-glow,
-  .gamified-spark,
-  .gamified-sparklet {
+  .btn-gamified-confirm::before {
     animation: none !important;
-  }
-  /* Drop SVG displace (and its SMIL) — keep static glow only */
-  .gamified-border-electric {
-    filter:
-      drop-shadow(0 0 3px rgba(103, 232, 249, 0.95))
-      drop-shadow(0 0 10px rgba(192, 132, 252, 0.7)) !important;
-  }
-  .gamified-border-electric-secondary {
-    filter:
-      drop-shadow(0 0 2px rgba(255, 255, 255, 0.85))
-      drop-shadow(0 0 8px rgba(236, 72, 153, 0.6)) !important;
   }
 }
 .btn-gamified-confirm .gamified-confirm-label {
@@ -4858,10 +4835,10 @@ select.form-select {
   box-shadow:
     0 4px 18px rgba(236, 72, 153, 0.45),
     0 0 24px rgba(139, 92, 246, 0.28) !important;
-  overflow: hidden !important; /* clip effect layers; do not flicker modal scrollbar */
+  overflow: visible !important;
 }
 .gamified-confirm-wrap {
-  overflow: hidden !important;
+  overflow: visible !important;
   border-radius: var(--radius-md);
 }
 
