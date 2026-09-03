@@ -1386,13 +1386,17 @@ export function CalendarGrid({
     // connected bar overlay (see festivalBars above) instead of a per-day badge.
     const cellAnns = getAnniversariesForDate(dateStr, anniversaries).filter(ann => ann.type !== 'range');
     const isFestivalCovered = festivalCoveredDates.has(dateStr);
-    // Only one badge shows next to the date number: holiday name takes priority (it's
-    // tied to the red date styling), then '확정' if this date has been promoted to a
-    // confirmed meeting, then '전원' if everyone's available that day (replacing a solar
-    // term that would otherwise be shown), then the solar term.
-    const cornerText = isHoliday ? holidayNames.join('·') : isConfirmed ? '확정' : isAllAvailable ? '전원' : solarTermName;
+    // Holiday name stays visible (red date styling), but when the day is also a confirmed
+    // meeting we append ·확정 -- otherwise users only see '개천절' and re-tap 모임확정,
+    // which toggles the confirmation OFF. Then '전원', then solar term.
+    const holidayLabel = isHoliday ? holidayNames.join('·') : '';
+    const cornerText = isHoliday
+      ? (isConfirmed ? `${holidayLabel}·확정` : holidayLabel)
+      : isConfirmed ? '확정' : isAllAvailable ? '전원' : solarTermName;
     const cornerColor = isHoliday ? '#EF4444' : isConfirmed ? '#7C3AED' : isAllAvailable ? 'var(--status-green)' : '#94A3B8';
-    const cornerTitle = isHoliday ? (lunarLabel ? `${holidayNames.join(', ')} (${lunarLabel})` : holidayNames.join(', ')) : undefined;
+    const cornerTitle = isHoliday
+      ? ((lunarLabel ? `${holidayNames.join(', ')} (${lunarLabel})` : holidayNames.join(', ')) + (isConfirmed ? ' · 확정' : ''))
+      : (isConfirmed ? '모임 확정' : undefined);
     const columnDow = idx % 7; // 0=Sun .. 6=Sat, since each week row starts on Sunday
     const isSunday = columnDow === 0;
     const isTouchDropTarget = isTouchDragging && touchDropTargetDate === dateStr;
@@ -2148,7 +2152,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       }
     },
     style: {
-      backgroundColor: memo.color || 'var(--bg-primary)',
+      backgroundColor: (memo.color && memo.color !== 'var(--bg-card)') ? memo.color : 'var(--bg-primary)',
       border: '0',
       borderRadius: 'var(--radius-md)',
       padding: '12px',
