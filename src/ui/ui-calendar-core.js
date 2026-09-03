@@ -2001,7 +2001,7 @@ export function CommentsSection({
   }) : null));
 }
 
-export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onSelectTag, onCommentsChange, getBorderColor, onRequestConfirm, showToast, effectivePinned, hidePinButton = false }) {
+export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onSelectTag, onCommentsChange, getBorderColor, onRequestConfirm, showToast, effectivePinned, hidePinButton = false, variant = 'page' }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -2017,6 +2017,8 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
   const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
   const AutoGrowTextarea = __comp.AutoGrowTextarea || __deps.AutoGrowTextarea;
+  // 'page' = memo-page standard module; 'preview' = main-screen section customization.
+  const isPreview = variant === 'preview';
   const sanitizeText = __deps.sanitizeText;
   const extractFirstUrl = __deps.extractFirstUrl;
 
@@ -2189,7 +2191,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       }
     },
     style: {
-      backgroundColor: (memo.color && memo.color !== 'var(--bg-card)' && memo.color !== '#fff' && memo.color !== '#FFFFFF') ? memo.color : '#fff',
+      backgroundColor: (memo.color && memo.color !== 'var(--bg-card)' && memo.color !== '#fff' && memo.color !== '#FFFFFF') ? memo.color : (isPreview ? 'var(--bg-primary)' : '#fff'),
       border: '0',
       borderRadius: 'var(--radius-md)',
       padding: '12px',
@@ -2311,7 +2313,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         fallbackTitle: memo.title || (memo.text ? removeFirstUrl(memo.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : ''),
         cachedData: memo.linkPreview,
         stretch: true,
-        noBorder: true
+        noBorder: isPreview
       }),
 
       /* Video Toggle button if this URL is a video */
@@ -2444,7 +2446,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         onClick: e => e.stopPropagation(),
         style: {
           display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 2px',
-          borderTop: commentIdx > 0 ? '1px solid var(--border-subtle)' : 'none'
+          borderTop: commentIdx > 0 ? '1px solid color-mix(in srgb, var(--bg-primary) 96%, black)' : 'none'
         }
       },
         /*#__PURE__*/React.createElement("span", {
