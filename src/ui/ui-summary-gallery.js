@@ -1006,12 +1006,7 @@ export function MemoPreviewSection({ memos = [], calendar = null, onViewAll, onO
         type: "button",
         onClick: e => { e.stopPropagation(); openMemoPage(); },
         style: { background: 'none', border: 'none', color: '#3B82F6', fontSize: 'var(--font-size-md)', fontWeight: 800, cursor: 'pointer', padding: '4px 6px', flexShrink: 0 }
-      }, "전체보기"),
-      /*#__PURE__*/React.createElement(SectionToggleButton, {
-        collapsed,
-        onToggle: () => setCollapsed(prev => !prev),
-        label: collapsed ? '메모 펼치기' : '메모 접기'
-      })
+      }, "전체보기")
     ),
     /*#__PURE__*/React.createElement("div", {
       style: { display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '12px' }
@@ -1043,7 +1038,6 @@ export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalG
   const MediaThumb = __comp.MediaThumb || __deps.MediaThumb;
   const resolveMeetingPhotoDisplay = __deps.resolveMeetingPhotoDisplay;
   const SectionCountBadge = __comp.SectionCountBadge;
-  const SectionToggleButton = __comp.SectionToggleButton;
 
   const [collapsed, setCollapsed] = React.useState(false);
   const [lightbox, setLightbox] = React.useState(null);
@@ -1232,12 +1226,7 @@ export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalG
           border: 'none', background: 'transparent', cursor: 'pointer',
           color: '#3B82F6', fontSize: 'var(--font-size-md)', fontWeight: 700, padding: '4px 6px', flexShrink: 0
         }
-      }, "전체보기"),
-      /*#__PURE__*/React.createElement(SectionToggleButton, {
-        collapsed,
-        onToggle: () => setCollapsed(prev => !prev),
-        label: collapsed ? '갤러리 펼치기' : '갤러리 접기'
-      })
+      }, "전체보기")
     ),
     !collapsed && displayedEntries.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null,
       /*#__PURE__*/React.createElement("div", {

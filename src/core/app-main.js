@@ -7113,12 +7113,10 @@ function CalendarApp() {
     ));
   }
 
-  const mainMenuPollCount = getCalendarPolls(activeCal).filter(poll => !isPollClosed(poll) && !poll.hidden).length;
   // Whether the 진행중 투표 section has anything to render at all -- mirrors PollList's own
   // "polls" filter (ui-calendar-core.js), which keeps closed-but-not-hidden polls visible there
-  // (shown dimmed with a winning-option badge) rather than excluding them like mainMenuPollCount
-  // does. Used both to decide whether to render that section and whether the header 투표 메뉴 click
-  // should scroll to it or show a "없습니다" alert instead.
+  // (shown dimmed with a winning-option badge). Used both to decide whether to render that
+  // section and whether the header 투표 메뉴 click should scroll to it or show a "없습니다" alert.
   const hasVisiblePolls = getCalendarPolls(activeCal).some(poll => !poll.hidden);
   const mainMenuChatCount = (typeof totalChatCount === 'number' && totalChatCount >= 0)
     ? totalChatCount
@@ -7126,9 +7124,22 @@ function CalendarApp() {
   const mainMenuChatLatestTimestamp = visibleChatMessages.length > 0 ? visibleChatMessages[visibleChatMessages.length - 1].timestamp : 0;
   const mainMenuChatHasUnread = mainMenuChatLatestTimestamp > getChatLastReadTimestamp(activeCalId);
 
+  // No per-user "last read" tracking exists for polls/memos the way chat has
+  // getChatLastReadTimestamp, so their main-menu dot falls back to "created within the last 6
+  // hours" as a reasonable proxy for "new" -- see NEW_CONTENT_DOT_WINDOW_MS.
+  const NEW_CONTENT_DOT_WINDOW_MS = 6 * 60 * 60 * 1000;
+  const mainMenuPollLatestTimestamp = getCalendarPolls(activeCal)
+    .filter(poll => !poll.hidden)
+    .reduce((max, poll) => Math.max(max, Number(poll.createdAt) || 0), 0);
+  const mainMenuPollHasNew = mainMenuPollLatestTimestamp > 0
+    && (Date.now() - mainMenuPollLatestTimestamp) < NEW_CONTENT_DOT_WINDOW_MS;
+
   const mainMenuMemoCount = (typeof totalMemoCount === 'number' && totalMemoCount >= 0)
     ? totalMemoCount
     : (memos || []).length;
+  const mainMenuMemoLatestTimestamp = (memos || []).reduce((max, memo) => Math.max(max, Number(memo && memo.createdAt) || 0), 0);
+  const mainMenuMemoHasNew = mainMenuMemoLatestTimestamp > 0
+    && (Date.now() - mainMenuMemoLatestTimestamp) < NEW_CONTENT_DOT_WINDOW_MS;
   const mainMenuGalleryCount = (localGalleryCount > 0)
     ? localGalleryCount
     : ((typeof totalGalleryCount === 'number' && totalGalleryCount >= 0) ? totalGalleryCount : localGalleryCount);
@@ -7249,15 +7260,16 @@ function CalendarApp() {
       setPollsExpandSignal(prev => prev + 1);
       scrollToSection(pollsSectionRef);
     }
-  }, /*#__PURE__*/React.createElement("span", { className: "main-menu-icon" }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M9 11l3 3l8 -8", "M20 12v6a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h9"] })), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-full" }, "투표"), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-short" }, "투표"), mainMenuPollCount > 0 && /*#__PURE__*/React.createElement("span", {
-    className: "main-menu-badge"
-  }, mainMenuPollCount)), /*#__PURE__*/React.createElement("div", { className: "main-menu-sep" }), /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement("span", { className: "main-menu-icon" }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M9 11l3 3l8 -8", "M20 12v6a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h9"] })), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-full" }, "투표"), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-short" }, "투표"), mainMenuPollHasNew && /*#__PURE__*/React.createElement("span", {
+    className: "main-menu-dot"
+  })), /*#__PURE__*/React.createElement("div", { className: "main-menu-sep" }), /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "main-menu-item",
     onClick: () => changeView('chat')
-  }, /*#__PURE__*/React.createElement("span", { className: "main-menu-icon" }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"] })), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-full" }, "채팅"), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-short" }, "채팅"), mainMenuChatCount > 0 && /*#__PURE__*/React.createElement("span", {
-    className: `main-menu-badge${mainMenuChatHasUnread ? ' is-unread' : ''}`
-  }, mainMenuChatCount)), canUseSettlement && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", { className: "main-menu-sep" }), /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement("span", { className: "main-menu-icon" }, /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"] })), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-full" }, "채팅"), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-short" }, "채팅"), mainMenuChatHasUnread && /*#__PURE__*/React.createElement("span", {
+    className: "main-menu-dot",
+    style: navChatLastAuthor && navChatLastAuthor.color ? { backgroundColor: navChatLastAuthor.color } : undefined
+  })), canUseSettlement && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", { className: "main-menu-sep" }), /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "main-menu-item",
     onClick: () => {
@@ -7279,9 +7291,9 @@ function CalendarApp() {
     onClick: () => {
       if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 메모 정보를 확인해 주세요.')) changeView('memo');
     }
-  }, /*#__PURE__*/React.createElement("span", { className: "main-menu-icon" }, /*#__PURE__*/React.createElement(NotepadTextIcon, null)), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-full" }, "메모"), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-short" }, "메모"), activeCal && mainMenuMemoCount > 0 && /*#__PURE__*/React.createElement("span", {
-    className: "main-menu-badge"
-  }, mainMenuMemoCount))))), isMainSideMenuOpen && /*#__PURE__*/React.createElement(MainSideMenu, {
+  }, /*#__PURE__*/React.createElement("span", { className: "main-menu-icon" }, /*#__PURE__*/React.createElement(NotepadTextIcon, null)), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-full" }, "메모"), /*#__PURE__*/React.createElement("span", { className: "main-menu-label-short" }, "메모"), activeCal && mainMenuMemoHasNew && /*#__PURE__*/React.createElement("span", {
+    className: "main-menu-dot"
+  }))))), isMainSideMenuOpen && /*#__PURE__*/React.createElement(MainSideMenu, {
     calendar: activeCal,
     anniversaries: anniversaries,
     galleryCount: mainMenuGalleryCount,

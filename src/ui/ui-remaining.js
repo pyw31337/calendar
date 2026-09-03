@@ -1363,7 +1363,6 @@ export function PlacesSection({ calendar, onViewAll, onSelectPlace }) {
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const PlaceSectionIcon = __comp.PlaceSectionIcon || __deps.PlaceSectionIcon;
   const PlaceCategoryMarkerIcon = __comp.PlaceCategoryMarkerIcon || __deps.PlaceCategoryMarkerIcon;
-  const SectionToggleButton = __comp.SectionToggleButton || __deps.SectionToggleButton;
   const BuildingIcon = __comp.BuildingIcon || __deps.BuildingIcon;
   const getCalendarPlaces = __deps.getCalendarPlaces;
 
@@ -1408,12 +1407,7 @@ export function PlacesSection({ calendar, onViewAll, onSelectPlace }) {
           type: "button",
           onClick: e => { e.stopPropagation(); onViewAll(); },
           style: { background: 'none', border: 'none', color: '#3B82F6', fontSize: 'var(--font-size-md)', fontWeight: 800, cursor: 'pointer', padding: '4px 6px' }
-        }, "전체보기"),
-        /*#__PURE__*/React.createElement(SectionToggleButton, {
-          collapsed,
-          onToggle: () => setCollapsed(prev => !prev),
-          label: collapsed ? '장소 펼치기' : '장소 접기'
-        })
+        }, "전체보기")
       )
     ),
     /*#__PURE__*/React.createElement("div", {
