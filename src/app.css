@@ -598,7 +598,7 @@ button.confirmed-meeting-icon-btn.confirmed-meeting-surface.is-heartbeat {
 .toast-message { flex: 1 1 180px; min-width: 0; }
 .toast-action {
   flex-shrink: 0;
-  min-height: 32px;
+  min-height: 30px;
   padding: 0 12px;
   border-radius: var(--radius-full);
   border: 1px solid rgba(255, 255, 255, 0.38);
@@ -1358,26 +1358,6 @@ button, input, textarea, select {
 @media (min-width: 768px) { .calendar-desc { font-size: 0.875rem; } }
 
 /* Buttons */
-/* Touch target floor: all app buttons ≥ 32px */
-button:not(.leaflet-marker-icon):not(.place-cluster-icon):not(.place-map-marker),
-.btn,
-.btn-action,
-.btn-secondary,
-.btn-primary,
-.btn-danger,
-.icon-btn,
-.section-toggle-btn,
-.tap-target,
-.modal-close-btn,
-.admin-side-menu-close-btn,
-.admin-side-menu-font-btn,
-.calendar-month-nav-btn,
-.chat-msg-action,
-.chat-keyboard-reopen-btn,
-[role="button"]:not(.leaflet-marker-icon):not(.place-cluster-icon):not(.place-map-marker):not(.summary-title) {
-  min-height: 32px;
-  box-sizing: border-box;
-}
 
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
@@ -2247,10 +2227,9 @@ select.form-select {
   height: 12px;
 }
 .poll-drag-handle {
-  width: 32px;
-  min-width: 32px;
-  height: 32px;
-  min-height: 32px;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2721,10 +2700,9 @@ select.form-select {
 }
 .section-toggle-btn {
   margin-left: auto;
-  width: 32px;
-  height: 32px;
-  min-height: 32px;
-  flex: 0 0 32px;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
   border: 0;
   background: transparent;
   color: #94A3B8;
@@ -2872,9 +2850,8 @@ select.form-select {
   order: 3;
 }
 .admin-menu-toggle-btn {
-  width: 32px;
-  height: 32px;
-  min-height: 32px;
+  width: 28px;
+  height: 28px;
   padding: 0;
   border: none;
   background: transparent;
@@ -3143,9 +3120,8 @@ select.form-select {
   flex-shrink: 0;
 }
 .admin-side-menu-font-btn {
-  width: 32px;
-  height: 32px;
-  min-height: 32px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   border: 1px solid var(--border-subtle);
   background: #F8FAFC;
@@ -3829,7 +3805,7 @@ select.form-select {
 }
 .region-selection-badge-remove {
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-  width: 18px; height: 18px; padding: 0; border: none; border-radius: 50%;
+  width: 18px; height: 18px; min-height: 0 !important; padding: 0; border: none; border-radius: 50%;
   background: var(--accent-primary); color: #fff; cursor: pointer;
 }
 
@@ -3852,6 +3828,11 @@ select.form-select {
   cursor: pointer;
 }
 .region-filter-save-btn:disabled { opacity: 0.4; cursor: default; }
+
+/* Poster cards are <button>s with % padding aspect-ratio; never apply touch min-heights */
+.culture-items-grid > button {
+  min-height: 0;
+}
 
 /* 문화공연 / 지역축제 포스터 그리드.
    is-cols-2 (default): 모바일 2단 / 태블릿 4단 / PC 6단.

@@ -2249,7 +2249,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
                 },
                 title: "업체보기",
                 style: {
-                  width: '32px', height: '32px', minWidth: '32px', minHeight: '32px', boxSizing: 'border-box',
+                  width: '28px', height: '28px',
                   background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-light)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
                   position: 'relative', zIndex: 11
@@ -2264,7 +2264,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
                 },
                 title: "장소 수정",
                 style: {
-                  width: '32px', height: '32px', minWidth: '32px', minHeight: '32px', boxSizing: 'border-box',
+                  width: '28px', height: '28px',
                   background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-light)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
                   position: 'relative', zIndex: 11
@@ -2351,13 +2351,13 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
                         /*#__PURE__*/React.createElement("button", {
                           type: "button",
                           onClick: e => { e.stopPropagation(); handleCancelEditPlaceMemoEntry(); },
-                          style: { height: '32px', minHeight: '32px', padding: '0 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', background: 'none', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer', boxSizing: 'border-box' }
+                          style: { height: '28px', padding: '0 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', background: 'none', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' }
                         }, "취소"),
                         /*#__PURE__*/React.createElement("button", {
                           type: "button",
                           onClick: e => { e.stopPropagation(); handleSavePlaceMemoEntry(place, entry); },
                           disabled: !editingMemoEntryText.trim(),
-                          style: { height: '32px', minHeight: '32px', padding: '0 10px', borderRadius: 'var(--radius-sm)', border: 'none', backgroundColor: 'var(--accent-primary)', color: '#FFFFFF', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer', opacity: editingMemoEntryText.trim() ? 1 : 0.5, boxSizing: 'border-box' }
+                          style: { height: '28px', padding: '0 10px', borderRadius: 'var(--radius-sm)', border: 'none', backgroundColor: 'var(--accent-primary)', color: '#FFFFFF', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer', opacity: editingMemoEntryText.trim() ? 1 : 0.5 }
                         }, "수정")
                       )
                     );
