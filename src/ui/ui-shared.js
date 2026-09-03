@@ -1090,13 +1090,30 @@ export function GamifiedConfirmButtonContent({ label }) {
   );
 }
 
-export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = false, stretchWidth = null, noBorder = false }) {
+export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = false, stretchWidth = null, noBorder = false, onStatusChange = null }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
 
   const preview = useLinkPreview(url, cachedData);
   const hasPreviewData = !!(preview && preview.status === 'success' && preview.data);
+
+  // Notify parents (e.g. DirectChatMediaText) when preview settles so they can hide the raw URL
+  // from bubble text once a card is successfully showing -- while loading/failed the URL stays
+  // visible/clickable. Fire on every preview.status change, including the cachedData success
+  // path that useLinkPreview returns synchronously on mount. Keep the callback in a ref so a
+  // fresh inline onStatusChange from the parent doesn't re-fire this effect every render.
+  const onStatusChangeRef = React.useRef(onStatusChange);
+  onStatusChangeRef.current = onStatusChange;
+  React.useEffect(() => {
+    const cb = onStatusChangeRef.current;
+    if (typeof cb !== 'function') return;
+    if (preview && preview.status) {
+      cb(preview.status);
+    } else if (cachedData) {
+      cb('success');
+    }
+  }, [preview, cachedData]);
 
   if (!hasPreviewData && !fallbackTitle) return null;
 
