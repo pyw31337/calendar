@@ -3203,11 +3203,11 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
             getIndividualSettlementAmount(row.participantId) !== 0 && React.createElement('span', { style: { fontSize: 'var(--font-size-md)', color: 'var(--text-main)', whiteSpace: 'nowrap', marginRight: '2px', fontWeight: 800 } }, `${getIndividualSettlementAmount(row.participantId) < 0 ? '+' : '-'}${Math.abs(getIndividualSettlementAmount(row.participantId)).toLocaleString()}원`),
             React.createElement('button', {
               type: 'button', title: '참여자 메모 편집', 'aria-label': '참여자 메모 편집', onClick: () => handleEditParticipantRow(row),
-              style: { width: '32px', height: '32px', minWidth: '32px', minHeight: '32px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--radius-sm)', color: 'var(--text-muted)', backgroundColor: 'transparent', border: '1px solid #CBD5E1', flexShrink: 0 }
+              style: { width: '24px', height: '24px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--radius-sm)', color: 'var(--text-muted)', backgroundColor: 'transparent', border: '1px solid #CBD5E1', flexShrink: 0 }
             }, React.createElement(PencilIcon, { size: 12 })),
             React.createElement('button', {
               type: 'button', title: '참여자 삭제', 'aria-label': '참여자 삭제', onClick: () => handleRemoveParticipantRow(row.id),
-              style: { width: '32px', height: '32px', minWidth: '32px', minHeight: '32px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--radius-sm)', color: 'var(--text-muted)', backgroundColor: 'transparent', border: 'none', flexShrink: 0 }
+              style: { width: '24px', height: '24px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--radius-sm)', color: 'var(--text-muted)', backgroundColor: 'transparent', border: 'none', flexShrink: 0 }
             }, React.createElement(TrashIcon, { size: 14, style: { stroke: '#64748B' } }))
             )
           ),

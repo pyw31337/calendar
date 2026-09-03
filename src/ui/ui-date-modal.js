@@ -2909,7 +2909,8 @@ export function DateModal({
                 className: "poll-drag-handle",
                 disabled: isReorderingAttendance,
                 title: "드래그하여 순서 변경",
-                style: { width: '32px', height: '32px', minWidth: '32px', minHeight: '32px', boxSizing: 'border-box', border: '1px solid var(--border-subtle)',
+                style: {
+                  width: '22px', height: '22px', border: '1px solid var(--border-subtle)',
                   backgroundColor: 'var(--bg-card)', borderRadius: 'var(--radius-sm)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   cursor: 'grab', padding: 0, color: 'var(--text-muted)',
@@ -3237,7 +3238,7 @@ export function DateModal({
               // HTML drag-and-drop is intentionally used here: it works with a mouse/trackpad,
               // while touch users can still reorder through the same control on browsers that
               // promote draggable elements to a native long-press drag gesture.
-              style: { width: '32px', height: '32px', minWidth: '32px', minHeight: '32px', boxSizing: 'border-box', padding: 0, border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)', borderRadius: 'var(--radius-sm)', cursor: 'grab', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'none', userSelect: 'none' }
+              style: { width: '22px', height: '22px', padding: 0, border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)', borderRadius: 'var(--radius-sm)', cursor: 'grab', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'none', userSelect: 'none' }
             }, /*#__PURE__*/React.createElement(LineHeightIcon, { size: 12 })), /*#__PURE__*/React.createElement(ItemEditDeleteActions, {
               showEdit: false,
               onDelete: () => {
@@ -3514,7 +3515,8 @@ export function DateModal({
                 className: "poll-drag-handle",
                 disabled: isSavingExpense,
                 title: "드래그하여 순서 변경",
-                style: { width: '32px', height: '32px', minWidth: '32px', minHeight: '32px', boxSizing: 'border-box', border: '1px solid var(--border-subtle)',
+                style: {
+                  width: '22px', height: '22px', border: '1px solid var(--border-subtle)',
                   backgroundColor: 'var(--bg-card)', borderRadius: 'var(--radius-sm)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   cursor: 'grab', padding: 0, color: 'var(--text-muted)',

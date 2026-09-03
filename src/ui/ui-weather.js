@@ -1057,7 +1057,7 @@ export function WeatherLocationModal({ onClose, onSelectLocation, onDeleteRecent
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: onClose,
-        style: { width: '32px', height: '32px', minWidth: '32px', minHeight: '32px', boxSizing: 'border-box', borderRadius: '50%', border: 'none', background: 'var(--border-subtle)', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }
+        style: { width: '28px', height: '28px', borderRadius: '50%', border: 'none', background: 'var(--border-subtle)', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }
       }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 14 }))
     ),
 

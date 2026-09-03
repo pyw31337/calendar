@@ -1424,7 +1424,7 @@ export function AdminModal({
                   /* Remove button */
                   /*#__PURE__*/React.createElement("button", {
                     type: "button", className: "btn btn-danger", disabled: isSubmitting, title: "삭제",
-                    style: { width: '32px', height: '32px', minWidth: '32px', minHeight: '32px', padding: 0, flexShrink: 0 },
+                    style: { width: '30px', height: '30px', padding: 0, flexShrink: 0 },
                     onClick: () => onRequestConfirm('참여자 삭제', `"${p.name}" 참여자를 삭제하시겠습니까?`, () => updateParticipant(p.id, { removedAt: Date.now() }))
                   }, /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }))
                 ))
@@ -1495,7 +1495,7 @@ export function AdminModal({
                   className: "btn btn-danger",
                   title: "삭제",
                   onClick: () => handleDeletePollFromAdmin(poll),
-                  style: { width: '32px', height: '32px', minWidth: '32px', minHeight: '32px', padding: 0, flexShrink: 0 }
+                  style: { width: '30px', height: '30px', padding: 0, flexShrink: 0 }
                 }, /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }))
               )
             ))
@@ -1777,7 +1777,7 @@ export function AdminModal({
               type: "button",
               className: "btn btn-danger",
               title: "로그 삭제",
-              style: { width: '32px', height: '32px', minWidth: '32px', minHeight: '32px', padding: 0, flexShrink: 0 },
+              style: { width: '30px', height: '30px', padding: 0, flexShrink: 0 },
               onClick: (e) => {
                 e.stopPropagation();
                 if (typeof onDeleteLog !== 'function') return;
