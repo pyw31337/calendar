@@ -744,13 +744,13 @@ export function MenuIcon({ paths }) {
   }, paths.map((d, i) => /*#__PURE__*/React.createElement("path", { key: i, d })));
 }
 
-export function NotepadTextIcon() {
+export function NotepadTextIcon({ size = 16 } = {}) {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {
     xmlns: "http://www.w3.org/2000/svg",
-    width: "16",
-    height: "16",
+    width: String(size),
+    height: String(size),
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
@@ -1958,6 +1958,9 @@ export function PlaceSectionIcon({ size = 20 } = {}) {
 export function MemoSectionIcon({ size = 20 } = {}) {
   const React = window.React;
 
+  // Same notepad shape as NotepadTextIcon (used for the header/side-menu 메모 entries) rather
+  // than a pencil -- a pencil reads as "edit", not "notes", and this icon is only ever a
+  // section label, never an edit affordance.
   return /*#__PURE__*/React.createElement("svg", {
     xmlns: "http://www.w3.org/2000/svg",
     width: String(size),
@@ -1968,8 +1971,15 @@ export function MemoSectionIcon({ size = 20 } = {}) {
     "strokeWidth": "2",
     "strokeLinecap": "round",
     "strokeLinejoin": "round"
-  }, /*#__PURE__*/React.createElement("path", { d: "M12 20h9" }),
-    /*#__PURE__*/React.createElement("path", { d: "M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" }));
+  },
+    /*#__PURE__*/React.createElement("path", { d: "M8 2v4" }),
+    /*#__PURE__*/React.createElement("path", { d: "M12 2v4" }),
+    /*#__PURE__*/React.createElement("path", { d: "M16 2v4" }),
+    /*#__PURE__*/React.createElement("rect", { width: "16", height: "18", x: "4", y: "4", rx: "2" }),
+    /*#__PURE__*/React.createElement("path", { d: "M8 10h6" }),
+    /*#__PURE__*/React.createElement("path", { d: "M8 14h8" }),
+    /*#__PURE__*/React.createElement("path", { d: "M8 18h5" })
+  );
 }
 
 export function ThreeLinesIcon({ size = 18 } = {}) {
