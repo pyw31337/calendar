@@ -1812,7 +1812,7 @@ select.form-select {
 .ann-cooking-pot-jiggle {
   display: inline-flex;
   transform-origin: 50% 70%;
-  animation: ann-cooking-pot-jiggle 2s ease-in-out infinite;
+  animation: ann-cooking-pot-jiggle 1s ease-in-out infinite;
   will-change: transform;
 }
 @keyframes ann-cooking-pot-jiggle {
