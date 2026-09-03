@@ -1278,7 +1278,10 @@ export function ChatGalleryModal({
   };
   const groupedGallerySections = React.useMemo(() => {
     if (galleryViewMode !== 'date') return [];
-    const sourceItems = activeTab === 'links' ? filteredLinks : renderedPhotos;
+    // Date mode must group the full filtered list (visiblePhotos), not the flat-mode
+    // render slice (renderedPhotos). Slicing left hasLocallyHiddenPhotos true for other
+    // months and made auto load-more keep firing without growing the current month UI.
+    const sourceItems = activeTab === 'links' ? filteredLinks : visiblePhotos;
     const groups = new Map();
     (sourceItems || []).forEach((item, idx) => {
       const key = getGalleryItemDateKey(item) || '__unknown__';
@@ -1301,7 +1304,41 @@ export function ChatGalleryModal({
           .sort((a, b) => (Number(b.item?.timestamp || 0) - Number(a.item?.timestamp || 0)) || (a.idx - b.idx))
           .map(entry => entry.item)
       }));
-  }, [galleryViewMode, activeTab, filteredLinks, renderedPhotos, galleryMonthKey]);
+  }, [galleryViewMode, activeTab, filteredLinks, visiblePhotos, galleryMonthKey]);
+
+  // Per-month photo count for the active galleryMonthKey (already-loaded visiblePhotos only).
+  const monthVisiblePhotoCount = React.useMemo(() => {
+    if (galleryViewMode !== 'date' || activeTab === 'links') return 0;
+    return (visiblePhotos || []).reduce((count, item) => {
+      const key = getGalleryItemDateKey(item) || '';
+      return key.startsWith(galleryMonthKey) ? count + 1 : count;
+    }, 0);
+  }, [galleryViewMode, activeTab, visiblePhotos, galleryMonthKey]);
+
+  // When an older-chat load finishes without adding any photos for the current month,
+  // mark that month exhausted so date-mode auto load-more stops bouncing at the bottom.
+  const [exhaustedGalleryMonthKey, setExhaustedGalleryMonthKey] = React.useState(null);
+  const prevLoadingOlderChatRef = React.useRef(!!loadingOlderChat);
+  const prevMonthVisiblePhotoCountRef = React.useRef(monthVisiblePhotoCount);
+  const prevGalleryMonthKeyForExhaustRef = React.useRef(galleryMonthKey);
+  React.useEffect(() => {
+    if (prevGalleryMonthKeyForExhaustRef.current !== galleryMonthKey) {
+      prevGalleryMonthKeyForExhaustRef.current = galleryMonthKey;
+      setExhaustedGalleryMonthKey(null);
+      prevMonthVisiblePhotoCountRef.current = monthVisiblePhotoCount;
+      prevLoadingOlderChatRef.current = !!loadingOlderChat;
+      return;
+    }
+    const wasLoading = prevLoadingOlderChatRef.current;
+    prevLoadingOlderChatRef.current = !!loadingOlderChat;
+    if (monthVisiblePhotoCount > prevMonthVisiblePhotoCountRef.current) {
+      setExhaustedGalleryMonthKey(prev => prev === galleryMonthKey ? null : prev);
+    }
+    if (wasLoading && !loadingOlderChat && monthVisiblePhotoCount <= prevMonthVisiblePhotoCountRef.current) {
+      setExhaustedGalleryMonthKey(galleryMonthKey);
+    }
+    prevMonthVisiblePhotoCountRef.current = monthVisiblePhotoCount;
+  }, [loadingOlderChat, monthVisiblePhotoCount, galleryMonthKey]);
 
   const toggleGalleryDate = dateKey => {
     setCollapsedGalleryDates(prev => {
@@ -1637,31 +1674,26 @@ export function ChatGalleryModal({
   // no net-new content (a stretch of text-only chat history with no photos, or a page shorter
   // than the 300px lookahead) leaves the sentinel sitting in the trigger zone with nothing having
   // moved, so gating on `disabled` alone would re-fire the instant it clears and hammer Firestore
-  // in a tight loop for as long as that page keeps coming back empty. Requiring one genuine
-  // `scroll` event to re-arm means auto-load fires at most once per scroll gesture regardless of
-  // whether that page grew the list -- a manual tap on the button always still works.
+  // in a tight loop for as long as that page keeps coming back empty.
+  // Re-arm only when the sentinel leaves the viewport (intersecting → not intersecting). Arming
+  // on every scroll (including bottom rubber-band) would loop-fire while the sentinel stays
+  // intersecting. Manual tap on the button still calls onClick directly.
   const GalleryLoadMoreButton = ({ loadingLabel, label, onClick, disabled }) => {
     const sentinelRef = React.useRef(null);
     const armedRef = React.useRef(true);
-    React.useEffect(() => {
-      // Arm on the real gallery scroller (gridHost), not window -- asPage scrolls inside
-      // gridHostRef, so a window listener never sees those gestures and progressive load stalls.
-      const scroller = gridHostRef.current;
-      const onScroll = () => { armedRef.current = true; };
-      if (scroller) {
-        scroller.addEventListener('scroll', onScroll, { passive: true });
-        return () => scroller.removeEventListener('scroll', onScroll);
-      }
-      window.addEventListener('scroll', onScroll, { passive: true, capture: true });
-      return () => window.removeEventListener('scroll', onScroll, { capture: true });
-    }, []);
+    const wasIntersectingRef = React.useRef(false);
     React.useEffect(() => {
       const node = sentinelRef.current;
       if (!node || disabled || typeof IntersectionObserver !== 'function') return undefined;
       const root = gridHostRef.current || null;
       const observer = new IntersectionObserver(entries => {
+        const isIntersecting = entries.some(entry => entry.isIntersecting);
+        if (wasIntersectingRef.current && !isIntersecting) {
+          armedRef.current = true;
+        }
+        wasIntersectingRef.current = isIntersecting;
         if (!armedRef.current) return;
-        if (entries.some(entry => entry.isIntersecting)) {
+        if (isIntersecting) {
           armedRef.current = false;
           onClick();
         }
@@ -1815,9 +1847,13 @@ export function ChatGalleryModal({
   const renderGalleryContent = () => {
     if (galleryViewMode === 'date') {
       const isLinkMode = activeTab === 'links';
+      const monthExhausted = !isLinkMode && exhaustedGalleryMonthKey === galleryMonthKey;
+      // Date mode: do not gate on hasLocallyHiddenPhotos (flat slice). Photos already group from
+      // visiblePhotos; only older-chat pagination (plus loading) matters. Hide when this month
+      // was exhausted by a load that added zero month photos.
       const showLoadMore = isLinkMode
         ? (hasMoreOlderChat || hasMoreMemos)
-        : (hasLocallyHiddenPhotos || hasMoreOlderChat || loadingOlderChat);
+        : ((hasMoreOlderChat || loadingOlderChat) && !monthExhausted);
       const loadMoreNode = showLoadMore && !(searchQuery || '').trim() && (
         isLinkMode
           ? renderGalleryLoadMoreButton({
@@ -1833,10 +1869,14 @@ export function ChatGalleryModal({
               label: `이전 사진 더 보기 (${visiblePhotos.length}장 불러옴)`,
               loadingLabel: '이전 사진을 불러오는 중…',
               disabled: !!loadingOlderChat,
-              onClick: loadMorePhotos
+              onClick: () => {
+                if (typeof onLoadOlderChat === 'function' && hasMoreOlderChat && !loadingOlderChat) onLoadOlderChat();
+              }
             })
       );
       return /*#__PURE__*/React.createElement(React.Fragment, null,
+        // Keep 전체|일자 + 붙여넣기/추가 toolbar visible in date mode (same mobile header as flat).
+        isLinkMode ? renderLinkListHeader() : renderPhotoListHeader(),
         renderGalleryMonthNavigator(),
         groupedGallerySections.length === 0 ? /*#__PURE__*/React.createElement("div", {
           style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: 'var(--font-size-base)' }
@@ -1879,7 +1919,7 @@ export function ChatGalleryModal({
             !isCollapsed && /*#__PURE__*/React.createElement("div", {
               id: `gallery-date-items-${section.dateKey}`,
               style: { display: 'flex', flexDirection: 'column', gap: '8px' }
-            }, isLinkMode ? renderGalleryLinkList(section.items) : renderGalleryPhotoGrid(section.items, renderedPhotos))
+            }, isLinkMode ? renderGalleryLinkList(section.items) : renderGalleryPhotoGrid(section.items, visiblePhotos))
           );
         }),
         loadMoreNode
