@@ -1352,22 +1352,20 @@ export function SummaryList({
   // 3. Confirmed-meeting dates -- every date promoted to 모임확정, past or future.
   const confirmedDates = getSortedDates(getTrulyConfirmedMeetings(calendar).filter(m => isValidDateString(m?.date)).map(m => m.date));
 
-  // '6인 이상 참석 가능' / '전원 참석 가능' / '모임 확정' only ever show when they have at least
-  // one matching date -- an empty one hides its title entirely rather than rendering a
-  // placeholder. Track which sections are actually visible so dividers between them only
-  // appear between two sections that both render.
-  const isPartialVisible = thresholdN > 0 && sortedPartialDates.length > 0;
-  const isAllVisible = sortedAllDates.length > 0;
-  // '모임 확정' moved off the main screen entirely, onto its own 히스토리 page (see HistoryView
-  // below) -- forcing this false hides the section (and its divider, gated on the same flag)
-  // without touching the JSX below it, so there's no risk of a stray unbalanced paren from
-  // hand-editing that large nested block.
+  // '6인 이상 참석 가능' / '전원 참석 가능' / '모임 확정' -- all three removed from the main
+  // screen entirely per product decision (모임 확정 already lives on its own 히스토리 page; the
+  // partial/all-available sections were the last ones still rendering here). Forcing all three
+  // flags false hides every section (and the dividers between them, gated on the same flags)
+  // without touching the large nested JSX blocks below, so there's no risk of a stray unbalanced
+  // paren from hand-editing them -- the early return just below then always fires.
+  const isPartialVisible = false;
+  const isAllVisible = false;
   const isConfirmedVisible = false;
   const anyBeforeAll = isPartialVisible;
   const anyBeforeConfirmed = isPartialVisible || isAllVisible;
 
-  // Nothing to show (common now that 모임 확정 always renders false here -- see above) -- an
-  // empty .summary-card shell used to still take up a visible gap on the main screen below chat.
+  // Nothing to show (this section is now always hidden -- see above) -- an empty .summary-card
+  // shell used to still take up a visible gap on the main screen below chat.
   if (!isPartialVisible && !isAllVisible && !isConfirmedVisible) return null;
 
   return /*#__PURE__*/React.createElement("div", {

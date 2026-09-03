@@ -1155,6 +1155,7 @@ export function SharedAppNavBlock({
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const FolderClockIcon = __comp.FolderClockIcon || __deps.FolderClockIcon;
+  const NotepadTextIcon = __comp.NotepadTextIcon || __deps.NotepadTextIcon;
   const go = (view) => {
     if (typeof onChangeView === 'function') onChangeView(view);
     if (typeof onClose === 'function') onClose();
@@ -1253,7 +1254,7 @@ export function SharedAppNavBlock({
     ),
     /* 7. 메모 */
     /*#__PURE__*/React.createElement("button", { type: "button", className: "admin-side-menu-item", onClick: () => go("memo") },
-      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2" }, /*#__PURE__*/React.createElement("path", { d: "M12 20h9" }), /*#__PURE__*/React.createElement("path", { d: "M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" }))),
+      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, NotepadTextIcon ? /*#__PURE__*/React.createElement(NotepadTextIcon, { size: 20 }) : null),
       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title", style: { display: "flex", alignItems: "center", gap: "6px" } }, "메모")
       ),
