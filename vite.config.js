@@ -80,6 +80,14 @@ export default defineConfig({
         }
       }
     },
-    chunkSizeWarningLimit: 700
+    // vendor-map (Leaflet + MapLibre, ~1.1MB) is the only chunk anywhere near this limit, and
+    // it's already lazy-loaded only when the 장소 map view opens (import('leaflet') inside
+    // loadLeaflet(), no static reference from index.html -- verified 2026-09-03, see
+    // docs/ops-runbook.md). Raised from 700 to 1200 so that known, already-lazy chunk stops
+    // printing a build-log warning every single build, while still catching a genuine
+    // regression -- any *other* chunk crossing 700KB-1200KB (none currently do; the next
+    // largest is app-main.js at ~240KB) is exactly the kind of accidental eager-bundle growth
+    // this limit exists to catch.
+    chunkSizeWarningLimit: 1200
   }
 });
