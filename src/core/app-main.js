@@ -2391,8 +2391,12 @@ function CalendarApp() {
   // Anniversaries: full collection (no orderBy) + client sort so docs without createdAt still show.
   // Also active on history (보관함) so culture/festival "캘린더와 연동" checkboxes can resolve
   // cultureSourceId matches without requiring a prior visit to the calendar view this session.
+  const needsAnniversariesData = React.useMemo(
+    () => activeView === 'calendar' || activeView === 'history',
+    [activeView]
+  );
   React.useEffect(() => {
-    if (!activeCalId || (activeView !== 'calendar' && activeView !== 'history')) return;
+    if (!activeCalId || !needsAnniversariesData) return;
     let isMounted = true;
     const sortAnns = list => {
       const arr = Array.isArray(list) ? list.slice() : [];
@@ -2421,7 +2425,7 @@ function CalendarApp() {
         });
       });
     return () => { isMounted = false; unsub(); };
-  }, [activeCalId, activeView, firebaseDb, firebaseConnectionVersion]);
+  }, [activeCalId, needsAnniversariesData, firebaseDb, firebaseConnectionVersion]);
 
   // Patches local state immediately after a confirmed-successful write instead of waiting on
   // the realtime listener above. A write that falls through to the REST fallback (see
@@ -2612,9 +2616,18 @@ function CalendarApp() {
     }
   };
 
-  // Places + confirmed meetings: calendar / places / settlement / history only
+  // Places + confirmed meetings: calendar / places / settlement / history only.
+  // needsPlacesData is memoized and used as the effect's dependency (instead of the raw
+  // activeView) so navigating between these four views -- all of which need the same
+  // subscriptions -- doesn't tear down and recreate the Firestore listeners on every single
+  // screen change. That churn (unsubscribe+resubscribe within milliseconds of a nav) was the
+  // most likely trigger for the Firestore "INTERNAL ASSERTION FAILED: Unexpected state" errors:
+  // only a genuine transition across the needs-it/doesn't-need-it boundary should resubscribe.
+  const needsPlacesData = React.useMemo(
+    () => activeView === 'calendar' || activeView === 'places' || activeView === 'settlement' || activeView === 'history',
+    [activeView]
+  );
   React.useEffect(() => {
-    const needsPlacesData = activeView === 'calendar' || activeView === 'places' || activeView === 'settlement' || activeView === 'history';
     if (!activeCalId || !needsPlacesData) return;
     let isMounted = true;
 
@@ -2688,7 +2701,7 @@ function CalendarApp() {
       unsubPlaces();
       unsubMeetings();
     };
-  }, [activeCalId, activeView, firebaseDb, firebaseConnectionVersion]);
+  }, [activeCalId, needsPlacesData, firebaseDb, firebaseConnectionVersion]);
 
   // Memos: paginated newest-first load (rather than subscribing to the entire collection at
   // once, which would download/re-sync thousands of memos on every open as a calendar grows).
@@ -2701,6 +2714,15 @@ function CalendarApp() {
     setMemosLimit(MEMOS_PAGE_SIZE);
   }, [activeCalId]);
 
+  // Same churn fix as needsPlacesData above: memoize the gate boolean and depend on it instead
+  // of the raw activeView/isGlobalSearchOpen, so navigating among the views that DON'T need the
+  // memo collection (e.g. calendar -> chat -> settlement) never tears down and recreates these
+  // three memo listeners -- only crossing into/out of memo|gallery|search actually should.
+  const needsMemoCollection = React.useMemo(
+    () => activeView === 'memo' || activeView === 'gallery' || isGlobalSearchOpen,
+    [activeView, isGlobalSearchOpen]
+  );
+
   React.useEffect(() => {
     if (!activeCalId) {
       setMemos([]);
@@ -2709,7 +2731,6 @@ function CalendarApp() {
     }
     // Gallery needs a paginated memo window for memo-attached photos/links; other routes only
     // need the latest memo for their summary badge/snippet.
-    const needsMemoCollection = activeView === 'memo' || activeView === 'gallery' || isGlobalSearchOpen;
     const effectiveMemosLimit = needsMemoCollection ? memosLimit : 1;
     let isMounted = true;
     const liveDb = (typeof window !== 'undefined' && window.__gatherFirebaseDb) || firebaseDb;
@@ -2779,7 +2800,7 @@ function CalendarApp() {
       if (typeof unsubscribeRecentActivity === 'function') unsubscribeRecentActivity();
       if (typeof unsubscribeRecent === 'function') unsubscribeRecent();
     };
-  }, [activeCalId, activeView, isGlobalSearchOpen, memosLimit, firebaseDb, firebaseConnectionVersion]);
+  }, [activeCalId, needsMemoCollection, memosLimit, firebaseDb, firebaseConnectionVersion]);
 
   // Dynamic body padding override for full-screen subviews (chat, settlement, memo, places, history).
   // Each of these renders its own `position:fixed; top/left/right/bottom:0` container with an

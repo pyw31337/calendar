@@ -1114,8 +1114,7 @@ export function ItemEditDeleteActions({ onEdit, onDelete, editTitle = '수정', 
       onClick: e => { e.preventDefault(); e.stopPropagation(); onEdit(e); },
       title: editTitle, "aria-label": editTitle,
       style: {
-        width: '32px', height: '32px', minWidth: '32px', minHeight: '32px', boxSizing: 'border-box',
-        border: '1px solid var(--border-subtle)',
+        width: '22px', height: '22px', border: '1px solid var(--border-subtle)',
         backgroundColor: 'var(--bg-card)', borderRadius: 'var(--radius-sm)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         cursor: 'pointer', padding: 0, color: 'var(--text-muted)'
@@ -1126,8 +1125,7 @@ export function ItemEditDeleteActions({ onEdit, onDelete, editTitle = '수정', 
       onClick: e => { e.preventDefault(); e.stopPropagation(); onDelete(e); },
       title: deleteTitle, "aria-label": deleteTitle,
       style: {
-        width: '32px', height: '32px', minWidth: '32px', minHeight: '32px', boxSizing: 'border-box',
-        border: 'none', background: 'none',
+        width: '22px', height: '22px', border: 'none', background: 'none',
         padding: 0, cursor: 'pointer', color: 'var(--text-muted)',
         display: 'flex', alignItems: 'center', justifyContent: 'center'
       }
