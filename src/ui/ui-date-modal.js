@@ -838,7 +838,8 @@ export function DateModal({
   onClose,
   showToast,
   onParticipantClick,
-  syncStatus = null
+  syncStatus = null,
+  onEditAnniversary
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -855,6 +856,7 @@ export function DateModal({
   const UnderlineTabs = __comp.UnderlineTabs || __deps.UnderlineTabs;
   const SimpleBottomSheetPicker = __comp.SimpleBottomSheetPicker || __deps.SimpleBottomSheetPicker;
   const MediaThumb = __comp.MediaThumb || __deps.MediaThumb;
+  const PencilIcon = __comp.PencilIcon || __deps.PencilIcon;
   const CakeIcon = __comp.CakeIcon || __deps.CakeIcon;
   const BalloonIcon = __comp.BalloonIcon || __deps.BalloonIcon;
   const ConfettiIcon = __comp.ConfettiIcon || __deps.ConfettiIcon;
@@ -907,6 +909,12 @@ export function DateModal({
     }
     if (ann.type === 'range') return `${formatDateWithDayName(ann.startDate)} ~ ${formatDateWithDayName(ann.endDate)}`;
     return ann.targetDate ? `기준일: ${ann.targetDate}` : '';
+  };
+  const getAnnBannerPhotos = (ann) => {
+    if (!ann) return [];
+    if (Array.isArray(ann.photos) && ann.photos.length) return ann.photos;
+    if (ann.image) return [{ url: ann.image, thumbUrl: ann.image, id: `img_${ann.id}` }];
+    return [];
   };
   // Same as ui-event-modals.js's getKakaoMapLinkUrl -- see that file's comment for why this
   // isn't going through the (dead) getPlaceKakaoRouteUrl bridge.
@@ -2524,8 +2532,9 @@ export function DateModal({
         const displayColor = getAnniversaryDisplayColor(ann, calendar);
         const bannerKey = ann.id || aIdx;
         const isExpanded = expandedAnnBannerIds.has(bannerKey);
-        const hasDetail = !!(ann.place || ann.description || getAnnBannerDateDisplay(ann));
-        const photos = Array.isArray(ann.photos) ? ann.photos : [];
+        const cultureLink = (ann.cultureSourceLink && String(ann.cultureSourceLink).trim()) || '';
+        const hasDetail = !!(ann.place || ann.description || getAnnBannerDateDisplay(ann) || cultureLink);
+        const photos = getAnnBannerPhotos(ann);
         // Keep a fixed thumb size when the banner expands -- growing to 64px looked jumpy and
         // made the title row reflow; 22px matches the collapsed state.
         const thumbSize = 22;
@@ -2565,6 +2574,13 @@ export function DateModal({
               cursor: 'pointer', flexShrink: 0
             }
           }),
+          onEditAnniversary && /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            onClick: e => { e.stopPropagation(); onEditAnniversary(ann); },
+            "aria-label": "기념일 편집",
+            title: "기념일 편집",
+            style: { background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', padding: '2px', display: 'flex', alignItems: 'center', flexShrink: 0, opacity: 0.9 }
+          }, PencilIcon ? /*#__PURE__*/React.createElement(PencilIcon, { size: 14 }) : null),
           hasDetail && /*#__PURE__*/React.createElement("button", {
             type: "button",
             onClick: e => { e.stopPropagation(); toggleAnnBannerExpanded(bannerKey); },
@@ -2657,15 +2673,29 @@ export function DateModal({
             ),
             placeBlock
           ),
-          ann.description && /*#__PURE__*/React.createElement("div", {
-            style: {
-              backgroundColor: `color-mix(in srgb, ${displayColor} 12%, white)`,
-              color: 'var(--text-main)',
-              padding: '10px 12px',
-              fontWeight: 500,
-              fontSize: 'var(--font-size-sm)'
-            }
-          }, renderTextWithUrlBadge(ann.description))
+          (() => {
+            const descText = (ann.description && String(ann.description)) || '';
+            const linkAlreadyInDesc = !!(cultureLink && descText.includes(cultureLink));
+            const showLink = !!(cultureLink && !linkAlreadyInDesc);
+            if (!descText && !showLink) return null;
+            return /*#__PURE__*/React.createElement("div", {
+              style: {
+                backgroundColor: `color-mix(in srgb, ${displayColor} 12%, white)`,
+                color: 'var(--text-main)',
+                padding: '10px 12px',
+                fontWeight: 500,
+                fontSize: 'var(--font-size-sm)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '6px'
+              }
+            },
+              descText ? renderTextWithUrlBadge(descText) : null,
+              showLink ? (UrlCapsuleBadge
+                ? /*#__PURE__*/React.createElement(UrlCapsuleBadge, { url: cultureLink })
+                : renderTextWithUrlBadge(cultureLink)) : null
+            );
+          })()
         );
       })),
 
