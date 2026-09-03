@@ -1257,6 +1257,7 @@ function CalendarApp() {
   const [isPlacesShareOpen, setIsPlacesShareOpen] = React.useState(false);
   const [isMemoShareOpen, setIsMemoShareOpen] = React.useState(false);
   const [isGalleryShareOpen, setIsGalleryShareOpen] = React.useState(false);
+  const [isHistoryShareOpen, setIsHistoryShareOpen] = React.useState(false);
   const [isMainSideMenuOpen, setIsMainSideMenuOpen] = React.useState(false);
   const confirmedMeetingAnimationTimersRef = React.useRef(new Map());
   const [isNotificationHelpOpen, setIsNotificationHelpOpen] = React.useState(false);
@@ -6860,11 +6861,20 @@ function CalendarApp() {
         isChatNotifyEnabled: mainNotifPermission === 'granted' && mainChatNotifyEnabled,
         onToggleChatNotifications: handleMainToggleNotifications,
         onOpenAppSettings: () => setIsAppSettingsOpen(true),
+        onOpenShare: () => {
+          if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsHistoryShareOpen(true);
+        },
         syncStatus: syncStatus,
         anniversaries: anniversaries,
         onRegisterCultureEvent: handleRegisterCultureEvent,
         onUnregisterCultureEvent: handleUnregisterCultureEvent,
         ...navMenuProps
+      }),
+      isHistoryShareOpen && activeCal && /*#__PURE__*/React.createElement(ShareModal, {
+        calendar: activeCal,
+        shareType: "history",
+        showToast: showToast,
+        onClose: () => setIsHistoryShareOpen(false)
       }),
       sharedAppOverlays
     ));

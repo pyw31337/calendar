@@ -1942,6 +1942,17 @@ export function ChatGalleryModal({
             ),
             /*#__PURE__*/React.createElement("button", {
               type: "button",
+              onClick: () => setIsSearchOpen(prev => { if (prev) setSearchQuery(''); return !prev; }),
+              title: "갤러리 검색", "aria-label": "갤러리 검색",
+              style: {
+                background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
+                color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+              }
+            }, /*#__PURE__*/React.createElement("svg", {
+              xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.5"
+            }, /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /*#__PURE__*/React.createElement("path", { d: "m21 21-4.3-4.3" }))),
+            /*#__PURE__*/React.createElement("button", {
+              type: "button",
               onClick: () => setIsMenuOpen(true),
               title: "갤러리 메뉴", "aria-label": "갤러리 메뉴 열기",
               style: {
