@@ -624,16 +624,23 @@ function useScrollHideHeader() {
   const [isHeaderVisible, setIsHeaderVisible] = React.useState(true);
   const lastScrollTopRef = React.useRef(0);
   const onScroll = React.useCallback((e) => {
-    const scrollTop = e && e.target ? e.target.scrollTop : 0;
+    const el = e && e.target;
+    const scrollTop = el && typeof el.scrollTop === 'number' ? el.scrollTop : 0;
     const lastScrollTop = lastScrollTopRef.current;
+    const delta = scrollTop - lastScrollTop;
+    lastScrollTopRef.current = scrollTop;
+    // Ignore sub-pixel / rubber-band noise
+    if (Math.abs(delta) < 4) return;
+    const maxScroll = el ? Math.max(0, (el.scrollHeight || 0) - (el.clientHeight || 0)) : 0;
+    // Near the bottom, never re-show from tiny upward deltas (padding oscillation)
+    const nearBottom = maxScroll > 0 && (maxScroll - scrollTop) < 64;
     if (scrollTop < 10) {
       setIsHeaderVisible(true);
-    } else if (scrollTop > lastScrollTop && scrollTop > 56) {
+    } else if (delta > 0 && scrollTop > 56) {
       setIsHeaderVisible(false);
-    } else if (scrollTop < lastScrollTop) {
+    } else if (delta < 0 && !nearBottom) {
       setIsHeaderVisible(true);
     }
-    lastScrollTopRef.current = scrollTop;
   }, []);
   return { isHeaderVisible, onScroll };
 }
@@ -1393,8 +1400,11 @@ export function ChatRoomView({
           onClick: () => handleStartReply(msg, msgImageCount),
           title: "답장",
           style: {
-            width: '24px',
-            height: '24px',
+            width: '32px',
+            height: '32px',
+            minWidth: '32px',
+            minHeight: '32px',
+            boxSizing: 'border-box',
             border: 'none',
             background: 'none',
             padding: 0,
@@ -1411,8 +1421,11 @@ export function ChatRoomView({
           onClick: () => onDeleteMessage && onDeleteMessage(msg),
           title: "삭제",
           style: {
-            width: '24px',
-            height: '24px',
+            width: '32px',
+            height: '32px',
+            minWidth: '32px',
+            minHeight: '32px',
+            boxSizing: 'border-box',
             border: 'none',
             background: 'none',
             padding: 0,
@@ -1440,8 +1453,11 @@ export function ChatRoomView({
           onClick: () => onEditMessage && onEditMessage(msg),
           title: "편집",
           style: {
-            width: '24px',
-            height: '24px',
+            width: '32px',
+            height: '32px',
+            minWidth: '32px',
+            minHeight: '32px',
+            boxSizing: 'border-box',
             border: '1px solid var(--border-subtle)',
             backgroundColor: 'var(--bg-primary)',
             borderRadius: 'var(--radius-sm)',
@@ -1604,8 +1620,11 @@ export function ChatRoomView({
         onClick: () => handleStartReply(msg, msgImageCount),
         title: "답장",
         style: {
-          width: '24px',
-          height: '24px',
+          width: '32px',
+          height: '32px',
+          minWidth: '32px',
+          minHeight: '32px',
+          boxSizing: 'border-box',
           border: 'none',
           background: 'none',
           padding: 0,
@@ -2047,8 +2066,11 @@ export function ChatRoomView({
           onClick: handleCancelReply,
           "aria-label": "답장 취소",
           style: {
-            width: '22px',
-            height: '22px',
+            width: '32px',
+            height: '32px',
+            minWidth: '32px',
+            minHeight: '32px',
+            boxSizing: 'border-box',
             border: 'none',
             background: 'none',
             padding: 0,

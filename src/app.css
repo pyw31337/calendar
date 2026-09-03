@@ -598,7 +598,7 @@ button.confirmed-meeting-icon-btn.confirmed-meeting-surface.is-heartbeat {
 .toast-message { flex: 1 1 180px; min-width: 0; }
 .toast-action {
   flex-shrink: 0;
-  min-height: 30px;
+  min-height: 32px;
   padding: 0 12px;
   border-radius: var(--radius-full);
   border: 1px solid rgba(255, 255, 255, 0.38);
@@ -1358,6 +1358,27 @@ button, input, textarea, select {
 @media (min-width: 768px) { .calendar-desc { font-size: 0.875rem; } }
 
 /* Buttons */
+/* Touch target floor: all app buttons ≥ 32px */
+button:not(.leaflet-marker-icon):not(.place-cluster-icon):not(.place-map-marker),
+.btn,
+.btn-action,
+.btn-secondary,
+.btn-primary,
+.btn-danger,
+.icon-btn,
+.section-toggle-btn,
+.tap-target,
+.modal-close-btn,
+.admin-side-menu-close-btn,
+.admin-side-menu-font-btn,
+.calendar-month-nav-btn,
+.chat-msg-action,
+.chat-keyboard-reopen-btn,
+[role="button"]:not(.leaflet-marker-icon):not(.place-cluster-icon):not(.place-map-marker):not(.summary-title) {
+  min-height: 32px;
+  box-sizing: border-box;
+}
+
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   padding: 10px 16px; border-radius: var(--radius-md); font-size: 0.875rem; font-weight: 700;
@@ -2226,9 +2247,10 @@ select.form-select {
   height: 12px;
 }
 .poll-drag-handle {
-  width: 28px;
-  min-width: 28px;
-  height: 28px;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  min-height: 32px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2699,9 +2721,10 @@ select.form-select {
 }
 .section-toggle-btn {
   margin-left: auto;
-  width: 28px;
-  height: 28px;
-  flex: 0 0 28px;
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  flex: 0 0 32px;
   border: 0;
   background: transparent;
   color: #94A3B8;
@@ -2849,8 +2872,9 @@ select.form-select {
   order: 3;
 }
 .admin-menu-toggle-btn {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
   padding: 0;
   border: none;
   background: transparent;
@@ -3119,8 +3143,9 @@ select.form-select {
   flex-shrink: 0;
 }
 .admin-side-menu-font-btn {
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
   border-radius: 50%;
   border: 1px solid var(--border-subtle);
   background: #F8FAFC;

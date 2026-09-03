@@ -736,16 +736,23 @@ function useScrollHideHeader() {
   const [isHeaderVisible, setIsHeaderVisible] = React.useState(true);
   const lastScrollTopRef = React.useRef(0);
   const onScroll = React.useCallback((e) => {
-    const scrollTop = e && e.target ? e.target.scrollTop : 0;
+    const el = e && e.target;
+    const scrollTop = el && typeof el.scrollTop === 'number' ? el.scrollTop : 0;
     const lastScrollTop = lastScrollTopRef.current;
+    const delta = scrollTop - lastScrollTop;
+    lastScrollTopRef.current = scrollTop;
+    // Ignore sub-pixel / rubber-band noise
+    if (Math.abs(delta) < 4) return;
+    const maxScroll = el ? Math.max(0, (el.scrollHeight || 0) - (el.clientHeight || 0)) : 0;
+    // Near the bottom, never re-show from tiny upward deltas (padding oscillation)
+    const nearBottom = maxScroll > 0 && (maxScroll - scrollTop) < 64;
     if (scrollTop < 10) {
       setIsHeaderVisible(true);
-    } else if (scrollTop > lastScrollTop && scrollTop > 56) {
+    } else if (delta > 0 && scrollTop > 56) {
       setIsHeaderVisible(false);
-    } else if (scrollTop < lastScrollTop) {
+    } else if (delta < 0 && !nearBottom) {
       setIsHeaderVisible(true);
     }
-    lastScrollTopRef.current = scrollTop;
   }, []);
   return { isHeaderVisible, onScroll };
 }
@@ -1881,7 +1888,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
               /*#__PURE__*/React.createElement("button", {
                 type: "button",
                 onClick: () => setNewIsPinned(!newIsPinned),
-                style: { background: 'none', border: 'none', cursor: 'pointer', color: newIsPinned ? '#F59E0B' : '#94A3B8', padding: '4px' }
+                style: { background: 'none', border: 'none', cursor: 'pointer', color: newIsPinned ? '#F59E0B' : '#94A3B8', padding: '4px', minHeight: '32px', minWidth: '32px', boxSizing: 'border-box' }
               }, newIsPinned ? 
                 /*#__PURE__*/React.createElement("svg", {
                   xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "currentColor", className: "icon icon-tabler icon-tabler-filled icon-tabler-pin"
@@ -2017,9 +2024,9 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
                 onClick: handleAddNewTag,
                 disabled: newTags.length >= 10,
                 style: {
-                  flexShrink: 0, height: '28px', padding: '0 10px', borderRadius: 'var(--radius-sm)',
+                  flexShrink: 0, height: '32px', minHeight: '32px', padding: '0 10px', borderRadius: 'var(--radius-sm)',
                   border: '1px solid var(--border-subtle)', background: 'var(--border-subtle)',
-                  color: 'var(--text-main)', fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer',
+                  color: 'var(--text-main)', fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer', boxSizing: 'border-box',
                   opacity: newTags.length >= 10 ? 0.45 : 1
                 }
               }, "저장")
@@ -2423,7 +2430,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
             onClick: handleAddEditTag,
             disabled: editTags.length >= 10,
             style: {
-              flexShrink: 0, height: '28px', padding: '0 10px', borderRadius: 'var(--radius-sm)',
+              flexShrink: 0, height: '32px', minHeight: '32px', padding: '0 10px', borderRadius: 'var(--radius-sm)',
               border: '1px solid var(--border-subtle)', background: 'var(--border-subtle)',
               color: 'var(--text-main)', fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer',
               opacity: editTags.length >= 10 ? 0.45 : 1

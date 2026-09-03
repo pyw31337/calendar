@@ -624,16 +624,23 @@ function useScrollHideHeader() {
   const [isHeaderVisible, setIsHeaderVisible] = React.useState(true);
   const lastScrollTopRef = React.useRef(0);
   const onScroll = React.useCallback((e) => {
-    const scrollTop = e && e.target ? e.target.scrollTop : 0;
+    const el = e && e.target;
+    const scrollTop = el && typeof el.scrollTop === 'number' ? el.scrollTop : 0;
     const lastScrollTop = lastScrollTopRef.current;
+    const delta = scrollTop - lastScrollTop;
+    lastScrollTopRef.current = scrollTop;
+    // Ignore sub-pixel / rubber-band noise
+    if (Math.abs(delta) < 4) return;
+    const maxScroll = el ? Math.max(0, (el.scrollHeight || 0) - (el.clientHeight || 0)) : 0;
+    // Near the bottom, never re-show from tiny upward deltas (padding oscillation)
+    const nearBottom = maxScroll > 0 && (maxScroll - scrollTop) < 64;
     if (scrollTop < 10) {
       setIsHeaderVisible(true);
-    } else if (scrollTop > lastScrollTop && scrollTop > 56) {
+    } else if (delta > 0 && scrollTop > 56) {
       setIsHeaderVisible(false);
-    } else if (scrollTop < lastScrollTop) {
+    } else if (delta < 0 && !nearBottom) {
       setIsHeaderVisible(true);
     }
-    lastScrollTopRef.current = scrollTop;
   }, []);
   return { isHeaderVisible, onScroll };
 }
@@ -1107,7 +1114,8 @@ export function ItemEditDeleteActions({ onEdit, onDelete, editTitle = '수정', 
       onClick: e => { e.preventDefault(); e.stopPropagation(); onEdit(e); },
       title: editTitle, "aria-label": editTitle,
       style: {
-        width: '22px', height: '22px', border: '1px solid var(--border-subtle)',
+        width: '32px', height: '32px', minWidth: '32px', minHeight: '32px', boxSizing: 'border-box',
+        border: '1px solid var(--border-subtle)',
         backgroundColor: 'var(--bg-card)', borderRadius: 'var(--radius-sm)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         cursor: 'pointer', padding: 0, color: 'var(--text-muted)'
@@ -1118,7 +1126,8 @@ export function ItemEditDeleteActions({ onEdit, onDelete, editTitle = '수정', 
       onClick: e => { e.preventDefault(); e.stopPropagation(); onDelete(e); },
       title: deleteTitle, "aria-label": deleteTitle,
       style: {
-        width: '22px', height: '22px', border: 'none', background: 'none',
+        width: '32px', height: '32px', minWidth: '32px', minHeight: '32px', boxSizing: 'border-box',
+        border: 'none', background: 'none',
         padding: 0, cursor: 'pointer', color: 'var(--text-muted)',
         display: 'flex', alignItems: 'center', justifyContent: 'center'
       }
