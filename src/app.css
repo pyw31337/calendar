@@ -1448,6 +1448,12 @@ html {
 }
 
 /* 셀렉트박스 규칙: 일정 팝업 카테고리와 동일 (Rounded 사각형, Capsule 금지) */
+
+input[type="date"].form-input {
+  min-width: 0;
+  max-width: 100%;
+}
+
 .form-select, .form-input {
   width: 100%;
   padding: 10px 14px;
