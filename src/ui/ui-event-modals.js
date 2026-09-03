@@ -773,7 +773,8 @@ export function AnniversaryModal({
   onAnniversarySaved,
   onAnniversaryDeleted,
   isDarkTheme,
-  embedded = false
+  embedded = false,
+  setActiveLightbox
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -911,7 +912,7 @@ export function AnniversaryModal({
     setSelectedPlace(ann.place || null);
     setPlaceQuery('');
     setPlaceResults([]);
-    setPhotos(Array.isArray(ann.photos) ? ann.photos.map(p => ({ isExisting: true, original: p.url, thumbnail: p.thumbUrl || p.url })) : []);
+    setPhotos(Array.isArray(ann.photos) ? ann.photos.map(p => ({ isExisting: true, original: p.url, thumbnail: p.thumbUrl || p.url, tags: p.tags || '', photoId: p.id || '' })) : []);
     if (ann.type === 'dday') {
       // Pre-existing D-Day entries can no longer be created from this form, but must still be
       // editable in place rather than silently losing their targetDate/isCountDown fields.
@@ -997,9 +998,21 @@ export function AnniversaryModal({
       }
       if (photos.length > 0) {
         const resolvedPhotos = await resolveAnniversaryImageBatch(calendarId, photos, setPhotoUploadProgress);
+        const prevPhotos = Array.isArray(oldAnn?.photos) ? oldAnn.photos : [];
         annData.photos = (resolvedPhotos || [])
           .filter(Boolean)
-          .map(p => ({ url: p.imageUrl, thumbUrl: p.thumbUrl }));
+          .map((p, idx) => {
+            const formPhoto = photos[idx] || null;
+            const prev = prevPhotos.find(op => op && (op.url === p.imageUrl || op.thumbUrl === p.thumbUrl || op.url === formPhoto?.original))
+              || prevPhotos[idx]
+              || null;
+            const out = { url: p.imageUrl, thumbUrl: p.thumbUrl };
+            const tags = (formPhoto && formPhoto.tags) || (prev && prev.tags) || '';
+            if (tags) out.tags = tags;
+            const photoId = (formPhoto && formPhoto.photoId) || (prev && prev.id) || '';
+            if (photoId) out.id = photoId;
+            return out;
+          });
         setPhotoUploadProgress(null);
       }
 
@@ -1286,31 +1299,60 @@ export function AnniversaryModal({
       /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } },
         getAnniversaryDateDisplay(ann)
       ),
-      /* Place (if set) */
+      /* Place (if set) -- two lines: name, then address; no underline on the map link */
       ann.place && (() => {
         const mapUrl = getKakaoMapLinkUrl(ann.place);
-        const label = `[${ann.place.alias || ann.place.name}] ${getDisplayPlaceAddress(ann.place) || ''}`.trim();
-        return /*#__PURE__*/React.createElement("span", { style: { display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } },
-          MapPinIcon && /*#__PURE__*/React.createElement(MapPinIcon, { size: 14 }),
-          mapUrl
-            ? /*#__PURE__*/React.createElement("a", {
-                href: mapUrl, target: "_blank", rel: "noreferrer",
-                onClick: e => e.stopPropagation(),
-                style: { color: 'var(--text-muted)', textDecoration: 'none' }
-              }, label)
-            : /*#__PURE__*/React.createElement("span", null, label)
+        const placeName = ann.place.alias || ann.place.name || '';
+        const placeAddress = getDisplayPlaceAddress(ann.place) || '';
+        const nameEl = mapUrl
+          ? /*#__PURE__*/React.createElement("a", {
+              href: mapUrl, target: "_blank", rel: "noreferrer",
+              onClick: e => e.stopPropagation(),
+              style: { color: 'var(--text-main)', textDecoration: 'none', fontWeight: 700 }
+            }, placeName)
+          : /*#__PURE__*/React.createElement("span", { style: { color: 'var(--text-main)', fontWeight: 700 } }, placeName);
+        return /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'flex-start', gap: '4px', fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginTop: '2px' } },
+          MapPinIcon && /*#__PURE__*/React.createElement("span", { style: { display: 'inline-flex', marginTop: '2px', flexShrink: 0 } },
+            /*#__PURE__*/React.createElement(MapPinIcon, { size: 14 })
+          ),
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0 } },
+            nameEl,
+            placeAddress ? /*#__PURE__*/React.createElement("span", null, placeAddress) : null
+          )
         );
       })(),
       /* Description (URLs rendered as capsule badges) */
       ann.description && /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-main)', marginTop: '2px' } },
         renderTextWithUrlBadge(ann.description)
       ),
-      /* Photos (if any) */
+      /* Photos (if any) -- thumb opens full lightbox with anniversary meta */
       Array.isArray(ann.photos) && ann.photos.length > 0 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '4px', marginTop: '4px', flexWrap: 'wrap' } },
-        ann.photos.map((photo, idx) => /*#__PURE__*/React.createElement("img", {
-          key: idx, src: photo.thumbUrl || photo.url, alt: `사진 ${idx + 1}`,
-          style: { width: '40px', height: '40px', objectFit: 'cover', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }
-        }))
+        ann.photos.map((photo, idx) => {
+          const listIdx = Array.isArray(anniversaries) ? anniversaries.findIndex(a => a && a.id === ann.id) : -1;
+          const anniversaryIndex = listIdx >= 0 ? listIdx + 1 : 1;
+          return /*#__PURE__*/React.createElement("img", {
+            key: idx, src: photo.thumbUrl || photo.url, alt: `사진 ${idx + 1}`,
+            onClick: e => {
+              e.stopPropagation();
+              if (typeof setActiveLightbox !== 'function') return;
+              setActiveLightbox({
+                urls: ann.photos.map(p => p.url || p.thumbUrl),
+                index: idx,
+                meta: ann.photos.map((p, pIdx) => ({
+                  source: 'anniversary',
+                  anniversaryId: ann.id,
+                  anniversaryIndex,
+                  imageIndex: pIdx,
+                  timestamp: ann.updatedAt || ann.createdAt || Date.now(),
+                  tags: p.tags || '',
+                  photoId: p.id || `${ann.id || 'ann'}_${pIdx}`,
+                  thumb: p.thumbUrl || p.url || ''
+                }))
+              });
+            },
+            style: { width: '40px', height: '40px', objectFit: 'cover', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', cursor: setActiveLightbox ? 'pointer' : 'default' }
+          });
+        })
       )
     ),
 
@@ -1363,6 +1405,7 @@ export function AnniversaryModal({
     /* Modal Navigation Tabs */
     UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
       ariaLabel: "기념일 탭",
+      variant: "flush",
       value: activeTab,
       onChange: (id) => {
         setActiveTab(id);

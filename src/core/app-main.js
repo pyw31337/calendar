@@ -3835,7 +3835,39 @@ function CalendarApp() {
     return true;
   };
 
+  // Persist hashtags onto anniversary.photos[i].tags (anniversary docs live in the
+  // anniversaries subcollection -- same write path AnniversaryModal's own save uses).
+  const handleSaveAnniversaryPhotoTags = async (anniversaryId, imageIndex, tagsText) => {
+    if (!activeCal?.id || !anniversaryId || !Number.isInteger(imageIndex)) return false;
+    const ann = (anniversaries || []).find(a => a && a.id === anniversaryId);
+    const photos = Array.isArray(ann?.photos) ? ann.photos : [];
+    if (!ann || imageIndex < 0 || imageIndex >= photos.length) {
+      showToast('태그 저장 대상 사진을 찾지 못했습니다.', 'error', 4000);
+      return false;
+    }
+    const parseTagTokens = text => Array.from(new Set(
+      String(text || '').split(/[,\s#]+/).map(t => sanitizeText(t.trim(), 30)).filter(Boolean)
+    )).slice(0, 10);
+    const cleanTags = sanitizeText(parseTagTokens(tagsText).join(' '), 100);
+    const nextPhotos = photos.map((p, i) => i === imageIndex ? { ...p, tags: cleanTags } : p);
+    const annData = { ...ann, photos: nextPhotos, updatedAt: Date.now() };
+    try {
+      const saved = await writeCollectionDocumentWithFallback('anniversaries', activeCal.id, anniversaryId, annData, 'set', '기념일 사진 태그 저장');
+      if (!saved?.success) throw new Error('Anniversary photo tags update failed');
+      handleAnniversarySaved(annData);
+      showToast('태그 저장완료', 'success');
+      return true;
+    } catch (err) {
+      console.error('Anniversary photo tag save failed:', err);
+      showToast('태그 저장 실패', 'error');
+      return false;
+    }
+  };
+
   const handleSaveImageTags = async (messageId, imageIndex, tagsText, meta = {}) => {
+    if (meta?.source === 'anniversary') {
+      return handleSaveAnniversaryPhotoTags(meta.anniversaryId, meta.imageIndex, tagsText);
+    }
     if (meta?.source === 'meeting') {
       // An auto-linked 일정 사진 (created via a date hashtag, see linkTaggedImageToMeetingDates)
       // is just a reference to a real chat photo -- edit its tags there, not on the reference
@@ -7195,7 +7227,8 @@ function CalendarApp() {
     onBulkRegister: handleBulkRegisterAvailability,
     onAnniversarySaved: handleAnniversarySaved,
     onAnniversaryDeleted: handleAnniversaryDeleted,
-    isDarkTheme: isDarkTheme
+    isDarkTheme: isDarkTheme,
+    setActiveLightbox: setActiveLightbox
   }), /*#__PURE__*/React.createElement("div", {
     ref: calendarSectionRef
   }, visibleConfirmedMeetings.length > 0 && /*#__PURE__*/React.createElement("div", {
@@ -10510,6 +10543,27 @@ function getAnniversariesForDate(dateStr, anniversariesList) {
   const [y, m, d] = dateStr.split('-').map(Number);
   if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return [];
 
+  // DateModal's expanded banner + lightbox need place/description/photos/timestamps on every
+  // matching anniversary, not only range/festival entries. Keep calendar-grid fields (title/
+  // badgeColor/icon) and layer the detail fields from the source doc.
+  const withAnnDetail = (base, ann) => ({
+    ...base,
+    type: base.type || ann.type,
+    date: ann.date,
+    targetDate: ann.targetDate,
+    isCountDown: ann.isCountDown,
+    isLunar: ann.isLunar,
+    isLeap: ann.isLeap,
+    startDate: base.startDate || ann.startDate,
+    endDate: base.endDate || ann.endDate,
+    place: ann.place,
+    description: ann.description,
+    photos: ann.photos,
+    createdAt: ann.createdAt,
+    updatedAt: ann.updatedAt,
+    category: ann.category
+  });
+
   const results = [];
   anniversariesList.forEach(ann => {
     if (!ann || typeof ann !== 'object') return;
@@ -10524,12 +10578,13 @@ function getAnniversariesForDate(dateStr, anniversariesList) {
             const solar = cal.getSolarCalendar();
             if (solar && solar.year === y && solar.month === m && solar.day === d) {
               const yearlyCatBadge = getAnniversaryCategoryBadge(ann.category);
-              results.push({
+              results.push(withAnnDetail({
                 id: ann.id,
                 title: `${ann.title || ''} (음)`,
                 badgeColor: yearlyCatBadge.badgeColor,
-                icon: yearlyCatBadge.icon
-              });
+                icon: yearlyCatBadge.icon,
+                type: 'yearly'
+              }, ann));
             }
           }
         } catch (e) {
@@ -10539,24 +10594,26 @@ function getAnniversariesForDate(dateStr, anniversariesList) {
         const [solarM, solarD] = ann.date.split('-').map(Number);
         if (solarM === m && solarD === d) {
           const yearlyCatBadge = getAnniversaryCategoryBadge(ann.category);
-          results.push({
+          results.push(withAnnDetail({
             id: ann.id,
             title: `${ann.title || ''}`,
             badgeColor: yearlyCatBadge.badgeColor,
-            icon: yearlyCatBadge.icon
-          });
+            icon: yearlyCatBadge.icon,
+            type: 'yearly'
+          }, ann));
         }
       }
     } else if (ann.type === 'dday') {
       const targetStr = ann.targetDate;
       if (!targetStr || typeof targetStr !== 'string') return;
       if (targetStr === dateStr) {
-        results.push({
+        results.push(withAnnDetail({
           id: ann.id,
           title: `${ann.title || ''} (D-Day)`,
           badgeColor: '#3B82F6',
-          icon: '🎁'
-        });
+          icon: '🎁',
+          type: 'dday'
+        }, ann));
       } else {
         const tDate = new Date(`${targetStr}T00:00:00`);
         const cDate = new Date(`${dateStr}T00:00:00`);
@@ -10568,51 +10625,57 @@ function getAnniversariesForDate(dateStr, anniversariesList) {
           if (diffDays < 0) {
             const daysLeft = Math.abs(diffDays);
             if (daysLeft === 100 || daysLeft === 50 || daysLeft === 10 || daysLeft === 30) {
-              results.push({
+              results.push(withAnnDetail({
                 id: ann.id,
                 title: `${ann.title || ''} D-${daysLeft}`,
                 badgeColor: '#6366F1',
-                icon: '📅'
-              });
+                icon: '📅',
+                type: 'dday'
+              }, ann));
             }
           }
         } else {
           if (diffDays === 99) {
-            results.push({
+            results.push(withAnnDetail({
               id: ann.id,
               title: `${ann.title || ''} 100일`,
               badgeColor: '#EC4899',
-              icon: '💖'
-            });
+              icon: '💖',
+              type: 'dday'
+            }, ann));
           } else if (diffDays === 199) {
-            results.push({
+            results.push(withAnnDetail({
               id: ann.id,
               title: `${ann.title || ''} 200일`,
               badgeColor: '#EC4899',
-              icon: '💖'
-            });
+              icon: '💖',
+              type: 'dday'
+            }, ann));
           } else if (diffDays === 299) {
-            results.push({
+            results.push(withAnnDetail({
               id: ann.id,
               title: `${ann.title || ''} 300일`,
               badgeColor: '#EC4899',
-              icon: '💖'
-            });
+              icon: '💖',
+              type: 'dday'
+            }, ann));
           } else if (diffDays === 364) {
-            results.push({
+            results.push(withAnnDetail({
               id: ann.id,
               title: `${ann.title || ''} 1주년`,
               badgeColor: '#EC4899',
-              icon: '🎉'
-            });
+              icon: '🎉',
+              type: 'dday'
+            }, ann));
           } else if (diffDays > 0 && diffDays % 365 === 364) {
             const years = Math.round((diffDays + 1) / 365);
-            results.push({
+            results.push(withAnnDetail({
               id: ann.id,
               title: `${ann.title || ''} ${years}주년`,
               badgeColor: '#EC4899',
-              icon: '🎉'
-            });
+              icon: '🎉',
+              type: 'dday'
+            }, ann));
           }
         }
       }
@@ -10628,23 +10691,25 @@ function getAnniversariesForDate(dateStr, anniversariesList) {
           cal.setLunarDate(onceY, onceM, onceD, !!ann.isLeap);
           const solar = cal.getSolarCalendar();
           if (solar && solar.year === y && solar.month === m && solar.day === d) {
-            results.push({
+            results.push(withAnnDetail({
               id: ann.id,
               title: `${ann.title || ''} (음)`,
               badgeColor: catBadge.badgeColor,
-              icon: catBadge.icon
-            });
+              icon: catBadge.icon,
+              type: 'once'
+            }, ann));
           }
         } catch (e) {
           console.warn('Lunar date calculation failed for', ann.title, e);
         }
       } else if (onceY === y && onceM === m && onceD === d) {
-        results.push({
+        results.push(withAnnDetail({
           id: ann.id,
           title: `${ann.title || ''}`,
           badgeColor: catBadge.badgeColor,
-          icon: catBadge.icon
-        });
+          icon: catBadge.icon,
+          type: 'once'
+        }, ann));
       }
     } else if (ann.type === 'range') {
       // Multi-day (연일) event/festival spanning a start/end date range. type/startDate/endDate
@@ -10657,7 +10722,7 @@ function getAnniversariesForDate(dateStr, anniversariesList) {
       if (!ann.startDate || !ann.endDate) return;
       if (dateStr >= ann.startDate && dateStr <= ann.endDate) {
         const catBadge = getAnniversaryCategoryBadge(ann.category);
-        results.push({
+        results.push(withAnnDetail({
           id: ann.id,
           title: `${ann.title || ''}`,
           badgeColor: catBadge.badgeColor,
@@ -10668,7 +10733,7 @@ function getAnniversariesForDate(dateStr, anniversariesList) {
           place: ann.place,
           description: ann.description,
           photos: ann.photos
-        });
+        }, ann));
       }
     }
   });
