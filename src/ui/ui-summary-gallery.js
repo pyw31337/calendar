@@ -1941,9 +1941,9 @@ export function HistoryView({
       value: historyTab,
       onChange: v => setHistoryTab(v),
       options: [
-        { value: 'meetings', label: '지난 모임' },
+        { value: 'festival', label: '지역축제' },
         { value: 'culture', label: '문화공연' },
-        { value: 'festival', label: '지역축제' }
+        { value: 'meetings', label: '지난 모임' }
       ]
     }),
     historyTab !== 'meetings' && regionSelections.length > 0 && /*#__PURE__*/React.createElement("div", {

@@ -908,6 +908,12 @@ export function DateModal({
     if (ann.type === 'range') return `${formatDateWithDayName(ann.startDate)} ~ ${formatDateWithDayName(ann.endDate)}`;
     return ann.targetDate ? `기준일: ${ann.targetDate}` : '';
   };
+  const getAnnBannerPhotos = (ann) => {
+    if (!ann) return [];
+    if (Array.isArray(ann.photos) && ann.photos.length) return ann.photos;
+    if (ann.image) return [{ url: ann.image, thumbUrl: ann.image, id: `img_${ann.id}` }];
+    return [];
+  };
   // Same as ui-event-modals.js's getKakaoMapLinkUrl -- see that file's comment for why this
   // isn't going through the (dead) getPlaceKakaoRouteUrl bridge.
   const getAnnBannerKakaoMapLinkUrl = (place) => {
@@ -2524,8 +2530,9 @@ export function DateModal({
         const displayColor = getAnniversaryDisplayColor(ann, calendar);
         const bannerKey = ann.id || aIdx;
         const isExpanded = expandedAnnBannerIds.has(bannerKey);
-        const hasDetail = !!(ann.place || ann.description || getAnnBannerDateDisplay(ann));
-        const photos = Array.isArray(ann.photos) ? ann.photos : [];
+        const cultureLink = (ann.cultureSourceLink && String(ann.cultureSourceLink).trim()) || '';
+        const hasDetail = !!(ann.place || ann.description || getAnnBannerDateDisplay(ann) || cultureLink);
+        const photos = getAnnBannerPhotos(ann);
         // Keep a fixed thumb size when the banner expands -- growing to 64px looked jumpy and
         // made the title row reflow; 22px matches the collapsed state.
         const thumbSize = 22;
@@ -2657,15 +2664,29 @@ export function DateModal({
             ),
             placeBlock
           ),
-          ann.description && /*#__PURE__*/React.createElement("div", {
-            style: {
-              backgroundColor: `color-mix(in srgb, ${displayColor} 12%, white)`,
-              color: 'var(--text-main)',
-              padding: '10px 12px',
-              fontWeight: 500,
-              fontSize: 'var(--font-size-sm)'
-            }
-          }, renderTextWithUrlBadge(ann.description))
+          (() => {
+            const descText = (ann.description && String(ann.description)) || '';
+            const linkAlreadyInDesc = !!(cultureLink && descText.includes(cultureLink));
+            const showLink = !!(cultureLink && !linkAlreadyInDesc);
+            if (!descText && !showLink) return null;
+            return /*#__PURE__*/React.createElement("div", {
+              style: {
+                backgroundColor: `color-mix(in srgb, ${displayColor} 12%, white)`,
+                color: 'var(--text-main)',
+                padding: '10px 12px',
+                fontWeight: 500,
+                fontSize: 'var(--font-size-sm)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '6px'
+              }
+            },
+              descText ? renderTextWithUrlBadge(descText) : null,
+              showLink ? (UrlCapsuleBadge
+                ? /*#__PURE__*/React.createElement(UrlCapsuleBadge, { url: cultureLink })
+                : renderTextWithUrlBadge(cultureLink)) : null
+            );
+          })()
         );
       })),
 
