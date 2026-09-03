@@ -1021,7 +1021,8 @@ export function MemoPreviewSection({ memos = [], calendar = null, onViewAll, onO
       onRequestConfirm: onRequestConfirm,
       showToast: showToast,
       effectivePinned: !!memo.isPinned,
-      hidePinButton: true
+      hidePinButton: true,
+      variant: 'preview'
     })) : null)
   );
 }
