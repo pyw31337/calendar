@@ -4394,6 +4394,11 @@ function CalendarApp() {
 	    // instead of requiring the same line item to be re-typed there by hand.
 	    const activeParticipantNames = new Set(getActiveParticipants(activeCal).map(p => p.name));
 	    const cleanPayerId = activeParticipantNames.has(expense?.payerId) ? expense.payerId : '';
+	    // 자비부담: a personal expense someone covered entirely themselves, as opposed to a
+	    // 선결제 shared cost they merely fronted. Recorded for visibility only -- excluded from
+	    // 공금 (calculateSettlementBalance) and from the settlement card's split total
+	    // (monthlyExpenses in ui-event-modals.js) wherever amount is summed.
+	    const cleanIsSelfPay = !!expense?.isSelfPay;
     if ((!cleanLabel && !cleanUrl) || !cleanAmount) return false;
     
     // Link previews are display metadata, not part of the settlement write. Never block the
@@ -4418,8 +4423,8 @@ function CalendarApp() {
 	    const existingExpenses = Array.isArray(meeting.expenses) ? meeting.expenses : [];
 	    const isEditing = !!expense?.id;
 	    const nextExpenses = isEditing
-	      ? existingExpenses.map(e => e.id === expense.id ? { ...e, label: cleanLabel, url: cleanUrl, categoryId: cleanCategoryId, amount: cleanAmount, payerId: cleanPayerId, updatedAt: now, linkPreview: linkPreview || null } : e)
-	      : [...existingExpenses, { id: `exp_${activeCal.id}_${dateStr}_${now}_${Math.random().toString(36).slice(2, 7)}`, label: cleanLabel, url: cleanUrl, categoryId: cleanCategoryId, amount: cleanAmount, payerId: cleanPayerId, order: existingExpenses.length, createdAt: now, updatedAt: now, linkPreview: linkPreview || null }];
+	      ? existingExpenses.map(e => e.id === expense.id ? { ...e, label: cleanLabel, url: cleanUrl, categoryId: cleanCategoryId, amount: cleanAmount, payerId: cleanPayerId, isSelfPay: cleanIsSelfPay, updatedAt: now, linkPreview: linkPreview || null } : e)
+	      : [...existingExpenses, { id: `exp_${activeCal.id}_${dateStr}_${now}_${Math.random().toString(36).slice(2, 7)}`, label: cleanLabel, url: cleanUrl, categoryId: cleanCategoryId, amount: cleanAmount, payerId: cleanPayerId, isSelfPay: cleanIsSelfPay, order: existingExpenses.length, createdAt: now, updatedAt: now, linkPreview: linkPreview || null }];
     const nextConfirmedMeetings = meetings.map((m, i) => i === meetingIndex ? { ...m, expenses: nextExpenses, updatedAt: now, amount: null } : m);
     // Expense/income entries have no participant selector of their own, so these logs carry an
     // empty participantId (matching how poll activity logs already handle system-level actions)
@@ -4428,16 +4433,17 @@ function CalendarApp() {
     const expCats = getExpenseCategories(activeCal);
     const expCatName = id => (expCats.find(c => c.id === id) || {}).name || id || '-';
     const prevExp = isEditing ? existingExpenses.find(e => e.id === expense.id) : null;
+    const payerLabel = (payerId, selfPay) => payerId ? `${payerId} ${selfPay ? '자비부담' : '선결제'}` : (selfPay ? '자비부담' : '공금지출');
     let expenseLogNote;
     if (isEditing && prevExp) {
       expenseLogNote = buildFieldChangeNote(cleanLabel || cleanUrl || '정산', [
         { key: '금액', before: fmtAmt(prevExp.amount), after: fmtAmt(cleanAmount) },
         { key: '명목', before: prevExp.label || prevExp.url || '', after: cleanLabel || cleanUrl },
         { key: '카테고리', before: expCatName(prevExp.categoryId), after: expCatName(cleanCategoryId) },
-        { key: '지출자', before: prevExp.payerId || '공금지출', after: cleanPayerId || '공금지출' }
+        { key: '지출자', before: payerLabel(prevExp.payerId, prevExp.isSelfPay), after: payerLabel(cleanPayerId, cleanIsSelfPay) }
       ]);
     } else {
-      expenseLogNote = sanitizeText(`${fmtAmt(cleanAmount)} ${cleanLabel || cleanUrl} · ${expCatName(cleanCategoryId)}${cleanPayerId ? ` · ${cleanPayerId} 선결제` : ''}`, 300);
+      expenseLogNote = sanitizeText(`${fmtAmt(cleanAmount)} ${cleanLabel || cleanUrl} · ${expCatName(cleanCategoryId)}${(cleanPayerId || cleanIsSelfPay) ? ` · ${payerLabel(cleanPayerId, cleanIsSelfPay)}` : ''}`, 300);
     }
     const expenseActivityLog = createActivityLog(activeCal.id, isEditing ? 'expense_update' : 'expense_create', dateStr, '', now, expenseLogNote);
     return commitConfirmedMeetings(nextConfirmedMeetings, '지출 저장완료', expenseActivityLog ? [expenseActivityLog] : []);
