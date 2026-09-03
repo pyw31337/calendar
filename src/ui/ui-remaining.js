@@ -793,8 +793,9 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
   // nulling mediaInfo up front makes every check below naturally take that already-existing path.
   const mediaInfo = linkPreviewOnly ? null : getDirectChatMediaInfo(firstUrl);
   // When a message also contains uploaded images, the surrounding bubble is sized by that
-  // image row. Stretch its link previews to the same width; standalone text links retain their
-  // compact intrinsic card width.
+  // image row -- stretchWidth below locks the card to that image layout width. Chat link cards
+  // always stretch (width 100%) so left/right margins match the bubble content rather than a
+  // narrow fit-content card with empty space on the right.
   const hasAttachedImages = !!(message && getMessageImageEntries(message).length > 0);
   // A bubble with several plain webpage links (not a multi-image-link message, which is handled
   // separately below) used to only ever preview firstUrl -- every other link in the same message
@@ -823,6 +824,35 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
     }),
     [allPreviewUrls, linkPreviewOnly]
   );
+  // URLs whose LinkPreviewCard has reported success -- those are stripped from bubble text so the
+  // card is the clickable affordance. Loading/failed keep the raw URL visible. Seed with firstUrl
+  // when message-level cached linkPreview data already exists (immediate success, no flash).
+  const previewUrlsKey = previewUrls.join('\0');
+  const [readyPreviewUrls, setReadyPreviewUrls] = React.useState(() => {
+    const initial = new Set();
+    if (firstUrl && linkPreview && previewUrls.includes(firstUrl)) initial.add(firstUrl);
+    return initial;
+  });
+  React.useEffect(() => {
+    const initial = new Set();
+    if (firstUrl && linkPreview && previewUrls.includes(firstUrl)) {
+      initial.add(firstUrl);
+    }
+    setReadyPreviewUrls(initial);
+    // Only text / previewUrlsKey: linkPreview object identity can churn without meaningful change;
+    // cached success is still re-reported via LinkPreviewCard onStatusChange.
+  }, [text, previewUrlsKey]);
+  const handlePreviewStatusChange = React.useCallback((url, status) => {
+    setReadyPreviewUrls(prev => {
+      const shouldHave = status === 'success';
+      const has = prev.has(url);
+      if (shouldHave === has) return prev;
+      const next = new Set(prev);
+      if (shouldHave) next.add(url);
+      else next.delete(url);
+      return next;
+    });
+  }, []);
   const [failed, setFailed] = React.useState(false);
   React.useEffect(() => {
     setFailed(false);
@@ -918,27 +948,47 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
   }
 
   if (!mediaInfo || failed) {
-    const textNode = text ? parseTextWithLinks(text, searchQuery) : null;
+    // Strip every URL whose preview card is ready so the card becomes the clickable target.
+    // extractAllUrlInfos covers explicit http(s)/www links; bare-domain first URLs (matched by
+    // extractFirstUrlInfo but not extractAllUrlInfos) are removed via repeated removeFirstUrl.
+    let displayText = String(text || '');
+    extractAllUrlInfos(displayText).forEach(info => {
+      if (info && info.url && info.raw && readyPreviewUrls.has(info.url)) {
+        displayText = displayText.split(info.raw).join('');
+      }
+    });
+    const extractFirstUrlInfo = (__deps.extractFirstUrlInfo || GATHER_APP_UTILS.extractFirstUrlInfo);
+    for (let guard = 0; guard < 8; guard += 1) {
+      const info = typeof extractFirstUrlInfo === 'function'
+        ? extractFirstUrlInfo(displayText)
+        : { raw: '', url: firstUrl && readyPreviewUrls.has(firstUrl) ? firstUrl : '' };
+      if (!info || !info.url || !readyPreviewUrls.has(info.url)) break;
+      if (info.raw) {
+        displayText = displayText.split(info.raw).join('');
+      } else {
+        displayText = removeFirstUrl(displayText);
+      }
+    }
+    displayText = displayText.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+    const textNode = displayText ? parseTextWithLinks(displayText, searchQuery) : null;
     // textMaxWidth (grid caption case, see above) takes priority when both apply. Otherwise, if
-    // this text contains a URL, cap it to the same width LinkPreviewCard below uses (whether or
-    // not that card actually ends up rendering -- it may still be loading, or fail to fetch a
-    // preview at all). Pasted links are often padded with long tracking query strings that, left
-    // unbounded, are literally the ONE piece of content wide enough to force this fit-content
-    // bubble out to its absolute max width -- verified by measuring rendered widths in an
-    // isolated repro: an unbounded 140-char tracking URL alone stretched the bubble ~400px wider
-    // than the card sitting next to it, while wrapping the same URL at the card's own width
-    // closed that gap to a few px. overflow-wrap:break-word is already inherited from the bubble,
-    // so it wraps here instead of overflowing; the link stays fully visible and clickable either
-    // way, unlike hiding it outright (which would leave nothing clickable if the card fails).
-    // Plain length (not min(100%, ...)) for the same reason as computeChatImageGridMaxWidth in
-    // app-main.js -- paired with width:'100%' below, that alone is enough to shrink safely on a
-    // narrow viewport, and min()+percentage here breaks the ancestor bubble's fit-content sizing.
-    const effectiveMaxWidth = textMaxWidth || (firstUrl ? '280px' : null);
+    // a preview URL is still shown in the text (loading/failed), cap it to the compact card width
+    // so long tracking query strings don't force the fit-content bubble wider than the card.
+    // Once every preview URL is stripped, drop the 280px force so remaining long text can define
+    // bubble width and the stretched card matches it. Plain length (not min(100%, ...)) for the
+    // same reason as computeChatImageGridMaxWidth in app-main.js.
+    const firstUrlStillShown = !!(firstUrl && !readyPreviewUrls.has(firstUrl));
+    const effectiveMaxWidth = textMaxWidth || (firstUrlStillShown ? '280px' : null);
     const cappedTextNode = (textNode && effectiveMaxWidth)
       ? /*#__PURE__*/React.createElement('div', {
         style: { maxWidth: effectiveMaxWidth, width: '100%', boxSizing: 'border-box' }
       }, textNode)
       : textNode;
+    // textMaxWidth (multi-image grid caption from app-main) wins; else match attached image
+    // layout width; else null so stretch uses width/maxWidth 100% and fills the bubble.
+    const cardStretchWidth = textMaxWidth
+      ? textMaxWidth
+      : (hasAttachedImages ? (style.maxWidth || '420px') : null);
     return /*#__PURE__*/React.createElement(React.Fragment, null,
       cappedTextNode,
       previewUrls.map((url, idx) => /*#__PURE__*/React.createElement(LinkPreviewCard, {
@@ -946,8 +996,9 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
         url,
         fallbackTitle: (idx === 0 && text) ? removeFirstUrl(text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '',
         cachedData: idx === 0 ? linkPreview : undefined,
-        stretch: hasAttachedImages,
-        stretchWidth: hasAttachedImages ? (style.maxWidth || '420px') : null
+        stretch: true,
+        stretchWidth: cardStretchWidth,
+        onStatusChange: (status) => handlePreviewStatusChange(url, status)
       }))
     );
   }
