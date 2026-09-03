@@ -3678,6 +3678,9 @@ select.form-select {
 .region-filter-trigger-row {
   display: flex; align-items: center; gap: 8px; padding: 20px 16px 12px;
 }
+/* When a badges row (saved regions) precedes it, that row already carries the top gap below the
+   tabs, so the trigger row only needs a small gap under the badges instead of stacking both. */
+.region-selection-badges-row + .region-filter-trigger-row { padding-top: 12px; }
 .region-filter-trigger {
   /* No explicit height here -- .form-select's own min-height:44px (app.css:1463) is the standard
      every other select/picker box in the app uses; a shorter height here (previously 38px) lost
@@ -3741,6 +3744,48 @@ select.form-select {
   background: none; border: none; color: var(--accent-primary); font-size: var(--font-size-sm);
   font-weight: 800; cursor: pointer; padding: 4px 2px;
 }
+
+/* Saved-region capsule badges ("서울 광진구 (x)") -- shared markup (RegionSelectionBadge) used
+   both in the page-level row above .region-filter-trigger-row and inside the backdrop's own
+   body, both driven by the same regionSelections array so removing one anywhere stays in sync. */
+.region-selection-badges-row {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 20px 16px 0;
+}
+.region-selection-badges-row .region-filter-reset-btn { margin-left: auto; flex-shrink: 0; }
+.region-selection-badges {
+  display: flex; flex-wrap: wrap; gap: 8px;
+}
+.region-selection-badge {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 8px 6px 12px; border-radius: var(--radius-full);
+  background: rgba(79, 70, 229, 0.12); color: var(--accent-primary);
+  font-size: var(--font-size-sm); font-weight: 800; white-space: nowrap;
+}
+.region-selection-badge-remove {
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 18px; height: 18px; padding: 0; border: none; border-radius: 50%;
+  background: var(--accent-primary); color: #fff; cursor: pointer;
+}
+
+/* Search field + GPS "현재 위치로 검색" icon button inside RegionFilterBackdrop. */
+.region-filter-search-row {
+  display: flex; align-items: center; gap: 8px;
+}
+.region-filter-search-row .form-input { flex: 1 1 0%; min-width: 0; }
+.region-filter-locate-btn {
+  flex: 0 0 auto; width: 44px; height: 44px; padding: 0; border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle); background: var(--bg-primary); color: var(--text-main);
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.region-filter-locate-btn:disabled { opacity: 0.6; cursor: default; }
+
+/* RegionFilterBackdrop's fixed footer "지역 저장" button (see .bottom-sheet-footer). */
+.region-filter-save-btn {
+  width: 100%; padding: 13px; border: none; border-radius: var(--radius-md);
+  background: var(--accent-primary); color: #fff; font-size: var(--font-size-base); font-weight: 800;
+  cursor: pointer;
+}
+.region-filter-save-btn:disabled { opacity: 0.4; cursor: default; }
 
 /* 문화공연 / 지역축제 포스터 그리드 -- 모바일 2단 / 태블릿 4단 / PC 6단. */
 .culture-items-grid {
@@ -4184,11 +4229,28 @@ select.form-select {
   display: flex; align-items: center; justify-content: space-between;
   background: var(--bg-primary);
   border-radius: var(--radius-md) var(--radius-md) 0 0;
+  flex-shrink: 0;
 }
 .bottom-sheet-header h4 { font-size: 1rem; font-weight: 800; margin: 0; }
 .bottom-sheet-body {
   padding: 12px 20px calc(24px + env(safe-area-inset-bottom, 0px));
   overflow-y: auto; display: flex; flex-direction: column; gap: 8px;
+  /* Header/footer stay put, this middle section is the only part that scrolls -- flex:1 lets it
+     take exactly the space left after the (flex-shrink:0 by default, non-scrolling) header and
+     footer siblings, and min-height:0 is required for that shrink to actually take effect inside
+     a flex column (without it a flex item's automatic minimum size is its content size, so it
+     would refuse to shrink below the full content height and push the footer off-screen instead
+     of scrolling under it -- this is the correct, intentional use of min-height:0, not the bug
+     where overflow:hidden silently zeroes an item's automatic minimum size). */
+  flex: 1 1 auto; min-height: 0;
+}
+/* Sits below .bottom-sheet-body as a fixed (non-scrolling) action-button bar, e.g.
+   RegionFilterBackdrop's "지역 저장" button -- any bottom sheet whose body can grow past the
+   viewport should put its primary action here instead of inside .bottom-sheet-body, so the
+   button stays reachable at the bottom of the screen instead of scrolling away with the content. */
+.bottom-sheet-footer {
+  flex-shrink: 0; padding: 12px 20px calc(16px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--border-subtle); background: var(--bg-card);
 }
 /* 백드롭 규칙: 항목 글자는 참여자 선택과 같이 굵고 진하게 */
 .bottom-sheet-item {
