@@ -3729,14 +3729,15 @@ select.form-select {
   border-radius: inherit;
 }
 
-/* 보관함의 문화공연/지역축제 탭 하단 지역(시/도, 군/구) 선택 트리거 -- 둘 다 같은
-   RegionFilterBackdrop을 연다 (see ui-summary-gallery.js). */
+/* 보관함의 문화공연/지역축제 탭 하단 지역 선택 툴바 -- 현재 위치 | 지역 선택 | 1·2단 toggle.
+   지역 선택 opens RegionFilterBackdrop (see ui-summary-gallery.js). */
 .region-filter-trigger-row {
   display: flex; align-items: center; gap: 8px; padding: 20px 16px 12px;
 }
-/* When a badges row (saved regions) precedes it, that row already carries the top gap below the
-   tabs, so the trigger row only needs a small gap under the badges instead of stacking both. */
-.region-selection-badges-row + .region-filter-trigger-row { padding-top: 12px; }
+/* Badges now sit below the trigger row (tabs → toolbar → badges → chips → grid). When present,
+   shrink the badges' own top padding so the gap under the toolbar doesn't stack with the old
+   "first-row-under-tabs" top padding the badges used to carry when they preceded the toolbar. */
+.region-filter-trigger-row + .region-selection-badges-row { padding-top: 0; padding-bottom: 0; }
 @media (max-width: 640px) {
   .region-filter-trigger-row { padding: 10px 16px 12px; }
 }
@@ -3748,24 +3749,34 @@ select.form-select {
      literal height -- the two never matched. Both are 44px explicitly now. */
   flex: 1 1 0%; min-width: 0; font-size: 0.8rem;
 }
-/* "현재 위치" sits to the right of the 군/구 트리거 and never stretches with it -- its own width
-   is just its content (icon + label on wide screens, icon alone once the label is hidden below).
-   Dark fill (not the app's usual bordered/light form control look) so it visually reads as an
-   action button rather than a third filter field. */
+/* "현재 위치" sits LEFT of the 지역 선택 trigger -- always a 44×44 icon-only dark square so the
+   row stays compact next to the flex-1 region select and the 1·2단 cols toggle on the right. */
 .current-location-btn {
-  flex: 0 0 auto; display: flex; align-items: center; justify-content: center; gap: 6px;
-  height: 44px; padding: 0 14px; border-radius: var(--radius-md); border: 1px solid transparent;
+  flex: 0 0 auto; display: flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; padding: 0; border-radius: var(--radius-md); border: 1px solid transparent;
   background: #111827; color: #fff; font-size: var(--font-size-sm); font-weight: 700;
   cursor: pointer; white-space: nowrap;
 }
 .current-location-btn:disabled {
   opacity: 0.6; cursor: default;
 }
-@media (max-width: 480px) {
-  /* Icon-only on mobile, per the product ask -- the label would otherwise force this row to wrap
-     or squeeze the 시/도·군/구 triggers below a usable width on narrow phones. */
-  .current-location-btn { padding: 0 10px; }
-  .current-location-btn-label { display: none; }
+.current-location-btn-label { display: none; }
+
+/* 1단/2단 poster-grid density toggle -- pill group matching gallery visit-filter-toggle-mobile
+   (border + 3px padding, active filled #4F46E5). Square icon buttons keep the row at 44px. */
+.culture-grid-cols-toggle {
+  flex: 0 0 auto; display: inline-flex; align-items: center; box-sizing: border-box;
+  height: 44px; padding: 3px; border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle); background: var(--bg-card);
+}
+.culture-grid-cols-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 38px; height: 100%; padding: 0; box-sizing: border-box;
+  border: none; border-radius: var(--radius-sm); cursor: pointer;
+  background: transparent; color: var(--text-muted);
+}
+.culture-grid-cols-btn.is-active {
+  background: #4F46E5; color: #FFFFFF;
 }
 /* RegionFilterBackdrop: search field + tap-target chip lists (시/도, then that province's
    군/구), modeled on Culture Flow's own region picker referenced by the product ask -- laid out
@@ -3805,10 +3816,12 @@ select.form-select {
 }
 
 /* Saved-region capsule badges ("서울 광진구 (x)") -- shared markup (RegionSelectionBadge) used
-   both in the page-level row above .region-filter-trigger-row and inside the backdrop's own
-   body, both driven by the same regionSelections array so removing one anywhere stays in sync. */
+   both in the page-level row below .region-filter-trigger-row and inside the backdrop's own
+   body, both driven by the same regionSelections array so removing one anywhere stays in sync.
+   Top padding is for the rare case badges render without a preceding trigger; when they follow
+   the toolbar, .region-filter-trigger-row + .region-selection-badges-row zeroes it. */
 .region-selection-badges-row {
-  display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 20px 16px 0;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 12px 16px 0;
 }
 .region-selection-badges-row .region-filter-reset-btn { margin-left: auto; flex-shrink: 0; }
 .region-selection-badges {
@@ -3846,15 +3859,29 @@ select.form-select {
 }
 .region-filter-save-btn:disabled { opacity: 0.4; cursor: default; }
 
-/* 문화공연 / 지역축제 포스터 그리드 -- 모바일 2단 / 태블릿 4단 / PC 6단. */
-.culture-items-grid {
+/* 문화공연 / 지역축제 포스터 그리드.
+   is-cols-2 (default): 모바일 2단 / 태블릿 4단 / PC 6단.
+   is-cols-1: 모바일 1단 / 640px+ 2단 / 1024px+ 3단 (single-column denser on wide screens). */
+.culture-items-grid,
+.culture-items-grid.is-cols-2 {
   display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;
 }
 @media (min-width: 640px) and (max-width: 1023px) {
-  .culture-items-grid { grid-template-columns: repeat(4, 1fr); }
+  .culture-items-grid,
+  .culture-items-grid.is-cols-2 { grid-template-columns: repeat(4, 1fr); }
 }
 @media (min-width: 1024px) {
-  .culture-items-grid { grid-template-columns: repeat(6, 1fr); }
+  .culture-items-grid,
+  .culture-items-grid.is-cols-2 { grid-template-columns: repeat(6, 1fr); }
+}
+.culture-items-grid.is-cols-1 {
+  display: grid; grid-template-columns: 1fr; gap: 12px;
+}
+@media (min-width: 640px) and (max-width: 1023px) {
+  .culture-items-grid.is-cols-1 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (min-width: 1024px) {
+  .culture-items-grid.is-cols-1 { grid-template-columns: repeat(3, 1fr); }
 }
 
 .date-item-btn {
