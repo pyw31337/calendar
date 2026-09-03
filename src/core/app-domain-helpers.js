@@ -1635,6 +1635,7 @@ function getActivityLogStamp(...args) {
   return typeof f === 'function' ? f(...args) : undefined;
 }
 const SCHEDULE_ACTIVITY_ACTIONS = Array.isArray(GATHER_APP_CONSTANTS.SCHEDULE_ACTIVITY_ACTIONS) ? GATHER_APP_CONSTANTS.SCHEDULE_ACTIVITY_ACTIONS : ['create', 'update', 'delete'];
+const BULK_NO_PARTICIPANT_ID = GATHER_APP_CONSTANTS.BULK_NO_PARTICIPANT_ID || '__none__';
 const POLL_ACTIVITY_ACTIONS = Array.isArray(GATHER_APP_CONSTANTS.POLL_ACTIVITY_ACTIONS) ? GATHER_APP_CONSTANTS.POLL_ACTIVITY_ACTIONS : ['poll_create', 'poll_vote', 'poll_cancel'];
 // Expense/income entries (회비정산) have no participant selector of their own -- these logs
 // carry an empty participantId, same as poll activity logs, so they need the same
@@ -1656,13 +1657,14 @@ function normalizeActivityLog(calendarId, log, participantIds = null, idRedirect
   const participantId = sanitizeText(idRedirects.get(log.participantId) || log.participantId || '', 120);
   const action = ACTIVITY_ACTIONS.includes(log.action) ? log.action : '';
   const isParticipantOptionalAction = POLL_ACTIVITY_ACTIONS.includes(action) || EXPENSE_ACTIVITY_ACTIONS.includes(action) || IMAGE_TAG_ACTIVITY_ACTIONS.includes(action) || MEETING_ACTIVITY_ACTIONS.includes(action) || MEMO_ACTIVITY_ACTIONS.includes(action) || PLACE_ACTIVITY_ACTIONS.includes(action);
+  const isBulkNoParticipant = participantId === BULK_NO_PARTICIPANT_ID;
   const date = sanitizeText(log.date || '', 20);
   const timestamp = Number(log.timestamp || log.updatedAt || 0) || 0;
   if (!action || !timestamp) return null;
   if (!isParticipantOptionalAction && (!participantId || !date || !isValidDateString(date))) return null;
   if (isParticipantOptionalAction && date && !isValidDateString(date)) return null;
-  if (participantIds && participantId && !participantIds.has(participantId)) return null;
-  if (participantIds && !isParticipantOptionalAction && !participantIds.has(participantId)) return null;
+  if (participantIds && participantId && !isBulkNoParticipant && !participantIds.has(participantId)) return null;
+  if (participantIds && !isParticipantOptionalAction && !isBulkNoParticipant && !participantIds.has(participantId)) return null;
   const idDatePart = date || 'poll';
   const idParticipantPart = participantId || 'system';
   const id = sanitizeText(log.id || `${calendarId}_${idDatePart}_${idParticipantPart}_${action}_${timestamp}`, 160);
@@ -1707,6 +1709,9 @@ function buildFieldChangeNote(label, changes, maxLen = 300) {
 function resolveLogParticipant(log, participantsMap) {
   if (log?.participantId && participantsMap && participantsMap[log.participantId]) {
     return participantsMap[log.participantId];
+  }
+  if (log?.participantId === BULK_NO_PARTICIPANT_ID) {
+    return { name: '일정', color: '#94A3B8' };
   }
   const action = log?.action || '';
   if (log?.type === 'chat') return { name: '메시지', color: '#0369A1' };
