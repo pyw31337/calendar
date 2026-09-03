@@ -1576,7 +1576,7 @@ export function CalendarGrid({
           key: ann.id || aIdx,
           className: isHeundeul ? 'day-anniversary-badge-jiggle' : undefined,
           style: {
-            height: isHeundeul ? 'auto' : '24px',
+            height: '24px',
             minHeight: '24px',
             backgroundColor: `${displayColor}22`,
             padding: '3px 8px',
