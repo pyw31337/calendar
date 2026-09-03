@@ -798,6 +798,8 @@ export function AnniversaryModal({
   const TicketsPlaneIcon = __comp.TicketsPlaneIcon || __deps.TicketsPlaneIcon;
   const MessageCircleMoreIcon = __comp.MessageCircleMoreIcon || __deps.MessageCircleMoreIcon;
   const MapPinIcon = __comp.MapPinIcon || __deps.MapPinIcon;
+  const ItemEditDeleteActions = __comp.ItemEditDeleteActions || __deps.ItemEditDeleteActions;
+  const firebaseConfig = __deps.firebaseConfig || window.firebaseConfig;
   const ANNIVERSARY_CATEGORY_ICONS = {
     birthday: CakeIcon, event: BalloonIcon, festival: ConfettiIcon, travel: TicketsPlaneIcon, other: MessageCircleMoreIcon
   };
@@ -1096,7 +1098,13 @@ export function AnniversaryModal({
     setIsPlaceSearching(true);
     setPlaceResults([]);
     try {
-      const { results } = await searchPlaces(q);
+      // Without firebaseConfig, the kakao/google providers build their Cloud Functions proxy
+      // URL as ".../us-central1-undefined.cloudfunctions.net/..." and fail outright, silently
+      // falling through to nominatim (OpenStreetMap) -- which lacks many Korean POI names (e.g.
+      // "화성에코테마파크") that Kakao's own database has. The date modal's own place search
+      // (searchPlacesWithProviders in ui-date-modal.js) passes these same two options and finds
+      // it without issue; this call was missing them.
+      const { results } = await searchPlaces(q, { firebaseConfig, categoryMap: KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY });
       setPlaceResults(Array.isArray(results) ? results : []);
       if (!results || results.length === 0) showToast('검색 결과가 없습니다.', 'error');
     } catch (err) {
@@ -1249,12 +1257,16 @@ export function AnniversaryModal({
   const renderAnniversaryRow = (ann) => /*#__PURE__*/React.createElement("div", {
     key: ann.id,
     style: {
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: '10px 12px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)',
+      position: 'relative',
+      // Reserves just enough room for the edit/delete icons docked in the top-right corner
+      // (see ItemEditDeleteActions below) -- the content column itself is no longer split into
+      // a side-by-side flex row with the actions, so its description/place text can use nearly
+      // the row's full width instead of always losing a wide fixed column to the buttons.
+      padding: '10px 44px 10px 12px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)',
       backgroundColor: 'var(--bg-primary)'
     }
   },
-    /* Left info */
+    /* Content */
     /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 } },
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
         ANNIVERSARY_CATEGORY_ICONS[ann.category] && /*#__PURE__*/React.createElement(ANNIVERSARY_CATEGORY_ICONS[ann.category], { size: 16 }),
@@ -1301,26 +1313,16 @@ export function AnniversaryModal({
       )
     ),
 
-    /* Action Buttons */
-    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '6px', flexShrink: 0 } },
-      /* Edit button */
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: () => handleEditClick(ann),
-        style: {
-          background: 'none', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)',
-          padding: '4px 8px', fontSize: 'var(--font-size-sm)', color: 'var(--text-main)', cursor: 'pointer'
-        }
-      }, "수정"),
-      /* Delete button */
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: () => handleDeleteAnniversary(ann),
-        style: {
-          background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: 'var(--radius-sm)',
-          padding: '4px 8px', fontSize: 'var(--font-size-sm)', color: '#EF4444', cursor: 'pointer'
-        }
-      }, "삭제")
+    /* Edit/delete icons -- same pencil+trash module used by the date modal's attendance cards,
+       docked to the row's top-right corner instead of a same-row text-button column, so the
+       content above can use the row's full width. */
+    /*#__PURE__*/React.createElement("div", {
+      style: { position: 'absolute', top: '8px', right: '8px', display: 'flex', alignItems: 'center', gap: '4px' }
+    },
+      /*#__PURE__*/React.createElement(ItemEditDeleteActions, {
+        onEdit: () => handleEditClick(ann),
+        onDelete: () => handleDeleteAnniversary(ann)
+      })
     )
   );
 
