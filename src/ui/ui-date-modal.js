@@ -2657,7 +2657,7 @@ export function DateModal({
             style: {
               display: 'flex',
               flexDirection: 'column',
-              gap: '6px',
+              gap: 0,
               padding: '10px 12px',
               backgroundColor: displayColor,
               color: '#fff',
