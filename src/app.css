@@ -3546,6 +3546,55 @@ select.form-select {
 @media (min-width: 1024px) {
   .history-meetings-grid { grid-template-columns: repeat(4, 1fr); }
 }
+/* Same root cause as the culture-items-grid poster cards and the flex-shrink fix on
+   .date-item-btn itself: a grid (or flex) item's *automatic* minimum size resolves to 0
+   whenever the item itself has a non-visible overflow, which lets the row track-sizing pass
+   under-measure a card with a wrapping memo badge + place block and clip its text/place row
+   instead of growing the row to fit it. .date-item-btn.confirmed-meeting-card and
+   .confirmed-meeting-surface both set overflow:hidden (needed elsewhere -- the banner's
+   collapse animation, the icon button -- so it can't just be removed from those rules), so
+   scope the reset to this grid only and move the rounded-corner clipping those rules relied on
+   onto the ::before gradient overlay's own border-radius instead. */
+.history-meetings-grid .date-item-btn.confirmed-meeting-card,
+.history-meetings-grid .confirmed-meeting-surface {
+  overflow: visible;
+}
+.history-meetings-grid .date-item-btn.confirmed-meeting-card::before {
+  border-radius: inherit;
+}
+
+/* 보관함의 문화공연/지역축제 탭 하단 지역(시/도, 군/구) 선택 트리거 -- 둘 다 같은
+   RegionFilterBackdrop을 연다 (see ui-summary-gallery.js). */
+.region-filter-trigger-row {
+  display: flex; gap: 8px; padding: 0 16px 12px;
+}
+.region-filter-trigger {
+  flex: 1 1 0%; min-width: 0; height: 38px; font-size: var(--font-size-sm);
+}
+/* RegionFilterBackdrop: search field + tap-target chip lists (시/도, then that province's
+   군/구), modeled on Culture Flow's own region picker referenced by the product ask -- laid out
+   as wrapped chips rather than the app's usual full-width .bottom-sheet-item rows since a
+   province/district name is short and there are many of them. */
+.region-filter-sheet {
+  max-height: min(80vh, calc(100svh - 16px));
+}
+.region-filter-body {
+  gap: 12px;
+}
+.region-filter-section-label {
+  font-size: var(--font-size-sm); font-weight: 800; color: var(--text-muted); margin-top: 4px;
+}
+.region-filter-chip-group {
+  display: flex; flex-wrap: wrap; gap: 6px;
+}
+.region-filter-chip {
+  padding: 6px 12px; border-radius: var(--radius-full); border: 1px solid var(--border-subtle);
+  background: var(--bg-primary); color: var(--text-main); font-size: var(--font-size-sm);
+  font-weight: 700; cursor: pointer;
+}
+.region-filter-chip.is-active {
+  background: var(--accent-primary); border-color: var(--accent-primary); color: #FFFFFF;
+}
 
 /* 문화공연 / 지역축제 포스터 그리드 -- 모바일 2단 / 태블릿 4단 / PC 6단. */
 .culture-items-grid {

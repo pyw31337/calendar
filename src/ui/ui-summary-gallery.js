@@ -1758,6 +1758,13 @@ export function HistoryView({
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [historyTab, setHistoryTab] = React.useState('meetings');
+  // Shared 시/도·군/구 filter for the 문화공연/지역축제 tabs (지난 모임 has no region data to
+  // filter by). Lives here rather than inside CulturePerformancesTab so switching between the
+  // 문화공연/지역축제 tabs keeps the same region selected instead of resetting it.
+  const [regionSido, setRegionSido] = React.useState('');
+  const [regionGugun, setRegionGugun] = React.useState('');
+  const [isRegionFilterOpen, setIsRegionFilterOpen] = React.useState(false);
+  const applyRegionFilter = (sido, gugun) => { setRegionSido(sido); setRegionGugun(gugun); };
 
   const activeParticipants = getActiveParticipants(calendar);
   const participantsMap = activeParticipants.reduce((acc, p) => { acc[p.id] = p; return acc; }, {});
@@ -1843,13 +1850,34 @@ export function HistoryView({
         { value: 'festival', label: '지역축제' }
       ]
     }),
+    historyTab !== 'meetings' && /*#__PURE__*/React.createElement("div", {
+      className: "region-filter-trigger-row"
+    },
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "form-select region-filter-trigger",
+        onClick: () => setIsRegionFilterOpen(true)
+      }, KOREA_REGIONS.find(r => r.code === regionSido)?.label || "시/도 선택"),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "form-select region-filter-trigger",
+        onClick: () => setIsRegionFilterOpen(true)
+      }, regionGugun || "군/구 선택")
+    ),
+    /*#__PURE__*/React.createElement(RegionFilterBackdrop, {
+      isOpen: isRegionFilterOpen,
+      onClose: () => setIsRegionFilterOpen(false),
+      sido: regionSido,
+      gugun: regionGugun,
+      onApply: applyRegionFilter
+    }),
     historyTab === 'culture' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
       calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent, dataUrl: CULTURE_PERFORMANCES_URL,
-      emptyLabel: "상영중이거나 예정된 문화공연이 없습니다."
+      emptyLabel: "상영중이거나 예정된 문화공연이 없습니다.", regionSido, regionGugun
     }),
     historyTab === 'festival' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
       calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent, dataUrl: CULTURE_FESTIVALS_URL,
-      emptyLabel: "진행중이거나 예정된 지역축제가 없습니다."
+      emptyLabel: "진행중이거나 예정된 지역축제가 없습니다.", regionSido, regionGugun
     }),
     historyTab === 'meetings' && /*#__PURE__*/React.createElement("div", {
       className: "history-meetings-grid",
@@ -1879,7 +1907,7 @@ export function HistoryView({
             }, isPast ? formatDateWithDayName(d) : formatConfirmedMeetingLabel(d)),
             /*#__PURE__*/React.createElement("span", { className: `date-item-badge dday-badge ${isPast ? 'is-past' : 'is-confirmed'}`, style: { flexShrink: 0 } }, ddayLabel)
           ),
-          memoEntries.length > 0 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' } },
+          memoEntries.length > 0 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'flex-start', gap: '6px', flexWrap: 'wrap' } },
             memoEntries.map(e => {
               const p = participantsMap[e.participantId];
               if (!p) return null;
@@ -2002,13 +2030,139 @@ const CULTURE_FESTIVALS_URL = `${CULTURE_DATA_BASE}data/culture-festivals.json`;
 const CULTURE_MISSING_LABEL = '정보없음';
 const culturePerf = value => (value && String(value).trim()) || CULTURE_MISSING_LABEL;
 
+// 문화공연/지역축제 탭의 지역 필터용 전국 시/도-군/구 목록 (동 단위는 두지 않음). `code`는
+// culture-performances.json/culture-festivals.json의 각 항목이 이미 들고 있는 `region` 필드값과
+// 그대로 맞춘 것 -- 이 코드로 데이터를 직접 필터링한다. `gugun`은 데이터에 별도 필드가 없어
+// item.address의 두 번째 토큰(예: "경기도 부천시 ...")으로 대조하므로, 실제 데이터 유무와 무관하게
+// 대한민국 표준 행정구역 전체를 보여준다 (Culture Flow 자체 지역설정 백드롭과 동일한 방식).
+const KOREA_REGIONS = [
+  { code: 'seoul', label: '서울', gugun: ['종로구', '중구', '용산구', '성동구', '광진구', '동대문구', '중랑구', '성북구', '강북구', '도봉구', '노원구', '은평구', '서대문구', '마포구', '양천구', '강서구', '구로구', '금천구', '영등포구', '동작구', '관악구', '서초구', '강남구', '송파구', '강동구'] },
+  { code: 'busan', label: '부산', gugun: ['중구', '서구', '동구', '영도구', '부산진구', '동래구', '남구', '북구', '해운대구', '사하구', '금정구', '강서구', '연제구', '수영구', '사상구', '기장군'] },
+  { code: 'daegu', label: '대구', gugun: ['중구', '동구', '서구', '남구', '북구', '수성구', '달서구', '달성군', '군위군'] },
+  { code: 'incheon', label: '인천', gugun: ['중구', '동구', '미추홀구', '연수구', '남동구', '부평구', '계양구', '서구', '강화군', '옹진군'] },
+  { code: 'gwangju', label: '광주', gugun: ['동구', '서구', '남구', '북구', '광산구'] },
+  { code: 'daejeon', label: '대전', gugun: ['동구', '중구', '서구', '유성구', '대덕구'] },
+  { code: 'ulsan', label: '울산', gugun: ['중구', '남구', '동구', '북구', '울주군'] },
+  { code: 'sejong', label: '세종', gugun: ['세종시'] },
+  { code: 'gyeonggi', label: '경기', gugun: ['수원시', '성남시', '의정부시', '안양시', '부천시', '광명시', '평택시', '동두천시', '안산시', '고양시', '과천시', '구리시', '남양주시', '오산시', '시흥시', '군포시', '의왕시', '하남시', '용인시', '파주시', '이천시', '안성시', '김포시', '화성시', '광주시', '양주시', '포천시', '여주시', '연천군', '가평군', '양평군'] },
+  { code: 'gangwon', label: '강원', gugun: ['춘천시', '원주시', '강릉시', '동해시', '태백시', '속초시', '삼척시', '홍천군', '횡성군', '영월군', '평창군', '정선군', '철원군', '화천군', '양구군', '인제군', '고성군', '양양군'] },
+  { code: 'chungbuk', label: '충북', gugun: ['청주시', '충주시', '제천시', '보은군', '옥천군', '영동군', '증평군', '진천군', '괴산군', '음성군', '단양군'] },
+  { code: 'chungnam', label: '충남', gugun: ['천안시', '공주시', '보령시', '아산시', '서산시', '논산시', '계룡시', '당진시', '금산군', '부여군', '서천군', '청양군', '홍성군', '예산군', '태안군'] },
+  { code: 'jeonbuk', label: '전북', gugun: ['전주시', '군산시', '익산시', '정읍시', '남원시', '김제시', '완주군', '진안군', '무주군', '장수군', '임실군', '순창군', '고창군', '부안군'] },
+  { code: 'jeonnam', label: '전남', gugun: ['목포시', '여수시', '순천시', '나주시', '광양시', '담양군', '곡성군', '구례군', '고흥군', '보성군', '화순군', '장흥군', '강진군', '해남군', '영암군', '무안군', '함평군', '영광군', '장성군', '완도군', '진도군', '신안군'] },
+  { code: 'gyeongbuk', label: '경북', gugun: ['포항시', '경주시', '김천시', '안동시', '구미시', '영주시', '영천시', '상주시', '문경시', '경산시', '의성군', '청송군', '영양군', '영덕군', '청도군', '고령군', '성주군', '칠곡군', '예천군', '봉화군', '울진군', '울릉군'] },
+  { code: 'gyeongnam', label: '경남', gugun: ['창원시', '진주시', '통영시', '사천시', '김해시', '밀양시', '거제시', '양산시', '의령군', '함안군', '창녕군', '고성군', '남해군', '하동군', '산청군', '함양군', '거창군', '합천군'] },
+  { code: 'jeju', label: '제주', gugun: ['제주시', '서귀포시'] }
+];
+// Flat (region, gugun) lookup used by the search field below to resolve a typed district name
+// (e.g. "부천") straight to its parent 시/도 -- built once at module load since KOREA_REGIONS
+// never changes at runtime.
+const KOREA_REGION_GUGUN_INDEX = KOREA_REGIONS.flatMap(region =>
+  region.gugun.map(gugun => ({ code: region.code, label: region.label, gugun }))
+);
+
+// Region-select backdrop shared by the 시/도 and 군/구 trigger buttons below the 보관함 tabs
+// (Culture Flow's own region picker, referenced by the product ask, is the model: a search field
+// on top auto-resolving a typed district straight to its province, plus every province's full
+// district list laid out as tap targets rather than a plain dropdown). Selecting a 시/도 narrows
+// the sheet to that province's 군/구 chips without closing it (so 시/도 → 군/구 is one flow);
+// picking a 군/구 (or "전체") applies and closes.
+export function RegionFilterBackdrop({ isOpen, onClose, sido, gugun, onApply }) {
+  const React = window.React;
+  const ReactDOM = window.ReactDOM;
+  const [query, setQuery] = React.useState('');
+  const [expandedSido, setExpandedSido] = React.useState(sido || '');
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setExpandedSido(sido || '');
+      setQuery('');
+    }
+  }, [isOpen, sido]);
+
+  // Typing a district name (partial match, e.g. "부천" -> "부천시") jumps straight to that
+  // province's chip list and applies both the 시/도 and 군/구 in one step, matching Culture
+  // Flow's own search-to-select behavior -- the user never has to also tap the province chip.
+  React.useEffect(() => {
+    const trimmed = query.trim();
+    if (!trimmed) return;
+    const match = KOREA_REGION_GUGUN_INDEX.find(entry => entry.gugun.includes(trimmed));
+    if (match) {
+      setExpandedSido(match.code);
+      onApply(match.code, match.gugun);
+    }
+  }, [query]);
+
+  if (!isOpen) return null;
+
+  const activeRegion = KOREA_REGIONS.find(r => r.code === expandedSido);
+
+  const sheet = /*#__PURE__*/React.createElement("div", {
+    className: "bottom-sheet-overlay",
+    onClick: e => { e.stopPropagation(); onClose(); }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bottom-sheet region-filter-sheet",
+    onClick: e => e.stopPropagation()
+  },
+    /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-header" },
+      /*#__PURE__*/React.createElement("h4", null, "지역 설정"),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        style: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer' },
+        onClick: onClose
+      }, "✕")
+    ),
+    /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-body region-filter-body" },
+      /*#__PURE__*/React.createElement("input", {
+        type: "text",
+        className: "form-input",
+        placeholder: "지역명으로 검색 (예: 부천)",
+        value: query,
+        onChange: e => setQuery(e.target.value),
+        autoFocus: true
+      }),
+      /*#__PURE__*/React.createElement("div", { className: "region-filter-section-label" }, "시/도"),
+      /*#__PURE__*/React.createElement("div", { className: "region-filter-chip-group" },
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          className: `region-filter-chip${!expandedSido ? ' is-active' : ''}`,
+          onClick: () => { setQuery(''); setExpandedSido(''); onApply('', ''); onClose(); }
+        }, "전국"),
+        KOREA_REGIONS.map(r => /*#__PURE__*/React.createElement("button", {
+          key: r.code,
+          type: "button",
+          className: `region-filter-chip${r.code === expandedSido ? ' is-active' : ''}`,
+          onClick: () => { setQuery(''); setExpandedSido(r.code); onApply(r.code, ''); }
+        }, r.label))
+      ),
+      activeRegion && /*#__PURE__*/React.createElement(React.Fragment, null,
+        /*#__PURE__*/React.createElement("div", { className: "region-filter-section-label" }, "군/구"),
+        /*#__PURE__*/React.createElement("div", { className: "region-filter-chip-group" },
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            className: `region-filter-chip${expandedSido === sido && !gugun ? ' is-active' : ''}`,
+            onClick: () => { setQuery(''); onApply(expandedSido, ''); onClose(); }
+          }, "전체"),
+          activeRegion.gugun.map(g => /*#__PURE__*/React.createElement("button", {
+            key: g,
+            type: "button",
+            className: `region-filter-chip${expandedSido === sido && g === gugun ? ' is-active' : ''}`,
+            onClick: () => { setQuery(''); onApply(expandedSido, g); onClose(); }
+          }, g))
+        )
+      )
+    )
+  ));
+  return typeof document !== 'undefined' && ReactDOM.createPortal ? ReactDOM.createPortal(sheet, document.body) : sheet;
+}
+
 // 히스토리(보관함) 페이지의 '문화공연'/'지역축제' 탭 -- 둘 다 이 컴포넌트 하나를 dataUrl만 바꿔
 // 재사용한다 (문화공연은 culture-performances.json, 지역축제는 culture-festivals.json). 둘 다
 // scripts/sync-culture-performances.mjs가 매일 커밋하는 이 리포 소유의 정적 스냅샷을 fetch해서
 // 상영중/예정 목록을 보여준다. Culture Flow(별개 프로젝트)의 실시간 JSON을 직접 fetch하지 않는
 // 이유는 그 프로젝트의 스키마가 바뀌거나 그날 수집이 실패해도 이 탭이 즉시 깨지지 않게 하기
 // 위함 -- 동기화 스크립트가 검증에 실패하면 최근 정상 스냅샷을 그대로 커밋해 유지한다.
-export function CulturePerformancesTab({ calendar, anniversaries = [], onRegisterCultureEvent, onUnregisterCultureEvent, dataUrl = CULTURE_PERFORMANCES_URL, emptyLabel = "상영중이거나 예정된 문화공연이 없습니다." }) {
+export function CulturePerformancesTab({ calendar, anniversaries = [], onRegisterCultureEvent, onUnregisterCultureEvent, dataUrl = CULTURE_PERFORMANCES_URL, emptyLabel = "상영중이거나 예정된 문화공연이 없습니다.", regionSido = '', regionGugun = '' }) {
   const React = window.React;
   const ReactDOM = window.ReactDOM;
   const [items, setItems] = React.useState(null); // null = loading, [] = loaded-empty
@@ -2065,12 +2219,31 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
     }, loadError ? "정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요." : emptyLabel);
   }
 
+  // item.region already matches a KOREA_REGIONS code 1:1 (see that table's own comment). There's
+  // no separate 군/구 field in the snapshot, so match it against the first two space-separated
+  // tokens of the item's own address string (Korean addresses always lead with "시/도 시/군/구
+  // ...", so the second token is exactly the district name these buttons list).
+  const filteredItems = items.filter(item => {
+    if (regionSido && item.region !== regionSido) return false;
+    if (regionGugun) {
+      const addressTokens = String(item.address || item.venue || '').trim().split(/\s+/);
+      if (addressTokens[1] !== regionGugun) return false;
+    }
+    return true;
+  });
+
+  if (filteredItems.length === 0) {
+    return /*#__PURE__*/React.createElement("div", {
+      style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)' }
+    }, "선택한 지역에 해당하는 항목이 없습니다.");
+  }
+
   return /*#__PURE__*/React.createElement(React.Fragment, null,
     /*#__PURE__*/React.createElement("div", {
       className: "culture-items-grid",
       style: { flex: 1, overflowY: 'auto', padding: '16px', alignContent: 'start' }
     },
-      items.map(item => {
+      filteredItems.map(item => {
         const registered = !!findRegisteredAnniversary(item.id);
         return /*#__PURE__*/React.createElement("button", {
           key: item.id,
@@ -2189,5 +2362,6 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
     SummaryList: SummaryList,
     HistoryView: HistoryView,
     CulturePerformancesTab: CulturePerformancesTab,
+    RegionFilterBackdrop: RegionFilterBackdrop,
   });
 }
