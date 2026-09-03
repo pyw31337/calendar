@@ -2877,7 +2877,11 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
             /*#__PURE__*/React.createElement("div", {
               style: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--text-main)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', wordBreak: 'break-word' }
             }, item.title),
-            /*#__PURE__*/React.createElement("div", {
+            // 지역축제는 '장소'와 '주소'가 사실상 같은 정보를 가리키는 경우가 대부분이라
+            // (예: 장소="영등포아트홀", 주소="서울 영등포구 ...") 축제 카드에서는 장소 줄을
+            // 생략하고 주소만 보여준다. 문화공연(anniversaryCategory 'event')은 공연장 이름이
+            // 주소만으로는 알 수 없는 별도 정보라 계속 둘 다 보여준다.
+            anniversaryCategory !== 'festival' && /*#__PURE__*/React.createElement("div", {
               style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
             }, item.venue || CULTURE_MISSING_LABEL),
             /*#__PURE__*/React.createElement("div", {
