@@ -2539,7 +2539,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
       if (!dateStr || !dateStr.startsWith(monthStr)) return;
       const exps = Array.isArray(m.expenses) ? m.expenses : [];
       exps.forEach((exp, idx) => {
-        if (!exp) return;
+        if (!exp || isTombstone(exp)) return;
         const textToTest = (exp.label || exp.title || exp.note || exp.category || '').toLowerCase();
         if (textToTest.includes('이월') || textToTest.includes('전년이월') || textToTest.includes('전월이월')) return;
         const key = `${dateStr}_${exp.id || idx}_${exp.amount || 0}`;
@@ -3744,7 +3744,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   const allTimeRows = getConfirmedMeetings(calendar).slice().sort((a, b) => b.date.localeCompare(a.date))
     .map(meeting => {
       const items = orderSettlementItemsForDisplay((Array.isArray(meeting.expenses) ? meeting.expenses : [])
-        .filter(expense => Number.isFinite(Number(expense.amount)) && Number(expense.amount) !== 0)
+        .filter(expense => !isTombstone(expense) && Number.isFinite(Number(expense.amount)) && Number(expense.amount) !== 0)
         .map((expense, index) => {
           const amount = Number(expense.amount || 0);
           const isIncome = isExpenseIncomeEntry(expense);
@@ -3805,7 +3805,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     .filter(meeting => activeTab === 'total' || meeting.date.startsWith(targetPrefix))
     .map(meeting => {
       const items = orderSettlementItemsForDisplay((Array.isArray(meeting.expenses) ? meeting.expenses : [])
-        .filter(expense => Number.isFinite(Number(expense.amount)) && Number(expense.amount) !== 0)
+        .filter(expense => !isTombstone(expense) && Number.isFinite(Number(expense.amount)) && Number(expense.amount) !== 0)
         .sort((a, b) => {
           const aOrder = Number.isFinite(Number(a.order)) ? Number(a.order) : Number.POSITIVE_INFINITY;
           const bOrder = Number.isFinite(Number(b.order)) ? Number(b.order) : Number.POSITIVE_INFINITY;

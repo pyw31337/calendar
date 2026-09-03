@@ -1523,7 +1523,7 @@ export function DateModal({
       refKey: `meeting-index:${photo.id}`
     }));
     const directPhotos = [...indexedPhotos, ...(Array.isArray(confirmedMeetingEntry?.photos) ? confirmedMeetingEntry.photos : [])]
-      .filter(photo => photo && (photo.imageUrl || photo.thumbUrl))
+      .filter(photo => photo && !isTombstone(photo) && (photo.imageUrl || photo.thumbUrl))
       .map(photo => {
         const resolved = resolveMeetingPhotoDisplay(photo, chatMessagesWithFetchedSources) || {};
         const mediaKey = resolved.mediaKey
@@ -1669,7 +1669,7 @@ export function DateModal({
   }, [pastePreview]);
   const expenses = React.useMemo(
     () => (Array.isArray(confirmedMeetingEntry?.expenses) ? confirmedMeetingEntry.expenses : [])
-      .filter(e => e && typeof e === 'object' && e.id)
+      .filter(e => e && typeof e === 'object' && e.id && !isTombstone(e))
       .slice()
       .sort((a, b) => {
       const aOrder = Number.isFinite(Number(a.order)) ? Number(a.order) : Number.POSITIVE_INFINITY;
