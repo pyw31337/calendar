@@ -241,6 +241,22 @@ function isAnniversaryToday(ann, y, m, d) {
   if (ann.type === 'dday') {
     return ann.targetDate === `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
   }
+  if (ann.type === 'once') {
+    if (!ann.date) return false;
+    const [oy, om, od] = ann.date.split('-').map(Number);
+    return oy === y && om === m && od === d;
+  }
+  if (ann.type === 'repeat') {
+    // Same ceil(day/7) + weekday match the client bulk-register / getAnniversariesForDate use.
+    const dateStr = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    if (ann.startDate && dateStr < ann.startDate) return false;
+    if (ann.endDate && dateStr > ann.endDate) return false;
+    const weekOfMonth = Math.ceil(d / 7);
+    const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+    const weekSet = new Set((Array.isArray(ann.weeks) ? ann.weeks : []).map(Number));
+    const daySet = new Set((Array.isArray(ann.weekdays) ? ann.weekdays : []).map(Number));
+    return weekSet.has(weekOfMonth) && daySet.has(dow);
+  }
   return false;
 }
 
@@ -407,6 +423,87 @@ exports.sendAnniversaryReminders = functions.runWith({ secrets: ['VAPID_PRIVATE_
     });
   }
 
+  await Promise.all(promises);
+  return null;
+});
+
+// Eve-of schedule push at 18:00 KST: tomorrow's confirmed meetings + tomorrow's matching
+// type:repeat anniversary rules (e.g. 매월 셋째주 수요일). Complements the local D-1 nudge
+// (client only fires when the tab is open after 18:00) and the morning anniversary job.
+exports.sendEveScheduleReminders = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).pubsub.schedule('0 18 * * *').timeZone('Asia/Seoul').onRun(async () => {
+  ensureVapidConfigured();
+  const kstNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+  const tomorrow = new Date(kstNow.getFullYear(), kstNow.getMonth(), kstNow.getDate() + 1);
+  const y = tomorrow.getFullYear();
+  const m = tomorrow.getMonth() + 1;
+  const d = tomorrow.getDate();
+  const tomorrowKey = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+
+  const db = admin.firestore();
+  const promises = [];
+
+  // Confirmed meetings scheduled for tomorrow.
+  const meetingSnap = await db.collectionGroup('confirmedMeetings').get();
+  const meetingsByCal = new Map();
+  meetingSnap.forEach(doc => {
+    const data = doc.data() || {};
+    if (data.confirmed === false) return;
+    const dateKey = normalizeMeetingDateKey(doc.id || data.date || '');
+    if (dateKey !== tomorrowKey) return;
+    const calendarRef = doc.ref.parent.parent;
+    if (!calendarRef) return;
+    if (!meetingsByCal.has(calendarRef.id)) meetingsByCal.set(calendarRef.id, { ref: calendarRef, dates: [] });
+    meetingsByCal.get(calendarRef.id).dates.push(dateKey);
+  });
+
+  for (const [calendarDocId, entry] of meetingsByCal.entries()) {
+    const calendarSnap = await entry.ref.get();
+    if (!calendarSnap.exists) continue;
+    const calendarData = (calendarSnap.data() || {}).calendar || {};
+    const calendarTitle = calendarData.title || '모여라 캘린더';
+    for (const dateLabel of entry.dates) {
+      promises.push(broadcastCalendarPush(calendarDocId, {
+        title: `${calendarTitle} · 모임 알림`,
+        body: `내일(${dateLabel}) 확정 모임이 있습니다`,
+        url: `./?id=${calendarDocId.replace('cal_', '')}`,
+        tag: `schedule-eve-${calendarDocId}-${dateLabel}`
+      }, { channel: 'schedule' }));
+    }
+  }
+
+  // Repeat anniversary rules that land tomorrow.
+  const annSnap = await db.collectionGroup('anniversaries').get();
+  const repeatsByCal = new Map();
+  annSnap.forEach(doc => {
+    const ann = { id: doc.id, ...doc.data() };
+    if (ann.type !== 'repeat') return;
+    if (!isAnniversaryToday(ann, y, m, d)) return;
+    const calendarRef = doc.ref.parent.parent;
+    if (!calendarRef) return;
+    if (!repeatsByCal.has(calendarRef.id)) repeatsByCal.set(calendarRef.id, { ref: calendarRef, anns: [] });
+    repeatsByCal.get(calendarRef.id).anns.push(ann);
+  });
+
+  for (const [calendarDocId, entry] of repeatsByCal.entries()) {
+    const calendarSnap = await entry.ref.get();
+    if (!calendarSnap.exists) continue;
+    const calendarData = (calendarSnap.data() || {}).calendar || {};
+    const calendarTitle = calendarData.title || '모여라 캘린더';
+    for (const ann of entry.anns) {
+      const title = ann.title || ann.patternLabel || '반복 일정';
+      promises.push(broadcastCalendarPush(calendarDocId, {
+        title: `${calendarTitle} · 일정 알림`,
+        body: `내일(${tomorrowKey}) ${title}`,
+        url: `./?id=${calendarDocId.replace('cal_', '')}`,
+        tag: `repeat-eve-${calendarDocId}-${ann.id}-${tomorrowKey}`
+      }, { channel: 'schedule' }));
+    }
+  }
+
+  if (promises.length === 0) {
+    console.log('No eve schedule reminders for', tomorrowKey);
+    return null;
+  }
   await Promise.all(promises);
   return null;
 });
