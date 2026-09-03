@@ -1825,6 +1825,32 @@ export function HistoryView({
       .finally(() => setIsLocating(false));
   };
 
+  // 채팅방/갤러리 페이지의 고정 헤더와 같은 방식: 상단 헤더+탭+지역필터+카테고리칩을 하나의
+  // position:fixed 묶음으로 만들어서, 아래로 스크롤하면 위로 숨고 위로 스크롤하면 다시 나타나게
+  // 한다. 묶음의 실제 높이는 탭에 따라(지난 모임엔 지역필터/카테고리칩이 없음) 달라지므로
+  // ResizeObserver로 직접 측정 -- 갤러리 헤더처럼 고정 픽셀값을 하드코딩하지 않는다.
+  const { isHeaderVisible, onScroll: handleHistoryScroll } = useScrollHideHeader();
+  const headerStackRef = React.useRef(null);
+  const [headerStackHeight, setHeaderStackHeight] = React.useState(0);
+  React.useLayoutEffect(() => {
+    const el = headerStackRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(entries => {
+      const rect = entries[0] && entries[0].contentRect;
+      setHeaderStackHeight(Math.round(rect ? rect.height : el.offsetHeight));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  // Portal target for CulturePerformancesTab's category-chip row, rendered inside the fixed
+  // header stack below (see chipRowSlot prop) -- a callback ref so the state update that makes
+  // the slot available to the child only fires once the DOM node actually exists.
+  const [chipRowSlot, setChipRowSlot] = React.useState(null);
+  // Content sits below the now-fixed header stack; padding-top reserves exactly its measured
+  // height, and drops to a small constant while hidden so the first scroll-up gesture actually
+  // moves content instead of only eating reserved empty space (same trick the 갤러리 페이지 uses).
+  const historyContentPaddingTop = isHeaderVisible ? headerStackHeight : 12;
+
   const activeParticipants = getActiveParticipants(calendar);
   const participantsMap = activeParticipants.reduce((acc, p) => { acc[p.id] = p; return acc; }, {});
   const availabilities = getActiveAvailabilities(calendar);
@@ -1860,12 +1886,22 @@ export function HistoryView({
     }
   },
     /*#__PURE__*/React.createElement("div", {
+      ref: headerStackRef,
+      className: "history-header-stack",
+      style: {
+        position: 'fixed', top: 0, left: 0, right: 0, zIndex: 1010,
+        backgroundColor: 'var(--bg-primary)',
+        transition: 'transform 0.3s ease',
+        transform: isHeaderVisible ? 'translateY(0)' : 'translateY(-100%)'
+      }
+    },
+    /*#__PURE__*/React.createElement("div", {
       className: "places-view-header",
       style: {
         position: 'relative', height: '56px',
         backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 16px', zIndex: 1010, flexShrink: 0
+        padding: '0 16px', flexShrink: 0
       }
     },
       /*#__PURE__*/React.createElement("button", {
@@ -1953,6 +1989,11 @@ export function HistoryView({
         /*#__PURE__*/React.createElement("span", { className: "current-location-btn-label" }, isLocating ? "위치 확인 중..." : "현재 위치")
       )
     ),
+    // Portal target for CulturePerformancesTab's category-chip row -- lives inside the fixed
+    // header stack so it slides away with everything above it instead of staying pinned while
+    // the poster grid scrolls underneath.
+    historyTab !== 'meetings' && /*#__PURE__*/React.createElement("div", { ref: setChipRowSlot })
+    ), // end history-header-stack
     /*#__PURE__*/React.createElement(RegionFilterBackdrop, {
       isOpen: isRegionFilterOpen,
       onClose: () => setIsRegionFilterOpen(false),
@@ -1966,17 +2007,20 @@ export function HistoryView({
       calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent, dataUrl: CULTURE_PERFORMANCES_URL,
       emptyLabel: "상영중이거나 예정된 문화공연이 없습니다.", regionSelections, onItemsLoaded: setRegionFilterItems,
       anniversaryCategory: "event",
-      extraItems: (customCultureItems || []).filter(i => i && i.kind === 'performance')
+      extraItems: (customCultureItems || []).filter(i => i && i.kind === 'performance'),
+      chipRowSlot, contentPaddingTop: historyContentPaddingTop, onScroll: handleHistoryScroll
     }),
     historyTab === 'festival' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
       calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent, dataUrl: CULTURE_FESTIVALS_URL,
       emptyLabel: "진행중이거나 예정된 지역축제가 없습니다.", regionSelections, onItemsLoaded: setRegionFilterItems,
       anniversaryCategory: "festival",
-      extraItems: (customCultureItems || []).filter(i => i && i.kind === 'festival')
+      extraItems: (customCultureItems || []).filter(i => i && i.kind === 'festival'),
+      chipRowSlot, contentPaddingTop: historyContentPaddingTop, onScroll: handleHistoryScroll
     }),
     historyTab === 'meetings' && /*#__PURE__*/React.createElement("div", {
       className: "history-meetings-grid",
-      style: { flex: 1, overflowY: 'auto', padding: '16px' }
+      onScroll: handleHistoryScroll,
+      style: { flex: 1, overflowY: 'auto', padding: '16px', paddingTop: historyContentPaddingTop }
     },
       confirmedDates.length === 0 ? /*#__PURE__*/React.createElement("div", {
         style: { textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)' }
@@ -2618,7 +2662,7 @@ function ContentRegisterModal({ onClose, onSave, showToast = null }) {
 // 상영중/예정 목록을 보여준다. Culture Flow(별개 프로젝트)의 실시간 JSON을 직접 fetch하지 않는
 // 이유는 그 프로젝트의 스키마가 바뀌거나 그날 수집이 실패해도 이 탭이 즉시 깨지지 않게 하기
 // 위함 -- 동기화 스크립트가 검증에 실패하면 최근 정상 스냅샷을 그대로 커밋해 유지한다.
-export function CulturePerformancesTab({ calendar, anniversaries = [], onRegisterCultureEvent, onUnregisterCultureEvent, dataUrl = CULTURE_PERFORMANCES_URL, emptyLabel = "상영중이거나 예정된 문화공연이 없습니다.", regionSelections = [], onItemsLoaded, anniversaryCategory = 'event', extraItems = [] }) {
+export function CulturePerformancesTab({ calendar, anniversaries = [], onRegisterCultureEvent, onUnregisterCultureEvent, dataUrl = CULTURE_PERFORMANCES_URL, emptyLabel = "상영중이거나 예정된 문화공연이 없습니다.", regionSelections = [], onItemsLoaded, anniversaryCategory = 'event', extraItems = [], chipRowSlot = null, contentPaddingTop = 0, onScroll }) {
   const React = window.React;
   const ReactDOM = window.ReactDOM;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -2693,13 +2737,13 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
 
   if (mergedItems === null) {
     return /*#__PURE__*/React.createElement("div", {
-      style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)' }
+      style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)', paddingTop: contentPaddingTop }
     }, "불러오는 중...");
   }
 
   if (mergedItems.length === 0) {
     return /*#__PURE__*/React.createElement("div", {
-      style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)' }
+      style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)', paddingTop: contentPaddingTop }
     }, loadError ? "정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요." : emptyLabel);
   }
 
@@ -2716,7 +2760,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
 
   if (regionFilteredItems.length === 0) {
     return /*#__PURE__*/React.createElement("div", {
-      style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)' }
+      style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)', paddingTop: contentPaddingTop }
     }, "선택한 지역에 해당하는 항목이 없습니다.");
   }
 
@@ -2756,20 +2800,29 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
     })
   );
 
+  // Portals into the fixed header-stack slot HistoryView renders below the 시/도·군/구 row so the
+  // chip row slides away together with the rest of the header on scroll, instead of scrolling
+  // with the poster grid underneath it. Falls back to rendering inline (its pre-existing spot,
+  // right above the grid) on the rare render where the slot ref hasn't attached yet.
+  const renderedCategoryChipRow = chipRowSlot
+    ? (categoryChipRow ? ReactDOM.createPortal(categoryChipRow, chipRowSlot) : null)
+    : categoryChipRow;
+
   if (filteredItems.length === 0) {
     return /*#__PURE__*/React.createElement(React.Fragment, null,
-      categoryChipRow,
+      renderedCategoryChipRow,
       /*#__PURE__*/React.createElement("div", {
-        style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)' }
+        style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)', paddingTop: contentPaddingTop }
       }, "선택한 카테고리에 해당하는 항목이 없습니다.")
     );
   }
 
   return /*#__PURE__*/React.createElement(React.Fragment, null,
-    categoryChipRow,
+    renderedCategoryChipRow,
     /*#__PURE__*/React.createElement("div", {
       className: "culture-items-grid",
-      style: { flex: 1, overflowY: 'auto', padding: '16px', alignContent: 'start' }
+      onScroll,
+      style: { flex: 1, overflowY: 'auto', padding: '16px', paddingTop: contentPaddingTop, alignContent: 'start' }
     },
       filteredItems.map(item => {
         const registered = !!findRegisteredAnniversary(item.id);
@@ -2816,13 +2869,19 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
               style: { position: 'absolute', top: '6px', right: '6px', backgroundColor: '#7C3AED', color: '#fff', borderRadius: 'var(--radius-full)', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 800, boxShadow: '0 1px 3px rgba(0,0,0,0.25)' }
             }, "✓")
           ),
-          /*#__PURE__*/React.createElement("div", { style: { padding: '8px 10px 10px', minWidth: 0 } },
+          /*#__PURE__*/React.createElement("div", { style: { padding: '8px 10px 10px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px' } },
+            /*#__PURE__*/React.createElement("div", {
+              style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+            }, item.dateLabel || formatCultureDateLabel(item.startDate, item.endDate) || CULTURE_MISSING_LABEL),
             /*#__PURE__*/React.createElement("div", {
               style: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--text-main)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', wordBreak: 'break-word' }
             }, item.title),
             /*#__PURE__*/React.createElement("div", {
-              style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
-            }, item.venue || CULTURE_MISSING_LABEL)
+              style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+            }, item.venue || CULTURE_MISSING_LABEL),
+            /*#__PURE__*/React.createElement("div", {
+              style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+            }, item.address || CULTURE_MISSING_LABEL)
           )
         );
       })

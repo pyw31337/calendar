@@ -3681,13 +3681,16 @@ select.form-select {
 /* When a badges row (saved regions) precedes it, that row already carries the top gap below the
    tabs, so the trigger row only needs a small gap under the badges instead of stacking both. */
 .region-selection-badges-row + .region-filter-trigger-row { padding-top: 12px; }
+@media (max-width: 640px) {
+  .region-filter-trigger-row { padding: 10px 16px 12px; }
+}
 .region-filter-trigger {
   /* No explicit height here -- .form-select's own min-height:44px (app.css:1463) is the standard
      every other select/picker box in the app uses; a shorter height here (previously 38px) lost
      out to that min-height anyway (min-height wins when it exceeds height), so the box actually
      rendered at 44px while .current-location-btn (no .form-select class) rendered at its own
      literal height -- the two never matched. Both are 44px explicitly now. */
-  flex: 1 1 0%; min-width: 0; font-size: var(--font-size-sm);
+  flex: 1 1 0%; min-width: 0; font-size: 0.8rem;
 }
 /* "현재 위치" sits to the right of the 군/구 트리거 and never stretches with it -- its own width
    is just its content (icon + label on wide screens, icon alone once the label is hidden below).
