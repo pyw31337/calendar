@@ -1632,8 +1632,8 @@ export function CalendarGrid({
           title: ann.title,
           className: isHeundeul ? 'day-anniversary-badge-jiggle' : undefined,
           style: {
-            width: isHeundeul ? '26px' : '18px',
-            height: isHeundeul ? '26px' : '18px',
+            width: '18px',
+            height: '18px',
             borderRadius: '50%',
             backgroundColor: displayColor,
             color: '#FFFFFF',
@@ -1644,7 +1644,7 @@ export function CalendarGrid({
             flexShrink: 0,
             overflow: isHeundeul ? 'visible' : undefined
           }
-        }, renderAnniversaryIcon(ann, isHeundeul ? 14 : 11));
+        }, renderAnniversaryIcon(ann, isHeundeul ? 10 : 11));
       })),
 
       /* Reserves room at the bottom of this cell for the festival-bar overlay drawn as a
