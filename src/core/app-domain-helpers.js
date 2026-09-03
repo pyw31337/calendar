@@ -1250,7 +1250,10 @@ function calculateSettlementBalance(calendar) {
         const isIncome = isExpenseIncomeEntry(exp);
         if (isIncome) {
           incomeTotal += Math.abs(amount);
-        } else {
+        } else if (!exp.isSelfPay) {
+          // 자비부담 expenses were paid entirely by one person for themselves -- 공금 never
+          // touched them, so they must not reduce this balance the way a real shared or
+          // 선결제 (fronted-but-shared) expense does.
           expenseTotal += Math.abs(amount);
         }
       }

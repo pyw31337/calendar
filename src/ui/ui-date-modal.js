@@ -1687,6 +1687,13 @@ export function DateModal({
     ...activeParticipants.map(p => ({ value: p.name, label: p.name, color: p.color }))
   ], [activeParticipants]);
   const [expenseIsIncome, setExpenseIsIncome] = React.useState(false);
+  // 자비부담: this expense was paid entirely out of that participant's own pocket for
+  // themselves, unlike 지출자(선결제) which fronts a *shared* cost pending reimbursement from
+  // the group. A self-pay item keeps its price recorded for visibility but never touches 공금
+  // (shared fund) or the split total -- see its exclusion in expenseTotal below,
+  // calculateSettlementBalance in app-domain-helpers.js, and monthlyExpenses in
+  // ui-event-modals.js's settlement-card editor.
+  const [expenseIsSelfPay, setExpenseIsSelfPay] = React.useState(false);
   const [editingExpenseId, setEditingExpenseId] = React.useState(null);
   const [isSavingExpense, setIsSavingExpense] = React.useState(false);
   const [draggingExpenseId, setDraggingExpenseId] = React.useState('');
@@ -1711,6 +1718,7 @@ export function DateModal({
     setExpenseCategoryInput(getExpenseCategories(calendar)[0]?.id || 'etc');
     setExpensePayerInput('');
     setExpenseIsIncome(false);
+    setExpenseIsSelfPay(false);
     setEditingExpenseId(null);
     setDraggingExpenseId('');
     setDragOverExpenseId('');
@@ -1817,7 +1825,11 @@ export function DateModal({
     });
   };
 
-  const expenseTotal = expenses.reduce((sum, e) => sum + (Number(e?.amount) || 0), 0);
+  // 자비부담(isSelfPay) expenses are personal, not shared -- they keep their price recorded on
+  // the line item for visibility but never enter this shared total (nor 공금, nor anyone else's
+  // settlement split; see calculateSettlementBalance in app-domain-helpers.js and the
+  // 정산카드 editor's monthlyExpenses filter in ui-event-modals.js).
+  const expenseTotal = expenses.reduce((sum, e) => sum + (e?.isSelfPay ? 0 : (Number(e?.amount) || 0)), 0);
   const expenseCategories = getExpenseCategories(calendar) || [];
   const getExpenseUrl = expense => {
     try {
@@ -1844,12 +1856,14 @@ export function DateModal({
     const amountStr = Math.abs(Number(expense.amount)).toLocaleString();
     const cat = expense.categoryId || 'etc';
     const payer = expense.payerId || '';
+    const selfPay = !!expense.isSelfPay;
     setEditingExpenseId(eid);
     setExpenseLabelInput(label);
     setExpenseIsIncome(isIncome);
     setExpenseAmountInput(amountStr);
     setExpenseCategoryInput(cat);
     setExpensePayerInput(payer);
+    setExpenseIsSelfPay(selfPay);
     setHasInteracted(false);
     snapshotFormBaseline({
       ...formBaselineRef.current,
@@ -1858,7 +1872,8 @@ export function DateModal({
       expenseAmountInput: amountStr,
       expenseIsIncome: isIncome,
       expenseCategoryInput: cat,
-      expensePayerInput: payer
+      expensePayerInput: payer,
+      expenseIsSelfPay: selfPay
     });
     requestAnimationFrame(() => {
       const field = expenseLabelFieldRef.current;
@@ -1887,7 +1902,8 @@ export function DateModal({
         label,
         amount: finalAmount,
         categoryId: expenseCategoryInput,
-        payerId: expenseIsIncome ? '' : expensePayerInput
+        payerId: expenseIsIncome ? '' : expensePayerInput,
+        isSelfPay: expenseIsIncome ? false : expenseIsSelfPay
       });
       if (ok !== false) {
         showToast(editingExpenseId ? '정산 내역이 수정되었습니다.' : '정산 내역이 추가되었습니다.', 'success');
@@ -1896,6 +1912,7 @@ export function DateModal({
         setExpenseAmountInput('');
         setExpenseIsIncome(false);
         setExpensePayerInput('');
+        setExpenseIsSelfPay(false);
         setHasInteracted(false);
         const resetExpCat = getExpenseCategories(calendar)[0]?.id || 'etc';
         setExpenseCategoryInput(resetExpCat);
@@ -1906,7 +1923,8 @@ export function DateModal({
           expenseAmountInput: '',
           expenseIsIncome: false,
           expenseCategoryInput: resetExpCat,
-          expensePayerInput: ''
+          expensePayerInput: '',
+          expenseIsSelfPay: false
         });
       }
     } catch (err) {
@@ -1944,7 +1962,8 @@ export function DateModal({
               label: expenseSnapshot?.label || expenseSnapshot?.url || '',
               amount: Number(expenseSnapshot?.amount) || 0,
               categoryId: expenseSnapshot?.categoryId || expenseCategoryInput,
-              payerId: expenseSnapshot?.payerId || ''
+              payerId: expenseSnapshot?.payerId || '',
+              isSelfPay: !!expenseSnapshot?.isSelfPay
             });
             if (restored !== false) showToast('정산 삭제를 되돌렸습니다.', 'success', 3000);
             else showToast('정산 복원 실패', 'error', 4000);
@@ -3204,15 +3223,38 @@ export function DateModal({
           /*#__PURE__*/React.createElement("label", {
             style: { display: 'block', fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px' }
           }, "지출자"),
-          /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
-            title: "지출자 선택",
-            placeholder: "공금지출",
-            value: expensePayerInput,
-            disabled: isSavingExpense,
-            onSelect: setExpensePayerInput,
-            options: expensePayerOptions,
-            style: { width: '100%', height: '42px' }
-          })
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+            /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
+              title: "지출자 선택",
+              placeholder: "공금지출",
+              value: expensePayerInput,
+              disabled: isSavingExpense,
+              onSelect: setExpensePayerInput,
+              options: expensePayerOptions,
+              style: { flex: '1 1 0%', minWidth: 0, height: '42px' }
+            }),
+            /*#__PURE__*/React.createElement("label", {
+              title: "체크하면 공금에 영향을 주지 않고, 정산 대상에서도 제외되는 개인 지출로 기록됩니다.",
+              style: {
+                display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0,
+                padding: '0 10px', height: '42px', borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--border-subtle)',
+                backgroundColor: expenseIsSelfPay ? 'rgba(79, 70, 229, 0.08)' : 'var(--bg-card)',
+                color: expenseIsSelfPay ? 'var(--accent-primary)' : 'var(--text-muted)',
+                fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: isSavingExpense ? 'default' : 'pointer',
+                userSelect: 'none'
+              }
+            },
+              /*#__PURE__*/React.createElement("input", {
+                type: "checkbox",
+                checked: expenseIsSelfPay,
+                disabled: isSavingExpense,
+                onChange: e => setExpenseIsSelfPay(e.target.checked),
+                style: { margin: 0, cursor: isSavingExpense ? 'default' : 'pointer' }
+              }),
+              "자비부담"
+            )
+          )
         ),
         /*#__PURE__*/React.createElement("div", { ref: expenseLabelFieldRef },
           /*#__PURE__*/React.createElement("label", {
@@ -3258,6 +3300,7 @@ export function DateModal({
               setExpenseAmountInput('');
               setExpenseIsIncome(false);
               setExpensePayerInput('');
+              setExpenseIsSelfPay(false);
             },
             onSubmit: handleSaveExpenseClick
           })
@@ -3387,7 +3430,7 @@ export function DateModal({
                     fontWeight: 'bold'
                   }
                 }, expenseTime),
-                expense.payerId && /*#__PURE__*/React.createElement("span", {
+                (expense.payerId || expense.isSelfPay) && /*#__PURE__*/React.createElement("span", {
                   style: {
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -3398,7 +3441,7 @@ export function DateModal({
                     fontSize: 'var(--font-size-xs)',
                     fontWeight: 900
                   }
-                }, `${expense.payerId} 선결제`)
+                }, expense.payerId ? `${expense.payerId} ${expense.isSelfPay ? '자비부담' : '선결제'}` : '자비부담')
               ),
               /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-base)', fontWeight: 'bold', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', width: '100%', wordBreak: 'break-all' } },
                 expenseUrl ? /*#__PURE__*/React.createElement(React.Fragment, null,

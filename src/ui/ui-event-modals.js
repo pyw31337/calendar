@@ -2287,8 +2287,9 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
     });
     // The settlement editor selects shared expenses only. Income entries
     // (shown with a `+` amount) must not appear here or participate in the
-    // editor's checked-item state.
-    return list.filter(item => !item.isIncome);
+    // editor's checked-item state. 자비부담(self-pay) items are personal, not shared -- they
+    // must not be selectable as a settlement target here either.
+    return list.filter(item => !item.isIncome && !item.isSelfPay);
   }, [confirmed, monthStr]);
 
   React.useEffect(() => {
