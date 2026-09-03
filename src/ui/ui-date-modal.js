@@ -2395,9 +2395,11 @@ export function DateModal({
     style: {
       display: 'flex',
       flexDirection: 'column',
-      gap: '10px',
-      padding: '14px 16px 12px 16px',
-      borderBottom: '1px solid var(--border-subtle)',
+      gap: 0,
+      // Padding lives on the title row only so UnderlineTabs can span the full modal width
+      // (flush hairline underline, matching 참여자|장소|정산|사진 edge-to-edge).
+      padding: 0,
+      borderBottom: 'none',
       backgroundColor: 'var(--bg-card)'
     }
   }, /*#__PURE__*/React.createElement("div", {
@@ -2405,7 +2407,9 @@ export function DateModal({
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
-      width: '100%'
+      width: '100%',
+      padding: '14px 16px 12px 16px',
+      boxSizing: 'border-box'
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -2460,9 +2464,10 @@ export function DateModal({
     title: "닫기"
   }, "✕"))), UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
     ariaLabel: "일정 탭",
+    variant: "flush",
     value: activeTab,
     onChange: (id) => setActiveTab(id),
-    style: { backgroundColor: 'transparent', borderBottom: 'none', width: '100%' },
+    style: { backgroundColor: 'var(--bg-card)', width: '100%' },
     options: [
       { value: 'participant', label: /*#__PURE__*/React.createElement(React.Fragment, null, "참여자", /*#__PURE__*/React.createElement(SectionCountBadge, { count: dateEntries.length })) },
       { value: 'meeting', label: /*#__PURE__*/React.createElement(React.Fragment, null, "장소", /*#__PURE__*/React.createElement(SectionCountBadge, { count: registeredPlaces.length })) },
@@ -2491,7 +2496,28 @@ export function DateModal({
         const isExpanded = expandedAnnBannerIds.has(bannerKey);
         const hasDetail = !!(ann.place || ann.description || getAnnBannerDateDisplay(ann));
         const photos = Array.isArray(ann.photos) ? ann.photos : [];
-        const thumbSize = isExpanded ? 64 : 22;
+        // Keep a fixed thumb size when the banner expands -- growing to 64px looked jumpy and
+        // made the title row reflow; 22px matches the collapsed state.
+        const thumbSize = 22;
+        const listIdx = Array.isArray(anniversaries) ? anniversaries.findIndex(a => a && a.id === ann.id) : -1;
+        const anniversaryIndex = listIdx >= 0 ? listIdx + 1 : (aIdx + 1);
+        const openAnniversaryLightbox = (startIndex) => {
+          if (typeof setActiveLightbox !== 'function' || photos.length === 0) return;
+          setActiveLightbox({
+            urls: photos.map(p => p.url || p.thumbUrl),
+            index: startIndex || 0,
+            meta: photos.map((p, idx) => ({
+              source: 'anniversary',
+              anniversaryId: ann.id,
+              anniversaryIndex,
+              imageIndex: idx,
+              timestamp: ann.updatedAt || ann.createdAt || Date.now(),
+              tags: p.tags || '',
+              photoId: p.id || `${ann.id || 'ann'}_${idx}`,
+              thumb: p.thumbUrl || p.url || ''
+            }))
+          });
+        };
         return /*#__PURE__*/React.createElement("div", {
           key: bannerKey,
           style: {
@@ -2515,17 +2541,11 @@ export function DateModal({
               alt: "기념일 사진",
               onClick: e => {
                 e.stopPropagation();
-                if (typeof setActiveLightbox === 'function') {
-                  setActiveLightbox({
-                    urls: photos.map(p => p.url || p.thumbUrl),
-                    index: 0,
-                    meta: photos.map(() => ({}))
-                  });
-                }
+                openAnniversaryLightbox(0);
               },
               style: {
                 width: `${thumbSize}px`, height: `${thumbSize}px`, borderRadius: '6px', objectFit: 'cover',
-                cursor: 'pointer', flexShrink: 0, transition: 'width 150ms ease, height 150ms ease'
+                cursor: 'pointer', flexShrink: 0
               }
             }),
             hasDetail && /*#__PURE__*/React.createElement("button", {
@@ -2547,16 +2567,23 @@ export function DateModal({
             getAnnBannerDateDisplay(ann) && /*#__PURE__*/React.createElement("div", null, getAnnBannerDateDisplay(ann)),
             ann.place && (() => {
               const mapUrl = getAnnBannerKakaoMapLinkUrl(ann.place);
-              const label = `[${ann.place.alias || ann.place.name}] ${getDisplayPlaceAddress(ann.place) || ''}`.trim();
-              return /*#__PURE__*/React.createElement("div", { style: { display: 'inline-flex', alignItems: 'center', gap: '4px' } },
-                MapPinIcon && /*#__PURE__*/React.createElement(MapPinIcon, { size: 14 }),
-                mapUrl
-                  ? /*#__PURE__*/React.createElement("a", {
-                      href: mapUrl, target: "_blank", rel: "noreferrer",
-                      onClick: e => e.stopPropagation(),
-                      style: { color: 'inherit', textDecoration: 'underline' }
-                    }, label)
-                  : /*#__PURE__*/React.createElement("span", null, label)
+              const placeName = ann.place.alias || ann.place.name || '';
+              const placeAddress = getDisplayPlaceAddress(ann.place) || '';
+              const nameEl = mapUrl
+                ? /*#__PURE__*/React.createElement("a", {
+                    href: mapUrl, target: "_blank", rel: "noreferrer",
+                    onClick: e => e.stopPropagation(),
+                    style: { color: 'inherit', textDecoration: 'none', fontWeight: 700 }
+                  }, placeName)
+                : /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700 } }, placeName);
+              return /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'flex-start', gap: '4px' } },
+                MapPinIcon && /*#__PURE__*/React.createElement("span", { style: { display: 'inline-flex', marginTop: '2px', flexShrink: 0 } },
+                  /*#__PURE__*/React.createElement(MapPinIcon, { size: 14 })
+                ),
+                /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0 } },
+                  nameEl,
+                  placeAddress ? /*#__PURE__*/React.createElement("span", { style: { color: 'var(--text-muted)', fontWeight: 500 } }, placeAddress) : null
+                )
               );
             })(),
             ann.description && /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-main)' } },
