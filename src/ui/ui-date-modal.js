@@ -860,6 +860,7 @@ export function DateModal({
   const TicketsPlaneIcon = __comp.TicketsPlaneIcon || __deps.TicketsPlaneIcon;
   const MessageCircleMoreIcon = __comp.MessageCircleMoreIcon || __deps.MessageCircleMoreIcon;
   const MapPinIcon = __comp.MapPinIcon || __deps.MapPinIcon;
+  const CalendarIcon = __comp.CalendarIcon || __deps.CalendarIcon;
   // Legacy D-Day badges (ann.type === 'dday') keep their plain emoji exactly as before; only the
   // newer category-tagged types (yearly/once/range) swap their category emoji for its icon component.
   const renderAnniversaryIcon = (ann, size) => {
@@ -2544,7 +2545,10 @@ export function DateModal({
           isExpanded && /*#__PURE__*/React.createElement("div", {
             style: { display: 'flex', flexDirection: 'column', gap: '4px', fontSize: 'var(--font-size-sm)', fontWeight: 500 }
           },
-            getAnnBannerDateDisplay(ann) && /*#__PURE__*/React.createElement("div", null, getAnnBannerDateDisplay(ann)),
+            getAnnBannerDateDisplay(ann) && /*#__PURE__*/React.createElement("div", { style: { display: 'inline-flex', alignItems: 'center', gap: '4px' } },
+              CalendarIcon && /*#__PURE__*/React.createElement(CalendarIcon, { size: 14 }),
+              /*#__PURE__*/React.createElement("span", null, getAnnBannerDateDisplay(ann))
+            ),
             ann.place && (() => {
               const mapUrl = getAnnBannerKakaoMapLinkUrl(ann.place);
               const label = `[${ann.place.alias || ann.place.name}] ${getDisplayPlaceAddress(ann.place) || ''}`.trim();
