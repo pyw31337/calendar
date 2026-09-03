@@ -4009,7 +4009,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   }, /*#__PURE__*/React.createElement("div", {
     style: { minWidth: 0, display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }
   }, categoryBadge(getDisplayCategory(item)), item.isSelfPay ? selfPayBadge : null, showDate && /*#__PURE__*/React.createElement("span", { className: "registered-at-text" }, formatDateWithDayName(item.date))), /*#__PURE__*/React.createElement("strong", {
-    style: { fontSize: '0.9rem', color: item.isIncome ? 'var(--status-green)' : '#DC2626', whiteSpace: 'nowrap' }
+    style: { fontSize: '0.9rem', color: item.isIncome ? 'var(--status-green)' : (item.isSelfPay ? '#64748B' : '#DC2626'), whiteSpace: 'nowrap' }
   }, item.isIncome ? '+' : '-', Math.abs(item.amount).toLocaleString(), "원")), /*#__PURE__*/React.createElement("span", {
     style: { fontSize: 'var(--font-size-base)', color: 'var(--text-main)', fontWeight: 500, overflowWrap: 'anywhere' }
   }, highlightSettlement(item.label)), !item.isSelfPay && settlementBalanceByKey.get(item.ledgerKey) != null && /*#__PURE__*/React.createElement("span", {
