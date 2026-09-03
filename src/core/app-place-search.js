@@ -10,12 +10,13 @@ const PLACE_SEARCH_PROVIDER_KEY = 'gather_place_search_provider_v1';
 const NOMINATIM_ENDPOINT_KEY = 'gather_nominatim_endpoint_v1';
 const DEFAULT_PROVIDER_ORDER = ['kakao', 'google', 'nominatim'];
 const NOMINATIM_MIN_INTERVAL_MS = 1100;
-const REQUEST_TIMEOUT_MS = 6000;
+const REQUEST_TIMEOUT_MS = 4500;
 const TOUR_TYPE_LABELS = {
   '12': '관광지', '14': '문화시설', '15': '축제·행사', '25': '여행코스',
   '28': '레포츠', '32': '숙박', '38': '쇼핑', '39': '음식점'
 };
 const memoryCache = new Map();
+const inFlightSearches = new Map();
 let lastNominatimRequestAt = 0;
 let nominatimQueue = Promise.resolve();
 
@@ -138,33 +139,47 @@ async function searchProvider(provider, query, options) {
   const hit = cached(key);
   if (hit) return hit;
 
-  if (provider === 'kakao') {
-    const base = `https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/kakaoLocalSearchProxy`;
-    const response = await fetchWithTimeout(`${base}?query=${encodeURIComponent(query)}`);
-    const json = response.ok ? await response.json() : null;
-    const result = json?.ok && Array.isArray(json.documents)
-      ? json.documents.map((doc, idx) => normalizeKakao(doc, idx, query, categoryMap)).filter(Boolean) : [];
-    return cache(key, result);
-  }
+  // Deduplicate concurrent identical provider lookups so debounce + manual search
+  // share one network trip instead of racing duplicate responses into the UI.
+  const existing = inFlightSearches.get(key);
+  if (existing) return existing;
 
-  if (provider === 'google') {
-    const base = `https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/googlePlacesSearchProxy`;
-    const response = await fetchWithTimeout(`${base}?query=${encodeURIComponent(query)}`);
-    const json = response.ok ? await response.json() : null;
-    const result = json?.ok && Array.isArray(json.places)
-      ? json.places.map((place, idx) => normalizeGoogle(place, idx, query)).filter(Boolean) : [];
-    return cache(key, result);
-  }
+  const pending = (async () => {
+    if (provider === 'kakao') {
+      const base = `https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/kakaoLocalSearchProxy`;
+      const response = await fetchWithTimeout(`${base}?query=${encodeURIComponent(query)}`);
+      const json = response.ok ? await response.json() : null;
+      const result = json?.ok && Array.isArray(json.documents)
+        ? json.documents.map((doc, idx) => normalizeKakao(doc, idx, query, categoryMap)).filter(Boolean) : [];
+      return cache(key, result);
+    }
 
-  if (provider === 'nominatim') {
-    await waitForNominatimSlot();
-    const url = `${nominatimEndpoint}?q=${encodeURIComponent(query)}&format=json&limit=8&accept-language=ko`;
-    const response = await fetchWithTimeout(url);
-    const data = response.ok ? await response.json() : [];
-    const result = Array.isArray(data) ? data.map((item, idx) => normalizeNominatim(item, idx, query)).filter(Boolean) : [];
-    return cache(key, result);
+    if (provider === 'google') {
+      const base = `https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/googlePlacesSearchProxy`;
+      const response = await fetchWithTimeout(`${base}?query=${encodeURIComponent(query)}`);
+      const json = response.ok ? await response.json() : null;
+      const result = json?.ok && Array.isArray(json.places)
+        ? json.places.map((place, idx) => normalizeGoogle(place, idx, query)).filter(Boolean) : [];
+      return cache(key, result);
+    }
+
+    if (provider === 'nominatim') {
+      await waitForNominatimSlot();
+      const url = `${nominatimEndpoint}?q=${encodeURIComponent(query)}&format=json&limit=8&accept-language=ko`;
+      const response = await fetchWithTimeout(url);
+      const data = response.ok ? await response.json() : [];
+      const result = Array.isArray(data) ? data.map((item, idx) => normalizeNominatim(item, idx, query)).filter(Boolean) : [];
+      return cache(key, result);
+    }
+    return [];
+  })();
+
+  inFlightSearches.set(key, pending);
+  try {
+    return await pending;
+  } finally {
+    if (inFlightSearches.get(key) === pending) inFlightSearches.delete(key);
   }
-  return [];
 }
 
 async function searchPlaces(query, options = {}) {

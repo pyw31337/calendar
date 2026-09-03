@@ -987,6 +987,9 @@ export function DateModal({
   // re-wraps it, and so on. Only the calls that load a fresh/different memo (see setPlaceMemo call
   // sites) explicitly reset this back to false.
   const placeMemoTextareaRef = React.useRef(null);
+  // Monotonic request id so stale place-search responses never overwrite newer results
+  // (debounced live search and the manual 검색 button can overlap without AbortController).
+  const placeSearchReqIdRef = React.useRef(0);
   const [isPlaceMemoWrapped, setIsPlaceMemoWrapped] = React.useState(false);
   React.useLayoutEffect(() => {
     const el = placeMemoTextareaRef.current;
@@ -1029,11 +1032,15 @@ export function DateModal({
   const searchPlacesWithProviders = async (cleanQuery, options = {}) => {
     const api = window.GATHER_APP_PLACE_SEARCH;
     if (!api || typeof api.searchPlaces !== 'function') return { provider: null, results: [] };
+    const callerOnStage = typeof options.onStage === 'function' ? options.onStage : null;
     return api.searchPlaces(cleanQuery, {
       ...options,
       firebaseConfig,
       categoryMap: KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY,
-      onStage: setPlaceSearchStage
+      onStage: stage => {
+        if (callerOnStage) callerOnStage(stage);
+        else setPlaceSearchStage(stage);
+      }
     });
   };
 
@@ -1093,9 +1100,14 @@ export function DateModal({
     const trimmed = placeQuery.trim();
     if (selectedPlace && selectedPlace.name === trimmed) return undefined;
     if (trimmed.length < 2) {
+      // Invalidate any in-flight search so a late response cannot repopulate an empty query.
+      placeSearchReqIdRef.current += 1;
       setPlaceResults([]);
+      setIsPlaceLoading(false);
+      setPlaceSearchStage(null);
       return undefined;
     }
+    // Keep previous results visible until the newer request finishes (no flash-empty).
     const timer = setTimeout(() => { handlePlaceSearch(null, true); }, 380);
     return () => clearTimeout(timer);
   }, [placeQuery, selectedPlace]);
@@ -1125,19 +1137,34 @@ export function DateModal({
       if (!auto) showToast('검색할 주소나 업체명을 입력해 주세요.', 'error');
       return;
     }
+    const reqId = ++placeSearchReqIdRef.current;
+    const guardedOnStage = stage => {
+      if (reqId === placeSearchReqIdRef.current) setPlaceSearchStage(stage);
+    };
     setIsPlaceLoading(true);
     try {
-      const { results: mapped } = await searchPlacesWithProviders(cleanQuery, { auto });
-      setPlaceResults(mapped);
-      if (mapped.length === 0 && !auto) {
+      // Always try kakao-first first (same path as debounce) for snappy UX.
+      // Manual 검색 additionally falls back to the full provider order only when kakao
+      // returns zero hits -- never apply results from an superseded request.
+      let { results: mapped } = await searchPlacesWithProviders(cleanQuery, { auto: true, onStage: guardedOnStage });
+      if (reqId !== placeSearchReqIdRef.current) return;
+      if ((!mapped || mapped.length === 0) && !auto) {
+        ({ results: mapped } = await searchPlacesWithProviders(cleanQuery, { auto: false, onStage: guardedOnStage }));
+        if (reqId !== placeSearchReqIdRef.current) return;
+      }
+      setPlaceResults(mapped || []);
+      if ((mapped || []).length === 0 && !auto) {
         showToast('검색 결과가 없습니다.', 'info');
       }
     } catch (err) {
+      if (reqId !== placeSearchReqIdRef.current) return;
       console.error('Place search error:', err);
       showToast('장소 검색 중 오류가 발생했습니다.', 'error');
     } finally {
-      setIsPlaceLoading(false);
-      setPlaceSearchStage(null);
+      if (reqId === placeSearchReqIdRef.current) {
+        setIsPlaceLoading(false);
+        setPlaceSearchStage(null);
+      }
     }
   };
 
@@ -1217,8 +1244,47 @@ export function DateModal({
     setPlaceResults([]);
   };
 
+  // Prefills the place form for a place already linked to THIS date (card-click edit).
+  // Scrolls to and focuses the 장소 메모 input after state settles so the user can edit immediately.
+  const beginEditLinkedPlace = (place) => {
+    if (!place) return;
+    const sp = { name: place.name, address: place.address || '', lat: place.lat, lng: place.lng, categoryId: place.categoryId || 'etc' };
+    // Prefill with ONLY this date's note, not the place's whole memo history -- this
+    // field always represents a single date's entry, upserted back into the stack on
+    // save (see handleSavePlaceClick's memoOp:'upsert').
+    const dateNote = getPlaceMemoEntryForDate(place.memo || '', dateStr);
+    const catId = place.categoryId || 'etc';
+    const visit = place.visitStatus === 'planned' ? 'planned' : 'visited';
+    setEditingLinkedPlaceId(place.id);
+    setSelectedPlace(sp);
+    setPlaceQuery(place.name || '');
+    setPlaceAlias(place.alias || '');
+    setPlaceMemo(dateNote);
+    setIsPlaceMemoWrapped(false);
+    setPlaceCategoryId(catId);
+    setPlaceVisitStatus(visit);
+    setPlaceResults([]);
+    setHasInteracted(false);
+    snapshotFormBaseline({
+      ...formBaselineRef.current,
+      editingLinkedPlaceId: place.id,
+      placeMemo: dateNote,
+      placeAlias: place.alias || '',
+      placeQuery: place.name || '',
+      selectedPlaceKey: String(sp.id || '') + '|' + String(sp.name || '') + '|' + String(sp.lat || '') + '|' + String(sp.lng || ''),
+      placeCategoryId: catId,
+      placeVisitStatus: visit
+    });
+    window.setTimeout(() => {
+      const el = placeMemoTextareaRef.current;
+      if (!el) return;
+      try { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_) {}
+      try { el.focus(); } catch (_) {}
+    }, 50);
+  };
+
   // Reuses an already-registered calendar place picked from existingPlaceSuggestions above.
-  // Deliberately does NOT set editingLinkedPlaceId (that's reserved for the pencil-icon edit of
+  // Deliberately does NOT set editingLinkedPlaceId (that's reserved for card-click edit of
   // a place already linked to THIS date) -- instead handleSavePlaceClick below carries this
   // place's own id through as sourcePlaceId, which handleSavePlace (app-main.js) recognizes and
   // merges into, appending this date onto the place's existing multi-date memo instead of
@@ -2935,20 +3001,31 @@ export function DateModal({
           const category = getPlaceCategoryById(calendar, place.categoryId) || { id: 'etc', name: '기타', color: '#64748B' };
           const catColor = category.color || '#64748B';
           const catName = category.name || '기타';
+          const isEditingThisPlace = editingLinkedPlaceId === place.id;
           return /*#__PURE__*/React.createElement("div", {
             key: place.id,
-            className: `date-modal-place-row${draggingPlaceId === place.id ? ' is-dragging' : ''}${dragOverPlaceId === place.id ? ' is-drop-target' : ''}`,
+            className: `date-modal-place-row${draggingPlaceId === place.id ? ' is-dragging' : ''}${dragOverPlaceId === place.id ? ' is-drop-target' : ''}${isEditingThisPlace ? ' is-editing' : ''}`,
             "data-place-id": place.id,
+            role: !adminMode ? 'button' : undefined,
+            tabIndex: !adminMode ? 0 : undefined,
             style: {
               display: 'flex',
               flexDirection: 'column',
               gap: '6px',
               padding: '12px 14px',
-              backgroundColor: 'var(--bg-card)',
-              border: '1px solid var(--border-subtle)',
+              backgroundColor: isEditingThisPlace ? 'rgba(59, 130, 246, 0.08)' : 'var(--bg-card)',
+              border: isEditingThisPlace ? '1px solid rgba(59, 130, 246, 0.35)' : '1px solid var(--border-subtle)',
               borderRadius: 'var(--radius-md)',
-              position: 'relative'
+              position: 'relative',
+              cursor: !adminMode ? 'pointer' : undefined
             },
+            onClick: !adminMode ? () => beginEditLinkedPlace(place) : undefined,
+            onKeyDown: !adminMode ? event => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                beginEditLinkedPlace(place);
+              }
+            } : undefined,
             onDragOver: event => { event.preventDefault(); if (draggingPlaceId && draggingPlaceId !== place.id) setDragOverPlaceId(place.id); },
             onDrop: async event => {
               event.preventDefault();
@@ -2985,13 +3062,15 @@ export function DateModal({
               }, renderTextWithUrlBadge(`${memoDate} ${dateNote}`));
             })(),
             !adminMode && /*#__PURE__*/React.createElement("div", {
-              style: { position: 'absolute', top: '10px', right: '10px', display: 'flex', alignItems: 'center', gap: '4px' }
+              style: { position: 'absolute', top: '10px', right: '10px', display: 'flex', alignItems: 'center', gap: '4px' },
+              onClick: event => { event.preventDefault(); event.stopPropagation(); }
             }, /*#__PURE__*/React.createElement("button", {
               type: 'button',
               className: 'poll-drag-handle',
               draggable: true,
               title: '드래그하여 순서 변경',
               'aria-label': '장소 순서 변경',
+              onClick: event => { event.preventDefault(); event.stopPropagation(); },
               onDragStart: event => { event.stopPropagation(); setDraggingPlaceId(place.id); event.dataTransfer.effectAllowed = 'move'; },
               onDragEnd: () => { setDraggingPlaceId(''); setDragOverPlaceId(''); },
               // HTML drag-and-drop is intentionally used here: it works with a mouse/trackpad,
@@ -2999,35 +3078,7 @@ export function DateModal({
               // promote draggable elements to a native long-press drag gesture.
               style: { width: '22px', height: '22px', padding: 0, border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)', borderRadius: 'var(--radius-sm)', cursor: 'grab', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'none', userSelect: 'none' }
             }, /*#__PURE__*/React.createElement(LineHeightIcon, { size: 12 })), /*#__PURE__*/React.createElement(ItemEditDeleteActions, {
-              onEdit: () => {
-                const sp = { name: place.name, address: place.address || '', lat: place.lat, lng: place.lng, categoryId: place.categoryId || 'etc' };
-                // Prefill with ONLY this date's note, not the place's whole memo history -- this
-                // field always represents a single date's entry, upserted back into the stack on
-                // save (see handleSavePlaceClick's memoOp:'upsert').
-                const dateNote = getPlaceMemoEntryForDate(place.memo || '', dateStr);
-                const catId = place.categoryId || 'etc';
-                const visit = place.visitStatus === 'planned' ? 'planned' : 'visited';
-                setEditingLinkedPlaceId(place.id);
-                setSelectedPlace(sp);
-                setPlaceQuery(place.name || '');
-                setPlaceAlias(place.alias || '');
-                setPlaceMemo(dateNote);
-                setIsPlaceMemoWrapped(false);
-                setPlaceCategoryId(catId);
-                setPlaceVisitStatus(visit);
-                setPlaceResults([]);
-                setHasInteracted(false);
-                snapshotFormBaseline({
-                  ...formBaselineRef.current,
-                  editingLinkedPlaceId: place.id,
-                  placeMemo: dateNote,
-                  placeAlias: place.alias || '',
-                  placeQuery: place.name || '',
-                  selectedPlaceKey: String(sp.id || '') + '|' + String(sp.name || '') + '|' + String(sp.lat || '') + '|' + String(sp.lng || ''),
-                  placeCategoryId: catId,
-                  placeVisitStatus: visit
-                });
-              },
+              showEdit: false,
               onDelete: () => {
                 const placeSnapshot = JSON.parse(JSON.stringify(place));
                 const canRestorePlace = typeof onSavePlace === 'function';
