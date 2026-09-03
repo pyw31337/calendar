@@ -1431,6 +1431,9 @@ button.form-select {
 }
 
 .form-select:focus, .form-input:focus { border-color: var(--accent-primary); box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15); }
+@media (max-width: 639px) {
+  .form-select, .form-input { font-size: 0.8rem; }
+}
 
 /* Native <select> elements: replace the browser's default OS-styled dropdown arrow with the
    same chevron-down icon used everywhere else in the app (e.g. the admin header's calendar
