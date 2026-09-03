@@ -1836,7 +1836,7 @@ export function HistoryView({
     UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
       ariaLabel: "보관함 탭",
       value: historyTab,
-      onChange: setHistoryTab,
+      onChange: v => setHistoryTab(v),
       options: [{ value: 'meetings', label: '지난 모임' }, { value: 'culture', label: '문화공연' }]
     }),
     historyTab === 'culture' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
