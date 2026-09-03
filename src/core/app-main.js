@@ -7292,7 +7292,7 @@ function CalendarApp() {
     className: "confirmed-meeting-list",
     "data-confirmed-count": visibleConfirmedMeetings.length === 1 ? 'one' : visibleConfirmedMeetings.length === 2 ? 'two' : 'three-plus',
     style: { display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '8px', marginBottom: '12px', alignItems: 'center', width: '100%' }
-  }, visibleConfirmedMeetings.map(meeting => {
+  }, visibleConfirmedMeetings.map((meeting, meetingIndex) => {
     // A lone confirmed meeting defaults to the expanded banner (no need to tap to see it), but
     // once the user has explicitly toggled it, that explicit choice always wins -- otherwise the
     // forced-expanded default fights the collapse animation started by toggleConfirmedDateExpand
@@ -7300,6 +7300,9 @@ function CalendarApp() {
     const isExpanded = meeting.date in expandedConfirmedDates
       ? expandedConfirmedDates[meeting.date]
       : visibleConfirmedMeetings.length === 1;
+    // Only the lead (first) upcoming card gets the 두근두근 pulse, and only while collapsed —
+    // expanded banner must stay still.
+    const isLeadCollapsedHeartbeat = meetingIndex === 0 && !isExpanded;
     const memoEntries = getActiveAvailabilities(activeCal).filter(e => e.date === meeting.date && e.note && e.note.trim());
     const [y, m, d] = meeting.date.split('-');
     const dateObj = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
@@ -7315,7 +7318,7 @@ function CalendarApp() {
       return /*#__PURE__*/React.createElement("button", {
         type: "button",
         key: meeting.date,
-        className: "confirmed-meeting-icon-btn confirmed-meeting-surface",
+        className: "confirmed-meeting-icon-btn confirmed-meeting-surface" + (isLeadCollapsedHeartbeat ? " is-heartbeat" : ""),
         onClick: () => toggleConfirmedDateExpand(meeting.date),
         title: `${formatConfirmedMeetingLabel(meeting.date)} (클릭하여 펼치기)`,
         style: {

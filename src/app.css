@@ -495,6 +495,35 @@ body:has(.admin-login-gate) {
 .confirmed-meeting-icon-btn:active {
   transform: none !important;
 }
+/* Lead upcoming meeting (collapsed icon only): CodePen-style 두근두근 (kazsaj AxZXvv lub-dub scale).
+   Expanded banner never gets .is-heartbeat, so the pulse stops when opened. */
+.confirmed-meeting-icon-btn.is-heartbeat {
+  transform-origin: center center;
+  animation: confirmed-meeting-heartbeat 1.25s ease-in-out infinite;
+  will-change: transform;
+}
+.confirmed-meeting-icon-btn.is-heartbeat:hover {
+  /* Keep transform ownership with the keyframes; still lift the glow on hover. */
+  transform: none;
+  box-shadow: 0 4px 14px rgba(168, 85, 247, 0.45) !important;
+}
+.confirmed-meeting-icon-btn.is-heartbeat:active {
+  animation: none;
+  transform: scale(0.98) !important;
+}
+@keyframes confirmed-meeting-heartbeat {
+  0% { transform: scale(1); }
+  14% { transform: scale(1.1); }
+  28% { transform: scale(1); }
+  42% { transform: scale(1.12); }
+  70% { transform: scale(1); }
+  100% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .confirmed-meeting-icon-btn.is-heartbeat {
+    animation: none;
+  }
+}
 .confirmed-meeting-banner .confirmed-meeting-label-badge {
   background: transparent !important;
   color: #FFFFFF !important;
