@@ -2809,7 +2809,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
       ? React.createElement(UnderlineTabs, {
           ariaLabel: '정산 수정 탭',
           value: activeTab,
-          onChange: setActiveTab,
+          onChange: v => setActiveTab(v),
           options: [
             { value: 'general', label: '일반' },
             { value: 'settlement', label: '정산' }
@@ -4088,7 +4088,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
       className: "settlement-view-tabs",
       ariaLabel: "누적 또는 월별 정산 보기",
       value: activeTab,
-      onChange: setActiveTab,
+      onChange: v => setActiveTab(v),
       options: [{ value: 'total', label: '누적보기' }, { value: 'daily', label: '월별보기' }]
     }),
 
