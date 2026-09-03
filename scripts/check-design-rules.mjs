@@ -36,14 +36,14 @@ if (places.includes('장소 페이지 URL 복사') || places.includes('"공유�
 if (!utils.includes('share/')) fail('utils missing /share/ path helpers');
 else ok('share path helpers in utils');
 
-const gal = main.indexOf("if (activeView === 'gallery')");
-if (gal < 0) fail('gallery view branch missing');
-else {
-  const slice = main.slice(gal, gal + 1500);
-  if (!slice.includes('activeLightbox') || !slice.includes('Lightbox')) {
-    fail('gallery view must render Lightbox when activeLightbox is set');
-  } else ok('gallery page wires Lightbox');
-}
+// Lightbox must be hosted once in withStickyVideo so every activeView (including
+// settlement/memo/places/history DateModal) can open photos — not only gallery.
+if (!main.includes("const withStickyVideo")) fail('withStickyVideo wrapper missing');
+else if (!main.includes('Shared Lightbox host') || !main.includes('createElement(Lightbox')) {
+  fail('withStickyVideo must mount shared Lightbox when activeLightbox is set');
+} else ok('shared Lightbox host in withStickyVideo');
+if (!main.includes("if (activeView === 'gallery')")) fail('gallery view branch missing');
+else ok('gallery view branch present');
 
 if (!css.includes('--radius-md') && !css.includes('--radius-sm') && !css.includes('--radius-full')) {
   fail('radius design tokens missing');
