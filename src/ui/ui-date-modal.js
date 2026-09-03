@@ -1277,7 +1277,11 @@ export function DateModal({
       note: n
     });
     if (noteInputRef.current) {
-      noteInputRef.current.focus();
+      // The attendance list this click came from typically sits well below the memo field in
+      // the modal's own scroll, so a plain focus() can leave the just-loaded field off-screen --
+      // scroll it into view first, then focus once that scroll settles.
+      noteInputRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      noteInputRef.current.focus({ preventScroll: true });
     }
   };
 
@@ -2676,6 +2680,11 @@ export function DateModal({
           const part = activeParticipants.find(p => p.id === entry.participantId);
           if (!part) return null;
           const canReorder = !adminMode && dateEntries.length > 1;
+          // The reserved right-hand gap only needs to clear the absolutely-positioned drag/delete
+          // icons near the row's top-right corner, not the whole card height -- letting the note
+          // below reclaim most of that width (see its own negative marginRight) keeps its usable
+          // width close to the row's actual left inset instead of wrapping early for no reason.
+          const attendanceRightReserve = adminMode ? 12 : (canReorder ? 78 : 44);
           return /*#__PURE__*/React.createElement("div", {
             key: entry.id || `${entry.participantId || 'participant'}_${entryIndex}`,
             "data-participant-id": entry.participantId,
@@ -2686,11 +2695,20 @@ export function DateModal({
               alignItems: 'stretch',
               gap: '4px',
               padding: '10px 12px',
-              paddingRight: adminMode ? '12px' : (canReorder ? '78px' : '44px'),
+              paddingRight: `${attendanceRightReserve}px`,
               backgroundColor: 'var(--bg-card)',
               border: '1px solid var(--border-subtle)',
               borderRadius: 'var(--radius-md)',
-              position: 'relative'
+              position: 'relative',
+              cursor: 'pointer'
+            },
+            title: '눌러서 수정 (참여자·메모 불러오기)',
+            onClick: e => {
+              // Let the drag handle, delete button, and any URL badge inside the note handle
+              // their own clicks (they already stopPropagation, but this also covers future
+              // interactive children) instead of also opening edit mode underneath them.
+              if (e.target.closest('button, a, [data-stop-card-open]')) return;
+              handleEditClick(entry);
             }
           },
             /*#__PURE__*/React.createElement("div", {
@@ -2707,12 +2725,9 @@ export function DateModal({
                   fontSize: 'var(--font-size-base)',
                   color: part.color || 'var(--text-main)',
                   minWidth: 0,
-                  cursor: 'pointer',
                   lineHeight: 1.35,
                   wordBreak: 'keep-all'
-                },
-                title: '눌러서 수정 (참여자·메모 불러오기)',
-                onClick: () => handleEditClick(entry)
+                }
               }, part.name)
             ),
             entry.note && /*#__PURE__*/React.createElement("div", {
@@ -2728,7 +2743,14 @@ export function DateModal({
                 gap: '4px',
                 paddingLeft: '16px',
                 paddingRight: '0',
-                width: '100%',
+                // Reclaims the row's own right-inset reserve (kept for the top-right icons) so
+                // this note -- which sits below the icons and never overlaps them -- can use
+                // nearly the row's full width instead of wrapping early against unused space.
+                // A negative margin-right alone wouldn't widen this box (this is a flex item
+                // with an explicit width, not width:auto, so margins don't affect its own
+                // sizing) -- extending width itself past 100% via calc() is what actually grows
+                // it, landing its right edge just inside the row's own border either way.
+                width: `calc(100% + ${Math.max(attendanceRightReserve - 12, 0)}px)`,
                 boxSizing: 'border-box',
                 wordBreak: 'break-word',
                 overflowWrap: 'anywhere'
@@ -2754,7 +2776,7 @@ export function DateModal({
                 onPointerDown: event => beginAttendancePointerSort(event, entry.participantId)
               }, /*#__PURE__*/React.createElement(LineHeightIcon, { size: 12 })),
               /*#__PURE__*/React.createElement(ItemEditDeleteActions, {
-                onEdit: () => handleEditClick(entry),
+                showEdit: false,
                 onDelete: () => handleDeleteClick(entry)
               })
             )
