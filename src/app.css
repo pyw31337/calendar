@@ -3679,14 +3679,21 @@ select.form-select {
   display: flex; align-items: center; gap: 8px; padding: 20px 16px 12px;
 }
 .region-filter-trigger {
-  flex: 1 1 0%; min-width: 0; height: 38px; font-size: var(--font-size-sm);
+  /* No explicit height here -- .form-select's own min-height:44px (app.css:1463) is the standard
+     every other select/picker box in the app uses; a shorter height here (previously 38px) lost
+     out to that min-height anyway (min-height wins when it exceeds height), so the box actually
+     rendered at 44px while .current-location-btn (no .form-select class) rendered at its own
+     literal height -- the two never matched. Both are 44px explicitly now. */
+  flex: 1 1 0%; min-width: 0; font-size: var(--font-size-sm);
 }
 /* "현재 위치" sits to the right of the 군/구 트리거 and never stretches with it -- its own width
-   is just its content (icon + label on wide screens, icon alone once the label is hidden below). */
+   is just its content (icon + label on wide screens, icon alone once the label is hidden below).
+   Dark fill (not the app's usual bordered/light form control look) so it visually reads as an
+   action button rather than a third filter field. */
 .current-location-btn {
   flex: 0 0 auto; display: flex; align-items: center; justify-content: center; gap: 6px;
-  height: 38px; padding: 0 14px; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);
-  background: var(--bg-card); color: var(--text-main); font-size: var(--font-size-sm); font-weight: 700;
+  height: 44px; padding: 0 14px; border-radius: var(--radius-md); border: 1px solid transparent;
+  background: #111827; color: #fff; font-size: var(--font-size-sm); font-weight: 700;
   cursor: pointer; white-space: nowrap;
 }
 .current-location-btn:disabled {

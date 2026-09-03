@@ -50,6 +50,22 @@ function isVisible(endDate, startDate, todayIso) {
   return effectiveEnd >= todayIso;
 }
 
+// Culture Flow's own site is served at basePath '/culture' (Next export on GitHub Pages), and most
+// of its poster images are root-relative paths meant to resolve against ITS domain
+// ("/images/posters/festivals/....webp", "/images/fallbacks/exhibition.jpg") -- not an absolute
+// https:// URL like the few externally-hotlinked ones are. Fetched as-is from our own domain, a
+// relative path 404s silently (every festival item, and the large majority of kopis/culture-portal
+// items -- checked directly against a live pull: 1510/1510 kopis, 68/80 culture-portal, 155/155
+// festival were relative), which is why every poster in both tabs was blank. Resolve against
+// Culture Flow's own origin so the browser fetches the real image from where it actually lives.
+const CULTURE_FLOW_ORIGIN = 'https://pyw31337.github.io/culture';
+function resolveImageUrl(raw) {
+  const value = String(raw || '').trim();
+  if (!value) return '';
+  if (/^https?:\/\//i.test(value)) return value;
+  return `${CULTURE_FLOW_ORIGIN}${value.startsWith('/') ? '' : '/'}${value}`;
+}
+
 function normalizeItem(raw) {
   const { startDate, endDate } = parseDateRange(raw.date);
   return {
@@ -66,7 +82,7 @@ function normalizeItem(raw) {
       lat: typeof raw.lat === 'number' ? raw.lat : null,
       lng: typeof raw.lng === 'number' ? raw.lng : null,
       genre: raw.genre || '',
-      image: raw.image || raw.backupPoster || '',
+      image: resolveImageUrl(raw.image || raw.backupPoster),
       link: String(raw.link),
       price: raw.price || '',
       contact: raw.contact || '',

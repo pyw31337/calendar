@@ -1729,6 +1729,20 @@ function getKakaoMapLinkUrl(place) {
   return `https://map.kakao.com/link/map/${label},${place.lat},${place.lng}`;
 }
 
+// Same chevron-down glyph SimpleBottomSheetPicker renders (see below) -- reused as-is on the
+// 시/도·군/구 region triggers so they read as the exact same picker control the rest of the app
+// uses, not a bespoke plain-text button. A function (not a module-level element) because it needs
+// the caller's own `React` local -- this module never assumes window.React is ready at
+// module-evaluation time, only once a component actually renders.
+function renderRegionTriggerChevron(React) {
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg", width: "18", height: "18", viewBox: "0 0 24 24",
+    fill: "none", stroke: "currentColor", "stroke-width": "2", "stroke-linecap": "round", "stroke-linejoin": "round",
+    className: "form-select-chevron"
+  }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
+    /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" }));
+}
+
 // Full-page '히스토리' view -- every confirmed meeting date (모임 확정), moved off the main
 // calendar screen onto its own page. Each card also folds in whatever place(s) were registered
 // for that date (see doesPlaceMatchDate), since a confirmed meeting's place is exactly the kind
@@ -1766,11 +1780,23 @@ export function HistoryView({
   // Shared 시/도·군/구 filter for the 문화공연/지역축제 tabs (지난 모임 has no region data to
   // filter by). Lives here rather than inside CulturePerformancesTab so switching between the
   // 문화공연/지역축제 tabs keeps the same region selected instead of resetting it.
-  const [regionSido, setRegionSido] = React.useState('');
-  const [regionGugun, setRegionGugun] = React.useState('');
+  // Restored from localStorage so a region picked on a previous visit still applies next time --
+  // wrapped in try/catch since localStorage can throw (private browsing, disabled site data) and
+  // an empty/garbled saved value should just fall back to "no filter" rather than crash the page.
+  const CULTURE_REGION_STORAGE_KEY = 'gather_culture_region_filter';
+  const [regionSido, setRegionSido] = React.useState(() => {
+    try { return JSON.parse(localStorage.getItem(CULTURE_REGION_STORAGE_KEY) || '{}').sido || ''; } catch (_) { return ''; }
+  });
+  const [regionGugun, setRegionGugun] = React.useState(() => {
+    try { return JSON.parse(localStorage.getItem(CULTURE_REGION_STORAGE_KEY) || '{}').gugun || ''; } catch (_) { return ''; }
+  });
   const [isRegionFilterOpen, setIsRegionFilterOpen] = React.useState(false);
   const [isContentRegisterOpen, setIsContentRegisterOpen] = React.useState(false);
-  const applyRegionFilter = (sido, gugun) => { setRegionSido(sido); setRegionGugun(gugun); };
+  const applyRegionFilter = (sido, gugun) => {
+    setRegionSido(sido);
+    setRegionGugun(gugun);
+    try { localStorage.setItem(CULTURE_REGION_STORAGE_KEY, JSON.stringify({ sido, gugun })); } catch (_) { /* best-effort */ }
+  };
   // Whichever of 문화공연/지역축제 is currently mounted below reports its own loaded (unfiltered)
   // snapshot back up here via onItemsLoaded, purely so RegionFilterBackdrop can show a per-region
   // item count badge -- it has no other reason to fetch or hold this data itself.
@@ -1898,12 +1924,18 @@ export function HistoryView({
         type: "button",
         className: "form-select region-filter-trigger",
         onClick: () => setIsRegionFilterOpen(true)
-      }, KOREA_REGIONS.find(r => r.code === regionSido)?.label || "시/도 선택"),
+      },
+        /*#__PURE__*/React.createElement("span", { style: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, KOREA_REGIONS.find(r => r.code === regionSido)?.label || "시/도 선택"),
+        renderRegionTriggerChevron(React)
+      ),
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "form-select region-filter-trigger",
         onClick: () => setIsRegionFilterOpen(true)
-      }, regionGugun || "군/구 선택"),
+      },
+        /*#__PURE__*/React.createElement("span", { style: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, regionGugun || "군/구 선택"),
+        renderRegionTriggerChevron(React)
+      ),
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "current-location-btn",
@@ -2476,6 +2508,9 @@ function ContentRegisterModal({ onClose, onSave, showToast = null }) {
 export function CulturePerformancesTab({ calendar, anniversaries = [], onRegisterCultureEvent, onUnregisterCultureEvent, dataUrl = CULTURE_PERFORMANCES_URL, emptyLabel = "상영중이거나 예정된 문화공연이 없습니다.", regionSido = '', regionGugun = '', onItemsLoaded, anniversaryCategory = 'event', extraItems = [] }) {
   const React = window.React;
   const ReactDOM = window.ReactDOM;
+  const __deps = window.GATHER_UI_DEPS || {};
+  const __comp = window.GATHER_UI_COMPONENTS || {};
+  const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
   const [items, setItems] = React.useState(null); // null = loading, [] = loaded-empty
   const [loadError, setLoadError] = React.useState(false);
   const [selected, setSelected] = React.useState(null);
@@ -2630,36 +2665,53 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
         /*#__PURE__*/React.createElement("div", {
           onClick: e => e.stopPropagation(),
           style: {
-            width: '100%', maxWidth: '480px', maxHeight: '85vh', overflowY: 'auto',
+            position: 'relative', width: '100%', maxWidth: '480px', maxHeight: '85vh',
             backgroundColor: 'var(--bg-card)', borderRadius: '16px 16px 0 0', padding: '20px',
-            display: 'flex', flexDirection: 'column', gap: '10px'
+            display: 'flex', flexDirection: 'column', gap: '10px', boxSizing: 'border-box'
           }
         },
+          /*#__PURE__*/React.createElement("button", {
+            type: "button", onClick: () => setSelected(null), "aria-label": "닫기",
+            style: {
+              position: 'absolute', top: '12px', right: '12px', zIndex: 1,
+              width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              border: 'none', borderRadius: 'var(--radius-full)', cursor: 'pointer',
+              backgroundColor: 'rgba(0,0,0,0.45)', color: '#fff'
+            }
+          }, SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 18 }) : "✕"),
           selected.image && /*#__PURE__*/React.createElement("img", {
             src: selected.image, alt: selected.title, loading: 'lazy',
-            style: { width: '100%', maxHeight: '260px', objectFit: 'contain', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)' },
+            style: { width: '100%', maxHeight: '260px', objectFit: 'contain', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)', flexShrink: 0 },
             onError: e => { e.currentTarget.style.display = 'none'; }
           }),
-          /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)' } }, selected.title),
-          [
-            ['기간', culturePerf(selected.dateLabel)],
-            ['장소', culturePerf(selected.venue)],
-            ['주소', culturePerf(selected.address)],
-            ['주최', culturePerf(selected.organizer)],
-            ['문의', culturePerf(selected.contact)],
-            ['가격', culturePerf(selected.price)],
-            ['공식 홈페이지', culturePerf(selected.website)]
-          ].map(([label, value]) => /*#__PURE__*/React.createElement("div", {
-            key: label, style: { display: 'flex', gap: '8px', fontSize: 'var(--font-size-sm)' }
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)', flexShrink: 0, paddingRight: '36px' } }, selected.title),
+          // 기간~설명까지 한 블록으로 스크롤 -- 예전엔 설명 칸만 따로 120px 높이로 스크롤돼서
+          // 모바일 세로폭에선 몇 줄 보이지도 않는 좁은 창으로 긴 설명을 읽어야 했다. 이미지/제목은
+          // 항상 보이게 위에 고정, 체크박스/링크 버튼은 항상 보이게 아래 고정하고, 그 사이 정보
+          // 블록만 남는 공간을 스크롤하도록 minHeight:0 + flex:1로 바꿨다.
+          /*#__PURE__*/React.createElement("div", {
+            style: { flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }
           },
-            /*#__PURE__*/React.createElement("span", { style: { flexShrink: 0, width: '84px', color: 'var(--text-muted)', fontWeight: 700 } }, label),
-            /*#__PURE__*/React.createElement("span", { style: { color: 'var(--text-main)', wordBreak: 'break-word' } }, value)
-          )),
-          selected.description && /*#__PURE__*/React.createElement("div", {
-            style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-main)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', marginTop: '4px', maxHeight: '120px', overflowY: 'auto' }
-          }, selected.description),
+            [
+              ['기간', culturePerf(selected.dateLabel)],
+              ['장소', culturePerf(selected.venue)],
+              ['주소', culturePerf(selected.address)],
+              ['주최', culturePerf(selected.organizer)],
+              ['문의', culturePerf(selected.contact)],
+              ['가격', culturePerf(selected.price)],
+              ['공식 홈페이지', culturePerf(selected.website)]
+            ].map(([label, value]) => /*#__PURE__*/React.createElement("div", {
+              key: label, style: { display: 'flex', gap: '8px', fontSize: 'var(--font-size-sm)' }
+            },
+              /*#__PURE__*/React.createElement("span", { style: { flexShrink: 0, width: '84px', color: 'var(--text-muted)', fontWeight: 700 } }, label),
+              /*#__PURE__*/React.createElement("span", { style: { color: 'var(--text-main)', wordBreak: 'break-word' } }, value)
+            )),
+            selected.description && /*#__PURE__*/React.createElement("div", {
+              style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-main)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }
+            }, selected.description)
+          ),
           /*#__PURE__*/React.createElement("label", {
-            style: { display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px', padding: '10px', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)', cursor: pendingId ? 'wait' : 'pointer', fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-main)' }
+            style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, padding: '10px', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)', cursor: pendingId ? 'wait' : 'pointer', fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-main)' }
           },
             /*#__PURE__*/React.createElement("input", {
               type: "checkbox",
@@ -2672,14 +2724,10 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
           selected.link && /*#__PURE__*/React.createElement("a", {
             href: selected.link, target: "_blank", rel: "noreferrer",
             style: {
-              display: 'block', textAlign: 'center', padding: '10px', borderRadius: 'var(--radius-md)',
+              display: 'block', flexShrink: 0, textAlign: 'center', padding: '10px', borderRadius: 'var(--radius-md)',
               backgroundColor: '#7C3AED', color: '#fff', fontWeight: 800, fontSize: 'var(--font-size-md)', textDecoration: 'none'
             }
-          }, selected.source === 'custom' ? "링크 열기 (새 창)" : "문화포털에서 상세보기 (새 창)"),
-          /*#__PURE__*/React.createElement("button", {
-            type: "button", onClick: () => setSelected(null),
-            style: { padding: '8px', border: 'none', background: 'none', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', cursor: 'pointer' }
-          }, "닫기")
+          }, selected.source === 'custom' ? "링크 열기" : "문화포털에서 상세보기")
         )
       ),
       document.body
