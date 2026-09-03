@@ -1892,7 +1892,7 @@ export function HistoryView({
                 className: "place-memo-stack",
                 style: {
                   display: 'flex', alignItems: 'flex-start', gap: '6px',
-                  backgroundColor: isPast ? 'rgba(255, 255, 255, 0.92)' : '#333',
+                  backgroundColor: isPast ? 'transparent' : '#333',
                   borderRadius: isPast ? 0 : 'var(--radius-md)',
                   borderTop: isPast ? '1px solid rgba(0, 0, 0, 0.05)' : 'none',
                   padding: '7px 10px', width: '100%', boxSizing: 'border-box'
