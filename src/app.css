@@ -3532,6 +3532,32 @@ select.form-select {
   }
 }
 
+/* 히스토리(보관함) 페이지 그리드 -- 지난 모임: 모바일 1단 / 태블릿 2단 / PC 4단.
+   .date-item-btn cards keep margin-bottom:10px for the non-grid contexts that still stack them
+   (main-screen SummaryList); this grid supplies its own gap and turns that margin off so rows
+   don't get doubled spacing. */
+.history-meetings-grid {
+  display: grid; grid-template-columns: 1fr; gap: 10px;
+}
+.history-meetings-grid .date-item-btn { margin-bottom: 0; }
+@media (min-width: 640px) and (max-width: 1023px) {
+  .history-meetings-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (min-width: 1024px) {
+  .history-meetings-grid { grid-template-columns: repeat(4, 1fr); }
+}
+
+/* 문화공연 / 지역축제 포스터 그리드 -- 모바일 2단 / 태블릿 4단 / PC 6단. */
+.culture-items-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;
+}
+@media (min-width: 640px) and (max-width: 1023px) {
+  .culture-items-grid { grid-template-columns: repeat(4, 1fr); }
+}
+@media (min-width: 1024px) {
+  .culture-items-grid { grid-template-columns: repeat(6, 1fr); }
+}
+
 .date-item-btn {
   width: 100%; display: flex; flex-direction: column; align-items: flex-start; padding: 12px 14px;
   background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-md);

@@ -1837,13 +1837,23 @@ export function HistoryView({
       ariaLabel: "보관함 탭",
       value: historyTab,
       onChange: v => setHistoryTab(v),
-      options: [{ value: 'meetings', label: '지난 모임' }, { value: 'culture', label: '문화공연' }]
+      options: [
+        { value: 'meetings', label: '지난 모임' },
+        { value: 'culture', label: '문화공연' },
+        { value: 'festival', label: '지역축제' }
+      ]
     }),
     historyTab === 'culture' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
-      calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent
+      calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent, dataUrl: CULTURE_PERFORMANCES_URL,
+      emptyLabel: "상영중이거나 예정된 문화공연이 없습니다."
+    }),
+    historyTab === 'festival' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
+      calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent, dataUrl: CULTURE_FESTIVALS_URL,
+      emptyLabel: "진행중이거나 예정된 지역축제가 없습니다."
     }),
     historyTab === 'meetings' && /*#__PURE__*/React.createElement("div", {
-      style: { flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }
+      className: "history-meetings-grid",
+      style: { flex: 1, overflowY: 'auto', padding: '16px' }
     },
       confirmedDates.length === 0 ? /*#__PURE__*/React.createElement("div", {
         style: { textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)' }
@@ -1986,16 +1996,19 @@ export function HistoryView({
   );
 }
 
-const CULTURE_PERFORMANCES_URL = `${(typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.BASE_URL) || '/'}data/culture-performances.json`;
+const CULTURE_DATA_BASE = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.BASE_URL) || '/';
+const CULTURE_PERFORMANCES_URL = `${CULTURE_DATA_BASE}data/culture-performances.json`;
+const CULTURE_FESTIVALS_URL = `${CULTURE_DATA_BASE}data/culture-festivals.json`;
 const CULTURE_MISSING_LABEL = '정보없음';
 const culturePerf = value => (value && String(value).trim()) || CULTURE_MISSING_LABEL;
 
-// 히스토리 페이지 '문화공연' 탭 -- scripts/sync-culture-performances.mjs가 매일 커밋하는 이
-// 리포 소유의 정적 스냅샷(public-vite/data/culture-performances.json)을 fetch해서 상영중/예정작
-// 목록을 보여준다. Culture Flow(별개 프로젝트)의 실시간 JSON을 직접 fetch하지 않는 이유는 그
-// 프로젝트의 스키마가 바뀌거나 그날 수집이 실패해도 이 탭이 즉시 깨지지 않게 하기 위함 -- 동기화
-// 스크립트가 검증에 실패하면 최근 정상 스냅샷을 그대로 커밋해 유지한다.
-export function CulturePerformancesTab({ calendar, anniversaries = [], onRegisterCultureEvent, onUnregisterCultureEvent }) {
+// 히스토리(보관함) 페이지의 '문화공연'/'지역축제' 탭 -- 둘 다 이 컴포넌트 하나를 dataUrl만 바꿔
+// 재사용한다 (문화공연은 culture-performances.json, 지역축제는 culture-festivals.json). 둘 다
+// scripts/sync-culture-performances.mjs가 매일 커밋하는 이 리포 소유의 정적 스냅샷을 fetch해서
+// 상영중/예정 목록을 보여준다. Culture Flow(별개 프로젝트)의 실시간 JSON을 직접 fetch하지 않는
+// 이유는 그 프로젝트의 스키마가 바뀌거나 그날 수집이 실패해도 이 탭이 즉시 깨지지 않게 하기
+// 위함 -- 동기화 스크립트가 검증에 실패하면 최근 정상 스냅샷을 그대로 커밋해 유지한다.
+export function CulturePerformancesTab({ calendar, anniversaries = [], onRegisterCultureEvent, onUnregisterCultureEvent, dataUrl = CULTURE_PERFORMANCES_URL, emptyLabel = "상영중이거나 예정된 문화공연이 없습니다." }) {
   const React = window.React;
   const ReactDOM = window.ReactDOM;
   const [items, setItems] = React.useState(null); // null = loading, [] = loaded-empty
@@ -2005,18 +2018,20 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
 
   React.useEffect(() => {
     let cancelled = false;
-    fetch(CULTURE_PERFORMANCES_URL)
+    setItems(null);
+    setLoadError(false);
+    fetch(dataUrl)
       .then(res => { if (!res.ok) throw new Error(`status ${res.status}`); return res.json(); })
       .then(data => {
         if (cancelled) return;
         setItems(Array.isArray(data?.items) ? data.items : []);
       })
       .catch(err => {
-        console.warn('Culture performances snapshot load failed:', err);
+        console.warn('Culture snapshot load failed:', err);
         if (!cancelled) { setItems([]); setLoadError(true); }
       });
     return () => { cancelled = true; };
-  }, []);
+  }, [dataUrl]);
 
   // A registered item's own anniversary doc (cultureSourceId set by handleRegisterCultureEvent
   // in app-main.js), or null if this item hasn't been added to the calendar yet.
@@ -2047,15 +2062,13 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
   if (items.length === 0) {
     return /*#__PURE__*/React.createElement("div", {
       style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)' }
-    }, loadError ? "문화공연 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요." : "상영중이거나 예정된 문화공연이 없습니다.");
+    }, loadError ? "정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요." : emptyLabel);
   }
 
   return /*#__PURE__*/React.createElement(React.Fragment, null,
     /*#__PURE__*/React.createElement("div", {
-      style: {
-        flex: 1, overflowY: 'auto', padding: '16px',
-        display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px', alignContent: 'start'
-      }
+      className: "culture-items-grid",
+      style: { flex: 1, overflowY: 'auto', padding: '16px', alignContent: 'start' }
     },
       items.map(item => {
         const registered = !!findRegisteredAnniversary(item.id);

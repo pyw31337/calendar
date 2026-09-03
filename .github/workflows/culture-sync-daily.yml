@@ -1,9 +1,10 @@
 name: Culture Performances Daily Sync
 
-# Pulls the culture-portal slice of Culture Flow's public performances feed once a day and commits
-# a normalized snapshot to public-vite/data/culture-performances.json. See
-# scripts/sync-culture-performances.mjs for why this never touches the file on a failed/suspicious
-# fetch (Culture Flow is a separate project we don't control the release cadence of).
+# Pulls the culture-portal+kopis and festival slices of Culture Flow's public performances feed
+# once a day and commits normalized snapshots to public-vite/data/culture-performances.json and
+# public-vite/data/culture-festivals.json. See scripts/sync-culture-performances.mjs for why this
+# never touches either file on a failed/suspicious fetch (Culture Flow is a separate project we
+# don't control the release cadence of).
 
 on:
   workflow_dispatch:
@@ -27,12 +28,12 @@ jobs:
         run: node scripts/sync-culture-performances.mjs
       - name: Commit if changed
         run: |
-          if git diff --quiet -- public-vite/data/culture-performances.json; then
-            echo "No change in culture performances snapshot."
+          if git diff --quiet -- public-vite/data/culture-performances.json public-vite/data/culture-festivals.json; then
+            echo "No change in culture performances/festivals snapshots."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add public-vite/data/culture-performances.json
-          git commit -m "chore: daily culture performances snapshot sync"
+          git add public-vite/data/culture-performances.json public-vite/data/culture-festivals.json
+          git commit -m "chore: daily culture performances/festivals snapshot sync"
           git push

@@ -1,23 +1,37 @@
-// Pulls the culture-portal (문화포털) slice of Culture Flow's public performances feed
+// Pulls two slices of Culture Flow's public performances feed
 // (https://pyw31337.github.io/culture/data/performances.json, CORS-open static JSON) once a day,
-// keeps only currently-running or upcoming shows, and writes a small normalized snapshot into
-// this repo's own public-vite/data/ so the calendar app never depends on a live cross-origin
-// fetch at runtime.
+// keeps only currently-running or upcoming items, and writes normalized snapshots into this
+// repo's own public-vite/data/ so the calendar app never depends on a live cross-origin fetch at
+// runtime:
+//   - culture-performances.json (문화공연 탭): source 'culture-portal' + 'kopis'. KOPIS turned out
+//     to carry far more currently-active listings than the 문화포털 API alone (~1400 vs ~90 on a
+//     typical day) with near-complete region/district coverage, so both are kept side by side
+//     rather than picking one -- no de-duplication between them is attempted (they're independent
+//     upstream sources with no shared id space to match on reliably), so a show simultaneously
+//     listed on both sites can appear twice. Worth revisiting if that turns out to bother anyone
+//     in practice; for now more coverage beats a naive title-fuzzy-match that could just as easily
+//     drop a real show as a duplicate one.
+//   - culture-festivals.json (지역축제 탭): source 'festival' -- Culture Flow already aggregates
+//     VisitKorea/문체부/VisitSeoul/경기관광공사 등 지역축제 sources into this one merged bucket, so
+//     this repo doesn't need its own scrapers for any of those sites.
 //
 // Deliberately defensive: Culture Flow is a separate project with its own release cadence. If its
 // feed is unreachable, empty, or missing fields this script depends on, we log and exit WITHOUT
-// touching the existing committed snapshot -- yesterday's data keeps serving rather than the
-// calendar site losing the 문화공연 tab (or showing empty) because of an unrelated project's bad
-// day. The GitHub Actions step running this only commits when the file actually changed, so a
-// no-op run leaves no diff.
+// touching the existing committed snapshots -- yesterday's data keeps serving rather than the
+// calendar site losing a tab (or showing empty) because of an unrelated project's bad day. The
+// GitHub Actions step running this only commits files that actually changed.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SOURCE_URL = 'https://pyw31337.github.io/culture/data/performances.json';
-const OUTPUT_PATH = path.resolve(__dirname, '../public-vite/data/culture-performances.json');
-const SOURCE_TAG = 'culture-portal';
+const DATA_DIR = path.resolve(__dirname, '../public-vite/data');
+
+const FEEDS = [
+  { file: 'culture-performances.json', sources: new Set(['culture-portal', 'kopis']), label: 'performances' },
+  { file: 'culture-festivals.json', sources: new Set(['festival']), label: 'festivals' }
+];
 
 function parseDateRange(raw) {
   // Culture Flow date strings look like "2026.08.28 (금) ~ 2027.02.09 (화)" or a single
@@ -38,45 +52,11 @@ function isVisible(endDate, startDate, todayIso) {
   return effectiveEnd >= todayIso;
 }
 
-async function main() {
-  const todayIso = new Date().toISOString().slice(0, 10);
-
-  let response;
-  try {
-    response = await fetch(SOURCE_URL, { signal: AbortSignal.timeout(20000) });
-  } catch (err) {
-    console.error(`[sync-culture-performances] fetch failed, keeping existing snapshot: ${err.message}`);
-    return;
-  }
-  if (!response.ok) {
-    console.error(`[sync-culture-performances] fetch returned ${response.status}, keeping existing snapshot`);
-    return;
-  }
-
-  let all;
-  try {
-    all = await response.json();
-  } catch (err) {
-    console.error(`[sync-culture-performances] response was not valid JSON, keeping existing snapshot: ${err.message}`);
-    return;
-  }
-  if (!Array.isArray(all)) {
-    console.error('[sync-culture-performances] response was not an array, keeping existing snapshot');
-    return;
-  }
-
-  const REQUIRED_FIELDS = ['title', 'date', 'link'];
-  const normalized = [];
-  let skippedMissingFields = 0;
-  let skippedPast = 0;
-
-  for (const raw of all) {
-    if (!raw || raw.source !== SOURCE_TAG) continue;
-    if (REQUIRED_FIELDS.some(f => !raw[f])) { skippedMissingFields++; continue; }
-    const { startDate, endDate } = parseDateRange(raw.date);
-    if (!isVisible(endDate, startDate, todayIso)) { skippedPast++; continue; }
-
-    normalized.push({
+function normalizeItem(raw) {
+  const { startDate, endDate } = parseDateRange(raw.date);
+  return {
+    startDate, endDate,
+    item: {
       id: String(raw.id || `${raw.title}::${raw.date}`),
       title: String(raw.title),
       dateLabel: String(raw.date),
@@ -94,31 +74,70 @@ async function main() {
       contact: raw.contact || '',
       organizer: raw.organizer || raw.host || '',
       website: raw.website || '',
-      description: raw.description || ''
-    });
-  }
+      // KOPIS alone pushed this feed from ~80 to ~1300 items -- capping description (routinely
+      // several paragraphs, the single biggest field) keeps the payload reasonable for a tab
+      // that's fetched fresh on open rather than paginated.
+      description: String(raw.description || '').slice(0, 600),
+      source: raw.source || ''
+    }
+  };
+}
 
+function writeFeedIfHealthy(outputPath, items, label) {
   // A near-empty result is far more likely to be an upstream problem (feed truncated mid-build,
-  // a filter regression) than 3790 real shows genuinely shrinking to a handful overnight -- refuse
-  // to overwrite a healthy snapshot with a suspiciously small one. 5 is well below any observed
-  // day's culture-portal count (dozens) but well above "the feed came back empty".
-  if (normalized.length < 5) {
-    console.error(`[sync-culture-performances] only ${normalized.length} visible items after filtering (skipped ${skippedMissingFields} missing-field, ${skippedPast} past) -- looks like an upstream problem, keeping existing snapshot`);
+  // a filter regression) than a real feed genuinely shrinking to a handful overnight -- refuse to
+  // overwrite a healthy snapshot with a suspiciously small one.
+  if (items.length < 5) {
+    console.error(`[sync-culture-performances] ${label}: only ${items.length} visible items -- looks like an upstream problem, keeping existing snapshot`);
+    return;
+  }
+  const output = { generatedAt: new Date().toISOString(), sourceUrl: SOURCE_URL, count: items.length, items };
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  const tmpPath = `${outputPath}.tmp`;
+  fs.writeFileSync(tmpPath, JSON.stringify(output, null, 2));
+  fs.renameSync(tmpPath, outputPath);
+  console.log(`[sync-culture-performances] ${label}: wrote ${items.length} items to ${path.relative(process.cwd(), outputPath)}`);
+}
+
+async function main() {
+  const todayIso = new Date().toISOString().slice(0, 10);
+
+  let response;
+  try {
+    response = await fetch(SOURCE_URL, { signal: AbortSignal.timeout(20000) });
+  } catch (err) {
+    console.error(`[sync-culture-performances] fetch failed, keeping existing snapshots: ${err.message}`);
+    return;
+  }
+  if (!response.ok) {
+    console.error(`[sync-culture-performances] fetch returned ${response.status}, keeping existing snapshots`);
     return;
   }
 
-  const output = {
-    generatedAt: new Date().toISOString(),
-    sourceUrl: SOURCE_URL,
-    count: normalized.length,
-    items: normalized
-  };
+  let all;
+  try {
+    all = await response.json();
+  } catch (err) {
+    console.error(`[sync-culture-performances] response was not valid JSON, keeping existing snapshots: ${err.message}`);
+    return;
+  }
+  if (!Array.isArray(all)) {
+    console.error('[sync-culture-performances] response was not an array, keeping existing snapshots');
+    return;
+  }
 
-  fs.mkdirSync(path.dirname(OUTPUT_PATH), { recursive: true });
-  const tmpPath = `${OUTPUT_PATH}.tmp`;
-  fs.writeFileSync(tmpPath, JSON.stringify(output, null, 2));
-  fs.renameSync(tmpPath, OUTPUT_PATH);
-  console.log(`[sync-culture-performances] wrote ${normalized.length} items (skipped ${skippedMissingFields} missing-field, ${skippedPast} past) to ${path.relative(process.cwd(), OUTPUT_PATH)}`);
+  const REQUIRED_FIELDS = ['title', 'date', 'link'];
+  for (const feed of FEEDS) {
+    const normalized = [];
+    for (const raw of all) {
+      if (!raw || !feed.sources.has(raw.source)) continue;
+      if (REQUIRED_FIELDS.some(f => !raw[f])) continue;
+      const { startDate, endDate, item } = normalizeItem(raw);
+      if (!isVisible(endDate, startDate, todayIso)) continue;
+      normalized.push(item);
+    }
+    writeFeedIfHealthy(path.resolve(DATA_DIR, feed.file), normalized, feed.label);
+  }
 }
 
 await main();
