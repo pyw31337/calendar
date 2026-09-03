@@ -836,6 +836,7 @@ export function AnniversaryModal({
   const MessageCircleMoreIcon = __comp.MessageCircleMoreIcon || __deps.MessageCircleMoreIcon;
   const MapPinIcon = __comp.MapPinIcon || __deps.MapPinIcon;
   const ItemEditDeleteActions = __comp.ItemEditDeleteActions || __deps.ItemEditDeleteActions;
+  const SectionCountBadge = __comp.SectionCountBadge || __deps.SectionCountBadge;
   const firebaseConfig = __deps.firebaseConfig || window.firebaseConfig;
   const ANNIVERSARY_CATEGORY_ICONS = {
     birthday: CakeIcon, event: BalloonIcon, festival: ConfettiIcon, travel: TicketsPlaneIcon, other: MessageCircleMoreIcon
@@ -889,10 +890,10 @@ export function AnniversaryModal({
   const photoFileInputRef = React.useRef(null);
 
   // Migrated bulk register availability states
-  const [bulkParticipantId, setBulkParticipantId] = React.useState('');
+  const [bulkParticipantId, setBulkParticipantId] = React.useState(BULK_NO_PARTICIPANT_ID);
   const [isBulkParticipantSheetOpen, setIsBulkParticipantSheetOpen] = React.useState(false);
-  const [bulkWeeks, setBulkWeeks] = React.useState([1, 2, 3, 4, 5]);
-  const [bulkWeekdays, setBulkWeekdays] = React.useState([1]);
+  const [bulkWeeks, setBulkWeeks] = React.useState([]);
+  const [bulkWeekdays, setBulkWeekdays] = React.useState([]);
   const [isBulkWeekSheetOpen, setIsBulkWeekSheetOpen] = React.useState(false);
   const [isBulkWeekdaySheetOpen, setIsBulkWeekdaySheetOpen] = React.useState(false);
   const [bulkNote, setBulkNote] = React.useState('');
@@ -950,20 +951,14 @@ export function AnniversaryModal({
   const toggleBulkWeek = (weekValue) => {
     setBulkWeeks(prev => {
       const has = prev.includes(weekValue);
-      if (has) {
-        if (prev.length <= 1) return prev;
-        return prev.filter(v => v !== weekValue).sort((a, b) => a - b);
-      }
+      if (has) return prev.filter(v => v !== weekValue).sort((a, b) => a - b);
       return [...prev, weekValue].sort((a, b) => a - b);
     });
   };
   const toggleBulkWeekday = (dayValue) => {
     setBulkWeekdays(prev => {
       const has = prev.includes(dayValue);
-      if (has) {
-        if (prev.length <= 1) return prev;
-        return prev.filter(v => v !== dayValue);
-      }
+      if (has) return prev.filter(v => v !== dayValue);
       return [...prev, dayValue];
     });
   };
@@ -996,6 +991,17 @@ export function AnniversaryModal({
       setOnceDate(ann.date || todayStr());
       setIsLunar(!!ann.isLunar);
       setIsLeap(!!ann.isLeap);
+    } else if (ann.type === 'repeat') {
+      setIsLegacyDdayEdit(false);
+      setBulkWeeks(Array.isArray(ann.weeks) ? ann.weeks.slice() : []);
+      setBulkWeekdays(Array.isArray(ann.weekdays) ? ann.weekdays.slice() : []);
+      setBulkStartDate(ann.startDate || bulkStartDate);
+      setBulkEndDate(ann.endDate || bulkEndDate);
+      setBulkNote(ann.note || ann.title || '');
+      setBulkParticipantId(BULK_NO_PARTICIPANT_ID);
+      setEditingId(ann.id);
+      setActiveTab('bulk');
+      return;
     } else {
       // 'yearly' (also the default for any legacy entry saved before the type field existed)
       setIsLegacyDdayEdit(false);
@@ -1225,10 +1231,6 @@ export function AnniversaryModal({
 
   const handleApplyBulkRegister = async () => {
     if (isBulkSubmitting || !onBulkRegister) return;
-    if (!bulkParticipantId) {
-      showToast('참여자를 선택해 주세요.', 'error');
-      return;
-    }
     if (!bulkWeeks.length || !bulkWeekdays.length) {
       showToast('주차와 요일을 각각 하나 이상 선택해 주세요.', 'error');
       return;
@@ -1277,14 +1279,43 @@ export function AnniversaryModal({
       async () => {
         setIsBulkSubmitting(true);
         try {
-          const successCount = await onBulkRegister(bulkParticipantId, dates, bulkNote);
+          const participantId = bulkParticipantId || BULK_NO_PARTICIPANT_ID;
+          const successCount = await onBulkRegister(participantId, dates, bulkNote);
+          // Persist a listable repeat rule so 목록 can show/edit the pattern later.
+          const stamp = Date.now();
+          const anniversaryId = (editingId && String(editingId).startsWith('repeat_'))
+            ? editingId
+            : ('repeat_' + stamp + '_' + Math.random().toString(36).slice(2, 8));
+          const prev = (anniversaries || []).find(a => a && a.id === anniversaryId);
+          const annData = {
+            id: anniversaryId,
+            calendarId: calendar.id,
+            type: 'repeat',
+            category: 'other',
+            title: (bulkNote && String(bulkNote).trim()) || patternLabel || '반복 일정',
+            weeks: bulkWeeks.slice(),
+            weekdays: bulkWeekdays.slice(),
+            startDate: bulkStartDate,
+            endDate: bulkEndDate,
+            note: bulkNote || '',
+            patternLabel,
+            createdAt: (prev && prev.createdAt) || stamp,
+            updatedAt: stamp
+          };
+          try {
+            const saved = await writeSharedCollection('anniversaries', calendar.id, anniversaryId, annData, 'set', '반복 일정 규칙 저장');
+            if (saved?.success && typeof onAnniversarySaved === 'function') onAnniversarySaved(annData);
+          } catch (ruleErr) {
+            console.error('Repeat rule save error:', ruleErr);
+          }
           const toastMsg = capped
             ? `${successCount}개의 반복 일정이 등록되었습니다. (상한 ${maxLimit}개 적용)`
             : `${successCount}개의 반복 일정이 등록되었습니다.`;
           showToast(toastMsg, capped ? 'info' : 'success');
           setBulkNote('');
+          setBulkWeeks([]);
+          setBulkWeekdays([]);
           setActiveTab('list');
-          onClose();
         } catch (err) {
           console.error('Bulk register error:', err);
           showToast('일괄 등록에 실패했습니다.', 'error');
@@ -1333,6 +1364,7 @@ export function AnniversaryModal({
     if (ann.type === 'yearly') return '매년 반복';
     if (ann.type === 'once') return '단발성';
     if (ann.type === 'range') return ANNIVERSARY_CATEGORY_OPTIONS.find(o => o.value === ann.category)?.label || '기간';
+    if (ann.type === 'repeat') return ann.patternLabel || formatBulkPatternLabel(ann.weeks || [], ann.weekdays || []) || '반복 일정';
     return getDDayBadge(ann);
   };
 
@@ -1340,6 +1372,13 @@ export function AnniversaryModal({
     if (ann.type === 'yearly') return getYearlyDisplay(ann);
     if (ann.type === 'once') return getOnceDisplay(ann);
     if (ann.type === 'range') return `${formatDateWithDayName(ann.startDate)} ~ ${formatDateWithDayName(ann.endDate)}`;
+    if (ann.type === 'repeat') {
+      const range = (ann.startDate && ann.endDate)
+        ? `${formatDateWithDayName(ann.startDate)} ~ ${formatDateWithDayName(ann.endDate)}`
+        : '';
+      const pattern = ann.patternLabel || formatBulkPatternLabel(ann.weeks || [], ann.weekdays || []);
+      return [pattern, range].filter(Boolean).join(' · ');
+    }
     return `기준일: ${ann.targetDate}`;
   };
 
@@ -1347,7 +1386,8 @@ export function AnniversaryModal({
     const map = {
       yearly: { bg: 'rgba(59,130,246,0.1)', fg: '#3B82F6' },
       once: { bg: 'rgba(16,185,129,0.1)', fg: '#10B981' },
-      range: { bg: 'rgba(139,92,246,0.1)', fg: '#8B5CF6' }
+      range: { bg: 'rgba(139,92,246,0.1)', fg: '#8B5CF6' },
+      repeat: { bg: 'rgba(99,102,241,0.12)', fg: '#6366F1' }
     };
     return map[ann.type] || { bg: 'rgba(245,158,11,0.1)', fg: '#F59E0B' }; // legacy dday
   };
@@ -1369,7 +1409,7 @@ export function AnniversaryModal({
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
         ANNIVERSARY_CATEGORY_ICONS[ann.category] && /*#__PURE__*/React.createElement(ANNIVERSARY_CATEGORY_ICONS[ann.category], { size: 16 }),
         /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: 'var(--font-size-base)', color: 'var(--text-main)' } }, ann.title),
-        /* Badge */
+        /* Badge — festivals always show 축제; others keep type label */
         /*#__PURE__*/React.createElement("span", {
           style: {
             fontSize: 'var(--font-size-xs)', padding: '1px 6px', borderRadius: '4px',
@@ -1377,14 +1417,14 @@ export function AnniversaryModal({
             color: getAnniversaryBadgeStyle(ann).fg,
             fontWeight: 700
           }
-        }, getAnniversaryTypeLabel(ann))
+        }, ann.category === 'festival' ? '축제' : getAnniversaryTypeLabel(ann))
       ),
       /* Date details */
       /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } },
         getAnniversaryDateDisplay(ann)
       ),
-      /* Place (if set) -- two lines: name, then address; no underline on the map link */
-      ann.place && (() => {
+      /* Place (if set) -- festivals list name+period only */
+      ann.category !== 'festival' && ann.place && (() => {
         const mapUrl = getKakaoMapLinkUrl(ann.place);
         const placeName = ann.place.alias || ann.place.name || '';
         const placeAddress = getDisplayPlaceAddress(ann.place) || '';
@@ -1406,11 +1446,11 @@ export function AnniversaryModal({
         );
       })(),
       /* Description (URLs rendered as capsule badges) */
-      ann.description && /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-main)', marginTop: '2px' } },
+      ann.category !== 'festival' && ann.description && /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-main)', marginTop: '2px' } },
         renderTextWithUrlBadge(ann.description)
       ),
       /* Photos (if any) -- thumb opens full lightbox with anniversary meta */
-      Array.isArray(ann.photos) && ann.photos.length > 0 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '4px', marginTop: '4px', flexWrap: 'wrap' } },
+      ann.category !== 'festival' && Array.isArray(ann.photos) && ann.photos.length > 0 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '4px', marginTop: '4px', flexWrap: 'wrap' } },
         ann.photos.map((photo, idx) => {
           const listIdx = Array.isArray(anniversaries) ? anniversaries.findIndex(a => a && a.id === ann.id) : -1;
           const anniversaryIndex = listIdx >= 0 ? listIdx + 1 : 1;
@@ -1520,7 +1560,7 @@ export function AnniversaryModal({
        instead of always scrolling through every group. */
     activeTab === 'list' && anniversaries.length > 0 && /*#__PURE__*/React.createElement("div", {
       style: {
-        display: 'flex', gap: '6px', padding: '10px 12px 0', overflowX: 'auto', flexShrink: 0
+        display: 'flex', gap: '6px', padding: '10px 12px', overflowX: 'auto', flexShrink: 0, alignItems: 'center'
       }
     },
       [{ value: 'all', label: '전체' }, ...ANNIVERSARY_CATEGORY_OPTIONS].map(opt => {
@@ -1543,9 +1583,12 @@ export function AnniversaryModal({
             fontWeight: 700,
             fontSize: 'var(--font-size-sm)',
             cursor: 'pointer',
-            whiteSpace: 'nowrap'
+            whiteSpace: 'nowrap',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px'
           }
-        }, `${opt.label} (${count})`);
+        }, opt.label, SectionCountBadge ? /*#__PURE__*/React.createElement(SectionCountBadge, { count }) : null);
       })
     ),
 
@@ -1944,36 +1987,6 @@ export function AnniversaryModal({
             "매주 또는 매월 n번째 주에 반복되는 일정을 일괄 등록합니다."
           ),
 
-          /* Participant picker */
-          /*#__PURE__*/React.createElement("button", {
-            type: "button",
-            className: "form-select",
-            disabled: isBulkSubmitting,
-            style: {
-              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              gap: '4px', textAlign: 'left', cursor: isBulkSubmitting ? 'default' : 'pointer', padding: '10px 8px'
-            },
-            onClick: () => { if (!isBulkSubmitting) setIsBulkParticipantSheetOpen(true); }
-          },
-            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, overflow: 'hidden' } },
-              bulkParticipant && /*#__PURE__*/React.createElement("span", {
-                className: "form-select-color-indicator",
-                style: { backgroundColor: bulkParticipant.color }
-              }),
-              /*#__PURE__*/React.createElement("span", {
-                style: {
-                  fontWeight: 700, color: (bulkParticipant || isBulkNoParticipant) ? 'var(--text-main)' : 'var(--text-muted)',
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 'var(--font-size-md)'
-                }
-              }, bulkParticipantLabel)
-            ),
-            /*#__PURE__*/React.createElement("svg", {
-              xmlns: "http://www.w3.org/2000/svg", width: "16", height: "16", viewBox: "0 0 24 24",
-              fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round",
-              className: "form-select-chevron", "aria-hidden": "true"
-            }, /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" }))
-          ),
-
           /* Week-of-month + Weekday multi-selects */
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
             /*#__PURE__*/React.createElement("button", {
@@ -1988,10 +2001,10 @@ export function AnniversaryModal({
             },
               /*#__PURE__*/React.createElement("span", {
                 style: {
-                  fontWeight: 700, color: 'var(--text-main)',
+                  fontWeight: 700, color: bulkWeeks.length ? 'var(--text-main)' : 'var(--text-muted)',
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 'var(--font-size-md)'
                 }
-              }, bulkWeeksLabel || '주차 선택'),
+              }, bulkWeeks.length ? (bulkWeeksLabel || '주차 선택') : '주차 선택'),
               /*#__PURE__*/React.createElement("svg", {
                 xmlns: "http://www.w3.org/2000/svg", width: "16", height: "16", viewBox: "0 0 24 24",
                 fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round",
@@ -2032,18 +2045,20 @@ export function AnniversaryModal({
           /*#__PURE__*/React.createElement("div", { style: { flex: '1 1 130px' } },
             /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "시작일자"),
             /*#__PURE__*/React.createElement(DeadlineDateTimePicker, {
-              value: `${bulkStartDate}T00:00`,
+              dateOnly: true,
+              value: bulkStartDate,
               disabled: isBulkSubmitting,
-              onChange: v => setBulkStartDate(v.slice(0, 10))
+              onChange: v => setBulkStartDate(String(v || '').slice(0, 10))
             })
           ),
           /* End */
           /*#__PURE__*/React.createElement("div", { style: { flex: '1 1 130px' } },
             /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "종료일자"),
             /*#__PURE__*/React.createElement(DeadlineDateTimePicker, {
-              value: `${bulkEndDate}T00:00`,
+              dateOnly: true,
+              value: bulkEndDate,
               disabled: isBulkSubmitting,
-              onChange: v => setBulkEndDate(v.slice(0, 10))
+              onChange: v => setBulkEndDate(String(v || '').slice(0, 10))
             })
           )
         ),
