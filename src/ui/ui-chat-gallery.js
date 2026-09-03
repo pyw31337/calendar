@@ -1212,7 +1212,7 @@ export function ChatGalleryModal({
     if (key && brokenPhotoKeysRef.current.has(key)) return false;
     return !isBrokenPhotoValue(photo.full) && !isBrokenPhotoValue(photo.thumb);
   }), [filteredPhotos, brokenPhotoRevision]);
-  const [photoRenderLimit, setPhotoRenderLimit] = React.useState(12);
+  const [photoRenderLimit, setPhotoRenderLimit] = React.useState(24);
   const renderedPhotos = React.useMemo(
     () => asPage ? visiblePhotos.slice(0, photoRenderLimit) : visiblePhotos,
     [asPage, visiblePhotos, photoRenderLimit]
@@ -1644,20 +1644,28 @@ export function ChatGalleryModal({
     const sentinelRef = React.useRef(null);
     const armedRef = React.useRef(true);
     React.useEffect(() => {
+      // Arm on the real gallery scroller (gridHost), not window -- asPage scrolls inside
+      // gridHostRef, so a window listener never sees those gestures and progressive load stalls.
+      const scroller = gridHostRef.current;
       const onScroll = () => { armedRef.current = true; };
+      if (scroller) {
+        scroller.addEventListener('scroll', onScroll, { passive: true });
+        return () => scroller.removeEventListener('scroll', onScroll);
+      }
       window.addEventListener('scroll', onScroll, { passive: true, capture: true });
       return () => window.removeEventListener('scroll', onScroll, { capture: true });
     }, []);
     React.useEffect(() => {
       const node = sentinelRef.current;
       if (!node || disabled || typeof IntersectionObserver !== 'function') return undefined;
+      const root = gridHostRef.current || null;
       const observer = new IntersectionObserver(entries => {
         if (!armedRef.current) return;
         if (entries.some(entry => entry.isIntersecting)) {
           armedRef.current = false;
           onClick();
         }
-      }, { rootMargin: '300px 0px' });
+      }, { root, rootMargin: '300px 0px' });
       observer.observe(node);
       return () => observer.disconnect();
     }, [disabled, onClick]);
@@ -1702,12 +1710,39 @@ export function ChatGalleryModal({
   };
   // Count + 붙여넣기/추가 header shown above the flat (전체) list -- same module the date modal's
   // own 사진 tab uses (label left, action buttons right), reused here for visual consistency.
+  // Mobile-only 전체|일자 pill (same markup/styles as the former visit-filter-toggle-mobile
+  // that lived beside the 사진|링크 tabs). Desktop keeps the filter in the page header.
+  const renderVisitFilterToggleMobile = () => /*#__PURE__*/React.createElement("div", {
+    className: "visit-filter-toggle-mobile",
+    style: {
+      display: 'inline-flex', alignItems: 'center', height: '36px', boxSizing: 'border-box',
+      padding: '3px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)',
+      backgroundColor: 'var(--bg-card)', flexShrink: 0
+    }
+  },
+    [
+      { key: 'all', label: '전체' },
+      { key: 'date', label: '일자' }
+    ].map(tab => /*#__PURE__*/React.createElement("button", {
+      key: tab.key,
+      type: "button",
+      onClick: () => setGalleryViewMode(tab.key),
+      style: {
+        height: '100%', boxSizing: 'border-box', padding: '0 12px', fontSize: 'var(--font-size-md)', fontWeight: 900,
+        borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer',
+        backgroundColor: galleryViewMode === tab.key ? '#4F46E5' : 'transparent',
+        color: galleryViewMode === tab.key ? '#FFFFFF' : 'var(--text-muted)'
+      }
+    }, tab.label))
+  );
   const renderPhotoListHeader = () => /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '4px' }
   },
-    /*#__PURE__*/React.createElement("label", {
-      style: { fontSize: 'var(--font-size-md)', fontWeight: 800, color: 'var(--text-muted)' }
-    }, `등록된 사진 (${displayPhotoTabCount}장)`),
+    isMobile
+      ? renderVisitFilterToggleMobile()
+      : /*#__PURE__*/React.createElement("label", {
+          style: { fontSize: 'var(--font-size-md)', fontWeight: 800, color: 'var(--text-muted)' }
+        }, `등록된 사진 (${displayPhotoTabCount}장)`),
     /*#__PURE__*/React.createElement("div", {
       style: { display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }
     },
@@ -1731,9 +1766,11 @@ export function ChatGalleryModal({
     /*#__PURE__*/React.createElement("div", {
       style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }
     },
-      /*#__PURE__*/React.createElement("label", {
-        style: { fontSize: 'var(--font-size-md)', fontWeight: 800, color: 'var(--text-muted)' }
-      }, `등록된 링크 (${filteredLinks.length}개)`),
+      isMobile
+        ? renderVisitFilterToggleMobile()
+        : /*#__PURE__*/React.createElement("label", {
+            style: { fontSize: 'var(--font-size-md)', fontWeight: 800, color: 'var(--text-muted)' }
+          }, `등록된 링크 (${filteredLinks.length}개)`),
       /*#__PURE__*/React.createElement("div", {
         style: { display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }
       },
@@ -2122,7 +2159,7 @@ export function ChatGalleryModal({
     UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
       ariaLabel: "갤러리 탭",
       value: activeTab,
-      onChange: setActiveTab,
+      onChange: v => setActiveTab(v),
       style: { backgroundColor: 'var(--bg-primary)', flex: 1, borderBottom: 'none' },
       options: [
         { value: 'photos', label: '사진', badge: ((searchQuery || '').trim() ? visiblePhotos.length : displayPhotoTabCount) },
@@ -2132,8 +2169,8 @@ export function ChatGalleryModal({
   ), asPage && isMobile && /*#__PURE__*/React.createElement("div", {
     className: "gallery-page-tabs-mobile",
     style: {
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
-      padding: '6px 12px', borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)',
+      display: 'flex', alignItems: 'center', padding: '0',
+      borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)',
       flexShrink: 0,
       position: 'fixed', top: isSearchOpen ? '104px' : '56px', left: 0, right: 0, zIndex: 1009,
       transition: 'transform 0.3s ease, top 0.3s ease',
@@ -2143,45 +2180,28 @@ export function ChatGalleryModal({
     UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
       ariaLabel: "갤러리 탭",
       value: activeTab,
-      onChange: setActiveTab,
+      onChange: v => setActiveTab(v),
       style: { backgroundColor: 'var(--bg-primary)', flex: 1, borderBottom: 'none' },
       options: [
         { value: 'photos', label: '사진', badge: ((searchQuery || '').trim() ? visiblePhotos.length : displayPhotoTabCount) },
         { value: 'links', label: '링크', badge: filteredLinks.length }
       ]
-    }),
-    /* View-mode toggle: 전체 | 일자 -- same pill as the PC header filter, just relocated
-       into this row on narrow phones (matches the places page's 방문/예정 mobile toggle). */
-    /*#__PURE__*/React.createElement("div", {
-      className: "visit-filter-toggle-mobile",
-      style: {
-        display: 'inline-flex', alignItems: 'center', height: '44px', boxSizing: 'border-box',
-        padding: '3px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)',
-        backgroundColor: 'var(--bg-card)', flexShrink: 0
-      }
-    },
-      [
-        { key: 'all', label: '전체' },
-        { key: 'date', label: '일자' }
-      ].map(tab => /*#__PURE__*/React.createElement("button", {
-        key: tab.key,
-        type: "button",
-        onClick: () => setGalleryViewMode(tab.key),
-        style: {
-          height: '100%', boxSizing: 'border-box', padding: '0 12px', fontSize: 'var(--font-size-md)', fontWeight: 900,
-          borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer',
-          backgroundColor: galleryViewMode === tab.key ? '#4F46E5' : 'transparent',
-          color: galleryViewMode === tab.key ? '#FFFFFF' : 'var(--text-muted)'
-        }
-      }, tab.label))
-    )
+    })
   ), /*#__PURE__*/React.createElement("div", {
     ref: gridHostRef,
     onScroll: asPage ? handleGalleryScroll : undefined,
     style: {
-      flex: 1, overflowY: 'auto',
+      flex: 1, overflowY: 'auto', minHeight: 0,
+      overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch',
+      // When the fixed header/tabs hide via translateY, drop the reserved top padding so the
+      // first scroll gesture actually moves thumbnails instead of only eating empty padding.
       padding: asPage
-        ? ((isSearchOpen ? '180px' : '132px') + ' 20px 16px 20px')
+        ? (
+            (!isHeaderVisible
+              ? '12px'
+              : (isSearchOpen ? '156px' : '108px'))
+            + ' 20px 16px 20px'
+          )
         : '16px 20px',
       display: 'flex', flexDirection: 'column', gap: activeTab === 'links' ? '8px' : '12px', boxSizing: 'border-box',
       minWidth: 0
