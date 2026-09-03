@@ -3511,7 +3511,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     const meetingText = [row.meeting?.date, row.meeting?.note].filter(Boolean).join(' ').toLowerCase();
     const meetingMatches = meetingText.includes(settlementSearchNeedle);
     const items = meetingMatches ? row.items : row.items.filter(item => [item.label, item.category?.name, item.category?.id, item.url].filter(Boolean).join(' ').toLowerCase().includes(settlementSearchNeedle));
-    return { ...row, items, expenseTotal: items.filter(item => !item.isIncome).reduce((sum, item) => sum + Math.abs(item.amount), 0), incomeTotal: items.filter(item => item.isIncome).reduce((sum, item) => sum + Math.abs(item.amount), 0) };
+    return { ...row, items, expenseTotal: items.filter(item => !item.isIncome && !item.isSelfPay).reduce((sum, item) => sum + Math.abs(item.amount), 0), incomeTotal: items.filter(item => item.isIncome).reduce((sum, item) => sum + Math.abs(item.amount), 0) };
   };
   const matchesSettlementSearch = row => {
     if (!settlementSearchNeedle) return true;
@@ -3540,7 +3540,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
             ledgerKey: `${meeting.date}|${expense.id || index}|${expense.createdAt || ''}|${amount}`
           };
         }));
-      const expenseTotal = items.filter(item => !item.isIncome).reduce((sum, item) => sum + Math.abs(item.amount), 0);
+      const expenseTotal = items.filter(item => !item.isIncome && !item.isSelfPay).reduce((sum, item) => sum + Math.abs(item.amount), 0);
       const incomeTotal = items.filter(item => item.isIncome).reduce((sum, item) => sum + Math.abs(item.amount), 0);
       return { meeting, items, expenseTotal, incomeTotal, net: incomeTotal - expenseTotal };
     })
@@ -3550,12 +3550,17 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   const allTimeItems = allTimeRows.flatMap(row => row.items.map(item => ({ ...item, date: row.meeting.date, meetingNote: row.meeting.note || '' })));
   const settlementBalanceByKey = new Map();
   let runningSettlementBalance = baseBudget;
+  // 자비부담(isSelfPay) stays visible in the ledger but never moves 공금 running balance.
   allTimeItems.slice().reverse().forEach(item => {
+    if (item.isSelfPay) {
+      settlementBalanceByKey.set(item.ledgerKey, null);
+      return;
+    }
     runningSettlementBalance += item.isIncome ? Math.abs(item.amount) : -Math.abs(item.amount);
     settlementBalanceByKey.set(item.ledgerKey, runningSettlementBalance);
   });
   const allTimeIncome = baseBudget + allTimeItems.filter(item => item.isIncome).reduce((sum, item) => sum + Math.abs(item.amount), 0);
-  const allTimeExpense = allTimeItems.filter(item => !item.isIncome).reduce((sum, item) => sum + Math.abs(item.amount), 0);
+  const allTimeExpense = allTimeItems.filter(item => !item.isIncome && !item.isSelfPay).reduce((sum, item) => sum + Math.abs(item.amount), 0);
   const settlementParticipants = getActiveParticipants(calendar);
   const getCalendarSettlementCards = __deps.getCalendarSettlementCards || (c => Array.isArray(c?.settlementCards) ? c.settlementCards : []);
   const customSettlementCards = getCalendarSettlementCards(calendar);
@@ -3602,7 +3607,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
             ledgerKey: `${meeting.date}|${expense.id || index}|${expense.createdAt || ''}|${amount}`
           };
         }));
-      const expenseTotal = items.filter(item => !item.isIncome).reduce((sum, item) => sum + Math.abs(item.amount), 0);
+      const expenseTotal = items.filter(item => !item.isIncome && !item.isSelfPay).reduce((sum, item) => sum + Math.abs(item.amount), 0);
       const incomeTotal = items.filter(item => item.isIncome).reduce((sum, item) => sum + Math.abs(item.amount), 0);
       return { meeting, items, expenseTotal, incomeTotal, net: incomeTotal - expenseTotal };
     })
@@ -3613,6 +3618,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   const allItems = rows.flatMap(row => row.items.map(item => ({ ...item, date: row.meeting.date, meetingNote: row.meeting.note || '' })));
   const incomeItems = allItems.filter(item => item.isIncome);
   const expenseItems = allItems.filter(item => !item.isIncome);
+  const fundExpenseItems = expenseItems.filter(item => !item.isSelfPay);
 
   const displayIncome = activeTab === 'total'
     ? allTimeIncome
@@ -3620,14 +3626,14 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
 
   const displayExpense = activeTab === 'total'
     ? allTimeExpense
-    : expenseItems.reduce((sum, item) => sum + Math.abs(item.amount), 0);
+    : fundExpenseItems.reduce((sum, item) => sum + Math.abs(item.amount), 0);
 
   // 일자별보기(선택된 월)일 때는 그 달의 수입-지출 순액을, 누적보기일 때는 baseBudget까지 포함한
   // 전체 기간 잔액을 보여준다 -- displayIncome/displayExpense가 이미 탭에 따라 그 값들을 계산해
   // 두므로 둘의 차만 내면 두 경우 모두 올바른 값이 나온다.
   const displayBalance = activeTab === 'total' ? overallBalance : (displayIncome - displayExpense);
 
-  const allTimeExpenseItems = allTimeItems.filter(item => !item.isIncome);
+  const allTimeExpenseItems = allTimeItems.filter(item => !item.isIncome && !item.isSelfPay);
   const categoryTotals = categories.map(category => ({
     category,
     total: allTimeExpenseItems.filter(item => item.category.id === category.id).reduce((sum, item) => sum + Math.abs(item.amount), 0),
@@ -3747,6 +3753,20 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     style: { width: '7px', height: '7px', borderRadius: '50%', backgroundColor: category.color }
   }), category.name);
 
+  const selfPayBadge = /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      padding: '4px 9px',
+      borderRadius: 'var(--radius-full)',
+      backgroundColor: 'rgba(100, 116, 139, 0.14)',
+      color: '#475569',
+      fontSize: 'var(--font-size-xs)',
+      fontWeight: 900,
+      whiteSpace: 'nowrap'
+    }
+  }, "자비부담");
+
   const renderItemRow = (item, showDate = false) => /*#__PURE__*/React.createElement("div", {
     key: item.id || `${item.date}_${item.createdAt}_${item.amount}`,
     onClick: () => onSelectDate && onSelectDate(item.date),
@@ -3755,13 +3775,13 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }
   }, /*#__PURE__*/React.createElement("div", {
     style: { minWidth: 0, display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }
-  }, categoryBadge(getDisplayCategory(item)), showDate && /*#__PURE__*/React.createElement("span", { className: "registered-at-text" }, formatDateWithDayName(item.date))), /*#__PURE__*/React.createElement("strong", {
+  }, categoryBadge(getDisplayCategory(item)), item.isSelfPay ? selfPayBadge : null, showDate && /*#__PURE__*/React.createElement("span", { className: "registered-at-text" }, formatDateWithDayName(item.date))), /*#__PURE__*/React.createElement("strong", {
     style: { fontSize: '0.9rem', color: item.isIncome ? 'var(--status-green)' : '#DC2626', whiteSpace: 'nowrap' }
   }, item.isIncome ? '+' : '-', Math.abs(item.amount).toLocaleString(), "원")), /*#__PURE__*/React.createElement("span", {
     style: { fontSize: 'var(--font-size-base)', color: 'var(--text-main)', fontWeight: 500, overflowWrap: 'anywhere' }
-  }, highlightSettlement(item.label)), /*#__PURE__*/React.createElement("span", {
+  }, highlightSettlement(item.label)), !item.isSelfPay && settlementBalanceByKey.get(item.ledgerKey) != null && /*#__PURE__*/React.createElement("span", {
     className: "settlement-running-balance"
-  }, `잔액\u00a0\u00a0\u00a0${Number(settlementBalanceByKey.get(item.ledgerKey) || 0).toLocaleString()}원`), item.url && /*#__PURE__*/React.createElement("button", {
+  }, `잔액\u00a0\u00a0\u00a0${Number(settlementBalanceByKey.get(item.ledgerKey)).toLocaleString()}원`), item.url && /*#__PURE__*/React.createElement("button", {
     type: "button",
     title: item.url,
     style: {
