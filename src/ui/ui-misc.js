@@ -921,6 +921,7 @@ export function InlineSearchBar({
   autoFocus = true,
   fixed = false,
   inputRef = null,
+  leading = null,
   trailing = null,
   className = '',
   style = null
@@ -945,6 +946,7 @@ export function InlineSearchBar({
     className: `inline-search-bar${fixed ? ' is-fixed' : ''}${className ? ' ' + className : ''}`,
     style: barStyle
   },
+    leading,
     /*#__PURE__*/React.createElement("div", {
       className: "inline-search-capsule",
       style: {

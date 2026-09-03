@@ -1731,7 +1731,7 @@ function getKakaoMapLinkUrl(place) {
 // for that date (see doesPlaceMatchDate), since a confirmed meeting's place is exactly the kind
 // of detail worth keeping alongside its history entry.
 export function HistoryView({
-  calendar, onBack, onSelectDate, onChangeView, onOpenAppSettings,
+  calendar, onBack, onSelectDate, onChangeView, onOpenAppSettings, onOpenShare = null,
   chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, historyCount = 0,
   chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null,
   showSettlement = true, onOpenCreateSettlement,
@@ -1814,7 +1814,7 @@ export function HistoryView({
           display: 'flex', alignItems: 'center', fontWeight: 800, fontSize: '0.95rem',
           color: 'var(--text-main)', whiteSpace: 'nowrap', pointerEvents: 'none'
         }
-      }, calendar.title, " 히스토리"),
+      }, calendar.title, " 보관함"),
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
         /*#__PURE__*/React.createElement("button", {
           type: "button", onClick: () => setIsSearchOpen(v => !v), title: "모임 검색", "aria-label": "모임 검색",
@@ -1830,10 +1830,11 @@ export function HistoryView({
       value: searchQuery,
       placeholder: "날짜·참여자·메모·장소 검색...",
       onChange: e => setSearchQuery(e.target.value),
-      trailing: searchQuery ? /*#__PURE__*/React.createElement("button", {
-        type: "button", onClick: () => setSearchQuery(''),
-        style: { border: 'none', background: 'none', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)', cursor: 'pointer', fontWeight: 600, flexShrink: 0 }
-      }, "초기화") : null
+      leading: /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => { setIsSearchOpen(false); setSearchQuery(''); },
+        style: { border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px 6px', fontSize: 'var(--font-size-md)', fontWeight: 700, flexShrink: 0 }
+      }, "닫기")
     }),
     /*#__PURE__*/React.createElement("div", {
       style: { display: 'flex', borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)', flexShrink: 0 }
@@ -1941,7 +1942,7 @@ export function HistoryView({
     isMenuOpen && /*#__PURE__*/React.createElement("div", {
       className: "admin-side-menu-overlay", style: { zIndex: 12000 }, onClick: () => setIsMenuOpen(false)
     }, /*#__PURE__*/React.createElement("div", {
-      className: "admin-side-menu", onClick: e => e.stopPropagation(), role: "dialog", "aria-label": "히스토리 메뉴"
+      className: "admin-side-menu", onClick: e => e.stopPropagation(), role: "dialog", "aria-label": "보관함 메뉴"
     },
       /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-header" },
         /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-brand" },
@@ -1950,7 +1951,7 @@ export function HistoryView({
               type: "button", className: "admin-side-menu-title", title: "메인 화면으로 이동", "aria-label": "메인 화면으로 이동",
               onClick: () => { setIsMenuOpen(false); if (typeof onChangeView === 'function') onChangeView('calendar'); else if (typeof onBack === 'function') onBack(); },
               style: { background: 'none', border: 'none', padding: 0, margin: 0, color: 'var(--text-main)', fontSize: '1.05rem', fontWeight: 800, cursor: 'pointer' }
-            }, "히스토리")
+            }, "보관함")
           )
         ),
         /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 } },
@@ -1992,6 +1993,7 @@ export function HistoryView({
       }),
       typeof SharedSideMenuFooter === 'function' && /*#__PURE__*/React.createElement(SharedSideMenuFooter, {
         onClose: () => setIsMenuOpen(false),
+        onOpenShare: onOpenShare,
         onOpenSettings: onOpenAppSettings
       })
     ))

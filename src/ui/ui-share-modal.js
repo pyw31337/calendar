@@ -776,6 +776,7 @@ function getDeps() { return window.GATHER_UI_DEPS || {}; }
       if (shareType === 'memo') return getViewShareUrl(calendar.id, 'memo');
       if (shareType === 'gallery') return getViewShareUrl(calendar.id, 'gallery');
       if (shareType === 'settlement') return getViewShareUrl(calendar.id, 'settlement');
+      if (shareType === 'history') return getViewShareUrl(calendar.id, 'history');
       return getCalendarShareUrl(calendar.id);
     }, [calendar, shareType, customUrl]);
 
@@ -784,12 +785,14 @@ function getDeps() { return window.GATHER_UI_DEPS || {}; }
       : shareType === 'memo' ? '메모 공유 URL'
       : shareType === 'gallery' ? '갤러리 공유 URL'
       : shareType === 'settlement' ? '정산 공유 URL'
+      : shareType === 'history' ? '보관함 공유 URL'
       : '캘린더 공유 URL';
     const shareLabel = shareType === 'chat' ? ('현재 채팅방 (' + calendar.id + ') 전용 공유 URL')
       : shareType === 'places' ? ('현재 장소 (' + calendar.id + ') 전용 공유 URL')
       : shareType === 'memo' ? ('현재 메모 (' + calendar.id + ') 전용 공유 URL')
       : shareType === 'gallery' ? ('현재 갤러리 (' + calendar.id + ') 전용 공유 URL')
       : shareType === 'settlement' ? ('현재 정산 (' + calendar.id + ') 전용 공유 URL')
+      : shareType === 'history' ? ('현재 보관함 (' + calendar.id + ') 전용 공유 URL')
       : ('현재 캘린더 (' + calendar.id + ') 전용 공유 URL');
 
     const qrDataUrl = React.useMemo(function () {

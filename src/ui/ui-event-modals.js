@@ -3883,7 +3883,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     value: settlementSearchQuery,
     placeholder: "정산 항목, 날짜 또는 카테고리 검색...",
     onChange: event => setSettlementSearchQuery(event.target.value),
-    trailing: settlementSearchQuery ? /*#__PURE__*/React.createElement("button", { type: "button", onClick: () => setSettlementSearchQuery(''), style: { border: 'none', background: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontWeight: 700 } }, "초기화") : null
+    trailing: /*#__PURE__*/React.createElement("button", { type: "button", onClick: () => { setIsSettlementSearchOpen(false); setSettlementSearchQuery(''); }, style: { border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px 6px', fontSize: 'var(--font-size-md)', fontWeight: 700, flexShrink: 0 } }, "닫기")
   }),
 
   /*#__PURE__*/React.createElement("div", {

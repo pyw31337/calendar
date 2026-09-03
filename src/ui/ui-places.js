@@ -1912,7 +1912,17 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
             }
           }, "예정")
         ),
-        /* 3-line menu */
+        /* Search + 3-line menu */
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          onClick: () => setIsSearchOpen(prev => { if (prev) setListSearchQuery(''); return !prev; }),
+          title: "장소 검색",
+          "aria-label": "장소 검색",
+          style: {
+            background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
+            color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }
+        }, SearchIcon ? /*#__PURE__*/React.createElement(SearchIcon, null) : "🔍"),
         /*#__PURE__*/React.createElement("button", {
           type: "button",
           onClick: () => setIsPlacesMenuOpen(true),
@@ -1934,11 +1944,11 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
         setListSearchQuery(val);
         if (val.trim()) setCategoryFilter('all');
       },
-      trailing: listSearchQuery ? /*#__PURE__*/React.createElement("button", {
+      trailing: /*#__PURE__*/React.createElement("button", {
         type: "button",
-        onClick: () => setListSearchQuery(''),
-        style: { border: 'none', background: 'none', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)', cursor: 'pointer', fontWeight: 600, flexShrink: 0 }
-      }, "초기화") : null
+        onClick: () => { setIsSearchOpen(false); setListSearchQuery(''); },
+        style: { border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px 6px', fontSize: 'var(--font-size-md)', fontWeight: 700, flexShrink: 0 }
+      }, "닫기")
     }),
 
     /* Sticky Map Area */
