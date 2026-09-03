@@ -132,6 +132,7 @@ import {
   unsubscribeUserFromPush,
   notifyNewChatMessage,
   notifyMeetingReminder,
+  notifyRepeatScheduleReminder,
   getContrastTextColor,
   formatDateWithDayName,
   formatShortDateWithDayName,
@@ -2163,26 +2164,45 @@ function CalendarApp() {
     }
   }, [activeCal, activeCalLoaded]);
 
-  // Local meeting reminder: on D-day or D-1 of a confirmed meeting, nudge once per day the app
-  // happens to be opened (no backend push exists here -- see notifyMeetingReminder's own note).
+  // Local schedule reminder: D-day anytime, or D-1 after 18:00 local, for confirmed meetings
+  // and type:repeat anniversary occurrences. Best-effort while the tab is open -- server push
+  // at 18:00 KST (sendEveScheduleReminders) covers devices that aren't open.
   React.useEffect(() => {
     if (!activeCalLoaded || !activeCal) return;
     const meetings = getTrulyConfirmedMeetings(activeCal);
-    if (meetings.length === 0) return;
     const now = new Date();
     const toDateStr = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     const todayStr = toDateStr(now);
     const tomorrowStr = toDateStr(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));
+    const hour = now.getHours();
+    const candidates = [];
     const todayMeeting = meetings.find(m => m.date === todayStr);
-    const tomorrowMeeting = meetings.find(m => m.date === tomorrowStr);
-    const target = todayMeeting ? { meeting: todayMeeting, whenLabel: '오늘' } : tomorrowMeeting ? { meeting: tomorrowMeeting, whenLabel: '내일' } : null;
-    if (!target) return;
-    const shownKey = `gather_meeting_reminder_shown_${activeCal.id}_${target.meeting.date}_${todayStr}_v1`;
-    if (getLocalStorage().getItem(shownKey)) return;
-    getLocalStorage().setItem(shownKey, '1');
-    const fallbackMessage = notifyMeetingReminder(activeCal, target.meeting, target.whenLabel);
-    if (fallbackMessage) showToast(fallbackMessage, 'success');
-  }, [activeCal?.id, activeCalLoaded, activeCal?.confirmedMeeting]);
+    if (todayMeeting) candidates.push({ kind: 'meeting', meeting: todayMeeting, whenLabel: '오늘', key: todayMeeting.date });
+    if (hour >= 18) {
+      const tomorrowMeeting = meetings.find(m => m.date === tomorrowStr);
+      if (tomorrowMeeting) candidates.push({ kind: 'meeting', meeting: tomorrowMeeting, whenLabel: '내일', key: tomorrowMeeting.date });
+    }
+    const annList = Array.isArray(anniversaries) ? anniversaries : [];
+    const collectRepeats = (dateStr, whenLabel) => {
+      getAnniversariesForDate(dateStr, annList).filter(a => a && a.type === 'repeat').forEach(ann => {
+        candidates.push({ kind: 'repeat', ann, whenLabel, date: dateStr, key: `repeat_${ann.id}_${dateStr}` });
+      });
+    };
+    collectRepeats(todayStr, '오늘');
+    if (hour >= 18) collectRepeats(tomorrowStr, '내일');
+    candidates.forEach(target => {
+      const shownKey = `gather_meeting_reminder_shown_${activeCal.id}_${target.key}_${todayStr}_v1`;
+      if (getLocalStorage().getItem(shownKey)) return;
+      getLocalStorage().setItem(shownKey, '1');
+      if (target.kind === 'meeting') {
+        const fallbackMessage = notifyMeetingReminder(activeCal, target.meeting, target.whenLabel);
+        if (fallbackMessage) showToast(fallbackMessage, 'success');
+      } else if (typeof notifyRepeatScheduleReminder === 'function') {
+        const fallbackMessage = notifyRepeatScheduleReminder(activeCal, target.ann, target.whenLabel, target.date);
+        if (fallbackMessage) showToast(fallbackMessage, 'success');
+      }
+    });
+  }, [activeCal?.id, activeCalLoaded, activeCal?.confirmedMeeting, anniversaries]);
 
   // Synchronize chatParticipantId when activeCal changes (loads cached participant or defaults to first active)
   React.useEffect(() => {
@@ -10607,6 +10627,21 @@ async function resolveAnniversaryImageBatch(calendarId, compressedList, onProgre
   return resolveImageBatch(calendarId, compressedList, onProgress, uploadAnniversaryImageAssets);
 }
 
+
+function isRepeatAnniversaryOnDate(ann, dateStr) {
+  if (!ann || ann.type !== 'repeat' || !dateStr) return false;
+  if (ann.startDate && dateStr < ann.startDate) return false;
+  if (ann.endDate && dateStr > ann.endDate) return false;
+  const parts = dateStr.split('-').map(Number);
+  const y = parts[0], m = parts[1], d = parts[2];
+  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return false;
+  const weekOfMonth = Math.ceil(d / 7);
+  const dow = new Date(y, m - 1, d).getDay();
+  const weekSet = new Set((Array.isArray(ann.weeks) ? ann.weeks : []).map(Number));
+  const daySet = new Set((Array.isArray(ann.weekdays) ? ann.weekdays : []).map(Number));
+  return weekSet.has(weekOfMonth) && daySet.has(dow);
+}
+
 function getAnniversariesForDate(dateStr, anniversariesList) {
   if (!dateStr || !Array.isArray(anniversariesList)) return [];
   const [y, m, d] = dateStr.split('-').map(Number);
@@ -10804,6 +10839,23 @@ function getAnniversariesForDate(dateStr, anniversariesList) {
           photos: ann.photos
         }, ann));
       }
+    } else if (ann.type === 'repeat') {
+      // Monthly nth-weekday rules saved from the 반복 tab (e.g. 매월 셋째주 수요일). Same
+      // weekOfMonth = ceil(day/7) + weekday match used when bulk-registering dates.
+      if (!isRepeatAnniversaryOnDate(ann, dateStr)) return;
+      const catBadge = getAnniversaryCategoryBadge(ann.category || 'other');
+      results.push(withAnnDetail({
+        id: ann.id,
+        title: `${ann.title || ann.patternLabel || '반복 일정'}`,
+        badgeColor: catBadge.badgeColor,
+        icon: catBadge.icon,
+        type: 'repeat',
+        startDate: ann.startDate,
+        endDate: ann.endDate,
+        weeks: ann.weeks,
+        weekdays: ann.weekdays,
+        patternLabel: ann.patternLabel
+      }, ann));
     }
   });
   return results;

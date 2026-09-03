@@ -1107,6 +1107,27 @@ function notifyMeetingReminder(calendar, meeting, whenLabel) {
   return body;
 }
 
+function notifyRepeatScheduleReminder(calendar, ann, whenLabel, dateStr) {
+  if (!isChatNotifyEnabledForCalendar(calendar?.id)) return;
+  const title = (ann && (ann.title || ann.patternLabel)) || '반복 일정';
+  const dateLabel = dateStr ? formatConfirmedMeetingLabel(dateStr) : '';
+  const body = dateLabel
+    ? `${whenLabel} 반복 일정입니다. ${title} (${dateLabel})`
+    : `${whenLabel} 반복 일정입니다. ${title}`;
+  if (isNotificationSupported() && Notification.permission === 'granted') {
+    try {
+      new Notification(`${calendar?.title || '모여라 캘린더'} 일정 알림`, {
+        body,
+        tag: `repeat-reminder-${calendar?.id}-${ann?.id || 'x'}-${dateStr || ''}`
+      });
+      return;
+    } catch (e) {
+      console.warn('Failed to show repeat reminder notification:', e);
+    }
+  }
+  return body;
+}
+
 // Registers sw.js, which only caches static assets (icons/manifests) -- never index.html
 // itself, since this app deliberately serves its HTML as no-cache (see sw.js for why). Safe to
 // register unconditionally: browsers without service worker support simply skip this.
@@ -2273,6 +2294,7 @@ export {
   unsubscribeUserFromPush,
   notifyNewChatMessage,
   notifyMeetingReminder,
+  notifyRepeatScheduleReminder,
   getContrastTextColor,
   formatDateWithDayName,
   formatShortDateWithDayName,
