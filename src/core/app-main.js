@@ -10622,7 +10622,10 @@ function getAnniversariesForDate(dateStr, anniversariesList) {
       // Multi-day (연일) event/festival spanning a start/end date range. type/startDate/endDate
       // are kept on the result (unlike the other branches above) so the calendar grid can tell
       // a spanning festival apart from a single-day anniversary and render it as one connected
-      // bar across the days it covers instead of a separate badge repeated on each day.
+      // bar across the days it covers instead of a separate badge repeated on each day. place/
+      // description/photos are also carried through -- DateModal's expanded festival banner
+      // reads these directly, and without them here it could only ever show a title and date
+      // range no matter how much detail the anniversary itself actually had saved.
       if (!ann.startDate || !ann.endDate) return;
       if (dateStr >= ann.startDate && dateStr <= ann.endDate) {
         const catBadge = getAnniversaryCategoryBadge(ann.category);
@@ -10633,7 +10636,10 @@ function getAnniversariesForDate(dateStr, anniversariesList) {
           icon: catBadge.icon,
           type: 'range',
           startDate: ann.startDate,
-          endDate: ann.endDate
+          endDate: ann.endDate,
+          place: ann.place,
+          description: ann.description,
+          photos: ann.photos
         });
       }
     }
