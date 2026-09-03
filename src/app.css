@@ -466,6 +466,9 @@ body:has(.admin-login-gate) {
   transition: transform var(--motion-base) var(--motion-ease-out), box-shadow var(--motion-base) var(--motion-ease-out);
 }
 @media (max-width: 600px) {
+  .confirmed-meeting-list {
+    margin-top: -10px;
+  }
   .confirmed-meeting-list[data-confirmed-count="three-plus"] {
     display: grid !important;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1420,7 +1423,13 @@ button, input, textarea, select {
 
 
 
-/* Mobile rule: iOS Safari zooms focused inputs under 16px — keep form controls at 16px */
+/* Mobile rule: iOS Safari zooms focused inputs under 16px — keep form controls at 16px.
+   The blanket input/select/textarea selectors below (added alongside the original named-class
+   list) are the actual "모든 입력필드와 셀렉트박스" unification rule -- every real text-entry
+   control on mobile lands on this one !important 1rem regardless of what class/inline font-size
+   it was individually given, rather than relying on each usage remembering to opt in. Non-text
+   input types are excluded since forcing a font-size on a checkbox/radio/range/color/file input
+   has no visual meaning and isn't part of the iOS zoom-on-focus behavior this rule guards. */
 @media (max-width: 720px) {
   input.form-input,
   textarea.form-input,
@@ -1433,7 +1442,9 @@ button, input, textarea, select {
   input[type="text"],
   input[type="search"],
   input[type="number"],
-  textarea {
+  textarea,
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="hidden"]),
+  select {
     font-size: 1rem !important;
   }
 }
