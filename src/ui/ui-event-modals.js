@@ -809,7 +809,9 @@ export function AnniversaryModal({
   onAnniversaryDeleted,
   isDarkTheme,
   embedded = false,
-  setActiveLightbox
+  setActiveLightbox,
+  initialEditId = null,
+  onInitialEditConsumed = null
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -1015,6 +1017,13 @@ export function AnniversaryModal({
     }
     setActiveTab('add');
   };
+
+  React.useEffect(() => {
+    if (!initialEditId) return;
+    const ann = (anniversaries || []).find(a => a && a.id === initialEditId);
+    if (ann) handleEditClick(ann);
+    if (typeof onInitialEditConsumed === 'function') onInitialEditConsumed();
+  }, [initialEditId]); // intentional once when id set
 
   const handleAttachPhotoFiles = async (files) => {
     if (!files || files.length === 0) return;

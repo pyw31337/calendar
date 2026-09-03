@@ -838,7 +838,8 @@ export function DateModal({
   onClose,
   showToast,
   onParticipantClick,
-  syncStatus = null
+  syncStatus = null,
+  onEditAnniversary
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -855,6 +856,7 @@ export function DateModal({
   const UnderlineTabs = __comp.UnderlineTabs || __deps.UnderlineTabs;
   const SimpleBottomSheetPicker = __comp.SimpleBottomSheetPicker || __deps.SimpleBottomSheetPicker;
   const MediaThumb = __comp.MediaThumb || __deps.MediaThumb;
+  const PencilIcon = __comp.PencilIcon || __deps.PencilIcon;
   const CakeIcon = __comp.CakeIcon || __deps.CakeIcon;
   const BalloonIcon = __comp.BalloonIcon || __deps.BalloonIcon;
   const ConfettiIcon = __comp.ConfettiIcon || __deps.ConfettiIcon;
@@ -2572,6 +2574,13 @@ export function DateModal({
               cursor: 'pointer', flexShrink: 0
             }
           }),
+          onEditAnniversary && /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            onClick: e => { e.stopPropagation(); onEditAnniversary(ann); },
+            "aria-label": "기념일 편집",
+            title: "기념일 편집",
+            style: { background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', padding: '2px', display: 'flex', alignItems: 'center', flexShrink: 0, opacity: 0.9 }
+          }, PencilIcon ? /*#__PURE__*/React.createElement(PencilIcon, { size: 14 }) : null),
           hasDetail && /*#__PURE__*/React.createElement("button", {
             type: "button",
             onClick: e => { e.stopPropagation(); toggleAnnBannerExpanded(bannerKey); },

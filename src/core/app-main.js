@@ -1280,6 +1280,7 @@ function CalendarApp() {
   const [voteTarget, setVoteTarget] = React.useState(null);
   const [isGuideOpen, setIsGuideOpen] = React.useState(false);
   const [isAnniversariesOpen, setIsAnniversariesOpen] = React.useState(false);
+  const [anniversaryEditId, setAnniversaryEditId] = React.useState(null);
   const [isInitialDataLoading, setIsInitialDataLoading] = React.useState(() => {
     if (!firebaseDb) return false;
     try {
@@ -6240,7 +6241,8 @@ function CalendarApp() {
       onRequestConfirm: showConfirmDialog,
       syncStatus: syncStatus,
       onClose: () => { setIsModalOpen(false); setDateModalInitialTab(null); },
-      onParticipantClick: handleParticipantClick
+      onParticipantClick: handleParticipantClick,
+      onEditAnniversary: (ann) => { if (!ann?.id) return; setAnniversaryEditId(ann.id); setIsAnniversariesOpen(true); }
     }),
     confirmDialog && /*#__PURE__*/React.createElement(ConfirmDialog, {
       title: confirmDialog.title,
@@ -7381,7 +7383,9 @@ function CalendarApp() {
   }), isAnniversariesOpen && /*#__PURE__*/React.createElement(AnniversaryModal, {
     calendar: activeCal,
     anniversaries: anniversaries,
-    onClose: () => setIsAnniversariesOpen(false),
+    initialEditId: anniversaryEditId,
+    onInitialEditConsumed: () => setAnniversaryEditId(null),
+    onClose: () => { setIsAnniversariesOpen(false); setAnniversaryEditId(null); },
     showToast: showToast,
     onRequestConfirm: showConfirmDialog,
     onBulkRegister: handleBulkRegisterAvailability,
