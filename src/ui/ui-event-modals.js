@@ -2197,7 +2197,7 @@ export function AnniversaryModal({
         );
       })
     ),
-    /*#__PURE__*/React.createElement("div", { style: { padding: '12px 16px 16px' } },
+    /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-footer" },
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "btn btn-primary",
@@ -2237,7 +2237,7 @@ export function AnniversaryModal({
         );
       })
     ),
-    /*#__PURE__*/React.createElement("div", { style: { padding: '12px 16px 16px' } },
+    /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-footer" },
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "btn btn-primary",

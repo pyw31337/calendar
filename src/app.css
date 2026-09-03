@@ -2446,11 +2446,19 @@ select.form-select {
   flex-shrink: 0;
 }
 .comment-composer-input {
-  font-size: 0.8rem !important;
   background-color: #fff !important;
   white-space: pre-wrap;
   word-break: break-word;
   overflow-wrap: anywhere;
+}
+/* Desktop-only: mobile textareas stay at the blanket 1rem mobile input rule (app.css ~1433) --
+   a class-selector !important here would otherwise beat that tag-selector !important on
+   specificity and drop this composer to 0.8rem on phones, risking iOS Safari's
+   zoom-on-focus-under-16px behavior that rule exists to prevent. */
+@media (min-width: 640px) {
+  .comment-composer-input {
+    font-size: 0.8rem !important;
+  }
 }
 @media (min-width: 640px) {
   .comment-composer {
