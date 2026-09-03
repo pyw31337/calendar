@@ -1127,6 +1127,10 @@ export function GamifiedConfirmButtonContent({ label }) {
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
 
+  const reduceMotion = typeof window !== "undefined"
+    && typeof window.matchMedia === "function"
+    && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
   const bolt = /*#__PURE__*/React.createElement("svg", {
     xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 24 24", width: "100%", height: "100%",
     fill: "currentColor", "aria-hidden": true
@@ -1135,7 +1139,63 @@ export function GamifiedConfirmButtonContent({ label }) {
     xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 24 24", width: "100%", height: "100%",
     fill: "currentColor", "aria-hidden": true
   }, /*#__PURE__*/React.createElement("path", { d: "M12 2l2.4 7.2H22l-6 4.8 2.3 7.2L12 16.8 5.7 21.2 8 14 2 9.2h7.6z" }));
+
+  /* Hidden SVG filter defs: feTurbulence + feDisplacementMap electric crackle (animate feOffset dy). */
+  const electricFilterDefs = /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: 0,
+    height: 0,
+    className: "gamified-electric-svg-defs",
+    "aria-hidden": true,
+    focusable: "false",
+    style: {
+      position: "absolute",
+      width: 0,
+      height: 0,
+      overflow: "hidden",
+      pointerEvents: "none"
+    }
+  }, /*#__PURE__*/React.createElement("defs", null,
+    /*#__PURE__*/React.createElement("filter", {
+      id: "gamified-electric-displace",
+      x: "-35%",
+      y: "-35%",
+      width: "170%",
+      height: "170%",
+      filterUnits: "objectBoundingBox",
+      colorInterpolationFilters: "sRGB"
+    },
+      /*#__PURE__*/React.createElement("feTurbulence", {
+        type: "fractalNoise",
+        baseFrequency: "0.04 0.09",
+        numOctaves: "2",
+        seed: "7",
+        result: "noise",
+        stitchTiles: "stitch"
+      }),
+      /*#__PURE__*/React.createElement("feOffset", {
+        in: "noise",
+        dx: "0",
+        dy: "0",
+        result: "offsetNoise"
+      }, !reduceMotion && /*#__PURE__*/React.createElement("animate", {
+        attributeName: "dy",
+        values: "0;70;-35;110;0",
+        dur: "2.2s",
+        repeatCount: "indefinite"
+      })),
+      /*#__PURE__*/React.createElement("feDisplacementMap", {
+        in: "SourceGraphic",
+        in2: "offsetNoise",
+        scale: "8",
+        xChannelSelector: "R",
+        yChannelSelector: "G"
+      })
+    )
+  ));
+
   return /*#__PURE__*/React.createElement(React.Fragment, null,
+    electricFilterDefs,
     /*#__PURE__*/React.createElement("span", { className: "gamified-shiny-glow-wrapper", "aria-hidden": true },
       /*#__PURE__*/React.createElement("span", { className: "gamified-shiny-glow" })
     ),
