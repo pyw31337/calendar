@@ -2135,7 +2135,16 @@ export function ResizableListSection({
   // mount time only, so a later content change doesn't fight a resize the user already made.
   React.useLayoutEffect(() => {
     if (!isAutoInitial || !listRef.current) return;
-    setHeight(clampHeight(listRef.current.scrollHeight));
+    const el = listRef.current;
+    // scrollHeight never includes border width (only padding + content), but this element's
+    // own box-sizing is border-box (global `* { box-sizing: border-box }`), so setting height
+    // straight from scrollHeight leaves exactly the border's width too little room -- content
+    // that fits exactly still overflows by a pixel or two and shows a needless scrollbar.
+    // offsetHeight - clientHeight isolates that border width (both already reflect the same
+    // border regardless of the element's current, possibly still-clamped, height) so it can be
+    // added back to get a height that actually fits the measured content with no scroll.
+    const borderHeight = el.offsetHeight - el.clientHeight;
+    setHeight(clampHeight(el.scrollHeight + borderHeight));
   }, []);
 
   const handleResizeStart = event => {
