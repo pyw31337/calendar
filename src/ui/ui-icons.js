@@ -2169,6 +2169,23 @@ export function FolderClockIcon({ size = 24 } = {}) {
   );
 }
 
+// Plain calendar (no check/cog/search overlay) used for anniversary date-range info, alongside
+// MapPinIcon below -- the existing Calendar*Icon variants all carry an extra glyph unsuited to a
+// simple date-range line.
+export function CalendarIcon({ size = 24 } = {}) {
+  const React = window.React;
+  return /*#__PURE__*/React.createElement('svg', {
+    xmlns: 'http://www.w3.org/2000/svg', width: String(size), height: String(size), viewBox: '0 0 24 24',
+    fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round',
+    'aria-hidden': 'true'
+  },
+    /*#__PURE__*/React.createElement('path', { d: 'M8 2v3' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M16 2v3' }),
+    /*#__PURE__*/React.createElement('rect', { x: '3', y: '4', width: '18', height: '18', rx: '2' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M3 10h18' })
+  );
+}
+
 // "현재 위치" (use my current location) button icon -- Lucide's locate-fixed, provided verbatim
 // by the product ask.
 export function LocateFixedIcon({ size = 24 } = {}) {
@@ -2209,6 +2226,7 @@ export function MapPinIcon({ size = 24 } = {}) {
     ConfettiIcon: ConfettiIcon,
     TicketsPlaneIcon: TicketsPlaneIcon,
     FolderClockIcon: FolderClockIcon,
+    CalendarIcon: CalendarIcon,
     LocateFixedIcon: LocateFixedIcon,
     MapPinIcon: MapPinIcon,
     MessageCircleMoreIcon: MessageCircleMoreIcon,
