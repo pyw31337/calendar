@@ -2522,85 +2522,124 @@ export function DateModal({
             }))
           });
         };
+        const dateDisplay = getAnnBannerDateDisplay(ann);
+        const titleRow = /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+          renderAnniversaryIcon(ann, 14), " ",
+          /*#__PURE__*/React.createElement("span", { style: { flex: 1, minWidth: 0 } }, ann.title),
+          photos.length > 0 && MediaThumb && /*#__PURE__*/React.createElement(MediaThumb, {
+            src: photos[0].thumbUrl || photos[0].url,
+            fallbackSrc: photos[0].url || photos[0].thumbUrl,
+            alt: "기념일 사진",
+            onClick: e => {
+              e.stopPropagation();
+              openAnniversaryLightbox(0);
+            },
+            style: {
+              width: `${thumbSize}px`, height: `${thumbSize}px`, borderRadius: '6px', objectFit: 'cover',
+              cursor: 'pointer', flexShrink: 0
+            }
+          }),
+          hasDetail && /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            onClick: e => { e.stopPropagation(); toggleAnnBannerExpanded(bannerKey); },
+            "aria-label": isExpanded ? "기념일 상세 접기" : "기념일 상세 펼치기",
+            style: { background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', padding: '2px', display: 'flex', alignItems: 'center', flexShrink: 0 }
+          }, /*#__PURE__*/React.createElement("svg", {
+            width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor",
+            strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+          }, isExpanded
+            ? /*#__PURE__*/React.createElement("path", { d: "M18 15l-6-6-6 6" })
+            : /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6 6-6" })
+          ))
+        );
+        const placeBlock = ann.place ? (() => {
+          const mapUrl = getAnnBannerKakaoMapLinkUrl(ann.place);
+          const placeName = ann.place.alias || ann.place.name || '';
+          const placeAddress = getDisplayPlaceAddress(ann.place) || '';
+          const nameEl = mapUrl
+            ? /*#__PURE__*/React.createElement("a", {
+                href: mapUrl, target: "_blank", rel: "noreferrer",
+                onClick: e => e.stopPropagation(),
+                style: { color: 'inherit', textDecoration: 'none', fontWeight: 700 }
+              }, placeName)
+            : /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700 } }, placeName);
+          return /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'flex-start', gap: '4px' } },
+            MapPinIcon && /*#__PURE__*/React.createElement("span", { style: { display: 'inline-flex', marginTop: '2px', flexShrink: 0 } },
+              /*#__PURE__*/React.createElement(MapPinIcon, { size: 14 })
+            ),
+            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0 } },
+              nameEl,
+              placeAddress ? /*#__PURE__*/React.createElement("span", { style: { color: 'rgba(255,255,255,0.85)', fontWeight: 500 } }, placeAddress) : null
+            )
+          );
+        })() : null;
+
+        if (!isExpanded) {
+          return /*#__PURE__*/React.createElement("div", {
+            key: bannerKey,
+            style: {
+              display: 'flex', flexDirection: 'column', gap: '8px',
+              justifyContent: 'center',
+              boxSizing: 'border-box',
+              height: '40px',
+              minHeight: '40px',
+              padding: '0 14px',
+              backgroundColor: `${displayColor}12`,
+              color: displayColor,
+              border: `1px solid ${displayColor}30`,
+              borderLeft: `4px solid ${displayColor}`,
+              borderRadius: 'var(--radius-md)',
+              fontSize: 'var(--font-size-md)',
+              fontWeight: 'bold'
+            }
+          }, titleRow);
+        }
+
+        // Expanded: two-tone — solid color header (title/date/place/thumb/chevron) + cream body (description)
         return /*#__PURE__*/React.createElement("div", {
           key: bannerKey,
           style: {
-            display: 'flex', flexDirection: 'column', gap: '8px',
-            justifyContent: 'center',
-            boxSizing: 'border-box',
-            height: isExpanded ? 'auto' : '40px',
-            minHeight: '40px',
-            padding: isExpanded ? '10px 14px' : '0 14px',
-            backgroundColor: `${displayColor}12`,
-            color: displayColor,
-            border: `1px solid ${displayColor}30`,
-            borderLeft: `4px solid ${displayColor}`,
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
             borderRadius: 'var(--radius-md)',
-            fontSize: 'var(--font-size-md)',
-            fontWeight: 'bold'
+            border: 'none',
+            height: 'auto',
+            padding: 0,
+            background: 'transparent',
+            gap: 0
           }
         },
-          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
-            renderAnniversaryIcon(ann, 14), " ",
-            /*#__PURE__*/React.createElement("span", { style: { flex: 1, minWidth: 0 } }, ann.title),
-            photos.length > 0 && MediaThumb && /*#__PURE__*/React.createElement(MediaThumb, {
-              src: photos[0].thumbUrl || photos[0].url,
-              fallbackSrc: photos[0].url || photos[0].thumbUrl,
-              alt: "기념일 사진",
-              onClick: e => {
-                e.stopPropagation();
-                openAnniversaryLightbox(0);
-              },
-              style: {
-                width: `${thumbSize}px`, height: `${thumbSize}px`, borderRadius: '6px', objectFit: 'cover',
-                cursor: 'pointer', flexShrink: 0
-              }
-            }),
-            hasDetail && /*#__PURE__*/React.createElement("button", {
-              type: "button",
-              onClick: e => { e.stopPropagation(); toggleAnnBannerExpanded(bannerKey); },
-              "aria-label": isExpanded ? "기념일 상세 접기" : "기념일 상세 펼치기",
-              style: { background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', padding: '2px', display: 'flex', alignItems: 'center', flexShrink: 0 }
-            }, /*#__PURE__*/React.createElement("svg", {
-              width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor",
-              strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
-            }, isExpanded
-              ? /*#__PURE__*/React.createElement("path", { d: "M18 15l-6-6-6 6" })
-              : /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6 6-6" })
-            ))
-          ),
-          isExpanded && /*#__PURE__*/React.createElement("div", {
-            style: { display: 'flex', flexDirection: 'column', gap: '4px', fontSize: 'var(--font-size-sm)', fontWeight: 500 }
+          /*#__PURE__*/React.createElement("div", {
+            onClick: hasDetail ? () => toggleAnnBannerExpanded(bannerKey) : undefined,
+            style: {
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px',
+              padding: '10px 12px',
+              backgroundColor: displayColor,
+              color: '#fff',
+              fontSize: 'var(--font-size-md)',
+              fontWeight: 'bold',
+              cursor: hasDetail ? 'pointer' : 'default'
+            }
           },
-            getAnnBannerDateDisplay(ann) && /*#__PURE__*/React.createElement("div", { style: { display: 'inline-flex', alignItems: 'center', gap: '4px' } },
+            titleRow,
+            dateDisplay && /*#__PURE__*/React.createElement("div", { style: { display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 500, fontSize: 'var(--font-size-sm)' } },
               CalendarIcon && /*#__PURE__*/React.createElement(CalendarIcon, { size: 14 }),
-              /*#__PURE__*/React.createElement("span", null, getAnnBannerDateDisplay(ann))
+              /*#__PURE__*/React.createElement("span", null, dateDisplay)
             ),
-            ann.place && (() => {
-              const mapUrl = getAnnBannerKakaoMapLinkUrl(ann.place);
-              const placeName = ann.place.alias || ann.place.name || '';
-              const placeAddress = getDisplayPlaceAddress(ann.place) || '';
-              const nameEl = mapUrl
-                ? /*#__PURE__*/React.createElement("a", {
-                    href: mapUrl, target: "_blank", rel: "noreferrer",
-                    onClick: e => e.stopPropagation(),
-                    style: { color: 'inherit', textDecoration: 'none', fontWeight: 700 }
-                  }, placeName)
-                : /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700 } }, placeName);
-              return /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'flex-start', gap: '4px' } },
-                MapPinIcon && /*#__PURE__*/React.createElement("span", { style: { display: 'inline-flex', marginTop: '2px', flexShrink: 0 } },
-                  /*#__PURE__*/React.createElement(MapPinIcon, { size: 14 })
-                ),
-                /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0 } },
-                  nameEl,
-                  placeAddress ? /*#__PURE__*/React.createElement("span", { style: { color: 'var(--text-muted)', fontWeight: 500 } }, placeAddress) : null
-                )
-              );
-            })(),
-            ann.description && /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-main)' } },
-              renderTextWithUrlBadge(ann.description)
-            )
-          )
+            placeBlock
+          ),
+          ann.description && /*#__PURE__*/React.createElement("div", {
+            style: {
+              backgroundColor: `color-mix(in srgb, ${displayColor} 12%, white)`,
+              color: 'var(--text-main)',
+              padding: '10px 12px',
+              fontWeight: 500,
+              fontSize: 'var(--font-size-sm)'
+            }
+          }, renderTextWithUrlBadge(ann.description))
         );
       })),
 

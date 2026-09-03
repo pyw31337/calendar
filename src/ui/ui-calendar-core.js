@@ -2189,7 +2189,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       }
     },
     style: {
-      backgroundColor: (memo.color && memo.color !== 'var(--bg-card)') ? memo.color : 'var(--bg-primary)',
+      backgroundColor: (memo.color && memo.color !== 'var(--bg-card)' && memo.color !== '#fff' && memo.color !== '#FFFFFF') ? memo.color : '#fff',
       border: '0',
       borderRadius: 'var(--radius-md)',
       padding: '12px',
