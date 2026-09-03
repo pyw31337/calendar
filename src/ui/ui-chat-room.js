@@ -1668,7 +1668,7 @@ export function ChatRoomView({
     "aria-label": "뒤로가기",
     style: {
       position: 'fixed',
-      top: '10px',
+      top: 'calc(10px + env(safe-area-inset-top, 0px))',
       left: '10px',
       width: '36px',
       height: '36px',
@@ -1736,7 +1736,7 @@ export function ChatRoomView({
     "aria-label": "공지 펼치기",
     style: {
       position: 'fixed',
-      top: '10px',
+      top: 'calc(10px + env(safe-area-inset-top, 0px))',
       right: '16px',
       width: '36px',
       height: '36px',
@@ -1755,7 +1755,7 @@ export function ChatRoomView({
     className: "chat-room-header",
     style: {
       position: 'fixed',
-      top: 0,
+      top: 'env(safe-area-inset-top, 0px)',
       left: 0,
       right: 0,
       height: '56px',
@@ -1821,7 +1821,7 @@ export function ChatRoomView({
       inset: 0,
       overflowY: 'auto',
       padding: '16px',
-      paddingTop: isSearchOpen ? '124px' : '72px',
+      paddingTop: `calc(${isSearchOpen ? '124px' : '72px'} + env(safe-area-inset-top, 0px))`,
       // Static 152px alone only clears the composer at its rest position. Once the virtual
       // keyboard opens, the fixed .chat-composer rides up by viewportBottom px (see its own
       // `bottom: viewportBottom` below) -- without adding that same amount here, scrolling to

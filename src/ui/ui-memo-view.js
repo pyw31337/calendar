@@ -1609,7 +1609,9 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       onClick: onBack,
       "aria-label": "뒤로가기",
       style: {
-        position: 'fixed', top: '10px', left: '10px', width: '36px', height: '36px',
+        // env(safe-area-inset-top): iOS 홈화면 설치 상태에서 상태바 아래로 밀어내 겹침/터치
+        // 불가 문제를 막는다. 일반 브라우저 탭에서는 0이라 기존 10px 그대로.
+        position: 'fixed', top: 'calc(10px + env(safe-area-inset-top, 0px))', left: '10px', width: '36px', height: '36px',
         borderRadius: '50%', backgroundColor: 'var(--bg-card)', border: 'none',
         boxShadow: isHeaderVisible ? 'none' : '0 2px 8px rgba(0,0,0,0.12)',
         transition: 'box-shadow 0.2s ease',
@@ -1623,7 +1625,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
     /*#__PURE__*/React.createElement("div", {
       className: "memo-view-header",
       style: {
-        position: 'fixed', top: 0, left: 0, right: 0, height: '56px',
+        position: 'fixed', top: 'env(safe-area-inset-top, 0px)', left: 0, right: 0, height: '56px',
         backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '0 16px', zIndex: 1010,
@@ -1769,7 +1771,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       style: { flex: 1, position: 'relative', minHeight: 0 }
     }, /*#__PURE__*/React.createElement("div", {
       onScroll: handleMemoScroll,
-      style: { position: 'absolute', inset: 0, overflowY: 'auto', padding: '16px', paddingTop: isSearchOpen ? '116px' : '72px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '20px' }
+      style: { position: 'absolute', inset: 0, overflowY: 'auto', padding: '16px', paddingTop: `calc(${isSearchOpen ? '116px' : '72px'} + env(safe-area-inset-top, 0px))`, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '20px' }
     },
       /* Shared-memo banner -- when this page was opened via a memo's own share link
          (?view=memo&memo=<id>), show that memo prominently as a single full-width row above

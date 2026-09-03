@@ -947,7 +947,11 @@ export function InlineSearchBar({
     borderBottom: '1px solid var(--border-subtle)',
     boxSizing: 'border-box',
     ...(fixed ? {
-      position: 'fixed', top: '56px', left: 0, right: 0, zIndex: 1008, flexShrink: 0
+      // +env(safe-area-inset-top): every `fixed` caller assumes a 56px header directly above
+      // starting at top:0 -- once that header shifts down for iOS standalone's status bar (see
+      // .main-header/.memo-view-header etc.), this bar needs the same shift to stay glued right
+      // below it instead of sliding back up under the status bar. 0 in a normal browser tab.
+      position: 'fixed', top: 'calc(56px + env(safe-area-inset-top, 0px))', left: 0, right: 0, zIndex: 1008, flexShrink: 0
     } : { flexShrink: 0, zIndex: 1008 }),
     ...(style || {})
   };

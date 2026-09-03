@@ -1621,7 +1621,9 @@ export function ChatGalleryModal({
     height: '56px', padding: '0 16px',
     borderBottom: isSearchOpen ? 'none' : '1px solid var(--border-subtle)',
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    position: 'fixed', top: 0, left: 0, right: 0, zIndex: 1010, overflow: 'hidden', flexShrink: 0,
+    // top shifts down by env(safe-area-inset-top) for iOS standalone (see .main-header) --
+    // 0 in a normal browser tab, so this is a no-op there.
+    position: 'fixed', top: 'env(safe-area-inset-top, 0px)', left: 0, right: 0, zIndex: 1010, overflow: 'hidden', flexShrink: 0,
     backgroundColor: 'var(--bg-card)',
     transition: 'transform 0.3s ease',
     transform: isHeaderVisible ? 'translateY(0)' : 'translateY(-100%)'
@@ -2201,7 +2203,7 @@ export function ChatGalleryModal({
       display: 'flex', alignItems: 'center', padding: '0',
       borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)',
       flexShrink: 0,
-      position: 'fixed', top: isSearchOpen ? '104px' : '56px', left: 0, right: 0, zIndex: 1009,
+      position: 'fixed', top: `calc(${isSearchOpen ? '104px' : '56px'} + env(safe-area-inset-top, 0px))`, left: 0, right: 0, zIndex: 1009,
       transition: 'transform 0.3s ease, top 0.3s ease',
       transform: isHeaderVisible ? 'translateY(0)' : 'translateY(calc(-100% - 56px))'
     }
@@ -2222,7 +2224,7 @@ export function ChatGalleryModal({
       display: 'flex', alignItems: 'center', padding: '0',
       borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)',
       flexShrink: 0,
-      position: 'fixed', top: isSearchOpen ? '104px' : '56px', left: 0, right: 0, zIndex: 1009,
+      position: 'fixed', top: `calc(${isSearchOpen ? '104px' : '56px'} + env(safe-area-inset-top, 0px))`, left: 0, right: 0, zIndex: 1009,
       transition: 'transform 0.3s ease, top 0.3s ease',
       transform: isHeaderVisible ? 'translateY(0)' : 'translateY(calc(-100% - 56px))'
     }
@@ -2247,11 +2249,13 @@ export function ChatGalleryModal({
       backgroundColor: asPage ? 'var(--bg-primary)' : undefined,
       // When the fixed header/tabs hide via translateY, drop the reserved top padding so the
       // first scroll gesture actually moves thumbnails instead of only eating empty padding.
+      // Each top value also adds env(safe-area-inset-top) since the fixed bars above now start
+      // that far down on iOS standalone instead of at the very top of the screen (0 elsewhere).
       padding: asPage
         ? (
-            (!isHeaderVisible
+            `calc(${(!isHeaderVisible
               ? '12px'
-              : (isSearchOpen ? '156px' : '108px'))
+              : (isSearchOpen ? '156px' : '108px'))} + env(safe-area-inset-top, 0px))`
             + ' 20px 16px 20px'
           )
         : '16px 20px',

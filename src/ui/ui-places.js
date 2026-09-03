@@ -1848,6 +1848,12 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
       width: '100%', maxWidth: '100%', overflowX: 'hidden'
     }
   },
+    // iOS 홈화면 설치(standalone) 상태에서 콘텐츠가 상태바 영역까지 그려지는 걸 막는 여백 --
+    // 헤더 자체의 높이/정렬은 그대로 두고, 헤더와 같은 배경색의 스페이서를 그 위에 얹어
+    // 상태바 아이콘과 겹치지 않게 한다. 일반 브라우저 탭에서는 0px라 보이지 않는다.
+    /*#__PURE__*/React.createElement("div", {
+      style: { height: 'env(safe-area-inset-top, 0px)', flexShrink: 0, backgroundColor: 'var(--bg-card)' }
+    }),
     /* Header: inline back button, centered title, right action buttons */
     /*#__PURE__*/React.createElement("div", {
       className: "places-view-header",

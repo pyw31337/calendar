@@ -7152,7 +7152,10 @@ function CalendarApp() {
 
   return withStickyVideo(/*#__PURE__*/React.createElement("div", {
     className: "app-container",
-    style: { paddingTop: `${mainHeaderHeight}px` }
+    // mainHeaderRef.offsetHeight (below) only measures the header's own box, not the
+    // env(safe-area-inset-top) gap .main-header's `top` now sits at -- add it back here so
+    // page content starts right below the header instead of partly hidden under it.
+    style: { paddingTop: `calc(${mainHeaderHeight}px + env(safe-area-inset-top, 0px))` }
   }, /*#__PURE__*/React.createElement("header", {
     ref: mainHeaderRef,
     className: "main-header",

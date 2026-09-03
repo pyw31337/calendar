@@ -1187,7 +1187,13 @@ button, input, textarea, select {
    same max-width as .app-container so it lines up with the page content below it. */
 .main-header {
   position: fixed;
-  top: 0;
+  /* iOS home-screen install (standalone display-mode, apple-mobile-web-app-status-bar-style:
+     black-translucent) renders web content full-bleed under the status bar instead of Safari's
+     own chrome reserving that space -- without this, the status bar's time/battery/signal icons
+     sit on top of the header and its buttons become untappable (the status bar area intercepts
+     the touch). env(safe-area-inset-top) is exactly the notch/status-bar height and resolves to
+     0px in a normal browser tab, so this is a no-op everywhere else. */
+  top: env(safe-area-inset-top, 0px);
   left: 0;
   right: 0;
   max-width: 100%;

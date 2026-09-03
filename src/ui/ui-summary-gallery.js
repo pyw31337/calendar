@@ -1876,7 +1876,11 @@ export function HistoryView({
   // Content sits below the now-fixed header stack; padding-top reserves exactly its measured
   // height, and drops to a small constant while hidden so the first scroll-up gesture actually
   // moves content instead of only eating reserved empty space (same trick the 갤러리 페이지 uses).
-  const historyContentPaddingTop = isHeaderVisible ? headerStackHeight : 12;
+  // Both branches add env(safe-area-inset-top) too, since the header stack itself now starts
+  // that far down (see its `top` above) rather than at the very top of the screen.
+  const historyContentPaddingTop = isHeaderVisible
+    ? `calc(${headerStackHeight}px + env(safe-area-inset-top, 0px))`
+    : `calc(12px + env(safe-area-inset-top, 0px))`;
 
   const activeParticipants = getActiveParticipants(calendar);
   const participantsMap = activeParticipants.reduce((acc, p) => { acc[p.id] = p; return acc; }, {});
@@ -1916,7 +1920,10 @@ export function HistoryView({
       ref: headerStackRef,
       className: "history-header-stack",
       style: {
-        position: 'fixed', top: 0, left: 0, right: 0, zIndex: 1010,
+        // iOS 홈화면 설치(standalone) 상태에서는 상태바 영역까지 콘텐츠가 그려지므로, top:0
+        // 대신 env(safe-area-inset-top)만큼 아래로 밀어야 상태바 아이콘과 겹치지 않고 버튼도
+        // 눌린다. 일반 브라우저 탭에서는 이 값이 0이라 동작 변화 없음.
+        position: 'fixed', top: 'env(safe-area-inset-top, 0px)', left: 0, right: 0, zIndex: 1010,
         backgroundColor: 'var(--bg-primary)',
         transition: 'transform 0.3s ease',
         transform: isHeaderVisible ? 'translateY(0)' : 'translateY(-100%)'

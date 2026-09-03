@@ -1925,7 +1925,7 @@ export function AdminUnifiedSearchResultsView({
       style: {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         height: '56px', padding: '0 16px', borderBottom: '1px solid var(--border-subtle)',
-        position: 'sticky', top: 0, backgroundColor: 'var(--bg-card)', zIndex: 5
+        position: 'sticky', top: 'env(safe-area-inset-top, 0px)', backgroundColor: 'var(--bg-card)', zIndex: 5
       }
     },
       /*#__PURE__*/React.createElement("button", {
