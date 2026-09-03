@@ -7,6 +7,7 @@ const GATHER_APP_CALENDAR_DATA = window.GATHER_APP_CALENDAR_DATA || {};
 const GATHER_APP_CHAT_DATA = window.GATHER_APP_CHAT_DATA || {};
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
+const BULK_NO_PARTICIPANT_ID = GATHER_APP_CONSTANTS.BULK_NO_PARTICIPANT_ID || '__none__';
 const GATHER_APP_CONFIG = window.GATHER_APP_CONFIG || {};
 function __gatherUiDeps() { return window.GATHER_UI_DEPS || {}; }
 function getActiveAvailabilities(calendar) {
@@ -1355,7 +1356,9 @@ export function DateModal({
 
   const handleDeleteClick = (entry) => {
     if (!onDelete) return;
-    const part = activeParticipants.find(p => p.id === entry.participantId);
+    const part = entry.participantId === BULK_NO_PARTICIPANT_ID
+      ? { id: BULK_NO_PARTICIPANT_ID, name: '참여자 없음', color: '#94A3B8' }
+      : activeParticipants.find(p => p.id === entry.participantId);
     const nameLabel = part ? part.name : '참여자';
     const entrySnapshot = JSON.parse(JSON.stringify(entry));
     onRequestConfirm('참석 삭제', `"${nameLabel}"님의 참석 기록을 삭제하시겠습니까?`, async () => {
@@ -1386,7 +1389,7 @@ export function DateModal({
   const holidayNames = React.useMemo(() => getHolidayNamesForDate(dateStr), [dateStr]);
   const holidayLabelText = holidayNames.length > 0 ? holidayNames.join('·') : '';
   const totalPartCount = activeParticipants.length || 0;
-  const uniqueActiveParts = new Set(dateEntries.map(e => e.participantId));
+  const uniqueActiveParts = new Set(dateEntries.filter(e => e.participantId !== BULK_NO_PARTICIPANT_ID).map(e => e.participantId));
   const isAllAvailable = totalPartCount > 0 && uniqueActiveParts.size === totalPartCount;
   const isConfirmed = isDateConfirmedMeeting(calendar, dateStr);
   const confirmedMeetingEntry = getConfirmedMeetings(calendar).find(m => m.date === dateStr) || null;
@@ -1520,7 +1523,7 @@ export function DateModal({
       refKey: `meeting-index:${photo.id}`
     }));
     const directPhotos = [...indexedPhotos, ...(Array.isArray(confirmedMeetingEntry?.photos) ? confirmedMeetingEntry.photos : [])]
-      .filter(photo => photo && (photo.imageUrl || photo.thumbUrl))
+      .filter(photo => photo && !isTombstone(photo) && (photo.imageUrl || photo.thumbUrl))
       .map(photo => {
         const resolved = resolveMeetingPhotoDisplay(photo, chatMessagesWithFetchedSources) || {};
         const mediaKey = resolved.mediaKey
@@ -1666,7 +1669,7 @@ export function DateModal({
   }, [pastePreview]);
   const expenses = React.useMemo(
     () => (Array.isArray(confirmedMeetingEntry?.expenses) ? confirmedMeetingEntry.expenses : [])
-      .filter(e => e && typeof e === 'object' && e.id)
+      .filter(e => e && typeof e === 'object' && e.id && !isTombstone(e))
       .slice()
       .sort((a, b) => {
       const aOrder = Number.isFinite(Number(a.order)) ? Number(a.order) : Number.POSITIVE_INFINITY;
@@ -2709,9 +2712,11 @@ export function DateModal({
           handleTitle: '드래그하여 참석자 목록 높이 조절',
           handleAriaLabel: '참석자 목록 높이 조절'
         }, dateEntries.map((entry, entryIndex) => {
-          const part = activeParticipants.find(p => p.id === entry.participantId);
+          const part = entry.participantId === BULK_NO_PARTICIPANT_ID
+            ? { id: BULK_NO_PARTICIPANT_ID, name: '참여자 없음', color: '#94A3B8' }
+            : activeParticipants.find(p => p.id === entry.participantId);
           if (!part) return null;
-          const canReorder = !adminMode && dateEntries.length > 1;
+          const canReorder = !adminMode && dateEntries.length > 1 && entry.participantId !== BULK_NO_PARTICIPANT_ID;
           // The reserved right-hand gap only needs to clear the absolutely-positioned drag/delete
           // icons near the row's top-right corner, not the whole card height -- letting the note
           // below reclaim most of that width (see its own negative marginRight) keeps its usable
@@ -3461,18 +3466,6 @@ export function DateModal({
                     fontWeight: 'bold'
                   }
                 }, expenseTime),
-                expense.isSelfPay && /*#__PURE__*/React.createElement("span", {
-                  style: {
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    padding: '3px 8px',
-                    borderRadius: 'var(--radius-full)',
-                    backgroundColor: 'rgba(100, 116, 139, 0.14)',
-                    color: '#475569',
-                    fontSize: 'var(--font-size-xs)',
-                    fontWeight: 900
-                  }
-                }, "자비부담"),
                 expense.payerId && /*#__PURE__*/React.createElement("span", {
                   style: {
                     display: 'inline-flex',
@@ -3484,7 +3477,19 @@ export function DateModal({
                     fontSize: 'var(--font-size-xs)',
                     fontWeight: 900
                   }
-                }, expense.isSelfPay ? expense.payerId : `${expense.payerId} 선결제`)
+                }, expense.isSelfPay ? expense.payerId : `${expense.payerId} 선결제`),
+                expense.isSelfPay && /*#__PURE__*/React.createElement("span", {
+                  style: {
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    padding: '3px 8px',
+                    borderRadius: 'var(--radius-full)',
+                    backgroundColor: 'rgba(100, 116, 139, 0.14)',
+                    color: '#475569',
+                    fontSize: 'var(--font-size-xs)',
+                    fontWeight: 900
+                  }
+                }, "자비부담")
               ),
               /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-base)', fontWeight: 'bold', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', width: '100%', wordBreak: 'break-all' } },
                 expenseUrl ? /*#__PURE__*/React.createElement(React.Fragment, null,

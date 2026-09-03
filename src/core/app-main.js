@@ -132,6 +132,7 @@ import {
   unsubscribeUserFromPush,
   notifyNewChatMessage,
   notifyMeetingReminder,
+  notifyRepeatScheduleReminder,
   getContrastTextColor,
   formatDateWithDayName,
   formatShortDateWithDayName,
@@ -482,6 +483,7 @@ import {
   invalidateGalleryItemCount,
   fetchMemosRest,
   fetchAnniversariesRest,
+  fetchCustomCultureItemsRest,
   sendChatMessageRest,
   writeCollectionDocumentWithFallback,
   writeRootCollectionDocumentWithFallback,
@@ -1393,6 +1395,7 @@ function CalendarApp() {
     return () => { isMounted = false; };
   }, [activeCalId, firebaseDb, firebaseConnectionVersion]);
   const [anniversaries, setAnniversaries] = React.useState([]);
+  const [customCultureItems, setCustomCultureItems] = React.useState([]);
   // Live subcollection state for places/confirmedMeeting (see unionPlaces/unionConfirmedMeetings
   // and the effect below) -- unlike activityLogs (only fetched on-demand for the recovery UI),
   // these two feed many always-visible surfaces (calendar grid badges, summary banners, place
@@ -2161,26 +2164,45 @@ function CalendarApp() {
     }
   }, [activeCal, activeCalLoaded]);
 
-  // Local meeting reminder: on D-day or D-1 of a confirmed meeting, nudge once per day the app
-  // happens to be opened (no backend push exists here -- see notifyMeetingReminder's own note).
+  // Local schedule reminder: D-day anytime, or D-1 after 18:00 local, for confirmed meetings
+  // and type:repeat anniversary occurrences. Best-effort while the tab is open -- server push
+  // at 18:00 KST (sendEveScheduleReminders) covers devices that aren't open.
   React.useEffect(() => {
     if (!activeCalLoaded || !activeCal) return;
     const meetings = getTrulyConfirmedMeetings(activeCal);
-    if (meetings.length === 0) return;
     const now = new Date();
     const toDateStr = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     const todayStr = toDateStr(now);
     const tomorrowStr = toDateStr(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));
+    const hour = now.getHours();
+    const candidates = [];
     const todayMeeting = meetings.find(m => m.date === todayStr);
-    const tomorrowMeeting = meetings.find(m => m.date === tomorrowStr);
-    const target = todayMeeting ? { meeting: todayMeeting, whenLabel: '오늘' } : tomorrowMeeting ? { meeting: tomorrowMeeting, whenLabel: '내일' } : null;
-    if (!target) return;
-    const shownKey = `gather_meeting_reminder_shown_${activeCal.id}_${target.meeting.date}_${todayStr}_v1`;
-    if (getLocalStorage().getItem(shownKey)) return;
-    getLocalStorage().setItem(shownKey, '1');
-    const fallbackMessage = notifyMeetingReminder(activeCal, target.meeting, target.whenLabel);
-    if (fallbackMessage) showToast(fallbackMessage, 'success');
-  }, [activeCal?.id, activeCalLoaded, activeCal?.confirmedMeeting]);
+    if (todayMeeting) candidates.push({ kind: 'meeting', meeting: todayMeeting, whenLabel: '오늘', key: todayMeeting.date });
+    if (hour >= 18) {
+      const tomorrowMeeting = meetings.find(m => m.date === tomorrowStr);
+      if (tomorrowMeeting) candidates.push({ kind: 'meeting', meeting: tomorrowMeeting, whenLabel: '내일', key: tomorrowMeeting.date });
+    }
+    const annList = Array.isArray(anniversaries) ? anniversaries : [];
+    const collectRepeats = (dateStr, whenLabel) => {
+      getAnniversariesForDate(dateStr, annList).filter(a => a && a.type === 'repeat').forEach(ann => {
+        candidates.push({ kind: 'repeat', ann, whenLabel, date: dateStr, key: `repeat_${ann.id}_${dateStr}` });
+      });
+    };
+    collectRepeats(todayStr, '오늘');
+    if (hour >= 18) collectRepeats(tomorrowStr, '내일');
+    candidates.forEach(target => {
+      const shownKey = `gather_meeting_reminder_shown_${activeCal.id}_${target.key}_${todayStr}_v1`;
+      if (getLocalStorage().getItem(shownKey)) return;
+      getLocalStorage().setItem(shownKey, '1');
+      if (target.kind === 'meeting') {
+        const fallbackMessage = notifyMeetingReminder(activeCal, target.meeting, target.whenLabel);
+        if (fallbackMessage) showToast(fallbackMessage, 'success');
+      } else if (typeof notifyRepeatScheduleReminder === 'function') {
+        const fallbackMessage = notifyRepeatScheduleReminder(activeCal, target.ann, target.whenLabel, target.date);
+        if (fallbackMessage) showToast(fallbackMessage, 'success');
+      }
+    });
+  }, [activeCal?.id, activeCalLoaded, activeCal?.confirmedMeeting, anniversaries]);
 
   // Synchronize chatParticipantId when activeCal changes (loads cached participant or defaults to first active)
   React.useEffect(() => {
@@ -2353,8 +2375,10 @@ function CalendarApp() {
   }, [activeCalId, activeView, chatLiveLimit, firebaseDb, CHAT_INITIAL_MESSAGE_LIMIT]);
 
   // Anniversaries: full collection (no orderBy) + client sort so docs without createdAt still show.
+  // Also active on history (보관함) so culture/festival "캘린더와 연동" checkboxes can resolve
+  // cultureSourceId matches without requiring a prior visit to the calendar view this session.
   React.useEffect(() => {
-    if (!activeCalId || activeView !== 'calendar') return;
+    if (!activeCalId || (activeView !== 'calendar' && activeView !== 'history')) return;
     let isMounted = true;
     const sortAnns = list => {
       const arr = Array.isArray(list) ? list.slice() : [];
@@ -2413,17 +2437,21 @@ function CalendarApp() {
   // venue/link) is already complete and doesn't need a form. cultureSourceId lets the checkbox
   // find its own registered anniversary again (to show checked, or to unregister) without the
   // culture item and the anniversary doc needing the same id.
-  const handleRegisterCultureEvent = async (item) => {
+  const handleRegisterCultureEvent = async (item, options = {}) => {
     if (!activeCal?.id || !item?.id || !item?.title) return null;
     const stamp = Date.now();
     const anniversaryId = 'anniversary_culture_' + stamp + '_' + Math.random().toString(36).slice(2, 8);
     const startDate = item.startDate || item.endDate;
     if (!startDate) { showToast('공연 기간 정보가 없어 등록할 수 없습니다.', 'error'); return null; }
+    // 문화공연 tab → event(행사), 지역축제 tab → festival(축제). Prefer explicit options.category,
+    // then item.anniversaryCategory / item.kind from the register checkbox path.
+    const rawCategory = (options && options.category) || item.anniversaryCategory || (item.kind === 'festival' ? 'festival' : 'event');
+    const category = rawCategory === 'festival' ? 'festival' : 'event';
     const annData = {
       id: anniversaryId,
       calendarId: activeCal.id,
       title: item.title,
-      category: 'event',
+      category,
       type: 'range',
       startDate,
       endDate: item.endDate || startDate,
@@ -2459,6 +2487,52 @@ function CalendarApp() {
     } catch (err) {
       console.error('Failed to unregister culture event anniversary:', err);
       showToast('취소 실패', 'error');
+    }
+  };
+
+  // 보관함 > 컨텐츠 등록: calendar-owned custom culture/festival cards merged into the
+  // CulturePerformancesTab lists alongside crawled JSON snapshots.
+  React.useEffect(() => {
+    if (!activeCalId || activeView !== 'history') return;
+    let isMounted = true;
+    const applyList = (list) => {
+      if (!isMounted) return;
+      const arr = Array.isArray(list) ? list.slice() : [];
+      arr.sort((a, b) => (Number(b.createdAt) || Number(b.updatedAt) || 0) - (Number(a.createdAt) || Number(a.updatedAt) || 0));
+      setCustomCultureItems(arr);
+    };
+    if (!firebaseDb) {
+      fetchCustomCultureItemsRest(activeCalId).then(list => applyList(list)).catch(() => applyList([]));
+      return () => { isMounted = false; };
+    }
+    const unsub = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('customCultureItems')
+      .onSnapshot(snapshot => {
+        const list = [];
+        snapshot.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
+        applyList(list);
+      }, err => {
+        console.warn('Firestore customCultureItems subscription error:', err);
+        fetchCustomCultureItemsRest(activeCalId).then(list => applyList(list)).catch(() => applyList([]));
+      });
+    return () => { isMounted = false; unsub(); };
+  }, [activeCalId, activeView, firebaseDb, firebaseConnectionVersion]);
+
+  const handleSaveCustomCultureItem = async (item) => {
+    if (!activeCal?.id || !item?.id || !item?.title) return false;
+    try {
+      const saved = await writeCollectionDocumentWithFallback('customCultureItems', activeCal.id, item.id, item, 'set', '컨텐츠 등록');
+      if (!saved?.success) throw new Error('Custom culture item save failed');
+      setCustomCultureItems(prev => {
+        const list = Array.isArray(prev) ? prev.filter(x => x && x.id !== item.id) : [];
+        list.unshift(item);
+        return list;
+      });
+      showToast('컨텐츠가 등록되었습니다.', 'success');
+      return true;
+    } catch (err) {
+      console.error('Failed to save custom culture item:', err);
+      showToast('컨텐츠 등록 실패', 'error');
+      return false;
     }
   };
 
@@ -4040,8 +4114,9 @@ function CalendarApp() {
       showToast('날짜 형식 오류', 'error');
       return false;
     }
+    const BULK_NO_PARTICIPANT_ID = (GATHER_APP_CONSTANTS && GATHER_APP_CONSTANTS.BULK_NO_PARTICIPANT_ID) || '__none__';
     const activeParticipantIds = new Set(getActiveParticipants(activeCal).map(participant => participant.id));
-    if (!activeParticipantIds.has(participantId)) {
+    if (participantId !== BULK_NO_PARTICIPANT_ID && !activeParticipantIds.has(participantId)) {
       showToast('참여자 재선택 필요', 'error');
       return false;
     }
@@ -4069,7 +4144,9 @@ function CalendarApp() {
         updatedAt: now
       });
     }
-    const partName = (getActiveParticipants(activeCal).find(p => p.id === participantId) || {}).name || participantId;
+    const partName = participantId === BULK_NO_PARTICIPANT_ID
+      ? '참여자 없음'
+      : ((getActiveParticipants(activeCal).find(p => p.id === participantId) || {}).name || participantId);
     const logNote = `[참여자: ${partName}] ${cleanNote ? `[메모: ${cleanNote}]` : '[참석]'}`;
     const activityLog = createActivityLog(activeCal.id, action, dateStr, participantId, now, logNote);
     const updatedCal = {
@@ -4159,8 +4236,9 @@ function CalendarApp() {
       showToast('잠시 후 다시 시도', 'error');
       return false;
     }
+    const BULK_NO_PARTICIPANT_ID = (GATHER_APP_CONSTANTS && GATHER_APP_CONSTANTS.BULK_NO_PARTICIPANT_ID) || '__none__';
     const activeParticipantIds = new Set(getActiveParticipants(activeCal).map(participant => participant.id));
-    if (!activeParticipantIds.has(participantId)) {
+    if (participantId !== BULK_NO_PARTICIPANT_ID && !activeParticipantIds.has(participantId)) {
       showToast('참여자 재선택 필요', 'error');
       return false;
     }
@@ -4195,8 +4273,9 @@ function CalendarApp() {
   };
   const handleDeleteAvailability = async (dateStr, participantId) => {
     if (!activeCal || !isValidDateString(dateStr)) return false;
+    const BULK_NO_PARTICIPANT_ID = (GATHER_APP_CONSTANTS && GATHER_APP_CONSTANTS.BULK_NO_PARTICIPANT_ID) || '__none__';
     const activeParticipantIds = new Set(getActiveParticipants(activeCal).map(participant => participant.id));
-    if (!activeParticipantIds.has(participantId)) return false;
+    if (participantId !== BULK_NO_PARTICIPANT_ID && !activeParticipantIds.has(participantId)) return false;
     const now = Date.now();
     const targetEntry = (activeCal.availabilities || []).find(e => e.date === dateStr && e.participantId === participantId && !isTombstone(e));
     if (!targetEntry) return false;
@@ -6298,7 +6377,30 @@ function CalendarApp() {
       showToast: showToast
     }),
     operationProgress && !chatUploadProgress && /*#__PURE__*/React.createElement(OperationProgressOverlay, operationProgress),
-    chatUploadProgress && /*#__PURE__*/React.createElement(ImageUploadOverlay, chatUploadProgress)
+    chatUploadProgress && /*#__PURE__*/React.createElement(ImageUploadOverlay, chatUploadProgress),
+    // Shared Lightbox host for every activeView (calendar/chat/gallery/settlement/memo/places/history).
+    // DateModal and other callers only setActiveLightbox; without a single mount here, settlement
+    // (and similar early-return views) updated state with nothing to render.
+    activeLightbox ? /*#__PURE__*/React.createElement(Lightbox, {
+      urls: activeLightbox.urls,
+      index: activeLightbox.index,
+      meta: activeLightbox.meta,
+      onClose: () => setActiveLightbox(null),
+      onNavigate: i => setActiveLightbox(prev => prev ? { ...prev, index: i } : prev),
+      showToast: showToast,
+      onPromoteImageUrl: handlePromoteInlineChatImage,
+      onSaveImageTags: handleSaveImageTags,
+      onSearchTag: handleSearchTag,
+      onDeletePhoto: handleDeletePhoto,
+      onReplacePhoto: handleReplacePhoto,
+      onJumpToChatMessage: handleJumpToChatMessage,
+      onJumpToMemo: handleJumpToMemo,
+      onJumpToMeetingDate: handleJumpToMeetingDate,
+      onJumpToGallery: handleJumpToGallery,
+      onGetChatMessageOrdinal: handleGetChatMessageOrdinal,
+      onGetGalleryPhotoOrdinal: handleGetGalleryPhotoOrdinal,
+      onRequestConfirm: showConfirmDialog
+    }) : null
   );
   const localGalleryCount = (() => {
     const directUrls = new Set();
@@ -6669,7 +6771,7 @@ function CalendarApp() {
       setChatImage: setChatImages,
       chatReplyTarget: chatReplyTarget,
       setChatReplyTarget: setChatReplyTarget,
-      activeLightbox: activeLightbox,
+      activeLightbox: null, // render via withStickyVideo shared Lightbox host
       setActiveLightbox: setActiveLightbox,
       onSend: handleSendChatMessage,
       onDeleteMessage: handleDeleteMessage,
@@ -6790,7 +6892,7 @@ function CalendarApp() {
   }
 
   if (activeView === 'gallery') {
-    // activeLightbox keeps the shared Lightbox mounted in the gallery page.
+    // Lightbox mounts once in withStickyVideo (shared across views).
     return withStickyVideo(/*#__PURE__*/React.createElement(React.Fragment, null,
       /*#__PURE__*/React.createElement(ChatGalleryModal, {
         calendar: activeCal,
@@ -6822,26 +6924,6 @@ function CalendarApp() {
         syncStatus: syncStatus,
         ...navMenuProps
       }),
-      activeLightbox ? /*#__PURE__*/React.createElement(Lightbox, {
-        urls: activeLightbox.urls,
-        index: activeLightbox.index,
-        meta: activeLightbox.meta,
-        onClose: () => setActiveLightbox(null),
-        onNavigate: i => setActiveLightbox(prev => prev ? { ...prev, index: i } : prev),
-        showToast: showToast,
-        onPromoteImageUrl: handlePromoteInlineChatImage,
-        onSaveImageTags: handleSaveImageTags,
-        onSearchTag: handleSearchTag,
-        onDeletePhoto: handleDeletePhoto,
-        onReplacePhoto: handleReplacePhoto,
-        onJumpToChatMessage: handleJumpToChatMessage,
-        onJumpToMemo: handleJumpToMemo,
-        onJumpToMeetingDate: handleJumpToMeetingDate,
-        onJumpToGallery: handleJumpToGallery,
-        onGetChatMessageOrdinal: handleGetChatMessageOrdinal,
-        onGetGalleryPhotoOrdinal: handleGetGalleryPhotoOrdinal,
-        onRequestConfirm: showConfirmDialog
-      }) : null,
       isGalleryShareOpen && activeCal && /*#__PURE__*/React.createElement(ShareModal, {
         calendar: activeCal,
         shareType: "gallery",
@@ -6918,6 +7000,9 @@ function CalendarApp() {
         anniversaries: anniversaries,
         onRegisterCultureEvent: handleRegisterCultureEvent,
         onUnregisterCultureEvent: handleUnregisterCultureEvent,
+        customCultureItems: customCultureItems,
+        onSaveCustomCultureItem: handleSaveCustomCultureItem,
+        showToast: showToast,
         ...navMenuProps
       }),
       isHistoryShareOpen && activeCal && /*#__PURE__*/React.createElement(ShareModal, {
@@ -7235,7 +7320,7 @@ function CalendarApp() {
     className: "confirmed-meeting-list",
     "data-confirmed-count": visibleConfirmedMeetings.length === 1 ? 'one' : visibleConfirmedMeetings.length === 2 ? 'two' : 'three-plus',
     style: { display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: '8px', marginBottom: '12px', alignItems: 'center', width: '100%' }
-  }, visibleConfirmedMeetings.map(meeting => {
+  }, visibleConfirmedMeetings.map((meeting, meetingIndex) => {
     // A lone confirmed meeting defaults to the expanded banner (no need to tap to see it), but
     // once the user has explicitly toggled it, that explicit choice always wins -- otherwise the
     // forced-expanded default fights the collapse animation started by toggleConfirmedDateExpand
@@ -7243,6 +7328,9 @@ function CalendarApp() {
     const isExpanded = meeting.date in expandedConfirmedDates
       ? expandedConfirmedDates[meeting.date]
       : visibleConfirmedMeetings.length === 1;
+    // Only the lead (first) upcoming card gets the 두근두근 pulse, and only while collapsed —
+    // expanded banner must stay still.
+    const isLeadCollapsedHeartbeat = meetingIndex === 0 && !isExpanded;
     const memoEntries = getActiveAvailabilities(activeCal).filter(e => e.date === meeting.date && e.note && e.note.trim());
     const [y, m, d] = meeting.date.split('-');
     const dateObj = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
@@ -7258,7 +7346,7 @@ function CalendarApp() {
       return /*#__PURE__*/React.createElement("button", {
         type: "button",
         key: meeting.date,
-        className: "confirmed-meeting-icon-btn confirmed-meeting-surface",
+        className: "confirmed-meeting-icon-btn confirmed-meeting-surface" + (isLeadCollapsedHeartbeat ? " is-heartbeat" : ""),
         onClick: () => toggleConfirmedDateExpand(meeting.date),
         title: `${formatConfirmedMeetingLabel(meeting.date)} (클릭하여 펼치기)`,
         style: {
@@ -7489,7 +7577,7 @@ function CalendarApp() {
       chatTextareaRef: chatTextareaRef,
       chatImage: chatImages,
       setChatImage: setChatImages,
-      activeLightbox: activeLightbox,
+      activeLightbox: null, // render via withStickyVideo shared Lightbox host
       setActiveLightbox: setActiveLightbox,
       onSend: handleSendChatMessage,
       onDeleteMessage: handleDeleteMessage,
@@ -9887,13 +9975,14 @@ const rebuildCalendarToTimestamp = (calendar, T, logs = []) => {
     });
 
   const participantIds = new Set(rebuiltParticipants.map(p => p.id));
+  const BULK_NO_PARTICIPANT_ID = (GATHER_APP_CONSTANTS && GATHER_APP_CONSTANTS.BULK_NO_PARTICIPANT_ID) || '__none__';
 
   // 2. Rebuild availabilities
   const rebuiltAvailabilities = new Map();
   for (const log of sortedLogs) {
     if (log.timestamp > T) continue;
     if (POLL_ACTIVITY_ACTIONS.includes(log.action)) continue;
-    if (log.participantId && !participantIds.has(log.participantId)) continue;
+    if (log.participantId && log.participantId !== BULK_NO_PARTICIPANT_ID && !participantIds.has(log.participantId)) continue;
 
     const key = `${log.date}_${log.participantId}`;
     if (log.action === 'create' || log.action === 'update') {
@@ -10538,6 +10627,21 @@ async function resolveAnniversaryImageBatch(calendarId, compressedList, onProgre
   return resolveImageBatch(calendarId, compressedList, onProgress, uploadAnniversaryImageAssets);
 }
 
+
+function isRepeatAnniversaryOnDate(ann, dateStr) {
+  if (!ann || ann.type !== 'repeat' || !dateStr) return false;
+  if (ann.startDate && dateStr < ann.startDate) return false;
+  if (ann.endDate && dateStr > ann.endDate) return false;
+  const parts = dateStr.split('-').map(Number);
+  const y = parts[0], m = parts[1], d = parts[2];
+  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return false;
+  const weekOfMonth = Math.ceil(d / 7);
+  const dow = new Date(y, m - 1, d).getDay();
+  const weekSet = new Set((Array.isArray(ann.weeks) ? ann.weeks : []).map(Number));
+  const daySet = new Set((Array.isArray(ann.weekdays) ? ann.weekdays : []).map(Number));
+  return weekSet.has(weekOfMonth) && daySet.has(dow);
+}
+
 function getAnniversariesForDate(dateStr, anniversariesList) {
   if (!dateStr || !Array.isArray(anniversariesList)) return [];
   const [y, m, d] = dateStr.split('-').map(Number);
@@ -10735,6 +10839,23 @@ function getAnniversariesForDate(dateStr, anniversariesList) {
           photos: ann.photos
         }, ann));
       }
+    } else if (ann.type === 'repeat') {
+      // Monthly nth-weekday rules saved from the 반복 tab (e.g. 매월 셋째주 수요일). Same
+      // weekOfMonth = ceil(day/7) + weekday match used when bulk-registering dates.
+      if (!isRepeatAnniversaryOnDate(ann, dateStr)) return;
+      const catBadge = getAnniversaryCategoryBadge(ann.category || 'other');
+      results.push(withAnnDetail({
+        id: ann.id,
+        title: `${ann.title || ann.patternLabel || '반복 일정'}`,
+        badgeColor: catBadge.badgeColor,
+        icon: catBadge.icon,
+        type: 'repeat',
+        startDate: ann.startDate,
+        endDate: ann.endDate,
+        weeks: ann.weeks,
+        weekdays: ann.weekdays,
+        patternLabel: ann.patternLabel
+      }, ann));
     }
   });
   return results;

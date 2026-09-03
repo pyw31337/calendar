@@ -1852,7 +1852,7 @@ export function ChatGalleryModal({
           const isCollapsed = collapsedGalleryDates.has(section.dateKey);
           return /*#__PURE__*/React.createElement("section", {
           key: section.dateKey,
-          style: { border: '0', borderRadius: 'var(--radius-md)', padding: '12px', backgroundColor: 'var(--bg-primary)' }
+          style: { border: 'none', borderRadius: 'var(--radius-md)', padding: '12px', backgroundColor: '#FFFFFF' }
         },
             /*#__PURE__*/React.createElement("div", {
               style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: isCollapsed ? 0 : '10px' }
@@ -2149,7 +2149,7 @@ export function ChatGalleryModal({
     className: "gallery-page-tabs",
     style: {
       display: 'flex', alignItems: 'center', padding: '0',
-      borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)',
+      borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)',
       flexShrink: 0,
       position: 'fixed', top: isSearchOpen ? '104px' : '56px', left: 0, right: 0, zIndex: 1009,
       transition: 'transform 0.3s ease, top 0.3s ease',
@@ -2160,17 +2160,17 @@ export function ChatGalleryModal({
       ariaLabel: "갤러리 탭",
       value: activeTab,
       onChange: v => setActiveTab(v),
-      style: { backgroundColor: 'var(--bg-primary)', flex: 1, borderBottom: 'none' },
+      style: { backgroundColor: 'var(--bg-card)', flex: 1, borderBottom: 'none' },
       options: [
-        { value: 'photos', label: '사진', badge: ((searchQuery || '').trim() ? visiblePhotos.length : displayPhotoTabCount) },
-        { value: 'links', label: '링크', badge: filteredLinks.length }
+        { value: 'photos', label: '사진' },
+        { value: 'links', label: '링크' }
       ]
     })
   ), asPage && isMobile && /*#__PURE__*/React.createElement("div", {
     className: "gallery-page-tabs-mobile",
     style: {
       display: 'flex', alignItems: 'center', padding: '0',
-      borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)',
+      borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)',
       flexShrink: 0,
       position: 'fixed', top: isSearchOpen ? '104px' : '56px', left: 0, right: 0, zIndex: 1009,
       transition: 'transform 0.3s ease, top 0.3s ease',
@@ -2181,18 +2181,20 @@ export function ChatGalleryModal({
       ariaLabel: "갤러리 탭",
       value: activeTab,
       onChange: v => setActiveTab(v),
-      style: { backgroundColor: 'var(--bg-primary)', flex: 1, borderBottom: 'none' },
+      style: { backgroundColor: 'var(--bg-card)', flex: 1, borderBottom: 'none' },
       options: [
-        { value: 'photos', label: '사진', badge: ((searchQuery || '').trim() ? visiblePhotos.length : displayPhotoTabCount) },
-        { value: 'links', label: '링크', badge: filteredLinks.length }
+        { value: 'photos', label: '사진' },
+        { value: 'links', label: '링크' }
       ]
     })
   ), /*#__PURE__*/React.createElement("div", {
     ref: gridHostRef,
+    className: asPage ? "gallery-page-scroll" : undefined,
     onScroll: asPage ? handleGalleryScroll : undefined,
     style: {
       flex: 1, overflowY: 'auto', minHeight: 0,
       overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch',
+      backgroundColor: asPage ? 'var(--bg-primary)' : undefined,
       // When the fixed header/tabs hide via translateY, drop the reserved top padding so the
       // first scroll gesture actually moves thumbnails instead of only eating empty padding.
       padding: asPage

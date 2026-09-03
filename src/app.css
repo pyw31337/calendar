@@ -495,6 +495,44 @@ body:has(.admin-login-gate) {
 .confirmed-meeting-icon-btn:active {
   transform: none !important;
 }
+/* Lead upcoming meeting (collapsed icon only): CodePen-style 두근두근 (kazsaj AxZXvv lub-dub scale).
+   Expanded banner never gets .is-heartbeat, so the pulse stops when opened. */
+.confirmed-meeting-list {
+  overflow: visible;
+  padding: 8px 6px 10px;
+  box-sizing: border-box;
+}
+.confirmed-meeting-icon-btn.is-heartbeat,
+button.confirmed-meeting-icon-btn.confirmed-meeting-surface.is-heartbeat {
+  overflow: visible !important;
+  transform-origin: center center;
+  animation: confirmed-meeting-heartbeat 1.25s ease-in-out infinite;
+  will-change: transform;
+  z-index: 5;
+  position: relative;
+}
+.confirmed-meeting-icon-btn.is-heartbeat:hover {
+  /* Keep transform ownership with the keyframes; still lift the glow on hover. */
+  transform: none;
+  box-shadow: 0 4px 14px rgba(168, 85, 247, 0.45) !important;
+}
+.confirmed-meeting-icon-btn.is-heartbeat:active {
+  animation: none;
+  transform: scale(0.98) !important;
+}
+@keyframes confirmed-meeting-heartbeat {
+  0% { transform: scale(1); }
+  14% { transform: scale(1.07); }
+  28% { transform: scale(1); }
+  42% { transform: scale(1.08); }
+  70% { transform: scale(1); }
+  100% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .confirmed-meeting-icon-btn.is-heartbeat {
+    animation: none;
+  }
+}
 .confirmed-meeting-banner .confirmed-meeting-label-badge {
   background: transparent !important;
   color: #FFFFFF !important;
@@ -1733,6 +1771,48 @@ select.form-select {
   }
   .day-anniversary-mobile {
     display: flex !important;
+  }
+}
+
+/* 흔들도시락 cooking-pot jiggle: .day-cell normally clips with overflow:hidden — lift that
+   for cells that host this anniversary so scale~1.5 shake is not cut off. Modest z-index so
+   the enlarged icon paints above neighbors. */
+.day-cell.day-cell-ann-jiggle {
+  overflow: visible;
+  z-index: 3;
+}
+.day-anniversary-desktop.day-ann-jiggle-row,
+.day-anniversary-mobile.day-ann-jiggle-row,
+.day-anniversary-badge-jiggle,
+.ann-cooking-pot-icon-wrap {
+  overflow: visible;
+}
+.ann-cooking-pot-icon-wrap {
+  position: relative;
+  z-index: 1;
+}
+.ann-cooking-pot-jiggle {
+  display: inline-flex;
+  transform-origin: 50% 70%;
+  animation: ann-cooking-pot-jiggle 2s ease-in-out infinite;
+  will-change: transform;
+}
+@keyframes ann-cooking-pot-jiggle {
+  0%   { transform: scale(1) rotate(0deg); }
+  6%   { transform: scale(1.45) rotate(16deg); }
+  12%  { transform: scale(1.55) rotate(-18deg); }
+  18%  { transform: scale(1.5) rotate(14deg); }
+  24%  { transform: scale(1.55) rotate(-14deg); }
+  30%  { transform: scale(1.48) rotate(10deg); }
+  36%  { transform: scale(1.4) rotate(-8deg); }
+  42%  { transform: scale(1.2) rotate(4deg); }
+  50%  { transform: scale(1) rotate(0deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ann-cooking-pot-jiggle {
+    animation: none;
+    transform: none;
   }
 }
 .day-cell.other-month {
@@ -3392,6 +3472,11 @@ select.form-select {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   flex-shrink: 0;
 }
+
+/* Extra breathing room under fixed 누적/월별 tabs (settlement page). */
+.settlement-page-body > .settlement-metric-grid {
+  margin-top: 12px;
+}
 .settlement-metric-card {
   display: flex;
   flex-direction: column;
@@ -4688,6 +4773,13 @@ select.form-select {
 }
 .gallery-page-container .gallery-page-tabs {
   border-top: none;
+}
+.gallery-page-container .gallery-page-tabs,
+.gallery-page-container .gallery-page-tabs-mobile {
+  background-color: var(--bg-card) !important;
+}
+.gallery-page-container .gallery-page-scroll {
+  background-color: var(--bg-primary);
 }
 
 

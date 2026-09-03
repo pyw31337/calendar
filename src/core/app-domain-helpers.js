@@ -1107,6 +1107,27 @@ function notifyMeetingReminder(calendar, meeting, whenLabel) {
   return body;
 }
 
+function notifyRepeatScheduleReminder(calendar, ann, whenLabel, dateStr) {
+  if (!isChatNotifyEnabledForCalendar(calendar?.id)) return;
+  const title = (ann && (ann.title || ann.patternLabel)) || '반복 일정';
+  const dateLabel = dateStr ? formatConfirmedMeetingLabel(dateStr) : '';
+  const body = dateLabel
+    ? `${whenLabel} 반복 일정입니다. ${title} (${dateLabel})`
+    : `${whenLabel} 반복 일정입니다. ${title}`;
+  if (isNotificationSupported() && Notification.permission === 'granted') {
+    try {
+      new Notification(`${calendar?.title || '모여라 캘린더'} 일정 알림`, {
+        body,
+        tag: `repeat-reminder-${calendar?.id}-${ann?.id || 'x'}-${dateStr || ''}`
+      });
+      return;
+    } catch (e) {
+      console.warn('Failed to show repeat reminder notification:', e);
+    }
+  }
+  return body;
+}
+
 // Registers sw.js, which only caches static assets (icons/manifests) -- never index.html
 // itself, since this app deliberately serves its HTML as no-cache (see sw.js for why). Safe to
 // register unconditionally: browsers without service worker support simply skip this.
@@ -1241,21 +1262,24 @@ function calculateSettlementBalance(calendar) {
   const confirmed = getConfirmedMeetings(calendar);
   let incomeTotal = 0;
   let expenseTotal = 0;
-  
+
+  // Same filters as SettlementSummaryModal's overallBalance: ignore soft-deleted expenses
+  // (isTombstone) and 자비부담 (isSelfPay). Without the tombstone skip, deleted income/expense
+  // still moves the nav/side-menu badge while the settlement page already hid them -- e.g.
+  // a deleted +38만 income left the badge at +6만 while the page showed -32만.
   confirmed.forEach(meeting => {
     const expenses = Array.isArray(meeting.expenses) ? meeting.expenses : [];
     expenses.forEach(exp => {
+      if (isTombstone(exp)) return;
       const amount = Number(exp.amount || 0);
-      if (Number.isFinite(amount) && amount !== 0) {
-        const isIncome = isExpenseIncomeEntry(exp);
-        if (isIncome) {
-          incomeTotal += Math.abs(amount);
-        } else if (!exp.isSelfPay) {
-          // 자비부담 expenses were paid entirely by one person for themselves -- 공금 never
-          // touched them, so they must not reduce this balance the way a real shared or
-          // 선결제 (fronted-but-shared) expense does.
-          expenseTotal += Math.abs(amount);
-        }
+      if (!Number.isFinite(amount) || amount === 0) return;
+      if (isExpenseIncomeEntry(exp)) {
+        incomeTotal += Math.abs(amount);
+      } else if (!exp.isSelfPay) {
+        // 자비부담 expenses were paid entirely by one person for themselves -- 공금 never
+        // touched them, so they must not reduce this balance the way a real shared or
+        // 선결제 (fronted-but-shared) expense does.
+        expenseTotal += Math.abs(amount);
       }
     });
   });
@@ -1635,6 +1659,7 @@ function getActivityLogStamp(...args) {
   return typeof f === 'function' ? f(...args) : undefined;
 }
 const SCHEDULE_ACTIVITY_ACTIONS = Array.isArray(GATHER_APP_CONSTANTS.SCHEDULE_ACTIVITY_ACTIONS) ? GATHER_APP_CONSTANTS.SCHEDULE_ACTIVITY_ACTIONS : ['create', 'update', 'delete'];
+const BULK_NO_PARTICIPANT_ID = GATHER_APP_CONSTANTS.BULK_NO_PARTICIPANT_ID || '__none__';
 const POLL_ACTIVITY_ACTIONS = Array.isArray(GATHER_APP_CONSTANTS.POLL_ACTIVITY_ACTIONS) ? GATHER_APP_CONSTANTS.POLL_ACTIVITY_ACTIONS : ['poll_create', 'poll_vote', 'poll_cancel'];
 // Expense/income entries (회비정산) have no participant selector of their own -- these logs
 // carry an empty participantId, same as poll activity logs, so they need the same
@@ -1656,13 +1681,14 @@ function normalizeActivityLog(calendarId, log, participantIds = null, idRedirect
   const participantId = sanitizeText(idRedirects.get(log.participantId) || log.participantId || '', 120);
   const action = ACTIVITY_ACTIONS.includes(log.action) ? log.action : '';
   const isParticipantOptionalAction = POLL_ACTIVITY_ACTIONS.includes(action) || EXPENSE_ACTIVITY_ACTIONS.includes(action) || IMAGE_TAG_ACTIVITY_ACTIONS.includes(action) || MEETING_ACTIVITY_ACTIONS.includes(action) || MEMO_ACTIVITY_ACTIONS.includes(action) || PLACE_ACTIVITY_ACTIONS.includes(action);
+  const isBulkNoParticipant = participantId === BULK_NO_PARTICIPANT_ID;
   const date = sanitizeText(log.date || '', 20);
   const timestamp = Number(log.timestamp || log.updatedAt || 0) || 0;
   if (!action || !timestamp) return null;
   if (!isParticipantOptionalAction && (!participantId || !date || !isValidDateString(date))) return null;
   if (isParticipantOptionalAction && date && !isValidDateString(date)) return null;
-  if (participantIds && participantId && !participantIds.has(participantId)) return null;
-  if (participantIds && !isParticipantOptionalAction && !participantIds.has(participantId)) return null;
+  if (participantIds && participantId && !isBulkNoParticipant && !participantIds.has(participantId)) return null;
+  if (participantIds && !isParticipantOptionalAction && !isBulkNoParticipant && !participantIds.has(participantId)) return null;
   const idDatePart = date || 'poll';
   const idParticipantPart = participantId || 'system';
   const id = sanitizeText(log.id || `${calendarId}_${idDatePart}_${idParticipantPart}_${action}_${timestamp}`, 160);
@@ -1707,6 +1733,9 @@ function buildFieldChangeNote(label, changes, maxLen = 300) {
 function resolveLogParticipant(log, participantsMap) {
   if (log?.participantId && participantsMap && participantsMap[log.participantId]) {
     return participantsMap[log.participantId];
+  }
+  if (log?.participantId === BULK_NO_PARTICIPANT_ID) {
+    return { name: '일정', color: '#94A3B8' };
   }
   const action = log?.action || '';
   if (log?.type === 'chat') return { name: '메시지', color: '#0369A1' };
@@ -2265,6 +2294,7 @@ export {
   unsubscribeUserFromPush,
   notifyNewChatMessage,
   notifyMeetingReminder,
+  notifyRepeatScheduleReminder,
   getContrastTextColor,
   formatDateWithDayName,
   formatShortDateWithDayName,

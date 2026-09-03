@@ -7,6 +7,7 @@ const GATHER_APP_CALENDAR_DATA = window.GATHER_APP_CALENDAR_DATA || {};
 const GATHER_APP_CHAT_DATA = window.GATHER_APP_CHAT_DATA || {};
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
+const BULK_NO_PARTICIPANT_ID = GATHER_APP_CONSTANTS.BULK_NO_PARTICIPANT_ID || '__none__';
 const GATHER_APP_CONFIG = window.GATHER_APP_CONFIG || {};
 function __gatherUiDeps() { return window.GATHER_UI_DEPS || {}; }
 function getActiveAvailabilities(calendar) {
@@ -780,10 +781,36 @@ export function CalendarGrid({
   const ConfettiIcon = __comp.ConfettiIcon || __deps.ConfettiIcon;
   const TicketsPlaneIcon = __comp.TicketsPlaneIcon || __deps.TicketsPlaneIcon;
   const MessageCircleMoreIcon = __comp.MessageCircleMoreIcon || __deps.MessageCircleMoreIcon;
+  const CookingPotIcon = __comp.CookingPotIcon || __deps.CookingPotIcon;
   const ParticipantBadge = __comp.ParticipantBadge || __deps.ParticipantBadge;
+  // 흔들도시락 anniversary: cooking-pot icon + jiggle (title match, not category emoji).
+  const isHeundeulDosirakAnn = (ann) => {
+    const title = String(ann && ann.title != null ? ann.title : '').trim();
+    return title === '흔들도시락' || title.includes('흔들도시락');
+  };
   // Legacy D-Day badges (ann.type === 'dday') keep their plain emoji exactly as before; only the
   // newer category-tagged types (yearly/once/range) swap their category emoji for its icon component.
   const renderAnniversaryIcon = (ann, size) => {
+    if (isHeundeulDosirakAnn(ann)) {
+      const potSize = size;
+      return /*#__PURE__*/React.createElement("span", {
+        className: "ann-cooking-pot-icon-wrap",
+        style: {
+          width: Math.ceil(potSize * 1.5),
+          height: Math.ceil(potSize * 1.5),
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+          overflow: 'visible'
+        },
+        "aria-hidden": "true"
+      }, /*#__PURE__*/React.createElement("span", {
+        className: "ann-cooking-pot-jiggle"
+      }, CookingPotIcon ? /*#__PURE__*/React.createElement(CookingPotIcon, {
+        size: potSize
+      }) : null));
+    }
     if (ann.type === 'dday') return ann.icon;
     const iconMap = { '🎂': CakeIcon, '🎈': BalloonIcon, '🎉': ConfettiIcon, '✈️': TicketsPlaneIcon, '💬': MessageCircleMoreIcon };
     const Icon = iconMap[ann.icon];
@@ -1369,8 +1396,8 @@ export function CalendarGrid({
     const today = new Date();
     const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
     const isToday = isCurrentMonth && dateStr === todayStr;
-    const entries = (availMap[dateStr] || []).filter(e => participantsMap[e.participantId]);
-    const uniqueActiveParts = new Set(entries.map(e => e.participantId));
+    const entries = (availMap[dateStr] || []).filter(e => participantsMap[e.participantId] || e.participantId === BULK_NO_PARTICIPANT_ID);
+    const uniqueActiveParts = new Set(entries.filter(e => participantsMap[e.participantId]).map(e => e.participantId));
     const isAllAvailable = totalPartCount > 0 && uniqueActiveParts.size === totalPartCount;
     const holidayNames = holidayMap[dateStr];
     const isHoliday = !!holidayNames && holidayNames.length > 0;
@@ -1384,20 +1411,25 @@ export function CalendarGrid({
     // Range-type (연일 festival/event) anniversaries are excluded here -- they render as a
     // connected bar overlay (see festivalBars above) instead of a per-day badge.
     const cellAnns = getAnniversariesForDate(dateStr, anniversaries).filter(ann => ann.type !== 'range');
+    const hasHeundeulDosirak = cellAnns.some(isHeundeulDosirakAnn);
     const isFestivalCovered = festivalCoveredDates.has(dateStr);
-    // Only one badge shows next to the date number: holiday name takes priority (it's
-    // tied to the red date styling), then '확정' if this date has been promoted to a
-    // confirmed meeting, then '전원' if everyone's available that day (replacing a solar
-    // term that would otherwise be shown), then the solar term.
-    const cornerText = isHoliday ? holidayNames.join('·') : isConfirmed ? '확정' : isAllAvailable ? '전원' : solarTermName;
+    // Holiday name stays visible (red date styling), but when the day is also a confirmed
+    // meeting we append ·확정 -- otherwise users only see '개천절' and re-tap 모임확정,
+    // which toggles the confirmation OFF. Then '전원', then solar term.
+    const holidayLabel = isHoliday ? holidayNames.join('·') : '';
+    const cornerText = isHoliday
+      ? (isConfirmed ? `${holidayLabel}·확정` : holidayLabel)
+      : isConfirmed ? '확정' : isAllAvailable ? '전원' : solarTermName;
     const cornerColor = isHoliday ? '#EF4444' : isConfirmed ? '#7C3AED' : isAllAvailable ? 'var(--status-green)' : '#94A3B8';
-    const cornerTitle = isHoliday ? (lunarLabel ? `${holidayNames.join(', ')} (${lunarLabel})` : holidayNames.join(', ')) : undefined;
+    const cornerTitle = isHoliday
+      ? ((lunarLabel ? `${holidayNames.join(', ')} (${lunarLabel})` : holidayNames.join(', ')) + (isConfirmed ? ' · 확정' : ''))
+      : (isConfirmed ? '모임 확정' : undefined);
     const columnDow = idx % 7; // 0=Sun .. 6=Sat, since each week row starts on Sunday
     const isSunday = columnDow === 0;
     const isTouchDropTarget = isTouchDragging && touchDropTargetDate === dateStr;
     return /*#__PURE__*/React.createElement("div", {
       key: idx,
-      className: `day-cell ${isCurrentMonth ? '' : 'other-month'} ${isConfirmed ? 'confirmed-meeting' : isAllAvailable ? 'all-available' : ''}`,
+      className: `day-cell ${isCurrentMonth ? '' : 'other-month'} ${isConfirmed ? 'confirmed-meeting' : isAllAvailable ? 'all-available' : ''}${hasHeundeulDosirak ? ' day-cell-ann-jiggle' : ''}`,
       "data-date-str": dateStr,
       // Explicit grid placement (rather than relying on auto-flow) so a festival-bar overlay
       // (see festivalBars below), which must also use explicit placement to span multiple
@@ -1487,14 +1519,17 @@ export function CalendarGrid({
       /*#__PURE__*/React.createElement("div", {
         className: "badges-container"
       }, entries.map(e => {
-        const p = participantsMap[e.participantId];
+        const isNone = e.participantId === BULK_NO_PARTICIPANT_ID;
+        const p = isNone
+          ? { id: BULK_NO_PARTICIPANT_ID, name: '일정', color: '#94A3B8' }
+          : participantsMap[e.participantId];
         if (!p) return null;
         return /*#__PURE__*/React.createElement(ParticipantBadge, {
-          key: p.id,
+          key: p.id + (e.id || e.date || ''),
           participant: p,
           style: { cursor: 'pointer' },
-          draggable: true,
-          onDragStart: event => {
+          draggable: !isNone,
+          onDragStart: isNone ? undefined : (event => {
             event.stopPropagation();
             event.dataTransfer.setData('text/plain', JSON.stringify({
               entryReferId: e.id,
@@ -1502,15 +1537,15 @@ export function CalendarGrid({
               participantId: e.participantId,
               participantName: p.name
             }));
-          },
-          onTouchStart: event => { event.stopPropagation(); handleBadgeTouchStart(event, e, p, dateStr); },
-          onTouchMove: event => { event.stopPropagation(); handleBadgeTouchMove(event); },
-          onTouchEnd: event => { event.stopPropagation(); handleBadgeTouchEnd(event); },
-          onTouchCancel: event => { event.stopPropagation(); handleBadgeTouchCancel(); },
+          }),
+          onTouchStart: isNone ? undefined : (event => { event.stopPropagation(); handleBadgeTouchStart(event, e, p, dateStr); }),
+          onTouchMove: isNone ? undefined : (event => { event.stopPropagation(); handleBadgeTouchMove(event); }),
+          onTouchEnd: isNone ? undefined : (event => { event.stopPropagation(); handleBadgeTouchEnd(event); }),
+          onTouchCancel: isNone ? undefined : (event => { event.stopPropagation(); handleBadgeTouchCancel(); }),
           onClick: event => {
             event.stopPropagation();
             if (justTouchDraggedRef.current) return;
-            if (typeof onParticipantClick === 'function') {
+            if (!isNone && typeof onParticipantClick === 'function') {
               onParticipantClick(p.name, dateStr);
             } else if (typeof onSelectDate === 'function') {
               onSelectDate(dateStr);
@@ -1524,21 +1559,25 @@ export function CalendarGrid({
 
       /* PC Anniversary Badge (desktop-only, soft banner cards at the bottom of schedules) */
       cellAnns.length > 0 && /*#__PURE__*/React.createElement("div", {
-        className: "day-anniversary-desktop",
+        className: `day-anniversary-desktop${hasHeundeulDosirak ? ' day-ann-jiggle-row' : ''}`,
         style: {
           flexDirection: 'column',
           gap: '2px',
           width: '100%',
           marginTop: 'auto',
           paddingTop: '8px',
-          pointerEvents: 'none'
+          pointerEvents: 'none',
+          overflow: hasHeundeulDosirak ? 'visible' : undefined
         }
       }, cellAnns.map((ann, aIdx) => {
         const displayColor = getAnniversaryDisplayColor(ann, calendar);
+        const isHeundeul = isHeundeulDosirakAnn(ann);
         return /*#__PURE__*/React.createElement("div", {
           key: ann.id || aIdx,
+          className: isHeundeul ? 'day-anniversary-badge-jiggle' : undefined,
           style: {
-            height: '24px',
+            height: isHeundeul ? 'auto' : '24px',
+            minHeight: '24px',
             backgroundColor: `${displayColor}22`,
             padding: '3px 8px',
             borderRadius: 'var(--radius-sm)',
@@ -1550,16 +1589,17 @@ export function CalendarGrid({
             gap: '4px',
             width: '100%',
             boxSizing: 'border-box',
-            color: displayColor
+            color: displayColor,
+            overflow: isHeundeul ? 'visible' : undefined
           }
-        }, renderAnniversaryIcon(ann, 12), /*#__PURE__*/React.createElement("span", {
+        }, renderAnniversaryIcon(ann, isHeundeul ? 17 : 12), /*#__PURE__*/React.createElement("span", {
           style: ANNIVERSARY_BADGE_TEXT_STYLE(displayColor)
         }, ann.title));
       })),
 
       /* Mobile Anniversary Icon Badge (mobile-only, circular icons containing emoji with participant color) */
       cellAnns.length > 0 && /*#__PURE__*/React.createElement("div", {
-        className: "day-anniversary-mobile",
+        className: `day-anniversary-mobile${hasHeundeulDosirak ? ' day-ann-jiggle-row' : ''}`,
         style: {
           gap: '3px',
           justifyContent: 'center',
@@ -1568,16 +1608,19 @@ export function CalendarGrid({
           paddingTop: '6px',
           pointerEvents: 'none',
           boxSizing: 'border-box',
-          flexWrap: 'wrap'
+          flexWrap: 'wrap',
+          overflow: hasHeundeulDosirak ? 'visible' : undefined
         }
       }, cellAnns.map((ann, aIdx) => {
         const displayColor = getAnniversaryDisplayColor(ann, calendar);
+        const isHeundeul = isHeundeulDosirakAnn(ann);
         return /*#__PURE__*/React.createElement("div", {
           key: ann.id || aIdx,
           title: ann.title,
+          className: isHeundeul ? 'day-anniversary-badge-jiggle' : undefined,
           style: {
-            width: '18px',
-            height: '18px',
+            width: isHeundeul ? '26px' : '18px',
+            height: isHeundeul ? '26px' : '18px',
             borderRadius: '50%',
             backgroundColor: displayColor,
             color: '#FFFFFF',
@@ -1585,9 +1628,10 @@ export function CalendarGrid({
             alignItems: 'center',
             justifyContent: 'center',
             fontSize: 'var(--font-size-2xs)',
-            flexShrink: 0
+            flexShrink: 0,
+            overflow: isHeundeul ? 'visible' : undefined
           }
-        }, renderAnniversaryIcon(ann, 11));
+        }, renderAnniversaryIcon(ann, isHeundeul ? 14 : 11));
       })),
 
       /* Reserves room at the bottom of this cell for the festival-bar overlay drawn as a
@@ -2144,7 +2188,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       }
     },
     style: {
-      backgroundColor: memo.color || 'var(--bg-primary)',
+      backgroundColor: (memo.color && memo.color !== 'var(--bg-card)') ? memo.color : 'var(--bg-primary)',
       border: '0',
       borderRadius: 'var(--radius-md)',
       padding: '12px',

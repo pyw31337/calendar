@@ -1536,6 +1536,25 @@ async function fetchAnniversariesRest(calId) {
   }
 }
 
+async function fetchCustomCultureItemsRest(calId) {
+  try {
+    const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}/customCultureItems`;
+    const res = await fetchFirestoreRequest(url);
+    if (!res.ok) return [];
+    const data = await res.json();
+    const docs = data.documents || [];
+    const list = docs.map(doc => ({
+      id: doc.name.split('/').pop(),
+      ...firestoreDocumentToJs(doc)
+    }));
+    list.sort((a, b) => (Number(b.createdAt) || Number(b.updatedAt) || 0) - (Number(a.createdAt) || Number(a.updatedAt) || 0));
+    return list;
+  } catch (err) {
+    console.warn('fetchCustomCultureItemsRest error:', err);
+    return [];
+  }
+}
+
 async function sendChatMessageRest(calId, message) {
   try {
     const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}/messages`;
@@ -2294,6 +2313,9 @@ function normalizeConfirmedMeetingExpense(expense) {
   if (url) normalized.url = url;
   if (categoryId) normalized.categoryId = categoryId;
   if (payerId) normalized.payerId = payerId;
+  // Persist 자비부담 -- without this, optimistic UI shows isSelfPay then commitConfirmedMeetings
+  // re-normalizes expenses and drops the flag, so the list snaps back to 선결제.
+  if (expense.isSelfPay) normalized.isSelfPay = true;
   if (Number.isFinite(amount)) normalized.amount = Math.round(amount);
   if (Number.isFinite(order)) normalized.order = Math.max(0, Math.round(order));
   if (Number.isFinite(createdAt)) normalized.createdAt = Math.max(0, Math.round(createdAt));
@@ -3030,7 +3052,8 @@ const CALENDAR_BACKUP_COLLECTION_NAMES = [
   'places',
   'confirmedMeetings',
   'activityLogs',
-  'anniversaries'
+  'anniversaries',
+  'customCultureItems'
 ];
 
 function cloneJsonSafe(value) {
@@ -3716,6 +3739,7 @@ export {
   invalidateGalleryItemCount,
   fetchMemosRest,
   fetchAnniversariesRest,
+  fetchCustomCultureItemsRest,
   sendChatMessageRest,
   writeCollectionDocumentWithFallback,
   writeRootCollectionDocumentWithFallback,
