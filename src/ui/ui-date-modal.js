@@ -2493,7 +2493,7 @@ export function DateModal({
     activeTab === 'participant' && /*#__PURE__*/React.createElement(React.Fragment, null,
       /* Anniversaries banner list inside DateModal body */
       dateAnns.length > 0 && /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '14px' }
+        style: { display: 'flex', flexDirection: 'column', gap: '6px' }
       }, dateAnns.map((ann, aIdx) => {
         const displayColor = getAnniversaryDisplayColor(ann, calendar);
         const bannerKey = ann.id || aIdx;
@@ -2526,7 +2526,11 @@ export function DateModal({
           key: bannerKey,
           style: {
             display: 'flex', flexDirection: 'column', gap: '8px',
-            padding: '10px 14px',
+            justifyContent: 'center',
+            boxSizing: 'border-box',
+            height: isExpanded ? 'auto' : '40px',
+            minHeight: '40px',
+            padding: isExpanded ? '10px 14px' : '0 14px',
             backgroundColor: `${displayColor}12`,
             color: displayColor,
             border: `1px solid ${displayColor}30`,
