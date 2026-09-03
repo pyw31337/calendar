@@ -1280,6 +1280,7 @@ function CalendarApp() {
   const [voteTarget, setVoteTarget] = React.useState(null);
   const [isGuideOpen, setIsGuideOpen] = React.useState(false);
   const [isAnniversariesOpen, setIsAnniversariesOpen] = React.useState(false);
+  const [anniversaryEditId, setAnniversaryEditId] = React.useState(null);
   const [isInitialDataLoading, setIsInitialDataLoading] = React.useState(() => {
     if (!firebaseDb) return false;
     try {
@@ -1396,6 +1397,19 @@ function CalendarApp() {
   }, [activeCalId, firebaseDb, firebaseConnectionVersion]);
   const [anniversaries, setAnniversaries] = React.useState([]);
   const [customCultureItems, setCustomCultureItems] = React.useState([]);
+  // id -> poster URL from crawled culture JSON (festivals + performances). Used to enrich
+  // already-registered culture anniversaries that were saved before posters were copied.
+  const [culturePosterById, setCulturePosterById] = React.useState(() => new Map());
+  const culturePosterFetchedRef = React.useRef(false);
+  const customPosterById = React.useMemo(() => {
+    const m = new Map();
+    (customCultureItems || []).forEach(item => {
+      if (!item || !item.id) return;
+      const img = item.image ? String(item.image).trim() : '';
+      if (img) m.set(item.id, img);
+    });
+    return m;
+  }, [customCultureItems]);
   // Live subcollection state for places/confirmedMeeting (see unionPlaces/unionConfirmedMeetings
   // and the effect below) -- unlike activityLogs (only fetched on-demand for the recovery UI),
   // these two feed many always-visible surfaces (calendar grid badges, summary banners, place
@@ -2431,6 +2445,59 @@ function CalendarApp() {
     setAnniversaries(prev => (Array.isArray(prev) ? prev.filter(a => a.id !== annId) : []));
   };
 
+  // One-time fetch of crawled culture posters when any culture-linked anniversary lacks photos.
+  React.useEffect(() => {
+    const missing = (anniversaries || []).some(a => {
+      if (!a || !a.cultureSourceId) return false;
+      const hasPhotos = Array.isArray(a.photos) && a.photos.length > 0;
+      const hasImage = !!(a.image && String(a.image).trim());
+      if (hasPhotos || hasImage) return false;
+      if (customPosterById.has(a.cultureSourceId)) return false;
+      if (culturePosterById.has(a.cultureSourceId)) return false;
+      return true;
+    });
+    if (!missing || culturePosterFetchedRef.current) return;
+    culturePosterFetchedRef.current = true;
+    let cancelled = false;
+    const base = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.BASE_URL) || '/';
+    const urls = [`${base}data/culture-festivals.json`, `${base}data/culture-performances.json`];
+    Promise.all(urls.map(u => fetch(u).then(r => (r.ok ? r.json() : null)).catch(() => null))).then(results => {
+      if (cancelled) return;
+      setCulturePosterById(prev => {
+        const next = new Map(prev);
+        (results || []).forEach(data => {
+          const items = Array.isArray(data && data.items) ? data.items : [];
+          items.forEach(it => {
+            if (!it || !it.id) return;
+            const img = it.image ? String(it.image).trim() : '';
+            if (img && !next.has(it.id)) next.set(it.id, img);
+          });
+        });
+        return next;
+      });
+    });
+    return () => { cancelled = true; };
+  }, [anniversaries, customPosterById, culturePosterById]);
+
+  // In-memory poster enrichment for DateModal / calendar display (no Firestore rewrite).
+  const anniversariesWithPosters = React.useMemo(() => {
+    if (!Array.isArray(anniversaries)) return [];
+    return anniversaries.map(ann => {
+      if (!ann) return ann;
+      const hasPhotos = Array.isArray(ann.photos) && ann.photos.length > 0;
+      const hasImage = !!(ann.image && String(ann.image).trim());
+      if (hasPhotos || hasImage) return ann;
+      if (!ann.cultureSourceId) return ann;
+      const poster = customPosterById.get(ann.cultureSourceId) || culturePosterById.get(ann.cultureSourceId);
+      if (!poster) return ann;
+      return {
+        ...ann,
+        image: poster,
+        photos: [{ id: `poster_${ann.id}`, url: poster, thumbUrl: poster }]
+      };
+    });
+  }, [anniversaries, customPosterById, culturePosterById]);
+
   // 히스토리 > 문화공연 탭의 "캘린더에 일정 추가" 체크박스가 직접 호출하는 write path -- reuses
   // the exact same anniversaries write shape AnniversaryModal's own handleSaveAnniversary uses
   // (ui-event-modals.js) rather than opening that modal, since the source data (title/period/
@@ -2462,9 +2529,18 @@ function CalendarApp() {
     // Conditionally-added, not `field: value || undefined` -- Firestore's set() rejects a literal
     // undefined property value outright, so an always-present key here would throw on exactly the
     // items missing that field (same pattern AnniversaryModal's own handleSaveAnniversary uses).
-    const descriptionText = [item.venue, item.address].filter(Boolean).join(' · ');
+    const descriptionParts = [item.venue, item.address];
+    if (item.description) descriptionParts.push(String(item.description).trim());
+    if (item.link) descriptionParts.push(String(item.link).trim());
+    const descriptionText = descriptionParts.filter(Boolean).join(' · ');
     if (descriptionText) annData.description = descriptionText;
     if (item.link) annData.cultureSourceLink = item.link;
+    // Copy archive-card poster so DateModal anniversary banners can show the same image.
+    const poster = item.image ? String(item.image).trim() : '';
+    if (poster) {
+      annData.image = poster;
+      annData.photos = [{ id: `poster_${anniversaryId}`, url: poster, thumbUrl: poster }];
+    }
     try {
       const saved = await writeCollectionDocumentWithFallback('anniversaries', activeCal.id, anniversaryId, annData, 'set', '문화공연 캘린더 등록');
       if (!saved?.success) throw new Error('Culture event anniversary save failed');
@@ -6133,7 +6209,7 @@ function CalendarApp() {
       }
     }),
     isModalOpen && /*#__PURE__*/React.createElement(DateModal, {
-      anniversaries: anniversaries,
+      anniversaries: anniversariesWithPosters,
       dateStr: selectedDate,
       calendar: activeCal,
       chatMessages: displayChatMessages,
@@ -6165,7 +6241,8 @@ function CalendarApp() {
       onRequestConfirm: showConfirmDialog,
       syncStatus: syncStatus,
       onClose: () => { setIsModalOpen(false); setDateModalInitialTab(null); },
-      onParticipantClick: handleParticipantClick
+      onParticipantClick: handleParticipantClick,
+      onEditAnniversary: (ann) => { if (!ann?.id) return; setAnniversaryEditId(ann.id); setIsAnniversariesOpen(true); }
     }),
     confirmDialog && /*#__PURE__*/React.createElement(ConfirmDialog, {
       title: confirmDialog.title,
@@ -7306,7 +7383,9 @@ function CalendarApp() {
   }), isAnniversariesOpen && /*#__PURE__*/React.createElement(AnniversaryModal, {
     calendar: activeCal,
     anniversaries: anniversaries,
-    onClose: () => setIsAnniversariesOpen(false),
+    initialEditId: anniversaryEditId,
+    onInitialEditConsumed: () => setAnniversaryEditId(null),
+    onClose: () => { setIsAnniversariesOpen(false); setAnniversaryEditId(null); },
     showToast: showToast,
     onRequestConfirm: showConfirmDialog,
     onBulkRegister: handleBulkRegisterAvailability,
@@ -7526,7 +7605,7 @@ function CalendarApp() {
       );
     }
   })), /*#__PURE__*/React.createElement(CalendarGrid, {
-    anniversaries: anniversaries,
+    anniversaries: anniversariesWithPosters,
     calendar: activeCal,
     isLoading: isInitialDataLoading,
     monthDate: currentMonthDate,
