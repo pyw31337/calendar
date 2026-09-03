@@ -1777,7 +1777,26 @@ export function HistoryView({
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState('');
-  const [historyTab, setHistoryTab] = React.useState('meetings');
+  const HISTORY_TAB_STORAGE_KEY = 'gather_history_tab';
+  const VALID_HISTORY_TABS = ['festival', 'culture', 'meetings'];
+  const [historyTab, setHistoryTab] = React.useState(() => {
+    try {
+      const saved = localStorage.getItem(HISTORY_TAB_STORAGE_KEY);
+      if (VALID_HISTORY_TABS.includes(saved)) return saved;
+    } catch (_) { /* private browsing / disabled storage */ }
+    return 'festival';
+  });
+  const changeHistoryTab = (tab) => {
+    if (!VALID_HISTORY_TABS.includes(tab)) return;
+    setHistoryTab(tab);
+    try { localStorage.setItem(HISTORY_TAB_STORAGE_KEY, tab); } catch (_) { /* best-effort */ }
+  };
+  // When the side menu navigates to 보관함 again (or any view), force the festival tab so
+  // re-entry always lands on 지역축제 rather than whatever tab was last open.
+  const handleHistoryChangeView = (view) => {
+    if (view === 'history') changeHistoryTab('festival');
+    if (typeof onChangeView === 'function') onChangeView(view);
+  };
   // Shared 시/도·군/구 filter for the 문화공연/지역축제 tabs (지난 모임 has no region data to
   // filter by). Lives here rather than inside CulturePerformancesTab so switching between the
   // 문화공연/지역축제 tabs keeps the same region selected instead of resetting it.
@@ -1939,7 +1958,7 @@ export function HistoryView({
     UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
       ariaLabel: "보관함 탭",
       value: historyTab,
-      onChange: v => setHistoryTab(v),
+      onChange: changeHistoryTab,
       options: [
         { value: 'festival', label: '지역축제' },
         { value: 'culture', label: '문화공연' },
@@ -2021,10 +2040,13 @@ export function HistoryView({
     historyTab === 'meetings' && /*#__PURE__*/React.createElement("div", {
       className: "history-meetings-grid",
       onScroll: handleHistoryScroll,
-      style: { flex: 1, overflowY: 'auto', padding: '16px', paddingTop: historyContentPaddingTop }
+      style: Object.assign(
+        { flex: 1, overflowY: 'auto', padding: '118px 16px 16px' },
+        confirmedDates.length === 0 ? { display: 'flex', alignItems: 'center', justifyContent: 'center' } : {}
+      )
     },
       confirmedDates.length === 0 ? /*#__PURE__*/React.createElement("div", {
-        style: { textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)' }
+        style: { textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)' }
       }, q ? "검색 결과가 없습니다." : "아직 확정된 모임이 없습니다.") : confirmedDates.map(d => {
         const dateEntries = (dateMap[d] || []).filter(e => (participantsMap[e.participantId] || e.participantId === BULK_NO_PARTICIPANT_ID) && !isTombstone(e));
         const memoEntries = dateEntries.filter(e => e.note && e.note.trim().length > 0);
@@ -2159,7 +2181,7 @@ export function HistoryView({
       ),
       typeof SharedAppNavBlock === 'function' && /*#__PURE__*/React.createElement(SharedAppNavBlock, {
         onClose: () => setIsMenuOpen(false),
-        onChangeView: onChangeView,
+        onChangeView: handleHistoryChangeView,
         onOpenCreateSettlement: onOpenCreateSettlement,
         showSettlement: showSettlement,
         chatCount: chatCount,

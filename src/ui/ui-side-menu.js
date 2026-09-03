@@ -1261,7 +1261,10 @@ export function SharedAppNavBlock({
       metaPill(memoLastTitleWord)
     ),
     /* 8. 보관함 (구 히스토리) */
-    /*#__PURE__*/React.createElement("button", { type: "button", className: "admin-side-menu-item", onClick: () => go("history") },
+    /*#__PURE__*/React.createElement("button", { type: "button", className: "admin-side-menu-item", onClick: () => {
+      try { localStorage.setItem('gather_history_tab', 'festival'); } catch (_) { /* best-effort */ }
+      go("history");
+    } },
       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, FolderClockIcon ? /*#__PURE__*/React.createElement(FolderClockIcon, { size: 20 }) : null),
       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title", style: { display: "flex", alignItems: "center", gap: "6px" } }, "보관함")

@@ -1417,8 +1417,10 @@ export function CalendarGrid({
     // meeting we append ·확정 -- otherwise users only see '개천절' and re-tap 모임확정,
     // which toggles the confirmation OFF. Then '전원', then solar term.
     const holidayLabel = isHoliday ? holidayNames.join('·') : '';
+    // Holiday name stays red; when also confirmed, ·확정 is a nested purple span so both
+    // statuses remain readable. Non-holiday confirmed days keep plain purple '확정'.
     const cornerText = isHoliday
-      ? (isConfirmed ? `${holidayLabel}·확정` : holidayLabel)
+      ? holidayLabel
       : isConfirmed ? '확정' : isAllAvailable ? '전원' : solarTermName;
     const cornerColor = isHoliday ? '#EF4444' : isConfirmed ? '#7C3AED' : isAllAvailable ? 'var(--status-green)' : '#94A3B8';
     const cornerTitle = isHoliday
@@ -1512,7 +1514,11 @@ export function CalendarGrid({
             whiteSpace: 'nowrap',
             textAlign: 'right'
           }
-        }, cornerText)
+        }, cornerText, isHoliday && isConfirmed ? /*#__PURE__*/React.createElement("span", {
+          style: {
+            color: '#7C3AED'
+          }
+        }, "·확정") : null)
       ),
 
       /* Middle: Schedule badges container */
