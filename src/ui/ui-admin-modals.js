@@ -678,16 +678,23 @@ function useScrollHideHeader() {
   const [isHeaderVisible, setIsHeaderVisible] = React.useState(true);
   const lastScrollTopRef = React.useRef(0);
   const onScroll = React.useCallback((e) => {
-    const scrollTop = e && e.target ? e.target.scrollTop : 0;
+    const el = e && e.target;
+    const scrollTop = el && typeof el.scrollTop === 'number' ? el.scrollTop : 0;
     const lastScrollTop = lastScrollTopRef.current;
+    const delta = scrollTop - lastScrollTop;
+    lastScrollTopRef.current = scrollTop;
+    // Ignore sub-pixel / rubber-band noise
+    if (Math.abs(delta) < 4) return;
+    const maxScroll = el ? Math.max(0, (el.scrollHeight || 0) - (el.clientHeight || 0)) : 0;
+    // Near the bottom, never re-show from tiny upward deltas (padding oscillation)
+    const nearBottom = maxScroll > 0 && (maxScroll - scrollTop) < 64;
     if (scrollTop < 10) {
       setIsHeaderVisible(true);
-    } else if (scrollTop > lastScrollTop && scrollTop > 56) {
+    } else if (delta > 0 && scrollTop > 56) {
       setIsHeaderVisible(false);
-    } else if (scrollTop < lastScrollTop) {
+    } else if (delta < 0 && !nearBottom) {
       setIsHeaderVisible(true);
     }
-    lastScrollTopRef.current = scrollTop;
   }, []);
   return { isHeaderVisible, onScroll };
 }
@@ -1417,7 +1424,7 @@ export function AdminModal({
                   /* Remove button */
                   /*#__PURE__*/React.createElement("button", {
                     type: "button", className: "btn btn-danger", disabled: isSubmitting, title: "삭제",
-                    style: { width: '30px', height: '30px', padding: 0, flexShrink: 0 },
+                    style: { width: '32px', height: '32px', minWidth: '32px', minHeight: '32px', padding: 0, flexShrink: 0 },
                     onClick: () => onRequestConfirm('참여자 삭제', `"${p.name}" 참여자를 삭제하시겠습니까?`, () => updateParticipant(p.id, { removedAt: Date.now() }))
                   }, /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }))
                 ))
@@ -1488,7 +1495,7 @@ export function AdminModal({
                   className: "btn btn-danger",
                   title: "삭제",
                   onClick: () => handleDeletePollFromAdmin(poll),
-                  style: { width: '30px', height: '30px', padding: 0, flexShrink: 0 }
+                  style: { width: '32px', height: '32px', minWidth: '32px', minHeight: '32px', padding: 0, flexShrink: 0 }
                 }, /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }))
               )
             ))
@@ -1770,7 +1777,7 @@ export function AdminModal({
               type: "button",
               className: "btn btn-danger",
               title: "로그 삭제",
-              style: { width: '30px', height: '30px', padding: 0, flexShrink: 0 },
+              style: { width: '32px', height: '32px', minWidth: '32px', minHeight: '32px', padding: 0, flexShrink: 0 },
               onClick: (e) => {
                 e.stopPropagation();
                 if (typeof onDeleteLog !== 'function') return;

@@ -640,16 +640,23 @@ function useScrollHideHeader() {
   const [isHeaderVisible, setIsHeaderVisible] = React.useState(true);
   const lastScrollTopRef = React.useRef(0);
   const onScroll = React.useCallback((e) => {
-    const scrollTop = e && e.target ? e.target.scrollTop : 0;
+    const el = e && e.target;
+    const scrollTop = el && typeof el.scrollTop === 'number' ? el.scrollTop : 0;
     const lastScrollTop = lastScrollTopRef.current;
+    const delta = scrollTop - lastScrollTop;
+    lastScrollTopRef.current = scrollTop;
+    // Ignore sub-pixel / rubber-band noise
+    if (Math.abs(delta) < 4) return;
+    const maxScroll = el ? Math.max(0, (el.scrollHeight || 0) - (el.clientHeight || 0)) : 0;
+    // Near the bottom, never re-show from tiny upward deltas (padding oscillation)
+    const nearBottom = maxScroll > 0 && (maxScroll - scrollTop) < 64;
     if (scrollTop < 10) {
       setIsHeaderVisible(true);
-    } else if (scrollTop > lastScrollTop && scrollTop > 56) {
+    } else if (delta > 0 && scrollTop > 56) {
       setIsHeaderVisible(false);
-    } else if (scrollTop < lastScrollTop) {
+    } else if (delta < 0 && !nearBottom) {
       setIsHeaderVisible(true);
     }
-    lastScrollTopRef.current = scrollTop;
   }, []);
   return { isHeaderVisible, onScroll };
 }
@@ -844,8 +851,11 @@ function GalleryLinkCard({ item }) {
         justifyContent: 'center',
         gap: '6px',
         width: '100%',
-        padding: '7px 0',
+        height: '32px',
+        minHeight: '32px',
+        padding: '0 12px',
         marginTop: '2px',
+        boxSizing: 'border-box',
         borderRadius: 'var(--radius-md)',
         border: isVideoOpen ? '1px solid var(--border-subtle)' : '1px solid var(--primary)',
         backgroundColor: isVideoOpen ? 'var(--bg-secondary)' : 'color-mix(in srgb, var(--primary) 10%, transparent)',

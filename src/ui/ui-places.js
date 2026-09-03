@@ -620,16 +620,23 @@ function useScrollHideHeader() {
   const [isHeaderVisible, setIsHeaderVisible] = React.useState(true);
   const lastScrollTopRef = React.useRef(0);
   const onScroll = React.useCallback((e) => {
-    const scrollTop = e && e.target ? e.target.scrollTop : 0;
+    const el = e && e.target;
+    const scrollTop = el && typeof el.scrollTop === 'number' ? el.scrollTop : 0;
     const lastScrollTop = lastScrollTopRef.current;
+    const delta = scrollTop - lastScrollTop;
+    lastScrollTopRef.current = scrollTop;
+    // Ignore sub-pixel / rubber-band noise
+    if (Math.abs(delta) < 4) return;
+    const maxScroll = el ? Math.max(0, (el.scrollHeight || 0) - (el.clientHeight || 0)) : 0;
+    // Near the bottom, never re-show from tiny upward deltas (padding oscillation)
+    const nearBottom = maxScroll > 0 && (maxScroll - scrollTop) < 64;
     if (scrollTop < 10) {
       setIsHeaderVisible(true);
-    } else if (scrollTop > lastScrollTop && scrollTop > 56) {
+    } else if (delta > 0 && scrollTop > 56) {
       setIsHeaderVisible(false);
-    } else if (scrollTop < lastScrollTop) {
+    } else if (delta < 0 && !nearBottom) {
       setIsHeaderVisible(true);
     }
-    lastScrollTopRef.current = scrollTop;
   }, []);
   return { isHeaderVisible, onScroll };
 }
@@ -2242,7 +2249,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
                 },
                 title: "업체보기",
                 style: {
-                  width: '28px', height: '28px',
+                  width: '32px', height: '32px', minWidth: '32px', minHeight: '32px', boxSizing: 'border-box',
                   background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-light)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
                   position: 'relative', zIndex: 11
@@ -2257,7 +2264,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
                 },
                 title: "장소 수정",
                 style: {
-                  width: '28px', height: '28px',
+                  width: '32px', height: '32px', minWidth: '32px', minHeight: '32px', boxSizing: 'border-box',
                   background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-light)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
                   position: 'relative', zIndex: 11
@@ -2344,13 +2351,13 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
                         /*#__PURE__*/React.createElement("button", {
                           type: "button",
                           onClick: e => { e.stopPropagation(); handleCancelEditPlaceMemoEntry(); },
-                          style: { height: '28px', padding: '0 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', background: 'none', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' }
+                          style: { height: '32px', minHeight: '32px', padding: '0 10px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', background: 'none', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer', boxSizing: 'border-box' }
                         }, "취소"),
                         /*#__PURE__*/React.createElement("button", {
                           type: "button",
                           onClick: e => { e.stopPropagation(); handleSavePlaceMemoEntry(place, entry); },
                           disabled: !editingMemoEntryText.trim(),
-                          style: { height: '28px', padding: '0 10px', borderRadius: 'var(--radius-sm)', border: 'none', backgroundColor: 'var(--accent-primary)', color: '#FFFFFF', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer', opacity: editingMemoEntryText.trim() ? 1 : 0.5 }
+                          style: { height: '32px', minHeight: '32px', padding: '0 10px', borderRadius: 'var(--radius-sm)', border: 'none', backgroundColor: 'var(--accent-primary)', color: '#FFFFFF', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer', opacity: editingMemoEntryText.trim() ? 1 : 0.5, boxSizing: 'border-box' }
                         }, "수정")
                       )
                     );

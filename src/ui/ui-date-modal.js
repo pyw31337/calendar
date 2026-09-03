@@ -92,7 +92,8 @@ function DateModalVideoCard({ video }) {
       "aria-expanded": isVideoOpen,
       style: {
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-        width: '100%', padding: '6px 0', marginTop: '6px', borderRadius: 'var(--radius-md)',
+        width: '100%', height: '32px', minHeight: '32px', padding: '0 12px', marginTop: '6px',
+        boxSizing: 'border-box', borderRadius: 'var(--radius-md)',
         border: isVideoOpen ? '1px solid var(--border-subtle)' : '1px solid var(--primary)',
         backgroundColor: isVideoOpen ? 'var(--bg-secondary)' : 'var(--bg-primary)',
         color: isVideoOpen ? 'var(--text-muted)' : 'var(--primary)',
@@ -691,16 +692,23 @@ function useScrollHideHeader() {
   const [isHeaderVisible, setIsHeaderVisible] = React.useState(true);
   const lastScrollTopRef = React.useRef(0);
   const onScroll = React.useCallback((e) => {
-    const scrollTop = e && e.target ? e.target.scrollTop : 0;
+    const el = e && e.target;
+    const scrollTop = el && typeof el.scrollTop === 'number' ? el.scrollTop : 0;
     const lastScrollTop = lastScrollTopRef.current;
+    const delta = scrollTop - lastScrollTop;
+    lastScrollTopRef.current = scrollTop;
+    // Ignore sub-pixel / rubber-band noise
+    if (Math.abs(delta) < 4) return;
+    const maxScroll = el ? Math.max(0, (el.scrollHeight || 0) - (el.clientHeight || 0)) : 0;
+    // Near the bottom, never re-show from tiny upward deltas (padding oscillation)
+    const nearBottom = maxScroll > 0 && (maxScroll - scrollTop) < 64;
     if (scrollTop < 10) {
       setIsHeaderVisible(true);
-    } else if (scrollTop > lastScrollTop && scrollTop > 56) {
+    } else if (delta > 0 && scrollTop > 56) {
       setIsHeaderVisible(false);
-    } else if (scrollTop < lastScrollTop) {
+    } else if (delta < 0 && !nearBottom) {
       setIsHeaderVisible(true);
     }
-    lastScrollTopRef.current = scrollTop;
   }, []);
   return { isHeaderVisible, onScroll };
 }
@@ -2901,8 +2909,7 @@ export function DateModal({
                 className: "poll-drag-handle",
                 disabled: isReorderingAttendance,
                 title: "드래그하여 순서 변경",
-                style: {
-                  width: '22px', height: '22px', border: '1px solid var(--border-subtle)',
+                style: { width: '32px', height: '32px', minWidth: '32px', minHeight: '32px', boxSizing: 'border-box', border: '1px solid var(--border-subtle)',
                   backgroundColor: 'var(--bg-card)', borderRadius: 'var(--radius-sm)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   cursor: 'grab', padding: 0, color: 'var(--text-muted)',
@@ -3230,7 +3237,7 @@ export function DateModal({
               // HTML drag-and-drop is intentionally used here: it works with a mouse/trackpad,
               // while touch users can still reorder through the same control on browsers that
               // promote draggable elements to a native long-press drag gesture.
-              style: { width: '22px', height: '22px', padding: 0, border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)', borderRadius: 'var(--radius-sm)', cursor: 'grab', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'none', userSelect: 'none' }
+              style: { width: '32px', height: '32px', minWidth: '32px', minHeight: '32px', boxSizing: 'border-box', padding: 0, border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)', borderRadius: 'var(--radius-sm)', cursor: 'grab', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'none', userSelect: 'none' }
             }, /*#__PURE__*/React.createElement(LineHeightIcon, { size: 12 })), /*#__PURE__*/React.createElement(ItemEditDeleteActions, {
               showEdit: false,
               onDelete: () => {
@@ -3507,8 +3514,7 @@ export function DateModal({
                 className: "poll-drag-handle",
                 disabled: isSavingExpense,
                 title: "드래그하여 순서 변경",
-                style: {
-                  width: '22px', height: '22px', border: '1px solid var(--border-subtle)',
+                style: { width: '32px', height: '32px', minWidth: '32px', minHeight: '32px', boxSizing: 'border-box', border: '1px solid var(--border-subtle)',
                   backgroundColor: 'var(--bg-card)', borderRadius: 'var(--radius-sm)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   cursor: 'grab', padding: 0, color: 'var(--text-muted)',
