@@ -2142,6 +2142,20 @@ const CULTURE_FESTIVALS_URL = `${CULTURE_DATA_BASE}data/culture-festivals.json`;
 const CULTURE_MISSING_LABEL = '정보없음';
 const culturePerf = value => (value && String(value).trim()) || CULTURE_MISSING_LABEL;
 
+// culture-performances.json/culture-festivals.json 항목의 raw `genre` 코드 -> 칩에 보여줄 한글
+// 라벨. 매핑에 없는 값(장래에 Culture Flow가 새 장르를 추가하는 경우)은 코드값 그대로 보여준다 --
+// 조용히 사라지는 것보다 "알 수 없는 라벨"이 낫다.
+const CULTURE_GENRE_LABELS = {
+  classic_tradition: '클래식/전통',
+  play: '연극',
+  musical: '뮤지컬',
+  concert: '콘서트',
+  exhibition: '전시',
+  activity: '체험',
+  museum: '박물관'
+};
+const cultureGenreLabel = genre => CULTURE_GENRE_LABELS[genre] || genre || '기타';
+
 // 문화공연/지역축제 탭의 지역 필터용 전국 시/도-군/구 목록 (동 단위는 두지 않음). `code`는
 // culture-performances.json/culture-festivals.json의 각 항목이 이미 들고 있는 `region` 필드값과
 // 그대로 맞춘 것 -- 이 코드로 데이터를 직접 필터링한다. `gugun`은 데이터에 별도 필드가 없어
@@ -2515,6 +2529,12 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
   const [loadError, setLoadError] = React.useState(false);
   const [selected, setSelected] = React.useState(null);
   const [pendingId, setPendingId] = React.useState(null);
+  // Local to this mount, not lifted to HistoryView like regionSido/regionGugun -- 문화공연 and
+  // 지역축제 have genuinely different genre mixes (지역축제 is almost entirely 'exhibition'), so a
+  // category picked in one tab wouldn't mean anything carried over to the other. Since HistoryView
+  // renders only one of these two tabs at a time (mutually exclusive `historyTab === ...` guards),
+  // switching tabs unmounts this component and this state naturally resets with it.
+  const [categoryFilter, setCategoryFilter] = React.useState('');
 
   React.useEffect(() => {
     let cancelled = false;
@@ -2584,19 +2604,65 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
     }, loadError ? "정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요." : emptyLabel);
   }
 
-  const filteredItems = mergedItems.filter(item => {
+  const regionFilteredItems = mergedItems.filter(item => {
     if (regionSido && item.region !== regionSido) return false;
     if (regionGugun && getCultureItemDistrict(item) !== regionGugun) return false;
     return true;
   });
 
-  if (filteredItems.length === 0) {
+  if (regionFilteredItems.length === 0) {
     return /*#__PURE__*/React.createElement("div", {
       style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)' }
     }, "선택한 지역에 해당하는 항목이 없습니다.");
   }
 
+  // Counts (and which genres even exist) are computed off the region-filtered set, not the raw
+  // snapshot -- so switching region can change which category chips show up / their counts,
+  // consistent with how RegionFilterBackdrop's own counts work off whichever tab is mounted.
+  const categoryCounts = new Map();
+  regionFilteredItems.forEach(item => {
+    const key = item.genre || '';
+    categoryCounts.set(key, (categoryCounts.get(key) || 0) + 1);
+  });
+  const categoryOptions = [...categoryCounts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([genre, count]) => ({ value: genre, label: cultureGenreLabel(genre), count }));
+
+  const filteredItems = categoryFilter
+    ? regionFilteredItems.filter(item => (item.genre || '') === categoryFilter)
+    : regionFilteredItems;
+
+  const categoryChipRow = categoryOptions.length > 1 && /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', gap: '6px', padding: '0 16px 12px', overflowX: 'auto', flexShrink: 0, alignItems: 'center' }
+  },
+    [{ value: '', label: '전체', count: regionFilteredItems.length }, ...categoryOptions].map(opt => {
+      const isActive = categoryFilter === opt.value;
+      return /*#__PURE__*/React.createElement("button", {
+        key: opt.value || 'all',
+        type: "button",
+        onClick: () => setCategoryFilter(opt.value),
+        style: {
+          flexShrink: 0, border: 'none', borderRadius: 'var(--radius-full)', padding: '6px 12px',
+          background: isActive ? 'var(--accent-primary)' : 'var(--bg-primary)',
+          color: isActive ? '#FFFFFF' : 'var(--text-muted)',
+          fontWeight: 700, fontSize: 'var(--font-size-sm)', cursor: 'pointer', whiteSpace: 'nowrap',
+          display: 'inline-flex', alignItems: 'center', gap: '6px'
+        }
+      }, opt.label, /*#__PURE__*/React.createElement(SectionCountBadge, { count: opt.count }));
+    })
+  );
+
+  if (filteredItems.length === 0) {
+    return /*#__PURE__*/React.createElement(React.Fragment, null,
+      categoryChipRow,
+      /*#__PURE__*/React.createElement("div", {
+        style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)' }
+      }, "선택한 카테고리에 해당하는 항목이 없습니다.")
+    );
+  }
+
   return /*#__PURE__*/React.createElement(React.Fragment, null,
+    categoryChipRow,
     /*#__PURE__*/React.createElement("div", {
       className: "culture-items-grid",
       style: { flex: 1, overflowY: 'auto', padding: '16px', alignContent: 'start' }
