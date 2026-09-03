@@ -1773,6 +1773,48 @@ select.form-select {
     display: flex !important;
   }
 }
+
+/* 흔들도시락 cooking-pot jiggle: .day-cell normally clips with overflow:hidden — lift that
+   for cells that host this anniversary so scale~1.5 shake is not cut off. Modest z-index so
+   the enlarged icon paints above neighbors. */
+.day-cell.day-cell-ann-jiggle {
+  overflow: visible;
+  z-index: 3;
+}
+.day-anniversary-desktop.day-ann-jiggle-row,
+.day-anniversary-mobile.day-ann-jiggle-row,
+.day-anniversary-badge-jiggle,
+.ann-cooking-pot-icon-wrap {
+  overflow: visible;
+}
+.ann-cooking-pot-icon-wrap {
+  position: relative;
+  z-index: 1;
+}
+.ann-cooking-pot-jiggle {
+  display: inline-flex;
+  transform-origin: 50% 70%;
+  animation: ann-cooking-pot-jiggle 2s ease-in-out infinite;
+  will-change: transform;
+}
+@keyframes ann-cooking-pot-jiggle {
+  0%   { transform: scale(1) rotate(0deg); }
+  6%   { transform: scale(1.45) rotate(16deg); }
+  12%  { transform: scale(1.55) rotate(-18deg); }
+  18%  { transform: scale(1.5) rotate(14deg); }
+  24%  { transform: scale(1.55) rotate(-14deg); }
+  30%  { transform: scale(1.48) rotate(10deg); }
+  36%  { transform: scale(1.4) rotate(-8deg); }
+  42%  { transform: scale(1.2) rotate(4deg); }
+  50%  { transform: scale(1) rotate(0deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ann-cooking-pot-jiggle {
+    animation: none;
+    transform: none;
+  }
+}
 .day-cell.other-month {
   opacity: 1;
   background: rgba(250, 250, 250, 0.38);
