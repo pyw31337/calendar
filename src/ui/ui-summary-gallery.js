@@ -7,6 +7,7 @@ const GATHER_APP_CALENDAR_DATA = window.GATHER_APP_CALENDAR_DATA || {};
 const GATHER_APP_CHAT_DATA = window.GATHER_APP_CHAT_DATA || {};
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
+const BULK_NO_PARTICIPANT_ID = GATHER_APP_CONSTANTS.BULK_NO_PARTICIPANT_ID || '__none__';
 const GATHER_APP_CONFIG = window.GATHER_APP_CONFIG || {};
 function __gatherUiDeps() { return window.GATHER_UI_DEPS || {}; }
 function getActiveAvailabilities(calendar) {
@@ -1322,7 +1323,7 @@ export function SummaryList({
 
   // 1. All-available dates: only count active participants (those still in participantsMap)
   const allAvailableDates = Object.keys(dateMap).filter(d => {
-    const entries = dateMap[d].filter(e => participantsMap[e.participantId]);
+    const entries = dateMap[d].filter(e => participantsMap[e.participantId] || e.participantId === BULK_NO_PARTICIPANT_ID);
     const uniqueParticipants = new Set(entries.map(e => e.participantId));
     return totalCount > 0 && uniqueParticipants.size === totalCount;
   });
@@ -1331,7 +1332,7 @@ export function SummaryList({
   // 2. Partial-available dates (MIN_THRESHOLD <= availCount < totalCount), excluding all-available
   const partialAvailableDates = thresholdN > 0 ? Object.keys(dateMap).filter(d => {
     if (allAvailableSet.has(d)) return false;
-    const entries = dateMap[d].filter(e => participantsMap[e.participantId]);
+    const entries = dateMap[d].filter(e => participantsMap[e.participantId] || e.participantId === BULK_NO_PARTICIPANT_ID);
     const uniqueParticipants = new Set(entries.map(e => e.participantId));
     const cnt = uniqueParticipants.size;
     return cnt >= thresholdN && cnt < totalCount;
@@ -1415,7 +1416,7 @@ export function SummaryList({
     onToggle: () => toggleSection('partial'),
     label: collapsedSections.partial ? `${thresholdN}\uBA85 \uC774\uC0C1 \uCC38\uC11D \uAC00\uB2A5 \uD3BC\uCE58\uAE30` : `${thresholdN}\uBA85 \uC774\uC0C1 \uCC38\uC11D \uAC00\uB2A5 \uC811\uAE30`
   })), !collapsedSections.partial && /*#__PURE__*/React.createElement("div", null, sortedPartialDates.map(d => {
-    const dateEntries = (dateMap[d] || []).filter(e => participantsMap[e.participantId] && !isTombstone(e));
+    const dateEntries = (dateMap[d] || []).filter(e => (participantsMap[e.participantId] || e.participantId === BULK_NO_PARTICIPANT_ID) && !isTombstone(e));
     const formattedDateStr = formatDateWithDayName(d);
     const memoEntries = dateEntries.filter(e => e.note && e.note.trim().length > 0);
     const isPast = d < todayStr;
@@ -1441,7 +1442,7 @@ export function SummaryList({
         flexWrap: 'wrap'
       }
     }, memoEntries.map(e => {
-      const p = participantsMap[e.participantId];
+      const p = participantsMap[e.participantId] || (e.participantId === BULK_NO_PARTICIPANT_ID ? { id: BULK_NO_PARTICIPANT_ID, name: '일정', color: '#94A3B8' } : null);
       if (!p) return null;
       const memoUrl = extractFirstUrl(e.note);
       const memoText = memoUrl ? removeFirstUrl(e.note) : e.note.trim();
@@ -1510,7 +1511,7 @@ export function SummaryList({
       padding: '10px 0'
     }
   }, "\uC544\uC9C1 \uCC38\uC5EC\uC790 \uC804\uC6D0\uC774 \uAC00\uB2A5\uD55C \uB0A0\uC9DC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4. \uCE98\uB9B0\uB354\uC5D0\uC11C \uB0A0\uC9DC\uB97C \uC120\uD0DD\uD558\uC5EC \uAC00\uB2A5 \uC5EC\uBD80\uB97C \uD45C\uAE30\uD574\uBCF4\uC138\uC694!") : /*#__PURE__*/React.createElement("div", null, sortedAllDates.slice(0, allListLimit).map(d => {
-    const dateEntries = (dateMap[d] || []).filter(e => participantsMap[e.participantId] && !isTombstone(e));
+    const dateEntries = (dateMap[d] || []).filter(e => (participantsMap[e.participantId] || e.participantId === BULK_NO_PARTICIPANT_ID) && !isTombstone(e));
     const formattedDateStr = formatDateWithDayName(d);
     const memoEntries = dateEntries.filter(e => e.note && e.note.trim().length > 0);
     const isPast = d < todayStr;
@@ -1556,7 +1557,7 @@ export function SummaryList({
         flexWrap: 'wrap'
       }
     }, memoEntries.map(e => {
-      const p = participantsMap[e.participantId];
+      const p = participantsMap[e.participantId] || (e.participantId === BULK_NO_PARTICIPANT_ID ? { id: BULK_NO_PARTICIPANT_ID, name: '일정', color: '#94A3B8' } : null);
       if (!p) return null;
       const memoUrl = extractFirstUrl(e.note);
       const memoText = memoUrl ? removeFirstUrl(e.note) : e.note.trim();
@@ -1627,7 +1628,7 @@ export function SummaryList({
     onToggle: () => toggleSection('confirmed'),
     label: collapsedSections.confirmed ? "모임 확정 펼치기" : "모임 확정 접기"
   })), !collapsedSections.confirmed && /*#__PURE__*/React.createElement("div", null, confirmedDates.slice(0, confirmedListLimit).map(d => {
-    const dateEntries = (dateMap[d] || []).filter(e => participantsMap[e.participantId] && !isTombstone(e));
+    const dateEntries = (dateMap[d] || []).filter(e => (participantsMap[e.participantId] || e.participantId === BULK_NO_PARTICIPANT_ID) && !isTombstone(e));
     const formattedDateStr = formatDateWithDayName(d);
     const memoEntries = dateEntries.filter(e => e.note && e.note.trim().length > 0);
     const isPast = d < todayStr;
@@ -1675,7 +1676,7 @@ export function SummaryList({
         flexWrap: 'wrap'
       }
     }, memoEntries.map(e => {
-      const p = participantsMap[e.participantId];
+      const p = participantsMap[e.participantId] || (e.participantId === BULK_NO_PARTICIPANT_ID ? { id: BULK_NO_PARTICIPANT_ID, name: '일정', color: '#94A3B8' } : null);
       if (!p) return null;
       const memoUrl = extractFirstUrl(e.note);
       const memoText = memoUrl ? removeFirstUrl(e.note) : e.note.trim();
@@ -1782,7 +1783,7 @@ export function HistoryView({
 
   const q = searchQuery.trim().toLowerCase();
   const confirmedDates = !q ? allConfirmedDates : allConfirmedDates.filter(d => {
-    const dateEntries = (dateMap[d] || []).filter(e => participantsMap[e.participantId]);
+    const dateEntries = (dateMap[d] || []).filter(e => participantsMap[e.participantId] || e.participantId === BULK_NO_PARTICIPANT_ID);
     const namesMatch = dateEntries.some(e => (participantsMap[e.participantId]?.name || '').toLowerCase().includes(q));
     const memoMatch = dateEntries.some(e => (e.note || '').toLowerCase().includes(q));
     const placeMatch = getCalendarPlaces(calendar).filter(p => doesPlaceMatchDate(p, d)).some(p =>
@@ -1890,7 +1891,7 @@ export function HistoryView({
       confirmedDates.length === 0 ? /*#__PURE__*/React.createElement("div", {
         style: { textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)' }
       }, q ? "검색 결과가 없습니다." : "아직 확정된 모임이 없습니다.") : confirmedDates.map(d => {
-        const dateEntries = (dateMap[d] || []).filter(e => participantsMap[e.participantId] && !isTombstone(e));
+        const dateEntries = (dateMap[d] || []).filter(e => (participantsMap[e.participantId] || e.participantId === BULK_NO_PARTICIPANT_ID) && !isTombstone(e));
         const memoEntries = dateEntries.filter(e => e.note && e.note.trim().length > 0);
         const isPast = d < todayStr;
         const ddayLabel = isPast ? '지난 모임' : (() => {
@@ -1913,7 +1914,7 @@ export function HistoryView({
           ),
           memoEntries.length > 0 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'flex-start', gap: '6px', flexWrap: 'wrap' } },
             memoEntries.map(e => {
-              const p = participantsMap[e.participantId];
+              const p = participantsMap[e.participantId] || (e.participantId === BULK_NO_PARTICIPANT_ID ? { id: BULK_NO_PARTICIPANT_ID, name: '일정', color: '#94A3B8' } : null);
               if (!p) return null;
               const memoUrl = extractFirstUrl(e.note);
               const memoText = memoUrl ? removeFirstUrl(e.note) : e.note.trim();

@@ -29,6 +29,8 @@ export const EXPENSE_CATEGORY_ICONS = Object.freeze({
   etc: '💬'
 });
 
+export const BULK_NO_PARTICIPANT_ID = '__none__';
+
 export const SCHEDULE_ACTIVITY_ACTIONS = Object.freeze(['create', 'update', 'delete']);
 export const POLL_ACTIVITY_ACTIONS = Object.freeze(['poll_create', 'poll_vote', 'poll_cancel']);
 export const EXPENSE_ACTIVITY_ACTIONS = Object.freeze(['expense_create', 'expense_update', 'expense_delete']);
@@ -41,6 +43,7 @@ export const GATHER_APP_CONSTANTS = Object.freeze({
   PRESET_COLORS,
   DEFAULT_EXPENSE_CATEGORIES,
   EXPENSE_CATEGORY_ICONS,
+  BULK_NO_PARTICIPANT_ID,
   SCHEDULE_ACTIVITY_ACTIONS,
   POLL_ACTIVITY_ACTIONS,
   EXPENSE_ACTIVITY_ACTIONS,

@@ -7,6 +7,7 @@ const GATHER_APP_CALENDAR_DATA = window.GATHER_APP_CALENDAR_DATA || {};
 const GATHER_APP_CHAT_DATA = window.GATHER_APP_CHAT_DATA || {};
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
+const BULK_NO_PARTICIPANT_ID = GATHER_APP_CONSTANTS.BULK_NO_PARTICIPANT_ID || '__none__';
 const GATHER_APP_CONFIG = window.GATHER_APP_CONFIG || {};
 function __gatherUiDeps() { return window.GATHER_UI_DEPS || {}; }
 function getActiveAvailabilities(calendar) {
@@ -1369,8 +1370,8 @@ export function CalendarGrid({
     const today = new Date();
     const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
     const isToday = isCurrentMonth && dateStr === todayStr;
-    const entries = (availMap[dateStr] || []).filter(e => participantsMap[e.participantId]);
-    const uniqueActiveParts = new Set(entries.map(e => e.participantId));
+    const entries = (availMap[dateStr] || []).filter(e => participantsMap[e.participantId] || e.participantId === BULK_NO_PARTICIPANT_ID);
+    const uniqueActiveParts = new Set(entries.filter(e => participantsMap[e.participantId]).map(e => e.participantId));
     const isAllAvailable = totalPartCount > 0 && uniqueActiveParts.size === totalPartCount;
     const holidayNames = holidayMap[dateStr];
     const isHoliday = !!holidayNames && holidayNames.length > 0;
@@ -1487,14 +1488,17 @@ export function CalendarGrid({
       /*#__PURE__*/React.createElement("div", {
         className: "badges-container"
       }, entries.map(e => {
-        const p = participantsMap[e.participantId];
+        const isNone = e.participantId === BULK_NO_PARTICIPANT_ID;
+        const p = isNone
+          ? { id: BULK_NO_PARTICIPANT_ID, name: '일정', color: '#94A3B8' }
+          : participantsMap[e.participantId];
         if (!p) return null;
         return /*#__PURE__*/React.createElement(ParticipantBadge, {
-          key: p.id,
+          key: p.id + (e.id || e.date || ''),
           participant: p,
           style: { cursor: 'pointer' },
-          draggable: true,
-          onDragStart: event => {
+          draggable: !isNone,
+          onDragStart: isNone ? undefined : (event => {
             event.stopPropagation();
             event.dataTransfer.setData('text/plain', JSON.stringify({
               entryReferId: e.id,
@@ -1502,15 +1506,15 @@ export function CalendarGrid({
               participantId: e.participantId,
               participantName: p.name
             }));
-          },
-          onTouchStart: event => { event.stopPropagation(); handleBadgeTouchStart(event, e, p, dateStr); },
-          onTouchMove: event => { event.stopPropagation(); handleBadgeTouchMove(event); },
-          onTouchEnd: event => { event.stopPropagation(); handleBadgeTouchEnd(event); },
-          onTouchCancel: event => { event.stopPropagation(); handleBadgeTouchCancel(); },
+          }),
+          onTouchStart: isNone ? undefined : (event => { event.stopPropagation(); handleBadgeTouchStart(event, e, p, dateStr); }),
+          onTouchMove: isNone ? undefined : (event => { event.stopPropagation(); handleBadgeTouchMove(event); }),
+          onTouchEnd: isNone ? undefined : (event => { event.stopPropagation(); handleBadgeTouchEnd(event); }),
+          onTouchCancel: isNone ? undefined : (event => { event.stopPropagation(); handleBadgeTouchCancel(); }),
           onClick: event => {
             event.stopPropagation();
             if (justTouchDraggedRef.current) return;
-            if (typeof onParticipantClick === 'function') {
+            if (!isNone && typeof onParticipantClick === 'function') {
               onParticipantClick(p.name, dateStr);
             } else if (typeof onSelectDate === 'function') {
               onSelectDate(dateStr);

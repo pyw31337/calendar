@@ -4094,8 +4094,9 @@ function CalendarApp() {
       showToast('날짜 형식 오류', 'error');
       return false;
     }
+    const BULK_NO_PARTICIPANT_ID = (GATHER_APP_CONSTANTS && GATHER_APP_CONSTANTS.BULK_NO_PARTICIPANT_ID) || '__none__';
     const activeParticipantIds = new Set(getActiveParticipants(activeCal).map(participant => participant.id));
-    if (!activeParticipantIds.has(participantId)) {
+    if (participantId !== BULK_NO_PARTICIPANT_ID && !activeParticipantIds.has(participantId)) {
       showToast('참여자 재선택 필요', 'error');
       return false;
     }
@@ -4123,7 +4124,9 @@ function CalendarApp() {
         updatedAt: now
       });
     }
-    const partName = (getActiveParticipants(activeCal).find(p => p.id === participantId) || {}).name || participantId;
+    const partName = participantId === BULK_NO_PARTICIPANT_ID
+      ? '참여자 없음'
+      : ((getActiveParticipants(activeCal).find(p => p.id === participantId) || {}).name || participantId);
     const logNote = `[참여자: ${partName}] ${cleanNote ? `[메모: ${cleanNote}]` : '[참석]'}`;
     const activityLog = createActivityLog(activeCal.id, action, dateStr, participantId, now, logNote);
     const updatedCal = {
@@ -4213,8 +4216,9 @@ function CalendarApp() {
       showToast('잠시 후 다시 시도', 'error');
       return false;
     }
+    const BULK_NO_PARTICIPANT_ID = (GATHER_APP_CONSTANTS && GATHER_APP_CONSTANTS.BULK_NO_PARTICIPANT_ID) || '__none__';
     const activeParticipantIds = new Set(getActiveParticipants(activeCal).map(participant => participant.id));
-    if (!activeParticipantIds.has(participantId)) {
+    if (participantId !== BULK_NO_PARTICIPANT_ID && !activeParticipantIds.has(participantId)) {
       showToast('참여자 재선택 필요', 'error');
       return false;
     }
@@ -4249,8 +4253,9 @@ function CalendarApp() {
   };
   const handleDeleteAvailability = async (dateStr, participantId) => {
     if (!activeCal || !isValidDateString(dateStr)) return false;
+    const BULK_NO_PARTICIPANT_ID = (GATHER_APP_CONSTANTS && GATHER_APP_CONSTANTS.BULK_NO_PARTICIPANT_ID) || '__none__';
     const activeParticipantIds = new Set(getActiveParticipants(activeCal).map(participant => participant.id));
-    if (!activeParticipantIds.has(participantId)) return false;
+    if (participantId !== BULK_NO_PARTICIPANT_ID && !activeParticipantIds.has(participantId)) return false;
     const now = Date.now();
     const targetEntry = (activeCal.availabilities || []).find(e => e.date === dateStr && e.participantId === participantId && !isTombstone(e));
     if (!targetEntry) return false;
@@ -9947,13 +9952,14 @@ const rebuildCalendarToTimestamp = (calendar, T, logs = []) => {
     });
 
   const participantIds = new Set(rebuiltParticipants.map(p => p.id));
+  const BULK_NO_PARTICIPANT_ID = (GATHER_APP_CONSTANTS && GATHER_APP_CONSTANTS.BULK_NO_PARTICIPANT_ID) || '__none__';
 
   // 2. Rebuild availabilities
   const rebuiltAvailabilities = new Map();
   for (const log of sortedLogs) {
     if (log.timestamp > T) continue;
     if (POLL_ACTIVITY_ACTIONS.includes(log.action)) continue;
-    if (log.participantId && !participantIds.has(log.participantId)) continue;
+    if (log.participantId && log.participantId !== BULK_NO_PARTICIPANT_ID && !participantIds.has(log.participantId)) continue;
 
     const key = `${log.date}_${log.participantId}`;
     if (log.action === 'create' || log.action === 'update') {
