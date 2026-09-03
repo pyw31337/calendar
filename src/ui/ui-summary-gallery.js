@@ -2250,7 +2250,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
           style: {
             display: 'flex', flexDirection: 'column', gap: '6px', padding: 0,
             border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)',
-            backgroundColor: 'var(--bg-card)', cursor: 'pointer', textAlign: 'left'
+            backgroundColor: 'var(--bg-card)', cursor: 'pointer', textAlign: 'left',
             // No overflow:hidden here -- this is a CSS Grid item, and per the sizing spec a grid
             // (or flex) item's *automatic* minimum size resolves to 0 whenever the item itself has
             // a non-visible overflow, which made every card collapse to ~6px (grid-auto-rows:auto
@@ -2258,21 +2258,35 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
             // 히스토리 date-row flex-shrink bug fixed earlier -- see .date-item-btn in app.css --
             // just tripped via Grid's row auto-sizing instead of Flexbox shrinking. Rounding the
             // poster's own top corners below achieves the same clipped look without it.
+            //
+            // minWidth:0 is the width-axis counterpart of that same bug: this button is also a
+            // `repeat(2/4/6, 1fr)` grid item, and a 1fr track's automatic minimum uses the
+            // item's min-content contribution -- which the venue line below inflates to its full
+            // unwrapped text width (white-space:nowrap's min-content IS its full width) unless
+            // this is capped. Left uncapped, one long unbroken address (real festival data
+            // regularly has these) forces every column wider than the grid's own box, so the
+            // whole grid silently overflows past the viewport with no scrollbar (clipped by the
+            // page's own overflow-x safety net) instead of the ellipsis actually kicking in.
+            minWidth: 0
           }
         },
           /*#__PURE__*/React.createElement("div", { style: { position: 'relative', width: '100%', paddingTop: '133%', backgroundColor: 'var(--bg-primary)', flexShrink: 0, borderRadius: 'var(--radius-md) var(--radius-md) 0 0', overflow: 'hidden' } },
-            item.image
-              ? /*#__PURE__*/React.createElement("img", {
-                  src: item.image, alt: item.title, loading: 'lazy', decoding: 'async',
-                  style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' },
-                  onError: e => { e.currentTarget.style.display = 'none'; }
-                })
-              : /*#__PURE__*/React.createElement("div", { style: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' } }, "포스터 없음"),
+            // "포스터 없음" is always the base layer (not just the no-image branch's fallback) so
+            // a broken image URL -- the daily snapshot's festival items all carry an
+            // /images/fallbacks/*.jpg path that was never actually committed as a real asset,
+            // so every one 404s -- reveals this placeholder underneath once onError hides the
+            // <img>, instead of leaving a blank box with nothing in it.
+            /*#__PURE__*/React.createElement("div", { style: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' } }, "포스터 없음"),
+            item.image && /*#__PURE__*/React.createElement("img", {
+              src: item.image, alt: item.title, loading: 'lazy', decoding: 'async',
+              style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' },
+              onError: e => { e.currentTarget.style.display = 'none'; }
+            }),
             registered && /*#__PURE__*/React.createElement("div", {
               style: { position: 'absolute', top: '6px', right: '6px', backgroundColor: '#7C3AED', color: '#fff', borderRadius: 'var(--radius-full)', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 800, boxShadow: '0 1px 3px rgba(0,0,0,0.25)' }
             }, "✓")
           ),
-          /*#__PURE__*/React.createElement("div", { style: { padding: '8px 10px 10px' } },
+          /*#__PURE__*/React.createElement("div", { style: { padding: '8px 10px 10px', minWidth: 0 } },
             /*#__PURE__*/React.createElement("div", {
               style: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--text-main)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', wordBreak: 'break-word' }
             }, item.title),

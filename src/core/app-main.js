@@ -2631,9 +2631,15 @@ function CalendarApp() {
     };
   }, [activeCalId, activeView, isGlobalSearchOpen, memosLimit, firebaseDb, firebaseConnectionVersion]);
 
-  // Dynamic body padding override for full-screen subviews (chat, settlement, memo)
+  // Dynamic body padding override for full-screen subviews (chat, settlement, memo, places, history).
+  // Each of these renders its own `position:fixed; top/left/right/bottom:0` container with an
+  // internal `overflowY:auto` scroll region, sized to exactly fill the viewport. Leaving body's
+  // default padding (24px top + 60px bottom, see `body` in app.css) in place while one of these
+  // is mounted makes body's own box 84px taller than the viewport regardless of content -- since
+  // a fixed-position child doesn't shrink its ancestor -- so `html`/`body` end up with their own
+  // ~84px scrollbar on top of the subview's internal one, i.e. a visible double vertical scrollbar.
   React.useEffect(() => {
-    if (activeView === 'memo' || activeView === 'chat' || activeView === 'settlement') {
+    if (activeView === 'memo' || activeView === 'chat' || activeView === 'settlement' || activeView === 'places' || activeView === 'history') {
       document.body.classList.add('no-body-padding');
     } else {
       document.body.classList.remove('no-body-padding');
