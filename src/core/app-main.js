@@ -6357,7 +6357,30 @@ function CalendarApp() {
       showToast: showToast
     }),
     operationProgress && !chatUploadProgress && /*#__PURE__*/React.createElement(OperationProgressOverlay, operationProgress),
-    chatUploadProgress && /*#__PURE__*/React.createElement(ImageUploadOverlay, chatUploadProgress)
+    chatUploadProgress && /*#__PURE__*/React.createElement(ImageUploadOverlay, chatUploadProgress),
+    // Shared Lightbox host for every activeView (calendar/chat/gallery/settlement/memo/places/history).
+    // DateModal and other callers only setActiveLightbox; without a single mount here, settlement
+    // (and similar early-return views) updated state with nothing to render.
+    activeLightbox ? /*#__PURE__*/React.createElement(Lightbox, {
+      urls: activeLightbox.urls,
+      index: activeLightbox.index,
+      meta: activeLightbox.meta,
+      onClose: () => setActiveLightbox(null),
+      onNavigate: i => setActiveLightbox(prev => prev ? { ...prev, index: i } : prev),
+      showToast: showToast,
+      onPromoteImageUrl: handlePromoteInlineChatImage,
+      onSaveImageTags: handleSaveImageTags,
+      onSearchTag: handleSearchTag,
+      onDeletePhoto: handleDeletePhoto,
+      onReplacePhoto: handleReplacePhoto,
+      onJumpToChatMessage: handleJumpToChatMessage,
+      onJumpToMemo: handleJumpToMemo,
+      onJumpToMeetingDate: handleJumpToMeetingDate,
+      onJumpToGallery: handleJumpToGallery,
+      onGetChatMessageOrdinal: handleGetChatMessageOrdinal,
+      onGetGalleryPhotoOrdinal: handleGetGalleryPhotoOrdinal,
+      onRequestConfirm: showConfirmDialog
+    }) : null
   );
   const localGalleryCount = (() => {
     const directUrls = new Set();
@@ -6728,7 +6751,7 @@ function CalendarApp() {
       setChatImage: setChatImages,
       chatReplyTarget: chatReplyTarget,
       setChatReplyTarget: setChatReplyTarget,
-      activeLightbox: activeLightbox,
+      activeLightbox: null, // render via withStickyVideo shared Lightbox host
       setActiveLightbox: setActiveLightbox,
       onSend: handleSendChatMessage,
       onDeleteMessage: handleDeleteMessage,
@@ -6849,7 +6872,7 @@ function CalendarApp() {
   }
 
   if (activeView === 'gallery') {
-    // activeLightbox keeps the shared Lightbox mounted in the gallery page.
+    // Lightbox mounts once in withStickyVideo (shared across views).
     return withStickyVideo(/*#__PURE__*/React.createElement(React.Fragment, null,
       /*#__PURE__*/React.createElement(ChatGalleryModal, {
         calendar: activeCal,
@@ -6881,26 +6904,6 @@ function CalendarApp() {
         syncStatus: syncStatus,
         ...navMenuProps
       }),
-      activeLightbox ? /*#__PURE__*/React.createElement(Lightbox, {
-        urls: activeLightbox.urls,
-        index: activeLightbox.index,
-        meta: activeLightbox.meta,
-        onClose: () => setActiveLightbox(null),
-        onNavigate: i => setActiveLightbox(prev => prev ? { ...prev, index: i } : prev),
-        showToast: showToast,
-        onPromoteImageUrl: handlePromoteInlineChatImage,
-        onSaveImageTags: handleSaveImageTags,
-        onSearchTag: handleSearchTag,
-        onDeletePhoto: handleDeletePhoto,
-        onReplacePhoto: handleReplacePhoto,
-        onJumpToChatMessage: handleJumpToChatMessage,
-        onJumpToMemo: handleJumpToMemo,
-        onJumpToMeetingDate: handleJumpToMeetingDate,
-        onJumpToGallery: handleJumpToGallery,
-        onGetChatMessageOrdinal: handleGetChatMessageOrdinal,
-        onGetGalleryPhotoOrdinal: handleGetGalleryPhotoOrdinal,
-        onRequestConfirm: showConfirmDialog
-      }) : null,
       isGalleryShareOpen && activeCal && /*#__PURE__*/React.createElement(ShareModal, {
         calendar: activeCal,
         shareType: "gallery",
@@ -7554,7 +7557,7 @@ function CalendarApp() {
       chatTextareaRef: chatTextareaRef,
       chatImage: chatImages,
       setChatImage: setChatImages,
-      activeLightbox: activeLightbox,
+      activeLightbox: null, // render via withStickyVideo shared Lightbox host
       setActiveLightbox: setActiveLightbox,
       onSend: handleSendChatMessage,
       onDeleteMessage: handleDeleteMessage,
