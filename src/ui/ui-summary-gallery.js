@@ -1804,7 +1804,7 @@ export function HistoryView({
     if (view === 'history') changeHistoryTab('festival');
     if (typeof onChangeView === 'function') onChangeView(view);
   };
-  // Shared 시/도·군/구 filter for the 문화공연/지역축제 tabs (지난 모임 has no region data to
+  // Shared 지역 filter for the 문화공연/지역축제 tabs (지난 모임 has no region data to
   // filter by). Lives here rather than inside CulturePerformancesTab so switching between the
   // 문화공연/지역축제 tabs keeps the same region selected instead of resetting it.
   // Restored from localStorage so a region picked on a previous visit still applies next time --
@@ -1843,6 +1843,20 @@ export function HistoryView({
   // item count badge -- it has no other reason to fetch or hold this data itself.
   const [regionFilterItems, setRegionFilterItems] = React.useState([]);
   const [isLocating, setIsLocating] = React.useState(false);
+  // 1단/2단 poster-grid density for 문화공연/지역축제 -- shared across both tabs (lives on
+  // HistoryView, not inside CulturePerformancesTab) and persisted so the choice sticks across
+  // visits. Values are the strings '1' | '2'; default '2' (current 2-col mobile layout).
+  const CULTURE_GRID_COLS_STORAGE_KEY = 'gather_culture_grid_cols';
+  const [gridCols, setGridCols] = React.useState(() => {
+    try {
+      const saved = localStorage.getItem(CULTURE_GRID_COLS_STORAGE_KEY);
+      return saved === '1' || saved === '2' ? saved : '2';
+    } catch (_) { return '2'; }
+  });
+  const persistGridCols = (next) => {
+    setGridCols(next);
+    try { localStorage.setItem(CULTURE_GRID_COLS_STORAGE_KEY, next); } catch (_) { /* best-effort */ }
+  };
   const handleUseCurrentLocation = () => {
     if (isLocating) return;
     setIsLocating(true);
@@ -1972,6 +1986,65 @@ export function HistoryView({
         { value: 'meetings', label: '지난 모임' }
       ]
     }),
+    historyTab !== 'meetings' && /*#__PURE__*/React.createElement("div", {
+      className: "region-filter-trigger-row"
+    },
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "current-location-btn",
+        disabled: isLocating,
+        onClick: handleUseCurrentLocation,
+        title: "현재 위치",
+        "aria-label": "현재 위치"
+      },
+        LocateFixedIcon && /*#__PURE__*/React.createElement(LocateFixedIcon, { size: 18 })
+      ),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "form-select region-filter-trigger",
+        onClick: () => setIsRegionFilterOpen(true)
+      },
+        /*#__PURE__*/React.createElement("span", { style: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, "지역 선택"),
+        renderRegionTriggerChevron(React)
+      ),
+      /*#__PURE__*/React.createElement("div", {
+        className: "culture-grid-cols-toggle",
+        role: "group",
+        "aria-label": "그리드 열 수"
+      },
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          className: "culture-grid-cols-btn" + (gridCols === '2' ? " is-active" : ""),
+          "aria-label": "2단",
+          "aria-pressed": gridCols === '2',
+          onClick: () => persistGridCols('2')
+        },
+          /*#__PURE__*/React.createElement("svg", {
+            width: 20, height: 20, viewBox: "0 0 24 24", fill: "none",
+            stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round",
+            "aria-hidden": "true"
+          },
+            /*#__PURE__*/React.createElement("path", { d: "M3 4a1 1 0 0 1 1 -1h16a1 1 0 0 1 1 1v16a1 1 0 0 1 -1 1h-16a1 1 0 0 1 -1 -1v-16" }),
+            /*#__PURE__*/React.createElement("path", { d: "M12 3v18" })
+          )
+        ),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          className: "culture-grid-cols-btn" + (gridCols === '1' ? " is-active" : ""),
+          "aria-label": "1단",
+          "aria-pressed": gridCols === '1',
+          onClick: () => persistGridCols('1')
+        },
+          /*#__PURE__*/React.createElement("svg", {
+            width: 20, height: 20, viewBox: "0 0 24 24", fill: "none",
+            stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round",
+            "aria-hidden": "true"
+          },
+            /*#__PURE__*/React.createElement("path", { d: "M5 4a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v16a1 1 0 0 1 -1 1h-12a1 1 0 0 1 -1 -1l0 -16" })
+          )
+        )
+      )
+    ),
     historyTab !== 'meetings' && regionSelections.length > 0 && /*#__PURE__*/React.createElement("div", {
       className: "region-selection-badges-row"
     },
@@ -1985,36 +2058,6 @@ export function HistoryView({
         className: "region-filter-reset-btn",
         onClick: resetRegionSelections
       }, "초기화")
-    ),
-    historyTab !== 'meetings' && /*#__PURE__*/React.createElement("div", {
-      className: "region-filter-trigger-row"
-    },
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "form-select region-filter-trigger",
-        onClick: () => setIsRegionFilterOpen(true)
-      },
-        /*#__PURE__*/React.createElement("span", { style: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, "시/도 선택"),
-        renderRegionTriggerChevron(React)
-      ),
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "form-select region-filter-trigger",
-        onClick: () => setIsRegionFilterOpen(true)
-      },
-        /*#__PURE__*/React.createElement("span", { style: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, "군/구 선택"),
-        renderRegionTriggerChevron(React)
-      ),
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "current-location-btn",
-        disabled: isLocating,
-        onClick: handleUseCurrentLocation,
-        title: "현재 위치"
-      },
-        LocateFixedIcon && /*#__PURE__*/React.createElement(LocateFixedIcon, { size: 18 }),
-        /*#__PURE__*/React.createElement("span", { className: "current-location-btn-label" }, isLocating ? "위치 확인 중..." : "현재 위치")
-      )
     ),
     // Portal target for CulturePerformancesTab's category-chip row -- lives inside the fixed
     // header stack so it slides away with everything above it instead of staying pinned while
@@ -2035,14 +2078,16 @@ export function HistoryView({
       emptyLabel: "상영중이거나 예정된 문화공연이 없습니다.", regionSelections, onItemsLoaded: setRegionFilterItems,
       anniversaryCategory: "event",
       extraItems: (customCultureItems || []).filter(i => i && i.kind === 'performance'),
-      chipRowSlot, contentPaddingTop: historyContentPaddingTop, onScroll: handleHistoryScroll
+      chipRowSlot, contentPaddingTop: historyContentPaddingTop, onScroll: handleHistoryScroll,
+      gridCols
     }),
     historyTab === 'festival' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
       calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent, dataUrl: CULTURE_FESTIVALS_URL,
       emptyLabel: "진행중이거나 예정된 지역축제가 없습니다.", regionSelections, onItemsLoaded: setRegionFilterItems,
       anniversaryCategory: "festival",
       extraItems: (customCultureItems || []).filter(i => i && i.kind === 'festival'),
-      chipRowSlot, contentPaddingTop: historyContentPaddingTop, onScroll: handleHistoryScroll
+      chipRowSlot, contentPaddingTop: historyContentPaddingTop, onScroll: handleHistoryScroll,
+      gridCols
     }),
     historyTab === 'meetings' && /*#__PURE__*/React.createElement("div", {
       className: "history-meetings-grid",
@@ -2309,8 +2354,8 @@ function resolveCurrentLocationRegion() {
   });
 }
 
-// One capsule badge for a saved region selection ("서울 광진구 (x)") -- rendered both above the
-// 시/도·군/구 trigger row on the page itself and inside RegionFilterBackdrop's own body, both
+// One capsule badge for a saved region selection ("서울 광진구 (x)") -- rendered both below the
+// 지역 선택 trigger row on the page itself and inside RegionFilterBackdrop's own body, both
 // driven by the same regionSelections array so the two stay in sync.
 function RegionSelectionBadge({ sel, onRemove }) {
   const React = window.React;
@@ -2329,7 +2374,7 @@ function RegionSelectionBadge({ sel, onRemove }) {
   );
 }
 
-// Region-select backdrop shared by the 시/도 and 군/구 trigger buttons below the 보관함 tabs
+// Region-select backdrop opened by the single 지역 선택 trigger below the 보관함 tabs
 // (Culture Flow's own region picker, referenced by the product ask, is the model: a search field
 // on top auto-resolving a typed district straight to its province, plus every province's full
 // district list laid out as tap targets rather than a plain dropdown). Multi-select: choosing a
@@ -2703,7 +2748,7 @@ function ContentRegisterModal({ onClose, onSave, showToast = null }) {
 // 상영중/예정 목록을 보여준다. Culture Flow(별개 프로젝트)의 실시간 JSON을 직접 fetch하지 않는
 // 이유는 그 프로젝트의 스키마가 바뀌거나 그날 수집이 실패해도 이 탭이 즉시 깨지지 않게 하기
 // 위함 -- 동기화 스크립트가 검증에 실패하면 최근 정상 스냅샷을 그대로 커밋해 유지한다.
-export function CulturePerformancesTab({ calendar, anniversaries = [], onRegisterCultureEvent, onUnregisterCultureEvent, dataUrl = CULTURE_PERFORMANCES_URL, emptyLabel = "상영중이거나 예정된 문화공연이 없습니다.", regionSelections = [], onItemsLoaded, anniversaryCategory = 'event', extraItems = [], chipRowSlot = null, contentPaddingTop = 0, onScroll }) {
+export function CulturePerformancesTab({ calendar, anniversaries = [], onRegisterCultureEvent, onUnregisterCultureEvent, dataUrl = CULTURE_PERFORMANCES_URL, emptyLabel = "상영중이거나 예정된 문화공연이 없습니다.", regionSelections = [], onItemsLoaded, anniversaryCategory = 'event', extraItems = [], chipRowSlot = null, contentPaddingTop = 0, onScroll, gridCols = '2' }) {
   const React = window.React;
   const ReactDOM = window.ReactDOM;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -2861,7 +2906,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
   return /*#__PURE__*/React.createElement(React.Fragment, null,
     renderedCategoryChipRow,
     /*#__PURE__*/React.createElement("div", {
-      className: "culture-items-grid",
+      className: "culture-items-grid is-cols-" + (gridCols === '1' ? '1' : '2'),
       onScroll,
       style: { flex: 1, overflowY: 'auto', padding: '16px', paddingTop: contentPaddingTop, alignContent: 'start' }
     },
