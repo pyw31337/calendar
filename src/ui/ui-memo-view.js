@@ -1687,9 +1687,10 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           padding: '6px 12px', borderRadius: '16px', backgroundColor: 'var(--bg-primary)',
           border: '1px solid var(--border-subtle)', color: '#3B82F6', fontSize: 'var(--font-size-sm)',
           fontWeight: 'bold', cursor: 'pointer', flexShrink: 0,
-          maxWidth: '35vw', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+          maxWidth: '35vw', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          display: 'inline-flex', alignItems: 'center', gap: '4px'
         }
-      }, selectedTag, " ✕") : null,
+      }, selectedTag, /*#__PURE__*/React.createElement(TrashIcon, { size: 12 })) : null,
       onClose: () => { setIsSearchOpen(false); setSearchQuery(''); setSelectedTag(''); }
     }),
 
@@ -1888,7 +1889,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
               /*#__PURE__*/React.createElement("button", {
                 type: "button",
                 onClick: () => setNewIsPinned(!newIsPinned),
-                style: { background: 'none', border: 'none', cursor: 'pointer', color: newIsPinned ? '#F59E0B' : '#94A3B8', padding: '4px', minHeight: '32px', minWidth: '32px', boxSizing: 'border-box' }
+                style: { background: 'none', border: 'none', cursor: 'pointer', color: newIsPinned ? '#F59E0B' : '#94A3B8', padding: '4px' }
               }, newIsPinned ? 
                 /*#__PURE__*/React.createElement("svg", {
                   xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24", fill: "currentColor", className: "icon icon-tabler icon-tabler-filled icon-tabler-pin"
@@ -2024,9 +2025,9 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
                 onClick: handleAddNewTag,
                 disabled: newTags.length >= 10,
                 style: {
-                  flexShrink: 0, height: '32px', minHeight: '32px', padding: '0 10px', borderRadius: 'var(--radius-sm)',
+                  flexShrink: 0, height: '28px', padding: '0 10px', borderRadius: 'var(--radius-sm)',
                   border: '1px solid var(--border-subtle)', background: 'var(--border-subtle)',
-                  color: 'var(--text-main)', fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer', boxSizing: 'border-box',
+                  color: 'var(--text-main)', fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer',
                   opacity: newTags.length >= 10 ? 0.45 : 1
                 }
               }, "저장")
@@ -2430,7 +2431,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
             onClick: handleAddEditTag,
             disabled: editTags.length >= 10,
             style: {
-              flexShrink: 0, height: '32px', minHeight: '32px', padding: '0 10px', borderRadius: 'var(--radius-sm)',
+              flexShrink: 0, height: '28px', padding: '0 10px', borderRadius: 'var(--radius-sm)',
               border: '1px solid var(--border-subtle)', background: 'var(--border-subtle)',
               color: 'var(--text-main)', fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer',
               opacity: editTags.length >= 10 ? 0.45 : 1

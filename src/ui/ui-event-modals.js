@@ -838,6 +838,7 @@ export function AnniversaryModal({
     return React.createElement('option', { key: String(item.value), value: item.value }, item.label ?? item.value);
   })));
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon || (function () { return '×'; });
+  const TrashIcon = __comp.TrashIcon || __deps.TrashIcon || (function () { return '🗑'; });
   const CakeIcon = __comp.CakeIcon || __deps.CakeIcon;
   const BalloonIcon = __comp.BalloonIcon || __deps.BalloonIcon;
   const ConfettiIcon = __comp.ConfettiIcon || __deps.ConfettiIcon;
@@ -1725,9 +1726,10 @@ export function AnniversaryModal({
                   style: {
                     position: 'absolute', top: '-6px', right: '-6px', width: '18px', height: '18px', borderRadius: '50%',
                     border: 'none', backgroundColor: 'rgba(0,0,0,0.65)', color: '#FFFFFF', fontSize: '11px',
-                    lineHeight: '18px', textAlign: 'center', cursor: 'pointer', padding: 0
+                    lineHeight: '18px', textAlign: 'center', cursor: 'pointer', padding: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
                   }
-                }, "✕")
+                }, /*#__PURE__*/React.createElement(TrashIcon, { size: 10 }))
               )),
               /*#__PURE__*/React.createElement("button", {
                 type: "button",
@@ -3203,11 +3205,11 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
             getIndividualSettlementAmount(row.participantId) !== 0 && React.createElement('span', { style: { fontSize: 'var(--font-size-md)', color: 'var(--text-main)', whiteSpace: 'nowrap', marginRight: '2px', fontWeight: 800 } }, `${getIndividualSettlementAmount(row.participantId) < 0 ? '+' : '-'}${Math.abs(getIndividualSettlementAmount(row.participantId)).toLocaleString()}원`),
             React.createElement('button', {
               type: 'button', title: '참여자 메모 편집', 'aria-label': '참여자 메모 편집', onClick: () => handleEditParticipantRow(row),
-              style: { width: '32px', height: '32px', minWidth: '32px', minHeight: '32px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--radius-sm)', color: 'var(--text-muted)', backgroundColor: 'transparent', border: '1px solid #CBD5E1', flexShrink: 0 }
+              style: { width: '24px', height: '24px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--radius-sm)', color: 'var(--text-muted)', backgroundColor: 'transparent', border: '1px solid #CBD5E1', flexShrink: 0 }
             }, React.createElement(PencilIcon, { size: 12 })),
             React.createElement('button', {
               type: 'button', title: '참여자 삭제', 'aria-label': '참여자 삭제', onClick: () => handleRemoveParticipantRow(row.id),
-              style: { width: '32px', height: '32px', minWidth: '32px', minHeight: '32px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--radius-sm)', color: 'var(--text-muted)', backgroundColor: 'transparent', border: 'none', flexShrink: 0 }
+              style: { width: '24px', height: '24px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--radius-sm)', color: 'var(--text-muted)', backgroundColor: 'transparent', border: 'none', flexShrink: 0 }
             }, React.createElement(TrashIcon, { size: 14, style: { stroke: '#64748B' } }))
             )
           ),

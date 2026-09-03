@@ -874,7 +874,7 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
         className: "lightbox-url-btn",
         onClick: () => onOpenUrl && onOpenUrl(),
         style: {
-          flexShrink: 0, height: '32px', minHeight: '32px', padding: '0 10px', borderRadius: 'var(--radius-full)',
+          flexShrink: 0, height: '30px', padding: '0 10px', borderRadius: 'var(--radius-full)',
           border: '1px solid rgba(255,255,255,0.32)', background: 'rgba(255,255,255,0.14)',
           color: '#FFFFFF', display: 'inline-flex', alignItems: 'center', gap: '5px',
           cursor: 'pointer', fontSize: 'var(--font-size-sm)', fontWeight: 800, WebkitBackdropFilter: 'blur(6px)', backdropFilter: 'blur(6px)'
@@ -910,7 +910,7 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
         onClick: handleSaveTags,
         disabled: isSavingTags || tagTokens.length >= 10,
         style: {
-          flexShrink: 0, height: '32px', minHeight: '32px', padding: '0 10px', borderRadius: 'var(--radius-sm)',
+          flexShrink: 0, height: '28px', padding: '0 10px', borderRadius: 'var(--radius-sm)',
           border: '1px solid rgba(255,255,255,0.32)', background: 'rgba(255,255,255,0.22)',
           color: '#FFFFFF', fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer',
           opacity: (isSavingTags || tagTokens.length >= 10) ? 0.45 : 1
@@ -1704,7 +1704,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
         "aria-label": "사진 삭제",
         title: "사진 삭제",
         style: {
-          width: '32px', height: '32px', minWidth: '32px', minHeight: '32px', borderRadius: '50%', border: 'none',
+          width: '30px', height: '30px', borderRadius: '50%', border: 'none',
           background: 'rgba(15,23,42,0.62)', color: '#FFFFFF', display: 'flex',
           alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 'var(--font-size-sm)',
           opacity: (isReplacingPhoto || isDeletingPhoto) ? 0.5 : 1
@@ -1717,7 +1717,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
         "aria-label": "사진 편집",
         title: "사진 교체",
         style: {
-          width: '32px', height: '32px', minWidth: '32px', minHeight: '32px', borderRadius: '50%', border: 'none',
+          width: '30px', height: '30px', borderRadius: '50%', border: 'none',
           background: 'rgba(15,23,42,0.62)', color: '#FFFFFF', display: 'flex',
           alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 'var(--font-size-sm)',
           opacity: (isReplacingPhoto || isDeletingPhoto) ? 0.5 : 1
@@ -1749,10 +1749,8 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
         "aria-label": "축소",
         title: "축소",
         style: {
-          width: '32px',
-          height: '32px',
-          minWidth: '32px',
-          minHeight: '32px',
+          width: '30px',
+          height: '30px',
           borderRadius: '50%',
           border: 'none',
           background: 'rgba(15,23,42,0.62)',
@@ -1772,10 +1770,8 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
         "aria-label": "100%로 초기화",
         title: "100%로 초기화",
         style: {
-          width: '32px',
-          height: '32px',
-          minWidth: '32px',
-          minHeight: '32px',
+          width: '30px',
+          height: '30px',
           borderRadius: '50%',
           border: 'none',
           background: 'rgba(15,23,42,0.62)',
@@ -1796,10 +1792,8 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
         "aria-label": "확대",
         title: "확대",
         style: {
-          width: '32px',
-          height: '32px',
-          minWidth: '32px',
-          minHeight: '32px',
+          width: '30px',
+          height: '30px',
           borderRadius: '50%',
           border: 'none',
           background: 'rgba(15,23,42,0.62)',

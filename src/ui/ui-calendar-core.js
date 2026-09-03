@@ -1965,12 +1965,12 @@ export function CommentsSection({
             /* Edit Button */
             /*#__PURE__*/React.createElement('button', {
               type: 'button', onClick: () => onEditMessage && onEditMessage(msg), title: '편집',
-              style: { width: '32px', height: '32px', minWidth: '32px', minHeight: '32px', border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, color: 'var(--text-muted)', boxSizing: 'border-box' }
+              style: { width: '22px', height: '22px', border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, color: 'var(--text-muted)' }
             }, editSvg),
             /* Delete Button */
             /*#__PURE__*/React.createElement('button', {
               type: 'button', onClick: () => onDeleteMessage && onDeleteMessage(msg), title: '삭제',
-              style: { width: '32px', height: '32px', minWidth: '32px', minHeight: '32px', border: 'none', background: 'none', padding: 0, cursor: 'pointer', color: 'var(--text-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' }
+              style: { width: '22px', height: '22px', border: 'none', background: 'none', padding: 0, cursor: 'pointer', color: 'var(--text-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }
             }, /*#__PURE__*/React.createElement(TrashIcon, { size: 14 }))
           ) : null
         )
@@ -2538,9 +2538,9 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
             type: "button",
             onClick: handleCancelComment,
             style: {
-              flexShrink: 0, height: '32px', minHeight: '32px', padding: '0 12px', borderRadius: 'var(--radius-sm)',
+              flexShrink: 0, height: '30px', padding: '0 12px', borderRadius: 'var(--radius-sm)',
               border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)', color: 'var(--text-muted)',
-              fontSize: 'var(--font-size-md)', fontWeight: 'bold', cursor: 'pointer', boxSizing: 'border-box'
+              fontSize: 'var(--font-size-md)', fontWeight: 'bold', cursor: 'pointer'
             }
           }, "취소"),
           /*#__PURE__*/React.createElement("button", {
@@ -2548,9 +2548,9 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
             onClick: handleSaveComment,
             disabled: !commentText.trim() || !commentParticipantId || isSavingComment,
             style: {
-              flexShrink: 0, height: '32px', minHeight: '32px', padding: '0 12px', borderRadius: 'var(--radius-sm)', border: 'none',
+              flexShrink: 0, height: '30px', padding: '0 12px', borderRadius: 'var(--radius-sm)', border: 'none',
               backgroundColor: 'var(--accent-primary)', color: '#FFFFFF', fontSize: 'var(--font-size-md)', fontWeight: 'bold',
-              cursor: isSavingComment ? 'wait' : 'pointer', opacity: (commentText.trim() && commentParticipantId && !isSavingComment) ? 1 : 0.5, boxSizing: 'border-box'
+              cursor: isSavingComment ? 'wait' : 'pointer', opacity: (commentText.trim() && commentParticipantId && !isSavingComment) ? 1 : 0.5
             }
           }, isSavingComment ? "저장 중…" : "저장")
         )
