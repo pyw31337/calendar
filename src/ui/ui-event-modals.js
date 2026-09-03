@@ -782,6 +782,7 @@ export function AnniversaryModal({
   const DeadlineDateTimePicker = __comp.DeadlineDateTimePicker || __deps.DeadlineDateTimePicker || (function () { return null; });
   const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer || (function Shell(p) { return React.createElement('div', p, p.children); });
   const SegmentedToggle = __comp.SegmentedToggle || __deps.SegmentedToggle || (function Shell(p) { return React.createElement('div', p, p.children); });
+  const UnderlineTabs = __comp.UnderlineTabs || __deps.UnderlineTabs;
   const SimpleBottomSheetPicker = __comp.SimpleBottomSheetPicker || __deps.SimpleBottomSheetPicker || ((props) => React.createElement('select', {
     value: props.value ?? '',
     onChange: event => props.onSelect?.(event.target.value),
@@ -1360,62 +1361,32 @@ export function AnniversaryModal({
 
   const anniversaryPanelInner = /*#__PURE__*/React.createElement(React.Fragment, null,
     /* Modal Navigation Tabs */
-    /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: 'grid',
-        gridTemplateColumns: 'repeat(3, 1fr)',
-        gap: '6px',
-        width: '100%',
-        padding: '10px 12px 8px',
-        boxSizing: 'border-box',
-        flexShrink: 0
-      }
-    },
-      [['list', '목록'], ['add', '등록'], ['bulk', '반복']].map(([id, label]) => /*#__PURE__*/React.createElement("button", {
-        key: id,
-        type: "button",
-        onClick: () => {
-          setActiveTab(id);
-          if (id === 'add') {
-            setEditingId(null);
-            setNewTitle('');
-            setNewCategory('birthday');
-            setDayMode('single');
-            setRepeatYearly(true);
-            setIsLunar(false);
-            setIsLeap(false);
-            setIsLegacyDdayEdit(false);
-            setNewDescription('');
-            setPlaceQuery('');
-            setPlaceResults([]);
-            setSelectedPlace(null);
-            setPhotos([]);
-          }
-        },
-        style: {
-          border: 'none',
-          borderRadius: 'var(--radius-md)',
-          padding: '7px 4px',
-          background: activeTab === id ? 'var(--accent-primary)' : 'transparent',
-          color: activeTab === id ? '#FFFFFF' : 'var(--text-muted)',
-          fontWeight: 800,
-          fontSize: 'var(--font-size-md)',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '4px'
+    UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
+      ariaLabel: "기념일 탭",
+      value: activeTab,
+      onChange: (id) => {
+        setActiveTab(id);
+        if (id === 'add') {
+          setEditingId(null);
+          setNewTitle('');
+          setNewCategory('birthday');
+          setDayMode('single');
+          setRepeatYearly(true);
+          setIsLunar(false);
+          setIsLeap(false);
+          setIsLegacyDdayEdit(false);
+          setNewDescription('');
+          setPlaceQuery('');
+          setPlaceResults([]);
+          setSelectedPlace(null);
+          setPhotos([]);
         }
-      }, label))
-    ),
-    /*#__PURE__*/React.createElement("div", {
-      className: "anniversary-subtab-divider",
-      style: {
-        height: '1px',
-        width: '100%',
-        backgroundColor: 'var(--border-subtle)',
-        flexShrink: 0
-      }
+      },
+      options: [
+        { value: 'list', label: '목록' },
+        { value: 'add', label: '등록' },
+        { value: 'bulk', label: '반복' }
+      ]
     }),
 
     /* 목록 tab's category filter row -- lets 생일/행사/축제/여행/기타 be viewed separately
@@ -2124,6 +2095,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
   const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer || ((props) => React.createElement('div', props, props.children));
   const ResizableListSection = __comp.ResizableListSection || __deps.ResizableListSection;
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon || (() => '×');
+  const UnderlineTabs = __comp.UnderlineTabs || __deps.UnderlineTabs;
   const SimpleBottomSheetPicker = __comp.SimpleBottomSheetPicker || __deps.SimpleBottomSheetPicker || ((props) => React.createElement('select', {
     value: props.value ?? '',
     onChange: event => props.onSelect?.(event.target.value),
@@ -2833,24 +2805,34 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
         }, React.createElement(SmallXIcon, { size: 20 }))
       )
     ),
-    React.createElement('div', {
-      role: 'tablist',
-      'aria-label': '정산 수정 탭',
-      style: { display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)' }
-    },
-      ['general', 'settlement'].map(tab => React.createElement('button', {
-        key: tab,
-        type: 'button',
-        role: 'tab',
-        'aria-selected': activeTab === tab,
-        onClick: () => setActiveTab(tab),
-        style: {
-          height: '46px', border: 'none', borderBottom: activeTab === tab ? '2px solid #2563EB' : '2px solid transparent',
-          background: 'transparent', color: activeTab === tab ? '#2563EB' : 'var(--text-muted)',
-          fontSize: 'var(--font-size-base)', fontWeight: 800, cursor: 'pointer'
-        }
-      }, tab === 'general' ? '일반' : '정산'))
-    ),
+    UnderlineTabs
+      ? React.createElement(UnderlineTabs, {
+          ariaLabel: '정산 수정 탭',
+          value: activeTab,
+          onChange: setActiveTab,
+          options: [
+            { value: 'general', label: '일반' },
+            { value: 'settlement', label: '정산' }
+          ]
+        })
+      : React.createElement('div', {
+          role: 'tablist',
+          'aria-label': '정산 수정 탭',
+          style: { display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)' }
+        },
+          ['general', 'settlement'].map(tab => React.createElement('button', {
+            key: tab,
+            type: 'button',
+            role: 'tab',
+            'aria-selected': activeTab === tab,
+            onClick: () => setActiveTab(tab),
+            style: {
+              height: '46px', border: 'none', borderBottom: activeTab === tab ? '2px solid #2563EB' : '2px solid transparent',
+              background: 'transparent', color: activeTab === tab ? '#2563EB' : 'var(--text-muted)',
+              fontSize: 'var(--font-size-base)', fontWeight: 800, cursor: 'pointer'
+            }
+          }, tab === 'general' ? '일반' : '정산'))
+        ),
     React.createElement('div', {
       className: 'modal-body',
       style: { overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }
@@ -3361,6 +3343,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer || (function Shell(p) { return React.createElement('div', p, p.children); });
   const SectionToggleButton = __comp.SectionToggleButton || __deps.SectionToggleButton || (function Shell(p) { return React.createElement('div', p, p.children); });
   const SegmentedToggle = __comp.SegmentedToggle || __deps.SegmentedToggle || (function Shell(p) { return React.createElement('div', p, p.children); });
+  const UnderlineTabs = __comp.UnderlineTabs || __deps.UnderlineTabs;
   const ShareIcon = __comp.ShareIcon || __deps.ShareIcon || (function () { return '🔗'; });
   const SharedSideMenuFooter = __comp.SharedSideMenuFooter || __deps.SharedSideMenuFooter || (function Shell(p) { return React.createElement('div', p, p.children); });
   const SharedAppNavBlock = __comp.SharedAppNavBlock || __deps.SharedAppNavBlock || (function Shell(p) { return React.createElement('div', p, p.children); });
@@ -3883,7 +3866,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     value: settlementSearchQuery,
     placeholder: "정산 항목, 날짜 또는 카테고리 검색...",
     onChange: event => setSettlementSearchQuery(event.target.value),
-    trailing: /*#__PURE__*/React.createElement("button", { type: "button", onClick: () => { setIsSettlementSearchOpen(false); setSettlementSearchQuery(''); }, style: { border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px 6px', fontSize: 'var(--font-size-md)', fontWeight: 700, flexShrink: 0 } }, "닫기")
+    onClose: () => { setIsSettlementSearchOpen(false); setSettlementSearchQuery(''); }
   }),
 
   /*#__PURE__*/React.createElement("div", {
@@ -4101,17 +4084,13 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     })(),
 
     /* 누적/월별 toggle -- moved here from the header, right under the settlement card(s), full width like the other sections */
-    /*#__PURE__*/React.createElement("div", {
+    UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
       className: "settlement-view-tabs",
-      "aria-label": "정산 보기 방식",
-      style: { display: 'flex', width: '100%' }
-    }, /*#__PURE__*/React.createElement(SegmentedToggle, {
       ariaLabel: "누적 또는 월별 정산 보기",
       value: activeTab,
-      onChange: v => setActiveTab(v),
-      options: [{ value: 'total', label: '누적보기' }, { value: 'daily', label: '월별보기' }],
-      style: { width: '100%', padding: '2px', borderRadius: 'var(--radius-md)' }
-    })),
+      onChange: setActiveTab,
+      options: [{ value: 'total', label: '누적보기' }, { value: 'daily', label: '월별보기' }]
+    }),
 
     /* Metric Grid (총수입 / 총지출 / 현재잔액) */
     /*#__PURE__*/React.createElement("div", {

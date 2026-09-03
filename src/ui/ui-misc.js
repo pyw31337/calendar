@@ -923,6 +923,8 @@ export function InlineSearchBar({
   inputRef = null,
   leading = null,
   trailing = null,
+  onClose = null,
+  closeLabel = '닫기',
   className = '',
   style = null
 }) {
@@ -973,7 +975,15 @@ export function InlineSearchBar({
         }
       })
     ),
-    trailing
+    trailing,
+    typeof onClose === 'function' ? /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: onClose,
+      style: {
+        border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)',
+        padding: '4px 6px', fontSize: 'var(--font-size-md)', fontWeight: 700, flexShrink: 0
+      }
+    }, closeLabel) : null
   );
 }
 

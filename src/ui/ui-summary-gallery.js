@@ -1749,6 +1749,7 @@ export function HistoryView({
   const FolderClockIcon = __comp.FolderClockIcon || __deps.FolderClockIcon;
   const MapPinIcon = __comp.MapPinIcon || __deps.MapPinIcon;
   const InlineSearchBar = __comp.InlineSearchBar || __deps.InlineSearchBar;
+  const UnderlineTabs = __comp.UnderlineTabs || __deps.UnderlineTabs;
   const WeatherBadge = __comp.WeatherBadge || __deps.WeatherBadge;
   const SharedAppNavBlock = __comp.SharedAppNavBlock || __deps.SharedAppNavBlock;
   const SharedSideMenuFooter = __comp.SharedSideMenuFooter || __deps.SharedSideMenuFooter;
@@ -1830,29 +1831,14 @@ export function HistoryView({
       value: searchQuery,
       placeholder: "날짜·참여자·메모·장소 검색...",
       onChange: e => setSearchQuery(e.target.value),
-      leading: /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: () => { setIsSearchOpen(false); setSearchQuery(''); },
-        style: { border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px 6px', fontSize: 'var(--font-size-md)', fontWeight: 700, flexShrink: 0 }
-      }, "닫기")
+      onClose: () => { setIsSearchOpen(false); setSearchQuery(''); }
     }),
-    /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)', flexShrink: 0 }
-    },
-      [{ id: 'meetings', label: '지난 모임' }, { id: 'culture', label: '문화공연' }].map(tab =>
-        /*#__PURE__*/React.createElement("button", {
-          key: tab.id,
-          type: "button",
-          onClick: () => setHistoryTab(tab.id),
-          style: {
-            flex: 1, padding: '12px 0', background: 'none', border: 'none', cursor: 'pointer',
-            fontSize: 'var(--font-size-md)', fontWeight: 800,
-            color: historyTab === tab.id ? '#7C3AED' : 'var(--text-muted)',
-            borderBottom: historyTab === tab.id ? '2px solid #7C3AED' : '2px solid transparent'
-          }
-        }, tab.label)
-      )
-    ),
+    UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
+      ariaLabel: "보관함 탭",
+      value: historyTab,
+      onChange: setHistoryTab,
+      options: [{ value: 'meetings', label: '지난 모임' }, { value: 'culture', label: '문화공연' }]
+    }),
     historyTab === 'culture' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
       calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent
     }),

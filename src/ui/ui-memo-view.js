@@ -1672,24 +1672,18 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       value: searchQuery,
       placeholder: "메모 제목, 내용, 해시태그 검색...",
       onChange: e => setSearchQuery(e.target.value),
-      trailing: /*#__PURE__*/React.createElement(React.Fragment, null,
-        selectedTag && /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          onClick: () => setSelectedTag(''),
-          title: selectedTag,
-          style: {
-            padding: '6px 12px', borderRadius: '16px', backgroundColor: 'var(--bg-primary)',
-            border: '1px solid var(--border-subtle)', color: '#3B82F6', fontSize: 'var(--font-size-sm)',
-            fontWeight: 'bold', cursor: 'pointer', flexShrink: 0,
-            maxWidth: '35vw', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
-          }
-        }, selectedTag, " ✕"),
-        /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          onClick: () => { setIsSearchOpen(false); setSearchQuery(''); setSelectedTag(''); },
-          style: { border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px 6px', fontSize: 'var(--font-size-md)', fontWeight: 700, flexShrink: 0 }
-        }, "닫기")
-      )
+      trailing: selectedTag ? /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => setSelectedTag(''),
+        title: selectedTag,
+        style: {
+          padding: '6px 12px', borderRadius: '16px', backgroundColor: 'var(--bg-primary)',
+          border: '1px solid var(--border-subtle)', color: '#3B82F6', fontSize: 'var(--font-size-sm)',
+          fontWeight: 'bold', cursor: 'pointer', flexShrink: 0,
+          maxWidth: '35vw', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+        }
+      }, selectedTag, " ✕") : null,
+      onClose: () => { setIsSearchOpen(false); setSearchQuery(''); setSelectedTag(''); }
     }),
 
     isMemoMenuOpen && /*#__PURE__*/React.createElement("div", {

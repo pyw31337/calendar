@@ -998,6 +998,7 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
         cachedData: idx === 0 ? linkPreview : undefined,
         stretch: true,
         stretchWidth: cardStretchWidth,
+        marginTop: displayText ? 20 : 0,
         onStatusChange: (status) => handlePreviewStatusChange(url, status)
       }))
     );
@@ -1178,7 +1179,8 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
           url: firstUrl,
           fallbackTitle: text ? removeFirstUrl(text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '',
           cachedData: linkPreview,
-          stretch: true
+          stretch: true,
+          marginTop: 20
         }));
       })(),
     remainingText ? /*#__PURE__*/React.createElement('div', null, parseTextWithLinks(remainingText, searchQuery)) : null

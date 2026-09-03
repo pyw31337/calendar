@@ -234,6 +234,12 @@ function SegmentedToggle(props) {
   const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SegmentedToggle;
   return typeof C === 'function' ? React.createElement(C, props) : null;
 }
+function UnderlineTabs(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.UnderlineTabs;
+  if (C) return React.createElement(C, props);
+  const f = window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.UnderlineTabs;
+  return typeof f === 'function' ? f(props) : null;
+}
 function ItemEditDeleteActions(props) {
   const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ItemEditDeleteActions;
   return typeof C === 'function' ? React.createElement(C, props) : null;
@@ -11365,6 +11371,7 @@ function bindGatherUiDeps() {
     FormAddEditActionButtons: typeof FormAddEditActionButtons === 'function' ? FormAddEditActionButtons : null,
     PlaceSectionIcon: typeof PlaceSectionIcon === 'function' ? PlaceSectionIcon : null,
     SegmentedToggle: typeof SegmentedToggle === 'function' ? SegmentedToggle : null,
+    UnderlineTabs: typeof UnderlineTabs === 'function' ? UnderlineTabs : null,
     normalizePlaceDateForSort: typeof normalizePlaceDateForSort === 'function' ? normalizePlaceDateForSort : null,
     autoGrowTextarea: typeof autoGrowTextarea === 'function' ? autoGrowTextarea : null,
     getPlaceCategoryIcon: typeof getPlaceCategoryIcon === 'function' ? getPlaceCategoryIcon : null,

@@ -982,6 +982,67 @@ export function FormAddEditActionButtons({ isEditing, isSaving, onCancel, onSubm
   );
 }
 
+export function UnderlineTabs({ options = [], value, onChange, ariaLabel, className = '', style = null, activeColor = '#7C3AED' }) {
+  const React = window.React;
+  const list = Array.isArray(options) ? options : [];
+  return /*#__PURE__*/React.createElement('div', {
+    className: `underline-tabs${className ? ' ' + className : ''}`,
+    role: 'tablist',
+    'aria-label': ariaLabel || undefined,
+    style: {
+      display: 'flex',
+      width: '100%',
+      borderBottom: '1px solid var(--border-subtle)',
+      backgroundColor: 'var(--bg-card)',
+      flexShrink: 0,
+      boxSizing: 'border-box',
+      ...(style || {})
+    }
+  }, list.map(opt => {
+    const id = opt.value;
+    const isActive = value === id;
+    const label = typeof opt.label === 'function' ? opt.label(isActive) : opt.label;
+    const badge = opt.badge;
+    return /*#__PURE__*/React.createElement('button', {
+      key: String(id),
+      type: 'button',
+      role: 'tab',
+      'aria-selected': isActive,
+      onClick: () => { if (typeof onChange === 'function') onChange(id); },
+      style: {
+        flex: 1,
+        padding: '12px 0',
+        background: 'none',
+        border: 'none',
+        cursor: 'pointer',
+        fontSize: 'var(--font-size-md)',
+        fontWeight: 800,
+        color: isActive ? activeColor : 'var(--text-muted)',
+        borderBottom: isActive ? `2px solid ${activeColor}` : '2px solid transparent',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '6px',
+        marginBottom: '-1px'
+      }
+    },
+      label,
+      badge != null && badge !== '' ? /*#__PURE__*/React.createElement('span', {
+        style: {
+          fontSize: 'var(--font-size-xs)',
+          fontWeight: 800,
+          padding: '1px 7px',
+          borderRadius: 'var(--radius-full)',
+          backgroundColor: isActive ? 'rgba(124, 58, 237, 0.12)' : 'var(--border-subtle)',
+          color: isActive ? activeColor : 'var(--text-muted)',
+          minWidth: '18px',
+          textAlign: 'center'
+        }
+      }, String(badge)) : null
+    );
+  }));
+}
+
 export function SegmentedToggle({ options, value, onChange, disabled, style, ariaLabel }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -1090,7 +1151,7 @@ export function GamifiedConfirmButtonContent({ label }) {
   );
 }
 
-export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = false, stretchWidth = null, noBorder = false, onStatusChange = null }) {
+export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = false, stretchWidth = null, noBorder = false, onStatusChange = null, marginTop = null }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -1160,7 +1221,7 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = fals
       maxWidth: stretchWidth || (stretch ? '100%' : 'min(100%, 280px)'),
       boxSizing: 'border-box',
       gap: '10px',
-      marginTop: stretch ? '0px' : '6px',
+      marginTop: marginTop != null ? (typeof marginTop === 'number' ? `${marginTop}px` : marginTop) : (stretch ? '0px' : '6px'),
       border: noBorder ? 'none' : '1px solid var(--border-subtle)',
       borderRadius: 'var(--radius-md)',
       // Was 'visible' -- with a nowrap+ellipsis title inside a flex child, 'visible' let the
@@ -2227,6 +2288,7 @@ export function ResizableListSection({
     AutoGrowTextarea: AutoGrowTextarea,
     FormAddEditActionButtons: FormAddEditActionButtons,
     SegmentedToggle: SegmentedToggle,
+    UnderlineTabs: UnderlineTabs,
     ItemEditDeleteActions: ItemEditDeleteActions,
     GamifiedConfirmButtonContent: GamifiedConfirmButtonContent,
     SyncStatusChip: SyncStatusChip,

@@ -928,6 +928,7 @@ export function ChatGalleryModal({
   const SharedAppNavBlock = __comp.SharedAppNavBlock || __deps.SharedAppNavBlock;
   const WeatherBadge = __comp.WeatherBadge || __deps.WeatherBadge;
   const InlineSearchBar = __comp.InlineSearchBar || __deps.InlineSearchBar;
+  const UnderlineTabs = __comp.UnderlineTabs || __deps.UnderlineTabs;
   const SyncStatusChip = __comp.SyncStatusChip || __deps.SyncStatusChip;
   const SyncStatusBanner = __comp.SyncStatusBanner || __deps.SyncStatusBanner;
   const TikTokEmbedWidget = __comp.TikTokEmbedWidget || __deps.TikTokEmbedWidget;
@@ -1949,7 +1950,7 @@ export function ChatGalleryModal({
                 color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
               }
             }, /*#__PURE__*/React.createElement("svg", {
-              xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.5"
+              xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true
             }, /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /*#__PURE__*/React.createElement("path", { d: "m21 21-4.3-4.3" }))),
             /*#__PURE__*/React.createElement("button", {
               type: "button",
@@ -1972,7 +1973,7 @@ export function ChatGalleryModal({
               onClick: () => setIsSearchOpen(prev => { if (prev) setSearchQuery(''); return !prev; }),
               style: { display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '6px', border: 0, background: 'none', cursor: 'pointer', color: 'var(--text-muted)' }
             }, /*#__PURE__*/React.createElement("svg", {
-              xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.5"
+              xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true
             }, /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /*#__PURE__*/React.createElement("path", { d: "m21 21-4.3-4.3" }))),
             /*#__PURE__*/React.createElement("button", {
               type: "button", className: "modal-close-btn", onClick: onClose, "aria-label": "닫기",
@@ -2106,59 +2107,29 @@ export function ChatGalleryModal({
       transition: 'transform 0.3s ease',
       transform: isHeaderVisible ? 'translateY(0)' : 'translateY(-100%)'
     } : { borderBottom: '1px solid var(--border-subtle)' },
-    trailing: /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      onClick: () => { setIsSearchOpen(false); setSearchQuery(''); },
-      style: { border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px 6px', fontSize: 'var(--font-size-md)', fontWeight: 700, flexShrink: 0 }
-    }, "닫기")
+    onClose: () => { setIsSearchOpen(false); setSearchQuery(''); }
   }), asPage && !isMobile && /*#__PURE__*/React.createElement("div", {
     className: "gallery-page-tabs",
     style: {
-      display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', padding: '12px 20px 8px 20px',
+      display: 'flex', alignItems: 'center', padding: '0',
       borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)',
       flexShrink: 0,
       position: 'fixed', top: isSearchOpen ? '104px' : '56px', left: 0, right: 0, zIndex: 1009,
       transition: 'transform 0.3s ease, top 0.3s ease',
       transform: isHeaderVisible ? 'translateY(0)' : 'translateY(calc(-100% - 56px))'
     }
-  }, [['photos', '사진'], ['links', '링크']].map(tab => {
-    const count = tab[0] === 'photos'
-      ? ((searchQuery || '').trim() ? visiblePhotos.length : displayPhotoTabCount)
-      : filteredLinks.length;
-    return /*#__PURE__*/React.createElement("button", {
-      key: tab[0],
-      type: "button",
-      onClick: () => setActiveTab(tab[0]),
-      style: {
-        border: 'none',
-        borderRadius: 'var(--radius-md)',
-        padding: '8px 10px',
-        background: activeTab === tab[0] ? 'var(--accent-primary)' : 'transparent',
-        color: activeTab === tab[0] ? '#FFFFFF' : 'var(--text-muted)',
-        fontWeight: 900,
-        fontSize: 'var(--font-size-base)',
-        cursor: 'pointer',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '6px'
-      }
-    },
-      tab[1],
-      /*#__PURE__*/React.createElement("span", {
-        style: {
-          fontSize: 'var(--font-size-xs)',
-          fontWeight: 800,
-          padding: '1px 7px',
-          borderRadius: 'var(--radius-full)',
-          backgroundColor: activeTab === tab[0] ? 'rgba(255,255,255,0.22)' : 'var(--border-subtle)',
-          color: activeTab === tab[0] ? '#FFFFFF' : 'var(--text-muted)',
-          minWidth: '18px',
-          textAlign: 'center'
-        }
-      }, String(count))
-    );
-  })), asPage && isMobile && /*#__PURE__*/React.createElement("div", {
+  },
+    UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
+      ariaLabel: "갤러리 탭",
+      value: activeTab,
+      onChange: setActiveTab,
+      style: { backgroundColor: 'var(--bg-primary)', flex: 1, borderBottom: 'none' },
+      options: [
+        { value: 'photos', label: '사진', badge: ((searchQuery || '').trim() ? visiblePhotos.length : displayPhotoTabCount) },
+        { value: 'links', label: '링크', badge: filteredLinks.length }
+      ]
+    })
+  ), asPage && isMobile && /*#__PURE__*/React.createElement("div", {
     className: "gallery-page-tabs-mobile",
     style: {
       display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
@@ -2169,28 +2140,15 @@ export function ChatGalleryModal({
       transform: isHeaderVisible ? 'translateY(0)' : 'translateY(calc(-100% - 56px))'
     }
   },
-    /* Photos/links select box -- swaps the desktop grid tabs for a picker, matching the places
-       page's category select box on narrow phones. */
-    /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
-      title: "탭 선택",
+    UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
+      ariaLabel: "갤러리 탭",
       value: activeTab,
-      options: [['photos', '사진'], ['links', '링크']].map(tab => {
-        const count = tab[0] === 'photos'
-          ? ((searchQuery || '').trim() ? visiblePhotos.length : displayPhotoTabCount)
-          : filteredLinks.length;
-        return {
-          value: tab[0],
-          label: /*#__PURE__*/React.createElement(React.Fragment, null, `${tab[1]} `,
-            /*#__PURE__*/React.createElement("span", {
-              style: {
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '20px', height: '18px',
-                borderRadius: 'var(--radius-full)', backgroundColor: count >= 1 ? '#4F46E5' : '#E2E8F0',
-                color: count >= 1 ? '#FFFFFF' : '#475569', fontSize: 'var(--font-size-sm)', fontWeight: 'bold', padding: '0 6px', marginLeft: '4px'
-              }
-            }, String(count)))
-        };
-      }),
-      onSelect: setActiveTab
+      onChange: setActiveTab,
+      style: { backgroundColor: 'var(--bg-primary)', flex: 1, borderBottom: 'none' },
+      options: [
+        { value: 'photos', label: '사진', badge: ((searchQuery || '').trim() ? visiblePhotos.length : displayPhotoTabCount) },
+        { value: 'links', label: '링크', badge: filteredLinks.length }
+      ]
     }),
     /* View-mode toggle: 전체 | 일자 -- same pill as the PC header filter, just relocated
        into this row on narrow phones (matches the places page's 방문/예정 mobile toggle). */
