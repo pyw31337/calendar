@@ -781,10 +781,36 @@ export function CalendarGrid({
   const ConfettiIcon = __comp.ConfettiIcon || __deps.ConfettiIcon;
   const TicketsPlaneIcon = __comp.TicketsPlaneIcon || __deps.TicketsPlaneIcon;
   const MessageCircleMoreIcon = __comp.MessageCircleMoreIcon || __deps.MessageCircleMoreIcon;
+  const CookingPotIcon = __comp.CookingPotIcon || __deps.CookingPotIcon;
   const ParticipantBadge = __comp.ParticipantBadge || __deps.ParticipantBadge;
+  // 흔들도시락 anniversary: cooking-pot icon + jiggle (title match, not category emoji).
+  const isHeundeulDosirakAnn = (ann) => {
+    const title = String(ann && ann.title != null ? ann.title : '').trim();
+    return title === '흔들도시락' || title.includes('흔들도시락');
+  };
   // Legacy D-Day badges (ann.type === 'dday') keep their plain emoji exactly as before; only the
   // newer category-tagged types (yearly/once/range) swap their category emoji for its icon component.
   const renderAnniversaryIcon = (ann, size) => {
+    if (isHeundeulDosirakAnn(ann)) {
+      const potSize = size;
+      return /*#__PURE__*/React.createElement("span", {
+        className: "ann-cooking-pot-icon-wrap",
+        style: {
+          width: Math.ceil(potSize * 1.5),
+          height: Math.ceil(potSize * 1.5),
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+          overflow: 'visible'
+        },
+        "aria-hidden": "true"
+      }, /*#__PURE__*/React.createElement("span", {
+        className: "ann-cooking-pot-jiggle"
+      }, CookingPotIcon ? /*#__PURE__*/React.createElement(CookingPotIcon, {
+        size: potSize
+      }) : null));
+    }
     if (ann.type === 'dday') return ann.icon;
     const iconMap = { '🎂': CakeIcon, '🎈': BalloonIcon, '🎉': ConfettiIcon, '✈️': TicketsPlaneIcon, '💬': MessageCircleMoreIcon };
     const Icon = iconMap[ann.icon];
@@ -1385,6 +1411,7 @@ export function CalendarGrid({
     // Range-type (연일 festival/event) anniversaries are excluded here -- they render as a
     // connected bar overlay (see festivalBars above) instead of a per-day badge.
     const cellAnns = getAnniversariesForDate(dateStr, anniversaries).filter(ann => ann.type !== 'range');
+    const hasHeundeulDosirak = cellAnns.some(isHeundeulDosirakAnn);
     const isFestivalCovered = festivalCoveredDates.has(dateStr);
     // Holiday name stays visible (red date styling), but when the day is also a confirmed
     // meeting we append ·확정 -- otherwise users only see '개천절' and re-tap 모임확정,
@@ -1402,7 +1429,7 @@ export function CalendarGrid({
     const isTouchDropTarget = isTouchDragging && touchDropTargetDate === dateStr;
     return /*#__PURE__*/React.createElement("div", {
       key: idx,
-      className: `day-cell ${isCurrentMonth ? '' : 'other-month'} ${isConfirmed ? 'confirmed-meeting' : isAllAvailable ? 'all-available' : ''}`,
+      className: `day-cell ${isCurrentMonth ? '' : 'other-month'} ${isConfirmed ? 'confirmed-meeting' : isAllAvailable ? 'all-available' : ''}${hasHeundeulDosirak ? ' day-cell-ann-jiggle' : ''}`,
       "data-date-str": dateStr,
       // Explicit grid placement (rather than relying on auto-flow) so a festival-bar overlay
       // (see festivalBars below), which must also use explicit placement to span multiple
@@ -1532,21 +1559,25 @@ export function CalendarGrid({
 
       /* PC Anniversary Badge (desktop-only, soft banner cards at the bottom of schedules) */
       cellAnns.length > 0 && /*#__PURE__*/React.createElement("div", {
-        className: "day-anniversary-desktop",
+        className: `day-anniversary-desktop${hasHeundeulDosirak ? ' day-ann-jiggle-row' : ''}`,
         style: {
           flexDirection: 'column',
           gap: '2px',
           width: '100%',
           marginTop: 'auto',
           paddingTop: '8px',
-          pointerEvents: 'none'
+          pointerEvents: 'none',
+          overflow: hasHeundeulDosirak ? 'visible' : undefined
         }
       }, cellAnns.map((ann, aIdx) => {
         const displayColor = getAnniversaryDisplayColor(ann, calendar);
+        const isHeundeul = isHeundeulDosirakAnn(ann);
         return /*#__PURE__*/React.createElement("div", {
           key: ann.id || aIdx,
+          className: isHeundeul ? 'day-anniversary-badge-jiggle' : undefined,
           style: {
-            height: '24px',
+            height: isHeundeul ? 'auto' : '24px',
+            minHeight: '24px',
             backgroundColor: `${displayColor}22`,
             padding: '3px 8px',
             borderRadius: 'var(--radius-sm)',
@@ -1558,16 +1589,17 @@ export function CalendarGrid({
             gap: '4px',
             width: '100%',
             boxSizing: 'border-box',
-            color: displayColor
+            color: displayColor,
+            overflow: isHeundeul ? 'visible' : undefined
           }
-        }, renderAnniversaryIcon(ann, 12), /*#__PURE__*/React.createElement("span", {
+        }, renderAnniversaryIcon(ann, isHeundeul ? 17 : 12), /*#__PURE__*/React.createElement("span", {
           style: ANNIVERSARY_BADGE_TEXT_STYLE(displayColor)
         }, ann.title));
       })),
 
       /* Mobile Anniversary Icon Badge (mobile-only, circular icons containing emoji with participant color) */
       cellAnns.length > 0 && /*#__PURE__*/React.createElement("div", {
-        className: "day-anniversary-mobile",
+        className: `day-anniversary-mobile${hasHeundeulDosirak ? ' day-ann-jiggle-row' : ''}`,
         style: {
           gap: '3px',
           justifyContent: 'center',
@@ -1576,16 +1608,19 @@ export function CalendarGrid({
           paddingTop: '6px',
           pointerEvents: 'none',
           boxSizing: 'border-box',
-          flexWrap: 'wrap'
+          flexWrap: 'wrap',
+          overflow: hasHeundeulDosirak ? 'visible' : undefined
         }
       }, cellAnns.map((ann, aIdx) => {
         const displayColor = getAnniversaryDisplayColor(ann, calendar);
+        const isHeundeul = isHeundeulDosirakAnn(ann);
         return /*#__PURE__*/React.createElement("div", {
           key: ann.id || aIdx,
           title: ann.title,
+          className: isHeundeul ? 'day-anniversary-badge-jiggle' : undefined,
           style: {
-            width: '18px',
-            height: '18px',
+            width: isHeundeul ? '26px' : '18px',
+            height: isHeundeul ? '26px' : '18px',
             borderRadius: '50%',
             backgroundColor: displayColor,
             color: '#FFFFFF',
@@ -1593,9 +1628,10 @@ export function CalendarGrid({
             alignItems: 'center',
             justifyContent: 'center',
             fontSize: 'var(--font-size-2xs)',
-            flexShrink: 0
+            flexShrink: 0,
+            overflow: isHeundeul ? 'visible' : undefined
           }
-        }, renderAnniversaryIcon(ann, 11));
+        }, renderAnniversaryIcon(ann, isHeundeul ? 14 : 11));
       })),
 
       /* Reserves room at the bottom of this cell for the festival-bar overlay drawn as a
