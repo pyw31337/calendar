@@ -3869,10 +3869,28 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     onClose: () => { setIsSettlementSearchOpen(false); setSettlementSearchQuery(''); }
   }),
 
+  /* Fixed 누적/월별 tabs directly under the page header (same placement as gallery tabs). */
+  UnderlineTabs && /*#__PURE__*/React.createElement("div", {
+    className: "settlement-page-tabs",
+    style: {
+      position: 'fixed', top: isSettlementSearchOpen ? 104 : 56, left: 0, right: 0, zIndex: 1009,
+      width: '100%', backgroundColor: 'var(--bg-card)',
+      transition: 'transform 0.3s ease, top 0.3s ease',
+      transform: isHeaderVisible ? 'translateY(0)' : 'translateY(calc(-100% - 56px))'
+    }
+  }, /*#__PURE__*/React.createElement(UnderlineTabs, {
+    className: "settlement-view-tabs",
+    ariaLabel: "누적 또는 월별 정산 보기",
+    value: activeTab,
+    onChange: v => setActiveTab(v),
+    style: { backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)' },
+    options: [{ value: 'total', label: '누적보기' }, { value: 'daily', label: '월별보기' }]
+  })),
+
   /*#__PURE__*/React.createElement("div", {
     className: "settlement-page-body",
     onScroll: handleSettlementScroll,
-    style: { flex: '1 1 auto', overflowY: 'auto', padding: `${isSettlementSearchOpen ? 124 : 72}px 16px 16px`, display: 'flex', flexDirection: 'column', gap: '14px' }
+    style: { flex: '1 1 auto', overflowY: 'auto', padding: `${isSettlementSearchOpen ? 152 : 104}px 16px 16px`, display: 'flex', flexDirection: 'column', gap: '14px', minHeight: 0, overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }
   },
     /* 1. Settlement Cards (Positioned ABOVE metrics grid) -- no cards means no section at all,
        not an empty-state placeholder; the 정산 목록 modal already covers "no settlement cards
@@ -4082,15 +4100,6 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
         })
       );
     })(),
-
-    /* 누적/월별 toggle -- moved here from the header, right under the settlement card(s), full width like the other sections */
-    UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
-      className: "settlement-view-tabs",
-      ariaLabel: "누적 또는 월별 정산 보기",
-      value: activeTab,
-      onChange: v => setActiveTab(v),
-      options: [{ value: 'total', label: '누적보기' }, { value: 'daily', label: '월별보기' }]
-    }),
 
     /* Metric Grid (총수입 / 총지출 / 현재잔액) */
     /*#__PURE__*/React.createElement("div", {
