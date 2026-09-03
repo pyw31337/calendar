@@ -506,7 +506,7 @@ body:has(.admin-login-gate) {
 button.confirmed-meeting-icon-btn.confirmed-meeting-surface.is-heartbeat {
   overflow: visible !important;
   transform-origin: center center;
-  animation: confirmed-meeting-heartbeat 1.25s ease-in-out infinite;
+  animation: confirmed-meeting-heartbeat 0.75s ease-in-out infinite;
   will-change: transform;
   z-index: 5;
   position: relative;
@@ -1271,6 +1271,24 @@ button, input, textarea, select {
   .main-menu-icon { display: inline-flex; }
   .main-menu-label-full { display: inline; }
   .main-menu-label-short { display: none; }
+}
+/* Shared stroke + color for main-nav / side-menu / section-title icons (MenuIcon,
+   WalletIcon, NotepadTextIcon, Chat/Gallery/Place/Memo section icons, and inline
+   side-menu SVGs). Components already use currentColor; CSS enforces stroke-width 2
+   so one-off 2.5 attrs cannot drift the three surfaces apart. */
+.main-menu-icon,
+.main-menu-icon svg,
+.admin-side-menu-item-icon svg,
+.summary-title svg {
+  color: inherit;
+}
+.main-menu-icon svg,
+.admin-side-menu-item-icon svg,
+.summary-title svg {
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 .main-menu-item {
   flex: 1;
