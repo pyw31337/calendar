@@ -1852,7 +1852,7 @@ export function ChatGalleryModal({
           const isCollapsed = collapsedGalleryDates.has(section.dateKey);
           return /*#__PURE__*/React.createElement("section", {
           key: section.dateKey,
-          style: { border: '0', borderRadius: 'var(--radius-md)', padding: '12px', backgroundColor: 'var(--bg-primary)' }
+          style: { border: 'none', borderRadius: 'var(--radius-md)', padding: '12px', backgroundColor: '#FFFFFF' }
         },
             /*#__PURE__*/React.createElement("div", {
               style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: isCollapsed ? 0 : '10px' }
@@ -2162,8 +2162,8 @@ export function ChatGalleryModal({
       onChange: v => setActiveTab(v),
       style: { backgroundColor: 'var(--bg-card)', flex: 1, borderBottom: 'none' },
       options: [
-        { value: 'photos', label: '사진', badge: ((searchQuery || '').trim() ? visiblePhotos.length : displayPhotoTabCount) },
-        { value: 'links', label: '링크', badge: filteredLinks.length }
+        { value: 'photos', label: '사진' },
+        { value: 'links', label: '링크' }
       ]
     })
   ), asPage && isMobile && /*#__PURE__*/React.createElement("div", {
@@ -2183,8 +2183,8 @@ export function ChatGalleryModal({
       onChange: v => setActiveTab(v),
       style: { backgroundColor: 'var(--bg-card)', flex: 1, borderBottom: 'none' },
       options: [
-        { value: 'photos', label: '사진', badge: ((searchQuery || '').trim() ? visiblePhotos.length : displayPhotoTabCount) },
-        { value: 'links', label: '링크', badge: filteredLinks.length }
+        { value: 'photos', label: '사진' },
+        { value: 'links', label: '링크' }
       ]
     })
   ), /*#__PURE__*/React.createElement("div", {

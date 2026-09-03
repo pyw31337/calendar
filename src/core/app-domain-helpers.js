@@ -1241,21 +1241,24 @@ function calculateSettlementBalance(calendar) {
   const confirmed = getConfirmedMeetings(calendar);
   let incomeTotal = 0;
   let expenseTotal = 0;
-  
+
+  // Same filters as SettlementSummaryModal's overallBalance: ignore soft-deleted expenses
+  // (isTombstone) and 자비부담 (isSelfPay). Without the tombstone skip, deleted income/expense
+  // still moves the nav/side-menu badge while the settlement page already hid them -- e.g.
+  // a deleted +38만 income left the badge at +6만 while the page showed -32만.
   confirmed.forEach(meeting => {
     const expenses = Array.isArray(meeting.expenses) ? meeting.expenses : [];
     expenses.forEach(exp => {
+      if (isTombstone(exp)) return;
       const amount = Number(exp.amount || 0);
-      if (Number.isFinite(amount) && amount !== 0) {
-        const isIncome = isExpenseIncomeEntry(exp);
-        if (isIncome) {
-          incomeTotal += Math.abs(amount);
-        } else if (!exp.isSelfPay) {
-          // 자비부담 expenses were paid entirely by one person for themselves -- 공금 never
-          // touched them, so they must not reduce this balance the way a real shared or
-          // 선결제 (fronted-but-shared) expense does.
-          expenseTotal += Math.abs(amount);
-        }
+      if (!Number.isFinite(amount) || amount === 0) return;
+      if (isExpenseIncomeEntry(exp)) {
+        incomeTotal += Math.abs(amount);
+      } else if (!exp.isSelfPay) {
+        // 자비부담 expenses were paid entirely by one person for themselves -- 공금 never
+        // touched them, so they must not reduce this balance the way a real shared or
+        // 선결제 (fronted-but-shared) expense does.
+        expenseTotal += Math.abs(amount);
       }
     });
   });
