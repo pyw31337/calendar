@@ -3457,7 +3457,19 @@ export function DateModal({
                     fontWeight: 'bold'
                   }
                 }, expenseTime),
-                (expense.payerId || expense.isSelfPay) && /*#__PURE__*/React.createElement("span", {
+                expense.isSelfPay && /*#__PURE__*/React.createElement("span", {
+                  style: {
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    padding: '3px 8px',
+                    borderRadius: 'var(--radius-full)',
+                    backgroundColor: 'rgba(100, 116, 139, 0.14)',
+                    color: '#475569',
+                    fontSize: 'var(--font-size-xs)',
+                    fontWeight: 900
+                  }
+                }, "자비부담"),
+                expense.payerId && /*#__PURE__*/React.createElement("span", {
                   style: {
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -3468,7 +3480,7 @@ export function DateModal({
                     fontSize: 'var(--font-size-xs)',
                     fontWeight: 900
                   }
-                }, expense.payerId ? `${expense.payerId} ${expense.isSelfPay ? '자비부담' : '선결제'}` : '자비부담')
+                }, expense.isSelfPay ? expense.payerId : `${expense.payerId} 선결제`)
               ),
               /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-base)', fontWeight: 'bold', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', width: '100%', wordBreak: 'break-all' } },
                 expenseUrl ? /*#__PURE__*/React.createElement(React.Fragment, null,
