@@ -178,6 +178,10 @@ function isDomesticLatLng(...args) {
   const f = __gatherUiDeps().isDomesticLatLng || GATHER_APP_UTILS.isDomesticLatLng;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function normalizeDomesticKoreanAddress(...args) {
+  const f = __gatherUiDeps().normalizeDomesticKoreanAddress || GATHER_APP_UTILS.normalizeDomesticKoreanAddress;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
 function isExpenseIncomeEntry(...args) {
   const f = __gatherUiDeps().isExpenseIncomeEntry || GATHER_APP_UTILS.isExpenseIncomeEntry;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -1748,6 +1752,7 @@ export function HistoryView({
   const SearchIcon = __comp.SearchIcon || __deps.SearchIcon;
   const FolderClockIcon = __comp.FolderClockIcon || __deps.FolderClockIcon;
   const MapPinIcon = __comp.MapPinIcon || __deps.MapPinIcon;
+  const LocateFixedIcon = __comp.LocateFixedIcon || __deps.LocateFixedIcon;
   const InlineSearchBar = __comp.InlineSearchBar || __deps.InlineSearchBar;
   const UnderlineTabs = __comp.UnderlineTabs || __deps.UnderlineTabs;
   const WeatherBadge = __comp.WeatherBadge || __deps.WeatherBadge;
@@ -1766,6 +1771,41 @@ export function HistoryView({
   const [isRegionFilterOpen, setIsRegionFilterOpen] = React.useState(false);
   const [isContentRegisterOpen, setIsContentRegisterOpen] = React.useState(false);
   const applyRegionFilter = (sido, gugun) => { setRegionSido(sido); setRegionGugun(gugun); };
+  // Whichever of 문화공연/지역축제 is currently mounted below reports its own loaded (unfiltered)
+  // snapshot back up here via onItemsLoaded, purely so RegionFilterBackdrop can show a per-region
+  // item count badge -- it has no other reason to fetch or hold this data itself.
+  const [regionFilterItems, setRegionFilterItems] = React.useState([]);
+  const [isLocating, setIsLocating] = React.useState(false);
+  const handleUseCurrentLocation = () => {
+    if (isLocating || typeof navigator === 'undefined' || !navigator.geolocation) return;
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const { latitude, longitude } = pos.coords;
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=jsonv2&accept-language=ko&zoom=14`);
+          const data = await res.json();
+          // normalizeDomesticKoreanAddress turns Nominatim's most-specific-first display_name
+          // into the same "경기 성남시 ..." shape already used across the app (see place-search
+          // address normalization), so the same first/second-token convention used everywhere
+          // else here (시/도 label, 군/구 name) applies without any extra parsing.
+          const normalized = normalizeDomesticKoreanAddress(data?.display_name || '') || '';
+          const tokens = normalized.trim().split(/\s+/);
+          const matchedRegion = KOREA_REGIONS.find(r => r.label === tokens[0]);
+          if (matchedRegion) {
+            const matchedGugun = matchedRegion.gugun.includes(tokens[1]) ? tokens[1] : '';
+            applyRegionFilter(matchedRegion.code, matchedGugun);
+          }
+        } catch (err) {
+          console.warn('Current-location region lookup failed:', err);
+        } finally {
+          setIsLocating(false);
+        }
+      },
+      () => { setIsLocating(false); },
+      { timeout: 10000 }
+    );
+  };
 
   const activeParticipants = getActiveParticipants(calendar);
   const participantsMap = activeParticipants.reduce((acc, p) => { acc[p.id] = p; return acc; }, {});
@@ -1863,24 +1903,35 @@ export function HistoryView({
         type: "button",
         className: "form-select region-filter-trigger",
         onClick: () => setIsRegionFilterOpen(true)
-      }, regionGugun || "군/구 선택")
+      }, regionGugun || "군/구 선택"),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "current-location-btn",
+        disabled: isLocating,
+        onClick: handleUseCurrentLocation,
+        title: "현재 위치"
+      },
+        LocateFixedIcon && /*#__PURE__*/React.createElement(LocateFixedIcon, { size: 18 }),
+        /*#__PURE__*/React.createElement("span", { className: "current-location-btn-label" }, isLocating ? "위치 확인 중..." : "현재 위치")
+      )
     ),
     /*#__PURE__*/React.createElement(RegionFilterBackdrop, {
       isOpen: isRegionFilterOpen,
       onClose: () => setIsRegionFilterOpen(false),
       sido: regionSido,
       gugun: regionGugun,
-      onApply: applyRegionFilter
+      onApply: applyRegionFilter,
+      items: regionFilterItems
     }),
     historyTab === 'culture' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
       calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent, dataUrl: CULTURE_PERFORMANCES_URL,
-      emptyLabel: "상영중이거나 예정된 문화공연이 없습니다.", regionSido, regionGugun,
+      emptyLabel: "상영중이거나 예정된 문화공연이 없습니다.", regionSido, regionGugun, onItemsLoaded: setRegionFilterItems,
       anniversaryCategory: "event",
       extraItems: (customCultureItems || []).filter(i => i && i.kind === 'performance')
     }),
     historyTab === 'festival' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
       calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent, dataUrl: CULTURE_FESTIVALS_URL,
-      emptyLabel: "진행중이거나 예정된 지역축제가 없습니다.", regionSido, regionGugun,
+      emptyLabel: "진행중이거나 예정된 지역축제가 없습니다.", regionSido, regionGugun, onItemsLoaded: setRegionFilterItems,
       anniversaryCategory: "festival",
       extraItems: (customCultureItems || []).filter(i => i && i.kind === 'festival')
     }),
@@ -2090,13 +2141,23 @@ const KOREA_REGION_GUGUN_INDEX = KOREA_REGIONS.flatMap(region =>
   region.gugun.map(gugun => ({ code: region.code, label: region.label, gugun }))
 );
 
+// item.region already matches a KOREA_REGIONS code 1:1. There's no separate 군/구 field in the
+// culture snapshot, so this reads it off the second space-separated token of the item's own
+// address string (Korean addresses always lead with "시/도 시/군/구 ..."). Shared by the grid's
+// own region filter and the region-count badges in RegionFilterBackdrop below so both agree on
+// exactly the same district for a given item.
+function getCultureItemDistrict(item) {
+  const tokens = String(item?.address || item?.venue || '').trim().split(/\s+/);
+  return tokens[1] || '';
+}
+
 // Region-select backdrop shared by the 시/도 and 군/구 trigger buttons below the 보관함 tabs
 // (Culture Flow's own region picker, referenced by the product ask, is the model: a search field
 // on top auto-resolving a typed district straight to its province, plus every province's full
 // district list laid out as tap targets rather than a plain dropdown). Selecting a 시/도 narrows
 // the sheet to that province's 군/구 chips without closing it (so 시/도 → 군/구 is one flow);
 // picking a 군/구 (or "전체") applies and closes.
-export function RegionFilterBackdrop({ isOpen, onClose, sido, gugun, onApply }) {
+export function RegionFilterBackdrop({ isOpen, onClose, sido, gugun, onApply, items = [] }) {
   const React = window.React;
   const ReactDOM = window.ReactDOM;
   const [query, setQuery] = React.useState('');
@@ -2126,6 +2187,21 @@ export function RegionFilterBackdrop({ isOpen, onClose, sido, gugun, onApply }) 
 
   const activeRegion = KOREA_REGIONS.find(r => r.code === expandedSido);
 
+  // Per-region/per-군구 counts shown as badges next to each chip label, computed off the
+  // currently active tab's full (unfiltered) item snapshot passed down from HistoryView.
+  const regionCounts = {};
+  const gugunCounts = {};
+  items.forEach(item => {
+    regionCounts[item.region] = (regionCounts[item.region] || 0) + 1;
+    if (activeRegion && item.region === activeRegion.code) {
+      const district = getCultureItemDistrict(item);
+      if (district) gugunCounts[district] = (gugunCounts[district] || 0) + 1;
+    }
+  });
+
+  const hasActiveFilter = !!(sido || gugun);
+  const resetFilter = () => { setQuery(''); setExpandedSido(''); onApply('', ''); };
+
   const sheet = /*#__PURE__*/React.createElement("div", {
     className: "bottom-sheet-overlay",
     onClick: e => { e.stopPropagation(); onClose(); }
@@ -2135,11 +2211,18 @@ export function RegionFilterBackdrop({ isOpen, onClose, sido, gugun, onApply }) 
   },
     /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-header" },
       /*#__PURE__*/React.createElement("h4", null, "지역 설정"),
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        style: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer' },
-        onClick: onClose
-      }, "✕")
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '10px' } },
+        hasActiveFilter && /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          className: "region-filter-reset-btn",
+          onClick: resetFilter
+        }, "초기화"),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          style: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer' },
+          onClick: onClose
+        }, "✕")
+      )
     ),
     /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-body region-filter-body" },
       /*#__PURE__*/React.createElement("input", {
@@ -2156,13 +2239,13 @@ export function RegionFilterBackdrop({ isOpen, onClose, sido, gugun, onApply }) 
           type: "button",
           className: `region-filter-chip${!expandedSido ? ' is-active' : ''}`,
           onClick: () => { setQuery(''); setExpandedSido(''); onApply('', ''); onClose(); }
-        }, "전국"),
+        }, "전국", /*#__PURE__*/React.createElement("span", { className: "region-filter-chip-count" }, items.length)),
         KOREA_REGIONS.map(r => /*#__PURE__*/React.createElement("button", {
           key: r.code,
           type: "button",
           className: `region-filter-chip${r.code === expandedSido ? ' is-active' : ''}`,
           onClick: () => { setQuery(''); setExpandedSido(r.code); onApply(r.code, ''); }
-        }, r.label))
+        }, r.label, /*#__PURE__*/React.createElement("span", { className: "region-filter-chip-count" }, regionCounts[r.code] || 0)))
       ),
       activeRegion && /*#__PURE__*/React.createElement(React.Fragment, null,
         /*#__PURE__*/React.createElement("div", { className: "region-filter-section-label" }, "군/구"),
@@ -2171,13 +2254,13 @@ export function RegionFilterBackdrop({ isOpen, onClose, sido, gugun, onApply }) 
             type: "button",
             className: `region-filter-chip${expandedSido === sido && !gugun ? ' is-active' : ''}`,
             onClick: () => { setQuery(''); onApply(expandedSido, ''); onClose(); }
-          }, "전체"),
+          }, "전체", /*#__PURE__*/React.createElement("span", { className: "region-filter-chip-count" }, regionCounts[activeRegion.code] || 0)),
           activeRegion.gugun.map(g => /*#__PURE__*/React.createElement("button", {
             key: g,
             type: "button",
             className: `region-filter-chip${expandedSido === sido && g === gugun ? ' is-active' : ''}`,
             onClick: () => { setQuery(''); onApply(expandedSido, g); onClose(); }
-          }, g))
+          }, g, /*#__PURE__*/React.createElement("span", { className: "region-filter-chip-count" }, gugunCounts[g] || 0)))
         )
       )
     )
@@ -2387,7 +2470,7 @@ function ContentRegisterModal({ onClose, onSave, showToast = null }) {
 // 상영중/예정 목록을 보여준다. Culture Flow(별개 프로젝트)의 실시간 JSON을 직접 fetch하지 않는
 // 이유는 그 프로젝트의 스키마가 바뀌거나 그날 수집이 실패해도 이 탭이 즉시 깨지지 않게 하기
 // 위함 -- 동기화 스크립트가 검증에 실패하면 최근 정상 스냅샷을 그대로 커밋해 유지한다.
-export function CulturePerformancesTab({ calendar, anniversaries = [], onRegisterCultureEvent, onUnregisterCultureEvent, dataUrl = CULTURE_PERFORMANCES_URL, emptyLabel = "상영중이거나 예정된 문화공연이 없습니다.", regionSido = '', regionGugun = '', anniversaryCategory = 'event', extraItems = [] }) {
+export function CulturePerformancesTab({ calendar, anniversaries = [], onRegisterCultureEvent, onUnregisterCultureEvent, dataUrl = CULTURE_PERFORMANCES_URL, emptyLabel = "상영중이거나 예정된 문화공연이 없습니다.", regionSido = '', regionGugun = '', onItemsLoaded, anniversaryCategory = 'event', extraItems = [] }) {
   const React = window.React;
   const ReactDOM = window.ReactDOM;
   const [items, setItems] = React.useState(null); // null = loading, [] = loaded-empty
@@ -2444,6 +2527,13 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
     return [...extras, ...crawled];
   }, [items, extraItems]);
 
+  // Reported unfiltered (crawled snapshot + any custom items merged in above) -- RegionFilterBackdrop's
+  // per-region counts should always reflect every item available in this tab, not just whatever the
+  // current region selection narrows the grid down to.
+  React.useEffect(() => {
+    if (typeof onItemsLoaded === 'function') onItemsLoaded(mergedItems || []);
+  }, [mergedItems]);
+
   if (mergedItems === null) {
     return /*#__PURE__*/React.createElement("div", {
       style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)' }
@@ -2456,16 +2546,9 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
     }, loadError ? "정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요." : emptyLabel);
   }
 
-  // item.region already matches a KOREA_REGIONS code 1:1 (see that table's own comment). There's
-  // no separate 군/구 field in the snapshot, so match it against the first two space-separated
-  // tokens of the item's own address string (Korean addresses always lead with "시/도 시/군/구
-  // ...", so the second token is exactly the district name these buttons list).
   const filteredItems = mergedItems.filter(item => {
     if (regionSido && item.region !== regionSido) return false;
-    if (regionGugun) {
-      const addressTokens = String(item.address || item.venue || '').trim().split(/\s+/);
-      if (addressTokens[1] !== regionGugun) return false;
-    }
+    if (regionGugun && getCultureItemDistrict(item) !== regionGugun) return false;
     return true;
   });
 
