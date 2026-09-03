@@ -851,6 +851,7 @@ export function DateModal({
   const ItemEditDeleteActions = __deps.ItemEditDeleteActions;
   const LineHeightIcon = __deps.LineHeightIcon;
   const SegmentedToggle = __deps.SegmentedToggle;
+  const UnderlineTabs = __comp.UnderlineTabs || __deps.UnderlineTabs;
   const SimpleBottomSheetPicker = __comp.SimpleBottomSheetPicker || __deps.SimpleBottomSheetPicker;
   const MediaThumb = __comp.MediaThumb || __deps.MediaThumb;
   const CakeIcon = __comp.CakeIcon || __deps.CakeIcon;
@@ -2372,103 +2373,18 @@ export function DateModal({
       padding: '2px 4px'
     },
     title: "닫기"
-  }, "✕"))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'grid',
-      gridTemplateColumns: 'repeat(4, 1fr)',
-      gap: '6px',
-      width: '100%'
-    }
-  },
-    /* Tab 1: 참여자 */
-    /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      onClick: e => { e.preventDefault(); e.stopPropagation(); setActiveTab('participant'); },
-      style: {
-        border: 'none',
-        borderRadius: 'var(--radius-md)',
-        padding: '7px 4px',
-        background: activeTab === 'participant' ? 'var(--accent-primary)' : 'transparent',
-        color: activeTab === 'participant' ? '#FFFFFF' : 'var(--text-muted)',
-        fontWeight: 800,
-        fontSize: 'var(--font-size-md)',
-        cursor: 'pointer',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '4px'
-      }
-      },
-      "참여자",
-      /*#__PURE__*/React.createElement(SectionCountBadge, { count: dateEntries.length })
-    ),
-    /* Tab 2: 장소 */
-    /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      onClick: e => { e.preventDefault(); e.stopPropagation(); setActiveTab('meeting'); },
-      style: {
-        border: 'none',
-        borderRadius: 'var(--radius-md)',
-        padding: '7px 4px',
-        background: activeTab === 'meeting' ? 'var(--accent-primary)' : 'transparent',
-        color: activeTab === 'meeting' ? '#FFFFFF' : 'var(--text-muted)',
-        fontWeight: 800,
-        fontSize: 'var(--font-size-md)',
-        cursor: 'pointer',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '4px'
-      }
-      },
-      "장소",
-      /*#__PURE__*/React.createElement(SectionCountBadge, { count: registeredPlaces.length })
-    ),
-    /* Tab 3: 정산 */
-    /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      onClick: e => { e.preventDefault(); e.stopPropagation(); setActiveTab('settlement'); },
-      style: {
-        border: 'none',
-        borderRadius: 'var(--radius-md)',
-        padding: '7px 4px',
-        background: activeTab === 'settlement' ? 'var(--accent-primary)' : 'transparent',
-        color: activeTab === 'settlement' ? '#FFFFFF' : 'var(--text-muted)',
-        fontWeight: 800,
-        fontSize: 'var(--font-size-md)',
-        cursor: 'pointer',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '4px'
-      }
-      },
-      "정산",
-      /*#__PURE__*/React.createElement(SectionCountBadge, { count: expenses.length })
-    ),
-    /* Tab 4: 사진 */
-    /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      onClick: e => { e.preventDefault(); e.stopPropagation(); setActiveTab('photo'); },
-      style: {
-        border: 'none',
-        borderRadius: 'var(--radius-md)',
-        padding: '7px 4px',
-        background: activeTab === 'photo' ? 'var(--accent-primary)' : 'transparent',
-        color: activeTab === 'photo' ? '#FFFFFF' : 'var(--text-muted)',
-        fontWeight: 800,
-        fontSize: 'var(--font-size-md)',
-        cursor: 'pointer',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '4px'
-      }
-      },
-      "사진",
-      /*#__PURE__*/React.createElement(SectionCountBadge, { count: visibleMeetingPhotos.length })
-    )
-  )), /*#__PURE__*/React.createElement("form", {
+  }, "✕"))), UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
+    ariaLabel: "일정 탭",
+    value: activeTab,
+    onChange: (id) => setActiveTab(id),
+    style: { backgroundColor: 'transparent', borderBottom: 'none', width: '100%' },
+    options: [
+      { value: 'participant', label: /*#__PURE__*/React.createElement(React.Fragment, null, "참여자", /*#__PURE__*/React.createElement(SectionCountBadge, { count: dateEntries.length })) },
+      { value: 'meeting', label: /*#__PURE__*/React.createElement(React.Fragment, null, "장소", /*#__PURE__*/React.createElement(SectionCountBadge, { count: registeredPlaces.length })) },
+      { value: 'settlement', label: /*#__PURE__*/React.createElement(React.Fragment, null, "정산", /*#__PURE__*/React.createElement(SectionCountBadge, { count: expenses.length })) },
+      { value: 'photo', label: /*#__PURE__*/React.createElement(React.Fragment, null, "사진", /*#__PURE__*/React.createElement(SectionCountBadge, { count: visibleMeetingPhotos.length })) }
+    ]
+  })), /*#__PURE__*/React.createElement("form", {
     onSubmit: e => {
       e.preventDefault();
       if (activeTab === 'participant') handleSubmit(e);

@@ -1944,11 +1944,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
         setListSearchQuery(val);
         if (val.trim()) setCategoryFilter('all');
       },
-      trailing: /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: () => { setIsSearchOpen(false); setListSearchQuery(''); },
-        style: { border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px 6px', fontSize: 'var(--font-size-md)', fontWeight: 700, flexShrink: 0 }
-      }, "닫기")
+      onClose: () => { setIsSearchOpen(false); setListSearchQuery(''); }
     }),
 
     /* Sticky Map Area */
