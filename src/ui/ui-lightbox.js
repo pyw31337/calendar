@@ -1133,27 +1133,32 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
   // the messages collection, not memos -- tags there are a whole-memo field with no single-photo
   // target, so editing is intentionally left disabled rather than silently failing to save.
   const isMeetingPhoto = currentMeta?.source === 'meeting' && !!currentMeta?.meetingDate && !!currentMeta?.photoId;
+  // Anniversary photos live on the anniversary doc's photos[] array (not a chat message), so
+  // they identify by anniversaryId + imageIndex -- same shape handleSaveAnniversaryPhotoTags
+  // expects in app-main.js.
+  const isAnniversaryPhoto = currentMeta?.source === 'anniversary' && !!currentMeta?.anniversaryId && Number.isInteger(currentMeta?.imageIndex);
   // Was keyed on source === 'chat' specifically, which left tag editing silently disabled for
   // any directMediaUrl entry (a link pasted as plain text in a message, single or multi-image --
   // see DirectChatMediaText) since those never set `source` at all. Reworked to mirror
   // canEditPhoto's structure below: 'meeting' is the one case needing isMeetingPhoto, 'memo' stays
   // explicitly disabled (a memo's tags are a whole-memo field, no single-photo target to write
-  // to -- see the comment above), and everything else (chat, chat-tag, or an untagged
-  // directMediaUrl entry) just needs a real messageId to write handleSaveImageTags' update to.
+  // to -- see the comment above), anniversary uses anniversaryId+imageIndex, and everything else
+  // (chat, chat-tag, or an untagged directMediaUrl entry) just needs a real messageId.
   const canEditTags = currentMeta && (
     currentMeta.source === 'meeting' ? isMeetingPhoto :
+    currentMeta.source === 'anniversary' ? isAnniversaryPhoto :
     currentMeta.source === 'memo' ? false :
     currentMeta.messageId != null
   );
   const tagOverrideKey = currentMeta
     ? [
         'lb',
-        currentMeta.messageId || currentMeta.sourceMessageId || '',
+        currentMeta.messageId || currentMeta.sourceMessageId || currentMeta.anniversaryId || '',
         Number.isInteger(currentMeta.imageIndex)
           ? currentMeta.imageIndex
           : (Number.isInteger(currentMeta.sourceImageIndex) ? currentMeta.sourceImageIndex : ''),
         currentUrl || currentMeta.directMediaUrl || currentMeta.thumb || '',
-        currentMeta.photoId || currentMeta.meetingDate || ''
+        currentMeta.photoId || currentMeta.meetingDate || currentMeta.anniversaryId || ''
       ].join('::')
     : null;
   const currentTags = (tagOverrideKey && Object.prototype.hasOwnProperty.call(tagOverrides, tagOverrideKey))
@@ -1228,6 +1233,14 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
   }, [showInfo, currentMeta, onGetGalleryPhotoOrdinal]);
   const sourceInfo = React.useMemo(() => {
     if (!currentMeta) return null;
+
+    if (currentMeta.source === 'anniversary') {
+      const n = Number(currentMeta.anniversaryIndex);
+      return {
+        label: Number.isFinite(n) && n > 0 ? `기념일#${n}` : '기념일',
+        onClick: null
+      };
+    }
 
     const formatScheduleLabel = (dateStr) => {
       if (!dateStr || !isValidDateString(dateStr)) return '';

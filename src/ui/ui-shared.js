@@ -982,11 +982,16 @@ export function FormAddEditActionButtons({ isEditing, isSaving, onCancel, onSubm
   );
 }
 
-export function UnderlineTabs({ options = [], value, onChange, ariaLabel, className = '', style = null, activeColor = '#7C3AED' }) {
+export function UnderlineTabs({ options = [], value, onChange, ariaLabel, className = '', style = null, activeColor = '#7C3AED', variant = null }) {
   const React = window.React;
   const list = Array.isArray(options) ? options : [];
+  // 'flush' sits edge-to-edge on the modal/page width with equal flex children and no extra
+  // horizontal padding so the active 2px underline can land on the container's bottom hairline
+  // (marginBottom: -1px below). Callers that nest tabs inside a padded header should move the
+  // padding onto the title row (or pass negative horizontal margins) so the bar stays full-bleed.
+  const isFlush = variant === 'flush';
   return /*#__PURE__*/React.createElement('div', {
-    className: `underline-tabs${className ? ' ' + className : ''}`,
+    className: `underline-tabs${isFlush ? ' underline-tabs--flush' : ''}${className ? ' ' + className : ''}`,
     role: 'tablist',
     'aria-label': ariaLabel || undefined,
     style: {
@@ -996,6 +1001,8 @@ export function UnderlineTabs({ options = [], value, onChange, ariaLabel, classN
       backgroundColor: 'var(--bg-card)',
       flexShrink: 0,
       boxSizing: 'border-box',
+      paddingLeft: isFlush ? 0 : undefined,
+      paddingRight: isFlush ? 0 : undefined,
       ...(style || {})
     }
   }, list.map(opt => {
@@ -1011,7 +1018,7 @@ export function UnderlineTabs({ options = [], value, onChange, ariaLabel, classN
       onClick: () => { if (typeof onChange === 'function') onChange(id); },
       style: {
         flex: 1,
-        padding: '12px 0',
+        padding: isFlush ? '12px 0' : '12px 0',
         background: 'none',
         border: 'none',
         cursor: 'pointer',
@@ -1023,7 +1030,8 @@ export function UnderlineTabs({ options = [], value, onChange, ariaLabel, classN
         alignItems: 'center',
         justifyContent: 'center',
         gap: '6px',
-        marginBottom: '-1px'
+        marginBottom: '-1px',
+        minWidth: 0
       }
     },
       label,
