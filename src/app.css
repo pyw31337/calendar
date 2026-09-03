@@ -3712,7 +3712,7 @@ select.form-select {
 /* Badges now sit below the trigger row (tabs → toolbar → badges → chips → grid). When present,
    shrink the badges' own top padding so the gap under the toolbar doesn't stack with the old
    "first-row-under-tabs" top padding the badges used to carry when they preceded the toolbar. */
-.region-filter-trigger-row + .region-selection-badges-row { padding-top: 0; padding-bottom: 0; }
+.region-filter-trigger-row + .region-selection-badges-row { padding-top: 0; padding-bottom: 10px; }
 @media (max-width: 640px) {
   .region-filter-trigger-row { padding: 10px 16px 12px; }
 }
@@ -3796,7 +3796,7 @@ select.form-select {
    Top padding is for the rare case badges render without a preceding trigger; when they follow
    the toolbar, .region-filter-trigger-row + .region-selection-badges-row zeroes it. */
 .region-selection-badges-row {
-  display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 12px 16px 0;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 12px 16px 10px;
 }
 .region-selection-badges-row .region-filter-reset-btn { margin-left: auto; flex-shrink: 0; }
 .region-selection-badges {
@@ -3839,7 +3839,7 @@ select.form-select {
    is-cols-1: 모바일 1단 / 640px+ 2단 / 1024px+ 3단 (single-column denser on wide screens). */
 .culture-items-grid,
 .culture-items-grid.is-cols-2 {
-  display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 10px;
 }
 @media (min-width: 640px) and (max-width: 1023px) {
   .culture-items-grid,

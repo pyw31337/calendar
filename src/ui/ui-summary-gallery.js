@@ -2368,7 +2368,7 @@ function RegionSelectionBadge({ sel, onRemove }) {
   const React = window.React;
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const __deps = window.GATHER_UI_DEPS || {};
-  const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
+  const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
   const label = `${KOREA_REGIONS.find(r => r.code === sel.sido)?.label || sel.sido}${sel.gugun ? ' ' + sel.gugun : ''}`;
   return /*#__PURE__*/React.createElement("span", { className: "region-selection-badge" },
     label,
@@ -2377,7 +2377,7 @@ function RegionSelectionBadge({ sel, onRemove }) {
       className: "region-selection-badge-remove",
       "aria-label": `${label} 필터 해제`,
       onClick: onRemove
-    }, SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 11 }) : "✕")
+    }, TrashIcon ? /*#__PURE__*/React.createElement(TrashIcon, { size: 11 }) : "✕")
   );
 }
 
