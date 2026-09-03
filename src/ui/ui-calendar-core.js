@@ -1779,7 +1779,6 @@ export function CommentsSection({
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const ChatSectionIcon = __comp.ChatSectionIcon || __deps.ChatSectionIcon;
   const Lightbox = __comp.Lightbox || __deps.Lightbox;
-  const SectionToggleButton = __comp.SectionToggleButton || __deps.SectionToggleButton;
   const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
   const getActiveParticipants = __deps.getActiveParticipants;
 
@@ -1897,12 +1896,7 @@ export function CommentsSection({
         padding: '4px 6px',
         whiteSpace: 'nowrap'
       }
-    }, "전체보기"),
-    /*#__PURE__*/React.createElement(SectionToggleButton, {
-      collapsed: isCollapsed,
-      onToggle: toggleCommentsSection,
-      label: isCollapsed ? "채팅 펼치기" : "채팅 접기"
-    })
+    }, "전체보기")
   )),
   /* List Background Panel -- one continuous gray canvas the individual white message
      bubbles float on, instead of each message having its own separate gray card */

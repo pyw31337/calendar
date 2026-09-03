@@ -1336,6 +1336,14 @@ button, input, textarea, select {
   background-color: #EF4444;
   color: #FFFFFF;
 }
+.main-menu-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #EF4444;
+  flex-shrink: 0;
+}
 @media (max-width: 480px) {
   .main-menu-item { font-size: 0.74rem; padding: 6px 2px; }
   .main-menu-sep { margin: 0 1px; }
