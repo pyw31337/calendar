@@ -2169,6 +2169,24 @@ export function FolderClockIcon({ size = 24 } = {}) {
   );
 }
 
+// "현재 위치" (use my current location) button icon -- Lucide's locate-fixed, provided verbatim
+// by the product ask.
+export function LocateFixedIcon({ size = 24 } = {}) {
+  const React = window.React;
+  return /*#__PURE__*/React.createElement('svg', {
+    xmlns: 'http://www.w3.org/2000/svg', width: String(size), height: String(size), viewBox: '0 0 24 24',
+    fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round',
+    'aria-hidden': 'true'
+  },
+    /*#__PURE__*/React.createElement('line', { x1: '2', x2: '5', y1: '12', y2: '12' }),
+    /*#__PURE__*/React.createElement('line', { x1: '19', x2: '22', y1: '12', y2: '12' }),
+    /*#__PURE__*/React.createElement('line', { x1: '12', x2: '12', y1: '2', y2: '5' }),
+    /*#__PURE__*/React.createElement('line', { x1: '12', x2: '12', y1: '19', y2: '22' }),
+    /*#__PURE__*/React.createElement('circle', { cx: '12', cy: '12', r: '7' }),
+    /*#__PURE__*/React.createElement('circle', { cx: '12', cy: '12', r: '3' })
+  );
+}
+
 // Place/location marker used for anniversary place info (replaces the plain 📍 emoji).
 export function MapPinIcon({ size = 24 } = {}) {
   const React = window.React;
@@ -2191,6 +2209,7 @@ export function MapPinIcon({ size = 24 } = {}) {
     ConfettiIcon: ConfettiIcon,
     TicketsPlaneIcon: TicketsPlaneIcon,
     FolderClockIcon: FolderClockIcon,
+    LocateFixedIcon: LocateFixedIcon,
     MapPinIcon: MapPinIcon,
     MessageCircleMoreIcon: MessageCircleMoreIcon,
     NotepadTextIcon: NotepadTextIcon,
