@@ -2313,6 +2313,9 @@ function normalizeConfirmedMeetingExpense(expense) {
   if (url) normalized.url = url;
   if (categoryId) normalized.categoryId = categoryId;
   if (payerId) normalized.payerId = payerId;
+  // Persist 자비부담 -- without this, optimistic UI shows isSelfPay then commitConfirmedMeetings
+  // re-normalizes expenses and drops the flag, so the list snaps back to 선결제.
+  if (expense.isSelfPay) normalized.isSelfPay = true;
   if (Number.isFinite(amount)) normalized.amount = Math.round(amount);
   if (Number.isFinite(order)) normalized.order = Math.max(0, Math.round(order));
   if (Number.isFinite(createdAt)) normalized.createdAt = Math.max(0, Math.round(createdAt));
