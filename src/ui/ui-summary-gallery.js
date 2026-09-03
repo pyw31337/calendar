@@ -2290,6 +2290,7 @@ function ContentRegisterModal({ onClose, onSave, showToast = null }) {
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
   const UnderlineTabs = __comp.UnderlineTabs || __deps.UnderlineTabs;
+  const autoGrowTextarea = __deps.autoGrowTextarea || (window.GATHER_APP_UTILS || {}).autoGrowTextarea || (() => {});
 
   const [kind, setKind] = React.useState('performance'); // 'performance' | 'festival'
   const [title, setTitle] = React.useState('');
@@ -2446,9 +2447,11 @@ function ContentRegisterModal({ onClose, onSave, showToast = null }) {
           }))
         ),
         field("설명", /*#__PURE__*/React.createElement("textarea", {
-          className: "form-input", value: description, onChange: e => setDescription(e.target.value),
+          className: "form-input", value: description,
+          onChange: e => { setDescription(e.target.value); autoGrowTextarea(e.target, 240); },
+          onInput: e => autoGrowTextarea(e.target, 240),
           placeholder: "간단한 설명", rows: 3, maxLength: 2000,
-          style: { resize: 'vertical', minHeight: '72px' }
+          style: { resize: 'none', minHeight: '72px', overflow: 'hidden' }
         })),
         /*#__PURE__*/React.createElement("button", {
           type: "button", className: "btn btn-primary", disabled: saving, onClick: handleSave,

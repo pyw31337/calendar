@@ -2428,10 +2428,17 @@ select.form-select {
   gap: 6px;
   flex-shrink: 0;
 }
+.comment-composer-input {
+  font-size: 0.8rem !important;
+  background-color: #fff !important;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
 @media (min-width: 640px) {
   .comment-composer {
     flex-direction: row;
-    align-items: center;
+    align-items: flex-end;
   }
   .comment-composer-footer {
     display: contents;

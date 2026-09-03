@@ -1666,10 +1666,11 @@ export function AnniversaryModal({
             /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "설명"),
             /*#__PURE__*/React.createElement("textarea", {
               className: "form-input",
-              style: { width: '100%', minHeight: '64px', resize: 'vertical', fontFamily: 'inherit' },
+              style: { width: '100%', minHeight: '64px', resize: 'none', fontFamily: 'inherit', overflow: 'hidden' },
               placeholder: "설명을 입력하세요. 링크를 함께 적으면 URL 뱃지로 표시됩니다.",
               value: newDescription,
-              onChange: e => setNewDescription(e.target.value),
+              onChange: e => { setNewDescription(e.target.value); autoGrowTextarea(e.target, 240); },
+              onInput: e => autoGrowTextarea(e.target, 240),
               onPaste: handlePhotoPaste,
               maxLength: 500
             })

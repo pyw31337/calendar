@@ -2016,6 +2016,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
   const ShareIcon = __comp.ShareIcon || __deps.ShareIcon;
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
   const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
+  const AutoGrowTextarea = __comp.AutoGrowTextarea || __deps.AutoGrowTextarea;
   const sanitizeText = __deps.sanitizeText;
   const extractFirstUrl = __deps.extractFirstUrl;
 
@@ -2479,22 +2480,35 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       onClick: e => e.stopPropagation(),
       style: { marginTop: '8px' }
     },
-      /*#__PURE__*/React.createElement("input", {
+      AutoGrowTextarea && /*#__PURE__*/React.createElement(AutoGrowTextarea, {
         className: "comment-composer-input",
-        type: "text",
         value: commentText,
         onChange: e => setCommentText(e.target.value),
         onClick: e => e.stopPropagation(),
         onKeyDown: e => {
           e.stopPropagation();
-          if (e.key === 'Enter') {
+          // Allow Enter for newlines; Cmd/Ctrl+Enter saves (matches chat composer).
+          if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
             if (e.nativeEvent && e.nativeEvent.isComposing) return;
             e.preventDefault();
             handleSaveComment(e);
           }
         },
         placeholder: "댓글을 입력하세요...",
-        style: { width: '100%', height: '30px', fontSize: 'var(--font-size-md)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', padding: '0 8px', backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)', outline: 'none', boxSizing: 'border-box' }
+        rows: 1,
+        minHeight: 30,
+        maxHeight: 200,
+        style: {
+          width: '100%',
+          fontSize: '0.8rem',
+          border: '1px solid var(--border-subtle)',
+          borderRadius: 'var(--radius-sm)',
+          padding: '6px 8px',
+          backgroundColor: '#fff',
+          color: 'var(--text-main)',
+          outline: 'none',
+          boxSizing: 'border-box'
+        }
       }),
       /*#__PURE__*/React.createElement("div", { className: "comment-composer-footer" },
         /*#__PURE__*/React.createElement(ParticipantPickerButton, {

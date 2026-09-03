@@ -934,9 +934,13 @@ export function AutoGrowTextarea({
       resize: 'none',
       overflow: 'hidden',
       boxSizing: 'border-box',
+      width: '100%',
       minHeight: typeof minHeight === 'number' ? `${minHeight}px` : minHeight,
       fontFamily: 'inherit',
-      lineHeight: 1.45
+      lineHeight: 1.45,
+      whiteSpace: 'pre-wrap',
+      wordBreak: 'break-word',
+      overflowWrap: 'anywhere'
     }, style || {})
   }, rest));
 }
