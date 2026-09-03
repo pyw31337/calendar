@@ -3392,6 +3392,11 @@ select.form-select {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   flex-shrink: 0;
 }
+
+/* Extra breathing room under fixed 누적/월별 tabs (settlement page). */
+.settlement-page-body > .settlement-metric-grid {
+  margin-top: 12px;
+}
 .settlement-metric-card {
   display: flex;
   flex-direction: column;
@@ -4659,6 +4664,13 @@ select.form-select {
 }
 .gallery-page-container .gallery-page-tabs {
   border-top: none;
+}
+.gallery-page-container .gallery-page-tabs,
+.gallery-page-container .gallery-page-tabs-mobile {
+  background-color: var(--bg-card) !important;
+}
+.gallery-page-container .gallery-page-scroll {
+  background-color: var(--bg-primary);
 }
 
 

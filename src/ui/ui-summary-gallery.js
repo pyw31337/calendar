@@ -1735,7 +1735,8 @@ export function HistoryView({
   showSettlement = true, onOpenCreateSettlement,
   isDarkTheme, onToggleTheme, fontScalePercent, onDecreaseFont, onIncreaseFont,
   isChatNotifyEnabled, onToggleChatNotifications, syncStatus = null,
-  anniversaries = [], onRegisterCultureEvent, onUnregisterCultureEvent
+  anniversaries = [], onRegisterCultureEvent, onUnregisterCultureEvent,
+  customCultureItems = [], onSaveCustomCultureItem = null, showToast = null
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -1762,6 +1763,7 @@ export function HistoryView({
   const [regionSido, setRegionSido] = React.useState('');
   const [regionGugun, setRegionGugun] = React.useState('');
   const [isRegionFilterOpen, setIsRegionFilterOpen] = React.useState(false);
+  const [isContentRegisterOpen, setIsContentRegisterOpen] = React.useState(false);
   const applyRegionFilter = (sido, gugun) => { setRegionSido(sido); setRegionGugun(gugun); };
 
   const activeParticipants = getActiveParticipants(calendar);
@@ -1823,7 +1825,7 @@ export function HistoryView({
       }, calendar.title, " 보관함"),
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
         /*#__PURE__*/React.createElement("button", {
-          type: "button", onClick: () => setIsSearchOpen(v => !v), title: "모임 검색", "aria-label": "모임 검색",
+          type: "button", onClick: () => setIsSearchOpen(v => !v), title: "보관함 검색", "aria-label": "보관함 검색",
           style: { background: 'none', border: 'none', cursor: 'pointer', padding: '6px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }
         }, SearchIcon ? /*#__PURE__*/React.createElement(SearchIcon, null) : "🔍"),
         /*#__PURE__*/React.createElement("button", {
@@ -1871,11 +1873,15 @@ export function HistoryView({
     }),
     historyTab === 'culture' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
       calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent, dataUrl: CULTURE_PERFORMANCES_URL,
-      emptyLabel: "상영중이거나 예정된 문화공연이 없습니다.", regionSido, regionGugun
+      emptyLabel: "상영중이거나 예정된 문화공연이 없습니다.", regionSido, regionGugun,
+      anniversaryCategory: "event",
+      extraItems: (customCultureItems || []).filter(i => i && i.kind === 'performance')
     }),
     historyTab === 'festival' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
       calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent, dataUrl: CULTURE_FESTIVALS_URL,
-      emptyLabel: "진행중이거나 예정된 지역축제가 없습니다.", regionSido, regionGugun
+      emptyLabel: "진행중이거나 예정된 지역축제가 없습니다.", regionSido, regionGugun,
+      anniversaryCategory: "festival",
+      extraItems: (customCultureItems || []).filter(i => i && i.kind === 'festival')
     }),
     historyTab === 'meetings' && /*#__PURE__*/React.createElement("div", {
       className: "history-meetings-grid",
@@ -1991,8 +1997,27 @@ export function HistoryView({
         },
           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, SearchIcon ? /*#__PURE__*/React.createElement(SearchIcon, null) : "🔍"),
           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "모임 검색"),
-            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "확정된 모임 날짜·장소 검색")
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "보관함 검색"),
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "보관함 날짜·공연·축제 검색")
+          )
+        ),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", className: "admin-side-menu-item",
+          onClick: () => { setIsMenuOpen(false); setIsContentRegisterOpen(true); }
+        },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" },
+            /*#__PURE__*/React.createElement("svg", {
+              xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24",
+              fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true"
+            },
+              /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "12", r: "10" }),
+              /*#__PURE__*/React.createElement("path", { d: "M12 8v8" }),
+              /*#__PURE__*/React.createElement("path", { d: "M8 12h8" })
+            )
+          ),
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "컨텐츠 등록"),
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "문화공연·지역축제 직접 등록")
           )
         )
       ),
@@ -2018,7 +2043,12 @@ export function HistoryView({
         onOpenShare: onOpenShare,
         onOpenSettings: onOpenAppSettings
       })
-    ))
+    )),
+    isContentRegisterOpen && /*#__PURE__*/React.createElement(ContentRegisterModal, {
+      onClose: () => setIsContentRegisterOpen(false),
+      onSave: onSaveCustomCultureItem,
+      showToast: showToast
+    })
   );
 }
 
@@ -2154,13 +2184,209 @@ export function RegionFilterBackdrop({ isOpen, onClose, sido, gugun, onApply }) 
   return typeof document !== 'undefined' && ReactDOM.createPortal ? ReactDOM.createPortal(sheet, document.body) : sheet;
 }
 
+function formatCultureDateLabel(startDate, endDate) {
+  const fmt = (s) => {
+    if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return '';
+    const [y, m, d] = s.split('-');
+    return `${y}.${m}.${d}`;
+  };
+  const a = fmt(startDate);
+  const b = fmt(endDate || startDate);
+  if (!a) return '';
+  return a === b ? a : `${a} ~ ${b}`;
+}
+
+// Layer popup for manually registering 문화공연 / 지역축제 items into the archive tabs.
+// Portaled to document.body (same pattern as CulturePerformancesTab's detail sheet) so it sits
+// above the side menu / page chrome. Persists via onSave → app-main customCultureItems write.
+function ContentRegisterModal({ onClose, onSave, showToast = null }) {
+  const React = window.React;
+  const ReactDOM = window.ReactDOM;
+  const __deps = window.GATHER_UI_DEPS || {};
+  const __comp = window.GATHER_UI_COMPONENTS || {};
+  const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
+  const UnderlineTabs = __comp.UnderlineTabs || __deps.UnderlineTabs;
+
+  const [kind, setKind] = React.useState('performance'); // 'performance' | 'festival'
+  const [title, setTitle] = React.useState('');
+  const [startDate, setStartDate] = React.useState('');
+  const [endDate, setEndDate] = React.useState('');
+  const [venue, setVenue] = React.useState('');
+  const [address, setAddress] = React.useState('');
+  const [link, setLink] = React.useState('');
+  const [description, setDescription] = React.useState('');
+  const [image, setImage] = React.useState('');
+  const [price, setPrice] = React.useState('');
+  const [contact, setContact] = React.useState('');
+  const [saving, setSaving] = React.useState(false);
+
+  const handleSave = async () => {
+    const cleanTitle = (title || '').trim();
+    const cleanStart = (startDate || '').trim();
+    if (!cleanTitle) {
+      if (typeof showToast === 'function') showToast('제목을 입력해 주세요.', 'error');
+      return;
+    }
+    if (!cleanStart || !/^\d{4}-\d{2}-\d{2}$/.test(cleanStart)) {
+      if (typeof showToast === 'function') showToast('시작일을 YYYY-MM-DD 형식으로 입력해 주세요.', 'error');
+      return;
+    }
+    const cleanEnd = ((endDate || '').trim() || cleanStart);
+    if (cleanEnd && !/^\d{4}-\d{2}-\d{2}$/.test(cleanEnd)) {
+      if (typeof showToast === 'function') showToast('종료일을 YYYY-MM-DD 형식으로 입력해 주세요.', 'error');
+      return;
+    }
+    if (typeof onSave !== 'function') {
+      if (typeof showToast === 'function') showToast('저장 기능을 사용할 수 없습니다.', 'error');
+      return;
+    }
+    const stamp = Date.now();
+    const prefix = kind === 'festival' ? 'custom_fest_' : 'custom_perf_';
+    const id = prefix + stamp + '_' + Math.random().toString(36).slice(2, 8);
+    const item = {
+      id,
+      title: cleanTitle,
+      startDate: cleanStart,
+      endDate: cleanEnd,
+      dateLabel: formatCultureDateLabel(cleanStart, cleanEnd),
+      venue: (venue || '').trim(),
+      address: (address || '').trim(),
+      link: (link || '').trim(),
+      description: (description || '').trim(),
+      image: (image || '').trim(),
+      price: (price || '').trim(),
+      contact: (contact || '').trim(),
+      source: 'custom',
+      kind: kind === 'festival' ? 'festival' : 'performance',
+      createdAt: stamp,
+      updatedAt: stamp
+    };
+    // Drop empty optional strings so Firestore never sees unnecessary keys (and to keep card
+    // rendering identical to crawled items that omit missing fields).
+    Object.keys(item).forEach(k => {
+      if (item[k] === '' || item[k] == null) delete item[k];
+    });
+    // Re-assert required fields after the empty-key sweep.
+    item.id = id;
+    item.title = cleanTitle;
+    item.startDate = cleanStart;
+    item.endDate = cleanEnd;
+    item.source = 'custom';
+    item.kind = kind === 'festival' ? 'festival' : 'performance';
+    item.createdAt = stamp;
+    item.updatedAt = stamp;
+    if (!item.dateLabel) item.dateLabel = formatCultureDateLabel(cleanStart, cleanEnd);
+
+    setSaving(true);
+    try {
+      const ok = await onSave(item);
+      if (ok) onClose && onClose();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const field = (label, el) => /*#__PURE__*/React.createElement("label", {
+    style: { display: 'flex', flexDirection: 'column', gap: '6px', fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--text-main)' }
+  }, label, el);
+
+  if (typeof document === 'undefined' || !ReactDOM) return null;
+  return ReactDOM.createPortal(
+    /*#__PURE__*/React.createElement("div", {
+      onClick: () => !saving && onClose && onClose(),
+      style: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 14000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }
+    },
+      /*#__PURE__*/React.createElement("div", {
+        onClick: e => e.stopPropagation(),
+        role: "dialog",
+        "aria-label": "컨텐츠 등록",
+        style: {
+          width: '100%', maxWidth: '480px', maxHeight: '90vh', overflowY: 'auto',
+          backgroundColor: 'var(--bg-card)', borderRadius: '16px 16px 0 0', padding: '16px 16px 20px',
+          display: 'flex', flexDirection: 'column', gap: '12px', boxSizing: 'border-box'
+        }
+      },
+        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' } },
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)' } }, "컨텐츠 등록"),
+          /*#__PURE__*/React.createElement("button", {
+            type: "button", onClick: () => !saving && onClose && onClose(), "aria-label": "닫기",
+            style: { background: 'none', border: 'none', cursor: 'pointer', padding: '6px', color: 'var(--text-muted)', display: 'flex' }
+          }, SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }) : "✕")
+        ),
+        UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
+          ariaLabel: "컨텐츠 종류",
+          value: kind,
+          onChange: v => setKind(v),
+          style: { backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)' },
+          options: [
+            { value: 'performance', label: '문화공연' },
+            { value: 'festival', label: '지역축제' }
+          ]
+        }),
+        field("제목 *", /*#__PURE__*/React.createElement("input", {
+          className: "form-input", type: "text", value: title, onChange: e => setTitle(e.target.value),
+          placeholder: kind === 'festival' ? "축제 이름" : "공연 제목", maxLength: 120
+        })),
+        /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' } },
+          field("시작일 *", /*#__PURE__*/React.createElement("input", {
+            className: "form-input", type: "date", value: startDate, onChange: e => setStartDate(e.target.value)
+          })),
+          field("종료일", /*#__PURE__*/React.createElement("input", {
+            className: "form-input", type: "date", value: endDate, onChange: e => setEndDate(e.target.value)
+          }))
+        ),
+        field(kind === 'festival' ? "장소" : "공연장", /*#__PURE__*/React.createElement("input", {
+          className: "form-input", type: "text", value: venue, onChange: e => setVenue(e.target.value),
+          placeholder: "장소 / 공연장", maxLength: 120
+        })),
+        field("주소", /*#__PURE__*/React.createElement("input", {
+          className: "form-input", type: "text", value: address, onChange: e => setAddress(e.target.value),
+          placeholder: "주소", maxLength: 200
+        })),
+        field("링크 / URL", /*#__PURE__*/React.createElement("input", {
+          className: "form-input", type: "url", value: link, onChange: e => setLink(e.target.value),
+          placeholder: "https://", maxLength: 500
+        })),
+        field("이미지 URL (선택)", /*#__PURE__*/React.createElement("input", {
+          className: "form-input", type: "url", value: image, onChange: e => setImage(e.target.value),
+          placeholder: "https://", maxLength: 500
+        })),
+        /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' } },
+          field("가격 / 요금", /*#__PURE__*/React.createElement("input", {
+            className: "form-input", type: "text", value: price, onChange: e => setPrice(e.target.value),
+            placeholder: "예: 무료 / 20,000원", maxLength: 80
+          })),
+          field("문의", /*#__PURE__*/React.createElement("input", {
+            className: "form-input", type: "text", value: contact, onChange: e => setContact(e.target.value),
+            placeholder: "연락처 / 문의처", maxLength: 120
+          }))
+        ),
+        field("설명", /*#__PURE__*/React.createElement("textarea", {
+          className: "form-input", value: description, onChange: e => setDescription(e.target.value),
+          placeholder: "간단한 설명", rows: 3, maxLength: 2000,
+          style: { resize: 'vertical', minHeight: '72px' }
+        })),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", className: "btn btn-primary", disabled: saving, onClick: handleSave,
+          style: { width: '100%', marginTop: '4px', opacity: saving ? 0.7 : 1 }
+        }, saving ? "저장 중..." : "저장"),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", onClick: () => !saving && onClose && onClose(),
+          style: { padding: '8px', border: 'none', background: 'none', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', cursor: 'pointer' }
+        }, "취소")
+      )
+    ),
+    document.body
+  );
+}
+
 // 히스토리(보관함) 페이지의 '문화공연'/'지역축제' 탭 -- 둘 다 이 컴포넌트 하나를 dataUrl만 바꿔
 // 재사용한다 (문화공연은 culture-performances.json, 지역축제는 culture-festivals.json). 둘 다
 // scripts/sync-culture-performances.mjs가 매일 커밋하는 이 리포 소유의 정적 스냅샷을 fetch해서
 // 상영중/예정 목록을 보여준다. Culture Flow(별개 프로젝트)의 실시간 JSON을 직접 fetch하지 않는
 // 이유는 그 프로젝트의 스키마가 바뀌거나 그날 수집이 실패해도 이 탭이 즉시 깨지지 않게 하기
 // 위함 -- 동기화 스크립트가 검증에 실패하면 최근 정상 스냅샷을 그대로 커밋해 유지한다.
-export function CulturePerformancesTab({ calendar, anniversaries = [], onRegisterCultureEvent, onUnregisterCultureEvent, dataUrl = CULTURE_PERFORMANCES_URL, emptyLabel = "상영중이거나 예정된 문화공연이 없습니다.", regionSido = '', regionGugun = '' }) {
+export function CulturePerformancesTab({ calendar, anniversaries = [], onRegisterCultureEvent, onUnregisterCultureEvent, dataUrl = CULTURE_PERFORMANCES_URL, emptyLabel = "상영중이거나 예정된 문화공연이 없습니다.", regionSido = '', regionGugun = '', anniversaryCategory = 'event', extraItems = [] }) {
   const React = window.React;
   const ReactDOM = window.ReactDOM;
   const [items, setItems] = React.useState(null); // null = loading, [] = loaded-empty
@@ -2198,20 +2424,32 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
       if (existing) {
         if (typeof onUnregisterCultureEvent === 'function') await onUnregisterCultureEvent(existing.id);
       } else {
-        if (typeof onRegisterCultureEvent === 'function') await onRegisterCultureEvent(item);
+        const category = anniversaryCategory === 'festival' ? 'festival' : 'event';
+        if (typeof onRegisterCultureEvent === 'function') await onRegisterCultureEvent({ ...item, anniversaryCategory: category }, { category });
       }
     } finally {
       setPendingId(null);
     }
   };
 
-  if (items === null) {
+  // Merge calendar-owned custom items (컨텐츠 등록) ahead of the crawled snapshot. Custom ids
+  // use custom_perf_/custom_fest_ prefixes so they never collide with crawled perf_/fest_ ids,
+  // but still de-dupe by id in case a write echoes twice.
+  const mergedItems = React.useMemo(() => {
+    if (items === null) return null;
+    const extras = Array.isArray(extraItems) ? extraItems.filter(Boolean) : [];
+    const seen = new Set(extras.map(e => e && e.id).filter(Boolean));
+    const crawled = (items || []).filter(i => i && i.id && !seen.has(i.id));
+    return [...extras, ...crawled];
+  }, [items, extraItems]);
+
+  if (mergedItems === null) {
     return /*#__PURE__*/React.createElement("div", {
       style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)' }
     }, "불러오는 중...");
   }
 
-  if (items.length === 0) {
+  if (mergedItems.length === 0) {
     return /*#__PURE__*/React.createElement("div", {
       style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)' }
     }, loadError ? "정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요." : emptyLabel);
@@ -2221,7 +2459,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
   // no separate 군/구 field in the snapshot, so match it against the first two space-separated
   // tokens of the item's own address string (Korean addresses always lead with "시/도 시/군/구
   // ...", so the second token is exactly the district name these buttons list).
-  const filteredItems = items.filter(item => {
+  const filteredItems = mergedItems.filter(item => {
     if (regionSido && item.region !== regionSido) return false;
     if (regionGugun) {
       const addressTokens = String(item.address || item.venue || '').trim().split(/\s+/);
@@ -2342,15 +2580,15 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
               disabled: !!pendingId,
               onChange: () => handleToggleRegister(selected)
             }),
-            "캘린더에 일정 추가하기 (행사)"
+            "캘린더와 연동"
           ),
-          /*#__PURE__*/React.createElement("a", {
+          selected.link && /*#__PURE__*/React.createElement("a", {
             href: selected.link, target: "_blank", rel: "noreferrer",
             style: {
               display: 'block', textAlign: 'center', padding: '10px', borderRadius: 'var(--radius-md)',
               backgroundColor: '#7C3AED', color: '#fff', fontWeight: 800, fontSize: 'var(--font-size-md)', textDecoration: 'none'
             }
-          }, "문화포털에서 상세보기 (새 창)"),
+          }, selected.source === 'custom' ? "링크 열기 (새 창)" : "문화포털에서 상세보기 (새 창)"),
           /*#__PURE__*/React.createElement("button", {
             type: "button", onClick: () => setSelected(null),
             style: { padding: '8px', border: 'none', background: 'none', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', cursor: 'pointer' }
@@ -2374,6 +2612,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
     SummaryList: SummaryList,
     HistoryView: HistoryView,
     CulturePerformancesTab: CulturePerformancesTab,
+    ContentRegisterModal: ContentRegisterModal,
     RegionFilterBackdrop: RegionFilterBackdrop,
   });
 }

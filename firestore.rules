@@ -259,6 +259,23 @@ service cloud.firestore {
         allow delete: if isCalendarDoc(calendarDocId);
       }
 
+      // User-registered culture/festival archive cards (보관함 > 컨텐츠 등록). Merged into the
+      // crawled culture-performances / culture-festivals snapshots client-side. Same loose
+      // size-capped shape style as memos/anniversaries -- fields grow with form polish.
+      function hasValidCustomCultureItemShape(data) {
+        return (!('id' in data) || (data.id is string && data.id.size() <= 200))
+          && (!('title' in data) || (data.title is string && data.title.size() <= 200))
+          && (!('startDate' in data) || (data.startDate is string && data.startDate.size() <= 20))
+          && (!('endDate' in data) || (data.endDate is string && data.endDate.size() <= 20))
+          && (!('kind' in data) || (data.kind is string && data.kind.size() <= 40))
+          && (!('description' in data) || (data.description is string && data.description.size() <= 4000));
+      }
+      match /customCultureItems/{itemId} {
+        allow read: if isCalendarDoc(calendarDocId);
+        allow create, update: if isCalendarDoc(calendarDocId) && hasValidCustomCultureItemShape(request.resource.data);
+        allow delete: if isCalendarDoc(calendarDocId);
+      }
+
       // Registered places (장소 지도). Migrated out of the calendar document's embedded `places`
       // array for the same reason activityLogs was (see below): an unbounded-growth array on the
       // calendar doc gets re-downloaded on every single realtime update to that doc, for every
