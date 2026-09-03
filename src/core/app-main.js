@@ -482,6 +482,7 @@ import {
   invalidateGalleryItemCount,
   fetchMemosRest,
   fetchAnniversariesRest,
+  fetchCustomCultureItemsRest,
   sendChatMessageRest,
   writeCollectionDocumentWithFallback,
   writeRootCollectionDocumentWithFallback,
@@ -1393,6 +1394,7 @@ function CalendarApp() {
     return () => { isMounted = false; };
   }, [activeCalId, firebaseDb, firebaseConnectionVersion]);
   const [anniversaries, setAnniversaries] = React.useState([]);
+  const [customCultureItems, setCustomCultureItems] = React.useState([]);
   // Live subcollection state for places/confirmedMeeting (see unionPlaces/unionConfirmedMeetings
   // and the effect below) -- unlike activityLogs (only fetched on-demand for the recovery UI),
   // these two feed many always-visible surfaces (calendar grid badges, summary banners, place
@@ -2353,8 +2355,10 @@ function CalendarApp() {
   }, [activeCalId, activeView, chatLiveLimit, firebaseDb, CHAT_INITIAL_MESSAGE_LIMIT]);
 
   // Anniversaries: full collection (no orderBy) + client sort so docs without createdAt still show.
+  // Also active on history (보관함) so culture/festival "캘린더와 연동" checkboxes can resolve
+  // cultureSourceId matches without requiring a prior visit to the calendar view this session.
   React.useEffect(() => {
-    if (!activeCalId || activeView !== 'calendar') return;
+    if (!activeCalId || (activeView !== 'calendar' && activeView !== 'history')) return;
     let isMounted = true;
     const sortAnns = list => {
       const arr = Array.isArray(list) ? list.slice() : [];
@@ -2413,17 +2417,21 @@ function CalendarApp() {
   // venue/link) is already complete and doesn't need a form. cultureSourceId lets the checkbox
   // find its own registered anniversary again (to show checked, or to unregister) without the
   // culture item and the anniversary doc needing the same id.
-  const handleRegisterCultureEvent = async (item) => {
+  const handleRegisterCultureEvent = async (item, options = {}) => {
     if (!activeCal?.id || !item?.id || !item?.title) return null;
     const stamp = Date.now();
     const anniversaryId = 'anniversary_culture_' + stamp + '_' + Math.random().toString(36).slice(2, 8);
     const startDate = item.startDate || item.endDate;
     if (!startDate) { showToast('공연 기간 정보가 없어 등록할 수 없습니다.', 'error'); return null; }
+    // 문화공연 tab → event(행사), 지역축제 tab → festival(축제). Prefer explicit options.category,
+    // then item.anniversaryCategory / item.kind from the register checkbox path.
+    const rawCategory = (options && options.category) || item.anniversaryCategory || (item.kind === 'festival' ? 'festival' : 'event');
+    const category = rawCategory === 'festival' ? 'festival' : 'event';
     const annData = {
       id: anniversaryId,
       calendarId: activeCal.id,
       title: item.title,
-      category: 'event',
+      category,
       type: 'range',
       startDate,
       endDate: item.endDate || startDate,
@@ -2459,6 +2467,52 @@ function CalendarApp() {
     } catch (err) {
       console.error('Failed to unregister culture event anniversary:', err);
       showToast('취소 실패', 'error');
+    }
+  };
+
+  // 보관함 > 컨텐츠 등록: calendar-owned custom culture/festival cards merged into the
+  // CulturePerformancesTab lists alongside crawled JSON snapshots.
+  React.useEffect(() => {
+    if (!activeCalId || activeView !== 'history') return;
+    let isMounted = true;
+    const applyList = (list) => {
+      if (!isMounted) return;
+      const arr = Array.isArray(list) ? list.slice() : [];
+      arr.sort((a, b) => (Number(b.createdAt) || Number(b.updatedAt) || 0) - (Number(a.createdAt) || Number(a.updatedAt) || 0));
+      setCustomCultureItems(arr);
+    };
+    if (!firebaseDb) {
+      fetchCustomCultureItemsRest(activeCalId).then(list => applyList(list)).catch(() => applyList([]));
+      return () => { isMounted = false; };
+    }
+    const unsub = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('customCultureItems')
+      .onSnapshot(snapshot => {
+        const list = [];
+        snapshot.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
+        applyList(list);
+      }, err => {
+        console.warn('Firestore customCultureItems subscription error:', err);
+        fetchCustomCultureItemsRest(activeCalId).then(list => applyList(list)).catch(() => applyList([]));
+      });
+    return () => { isMounted = false; unsub(); };
+  }, [activeCalId, activeView, firebaseDb, firebaseConnectionVersion]);
+
+  const handleSaveCustomCultureItem = async (item) => {
+    if (!activeCal?.id || !item?.id || !item?.title) return false;
+    try {
+      const saved = await writeCollectionDocumentWithFallback('customCultureItems', activeCal.id, item.id, item, 'set', '컨텐츠 등록');
+      if (!saved?.success) throw new Error('Custom culture item save failed');
+      setCustomCultureItems(prev => {
+        const list = Array.isArray(prev) ? prev.filter(x => x && x.id !== item.id) : [];
+        list.unshift(item);
+        return list;
+      });
+      showToast('컨텐츠가 등록되었습니다.', 'success');
+      return true;
+    } catch (err) {
+      console.error('Failed to save custom culture item:', err);
+      showToast('컨텐츠 등록 실패', 'error');
+      return false;
     }
   };
 
@@ -6918,6 +6972,9 @@ function CalendarApp() {
         anniversaries: anniversaries,
         onRegisterCultureEvent: handleRegisterCultureEvent,
         onUnregisterCultureEvent: handleUnregisterCultureEvent,
+        customCultureItems: customCultureItems,
+        onSaveCustomCultureItem: handleSaveCustomCultureItem,
+        showToast: showToast,
         ...navMenuProps
       }),
       isHistoryShareOpen && activeCal && /*#__PURE__*/React.createElement(ShareModal, {
