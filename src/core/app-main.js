@@ -2400,6 +2400,61 @@ function CalendarApp() {
     setAnniversaries(prev => (Array.isArray(prev) ? prev.filter(a => a.id !== annId) : []));
   };
 
+  // 히스토리 > 문화공연 탭의 "캘린더에 일정 추가" 체크박스가 직접 호출하는 write path -- reuses
+  // the exact same anniversaries write shape AnniversaryModal's own handleSaveAnniversary uses
+  // (ui-event-modals.js) rather than opening that modal, since the source data (title/period/
+  // venue/link) is already complete and doesn't need a form. cultureSourceId lets the checkbox
+  // find its own registered anniversary again (to show checked, or to unregister) without the
+  // culture item and the anniversary doc needing the same id.
+  const handleRegisterCultureEvent = async (item) => {
+    if (!activeCal?.id || !item?.id || !item?.title) return null;
+    const stamp = Date.now();
+    const anniversaryId = 'anniversary_culture_' + stamp + '_' + Math.random().toString(36).slice(2, 8);
+    const startDate = item.startDate || item.endDate;
+    if (!startDate) { showToast('공연 기간 정보가 없어 등록할 수 없습니다.', 'error'); return null; }
+    const annData = {
+      id: anniversaryId,
+      calendarId: activeCal.id,
+      title: item.title,
+      category: 'event',
+      type: 'range',
+      startDate,
+      endDate: item.endDate || startDate,
+      cultureSourceId: item.id,
+      createdAt: stamp,
+      updatedAt: stamp
+    };
+    // Conditionally-added, not `field: value || undefined` -- Firestore's set() rejects a literal
+    // undefined property value outright, so an always-present key here would throw on exactly the
+    // items missing that field (same pattern AnniversaryModal's own handleSaveAnniversary uses).
+    const descriptionText = [item.venue, item.address].filter(Boolean).join(' · ');
+    if (descriptionText) annData.description = descriptionText;
+    if (item.link) annData.cultureSourceLink = item.link;
+    try {
+      const saved = await writeCollectionDocumentWithFallback('anniversaries', activeCal.id, anniversaryId, annData, 'set', '문화공연 캘린더 등록');
+      if (!saved?.success) throw new Error('Culture event anniversary save failed');
+      handleAnniversarySaved(annData);
+      showToast('캘린더에 등록되었습니다.', 'success');
+      return anniversaryId;
+    } catch (err) {
+      console.error('Failed to register culture event as anniversary:', err);
+      showToast('등록 실패', 'error');
+      return null;
+    }
+  };
+  const handleUnregisterCultureEvent = async (anniversaryId) => {
+    if (!activeCal?.id || !anniversaryId) return;
+    try {
+      const deleted = await writeCollectionDocumentWithFallback('anniversaries', activeCal.id, anniversaryId, null, 'delete', '문화공연 캘린더 등록 취소');
+      if (!deleted?.success) throw new Error('Culture event anniversary delete failed');
+      handleAnniversaryDeleted(anniversaryId);
+      showToast('등록이 취소되었습니다.', 'success');
+    } catch (err) {
+      console.error('Failed to unregister culture event anniversary:', err);
+      showToast('취소 실패', 'error');
+    }
+  };
+
   // Places + confirmed meetings: calendar / places / settlement / history only
   React.useEffect(() => {
     const needsPlacesData = activeView === 'calendar' || activeView === 'places' || activeView === 'settlement' || activeView === 'history';
@@ -6806,6 +6861,9 @@ function CalendarApp() {
         onToggleChatNotifications: handleMainToggleNotifications,
         onOpenAppSettings: () => setIsAppSettingsOpen(true),
         syncStatus: syncStatus,
+        anniversaries: anniversaries,
+        onRegisterCultureEvent: handleRegisterCultureEvent,
+        onUnregisterCultureEvent: handleUnregisterCultureEvent,
         ...navMenuProps
       }),
       sharedAppOverlays

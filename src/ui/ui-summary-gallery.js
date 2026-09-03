@@ -1736,7 +1736,8 @@ export function HistoryView({
   chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null,
   showSettlement = true, onOpenCreateSettlement,
   isDarkTheme, onToggleTheme, fontScalePercent, onDecreaseFont, onIncreaseFont,
-  isChatNotifyEnabled, onToggleChatNotifications, syncStatus = null
+  isChatNotifyEnabled, onToggleChatNotifications, syncStatus = null,
+  anniversaries = [], onRegisterCultureEvent, onUnregisterCultureEvent
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -1755,6 +1756,7 @@ export function HistoryView({
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState('');
+  const [historyTab, setHistoryTab] = React.useState('meetings');
 
   const activeParticipants = getActiveParticipants(calendar);
   const participantsMap = activeParticipants.reduce((acc, p) => { acc[p.id] = p; return acc; }, {});
@@ -1834,6 +1836,26 @@ export function HistoryView({
       }, "초기화") : null
     }),
     /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)', flexShrink: 0 }
+    },
+      [{ id: 'meetings', label: '지난 모임' }, { id: 'culture', label: '문화공연' }].map(tab =>
+        /*#__PURE__*/React.createElement("button", {
+          key: tab.id,
+          type: "button",
+          onClick: () => setHistoryTab(tab.id),
+          style: {
+            flex: 1, padding: '12px 0', background: 'none', border: 'none', cursor: 'pointer',
+            fontSize: 'var(--font-size-md)', fontWeight: 800,
+            color: historyTab === tab.id ? '#7C3AED' : 'var(--text-muted)',
+            borderBottom: historyTab === tab.id ? '2px solid #7C3AED' : '2px solid transparent'
+          }
+        }, tab.label)
+      )
+    ),
+    historyTab === 'culture' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
+      calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent
+    }),
+    historyTab === 'meetings' && /*#__PURE__*/React.createElement("div", {
       style: { flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }
     },
       confirmedDates.length === 0 ? /*#__PURE__*/React.createElement("div", {
@@ -1976,6 +1998,184 @@ export function HistoryView({
   );
 }
 
+const CULTURE_PERFORMANCES_URL = `${(typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.BASE_URL) || '/'}data/culture-performances.json`;
+const CULTURE_MISSING_LABEL = '정보없음';
+const culturePerf = value => (value && String(value).trim()) || CULTURE_MISSING_LABEL;
+
+// 히스토리 페이지 '문화공연' 탭 -- scripts/sync-culture-performances.mjs가 매일 커밋하는 이
+// 리포 소유의 정적 스냅샷(public-vite/data/culture-performances.json)을 fetch해서 상영중/예정작
+// 목록을 보여준다. Culture Flow(별개 프로젝트)의 실시간 JSON을 직접 fetch하지 않는 이유는 그
+// 프로젝트의 스키마가 바뀌거나 그날 수집이 실패해도 이 탭이 즉시 깨지지 않게 하기 위함 -- 동기화
+// 스크립트가 검증에 실패하면 최근 정상 스냅샷을 그대로 커밋해 유지한다.
+export function CulturePerformancesTab({ calendar, anniversaries = [], onRegisterCultureEvent, onUnregisterCultureEvent }) {
+  const React = window.React;
+  const ReactDOM = window.ReactDOM;
+  const [items, setItems] = React.useState(null); // null = loading, [] = loaded-empty
+  const [loadError, setLoadError] = React.useState(false);
+  const [selected, setSelected] = React.useState(null);
+  const [pendingId, setPendingId] = React.useState(null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    fetch(CULTURE_PERFORMANCES_URL)
+      .then(res => { if (!res.ok) throw new Error(`status ${res.status}`); return res.json(); })
+      .then(data => {
+        if (cancelled) return;
+        setItems(Array.isArray(data?.items) ? data.items : []);
+      })
+      .catch(err => {
+        console.warn('Culture performances snapshot load failed:', err);
+        if (!cancelled) { setItems([]); setLoadError(true); }
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  // A registered item's own anniversary doc (cultureSourceId set by handleRegisterCultureEvent
+  // in app-main.js), or null if this item hasn't been added to the calendar yet.
+  const findRegisteredAnniversary = itemId =>
+    (anniversaries || []).find(a => a?.cultureSourceId === itemId) || null;
+
+  const handleToggleRegister = async (item) => {
+    if (!item || pendingId) return;
+    setPendingId(item.id);
+    try {
+      const existing = findRegisteredAnniversary(item.id);
+      if (existing) {
+        if (typeof onUnregisterCultureEvent === 'function') await onUnregisterCultureEvent(existing.id);
+      } else {
+        if (typeof onRegisterCultureEvent === 'function') await onRegisterCultureEvent(item);
+      }
+    } finally {
+      setPendingId(null);
+    }
+  };
+
+  if (items === null) {
+    return /*#__PURE__*/React.createElement("div", {
+      style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)' }
+    }, "불러오는 중...");
+  }
+
+  if (items.length === 0) {
+    return /*#__PURE__*/React.createElement("div", {
+      style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)' }
+    }, loadError ? "문화공연 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요." : "상영중이거나 예정된 문화공연이 없습니다.");
+  }
+
+  return /*#__PURE__*/React.createElement(React.Fragment, null,
+    /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1, overflowY: 'auto', padding: '16px',
+        display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px', alignContent: 'start'
+      }
+    },
+      items.map(item => {
+        const registered = !!findRegisteredAnniversary(item.id);
+        return /*#__PURE__*/React.createElement("button", {
+          key: item.id,
+          type: "button",
+          onClick: () => setSelected(item),
+          style: {
+            display: 'flex', flexDirection: 'column', gap: '6px', padding: 0,
+            border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)',
+            backgroundColor: 'var(--bg-card)', cursor: 'pointer', textAlign: 'left'
+            // No overflow:hidden here -- this is a CSS Grid item, and per the sizing spec a grid
+            // (or flex) item's *automatic* minimum size resolves to 0 whenever the item itself has
+            // a non-visible overflow, which made every card collapse to ~6px (grid-auto-rows:auto
+            // sizes rows off that same automatic-minimum-size mechanism). Same root cause as the
+            // 히스토리 date-row flex-shrink bug fixed earlier -- see .date-item-btn in app.css --
+            // just tripped via Grid's row auto-sizing instead of Flexbox shrinking. Rounding the
+            // poster's own top corners below achieves the same clipped look without it.
+          }
+        },
+          /*#__PURE__*/React.createElement("div", { style: { position: 'relative', width: '100%', paddingTop: '133%', backgroundColor: 'var(--bg-primary)', flexShrink: 0, borderRadius: 'var(--radius-md) var(--radius-md) 0 0', overflow: 'hidden' } },
+            item.image
+              ? /*#__PURE__*/React.createElement("img", {
+                  src: item.image, alt: item.title, loading: 'lazy', decoding: 'async',
+                  style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' },
+                  onError: e => { e.currentTarget.style.display = 'none'; }
+                })
+              : /*#__PURE__*/React.createElement("div", { style: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' } }, "포스터 없음"),
+            registered && /*#__PURE__*/React.createElement("div", {
+              style: { position: 'absolute', top: '6px', right: '6px', backgroundColor: '#7C3AED', color: '#fff', borderRadius: 'var(--radius-full)', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 800, boxShadow: '0 1px 3px rgba(0,0,0,0.25)' }
+            }, "✓")
+          ),
+          /*#__PURE__*/React.createElement("div", { style: { padding: '8px 10px 10px' } },
+            /*#__PURE__*/React.createElement("div", {
+              style: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--text-main)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', wordBreak: 'break-word' }
+            }, item.title),
+            /*#__PURE__*/React.createElement("div", {
+              style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+            }, item.venue || CULTURE_MISSING_LABEL)
+          )
+        );
+      })
+    ),
+    selected && ReactDOM.createPortal(
+      /*#__PURE__*/React.createElement("div", {
+        onClick: () => setSelected(null),
+        style: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 13000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }
+      },
+        /*#__PURE__*/React.createElement("div", {
+          onClick: e => e.stopPropagation(),
+          style: {
+            width: '100%', maxWidth: '480px', maxHeight: '85vh', overflowY: 'auto',
+            backgroundColor: 'var(--bg-card)', borderRadius: '16px 16px 0 0', padding: '20px',
+            display: 'flex', flexDirection: 'column', gap: '10px'
+          }
+        },
+          selected.image && /*#__PURE__*/React.createElement("img", {
+            src: selected.image, alt: selected.title, loading: 'lazy',
+            style: { width: '100%', maxHeight: '260px', objectFit: 'contain', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)' },
+            onError: e => { e.currentTarget.style.display = 'none'; }
+          }),
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)' } }, selected.title),
+          [
+            ['기간', culturePerf(selected.dateLabel)],
+            ['장소', culturePerf(selected.venue)],
+            ['주소', culturePerf(selected.address)],
+            ['주최', culturePerf(selected.organizer)],
+            ['문의', culturePerf(selected.contact)],
+            ['가격', culturePerf(selected.price)],
+            ['공식 홈페이지', culturePerf(selected.website)]
+          ].map(([label, value]) => /*#__PURE__*/React.createElement("div", {
+            key: label, style: { display: 'flex', gap: '8px', fontSize: 'var(--font-size-sm)' }
+          },
+            /*#__PURE__*/React.createElement("span", { style: { flexShrink: 0, width: '84px', color: 'var(--text-muted)', fontWeight: 700 } }, label),
+            /*#__PURE__*/React.createElement("span", { style: { color: 'var(--text-main)', wordBreak: 'break-word' } }, value)
+          )),
+          selected.description && /*#__PURE__*/React.createElement("div", {
+            style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-main)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', marginTop: '4px', maxHeight: '120px', overflowY: 'auto' }
+          }, selected.description),
+          /*#__PURE__*/React.createElement("label", {
+            style: { display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px', padding: '10px', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)', cursor: pendingId ? 'wait' : 'pointer', fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-main)' }
+          },
+            /*#__PURE__*/React.createElement("input", {
+              type: "checkbox",
+              checked: !!findRegisteredAnniversary(selected.id),
+              disabled: !!pendingId,
+              onChange: () => handleToggleRegister(selected)
+            }),
+            "캘린더에 일정 추가하기 (행사)"
+          ),
+          /*#__PURE__*/React.createElement("a", {
+            href: selected.link, target: "_blank", rel: "noreferrer",
+            style: {
+              display: 'block', textAlign: 'center', padding: '10px', borderRadius: 'var(--radius-md)',
+              backgroundColor: '#7C3AED', color: '#fff', fontWeight: 800, fontSize: 'var(--font-size-md)', textDecoration: 'none'
+            }
+          }, "문화포털에서 상세보기 (새 창)"),
+          /*#__PURE__*/React.createElement("button", {
+            type: "button", onClick: () => setSelected(null),
+            style: { padding: '8px', border: 'none', background: 'none', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', cursor: 'pointer' }
+          }, "닫기")
+        )
+      ),
+      document.body
+    )
+  );
+}
+
   if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
     SectionCountBadge: SectionCountBadge,
@@ -1987,5 +2187,6 @@ export function HistoryView({
     MemoPreviewSection: MemoPreviewSection,
     SummaryList: SummaryList,
     HistoryView: HistoryView,
+    CulturePerformancesTab: CulturePerformancesTab,
   });
 }
