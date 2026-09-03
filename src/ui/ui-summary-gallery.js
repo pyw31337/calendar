@@ -2480,6 +2480,7 @@ function ContentRegisterModal({ onClose, onSave, showToast = null }) {
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
   const UnderlineTabs = __comp.UnderlineTabs || __deps.UnderlineTabs;
+  const AutoGrowTextarea = __comp.AutoGrowTextarea || __deps.AutoGrowTextarea;
   const autoGrowTextarea = __deps.autoGrowTextarea || (window.GATHER_APP_UTILS || {}).autoGrowTextarea || (() => {});
 
   const [kind, setKind] = React.useState('performance'); // 'performance' | 'festival'
@@ -2561,8 +2562,8 @@ function ContentRegisterModal({ onClose, onSave, showToast = null }) {
     }
   };
 
-  const field = (label, el) => /*#__PURE__*/React.createElement("label", {
-    style: { display: 'flex', flexDirection: 'column', gap: '6px', fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--text-main)' }
+  const field = (label, el, extraStyle = null) => /*#__PURE__*/React.createElement("label", {
+    style: Object.assign({ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--text-main)' }, extraStyle || {})
   }, label, el);
 
   if (typeof document === 'undefined' || !ReactDOM) return null;
@@ -2602,13 +2603,15 @@ function ContentRegisterModal({ onClose, onSave, showToast = null }) {
           className: "form-input", type: "text", value: title, onChange: e => setTitle(e.target.value),
           placeholder: kind === 'festival' ? "축제 이름" : "공연 제목", maxLength: 120
         })),
-        /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' } },
+        /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: '10px', width: '100%' } },
           field("시작일 *", /*#__PURE__*/React.createElement("input", {
-            className: "form-input", type: "date", value: startDate, onChange: e => setStartDate(e.target.value)
-          })),
+            className: "form-input", type: "date", value: startDate, onChange: e => setStartDate(e.target.value),
+            style: { width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }
+          }), { minWidth: 0, maxWidth: '100%', overflow: 'hidden' }),
           field("종료일", /*#__PURE__*/React.createElement("input", {
-            className: "form-input", type: "date", value: endDate, onChange: e => setEndDate(e.target.value)
-          }))
+            className: "form-input", type: "date", value: endDate, onChange: e => setEndDate(e.target.value),
+            style: { width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }
+          }), { minWidth: 0, maxWidth: '100%', overflow: 'hidden' })
         ),
         field(kind === 'festival' ? "장소" : "공연장", /*#__PURE__*/React.createElement("input", {
           className: "form-input", type: "text", value: venue, onChange: e => setVenue(e.target.value),
@@ -2636,21 +2639,29 @@ function ContentRegisterModal({ onClose, onSave, showToast = null }) {
             placeholder: "연락처 / 문의처", maxLength: 120
           }))
         ),
-        field("설명", /*#__PURE__*/React.createElement("textarea", {
-          className: "form-input", value: description,
-          onChange: e => { setDescription(e.target.value); autoGrowTextarea(e.target, 240); },
-          onInput: e => autoGrowTextarea(e.target, 240),
-          placeholder: "간단한 설명", rows: 3, maxLength: 2000,
-          style: { resize: 'none', minHeight: '72px', overflow: 'hidden' }
-        })),
+        field("설명", AutoGrowTextarea
+          ? /*#__PURE__*/React.createElement(AutoGrowTextarea, {
+              className: "form-input",
+              value: description,
+              onChange: e => setDescription(e.target.value),
+              placeholder: "간단한 설명",
+              rows: 3,
+              maxLength: 2000,
+              minHeight: 72,
+              maxHeight: 240,
+              style: { width: '100%' }
+            })
+          : /*#__PURE__*/React.createElement("textarea", {
+              className: "form-input", value: description,
+              onChange: e => { setDescription(e.target.value); autoGrowTextarea(e.target, 240); },
+              onInput: e => autoGrowTextarea(e.target, 240),
+              placeholder: "간단한 설명", rows: 3, maxLength: 2000,
+              style: { resize: 'none', minHeight: '72px', overflow: 'hidden', width: '100%' }
+            })),
         /*#__PURE__*/React.createElement("button", {
-          type: "button", className: "btn btn-primary", disabled: saving, onClick: handleSave,
-          style: { width: '100%', marginTop: '4px', opacity: saving ? 0.7 : 1 }
-        }, saving ? "저장 중..." : "저장"),
-        /*#__PURE__*/React.createElement("button", {
-          type: "button", onClick: () => !saving && onClose && onClose(),
-          style: { padding: '8px', border: 'none', background: 'none', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', cursor: 'pointer' }
-        }, "취소")
+          type: "button", className: "btn btn-primary btn-action", disabled: saving, onClick: handleSave,
+          style: { width: '100%', marginTop: '4px', height: '44px', minHeight: '44px', opacity: saving ? 0.7 : 1 }
+        }, saving ? "저장 중..." : "저장")
       )
     ),
     document.body

@@ -860,11 +860,37 @@ export function DateModal({
   const ConfettiIcon = __comp.ConfettiIcon || __deps.ConfettiIcon;
   const TicketsPlaneIcon = __comp.TicketsPlaneIcon || __deps.TicketsPlaneIcon;
   const MessageCircleMoreIcon = __comp.MessageCircleMoreIcon || __deps.MessageCircleMoreIcon;
+  const CookingPotIcon = __comp.CookingPotIcon || __deps.CookingPotIcon;
   const MapPinIcon = __comp.MapPinIcon || __deps.MapPinIcon;
   const CalendarIcon = __comp.CalendarIcon || __deps.CalendarIcon;
+  // 흔들도시락 anniversary: cooking-pot icon + jiggle (title match, not category emoji).
+  const isHeundeulDosirakAnn = (ann) => {
+    const title = String(ann && ann.title != null ? ann.title : '').trim();
+    return title === '흔들도시락' || title.includes('흔들도시락');
+  };
   // Legacy D-Day badges (ann.type === 'dday') keep their plain emoji exactly as before; only the
   // newer category-tagged types (yearly/once/range) swap their category emoji for its icon component.
   const renderAnniversaryIcon = (ann, size) => {
+    if (isHeundeulDosirakAnn(ann)) {
+      const potSize = size;
+      return /*#__PURE__*/React.createElement("span", {
+        className: "ann-cooking-pot-icon-wrap",
+        style: {
+          width: Math.ceil(potSize * 1.5),
+          height: Math.ceil(potSize * 1.5),
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+          overflow: 'visible'
+        },
+        "aria-hidden": "true"
+      }, /*#__PURE__*/React.createElement("span", {
+        className: "ann-cooking-pot-jiggle"
+      }, CookingPotIcon ? /*#__PURE__*/React.createElement(CookingPotIcon, {
+        size: potSize
+      }) : null));
+    }
     if (ann.type === 'dday') return ann.icon;
     const iconMap = { '🎂': CakeIcon, '🎈': BalloonIcon, '🎉': ConfettiIcon, '✈️': TicketsPlaneIcon, '💬': MessageCircleMoreIcon };
     const Icon = iconMap[ann.icon];
@@ -2473,7 +2499,7 @@ export function DateModal({
     onChange: (id) => setActiveTab(id),
     style: { backgroundColor: 'var(--bg-card)', width: '100%' },
     options: [
-      { value: 'participant', label: /*#__PURE__*/React.createElement(React.Fragment, null, "참여자", /*#__PURE__*/React.createElement(SectionCountBadge, { count: dateEntries.length })) },
+      { value: 'participant', label: /*#__PURE__*/React.createElement(React.Fragment, null, "참석", /*#__PURE__*/React.createElement(SectionCountBadge, { count: dateEntries.length })) },
       { value: 'meeting', label: /*#__PURE__*/React.createElement(React.Fragment, null, "장소", /*#__PURE__*/React.createElement(SectionCountBadge, { count: registeredPlaces.length })) },
       { value: 'settlement', label: /*#__PURE__*/React.createElement(React.Fragment, null, "정산", /*#__PURE__*/React.createElement(SectionCountBadge, { count: expenses.length })) },
       { value: 'photo', label: /*#__PURE__*/React.createElement(React.Fragment, null, "사진", /*#__PURE__*/React.createElement(SectionCountBadge, { count: visibleMeetingPhotos.length })) }
