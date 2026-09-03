@@ -1,0 +1,38 @@
+name: Culture Performances Daily Sync
+
+# Pulls the culture-portal slice of Culture Flow's public performances feed once a day and commits
+# a normalized snapshot to public-vite/data/culture-performances.json. See
+# scripts/sync-culture-performances.mjs for why this never touches the file on a failed/suspicious
+# fetch (Culture Flow is a separate project we don't control the release cadence of).
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 16 * * *' # 01:00 KST -- after Culture Flow's own 00:00 KST data refresh
+
+permissions:
+  contents: write
+
+concurrency:
+  group: culture-sync-daily
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Sync culture performances snapshot
+        run: node scripts/sync-culture-performances.mjs
+      - name: Commit if changed
+        run: |
+          if git diff --quiet -- public-vite/data/culture-performances.json; then
+            echo "No change in culture performances snapshot."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add public-vite/data/culture-performances.json
+          git commit -m "chore: daily culture performances snapshot sync"
+          git push
