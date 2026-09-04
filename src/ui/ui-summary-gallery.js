@@ -2356,7 +2356,11 @@ export function ContentView({
         venue: a.place ? (a.place.alias || a.place.name || '') : '',
         address: a.place ? (a.place.address || '') : '',
         description: a.description || '',
-        image: a.image || ''
+        // 컨텐츠 페이지 카드 커버 사진 -- 문화포털 자동 등록 항목은 a.image(포털 썸네일 URL)를
+        // 쓰지만, AnniversaryModal에서 직접 첨부한 사진은 a.photos 배열(url/thumbUrl)에 저장되어
+        // a.image는 항상 비어 있다. a.image가 없을 때는 첫 번째 첨부 사진으로 대체해야
+        // 사용자가 직접 올린 사진이 있는데도 "포스터 없음"으로 나오는 걸 막을 수 있다.
+        image: a.image || (Array.isArray(a.photos) && a.photos[0] ? (a.photos[0].thumbUrl || a.photos[0].url || '') : '')
       }));
   }, [anniversaries]);
 
@@ -3385,7 +3389,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
               }
             },
               /*#__PURE__*/React.createElement("div", {
-                style: { fontSize: 'var(--font-size-sm)', fontWeight: 800, textShadow: '0 1px 3px rgba(0,0,0,0.7)' }
+                style: { fontSize: '1.3rem', fontWeight: 800, textShadow: '0 1px 3px rgba(0,0,0,0.7)' }
               }, item.dateLabel || formatCultureDateLabel(item.startDate, item.endDate) || CULTURE_MISSING_LABEL),
               /*#__PURE__*/React.createElement("div", {
                 style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', width: '100%' }
@@ -3401,7 +3405,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
                   }, item.homeTeam)
                 ),
                 /*#__PURE__*/React.createElement("span", {
-                  style: { fontSize: 'var(--font-size-sm)', fontWeight: 800, textShadow: '0 1px 2px rgba(0,0,0,0.6)', flexShrink: 0 }
+                  style: { fontSize: '1.3rem', fontWeight: 800, textShadow: '0 1px 2px rgba(0,0,0,0.6)', flexShrink: 0 }
                 }, "vs"),
                 /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', flex: '1 1 0', minWidth: 0 } },
                   item.awayTeamLogo && /*#__PURE__*/React.createElement("img", {
@@ -3415,7 +3419,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
                 )
               ),
               /*#__PURE__*/React.createElement("div", {
-                style: { fontSize: 'var(--font-size-xs)', fontWeight: 700, textShadow: '0 1px 3px rgba(0,0,0,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }
+                style: { fontSize: '1.2rem', fontWeight: 700, textShadow: '0 1px 3px rgba(0,0,0,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }
               }, item.venue || CULTURE_MISSING_LABEL)
             ),
             registered && /*#__PURE__*/React.createElement("div", {

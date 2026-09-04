@@ -722,7 +722,8 @@ const CALENDAR_SETTINGS_FIELDS = new Set([
   'weatherLocation',
   'recentLocations',
   'pinnedNotices',
-  'pinnedNotice'
+  'pinnedNotice',
+  'customPersonTags'
 ]);
 
 function normalizeSettingsFields(settingsFields) {

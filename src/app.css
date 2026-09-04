@@ -1835,6 +1835,18 @@ select.form-select {
     display: flex !important;
   }
 }
+/* Bottom spacer that reserves room under a day cell for its festival bar(s) -- see
+   .festival-bar-spacer in ui-calendar-core.js. Matches FESTIVAL_BAR_HEIGHT (24px) on
+   desktop/tablet and FESTIVAL_BAR_HEIGHT_MOBILE (8px) on mobile, same breakpoint as the bar
+   itself above, so the reserved space never outsizes the bar it's making room for. */
+.festival-bar-spacer {
+  height: calc(var(--festival-stack-depth, 0) * 24px);
+}
+@media (max-width: 640px) {
+  .festival-bar-spacer {
+    height: calc(var(--festival-stack-depth, 0) * 8px);
+  }
+}
 
 /* 흔들도시락 cooking-pot jiggle: .day-cell normally clips with overflow:hidden — lift that
    for cells that host this anniversary so scale~1.5 shake is not cut off. Modest z-index so
