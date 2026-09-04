@@ -1736,7 +1736,13 @@ select.form-select {
 .day-cell {
   min-height: 58px; background: #FAFAFA; border: 1px solid transparent;
   border-radius: var(--radius-sm); padding: 4px; cursor: pointer; transition: all 0.2s ease;
-  display: flex; flex-direction: column; justify-content: space-between; position: relative;
+  /* flex-start (not space-between): participant name badges must pack immediately under the
+     date header, not float toward mid/bottom on a day that has no anniversary content to pair
+     with them. The day-anniversary-desktop/mobile block's own marginTop:'auto' (see
+     ui-calendar-core.js) is what pushes anniversary badges down to the bottom edge instead --
+     auto margins already take priority over justify-content, so flex-start here only affects
+     cells where that block isn't even rendered (no anniversary that day). */
+  display: flex; flex-direction: column; justify-content: flex-start; position: relative;
   overflow: hidden;
 }
 @media (min-width: 640px) {
