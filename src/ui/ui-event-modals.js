@@ -868,7 +868,7 @@ export function AnniversaryModal({
   const [newTitle, setNewTitle] = React.useState('');
   const [newCategory, setNewCategory] = React.useState('birthday'); // 'birthday' | 'event' | 'festival' | 'other'
   const [dayMode, setDayMode] = React.useState('single'); // 'single' (하루), 'range' (연일)
-  const [repeatYearly, setRepeatYearly] = React.useState(true); // single-day only: recurs every year
+  const [repeatYearly, setRepeatYearly] = React.useState(false); // single-day only: recurs every year
   const [newType, setNewType] = React.useState('yearly'); // 'yearly', 'dday' -- kept only for editing legacy D-Day entries
   // Yearly / recurring single-day options
   const [yearlyMonth, setYearlyMonth] = React.useState(() => new Date().getMonth() + 1);
@@ -1418,16 +1418,6 @@ export function AnniversaryModal({
     return `기준일: ${ann.targetDate}`;
   };
 
-  const getAnniversaryBadgeStyle = (ann) => {
-    const map = {
-      yearly: { bg: 'rgba(59,130,246,0.1)', fg: '#3B82F6' },
-      once: { bg: 'rgba(16,185,129,0.1)', fg: '#10B981' },
-      range: { bg: 'rgba(139,92,246,0.1)', fg: '#8B5CF6' },
-      repeat: { bg: 'rgba(99,102,241,0.12)', fg: '#6366F1' }
-    };
-    return map[ann.type] || { bg: 'rgba(245,158,11,0.1)', fg: '#F59E0B' }; // legacy dday
-  };
-
   const renderAnniversaryRow = (ann) => /*#__PURE__*/React.createElement("div", {
     key: ann.id,
     style: {
@@ -1440,79 +1430,16 @@ export function AnniversaryModal({
       backgroundColor: 'var(--bg-primary)'
     }
   },
-    /* Content */
+    /* Content -- 목록은 제목+날짜만 (뱃지/장소/설명/사진 미리보기는 일정 팝업이나 편집 화면에서
+       이미 볼 수 있어 여기서는 스캔하기 쉽게 생략) */
     /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 } },
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
         ANNIVERSARY_CATEGORY_ICONS[ann.category] && /*#__PURE__*/React.createElement(ANNIVERSARY_CATEGORY_ICONS[ann.category], { size: 16 }),
-        /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: 'var(--font-size-base)', color: 'var(--text-main)' } }, ann.title),
-        /* Badge — festivals always show 축제; others keep type label */
-        /*#__PURE__*/React.createElement("span", {
-          style: {
-            fontSize: 'var(--font-size-xs)', padding: '1px 6px', borderRadius: '4px',
-            backgroundColor: getAnniversaryBadgeStyle(ann).bg,
-            color: getAnniversaryBadgeStyle(ann).fg,
-            fontWeight: 700
-          }
-        }, ann.category === 'festival' ? '축제' : getAnniversaryTypeLabel(ann))
+        /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: 'var(--font-size-base)', color: 'var(--text-main)' } }, ann.title)
       ),
       /* Date details */
       /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } },
         getAnniversaryDateDisplay(ann)
-      ),
-      /* Place (if set) -- festivals list name+period only */
-      ann.category !== 'festival' && ann.place && (() => {
-        const mapUrl = getKakaoMapLinkUrl(ann.place);
-        const placeName = ann.place.alias || ann.place.name || '';
-        const placeAddress = getDisplayPlaceAddress(ann.place) || '';
-        const nameEl = mapUrl
-          ? /*#__PURE__*/React.createElement("a", {
-              href: mapUrl, target: "_blank", rel: "noreferrer",
-              onClick: e => e.stopPropagation(),
-              style: { color: 'var(--text-main)', textDecoration: 'none', fontWeight: 700 }
-            }, placeName)
-          : /*#__PURE__*/React.createElement("span", { style: { color: 'var(--text-main)', fontWeight: 700 } }, placeName);
-        return /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'flex-start', gap: '4px', fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginTop: '2px' } },
-          MapPinIcon && /*#__PURE__*/React.createElement("span", { style: { display: 'inline-flex', marginTop: '2px', flexShrink: 0 } },
-            /*#__PURE__*/React.createElement(MapPinIcon, { size: 14 })
-          ),
-          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0 } },
-            nameEl,
-            placeAddress ? /*#__PURE__*/React.createElement("span", null, placeAddress) : null
-          )
-        );
-      })(),
-      /* Description (URLs rendered as capsule badges) */
-      ann.category !== 'festival' && ann.description && /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-main)', marginTop: '2px' } },
-        renderTextWithUrlBadge(ann.description)
-      ),
-      /* Photos (if any) -- thumb opens full lightbox with anniversary meta */
-      ann.category !== 'festival' && Array.isArray(ann.photos) && ann.photos.length > 0 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '4px', marginTop: '4px', flexWrap: 'wrap' } },
-        ann.photos.map((photo, idx) => {
-          const listIdx = Array.isArray(anniversaries) ? anniversaries.findIndex(a => a && a.id === ann.id) : -1;
-          const anniversaryIndex = listIdx >= 0 ? listIdx + 1 : 1;
-          return /*#__PURE__*/React.createElement("img", {
-            key: idx, src: photo.thumbUrl || photo.url, alt: `사진 ${idx + 1}`,
-            onClick: e => {
-              e.stopPropagation();
-              if (typeof setActiveLightbox !== 'function') return;
-              setActiveLightbox({
-                urls: ann.photos.map(p => p.url || p.thumbUrl),
-                index: idx,
-                meta: ann.photos.map((p, pIdx) => ({
-                  source: 'anniversary',
-                  anniversaryId: ann.id,
-                  anniversaryIndex,
-                  imageIndex: pIdx,
-                  timestamp: ann.updatedAt || ann.createdAt || Date.now(),
-                  tags: p.tags || '',
-                  photoId: p.id || `${ann.id || 'ann'}_${pIdx}`,
-                  thumb: p.thumbUrl || p.url || ''
-                }))
-              });
-            },
-            style: { width: '40px', height: '40px', objectFit: 'cover', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', cursor: setActiveLightbox ? 'pointer' : 'default' }
-          });
-        })
       )
     ),
 
@@ -2293,7 +2220,9 @@ export function AnniversaryModal({
       }, "✕")
     ),
     /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-body" },
-      ANNIVERSARY_CATEGORY_OPTIONS.map(opt => {
+      // 스포츠는 컨텐츠 페이지(지역축제/문화행사/스포츠)에서 "캘린더와 연동"으로 자동
+      // 등록될 때만 쓰는 카테고리라, 직접 만드는 기념일 카테고리 목록에는 노출하지 않는다.
+      ANNIVERSARY_CATEGORY_OPTIONS.filter(opt => opt.value !== 'sports').map(opt => {
         const OptIcon = ANNIVERSARY_CATEGORY_ICONS[opt.value];
         return /*#__PURE__*/React.createElement("button", {
           key: opt.value,
