@@ -1379,6 +1379,7 @@ function CalendarApp() {
   const [hasMoreOlderChat, setHasMoreOlderChat] = React.useState(true);
   const [loadingOlderChat, setLoadingOlderChat] = React.useState(false);
   const [totalChatCount, setTotalChatCount] = React.useState(null);
+  const [chatPreviewHydrationExhausted, setChatPreviewHydrationExhausted] = React.useState(false);
   const [totalMemoCount, setTotalMemoCount] = React.useState(null);
   const [totalGalleryCount, setTotalGalleryCount] = React.useState(null);
   const [galleryPreviewMessages, setGalleryPreviewMessages] = React.useState([]);
@@ -2096,6 +2097,21 @@ function CalendarApp() {
     return allChatMessages.filter(msg => isChatRenderableMessage(msg, meetingPhotoMessageIds));
   }, [allChatMessages, meetingPhotoMessageIds]);
   const recentMessages = React.useMemo(() => visibleChatMessages.slice(-5).reverse(), [visibleChatMessages]);
+  // `totalChatCount` (server-side aggregate) only excludes messages whose OWN `uploadSource`
+  // field is 'meeting'/'gallery' -- see fetchSubcollectionCount's excludeUploadSources option.
+  // A photo originally posted as a normal chat message and only later linked into a confirmed
+  // meeting's photo album (handleConfirmMeeting matches by sourceMessageId, it never rewrites
+  // the original message doc's uploadSource) keeps its non-meeting uploadSource, so the server
+  // count still includes it -- but isChatRenderableMessage/meetingPhotoMessageIds filters it out
+  // of every rendered chat list on the client. For a calendar whose chat is mostly/entirely such
+  // promoted photos this made the main-screen preview widget's "totalChatCount > 0 but nothing to
+  // show" branch permanently true (stuck on "최근 채팅을 불러오는 중…" forever, since retrying the
+  // fetch just keeps re-discovering the same already-linked, already-hidden messages). Correct
+  // the count locally by subtracting the meeting-linked set, which is already known for free from
+  // `activeCal` without any extra fetch.
+  const visibleTotalChatCount = typeof totalChatCount === 'number'
+    ? Math.max(0, totalChatCount - meetingPhotoMessageIds.size)
+    : totalChatCount;
   const canUseSettlement = !!(activeCal && isSettlementEnabledCalendarId(activeCal.id || activeCalId));
   const syncStatus = saveSyncState;
   React.useEffect(() => {
@@ -3064,7 +3080,8 @@ function CalendarApp() {
   // after the first empty result.
   React.useEffect(() => {
     if (!activeCalId || isInitialDataLoading) return;
-    if (typeof totalChatCount !== 'number' || totalChatCount <= 0) return;
+    setChatPreviewHydrationExhausted(false);
+    if (typeof visibleTotalChatCount !== 'number' || visibleTotalChatCount <= 0) return;
     if (visibleChatMessages.length > 0) return;
     let cancelled = false;
     let attempt = 0;
@@ -3083,7 +3100,13 @@ function CalendarApp() {
       } catch (err) {
         console.warn('chat preview hydration failed:', err);
       }
-      if (cancelled || attempt >= MAX_ATTEMPTS) return;
+      if (cancelled) return;
+      if (attempt >= MAX_ATTEMPTS) {
+        // All retries came back empty -- rather than leaving the widget stuck on "불러오는
+        // 중…" forever, let CommentsSection fall back to a resolved "no chat to show" state.
+        setChatPreviewHydrationExhausted(true);
+        return;
+      }
       const delay = RETRY_DELAYS_MS[Math.min(attempt - 1, RETRY_DELAYS_MS.length - 1)];
       retryTimer = setTimeout(tryHydrate, delay);
     };
@@ -3092,7 +3115,7 @@ function CalendarApp() {
       cancelled = true;
       if (retryTimer) clearTimeout(retryTimer);
     };
-  }, [activeCalId, isInitialDataLoading, totalChatCount, visibleChatMessages.length]);
+  }, [activeCalId, isInitialDataLoading, visibleTotalChatCount, visibleChatMessages.length]);
 
   React.useEffect(() => {
     // Same reasoning as above -- wait for the initial calendar document load to finish before
@@ -6728,8 +6751,8 @@ function CalendarApp() {
     return directUrls.size;
   })();
 
-  const navChatCount = (typeof totalChatCount === 'number' && totalChatCount >= 0)
-    ? totalChatCount
+  const navChatCount = (typeof visibleTotalChatCount === 'number' && visibleTotalChatCount >= 0)
+    ? visibleTotalChatCount
     : visibleChatMessages.length;
   const navGalleryCount = (localGalleryCount > 0)
     ? localGalleryCount
@@ -7306,8 +7329,8 @@ function CalendarApp() {
   // (shown dimmed with a winning-option badge). Used both to decide whether to render that
   // section and whether the header 투표 메뉴 click should scroll to it or show a "없습니다" alert.
   const hasVisiblePolls = getCalendarPolls(activeCal).some(poll => !poll.hidden);
-  const mainMenuChatCount = (typeof totalChatCount === 'number' && totalChatCount >= 0)
-    ? totalChatCount
+  const mainMenuChatCount = (typeof visibleTotalChatCount === 'number' && visibleTotalChatCount >= 0)
+    ? visibleTotalChatCount
     : visibleChatMessages.length;
   const mainMenuChatLatestTimestamp = visibleChatMessages.length > 0 ? visibleChatMessages[visibleChatMessages.length - 1].timestamp : 0;
   const mainMenuChatHasUnread = mainMenuChatLatestTimestamp > getChatLastReadTimestamp(activeCalId);
@@ -7870,7 +7893,8 @@ function CalendarApp() {
       calendar: activeCal,
       recentMessages: recentMessages,
       chatMessages: visibleChatMessages,
-      totalChatCount: totalChatCount,
+      totalChatCount: visibleTotalChatCount,
+      previewHydrationExhausted: chatPreviewHydrationExhausted,
       chatInput: chatInput,
       setChatInput: setChatInput,
       chatParticipantId: chatParticipantId,
