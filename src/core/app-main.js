@@ -2582,6 +2582,9 @@ function CalendarApp() {
     const descriptionText = descriptionParts.filter(Boolean).join(' · ');
     if (descriptionText) annData.description = descriptionText;
     if (item.link) annData.cultureSourceLink = item.link;
+    // 스포츠 종목(야구/축구/농구/...) -- getAnniversaryCategoryBadge가 이 값으로 종목별 아이콘을
+    // 고른다. 문화행사/축제는 genre가 없으므로 자연히 생략됨.
+    if (category === 'sports' && item.genre) annData.genre = item.genre;
     // Copy archive-card poster so DateModal anniversary banners can show the same image.
     const poster = item.image ? String(item.image).trim() : '';
     if (poster) {
@@ -3104,6 +3107,14 @@ function CalendarApp() {
       if (attempt >= MAX_ATTEMPTS) {
         // All retries came back empty -- rather than leaving the widget stuck on "불러오는
         // 중…" forever, let CommentsSection fall back to a resolved "no chat to show" state.
+        // Diagnostic breadcrumb for this exact "count>0 but nothing renders" case -- if it
+        // recurs, checking devtools console for this line pins down whether the raw server
+        // count, the meeting-linked-photo correction, or the fetch itself is the mismatch.
+        console.info('[chat-preview] hydration exhausted', {
+          calendarId: activeCalId, rawTotalChatCount: totalChatCount,
+          meetingLinkedCount: meetingPhotoMessageIds.size, visibleTotalChatCount,
+          visibleChatMessagesLength: visibleChatMessages.length
+        });
         setChatPreviewHydrationExhausted(true);
         return;
       }
@@ -10813,7 +10824,7 @@ function getAnniversariesForDate(dateStr, anniversariesList) {
             cal.setLunarDate(y, lunarM, lunarD, !!ann.isLeap);
             const solar = cal.getSolarCalendar();
             if (solar && solar.year === y && solar.month === m && solar.day === d) {
-              const yearlyCatBadge = getAnniversaryCategoryBadge(ann.category);
+              const yearlyCatBadge = getAnniversaryCategoryBadge(ann.category, ann.genre);
               results.push(withAnnDetail({
                 id: ann.id,
                 title: `${ann.title || ''} (음)`,
@@ -10829,7 +10840,7 @@ function getAnniversariesForDate(dateStr, anniversariesList) {
       } else {
         const [solarM, solarD] = ann.date.split('-').map(Number);
         if (solarM === m && solarD === d) {
-          const yearlyCatBadge = getAnniversaryCategoryBadge(ann.category);
+          const yearlyCatBadge = getAnniversaryCategoryBadge(ann.category, ann.genre);
           results.push(withAnnDetail({
             id: ann.id,
             title: `${ann.title || ''}`,
@@ -10920,7 +10931,7 @@ function getAnniversariesForDate(dateStr, anniversariesList) {
       if (!ann.date || typeof ann.date !== 'string') return;
       const [onceY, onceM, onceD] = ann.date.split('-').map(Number);
       if (!Number.isFinite(onceY) || !Number.isFinite(onceM) || !Number.isFinite(onceD)) return;
-      const catBadge = getAnniversaryCategoryBadge(ann.category);
+      const catBadge = getAnniversaryCategoryBadge(ann.category, ann.genre);
       if (ann.isLunar) {
         try {
           const cal = new KoreanLunarCalendar();
@@ -10957,7 +10968,7 @@ function getAnniversariesForDate(dateStr, anniversariesList) {
       // range no matter how much detail the anniversary itself actually had saved.
       if (!ann.startDate || !ann.endDate) return;
       if (dateStr >= ann.startDate && dateStr <= ann.endDate) {
-        const catBadge = getAnniversaryCategoryBadge(ann.category);
+        const catBadge = getAnniversaryCategoryBadge(ann.category, ann.genre);
         results.push(withAnnDetail({
           id: ann.id,
           title: `${ann.title || ''}`,
@@ -10975,7 +10986,7 @@ function getAnniversariesForDate(dateStr, anniversariesList) {
       // Monthly nth-weekday rules saved from the 반복 tab (e.g. 매월 셋째주 수요일). Same
       // weekOfMonth = ceil(day/7) + weekday match used when bulk-registering dates.
       if (!isRepeatAnniversaryOnDate(ann, dateStr)) return;
-      const catBadge = getAnniversaryCategoryBadge(ann.category || 'other');
+      const catBadge = getAnniversaryCategoryBadge(ann.category || 'other', ann.genre);
       results.push(withAnnDetail({
         id: ann.id,
         title: `${ann.title || ann.patternLabel || '반복 일정'}`,
@@ -10996,12 +11007,18 @@ function getAnniversariesForDate(dateStr, anniversariesList) {
 // Badge color/icon for the newer category-tagged anniversary types ('once', 'range'). Legacy
 // 'yearly'/'dday' entries predate the category field and keep their original hardcoded look above
 // so nothing already saved changes appearance.
-function getAnniversaryCategoryBadge(category) {
+// 종목(genre)별 아이콘 -- culture-sports.json의 raw genre 코드(handleRegisterCultureEvent가
+// 등록 시 ann.genre로 그대로 복사해 둠). 매칭되는 종목이 없으면(레거시 데이터, 혹은 목록에
+// 없는 새 종목) 야구/축구를 대표하는 기존 공 아이콘으로 대체한다.
+const SPORTS_GENRE_ICONS = {
+  baseball: '⚾', basketball: '🏀', volleyball: '🏐', soccer: '⚽', handball: '🤾'
+};
+function getAnniversaryCategoryBadge(category, genre) {
   const map = {
     birthday: { badgeColor: '#EF4444', icon: '🎂' },
     event: { badgeColor: '#3B82F6', icon: '🎈' },
     festival: { badgeColor: '#F59E0B', icon: '🎉' },
-    sports: { badgeColor: '#0EA5E9', icon: '⚽' },
+    sports: { badgeColor: '#0EA5E9', icon: SPORTS_GENRE_ICONS[genre] || '⚽' },
     travel: { badgeColor: '#10B981', icon: '✈️' },
     other: { badgeColor: '#6B7280', icon: '💬' }
   };

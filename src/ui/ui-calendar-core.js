@@ -1676,8 +1676,15 @@ export function CalendarGrid({
 
       /* Reserves room at the bottom of this cell for the festival-bar overlay drawn as a
          separate .days-grid child (see festivalBars below) -- unconditional on cellAnns so it
-         also protects plain attendee badges from being covered, not just other anniversaries. */
-      festivalStackDepth > 0 && /*#__PURE__*/React.createElement("div", { style: { height: `${FESTIVAL_BAR_HEIGHT * festivalStackDepth}px`, flexShrink: 0, width: '100%' } })
+         also protects plain attendee badges from being covered, not just other anniversaries.
+         Sized via CSS custom property + .festival-bar-spacer (app.css) instead of a hardcoded
+         desktop-height inline style, so it shrinks to match FESTIVAL_BAR_HEIGHT_MOBILE on small
+         viewports -- otherwise every day under a festival bar reserved 24px/level even on mobile,
+         where the bar itself is only 8px tall, leaving a large unused gap under the day number. */
+      festivalStackDepth > 0 && /*#__PURE__*/React.createElement("div", {
+        className: "festival-bar-spacer",
+        style: { '--festival-stack-depth': festivalStackDepth, flexShrink: 0, width: '100%' }
+      })
     );
   }), festivalBars.flatMap(bar => {
     const displayColor = getAnniversaryDisplayColor(bar, calendar);
@@ -1759,7 +1766,9 @@ export function CalendarGrid({
           color: '#fff',
           overflow: 'visible'
         }
-      }, renderAnniversaryIcon(bar, 11)))
+      // 11px 아이콘이 8px짜리 바 안에 들어가면 아이콘이 바 배경보다 커서 위아래로 삐져나와
+      // 보였다 -- 바 높이에 맞춰 6px로 축소.
+      }, renderAnniversaryIcon(bar, 6)))
     ];
   })]));
 
