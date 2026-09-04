@@ -3160,9 +3160,16 @@ function CalendarApp() {
     const tryHydrate = async () => {
       attempt += 1;
       try {
-        const list = await fetchRecentChatMessages(activeCalId, 5);
+        // Fetch more than the widget's own 5-message display window -- the last 5 raw chat
+        // documents can be entirely meeting/gallery-linked photos (isChatRenderableMessage
+        // filters those out), in which case a 5-message fetch "succeeds" (non-empty list) but
+        // renders nothing, and this loop used to return on that first "success" without ever
+        // re-checking whether anything was actually renderable -- leaving the widget stuck on
+        // "불러오는 중…" forever even though real, older chat existed just outside that window.
+        const list = await fetchRecentChatMessages(activeCalId, 20);
         if (cancelled) return;
-        if (Array.isArray(list) && list.length > 0) {
+        const renderable = Array.isArray(list) ? list.filter(m => isChatRenderableMessage(m, meetingPhotoMessageIds)) : [];
+        if (renderable.length > 0) {
           setChatMessages(prev => (Array.isArray(prev) && prev.length > 0) ? prev : list.slice());
           return;
         }
@@ -3192,7 +3199,7 @@ function CalendarApp() {
       cancelled = true;
       if (retryTimer) clearTimeout(retryTimer);
     };
-  }, [activeCalId, isInitialDataLoading, visibleTotalChatCount, visibleChatMessages.length]);
+  }, [activeCalId, isInitialDataLoading, visibleTotalChatCount, visibleChatMessages.length, meetingPhotoMessageIds]);
 
   React.useEffect(() => {
     // Same reasoning as above -- wait for the initial calendar document load to finish before
