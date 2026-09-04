@@ -796,6 +796,12 @@ const ANNIVERSARY_CATEGORY_OPTIONS = [
   { value: 'travel', label: '여행' },
   { value: 'other', label: '기타' }
 ];
+// 캘린더에 표시되는 기념일 뱃지(getAnniversaryCategoryBadge, app-main.js)와 동일한 카테고리별
+// 색상 -- 목록에서도 같은 색으로 구분되게 그대로 재사용한다.
+const ANNIVERSARY_CATEGORY_COLORS = {
+  birthday: '#EF4444', event: '#3B82F6', festival: '#F59E0B',
+  sports: '#0EA5E9', travel: '#10B981', other: '#6B7280'
+};
 const ANNIVERSARY_CATEGORY_TITLE_LABEL = {
   birthday: '생일 이름',
   event: '행사 이름',
@@ -1156,7 +1162,7 @@ export function AnniversaryModal({
       setNewTitle('');
       setNewCategory('birthday');
       setDayMode('single');
-      setRepeatYearly(true);
+      setRepeatYearly(false);
       setIsLunar(false);
       setIsLeap(false);
       setYearlyMonth(new Date().getMonth() + 1);
@@ -1418,7 +1424,13 @@ export function AnniversaryModal({
     return `기준일: ${ann.targetDate}`;
   };
 
-  const renderAnniversaryRow = (ann) => /*#__PURE__*/React.createElement("div", {
+  const renderAnniversaryRow = (ann) => {
+    // 카테고리 필드가 없는 옛 항목은 목록 그룹핑과 동일하게 생일로 취급 -- 그래야 아이콘/색상이
+    // 항상 표시된다 (renderGroupedAnniversaryList의 groups.has(...) 폴백과 동일한 규칙).
+    const effectiveCategory = ANNIVERSARY_CATEGORY_ICONS[ann.category] ? ann.category : 'birthday';
+    const categoryColor = ANNIVERSARY_CATEGORY_COLORS[effectiveCategory] || ANNIVERSARY_CATEGORY_COLORS.other;
+    const RowCategoryIcon = ANNIVERSARY_CATEGORY_ICONS[effectiveCategory];
+    return /*#__PURE__*/React.createElement("div", {
     key: ann.id,
     style: {
       position: 'relative',
@@ -1426,16 +1438,19 @@ export function AnniversaryModal({
       // (see ItemEditDeleteActions below) -- the content column itself is no longer split into
       // a side-by-side flex row with the actions, so its description/place text can use nearly
       // the row's full width instead of always losing a wide fixed column to the buttons.
-      padding: '10px 44px 10px 12px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)',
-      backgroundColor: 'var(--bg-primary)'
+      padding: '10px 44px 10px 12px', border: `1px solid ${categoryColor}30`, borderRadius: 'var(--radius-md)',
+      backgroundColor: `${categoryColor}14`
     }
   },
     /* Content -- 목록은 제목+날짜만 (뱃지/장소/설명/사진 미리보기는 일정 팝업이나 편집 화면에서
-       이미 볼 수 있어 여기서는 스캔하기 쉽게 생략) */
+       이미 볼 수 있어 여기서는 스캔하기 쉽게 생략) -- 카테고리 색으로 배경 미색 + 제목 글자색을
+       입혀서 스캔할 때 카테고리 구분이 쉽도록 함 (getAnniversaryCategoryBadge와 동일 팔레트). */
     /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 } },
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
-        ANNIVERSARY_CATEGORY_ICONS[ann.category] && /*#__PURE__*/React.createElement(ANNIVERSARY_CATEGORY_ICONS[ann.category], { size: 16 }),
-        /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: 'var(--font-size-base)', color: 'var(--text-main)' } }, ann.title)
+        RowCategoryIcon && /*#__PURE__*/React.createElement("span", { style: { display: 'inline-flex', color: categoryColor } },
+          /*#__PURE__*/React.createElement(RowCategoryIcon, { size: 16 })
+        ),
+        /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: 'var(--font-size-base)', color: categoryColor } }, ann.title)
       ),
       /* Date details */
       /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } },
@@ -1455,6 +1470,7 @@ export function AnniversaryModal({
       })
     )
   );
+  };
 
   // '전체' 탭은 카테고리로 나누지 않고, 등록일(createdAt) 최신순으로 평평하게 나열한다 --
   // 카테고리별로 묶으면 방금 등록한 항목이 자기 카테고리 그룹 맨 위로 파묻혀 "최근 등록한 게
@@ -1511,7 +1527,7 @@ export function AnniversaryModal({
           setNewTitle('');
           setNewCategory('birthday');
           setDayMode('single');
-          setRepeatYearly(true);
+          setRepeatYearly(false);
           setIsLunar(false);
           setIsLeap(false);
           setIsLegacyDdayEdit(false);
@@ -2242,7 +2258,6 @@ export function AnniversaryModal({
             setNewCategory(opt.value);
             if (opt.value === 'birthday') {
               setDayMode('single');
-              setRepeatYearly(true);
             }
             setIsCategorySheetOpen(false);
           }
