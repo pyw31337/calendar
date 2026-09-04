@@ -1787,6 +1787,24 @@ export function HistoryView({
     setHistoryTab(tab);
     try { localStorage.setItem(HISTORY_TAB_STORAGE_KEY, tab); } catch (_) { /* best-effort */ }
   };
+  // 기념일 등록(AnniversaryModal)으로 직접 만든 festival/event도 지역축제/문화행사 탭에 보이도록,
+  // 문화포털에서 등록된 것(cultureSourceId 있음)은 제외하고 사용자가 직접 만든 것만 카드 형태로 변환.
+  const selfAuthoredCultureItems = React.useMemo(() => {
+    return (anniversaries || [])
+      .filter(a => a && !a.cultureSourceId && (a.category === 'festival' || a.category === 'event'))
+      .map(a => ({
+        id: a.id,
+        kind: a.category === 'festival' ? 'festival' : 'performance',
+        title: a.title || '',
+        startDate: a.startDate,
+        endDate: a.endDate,
+        dateLabel: (a.startDate && a.endDate && a.startDate !== a.endDate) ? `${a.startDate} ~ ${a.endDate}` : (a.startDate || ''),
+        venue: a.place ? (a.place.alias || a.place.name || '') : '',
+        address: a.place ? (a.place.address || '') : '',
+        description: a.description || '',
+        image: a.image || ''
+      }));
+  }, [anniversaries]);
   // When the side menu navigates to 보관함 again (or any view), force the festival tab so
   // re-entry always lands on 지역축제 rather than whatever tab was last open.
   const handleHistoryChangeView = (view) => {
@@ -2073,7 +2091,7 @@ export function HistoryView({
       calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo, dataUrl: CULTURE_PERFORMANCES_URL,
       emptyLabel: "상영중이거나 예정된 문화공연이 없습니다.", regionSelections, onItemsLoaded: setRegionFilterItems,
       anniversaryCategory: "event",
-      extraItems: (customCultureItems || []).filter(i => i && i.kind === 'performance'),
+      extraItems: [...selfAuthoredCultureItems.filter(i => i.kind === 'performance'), ...(customCultureItems || []).filter(i => i && i.kind === 'performance')],
       chipRowSlot, contentPaddingTop: historyContentPaddingTop, onScroll: handleHistoryScroll,
       gridCols
     }),
@@ -2081,7 +2099,7 @@ export function HistoryView({
       calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo, dataUrl: CULTURE_FESTIVALS_URL,
       emptyLabel: "진행중이거나 예정된 지역축제가 없습니다.", regionSelections, onItemsLoaded: setRegionFilterItems,
       anniversaryCategory: "festival",
-      extraItems: (customCultureItems || []).filter(i => i && i.kind === 'festival'),
+      extraItems: [...selfAuthoredCultureItems.filter(i => i.kind === 'festival'), ...(customCultureItems || []).filter(i => i && i.kind === 'festival')],
       chipRowSlot, contentPaddingTop: historyContentPaddingTop, onScroll: handleHistoryScroll,
       gridCols
     }),
@@ -2813,9 +2831,12 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
   }, [dataUrl]);
 
   // A registered item's own anniversary doc (cultureSourceId set by handleRegisterCultureEvent
-  // in app-main.js), or null if this item hasn't been added to the calendar yet.
+  // in app-main.js), or null if this item hasn't been added to the calendar yet. Also matches by
+  // a.id === itemId for cards built directly from a self-authored anniversary (기념일 등록으로
+  // 만든 festival/event -- see HistoryView's selfAuthoredCultureItems), which never gets its own
+  // cultureSourceId since it wasn't registered through this tab in the first place.
   const findRegisteredAnniversary = itemId =>
-    (anniversaries || []).find(a => a?.cultureSourceId === itemId) || null;
+    (anniversaries || []).find(a => a?.cultureSourceId === itemId || a?.id === itemId) || null;
 
   const handleToggleRegister = async (item) => {
     if (!item || pendingId) return;
