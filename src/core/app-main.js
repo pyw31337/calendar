@@ -2310,7 +2310,18 @@ function CalendarApp() {
   }, [activeCalId, activeView, CHAT_INITIAL_MESSAGE_LIMIT]);
 
   // Real-time messages listener
-  // Full window on chat/gallery; compact window elsewhere (main CommentsSection only needs ~5).
+  // Full window on chat/gallery. The main-screen preview (else branch) used to query only
+  // CHAT_INITIAL_MESSAGE_LIMIT (5) raw docs -- but this listener's query orders by raw
+  // `timestamp` with no way to exclude meeting/gallery-linked photos at the query level (that
+  // filter is client-only, see isChatRenderableMessage/meetingPhotoMessageIds -- a photo
+  // promoted into a confirmed meeting's album keeps its original non-meeting uploadSource on
+  // its own doc). So on a calendar whose 5 most recent raw messages happen to all be such
+  // promoted photos, every single snapshot from this always-subscribed listener kept resetting
+  // chatMessages to an all-filtered-out list, permanently re-triggering (and then immediately
+  // stomping) the separate hydration-retry effect below -- the widget could never settle on
+  // real content and stayed on "최근 채팅을 불러오는 중…" no matter how long you waited.
+  // CHAT_LIVE_MESSAGE_LIMIT (20, already used for the chat/gallery windows) gives the client-side
+  // filter enough raw docs to actually find renderable messages within the live window.
   React.useEffect(() => {
     if (!activeCalId) {
       setChatMessages([]);
@@ -2318,7 +2329,7 @@ function CalendarApp() {
     }
     const chatLimit = activeView === 'chat'
       ? chatLiveLimit
-      : activeView === 'gallery' ? Math.min(12, CHAT_LIVE_MESSAGE_LIMIT) : CHAT_INITIAL_MESSAGE_LIMIT;
+      : activeView === 'gallery' ? Math.min(12, CHAT_LIVE_MESSAGE_LIMIT) : CHAT_LIVE_MESSAGE_LIMIT;
     if (!firebaseDb) {
       // No live SDK channel at all (not just a stalled stream -- see the watchdog below for
       // that case) -- without this poll, a device stuck on this path never saw the other
