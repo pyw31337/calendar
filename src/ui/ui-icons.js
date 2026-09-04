@@ -2240,6 +2240,82 @@ export function MapPinIcon({ size = 24 } = {}) {
   );
 }
 
+// 스포츠 기념일 뱃지용 종목 아이콘 -- 데스크톱 캘린더에서 야구공/축구공 같은 이모지를 그대로
+// 쓰면 폰트마다 렌더링 크기/스타일이 들쭉날쭉해서, 다른 카테고리 뱃지들처럼 SVG 라인 아이콘으로
+// 통일한다. renderAnniversaryIcon(ui-calendar-core.js)의 iconMap이 ann.icon(=이 이모지 값,
+// getAnniversaryCategoryBadge/SPORTS_GENRE_ICONS가 저장)을 이 아이콘들로 매핑한다.
+export function BaseballIcon({ size = 18 } = {}) {
+  const React = window.React;
+  return /*#__PURE__*/React.createElement('svg', {
+    xmlns: 'http://www.w3.org/2000/svg', width: String(size), height: String(size), viewBox: '0 0 24 24',
+    fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round',
+    'aria-hidden': 'true'
+  },
+    /*#__PURE__*/React.createElement('circle', { cx: '12', cy: '12', r: '9' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M6.5 5c2 3 2 11 0 14' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M17.5 5c-2 3 -2 11 0 14' })
+  );
+}
+
+export function BasketballIcon({ size = 18 } = {}) {
+  const React = window.React;
+  return /*#__PURE__*/React.createElement('svg', {
+    xmlns: 'http://www.w3.org/2000/svg', width: String(size), height: String(size), viewBox: '0 0 24 24',
+    fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round',
+    'aria-hidden': 'true'
+  },
+    /*#__PURE__*/React.createElement('circle', { cx: '12', cy: '12', r: '9' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M12 3v18' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M3 12h18' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M5.6 5.6c3.5 3.5 3.5 9.3 0 12.8' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M18.4 5.6c-3.5 3.5 -3.5 9.3 0 12.8' })
+  );
+}
+
+export function VolleyballIcon({ size = 18 } = {}) {
+  const React = window.React;
+  return /*#__PURE__*/React.createElement('svg', {
+    xmlns: 'http://www.w3.org/2000/svg', width: String(size), height: String(size), viewBox: '0 0 24 24',
+    fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round',
+    'aria-hidden': 'true'
+  },
+    /*#__PURE__*/React.createElement('circle', { cx: '12', cy: '12', r: '9' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M12 3c-4 2 -4 8 0 9c4 1 8 4 8 8' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M3.3 9.7c4 -1 9 1 10 5c1 3 -1 5.8 -4 6.3' })
+  );
+}
+
+export function SoccerBallIcon({ size = 18 } = {}) {
+  const React = window.React;
+  return /*#__PURE__*/React.createElement('svg', {
+    xmlns: 'http://www.w3.org/2000/svg', width: String(size), height: String(size), viewBox: '0 0 24 24',
+    fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round',
+    'aria-hidden': 'true'
+  },
+    /*#__PURE__*/React.createElement('circle', { cx: '12', cy: '12', r: '9' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M12 8l3 2.2l-1.1 3.5h-3.8l-1.1 -3.5z' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M12 8v-3.8' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M9.1 13.7l-3.1 2.2' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M14.9 13.7l3.1 2.2' })
+  );
+}
+
+export function HandballIcon({ size = 18 } = {}) {
+  const React = window.React;
+  return /*#__PURE__*/React.createElement('svg', {
+    xmlns: 'http://www.w3.org/2000/svg', width: String(size), height: String(size), viewBox: '0 0 24 24',
+    fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round',
+    'aria-hidden': 'true'
+  },
+    /*#__PURE__*/React.createElement('circle', { cx: '12', cy: '12', r: '9' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M9 9h.01' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M15 9h.01' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M9 15h.01' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M15 15h.01' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M12 12h.01' })
+  );
+}
+
   if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
     KakaoTalkIcon: KakaoTalkIcon,
@@ -2254,6 +2330,11 @@ export function MapPinIcon({ size = 24 } = {}) {
     MapPinIcon: MapPinIcon,
     MessageCircleMoreIcon: MessageCircleMoreIcon,
     CookingPotIcon: CookingPotIcon,
+    BaseballIcon: BaseballIcon,
+    BasketballIcon: BasketballIcon,
+    VolleyballIcon: VolleyballIcon,
+    SoccerBallIcon: SoccerBallIcon,
+    HandballIcon: HandballIcon,
     NotepadTextIcon: NotepadTextIcon,
     ChatSectionIcon: ChatSectionIcon,
     LinkIcon: LinkIcon,

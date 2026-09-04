@@ -2000,8 +2000,12 @@ select.form-select {
   100% { transform: scale(7); opacity: 0; }
 }
 
-.badges-container { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; }
-@media (min-width: 640px) { .badges-container { gap: 4px; } }
+/* margin-top separates the badge row from the date-number header row above it -- the day-number
+   "today" circle badge and the first participant badge used to sit almost flush against each
+   other with only the day-cell's own 4-8px padding between them, since .day-cell has no gap of
+   its own between its header row and this badges-container. */
+.badges-container { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; margin-top: 3px; }
+@media (min-width: 640px) { .badges-container { gap: 4px; margin-top: 5px; } }
 @media (max-width: 640px) {
   .badges-container { justify-content: center; }
 }
@@ -2459,12 +2463,13 @@ select.form-select {
   }
 }
 
-/* Gallery preview thumbnails: 3 columns (9 shown, see PhotoGallery's isMobile-gated slice)
-   below the shared 640px breakpoint, 6 columns (18 shown) at/above it. */
+/* Gallery preview thumbnails: 3 columns (9 shown, see the isMobile-gated slice below) under
+   1024px -- this covers both phone and tablet widths, since 6 columns at tablet width shrank
+   each thumbnail too small to make out -- 6 columns (18 shown) only at real desktop widths. */
 .gallery-thumb-grid {
   grid-template-columns: repeat(3, 1fr);
 }
-@media (min-width: 640px) {
+@media (min-width: 1024px) {
   .gallery-thumb-grid {
     grid-template-columns: repeat(6, 1fr);
   }

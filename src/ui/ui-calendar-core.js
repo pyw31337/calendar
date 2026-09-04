@@ -789,6 +789,11 @@ export function CalendarGrid({
   const TicketsPlaneIcon = __comp.TicketsPlaneIcon || __deps.TicketsPlaneIcon;
   const MessageCircleMoreIcon = __comp.MessageCircleMoreIcon || __deps.MessageCircleMoreIcon;
   const CookingPotIcon = __comp.CookingPotIcon || __deps.CookingPotIcon;
+  const BaseballIcon = __comp.BaseballIcon || __deps.BaseballIcon;
+  const BasketballIcon = __comp.BasketballIcon || __deps.BasketballIcon;
+  const VolleyballIcon = __comp.VolleyballIcon || __deps.VolleyballIcon;
+  const SoccerBallIcon = __comp.SoccerBallIcon || __deps.SoccerBallIcon;
+  const HandballIcon = __comp.HandballIcon || __deps.HandballIcon;
   const ParticipantBadge = __comp.ParticipantBadge || __deps.ParticipantBadge;
   // 흔들도시락 anniversary: cooking-pot icon + jiggle (title match, not category emoji).
   const isHeundeulDosirakAnn = (ann) => {
@@ -819,7 +824,10 @@ export function CalendarGrid({
       }) : null));
     }
     if (ann.type === 'dday') return ann.icon;
-    const iconMap = { '🎂': CakeIcon, '🎈': BalloonIcon, '🎉': ConfettiIcon, '✈️': TicketsPlaneIcon, '💬': MessageCircleMoreIcon };
+    const iconMap = {
+      '🎂': CakeIcon, '🎈': BalloonIcon, '🎉': ConfettiIcon, '✈️': TicketsPlaneIcon, '💬': MessageCircleMoreIcon,
+      '⚾': BaseballIcon, '🏀': BasketballIcon, '🏐': VolleyballIcon, '⚽': SoccerBallIcon, '🤾': HandballIcon
+    };
     const Icon = iconMap[ann.icon];
     return Icon ? /*#__PURE__*/React.createElement(Icon, { size }) : ann.icon;
   };

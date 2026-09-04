@@ -1116,12 +1116,13 @@ export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalG
 
   const [collapsed, setCollapsed] = React.useState(false);
   const [lightbox, setLightbox] = React.useState(null);
-  // Mobile shows a tighter 3x3 grid instead of the desktop 6-wide layout, so the thumbnail cap
-  // needs to track the same breakpoint the CSS grid switches on (see .gallery-thumb-grid).
-  const [isMobile, setIsMobile] = React.useState(() => typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 639px)').matches);
+  // Phone AND tablet widths show a tighter 3x3 grid instead of the real-desktop 6-wide layout
+  // (6 columns at tablet width shrank each thumbnail too small to make out), so the thumbnail
+  // cap needs to track the same breakpoint the CSS grid switches on (see .gallery-thumb-grid).
+  const [isMobile, setIsMobile] = React.useState(() => typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 1023px)').matches);
   React.useEffect(() => {
     if (typeof window === 'undefined' || !window.matchMedia) return undefined;
-    const mq = window.matchMedia('(max-width: 639px)');
+    const mq = window.matchMedia('(max-width: 1023px)');
     const handleChange = () => setIsMobile(mq.matches);
     handleChange();
     if (mq.addEventListener) mq.addEventListener('change', handleChange);
