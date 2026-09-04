@@ -1655,11 +1655,10 @@ export function CalendarGrid({
         const displayColor = getAnniversaryDisplayColor(ann, calendar);
         const isHeundeul = isHeundeulDosirakAnn(ann);
         // 흔들도시락은 애니메이션이 붙은 특수 아이콘이라 원형 그대로 유지한다. 일반 기념일은
-        // 아이콘 없는 9px짜리 "점"이었는데, 참여자 뱃지도 모바일에서 똑같이 작은 원으로 보여서
-        // 서로 구분이 안 됐다 -- 원형 대신 셀 가로폭을 꽉 채우는 얇은 캡슐(막대) 모양으로 바꿔서
-        // 하루짜리 기념일이라도 참여자 점과 혼동되지 않게 한다. 여러 개면 부모의 flexWrap 덕에
-        // 각자 한 줄씩 자연히 쌓인다(너비 100%이므로).
-        const badgeSize = isHeundeul ? 18 : 9;
+        // 아이콘 없는 캡슐(막대) 모양인데, 하루짜리든 연일(festival-bar)이든 두께가 똑같아
+        // 보여야 하므로 FESTIVAL_BAR_HEIGHT_MOBILE과 동일한 값을 쓴다 -- 참여자 점과도
+        // 혼동되지 않는다(원형이 아니라 셀 가로폭을 꽉 채우는 막대라서).
+        const badgeSize = isHeundeul ? 18 : FESTIVAL_BAR_HEIGHT_MOBILE;
         return /*#__PURE__*/React.createElement("div", {
           key: ann.id || aIdx,
           title: ann.title,

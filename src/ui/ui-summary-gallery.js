@@ -2465,9 +2465,14 @@ export function ContentView({
         id: a.id,
         kind: kindByCategory[a.category],
         title: a.title || '',
-        startDate: a.startDate,
-        endDate: a.endDate,
-        dateLabel: (a.startDate && a.endDate && a.startDate !== a.endDate) ? `${a.startDate} ~ ${a.endDate}` : (a.startDate || ''),
+        // range 타입(dayMode==='range')일 때만 a.startDate/a.endDate가 채워진다. once/yearly
+        // 타입(하루짜리 기념일)은 대신 a.date에 저장되므로, 이걸 빼먹으면 정확히 날짜를 입력해도
+        // 기간이 항상 비어보인다(-> 컨텐츠 상세 시트에서 "정보없음"으로 표시됨).
+        startDate: a.startDate || a.date,
+        endDate: a.endDate || a.date,
+        dateLabel: (a.startDate && a.endDate && a.startDate !== a.endDate)
+          ? `${a.startDate} ~ ${a.endDate}`
+          : (a.startDate || a.date || ''),
         venue: a.place ? (a.place.alias || a.place.name || '') : '',
         address: a.place ? (a.place.address || '') : '',
         description: a.description || '',
@@ -3617,14 +3622,15 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
             style: { flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }
           },
             [
-              ['기간', culturePerf(selected.dateLabel)],
-              ['장소', culturePerf(selected.venue)],
-              ['주소', culturePerf(selected.address)],
-              ['주최', culturePerf(selected.organizer)],
-              ['문의', culturePerf(selected.contact)],
-              ['가격', culturePerf(selected.price)],
-              ['공식 홈페이지', culturePerf(selected.website)]
-            ].map(([label, value]) => /*#__PURE__*/React.createElement("div", {
+              ['기간', selected.dateLabel],
+              ['장소', selected.venue],
+              ['주소', selected.address],
+              ['주최', selected.organizer],
+              ['문의', selected.contact],
+              ['가격', selected.price],
+              ['공식 홈페이지', selected.website]
+            ].filter(([, value]) => value && String(value).trim())
+              .map(([label, value]) => /*#__PURE__*/React.createElement("div", {
               key: label, style: { display: 'flex', gap: '8px', fontSize: 'var(--font-size-sm)' }
             },
               /*#__PURE__*/React.createElement("span", { style: { flexShrink: 0, width: '84px', color: 'var(--text-muted)', fontWeight: 700 } }, label),
