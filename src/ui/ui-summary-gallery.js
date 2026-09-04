@@ -1069,10 +1069,10 @@ export function MemoPreviewSection({ memos = [], calendar = null, onViewAll, onO
       "data-no-press-feedback": true,
       onClick: () => setCollapsed(prev => !prev),
       onKeyDown: handleTitleKeyDown,
-      style: { display: 'flex', alignItems: 'center', gap: '6px', width: '100%', color: '#2563EB', cursor: 'pointer' }
+      style: { display: 'flex', alignItems: 'center', gap: '6px', width: '100%', color: 'var(--text-main)', cursor: 'pointer' }
     },
       /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0, color: '#2563EB' }
+        style: { display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0, color: 'var(--text-main)' }
       },
         /*#__PURE__*/React.createElement(MemoSectionIcon, null),
         /*#__PURE__*/React.createElement("span", null, "메모")
@@ -1210,10 +1210,10 @@ export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalG
       "data-no-press-feedback": true,
       onClick: () => setCollapsed(prev => !prev),
       onKeyDown: handleGalleryTitleKeyDown,
-      style: { display: 'flex', alignItems: 'center', gap: '6px', width: '100%', color: '#2563EB', cursor: 'pointer' }
+      style: { display: 'flex', alignItems: 'center', gap: '6px', width: '100%', color: 'var(--text-main)', cursor: 'pointer' }
     },
       /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0, color: '#2563EB' }
+        style: { display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0, color: 'var(--text-main)' }
       },
         /*#__PURE__*/React.createElement(GalleryIcon, null),
         /*#__PURE__*/React.createElement("span", null, "갤러리")
