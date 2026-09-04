@@ -1913,8 +1913,8 @@ export function HistoryView({
 
   const customPersonTags = Array.isArray(calendar?.customPersonTags) ? calendar.customPersonTags : [];
   const personTagChips = [
-    ...activeParticipants.map(p => ({ id: p.id, label: p.name, color: p.color || '#7C3AED' })),
-    ...customPersonTags.filter(t => !activeParticipants.some(p => p.name === t)).map(t => ({ id: `custom_${t}`, label: t, color: '#64748B' }))
+    ...activeParticipants.map(p => ({ id: p.id, participantId: p.id, label: p.name, color: p.color || '#7C3AED' })),
+    ...customPersonTags.filter(t => !activeParticipants.some(p => p.name === t)).map(t => ({ id: `custom_${t}`, participantId: null, label: t, color: '#64748B' }))
   ];
 
   // 인물/추억 탭이 공유하는 사진 목록 -- 갤러리 페이지(PhotoGallery)와 동일한 소스(채팅/메모/모임
@@ -1934,15 +1934,25 @@ export function HistoryView({
     if (/^[가-힣]{2,3}$/.test(trimmed)) variants.add(trimmed.slice(1));
     return Array.from(variants);
   };
-  const getPhotosForTagLabel = React.useCallback(label => {
+  // tag는 {label, participantId} -- participantId가 있으면(실제 캘린더 참여자) 그 사람이
+  // 보낸 채팅/메모 사진을 자동으로 매칭하고, 그 위에 해시태그(#이름) 매칭도 함께 적용한다.
+  // 참여자가 아닌 커스텀 인물 태그(예: "삼촌")는 participantId가 없어 해시태그로만 매칭된다 --
+  // 참여자 이름 태그만으로는 지금까지 등록된 사진 대부분이 "0장"으로 보이던 원인이었다: 사진에
+  // 누가 보냈는지는 이미 알고 있는데, 그 정보를 전혀 쓰지 않고 수동 해시태그만 보고 있었다.
+  const getPhotosForTagLabel = React.useCallback((label, participantId) => {
     if (!label) return [];
     const variants = getPersonNameVariants(label).map(v => v.toLowerCase());
     return historyPhotoEntries.filter(entry => {
+      if (participantId && entry.participantId && entry.participantId === participantId) return true;
       const tokens = entryTagTokens(entry).map(t => t.toLowerCase());
       return variants.some(v => tokens.includes(v));
     });
   }, [historyPhotoEntries]);
-  const photosForPersonTag = React.useMemo(() => getPhotosForTagLabel(selectedPersonTag), [getPhotosForTagLabel, selectedPersonTag]);
+  const selectedPersonTagChip = personTagChips.find(t => t.label === selectedPersonTag) || null;
+  const photosForPersonTag = React.useMemo(
+    () => getPhotosForTagLabel(selectedPersonTag, selectedPersonTagChip?.participantId),
+    [getPhotosForTagLabel, selectedPersonTag, selectedPersonTagChip]
+  );
   // 인물/추억 탭은 갤러리 페이지(PhotoGallery)와 달리 지금까지 setActiveLightbox에 URL 목록만
   // 넘겨서, 공유 라이트박스 호스트(app-main.js)가 받는 meta가 비어 태그 입력/삭제/교체 등 표준
   // 라이트박스 기능이 전혀 동작하지 않았다. PhotoGallery와 동일하게 이 탭 전용 라이트박스를
@@ -2154,8 +2164,10 @@ export function HistoryView({
     // 사진을 배경으로, 딤 처리 위에 여행 타이틀). 칸을 누르면 그 여행 사진만 모아 보여주는
     // 상세 페이지로 들어간다.
     historyTab === 'memories' && !selectedMemoryGroupId && /*#__PURE__*/React.createElement("div", {
+      // PC에서 벤또 그리드가 뷰포트 전체 폭으로 늘어나 칸이 지나치게 커 보이던 문제 -- 다른
+      // 페이지들과 비슷한 읽기 폭으로 콘텐츠 최대폭을 제한하고 가운데 정렬한다.
       style: { flex: 1, overflowY: 'auto', padding: '118px 16px 16px' }
-    },
+    }, /*#__PURE__*/React.createElement("div", { style: { maxWidth: '640px', margin: '0 auto' } },
       travelMemoryGroups.length === 0
         ? /*#__PURE__*/React.createElement("div", {
             style: {
@@ -2167,7 +2179,7 @@ export function HistoryView({
             /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-main)' } }, "등록된 여행 일정이 없습니다"),
             /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)' } }, "기념일 등록에서 '여행' 카테고리로 일정을 추가하면, 그 기간에 등록된 사진을 여기 모아 보여줘요.")
           )
-        : /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' } },
+        : /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px' } },
             travelMemoryGroups.map(group => {
               const cover = group.photos[0];
               return /*#__PURE__*/React.createElement("button", {
@@ -2203,14 +2215,14 @@ export function HistoryView({
               );
             })
           )
-    ),
+    )),
     // 추억 상세 페이지: 특정 여행 칸을 눌렀을 때 그 여행 사진만 모아 보여준다.
     historyTab === 'memories' && !!selectedMemoryGroupId && (() => {
       const group = travelMemoryGroups.find(g => g.id === selectedMemoryGroupId);
       if (!group) return null;
       return /*#__PURE__*/React.createElement("div", {
-        style: { flex: 1, overflowY: 'auto', padding: '118px 16px 16px', display: 'flex', flexDirection: 'column', gap: '12px' }
-      },
+        style: { flex: 1, overflowY: 'auto', padding: '118px 16px 16px' }
+      }, /*#__PURE__*/React.createElement("div", { style: { maxWidth: '640px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '12px' } },
         /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
           /*#__PURE__*/React.createElement("button", {
             type: "button", onClick: () => setSelectedMemoryGroupId(null), "aria-label": "추억 목록으로",
@@ -2228,7 +2240,7 @@ export function HistoryView({
           )
         ),
         /*#__PURE__*/React.createElement("div", {
-          style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px' }
+          style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '4px' }
         }, group.photos.map((photo, idx) => /*#__PURE__*/React.createElement("button", {
           key: photo.mediaKey || photo.refKey || `${group.id}_${idx}`,
           type: "button",
@@ -2239,18 +2251,49 @@ export function HistoryView({
           style: { width: '100%', height: '100%', objectFit: 'cover' }
         })))
         )
-      );
+      ));
     })(),
     // 인물 탭: 인물별 벤또 그리드(칸마다 그 사람 사진이 붙은 사진 중 하나를 커버로 보여줌).
     // 칸을 누르면 그 사람으로 태그된 사진만 모아 보여주는 상세 페이지로 들어간다.
     historyTab === 'people' && !selectedPersonTag && /*#__PURE__*/React.createElement("div", {
-      style: { flex: 1, overflowY: 'auto', padding: '118px 16px 16px', display: 'flex', flexDirection: 'column', gap: '16px' }
-    },
+      style: { flex: 1, overflowY: 'auto', padding: '118px 16px 16px' }
+    }, /*#__PURE__*/React.createElement("div", { style: { maxWidth: '640px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '16px' } },
+      // 새 인물 태그 추가 -- 벤또 그리드 위로 이동(추가 즉시 그리드에 반영되는 걸 바로 보기
+      // 쉽도록). 기존 .form-input/.btn-primary만으로는 패딩/높이/모서리가 다른 입력·버튼과
+      // 달라 보였어서, 이 화면에서 직접 크기/스타일을 지정해 나머지 디자인과 맞춘다.
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
+        /*#__PURE__*/React.createElement("input", {
+          type: "text",
+          placeholder: "새 인물 태그 추가 (예: 삼촌)",
+          value: newPersonTag,
+          onChange: e => setNewPersonTag(e.target.value),
+          onKeyDown: e => { if (e.key === 'Enter') { e.preventDefault(); handleAddPersonTagClick(); } },
+          style: {
+            flex: 1, height: '40px', padding: '0 14px', borderRadius: 'var(--radius-md)',
+            border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)',
+            color: 'var(--text-main)', fontSize: 'var(--font-size-sm)'
+          }
+        }),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          disabled: isAddingPersonTag || !newPersonTag.trim(),
+          onClick: handleAddPersonTagClick,
+          style: {
+            flexShrink: 0, height: '40px', padding: '0 16px', borderRadius: 'var(--radius-md)',
+            border: 'none', background: 'var(--accent-gradient)', color: '#fff',
+            fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer',
+            opacity: (isAddingPersonTag || !newPersonTag.trim()) ? 0.5 : 1
+          }
+        }, "태그 추가")
+      ),
+      /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' } },
+        "칸을 누르면 그 사람으로 태그된 사진을 모아 보여줘요. 사진에 태그를 달려면 갤러리에서 사진을 열고 해시태그로 그 이름을 추가하세요."
+      ),
       personTagChips.length === 0
-        ? /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' } }, "태그가 없습니다. 아래에서 인물 태그를 추가해 보세요.")
-        : /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' } },
+        ? /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' } }, "태그가 없습니다. 위에서 인물 태그를 추가해 보세요.")
+        : /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px' } },
             personTagChips.map(tag => {
-              const tagPhotos = getPhotosForTagLabel(tag.label);
+              const tagPhotos = getPhotosForTagLabel(tag.label, tag.participantId);
               const cover = tagPhotos[0];
               return /*#__PURE__*/React.createElement("button", {
                 key: tag.id,
@@ -2284,32 +2327,12 @@ export function HistoryView({
                 )
               );
             })
-          ),
-      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
-        /*#__PURE__*/React.createElement("input", {
-          type: "text",
-          className: "form-input",
-          placeholder: "새 인물 태그 추가 (예: 삼촌)",
-          value: newPersonTag,
-          onChange: e => setNewPersonTag(e.target.value),
-          onKeyDown: e => { if (e.key === 'Enter') { e.preventDefault(); handleAddPersonTagClick(); } },
-          style: { flex: 1 }
-        }),
-        /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          className: "btn-primary",
-          disabled: isAddingPersonTag || !newPersonTag.trim(),
-          onClick: handleAddPersonTagClick
-        }, "태그 추가")
-      ),
-      /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' } },
-        "칸을 누르면 그 사람으로 태그된 사진을 모아 보여줘요. 사진에 태그를 달려면 갤러리에서 사진을 열고 해시태그로 그 이름을 추가하세요."
-      )
-    ),
+          )
+    )),
     // 인물 상세 페이지: 특정 인물 칸을 눌렀을 때 그 사람으로 태그된 사진만 모아 보여준다.
     historyTab === 'people' && !!selectedPersonTag && /*#__PURE__*/React.createElement("div", {
-      style: { flex: 1, overflowY: 'auto', padding: '118px 16px 16px', display: 'flex', flexDirection: 'column', gap: '12px' }
-    },
+      style: { flex: 1, overflowY: 'auto', padding: '118px 16px 16px' }
+    }, /*#__PURE__*/React.createElement("div", { style: { maxWidth: '640px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '12px' } },
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
         /*#__PURE__*/React.createElement("button", {
           type: "button", onClick: () => setSelectedPersonTag(null), "aria-label": "인물 목록으로",
@@ -2324,7 +2347,7 @@ export function HistoryView({
       photosForPersonTag.length === 0
         ? /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' } }, `#${selectedPersonTag} 태그가 달린 사진이 아직 없어요.`)
         : /*#__PURE__*/React.createElement("div", {
-            style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px' }
+            style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '4px' }
           }, photosForPersonTag.map((photo, idx) => /*#__PURE__*/React.createElement("button", {
             key: photo.mediaKey || photo.refKey || `person_${idx}`,
             type: "button",
@@ -2335,7 +2358,7 @@ export function HistoryView({
             style: { width: '100%', height: '100%', objectFit: 'cover' }
           })))
           )
-    ),
+    )),
 
     historyLightbox && Lightbox && /*#__PURE__*/React.createElement(Lightbox, {
       urls: historyLightbox.urls,
