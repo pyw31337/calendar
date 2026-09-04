@@ -1958,7 +1958,7 @@ export function CommentsSection({
     onClick: toggleCommentsSection
   }, /*#__PURE__*/React.createElement("div", {
     className: "summary-title",
-    style: { color: '#2563EB', marginBottom: 0, display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }
+    style: { color: 'var(--text-main)', marginBottom: 0, display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }
   }, /*#__PURE__*/React.createElement(ChatSectionIcon, null), "채팅"),
   /*#__PURE__*/React.createElement("div", {
     style: { marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }
@@ -2700,7 +2700,7 @@ export function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCan
     onClick: togglePollList
   }, /*#__PURE__*/React.createElement("div", {
     className: "summary-title",
-    style: { color: '#2563EB', marginBottom: 0, display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }
+    style: { color: 'var(--text-main)', marginBottom: 0, display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }
   }, /*#__PURE__*/React.createElement(PollSectionIcon, null), "\uC9C4\uD589\uC911 \uD22C\uD45C ", /*#__PURE__*/React.createElement(SectionCountBadge, { count: polls.length })),
   /*#__PURE__*/React.createElement(SectionToggleButton, {
     collapsed: !anyPollOpen,

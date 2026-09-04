@@ -1224,8 +1224,19 @@ export function DateModal({
     try {
       const cleanName = sanitizeText(selectedPlace.name || '', 80);
       const cleanAddress = normalizePlaceAddressForSave(selectedPlace.address || '', selectedPlace.lat, selectedPlace.lng);
-      const cleanMemo = sanitizeText(placeMemo.trim() || '', 2000);
-      
+      // 장소 메모를 직접 입력하지 않고 저장하면, 이 날짜에 이미 적혀 있는 참석 메모("참석" 탭의
+      // 일정 메모)를 "참여자 / 메모" 형식으로 대신 채워 넣는다 -- 09월09일처럼 참석 메모만 남기고
+      // 장소는 빈 메모로 등록해버리면, 장소 히스토리만 봐서는 그 장소를 왜 갔는지 알 수 없었다.
+      // 직접 입력한 메모가 있으면(cleanMemo) 그건 그대로 우선한다.
+      const autoMemoFromAttendance = dateEntries
+        .filter(e => e && e.note && e.note.trim() && e.participantId !== BULK_NO_PARTICIPANT_ID)
+        .map(e => {
+          const name = (activeParticipants.find(p => p.id === e.participantId) || {}).name || '참여자';
+          return `${name} / ${e.note.trim()}`;
+        })
+        .join('\n');
+      const cleanMemo = sanitizeText((placeMemo.trim() || autoMemoFromAttendance || ''), 2000);
+
       const newPlaceData = {
         id: editingLinkedPlaceId || undefined,
         name: cleanName,

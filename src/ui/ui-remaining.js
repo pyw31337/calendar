@@ -1392,10 +1392,10 @@ export function PlacesSection({ calendar, onViewAll, onSelectPlace }) {
       "data-no-press-feedback": true,
       onClick: () => setCollapsed(prev => !prev),
       onKeyDown: handleSectionTitleKeyDown,
-      style: { display: 'flex', alignItems: 'center', gap: '6px', width: '100%', color: '#2563EB', cursor: 'pointer' }
+      style: { display: 'flex', alignItems: 'center', gap: '6px', width: '100%', color: 'var(--text-main)', cursor: 'pointer' }
     },
       /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0, color: '#2563EB' }
+        style: { display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0, color: 'var(--text-main)' }
       },
         /*#__PURE__*/React.createElement(PlaceSectionIcon, null),
         /*#__PURE__*/React.createElement("span", null, "장소")
