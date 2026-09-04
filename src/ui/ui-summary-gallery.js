@@ -3300,6 +3300,17 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
   // switching tabs unmounts this component and this state naturally resets with it.
   const [categoryFilter, setCategoryFilter] = React.useState('');
 
+  // 문화공연 스냅샷은 1500개 안팎, 스포츠도 700개 안팎이라 필터 없이 전부 DOM에 한꺼번에
+  // 그려버리면(포스터 이미지 <img>는 loading:'lazy'라 네트워크는 지연되지만, 카드 자체의 DOM
+  // 노드 생성/레이아웃은 즉시 전부 일어남) 저사양 모바일에서 탭 진입 시 버벅임이 생긴다.
+  // 한 번에 60개만 그리고 "더 보기"로 늘려가는 방식으로 초기 렌더 부담을 줄인다.
+  const CULTURE_RENDER_PAGE_SIZE = 60;
+  const [renderLimit, setRenderLimit] = React.useState(CULTURE_RENDER_PAGE_SIZE);
+  // 필터가 바뀌면(지역/카테고리) 보여줄 항목 자체가 달라지므로 페이지 크기를 처음부터 다시 센다.
+  React.useEffect(() => {
+    setRenderLimit(CULTURE_RENDER_PAGE_SIZE);
+  }, [categoryFilter, regionSelections, dataUrl]);
+
   React.useEffect(() => {
     let cancelled = false;
     setItems(null);
@@ -3462,6 +3473,9 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
     );
   }
 
+  const visibleItems = filteredItems.slice(0, renderLimit);
+  const hasMoreToRender = filteredItems.length > visibleItems.length;
+
   return /*#__PURE__*/React.createElement(React.Fragment, null,
     renderedCategoryChipRow,
     /*#__PURE__*/React.createElement("div", {
@@ -3469,7 +3483,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
       onScroll,
       style: { flex: 1, overflowY: 'auto', padding: '16px', paddingTop: contentPaddingTop, alignContent: 'start' }
     },
-      filteredItems.map(item => {
+      visibleItems.map(item => {
         const registered = !!findRegisteredAnniversary(item.id);
         return /*#__PURE__*/React.createElement("button", {
           key: item.id,
@@ -3586,7 +3600,16 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
             }, item.address || CULTURE_MISSING_LABEL)
           )
         );
-      })
+      }),
+      hasMoreToRender && /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => setRenderLimit(limit => limit + CULTURE_RENDER_PAGE_SIZE),
+        style: {
+          gridColumn: '1 / -1', padding: '12px', borderRadius: 'var(--radius-md)',
+          border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)',
+          color: 'var(--text-main)', fontWeight: 700, fontSize: 'var(--font-size-sm)', cursor: 'pointer'
+        }
+      }, `더 보기 (${visibleItems.length}/${filteredItems.length})`)
     ),
     selected && ReactDOM.createPortal(
       /*#__PURE__*/React.createElement("div", {
