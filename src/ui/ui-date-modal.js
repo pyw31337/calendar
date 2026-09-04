@@ -847,7 +847,9 @@ export function DateModal({
   showToast,
   onParticipantClick,
   syncStatus = null,
-  onEditAnniversary
+  onEditAnniversary,
+  onAddAnniversaryForDate = null,
+  onFocusCultureSource = null
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -2492,7 +2494,24 @@ export function DateModal({
       alignItems: 'center',
       gap: '12px'
     }
-  }, /*#__PURE__*/React.createElement("button", {
+  }, onAddAnniversaryForDate && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => { if (!isSubmitting) onAddAnniversaryForDate(dateStr); },
+    style: {
+      background: 'none',
+      border: '1px solid var(--border-subtle)',
+      borderRadius: 'var(--radius-full)',
+      color: 'var(--text-muted)',
+      fontSize: 'var(--font-size-xs)',
+      fontWeight: 700,
+      cursor: 'pointer',
+      padding: '5px 10px',
+      display: 'flex',
+      alignItems: 'center',
+      whiteSpace: 'nowrap'
+    },
+    title: "이 날짜로 기념일 등록"
+  }, "+ 기념일 등록"), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => {
       if (!isSubmitting) requestClose();
@@ -2566,9 +2585,21 @@ export function DateModal({
           });
         };
         const dateDisplay = getAnnBannerDateDisplay(ann);
+        // 컨텐츠(지역축제/문화행사/스포츠)에서 등록한 기념일은 원본 카드로 바로 이동할 수 있게
+        // 제목을 누르면 해당 탭을 열고 그 항목 상세를 자동으로 펼친다 (직접 만든 기념일은 대상이
+        // 없으므로 cultureSourceId가 있을 때만).
+        const canFocusCultureSource = !!(ann.cultureSourceId && typeof onFocusCultureSource === 'function');
         const titleRow = /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
           renderAnniversaryIcon(ann, 14), " ",
-          /*#__PURE__*/React.createElement("span", { style: { flex: 1, minWidth: 0 } }, ann.title),
+          /*#__PURE__*/React.createElement("span", {
+            style: {
+              flex: 1, minWidth: 0, fontSize: 'var(--font-size-lg)', fontWeight: 800,
+              cursor: canFocusCultureSource ? 'pointer' : undefined,
+              textDecoration: canFocusCultureSource ? 'underline' : undefined,
+              textUnderlineOffset: canFocusCultureSource ? '2px' : undefined
+            },
+            onClick: canFocusCultureSource ? (e) => { e.stopPropagation(); onFocusCultureSource(ann); } : undefined
+          }, ann.title),
           photos.length > 0 && MediaThumb && /*#__PURE__*/React.createElement(MediaThumb, {
             src: photos[0].thumbUrl || photos[0].url,
             fallbackSrc: photos[0].url || photos[0].thumbUrl,
@@ -2665,12 +2696,14 @@ export function DateModal({
             style: {
               display: 'flex',
               flexDirection: 'column',
-              gap: 0,
+              gap: '4px',
               padding: '10px 12px',
               backgroundColor: displayColor,
               color: '#fff',
-              fontSize: 'var(--font-size-md)',
-              fontWeight: 'bold',
+              // 제목은 titleRow 안에서 별도로 더 크고 굵게 설정되므로, 여기 기본값은 날짜/장소가
+              // 상속받을 더 작고 옅은 값으로 낮춰 제목과의 부모-자식 위계를 준다.
+              fontSize: 'var(--font-size-sm)',
+              fontWeight: 500,
               cursor: hasDetail ? 'pointer' : 'default'
             }
           },
@@ -2695,7 +2728,10 @@ export function DateModal({
                 fontSize: 'var(--font-size-sm)',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '6px'
+                gap: '6px',
+                // 원본 설명에 있던 줄바꿈을 그대로 살려서(기본 white-space:normal은 \n을 공백으로
+                // 접어버려 여러 문단이 한 줄처럼 붙어 보였음) 문단 구분이 보이도록 한다.
+                whiteSpace: 'pre-line'
               }
             },
               descText ? renderTextWithUrlBadge(descText) : null,
