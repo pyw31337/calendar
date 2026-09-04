@@ -26,9 +26,15 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SOURCE_URL = 'https://pyw31337.github.io/culture/data/performances.json';
 const DATA_DIR = path.resolve(__dirname, '../public-vite/data');
 
+// 스포츠(culture-sports.json)는 source가 아니라 genre로 고른다 -- Culture Flow의 야구/농구/배구/
+// 축구/핸드볼 스크레이퍼들은 각자 다른 소스 키(kbo/kbl/kovo/football/handball 등)를 쓰지만, 다섯
+// 종목 모두 raw.genre를 baseball/basketball/volleyball/soccer/handball 중 하나로 일관되게 채운다
+// (Culture Flow scripts/generate-performance-json.ts의 GENRE_LABELS/FALLBACK_IMAGES와 동일한 값).
+const SPORTS_GENRES = new Set(['baseball', 'basketball', 'volleyball', 'soccer', 'handball']);
 const FEEDS = [
   { file: 'culture-performances.json', sources: new Set(['culture-portal', 'kopis']), label: 'performances' },
-  { file: 'culture-festivals.json', sources: new Set(['festival']), label: 'festivals' }
+  { file: 'culture-festivals.json', sources: new Set(['festival']), label: 'festivals' },
+  { file: 'culture-sports.json', genres: SPORTS_GENRES, label: 'sports' }
 ];
 
 function parseDateRange(raw) {
@@ -92,7 +98,14 @@ function normalizeItem(raw) {
       // several paragraphs, the single biggest field) keeps the payload reasonable for a tab
       // that's fetched fresh on open rather than paginated.
       description: String(raw.description || '').slice(0, 600),
-      source: raw.source || ''
+      source: raw.source || '',
+      // 스포츠 경기 전용 필드 -- Culture Flow의 KBO/K리그/KBL/KOVO/핸드볼코리아 스크레이퍼가 이미
+      // 홈/원정팀과 팀 로고를 함께 수집하고 있어 그대로 전달한다 (culture-performances.json/
+      // culture-festivals.json에는 없던 정보이므로 두 필드가 없는 항목에서는 빈 값으로 남는다).
+      homeTeam: raw.homeTeam || '',
+      awayTeam: raw.awayTeam || '',
+      homeTeamLogo: resolveImageUrl(raw.homeTeamLogo),
+      awayTeamLogo: resolveImageUrl(raw.awayTeamLogo)
     }
   };
 }
@@ -234,13 +247,15 @@ async function main() {
   for (const feed of FEEDS) {
     let normalized = [];
     for (const raw of all) {
-      if (!raw || !feed.sources.has(raw.source)) continue;
+      if (!raw) continue;
+      const matches = feed.genres ? feed.genres.has(raw.genre) : feed.sources.has(raw.source);
+      if (!matches) continue;
       if (REQUIRED_FIELDS.some(f => !raw[f])) continue;
       const { startDate, endDate, item } = normalizeItem(raw);
       if (!isVisible(endDate, startDate, todayIso)) continue;
       normalized.push(item);
     }
-    if (feed.sources.size > 1) normalized = mergeDuplicates(normalized);
+    if (feed.sources && feed.sources.size > 1) normalized = mergeDuplicates(normalized);
     writeFeedIfHealthy(path.resolve(DATA_DIR, feed.file), normalized, feed.label);
   }
 }

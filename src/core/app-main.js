@@ -2538,10 +2538,10 @@ function CalendarApp() {
     const anniversaryId = 'anniversary_culture_' + stamp + '_' + Math.random().toString(36).slice(2, 8);
     const startDate = item.startDate || item.endDate;
     if (!startDate) { showToast('공연 기간 정보가 없어 등록할 수 없습니다.', 'error'); return null; }
-    // 문화공연 tab → event(행사), 지역축제 tab → festival(축제). Prefer explicit options.category,
-    // then item.anniversaryCategory / item.kind from the register checkbox path.
-    const rawCategory = (options && options.category) || item.anniversaryCategory || (item.kind === 'festival' ? 'festival' : 'event');
-    const category = rawCategory === 'festival' ? 'festival' : 'event';
+    // 문화행사 tab → event(행사), 지역축제 tab → festival(축제), 스포츠 tab → sports. Prefer explicit
+    // options.category, then item.anniversaryCategory / item.kind from the register checkbox path.
+    const rawCategory = (options && options.category) || item.anniversaryCategory || item.kind || 'event';
+    const category = (rawCategory === 'festival' || rawCategory === 'sports') ? rawCategory : 'event';
     const annData = {
       id: anniversaryId,
       calendarId: activeCal.id,
@@ -2665,10 +2665,23 @@ function CalendarApp() {
     }
   };
 
-  // 보관함 > 컨텐츠 등록: calendar-owned custom culture/festival cards merged into the
-  // CulturePerformancesTab lists alongside crawled JSON snapshots.
+  // 보관함 > 인물 탭의 "태그 추가" -- 참여자 외에 직접 구분하고 싶은 인물(예: "삼촌")을 캘린더
+  // 단위 커스텀 태그 목록에 저장한다. 사진 자체에는 이미 있는 해시태그 기능(라이트박스)으로 태그를
+  // 붙이므로, 여기서는 그 태그를 인물 탭에 칩으로 노출시키기 위한 이름 목록만 관리한다.
+  const handleAddPersonTag = async (label) => {
+    const trimmed = String(label || '').trim();
+    if (!trimmed || !activeCal) return false;
+    const existing = Array.isArray(activeCal.customPersonTags) ? activeCal.customPersonTags : [];
+    if (existing.includes(trimmed)) return true;
+    const nextCalendars = calendars.map(c => c.id === activeCal.id ? { ...c, customPersonTags: [...existing, trimmed] } : c);
+    const ok = await updateCalendars(nextCalendars, '태그가 추가되었습니다.', 'success', activeCal.id, 'settings');
+    return ok;
+  };
+
+  // 보관함 > 컨텐츠 등록 / 컨텐츠 페이지: calendar-owned custom culture/festival/sports cards
+  // merged into the CulturePerformancesTab lists alongside crawled JSON snapshots.
   React.useEffect(() => {
-    if (!activeCalId || activeView !== 'history') return;
+    if (!activeCalId || (activeView !== 'history' && activeView !== 'content')) return;
     let isMounted = true;
     const applyList = (list) => {
       if (!isMounted) return;
@@ -7190,12 +7203,8 @@ function CalendarApp() {
           if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsHistoryShareOpen(true);
         },
         syncStatus: syncStatus,
-        anniversaries: anniversaries,
-        onRegisterCultureEvent: handleRegisterCultureEvent,
-        onUnregisterCultureEvent: handleUnregisterCultureEvent,
-        onQuickSaveMemo: handleQuickSaveCultureMemo,
-        customCultureItems: customCultureItems,
-        onSaveCustomCultureItem: handleSaveCustomCultureItem,
+        onSearchTag: handleSearchTag,
+        onAddPersonTag: handleAddPersonTag,
         showToast: showToast,
         ...navMenuProps
       }),
@@ -7204,6 +7213,25 @@ function CalendarApp() {
         shareType: "history",
         showToast: showToast,
         onClose: () => setIsHistoryShareOpen(false)
+      }),
+      sharedAppOverlays
+    ));
+  }
+
+  if (activeView === 'content') {
+    return withStickyVideo(/*#__PURE__*/React.createElement(React.Fragment, null,
+      /*#__PURE__*/React.createElement(ContentView, {
+        calendar: activeCal,
+        onBack: () => changeView('calendar'),
+        onOpenAppSettings: () => setIsAppSettingsOpen(true),
+        anniversaries: anniversaries,
+        onRegisterCultureEvent: handleRegisterCultureEvent,
+        onUnregisterCultureEvent: handleUnregisterCultureEvent,
+        onQuickSaveMemo: handleQuickSaveCultureMemo,
+        customCultureItems: customCultureItems,
+        onSaveCustomCultureItem: handleSaveCustomCultureItem,
+        showToast: showToast,
+        ...navMenuProps
       }),
       sharedAppOverlays
     ));
@@ -10884,6 +10912,7 @@ function getAnniversaryCategoryBadge(category) {
     birthday: { badgeColor: '#EF4444', icon: '🎂' },
     event: { badgeColor: '#3B82F6', icon: '🎈' },
     festival: { badgeColor: '#F59E0B', icon: '🎉' },
+    sports: { badgeColor: '#0EA5E9', icon: '⚽' },
     travel: { badgeColor: '#10B981', icon: '✈️' },
     other: { badgeColor: '#6B7280', icon: '💬' }
   };
@@ -11356,6 +11385,10 @@ function PlacesView(props) {
 }
 function HistoryView(props) {
   const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.HistoryView;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function ContentView(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ContentView;
   return typeof C === 'function' ? React.createElement(C, props) : null;
 }
 
