@@ -1456,6 +1456,16 @@ export function AnniversaryModal({
     )
   );
 
+  // '전체' 탭은 카테고리로 나누지 않고, 등록일(createdAt) 최신순으로 평평하게 나열한다 --
+  // 카테고리별로 묶으면 방금 등록한 항목이 자기 카테고리 그룹 맨 위로 파묻혀 "최근 등록한 게
+  // 맨 위"라는 감각이 사라지기 때문. 특정 카테고리 칩을 고르면(아래) 그 카테고리 하나만 보이는
+  // 기존 그룹 렌더링을 그대로 쓴다.
+  const renderFlatAnniversaryList = () => {
+    return [...anniversaries]
+      .sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0))
+      .map(renderAnniversaryRow);
+  };
+
   // Groups the list by category, in ANNIVERSARY_CATEGORY_OPTIONS order, with a header (icon +
   // label + count) above each non-empty group -- legacy items with no category field group under
   // 생일 (getAnniversaryCategoryBadge falls back the same way for their calendar badge color).
@@ -1571,7 +1581,7 @@ export function AnniversaryModal({
                 }
               }, "등록된 기념일이 없습니다. 매년 돌아오는 생일이나 D-Day를 등록해 보세요. 🎂")
             : (() => {
-                const grouped = renderGroupedAnniversaryList();
+                const grouped = listCategoryFilter === 'all' ? renderFlatAnniversaryList() : renderGroupedAnniversaryList();
                 const hasAny = grouped.some(Boolean);
                 return hasAny ? grouped : /*#__PURE__*/React.createElement("div", {
                   style: {

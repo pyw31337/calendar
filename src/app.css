@@ -1822,6 +1822,19 @@ select.form-select {
     display: flex !important;
   }
 }
+/* Range-type (연일 festival/event) bars -- same desktop/mobile split as the single-day
+   anniversary badges above, see festivalBars.flatMap in ui-calendar-core.js. */
+.festival-bar-mobile {
+  display: none;
+}
+@media (max-width: 640px) {
+  .festival-bar-desktop {
+    display: none !important;
+  }
+  .festival-bar-mobile {
+    display: flex !important;
+  }
+}
 
 /* 흔들도시락 cooking-pot jiggle: .day-cell normally clips with overflow:hidden — lift that
    for cells that host this anniversary so scale~1.5 shake is not cut off. Modest z-index so

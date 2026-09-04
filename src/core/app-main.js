@@ -3050,25 +3050,48 @@ function CalendarApp() {
 
   // Main-screen chat preview safety net:
   // if the count says chat history exists but the live recent window is still empty,
-  // hydrate the newest messages once so the summary widget can render at least the latest
-  // chat instead of a blank state. Prefer the SDK-backed recent-chat path here so a REST
-  // hiccup does not leave the summary looking empty even though the live listener/count are
-  // still healthy.
+  // hydrate the newest messages so the summary widget can render at least the latest
+  // chat instead of getting stuck on "최근 채팅을 불러오는 중…" forever. Prefer the SDK-backed
+  // recent-chat path here so a REST hiccup does not leave the summary looking empty even
+  // though the live listener/count are still healthy.
+  //
+  // fetchRecentChatMessages swallows its own SDK/REST errors and resolves to `[]` rather than
+  // throwing, so a transient failure (a flaky network tick, or the live listener/token state
+  // being in one of the broken states the Firestore SDK watchdog above exists to recover from)
+  // used to end this effect's one and only attempt with nothing to show -- and since neither
+  // `totalChatCount` nor `visibleChatMessages.length` would ever change again on their own,
+  // the widget was left permanently stuck. Retry a few times with backoff instead of giving up
+  // after the first empty result.
   React.useEffect(() => {
     if (!activeCalId || isInitialDataLoading) return;
     if (typeof totalChatCount !== 'number' || totalChatCount <= 0) return;
     if (visibleChatMessages.length > 0) return;
     let cancelled = false;
-    (async () => {
+    let attempt = 0;
+    let retryTimer = null;
+    const MAX_ATTEMPTS = 5;
+    const RETRY_DELAYS_MS = [1500, 3000, 6000, 12000];
+    const tryHydrate = async () => {
+      attempt += 1;
       try {
         const list = await fetchRecentChatMessages(activeCalId, 5);
-        if (cancelled || !Array.isArray(list) || list.length === 0) return;
-        setChatMessages(prev => (Array.isArray(prev) && prev.length > 0) ? prev : list.slice());
+        if (cancelled) return;
+        if (Array.isArray(list) && list.length > 0) {
+          setChatMessages(prev => (Array.isArray(prev) && prev.length > 0) ? prev : list.slice());
+          return;
+        }
       } catch (err) {
         console.warn('chat preview hydration failed:', err);
       }
-    })();
-    return () => { cancelled = true; };
+      if (cancelled || attempt >= MAX_ATTEMPTS) return;
+      const delay = RETRY_DELAYS_MS[Math.min(attempt - 1, RETRY_DELAYS_MS.length - 1)];
+      retryTimer = setTimeout(tryHydrate, delay);
+    };
+    void tryHydrate();
+    return () => {
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
+    };
   }, [activeCalId, isInitialDataLoading, totalChatCount, visibleChatMessages.length]);
 
   React.useEffect(() => {
