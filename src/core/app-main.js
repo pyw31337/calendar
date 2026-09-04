@@ -2105,6 +2105,11 @@ function CalendarApp() {
     confirmedMeeting: unionConfirmedMeetings(rawActiveCal, confirmedMeetingsSubcollection)
   }), [rawActiveCal, placesSubcollection, confirmedMeetingsSubcollection]);
   const meetingPhotoMessageIds = React.useMemo(() => getMeetingOwnedPhotoMessageIds(activeCal), [activeCal]);
+  // Mirrors meetingPhotoMessageIds for effects that need its latest value without depending on
+  // (and being restarted by) its object identity, which changes on essentially every realtime
+  // listener tick since it's derived from `activeCal` -- see the chat-preview hydration effect.
+  const meetingPhotoMessageIdsRef = React.useRef(meetingPhotoMessageIds);
+  meetingPhotoMessageIdsRef.current = meetingPhotoMessageIds;
   const visibleChatMessages = React.useMemo(() => {
     return allChatMessages.filter(msg => isChatRenderableMessage(msg, meetingPhotoMessageIds));
   }, [allChatMessages, meetingPhotoMessageIds]);
@@ -3168,7 +3173,15 @@ function CalendarApp() {
         // "불러오는 중…" forever even though real, older chat existed just outside that window.
         const list = await fetchRecentChatMessages(activeCalId, 20);
         if (cancelled) return;
-        const renderable = Array.isArray(list) ? list.filter(m => isChatRenderableMessage(m, meetingPhotoMessageIds)) : [];
+        // Read meetingPhotoMessageIds via the ref (not the effect's own closure) -- this value
+        // is recomputed from `activeCal`, whose object identity changes on essentially every
+        // realtime listener tick (even for fields unrelated to chat). It used to sit in this
+        // effect's dependency array, which meant the effect itself was torn down and restarted
+        // on every such tick, resetting `attempt` back to 0 before the backoff loop could ever
+        // reach MAX_ATTEMPTS -- so the widget could get stuck on "불러오는 중…" forever on an
+        // active calendar even though the fetch itself was working fine. A ref lets this read
+        // the latest value without making the effect depend on (and restart with) it.
+        const renderable = Array.isArray(list) ? list.filter(m => isChatRenderableMessage(m, meetingPhotoMessageIdsRef.current)) : [];
         if (renderable.length > 0) {
           setChatMessages(prev => (Array.isArray(prev) && prev.length > 0) ? prev : list.slice());
           return;
@@ -3185,7 +3198,7 @@ function CalendarApp() {
         // count, the meeting-linked-photo correction, or the fetch itself is the mismatch.
         console.info('[chat-preview] hydration exhausted', {
           calendarId: activeCalId, rawTotalChatCount: totalChatCount,
-          meetingLinkedCount: meetingPhotoMessageIds.size, visibleTotalChatCount,
+          meetingLinkedCount: meetingPhotoMessageIdsRef.current.size, visibleTotalChatCount,
           visibleChatMessagesLength: visibleChatMessages.length
         });
         setChatPreviewHydrationExhausted(true);
@@ -3199,7 +3212,7 @@ function CalendarApp() {
       cancelled = true;
       if (retryTimer) clearTimeout(retryTimer);
     };
-  }, [activeCalId, isInitialDataLoading, visibleTotalChatCount, visibleChatMessages.length, meetingPhotoMessageIds]);
+  }, [activeCalId, isInitialDataLoading, visibleTotalChatCount, visibleChatMessages.length]);
 
   React.useEffect(() => {
     // Same reasoning as above -- wait for the initial calendar document load to finish before
