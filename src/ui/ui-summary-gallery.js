@@ -1921,7 +1921,8 @@ export function HistoryView({
   // 사진)를 결합해, 태그(인물)나 날짜(추억)로 걸러 보여준다.
   const historyPhotoEntries = React.useMemo(() => buildCombinedPhotoEntries(chatMessages, memos, calendar), [chatMessages, memos, calendar]);
   const [selectedPersonTag, setSelectedPersonTag] = React.useState(null);
-  React.useEffect(() => { setSelectedPersonTag(null); }, [historyTab]);
+  const [selectedMemoryGroupId, setSelectedMemoryGroupId] = React.useState(null);
+  React.useEffect(() => { setSelectedPersonTag(null); setSelectedMemoryGroupId(null); }, [historyTab]);
   const entryTagTokens = entry => String(entry?.tags || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean);
   // 한국식 성+이름 태그 매칭: "박영우"로 등록된 참여자는 "영우"라고만 붙은 사진 해시태그도
   // 같은 사람으로 인식해야 한다. 성 1자를 뗀 이름만으로도 같은 사람을 부르는 경우가 흔하기
@@ -2149,8 +2150,11 @@ export function HistoryView({
         );
       })
     ),
-    historyTab === 'memories' && /*#__PURE__*/React.createElement("div", {
-      style: { flex: 1, overflowY: 'auto', padding: '118px 16px 16px', display: 'flex', flexDirection: 'column', gap: '18px' }
+    // 추억 탭: 인물 탭과 동일하게, 초기화면은 여행별 벤또 그리드(칸마다 그 여행의 최신 등록
+    // 사진을 배경으로, 딤 처리 위에 여행 타이틀). 칸을 누르면 그 여행 사진만 모아 보여주는
+    // 상세 페이지로 들어간다.
+    historyTab === 'memories' && !selectedMemoryGroupId && /*#__PURE__*/React.createElement("div", {
+      style: { flex: 1, overflowY: 'auto', padding: '118px 16px 16px' }
     },
       travelMemoryGroups.length === 0
         ? /*#__PURE__*/React.createElement("div", {
@@ -2163,36 +2167,80 @@ export function HistoryView({
             /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-main)' } }, "등록된 여행 일정이 없습니다"),
             /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)' } }, "기념일 등록에서 '여행' 카테고리로 일정을 추가하면, 그 기간에 등록된 사진을 여기 모아 보여줘요.")
           )
-        : travelMemoryGroups.map(group => /*#__PURE__*/React.createElement("div", {
-            key: group.id,
-            // 여행별로 흰 카드 배경을 둘러서 구간 사이 경계가 뚜렷하게 보이도록 구분.
-            style: {
-              display: 'flex', flexDirection: 'column', gap: '8px',
-              backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)',
-              borderRadius: 'var(--radius-lg)', padding: '12px'
-            }
-          },
-            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '2px' } },
-              /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-md)', fontWeight: 800, color: 'var(--text-main)' } }, group.title),
-              /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' } },
-                group.startDate === group.endDate ? group.startDate : `${group.startDate} ~ ${group.endDate}`,
-                ` · 사진 ${group.photos.length}장`
-              )
-            ),
-            /*#__PURE__*/React.createElement("div", {
-                  style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px' }
-                }, group.photos.map((photo, idx) => /*#__PURE__*/React.createElement("button", {
-                  key: photo.mediaKey || photo.refKey || `${group.id}_${idx}`,
-                  type: "button",
-                  onClick: () => openHistoryLightbox(group.photos, idx, group.id),
-                  style: { padding: 0, border: 'none', borderRadius: 'var(--radius-sm)', overflow: 'hidden', aspectRatio: '1 / 1', cursor: 'pointer', backgroundColor: 'var(--bg-primary)' }
-                }, /*#__PURE__*/React.createElement("img", {
-                  src: photo.thumb || photo.full, alt: "", loading: "lazy", decoding: "async",
-                  style: { width: '100%', height: '100%', objectFit: 'cover' }
-                })))
-              )
-          ))
+        : /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' } },
+            travelMemoryGroups.map(group => {
+              const cover = group.photos[0];
+              return /*#__PURE__*/React.createElement("button", {
+                key: group.id,
+                type: "button",
+                onClick: () => setSelectedMemoryGroupId(group.id),
+                style: {
+                  position: 'relative', aspectRatio: '1 / 1', borderRadius: 'var(--radius-lg)', overflow: 'hidden',
+                  border: 'none', padding: 0, cursor: 'pointer', backgroundColor: 'var(--bg-card)'
+                }
+              },
+                cover
+                  ? /*#__PURE__*/React.createElement("img", {
+                      src: cover.thumb || cover.full, alt: "", loading: "lazy", decoding: "async",
+                      style: { width: '100%', height: '100%', objectFit: 'cover' }
+                    })
+                  : /*#__PURE__*/React.createElement("div", {
+                      style: {
+                        width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: '2.2rem'
+                      }
+                    }, "🗺️"),
+                /*#__PURE__*/React.createElement("div", {
+                  style: {
+                    position: 'absolute', left: 0, right: 0, bottom: 0, padding: '8px 10px',
+                    background: 'linear-gradient(transparent, rgba(0,0,0,0.7))',
+                    display: 'flex', flexDirection: 'column', gap: '1px'
+                  }
+                },
+                  /*#__PURE__*/React.createElement("span", { style: { color: '#fff', fontWeight: 800, fontSize: 'var(--font-size-sm)' } }, group.title),
+                  /*#__PURE__*/React.createElement("span", { style: { color: 'rgba(255,255,255,0.85)', fontSize: 'var(--font-size-2xs)' } }, `사진 ${group.photos.length}장`)
+                )
+              );
+            })
+          )
     ),
+    // 추억 상세 페이지: 특정 여행 칸을 눌렀을 때 그 여행 사진만 모아 보여준다.
+    historyTab === 'memories' && !!selectedMemoryGroupId && (() => {
+      const group = travelMemoryGroups.find(g => g.id === selectedMemoryGroupId);
+      if (!group) return null;
+      return /*#__PURE__*/React.createElement("div", {
+        style: { flex: 1, overflowY: 'auto', padding: '118px 16px 16px', display: 'flex', flexDirection: 'column', gap: '12px' }
+      },
+        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+          /*#__PURE__*/React.createElement("button", {
+            type: "button", onClick: () => setSelectedMemoryGroupId(null), "aria-label": "추억 목록으로",
+            style: {
+              width: '32px', height: '32px', borderRadius: '50%', border: 'none', background: 'transparent',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)', flexShrink: 0
+            }
+          }, BackArrowIcon ? /*#__PURE__*/React.createElement(BackArrowIcon, { size: 20 }) : "←"),
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', minWidth: 0 } },
+            /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-lg)', fontWeight: 800, color: 'var(--text-main)' } }, group.title),
+            /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' } },
+              group.startDate === group.endDate ? group.startDate : `${group.startDate} ~ ${group.endDate}`,
+              ` · 사진 ${group.photos.length}장`
+            )
+          )
+        ),
+        /*#__PURE__*/React.createElement("div", {
+          style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px' }
+        }, group.photos.map((photo, idx) => /*#__PURE__*/React.createElement("button", {
+          key: photo.mediaKey || photo.refKey || `${group.id}_${idx}`,
+          type: "button",
+          onClick: () => openHistoryLightbox(group.photos, idx, group.id),
+          style: { padding: 0, border: 'none', borderRadius: 'var(--radius-sm)', overflow: 'hidden', aspectRatio: '1 / 1', cursor: 'pointer', backgroundColor: 'var(--bg-primary)' }
+        }, /*#__PURE__*/React.createElement("img", {
+          src: photo.thumb || photo.full, alt: "", loading: "lazy", decoding: "async",
+          style: { width: '100%', height: '100%', objectFit: 'cover' }
+        })))
+        )
+      );
+    })(),
     // 인물 탭: 인물별 벤또 그리드(칸마다 그 사람 사진이 붙은 사진 중 하나를 커버로 보여줌).
     // 칸을 누르면 그 사람으로 태그된 사진만 모아 보여주는 상세 페이지로 들어간다.
     historyTab === 'people' && !selectedPersonTag && /*#__PURE__*/React.createElement("div", {
@@ -3446,7 +3494,11 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
               }
             },
               /*#__PURE__*/React.createElement("div", {
-                style: { fontSize: '1.3rem', fontWeight: 800, textShadow: '0 1px 3px rgba(0,0,0,0.7)' }
+                style: {
+                  fontSize: '1.3rem', fontWeight: 800, textShadow: '0 1px 3px rgba(0,0,0,0.7)',
+                  backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 'var(--radius-full)', padding: '2px 14px',
+                  maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                }
               }, item.dateLabel || formatCultureDateLabel(item.startDate, item.endDate) || CULTURE_MISSING_LABEL),
               /*#__PURE__*/React.createElement("div", {
                 style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', width: '100%' }
@@ -3476,7 +3528,11 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
                 )
               ),
               /*#__PURE__*/React.createElement("div", {
-                style: { fontSize: '1.2rem', fontWeight: 700, textShadow: '0 1px 3px rgba(0,0,0,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }
+                style: {
+                  fontSize: '1.2rem', fontWeight: 700, textShadow: '0 1px 3px rgba(0,0,0,0.7)',
+                  backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 'var(--radius-full)', padding: '2px 14px',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%'
+                }
               }, item.venue || CULTURE_MISSING_LABEL)
             ),
             registered && /*#__PURE__*/React.createElement("div", {

@@ -106,27 +106,68 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     if (!isValidCalId(calId)) return [];
     const pageSize = Math.max(1, Math.min(100, Number(limit) || 60));
     const firebaseDb = getDb();
+    // Firestore's orderBy() silently excludes any document that is missing the field being
+    // ordered on -- not just sorts it oddly, drops it from the result set entirely, at any limit.
+    // A message doc that somehow ended up without a `timestamp` field (a bad write, an old
+    // migration, manual Firestore console edits) would then be invisible to every orderBy('timestamp')
+    // query forever, while a plain count() aggregation still counts it -- exactly the "count says
+    // there's chat, nothing ever loads" symptom. If the ordered query comes back empty, fall back to
+    // an unordered read (which has no such exclusion) and sort client-side, so those documents are
+    // still findable instead of being permanently invisible.
+    let orderedEmpty = false;
     try {
       if (firebaseDb) {
         const snap = await withSdkTimeout(firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
           .orderBy('timestamp', 'desc').limit(pageSize).get(), FIRESTORE_REST_TIMEOUT_MS);
         const list = [];
         snap.forEach(function (doc) { list.push(slimMessage({ id: doc.id, ...doc.data() })); });
-        return list.reverse();
+        if (list.length > 0) return list.reverse();
+        orderedEmpty = true;
       }
     } catch (err) {
       console.warn('fetchRecentChatMessages sdk', err);
+    }
+    if (orderedEmpty && firebaseDb) {
+      try {
+        const snap = await withSdkTimeout(firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
+          .limit(pageSize).get(), FIRESTORE_REST_TIMEOUT_MS);
+        const list = [];
+        snap.forEach(function (doc) { list.push(slimMessage({ id: doc.id, ...doc.data() })); });
+        if (list.length > 0) {
+          list.sort(function (a, b) { return (Number(a.timestamp) || 0) - (Number(b.timestamp) || 0); });
+          console.warn('fetchRecentChatMessages: recovered', list.length, 'message(s) via unordered fallback -- some docs are likely missing a timestamp field');
+          return list;
+        }
+      } catch (err) {
+        console.warn('fetchRecentChatMessages unordered fallback', err);
+      }
     }
     try {
       const url = 'https://firestore.googleapis.com/v1/projects/' + projectId() + '/databases/(default)/documents/calendars/cal_' + calId + '/messages?orderBy=timestamp%20desc&pageSize=' + pageSize;
       const res = await fetchWithTimeout(url, { cache: 'no-store' });
       if (!res.ok) return [];
       const data = await res.json();
-      return (data.documents || []).map(function (doc) {
+      const list = (data.documents || []).map(function (doc) {
         return slimMessage({ id: doc.name.split('/').pop(), ...docToJs(doc) });
-      }).reverse();
+      });
+      if (list.length > 0) return list.reverse();
     } catch (err) {
       console.warn('fetchRecentChatMessages rest', err);
+    }
+    // Same unordered-fallback reasoning as the SDK path above, for when only REST is available.
+    try {
+      const url = 'https://firestore.googleapis.com/v1/projects/' + projectId() + '/databases/(default)/documents/calendars/cal_' + calId + '/messages?pageSize=' + pageSize;
+      const res = await fetchWithTimeout(url, { cache: 'no-store' });
+      if (!res.ok) return [];
+      const data = await res.json();
+      const list = (data.documents || []).map(function (doc) {
+        return slimMessage({ id: doc.name.split('/').pop(), ...docToJs(doc) });
+      });
+      list.sort(function (a, b) { return (Number(a.timestamp) || 0) - (Number(b.timestamp) || 0); });
+      if (list.length > 0) console.warn('fetchRecentChatMessages: recovered', list.length, 'message(s) via unordered REST fallback');
+      return list;
+    } catch (err) {
+      console.warn('fetchRecentChatMessages unordered rest fallback', err);
       return [];
     }
   }
