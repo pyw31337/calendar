@@ -3323,37 +3323,37 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
               }
             },
               /*#__PURE__*/React.createElement("div", {
-                style: { fontSize: 'var(--font-size-xs)', fontWeight: 700, textShadow: '0 1px 2px rgba(0,0,0,0.6)' }
+                style: { fontSize: 'var(--font-size-sm)', fontWeight: 800, textShadow: '0 1px 3px rgba(0,0,0,0.7)' }
               }, item.dateLabel || formatCultureDateLabel(item.startDate, item.endDate) || CULTURE_MISSING_LABEL),
               /*#__PURE__*/React.createElement("div", {
                 style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', width: '100%' }
               },
-                /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', flex: '1 1 0', minWidth: 0 } },
+                /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', flex: '1 1 0', minWidth: 0 } },
                   item.homeTeamLogo && /*#__PURE__*/React.createElement("img", {
                     src: item.homeTeamLogo, alt: item.homeTeam, loading: 'lazy', decoding: 'async',
-                    style: { width: '100%', maxWidth: '76px', aspectRatio: '1 / 1', objectFit: 'contain', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.55))' },
+                    style: { width: '100%', maxWidth: '112px', aspectRatio: '1 / 1', objectFit: 'contain', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.55))' },
                     onError: e => { e.currentTarget.style.display = 'none'; }
                   }),
                   /*#__PURE__*/React.createElement("span", {
-                    style: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, textShadow: '0 1px 2px rgba(0,0,0,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }
+                    style: { fontSize: 'var(--font-size-xs)', fontWeight: 800, textShadow: '0 1px 2px rgba(0,0,0,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }
                   }, item.homeTeam)
                 ),
                 /*#__PURE__*/React.createElement("span", {
-                  style: { fontSize: 'var(--font-size-xs)', fontWeight: 800, textShadow: '0 1px 2px rgba(0,0,0,0.6)', flexShrink: 0 }
+                  style: { fontSize: 'var(--font-size-sm)', fontWeight: 800, textShadow: '0 1px 2px rgba(0,0,0,0.6)', flexShrink: 0 }
                 }, "vs"),
-                /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', flex: '1 1 0', minWidth: 0 } },
+                /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', flex: '1 1 0', minWidth: 0 } },
                   item.awayTeamLogo && /*#__PURE__*/React.createElement("img", {
                     src: item.awayTeamLogo, alt: item.awayTeam, loading: 'lazy', decoding: 'async',
-                    style: { width: '100%', maxWidth: '76px', aspectRatio: '1 / 1', objectFit: 'contain', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.55))' },
+                    style: { width: '100%', maxWidth: '112px', aspectRatio: '1 / 1', objectFit: 'contain', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.55))' },
                     onError: e => { e.currentTarget.style.display = 'none'; }
                   }),
                   /*#__PURE__*/React.createElement("span", {
-                    style: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, textShadow: '0 1px 2px rgba(0,0,0,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }
+                    style: { fontSize: 'var(--font-size-xs)', fontWeight: 800, textShadow: '0 1px 2px rgba(0,0,0,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }
                   }, item.awayTeam)
                 )
               ),
               /*#__PURE__*/React.createElement("div", {
-                style: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, textShadow: '0 1px 2px rgba(0,0,0,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }
+                style: { fontSize: 'var(--font-size-xs)', fontWeight: 700, textShadow: '0 1px 3px rgba(0,0,0,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }
               }, item.venue || CULTURE_MISSING_LABEL)
             ),
             registered && /*#__PURE__*/React.createElement("div", {
