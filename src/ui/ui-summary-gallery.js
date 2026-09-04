@@ -3475,12 +3475,23 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
 
   const visibleItems = filteredItems.slice(0, renderLimit);
   const hasMoreToRender = filteredItems.length > visibleItems.length;
+  // 스크롤이 하단 근처(300px 이내)에 닿으면 "더 보기"를 누른 것과 동일하게 다음 60개를 이어
+  // 붙인다. 이 그리드는 HistoryView가 헤더 접힘 효과에 쓰는 자기 onScroll도 받고 있어서, 그걸
+  // 대체하지 않고 함께 호출한다.
+  const handleGridScroll = e => {
+    if (typeof onScroll === 'function') onScroll(e);
+    if (!hasMoreToRender) return;
+    const el = e.target;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 300) {
+      setRenderLimit(limit => limit + CULTURE_RENDER_PAGE_SIZE);
+    }
+  };
 
   return /*#__PURE__*/React.createElement(React.Fragment, null,
     renderedCategoryChipRow,
     /*#__PURE__*/React.createElement("div", {
       className: "culture-items-grid is-cols-" + (gridCols === '1' ? '1' : '2'),
-      onScroll,
+      onScroll: handleGridScroll,
       style: { flex: 1, overflowY: 'auto', padding: '16px', paddingTop: contentPaddingTop, alignContent: 'start' }
     },
       visibleItems.map(item => {
