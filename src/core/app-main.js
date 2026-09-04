@@ -1529,7 +1529,13 @@ function CalendarApp() {
     // Search results must be complete even when the search modal is opened from the calendar
     // view. Previously the full-history hydration only ran for chat/gallery routes, so a search
     // opened from the main page silently searched the bounded realtime window instead.
-    if (!activeCalId || !isGlobalSearchOpen || fullChatHistoryByCalendar[activeCalId] !== undefined) return;
+    //
+    // 보관함(history) 인물/추억 탭도 마찬가지 문제였다: HistoryView가 받는 chatMessages
+    // (galleryChatMessages)는 이 hydration이 없으면 실시간 리스너의 최근 N개짜리 창에만
+    // 묶여 있어서, 그 창보다 오래된 사진에 붙은 해시태그(#도연/#도은/#서준 등)는 아무리
+    // 정확히 태그해도 인물 탭에서 영원히 안 보였다 -- 태그 매칭 로직 자체는 멀쩡했지만
+    // 매칭할 데이터 자체가 애초에 없었던 것.
+    if (!activeCalId || (!isGlobalSearchOpen && activeView !== 'history') || fullChatHistoryByCalendar[activeCalId] !== undefined) return;
     const liveFirebaseDb = (typeof window !== 'undefined' && window.__gatherFirebaseDb) || firebaseDb;
     if (!liveFirebaseDb) {
       let cancelled = false;
@@ -1546,7 +1552,7 @@ function CalendarApp() {
       setFullChatHistoryByCalendar(prev => ({ ...prev, [activeCalId]: list }));
     }).catch(err => console.warn('full chat history load failed:', err));
     return () => { cancelled = true; };
-  }, [activeCalId, isGlobalSearchOpen, firebaseDb, firebaseConnectionVersion, fullChatHistoryByCalendar]);
+  }, [activeCalId, isGlobalSearchOpen, activeView, firebaseDb, firebaseConnectionVersion, fullChatHistoryByCalendar]);
   // The chat embed the user tapped play on -- { key, embedUrl, provider, orientation, title } |
   // null. Once set, it's rendered through a SINGLE always-mounted portal iframe (StickyVideoBox)
   // that never unmounts across view/tab switches, so playback genuinely never stops -- only its
