@@ -2562,9 +2562,6 @@ export function DateModal({
         const cultureLink = (ann.cultureSourceLink && String(ann.cultureSourceLink).trim()) || '';
         const hasDetail = !!(ann.place || ann.description || getAnnBannerDateDisplay(ann) || cultureLink);
         const photos = getAnnBannerPhotos(ann);
-        // Keep a fixed thumb size when the banner expands -- growing to 64px looked jumpy and
-        // made the title row reflow; 22px matches the collapsed state.
-        const thumbSize = 22;
         const listIdx = Array.isArray(anniversaries) ? anniversaries.findIndex(a => a && a.id === ann.id) : -1;
         const anniversaryIndex = listIdx >= 0 ? listIdx + 1 : (aIdx + 1);
         const openAnniversaryLightbox = (startIndex) => {
@@ -2600,19 +2597,6 @@ export function DateModal({
             },
             onClick: canFocusCultureSource ? (e) => { e.stopPropagation(); onFocusCultureSource(ann); } : undefined
           }, ann.title),
-          photos.length > 0 && MediaThumb && /*#__PURE__*/React.createElement(MediaThumb, {
-            src: photos[0].thumbUrl || photos[0].url,
-            fallbackSrc: photos[0].url || photos[0].thumbUrl,
-            alt: "기념일 사진",
-            onClick: e => {
-              e.stopPropagation();
-              openAnniversaryLightbox(0);
-            },
-            style: {
-              width: `${thumbSize}px`, height: `${thumbSize}px`, borderRadius: '6px', objectFit: 'cover',
-              cursor: 'pointer', flexShrink: 0
-            }
-          }),
           onEditAnniversary && /*#__PURE__*/React.createElement("button", {
             type: "button",
             onClick: e => { e.stopPropagation(); onEditAnniversary(ann); },
@@ -2739,7 +2723,28 @@ export function DateModal({
                 ? /*#__PURE__*/React.createElement(UrlCapsuleBadge, { url: cultureLink })
                 : renderTextWithUrlBadge(cultureLink)) : null
             );
-          })()
+          })(),
+          // 첨부된 사진 전부를 카드 하단에 썸네일로 보여준다 -- 예전엔 titleRow 안에 photos[0]
+          // 하나만 (폴딩 화살표 왼쪽에) 보여줘서 2장 이상 첨부해도 나머지는 확인할 방법이 없었음.
+          photos.length > 0 && MediaThumb && /*#__PURE__*/React.createElement("div", {
+            style: {
+              display: 'flex', flexWrap: 'wrap', gap: '6px', padding: '10px 12px',
+              backgroundColor: `color-mix(in srgb, ${displayColor} 12%, white)`
+            }
+          }, photos.map((p, pIdx) => /*#__PURE__*/React.createElement(MediaThumb, {
+            key: p.id || `${bannerKey}_photo_${pIdx}`,
+            src: p.thumbUrl || p.url,
+            fallbackSrc: p.url || p.thumbUrl,
+            alt: "기념일 사진",
+            onClick: e => {
+              e.stopPropagation();
+              openAnniversaryLightbox(pIdx);
+            },
+            style: {
+              width: '56px', height: '56px', borderRadius: 'var(--radius-sm)', objectFit: 'cover',
+              cursor: 'pointer', flexShrink: 0
+            }
+          })))
         );
       })),
 
