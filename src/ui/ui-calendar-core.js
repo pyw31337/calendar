@@ -1145,21 +1145,43 @@ export function CalendarGrid({
       bar.isFirstSegment = bar.spanIndex === 0;
       bar.isLastSegment = bar.spanIndex === bar.totalSegments - 1;
     });
+    // Two range-type anniversaries (e.g. a 지역축제 + 문화행사, or a self-made 기념일, registered
+    // on overlapping dates) used to render as two bars stacked in the exact same grid cell,
+    // painting directly on top of each other. Assign each bar in a row the lowest stack `level`
+    // that doesn't collide (by column range) with any bar already assigned in that row -- a
+    // greedy interval-graph coloring, same idea a day-grid calendar (e.g. FullCalendar) uses for
+    // overlapping multi-day events. Bars are sorted by startCol first so left-to-right visual
+    // order stays stable regardless of Map iteration order.
+    const barsByRow = new Map();
+    bars.forEach(bar => {
+      if (!barsByRow.has(bar.row)) barsByRow.set(bar.row, []);
+      barsByRow.get(bar.row).push(bar);
+    });
+    barsByRow.forEach(rowBars => {
+      rowBars.sort((a, b) => a.startCol - b.startCol);
+      const levelEnds = []; // levelEnds[level] = endCol of the last bar placed at that level
+      rowBars.forEach(bar => {
+        let level = levelEnds.findIndex(endCol => endCol < bar.startCol);
+        if (level === -1) level = levelEnds.length;
+        levelEnds[level] = bar.endCol;
+        bar.level = level;
+      });
+    });
     return bars;
   }, [days.map(d => d.dateStr).join('|'), anniversaries]);
-  // Dates covered by a festival bar reserve extra bottom space in their own day-cell (see the
-  // spacer div below) so a same-day regular anniversary badge stacks on the line above the bar
-  // instead of being covered by it -- the bar is a separate overlay, not part of that cell's own
-  // flex flow, so without this the two would render on top of each other.
+  // How many stacked bar rows (see `level` above) each date needs reserved beneath its own
+  // content -- the tallest stack any bar covering that date belongs to, so a same-day regular
+  // anniversary badge stacks above every bar instead of being covered by the topmost one.
   const festivalCoveredDates = React.useMemo(() => {
-    const set = new Set();
+    const map = new Map();
     festivalBars.forEach(bar => {
       for (let col = bar.startCol; col <= bar.endCol; col++) {
         const day = days[bar.row * 7 + col];
-        if (day) set.add(day.dateStr);
+        if (!day) continue;
+        map.set(day.dateStr, Math.max(map.get(day.dateStr) || 0, bar.level + 1));
       }
     });
-    return set;
+    return map;
   }, [festivalBars]);
   // Matches the single-line ellipsis title in ANNIVERSARY_BADGE_TEXT_STYLE.
   const FESTIVAL_BAR_HEIGHT = 24;
@@ -1419,7 +1441,7 @@ export function CalendarGrid({
     // connected bar overlay (see festivalBars above) instead of a per-day badge.
     const cellAnns = getAnniversariesForDate(dateStr, anniversaries).filter(ann => ann.type !== 'range');
     const hasHeundeulDosirak = cellAnns.some(isHeundeulDosirakAnn);
-    const isFestivalCovered = festivalCoveredDates.has(dateStr);
+    const festivalStackDepth = festivalCoveredDates.get(dateStr) || 0;
     // Holiday name stays visible (red date styling), but when the day is also a confirmed
     // meeting we append ·확정 -- otherwise users only see '개천절' and re-tap 모임확정,
     // which toggles the confirmation OFF. Then '전원', then solar term.
@@ -1650,7 +1672,7 @@ export function CalendarGrid({
       /* Reserves room at the bottom of this cell for the festival-bar overlay drawn as a
          separate .days-grid child (see festivalBars below) -- unconditional on cellAnns so it
          also protects plain attendee badges from being covered, not just other anniversaries. */
-      isFestivalCovered && /*#__PURE__*/React.createElement("div", { style: { height: `${FESTIVAL_BAR_HEIGHT}px`, flexShrink: 0, width: '100%' } })
+      festivalStackDepth > 0 && /*#__PURE__*/React.createElement("div", { style: { height: `${FESTIVAL_BAR_HEIGHT * festivalStackDepth}px`, flexShrink: 0, width: '100%' } })
     );
   }), festivalBars.map(bar => {
     const displayColor = getAnniversaryDisplayColor(bar, calendar);
@@ -1680,6 +1702,10 @@ export function CalendarGrid({
       style: {
         width: '100%',
         height: `${FESTIVAL_BAR_HEIGHT}px`,
+        // Bars whose date ranges overlap (see `level` assignment in festivalBars above) stack
+        // upward from the bottom of the cell instead of painting on top of each other -- level 0
+        // sits flush at the bottom, level 1 sits one bar-height above it, and so on.
+        marginBottom: bar.level > 0 ? `${bar.level * FESTIVAL_BAR_HEIGHT}px` : undefined,
         backgroundColor: `${displayColor}22`,
         // A festival spanning multiple week rows reads as one continuous bar broken across
         // rows: only the true start segment rounds its left corners and only the true end
