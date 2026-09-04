@@ -1751,8 +1751,7 @@ export function HistoryView({
   showSettlement = true, onOpenCreateSettlement,
   isDarkTheme, onToggleTheme, fontScalePercent, onDecreaseFont, onIncreaseFont,
   isChatNotifyEnabled, onToggleChatNotifications, syncStatus = null,
-  anniversaries = [], onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo = null,
-  customCultureItems = [], onSaveCustomCultureItem = null, showToast = null
+  onSearchTag = null, onAddPersonTag = null, showToast = null
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -1761,9 +1760,7 @@ export function HistoryView({
   const ThreeLinesIcon = __comp.ThreeLinesIcon || __deps.ThreeLinesIcon;
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
   const SearchIcon = __comp.SearchIcon || __deps.SearchIcon;
-  const FolderClockIcon = __comp.FolderClockIcon || __deps.FolderClockIcon;
   const MapPinIcon = __comp.MapPinIcon || __deps.MapPinIcon;
-  const LocateFixedIcon = __comp.LocateFixedIcon || __deps.LocateFixedIcon;
   const InlineSearchBar = __comp.InlineSearchBar || __deps.InlineSearchBar;
   const UnderlineTabs = __comp.UnderlineTabs || __deps.UnderlineTabs;
   const WeatherBadge = __comp.WeatherBadge || __deps.WeatherBadge;
@@ -1774,108 +1771,42 @@ export function HistoryView({
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState('');
   const HISTORY_TAB_STORAGE_KEY = 'gather_history_tab';
-  const VALID_HISTORY_TABS = ['festival', 'culture', 'meetings'];
+  const VALID_HISTORY_TABS = ['meetings', 'memories', 'people'];
   const [historyTab, setHistoryTab] = React.useState(() => {
     try {
       const saved = localStorage.getItem(HISTORY_TAB_STORAGE_KEY);
       if (VALID_HISTORY_TABS.includes(saved)) return saved;
     } catch (_) { /* private browsing / disabled storage */ }
-    return 'festival';
+    return 'meetings';
   });
   const changeHistoryTab = (tab) => {
     if (!VALID_HISTORY_TABS.includes(tab)) return;
     setHistoryTab(tab);
     try { localStorage.setItem(HISTORY_TAB_STORAGE_KEY, tab); } catch (_) { /* best-effort */ }
   };
-  // 기념일 등록(AnniversaryModal)으로 직접 만든 festival/event도 지역축제/문화행사 탭에 보이도록,
-  // 문화포털에서 등록된 것(cultureSourceId 있음)은 제외하고 사용자가 직접 만든 것만 카드 형태로 변환.
-  const selfAuthoredCultureItems = React.useMemo(() => {
-    return (anniversaries || [])
-      .filter(a => a && !a.cultureSourceId && (a.category === 'festival' || a.category === 'event'))
-      .map(a => ({
-        id: a.id,
-        kind: a.category === 'festival' ? 'festival' : 'performance',
-        title: a.title || '',
-        startDate: a.startDate,
-        endDate: a.endDate,
-        dateLabel: (a.startDate && a.endDate && a.startDate !== a.endDate) ? `${a.startDate} ~ ${a.endDate}` : (a.startDate || ''),
-        venue: a.place ? (a.place.alias || a.place.name || '') : '',
-        address: a.place ? (a.place.address || '') : '',
-        description: a.description || '',
-        image: a.image || ''
-      }));
-  }, [anniversaries]);
-  // When the side menu navigates to 보관함 again (or any view), force the festival tab so
-  // re-entry always lands on 지역축제 rather than whatever tab was last open.
+  // When the side menu navigates to 보관함 again (or any view), force the 지난모임 tab so
+  // re-entry always lands there rather than whatever tab was last open.
   const handleHistoryChangeView = (view) => {
-    if (view === 'history') changeHistoryTab('festival');
+    if (view === 'history') changeHistoryTab('meetings');
     if (typeof onChangeView === 'function') onChangeView(view);
   };
-  // Shared 지역 filter for the 문화공연/지역축제 tabs (지난 모임 has no region data to
-  // filter by). Lives here rather than inside CulturePerformancesTab so switching between the
-  // 문화공연/지역축제 tabs keeps the same region selected instead of resetting it.
-  // Restored from localStorage so a region picked on a previous visit still applies next time --
-  // wrapped in try/catch since localStorage can throw (private browsing, disabled site data) and
-  // an empty/garbled saved value should just fall back to "no filter" rather than crash the page.
-  const CULTURE_REGION_STORAGE_KEY = 'gather_culture_region_filter';
-  // Multi-select: an array of { sido, gugun } pairs (gugun '' means "that 시/도 전체"). Reads the
-  // current array shape, but also migrates the older single-value { sido, gugun } shape a
-  // previous version of this feature saved, so a region picked before this change still applies.
-  const [regionSelections, setRegionSelections] = React.useState(() => {
+  // 인물 탭: 기본 태그는 현재 캘린더 참여자, 그 외에 사용자가 직접 추가한 커스텀 태그
+  // (calendar.customPersonTags)도 함께 보여준다.
+  const [newPersonTag, setNewPersonTag] = React.useState('');
+  const [isAddingPersonTag, setIsAddingPersonTag] = React.useState(false);
+  const handleAddPersonTagClick = async () => {
+    const label = newPersonTag.trim();
+    if (!label || isAddingPersonTag || typeof onAddPersonTag !== 'function') return;
+    setIsAddingPersonTag(true);
     try {
-      const saved = JSON.parse(localStorage.getItem(CULTURE_REGION_STORAGE_KEY) || '{}');
-      if (Array.isArray(saved.selections)) return saved.selections.filter(s => s && s.sido);
-      if (saved.sido) return [{ sido: saved.sido, gugun: saved.gugun || '' }];
-      return [];
-    } catch (_) { return []; }
-  });
-  const [isRegionFilterOpen, setIsRegionFilterOpen] = React.useState(false);
-  const [isContentRegisterOpen, setIsContentRegisterOpen] = React.useState(false);
-  const persistRegionSelections = (next) => {
-    setRegionSelections(next);
-    try { localStorage.setItem(CULTURE_REGION_STORAGE_KEY, JSON.stringify({ selections: next })); } catch (_) { /* best-effort */ }
+      const ok = await onAddPersonTag(label);
+      if (ok) setNewPersonTag('');
+    } finally {
+      setIsAddingPersonTag(false);
+    }
   };
-  const addRegionSelection = (sido, gugun) => {
-    if (!sido) return;
-    const normalizedGugun = gugun || '';
-    if (regionSelections.some(s => s.sido === sido && (s.gugun || '') === normalizedGugun)) return;
-    persistRegionSelections([...regionSelections, { sido, gugun: normalizedGugun }]);
-  };
-  const removeRegionSelection = (index) => {
-    persistRegionSelections(regionSelections.filter((_, i) => i !== index));
-  };
-  const resetRegionSelections = () => persistRegionSelections([]);
-  // Whichever of 문화공연/지역축제 is currently mounted below reports its own loaded (unfiltered)
-  // snapshot back up here via onItemsLoaded, purely so RegionFilterBackdrop can show a per-region
-  // item count badge -- it has no other reason to fetch or hold this data itself.
-  const [regionFilterItems, setRegionFilterItems] = React.useState([]);
-  const [isLocating, setIsLocating] = React.useState(false);
-  // 1단/2단 poster-grid density for 문화공연/지역축제 -- shared across both tabs (lives on
-  // HistoryView, not inside CulturePerformancesTab) and persisted so the choice sticks across
-  // visits. Values are the strings '1' | '2'; default '2' (current 2-col mobile layout).
-  const CULTURE_GRID_COLS_STORAGE_KEY = 'gather_culture_grid_cols';
-  const [gridCols, setGridCols] = React.useState(() => {
-    try {
-      const saved = localStorage.getItem(CULTURE_GRID_COLS_STORAGE_KEY);
-      return saved === '1' || saved === '2' ? saved : '2';
-    } catch (_) { return '2'; }
-  });
-  const persistGridCols = (next) => {
-    setGridCols(next);
-    try { localStorage.setItem(CULTURE_GRID_COLS_STORAGE_KEY, next); } catch (_) { /* best-effort */ }
-  };
-  const handleUseCurrentLocation = () => {
-    if (isLocating) return;
-    setIsLocating(true);
-    resolveCurrentLocationRegion()
-      .then(({ sido, gugun }) => addRegionSelection(sido, gugun))
-      .catch(err => console.warn('Current-location region lookup failed:', err))
-      .finally(() => setIsLocating(false));
-  };
-
-  // 채팅방/갤러리 페이지의 고정 헤더와 같은 방식: 상단 헤더+탭+지역필터+카테고리칩을 하나의
-  // position:fixed 묶음으로 만들어서, 아래로 스크롤하면 위로 숨고 위로 스크롤하면 다시 나타나게
-  // 한다. 묶음의 실제 높이는 탭에 따라(지난 모임엔 지역필터/카테고리칩이 없음) 달라지므로
+  // 채팅방/갤러리 페이지의 고정 헤더와 같은 방식: 상단 헤더+탭을 하나의 position:fixed 묶음으로
+  // 만들어서, 아래로 스크롤하면 위로 숨고 위로 스크롤하면 다시 나타나게 한다. 묶음의 실제 높이는
   // ResizeObserver로 직접 측정 -- 갤러리 헤더처럼 고정 픽셀값을 하드코딩하지 않는다.
   const { isHeaderVisible, onScroll: handleHistoryScroll } = useScrollHideHeader();
   const headerStackRef = React.useRef(null);
@@ -1890,10 +1821,6 @@ export function HistoryView({
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  // Portal target for CulturePerformancesTab's category-chip row, rendered inside the fixed
-  // header stack below (see chipRowSlot prop) -- a callback ref so the state update that makes
-  // the slot available to the child only fires once the DOM node actually exists.
-  const [chipRowSlot, setChipRowSlot] = React.useState(null);
   // Content sits below the now-fixed header stack; padding-top reserves exactly its measured
   // height, and drops to a small constant while hidden so the first scroll-up gesture actually
   // moves content instead of only eating reserved empty space (same trick the 갤러리 페이지 uses).
@@ -1927,6 +1854,12 @@ export function HistoryView({
     );
     return d.includes(q) || namesMatch || memoMatch || placeMatch;
   });
+
+  const customPersonTags = Array.isArray(calendar?.customPersonTags) ? calendar.customPersonTags : [];
+  const personTagChips = [
+    ...activeParticipants.map(p => ({ id: p.id, label: p.name, color: p.color || '#7C3AED' })),
+    ...customPersonTags.filter(t => !activeParticipants.some(p => p.name === t)).map(t => ({ id: `custom_${t}`, label: t, color: '#64748B' }))
+  ];
 
   return /*#__PURE__*/React.createElement("div", {
     className: "places-view-container",
@@ -1995,114 +1928,12 @@ export function HistoryView({
       value: historyTab,
       onChange: changeHistoryTab,
       options: [
-        { value: 'festival', label: '지역축제' },
-        { value: 'culture', label: '문화공연' },
-        { value: 'meetings', label: '지난 모임' }
+        { value: 'meetings', label: '지난모임' },
+        { value: 'memories', label: '추억' },
+        { value: 'people', label: '인물' }
       ]
-    }),
-    historyTab !== 'meetings' && /*#__PURE__*/React.createElement("div", {
-      className: "region-filter-trigger-row"
-    },
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "current-location-btn",
-        disabled: isLocating,
-        onClick: handleUseCurrentLocation,
-        title: "현재 위치",
-        "aria-label": "현재 위치"
-      },
-        LocateFixedIcon && /*#__PURE__*/React.createElement(LocateFixedIcon, { size: 18 })
-      ),
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "form-select region-filter-trigger",
-        onClick: () => setIsRegionFilterOpen(true)
-      },
-        /*#__PURE__*/React.createElement("span", { style: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, "지역 선택"),
-        renderRegionTriggerChevron(React)
-      ),
-      /*#__PURE__*/React.createElement("div", {
-        className: "culture-grid-cols-toggle",
-        role: "group",
-        "aria-label": "그리드 열 수"
-      },
-        /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          className: "culture-grid-cols-btn" + (gridCols === '2' ? " is-active" : ""),
-          "aria-label": "2단",
-          "aria-pressed": gridCols === '2',
-          onClick: () => persistGridCols('2')
-        },
-          /*#__PURE__*/React.createElement("svg", {
-            width: 20, height: 20, viewBox: "0 0 24 24", fill: "none",
-            stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round",
-            "aria-hidden": "true"
-          },
-            /*#__PURE__*/React.createElement("path", { d: "M3 4a1 1 0 0 1 1 -1h16a1 1 0 0 1 1 1v16a1 1 0 0 1 -1 1h-16a1 1 0 0 1 -1 -1v-16" }),
-            /*#__PURE__*/React.createElement("path", { d: "M12 3v18" })
-          )
-        ),
-        /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          className: "culture-grid-cols-btn" + (gridCols === '1' ? " is-active" : ""),
-          "aria-label": "1단",
-          "aria-pressed": gridCols === '1',
-          onClick: () => persistGridCols('1')
-        },
-          /*#__PURE__*/React.createElement("svg", {
-            width: 20, height: 20, viewBox: "0 0 24 24", fill: "none",
-            stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round",
-            "aria-hidden": "true"
-          },
-            /*#__PURE__*/React.createElement("path", { d: "M5 4a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v16a1 1 0 0 1 -1 1h-12a1 1 0 0 1 -1 -1l0 -16" })
-          )
-        )
-      )
-    ),
-    historyTab !== 'meetings' && regionSelections.length > 0 && /*#__PURE__*/React.createElement("div", {
-      className: "region-selection-badges-row"
-    },
-      regionSelections.map((sel, idx) => /*#__PURE__*/React.createElement(RegionSelectionBadge, {
-        key: `${sel.sido}::${sel.gugun}`,
-        sel,
-        onRemove: () => removeRegionSelection(idx)
-      })),
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "region-filter-reset-btn",
-        onClick: resetRegionSelections
-      }, "초기화")
-    ),
-    // Portal target for CulturePerformancesTab's category-chip row -- lives inside the fixed
-    // header stack so it slides away with everything above it instead of staying pinned while
-    // the poster grid scrolls underneath.
-    historyTab !== 'meetings' && /*#__PURE__*/React.createElement("div", { ref: setChipRowSlot })
+    })
     ), // end history-header-stack
-    /*#__PURE__*/React.createElement(RegionFilterBackdrop, {
-      isOpen: isRegionFilterOpen,
-      onClose: () => setIsRegionFilterOpen(false),
-      selections: regionSelections,
-      onAdd: addRegionSelection,
-      onRemove: removeRegionSelection,
-      onReset: resetRegionSelections,
-      items: regionFilterItems
-    }),
-    historyTab === 'culture' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
-      calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo, dataUrl: CULTURE_PERFORMANCES_URL,
-      emptyLabel: "상영중이거나 예정된 문화공연이 없습니다.", regionSelections, onItemsLoaded: setRegionFilterItems,
-      anniversaryCategory: "event",
-      extraItems: [...selfAuthoredCultureItems.filter(i => i.kind === 'performance'), ...(customCultureItems || []).filter(i => i && i.kind === 'performance')],
-      chipRowSlot, contentPaddingTop: historyContentPaddingTop, onScroll: handleHistoryScroll,
-      gridCols
-    }),
-    historyTab === 'festival' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
-      calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo, dataUrl: CULTURE_FESTIVALS_URL,
-      emptyLabel: "진행중이거나 예정된 지역축제가 없습니다.", regionSelections, onItemsLoaded: setRegionFilterItems,
-      anniversaryCategory: "festival",
-      extraItems: [...selfAuthoredCultureItems.filter(i => i.kind === 'festival'), ...(customCultureItems || []).filter(i => i && i.kind === 'festival')],
-      chipRowSlot, contentPaddingTop: historyContentPaddingTop, onScroll: handleHistoryScroll,
-      gridCols
-    }),
     historyTab === 'meetings' && /*#__PURE__*/React.createElement("div", {
       className: "history-meetings-grid",
       onScroll: handleHistoryScroll,
@@ -2190,6 +2021,51 @@ export function HistoryView({
         );
       })
     ),
+    historyTab === 'memories' && /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        gap: '8px', padding: '118px 24px 16px', textAlign: 'center', color: 'var(--text-muted)'
+      }
+    },
+      /*#__PURE__*/React.createElement("span", { style: { fontSize: '2rem' } }, "🗂️"),
+      /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-main)' } }, "추억 기능 준비 중입니다"),
+      /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)' } }, "장소·업체·지역별로 사진을 모아보는 기능을 추가할 예정이에요.")
+    ),
+    historyTab === 'people' && /*#__PURE__*/React.createElement("div", {
+      style: { flex: 1, overflowY: 'auto', padding: '118px 16px 16px', display: 'flex', flexDirection: 'column', gap: '16px' }
+    },
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '8px' } },
+        personTagChips.length === 0
+          ? /*#__PURE__*/React.createElement("span", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' } }, "태그가 없습니다. 아래에서 인물 태그를 추가해 보세요.")
+          : personTagChips.map(tag => /*#__PURE__*/React.createElement("button", {
+              key: tag.id,
+              type: "button",
+              className: "region-selection-badge",
+              style: { backgroundColor: tag.color, color: getContrastTextColor(tag.color), border: 'none', cursor: 'pointer' },
+              onClick: () => { if (typeof onSearchTag === 'function') onSearchTag(`#${tag.label}`); }
+            }, tag.label))
+      ),
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
+        /*#__PURE__*/React.createElement("input", {
+          type: "text",
+          className: "form-input",
+          placeholder: "새 인물 태그 추가 (예: 삼촌)",
+          value: newPersonTag,
+          onChange: e => setNewPersonTag(e.target.value),
+          onKeyDown: e => { if (e.key === 'Enter') { e.preventDefault(); handleAddPersonTagClick(); } },
+          style: { flex: 1 }
+        }),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          className: "btn-primary",
+          disabled: isAddingPersonTag || !newPersonTag.trim(),
+          onClick: handleAddPersonTagClick
+        }, "태그 추가")
+      ),
+      /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' } },
+        "태그를 누르면 해당 태그가 달린 사진을 검색에서 모아볼 수 있어요. 사진에 태그를 달려면 갤러리에서 사진을 열고 해시태그로 추가하세요."
+      )
+    ),
 
     isMenuOpen && /*#__PURE__*/React.createElement("div", {
       className: "admin-side-menu-overlay", style: { zIndex: 12000 }, onClick: () => setIsMenuOpen(false)
@@ -2222,9 +2098,358 @@ export function HistoryView({
           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, SearchIcon ? /*#__PURE__*/React.createElement(SearchIcon, null) : "🔍"),
           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
             /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "보관함 검색"),
-            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "보관함 날짜·공연·축제 검색")
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "지난모임 날짜·참여자·메모·장소 검색")
+          )
+        )
+      ),
+      typeof SharedAppNavBlock === 'function' && /*#__PURE__*/React.createElement(SharedAppNavBlock, {
+        onClose: () => setIsMenuOpen(false),
+        onChangeView: handleHistoryChangeView,
+        onOpenCreateSettlement: onOpenCreateSettlement,
+        showSettlement: showSettlement,
+        chatCount: chatCount,
+        settlementBadge: settlementBadge,
+        galleryCount: galleryCount,
+        placeCount: placeCount,
+        memoCount: memoCount,
+        historyCount: historyCount,
+        chatLastAuthor: chatLastAuthor,
+        settlementLastDate: settlementLastDate,
+        galleryLastDate: galleryLastDate,
+        placeLastName: placeLastName,
+        memoLastTitleWord: memoLastTitleWord
+      }),
+      typeof SharedSideMenuFooter === 'function' && /*#__PURE__*/React.createElement(SharedSideMenuFooter, {
+        onClose: () => setIsMenuOpen(false),
+        onOpenShare: onOpenShare,
+        onOpenSettings: onOpenAppSettings
+      })
+    ))
+  );
+}
+
+// 컨텐츠: 사이드메뉴 "컨텐츠" 항목이 여는 페이지. 예전 보관함의 지역축제/문화공연 탭 chrome을 그대로
+// 이어받아 스포츠 탭을 추가한 것 -- 지역 필터/그리드 밀도 토글/컨텐츠 등록까지 동일하게 유지된다.
+export function ContentView({
+  calendar, onBack, onChangeView, onOpenAppSettings, onOpenShare = null,
+  chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, historyCount = 0,
+  chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null,
+  showSettlement = true, onOpenCreateSettlement,
+  anniversaries = [], onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo = null,
+  customCultureItems = [], onSaveCustomCultureItem = null, showToast = null
+}) {
+  const React = window.React;
+  const __deps = window.GATHER_UI_DEPS || {};
+  const __comp = window.GATHER_UI_COMPONENTS || {};
+  const BackArrowIcon = __comp.BackArrowIcon || __deps.BackArrowIcon;
+  const ThreeLinesIcon = __comp.ThreeLinesIcon || __deps.ThreeLinesIcon;
+  const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
+  const LocateFixedIcon = __comp.LocateFixedIcon || __deps.LocateFixedIcon;
+  const UnderlineTabs = __comp.UnderlineTabs || __deps.UnderlineTabs;
+  const WeatherBadge = __comp.WeatherBadge || __deps.WeatherBadge;
+  const SharedAppNavBlock = __comp.SharedAppNavBlock || __deps.SharedAppNavBlock;
+  const SharedSideMenuFooter = __comp.SharedSideMenuFooter || __deps.SharedSideMenuFooter;
+
+  const [isMenuOpen, setIsMenuOpen] = React.useState(false);
+  const [isContentRegisterOpen, setIsContentRegisterOpen] = React.useState(false);
+  const CONTENT_TAB_STORAGE_KEY = 'gather_content_tab';
+  const VALID_CONTENT_TABS = ['festival', 'culture', 'sports'];
+  const [contentTab, setContentTab] = React.useState(() => {
+    try {
+      const saved = localStorage.getItem(CONTENT_TAB_STORAGE_KEY);
+      if (VALID_CONTENT_TABS.includes(saved)) return saved;
+    } catch (_) { /* private browsing / disabled storage */ }
+    return 'festival';
+  });
+  const changeContentTab = (tab) => {
+    if (!VALID_CONTENT_TABS.includes(tab)) return;
+    setContentTab(tab);
+    try { localStorage.setItem(CONTENT_TAB_STORAGE_KEY, tab); } catch (_) { /* best-effort */ }
+  };
+  // 컨텐츠 메뉴를 다시 누르면 항상 지역축제 탭부터 보이도록.
+  const handleContentChangeView = (view) => {
+    if (view === 'content') changeContentTab('festival');
+    if (typeof onChangeView === 'function') onChangeView(view);
+  };
+
+  // 기념일 등록(AnniversaryModal)으로 직접 만든 festival/event/sports도 각 탭에 보이도록,
+  // 문화포털에서 등록된 것(cultureSourceId 있음)은 제외하고 사용자가 직접 만든 것만 카드 형태로 변환.
+  const selfAuthoredCultureItems = React.useMemo(() => {
+    const kindByCategory = { festival: 'festival', event: 'performance', sports: 'sports' };
+    return (anniversaries || [])
+      .filter(a => a && !a.cultureSourceId && kindByCategory[a.category])
+      .map(a => ({
+        id: a.id,
+        kind: kindByCategory[a.category],
+        title: a.title || '',
+        startDate: a.startDate,
+        endDate: a.endDate,
+        dateLabel: (a.startDate && a.endDate && a.startDate !== a.endDate) ? `${a.startDate} ~ ${a.endDate}` : (a.startDate || ''),
+        venue: a.place ? (a.place.alias || a.place.name || '') : '',
+        address: a.place ? (a.place.address || '') : '',
+        description: a.description || '',
+        image: a.image || ''
+      }));
+  }, [anniversaries]);
+
+  // Shared 지역 filter for the 지역축제/문화공연/스포츠 tabs. Restored from localStorage so a
+  // region picked on a previous visit still applies next time.
+  const CULTURE_REGION_STORAGE_KEY = 'gather_culture_region_filter';
+  const [regionSelections, setRegionSelections] = React.useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(CULTURE_REGION_STORAGE_KEY) || '{}');
+      if (Array.isArray(saved.selections)) return saved.selections.filter(s => s && s.sido);
+      if (saved.sido) return [{ sido: saved.sido, gugun: saved.gugun || '' }];
+      return [];
+    } catch (_) { return []; }
+  });
+  const [isRegionFilterOpen, setIsRegionFilterOpen] = React.useState(false);
+  const persistRegionSelections = (next) => {
+    setRegionSelections(next);
+    try { localStorage.setItem(CULTURE_REGION_STORAGE_KEY, JSON.stringify({ selections: next })); } catch (_) { /* best-effort */ }
+  };
+  const addRegionSelection = (sido, gugun) => {
+    if (!sido) return;
+    const normalizedGugun = gugun || '';
+    if (regionSelections.some(s => s.sido === sido && (s.gugun || '') === normalizedGugun)) return;
+    persistRegionSelections([...regionSelections, { sido, gugun: normalizedGugun }]);
+  };
+  const removeRegionSelection = (index) => {
+    persistRegionSelections(regionSelections.filter((_, i) => i !== index));
+  };
+  const resetRegionSelections = () => persistRegionSelections([]);
+  const [regionFilterItems, setRegionFilterItems] = React.useState([]);
+  const [isLocating, setIsLocating] = React.useState(false);
+  const CULTURE_GRID_COLS_STORAGE_KEY = 'gather_culture_grid_cols';
+  const [gridCols, setGridCols] = React.useState(() => {
+    try {
+      const saved = localStorage.getItem(CULTURE_GRID_COLS_STORAGE_KEY);
+      return saved === '1' || saved === '2' ? saved : '2';
+    } catch (_) { return '2'; }
+  });
+  const persistGridCols = (next) => {
+    setGridCols(next);
+    try { localStorage.setItem(CULTURE_GRID_COLS_STORAGE_KEY, next); } catch (_) { /* best-effort */ }
+  };
+  const handleUseCurrentLocation = () => {
+    if (isLocating) return;
+    setIsLocating(true);
+    resolveCurrentLocationRegion()
+      .then(({ sido, gugun }) => addRegionSelection(sido, gugun))
+      .catch(err => console.warn('Current-location region lookup failed:', err))
+      .finally(() => setIsLocating(false));
+  };
+
+  const { isHeaderVisible, onScroll: handleContentScroll } = useScrollHideHeader();
+  const headerStackRef = React.useRef(null);
+  const [headerStackHeight, setHeaderStackHeight] = React.useState(0);
+  React.useLayoutEffect(() => {
+    const el = headerStackRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(entries => {
+      const rect = entries[0] && entries[0].contentRect;
+      setHeaderStackHeight(Math.round(rect ? rect.height : el.offsetHeight));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const [chipRowSlot, setChipRowSlot] = React.useState(null);
+  const contentPaddingTop = isHeaderVisible
+    ? `calc(${headerStackHeight}px + env(safe-area-inset-top, 0px))`
+    : `calc(12px + env(safe-area-inset-top, 0px))`;
+
+  return /*#__PURE__*/React.createElement("div", {
+    className: "places-view-container",
+    style: {
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: 'var(--bg-primary)',
+      display: 'flex', flexDirection: 'column',
+      width: '100%', maxWidth: '100%', overflowX: 'hidden'
+    }
+  },
+    /*#__PURE__*/React.createElement("div", {
+      ref: headerStackRef,
+      className: "history-header-stack",
+      style: {
+        position: 'fixed', top: 'env(safe-area-inset-top, 0px)', left: 0, right: 0, zIndex: 1010,
+        backgroundColor: 'var(--bg-primary)',
+        transition: 'transform 0.3s ease',
+        transform: isHeaderVisible ? 'translateY(0)' : 'translateY(-100%)'
+      }
+    },
+    /*#__PURE__*/React.createElement("div", {
+      className: "places-view-header",
+      style: {
+        position: 'relative', height: '56px',
+        backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0 16px', flexShrink: 0
+      }
+    },
+      /*#__PURE__*/React.createElement("button", {
+        type: "button", onClick: onBack, "aria-label": "뒤로가기",
+        style: {
+          width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'transparent', border: 'none',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)'
+        }
+      }, BackArrowIcon ? /*#__PURE__*/React.createElement(BackArrowIcon, { size: 22 }) : "←"),
+      /*#__PURE__*/React.createElement("div", {
+        style: {
+          position: 'absolute', left: '50%', transform: 'translateX(-50%)',
+          display: 'flex', alignItems: 'center', fontWeight: 800, fontSize: '0.95rem',
+          color: 'var(--text-main)', whiteSpace: 'nowrap', pointerEvents: 'none'
+        }
+      }, calendar.title, " 컨텐츠"),
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", onClick: () => setIsMenuOpen(true), title: "메뉴", "aria-label": "메뉴 열기",
+          style: { background: 'none', border: 'none', cursor: 'pointer', padding: '6px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }
+        }, ThreeLinesIcon ? /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 22 }) : "≡")
+      )
+    ),
+    UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
+      ariaLabel: "컨텐츠 탭",
+      value: contentTab,
+      onChange: changeContentTab,
+      options: [
+        { value: 'festival', label: '지역축제' },
+        { value: 'culture', label: '문화행사' },
+        { value: 'sports', label: '스포츠' }
+      ]
+    }),
+    /*#__PURE__*/React.createElement("div", {
+      className: "region-filter-trigger-row"
+    },
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "current-location-btn",
+        disabled: isLocating,
+        onClick: handleUseCurrentLocation,
+        title: "현재 위치",
+        "aria-label": "현재 위치"
+      },
+        LocateFixedIcon && /*#__PURE__*/React.createElement(LocateFixedIcon, { size: 18 })
+      ),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "form-select region-filter-trigger",
+        onClick: () => setIsRegionFilterOpen(true)
+      },
+        /*#__PURE__*/React.createElement("span", { style: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, "지역 선택"),
+        renderRegionTriggerChevron(React)
+      ),
+      /*#__PURE__*/React.createElement("div", {
+        className: "culture-grid-cols-toggle",
+        role: "group",
+        "aria-label": "그리드 열 수"
+      },
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          className: "culture-grid-cols-btn" + (gridCols === '2' ? " is-active" : ""),
+          "aria-label": "2단",
+          "aria-pressed": gridCols === '2',
+          onClick: () => persistGridCols('2')
+        },
+          /*#__PURE__*/React.createElement("svg", {
+            width: 20, height: 20, viewBox: "0 0 24 24", fill: "none",
+            stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round",
+            "aria-hidden": "true"
+          },
+            /*#__PURE__*/React.createElement("path", { d: "M3 4a1 1 0 0 1 1 -1h16a1 1 0 0 1 1 1v16a1 1 0 0 1 -1 1h-16a1 1 0 0 1 -1 -1v-16" }),
+            /*#__PURE__*/React.createElement("path", { d: "M12 3v18" })
           )
         ),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          className: "culture-grid-cols-btn" + (gridCols === '1' ? " is-active" : ""),
+          "aria-label": "1단",
+          "aria-pressed": gridCols === '1',
+          onClick: () => persistGridCols('1')
+        },
+          /*#__PURE__*/React.createElement("svg", {
+            width: 20, height: 20, viewBox: "0 0 24 24", fill: "none",
+            stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round",
+            "aria-hidden": "true"
+          },
+            /*#__PURE__*/React.createElement("path", { d: "M5 4a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v16a1 1 0 0 1 -1 1h-12a1 1 0 0 1 -1 -1l0 -16" })
+          )
+        )
+      )
+    ),
+    regionSelections.length > 0 && /*#__PURE__*/React.createElement("div", {
+      className: "region-selection-badges-row"
+    },
+      regionSelections.map((sel, idx) => /*#__PURE__*/React.createElement(RegionSelectionBadge, {
+        key: `${sel.sido}::${sel.gugun}`,
+        sel,
+        onRemove: () => removeRegionSelection(idx)
+      })),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "region-filter-reset-btn",
+        onClick: resetRegionSelections
+      }, "초기화")
+    ),
+    /*#__PURE__*/React.createElement("div", { ref: setChipRowSlot })
+    ), // end history-header-stack
+    /*#__PURE__*/React.createElement(RegionFilterBackdrop, {
+      isOpen: isRegionFilterOpen,
+      onClose: () => setIsRegionFilterOpen(false),
+      selections: regionSelections,
+      onAdd: addRegionSelection,
+      onRemove: removeRegionSelection,
+      onReset: resetRegionSelections,
+      items: regionFilterItems
+    }),
+    contentTab === 'culture' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
+      calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo, dataUrl: CULTURE_PERFORMANCES_URL,
+      emptyLabel: "상영중이거나 예정된 문화행사가 없습니다.", regionSelections, onItemsLoaded: setRegionFilterItems,
+      anniversaryCategory: "event",
+      extraItems: [...selfAuthoredCultureItems.filter(i => i.kind === 'performance'), ...(customCultureItems || []).filter(i => i && i.kind === 'performance')],
+      chipRowSlot, contentPaddingTop, onScroll: handleContentScroll,
+      gridCols
+    }),
+    contentTab === 'festival' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
+      calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo, dataUrl: CULTURE_FESTIVALS_URL,
+      emptyLabel: "진행중이거나 예정된 지역축제가 없습니다.", regionSelections, onItemsLoaded: setRegionFilterItems,
+      anniversaryCategory: "festival",
+      extraItems: [...selfAuthoredCultureItems.filter(i => i.kind === 'festival'), ...(customCultureItems || []).filter(i => i && i.kind === 'festival')],
+      chipRowSlot, contentPaddingTop, onScroll: handleContentScroll,
+      gridCols
+    }),
+    contentTab === 'sports' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
+      calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo, dataUrl: CULTURE_SPORTS_URL,
+      emptyLabel: "진행중이거나 예정된 스포츠 경기가 없습니다.", regionSelections, onItemsLoaded: setRegionFilterItems,
+      anniversaryCategory: "sports",
+      extraItems: [...selfAuthoredCultureItems.filter(i => i.kind === 'sports'), ...(customCultureItems || []).filter(i => i && i.kind === 'sports')],
+      chipRowSlot, contentPaddingTop, onScroll: handleContentScroll,
+      gridCols
+    }),
+
+    isMenuOpen && /*#__PURE__*/React.createElement("div", {
+      className: "admin-side-menu-overlay", style: { zIndex: 12000 }, onClick: () => setIsMenuOpen(false)
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "admin-side-menu", onClick: e => e.stopPropagation(), role: "dialog", "aria-label": "컨텐츠 메뉴"
+    },
+      /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-header" },
+        /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-brand" },
+          /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-copy" },
+            /*#__PURE__*/React.createElement("button", {
+              type: "button", className: "admin-side-menu-title", title: "메인 화면으로 이동", "aria-label": "메인 화면으로 이동",
+              onClick: () => { setIsMenuOpen(false); if (typeof onChangeView === 'function') onChangeView('calendar'); else if (typeof onBack === 'function') onBack(); },
+              style: { background: 'none', border: 'none', padding: 0, margin: 0, color: 'var(--text-main)', fontSize: '1.05rem', fontWeight: 800, cursor: 'pointer' }
+            }, "컨텐츠")
+          )
+        ),
+        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 } },
+          WeatherBadge ? /*#__PURE__*/React.createElement(WeatherBadge, { weatherLocation: calendar && calendar.weatherLocation }) : null,
+          /*#__PURE__*/React.createElement("button", {
+            type: "button", className: "admin-side-menu-close-btn", title: "메뉴 닫기", "aria-label": "메뉴 닫기",
+            onClick: () => setIsMenuOpen(false)
+          }, SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }) : "✕")
+        )
+      ),
+      /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list" },
         /*#__PURE__*/React.createElement("button", {
           type: "button", className: "admin-side-menu-item",
           onClick: () => { setIsMenuOpen(false); setIsContentRegisterOpen(true); }
@@ -2241,13 +2466,13 @@ export function HistoryView({
           ),
           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
             /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "컨텐츠 등록"),
-            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "문화공연·지역축제 직접 등록")
+            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "문화행사·지역축제·스포츠 직접 등록")
           )
         )
       ),
       typeof SharedAppNavBlock === 'function' && /*#__PURE__*/React.createElement(SharedAppNavBlock, {
         onClose: () => setIsMenuOpen(false),
-        onChangeView: handleHistoryChangeView,
+        onChangeView: handleContentChangeView,
         onOpenCreateSettlement: onOpenCreateSettlement,
         showSettlement: showSettlement,
         chatCount: chatCount,
@@ -2279,6 +2504,7 @@ export function HistoryView({
 const CULTURE_DATA_BASE = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.BASE_URL) || '/';
 const CULTURE_PERFORMANCES_URL = `${CULTURE_DATA_BASE}data/culture-performances.json`;
 const CULTURE_FESTIVALS_URL = `${CULTURE_DATA_BASE}data/culture-festivals.json`;
+const CULTURE_SPORTS_URL = `${CULTURE_DATA_BASE}data/culture-sports.json`;
 const CULTURE_MISSING_LABEL = '정보없음';
 const culturePerf = value => (value && String(value).trim()) || CULTURE_MISSING_LABEL;
 
@@ -2292,7 +2518,12 @@ const CULTURE_GENRE_LABELS = {
   concert: '콘서트',
   exhibition: '전시',
   activity: '체험',
-  museum: '박물관'
+  museum: '박물관',
+  baseball: '야구',
+  basketball: '농구',
+  volleyball: '배구',
+  soccer: '축구',
+  handball: '핸드볼'
 };
 const cultureGenreLabel = genre => CULTURE_GENRE_LABELS[genre] || genre || '기타';
 
@@ -2846,7 +3077,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
       if (existing) {
         if (typeof onUnregisterCultureEvent === 'function') await onUnregisterCultureEvent(existing.id);
       } else {
-        const category = anniversaryCategory === 'festival' ? 'festival' : 'event';
+        const category = (anniversaryCategory === 'festival' || anniversaryCategory === 'sports') ? anniversaryCategory : 'event';
         if (typeof onRegisterCultureEvent === 'function') await onRegisterCultureEvent({ ...item, anniversaryCategory: category }, { category });
       }
     } finally {
@@ -3162,6 +3393,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
     MemoPreviewSection: MemoPreviewSection,
     SummaryList: SummaryList,
     HistoryView: HistoryView,
+    ContentView: ContentView,
     CulturePerformancesTab: CulturePerformancesTab,
     ContentRegisterModal: ContentRegisterModal,
     RegionFilterBackdrop: RegionFilterBackdrop,

@@ -48,7 +48,9 @@ const VIEWS = [
   { suffix: '&view=gallery', label: '갤러리' },
   { suffix: '&view=places', label: '장소' },
   { suffix: '&view=memo', label: '메모' },
-  { suffix: '&view=settlement', label: '정산' }
+  { suffix: '&view=settlement', label: '정산' },
+  { suffix: '&view=history', label: '보관함' },
+  { suffix: '&view=content', label: '컨텐츠' }
 ];
 const VIEWPORTS = [
   { name: 'PC', width: 1440, height: 900, isMobile: false, hasTouch: false },

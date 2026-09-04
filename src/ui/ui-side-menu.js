@@ -1267,9 +1267,19 @@ export function SharedAppNavBlock({
       ),
       metaPill(memoLastTitleWord)
     ),
-    /* 8. 보관함 (구 히스토리) */
+    /* 8. 컨텐츠 (지역축제/문화행사/스포츠) */
     /*#__PURE__*/React.createElement("button", { type: "button", className: "admin-side-menu-item", onClick: () => {
-      try { localStorage.setItem('gather_history_tab', 'festival'); } catch (_) { /* best-effort */ }
+      try { localStorage.setItem('gather_content_tab', 'festival'); } catch (_) { /* best-effort */ }
+      go("content");
+    } },
+      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, /*#__PURE__*/React.createElement("path", { d: "m12 3-8.5 4.5L12 12l8.5-4.5L12 3Z" }), /*#__PURE__*/React.createElement("path", { d: "m3.5 12 8.5 4.5 8.5-4.5" }), /*#__PURE__*/React.createElement("path", { d: "m3.5 16.5 8.5 4.5 8.5-4.5" }))),
+      /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title", style: { display: "flex", alignItems: "center", gap: "6px" } }, "컨텐츠")
+      )
+    ),
+    /* 9. 보관함 (구 히스토리) */
+    /*#__PURE__*/React.createElement("button", { type: "button", className: "admin-side-menu-item", onClick: () => {
+      try { localStorage.setItem('gather_history_tab', 'meetings'); } catch (_) { /* best-effort */ }
       go("history");
     } },
       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, FolderClockIcon ? /*#__PURE__*/React.createElement(FolderClockIcon, { size: 20 }) : null),

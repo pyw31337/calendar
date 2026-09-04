@@ -792,6 +792,7 @@ const ANNIVERSARY_CATEGORY_OPTIONS = [
   { value: 'birthday', label: '생일' },
   { value: 'event', label: '행사' },
   { value: 'festival', label: '축제' },
+  { value: 'sports', label: '스포츠' },
   { value: 'travel', label: '여행' },
   { value: 'other', label: '기타' }
 ];
@@ -799,11 +800,12 @@ const ANNIVERSARY_CATEGORY_TITLE_LABEL = {
   birthday: '생일 이름',
   event: '행사 이름',
   festival: '축제 이름',
+  sports: '경기 이름',
   travel: '여행 이름',
   other: '기념일 이름'
 };
 // 장소 검색은 모임/약속 성격이 있는 카테고리에서만 의미가 있다 (생일/여행/기타는 제외)
-const ANNIVERSARY_CATEGORIES_WITH_PLACE = new Set(['event', 'festival']);
+const ANNIVERSARY_CATEGORIES_WITH_PLACE = new Set(['event', 'festival', 'sports']);
 
 export function AnniversaryModal({
   calendar,
