@@ -2898,7 +2898,16 @@ select.form-select {
   background: var(--bg-card);
   color: var(--text-main);
   box-shadow: -12px 0 34px rgba(15, 23, 42, 0.12);
-  padding: 22px 16px 16px;
+  /* Shared by every side panel in the app (main hamburger menu, admin, chat/memo/places/gallery
+     side menus -- see .admin-side-menu-overlay usage sites) -- this one fix covers them all.
+     The overlay is position:fixed;inset:0, so on iOS home-screen install (standalone display-
+     mode, status bar rendered full-bleed over web content, same as .main-header) this panel's
+     own top edge sits right under the status bar with no adjustment. Adding
+     env(safe-area-inset-top) on top of the original 22px (rather than replacing it, which would
+     leave awkwardly little breathing room since the inset itself is already ~44-59px) keeps the
+     same visual spacing below the status bar/notch as before; 0px in a normal browser tab, so
+     this is a no-op everywhere else. */
+  padding: calc(22px + env(safe-area-inset-top, 0px)) 16px 16px;
   display: flex;
   flex-direction: column;
   gap: 0;
