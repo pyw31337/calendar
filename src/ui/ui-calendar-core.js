@@ -1185,6 +1185,11 @@ export function CalendarGrid({
   }, [festivalBars]);
   // Matches the single-line ellipsis title in ANNIVERSARY_BADGE_TEXT_STYLE.
   const FESTIVAL_BAR_HEIGHT = 24;
+  // Mobile-only icon-only line (see festivalBars.flatMap below) -- same height as the day-cell's
+  // own participant dot on mobile (.days-grid .participant-badge in app.css), since the title
+  // text is unreadable at that width anyway and the desktop banner's height was only ever sized
+  // to fit that text.
+  const FESTIVAL_BAR_HEIGHT_MOBILE = 8;
   const availMap = React.useMemo(() => getActiveAvailabilities(calendar).reduce((acc, entry) => {
     if (!acc[entry.date]) acc[entry.date] = [];
     acc[entry.date].push(entry);
@@ -1674,65 +1679,88 @@ export function CalendarGrid({
          also protects plain attendee badges from being covered, not just other anniversaries. */
       festivalStackDepth > 0 && /*#__PURE__*/React.createElement("div", { style: { height: `${FESTIVAL_BAR_HEIGHT * festivalStackDepth}px`, flexShrink: 0, width: '100%' } })
     );
-  }), festivalBars.map(bar => {
+  }), festivalBars.flatMap(bar => {
     const displayColor = getAnniversaryDisplayColor(bar, calendar);
-    return /*#__PURE__*/React.createElement("div", {
-      key: `festival-bar-${bar.id}-${bar.row}`,
-      style: {
-        gridRowStart: bar.row + 1,
-        gridColumnStart: bar.startCol + 1,
-        gridColumnEnd: bar.endCol + 2,
-        display: 'flex',
-        alignItems: 'flex-end',
-        pointerEvents: 'none',
-        boxSizing: 'border-box',
-        // .day-cell has position:relative, so it always paints in the positioned-elements
-        // layer above any position:static sibling regardless of DOM order -- without also
-        // being positioned here, this bar would render invisibly underneath every day-cell.
-        position: 'relative',
-        zIndex: 1,
-        // A grid item's automatic minimum width defaults to its content's min-content size
-        // (here, the unwrapped title text) unless overridden -- without this, a long title
-        // forces its spanned column(s) wide enough to fit the whole word, squeezing every
-        // other column in the row down to a sliver. minWidth:0 lets the item shrink to the
-        // track's actual size and leaves the inner pill's own overflow/ellipsis to truncate it.
-        minWidth: 0
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        width: '100%',
-        height: `${FESTIVAL_BAR_HEIGHT}px`,
-        // Bars whose date ranges overlap (see `level` assignment in festivalBars above) stack
-        // upward from the bottom of the cell instead of painting on top of each other -- level 0
-        // sits flush at the bottom, level 1 sits one bar-height above it, and so on.
-        marginBottom: bar.level > 0 ? `${bar.level * FESTIVAL_BAR_HEIGHT}px` : undefined,
-        backgroundColor: `${displayColor}22`,
-        // A festival spanning multiple week rows reads as one continuous bar broken across
-        // rows: only the true start segment rounds its left corners and only the true end
-        // segment rounds its right corners -- every edge where the bar actually continues into
-        // another row stays square, and a single-row festival (totalSegments === 1) keeps the
-        // plain all-around radius since there's nothing to visually connect to.
-        borderRadius: bar.totalSegments === 1
-          ? 'var(--radius-sm)'
-          : bar.isFirstSegment
-            ? '8px 0 0 8px'
-            : bar.isLastSegment
-              ? '0 8px 8px 0'
-              : '0',
-        padding: bar.totalSegments > 1 && bar.isLastSegment ? '3px 10px 3px 8px' : '3px 8px',
-        display: 'flex',
-        alignItems: 'center',
-        // Icon+text renders as one content-sized chunk (not stretched to fill the bar) so this
-        // justifyContent can actually move it -- alternates left/right by which week of the
-        // festival's span this bar segment is (see spanIndex in festivalBars above).
-        justifyContent: bar.spanIndex % 2 === 0 ? 'flex-start' : 'flex-end',
-        gap: '4px',
-        boxSizing: 'border-box',
-        color: displayColor
-      }
-    }, renderAnniversaryIcon(bar, 12), /*#__PURE__*/React.createElement("span", {
-      style: ANNIVERSARY_BADGE_TEXT_STYLE(displayColor)
-    }, bar.title)));
+    const gridPlacementStyle = {
+      gridRowStart: bar.row + 1,
+      gridColumnStart: bar.startCol + 1,
+      gridColumnEnd: bar.endCol + 2,
+      alignItems: 'flex-end',
+      pointerEvents: 'none',
+      boxSizing: 'border-box',
+      // .day-cell has position:relative, so it always paints in the positioned-elements
+      // layer above any position:static sibling regardless of DOM order -- without also
+      // being positioned here, this bar would render invisibly underneath every day-cell.
+      position: 'relative',
+      zIndex: 1,
+      // A grid item's automatic minimum width defaults to its content's min-content size
+      // (here, the unwrapped title text) unless overridden -- without this, a long title
+      // forces its spanned column(s) wide enough to fit the whole word, squeezing every
+      // other column in the row down to a sliver. minWidth:0 lets the item shrink to the
+      // track's actual size and leaves the inner pill's own overflow/ellipsis to truncate it.
+      minWidth: 0
+    };
+    const borderRadius = bar.totalSegments === 1
+      ? 'var(--radius-sm)'
+      : bar.isFirstSegment
+        ? '8px 0 0 8px'
+        : bar.isLastSegment
+          ? '0 8px 8px 0'
+          : '0';
+    return [
+      // Tablet/PC: unchanged icon+title banner.
+      /*#__PURE__*/React.createElement("div", {
+        key: `festival-bar-desktop-${bar.id}-${bar.row}`,
+        className: "festival-bar-desktop",
+        style: { ...gridPlacementStyle, display: 'flex' }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          width: '100%',
+          height: `${FESTIVAL_BAR_HEIGHT}px`,
+          // Bars whose date ranges overlap (see `level` assignment in festivalBars above) stack
+          // upward from the bottom of the cell instead of painting on top of each other -- level 0
+          // sits flush at the bottom, level 1 sits one bar-height above it, and so on.
+          marginBottom: bar.level > 0 ? `${bar.level * FESTIVAL_BAR_HEIGHT}px` : undefined,
+          backgroundColor: `${displayColor}22`,
+          borderRadius,
+          padding: bar.totalSegments > 1 && bar.isLastSegment ? '3px 10px 3px 8px' : '3px 8px',
+          display: 'flex',
+          alignItems: 'center',
+          // Icon+text renders as one content-sized chunk (not stretched to fill the bar) so this
+          // justifyContent can actually move it -- alternates left/right by which week of the
+          // festival's span this bar segment is (see spanIndex in festivalBars above).
+          justifyContent: bar.spanIndex % 2 === 0 ? 'flex-start' : 'flex-end',
+          gap: '4px',
+          boxSizing: 'border-box',
+          color: displayColor
+        }
+      }, renderAnniversaryIcon(bar, 12), /*#__PURE__*/React.createElement("span", {
+        style: ANNIVERSARY_BADGE_TEXT_STYLE(displayColor)
+      }, bar.title))),
+      // Mobile: the title text is unreadable at phone width anyway, so it's dropped entirely --
+      // just a solid-color line (same height as the day-cell's own participant dot) with the
+      // category icon centered on it, matching the icon-only treatment single-day anniversaries
+      // already get in their own mobile badge (day-anniversary-mobile below).
+      /*#__PURE__*/React.createElement("div", {
+        key: `festival-bar-mobile-${bar.id}-${bar.row}`,
+        className: "festival-bar-mobile",
+        style: { ...gridPlacementStyle, display: 'none' }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          width: '100%',
+          height: `${FESTIVAL_BAR_HEIGHT_MOBILE}px`,
+          marginBottom: bar.level > 0 ? `${bar.level * FESTIVAL_BAR_HEIGHT_MOBILE}px` : undefined,
+          backgroundColor: displayColor,
+          borderRadius,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxSizing: 'border-box',
+          color: '#fff',
+          overflow: 'visible'
+        }
+      }, renderAnniversaryIcon(bar, 11)))
+    ];
   })]));
 
   // Floating badge that follows the finger while a touch drag is active (see
