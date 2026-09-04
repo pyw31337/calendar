@@ -26,6 +26,20 @@ service firebase.storage {
       allow delete: if isCalendarId(calendarId);
     }
 
+    // Anniversary photos (uploadAnniversaryImageAssets, app-main.js) were never given a rule
+    // here, so every upload attempt fell through to the deny-all catch-all below and silently
+    // failed -- resolveImageUrls then fell back to the much-lower-resolution inline base64 path
+    // (bounded by Firestore's document size, unlike a Storage-hosted image), which is why
+    // anniversary photos looked degraded compared to chat/memo photos no matter how many times
+    // they were re-uploaded or how much the compression quality was tuned.
+    match /anniversaryImages/{calendarId}/{fileName} {
+      allow read: if isCalendarId(calendarId);
+      allow write: if isCalendarId(calendarId)
+        && request.resource.size <= 8 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if isCalendarId(calendarId);
+    }
+
     match /{allPaths=**} {
       allow read, write: if false;
     }

@@ -1185,11 +1185,11 @@ export function CalendarGrid({
   }, [festivalBars]);
   // Matches the single-line ellipsis title in ANNIVERSARY_BADGE_TEXT_STYLE.
   const FESTIVAL_BAR_HEIGHT = 24;
-  // Mobile-only icon-only line (see festivalBars.flatMap below) -- same height as the day-cell's
-  // own participant dot on mobile (.days-grid .participant-badge in app.css), since the title
-  // text is unreadable at that width anyway and the desktop banner's height was only ever sized
-  // to fit that text.
-  const FESTIVAL_BAR_HEIGHT_MOBILE = 8;
+  // Mobile-only plain-color line (see festivalBars.flatMap below) -- no icon, no text, just a
+  // thin bar, half the height of the day-cell's own participant dot on mobile (.days-grid
+  // .participant-badge in app.css): both title text and any icon (SVG or emoji) are unreadable
+  // at that width anyway, so this stays as compact as possible.
+  const FESTIVAL_BAR_HEIGHT_MOBILE = 4;
   const availMap = React.useMemo(() => getActiveAvailabilities(calendar).reduce((acc, entry) => {
     if (!acc[entry.date]) acc[entry.date] = [];
     acc[entry.date].push(entry);
@@ -1654,15 +1654,17 @@ export function CalendarGrid({
       }, cellAnns.map((ann, aIdx) => {
         const displayColor = getAnniversaryDisplayColor(ann, calendar);
         const isHeundeul = isHeundeulDosirakAnn(ann);
-        // 흔들도시락은 애니메이션이 붙은 특수 아이콘이라 그대로 유지하고, 일반 기념일은 아이콘을
-        // 아예 빼고 기존 세로폭(18px)의 절반(9px)짜리 색상 점만 남긴다 -- 모바일에서 아이콘이
-        // 안 보이는 건 마찬가지라 굳이 자리를 크게 차지할 필요가 없다는 취지.
+        // 흔들도시락은 애니메이션이 붙은 특수 아이콘이라 원형 그대로 유지한다. 일반 기념일은
+        // 아이콘 없는 9px짜리 "점"이었는데, 참여자 뱃지도 모바일에서 똑같이 작은 원으로 보여서
+        // 서로 구분이 안 됐다 -- 원형 대신 셀 가로폭을 꽉 채우는 얇은 캡슐(막대) 모양으로 바꿔서
+        // 하루짜리 기념일이라도 참여자 점과 혼동되지 않게 한다. 여러 개면 부모의 flexWrap 덕에
+        // 각자 한 줄씩 자연히 쌓인다(너비 100%이므로).
         const badgeSize = isHeundeul ? 18 : 9;
         return /*#__PURE__*/React.createElement("div", {
           key: ann.id || aIdx,
           title: ann.title,
           className: isHeundeul ? 'day-anniversary-badge-jiggle' : undefined,
-          style: {
+          style: isHeundeul ? {
             width: `${badgeSize}px`,
             height: `${badgeSize}px`,
             borderRadius: '50%',
@@ -1673,7 +1675,13 @@ export function CalendarGrid({
             justifyContent: 'center',
             fontSize: 'var(--font-size-2xs)',
             flexShrink: 0,
-            overflow: isHeundeul ? 'visible' : undefined
+            overflow: 'visible'
+          } : {
+            width: '100%',
+            height: `${badgeSize}px`,
+            borderRadius: 'var(--radius-full)',
+            backgroundColor: displayColor,
+            flexShrink: 0
           }
         }, isHeundeul ? renderAnniversaryIcon(ann, 10) : null);
       })),
@@ -1748,10 +1756,10 @@ export function CalendarGrid({
       }, renderAnniversaryIcon(bar, 12), /*#__PURE__*/React.createElement("span", {
         style: ANNIVERSARY_BADGE_TEXT_STYLE(displayColor)
       }, bar.title))),
-      // Mobile: the title text is unreadable at phone width anyway, so it's dropped entirely --
-      // just a solid-color line (same height as the day-cell's own participant dot) with the
-      // category icon centered on it, matching the icon-only treatment single-day anniversaries
-      // already get in their own mobile badge (day-anniversary-mobile below).
+      // Mobile: both the title text and any category icon (SVG or emoji) are unreadable/oversized
+      // at phone width, so this is now a plain solid-color line with nothing on it -- no icon at
+      // all, matching the single-day mobile badge (day-anniversary-mobile above), which dropped
+      // its icon for the same reason.
       /*#__PURE__*/React.createElement("div", {
         key: `festival-bar-mobile-${bar.id}-${bar.row}`,
         className: "festival-bar-mobile",
@@ -1763,24 +1771,9 @@ export function CalendarGrid({
           marginBottom: bar.level > 0 ? `${bar.level * FESTIVAL_BAR_HEIGHT_MOBILE}px` : undefined,
           backgroundColor: displayColor,
           borderRadius,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxSizing: 'border-box',
-          color: '#fff',
-          overflow: 'visible',
-          // renderAnniversaryIcon(bar, 6) only sizes SVG icon components -- a category with no
-          // matching SVG (e.g. sports' genre emoji ⚾/🏀/⚽/...) falls back to the raw emoji
-          // character, which ignores that `size` prop entirely and renders at the *inherited*
-          // font-size instead. Without an explicit fontSize here it inherited the day-cell's much
-          // larger default, so the emoji rendered oversized and overflowed the 8px-tall bar.
-          // Match the same font-size the other mobile badge (day-anniversary-mobile) uses.
-          fontSize: 'var(--font-size-2xs)',
-          lineHeight: 1
+          boxSizing: 'border-box'
         }
-      // 11px 아이콘이 8px짜리 바 안에 들어가면 아이콘이 바 배경보다 커서 위아래로 삐져나와
-      // 보였다 -- 바 높이에 맞춰 6px로 축소.
-      }, renderAnniversaryIcon(bar, 6)))
+      }))
     ];
   })]));
 
