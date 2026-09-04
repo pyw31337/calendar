@@ -1044,6 +1044,17 @@ export function EmojiPickerSheet({ onSelect, onClose }) {
 }
 
 const ReactComponentBase = (typeof React !== 'undefined' && React.Component) ? React.Component : class {};
+// Firestore's own internal watch-stream bookkeeping occasionally gets into a state it doesn't
+// recognize (observed in production as rapid tab/page-navigation churn tearing down and
+// re-attaching onSnapshot listeners) and throws "FIRESTORE (x.y.z) INTERNAL ASSERTION FAILED:
+// Unexpected state" -- this is SDK-internal client state corruption, not app data corruption, so
+// React re-rendering ("다시 시도") can never fix it: the same broken client object keeps throwing
+// on the very next Firestore call. A full reload is the only thing that actually recovers (it
+// constructs a fresh Firestore client), so this is auto-triggered once instead of leaving the
+// user stuck re-tapping "다시 시도" for an error that inherently can't be dismissed away.
+function isUnrecoverableFirestoreError(error) {
+  return /INTERNAL ASSERTION FAILED/i.test(String(error?.message || error || ''));
+}
 class AppErrorBoundary extends ReactComponentBase {
   constructor(props) {
     super(props);
@@ -1054,6 +1065,16 @@ class AppErrorBoundary extends ReactComponentBase {
   }
   componentDidCatch(error, errorInfo) {
     console.error('Uncaught UI Error captured by AppErrorBoundary:', error, errorInfo);
+    if (isUnrecoverableFirestoreError(error) && typeof window !== 'undefined' && typeof window.sessionStorage !== 'undefined') {
+      // Guards against a reload loop if the corrupted state somehow survives the reload (e.g. a
+      // network-level issue reproducing the same SDK error immediately) -- auto-reload fires at
+      // most once per browser tab session, then falls back to the manual buttons below.
+      const guardKey = 'gather_firestore_assertion_reload';
+      if (!window.sessionStorage.getItem(guardKey)) {
+        window.sessionStorage.setItem(guardKey, String(Date.now()));
+        window.location.reload();
+      }
+    }
   }
   render() {
     if (this.state.hasError) {

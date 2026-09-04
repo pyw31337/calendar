@@ -2830,10 +2830,23 @@ function CalendarApp() {
   // memo collection (e.g. calendar -> chat -> settlement) never tears down and recreates these
   // three memo listeners -- only crossing into/out of memo|gallery|search actually should.
   const needsMemoCollection = React.useMemo(
-    // 'history' included so 보관함 인물/추억 탭도 memo에 올라온 사진을 사진 목록에 포함할 수 있다.
-    () => activeView === 'memo' || activeView === 'gallery' || activeView === 'history' || isGlobalSearchOpen,
+    () => activeView === 'memo' || activeView === 'gallery' || isGlobalSearchOpen,
     [activeView, isGlobalSearchOpen]
   );
+  // 보관함 인물/추억 탭의 사진 목록용 memo 스냅샷 -- 위 needsMemoCollection에 'history'를 넣어 실시간
+  // 구독을 타게 하면 캘린더<->보관함을 오갈 때마다 리스너가 추가로 붙었다 떨어지는 처치(churn)가
+  // 늘어나는데, 이 리스너 처치가 실사용자 콘솔에서 반복 관찰된 "FIRESTORE INTERNAL ASSERTION
+  // FAILED: Unexpected state" 크래시의 유력한 방아쇠라 이미 위 주석에서 경고하고 있다. 사진 모아보기는
+  // 실시간일 필요가 없으므로, 보관함에 들어갈 때 한 번만 REST로 읽어와 별도 상태에 담는다(구독 없음).
+  const [historyMemosSnapshot, setHistoryMemosSnapshot] = React.useState([]);
+  React.useEffect(() => {
+    if (!activeCalId || activeView !== 'history') return;
+    let cancelled = false;
+    fetchMemosRest(activeCalId, 200).then(list => {
+      if (!cancelled) setHistoryMemosSnapshot(Array.isArray(list) ? list : []);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [activeCalId, activeView]);
 
   React.useEffect(() => {
     if (!activeCalId) {
@@ -7210,7 +7223,7 @@ function CalendarApp() {
         onAddPersonTag: handleAddPersonTag,
         anniversaries: anniversaries,
         chatMessages: galleryChatMessages,
-        memos: memos,
+        memos: historyMemosSnapshot,
         setActiveLightbox: setActiveLightbox,
         showToast: showToast,
         ...navMenuProps
