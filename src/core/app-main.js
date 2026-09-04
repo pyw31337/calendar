@@ -1305,6 +1305,9 @@ function CalendarApp() {
   const [isGuideOpen, setIsGuideOpen] = React.useState(false);
   const [isAnniversariesOpen, setIsAnniversariesOpen] = React.useState(false);
   const [anniversaryEditId, setAnniversaryEditId] = React.useState(null);
+  // 일정 팝업의 "+ 기념일 등록" 버튼이 채워 넣는 날짜 -- AnniversaryModal이 이 날짜로 바로
+  // 등록 폼을 여는 데 쓴다 (initialEditId와는 별개로, 기존 기념일이 아닌 새 등록 전용).
+  const [anniversaryInitialDate, setAnniversaryInitialDate] = React.useState(null);
   const [isInitialDataLoading, setIsInitialDataLoading] = React.useState(() => {
     if (!firebaseDb) return false;
     try {
@@ -6388,7 +6391,25 @@ function CalendarApp() {
       syncStatus: syncStatus,
       onClose: () => { setIsModalOpen(false); setDateModalInitialTab(null); },
       onParticipantClick: handleParticipantClick,
-      onEditAnniversary: (ann) => { if (!ann?.id) return; setAnniversaryEditId(ann.id); setIsAnniversariesOpen(true); }
+      onEditAnniversary: (ann) => { if (!ann?.id) return; setAnniversaryEditId(ann.id); setIsAnniversariesOpen(true); },
+      onAddAnniversaryForDate: (dateStr) => {
+        if (!dateStr) return;
+        setIsModalOpen(false);
+        setAnniversaryInitialDate(dateStr);
+        setIsAnniversariesOpen(true);
+      },
+      onFocusCultureSource: (ann) => {
+        if (!ann?.cultureSourceId) return;
+        // 문화행사/지역축제/스포츠 탭 중 이 기념일의 원래 카테고리에 맞는 탭을 열고, 그 항목의
+        // 상세를 자동으로 펼치도록 ContentView에 전달 -- 실제 매칭/표시는 컨텐츠 페이지 쪽에서.
+        const tabByCategory = { festival: 'festival', event: 'culture', sports: 'sports' };
+        try {
+          localStorage.setItem('gather_content_tab', tabByCategory[ann.category] || 'festival');
+          localStorage.setItem('gather_content_focus_item_id', ann.cultureSourceId);
+        } catch (_) { /* best-effort */ }
+        setIsModalOpen(false);
+        changeView('content');
+      }
     }),
     confirmDialog && /*#__PURE__*/React.createElement(ConfirmDialog, {
       title: confirmDialog.title,
@@ -7565,7 +7586,8 @@ function CalendarApp() {
     anniversaries: anniversaries,
     initialEditId: anniversaryEditId,
     onInitialEditConsumed: () => setAnniversaryEditId(null),
-    onClose: () => { setIsAnniversariesOpen(false); setAnniversaryEditId(null); },
+    initialDate: anniversaryInitialDate,
+    onClose: () => { setIsAnniversariesOpen(false); setAnniversaryEditId(null); setAnniversaryInitialDate(null); },
     showToast: showToast,
     onRequestConfirm: showConfirmDialog,
     onBulkRegister: handleBulkRegisterAvailability,

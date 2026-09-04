@@ -820,7 +820,8 @@ export function AnniversaryModal({
   embedded = false,
   setActiveLightbox,
   initialEditId = null,
-  onInitialEditConsumed = null
+  onInitialEditConsumed = null,
+  initialDate = null
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -1033,6 +1034,23 @@ export function AnniversaryModal({
     if (ann) handleEditClick(ann);
     if (typeof onInitialEditConsumed === 'function') onInitialEditConsumed();
   }, [initialEditId]); // intentional once when id set
+
+  // 일정 팝업의 "+ 기념일 등록" 버튼 -- 목록을 거치지 않고 바로 그 날짜가 채워진 등록 폼으로 연다.
+  React.useEffect(() => {
+    if (!initialDate || initialEditId) return;
+    setEditingId(null);
+    setNewTitle('');
+    setNewCategory('event');
+    setDayMode('single');
+    setRepeatYearly(false);
+    setOnceDate(initialDate);
+    setRangeStartDate(initialDate);
+    setRangeEndDate(initialDate);
+    const parts = String(initialDate).split('-');
+    setYearlyMonth(Number(parts[1]) || new Date().getMonth() + 1);
+    setYearlyDay(Number(parts[2]) || new Date().getDate());
+    setActiveTab('add');
+  }, [initialDate]); // intentional once when set
 
   const handleAttachPhotoFiles = async (files) => {
     if (!files || files.length === 0) return;

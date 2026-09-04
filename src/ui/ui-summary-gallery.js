@@ -2263,6 +2263,15 @@ export function ContentView({
     setContentTab(tab);
     try { localStorage.setItem(CONTENT_TAB_STORAGE_KEY, tab); } catch (_) { /* best-effort */ }
   };
+  // 일정 팝업의 기념일 제목 클릭 -> 컨텐츠 페이지 이동 시, app-main.js가 미리 저장해 둔 항목 id.
+  // 한 번 소비하면 바로 지워서 이후 컨텐츠 페이지 재방문 때 엉뚱한 항목이 다시 열리지 않게 한다.
+  const [focusItemId] = React.useState(() => {
+    try { return localStorage.getItem('gather_content_focus_item_id') || null; } catch (_) { return null; }
+  });
+  React.useEffect(() => {
+    if (!focusItemId) return;
+    try { localStorage.removeItem('gather_content_focus_item_id'); } catch (_) { /* best-effort */ }
+  }, [focusItemId]);
   // 컨텐츠 메뉴를 다시 누르면 항상 지역축제 탭부터 보이도록.
   const handleContentChangeView = (view) => {
     if (view === 'content') changeContentTab('festival');
@@ -2504,7 +2513,7 @@ export function ContentView({
       anniversaryCategory: "event",
       extraItems: [...selfAuthoredCultureItems.filter(i => i.kind === 'performance'), ...(customCultureItems || []).filter(i => i && i.kind === 'performance')],
       chipRowSlot, contentPaddingTop, onScroll: handleContentScroll,
-      gridCols
+      gridCols, focusItemId
     }),
     contentTab === 'festival' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
       calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo, dataUrl: CULTURE_FESTIVALS_URL,
@@ -2512,7 +2521,7 @@ export function ContentView({
       anniversaryCategory: "festival",
       extraItems: [...selfAuthoredCultureItems.filter(i => i.kind === 'festival'), ...(customCultureItems || []).filter(i => i && i.kind === 'festival')],
       chipRowSlot, contentPaddingTop, onScroll: handleContentScroll,
-      gridCols
+      gridCols, focusItemId
     }),
     contentTab === 'sports' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
       calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo, dataUrl: CULTURE_SPORTS_URL,
@@ -2520,7 +2529,7 @@ export function ContentView({
       anniversaryCategory: "sports",
       extraItems: [...selfAuthoredCultureItems.filter(i => i.kind === 'sports'), ...(customCultureItems || []).filter(i => i && i.kind === 'sports')],
       chipRowSlot, contentPaddingTop, onScroll: handleContentScroll,
-      gridCols
+      gridCols, focusItemId
     }),
 
     /*#__PURE__*/React.createElement(SideMenuOverlay, {
@@ -3066,7 +3075,7 @@ function buildQuickMemoPlaceholder(item) {
   return lines.join('\n') || '비워두면 행사 정보가 그대로 저장됩니다';
 }
 
-export function CulturePerformancesTab({ calendar, anniversaries = [], onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo = null, dataUrl = CULTURE_PERFORMANCES_URL, emptyLabel = "상영중이거나 예정된 문화공연이 없습니다.", regionSelections = [], onItemsLoaded, anniversaryCategory = 'event', extraItems = [], chipRowSlot = null, contentPaddingTop = 0, onScroll, gridCols = '2' }) {
+export function CulturePerformancesTab({ calendar, anniversaries = [], onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo = null, dataUrl = CULTURE_PERFORMANCES_URL, emptyLabel = "상영중이거나 예정된 문화공연이 없습니다.", regionSelections = [], onItemsLoaded, anniversaryCategory = 'event', extraItems = [], chipRowSlot = null, contentPaddingTop = 0, onScroll, gridCols = '2', focusItemId = null }) {
   const React = window.React;
   const ReactDOM = window.ReactDOM;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -3161,6 +3170,16 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
   React.useEffect(() => {
     if (typeof onItemsLoaded === 'function') onItemsLoaded(mergedItems || []);
   }, [mergedItems]);
+
+  // 일정 팝업에서 "기념일 제목"을 눌러 넘어온 경우, 그 항목을 찾아 상세 시트를 자동으로 연다.
+  // 한 번만 시도하면 되므로 mergedItems가 (아직 못 찾았더라도) 로드된 뒤로는 다시 확인하지 않는다.
+  const focusAttemptedRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!focusItemId || focusAttemptedRef.current || mergedItems === null) return;
+    focusAttemptedRef.current = true;
+    const match = mergedItems.find(i => i && i.id === focusItemId);
+    if (match) setSelected(match);
+  }, [focusItemId, mergedItems]);
 
   if (mergedItems === null) {
     return /*#__PURE__*/React.createElement("div", {
