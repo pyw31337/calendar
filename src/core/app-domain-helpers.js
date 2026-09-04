@@ -2031,7 +2031,11 @@ function getMessageImageEntries(msg) {
       // Callers building non-chat entries (e.g. memo pseudo-messages) override `source`
       // explicitly -- see ui-chat-gallery.js/ui-summary-gallery.js's sharedPhotos/photoEntries.
       source: sourceHint,
-      uploadSource: msg.uploadSource || null
+      uploadSource: msg.uploadSource || null,
+      // Who sent this message -- lets 보관함 > 인물 탭 match a participant's own photos
+      // automatically (see getPhotosForTagLabel in ui-summary-gallery.js) instead of relying
+      // only on manually-added hashtags, which almost nothing had actually been tagged with.
+      participantId: msg.participantId || null
     });
   }
   return entries;
