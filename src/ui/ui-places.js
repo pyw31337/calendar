@@ -1787,15 +1787,12 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
     setEditingPlace(null);
   };
 
-  // Most recent visit date first, oldest last
-  const sortedPlaces = [...places].sort((a, b) => {
-    const dateA = getPlaceSortDateKey(a);
-    const dateB = getPlaceSortDateKey(b);
-    if (dateA && dateB) return dateB.localeCompare(dateA);
-    if (dateA && !dateB) return -1;
-    if (!dateA && dateB) return 1;
-    return (b.updatedAt || 0) - (a.updatedAt || 0);
-  });
+  // 가장 최근에 등록되었거나 정보가 수정된 장소가 맨 위로 -- handleSavePlace(app-main.js)가
+  // 생성/수정 시 항상 updatedAt을 현재 시각으로 찍어주므로(createdAt은 최초 생성 시각 그대로
+  // 유지) 모든 장소에 항상 값이 있다. 예전엔 방문일자(getPlaceSortDateKey) 기준으로 먼저
+  // 정렬해서 방문 예정일이 먼 미래인 장소가 최근에 등록한 장소보다 위로 올라가는 등, "최근
+  // 등록/수정 순"이라는 사용자 기대와 다르게 보였다.
+  const sortedPlaces = [...places].sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
   
   // Feeds the "전체 N" badge and countsByCategory below -- both need to move together with
   // visitFilter (전체/방문/예정), not just listSearchQuery, or clicking 방문/예정 changes which
