@@ -1190,6 +1190,10 @@ export function CalendarGrid({
   // .participant-badge in app.css): both title text and any icon (SVG or emoji) are unreadable
   // at that width anyway, so this stays as compact as possible.
   const FESTIVAL_BAR_HEIGHT_MOBILE = 4;
+  // Overlapping-date bars stack via marginBottom = level * height, which left adjacent levels
+  // touching with zero visual separation. A small fixed gap between stacked levels makes each
+  // bar read as a distinct badge instead of one solid block.
+  const FESTIVAL_BAR_STACK_GAP = 2;
   const availMap = React.useMemo(() => getActiveAvailabilities(calendar).reduce((acc, entry) => {
     if (!acc[entry.date]) acc[entry.date] = [];
     acc[entry.date].push(entry);
@@ -1738,7 +1742,7 @@ export function CalendarGrid({
           // Bars whose date ranges overlap (see `level` assignment in festivalBars above) stack
           // upward from the bottom of the cell instead of painting on top of each other -- level 0
           // sits flush at the bottom, level 1 sits one bar-height above it, and so on.
-          marginBottom: bar.level > 0 ? `${bar.level * FESTIVAL_BAR_HEIGHT}px` : undefined,
+          marginBottom: bar.level > 0 ? `${bar.level * (FESTIVAL_BAR_HEIGHT + FESTIVAL_BAR_STACK_GAP)}px` : undefined,
           backgroundColor: `${displayColor}22`,
           borderRadius,
           padding: bar.totalSegments > 1 && bar.isLastSegment ? '3px 10px 3px 8px' : '3px 8px',
@@ -1767,7 +1771,7 @@ export function CalendarGrid({
         style: {
           width: '100%',
           height: `${FESTIVAL_BAR_HEIGHT_MOBILE}px`,
-          marginBottom: bar.level > 0 ? `${bar.level * FESTIVAL_BAR_HEIGHT_MOBILE}px` : undefined,
+          marginBottom: bar.level > 0 ? `${bar.level * (FESTIVAL_BAR_HEIGHT_MOBILE + FESTIVAL_BAR_STACK_GAP)}px` : undefined,
           backgroundColor: displayColor,
           borderRadius,
           boxSizing: 'border-box'

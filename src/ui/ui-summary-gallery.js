@@ -1934,24 +1934,22 @@ export function HistoryView({
     if (/^[가-힣]{2,3}$/.test(trimmed)) variants.add(trimmed.slice(1));
     return Array.from(variants);
   };
-  // tag는 {label, participantId} -- participantId가 있으면(실제 캘린더 참여자) 그 사람이
-  // 보낸 채팅/메모 사진을 자동으로 매칭하고, 그 위에 해시태그(#이름) 매칭도 함께 적용한다.
-  // 참여자가 아닌 커스텀 인물 태그(예: "삼촌")는 participantId가 없어 해시태그로만 매칭된다 --
-  // 참여자 이름 태그만으로는 지금까지 등록된 사진 대부분이 "0장"으로 보이던 원인이었다: 사진에
-  // 누가 보냈는지는 이미 알고 있는데, 그 정보를 전혀 쓰지 않고 수동 해시태그만 보고 있었다.
-  const getPhotosForTagLabel = React.useCallback((label, participantId) => {
+  // tag는 {label, participantId} -- 한때 participantId가 있으면(실제 캘린더 참여자) "그 사람이
+  // 보낸 사진 전부"를 자동으로 그 사람 사진으로 매칭했었다. 하지만 "보낸 사진"과 "그 사람이
+  // 등장하는 사진"은 다른 개념이라, 음식/풍경/서류 스캔처럼 본인이 안 나온 사진까지 전부
+  // 잡혀버려 인물 탭이 실제와 동떨어지게 부풀려지는 문제가 있었다. 인물 태그는 해시태그(#이름)로
+  // 명시적으로 붙인 사진만 인정한다 -- participantId는 더 이상 매칭에 쓰지 않는다.
+  const getPhotosForTagLabel = React.useCallback((label) => {
     if (!label) return [];
     const variants = getPersonNameVariants(label).map(v => v.toLowerCase());
     return historyPhotoEntries.filter(entry => {
-      if (participantId && entry.participantId && entry.participantId === participantId) return true;
       const tokens = entryTagTokens(entry).map(t => t.toLowerCase());
       return variants.some(v => tokens.includes(v));
     });
   }, [historyPhotoEntries]);
-  const selectedPersonTagChip = personTagChips.find(t => t.label === selectedPersonTag) || null;
   const photosForPersonTag = React.useMemo(
-    () => getPhotosForTagLabel(selectedPersonTag, selectedPersonTagChip?.participantId),
-    [getPhotosForTagLabel, selectedPersonTag, selectedPersonTagChip]
+    () => getPhotosForTagLabel(selectedPersonTag),
+    [getPhotosForTagLabel, selectedPersonTag]
   );
   // 인물/추억 탭은 갤러리 페이지(PhotoGallery)와 달리 지금까지 setActiveLightbox에 URL 목록만
   // 넘겨서, 공유 라이트박스 호스트(app-main.js)가 받는 meta가 비어 태그 입력/삭제/교체 등 표준
@@ -2291,7 +2289,7 @@ export function HistoryView({
         ? /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' } }, "태그가 없습니다. 위에서 인물 태그를 추가해 보세요.")
         : /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px' } },
             personTagChips.map(tag => {
-              const tagPhotos = getPhotosForTagLabel(tag.label, tag.participantId);
+              const tagPhotos = getPhotosForTagLabel(tag.label);
               const cover = tagPhotos[0];
               return /*#__PURE__*/React.createElement("button", {
                 key: tag.id,
