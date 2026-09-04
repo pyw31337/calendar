@@ -694,6 +694,25 @@ function isChatRenderableMessage(message, meetingPhotoMessageIds = null) {
   return true;
 }
 
+// Default memo body for a 문화공연/지역축제 card when the "메모" composer is saved empty --
+// the same fields shown in the detail sheet (기간/장소/주소/주최/문의/가격/설명/링크), one per
+// line, skipping any that are missing.
+function buildCultureEventMemoText(item) {
+  if (!item) return '';
+  const lines = [];
+  if (item.title) lines.push(item.title);
+  const period = item.dateLabel || [item.startDate, item.endDate].filter(Boolean).join(' ~ ');
+  if (period) lines.push(`기간: ${period}`);
+  if (item.venue) lines.push(`장소: ${item.venue}`);
+  if (item.address) lines.push(`주소: ${item.address}`);
+  if (item.organizer) lines.push(`주최: ${item.organizer}`);
+  if (item.contact) lines.push(`문의: ${item.contact}`);
+  if (item.price) lines.push(`가격: ${item.price}`);
+  if (item.description) lines.push(String(item.description).trim());
+  if (item.link) lines.push(String(item.link).trim());
+  return lines.join('\n');
+}
+
 function App() {
   if (isAdminDashboardRoute()) {
     const initialCalendars = loadLocalCache();
@@ -2555,12 +2574,41 @@ function CalendarApp() {
       if (!saved?.success) throw new Error('Culture event anniversary save failed');
       handleAnniversarySaved(annData);
       showToast('캘린더에 등록되었습니다.', 'success');
+      // Best-effort, non-blocking: also register the venue as a 장소 so it shows up on the
+      // 장소 tab/map without the user having to search and add it themselves. Never lets a
+      // place-search failure affect the anniversary registration that already succeeded above.
+      registerCulturePlaceForEvent(item, startDate).catch(() => {});
       return anniversaryId;
     } catch (err) {
       console.error('Failed to register culture event as anniversary:', err);
       showToast('등록 실패', 'error');
       return null;
     }
+  };
+  // Looks up the event's venue via the same Kakao/Google/Nominatim search chain 장소 등록
+  // uses (window.GATHER_APP_PLACE_SEARCH, see app-place-search.js) and saves it through
+  // handleSavePlace -- which already dedupes by sourcePlaceId, so registering the same venue
+  // from multiple events (or the same event twice) merges into one place instead of duplicating.
+  // Silently does nothing if the venue can't be found (no address/lat-lng to save) or the app is
+  // offline -- this is a convenience on top of the calendar registration, never a requirement.
+  const registerCulturePlaceForEvent = async (item, visitDate) => {
+    const venueQuery = String(item?.venue || '').trim() || String(item?.title || '').trim();
+    if (!venueQuery) return;
+    const api = window.GATHER_APP_PLACE_SEARCH;
+    if (!api || typeof api.searchPlaces !== 'function') return;
+    const { results } = await api.searchPlaces(venueQuery, { firebaseConfig, auto: true });
+    const top = Array.isArray(results) ? results[0] : null;
+    if (!top || !Number.isFinite(top.lat) || !Number.isFinite(top.lng)) return;
+    handleSavePlace({
+      name: item.venue || top.name,
+      address: item.address || top.address || '',
+      lat: top.lat,
+      lng: top.lng,
+      categoryId: top.categoryId || 'etc',
+      visitStatus: 'planned',
+      visitDate,
+      sourcePlaceId: top.id
+    });
   };
   const handleUnregisterCultureEvent = async (anniversaryId) => {
     if (!activeCal?.id || !anniversaryId) return;
@@ -2572,6 +2620,48 @@ function CalendarApp() {
     } catch (err) {
       console.error('Failed to unregister culture event anniversary:', err);
       showToast('취소 실패', 'error');
+    }
+  };
+  // 문화공연/지역축제 상세 시트의 "메모" 버튼 -- 사용자가 직접 입력한 내용이 있으면 그걸,
+  // 비워뒀으면(기본 상태) 행사 정보 자체를 메모 본문으로 등록한다. 새 메모 작성 흐름은
+  // ui-memo-view.js의 handleAddMemo와 같은 컬렉션/활동로그 패턴을 따르되, 이미지/태그 등
+  // 이 화면에 없는 입력은 다루지 않는다.
+  const handleQuickSaveCultureMemo = async (item, customText = '') => {
+    if (!activeCal?.id) return false;
+    const trimmedCustom = String(customText || '').trim();
+    const text = trimmedCustom || buildCultureEventMemoText(item);
+    if (!text) return false;
+    const participantId = getCurrentChatParticipantId() || '';
+    const stamp = Date.now();
+    const memoId = `memo_${stamp}_${Math.random().toString(36).slice(2, 8)}`;
+    const memoData = {
+      id: memoId,
+      participantId,
+      title: item?.title || '',
+      text,
+      imageUrls: [],
+      thumbUrls: [],
+      color: 'var(--bg-card)',
+      isPinned: false,
+      tags: [],
+      createdAt: stamp,
+      updatedAt: stamp
+    };
+    try {
+      const saved = await writeCollectionDocumentWithFallback('memos', activeCal.id, memoId, sanitizeMemoForFirestore(memoData), 'set', '문화공연 메모 저장');
+      if (!saved?.success) throw new Error('Culture event memo save failed');
+      const logNote = item?.title ? `제목: ${item.title}` : (text.slice(0, 30) + (text.length > 30 ? '...' : ''));
+      const activityLog = createMemoActivityLog(activeCal.id, 'memo_create', participantId, stamp, logNote);
+      if (activityLog) {
+        const nextCal = { ...activeCal, updatedAt: stamp, revision: (activeCal.revision || 0) + 1 };
+        await pushSingleCloudCalendar(nextCal, stamp, 4, null, 'settings', [activityLog]);
+      }
+      showToast('메모에 등록되었습니다.', 'success');
+      return true;
+    } catch (err) {
+      console.error('Failed to save culture event memo:', err);
+      showToast('메모 등록 실패', 'error');
+      return false;
     }
   };
 
@@ -7103,6 +7193,7 @@ function CalendarApp() {
         anniversaries: anniversaries,
         onRegisterCultureEvent: handleRegisterCultureEvent,
         onUnregisterCultureEvent: handleUnregisterCultureEvent,
+        onQuickSaveMemo: handleQuickSaveCultureMemo,
         customCultureItems: customCultureItems,
         onSaveCustomCultureItem: handleSaveCustomCultureItem,
         showToast: showToast,

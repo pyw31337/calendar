@@ -1751,7 +1751,7 @@ export function HistoryView({
   showSettlement = true, onOpenCreateSettlement,
   isDarkTheme, onToggleTheme, fontScalePercent, onDecreaseFont, onIncreaseFont,
   isChatNotifyEnabled, onToggleChatNotifications, syncStatus = null,
-  anniversaries = [], onRegisterCultureEvent, onUnregisterCultureEvent,
+  anniversaries = [], onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo = null,
   customCultureItems = [], onSaveCustomCultureItem = null, showToast = null
 }) {
   const React = window.React;
@@ -2070,7 +2070,7 @@ export function HistoryView({
       items: regionFilterItems
     }),
     historyTab === 'culture' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
-      calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent, dataUrl: CULTURE_PERFORMANCES_URL,
+      calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo, dataUrl: CULTURE_PERFORMANCES_URL,
       emptyLabel: "상영중이거나 예정된 문화공연이 없습니다.", regionSelections, onItemsLoaded: setRegionFilterItems,
       anniversaryCategory: "event",
       extraItems: (customCultureItems || []).filter(i => i && i.kind === 'performance'),
@@ -2078,7 +2078,7 @@ export function HistoryView({
       gridCols
     }),
     historyTab === 'festival' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
-      calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent, dataUrl: CULTURE_FESTIVALS_URL,
+      calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo, dataUrl: CULTURE_FESTIVALS_URL,
       emptyLabel: "진행중이거나 예정된 지역축제가 없습니다.", regionSelections, onItemsLoaded: setRegionFilterItems,
       anniversaryCategory: "festival",
       extraItems: (customCultureItems || []).filter(i => i && i.kind === 'festival'),
@@ -2744,7 +2744,21 @@ function ContentRegisterModal({ onClose, onSave, showToast = null }) {
 // 상영중/예정 목록을 보여준다. Culture Flow(별개 프로젝트)의 실시간 JSON을 직접 fetch하지 않는
 // 이유는 그 프로젝트의 스키마가 바뀌거나 그날 수집이 실패해도 이 탭이 즉시 깨지지 않게 하기
 // 위함 -- 동기화 스크립트가 검증에 실패하면 최근 정상 스냅샷을 그대로 커밋해 유지한다.
-export function CulturePerformancesTab({ calendar, anniversaries = [], onRegisterCultureEvent, onUnregisterCultureEvent, dataUrl = CULTURE_PERFORMANCES_URL, emptyLabel = "상영중이거나 예정된 문화공연이 없습니다.", regionSelections = [], onItemsLoaded, anniversaryCategory = 'event', extraItems = [], chipRowSlot = null, contentPaddingTop = 0, onScroll, gridCols = '2' }) {
+// Preview-only mirror of app-main.js's buildCultureEventMemoText -- shown as the textarea's
+// placeholder so the user can see what gets saved if they leave the memo blank. The actual
+// save always goes through onQuickSaveMemo (app-main.js), which is the single source of truth
+// for the saved text; this is just a hint and doesn't need to stay byte-identical.
+function buildQuickMemoPlaceholder(item) {
+  if (!item) return '';
+  const lines = [];
+  const period = item.dateLabel || [item.startDate, item.endDate].filter(Boolean).join(' ~ ');
+  if (period) lines.push(`기간: ${period}`);
+  if (item.venue) lines.push(`장소: ${item.venue}`);
+  if (item.address) lines.push(`주소: ${item.address}`);
+  return lines.join('\n') || '비워두면 행사 정보가 그대로 저장됩니다';
+}
+
+export function CulturePerformancesTab({ calendar, anniversaries = [], onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo = null, dataUrl = CULTURE_PERFORMANCES_URL, emptyLabel = "상영중이거나 예정된 문화공연이 없습니다.", regionSelections = [], onItemsLoaded, anniversaryCategory = 'event', extraItems = [], chipRowSlot = null, contentPaddingTop = 0, onScroll, gridCols = '2' }) {
   const React = window.React;
   const ReactDOM = window.ReactDOM;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -2754,6 +2768,26 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
   const [loadError, setLoadError] = React.useState(false);
   const [selected, setSelected] = React.useState(null);
   const [pendingId, setPendingId] = React.useState(null);
+  const [isMemoOpen, setIsMemoOpen] = React.useState(false);
+  const [memoDraft, setMemoDraft] = React.useState('');
+  const [isSavingMemo, setIsSavingMemo] = React.useState(false);
+  // Reset the memo composer whenever a different card is opened (or the sheet is closed),
+  // rather than leaving a previous card's draft/expanded state bleeding into the next one.
+  React.useEffect(() => {
+    setIsMemoOpen(false);
+    setMemoDraft('');
+    setIsSavingMemo(false);
+  }, [selected?.id]);
+  const handleSaveQuickMemo = async () => {
+    if (!selected || isSavingMemo || typeof onQuickSaveMemo !== 'function') return;
+    setIsSavingMemo(true);
+    try {
+      const ok = await onQuickSaveMemo(selected, memoDraft);
+      if (ok) { setIsMemoOpen(false); setMemoDraft(''); }
+    } finally {
+      setIsSavingMemo(false);
+    }
+  };
   // Local to this mount, not lifted to HistoryView like regionSelections -- 문화공연 and
   // 지역축제 have genuinely different genre mixes (지역축제 is almost entirely 'exhibition'), so a
   // category picked in one tab wouldn't mean anything carried over to the other. Since HistoryView
@@ -3025,16 +3059,62 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
               style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-main)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }
             }, selected.description)
           ),
-          /*#__PURE__*/React.createElement("label", {
-            style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, padding: '10px', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)', cursor: pendingId ? 'wait' : 'pointer', fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-main)' }
+          /*#__PURE__*/React.createElement("div", {
+            style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }
           },
-            /*#__PURE__*/React.createElement("input", {
-              type: "checkbox",
-              checked: !!findRegisteredAnniversary(selected.id),
-              disabled: !!pendingId,
-              onChange: () => handleToggleRegister(selected)
+            /*#__PURE__*/React.createElement("label", {
+              style: { display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0, padding: '10px', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)', cursor: pendingId ? 'wait' : 'pointer', fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-main)' }
+            },
+              /*#__PURE__*/React.createElement("input", {
+                type: "checkbox",
+                checked: !!findRegisteredAnniversary(selected.id),
+                disabled: !!pendingId,
+                onChange: () => handleToggleRegister(selected)
+              }),
+              "캘린더와 연동"
+            ),
+            typeof onQuickSaveMemo === 'function' && /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              onClick: () => setIsMemoOpen(prev => !prev),
+              "aria-expanded": isMemoOpen,
+              "aria-label": "메모로 등록",
+              style: {
+                display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0,
+                padding: '10px 12px', borderRadius: 'var(--radius-md)', border: 'none',
+                backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)',
+                fontSize: 'var(--font-size-md)', fontWeight: 700, cursor: 'pointer'
+              }
+            }, "메모", /*#__PURE__*/React.createElement("svg", {
+              xmlns: "http://www.w3.org/2000/svg", width: "16", height: "16", viewBox: "0 0 24 24",
+              fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round",
+              style: { transform: isMemoOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }
+            }, /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" })))
+          ),
+          isMemoOpen && /*#__PURE__*/React.createElement("div", {
+            style: { display: 'flex', flexDirection: 'column', gap: '8px', flexShrink: 0 }
+          },
+            /*#__PURE__*/React.createElement("textarea", {
+              value: memoDraft,
+              onChange: e => setMemoDraft(e.target.value),
+              placeholder: buildQuickMemoPlaceholder(selected),
+              rows: 4,
+              style: {
+                width: '100%', boxSizing: 'border-box', padding: '10px', borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)', color: 'var(--text-main)',
+                fontSize: 'var(--font-size-sm)', fontFamily: 'inherit', resize: 'vertical'
+              }
             }),
-            "캘린더와 연동"
+            /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              onClick: handleSaveQuickMemo,
+              disabled: isSavingMemo,
+              style: {
+                padding: '10px', borderRadius: 'var(--radius-md)', border: 'none',
+                backgroundColor: 'var(--accent-primary)', color: '#fff', fontWeight: 800,
+                fontSize: 'var(--font-size-md)', cursor: isSavingMemo ? 'wait' : 'pointer',
+                opacity: isSavingMemo ? 0.6 : 1
+              }
+            }, "메모 저장")
           ),
           selected.link && /*#__PURE__*/React.createElement("a", {
             href: selected.link, target: "_blank", rel: "noreferrer",
