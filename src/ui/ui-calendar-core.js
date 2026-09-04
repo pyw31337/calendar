@@ -1654,13 +1654,17 @@ export function CalendarGrid({
       }, cellAnns.map((ann, aIdx) => {
         const displayColor = getAnniversaryDisplayColor(ann, calendar);
         const isHeundeul = isHeundeulDosirakAnn(ann);
+        // 흔들도시락은 애니메이션이 붙은 특수 아이콘이라 그대로 유지하고, 일반 기념일은 아이콘을
+        // 아예 빼고 기존 세로폭(18px)의 절반(9px)짜리 색상 점만 남긴다 -- 모바일에서 아이콘이
+        // 안 보이는 건 마찬가지라 굳이 자리를 크게 차지할 필요가 없다는 취지.
+        const badgeSize = isHeundeul ? 18 : 9;
         return /*#__PURE__*/React.createElement("div", {
           key: ann.id || aIdx,
           title: ann.title,
           className: isHeundeul ? 'day-anniversary-badge-jiggle' : undefined,
           style: {
-            width: '18px',
-            height: '18px',
+            width: `${badgeSize}px`,
+            height: `${badgeSize}px`,
             borderRadius: '50%',
             backgroundColor: displayColor,
             color: '#FFFFFF',
@@ -1671,7 +1675,7 @@ export function CalendarGrid({
             flexShrink: 0,
             overflow: isHeundeul ? 'visible' : undefined
           }
-        }, renderAnniversaryIcon(ann, isHeundeul ? 10 : 11));
+        }, isHeundeul ? renderAnniversaryIcon(ann, 10) : null);
       })),
 
       /* Reserves room at the bottom of this cell for the festival-bar overlay drawn as a

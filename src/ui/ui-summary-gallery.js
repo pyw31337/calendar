@@ -3270,7 +3270,10 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
   // but still de-dupe by id in case a write echoes twice.
   const mergedItems = React.useMemo(() => {
     if (items === null) return null;
-    const extras = Array.isArray(extraItems) ? extraItems.filter(Boolean) : [];
+    // isCustomRegistered marks every self-authored/컨텐츠-등록 item (as opposed to crawled from
+    // the portal snapshot) so the "개별등록" category chip below can filter on it directly,
+    // instead of guessing from genre/id-prefix which crawled items can also lack.
+    const extras = (Array.isArray(extraItems) ? extraItems.filter(Boolean) : []).map(e => ({ ...e, isCustomRegistered: true }));
     const seen = new Set(extras.map(e => e && e.id).filter(Boolean));
     const crawled = (items || []).filter(i => i && i.id && !seen.has(i.id));
     return [...extras, ...crawled];
@@ -3333,15 +3336,23 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
   const categoryOptions = [...categoryCounts.entries()]
     .sort((a, b) => b[1] - a[1])
     .map(([genre, count]) => ({ value: genre, label: cultureGenreLabel(genre), count }));
+  const CUSTOM_CATEGORY_VALUE = '__custom__';
+  const customRegisteredCount = regionFilteredItems.filter(item => item && item.isCustomRegistered).length;
 
-  const filteredItems = categoryFilter
-    ? regionFilteredItems.filter(item => (item.genre || '') === categoryFilter)
-    : regionFilteredItems;
+  const filteredItems = categoryFilter === CUSTOM_CATEGORY_VALUE
+    ? regionFilteredItems.filter(item => item && item.isCustomRegistered)
+    : categoryFilter
+      ? regionFilteredItems.filter(item => (item.genre || '') === categoryFilter)
+      : regionFilteredItems;
 
-  const categoryChipRow = categoryOptions.length > 1 && /*#__PURE__*/React.createElement("div", {
+  const categoryChipRow = (categoryOptions.length > 1 || customRegisteredCount > 0) && /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', gap: '6px', padding: '0 16px 12px', overflowX: 'auto', flexShrink: 0, alignItems: 'center' }
   },
-    [{ value: '', label: '전체', count: regionFilteredItems.length }, ...categoryOptions].map(opt => {
+    [
+      { value: '', label: '전체', count: regionFilteredItems.length },
+      ...(customRegisteredCount > 0 ? [{ value: CUSTOM_CATEGORY_VALUE, label: '개별등록', count: customRegisteredCount }] : []),
+      ...categoryOptions
+    ].map(opt => {
       const isActive = categoryFilter === opt.value;
       return /*#__PURE__*/React.createElement("button", {
         key: opt.value || 'all',
@@ -3431,7 +3442,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
                 position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
                 justifyContent: 'center', alignItems: 'center', gap: '4px', padding: '10px 8px',
                 boxSizing: 'border-box', color: '#fff', textAlign: 'center',
-                background: 'linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.15) 22%, rgba(0,0,0,0.15) 78%, rgba(0,0,0,0.55) 100%)'
+                background: 'linear-gradient(180deg, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.4) 22%, rgba(0,0,0,0.4) 78%, rgba(0,0,0,0.72) 100%)'
               }
             },
               /*#__PURE__*/React.createElement("div", {

@@ -1429,6 +1429,12 @@ function CalendarApp() {
   // already-registered culture anniversaries that were saved before posters were copied.
   const [culturePosterById, setCulturePosterById] = React.useState(() => new Map());
   const culturePosterFetchedRef = React.useRef(false);
+  // id -> 종목(genre) from crawled culture-sports.json, same idea as culturePosterById above --
+  // backfills getAnniversaryCategoryBadge's per-sport icon for sports anniversaries registered
+  // before ann.genre started being saved (handleRegisterCultureEvent), which otherwise stay
+  // stuck on the generic ⚽ fallback forever since nothing ever writes the field after creation.
+  const [cultureGenreById, setCultureGenreById] = React.useState(() => new Map());
+  const cultureGenreFetchedRef = React.useRef(false);
   const customPosterById = React.useMemo(() => {
     const m = new Map();
     (customCultureItems || []).forEach(item => {
@@ -2526,24 +2532,54 @@ function CalendarApp() {
     return () => { cancelled = true; };
   }, [anniversaries, customPosterById, culturePosterById]);
 
-  // In-memory poster enrichment for DateModal / calendar display (no Firestore rewrite).
+  // One-time fetch of crawled culture-sports genres, to backfill ann.genre in-memory for sports
+  // anniversaries that predate handleRegisterCultureEvent saving it (see cultureGenreById above).
+  React.useEffect(() => {
+    const missing = (anniversaries || []).some(a => (
+      a && a.category === 'sports' && a.cultureSourceId && !a.genre && !cultureGenreById.has(a.cultureSourceId)
+    ));
+    if (!missing || cultureGenreFetchedRef.current) return;
+    cultureGenreFetchedRef.current = true;
+    let cancelled = false;
+    const base = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.BASE_URL) || '/';
+    fetch(`${base}data/culture-sports.json`).then(r => (r.ok ? r.json() : null)).catch(() => null).then(data => {
+      if (cancelled || !data) return;
+      const items = Array.isArray(data.items) ? data.items : [];
+      setCultureGenreById(prev => {
+        const next = new Map(prev);
+        items.forEach(it => {
+          if (!it || !it.id) return;
+          const genre = it.genre ? String(it.genre).trim() : '';
+          if (genre && !next.has(it.id)) next.set(it.id, genre);
+        });
+        return next;
+      });
+    });
+    return () => { cancelled = true; };
+  }, [anniversaries, cultureGenreById]);
+
+  // In-memory poster/genre enrichment for DateModal / calendar display (no Firestore rewrite).
   const anniversariesWithPosters = React.useMemo(() => {
     if (!Array.isArray(anniversaries)) return [];
     return anniversaries.map(ann => {
       if (!ann) return ann;
-      const hasPhotos = Array.isArray(ann.photos) && ann.photos.length > 0;
-      const hasImage = !!(ann.image && String(ann.image).trim());
-      if (hasPhotos || hasImage) return ann;
-      if (!ann.cultureSourceId) return ann;
-      const poster = customPosterById.get(ann.cultureSourceId) || culturePosterById.get(ann.cultureSourceId);
-      if (!poster) return ann;
+      let next = ann;
+      if (ann.category === 'sports' && ann.cultureSourceId && !ann.genre) {
+        const genre = cultureGenreById.get(ann.cultureSourceId);
+        if (genre) next = { ...next, genre };
+      }
+      const hasPhotos = Array.isArray(next.photos) && next.photos.length > 0;
+      const hasImage = !!(next.image && String(next.image).trim());
+      if (hasPhotos || hasImage || !next.cultureSourceId) return next;
+      const poster = customPosterById.get(next.cultureSourceId) || culturePosterById.get(next.cultureSourceId);
+      if (!poster) return next;
       return {
-        ...ann,
+        ...next,
         image: poster,
-        photos: [{ id: `poster_${ann.id}`, url: poster, thumbUrl: poster }]
+        photos: [{ id: `poster_${next.id}`, url: poster, thumbUrl: poster }]
       };
     });
-  }, [anniversaries, customPosterById, culturePosterById]);
+  }, [anniversaries, customPosterById, culturePosterById, cultureGenreById]);
 
   // 히스토리 > 문화공연 탭의 "캘린더에 일정 추가" 체크박스가 직접 호출하는 write path -- reuses
   // the exact same anniversaries write shape AnniversaryModal's own handleSaveAnniversary uses
@@ -8630,7 +8666,11 @@ async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_T
 
   const getHighQualityBlob = () => {
     if (isStorageDisabled) return Promise.resolve(null);
-    const maxDimHigh = 1440;
+    // 1440px/quality 0.72 was noticeably blurring dense small text (scanned notices, flyers) --
+    // this path only fires for genuinely oversized sources (small ones already return the
+    // original file untouched below), so a bigger cap and higher quality here doesn't cost much:
+    // Storage uploads aren't bounded by Firestore's 1MiB doc limit the way inline base64 is.
+    const maxDimHigh = 2000;
     const isOversized = img.width > maxDimHigh || img.height > maxDimHigh;
     if (!isOversized && file.size <= 1.5 * 1024 * 1024) {
       return Promise.resolve(file);
@@ -8647,7 +8687,7 @@ async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_T
       canvas.height = h;
       canvas.getContext('2d').drawImage(img, 0, 0, w, h);
       if (isPng) canvas.toBlob(blob => res(blob), 'image/png');
-      else canvas.toBlob(blob => res(blob), 'image/jpeg', 0.72);
+      else canvas.toBlob(blob => res(blob), 'image/jpeg', 0.85);
     });
   };
 
