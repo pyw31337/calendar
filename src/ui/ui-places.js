@@ -2455,9 +2455,10 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
               onClick: () => { setIsPlacesMenuOpen(false); if (typeof onChangeView === 'function') onChangeView('calendar'); else if (typeof onBack === 'function') onBack(); },
               style: {
                 background: 'none', border: 'none', padding: 0, margin: 0,
-                color: 'var(--text-main)', fontSize: '1.05rem', fontWeight: 800, cursor: 'pointer'
+                color: 'var(--text-main)', fontSize: '1.05rem', fontWeight: 800, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: '6px'
               }
-            }, "장소")
+            }, BackArrowIcon && /*#__PURE__*/React.createElement(BackArrowIcon, { size: 18 }), "장소")
           )
         ),
         /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 } },

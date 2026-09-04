@@ -1716,9 +1716,10 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
               style: {
                 background: 'none', border: 'none', padding: 0, margin: 0,
                 color: 'inherit',
-                cursor: 'pointer', textAlign: 'left'
+                cursor: 'pointer', textAlign: 'left',
+                display: 'flex', alignItems: 'center', gap: '6px'
               }
-            }, "메모")
+            }, BackArrowIcon && /*#__PURE__*/React.createElement(BackArrowIcon, { size: 18 }), "메모")
           )
         ),
         /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 } },

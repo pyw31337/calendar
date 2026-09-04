@@ -2703,6 +2703,30 @@ function CalendarApp() {
     return ok;
   };
 
+  // 보관함 > 추억 탭의 라이트박스 "이 추억에서 제거" -- 여행 사진 모음은 날짜 구간으로 자동
+  // 수집되므로, 같이 찍혔지만 그 여행과 무관한 사진이 섞일 수 있다. 사진 자체는 지우지 않고
+  // 이 여행(anniversary) 문서에 제외 목록(mediaKey/refKey)만 추가해 다음부터 그 모음에서 빠지게
+  // 한다. writeCollectionDocumentWithFallback의 'update'는 Firestore 부분 병합이라, 이 필드만
+  // 안전하게 덧붙일 수 있다.
+  const handleRemovePhotoFromTravelMemory = async (anniversaryId, photoKey) => {
+    if (!activeCal?.id || !anniversaryId || !photoKey) return false;
+    const ann = (anniversaries || []).find(a => a.id === anniversaryId);
+    const existing = Array.isArray(ann?.excludedMemoryPhotoKeys) ? ann.excludedMemoryPhotoKeys : [];
+    if (existing.includes(photoKey)) return true;
+    const next = [...existing, photoKey];
+    try {
+      const saved = await writeCollectionDocumentWithFallback('anniversaries', activeCal.id, anniversaryId, { excludedMemoryPhotoKeys: next }, 'update', '추억에서 사진 제거');
+      if (!saved?.success) throw new Error('remove photo from travel memory failed');
+      handleAnniversarySaved({ id: anniversaryId, excludedMemoryPhotoKeys: next });
+      showToast('추억에서 제거했습니다.', 'success');
+      return true;
+    } catch (err) {
+      console.error('Failed to remove photo from travel memory:', err);
+      showToast('제거 실패', 'error');
+      return false;
+    }
+  };
+
   // 보관함 > 컨텐츠 등록 / 컨텐츠 페이지: calendar-owned custom culture/festival/sports cards
   // merged into the CulturePerformancesTab lists alongside crawled JSON snapshots.
   React.useEffect(() => {
@@ -7304,6 +7328,18 @@ function CalendarApp() {
         memos: historyMemosSnapshot,
         setActiveLightbox: setActiveLightbox,
         showToast: showToast,
+        onPromoteImageUrl: handlePromoteInlineChatImage,
+        onSaveImageTags: handleSaveImageTags,
+        onSearchTag: handleSearchTag,
+        onDeletePhoto: handleDeletePhoto,
+        onReplacePhoto: handleReplacePhoto,
+        onJumpToChatMessage: handleJumpToChatMessage,
+        onJumpToMemo: handleJumpToMemo,
+        onJumpToMeetingDate: handleJumpToMeetingDate,
+        onGetChatMessageOrdinal: handleGetChatMessageOrdinal,
+        onGetGalleryPhotoOrdinal: handleGetGalleryPhotoOrdinal,
+        onRequestConfirm: showConfirmDialog,
+        onRemovePhotoFromMemory: handleRemovePhotoFromTravelMemory,
         ...navMenuProps
       }),
       isHistoryShareOpen && activeCal && /*#__PURE__*/React.createElement(ShareModal, {

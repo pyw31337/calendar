@@ -742,7 +742,7 @@ function getAnniversaryDisplayColor(...args) {
 }
 
 
-export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSearchTag, showToast, sourceInfo = null, showZoomControls = false, zoomLevel = 100, zoomMin = 50, zoomMax = 300, onZoomIn, onZoomOut, onZoomReset }) {
+export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSearchTag, showToast, sourceInfo = null, showZoomControls = false, zoomLevel = 100, zoomMin = 50, zoomMax = 300, onZoomIn, onZoomOut, onZoomReset, onRemoveFromMemory = null, isRemovingFromMemory = false }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const TrashIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.TrashIcon) || __deps.TrashIcon;
@@ -755,7 +755,7 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
   const [confirmDeleteTag, setConfirmDeleteTag] = React.useState(null);
   const [isDeletingTag, setIsDeletingTag] = React.useState(false);
   React.useEffect(() => { setTagInput(''); }, [tags]);
-  if (!info.dateLabel && !info.typeLabel && !onSaveTags && !sourceInfo) return null;
+  if (!info.dateLabel && !info.typeLabel && !onSaveTags && !sourceInfo && !onRemoveFromMemory) return null;
   const MAX_TAGS = 10;
   const handleSaveTags = async () => {
     if (!onSaveTags || isSavingTags) return;
@@ -916,7 +916,18 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
           opacity: (isSavingTags || tagTokens.length >= 10) ? 0.45 : 1
         }
       }, isSavingTags ? '...' : '저장')
-    )
+    ),
+    onRemoveFromMemory && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: e => { e.stopPropagation(); onRemoveFromMemory(); },
+      disabled: isRemovingFromMemory,
+      style: {
+        marginTop: '6px', width: '100%', height: '32px', borderRadius: 'var(--radius-sm)',
+        border: '1px solid rgba(255,255,255,0.32)', background: 'rgba(255,255,255,0.1)',
+        color: '#FFFFFF', fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer',
+        opacity: isRemovingFromMemory ? 0.55 : 1
+      }
+    }, isRemovingFromMemory ? '제거 중...' : '이 추억에서 제거')
   ), confirmDeleteTag && /*#__PURE__*/React.createElement(ConfirmDialog, {
     title: "해시태그 삭제",
     message: `#${confirmDeleteTag} 태그를 삭제하시겠습니까?`,
@@ -963,7 +974,7 @@ const LIGHTBOX_TRANSITION_MS = 230;
 const LIGHTBOX_TRANSITION_FALLBACK_MS = LIGHTBOX_TRANSITION_MS + 90;
 const LIGHTBOX_TRANSITION_EASING = 'cubic-bezier(0.22, 0.61, 0.36, 1)';
 
-export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag, onDeletePhoto, onReplacePhoto, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, onJumpToGallery, onGetChatMessageOrdinal, onGetGalleryPhotoOrdinal, onRequestConfirm }) {
+export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag, onDeletePhoto, onReplacePhoto, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, onJumpToGallery, onGetChatMessageOrdinal, onGetGalleryPhotoOrdinal, onRequestConfirm, onRemoveFromMemory }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const TrashIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.TrashIcon) || __deps.TrashIcon;
@@ -1311,6 +1322,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
   const replacePhotoInputRef = React.useRef(null);
   const [isReplacingPhoto, setIsReplacingPhoto] = React.useState(false);
   const [isDeletingPhoto, setIsDeletingPhoto] = React.useState(false);
+  const [isRemovingFromMemory, setIsRemovingFromMemory] = React.useState(false);
   const replacePhotoWithFile = async file => {
     if (!file || !onReplacePhoto || !currentMeta || isReplacingPhoto) return;
     setIsReplacingPhoto(true);
@@ -1357,6 +1369,26 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     };
     if (typeof onRequestConfirm === 'function') {
       onRequestConfirm('사진 삭제', '이 사진을 삭제하시겠습니까?', confirmAction);
+    }
+  };
+  // 추억(여행) 사진 모음은 날짜 구간으로 자동으로 모아지는 목록이라, 같이 찍혔지만 그 여행과
+  // 상관없는 사진이 섞여 들어올 수 있다 -- 원본 사진 자체는 지우지 않고 그 추억 모음에서만
+  // 빼는 조작. onRemoveFromMemory가 전달된 경우(추억 탭에서 연 라이트박스)에만 버튼이 뜬다.
+  const handleRemoveFromMemoryClick = () => {
+    if (!onRemoveFromMemory || !currentMeta || isRemovingFromMemory) return;
+    const confirmAction = async () => {
+      setIsRemovingFromMemory(true);
+      try {
+        const ok = await onRemoveFromMemory({ ...currentMeta, imageUrl: currentUrl });
+        if (ok) closeLightbox();
+      } finally {
+        setIsRemovingFromMemory(false);
+      }
+    };
+    if (typeof onRequestConfirm === 'function') {
+      onRequestConfirm('추억에서 제거', '이 사진을 이 추억 모음에서 제거하시겠습니까? (사진 자체는 삭제되지 않습니다)', confirmAction);
+    } else {
+      void confirmAction();
     }
   };
   const ensureCurrentShareUrl = async url => {
@@ -1869,7 +1901,9 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
         zoomMax: ZOOM_MAX,
         onZoomIn: handleZoomIn,
         onZoomOut: handleZoomOut,
-        onZoomReset: handleZoomReset
+        onZoomReset: handleZoomReset,
+        onRemoveFromMemory: onRemoveFromMemory ? handleRemoveFromMemoryClick : null,
+        isRemovingFromMemory: isRemovingFromMemory
       })));
     }
 
@@ -2013,7 +2047,9 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     zoomMax: ZOOM_MAX,
     onZoomIn: handleZoomIn,
     onZoomOut: handleZoomOut,
-    onZoomReset: handleZoomReset
+    onZoomReset: handleZoomReset,
+    onRemoveFromMemory: onRemoveFromMemory ? handleRemoveFromMemoryClick : null,
+    isRemovingFromMemory: isRemovingFromMemory
   })),
   total > 1 && (() => {
     const maxVisibleDots = 10;
