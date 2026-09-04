@@ -1740,6 +1740,60 @@ function renderRegionTriggerChevron(React) {
     /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" }));
 }
 
+// Shared by HistoryView(보관함) and ContentView(컨텐츠) -- both open the same admin-side-menu
+// overlay chrome (brand header/weather badge/close button + page-specific extra items +
+// SharedAppNavBlock + SharedSideMenuFooter), differing only in title text and which extra items
+// they show above the shared nav block.
+function SideMenuOverlay({ isOpen, onClose, homeLabel, ariaLabel, calendar, onGoHome, extraItems = [], navBlockProps, onOpenShare, onOpenAppSettings }) {
+  const React = window.React;
+  const __comp = window.GATHER_UI_COMPONENTS || {};
+  const __deps = window.GATHER_UI_DEPS || {};
+  const WeatherBadge = __comp.WeatherBadge || __deps.WeatherBadge;
+  const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
+  const SharedAppNavBlock = __comp.SharedAppNavBlock || __deps.SharedAppNavBlock;
+  const SharedSideMenuFooter = __comp.SharedSideMenuFooter || __deps.SharedSideMenuFooter;
+  if (!isOpen) return null;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "admin-side-menu-overlay", style: { zIndex: 12000 }, onClick: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "admin-side-menu", onClick: e => e.stopPropagation(), role: "dialog", "aria-label": ariaLabel
+  },
+    /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-header" },
+      /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-brand" },
+        /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-copy" },
+          /*#__PURE__*/React.createElement("button", {
+            type: "button", className: "admin-side-menu-title", title: "메인 화면으로 이동", "aria-label": "메인 화면으로 이동",
+            onClick: onGoHome,
+            style: { background: 'none', border: 'none', padding: 0, margin: 0, color: 'var(--text-main)', fontSize: '1.05rem', fontWeight: 800, cursor: 'pointer' }
+          }, homeLabel)
+        )
+      ),
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 } },
+        WeatherBadge ? /*#__PURE__*/React.createElement(WeatherBadge, { weatherLocation: calendar && calendar.weatherLocation }) : null,
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", className: "admin-side-menu-close-btn", title: "메뉴 닫기", "aria-label": "메뉴 닫기",
+          onClick: onClose
+        }, SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }) : "✕")
+      )
+    ),
+    extraItems.length > 0 && /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list" },
+      extraItems.map((it, idx) => /*#__PURE__*/React.createElement("button", {
+        key: idx, type: "button", className: "admin-side-menu-item", onClick: it.onClick
+      },
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, it.icon),
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, it.title),
+          it.desc && /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, it.desc)
+        )
+      ))
+    ),
+    typeof SharedAppNavBlock === 'function' && /*#__PURE__*/React.createElement(SharedAppNavBlock, navBlockProps),
+    typeof SharedSideMenuFooter === 'function' && /*#__PURE__*/React.createElement(SharedSideMenuFooter, {
+      onClose, onOpenShare, onOpenSettings: onOpenAppSettings
+    })
+  ));
+}
+
 // Full-page '히스토리' view -- every confirmed meeting date (모임 확정), moved off the main
 // calendar screen onto its own page. Each card also folds in whatever place(s) were registered
 // for that date (see doesPlaceMatchDate), since a confirmed meeting's place is exactly the kind
@@ -1758,14 +1812,10 @@ export function HistoryView({
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const BackArrowIcon = __comp.BackArrowIcon || __deps.BackArrowIcon;
   const ThreeLinesIcon = __comp.ThreeLinesIcon || __deps.ThreeLinesIcon;
-  const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
   const SearchIcon = __comp.SearchIcon || __deps.SearchIcon;
   const MapPinIcon = __comp.MapPinIcon || __deps.MapPinIcon;
   const InlineSearchBar = __comp.InlineSearchBar || __deps.InlineSearchBar;
   const UnderlineTabs = __comp.UnderlineTabs || __deps.UnderlineTabs;
-  const WeatherBadge = __comp.WeatherBadge || __deps.WeatherBadge;
-  const SharedAppNavBlock = __comp.SharedAppNavBlock || __deps.SharedAppNavBlock;
-  const SharedSideMenuFooter = __comp.SharedSideMenuFooter || __deps.SharedSideMenuFooter;
 
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
@@ -2067,64 +2117,28 @@ export function HistoryView({
       )
     ),
 
-    isMenuOpen && /*#__PURE__*/React.createElement("div", {
-      className: "admin-side-menu-overlay", style: { zIndex: 12000 }, onClick: () => setIsMenuOpen(false)
-    }, /*#__PURE__*/React.createElement("div", {
-      className: "admin-side-menu", onClick: e => e.stopPropagation(), role: "dialog", "aria-label": "보관함 메뉴"
-    },
-      /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-header" },
-        /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-brand" },
-          /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-copy" },
-            /*#__PURE__*/React.createElement("button", {
-              type: "button", className: "admin-side-menu-title", title: "메인 화면으로 이동", "aria-label": "메인 화면으로 이동",
-              onClick: () => { setIsMenuOpen(false); if (typeof onChangeView === 'function') onChangeView('calendar'); else if (typeof onBack === 'function') onBack(); },
-              style: { background: 'none', border: 'none', padding: 0, margin: 0, color: 'var(--text-main)', fontSize: '1.05rem', fontWeight: 800, cursor: 'pointer' }
-            }, "보관함")
-          )
-        ),
-        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 } },
-          WeatherBadge ? /*#__PURE__*/React.createElement(WeatherBadge, { weatherLocation: calendar && calendar.weatherLocation }) : null,
-          /*#__PURE__*/React.createElement("button", {
-            type: "button", className: "admin-side-menu-close-btn", title: "메뉴 닫기", "aria-label": "메뉴 닫기",
-            onClick: () => setIsMenuOpen(false)
-          }, SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }) : "✕")
-        )
-      ),
-      /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list" },
-        /*#__PURE__*/React.createElement("button", {
-          type: "button", className: "admin-side-menu-item",
-          onClick: () => { setIsMenuOpen(false); setIsSearchOpen(true); }
-        },
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, SearchIcon ? /*#__PURE__*/React.createElement(SearchIcon, null) : "🔍"),
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "보관함 검색"),
-            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "지난모임 날짜·참여자·메모·장소 검색")
-          )
-        )
-      ),
-      typeof SharedAppNavBlock === 'function' && /*#__PURE__*/React.createElement(SharedAppNavBlock, {
+    /*#__PURE__*/React.createElement(SideMenuOverlay, {
+      isOpen: isMenuOpen,
+      onClose: () => setIsMenuOpen(false),
+      homeLabel: "보관함",
+      ariaLabel: "보관함 메뉴",
+      calendar,
+      onGoHome: () => { setIsMenuOpen(false); if (typeof onChangeView === 'function') onChangeView('calendar'); else if (typeof onBack === 'function') onBack(); },
+      extraItems: [{
+        onClick: () => { setIsMenuOpen(false); setIsSearchOpen(true); },
+        icon: SearchIcon ? /*#__PURE__*/React.createElement(SearchIcon, null) : "🔍",
+        title: "보관함 검색",
+        desc: "지난모임 날짜·참여자·메모·장소 검색"
+      }],
+      navBlockProps: {
         onClose: () => setIsMenuOpen(false),
         onChangeView: handleHistoryChangeView,
-        onOpenCreateSettlement: onOpenCreateSettlement,
-        showSettlement: showSettlement,
-        chatCount: chatCount,
-        settlementBadge: settlementBadge,
-        galleryCount: galleryCount,
-        placeCount: placeCount,
-        memoCount: memoCount,
-        historyCount: historyCount,
-        chatLastAuthor: chatLastAuthor,
-        settlementLastDate: settlementLastDate,
-        galleryLastDate: galleryLastDate,
-        placeLastName: placeLastName,
-        memoLastTitleWord: memoLastTitleWord
-      }),
-      typeof SharedSideMenuFooter === 'function' && /*#__PURE__*/React.createElement(SharedSideMenuFooter, {
-        onClose: () => setIsMenuOpen(false),
-        onOpenShare: onOpenShare,
-        onOpenSettings: onOpenAppSettings
-      })
-    ))
+        onOpenCreateSettlement, showSettlement, chatCount, settlementBadge, galleryCount, placeCount, memoCount, historyCount,
+        chatLastAuthor, settlementLastDate, galleryLastDate, placeLastName, memoLastTitleWord
+      },
+      onOpenShare,
+      onOpenAppSettings
+    })
   );
 }
 
@@ -2143,12 +2157,8 @@ export function ContentView({
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const BackArrowIcon = __comp.BackArrowIcon || __deps.BackArrowIcon;
   const ThreeLinesIcon = __comp.ThreeLinesIcon || __deps.ThreeLinesIcon;
-  const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
   const LocateFixedIcon = __comp.LocateFixedIcon || __deps.LocateFixedIcon;
   const UnderlineTabs = __comp.UnderlineTabs || __deps.UnderlineTabs;
-  const WeatherBadge = __comp.WeatherBadge || __deps.WeatherBadge;
-  const SharedAppNavBlock = __comp.SharedAppNavBlock || __deps.SharedAppNavBlock;
-  const SharedSideMenuFooter = __comp.SharedSideMenuFooter || __deps.SharedSideMenuFooter;
 
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const [isContentRegisterOpen, setIsContentRegisterOpen] = React.useState(false);
@@ -2426,73 +2436,35 @@ export function ContentView({
       gridCols
     }),
 
-    isMenuOpen && /*#__PURE__*/React.createElement("div", {
-      className: "admin-side-menu-overlay", style: { zIndex: 12000 }, onClick: () => setIsMenuOpen(false)
-    }, /*#__PURE__*/React.createElement("div", {
-      className: "admin-side-menu", onClick: e => e.stopPropagation(), role: "dialog", "aria-label": "컨텐츠 메뉴"
-    },
-      /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-header" },
-        /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-brand" },
-          /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-copy" },
-            /*#__PURE__*/React.createElement("button", {
-              type: "button", className: "admin-side-menu-title", title: "메인 화면으로 이동", "aria-label": "메인 화면으로 이동",
-              onClick: () => { setIsMenuOpen(false); if (typeof onChangeView === 'function') onChangeView('calendar'); else if (typeof onBack === 'function') onBack(); },
-              style: { background: 'none', border: 'none', padding: 0, margin: 0, color: 'var(--text-main)', fontSize: '1.05rem', fontWeight: 800, cursor: 'pointer' }
-            }, "컨텐츠")
-          )
-        ),
-        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 } },
-          WeatherBadge ? /*#__PURE__*/React.createElement(WeatherBadge, { weatherLocation: calendar && calendar.weatherLocation }) : null,
-          /*#__PURE__*/React.createElement("button", {
-            type: "button", className: "admin-side-menu-close-btn", title: "메뉴 닫기", "aria-label": "메뉴 닫기",
-            onClick: () => setIsMenuOpen(false)
-          }, SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }) : "✕")
-        )
-      ),
-      /*#__PURE__*/React.createElement("div", { className: "admin-side-menu-list" },
-        /*#__PURE__*/React.createElement("button", {
-          type: "button", className: "admin-side-menu-item",
-          onClick: () => { setIsMenuOpen(false); setIsContentRegisterOpen(true); }
+    /*#__PURE__*/React.createElement(SideMenuOverlay, {
+      isOpen: isMenuOpen,
+      onClose: () => setIsMenuOpen(false),
+      homeLabel: "컨텐츠",
+      ariaLabel: "컨텐츠 메뉴",
+      calendar,
+      onGoHome: () => { setIsMenuOpen(false); if (typeof onChangeView === 'function') onChangeView('calendar'); else if (typeof onBack === 'function') onBack(); },
+      extraItems: [{
+        onClick: () => { setIsMenuOpen(false); setIsContentRegisterOpen(true); },
+        icon: /*#__PURE__*/React.createElement("svg", {
+          xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24",
+          fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true"
         },
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" },
-            /*#__PURE__*/React.createElement("svg", {
-              xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24",
-              fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true"
-            },
-              /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "12", r: "10" }),
-              /*#__PURE__*/React.createElement("path", { d: "M12 8v8" }),
-              /*#__PURE__*/React.createElement("path", { d: "M8 12h8" })
-            )
-          ),
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "컨텐츠 등록"),
-            /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "문화행사·지역축제·스포츠 직접 등록")
-          )
-        )
-      ),
-      typeof SharedAppNavBlock === 'function' && /*#__PURE__*/React.createElement(SharedAppNavBlock, {
+          /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "12", r: "10" }),
+          /*#__PURE__*/React.createElement("path", { d: "M12 8v8" }),
+          /*#__PURE__*/React.createElement("path", { d: "M8 12h8" })
+        ),
+        title: "컨텐츠 등록",
+        desc: "문화행사·지역축제·스포츠 직접 등록"
+      }],
+      navBlockProps: {
         onClose: () => setIsMenuOpen(false),
         onChangeView: handleContentChangeView,
-        onOpenCreateSettlement: onOpenCreateSettlement,
-        showSettlement: showSettlement,
-        chatCount: chatCount,
-        settlementBadge: settlementBadge,
-        galleryCount: galleryCount,
-        placeCount: placeCount,
-        memoCount: memoCount,
-        historyCount: historyCount,
-        chatLastAuthor: chatLastAuthor,
-        settlementLastDate: settlementLastDate,
-        galleryLastDate: galleryLastDate,
-        placeLastName: placeLastName,
-        memoLastTitleWord: memoLastTitleWord
-      }),
-      typeof SharedSideMenuFooter === 'function' && /*#__PURE__*/React.createElement(SharedSideMenuFooter, {
-        onClose: () => setIsMenuOpen(false),
-        onOpenShare: onOpenShare,
-        onOpenSettings: onOpenAppSettings
-      })
-    )),
+        onOpenCreateSettlement, showSettlement, chatCount, settlementBadge, galleryCount, placeCount, memoCount, historyCount,
+        chatLastAuthor, settlementLastDate, galleryLastDate, placeLastName, memoLastTitleWord
+      },
+      onOpenShare,
+      onOpenAppSettings
+    }),
     isContentRegisterOpen && /*#__PURE__*/React.createElement(ContentRegisterModal, {
       onClose: () => setIsContentRegisterOpen(false),
       onSave: onSaveCustomCultureItem,
