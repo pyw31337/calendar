@@ -1976,11 +1976,15 @@ export function HistoryView({
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   };
   const travelMemoryGroups = React.useMemo(() => {
+    // range 타입(dayMode==='range')이 아닌 once/yearly 타입(하루짜리) 여행 기념일은
+    // a.startDate/a.endDate가 비어 있고 대신 a.date에 날짜가 저장된다 (컨텐츠 상세 시트의
+    // "기간: 정보없음" 버그와 같은 원인) -- a.date를 폴백으로 읽지 않으면 하루짜리로 등록한
+    // 여행은 사진이 있어도 추억 탭에서 통째로 사라진다.
     return (anniversaries || [])
-      .filter(a => a && a.category === 'travel' && a.startDate)
+      .filter(a => a && a.category === 'travel' && (a.startDate || a.date))
       .map(a => {
-        const start = a.startDate;
-        const end = a.endDate || a.startDate;
+        const start = a.startDate || a.date;
+        const end = a.endDate || a.startDate || a.date;
         // 날짜 구간으로 자동 수집되다 보니 그 여행과 상관없는 사진이 섞여 들어올 수 있어,
         // 라이트박스의 '이 추억에서 제거' 버튼으로 뺀 사진(excludedMemoryPhotoKeys)은 제외한다.
         const excluded = new Set(Array.isArray(a.excludedMemoryPhotoKeys) ? a.excludedMemoryPhotoKeys : []);
