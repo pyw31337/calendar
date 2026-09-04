@@ -22,7 +22,12 @@ assert(/message\.thumbUrl \|\| message\.thumbUrls\?\.\[0\]/.test(helpers), 'noti
 assert(!/getDownloadURL\([^)]*imageUrl/.test(data), 'data records must not resolve Storage URLs repeatedly from render data');
 assert(/CHAT_INITIAL_MESSAGE_LIMIT:\s*5/.test(config), 'chat must retain a five-message critical first window');
 assert(/CHAT_OLDER_PAGE_SIZE:\s*20/.test(config), 'older chat reads must retain small cursor pages');
-assert(/!isGlobalSearchOpen \|\| fullChatHistoryByCalendar/.test(main), 'full chat history must only hydrate for an explicit search');
+// Full chat history hydration is allowed for two deliberate, user-initiated triggers: the
+// global search modal being open, or the 보관함(history) 인물/추억 tabs being the active view
+// (their photo-tag matching needs the complete history, not just the bounded realtime window --
+// see the effect's own comment in app-main.js). Both are explicit navigations, not a background
+// effect that could fire unconditionally, so this still guards against unbounded egress.
+assert(/isGlobalSearchOpen[\s\S]{0,40}activeView !== 'history'[\s\S]{0,60}fullChatHistoryByCalendar/.test(main), 'full chat history must only hydrate for an explicit search or the history view');
 assert(!/visiblePhotos \|\| \[\]\)\.length >= 60[\s\S]{0,100}onLoadOlderChat/.test(gallery), 'gallery must not auto-chain older history reads');
 assert(/visiblePhotos\.slice\(0, photoRenderLimit\)/.test(gallery), 'gallery must render media progressively');
 assert(!/<script[^>]+firebase-storage-compat/.test(index), 'Storage SDK must stay off the initial document path');

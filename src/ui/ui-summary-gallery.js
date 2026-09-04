@@ -2164,10 +2164,8 @@ export function HistoryView({
     // 사진을 배경으로, 딤 처리 위에 여행 타이틀). 칸을 누르면 그 여행 사진만 모아 보여주는
     // 상세 페이지로 들어간다.
     historyTab === 'memories' && !selectedMemoryGroupId && /*#__PURE__*/React.createElement("div", {
-      // PC에서 벤또 그리드가 뷰포트 전체 폭으로 늘어나 칸이 지나치게 커 보이던 문제 -- 다른
-      // 페이지들과 비슷한 읽기 폭으로 콘텐츠 최대폭을 제한하고 가운데 정렬한다.
       style: { flex: 1, overflowY: 'auto', padding: '118px 16px 16px' }
-    }, /*#__PURE__*/React.createElement("div", { style: { maxWidth: '640px', margin: '0 auto' } },
+    }, /*#__PURE__*/React.createElement("div", { style: {} },
       travelMemoryGroups.length === 0
         ? /*#__PURE__*/React.createElement("div", {
             style: {
@@ -2222,7 +2220,7 @@ export function HistoryView({
       if (!group) return null;
       return /*#__PURE__*/React.createElement("div", {
         style: { flex: 1, overflowY: 'auto', padding: '118px 16px 16px' }
-      }, /*#__PURE__*/React.createElement("div", { style: { maxWidth: '640px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '12px' } },
+      }, /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
         /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
           /*#__PURE__*/React.createElement("button", {
             type: "button", onClick: () => setSelectedMemoryGroupId(null), "aria-label": "추억 목록으로",
@@ -2257,7 +2255,7 @@ export function HistoryView({
     // 칸을 누르면 그 사람으로 태그된 사진만 모아 보여주는 상세 페이지로 들어간다.
     historyTab === 'people' && !selectedPersonTag && /*#__PURE__*/React.createElement("div", {
       style: { flex: 1, overflowY: 'auto', padding: '118px 16px 16px' }
-    }, /*#__PURE__*/React.createElement("div", { style: { maxWidth: '640px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '16px' } },
+    }, /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '16px' } },
       // 새 인물 태그 추가 -- 벤또 그리드 위로 이동(추가 즉시 그리드에 반영되는 걸 바로 보기
       // 쉽도록). 기존 .form-input/.btn-primary만으로는 패딩/높이/모서리가 다른 입력·버튼과
       // 달라 보였어서, 이 화면에서 직접 크기/스타일을 지정해 나머지 디자인과 맞춘다.
@@ -2332,7 +2330,7 @@ export function HistoryView({
     // 인물 상세 페이지: 특정 인물 칸을 눌렀을 때 그 사람으로 태그된 사진만 모아 보여준다.
     historyTab === 'people' && !!selectedPersonTag && /*#__PURE__*/React.createElement("div", {
       style: { flex: 1, overflowY: 'auto', padding: '118px 16px 16px' }
-    }, /*#__PURE__*/React.createElement("div", { style: { maxWidth: '640px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '12px' } },
+    }, /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
         /*#__PURE__*/React.createElement("button", {
           type: "button", onClick: () => setSelectedPersonTag(null), "aria-label": "인물 목록으로",
