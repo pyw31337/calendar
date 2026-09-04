@@ -1843,14 +1843,14 @@ select.form-select {
 }
 /* Bottom spacer that reserves room under a day cell for its festival bar(s) -- see
    .festival-bar-spacer in ui-calendar-core.js. Matches FESTIVAL_BAR_HEIGHT (24px) on
-   desktop/tablet and FESTIVAL_BAR_HEIGHT_MOBILE (8px) on mobile, same breakpoint as the bar
+   desktop/tablet and FESTIVAL_BAR_HEIGHT_MOBILE (4px) on mobile, same breakpoint as the bar
    itself above, so the reserved space never outsizes the bar it's making room for. */
 .festival-bar-spacer {
   height: calc(var(--festival-stack-depth, 0) * 24px);
 }
 @media (max-width: 640px) {
   .festival-bar-spacer {
-    height: calc(var(--festival-stack-depth, 0) * 8px);
+    height: calc(var(--festival-stack-depth, 0) * 4px);
   }
 }
 
