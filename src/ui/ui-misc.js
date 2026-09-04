@@ -1089,6 +1089,7 @@ export function ChatSideMenu({
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const SmallXIcon = __deps.SmallXIcon;
+  const BackArrowIcon = __comp.BackArrowIcon || __deps.BackArrowIcon;
   const WeatherBadge = __comp.WeatherBadge || __deps.WeatherBadge;
   const MegaphoneIcon = __deps.MegaphoneIcon;
   const SharedSideMenuSettings = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SharedSideMenuSettings) || __deps.SharedSideMenuSettings;
@@ -1129,9 +1130,10 @@ export function ChatSideMenu({
             style: {
               background: 'none', border: 'none', padding: 0, margin: 0,
               color: 'inherit',
-              cursor: 'pointer', textAlign: 'left'
+              cursor: 'pointer', textAlign: 'left',
+              display: 'flex', alignItems: 'center', gap: '6px'
             }
-          }, "채팅")
+          }, BackArrowIcon && /*#__PURE__*/React.createElement(BackArrowIcon, { size: 18 }), "채팅")
         )
       ),
         /*#__PURE__*/React.createElement("div", {

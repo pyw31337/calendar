@@ -1748,6 +1748,7 @@ function SideMenuOverlay({ isOpen, onClose, homeLabel, ariaLabel, calendar, onGo
   const __deps = window.GATHER_UI_DEPS || {};
   const WeatherBadge = __comp.WeatherBadge || __deps.WeatherBadge;
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
+  const BackArrowIcon = __comp.BackArrowIcon || __deps.BackArrowIcon;
   const SharedAppNavBlock = __comp.SharedAppNavBlock || __deps.SharedAppNavBlock;
   const SharedSideMenuFooter = __comp.SharedSideMenuFooter || __deps.SharedSideMenuFooter;
   if (!isOpen) return null;
@@ -1762,8 +1763,8 @@ function SideMenuOverlay({ isOpen, onClose, homeLabel, ariaLabel, calendar, onGo
           /*#__PURE__*/React.createElement("button", {
             type: "button", className: "admin-side-menu-title", title: "메인 화면으로 이동", "aria-label": "메인 화면으로 이동",
             onClick: onGoHome,
-            style: { background: 'none', border: 'none', padding: 0, margin: 0, color: 'var(--text-main)', fontSize: '1.05rem', fontWeight: 800, cursor: 'pointer' }
-          }, homeLabel)
+            style: { background: 'none', border: 'none', padding: 0, margin: 0, color: 'var(--text-main)', fontSize: '1.05rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }
+          }, BackArrowIcon && /*#__PURE__*/React.createElement(BackArrowIcon, { size: 18 }), homeLabel)
         )
       ),
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 } },
@@ -1804,7 +1805,12 @@ export function HistoryView({
   isDarkTheme, onToggleTheme, fontScalePercent, onDecreaseFont, onIncreaseFont,
   isChatNotifyEnabled, onToggleChatNotifications, syncStatus = null,
   onAddPersonTag = null, showToast = null,
-  anniversaries = [], chatMessages = [], memos = [], setActiveLightbox = null
+  anniversaries = [], chatMessages = [], memos = [], setActiveLightbox = null,
+  onPromoteImageUrl = null, onSaveImageTags = null, onSearchTag = null,
+  onDeletePhoto = null, onReplacePhoto = null,
+  onJumpToChatMessage = null, onJumpToMemo = null, onJumpToMeetingDate = null,
+  onGetChatMessageOrdinal = null, onGetGalleryPhotoOrdinal = null, onRequestConfirm = null,
+  onRemovePhotoFromMemory = null
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -1815,6 +1821,7 @@ export function HistoryView({
   const MapPinIcon = __comp.MapPinIcon || __deps.MapPinIcon;
   const InlineSearchBar = __comp.InlineSearchBar || __deps.InlineSearchBar;
   const UnderlineTabs = __comp.UnderlineTabs || __deps.UnderlineTabs;
+  const Lightbox = __comp.Lightbox || __deps.Lightbox;
 
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
@@ -1935,11 +1942,22 @@ export function HistoryView({
     });
   }, [historyPhotoEntries]);
   const photosForPersonTag = React.useMemo(() => getPhotosForTagLabel(selectedPersonTag), [getPhotosForTagLabel, selectedPersonTag]);
-  const openHistoryLightbox = (photos, index) => {
-    if (typeof setActiveLightbox !== 'function') return;
+  // 인물/추억 탭은 갤러리 페이지(PhotoGallery)와 달리 지금까지 setActiveLightbox에 URL 목록만
+  // 넘겨서, 공유 라이트박스 호스트(app-main.js)가 받는 meta가 비어 태그 입력/삭제/교체 등 표준
+  // 라이트박스 기능이 전혀 동작하지 않았다. PhotoGallery와 동일하게 이 탭 전용 라이트박스를
+  // 로컬로 띄우고, historyPhotoEntries가 이미 갖고 있는 전체 메타를 그대로 넘긴다.
+  // memoryId가 있으면(추억 탭에서 연 경우) 해당 여행 사진 모음에서만 제거하는 버튼이 뜬다.
+  const [historyLightbox, setHistoryLightbox] = React.useState(null);
+  const openHistoryLightbox = (photos, index, memoryId = null) => {
     const urls = photos.map(p => p.full || p.thumb).filter(Boolean);
     if (urls.length === 0) return;
-    setActiveLightbox({ urls, index });
+    const meta = photos.map(p => ({
+      timestamp: p.timestamp, messageId: p.messageId, imageIndex: p.imageIndex, thumb: p.thumb,
+      tags: p.tags, directMediaUrl: p.directMediaUrl, source: p.source, uploadSource: p.uploadSource,
+      meetingDate: p.meetingDate, photoId: p.photoId, sourceMessageId: p.sourceMessageId,
+      sourceImageIndex: p.sourceImageIndex, mediaKey: p.mediaKey, refKey: p.refKey
+    }));
+    setHistoryLightbox({ urls, index, meta, memoryId });
   };
   // 추억 탭: '여행' 카테고리 기념일의 제목을 기준으로, 그 기간에 등록된 사진을 모아 보여준다.
   const entryDateStr = entry => {
@@ -1954,9 +1972,14 @@ export function HistoryView({
       .map(a => {
         const start = a.startDate;
         const end = a.endDate || a.startDate;
+        // 날짜 구간으로 자동 수집되다 보니 그 여행과 상관없는 사진이 섞여 들어올 수 있어,
+        // 라이트박스의 '이 추억에서 제거' 버튼으로 뺀 사진(excludedMemoryPhotoKeys)은 제외한다.
+        const excluded = new Set(Array.isArray(a.excludedMemoryPhotoKeys) ? a.excludedMemoryPhotoKeys : []);
         const photos = historyPhotoEntries.filter(entry => {
           const d = entryDateStr(entry);
-          return d && d >= start && d <= end;
+          if (!d || d < start || d > end) return false;
+          const key = entry.mediaKey || entry.refKey;
+          return !key || !excluded.has(key);
         });
         return { id: a.id, title: a.title || '여행', startDate: start, endDate: end, photos };
       })
@@ -2161,7 +2184,7 @@ export function HistoryView({
                 }, group.photos.map((photo, idx) => /*#__PURE__*/React.createElement("button", {
                   key: photo.mediaKey || photo.refKey || `${group.id}_${idx}`,
                   type: "button",
-                  onClick: () => openHistoryLightbox(group.photos, idx),
+                  onClick: () => openHistoryLightbox(group.photos, idx, group.id),
                   style: { padding: 0, border: 'none', borderRadius: 'var(--radius-sm)', overflow: 'hidden', aspectRatio: '1 / 1', cursor: 'pointer', backgroundColor: 'var(--bg-primary)' }
                 }, /*#__PURE__*/React.createElement("img", {
                   src: photo.thumb || photo.full, alt: "", loading: "lazy", decoding: "async",
@@ -2265,6 +2288,29 @@ export function HistoryView({
           })))
           )
     ),
+
+    historyLightbox && Lightbox && /*#__PURE__*/React.createElement(Lightbox, {
+      urls: historyLightbox.urls,
+      index: historyLightbox.index,
+      meta: historyLightbox.meta,
+      onClose: () => setHistoryLightbox(null),
+      onNavigate: i => setHistoryLightbox(prev => prev ? { ...prev, index: i } : prev),
+      showToast,
+      onPromoteImageUrl,
+      onSaveImageTags,
+      onSearchTag,
+      onDeletePhoto,
+      onReplacePhoto,
+      onJumpToChatMessage: msgId => { setHistoryLightbox(null); if (typeof onJumpToChatMessage === 'function') onJumpToChatMessage(msgId); },
+      onJumpToMemo: memoId => { setHistoryLightbox(null); if (typeof onJumpToMemo === 'function') onJumpToMemo(memoId); },
+      onJumpToMeetingDate: (dateStr, tab) => { setHistoryLightbox(null); if (typeof onJumpToMeetingDate === 'function') onJumpToMeetingDate(dateStr, tab); },
+      onGetChatMessageOrdinal,
+      onGetGalleryPhotoOrdinal,
+      onRequestConfirm,
+      onRemoveFromMemory: (historyLightbox.memoryId && typeof onRemovePhotoFromMemory === 'function')
+        ? (photoMeta => onRemovePhotoFromMemory(historyLightbox.memoryId, photoMeta?.mediaKey || photoMeta?.refKey))
+        : null
+    }),
 
     /*#__PURE__*/React.createElement(SideMenuOverlay, {
       isOpen: isMenuOpen,

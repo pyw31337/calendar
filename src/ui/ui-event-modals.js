@@ -4615,9 +4615,10 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
             style: {
               background: 'none', border: 'none', padding: 0, margin: 0,
               color: 'inherit',
-              cursor: 'pointer', textAlign: 'left'
+              cursor: 'pointer', textAlign: 'left',
+              display: 'flex', alignItems: 'center', gap: '6px'
             }
-          }, "정산")
+          }, BackArrowIcon && /*#__PURE__*/React.createElement(BackArrowIcon, { size: 18 }), "정산")
         )
       ),
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 } },
