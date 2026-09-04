@@ -546,6 +546,81 @@ function getMessageDirectMediaEntry(...args) {
   const f = __gatherUiDeps().getMessageDirectMediaEntry || GATHER_APP_UTILS.getMessageDirectMediaEntry;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+
+// Combines chat message images, memo images, and confirmed-meeting photos into one flat, deduped,
+// newest-first list -- shared by PhotoGallery (갤러리 페이지) and HistoryView's 인물/추억 tabs so
+// both browse exactly the same photo set instead of two independently-built ones drifting apart.
+function buildCombinedPhotoEntries(chatMessages, memos, calendar) {
+  const __deps = window.GATHER_UI_DEPS || {};
+  const resolveMeetingPhotoDisplay = __deps.resolveMeetingPhotoDisplay;
+  const sorted = [...(chatMessages || [])].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+  const chatEntries = sorted.flatMap(msg => {
+    if (!msg || isTombstone(msg)) return [];
+    const directEntry = getMessageDirectMediaEntry(msg);
+    const entries = directEntry ? [...getMessageImageEntries(msg), directEntry] : getMessageImageEntries(msg);
+    return entries.map((entry) => ({ ...entry, source: 'chat', timestamp: msg.timestamp }));
+  });
+  const memoEntries = (memos || []).flatMap(memo => {
+    if (!memo || isTombstone(memo)) return [];
+    const memoTagsDisplay = Array.isArray(memo.tags) ? memo.tags.map(t => String(t || '').replace(/^#/, '')).filter(Boolean).join(' ') : '';
+    const asMsg = {
+      id: memo.id, text: memo.text || memo.content || memo.body || '',
+      imageUrl: memo.imageUrl, imageUrls: memo.imageUrls, thumbUrl: memo.thumbUrl, thumbUrls: memo.thumbUrls,
+      timestamp: memo.updatedAt || memo.createdAt || 0, participantId: memo.participantId || '',
+      uploadSource: 'memo'
+    };
+    const directEntry = getMessageDirectMediaEntry(asMsg);
+    const entries = directEntry ? [...getMessageImageEntries(asMsg), directEntry] : getMessageImageEntries(asMsg);
+    return entries.map(entry => ({ ...entry, tags: memoTagsDisplay, source: 'memo', timestamp: asMsg.timestamp }));
+  });
+  const meetingEntries = [];
+  getConfirmedMeetings(calendar).forEach(meeting => {
+    const photos = Array.isArray(meeting?.photos) ? meeting.photos : [];
+    photos.forEach((photo, index) => {
+      const resolved = resolveMeetingPhotoDisplay ? resolveMeetingPhotoDisplay(photo, chatMessages) : null;
+      const full = String(resolved?.imageUrl || photo?.imageUrl || photo?.full || '');
+      const thumb = String(resolved?.thumbUrl || photo?.thumbUrl || photo?.thumb || full);
+      if (!full && !thumb) return;
+      const mediaKey = resolved?.mediaKey
+        || photo?.mediaKey
+        || (photo?.sourceMessageId && Number.isInteger(photo?.sourceImageIndex)
+          ? `chat:${photo.sourceMessageId}:${photo.sourceImageIndex}`
+          : `meeting:${meeting.date || 'date'}:${photo?.id || index}`);
+      const refKey = resolved?.refKey || photo?.refKey || `meeting:${meeting.date || 'date'}:${photo?.id || index}`;
+      meetingEntries.push({
+        full: full || thumb,
+        thumb: thumb || full,
+        imageIndex: index,
+        messageId: null,
+        photoId: photo?.id || '',
+        sourceMessageId: photo?.sourceMessageId || '',
+        sourceImageIndex: Number.isInteger(photo?.sourceImageIndex) ? photo.sourceImageIndex : null,
+        timestamp: Number(photo?.createdAt || photo?.updatedAt || meeting?.confirmedAt || 0),
+        tags: String(resolved?.tags ?? photo?.tags ?? ''),
+        directMediaUrl: '',
+        source: 'meeting',
+        meetingDate: meeting.date || '',
+        mediaKey,
+        refKey
+      });
+    });
+  });
+  const byUrl = new Map();
+  const sourceRank = { chat: 0, memo: 1, meeting: 2 };
+  [...chatEntries, ...memoEntries, ...meetingEntries].forEach(entry => {
+    const key = entry.mediaKey || entry.refKey || entry.full || entry.thumb;
+    if (!key) return;
+    const existing = byUrl.get(key);
+    if (!existing) {
+      byUrl.set(key, { ...entry });
+    } else if ((sourceRank[entry.source] ?? 9) < (sourceRank[existing.source] ?? 9)) {
+      byUrl.set(key, { ...entry, meetingDate: entry.meetingDate || existing.meetingDate || '' });
+    } else if (!existing.meetingDate && entry.meetingDate) {
+      existing.meetingDate = entry.meetingDate;
+    }
+  });
+  return Array.from(byUrl.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+}
 function renderTextWithUrlBadge(...args) {
   const f = __gatherUiDeps().renderTextWithUrlBadge || GATHER_APP_UTILS.renderTextWithUrlBadge;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -1098,84 +1173,7 @@ export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalG
     if (changed) setBrokenPhotoRevision(prev => prev + 1);
   };
 
-  const photoEntries = React.useMemo(() => {
-    const sorted = [...(chatMessages || [])].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-    const chatEntries = sorted.flatMap(msg => {
-      if (!msg || isTombstone(msg)) return [];
-      const directEntry = getMessageDirectMediaEntry(msg);
-      const entries = directEntry ? [...getMessageImageEntries(msg), directEntry] : getMessageImageEntries(msg);
-      return entries.map((entry, i) => ({
-        ...entry,
-        source: 'chat',
-        timestamp: msg.timestamp
-      }));
-    });
-    const memoEntries = (memos || []).flatMap(memo => {
-      if (!memo || isTombstone(memo)) return [];
-      const memoTagsDisplay = Array.isArray(memo.tags) ? memo.tags.map(t => String(t || '').replace(/^#/, '')).filter(Boolean).join(' ') : '';
-      const asMsg = {
-        id: memo.id, text: memo.text || memo.content || memo.body || '',
-        imageUrl: memo.imageUrl, imageUrls: memo.imageUrls, thumbUrl: memo.thumbUrl, thumbUrls: memo.thumbUrls,
-        timestamp: memo.updatedAt || memo.createdAt || 0, participantId: memo.participantId || '',
-        uploadSource: 'memo'
-      };
-      const directEntry = getMessageDirectMediaEntry(asMsg);
-      const entries = directEntry ? [...getMessageImageEntries(asMsg), directEntry] : getMessageImageEntries(asMsg);
-      return entries.map(entry => ({
-        ...entry,
-        tags: memoTagsDisplay,
-        source: 'memo',
-        timestamp: asMsg.timestamp
-      }));
-    });
-    const meetingEntries = [];
-    getConfirmedMeetings(calendar).forEach(meeting => {
-      const photos = Array.isArray(meeting?.photos) ? meeting.photos : [];
-      photos.forEach((photo, index) => {
-        const resolved = resolveMeetingPhotoDisplay ? resolveMeetingPhotoDisplay(photo, chatMessages) : null;
-        const full = String(resolved?.imageUrl || photo?.imageUrl || photo?.full || '');
-        const thumb = String(resolved?.thumbUrl || photo?.thumbUrl || photo?.thumb || full);
-        if (!full && !thumb) return;
-        const mediaKey = resolved?.mediaKey
-          || photo?.mediaKey
-          || (photo?.sourceMessageId && Number.isInteger(photo?.sourceImageIndex)
-            ? `chat:${photo.sourceMessageId}:${photo.sourceImageIndex}`
-            : `meeting:${meeting.date || 'date'}:${photo?.id || index}`);
-        const refKey = resolved?.refKey || photo?.refKey || `meeting:${meeting.date || 'date'}:${photo?.id || index}`;
-        meetingEntries.push({
-          full: full || thumb,
-          thumb: thumb || full,
-          imageIndex: index,
-          messageId: null,
-          photoId: photo?.id || '',
-          sourceMessageId: photo?.sourceMessageId || '',
-          sourceImageIndex: Number.isInteger(photo?.sourceImageIndex) ? photo.sourceImageIndex : null,
-          timestamp: Number(photo?.createdAt || photo?.updatedAt || meeting?.confirmedAt || 0),
-          tags: String(resolved?.tags ?? photo?.tags ?? ''),
-          directMediaUrl: '',
-          source: 'meeting',
-          meetingDate: meeting.date || '',
-          mediaKey,
-          refKey
-        });
-      });
-    });
-    const byUrl = new Map();
-    const sourceRank = { chat: 0, memo: 1, meeting: 2 };
-    [...chatEntries, ...memoEntries, ...meetingEntries].forEach(entry => {
-      const key = entry.mediaKey || entry.refKey || entry.full || entry.thumb;
-      if (!key) return;
-      const existing = byUrl.get(key);
-      if (!existing) {
-        byUrl.set(key, { ...entry });
-      } else if ((sourceRank[entry.source] ?? 9) < (sourceRank[existing.source] ?? 9)) {
-        byUrl.set(key, { ...entry, meetingDate: entry.meetingDate || existing.meetingDate || '' });
-      } else if (!existing.meetingDate && entry.meetingDate) {
-        existing.meetingDate = entry.meetingDate;
-      }
-    });
-    return Array.from(byUrl.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-  }, [chatMessages, memos, calendar]);
+  const photoEntries = React.useMemo(() => buildCombinedPhotoEntries(chatMessages, memos, calendar), [chatMessages, memos, calendar]);
   const isKnownBrokenPhoto = entry => {
     const key = entry?.mediaKey || entry?.refKey || entry?.key;
     if (key && brokenPhotoKeysRef.current.has(key)) return true;
@@ -1805,7 +1803,8 @@ export function HistoryView({
   showSettlement = true, onOpenCreateSettlement,
   isDarkTheme, onToggleTheme, fontScalePercent, onDecreaseFont, onIncreaseFont,
   isChatNotifyEnabled, onToggleChatNotifications, syncStatus = null,
-  onSearchTag = null, onAddPersonTag = null, showToast = null
+  onAddPersonTag = null, showToast = null,
+  anniversaries = [], chatMessages = [], memos = [], setActiveLightbox = null
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -1910,6 +1909,45 @@ export function HistoryView({
     ...activeParticipants.map(p => ({ id: p.id, label: p.name, color: p.color || '#7C3AED' })),
     ...customPersonTags.filter(t => !activeParticipants.some(p => p.name === t)).map(t => ({ id: `custom_${t}`, label: t, color: '#64748B' }))
   ];
+
+  // 인물/추억 탭이 공유하는 사진 목록 -- 갤러리 페이지(PhotoGallery)와 동일한 소스(채팅/메모/모임
+  // 사진)를 결합해, 태그(인물)나 날짜(추억)로 걸러 보여준다.
+  const historyPhotoEntries = React.useMemo(() => buildCombinedPhotoEntries(chatMessages, memos, calendar), [chatMessages, memos, calendar]);
+  const [selectedPersonTag, setSelectedPersonTag] = React.useState(null);
+  React.useEffect(() => { setSelectedPersonTag(null); }, [historyTab]);
+  const entryTagTokens = entry => String(entry?.tags || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean);
+  const photosForPersonTag = React.useMemo(() => {
+    if (!selectedPersonTag) return [];
+    const needle = selectedPersonTag.toLowerCase();
+    return historyPhotoEntries.filter(entry => entryTagTokens(entry).some(t => t.toLowerCase() === needle));
+  }, [historyPhotoEntries, selectedPersonTag]);
+  const openHistoryLightbox = (photos, index) => {
+    if (typeof setActiveLightbox !== 'function') return;
+    const urls = photos.map(p => p.full || p.thumb).filter(Boolean);
+    if (urls.length === 0) return;
+    setActiveLightbox({ urls, index });
+  };
+  // 추억 탭: '여행' 카테고리 기념일의 제목을 기준으로, 그 기간에 등록된 사진을 모아 보여준다.
+  const entryDateStr = entry => {
+    const ts = Number(entry?.timestamp) || 0;
+    if (!ts) return '';
+    const d = new Date(ts);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+  const travelMemoryGroups = React.useMemo(() => {
+    return (anniversaries || [])
+      .filter(a => a && a.category === 'travel' && a.startDate)
+      .map(a => {
+        const start = a.startDate;
+        const end = a.endDate || a.startDate;
+        const photos = historyPhotoEntries.filter(entry => {
+          const d = entryDateStr(entry);
+          return d && d >= start && d <= end;
+        });
+        return { id: a.id, title: a.title || '여행', startDate: start, endDate: end, photos };
+      })
+      .sort((a, b) => (b.startDate || '').localeCompare(a.startDate || ''));
+  }, [anniversaries, historyPhotoEntries]);
 
   return /*#__PURE__*/React.createElement("div", {
     className: "places-view-container",
@@ -2072,14 +2110,45 @@ export function HistoryView({
       })
     ),
     historyTab === 'memories' && /*#__PURE__*/React.createElement("div", {
-      style: {
-        flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        gap: '8px', padding: '118px 24px 16px', textAlign: 'center', color: 'var(--text-muted)'
-      }
+      style: { flex: 1, overflowY: 'auto', padding: '118px 16px 16px', display: 'flex', flexDirection: 'column', gap: '18px' }
     },
-      /*#__PURE__*/React.createElement("span", { style: { fontSize: '2rem' } }, "🗂️"),
-      /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-main)' } }, "추억 기능 준비 중입니다"),
-      /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)' } }, "장소·업체·지역별로 사진을 모아보는 기능을 추가할 예정이에요.")
+      travelMemoryGroups.length === 0
+        ? /*#__PURE__*/React.createElement("div", {
+            style: {
+              flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              gap: '8px', padding: '24px', textAlign: 'center', color: 'var(--text-muted)'
+            }
+          },
+            /*#__PURE__*/React.createElement("span", { style: { fontSize: '2rem' } }, "🗂️"),
+            /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-main)' } }, "등록된 여행 일정이 없습니다"),
+            /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)' } }, "기념일 등록에서 '여행' 카테고리로 일정을 추가하면, 그 기간에 등록된 사진을 여기 모아 보여줘요.")
+          )
+        : travelMemoryGroups.map(group => /*#__PURE__*/React.createElement("div", {
+            key: group.id,
+            style: { display: 'flex', flexDirection: 'column', gap: '8px' }
+          },
+            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '2px' } },
+              /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-md)', fontWeight: 800, color: 'var(--text-main)' } }, group.title),
+              /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' } },
+                group.startDate === group.endDate ? group.startDate : `${group.startDate} ~ ${group.endDate}`,
+                ` · 사진 ${group.photos.length}장`
+              )
+            ),
+            group.photos.length === 0
+              ? /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' } }, "이 기간에 등록된 사진이 아직 없어요.")
+              : /*#__PURE__*/React.createElement("div", {
+                  style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px' }
+                }, group.photos.map((photo, idx) => /*#__PURE__*/React.createElement("button", {
+                  key: photo.mediaKey || photo.refKey || `${group.id}_${idx}`,
+                  type: "button",
+                  onClick: () => openHistoryLightbox(group.photos, idx),
+                  style: { padding: 0, border: 'none', borderRadius: 'var(--radius-sm)', overflow: 'hidden', aspectRatio: '1 / 1', cursor: 'pointer', backgroundColor: 'var(--bg-primary)' }
+                }, /*#__PURE__*/React.createElement("img", {
+                  src: photo.thumb || photo.full, alt: "", loading: "lazy", decoding: "async",
+                  style: { width: '100%', height: '100%', objectFit: 'cover' }
+                })))
+              )
+          ))
     ),
     historyTab === 'people' && /*#__PURE__*/React.createElement("div", {
       style: { flex: 1, overflowY: 'auto', padding: '118px 16px 16px', display: 'flex', flexDirection: 'column', gap: '16px' }
@@ -2091,8 +2160,11 @@ export function HistoryView({
               key: tag.id,
               type: "button",
               className: "region-selection-badge",
-              style: { backgroundColor: tag.color, color: getContrastTextColor(tag.color), border: 'none', cursor: 'pointer' },
-              onClick: () => { if (typeof onSearchTag === 'function') onSearchTag(`#${tag.label}`); }
+              style: {
+                backgroundColor: tag.color, color: getContrastTextColor(tag.color), cursor: 'pointer',
+                border: selectedPersonTag === tag.label ? '2px solid var(--text-main)' : 'none'
+              },
+              onClick: () => setSelectedPersonTag(prev => prev === tag.label ? null : tag.label)
             }, tag.label))
       ),
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
@@ -2112,9 +2184,24 @@ export function HistoryView({
           onClick: handleAddPersonTagClick
         }, "태그 추가")
       ),
-      /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' } },
-        "태그를 누르면 해당 태그가 달린 사진을 검색에서 모아볼 수 있어요. 사진에 태그를 달려면 갤러리에서 사진을 열고 해시태그로 추가하세요."
-      )
+      !selectedPersonTag
+        ? /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)' } },
+            "위 태그를 누르면 그 태그가 달린 사진을 모아 보여줘요. 사진에 태그를 달려면 갤러리에서 사진을 열고 해시태그로 그 이름을 추가하세요."
+          )
+        : photosForPersonTag.length === 0
+          ? /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' } }, `#${selectedPersonTag} 태그가 달린 사진이 아직 없어요.`)
+          : /*#__PURE__*/React.createElement("div", {
+              style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px' }
+            }, photosForPersonTag.map((photo, idx) => /*#__PURE__*/React.createElement("button", {
+              key: photo.mediaKey || photo.refKey || `person_${idx}`,
+              type: "button",
+              onClick: () => openHistoryLightbox(photosForPersonTag, idx),
+              style: { padding: 0, border: 'none', borderRadius: 'var(--radius-sm)', overflow: 'hidden', aspectRatio: '1 / 1', cursor: 'pointer', backgroundColor: 'var(--bg-primary)' }
+            }, /*#__PURE__*/React.createElement("img", {
+              src: photo.thumb || photo.full, alt: "", loading: "lazy", decoding: "async",
+              style: { width: '100%', height: '100%', objectFit: 'cover' }
+            })))
+          )
     ),
 
     /*#__PURE__*/React.createElement(SideMenuOverlay, {
@@ -3205,6 +3292,50 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
               style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' },
               onError: e => { e.currentTarget.style.display = 'none'; }
             }),
+            // 스포츠 경기 카드: 포스터(팀 관계없는 종목 기본 이미지) 위에 날짜/양팀 로고/경기장을
+            // 오버레이로 얹는다. 순서는 위→아래로 날짜, "홈로고 vs 원정로고", 경기장.
+            item.homeTeam && item.awayTeam && /*#__PURE__*/React.createElement("div", {
+              style: {
+                position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
+                justifyContent: 'space-between', alignItems: 'center', padding: '10px 8px',
+                boxSizing: 'border-box', color: '#fff', textAlign: 'center',
+                background: 'linear-gradient(180deg, rgba(0,0,0,0.58) 0%, rgba(0,0,0,0.12) 32%, rgba(0,0,0,0.12) 68%, rgba(0,0,0,0.62) 100%)'
+              }
+            },
+              /*#__PURE__*/React.createElement("div", {
+                style: { fontSize: 'var(--font-size-xs)', fontWeight: 700, textShadow: '0 1px 2px rgba(0,0,0,0.6)' }
+              }, item.dateLabel || formatCultureDateLabel(item.startDate, item.endDate) || CULTURE_MISSING_LABEL),
+              /*#__PURE__*/React.createElement("div", {
+                style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', width: '100%' }
+              },
+                /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flex: 1, minWidth: 0 } },
+                  item.homeTeamLogo && /*#__PURE__*/React.createElement("img", {
+                    src: item.homeTeamLogo, alt: item.homeTeam, loading: 'lazy', decoding: 'async',
+                    style: { width: '40px', height: '40px', objectFit: 'contain', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))' },
+                    onError: e => { e.currentTarget.style.display = 'none'; }
+                  }),
+                  /*#__PURE__*/React.createElement("span", {
+                    style: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, textShadow: '0 1px 2px rgba(0,0,0,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }
+                  }, item.homeTeam)
+                ),
+                /*#__PURE__*/React.createElement("span", {
+                  style: { fontSize: 'var(--font-size-xs)', fontWeight: 800, textShadow: '0 1px 2px rgba(0,0,0,0.6)', flexShrink: 0 }
+                }, "vs"),
+                /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flex: 1, minWidth: 0 } },
+                  item.awayTeamLogo && /*#__PURE__*/React.createElement("img", {
+                    src: item.awayTeamLogo, alt: item.awayTeam, loading: 'lazy', decoding: 'async',
+                    style: { width: '40px', height: '40px', objectFit: 'contain', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))' },
+                    onError: e => { e.currentTarget.style.display = 'none'; }
+                  }),
+                  /*#__PURE__*/React.createElement("span", {
+                    style: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, textShadow: '0 1px 2px rgba(0,0,0,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }
+                  }, item.awayTeam)
+                )
+              ),
+              /*#__PURE__*/React.createElement("div", {
+                style: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, textShadow: '0 1px 2px rgba(0,0,0,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }
+              }, item.venue || CULTURE_MISSING_LABEL)
+            ),
             registered && /*#__PURE__*/React.createElement("div", {
               style: { position: 'absolute', top: '6px', right: '6px', backgroundColor: '#7C3AED', color: '#fff', borderRadius: 'var(--radius-full)', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 800, boxShadow: '0 1px 3px rgba(0,0,0,0.25)' }
             }, "✓")
@@ -3346,7 +3477,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
               display: 'block', flexShrink: 0, textAlign: 'center', padding: '10px', borderRadius: 'var(--radius-md)',
               backgroundColor: '#7C3AED', color: '#fff', fontWeight: 800, fontSize: 'var(--font-size-md)', textDecoration: 'none'
             }
-          }, selected.source === 'custom' ? "링크 열기" : "문화포털에서 상세보기")
+          }, selected.source === 'custom' ? "링크 열기" : "자세히보기")
         )
       ),
       document.body

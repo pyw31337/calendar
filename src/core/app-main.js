@@ -2674,7 +2674,10 @@ function CalendarApp() {
     const existing = Array.isArray(activeCal.customPersonTags) ? activeCal.customPersonTags : [];
     if (existing.includes(trimmed)) return true;
     const nextCalendars = calendars.map(c => c.id === activeCal.id ? { ...c, customPersonTags: [...existing, trimmed] } : c);
-    const ok = await updateCalendars(nextCalendars, '태그가 추가되었습니다.', 'success', activeCal.id, 'settings');
+    // settingsFields tells the server-side settings merge (mergeCalendarSettingsDelta) which
+    // fields to actually overwrite from this write -- without it, an unlisted field like
+    // customPersonTags is silently dropped and only the server's old value survives.
+    const ok = await updateCalendars(nextCalendars, '태그가 추가되었습니다.', 'success', activeCal.id, 'settings', [], { settingsFields: ['customPersonTags'] });
     return ok;
   };
 
@@ -2827,7 +2830,8 @@ function CalendarApp() {
   // memo collection (e.g. calendar -> chat -> settlement) never tears down and recreates these
   // three memo listeners -- only crossing into/out of memo|gallery|search actually should.
   const needsMemoCollection = React.useMemo(
-    () => activeView === 'memo' || activeView === 'gallery' || isGlobalSearchOpen,
+    // 'history' included so 보관함 인물/추억 탭도 memo에 올라온 사진을 사진 목록에 포함할 수 있다.
+    () => activeView === 'memo' || activeView === 'gallery' || activeView === 'history' || isGlobalSearchOpen,
     [activeView, isGlobalSearchOpen]
   );
 
@@ -7203,8 +7207,11 @@ function CalendarApp() {
           if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsHistoryShareOpen(true);
         },
         syncStatus: syncStatus,
-        onSearchTag: handleSearchTag,
         onAddPersonTag: handleAddPersonTag,
+        anniversaries: anniversaries,
+        chatMessages: galleryChatMessages,
+        memos: memos,
+        setActiveLightbox: setActiveLightbox,
         showToast: showToast,
         ...navMenuProps
       }),
