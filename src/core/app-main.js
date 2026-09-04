@@ -3104,6 +3104,14 @@ function CalendarApp() {
       if (attempt >= MAX_ATTEMPTS) {
         // All retries came back empty -- rather than leaving the widget stuck on "불러오는
         // 중…" forever, let CommentsSection fall back to a resolved "no chat to show" state.
+        // Diagnostic breadcrumb for this exact "count>0 but nothing renders" case -- if it
+        // recurs, checking devtools console for this line pins down whether the raw server
+        // count, the meeting-linked-photo correction, or the fetch itself is the mismatch.
+        console.info('[chat-preview] hydration exhausted', {
+          calendarId: activeCalId, rawTotalChatCount: totalChatCount,
+          meetingLinkedCount: meetingPhotoMessageIds.size, visibleTotalChatCount,
+          visibleChatMessagesLength: visibleChatMessages.length
+        });
         setChatPreviewHydrationExhausted(true);
         return;
       }
