@@ -1768,7 +1768,15 @@ export function CalendarGrid({
           justifyContent: 'center',
           boxSizing: 'border-box',
           color: '#fff',
-          overflow: 'visible'
+          overflow: 'visible',
+          // renderAnniversaryIcon(bar, 6) only sizes SVG icon components -- a category with no
+          // matching SVG (e.g. sports' genre emoji ⚾/🏀/⚽/...) falls back to the raw emoji
+          // character, which ignores that `size` prop entirely and renders at the *inherited*
+          // font-size instead. Without an explicit fontSize here it inherited the day-cell's much
+          // larger default, so the emoji rendered oversized and overflowed the 8px-tall bar.
+          // Match the same font-size the other mobile badge (day-anniversary-mobile) uses.
+          fontSize: 'var(--font-size-2xs)',
+          lineHeight: 1
         }
       // 11px 아이콘이 8px짜리 바 안에 들어가면 아이콘이 바 배경보다 커서 위아래로 삐져나와
       // 보였다 -- 바 높이에 맞춰 6px로 축소.
