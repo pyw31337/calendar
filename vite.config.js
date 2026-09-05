@@ -7,7 +7,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   plugins: [react()],
-  base: process.env.GITHUB_PAGES === '1' ? '/calendar/' : './',
+  // PR previews (see .github/workflows/pr-preview.yml) live under a per-PR subpath on the same
+  // Pages site (/calendar/pr-preview/pr-<n>/) rather than the site root, so they set their own
+  // base explicitly; production keeps building with the fixed /calendar/ root it always has.
+  base: process.env.VITE_BASE_PATH || (process.env.GITHUB_PAGES === '1' ? '/calendar/' : './'),
   root: path.resolve(__dirname, 'src'),
   publicDir: path.resolve(__dirname, 'public-vite'),
   build: {

@@ -1,0 +1,46 @@
+name: PR Preview
+
+# Deploys every PR's build to its own subpath on the same gh-pages site production uses
+# (pyw31337.github.io/calendar/pr-preview/pr-<number>/), so a reviewer gets a real, public,
+# mobile-browser-testable URL without needing a local dev server or a tunnel. pr-preview-action
+# posts/updates a sticky comment on the PR with the link, and removes the folder when the PR
+# closes -- it never touches anything outside its own pr-preview/pr-<n>/ subdirectory, so it
+# coexists with deploy-vite-pages.yml's production publish to the same branch root.
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, closed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: pr-preview-${{ github.event.number }}
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        if: github.event.action != 'closed'
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+        if: github.event.action != 'closed'
+
+      - name: Build with the PR's preview base path
+        if: github.event.action != 'closed'
+        env:
+          VITE_BASE_PATH: /calendar/pr-preview/pr-${{ github.event.number }}/
+          VITE_BUILD_SHA: ${{ github.sha }}
+        run: npm run build
+
+      - name: Deploy or clean up preview
+        uses: rossjrw/pr-preview-action@v1
+        with:
+          source-dir: dist
