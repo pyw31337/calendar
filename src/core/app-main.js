@@ -2794,6 +2794,28 @@ function CalendarApp() {
     }
   };
 
+  // 위 handleRemovePhotoFromTravelMemory의 일괄(여러 장) 버전 -- 추억 상세 페이지의 편집 모드에서
+  // 체크박스로 여러 장을 골라 한 번에 제외할 때 쓴다. 장 수만큼 반복 호출하는 대신 병합된 제외
+  // 목록 하나로 한 번만 쓴다.
+  const handleRemovePhotosFromTravelMemory = async (anniversaryId, photoKeys) => {
+    if (!activeCal?.id || !anniversaryId || !Array.isArray(photoKeys) || photoKeys.length === 0) return false;
+    const ann = (anniversaries || []).find(a => a.id === anniversaryId);
+    const existing = Array.isArray(ann?.excludedMemoryPhotoKeys) ? ann.excludedMemoryPhotoKeys : [];
+    const next = Array.from(new Set([...existing, ...photoKeys]));
+    if (next.length === existing.length) return true;
+    try {
+      const saved = await writeCollectionDocumentWithFallback('anniversaries', activeCal.id, anniversaryId, { excludedMemoryPhotoKeys: next }, 'update', '추억에서 사진 일괄 제외');
+      if (!saved?.success) throw new Error('remove photos from travel memory failed');
+      handleAnniversarySaved({ id: anniversaryId, excludedMemoryPhotoKeys: next });
+      showToast(`사진 ${photoKeys.length}장을 추억에서 제외했습니다.`, 'success');
+      return true;
+    } catch (err) {
+      console.error('Failed to bulk-remove photos from travel memory:', err);
+      showToast('제외 실패', 'error');
+      return false;
+    }
+  };
+
   // 보관함 > 컨텐츠 등록 / 컨텐츠 페이지: calendar-owned custom culture/festival/sports cards
   // merged into the CulturePerformancesTab lists alongside crawled JSON snapshots.
   React.useEffect(() => {
@@ -7562,6 +7584,7 @@ function CalendarApp() {
         onGetGalleryPhotoOrdinal: handleGetGalleryPhotoOrdinal,
         onRequestConfirm: showConfirmDialog,
         onRemovePhotoFromMemory: handleRemovePhotoFromTravelMemory,
+        onRemovePhotosFromMemory: handleRemovePhotosFromTravelMemory,
         onFetchPhotoComments: handleFetchPhotoComments,
         onSavePhotoComments: handleSavePhotoComments,
         ...navMenuProps
