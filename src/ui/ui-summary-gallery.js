@@ -1822,7 +1822,7 @@ export function HistoryView({
   onDeletePhoto = null, onReplacePhoto = null,
   onJumpToChatMessage = null, onJumpToMemo = null, onJumpToMeetingDate = null,
   onGetChatMessageOrdinal = null, onGetGalleryPhotoOrdinal = null, onRequestConfirm = null,
-  onRemovePhotoFromMemory = null, onFetchPhotoComments = null, onSavePhotoComments = null
+  onRemovePhotoFromMemory = null, onRemovePhotosFromMemory = null, onFetchPhotoComments = null, onSavePhotoComments = null
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -1845,17 +1845,17 @@ export function HistoryView({
       const saved = localStorage.getItem(HISTORY_TAB_STORAGE_KEY);
       if (VALID_HISTORY_TABS.includes(saved)) return saved;
     } catch (_) { /* private browsing / disabled storage */ }
-    return 'meetings';
+    return 'memories';
   });
   const changeHistoryTab = (tab) => {
     if (!VALID_HISTORY_TABS.includes(tab)) return;
     setHistoryTab(tab);
     try { localStorage.setItem(HISTORY_TAB_STORAGE_KEY, tab); } catch (_) { /* best-effort */ }
   };
-  // When the side menu navigates to 보관함 again (or any view), force the 지난모임 tab so
+  // When the side menu navigates to 기록 again (or any view), force the 추억 tab so
   // re-entry always lands there rather than whatever tab was last open.
   const handleHistoryChangeView = (view) => {
-    if (view === 'history') changeHistoryTab('meetings');
+    if (view === 'history') changeHistoryTab('memories');
     if (typeof onChangeView === 'function') onChangeView(view);
   };
   // 인물 탭: 기본 태그는 현재 캘린더 참여자, 그 외에 사용자가 직접 추가한 커스텀 태그
@@ -1935,6 +1935,39 @@ export function HistoryView({
   const [selectedPersonTag, setSelectedPersonTag] = React.useState(null);
   const [selectedMemoryGroupId, setSelectedMemoryGroupId] = React.useState(null);
   React.useEffect(() => { setSelectedPersonTag(null); setSelectedMemoryGroupId(null); }, [historyTab]);
+  // 추억 상세 페이지의 사진 일괄 제외 -- 사진 하나하나 라이트박스를 열어 개별적으로 "이 추억에서
+  // 제거"를 누르기엔 사진이 수십~수백 장인 여행에서는 너무 번거로워서, 편집 모드에서 체크박스로
+  // 여러 장을 골라 한 번에 제외할 수 있게 한다.
+  const [isMemoryEditMode, setIsMemoryEditMode] = React.useState(false);
+  const [selectedMemoryPhotoKeys, setSelectedMemoryPhotoKeys] = React.useState(() => new Set());
+  const [isExcludingMemoryPhotos, setIsExcludingMemoryPhotos] = React.useState(false);
+  React.useEffect(() => { setIsMemoryEditMode(false); setSelectedMemoryPhotoKeys(new Set()); }, [selectedMemoryGroupId]);
+  const toggleMemoryPhotoSelected = key => {
+    setSelectedMemoryPhotoKeys(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+  const handleClickExcludeMemoryPhotos = group => {
+    const keys = Array.from(selectedMemoryPhotoKeys);
+    if (!keys.length || typeof onRemovePhotosFromMemory !== 'function') return;
+    const doExclude = async () => {
+      setIsExcludingMemoryPhotos(true);
+      try {
+        const ok = await onRemovePhotosFromMemory(group.id, keys);
+        if (ok !== false) {
+          setIsMemoryEditMode(false);
+          setSelectedMemoryPhotoKeys(new Set());
+        }
+      } finally {
+        setIsExcludingMemoryPhotos(false);
+      }
+    };
+    if (typeof onRequestConfirm === 'function') {
+      onRequestConfirm('사진 제외', `총 ${keys.length}장의 사진을 ${group.title}에서 제외할까요?`, doExclude);
+    }
+  };
   const entryTagTokens = entry => String(entry?.tags || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean);
   // 한국식 성+이름 태그 매칭: "박영우"로 등록된 참여자는 "영우"라고만 붙은 사진 해시태그도
   // 같은 사람으로 인식해야 한다. 성 1자를 뗀 이름만으로도 같은 사람을 부르는 경우가 흔하기
@@ -1984,7 +2017,8 @@ export function HistoryView({
     }));
     setHistoryLightbox({ urls, index, meta, memoryId });
   };
-  // 추억 탭: '여행' 카테고리 기념일의 제목을 기준으로, 그 기간에 등록된 사진을 모아 보여준다.
+  // 추억 탭: 날짜(startDate/date)가 등록된 기념일이면 카테고리와 상관없이, 그 기간에 등록된
+  // 사진을 모아 보여준다 (여행만이 아니라 행사/축제/생일 등도 사진이 있으면 노출).
   const entryDateStr = entry => {
     const ts = Number(entry?.timestamp) || 0;
     if (!ts) return '';
@@ -1997,11 +2031,11 @@ export function HistoryView({
     // "기간: 정보없음" 버그와 같은 원인) -- a.date를 폴백으로 읽지 않으면 하루짜리로 등록한
     // 여행은 사진이 있어도 추억 탭에서 통째로 사라진다.
     return (anniversaries || [])
-      .filter(a => a && a.category === 'travel' && (a.startDate || a.date))
+      .filter(a => a && (a.startDate || a.date))
       .map(a => {
         const start = a.startDate || a.date;
         const end = a.endDate || a.startDate || a.date;
-        // 날짜 구간으로 자동 수집되다 보니 그 여행과 상관없는 사진이 섞여 들어올 수 있어,
+        // 날짜 구간으로 자동 수집되다 보니 그 기념일과 상관없는 사진이 섞여 들어올 수 있어,
         // 라이트박스의 '이 추억에서 제거' 버튼으로 뺀 사진(excludedMemoryPhotoKeys)은 제외한다.
         const excluded = new Set(Array.isArray(a.excludedMemoryPhotoKeys) ? a.excludedMemoryPhotoKeys : []);
         const photos = historyPhotoEntries.filter(entry => {
@@ -2010,7 +2044,7 @@ export function HistoryView({
           const key = entry.mediaKey || entry.refKey;
           return !key || !excluded.has(key);
         });
-        return { id: a.id, title: a.title || '여행', startDate: start, endDate: end, photos };
+        return { id: a.id, title: a.title || '기록', startDate: start, endDate: end, photos };
       })
       // 등록된 사진이 없는 여행은 목록에서 아예 숨긴다 -- 빈 여행 카드를 계속 보여주는 것보다
       // 실제로 추억(사진)이 쌓인 여행만 보여주는 게 이 탭의 취지에 맞다.
@@ -2085,9 +2119,9 @@ export function HistoryView({
       value: historyTab,
       onChange: changeHistoryTab,
       options: [
-        { value: 'meetings', label: '지난모임' },
         { value: 'memories', label: '추억' },
-        { value: 'people', label: '인물' }
+        { value: 'people', label: '인물' },
+        { value: 'meetings', label: '지난모임' }
       ]
     })
     ), // end history-header-stack
@@ -2236,6 +2270,7 @@ export function HistoryView({
     historyTab === 'memories' && !!selectedMemoryGroupId && (() => {
       const group = travelMemoryGroups.find(g => g.id === selectedMemoryGroupId);
       if (!group) return null;
+      const canBulkExclude = typeof onRemovePhotosFromMemory === 'function';
       return /*#__PURE__*/React.createElement("div", {
         style: { flex: 1, overflowY: 'auto', padding: '118px 16px 16px' }
       }, /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
@@ -2247,25 +2282,79 @@ export function HistoryView({
               display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)', flexShrink: 0
             }
           }, BackArrowIcon ? /*#__PURE__*/React.createElement(BackArrowIcon, { size: 20 }) : "←"),
-          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', minWidth: 0 } },
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 } },
             /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-lg)', fontWeight: 800, color: 'var(--text-main)' } }, group.title),
             /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' } },
               group.startDate === group.endDate ? group.startDate : `${group.startDate} ~ ${group.endDate}`,
               ` · 사진 ${group.photos.length}장`
             )
+          ),
+          canBulkExclude && (
+            isMemoryEditMode
+              ? /*#__PURE__*/React.createElement(React.Fragment, null,
+                  /*#__PURE__*/React.createElement("button", {
+                    type: "button",
+                    onClick: () => { setIsMemoryEditMode(false); setSelectedMemoryPhotoKeys(new Set()); },
+                    disabled: isExcludingMemoryPhotos,
+                    style: {
+                      flexShrink: 0, height: '32px', padding: '0 12px', borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)',
+                      fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer'
+                    }
+                  }, "취소"),
+                  /*#__PURE__*/React.createElement("button", {
+                    type: "button",
+                    onClick: () => handleClickExcludeMemoryPhotos(group),
+                    disabled: selectedMemoryPhotoKeys.size === 0 || isExcludingMemoryPhotos,
+                    style: {
+                      flexShrink: 0, height: '32px', padding: '0 12px', borderRadius: 'var(--radius-md)', border: 'none',
+                      backgroundColor: '#EF4444', color: '#fff', fontSize: 'var(--font-size-sm)', fontWeight: 700,
+                      cursor: (selectedMemoryPhotoKeys.size === 0 || isExcludingMemoryPhotos) ? 'default' : 'pointer',
+                      opacity: (selectedMemoryPhotoKeys.size === 0 || isExcludingMemoryPhotos) ? 0.5 : 1
+                    }
+                  }, `제외${selectedMemoryPhotoKeys.size > 0 ? ` (${selectedMemoryPhotoKeys.size})` : ''}`)
+                )
+              : /*#__PURE__*/React.createElement("button", {
+                  type: "button",
+                  onClick: () => setIsMemoryEditMode(true),
+                  style: {
+                    flexShrink: 0, height: '32px', padding: '0 12px', borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)',
+                    fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer'
+                  }
+                }, "편집")
           )
         ),
         /*#__PURE__*/React.createElement("div", {
           style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '4px' }
-        }, group.photos.map((photo, idx) => /*#__PURE__*/React.createElement("button", {
-          key: photo.mediaKey || photo.refKey || `${group.id}_${idx}`,
-          type: "button",
-          onClick: () => openHistoryLightbox(group.photos, idx, group.id),
-          style: { padding: 0, border: 'none', borderRadius: 'var(--radius-sm)', overflow: 'hidden', aspectRatio: '1 / 1', cursor: 'pointer', backgroundColor: 'var(--bg-primary)' }
-        }, /*#__PURE__*/React.createElement("img", {
-          src: photo.thumb || photo.full, alt: "", loading: "lazy", decoding: "async",
-          style: { width: '100%', height: '100%', objectFit: 'cover' }
-        })))
+        }, group.photos.map((photo, idx) => {
+          const photoKey = photo.mediaKey || photo.refKey || `${group.id}_${idx}`;
+          const isChecked = selectedMemoryPhotoKeys.has(photoKey);
+          return /*#__PURE__*/React.createElement("button", {
+            key: photoKey,
+            type: "button",
+            onClick: () => isMemoryEditMode ? toggleMemoryPhotoSelected(photoKey) : openHistoryLightbox(group.photos, idx, group.id),
+            style: { position: 'relative', padding: 0, border: 'none', borderRadius: 'var(--radius-sm)', overflow: 'hidden', aspectRatio: '1 / 1', cursor: 'pointer', backgroundColor: 'var(--bg-primary)' }
+          },
+            /*#__PURE__*/React.createElement("img", {
+              src: photo.thumb || photo.full, alt: "", loading: "lazy", decoding: "async",
+              style: { width: '100%', height: '100%', objectFit: 'cover' }
+            }),
+            isMemoryEditMode && /*#__PURE__*/React.createElement("span", {
+              "aria-hidden": true,
+              style: {
+                position: 'absolute', top: '4px', left: '4px', width: '20px', height: '20px', borderRadius: '5px',
+                border: isChecked ? 'none' : '2px solid rgba(255,255,255,0.9)',
+                backgroundColor: isChecked ? 'var(--accent-primary)' : 'rgba(0,0,0,0.35)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.4)'
+              }
+            }, isChecked && /*#__PURE__*/React.createElement("svg", {
+              xmlns: "http://www.w3.org/2000/svg", width: "14", height: "14", viewBox: "0 0 24 24",
+              fill: "none", stroke: "#fff", strokeWidth: "3", strokeLinecap: "round", strokeLinejoin: "round"
+            }, /*#__PURE__*/React.createElement("path", { d: "M20 6 9 17l-5-5" })))
+          );
+        })
         )
       ));
     })(),

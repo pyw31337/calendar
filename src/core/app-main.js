@@ -2624,10 +2624,14 @@ function CalendarApp() {
     const anniversaryId = 'anniversary_culture_' + stamp + '_' + Math.random().toString(36).slice(2, 8);
     const startDate = item.startDate || item.endDate;
     if (!startDate) { showToast('공연 기간 정보가 없어 등록할 수 없습니다.', 'error'); return null; }
-    // 문화행사 tab → event(행사), 지역축제 tab → festival(축제), 스포츠 tab → sports. Prefer explicit
-    // options.category, then item.anniversaryCategory / item.kind from the register checkbox path.
+    // 문화행사 tab → event(행사), 지역축제 tab → festival(축제), 스포츠 tab도 event로 등록한다 --
+    // 기념일 수동 등록 폼(ANNIVERSARY_CATEGORY_OPTIONS.filter(opt => opt.value !== 'sports'),
+    // ui-event-modals.js)이 애초에 '스포츠'를 사용자가 고를 수 있는 카테고리로 노출하지 않으므로,
+    // 여기서만 별도로 'sports' 값을 만들어내면 사용자가 그 값을 다시 고를 방법이 없는 카테고리가
+    // 생겨버린다. Prefer explicit options.category, then item.anniversaryCategory / item.kind from
+    // the register checkbox path.
     const rawCategory = (options && options.category) || item.anniversaryCategory || item.kind || 'event';
-    const category = (rawCategory === 'festival' || rawCategory === 'sports') ? rawCategory : 'event';
+    const category = rawCategory === 'festival' ? 'festival' : 'event';
     const annData = {
       id: anniversaryId,
       calendarId: activeCal.id,
@@ -2649,9 +2653,12 @@ function CalendarApp() {
     const descriptionText = descriptionParts.filter(Boolean).join(' · ');
     if (descriptionText) annData.description = descriptionText;
     if (item.link) annData.cultureSourceLink = item.link;
-    // 스포츠 종목(야구/축구/농구/...) -- getAnniversaryCategoryBadge가 이 값으로 종목별 아이콘을
-    // 고른다. 문화행사/축제는 genre가 없으므로 자연히 생략됨.
-    if (category === 'sports' && item.genre) annData.genre = item.genre;
+    // 크롤링된 장소명(item.venue)을 기념일 자신의 구조화된 place 필드에도 그대로 채워 넣는다 --
+    // 이게 없으면 일정 팝업의 "장소" 줄이 공란으로 보였다(장소 자체는 registerCulturePlaceForEvent가
+    // 별도로 장소 목록에는 등록해두지만, 그 등록은 이 anniversaries 문서와 연결되지 않았다).
+    // 좌표(lat/lng)는 없어도 되도록 만들어져 있다(getAnnBannerKakaoMapLinkUrl/getDisplayPlaceAddress
+    // 모두 이름/주소만으로 동작) -- 지오코딩 성공 여부와 무관하게 항상 채워지도록 동기적으로 넣는다.
+    if (item.venue) annData.place = { name: item.venue, address: item.address || '' };
     // Copy archive-card poster so DateModal anniversary banners can show the same image.
     const poster = item.image ? String(item.image).trim() : '';
     if (poster) {
@@ -2790,6 +2797,28 @@ function CalendarApp() {
     } catch (err) {
       console.error('Failed to remove photo from travel memory:', err);
       showToast('제거 실패', 'error');
+      return false;
+    }
+  };
+
+  // 위 handleRemovePhotoFromTravelMemory의 일괄(여러 장) 버전 -- 추억 상세 페이지의 편집 모드에서
+  // 체크박스로 여러 장을 골라 한 번에 제외할 때 쓴다. 장 수만큼 반복 호출하는 대신 병합된 제외
+  // 목록 하나로 한 번만 쓴다.
+  const handleRemovePhotosFromTravelMemory = async (anniversaryId, photoKeys) => {
+    if (!activeCal?.id || !anniversaryId || !Array.isArray(photoKeys) || photoKeys.length === 0) return false;
+    const ann = (anniversaries || []).find(a => a.id === anniversaryId);
+    const existing = Array.isArray(ann?.excludedMemoryPhotoKeys) ? ann.excludedMemoryPhotoKeys : [];
+    const next = Array.from(new Set([...existing, ...photoKeys]));
+    if (next.length === existing.length) return true;
+    try {
+      const saved = await writeCollectionDocumentWithFallback('anniversaries', activeCal.id, anniversaryId, { excludedMemoryPhotoKeys: next }, 'update', '추억에서 사진 일괄 제외');
+      if (!saved?.success) throw new Error('remove photos from travel memory failed');
+      handleAnniversarySaved({ id: anniversaryId, excludedMemoryPhotoKeys: next });
+      showToast(`사진 ${photoKeys.length}장을 추억에서 제외했습니다.`, 'success');
+      return true;
+    } catch (err) {
+      console.error('Failed to bulk-remove photos from travel memory:', err);
+      showToast('제외 실패', 'error');
       return false;
     }
   };
@@ -7562,6 +7591,7 @@ function CalendarApp() {
         onGetGalleryPhotoOrdinal: handleGetGalleryPhotoOrdinal,
         onRequestConfirm: showConfirmDialog,
         onRemovePhotoFromMemory: handleRemovePhotoFromTravelMemory,
+        onRemovePhotosFromMemory: handleRemovePhotosFromTravelMemory,
         onFetchPhotoComments: handleFetchPhotoComments,
         onSavePhotoComments: handleSavePhotoComments,
         ...navMenuProps

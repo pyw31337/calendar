@@ -1194,7 +1194,7 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
   );
 }
 
-export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = false, placeholder }) {
+export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = false, placeholder, rangeMode = false, rangeStart, rangeEnd, onChangeRange }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -1211,8 +1211,25 @@ export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = f
   const [pMonth, setPMonth] = React.useState(isValid ? parsed.getMonth() : now.getMonth());
   const [pDay, setPDay] = React.useState(isValid ? parsed.getDate() : now.getDate());
   const [pTime, setPTime] = React.useState(isValid && !dateOnly ? value.slice(11, 16) : '23:59');
+  // rangeMode: 호텔스닷컴/야놀자 스타일 2탭 구간 선택 -- 백드롭 하나를 열고 1번째 클릭은
+  // 시작일, 2번째 클릭은 종료일로 자동 인식하며, 3번째 클릭은 다시 새 시작일로 리셋된다.
+  const [localRangeStart, setLocalRangeStart] = React.useState(rangeStart || null);
+  const [localRangeEnd, setLocalRangeEnd] = React.useState(rangeEnd || null);
+  const [rangePickStep, setRangePickStep] = React.useState('start');
 
   const openPicker = () => {
+    if (rangeMode) {
+      const anchor = rangeStart || null;
+      const d = anchor ? new Date(`${anchor}T00:00`) : null;
+      const v = d && !Number.isNaN(d.getTime());
+      setPYear(v ? d.getFullYear() : now.getFullYear());
+      setPMonth(v ? d.getMonth() : now.getMonth());
+      setLocalRangeStart(rangeStart || null);
+      setLocalRangeEnd(rangeEnd || null);
+      setRangePickStep('start');
+      setIsOpen(true);
+      return;
+    }
     const d = value ? new Date(dateOnly ? `${value}T00:00` : value) : null;
     const v = d && !Number.isNaN(d.getTime());
     setPYear(v ? d.getFullYear() : now.getFullYear());
@@ -1225,7 +1242,27 @@ export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = f
   const daysInMonth = new Date(pYear, pMonth + 1, 0).getDate();
   const firstWeekday = new Date(pYear, pMonth, 1).getDay();
 
+  const handleDayClick = day => {
+    if (!rangeMode) { setPDay(day); return; }
+    const mm = String(pMonth + 1).padStart(2, '0');
+    const dd = String(day).padStart(2, '0');
+    const dateStr = `${pYear}-${mm}-${dd}`;
+    if (rangePickStep === 'start') {
+      setLocalRangeStart(dateStr);
+      setLocalRangeEnd(null);
+      setRangePickStep('end');
+      return;
+    }
+    const start = dateStr < localRangeStart ? dateStr : localRangeStart;
+    const end = dateStr < localRangeStart ? localRangeStart : dateStr;
+    setLocalRangeStart(start);
+    setLocalRangeEnd(end);
+    setRangePickStep('start');
+    if (typeof onChangeRange === 'function') onChangeRange({ start, end });
+  };
+
   const handleApply = () => {
+    if (rangeMode) { setIsOpen(false); return; }
     const mm = String(pMonth + 1).padStart(2, '0');
     const dd = String(pDay).padStart(2, '0');
     onChange(dateOnly ? `${pYear}-${mm}-${dd}` : `${pYear}-${mm}-${dd}T${pTime}`);
@@ -1234,11 +1271,20 @@ export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = f
 
   const dayNamesKo = ['일', '월', '화', '수', '목', '금', '토'];
   const dayNameStr = isValid ? dayNamesKo[parsed.getDay()] : '';
-  const displayText = isValid
-    ? dateOnly
-      ? `${parsed.getFullYear()}.${String(parsed.getMonth() + 1).padStart(2, '0')}.${String(parsed.getDate()).padStart(2, '0')} (${dayNameStr})`
-      : `${parsed.getFullYear()}.${String(parsed.getMonth() + 1).padStart(2, '0')}.${String(parsed.getDate()).padStart(2, '0')} (${dayNameStr}) ${value.slice(11, 16)}`
-    : (placeholder || (dateOnly ? '날짜 선택' : '날짜/시간 선택'));
+  const fmtRangeDate = d => {
+    if (!d) return '';
+    const dt = new Date(`${d}T00:00`);
+    return `${dt.getMonth() + 1}.${dt.getDate()}(${dayNamesKo[dt.getDay()]})`;
+  };
+  const displayText = rangeMode
+    ? (rangeStart || rangeEnd)
+      ? `${fmtRangeDate(rangeStart) || '시작일'} ~ ${fmtRangeDate(rangeEnd) || '종료일'}`
+      : (placeholder || '기간 선택')
+    : isValid
+      ? dateOnly
+        ? `${parsed.getFullYear()}.${String(parsed.getMonth() + 1).padStart(2, '0')}.${String(parsed.getDate()).padStart(2, '0')} (${dayNameStr})`
+        : `${parsed.getFullYear()}.${String(parsed.getMonth() + 1).padStart(2, '0')}.${String(parsed.getDate()).padStart(2, '0')} (${dayNameStr}) ${value.slice(11, 16)}`
+      : (placeholder || (dateOnly ? '날짜 선택' : '날짜/시간 선택'));
 
   return /*#__PURE__*/React.createElement('div', { style: { position: 'relative' } },
     /*#__PURE__*/React.createElement('button', {
@@ -1252,7 +1298,7 @@ export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = f
       onClick: openPicker
     },
       /*#__PURE__*/React.createElement('span', { style: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, displayText),
-      dateOnly && /*#__PURE__*/React.createElement(CalendarSearchIcon, { size: 18 })
+      (dateOnly || rangeMode) && /*#__PURE__*/React.createElement(CalendarSearchIcon, { size: 18 })
     ),
     (() => {
       const sheet = isOpen && /*#__PURE__*/React.createElement('div', {
@@ -1264,7 +1310,7 @@ export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = f
         onClick: e => e.stopPropagation()
       },
         /*#__PURE__*/React.createElement('div', { className: 'bottom-sheet-header' },
-          /*#__PURE__*/React.createElement('h4', null, dateOnly ? '날짜 선택' : '날짜/시간 선택'),
+          /*#__PURE__*/React.createElement('h4', null, rangeMode ? (rangePickStep === 'start' ? '시작일 선택' : '종료일 선택') : (dateOnly ? '날짜 선택' : '날짜/시간 선택')),
           /*#__PURE__*/React.createElement('button', {
             type: 'button',
             style: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer' },
@@ -1283,7 +1329,7 @@ export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = f
               onClick: () => {
                 setPMonth(idx);
                 const dim = new Date(pYear, idx + 1, 0).getDate();
-                if (pDay > dim) setPDay(dim);
+                if (!rangeMode && pDay > dim) setPDay(dim);
               },
               style: {
                 padding: '6px 4px', borderRadius: 'var(--radius-sm)',
@@ -1303,13 +1349,17 @@ export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = f
             Array.from({ length: firstWeekday }).map((_, i) => /*#__PURE__*/React.createElement('div', { key: `blank-${i}` })),
             Array.from({ length: daysInMonth }).map((_, i) => {
               const day = i + 1;
-              const isSelected = pDay === day;
+              const mm = String(pMonth + 1).padStart(2, '0');
+              const dateStr = rangeMode ? `${pYear}-${mm}-${String(day).padStart(2, '0')}` : '';
+              const isRangeEndpoint = rangeMode && (dateStr === localRangeStart || dateStr === localRangeEnd);
+              const isInRange = rangeMode && localRangeStart && localRangeEnd && dateStr > localRangeStart && dateStr < localRangeEnd;
+              const isSelected = rangeMode ? isRangeEndpoint : pDay === day;
               return /*#__PURE__*/React.createElement('button', {
-                key: day, type: 'button', onClick: () => setPDay(day),
+                key: day, type: 'button', onClick: () => handleDayClick(day),
                 style: {
                   padding: '6px 0', borderRadius: 'var(--radius-sm)',
                   border: isSelected ? '2px solid var(--accent-primary)' : '1px solid transparent',
-                  background: isSelected ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
+                  background: isSelected ? 'rgba(99, 102, 241, 0.15)' : (isInRange ? 'rgba(99, 102, 241, 0.06)' : 'transparent'),
                   color: isSelected ? 'var(--accent-primary)' : 'var(--text-main)',
                   fontWeight: isSelected ? 800 : 500, fontSize: 'var(--font-size-md)', cursor: 'pointer'
                 }
