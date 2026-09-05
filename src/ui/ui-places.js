@@ -1899,7 +1899,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
             onClick: () => setVisitFilter('all'),
             style: {
               padding: '4px 10px', fontSize: 'var(--font-size-sm)', fontWeight: 800, borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer',
-              backgroundColor: visitFilter === 'all' ? '#4F46E5' : 'transparent',
+              backgroundColor: visitFilter === 'all' ? '#0E0E0E' : 'transparent',
               color: visitFilter === 'all' ? '#FFFFFF' : 'var(--text-muted)'
             }
           }, "전체"),
@@ -1908,7 +1908,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
             onClick: () => setVisitFilter('visited'),
             style: {
               padding: '4px 10px', fontSize: 'var(--font-size-sm)', fontWeight: 800, borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer',
-              backgroundColor: visitFilter === 'visited' ? '#4F46E5' : 'transparent',
+              backgroundColor: visitFilter === 'visited' ? '#0E0E0E' : 'transparent',
               color: visitFilter === 'visited' ? '#FFFFFF' : 'var(--text-muted)'
             }
           }, "방문"),
@@ -1917,7 +1917,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
             onClick: () => setVisitFilter('planned'),
             style: {
               padding: '4px 10px', fontSize: 'var(--font-size-sm)', fontWeight: 800, borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer',
-              backgroundColor: visitFilter === 'planned' ? '#4F46E5' : 'transparent',
+              backgroundColor: visitFilter === 'planned' ? '#0E0E0E' : 'transparent',
               color: visitFilter === 'planned' ? '#FFFFFF' : 'var(--text-muted)'
             }
           }, "예정")
@@ -2160,7 +2160,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
               borderRadius: 'var(--radius-sm)',
               border: 'none',
               cursor: 'pointer',
-              backgroundColor: visitFilter === 'visited' ? '#4F46E5' : 'transparent',
+              backgroundColor: visitFilter === 'visited' ? '#0E0E0E' : 'transparent',
               color: visitFilter === 'visited' ? '#FFFFFF' : 'var(--text-muted)'
             }
           }, "방문"),
@@ -2177,7 +2177,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
               borderRadius: 'var(--radius-sm)',
               border: 'none',
               cursor: 'pointer',
-              backgroundColor: visitFilter === 'planned' ? '#4F46E5' : 'transparent',
+              backgroundColor: visitFilter === 'planned' ? '#0E0E0E' : 'transparent',
               color: visitFilter === 'planned' ? '#FFFFFF' : 'var(--text-muted)'
             }
           }, "예정")
@@ -2227,7 +2227,7 @@ const getPlaceSortDateKey = __deps.getPlaceSortDateKey;
             style: {
               display: 'flex', flexDirection: 'column', gap: '4px',
               padding: '10px 12px', position: 'relative',
-              border: isPlaceFocused ? '1px solid #8B5CF6' : '1px solid var(--border-subtle)',
+              border: isPlaceFocused ? '1px solid #0E0E0E' : '1px solid var(--border-subtle)',
               boxShadow: 'none',
               borderRadius: 'var(--radius-md)',
               cursor: 'pointer',

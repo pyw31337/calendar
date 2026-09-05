@@ -2484,7 +2484,7 @@ export function DateModal({
     }
   }, titleParts.year, /*#__PURE__*/React.createElement("span", {
     style: {
-      color: isConfirmed ? '#7C3AED' : (isAllAvailable ? 'var(--status-green)' : 'var(--text-muted)'),
+      color: isConfirmed ? '#0E0E0E' : (isAllAvailable ? 'var(--status-green)' : 'var(--text-muted)'),
       marginLeft: '4px'
     }
   }, titleParts.rest)), holidayLabelText && /*#__PURE__*/React.createElement("span", {
@@ -3002,7 +3002,7 @@ export function DateModal({
             backgroundColor: 'rgba(239, 68, 68, 0.06)',
             color: 'rgb(239, 68, 68)'
           } : {
-            border: '1.5px solid #C4B5FD', backgroundColor: 'rgba(124, 58, 237, 0.08)', color: '#7C3AED'
+            border: '1.5px solid #D8D6CB', backgroundColor: 'rgba(14, 14, 14, 0.08)', color: '#0E0E0E'
           })
         }
       }, (!isConfirmed && isAllAvailable)
@@ -3434,7 +3434,7 @@ export function DateModal({
                 display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0,
                 padding: '0 10px', height: '42px', borderRadius: 'var(--radius-md)',
                 border: '1px solid var(--border-subtle)',
-                backgroundColor: expenseIsSelfPay ? 'rgba(79, 70, 229, 0.08)' : 'var(--bg-card)',
+                backgroundColor: expenseIsSelfPay ? 'rgba(14, 14, 14, 0.08)' : 'var(--bg-card)',
                 color: expenseIsSelfPay ? 'var(--accent-primary)' : 'var(--text-muted)',
                 fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: isSavingExpense ? 'default' : 'pointer',
                 userSelect: 'none'
@@ -3619,8 +3619,8 @@ export function DateModal({
                     alignItems: 'center',
                     padding: '3px 8px',
                     borderRadius: 'var(--radius-full)',
-                    backgroundColor: 'rgba(79, 70, 229, 0.08)',
-                    color: '#4F46E5',
+                    backgroundColor: 'rgba(14, 14, 14, 0.08)',
+                    color: '#0E0E0E',
                     fontSize: 'var(--font-size-xs)',
                     fontWeight: 'bold'
                   }

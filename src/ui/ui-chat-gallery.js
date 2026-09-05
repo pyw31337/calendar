@@ -1774,7 +1774,7 @@ export function ChatGalleryModal({
       style: {
         height: '100%', boxSizing: 'border-box', padding: '0 12px', fontSize: 'var(--font-size-md)', fontWeight: 900,
         borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer',
-        backgroundColor: galleryViewMode === tab.key ? '#4F46E5' : 'transparent',
+        backgroundColor: galleryViewMode === tab.key ? '#0E0E0E' : 'transparent',
         color: galleryViewMode === tab.key ? '#FFFFFF' : 'var(--text-muted)'
       }
     }, tab.label))
@@ -2025,7 +2025,7 @@ export function ChatGalleryModal({
                 onClick: () => setGalleryViewMode(tab.key),
                 style: {
                   padding: '4px 10px', fontSize: 'var(--font-size-sm)', fontWeight: 800, borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer',
-                  backgroundColor: galleryViewMode === tab.key ? '#4F46E5' : 'transparent',
+                  backgroundColor: galleryViewMode === tab.key ? '#0E0E0E' : 'transparent',
                   color: galleryViewMode === tab.key ? '#FFFFFF' : 'var(--text-muted)'
                 }
               }, tab.label))

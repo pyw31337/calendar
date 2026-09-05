@@ -1510,7 +1510,7 @@ export function ChatRoomView({
         borderTop: '7px solid transparent',
         borderBottom: '7px solid transparent',
         borderLeft: isSearchFocused
-          ? '7px solid #7C3AED'
+          ? '7px solid #0E0E0E'
           : isSearchMatch
             ? '7px solid rgba(124,58,237,0.45)'
             : '7px solid var(--border-subtle)',
@@ -1568,7 +1568,7 @@ export function ChatRoomView({
         borderTop: '7px solid transparent',
         borderBottom: '7px solid transparent',
         borderRight: isSearchFocused
-          ? '7px solid #7C3AED'
+          ? '7px solid #0E0E0E'
           : isSearchMatch
             ? '7px solid rgba(124,58,237,0.45)'
             : '7px solid var(--border-subtle)',
@@ -1961,7 +1961,7 @@ export function ChatRoomView({
       gap: '6px',
       padding: '8px 16px',
       borderRadius: 'var(--radius-full)',
-      backgroundColor: '#4F46E5',
+      backgroundColor: '#0E0E0E',
       color: '#FFFFFF',
       border: 'none',
       boxShadow: '0 4px 12px rgba(79,70,229,0.35)',

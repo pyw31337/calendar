@@ -2179,9 +2179,9 @@ select.form-select {
   background: var(--bg-card);
 }
 .poll-option-row.is-confirmed-winner {
-  border: 1px solid #8B5CF6;
-  background: #F5F3FF;
-  box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.08);
+  border: 1px solid #0E0E0E;
+  background: #F3F2ED;
+  box-shadow: inset 0 0 0 1px rgba(14, 14, 14, 0.08);
 }
 :root[data-theme="dark"] .poll-option-row.is-confirmed-winner {
   border-color: #A78BFA;
@@ -2242,7 +2242,7 @@ select.form-select {
   text-decoration: underline;
 }
 .poll-confirmed-badge {
-  background: #8B5CF6;
+  background: #0E0E0E;
   color: #FFFFFF;
   font-size: 0.68rem;
   font-weight: 800;
@@ -3112,8 +3112,8 @@ select.form-select {
   100% { transform: translateY(0); }
 }
 .chat-search-focused-bubble {
-  border: 1.5px solid #7C3AED !important;
-  background-color: rgba(124, 58, 237, 0.06) !important;
+  border: 1.5px solid #0E0E0E !important;
+  background-color: rgba(14, 14, 14, 0.06) !important;
   animation: chat-search-shake 0.72s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
 }
 .place-card-row,
@@ -3123,9 +3123,9 @@ select.form-select {
   transform: none !important;
 }
 .place-card-row.is-focused {
-  border: 1px solid #8B5CF6 !important;
+  border: 1px solid #0E0E0E !important;
   box-shadow: none !important;
-  background-color: rgba(139, 92, 246, 0.08) !important;
+  background-color: rgba(14, 14, 14, 0.08) !important;
 }
 .chat-search-match-bubble {
   border: 1px solid rgba(124, 58, 237, 0.35) !important;
@@ -3994,7 +3994,7 @@ select.form-select {
   overflow: hidden;
   isolation: isolate;
   border: none;
-  background: linear-gradient(90deg, #5B4BEB 0%, #8B3BDE 54%, #EC4899 100%);
+  background: #0E0E0E;
   color: #FFFFFF;
   box-shadow: none;
 }
@@ -4007,7 +4007,7 @@ select.form-select {
   opacity: 0.65;
 }
 .date-item-btn.confirmed-meeting-card:hover {
-  background: linear-gradient(90deg, #624DEB 0%, #9333EA 52%, #F43F5E 100%);
+  background: #2A2A2A;
   transform: none !important;
   box-shadow: none;
 }
@@ -4025,12 +4025,12 @@ select.form-select {
   opacity: 0.92;
 }
 :root[data-theme="dark"] .date-item-btn.confirmed-meeting-card {
-  background: linear-gradient(90deg, #5B4BEB 0%, #8B3BDE 54%, #EC4899 100%);
+  background: #0E0E0E;
   border: none;
   box-shadow: none;
 }
 :root[data-theme="dark"] .date-item-btn.confirmed-meeting-card:hover {
-  background: linear-gradient(90deg, #624DEB 0%, #9333EA 52%, #F43F5E 100%);
+  background: #2A2A2A;
 }
 :root[data-theme="dark"] .date-item-btn.confirmed-meeting-card.is-past {
   background: linear-gradient(90deg, #1A1A1A 0%, #22304F 100%) !important;
@@ -4135,7 +4135,7 @@ select.form-select {
 }
 .confirmed-meeting-label-badge {
   background-color: var(--bg-card);
-  color: #4F46E5;
+  color: #0E0E0E;
   border: none;
   box-shadow: none;
 }

@@ -813,7 +813,7 @@ export function UpdateAvailableBanner() {
         type: "button",
         onClick: () => window.location.reload(),
         style: {
-          backgroundColor: '#4F46E5', color: '#FFFFFF', border: 'none', borderRadius: 'var(--radius-md)',
+          backgroundColor: '#0E0E0E', color: '#FFFFFF', border: 'none', borderRadius: 'var(--radius-md)',
           padding: '6px 14px', fontSize: 'var(--font-size-md)', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap'
         }
       }, "새로고침"),

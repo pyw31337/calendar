@@ -1465,7 +1465,7 @@ export function SummaryList({
       className: `date-item-badge ${isPast ? 'is-past' : isConfirmed ? 'is-confirmed' : 'is-available'}`,
       style: {
         background: isPast ? '#E2E8F0' : isConfirmed ? '#F3E8FF' : '#DBEAFE',
-        color: isPast ? '#64748B' : isConfirmed ? '#7C3AED' : '#1D4ED8',
+        color: isPast ? '#64748B' : isConfirmed ? '#0E0E0E' : '#1D4ED8',
         border: isPast ? 'none' : isConfirmed ? '1px solid #E9D5FF' : '1px solid #BFDBFE'
       }
     }, isPast ? '지나간 모임' : isConfirmed ? '확정모임' : `${availCount}명 가능 (${availCount}/${totalCount}명)`));

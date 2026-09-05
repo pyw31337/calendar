@@ -64,7 +64,7 @@ export class AppErrorBoundary extends React.Component {
               onClick={this.handleReload}
               style={{
                 padding: '10px 20px',
-                background: '#4F46E5',
+                background: '#0E0E0E',
                 color: '#FFFFFF',
                 border: 'none',
                 borderRadius: '8px',

@@ -1468,7 +1468,7 @@ export function CalendarGrid({
     const cornerText = isHoliday
       ? holidayLabel
       : isConfirmed ? '확정' : isAllAvailable ? '전원' : solarTermName;
-    const cornerColor = isHoliday ? '#EF4444' : isConfirmed ? '#7C3AED' : isAllAvailable ? 'var(--status-green)' : '#94A3B8';
+    const cornerColor = isHoliday ? '#EF4444' : isConfirmed ? '#0E0E0E' : isAllAvailable ? 'var(--status-green)' : '#94A3B8';
     const cornerTitle = isHoliday
       ? ((lunarLabel ? `${holidayNames.join(', ')} (${lunarLabel})` : holidayNames.join(', ')) + (isConfirmed ? ' · 확정' : ''))
       : (isConfirmed ? '모임 확정' : undefined);
@@ -1562,7 +1562,7 @@ export function CalendarGrid({
           }
         }, cornerText, isHoliday && isConfirmed ? /*#__PURE__*/React.createElement("span", {
           style: {
-            color: '#7C3AED'
+            color: '#0E0E0E'
           }
         }, "·확정") : null)
       ),
