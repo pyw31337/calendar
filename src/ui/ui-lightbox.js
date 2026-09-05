@@ -811,8 +811,10 @@ export function LightboxInfoPanel({ info, sourceInfo = null, onRemoveFromMemory 
   );
 }
 
-// 사진을 탭하면 뜨는 패널 -- 해시태그 목록 + 태그입력만 보여준다(i 패널과 분리).
-export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast }) {
+// 사진을 탭하면 뜨는 패널 -- 해시태그 목록 + 태그입력만 보여준다(i 패널과 분리). "이 추억에서
+// 제거" 버튼은 i 패널(LightboxInfoPanel)에도 똑같이 있다 -- 사진 탭으로 여는 이 패널에서도
+// 그대로 보여야, i 버튼을 몰라도(예전처럼 사진을 탭하는 것만으로도) 계속 접근할 수 있다.
+export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast, onRemoveFromMemory = null, isRemovingFromMemory = false }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const TrashIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.TrashIcon) || __deps.TrashIcon;
@@ -824,7 +826,7 @@ export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast
   const [confirmDeleteTag, setConfirmDeleteTag] = React.useState(null);
   const [isDeletingTag, setIsDeletingTag] = React.useState(false);
   React.useEffect(() => { setTagInput(''); }, [tags]);
-  if (!tagTokens.length && !onSaveTags) return null;
+  if (!tagTokens.length && !onSaveTags && !onRemoveFromMemory) return null;
   const MAX_TAGS = 10;
   const labelStyle = { opacity: 0.7, flexShrink: 0, minWidth: '52px' };
   const handleSaveTags = async () => {
@@ -914,6 +916,11 @@ export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast
             handleSaveTags();
           }
         },
+        // 모바일 가상 키보드가 이 입력을 "다음(next)" 필드로 넘어가는 것으로 오인해, 리턴키를
+        // 누르면 태그가 저장되기 전에 포커스가 아래 댓글 입력창으로 넘어가버리는 문제가 있었다.
+        // 태그는 한 번에 짧게 입력하고 바로 저장하는 용도라 "완료"로 명시해 다음 필드로 넘어가지
+        // 않게 한다.
+        enterKeyHint: "done",
         placeholder: tagTokens.length >= 10 ? "태그 최대 10개 도달" : `태그 입력 (${tagTokens.length}/10)`,
         maxLength: 100,
         style: {
@@ -933,7 +940,18 @@ export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast
           opacity: (isSavingTags || tagTokens.length >= 10) ? 0.45 : 1
         }
       }, isSavingTags ? '...' : '저장')
-    )
+    ),
+    onRemoveFromMemory && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: e => { e.stopPropagation(); onRemoveFromMemory(); },
+      disabled: isRemovingFromMemory,
+      style: {
+        marginTop: '6px', width: '100%', height: '32px', borderRadius: 'var(--radius-sm)',
+        border: '1px solid rgba(255,255,255,0.32)', background: 'rgba(255,255,255,0.1)',
+        color: '#FFFFFF', fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer',
+        opacity: isRemovingFromMemory ? 0.55 : 1
+      }
+    }, isRemovingFromMemory ? '제거 중...' : '이 추억에서 제거')
   ), confirmDeleteTag && /*#__PURE__*/React.createElement(ConfirmDialog, {
     title: "해시태그 삭제",
     message: `#${confirmDeleteTag} 태그를 삭제하시겠습니까?`,
@@ -1435,7 +1453,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar, sho
         // auto 조합은 우측하단에 브라우저 네이티브 리사이즈 손잡이를 만들어준다 -- 별도 아이콘 없이
         // textarea와 동일한 방식으로 사용자가 세로폭을 직접 늘리거나 줄일 수 있다.
         width: '92vw', minHeight: '64px', maxHeight: '55vh', overflowY: 'auto', resize: 'vertical',
-        marginTop: '4px', padding: '10px 14px',
+        marginTop: isDesktop ? '4px' : '0px', padding: '10px 14px',
         backgroundColor: 'rgba(15, 23, 42, 0.72)', border: '1px solid rgba(255,255,255,0.12)',
         borderRadius: 'var(--radius-md)', boxSizing: 'border-box'
       }
@@ -2236,7 +2254,9 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar, sho
         tags: currentTags,
         onSaveTags: saveCurrentTags,
         onSearchTag: onSearchTag,
-        showToast: showToast
+        showToast: showToast,
+        onRemoveFromMemory: onRemoveFromMemory ? handleRemoveFromMemoryClick : null,
+        isRemovingFromMemory: isRemovingFromMemory
       })));
     }
 
@@ -2378,7 +2398,9 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar, sho
     tags: currentTags,
     onSaveTags: saveCurrentTags,
     onSearchTag: onSearchTag,
-    showToast: showToast
+    showToast: showToast,
+    onRemoveFromMemory: onRemoveFromMemory ? handleRemoveFromMemoryClick : null,
+    isRemovingFromMemory: isRemovingFromMemory
   })),
   renderCommentThread(),
   total > 1 && (() => {
