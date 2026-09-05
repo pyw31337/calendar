@@ -1292,11 +1292,13 @@ button, input, textarea, select {
 /* Mobile: icon-less, shortened menu labels (더 넓은 배지/텍스트 공간 확보) -- desktop shows the
    full icon + label. Both label spans always render; CSS picks which one is visible so no
    JS branching is needed. */
-.main-menu-icon { display: none; }
+/* Quick-access tiles: icon-over-label vertical cards (Nike-style redesign) rather than the
+   old icon-less text row -- the icon now always shows, stacked above the label, on every
+   breakpoint. Desktop still swaps in the longer label text where the tile has room. */
+.main-menu-icon { display: inline-flex; }
 .main-menu-label-full { display: none; }
 .main-menu-label-short { display: inline; }
 @media (min-width: 768px) {
-  .main-menu-icon { display: inline-flex; }
   .main-menu-label-full { display: inline; }
   .main-menu-label-short { display: none; }
 }
@@ -1322,13 +1324,14 @@ button, input, textarea, select {
   flex: 1;
   min-width: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 6px;
   background: var(--bg-primary);
   border: none;
-  padding: 10px 4px;
-  font-size: 0.85rem;
+  padding: 14px 4px;
+  font-size: 0.8rem;
   font-weight: 800;
   color: var(--text-main);
   cursor: pointer;
@@ -1337,6 +1340,8 @@ button, input, textarea, select {
   margin: 2px;
 }
 .main-menu-item:hover { background: var(--border-subtle); color: var(--text-main); }
+.main-menu-icon { font-size: 20px; }
+.main-menu-icon svg { width: 20px; height: 20px; }
 .main-menu-sep { flex: 0 0 auto; align-self: center; width: 1px; height: 16px; margin: 0 2px; background: var(--border-subtle); }
 .main-menu-badge {
   display: inline-flex;
