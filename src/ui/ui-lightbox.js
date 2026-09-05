@@ -2452,6 +2452,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar, sho
     );
   })(), imageUrlModalOpen && /*#__PURE__*/React.createElement(ImageUrlModal, {
     imageUrl: currentUrl,
+    tags: currentTags,
     onClose: () => setImageUrlModalOpen(false),
     showToast,
     onEnsureShareUrl: ensureCurrentShareUrl

@@ -3895,6 +3895,47 @@ function CalendarApp() {
     }
   };
 
+  // 다른 캘린더의 라이트박스에서 "URL 복사하기"로 복사한 사진을 이 갤러리에 붙여넣는다
+  // (ui-chat-gallery.js의 onPasteGatherPhoto). URL은 그대로 재사용한다 -- 사진 삭제는 어느
+  // 캘린더에서든 이 메시지 문서(참조)만 지울 뿐 Storage 원본 파일은 건드리지 않으므로(기존
+  // 사진 삭제 기능도 동일), 두 캘린더 중 어느 쪽에서 지워도 다른 쪽엔 전혀 영향이 없다. 태그도
+  // 붙여넣는 시점의 값을 이 메시지 문서 자신의 imageTags에 그대로 복사해 넣으므로, 그 이후
+  // 어느 쪽에서 태그를 추가/삭제해도 서로 완전히 독립적이다(한쪽 문서만 바뀔 뿐).
+  const handlePasteGatherPhoto = async (url, tags) => {
+    if (!guardLoadedCalendar()) return false;
+    const cleanUrl = String(url || '').trim();
+    if (!/^https?:\/\//i.test(cleanUrl)) {
+      showToast('올바른 사진 URL이 아닙니다.', 'error');
+      return false;
+    }
+    const fallbackParticipantId = chatParticipantId || getActiveParticipants(activeCal)[0]?.id || '';
+    const messageOperationId = `gather_photo_paste_${activeCal.id}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const tagTokens = String(tags || '').split(/[,\s#]+/).map(t => sanitizeText(t.trim(), 30)).filter(Boolean).slice(0, 10);
+    const cleanTags = sanitizeText(tagTokens.join(' '), 100);
+    const messageData = {
+      participantId: fallbackParticipantId,
+      text: '',
+      imageUrl: cleanUrl,
+      thumbUrl: cleanUrl,
+      imageUrls: [cleanUrl],
+      thumbUrls: [cleanUrl],
+      imageTags: [cleanTags],
+      timestamp: Date.now(),
+      uploadSource: 'gallery'
+    };
+    try {
+      const sent = await writeCollectionDocumentWithFallback('messages', activeCal.id, '', messageData, 'add', '사진 붙여넣기(다른 캘린더)', { documentId: messageOperationId });
+      if (!sent) throw new Error('Gather photo paste save failed');
+      if (sent.id) upsertLocalChatMessage({ ...messageData, id: sent.id });
+      showToast(sent.queued ? '네트워크가 불안정하여 대기열에 저장했습니다. 연결되면 자동으로 반영됩니다.' : '사진을 붙여넣었습니다.', sent.queued ? 'info' : 'success');
+      return sent.queued ? 'queued' : true;
+    } catch (err) {
+      console.error('handlePasteGatherPhoto failed:', err);
+      showToast('사진 붙여넣기 실패', 'error');
+      return false;
+    }
+  };
+
   const handleDeleteMessage = (msg) => {
     const deletingMessage = { ...msg, calId: activeCalId };
     const participants = getActiveParticipants(activeCal);
@@ -7390,6 +7431,7 @@ function CalendarApp() {
         onClose: () => changeView('calendar'),
         onUploadImages: handleUploadGalleryImages,
         onAddLink: handleAddGalleryLink,
+        onPasteGatherPhoto: handlePasteGatherPhoto,
         onOpenShare: () => {
           if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsGalleryShareOpen(true);
         },
@@ -7821,6 +7863,7 @@ function CalendarApp() {
     onClose: () => setIsGalleryOpen(false),
     onUploadImages: handleUploadGalleryImages,
     onAddLink: handleAddGalleryLink,
+    onPasteGatherPhoto: handlePasteGatherPhoto,
     onOpenShare: () => {
       if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsGalleryShareOpen(true);
     },
