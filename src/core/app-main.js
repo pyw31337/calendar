@@ -3215,18 +3215,22 @@ function CalendarApp() {
 
   // Main-screen chat preview safety net:
   // if the count says chat history exists but the live recent window is still empty,
-  // hydrate the newest messages so the summary widget can render at least the latest
-  // chat instead of getting stuck on "최근 채팅을 불러오는 중…" forever. Prefer the SDK-backed
-  // recent-chat path here so a REST hiccup does not leave the summary looking empty even
-  // though the live listener/count are still healthy.
+  // hydrate the newest renderable messages so the summary widget can render at least the
+  // latest real chat instead of getting stuck on "최근 채팅을 불러오는 중…" forever.
   //
-  // fetchRecentChatMessages swallows its own SDK/REST errors and resolves to `[]` rather than
-  // throwing, so a transient failure (a flaky network tick, or the live listener/token state
-  // being in one of the broken states the Firestore SDK watchdog above exists to recover from)
-  // used to end this effect's one and only attempt with nothing to show -- and since neither
-  // `totalChatCount` nor `visibleChatMessages.length` would ever change again on their own,
-  // the widget was left permanently stuck. Retry a few times with backoff instead of giving up
-  // after the first empty result.
+  // This used to re-fetch the "top N raw docs" from scratch on every retry with N escalating
+  // (20 -> 60 -> 150 -> 300 -> 400), which has two structural problems: (1) it re-reads the
+  // same already-seen photo docs from scratch on every attempt instead of making forward
+  // progress, and (2) it's still a hard ceiling -- a calendar whose real text chat sits behind
+  // more than 400 consecutive 일정(meeting)/갤러리 photo uploads (each its own message doc,
+  // filtered out client-side by isChatRenderableMessage -- there is no server-side field that
+  // reliably excludes them, see isNonChatUploadSource/meetingPhotoMessageIds) permanently
+  // exhausts every attempt and wrongly settles on "표시할 최근 채팅이 없습니다." even though real
+  // chat exists a bit further back. Walking backward with a cursor (the same startAfter/limit
+  // pagination "이전 메시지 더 보기" already uses) instead removes both: each page only scans
+  // docs the previous page hasn't already covered, and there's no arbitrary point at which a
+  // deep-enough photo backlog forces a wrong "no chat" conclusion -- it only stops for real once
+  // a page comes back shorter than requested, meaning the collection is genuinely exhausted.
   React.useEffect(() => {
     if (!activeCalId || isInitialDataLoading) return;
     setChatPreviewHydrationExhausted(false);
@@ -3235,45 +3239,48 @@ function CalendarApp() {
     if (typeof visibleTotalChatCountRef.current !== 'number' || visibleTotalChatCountRef.current <= 0) return;
     if (visibleChatMessages.length > 0) return;
     let cancelled = false;
-    let attempt = 0;
+    let page = 0;
+    let cursorTs = null; // null = start from the newest message; otherwise walk strictly older
     let retryTimer = null;
-    const MAX_ATTEMPTS = 5;
-    const RETRY_DELAYS_MS = [1500, 3000, 6000, 12000];
-    // Escalates the raw window on every retry instead of re-issuing the exact same 20-doc
-    // query -- a burst of 일정(meeting)/갤러리 photo uploads (each its own message doc, filtered
-    // out client-side by isChatRenderableMessage) can easily exceed 20, even 60 or 150,
-    // consecutive raw docs. Retrying the identical query would then deterministically return
-    // the same all-filtered-out result every single time regardless of attempt count, leaving
-    // the widget stuck (or wrongly settling on "no chat" once attempts ran out) even though real
-    // chat text existed just a bit further back. Escalating means a bulk photo upload of any
-    // realistic size still gets outrun within the existing bounded fetchRecentChatMessages cap.
-    const HYDRATE_FETCH_LIMITS = [20, 60, 150, 300, 400];
+    const PAGE_SIZE = 150;
+    const MAX_PAGES = 6; // safety valve: 900 raw docs scanned before giving up for good
+    const ERROR_RETRY_DELAY_MS = 3000; // only used when a page fetch itself fails (network hiccup)
     const tryHydrate = async () => {
-      attempt += 1;
+      page += 1;
+      let list;
       try {
-        const fetchLimit = HYDRATE_FETCH_LIMITS[Math.min(attempt - 1, HYDRATE_FETCH_LIMITS.length - 1)];
-        const list = await fetchRecentChatMessages(activeCalId, fetchLimit);
-        if (cancelled) return;
-        // Read meetingPhotoMessageIds via the ref (not the effect's own closure) -- this value
-        // is recomputed from `activeCal`, whose object identity changes on essentially every
-        // realtime listener tick (even for fields unrelated to chat). It used to sit in this
-        // effect's dependency array, which meant the effect itself was torn down and restarted
-        // on every such tick, resetting `attempt` back to 0 before the backoff loop could ever
-        // reach MAX_ATTEMPTS -- so the widget could get stuck on "불러오는 중…" forever on an
-        // active calendar even though the fetch itself was working fine. A ref lets this read
-        // the latest value without making the effect depend on (and restart with) it.
-        const renderable = Array.isArray(list) ? list.filter(m => isChatRenderableMessage(m, meetingPhotoMessageIdsRef.current)) : [];
-        if (renderable.length > 0) {
-          setChatMessages(prev => (Array.isArray(prev) && prev.length > 0) ? prev : list.slice());
-          return;
-        }
+        list = cursorTs == null
+          ? await fetchRecentChatMessages(activeCalId, PAGE_SIZE)
+          : await fetchOlderChatMessages(activeCalId, cursorTs, PAGE_SIZE);
       } catch (err) {
         console.warn('chat preview hydration failed:', err);
+        if (cancelled) return;
+        if (page >= MAX_PAGES) { setChatPreviewHydrationExhausted(true); return; }
+        page -= 1; // this attempt didn't actually consume a page -- retry the same one
+        retryTimer = setTimeout(tryHydrate, ERROR_RETRY_DELAY_MS);
+        return;
       }
       if (cancelled) return;
-      if (attempt >= MAX_ATTEMPTS) {
-        // All retries came back empty -- rather than leaving the widget stuck on "불러오는
-        // 중…" forever, let CommentsSection fall back to a resolved "no chat to show" state.
+      // Both fetchRecentChatMessages and fetchOlderChatMessages return ascending order (oldest
+      // first), so list[0] is the oldest doc seen in this page -- exactly the cursor the next
+      // page needs to keep walking backward without re-covering ground already scanned.
+      // Read meetingPhotoMessageIds via the ref (not the effect's own closure) -- this value is
+      // recomputed from `activeCal`, whose object identity changes on essentially every realtime
+      // listener tick (even for fields unrelated to chat), so reading it via a plain closure
+      // would go stale mid-walk instead of reflecting whatever meeting got confirmed most recently.
+      const renderable = Array.isArray(list) ? list.filter(m => isChatRenderableMessage(m, meetingPhotoMessageIdsRef.current)) : [];
+      if (renderable.length > 0) {
+        setChatMessages(prev => (Array.isArray(prev) && prev.length > 0) ? prev : list.slice());
+        return;
+      }
+      if (!Array.isArray(list) || list.length < PAGE_SIZE) {
+        // Fewer docs than requested came back -- there is nothing older left in the collection,
+        // so this is a genuine "no real chat exists" conclusion, not a ceiling being hit.
+        setChatPreviewHydrationExhausted(true);
+        return;
+      }
+      cursorTs = Number(list[0].timestamp) || cursorTs;
+      if (page >= MAX_PAGES) {
         // Diagnostic breadcrumb for this exact "count>0 but nothing renders" case -- if it
         // recurs, checking devtools console for this line pins down whether the raw server
         // count, the meeting-linked-photo correction, or the fetch itself is the mismatch.
@@ -3282,13 +3289,12 @@ function CalendarApp() {
           meetingLinkedCount: meetingPhotoMessageIdsRef.current.size,
           visibleTotalChatCount: visibleTotalChatCountRef.current,
           visibleChatMessagesLength: visibleChatMessages.length,
-          finalFetchLimit: HYDRATE_FETCH_LIMITS[HYDRATE_FETCH_LIMITS.length - 1]
+          pagesScanned: page, docsScanned: page * PAGE_SIZE
         });
         setChatPreviewHydrationExhausted(true);
         return;
       }
-      const delay = RETRY_DELAYS_MS[Math.min(attempt - 1, RETRY_DELAYS_MS.length - 1)];
-      retryTimer = setTimeout(tryHydrate, delay);
+      void tryHydrate();
     };
     void tryHydrate();
     return () => {
@@ -3298,14 +3304,13 @@ function CalendarApp() {
   // Deliberately NOT depending on `visibleTotalChatCount` here (read via ref above instead) --
   // it's `totalChatCount - meetingPhotoMessageIds.size`, and that subtrahend changes its actual
   // NUMBER (not just object identity) every time a new 일정/갤러리 photo is confirmed while this
-  // effect is mid-retry. With the number in this array, every such upload tore the effect down
-  // and rebuilt it, resetting `attempt` back to 0 and `chatPreviewHydrationExhausted` back to
-  // false before the backoff loop could ever reach MAX_ATTEMPTS -- so on a calendar where photos
-  // keep getting confirmed more often than the ~22s retry sequence takes to finish, the widget
+  // effect is mid-walk. With the number in this array, every such upload tore the effect down
+  // and rebuilt it, resetting the walk back to page 0 before it could ever reach MAX_PAGES -- so
+  // on a calendar where photos keep getting confirmed faster than the walk can finish, the widget
   // could stay on "불러오는 중…" indefinitely even though every individual fetch was completing
-  // fine and correctly finding nothing renderable. visibleChatMessages.length stays in the array
-  // on purpose: it only ever needs to fire once real chat text actually arrives (0 -> N), which
-  // is exactly when this effect should bail out early instead of continuing to retry.
+  // fine and correctly finding nothing renderable yet. visibleChatMessages.length stays in the
+  // array on purpose: it only ever needs to fire once real chat text actually arrives (0 -> N),
+  // which is exactly when this effect should bail out early instead of continuing to walk.
   }, [activeCalId, isInitialDataLoading, visibleChatMessages.length]);
 
   // Absolute backstop for the hydration safety net above, independent of its own retry/backoff
