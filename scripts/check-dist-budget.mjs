@@ -18,11 +18,21 @@ const BUDGETS = [
   { pattern: /^index-.*\.css$/, maxBytes: 240_000 }
 ];
 
-// Total JS across all Vite chunks. Temporarily doubled to 2.6MB (~200%) during active development.
-// Nudged to 2.66MB to fit the 추억 탭 "제외된 사진 다시 추가" 팝업 addition -- still well inside
-// the "doubled" ceiling above, not a new precedent. Will be reduced alongside post-stabilization
-// chunk optimization.
-const TOTAL_JS_MAX_BYTES = 2_660_000;
+// Chunks matching these patterns are loaded lazily/on-demand only -- never part of the
+// initial page load. vendor-map bundles maplibre-gl + leaflet + leaflet.markercluster +
+// the maplibre/leaflet bridge (together ~1.1MB), pulled in only via dynamic import() when
+// a user actually opens the 장소(지도) picker (verified: no static "import ... from
+// 'leaflet'|'maplibre-gl'" anywhere in src -- app-main.js and ui-places.js only reach them
+// through `await import(...)`). Counting an on-demand-only vendor bundle against the same
+// cap as eagerly-loaded app code was inflating "total js" without reflecting any actual
+// page-load cost, which is what this budget exists to guard. Reported separately below for
+// visibility, but excluded from TOTAL_JS_MAX_BYTES.
+const LAZY_CHUNK_PATTERNS = [/^vendor-map-.*\.js$/];
+
+// Total EAGER JS across all Vite chunks (excludes LAZY_CHUNK_PATTERNS above) -- this is what
+// actually loads before the app becomes interactive. Sized with real headroom over the
+// current eager total (~1.53MB) so routine feature work doesn't trip CI for a few KB.
+const TOTAL_JS_MAX_BYTES = 1_800_000;
 
 function fail(message) {
   console.error(`[check-dist-budget] ${message}`);
@@ -36,7 +46,15 @@ if (!existsSync(DIST_ASSETS_DIR)) {
 
 const files = readdirSync(DIST_ASSETS_DIR);
 const jsFiles = files.filter(file => file.endsWith('.js'));
-const totalJsBytes = jsFiles.reduce((sum, file) => sum + statSync(join(DIST_ASSETS_DIR, file)).size, 0);
+const isLazyChunk = file => LAZY_CHUNK_PATTERNS.some(p => p.test(file));
+const lazyJsFiles = jsFiles.filter(isLazyChunk);
+const eagerJsFiles = jsFiles.filter(file => !isLazyChunk(file));
+const totalJsBytes = eagerJsFiles.reduce((sum, file) => sum + statSync(join(DIST_ASSETS_DIR, file)).size, 0);
+
+for (const file of lazyJsFiles) {
+  const size = statSync(join(DIST_ASSETS_DIR, file)).size;
+  console.log(`[check-dist-budget] ${file} ${size} bytes (lazy/on-demand -- excluded from total js)`);
+}
 
 for (const { pattern, maxBytes } of BUDGETS) {
   const matches = files.filter(file => pattern.test(file));
