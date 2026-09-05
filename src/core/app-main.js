@@ -7870,10 +7870,10 @@ function CalendarApp() {
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: '8px 10px',
-          minWidth: '70px',
-          minHeight: '66px',
-          borderRadius: '12px',
+          padding: '10px 12px',
+          minWidth: '82px',
+          minHeight: '78px',
+          borderRadius: '16px',
           background: '#0E0E0E',
           color: '#FFFFFF',
           border: 'none',
@@ -7885,15 +7885,16 @@ function CalendarApp() {
       },
         /* Date YY.MM.DD */
         /*#__PURE__*/React.createElement("span", {
-          style: { fontSize: 'var(--font-size-xs)', fontWeight: 800, color: '#FFFFFF', lineHeight: 1.1, textShadow: '0 1px 2px rgba(0,0,0,0.15)' }
+          style: { fontFamily: 'var(--font-display)', fontSize: '0.75rem', fontWeight: 800, color: '#FFFFFF', lineHeight: 1.1, textShadow: '0 1px 2px rgba(0,0,0,0.15)' }
         }, yyMMdd),
         /* Day Name */
         /*#__PURE__*/React.createElement("span", {
           style: {
-            fontSize: 'var(--font-size-base)',
-            fontWeight: 800,
+            fontFamily: 'var(--font-display)',
+            fontSize: '1rem',
+            fontWeight: 900,
             color: shortDayName === '일' ? '#C6FF3D' : '#FFFFFF',
-            marginTop: '2px',
+            marginTop: '3px',
             lineHeight: 1.1,
             textShadow: '0 1px 2px rgba(0,0,0,0.15)'
           }
@@ -7903,11 +7904,12 @@ function CalendarApp() {
           style: {
             backgroundColor: 'rgba(255, 255, 255, 0.14)',
             color: '#C6FF3D',
-            padding: '2px 8px',
+            padding: '3px 9px',
             borderRadius: 'var(--radius-full)',
-            fontSize: 'var(--font-size-xs)',
+            fontFamily: 'var(--font-display)',
+            fontSize: '0.72rem',
             fontWeight: 800,
-            marginTop: '4px',
+            marginTop: '5px',
             whiteSpace: 'nowrap',
             letterSpacing: '0.02em',
             boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
@@ -7940,8 +7942,8 @@ function CalendarApp() {
           justifyContent: 'space-between',
           width: '100%',
           flex: '1 1 100%',
-          padding: '10px 14px',
-          borderRadius: '12px',
+          padding: '14px 18px',
+          borderRadius: '18px',
           background: '#0E0E0E',
           color: '#FFFFFF',
           border: 'none',

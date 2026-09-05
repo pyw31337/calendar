@@ -35,16 +35,18 @@
   --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.03);
   color-scheme: light;
 
-  /* Rounded-rectangle rule: the outermost edge of any rounded box or button is always 10px
+  /* Rounded-rectangle rule: the outermost edge of any rounded box or button is always 18px
      (--radius-lg and --radius-md both resolve to it -- they used to differ, but the rule has
-     no room for two different "outer" radii). --radius-sm is for a box nested inside another
+     no room for two different "outer" radii). Bumped from 10px as part of the Nike-style
+     redesign -- bold, chunky card corners are one of the clearest structural signals of that
+     look, alongside the bigger type scale below. --radius-sm is for a box nested inside another
      rounded box (day-cell inside the calendar grid, a menu item inside the header bar) --
-     visibly smaller than its parent's 10px so the nesting itself reads correctly, not an
+     visibly smaller than its parent's 18px so the nesting itself reads correctly, not an
      independent size choice. --radius-full stays untouched -- it's for pills/circles, not
      rounded rectangles, and is outside this rule entirely. */
-  --radius-lg: 10px;
-  --radius-md: 10px;
-  --radius-sm: 6px;
+  --radius-lg: 18px;
+  --radius-md: 18px;
+  --radius-sm: 12px;
   --radius-full: 9999px;
 
   /* Spacing scale (4px base grid). Any bordered container's top/bottom padding should use
@@ -1323,17 +1325,18 @@ button, input, textarea, select {
   align-items: center;
   justify-content: center;
   gap: 4px;
-  background: none;
+  background: var(--bg-primary);
   border: none;
-  padding: 6px 4px;
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: var(--text-muted);
+  padding: 10px 4px;
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--text-main);
   cursor: pointer;
   white-space: nowrap;
   border-radius: var(--radius-sm);
+  margin: 2px;
 }
-.main-menu-item:hover { background: var(--bg-primary); color: var(--text-main); }
+.main-menu-item:hover { background: var(--border-subtle); color: var(--text-main); }
 .main-menu-sep { flex: 0 0 auto; align-self: center; width: 1px; height: 16px; margin: 0 2px; background: var(--border-subtle); }
 .main-menu-badge {
   display: inline-flex;
@@ -1377,11 +1380,11 @@ button, input, textarea, select {
 
 .calendar-title {
   font-family: var(--font-display);
-  font-size: 1.25rem; font-weight: 800; color: var(--text-main); letter-spacing: -0.02em;
+  font-size: 1.55rem; font-weight: 900; color: var(--text-main); letter-spacing: -0.03em;
   min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   cursor: pointer;
 }
-@media (min-width: 768px) { .calendar-title { font-size: 1.35rem; } }
+@media (min-width: 768px) { .calendar-title { font-size: 1.7rem; } }
 
 .calendar-desc {
   font-size: 0.825rem; color: var(--text-muted); margin-top: -10px;
@@ -1676,7 +1679,8 @@ select.form-select {
 /* Calendar Card */
 .calendar-card {
   background: var(--bg-card);
-  border-radius: var(--radius-lg); padding: 16px; margin-bottom: 20px;
+  border-radius: var(--radius-lg); padding: 18px; margin-bottom: 20px;
+  box-shadow: var(--shadow-sm);
 }
 .calendar-loading-overlay {
   position: absolute;
@@ -1723,8 +1727,8 @@ select.form-select {
 .calendar-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
 @media (min-width: 640px) { .calendar-nav { margin-bottom: 20px; } }
 
-.month-display { font-family: var(--font-display); font-size: 1.15rem; font-weight: 800; color: var(--text-main); letter-spacing: -0.02em; }
-@media (min-width: 640px) { .month-display { font-size: 1.4rem; } }
+.month-display { font-family: var(--font-display); font-size: 1.5rem; font-weight: 900; color: var(--text-main); letter-spacing: -0.03em; }
+@media (min-width: 640px) { .month-display { font-size: 1.8rem; } }
 .month-display-year-short { display: none; }
 
 .weekday-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 8px; text-align: center; }
@@ -1753,8 +1757,8 @@ select.form-select {
 }
 
 .day-cell {
-  min-height: 58px; background: #FAFAFA; border: 1px solid transparent;
-  border-radius: var(--radius-sm); padding: 4px; cursor: pointer; transition: all 0.2s ease;
+  min-height: 68px; background: #FAFAFA; border: 1px solid transparent;
+  border-radius: var(--radius-sm); padding: 6px; cursor: pointer; transition: all 0.2s ease;
   /* flex-start (not space-between): participant name badges must pack immediately under the
      date header, not float toward mid/bottom on a day that has no anniversary content to pair
      with them. The day-anniversary-desktop/mobile block's own marginTop:'auto' (see
@@ -1766,13 +1770,13 @@ select.form-select {
 }
 @media (min-width: 640px) {
   .day-cell {
-    min-height: 100px;
-    padding: 8px;
+    min-height: 118px;
+    padding: 10px;
     border-radius: var(--radius-md);
   }
 }
 @media (max-width: 360px) {
-  .day-cell { min-height: 52px; padding: 2px; }
+  .day-cell { min-height: 60px; padding: 4px; }
 }
 
 /* Water-ripple hover/touch effect (see the pointer-tracking effect in ui-calendar-core.js's
@@ -2000,7 +2004,8 @@ select.form-select {
   opacity: 0.78;
 }
 
-.day-number { font-family: var(--font-display); font-size: 0.6rem; font-weight: 700; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; }
+.day-number { font-family: var(--font-display); font-size: 0.8rem; font-weight: 800; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; }
+@media (min-width: 640px) { .day-number { font-size: 0.95rem; width: 24px; height: 24px; } }
 @media (min-width: 640px) {
   .day-number { font-size: 0.95rem; width: 24px; height: 24px; }
 }
