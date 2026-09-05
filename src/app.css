@@ -1,20 +1,32 @@
 :root {
-  --font-sans: 'Plus Jakarta Sans', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-sans: 'Manrope', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+  /* Display face for titles, section headers and calendar numerals -- bolder, more
+     condensed than the body face, carrying the app's Nike-Training-style identity.
+     Falls back to the body face's own Korean coverage since Archivo has no hangul. */
+  --font-display: 'Archivo', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
 
-  /* White / Light Theme Colors */
-  --bg-primary: #F8FAFC;
+  /* Black / White / Lime Theme Colors */
+  --bg-primary: #FBFAF6;
   --bg-secondary: #FFFFFF;
   --bg-card: #FFFFFF;
-  --border-subtle: #E2E8F0;
-  --border-hover: #CBD5E1;
+  --border-subtle: #ECEAE0;
+  --border-hover: #D8D6CB;
 
-  --text-main: #0F172A;
-  --text-muted: #64748B;
-  --text-light: #94A3B8;
+  --text-main: #0E0E0E;
+  --text-muted: #6B6A63;
+  --text-light: #9B9A91;
 
-  --accent-primary: #4F46E5;
-  --accent-secondary: #7C3AED;
-  --accent-gradient: linear-gradient(135deg, #4F46E5 0%, #7C3AED 50%, #EC4899 100%);
+  /* accent-primary stays a text/border-safe near-black (readable on any light surface it's
+     used as foreground color for -- links, focus rings, filled chip text); the brand's lime
+     highlight lives in the separate --accent-lime tokens below, which are only ever used as a
+     FILL with --accent-lime-ink on top, never as text-on-light-bg (lime-on-white fails contrast). */
+  --accent-primary: #0E0E0E;
+  --accent-secondary: #1A1A1A;
+  --accent-gradient: #0E0E0E;
+
+  --accent-lime: #C6FF3D;
+  --accent-lime-soft: #F5FFDC;
+  --accent-lime-ink: #0E0E0E;
 
   --status-green: #16A34A;
 
@@ -70,16 +82,20 @@
    themselves with hardcoded colors rather than these tokens and are not part of this pass. */
 @media (prefers-color-scheme: dark) {
   :root[data-theme="dark"] {
-    --bg-primary: #0B1120;
-    --bg-secondary: #131B2E;
-    --bg-card: #131B2E;
-    --border-subtle: #232F49;
-    --border-hover: #34405C;
-    --text-main: #F1F5F9;
-    --text-muted: #94A3B8;
-    --text-light: #64748B;
-    --accent-primary: #6366F1;
-    --accent-secondary: #9333EA;
+    --bg-primary: #0B0B0B;
+    --bg-secondary: #141414;
+    --bg-card: #141414;
+    --border-subtle: #2A2A2A;
+    --border-hover: #3A3A3A;
+    --text-main: #F4F3EE;
+    --text-muted: #9B9A91;
+    --text-light: #6B6A63;
+    --accent-primary: #F4F3EE;
+    --accent-secondary: #2A2A2A;
+    /* Primary buttons stay a filled chip against either background: black-on-white in light
+       mode, white-on-black in dark -- inverting the fill (not just re-tinting it) is what
+       keeps --btn-primary readable once the background itself goes dark. */
+    --accent-gradient: #F4F3EE;
     --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.25);
     --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
     --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.45), 0 8px 10px -6px rgba(0, 0, 0, 0.35);
@@ -90,60 +106,60 @@
      .btn-secondary/.btn-danger/.form-input alone cover most of the app including admin
      screens (they're shared utility classes), and .day-cell covers the calendar grid,
      the single most central, most-used surface in the app. */
-  :root[data-theme="dark"] .day-cell { background: #1B2540; }
-  :root[data-theme="dark"] .day-cell:hover { background: #212D4D; }
-  :root[data-theme="dark"] .day-cell.today { background: #1E2648; }
+  :root[data-theme="dark"] .day-cell { background: #161616; }
+  :root[data-theme="dark"] .day-cell:hover { background: #1F1F1F; }
+  :root[data-theme="dark"] .day-cell.today { background: #1E2410; border-color: var(--accent-lime); }
   :root[data-theme="dark"] .day-cell.all-available { background: #0F2E22; border-color: var(--status-green); animation: cell-glow-available 2.5s ease-in-out infinite alternate; }
-  :root[data-theme="dark"] .day-cell.confirmed-meeting { background: #241B3D; border-color: #9333EA; animation: cell-glow-confirmed 2.5s ease-in-out infinite alternate; }
-  :root[data-theme="dark"] .btn-secondary { background: #1B2540; color: var(--text-main); }
-  :root[data-theme="dark"] .btn-secondary:hover { background: #232F49; }
+  :root[data-theme="dark"] .day-cell.confirmed-meeting { background: #1A1A1A; border-color: #F4F3EE; animation: cell-glow-confirmed-dark 2.5s ease-in-out infinite alternate; }
+  :root[data-theme="dark"] .btn-secondary { background: #1A1A1A; color: var(--text-main); }
+  :root[data-theme="dark"] .btn-secondary:hover { background: #232323; }
   :root[data-theme="dark"] .btn-danger { background: #2D1518; border-color: #7F1D1D; color: #F87171; }
   :root[data-theme="dark"] .btn-danger:hover { background: #3A1A1E; }
   :root[data-theme="dark"] .form-select,
-  :root[data-theme="dark"] .form-input { background: #1B2540; }
-  :root[data-theme="dark"] .poll-progress { background: #1B2540; }
+  :root[data-theme="dark"] .form-input { background: #1A1A1A; }
+  :root[data-theme="dark"] .poll-progress { background: #1A1A1A; }
   :root[data-theme="dark"] .modal-header.is-confirmed-theme,
-  :root[data-theme="dark"] .modal-footer.is-confirmed-theme { background-color: #241B3D; }
+  :root[data-theme="dark"] .modal-footer.is-confirmed-theme { background-color: #1A1A1A; }
   :root[data-theme="dark"] .modal-header.is-all-available-theme,
   :root[data-theme="dark"] .modal-footer.is-all-available-theme { background-color: #0F2E22; }
-  :root[data-theme="dark"] .poll-list-row { background-color: #1B2540; border-color: #232F49; }
+  :root[data-theme="dark"] .poll-list-row { background-color: #1A1A1A; border-color: #2A2A2A; }
 }
-:root[data-theme="dark"] .day-cell { background: #1B2540; }
-:root[data-theme="dark"] .day-cell:hover { background: #212D4D; }
-:root[data-theme="dark"] .day-cell.today { background: #1E2648; }
+:root[data-theme="dark"] .day-cell { background: #161616; }
+:root[data-theme="dark"] .day-cell:hover { background: #1F1F1F; }
+:root[data-theme="dark"] .day-cell.today { background: #1E2410; border-color: var(--accent-lime); }
 :root[data-theme="dark"] .day-cell.all-available { background: #0F2E22; border-color: var(--status-green); animation: cell-glow-available 2.5s ease-in-out infinite alternate; }
-:root[data-theme="dark"] .day-cell.confirmed-meeting { background: #241B3D; border-color: #9333EA; animation: cell-glow-confirmed 2.5s ease-in-out infinite alternate; }
-:root[data-theme="dark"] .btn-secondary { background: #1B2540; color: var(--text-main); }
-:root[data-theme="dark"] .btn-secondary:hover { background: #232F49; }
+:root[data-theme="dark"] .day-cell.confirmed-meeting { background: #1A1A1A; border-color: #F4F3EE; animation: cell-glow-confirmed-dark 2.5s ease-in-out infinite alternate; }
+:root[data-theme="dark"] .btn-secondary { background: #1A1A1A; color: var(--text-main); }
+:root[data-theme="dark"] .btn-secondary:hover { background: #232323; }
 :root[data-theme="dark"] .btn-danger { background: #2D1518; border-color: #7F1D1D; color: #F87171; }
 :root[data-theme="dark"] .btn-danger:hover { background: #3A1A1E; }
 :root[data-theme="dark"] .form-select,
-:root[data-theme="dark"] .form-input { background: #1B2540; }
-:root[data-theme="dark"] .poll-progress { background: #1B2540; }
+:root[data-theme="dark"] .form-input { background: #1A1A1A; }
+:root[data-theme="dark"] .poll-progress { background: #1A1A1A; }
 :root[data-theme="dark"] .modal-header.is-confirmed-theme,
-:root[data-theme="dark"] .modal-footer.is-confirmed-theme { background-color: #241B3D; }
+:root[data-theme="dark"] .modal-footer.is-confirmed-theme { background-color: #1A1A1A; }
 :root[data-theme="dark"] .modal-header.is-all-available-theme,
 :root[data-theme="dark"] .modal-footer.is-all-available-theme { background-color: #0F2E22; }
 /* Light-mode base (previously inline styles) -- kept as CSS now that dark-mode variants
    need to target the same classes. */
-.modal-header.is-confirmed-theme, .modal-footer.is-confirmed-theme { background-color: #F3E8FF; }
+.modal-header.is-confirmed-theme, .modal-footer.is-confirmed-theme { background-color: #F3F2ED; }
 .modal-header.is-all-available-theme, .modal-footer.is-all-available-theme { background-color: #D1FAE5; }
 .poll-list-row { background-color: #F8FAFC; border: 1px solid #F1F5F9; }
-:root[data-theme="dark"] .poll-list-row { background-color: #1B2540; border-color: #232F49; }
+:root[data-theme="dark"] .poll-list-row { background-color: #1A1A1A; border-color: #2A2A2A; }
 /* Status/date-count badges (확정/전원/N명 가능 etc.) set pastel light-mode colors inline;
    darkening them in place (rather than threading dark variants through every call site)
    keeps every one of these chips legible without a per-badge color prop. */
 :root[data-theme="dark"] .status-badge { filter: brightness(0.85) saturate(1.15); }
 :root[data-theme="dark"] .date-item-badge { filter: none; }
 :root[data-theme="dark"] .date-item-badge.is-past {
-  background: #1B2540 !important;
+  background: #1A1A1A !important;
   color: #CBD5E1 !important;
-  border: 1px solid #34405C !important;
+  border: 1px solid #3A3A3A !important;
 }
 :root[data-theme="dark"] .date-item-badge.is-confirmed {
-  background: #3B1E69 !important;
-  color: #E9D5FF !important;
-  border: 1px solid #8B5CF6 !important;
+  background: #2A2A2A !important;
+  color: #F4F3EE !important;
+  border: 1px solid #5A5A54 !important;
 }
 :root[data-theme="dark"] .date-item-badge.is-available {
   background: #1D315C !important;
@@ -157,16 +173,17 @@
 }
 :root[data-theme="dark"] {
   --status-green: #4ADE80;
-  --bg-primary: #0B1120;
-  --bg-secondary: #131B2E;
-  --bg-card: #131B2E;
-  --border-subtle: #232F49;
-  --border-hover: #34405C;
-  --text-main: #F1F5F9;
-  --text-muted: #94A3B8;
-  --text-light: #64748B;
-  --accent-primary: #6366F1;
-  --accent-secondary: #9333EA;
+  --bg-primary: #0B0B0B;
+  --bg-secondary: #141414;
+  --bg-card: #141414;
+  --border-subtle: #2A2A2A;
+  --border-hover: #3A3A3A;
+  --text-main: #F4F3EE;
+  --text-muted: #9B9A91;
+  --text-light: #6B6A63;
+  --accent-primary: #F4F3EE;
+  --accent-secondary: #2A2A2A;
+  --accent-gradient: #F4F3EE;
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.25);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
   --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.45), 0 8px 10px -6px rgba(0, 0, 0, 0.35);
@@ -263,9 +280,9 @@ body {
   font-feature-settings: "tnum" 1, "lnum" 1;
   background-color: var(--bg-primary);
   background-image:
-    radial-gradient(at 10% 10%, rgba(79, 70, 229, 0.05) 0px, transparent 40%),
-    radial-gradient(at 90% 80%, rgba(236, 72, 153, 0.04) 0px, transparent 40%),
-    radial-gradient(at 50% 50%, rgba(16, 185, 129, 0.04) 0px, transparent 40%);
+    radial-gradient(at 10% 10%, rgba(198, 255, 61, 0.06) 0px, transparent 40%),
+    radial-gradient(at 90% 80%, rgba(14, 14, 14, 0.03) 0px, transparent 40%),
+    radial-gradient(at 50% 50%, rgba(198, 255, 61, 0.03) 0px, transparent 40%);
   background-attachment: fixed;
   color: var(--text-main);
   min-height: 100vh;
@@ -1359,6 +1376,7 @@ button, input, textarea, select {
 }
 
 .calendar-title {
+  font-family: var(--font-display);
   font-size: 1.25rem; font-weight: 800; color: var(--text-main); letter-spacing: -0.02em;
   min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   cursor: pointer;
@@ -1377,8 +1395,9 @@ button, input, textarea, select {
   padding: 10px 16px; border-radius: var(--radius-md); font-size: 0.875rem; font-weight: 700;
   cursor: pointer; transition: all 0.2s ease; border: 1px solid transparent; font-family: inherit;
 }
-.btn-primary { background: var(--accent-gradient); color: #ffffff; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25); }
-.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(79, 70, 229, 0.35); }
+.btn-primary { background: var(--accent-gradient); color: var(--btn-primary-ink, #ffffff); box-shadow: 0 4px 12px rgba(14, 14, 14, 0.22); }
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(14, 14, 14, 0.3); }
+:root[data-theme="dark"] { --btn-primary-ink: #0E0E0E; }
 .btn-poll-create {
   background: #0F172A;
   color: #FFFFFF;
@@ -1517,7 +1536,7 @@ button.form-select {
   height: 18px;
 }
 
-.form-select:focus, .form-input:focus { border-color: var(--accent-primary); box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15); }
+.form-select:focus, .form-input:focus { border-color: var(--accent-primary); box-shadow: 0 0 0 3px rgba(14, 14, 14, 0.12); }
 @media (max-width: 639px) {
   .form-select, .form-input { font-size: 0.8rem; }
 }
@@ -1704,7 +1723,7 @@ select.form-select {
 .calendar-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
 @media (min-width: 640px) { .calendar-nav { margin-bottom: 20px; } }
 
-.month-display { font-size: 1.15rem; font-weight: 800; color: var(--text-main); letter-spacing: -0.02em; }
+.month-display { font-family: var(--font-display); font-size: 1.15rem; font-weight: 800; color: var(--text-main); letter-spacing: -0.02em; }
 @media (min-width: 640px) { .month-display { font-size: 1.4rem; } }
 .month-display-year-short { display: none; }
 
@@ -1772,7 +1791,7 @@ select.form-select {
   content: "";
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at var(--mx) var(--my), rgba(79, 70, 229, 0.14), transparent 60%);
+  background: radial-gradient(circle at var(--mx) var(--my), rgba(198, 255, 61, 0.22), transparent 60%);
   opacity: 0;
   transition: opacity 0.25s ease;
   pointer-events: none;
@@ -1784,7 +1803,7 @@ select.form-select {
 .day-cell-ripple {
   position: absolute;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(79, 70, 229, 0.3) 0%, rgba(79, 70, 229, 0.14) 55%, rgba(79, 70, 229, 0) 75%);
+  background: radial-gradient(circle, rgba(198, 255, 61, 0.4) 0%, rgba(198, 255, 61, 0.2) 55%, rgba(198, 255, 61, 0) 75%);
   pointer-events: none;
   z-index: 0;
   transform: scale(0);
@@ -1923,7 +1942,7 @@ select.form-select {
 /* overflow: visible + a z-index bump so the today badge's ripple (see .day-number-today below)
    can spread past this cell's own boundary into neighboring cells instead of being clipped by
    .day-cell's overflow: hidden, and paints above those neighbors rather than under them. */
-.day-cell.today { border-color: var(--accent-primary); background: #EEF2FF; overflow: visible; z-index: 2; }
+.day-cell.today { border-color: var(--accent-lime); background: var(--accent-lime-soft); overflow: visible; z-index: 2; }
 
 .day-cell.all-available {
   background: #ECFDF5;
@@ -1932,10 +1951,13 @@ select.form-select {
   animation: cell-glow-available 2.5s ease-in-out infinite alternate;
 }
 
+/* Confirmed uses the "opposite of background" neutral rather than the brand lime, so it
+   never gets mistaken for .today at a glance: black-on-white in light mode, white-on-black
+   in dark (see the dark-theme override below) -- lime stays reserved for "today". */
 .day-cell.confirmed-meeting {
-  background: #FAF5FF;
-  border: 1.5px solid #7C3AED;
-  box-shadow: inset 0 0 5px rgba(124, 58, 237, 0.18);
+  background: var(--bg-primary);
+  border: 1.5px solid var(--text-main);
+  box-shadow: inset 0 0 5px rgba(14, 14, 14, 0.12);
   animation: cell-glow-confirmed 2.5s ease-in-out infinite alternate;
 }
 
@@ -1944,9 +1966,19 @@ select.form-select {
   100% { border-color: var(--status-green); box-shadow: 0 0 8px rgba(52, 211, 153, 0.35), inset 0 0 5px rgba(52, 211, 153, 0.2); }
 }
 
+/* Animates glow/shadow only, not border-color -- so the light/dark border tone set above
+   (and re-set in the dark override below) isn't clobbered by the animation's own keyframe
+   values the way it would be if border-color were animated here too. */
 @keyframes cell-glow-confirmed {
-  0% { border-color: #7C3AED; box-shadow: 0 0 1px rgba(124, 58, 237, 0.12), inset 0 0 3px rgba(124, 58, 237, 0.1); }
-  100% { border-color: #A78BFA; box-shadow: 0 0 9px rgba(167, 139, 250, 0.42), inset 0 0 6px rgba(167, 139, 250, 0.25); }
+  0% { box-shadow: 0 0 1px rgba(14, 14, 14, 0.12), inset 0 0 3px rgba(14, 14, 14, 0.08); }
+  100% { box-shadow: 0 0 9px rgba(14, 14, 14, 0.3), inset 0 0 6px rgba(14, 14, 14, 0.16); }
+}
+:root[data-theme="dark"] .day-cell.confirmed-meeting {
+  box-shadow: inset 0 0 5px rgba(244, 243, 238, 0.1);
+}
+@keyframes cell-glow-confirmed-dark {
+  0% { box-shadow: 0 0 1px rgba(244, 243, 238, 0.14), inset 0 0 3px rgba(244, 243, 238, 0.08); }
+  100% { box-shadow: 0 0 9px rgba(244, 243, 238, 0.28), inset 0 0 6px rgba(244, 243, 238, 0.16); }
 }
 :root[data-theme="dark"] .day-cell.other-month {
   background: rgba(27, 37, 64, 0.34);
@@ -1968,7 +2000,7 @@ select.form-select {
   opacity: 0.78;
 }
 
-.day-number { font-size: 0.6rem; font-weight: 700; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; }
+.day-number { font-family: var(--font-display); font-size: 0.6rem; font-weight: 700; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; }
 @media (min-width: 640px) {
   .day-number { font-size: 0.95rem; width: 24px; height: 24px; }
 }
@@ -2356,7 +2388,7 @@ select.form-select {
 :root[data-theme="dark"] .poll-voter-option:hover,
 :root[data-theme="dark"] .poll-voter-option:focus-visible,
 :root[data-theme="dark"] .poll-voter-option:hover,
-:root[data-theme="dark"] .poll-voter-option:focus-visible { background: #212D4D; border-color: var(--accent-primary); }
+:root[data-theme="dark"] .poll-voter-option:focus-visible { background: #1F1F1F; border-color: var(--accent-primary); }
 @media (max-width: 640px) {
   .poll-option-row {
     grid-template-columns: 1fr;
@@ -3170,7 +3202,7 @@ select.form-select {
 :root[data-theme="dark"] .admin-side-menu-setting-icon,
 :root[data-theme="dark"] .admin-side-menu-setting-icon {
   color: #CBD5E1;
-  background: #1B2540;
+  background: #1A1A1A;
 }
 .admin-side-menu-font-controls {
   display: inline-flex;
@@ -3859,7 +3891,7 @@ select.form-select {
 .region-selection-badge {
   display: flex; align-items: center; gap: 6px;
   padding: 6px 8px 6px 12px; border-radius: var(--radius-full);
-  background: rgba(79, 70, 229, 0.12); color: var(--accent-primary);
+  background: rgba(198, 255, 61, 0.18); color: var(--accent-primary);
   font-size: var(--font-size-sm); font-weight: 800; white-space: nowrap;
 }
 .region-selection-badge-remove {
@@ -3943,16 +3975,16 @@ select.form-select {
    usages, which pick one of these instead of inline backgroundColor/borderColor so dark
    mode can retint them below instead of always showing the light pastel. */
 .date-item-btn.is-past { opacity: 0.7; background: var(--bg-primary); border-color: transparent; }
-.date-item-btn.is-confirmed { border-color: #E9D5FF; background: #FAF5FF; }
+.date-item-btn.is-confirmed { border-color: #0E0E0E; background: #F3F2ED; }
 .date-item-btn.is-available { border-color: #DBEAFE; background: #F8FAFC; }
 .date-item-btn.is-all { border-color: #A7F3D0; background: #ECFDF5; }
 :root[data-theme="dark"] .date-item-btn:hover { background: #1E2A4D; }
-:root[data-theme="dark"] .date-item-btn.is-confirmed { border-color: #5B21B6; background: #241B3D; }
+:root[data-theme="dark"] .date-item-btn.is-confirmed { border-color: #F4F3EE; background: #1A1A1A; }
 :root[data-theme="dark"] .date-item-btn.is-available { border-color: #1D4ED8; background: #16233E; }
 :root[data-theme="dark"] .date-item-btn.is-all { border-color: #065F46; background: #0F2E22; }
 @media (prefers-color-scheme: dark) {
   :root[data-theme="dark"] .date-item-btn:hover { background: #1E2A4D; }
-  :root[data-theme="dark"] .date-item-btn.is-confirmed { border-color: #5B21B6; background: #241B3D; }
+  :root[data-theme="dark"] .date-item-btn.is-confirmed { border-color: #F4F3EE; background: #1A1A1A; }
   :root[data-theme="dark"] .date-item-btn.is-available { border-color: #1D4ED8; background: #16233E; }
   :root[data-theme="dark"] .date-item-btn.is-all { border-color: #065F46; background: #0F2E22; }
 }
@@ -4001,7 +4033,7 @@ select.form-select {
   background: linear-gradient(90deg, #624DEB 0%, #9333EA 52%, #F43F5E 100%);
 }
 :root[data-theme="dark"] .date-item-btn.confirmed-meeting-card.is-past {
-  background: linear-gradient(90deg, #1B2540 0%, #22304F 100%) !important;
+  background: linear-gradient(90deg, #1A1A1A 0%, #22304F 100%) !important;
   border: none !important;
   color: #CBD5E1;
   box-shadow: none;
@@ -4043,7 +4075,7 @@ select.form-select {
   box-shadow: none;
 }
 :root[data-theme="dark"] .date-item-btn.confirmed-meeting-card .dday-badge.is-past {
-  background: #1B2540 !important;
+  background: #1A1A1A !important;
   color: #CBD5E1 !important;
   border: 1px solid rgba(52, 64, 93, 0.9) !important;
   box-shadow: none;
@@ -4180,21 +4212,21 @@ select.form-select {
   background-color: #EEF2FF;
 }
 :root[data-theme="dark"] .search-result-row {
-  background-color: #1B2540;
+  background-color: #1A1A1A;
 }
 :root[data-theme="dark"] .search-result-row:hover {
-  background-color: #212D4D;
+  background-color: #1F1F1F;
 }
 @media (prefers-color-scheme: dark) {
   :root[data-theme="dark"] .date-item-badge.is-past {
-    background: #1B2540 !important;
+    background: #1A1A1A !important;
     color: #CBD5E1 !important;
-    border: 1px solid #34405C !important;
+    border: 1px solid #3A3A3A !important;
   }
   :root[data-theme="dark"] .date-item-badge.is-confirmed {
-    background: #3B1E69 !important;
-    color: #E9D5FF !important;
-    border: 1px solid #8B5CF6 !important;
+    background: #2A2A2A !important;
+    color: #F4F3EE !important;
+    border: 1px solid #5A5A54 !important;
   }
   :root[data-theme="dark"] .date-item-badge.is-available {
     background: #1D315C !important;
@@ -4213,10 +4245,10 @@ select.form-select {
     box-shadow: none;
   }
   :root[data-theme="dark"] .search-result-row {
-    background-color: #1B2540;
+    background-color: #1A1A1A;
   }
   :root[data-theme="dark"] .search-result-row:hover {
-    background-color: #212D4D;
+    background-color: #1F1F1F;
   }
 }
 
@@ -4948,8 +4980,8 @@ select.form-select {
   transition: all 0.2s ease;
 }
 .place-preview-card:hover {
-  border-color: rgba(79, 70, 229, 0.3) !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04), inset 0 0 5px rgba(79, 70, 229, 0.05);
+  border-color: rgba(14, 14, 14, 0.25) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04), inset 0 0 5px rgba(14, 14, 14, 0.06);
 }
 
 /* Sidebar scrollbar hiding and activation during movement */
@@ -5385,7 +5417,7 @@ textarea.form-input {
 
 [data-theme="dark"] .btn-secondary,
 :root[data-theme="dark"] .btn-secondary {
-  background: #1B2540; color: var(--text-main); border-color: var(--border-subtle);
+  background: #1A1A1A; color: var(--text-main); border-color: var(--border-subtle);
 }
 [data-theme="dark"] .form-input,
 [data-theme="dark"] input.form-input,
@@ -5418,7 +5450,7 @@ textarea.form-input {
 }
 [data-theme="dark"] .url-capsule-badge,
 :root[data-theme="dark"] .url-capsule-badge {
-  background: #1B2540 !important; color: #A5B4FC !important; border-color: #312E81 !important;
+  background: #1A1A1A !important; color: #A5B4FC !important; border-color: #312E81 !important;
 }
 
 
@@ -5459,12 +5491,12 @@ textarea.form-input {
 :root[data-theme="dark"] .admin-side-menu-item:hover,
 :root[data-theme="dark"] .admin-side-menu-item:focus-visible,
 :root[data-theme="dark"] .admin-side-menu-item:hover,
-:root[data-theme="dark"] .admin-side-menu-item:focus-visible { background: #1B2540; }
+:root[data-theme="dark"] .admin-side-menu-item:focus-visible { background: #1A1A1A; }
 :root[data-theme="dark"] .admin-side-menu-close-btn,
 :root[data-theme="dark"] .admin-side-menu-close-btn { color: var(--text-muted); }
 :root[data-theme="dark"] .admin-side-menu-font-btn,
 :root[data-theme="dark"] .admin-side-menu-font-btn {
-  background: #1B2540; color: var(--text-main); border-color: var(--border-subtle);
+  background: #1A1A1A; color: var(--text-main); border-color: var(--border-subtle);
 }
 :root[data-theme="dark"] .settlement-base-budget-card,
 :root[data-theme="dark"] .settlement-base-budget-card {
@@ -5475,7 +5507,7 @@ textarea.form-input {
 :root[data-theme="dark"] .poll-progress,
 :root[data-theme="dark"] .poll-progress,
 :root[data-theme="dark"] .admin-progress,
-:root[data-theme="dark"] .admin-progress { background: #1B2540 !important; }
+:root[data-theme="dark"] .admin-progress { background: #1A1A1A !important; }
 :root[data-theme="dark"] a.link-preview-card,
 :root[data-theme="dark"] a.link-preview-card {
   border-color: var(--border-subtle) !important;
@@ -5508,7 +5540,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 
 :root[data-theme="dark"] .admin-side-menu-item-icon,
 :root[data-theme="dark"] .admin-side-menu-item-icon {
-  background: #1B2540 !important;
+  background: #1A1A1A !important;
   color: #E2E8F0 !important;
 }
 :root[data-theme="dark"] .admin-side-menu-item:hover .admin-side-menu-item-icon,
@@ -5540,7 +5572,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 }
 :root[data-theme="dark"] .admin-side-menu-setting-icon,
 :root[data-theme="dark"] .admin-side-menu-setting-icon {
-  background: #1B2540 !important;
+  background: #1A1A1A !important;
   color: #E2E8F0 !important;
 }
 
