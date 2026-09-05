@@ -1823,7 +1823,7 @@ export function HistoryView({
   onJumpToChatMessage = null, onJumpToMemo = null, onJumpToMeetingDate = null,
   onGetChatMessageOrdinal = null, onGetGalleryPhotoOrdinal = null, onRequestConfirm = null,
   onRemovePhotoFromMemory = null, onRemovePhotosFromMemory = null, onFetchPhotoComments = null, onSavePhotoComments = null,
-  onHideMemoryGroup = null
+  onHideMemoryGroup = null, onAddPhotosBackToMemory = null
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -1835,6 +1835,8 @@ export function HistoryView({
   const InlineSearchBar = __comp.InlineSearchBar || __deps.InlineSearchBar;
   const UnderlineTabs = __comp.UnderlineTabs || __deps.UnderlineTabs;
   const Lightbox = __comp.Lightbox || __deps.Lightbox;
+  const PencilIcon = __comp.PencilIcon || __deps.PencilIcon;
+  const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
 
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
@@ -1984,6 +1986,33 @@ export function HistoryView({
       onRequestConfirm('추억 삭제', `'${group.title}'을(를) 추억 목록에서 삭제할까요? (사진과 원래 일정은 그대로 유지됩니다)`, doHide);
     }
   };
+  // "추가" -- 라이트박스/편집 모드에서 제외했던 사진을 다시 이 추억에 넣을 수 있게, 제외된
+  // 사진 목록을 레이어 팝업으로 보여주고 체크박스로 골라 되돌린다.
+  const [isAddBackModalOpen, setIsAddBackModalOpen] = React.useState(false);
+  const [selectedAddBackKeys, setSelectedAddBackKeys] = React.useState(() => new Set());
+  const [isAddingBackPhotos, setIsAddingBackPhotos] = React.useState(false);
+  React.useEffect(() => { setIsAddBackModalOpen(false); setSelectedAddBackKeys(new Set()); }, [selectedMemoryGroupId]);
+  const toggleAddBackPhotoSelected = key => {
+    setSelectedAddBackKeys(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+  const handleClickAddBackPhotos = async (group) => {
+    const keys = Array.from(selectedAddBackKeys);
+    if (!keys.length || typeof onAddPhotosBackToMemory !== 'function') return;
+    setIsAddingBackPhotos(true);
+    try {
+      const ok = await onAddPhotosBackToMemory(group.id, keys);
+      if (ok !== false) {
+        setIsAddBackModalOpen(false);
+        setSelectedAddBackKeys(new Set());
+      }
+    } finally {
+      setIsAddingBackPhotos(false);
+    }
+  };
   const entryTagTokens = entry => String(entry?.tags || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean);
   // 한국식 성+이름 태그 매칭: "박영우"로 등록된 참여자는 "영우"라고만 붙은 사진 해시태그도
   // 같은 사람으로 인식해야 한다. 성 1자를 뗀 이름만으로도 같은 사람을 부르는 경우가 흔하기
@@ -2035,7 +2064,11 @@ export function HistoryView({
   };
   // 추억 탭: 날짜(startDate/date)가 등록된 기념일이면 카테고리와 상관없이, 그 기간에 등록된
   // 사진을 모아 보여준다 (여행만이 아니라 행사/축제/생일 등도 사진이 있으면 노출).
+  // 모임(meeting) 사진은 timestamp(업로드/확정 시각)와 실제 모임 날짜(meetingDate)가 다른 경우가
+  // 많다 -- 모임 당일이 아니라 나중에 사진을 올리거나 확정하는 경우가 흔하기 때문. 그래서
+  // meetingDate가 있으면 그걸 우선 쓰고, 채팅/메모처럼 모임과 무관한 사진만 timestamp로 폴백한다.
   const entryDateStr = entry => {
+    if (entry?.meetingDate) return String(entry.meetingDate).slice(0, 10);
     const ts = Number(entry?.timestamp) || 0;
     if (!ts) return '';
     const d = new Date(ts);
@@ -2054,19 +2087,60 @@ export function HistoryView({
         // 날짜 구간으로 자동 수집되다 보니 그 기념일과 상관없는 사진이 섞여 들어올 수 있어,
         // 라이트박스의 '이 추억에서 제거' 버튼으로 뺀 사진(excludedMemoryPhotoKeys)은 제외한다.
         const excluded = new Set(Array.isArray(a.excludedMemoryPhotoKeys) ? a.excludedMemoryPhotoKeys : []);
-        const photos = historyPhotoEntries.filter(entry => {
+        const photosInRange = historyPhotoEntries.filter(entry => {
           const d = entryDateStr(entry);
-          if (!d || d < start || d > end) return false;
+          return d && d >= start && d <= end;
+        });
+        const photos = photosInRange.filter(entry => {
           const key = entry.mediaKey || entry.refKey;
           return !key || !excluded.has(key);
         });
-        return { id: a.id, title: a.title || '기록', startDate: start, endDate: end, photos };
+        // 제외된 사진 목록 -- "추가" 버튼에서 다시 추억에 넣을 수 있게 보여준다.
+        const excludedPhotos = photosInRange.filter(entry => {
+          const key = entry.mediaKey || entry.refKey;
+          return key && excluded.has(key);
+        });
+        return { id: a.id, title: a.title || '기록', startDate: start, endDate: end, photos, excludedPhotos };
       })
       // 등록된 사진이 없는 여행은 목록에서 아예 숨긴다 -- 빈 여행 카드를 계속 보여주는 것보다
       // 실제로 추억(사진)이 쌓인 여행만 보여주는 게 이 탭의 취지에 맞다.
       .filter(group => group.photos.length > 0)
       .sort((a, b) => (b.startDate || '').localeCompare(a.startDate || ''));
   }, [anniversaries, historyPhotoEntries]);
+
+  // 추억 상세/제외된 사진 팝업이 공유하는 썸네일 그리드 -- checkable이면 체크박스 오버레이를 켜고
+  // 탭할 때 onToggle을, 아니면 onOpen(라이트박스)을 부른다.
+  const renderPhotoThumbGrid = (photos, { checkable, selectedKeys, onToggle, onOpen, keyPrefix }) => (
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '4px' }
+    }, photos.map((photo, idx) => {
+      const photoKey = photo.mediaKey || photo.refKey || `${keyPrefix}${idx}`;
+      const isChecked = checkable && selectedKeys.has(photoKey);
+      return /*#__PURE__*/React.createElement("button", {
+        key: photoKey, type: "button",
+        onClick: () => checkable ? onToggle(photoKey) : onOpen(idx),
+        style: { position: 'relative', padding: 0, border: 'none', borderRadius: 'var(--radius-sm)', overflow: 'hidden', aspectRatio: '1 / 1', cursor: 'pointer', backgroundColor: 'var(--bg-primary)' }
+      },
+        /*#__PURE__*/React.createElement("img", {
+          src: photo.thumb || photo.full, alt: "", loading: "lazy", decoding: "async",
+          style: { width: '100%', height: '100%', objectFit: 'cover' }
+        }),
+        checkable && /*#__PURE__*/React.createElement("span", {
+          "aria-hidden": true,
+          style: {
+            position: 'absolute', top: '4px', left: '4px', width: '20px', height: '20px', borderRadius: '5px',
+            border: isChecked ? 'none' : '2px solid rgba(255,255,255,0.9)',
+            backgroundColor: isChecked ? 'var(--accent-primary)' : 'rgba(0,0,0,0.35)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.4)'
+          }
+        }, isChecked && /*#__PURE__*/React.createElement("svg", {
+          xmlns: "http://www.w3.org/2000/svg", width: "14", height: "14", viewBox: "0 0 24 24",
+          fill: "none", stroke: "#fff", strokeWidth: "3", strokeLinecap: "round", strokeLinejoin: "round"
+        }, /*#__PURE__*/React.createElement("path", { d: "M20 6 9 17l-5-5" })))
+      );
+    }))
+  );
 
   return /*#__PURE__*/React.createElement("div", {
     className: "places-view-container",
@@ -2242,8 +2316,8 @@ export function HistoryView({
             }
           },
             /*#__PURE__*/React.createElement("span", { style: { fontSize: '2rem' } }, "🗂️"),
-            /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-main)' } }, "등록된 여행 일정이 없습니다"),
-            /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)' } }, "기념일 등록에서 '여행' 카테고리로 일정을 추가하면, 그 기간에 등록된 사진을 여기 모아 보여줘요.")
+            /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-main)' } }, "등록된 추억이 없습니다"),
+            /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)' } }, "기념일을 등록하면, 그 날짜(구간)에 올라온 사진을 여기 모아 보여줘요.")
           )
         : /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px' } },
             travelMemoryGroups.map(group => {
@@ -2287,7 +2361,7 @@ export function HistoryView({
       const group = travelMemoryGroups.find(g => g.id === selectedMemoryGroupId);
       if (!group) return null;
       const canBulkExclude = typeof onRemovePhotosFromMemory === 'function';
-      return /*#__PURE__*/React.createElement("div", {
+      return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
         style: { flex: 1, overflowY: 'auto', padding: '118px 16px 16px' }
       }, /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
         /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
@@ -2330,62 +2404,66 @@ export function HistoryView({
                     }
                   }, `제외${selectedMemoryPhotoKeys.size > 0 ? ` (${selectedMemoryPhotoKeys.size})` : ''}`)
                 )
-              : /*#__PURE__*/React.createElement(React.Fragment, null,
-                  /*#__PURE__*/React.createElement("button", {
-                    type: "button",
-                    onClick: () => setIsMemoryEditMode(true),
-                    style: {
-                      flexShrink: 0, height: '32px', padding: '0 12px', borderRadius: 'var(--radius-md)',
-                      border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)',
-                      fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer'
-                    }
-                  }, "편집"),
-                  typeof onHideMemoryGroup === 'function' && /*#__PURE__*/React.createElement("button", {
-                    type: "button",
-                    onClick: () => handleClickDeleteMemoryGroup(group),
-                    disabled: isHidingMemoryGroup,
-                    style: {
-                      flexShrink: 0, height: '32px', padding: '0 12px', borderRadius: 'var(--radius-md)',
-                      border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', color: '#EF4444',
-                      fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: isHidingMemoryGroup ? 'default' : 'pointer',
-                      opacity: isHidingMemoryGroup ? 0.5 : 1
-                    }
-                  }, "삭제")
-                )
+              : [
+                  { show: typeof onAddPhotosBackToMemory === 'function' && group.excludedPhotos.length > 0, key: 'add', onClick: () => setIsAddBackModalOpen(true), label: '제외된 사진 추가', css: { border: 'none', backgroundColor: '#111827', color: '#fff', fontSize: '1.1rem', fontWeight: 800, lineHeight: 1 }, content: "+" },
+                  { show: true, key: 'edit', onClick: () => setIsMemoryEditMode(true), label: '편집', css: { border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)' }, content: PencilIcon ? /*#__PURE__*/React.createElement(PencilIcon, { size: 15 }) : "✎" },
+                  { show: typeof onHideMemoryGroup === 'function', key: 'delete', onClick: () => handleClickDeleteMemoryGroup(group), disabled: isHidingMemoryGroup, label: '삭제', css: { border: '1px solid #EF4444', backgroundColor: 'var(--bg-primary)', color: '#EF4444', cursor: isHidingMemoryGroup ? 'default' : 'pointer', opacity: isHidingMemoryGroup ? 0.5 : 1 }, content: TrashIcon ? /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }) : "✕" }
+                ].map(cfg => cfg.show && /*#__PURE__*/React.createElement("button", {
+                  key: cfg.key, type: "button", onClick: cfg.onClick, disabled: cfg.disabled, "aria-label": cfg.label,
+                  style: Object.assign({ flexShrink: 0, width: '32px', height: '32px', padding: 0, borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }, cfg.css)
+                }, cfg.content))
           )
         ),
-        /*#__PURE__*/React.createElement("div", {
-          style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '4px' }
-        }, group.photos.map((photo, idx) => {
-          const photoKey = photo.mediaKey || photo.refKey || `${group.id}_${idx}`;
-          const isChecked = selectedMemoryPhotoKeys.has(photoKey);
-          return /*#__PURE__*/React.createElement("button", {
-            key: photoKey,
-            type: "button",
-            onClick: () => isMemoryEditMode ? toggleMemoryPhotoSelected(photoKey) : openHistoryLightbox(group.photos, idx, group.id),
-            style: { position: 'relative', padding: 0, border: 'none', borderRadius: 'var(--radius-sm)', overflow: 'hidden', aspectRatio: '1 / 1', cursor: 'pointer', backgroundColor: 'var(--bg-primary)' }
-          },
-            /*#__PURE__*/React.createElement("img", {
-              src: photo.thumb || photo.full, alt: "", loading: "lazy", decoding: "async",
-              style: { width: '100%', height: '100%', objectFit: 'cover' }
-            }),
-            isMemoryEditMode && /*#__PURE__*/React.createElement("span", {
-              "aria-hidden": true,
-              style: {
-                position: 'absolute', top: '4px', left: '4px', width: '20px', height: '20px', borderRadius: '5px',
-                border: isChecked ? 'none' : '2px solid rgba(255,255,255,0.9)',
-                backgroundColor: isChecked ? 'var(--accent-primary)' : 'rgba(0,0,0,0.35)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.4)'
-              }
-            }, isChecked && /*#__PURE__*/React.createElement("svg", {
-              xmlns: "http://www.w3.org/2000/svg", width: "14", height: "14", viewBox: "0 0 24 24",
-              fill: "none", stroke: "#fff", strokeWidth: "3", strokeLinecap: "round", strokeLinejoin: "round"
-            }, /*#__PURE__*/React.createElement("path", { d: "M20 6 9 17l-5-5" })))
-          );
+        renderPhotoThumbGrid(group.photos, {
+          checkable: isMemoryEditMode,
+          selectedKeys: selectedMemoryPhotoKeys,
+          onToggle: toggleMemoryPhotoSelected,
+          onOpen: idx => openHistoryLightbox(group.photos, idx, group.id),
+          keyPrefix: `${group.id}_`
         })
+      )),
+      isAddBackModalOpen && /*#__PURE__*/React.createElement("div", {
+        className: "bottom-sheet-overlay",
+        onClick: () => setIsAddBackModalOpen(false),
+        style: { zIndex: 12000 }
+      }, /*#__PURE__*/React.createElement("div", {
+        className: "bottom-sheet",
+        onClick: e => e.stopPropagation()
+      },
+        /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-header" },
+          /*#__PURE__*/React.createElement("h4", null, "제외된 사진"),
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            style: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer' },
+            onClick: () => setIsAddBackModalOpen(false)
+          }, '✕')
+        ),
+        /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-body" },
+          group.excludedPhotos.length === 0
+            ? /*#__PURE__*/React.createElement("p", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', textAlign: 'center', padding: '24px 0' } }, "제외된 사진이 없습니다.")
+            : /*#__PURE__*/React.createElement(React.Fragment, null,
+                renderPhotoThumbGrid(group.excludedPhotos, {
+                  checkable: true,
+                  selectedKeys: selectedAddBackKeys,
+                  onToggle: toggleAddBackPhotoSelected,
+                  onOpen: () => {},
+                  keyPrefix: `excluded_${group.id}_`
+                }),
+                /*#__PURE__*/React.createElement("button", {
+                  type: "button",
+                  className: "btn btn-primary",
+                  disabled: selectedAddBackKeys.size === 0 || isAddingBackPhotos,
+                  onClick: () => handleClickAddBackPhotos(group),
+                  style: {
+                    width: '100%', height: '44px', minHeight: '44px', fontSize: '0.95rem', fontWeight: 800,
+                    borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    marginTop: '14px', opacity: (selectedAddBackKeys.size === 0 || isAddingBackPhotos) ? 0.5 : 1
+                  }
+                }, `추가${selectedAddBackKeys.size > 0 ? ` (${selectedAddBackKeys.size})` : ''}`)
+              )
         )
-      ));
+      ))
+      );
     })(),
     // 인물 탭: 인물별 벤또 그리드(칸마다 그 사람 사진이 붙은 사진 중 하나를 커버로 보여줌).
     // 칸을 누르면 그 사람으로 태그된 사진만 모아 보여주는 상세 페이지로 들어간다.
