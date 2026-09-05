@@ -3279,6 +3279,23 @@ function CalendarApp() {
   // is exactly when this effect should bail out early instead of continuing to retry.
   }, [activeCalId, isInitialDataLoading, visibleChatMessages.length]);
 
+  // Absolute backstop for the hydration safety net above, independent of its own retry/backoff
+  // bookkeeping -- this exact widget has already needed several rounds of fixes for new ways to
+  // get permanently stuck on "불러오는 중…" (a filtered-out raw window, then a dependency-churn
+  // reset loop, ...), and each fix only closed the one mechanism found. Rather than trust that no
+  // further such mechanism exists, this timer guarantees a hard ceiling regardless of cause: no
+  // matter what goes wrong in the retry effect above (a bug not yet found, a future regression, a
+  // network condition none of the above anticipated), the widget can never show "불러오는 중…"
+  // for longer than this timeout before settling to a definitive resolved state. If real messages
+  // arrive after this fires, they still render immediately (visibleChatMessages.length > 0 always
+  // wins in CommentsSection's own emptyChatMessage check) -- this only forces the terminal
+  // "nothing found" state to stop waiting indefinitely.
+  React.useEffect(() => {
+    if (!activeCalId || isInitialDataLoading) return undefined;
+    const timer = setTimeout(() => setChatPreviewHydrationExhausted(true), 15000);
+    return () => clearTimeout(timer);
+  }, [activeCalId, isInitialDataLoading]);
+
   React.useEffect(() => {
     // Same reasoning as above -- wait for the initial calendar document load to finish before
     // spending a paginated Firestore scan on gallery-preview thumbnails.

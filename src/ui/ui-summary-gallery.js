@@ -3451,12 +3451,16 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
       ? regionFilteredItems.filter(item => (item.genre || '') === categoryFilter)
       : regionFilteredItems;
 
-  const categoryChipRow = (categoryOptions.length > 1 || customRegisteredCount > 0) && /*#__PURE__*/React.createElement("div", {
+  // "개별등록"은 전체/장르 칩과 마찬가지로 항상 고정 노출한다 -- 지금 등록된 개수가 0이어도
+  // (예: 등록해둔 항목이 피드 갱신으로 잠시 사라진 경우) 사용자가 바로 눌러서 확인할 수 있는
+  // 자리가 계속 있어야 하며, 개수만 보고 매번 나타났다 사라지는 건 "전체 / 개별등록 / 장르..."
+  // 로 항상 구성해 달라던 요청과 어긋난다.
+  const categoryChipRow = /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', gap: '6px', padding: '0 16px 12px', overflowX: 'auto', flexShrink: 0, alignItems: 'center' }
   },
     [
       { value: '', label: '전체', count: regionFilteredItems.length },
-      ...(customRegisteredCount > 0 ? [{ value: CUSTOM_CATEGORY_VALUE, label: '개별등록', count: customRegisteredCount }] : []),
+      { value: CUSTOM_CATEGORY_VALUE, label: '개별등록', count: customRegisteredCount },
       ...categoryOptions
     ].map(opt => {
       const isActive = categoryFilter === opt.value;
@@ -3504,6 +3508,28 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
     if (el.scrollHeight - el.scrollTop - el.clientHeight < 300) {
       setRenderLimit(limit => limit + CULTURE_RENDER_PAGE_SIZE);
     }
+  };
+
+  // 상세보기 설명(selected.description)은 외부 지역축제/문화행사 피드의 원본 텍스트를 그대로
+  // 보여주는 자유 텍스트라, 공식 홈페이지처럼 별도 구조화된 필드 없이 URL이 그냥 문장 중간에
+  // 섞여 들어오는 경우가 있다(예: 운영시간 뒤에 홈페이지 주소가 이어지는 식) -- 그런 URL도
+  // 클릭해서 새 창으로 열 수 있도록 설명 텍스트 안의 http(s) 링크만 찾아 <a>로 바꿔준다.
+  const renderDescriptionWithLinks = text => {
+    const raw = String(text || '');
+    return raw.split(/(https?:\/\/[^\s]+)/g).map((part, i) => {
+      if (!/^https?:\/\//.test(part)) return part;
+      const trailingMatch = part.match(/[).,!?"'”’]+$/);
+      const trailing = trailingMatch ? trailingMatch[0] : '';
+      const url = trailing ? part.slice(0, part.length - trailing.length) : part;
+      return /*#__PURE__*/React.createElement(React.Fragment, { key: i },
+        /*#__PURE__*/React.createElement("a", {
+          href: url, target: "_blank", rel: "noopener noreferrer",
+          onClick: e => e.stopPropagation(),
+          style: { color: 'var(--accent-primary)', textDecoration: 'underline', wordBreak: 'break-all' }
+        }, url),
+        trailing
+      );
+    });
   };
 
   return /*#__PURE__*/React.createElement(React.Fragment, null,
@@ -3567,7 +3593,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
             },
               /*#__PURE__*/React.createElement("div", {
                 style: {
-                  fontSize: '1.3rem', fontWeight: 800, textShadow: '0 1px 3px rgba(0,0,0,0.7)',
+                  fontSize: '0.9rem', fontWeight: 800, textShadow: '0 1px 3px rgba(0,0,0,0.7)',
                   backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 'var(--radius-full)', padding: '2px 14px',
                   maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
                 }
@@ -3586,7 +3612,10 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
                   }, item.homeTeam)
                 ),
                 /*#__PURE__*/React.createElement("span", {
-                  style: { fontSize: '1.3rem', fontWeight: 800, textShadow: '0 1px 2px rgba(0,0,0,0.6)', flexShrink: 0 }
+                  style: {
+                    fontSize: '1.3rem', fontWeight: 800, textShadow: '0 1px 2px rgba(0,0,0,0.6)', flexShrink: 0,
+                    backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 'var(--radius-full)', padding: '2px 10px'
+                  }
                 }, "vs"),
                 /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', flex: '1 1 0', minWidth: 0 } },
                   item.awayTeamLogo && /*#__PURE__*/React.createElement("img", {
@@ -3601,7 +3630,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
               ),
               /*#__PURE__*/React.createElement("div", {
                 style: {
-                  fontSize: '1.2rem', fontWeight: 700, textShadow: '0 1px 3px rgba(0,0,0,0.7)',
+                  fontSize: '0.9rem', fontWeight: 700, textShadow: '0 1px 3px rgba(0,0,0,0.7)',
                   backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 'var(--radius-full)', padding: '2px 14px',
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%'
                 }
@@ -3693,7 +3722,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
             )),
             selected.description && /*#__PURE__*/React.createElement("div", {
               style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-main)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }
-            }, selected.description)
+            }, renderDescriptionWithLinks(selected.description))
           ),
           /*#__PURE__*/React.createElement("div", {
             style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }
