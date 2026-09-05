@@ -297,6 +297,27 @@ service cloud.firestore {
         allow delete: if isCalendarDoc(calendarDocId);
       }
 
+      // 라이트박스 사진 댓글 (인물/장소와 무관하게 사진 자체에 다는 댓글). 사진은 채팅/메모/일정
+      // 사진첩/기념일 등 여러 파이프라인에 흩어져 있고 그 자체로 독립 문서가 아니므로, 댓글을
+      // 붙일 곳은 사진의 안정적인 식별자(mediaKey/refKey, getMediaIdentityKeys가 항상 만들어줌)를
+      // 문서 id로 쓰는 이 별도 컬렉션뿐이다. 댓글이 실제로 달린 사진만 문서가 생기므로(빈 배열은
+      // 절대 안 씀, 아래 app-firebase-data.js savePhotoComments 참고) 컬렉션 크기는 항상
+      // "댓글이 달린 사진 수"에 비례한다.
+      function isValidPhotoCommentDocId(id) {
+        return id is string && id.matches('^[A-Za-z0-9_:.-]{1,300}$');
+      }
+      function hasValidPhotoCommentShape(data) {
+        return (!('comments' in data) || (data.comments is list && data.comments.size() <= 200))
+          && (!('updatedAt' in data) || data.updatedAt is number);
+      }
+      match /photoComments/{photoKey} {
+        allow read: if isCalendarDoc(calendarDocId);
+        allow create, update: if isCalendarDoc(calendarDocId)
+          && isValidPhotoCommentDocId(photoKey)
+          && hasValidPhotoCommentShape(request.resource.data);
+        allow delete: if isCalendarDoc(calendarDocId);
+      }
+
       // Confirmed meeting dates + their 회비 정산 (settlement) data. Same migration reasoning as
       // places above. Doc ID is the entry's own `date` string (unique per calendar already, since
       // getConfirmedMeetings/handleConfirmMeeting key off date) rather than a generated id.

@@ -849,7 +849,8 @@ export function DateModal({
   syncStatus = null,
   onEditAnniversary,
   onAddAnniversaryForDate = null,
-  onFocusCultureSource = null
+  onFocusCultureSource = null,
+  photoCommentCounts = {}
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -866,6 +867,7 @@ export function DateModal({
   const UnderlineTabs = __comp.UnderlineTabs || __deps.UnderlineTabs;
   const SimpleBottomSheetPicker = __comp.SimpleBottomSheetPicker || __deps.SimpleBottomSheetPicker;
   const MediaThumb = __comp.MediaThumb || __deps.MediaThumb;
+  const PhotoCommentCountBadge = __comp.PhotoCommentCountBadge || __deps.PhotoCommentCountBadge;
   const PencilIcon = __comp.PencilIcon || __deps.PencilIcon;
   const CakeIcon = __comp.CakeIcon || __deps.CakeIcon;
   const BalloonIcon = __comp.BalloonIcon || __deps.BalloonIcon;
@@ -2742,20 +2744,32 @@ export function DateModal({
               display: 'flex', flexWrap: 'wrap', gap: '6px', padding: '10px 12px',
               backgroundColor: `color-mix(in srgb, ${displayColor} 12%, white)`
             }
-          }, photos.map((p, pIdx) => /*#__PURE__*/React.createElement(MediaThumb, {
-            key: p.id || `${bannerKey}_photo_${pIdx}`,
-            src: p.thumbUrl || p.url,
-            fallbackSrc: p.url || p.thumbUrl,
-            alt: "기념일 사진",
-            onClick: e => {
-              e.stopPropagation();
-              openAnniversaryLightbox(pIdx);
+          }, photos.map((p, pIdx) => {
+            // getMediaIdentityKeys가 source:'anniversary'+photoId로 만드는 결과와 반드시 같은
+            // 형식(`anniversary:${photoId}`)이어야 라이트박스에서 단 댓글의 개수가 여기 뱃지에도
+            // 그대로 반영된다 -- openAnniversaryLightbox가 넘기는 photoId와 동일한 값을 쓴다.
+            const photoIdForKey = p.id || `${ann.id || 'ann'}_${pIdx}`;
+            const commentCount = photoCommentCounts[`anniversary:${photoIdForKey}`] || 0;
+            return /*#__PURE__*/React.createElement("div", {
+              key: p.id || `${bannerKey}_photo_${pIdx}`,
+              style: { position: 'relative', flexShrink: 0 }
             },
-            style: {
-              width: '56px', height: '56px', borderRadius: 'var(--radius-sm)', objectFit: 'cover',
-              cursor: 'pointer', flexShrink: 0
-            }
-          })))
+              /*#__PURE__*/React.createElement(MediaThumb, {
+                src: p.thumbUrl || p.url,
+                fallbackSrc: p.url || p.thumbUrl,
+                alt: "기념일 사진",
+                onClick: e => {
+                  e.stopPropagation();
+                  openAnniversaryLightbox(pIdx);
+                },
+                style: {
+                  width: '56px', height: '56px', borderRadius: 'var(--radius-sm)', objectFit: 'cover',
+                  cursor: 'pointer'
+                }
+              }),
+              PhotoCommentCountBadge && /*#__PURE__*/React.createElement(PhotoCommentCountBadge, { count: commentCount })
+            );
+          }))
         );
       })),
 

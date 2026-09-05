@@ -1451,6 +1451,11 @@ function CalendarApp() {
   // fetch-on-open pattern.
   const [placesSubcollection, setPlacesSubcollection] = React.useState([]);
   const [confirmedMeetingsSubcollection, setConfirmedMeetingsSubcollection] = React.useState([]);
+  // 사진별 댓글 개수(라이트박스 댓글 뱃지용) -- 사진의 mediaKey/refKey를 문서 id로 쓰는
+  // calendars/cal_{id}/photoComments 컬렉션을 그대로 구독한다. 댓글이 실제로 달린 사진만
+  // 문서가 존재하므로(빈 배열은 안 씀) 컬렉션 크기가 항상 작게 유지된다 -- see the realtime
+  // listener below.
+  const [photoCommentCounts, setPhotoCommentCounts] = React.useState({});
   const [chatInput, setChatInput] = React.useState('');
   const [chatParticipantId, setChatParticipantId] = React.useState('');
   const chatParticipantIdRef = React.useRef(chatParticipantId);
@@ -2917,6 +2922,32 @@ function CalendarApp() {
       unsubMeetings();
     };
   }, [activeCalId, needsPlacesData, firebaseDb, firebaseConnectionVersion]);
+
+  // 사진 댓글 개수 실시간 구독 -- 썸네일 우측 상단 뱃지(캘린더 일정/갤러리 등)에 쓰인다. 댓글이
+  // 실제로 달린 사진만 문서가 존재하므로 컬렉션 자체가 작게 유지되어, 전체 스냅샷을 그대로
+  // 구독해도(개별 문서 get을 여러 번 하는 대신) 부담이 적다. 썸네일에 뱃지가 실제로 보이는
+  // 화면(캘린더/갤러리/보관함)에서만 구독한다.
+  const needsPhotoCommentCounts = React.useMemo(
+    () => activeView === 'calendar' || activeView === 'gallery' || activeView === 'history',
+    [activeView]
+  );
+  React.useEffect(() => {
+    if (!activeCalId || !needsPhotoCommentCounts) return;
+    if (!firebaseDb) { setPhotoCommentCounts({}); return; }
+    let isMounted = true;
+    const unsub = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('photoComments')
+      .onSnapshot(snapshot => {
+        if (!isMounted) return;
+        const next = {};
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          const n = Array.isArray(data?.comments) ? data.comments.length : 0;
+          if (n > 0) next[doc.id] = n;
+        });
+        setPhotoCommentCounts(next);
+      }, err => console.warn('Firestore photoComments subscription error:', err));
+    return () => { isMounted = false; unsub(); };
+  }, [activeCalId, needsPhotoCommentCounts, firebaseDb, firebaseConnectionVersion]);
 
   // Memos: paginated newest-first load (rather than subscribing to the entire collection at
   // once, which would download/re-sync thousands of memos on every open as a calendar grows).
@@ -5574,6 +5605,38 @@ function CalendarApp() {
   // Memo photos live in the memos collection, structurally identical to chat message images
   // (imageUrls/thumbUrls arrays), so this mirrors handleDeleteChatMessagePhoto/
   // handleReplaceChatMessagePhoto one-for-one against that collection instead.
+  // 라이트박스 사진 댓글 -- 사진의 mediaKey/refKey(getMediaIdentityKeys, 항상 값이 있음)를
+  // calendars/cal_{id}/photoComments 문서 id로 그대로 쓴다. firestore.rules의
+  // isValidPhotoCommentDocId와 같은 문자셋으로 한 번 더 다듬어(콜론/점/하이픈/밑줄/영숫자만,
+  // 300자 캡) 규칙에 안 걸리는 값만 서버로 보낸다.
+  const sanitizePhotoCommentDocId = key => String(key || '').replace(/[^A-Za-z0-9_:.-]/g, '_').slice(0, 300);
+  const handleFetchPhotoComments = async photoKey => {
+    const docId = sanitizePhotoCommentDocId(photoKey);
+    if (!docId || !activeCalId) return [];
+    try {
+      if (firebaseDb) {
+        const snap = await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('photoComments').doc(docId).get();
+        return snap?.exists && Array.isArray(snap.data()?.comments) ? snap.data().comments : [];
+      }
+      const res = await fetch(`https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${activeCalId}/photoComments/${docId}`);
+      if (!res.ok) return [];
+      const data = firestoreDocumentToJs(await res.json());
+      return Array.isArray(data?.comments) ? data.comments : [];
+    } catch (readErr) {
+      console.warn('handleFetchPhotoComments failed:', readErr);
+      return [];
+    }
+  };
+  const handleSavePhotoComments = async (photoKey, nextComments) => {
+    const docId = sanitizePhotoCommentDocId(photoKey);
+    if (!docId || !activeCalId) return false;
+    const saved = await writeCollectionDocumentWithFallback('photoComments', activeCalId, docId, {
+      comments: Array.isArray(nextComments) ? nextComments : [],
+      updatedAt: Date.now()
+    }, 'set', '사진 댓글 저장');
+    return !!saved?.success;
+  };
+
   const findMemoById = async memoId => {
     const local = (memos || []).find(m => m.id === memoId);
     if (local) return local;
@@ -6563,7 +6626,8 @@ function CalendarApp() {
         } catch (_) { /* best-effort */ }
         setIsModalOpen(false);
         changeView('content');
-      }
+      },
+      photoCommentCounts: photoCommentCounts
     }),
     confirmDialog && /*#__PURE__*/React.createElement(ConfirmDialog, {
       title: confirmDialog.title,
@@ -6783,6 +6847,7 @@ function CalendarApp() {
       urls: activeLightbox.urls,
       index: activeLightbox.index,
       meta: activeLightbox.meta,
+      calendar: activeCalLoaded ? activeCal : null,
       onClose: () => setActiveLightbox(null),
       onNavigate: i => setActiveLightbox(prev => prev ? { ...prev, index: i } : prev),
       showToast: showToast,
@@ -6797,7 +6862,9 @@ function CalendarApp() {
       onJumpToGallery: handleJumpToGallery,
       onGetChatMessageOrdinal: handleGetChatMessageOrdinal,
       onGetGalleryPhotoOrdinal: handleGetGalleryPhotoOrdinal,
-      onRequestConfirm: showConfirmDialog
+      onRequestConfirm: showConfirmDialog,
+      onFetchPhotoComments: handleFetchPhotoComments,
+      onSavePhotoComments: handleSavePhotoComments
     }) : null
   );
   const localGalleryCount = (() => {
@@ -7413,6 +7480,8 @@ function CalendarApp() {
         onGetGalleryPhotoOrdinal: handleGetGalleryPhotoOrdinal,
         onRequestConfirm: showConfirmDialog,
         onRemovePhotoFromMemory: handleRemovePhotoFromTravelMemory,
+        onFetchPhotoComments: handleFetchPhotoComments,
+        onSavePhotoComments: handleSavePhotoComments,
         ...navMenuProps
       }),
       isHistoryShareOpen && activeCal && /*#__PURE__*/React.createElement(ShareModal, {
@@ -8082,7 +8151,10 @@ function CalendarApp() {
       onJumpToGallery: handleJumpToGallery,
       onGetChatMessageOrdinal: handleGetChatMessageOrdinal,
       onGetGalleryPhotoOrdinal: handleGetGalleryPhotoOrdinal,
-      onRequestConfirm: showConfirmDialog
+      onRequestConfirm: showConfirmDialog,
+      onFetchPhotoComments: handleFetchPhotoComments,
+      onSavePhotoComments: handleSavePhotoComments,
+      photoCommentCounts: photoCommentCounts
     }),
     /*#__PURE__*/React.createElement(PlacesSection, {
       calendar: activeCal,
