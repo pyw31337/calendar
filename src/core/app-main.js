@@ -3249,12 +3249,23 @@ function CalendarApp() {
   // docs the previous page hasn't already covered, and there's no arbitrary point at which a
   // deep-enough photo backlog forces a wrong "no chat" conclusion -- it only stops for real once
   // a page comes back shorter than requested, meaning the collection is genuinely exhausted.
+  // Deliberately does NOT gate on `visibleTotalChatCount > 0` before attempting a hydrate pass
+  // (it used to). That count comes from a separate server-side aggregation query
+  // (fetchSubcollectionCount) rather than the same timestamp-ordered query this walk itself
+  // uses, so the two can disagree -- e.g. a message document missing its `timestamp` field
+  // entirely (a partial write, a pre-migration doc, ...) is invisible to every orderBy('timestamp')
+  // query below (Firestore excludes documents missing an ordered field from the result set) but
+  // still gets counted by a plain aggregation count(). That mismatch means the count can report
+  // "chat exists" forever while every walk -- no matter how many pages -- correctly and
+  // immediately finds nothing, which used to leave the widget trusting the wrong signal and
+  // stuck showing "최근 채팅을 불러오는 중…" well past when the actual collection had already
+  // been proven empty. Always attempting one real query and trusting ITS outcome (a page shorter
+  // than requested means the collection is actually exhausted, full stop) costs at most one extra
+  // Firestore read for a calendar that has genuinely never had any chat, and removes an entire
+  // class of "count lied" bugs.
   React.useEffect(() => {
     if (!activeCalId || isInitialDataLoading) return;
     setChatPreviewHydrationExhausted(false);
-    // Read via ref (not the reactive `visibleTotalChatCount` value) so this guard doesn't also
-    // sit in the dependency array below -- see the note there for why that mattered.
-    if (typeof visibleTotalChatCountRef.current !== 'number' || visibleTotalChatCountRef.current <= 0) return;
     if (visibleChatMessages.length > 0) return;
     let cancelled = false;
     let page = 0;
