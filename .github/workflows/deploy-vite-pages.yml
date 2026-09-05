@@ -6,9 +6,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
   group: pages-vite
@@ -40,17 +38,24 @@ jobs:
         continue-on-error: true
         run: |
           npm run smoke:browser
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v5
+      # Published straight to the gh-pages branch root (rather than the actions/deploy-pages
+      # artifact flow) so that PR previews -- deployed by pr-preview.yml to gh-pages under
+      # pr-preview/pr-<n>/ via the same mechanism -- can coexist on one Pages site instead of
+      # each full deploy replacing the other. Also: an actions/deploy-pages deployment silently
+      # flips the repo's Pages source setting back to "GitHub Actions" the moment it succeeds --
+      # confirmed the hard way (2026-09-05: an unrelated PR merge re-ran the old version of this
+      # workflow, which flipped Pages source back and made every live PR preview 404 until this
+      # workflow itself stopped using it). Publishing to the branch directly never touches that
+      # setting, so once Settings -> Pages is set to "Deploy from a branch: gh-pages" it stays
+      # that way. keep_files: true is what makes root/preview coexistence possible: without it,
+      # actions-gh-pages force-orphans the branch on every push and would wipe out any live PR
+      # preview folders on the next production deploy.
+      - name: Publish to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          path: dist
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v5
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: dist
+          keep_files: true
+          user_name: 'github-actions[bot]'
+          user_email: 'github-actions[bot]@users.noreply.github.com'
+          commit_message: 'deploy: production build from ${{ github.sha }}'
