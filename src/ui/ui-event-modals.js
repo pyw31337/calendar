@@ -852,12 +852,18 @@ export function AnniversaryModal({
   const ConfettiIcon = __comp.ConfettiIcon || __deps.ConfettiIcon;
   const TicketsPlaneIcon = __comp.TicketsPlaneIcon || __deps.TicketsPlaneIcon;
   const MessageCircleMoreIcon = __comp.MessageCircleMoreIcon || __deps.MessageCircleMoreIcon;
+  const TrophyIcon = __comp.TrophyIcon || __deps.TrophyIcon;
   const MapPinIcon = __comp.MapPinIcon || __deps.MapPinIcon;
   const ItemEditDeleteActions = __comp.ItemEditDeleteActions || __deps.ItemEditDeleteActions;
   const SectionCountBadge = __comp.SectionCountBadge || __deps.SectionCountBadge;
   const firebaseConfig = __deps.firebaseConfig || window.firebaseConfig;
+  // sports가 빠져 있던 자리 -- getAnniversaryCategoryBadge(app-main.js, 캘린더 셀 뱃지)는 이미
+  // sports를 하늘색(#0EA5E9) + 종목 이모지로 별도 처리하는데, 이 목록/등록 모달의 아이콘 맵에는
+  // sports가 없어서 매 스포츠 항목이 여기서만 "카테고리 없음" 취급되어 생일(빨간 케이크)로
+  // 표시되고 있었다 -- 실제 저장된 category는 'sports'가 맞는데 이 화면의 아이콘/색상만 잘못
+  // 보였던 것.
   const ANNIVERSARY_CATEGORY_ICONS = {
-    birthday: CakeIcon, event: BalloonIcon, festival: ConfettiIcon, travel: TicketsPlaneIcon, other: MessageCircleMoreIcon
+    birthday: CakeIcon, event: BalloonIcon, festival: ConfettiIcon, sports: TrophyIcon, travel: TicketsPlaneIcon, other: MessageCircleMoreIcon
   };
   const getActiveParticipants = __deps.getActiveParticipants;
   const [activeTab, setActiveTab] = React.useState('list'); // 'list', 'add', 'bulk'
