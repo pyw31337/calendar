@@ -1839,19 +1839,15 @@ export function HistoryView({
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState('');
-  const HISTORY_TAB_STORAGE_KEY = 'gather_history_tab';
   const VALID_HISTORY_TABS = ['meetings', 'memories', 'people'];
-  const [historyTab, setHistoryTab] = React.useState(() => {
-    try {
-      const saved = localStorage.getItem(HISTORY_TAB_STORAGE_KEY);
-      if (VALID_HISTORY_TABS.includes(saved)) return saved;
-    } catch (_) { /* private browsing / disabled storage */ }
-    return 'memories';
-  });
+  // 기록 페이지는 매번 새로 마운트되며(activeView==='history'일 때만 렌더), 언제 들어오든
+  // 항상 추억 탭이 첫화면이어야 한다 -- 예전에는 localStorage에 마지막으로 보던 탭을 저장해
+  // 재진입 시 그대로 복원했지만, 그러면 지난모임 탭을 보다 나간 사용자는 계속 지난모임이
+  // 먼저 나와 이 요구사항과 어긋나므로 탭 기억 기능 자체를 제거했다.
+  const [historyTab, setHistoryTab] = React.useState('memories');
   const changeHistoryTab = (tab) => {
     if (!VALID_HISTORY_TABS.includes(tab)) return;
     setHistoryTab(tab);
-    try { localStorage.setItem(HISTORY_TAB_STORAGE_KEY, tab); } catch (_) { /* best-effort */ }
   };
   // When the side menu navigates to 기록 again (or any view), force the 추억 tab so
   // re-entry always lands there rather than whatever tab was last open.
