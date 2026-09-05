@@ -6760,13 +6760,17 @@ function CalendarApp() {
         setIsAnniversariesOpen(true);
       },
       onFocusCultureSource: (ann) => {
-        if (!ann?.cultureSourceId) return;
+        // cultureSourceId가 있으면 포털에서 등록한(또는 등록 당시의) 항목의 원래 id, 없으면
+        // 기념일 등록으로 직접 만든 항목이라 이 기념일 자신의 id가 곧 컨텐츠 페이지 카드의 id다
+        // (HistoryView의 selfAuthoredCultureItems가 자기 id를 그대로 카드 id로 쓴다).
+        const focusId = ann?.cultureSourceId || ann?.id;
+        if (!focusId) return;
         // 문화행사/지역축제/스포츠 탭 중 이 기념일의 원래 카테고리에 맞는 탭을 열고, 그 항목의
         // 상세를 자동으로 펼치도록 ContentView에 전달 -- 실제 매칭/표시는 컨텐츠 페이지 쪽에서.
         const tabByCategory = { festival: 'festival', event: 'culture', sports: 'sports' };
         try {
           localStorage.setItem('gather_content_tab', tabByCategory[ann.category] || 'festival');
-          localStorage.setItem('gather_content_focus_item_id', ann.cultureSourceId);
+          localStorage.setItem('gather_content_focus_item_id', focusId);
         } catch (_) { /* best-effort */ }
         setIsModalOpen(false);
         changeView('content');

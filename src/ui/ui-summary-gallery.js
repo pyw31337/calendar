@@ -2560,10 +2560,14 @@ export function ContentView({
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const BackArrowIcon = __comp.BackArrowIcon || __deps.BackArrowIcon;
   const ThreeLinesIcon = __comp.ThreeLinesIcon || __deps.ThreeLinesIcon;
+  const SearchIcon = __comp.SearchIcon || __deps.SearchIcon;
+  const InlineSearchBar = __comp.InlineSearchBar || __deps.InlineSearchBar;
   const LocateFixedIcon = __comp.LocateFixedIcon || __deps.LocateFixedIcon;
   const UnderlineTabs = __comp.UnderlineTabs || __deps.UnderlineTabs;
 
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
+  const [isSearchOpen, setIsSearchOpen] = React.useState(false);
+  const [searchQuery, setSearchQuery] = React.useState('');
   const [isContentRegisterOpen, setIsContentRegisterOpen] = React.useState(false);
   const CONTENT_TAB_STORAGE_KEY = 'gather_content_tab';
   const VALID_CONTENT_TABS = ['festival', 'culture', 'sports'];
@@ -2622,6 +2626,28 @@ export function ContentView({
         image: a.image || (Array.isArray(a.photos) && a.photos[0] ? (a.photos[0].thumbUrl || a.photos[0].url || '') : '')
       }));
   }, [anniversaries]);
+
+  // Memoized per-kind so each stays reference-stable across renders when its actual contents
+  // haven't changed. Building these inline in JSX (as a fresh .filter()/.filter() spread every
+  // render) used to hand CulturePerformancesTab a brand-new `extraItems` array identity on every
+  // single ContentView render -- and since that tab's onItemsLoaded effect reports its merged
+  // list back up via setRegionFilterItems (ContentView's own state) whenever `extraItems`'s
+  // *reference* changes, every report caused this exact re-render that just handed it yet another
+  // new reference, live-locking the two components into an unthrottled render loop (visible as
+  // "Maximum update depth exceeded" and continuous CPU/battery drain with no other visible symptom,
+  // which is exactly why it went unnoticed).
+  const performanceExtraItems = React.useMemo(
+    () => [...selfAuthoredCultureItems.filter(i => i.kind === 'performance'), ...(customCultureItems || []).filter(i => i && i.kind === 'performance')],
+    [selfAuthoredCultureItems, customCultureItems]
+  );
+  const festivalExtraItems = React.useMemo(
+    () => [...selfAuthoredCultureItems.filter(i => i.kind === 'festival'), ...(customCultureItems || []).filter(i => i && i.kind === 'festival')],
+    [selfAuthoredCultureItems, customCultureItems]
+  );
+  const sportsExtraItems = React.useMemo(
+    () => [...selfAuthoredCultureItems.filter(i => i.kind === 'sports'), ...(customCultureItems || []).filter(i => i && i.kind === 'sports')],
+    [selfAuthoredCultureItems, customCultureItems]
+  );
 
   // Shared 지역 filter for the 지역축제/문화공연/스포츠 tabs. Restored from localStorage so a
   // region picked on a previous visit still applies next time.
@@ -2733,11 +2759,21 @@ export function ContentView({
       }, calendar.title, " 컨텐츠"),
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
         /*#__PURE__*/React.createElement("button", {
+          type: "button", onClick: () => setIsSearchOpen(v => !v), title: "컨텐츠 검색", "aria-label": "컨텐츠 검색",
+          style: { background: 'none', border: 'none', cursor: 'pointer', padding: '6px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }
+        }, SearchIcon ? /*#__PURE__*/React.createElement(SearchIcon, null) : "🔍"),
+        /*#__PURE__*/React.createElement("button", {
           type: "button", onClick: () => setIsMenuOpen(true), title: "메뉴", "aria-label": "메뉴 열기",
           style: { background: 'none', border: 'none', cursor: 'pointer', padding: '6px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }
         }, ThreeLinesIcon ? /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 22 }) : "≡")
       )
     ),
+    isSearchOpen && InlineSearchBar && /*#__PURE__*/React.createElement(InlineSearchBar, {
+      value: searchQuery,
+      placeholder: "제목으로 검색...",
+      onChange: e => setSearchQuery(e.target.value),
+      onClose: () => { setIsSearchOpen(false); setSearchQuery(''); }
+    }),
     UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
       ariaLabel: "컨텐츠 탭",
       value: contentTab,
@@ -2836,25 +2872,25 @@ export function ContentView({
       calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo, dataUrl: CULTURE_PERFORMANCES_URL,
       emptyLabel: "상영중이거나 예정된 문화행사가 없습니다.", regionSelections, onItemsLoaded: setRegionFilterItems,
       anniversaryCategory: "event",
-      extraItems: [...selfAuthoredCultureItems.filter(i => i.kind === 'performance'), ...(customCultureItems || []).filter(i => i && i.kind === 'performance')],
+      extraItems: performanceExtraItems,
       chipRowSlot, contentPaddingTop, onScroll: handleContentScroll,
-      gridCols, focusItemId
+      gridCols, focusItemId, searchQuery
     }),
     contentTab === 'festival' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
       calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo, dataUrl: CULTURE_FESTIVALS_URL,
       emptyLabel: "진행중이거나 예정된 지역축제가 없습니다.", regionSelections, onItemsLoaded: setRegionFilterItems,
       anniversaryCategory: "festival",
-      extraItems: [...selfAuthoredCultureItems.filter(i => i.kind === 'festival'), ...(customCultureItems || []).filter(i => i && i.kind === 'festival')],
+      extraItems: festivalExtraItems,
       chipRowSlot, contentPaddingTop, onScroll: handleContentScroll,
-      gridCols, focusItemId
+      gridCols, focusItemId, searchQuery
     }),
     contentTab === 'sports' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
       calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo, dataUrl: CULTURE_SPORTS_URL,
       emptyLabel: "진행중이거나 예정된 스포츠 경기가 없습니다.", regionSelections, onItemsLoaded: setRegionFilterItems,
       anniversaryCategory: "sports",
-      extraItems: [...selfAuthoredCultureItems.filter(i => i.kind === 'sports'), ...(customCultureItems || []).filter(i => i && i.kind === 'sports')],
+      extraItems: sportsExtraItems,
       chipRowSlot, contentPaddingTop, onScroll: handleContentScroll,
-      gridCols, focusItemId
+      gridCols, focusItemId, searchQuery
     }),
 
     /*#__PURE__*/React.createElement(SideMenuOverlay, {
@@ -2889,7 +2925,8 @@ export function ContentView({
     isContentRegisterOpen && /*#__PURE__*/React.createElement(ContentRegisterModal, {
       onClose: () => setIsContentRegisterOpen(false),
       onSave: onSaveCustomCultureItem,
-      showToast: showToast
+      showToast: showToast,
+      initialKind: contentTab === 'festival' ? 'festival' : (contentTab === 'sports' ? 'sports' : 'performance')
     })
   );
 }
@@ -3185,7 +3222,7 @@ function formatCultureDateLabel(startDate, endDate) {
 // Layer popup for manually registering 문화공연 / 지역축제 items into the archive tabs.
 // Portaled to document.body (same pattern as CulturePerformancesTab's detail sheet) so it sits
 // above the side menu / page chrome. Persists via onSave → app-main customCultureItems write.
-function ContentRegisterModal({ onClose, onSave, showToast = null }) {
+function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind = 'performance' }) {
   const React = window.React;
   const ReactDOM = window.ReactDOM;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -3195,7 +3232,10 @@ function ContentRegisterModal({ onClose, onSave, showToast = null }) {
   const AutoGrowTextarea = __comp.AutoGrowTextarea || __deps.AutoGrowTextarea;
   const autoGrowTextarea = __deps.autoGrowTextarea || (window.GATHER_APP_UTILS || {}).autoGrowTextarea || (() => {});
 
-  const [kind, setKind] = React.useState('performance'); // 'performance' | 'festival'
+  // 'performance' | 'festival' | 'sports' -- defaults to whichever 컨텐츠 탭 the user opened this
+  // from (initialKind), instead of always 'performance', so registering while already on 지역축제
+  // or 스포츠 doesn't silently save into 문화행사 unless the user notices and switches this tab.
+  const [kind, setKind] = React.useState(initialKind === 'festival' || initialKind === 'sports' ? initialKind : 'performance');
   const [title, setTitle] = React.useState('');
   const [startDate, setStartDate] = React.useState('');
   const [endDate, setEndDate] = React.useState('');
@@ -3229,8 +3269,10 @@ function ContentRegisterModal({ onClose, onSave, showToast = null }) {
       return;
     }
     const stamp = Date.now();
-    const prefix = kind === 'festival' ? 'custom_fest_' : 'custom_perf_';
+    const idPrefixByKind = { festival: 'custom_fest_', sports: 'custom_sport_' };
+    const prefix = idPrefixByKind[kind] || 'custom_perf_';
     const id = prefix + stamp + '_' + Math.random().toString(36).slice(2, 8);
+    const normalizedKind = kind === 'festival' || kind === 'sports' ? kind : 'performance';
     const item = {
       id,
       title: cleanTitle,
@@ -3245,7 +3287,7 @@ function ContentRegisterModal({ onClose, onSave, showToast = null }) {
       price: (price || '').trim(),
       contact: (contact || '').trim(),
       source: 'custom',
-      kind: kind === 'festival' ? 'festival' : 'performance',
+      kind: normalizedKind,
       createdAt: stamp,
       updatedAt: stamp
     };
@@ -3260,7 +3302,7 @@ function ContentRegisterModal({ onClose, onSave, showToast = null }) {
     item.startDate = cleanStart;
     item.endDate = cleanEnd;
     item.source = 'custom';
-    item.kind = kind === 'festival' ? 'festival' : 'performance';
+    item.kind = normalizedKind;
     item.createdAt = stamp;
     item.updatedAt = stamp;
     if (!item.dateLabel) item.dateLabel = formatCultureDateLabel(cleanStart, cleanEnd);
@@ -3308,12 +3350,13 @@ function ContentRegisterModal({ onClose, onSave, showToast = null }) {
           style: { backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)' },
           options: [
             { value: 'performance', label: '문화공연' },
-            { value: 'festival', label: '지역축제' }
+            { value: 'festival', label: '지역축제' },
+            { value: 'sports', label: '스포츠' }
           ]
         }),
         field("제목 *", /*#__PURE__*/React.createElement("input", {
           className: "form-input", type: "text", value: title, onChange: e => setTitle(e.target.value),
-          placeholder: kind === 'festival' ? "축제 이름" : "공연 제목", maxLength: 120
+          placeholder: kind === 'festival' ? "축제 이름" : (kind === 'sports' ? "경기/대회 이름" : "공연 제목"), maxLength: 120
         })),
         /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: '10px', width: '100%' } },
           field("시작일 *", /*#__PURE__*/React.createElement("input", {
@@ -3325,7 +3368,7 @@ function ContentRegisterModal({ onClose, onSave, showToast = null }) {
             style: { width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }
           }), { minWidth: 0, maxWidth: '100%', overflow: 'hidden' })
         ),
-        field(kind === 'festival' ? "장소" : "공연장", /*#__PURE__*/React.createElement("input", {
+        field(kind === 'festival' ? "장소" : (kind === 'sports' ? "경기장" : "공연장"), /*#__PURE__*/React.createElement("input", {
           className: "form-input", type: "text", value: venue, onChange: e => setVenue(e.target.value),
           placeholder: "장소 / 공연장", maxLength: 120
         })),
@@ -3400,7 +3443,7 @@ function buildQuickMemoPlaceholder(item) {
   return lines.join('\n') || '비워두면 행사 정보가 그대로 저장됩니다';
 }
 
-export function CulturePerformancesTab({ calendar, anniversaries = [], onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo = null, dataUrl = CULTURE_PERFORMANCES_URL, emptyLabel = "상영중이거나 예정된 문화공연이 없습니다.", regionSelections = [], onItemsLoaded, anniversaryCategory = 'event', extraItems = [], chipRowSlot = null, contentPaddingTop = 0, onScroll, gridCols = '2', focusItemId = null }) {
+export function CulturePerformancesTab({ calendar, anniversaries = [], onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo = null, dataUrl = CULTURE_PERFORMANCES_URL, emptyLabel = "상영중이거나 예정된 문화공연이 없습니다.", regionSelections = [], onItemsLoaded, anniversaryCategory = 'event', extraItems = [], chipRowSlot = null, contentPaddingTop = 0, onScroll, gridCols = '2', focusItemId = null, searchQuery = '' }) {
   const React = window.React;
   const ReactDOM = window.ReactDOM;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -3489,6 +3532,38 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
     }
   };
 
+  // A cultureSourceId-linked anniversary's card normally comes entirely from the live crawled
+  // snapshot (`items`) -- the anniversary itself only stores the source id, not a copy of the
+  // card's own fields. The daily sync (scripts/sync-culture-performances.mjs) drops items whose
+  // listing has expired or was removed upstream, which silently erases that card from every tab
+  // even though the calendar's own registration/confirmation of it is still completely intact --
+  // from the user's side it looks exactly like "I registered this and it just vanished." Once the
+  // snapshot has loaded, synthesize a fallback card (same shape HistoryView's selfAuthoredCultureItems
+  // builds for anniversaries with no cultureSourceId at all) for any registered anniversary whose
+  // source id is no longer present, so a user's own confirmed content never just disappears because
+  // an external feed happened to drop it that day.
+  const orphanedSourceItems = React.useMemo(() => {
+    if (items === null) return [];
+    const presentIds = new Set(items.map(i => i && i.id).filter(Boolean));
+    const kindByCategory = { festival: 'festival', event: 'performance', sports: 'sports' };
+    return (anniversaries || [])
+      .filter(a => a && a.cultureSourceId && a.category === anniversaryCategory && !presentIds.has(a.cultureSourceId))
+      .map(a => ({
+        id: a.cultureSourceId,
+        kind: kindByCategory[a.category] || 'performance',
+        title: a.title || '',
+        startDate: a.startDate || a.date,
+        endDate: a.endDate || a.date,
+        dateLabel: (a.startDate && a.endDate && a.startDate !== a.endDate)
+          ? `${a.startDate} ~ ${a.endDate}`
+          : (a.startDate || a.date || ''),
+        venue: a.place ? (a.place.alias || a.place.name || '') : '',
+        address: a.place ? (a.place.address || '') : '',
+        description: a.description || '',
+        image: a.image || (Array.isArray(a.photos) && a.photos[0] ? (a.photos[0].thumbUrl || a.photos[0].url || '') : '')
+      }));
+  }, [items, anniversaries, anniversaryCategory]);
+
   // Merge calendar-owned custom items (컨텐츠 등록) ahead of the crawled snapshot. Custom ids
   // use custom_perf_/custom_fest_ prefixes so they never collide with crawled perf_/fest_ ids,
   // but still de-dupe by id in case a write echoes twice.
@@ -3499,9 +3574,13 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
     // instead of guessing from genre/id-prefix which crawled items can also lack.
     const extras = (Array.isArray(extraItems) ? extraItems.filter(Boolean) : []).map(e => ({ ...e, isCustomRegistered: true }));
     const seen = new Set(extras.map(e => e && e.id).filter(Boolean));
+    const orphaned = orphanedSourceItems
+      .filter(o => o && o.id && !seen.has(o.id))
+      .map(o => ({ ...o, isCustomRegistered: true }));
+    orphaned.forEach(o => seen.add(o.id));
     const crawled = (items || []).filter(i => i && i.id && !seen.has(i.id));
-    return [...extras, ...crawled];
-  }, [items, extraItems]);
+    return [...extras, ...orphaned, ...crawled];
+  }, [items, extraItems, orphanedSourceItems]);
 
   // Reported unfiltered (crawled snapshot + any custom items merged in above) -- RegionFilterBackdrop's
   // per-region counts should always reflect every item available in this tab, not just whatever the
@@ -3549,11 +3628,22 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
     }, "선택한 지역에 해당하는 항목이 없습니다.");
   }
 
-  // Counts (and which genres even exist) are computed off the region-filtered set, not the raw
-  // snapshot -- so switching region can change which category chips show up / their counts,
-  // consistent with how RegionFilterBackdrop's own counts work off whichever tab is mounted.
+  const searchNeedle = (searchQuery || '').trim().toLowerCase();
+  const searchFilteredItems = searchNeedle
+    ? regionFilteredItems.filter(item => String(item?.title || '').toLowerCase().includes(searchNeedle))
+    : regionFilteredItems;
+
+  if (searchFilteredItems.length === 0) {
+    return /*#__PURE__*/React.createElement("div", {
+      style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)', paddingTop: contentPaddingTop }
+    }, "검색 결과가 없습니다.");
+  }
+
+  // Counts (and which genres even exist) are computed off the region+search-filtered set, not the
+  // raw snapshot -- so switching region/search can change which category chips show up / their
+  // counts, consistent with how RegionFilterBackdrop's own counts work off whichever tab is mounted.
   const categoryCounts = new Map();
-  regionFilteredItems.forEach(item => {
+  searchFilteredItems.forEach(item => {
     const key = item.genre || '';
     categoryCounts.set(key, (categoryCounts.get(key) || 0) + 1);
   });
@@ -3561,13 +3651,13 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
     .sort((a, b) => b[1] - a[1])
     .map(([genre, count]) => ({ value: genre, label: cultureGenreLabel(genre), count }));
   const CUSTOM_CATEGORY_VALUE = '__custom__';
-  const customRegisteredCount = regionFilteredItems.filter(item => item && item.isCustomRegistered).length;
+  const customRegisteredCount = searchFilteredItems.filter(item => item && item.isCustomRegistered).length;
 
   const filteredItems = categoryFilter === CUSTOM_CATEGORY_VALUE
-    ? regionFilteredItems.filter(item => item && item.isCustomRegistered)
+    ? searchFilteredItems.filter(item => item && item.isCustomRegistered)
     : categoryFilter
-      ? regionFilteredItems.filter(item => (item.genre || '') === categoryFilter)
-      : regionFilteredItems;
+      ? searchFilteredItems.filter(item => (item.genre || '') === categoryFilter)
+      : searchFilteredItems;
 
   // "개별등록"은 전체/장르 칩과 마찬가지로 항상 고정 노출한다 -- 지금 등록된 개수가 0이어도
   // (예: 등록해둔 항목이 피드 갱신으로 잠시 사라진 경우) 사용자가 바로 눌러서 확인할 수 있는
@@ -3577,7 +3667,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
     style: { display: 'flex', gap: '6px', padding: '0 16px 12px', overflowX: 'auto', flexShrink: 0, alignItems: 'center' }
   },
     [
-      { value: '', label: '전체', count: regionFilteredItems.length },
+      { value: '', label: '전체', count: searchFilteredItems.length },
       { value: CUSTOM_CATEGORY_VALUE, label: '개별등록', count: customRegisteredCount },
       ...categoryOptions
     ].map(opt => {

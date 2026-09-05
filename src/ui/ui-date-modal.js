@@ -2596,9 +2596,16 @@ export function DateModal({
         };
         const dateDisplay = getAnnBannerDateDisplay(ann);
         // 컨텐츠(지역축제/문화행사/스포츠)에서 등록한 기념일은 원본 카드로 바로 이동할 수 있게
-        // 제목을 누르면 해당 탭을 열고 그 항목 상세를 자동으로 펼친다 (직접 만든 기념일은 대상이
-        // 없으므로 cultureSourceId가 있을 때만).
-        const canFocusCultureSource = !!(ann.cultureSourceId && typeof onFocusCultureSource === 'function');
+        // 제목을 누르면 해당 탭을 열고 그 항목 상세를 자동으로 펼친다. cultureSourceId가 있으면
+        // 포털에서 등록한 항목(또는 그 항목이 이후 피드에서 빠져 컨텐츠 페이지가 자체 복원해
+        // 보여주는 카드)이고, 없어도 category가 festival/event/sports면 기념일 등록으로 직접
+        // 만든 항목(HistoryView의 selfAuthoredCultureItems가 이 기념일 자신의 id로 카드를 만듦)
+        // 이라 마찬가지로 이동 대상이 있다 -- 그 외(생일 등 일반 기념일)만 이동 대상이 없다.
+        const CULTURE_ANNIVERSARY_CATEGORIES = ['festival', 'event', 'sports'];
+        const canFocusCultureSource = !!(
+          typeof onFocusCultureSource === 'function' &&
+          (ann.cultureSourceId || CULTURE_ANNIVERSARY_CATEGORIES.includes(ann.category))
+        );
         const titleRow = /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
           renderAnniversaryIcon(ann, 14), " ",
           /*#__PURE__*/React.createElement("span", {
