@@ -1508,8 +1508,8 @@ function buildDynamicManifest(calendar) {
     start_url: startUrl,
     scope: base,
     display: 'standalone',
-    background_color: '#F8FAFC',
-    theme_color: '#4F46E5',
+    background_color: '#FBFAF6',
+    theme_color: '#0E0E0E',
     icons: [
       { src: `${base}icons/icon-192.png`, sizes: '192x192', type: 'image/png', purpose: 'any' },
       { src: `${base}icons/icon-512.png`, sizes: '512x512', type: 'image/png', purpose: 'any' },

@@ -993,7 +993,7 @@ export function FormAddEditActionButtons({ isEditing, isSaving, onCancel, onSubm
   );
 }
 
-export function UnderlineTabs({ options = [], value, onChange, ariaLabel, className = '', style = null, activeColor = '#7C3AED', variant = null }) {
+export function UnderlineTabs({ options = [], value, onChange, ariaLabel, className = '', style = null, activeColor = '#0E0E0E', variant = null }) {
   const React = window.React;
   const list = Array.isArray(options) ? options : [];
   // 'flush' sits edge-to-edge on the modal/page width with equal flex children and no extra
@@ -1803,7 +1803,7 @@ export function OperationProgressOverlay({ title, detail, pct }) {
     /*#__PURE__*/React.createElement('div', { style: { fontWeight: 900, fontSize: '0.9rem', color: 'var(--text-main)', marginBottom: '4px' } }, title || '작업 처리 중...'),
     /*#__PURE__*/React.createElement('div', { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginBottom: '10px', lineHeight: 1.4 } }, detail || '서버에 반영하고 있습니다.'),
     /*#__PURE__*/React.createElement('div', { style: { height: '9px', borderRadius: 'var(--radius-full)', backgroundColor: 'var(--border-subtle)', overflow: 'hidden' } },
-      /*#__PURE__*/React.createElement('div', { style: { height: '100%', width: `${clamped}%`, background: 'linear-gradient(90deg, #4F46E5, #EC4899)', transition: 'width 0.35s ease', borderRadius: 'var(--radius-full)' } })
+      /*#__PURE__*/React.createElement('div', { style: { height: '100%', width: `${clamped}%`, background: '#C6FF3D', transition: 'width 0.35s ease', borderRadius: 'var(--radius-full)' } })
     ),
     /*#__PURE__*/React.createElement('div', { style: { marginTop: '6px', color: 'var(--text-muted)', fontSize: 'var(--font-size-xs)', fontWeight: 800 } }, `${Math.round(clamped)}% · 다른 화면은 계속 사용할 수 있습니다.`)
   ));

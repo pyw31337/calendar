@@ -1796,7 +1796,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '0 4px' }
         },
           /*#__PURE__*/React.createElement("span", {
-            style: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: '#4F46E5', letterSpacing: '0.05em', textTransform: 'uppercase' }
+            style: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: '#0E0E0E', letterSpacing: '0.05em', textTransform: 'uppercase' }
           }, "공유된 메모"),
           /*#__PURE__*/React.createElement("button", {
             type: "button",

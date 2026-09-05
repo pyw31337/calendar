@@ -753,7 +753,7 @@ export function UserManualOverlay({ calendar, onClose }) {
       height: '42px',
       borderRadius: 'var(--radius-md)',
       background: 'linear-gradient(135deg, #EEF2FF, #FDF2F8)',
-      color: '#4F46E5',
+      color: '#0E0E0E',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -773,7 +773,7 @@ export function UserManualOverlay({ calendar, onClose }) {
         style: {
           minHeight: '56px',
           borderRadius: 'var(--radius-md)',
-          border: day === 22 ? '1px solid var(--status-green)' : day === 15 ? '1px solid #7C3AED' : '1px solid var(--border-subtle)',
+          border: day === 22 ? '1px solid var(--status-green)' : day === 15 ? '1px solid #0E0E0E' : '1px solid var(--border-subtle)',
           background: day === 22 ? '#ECFDF5' : day === 15 ? '#FAF5FF' : 'var(--bg-primary)',
           padding: '8px',
           display: 'flex',
@@ -790,7 +790,7 @@ export function UserManualOverlay({ calendar, onClose }) {
           fontWeight: 900,
           fontSize: 'var(--font-size-base)'
         }
-      }, day, day === 15 && /*#__PURE__*/React.createElement("span", { style: { color: '#7C3AED', fontSize: 'var(--font-size-2xs)' } }, "확정")), day === 22 ? /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '4px' } },
+      }, day, day === 15 && /*#__PURE__*/React.createElement("span", { style: { color: '#0E0E0E', fontSize: 'var(--font-size-2xs)' } }, "확정")), day === 22 ? /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '4px' } },
         participantBadge(sampleParticipant),
         participantBadge(sampleParticipant2)
       ) : day === 15 ? /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '4px' } },
@@ -831,8 +831,8 @@ export function UserManualOverlay({ calendar, onClose }) {
         style: { padding: '6px 10px', borderRadius: 'var(--radius-full)', background: 'var(--status-green)', color: '#FFFFFF', fontSize: 'var(--font-size-sm)', fontWeight: 900, whiteSpace: 'nowrap' }
       }, "전원")), /*#__PURE__*/React.createElement("div", {
         style: { border: '1px solid transparent', background: 'linear-gradient(var(--bg-card), var(--bg-card)) padding-box, var(--accent-gradient) border-box', borderRadius: 'var(--radius-md)', padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }
-      }, /*#__PURE__*/React.createElement("strong", { style: { color: '#4F46E5' } }, "[모임확정] 26.08.22 (토)"), /*#__PURE__*/React.createElement("span", {
-        style: { padding: '5px 10px', borderRadius: 'var(--radius-full)', background: 'linear-gradient(135deg, #6366F1, #EC4899)', color: '#FFFFFF', fontWeight: 900, fontSize: 'var(--font-size-sm)' }
+      }, /*#__PURE__*/React.createElement("strong", { style: { color: '#0E0E0E' } }, "[모임확정] 26.08.22 (토)"), /*#__PURE__*/React.createElement("span", {
+        style: { padding: '5px 10px', borderRadius: 'var(--radius-full)', background: '#0E0E0E', color: '#FFFFFF', fontWeight: 900, fontSize: 'var(--font-size-sm)' }
       }, "D-11")))
     }
   ];
@@ -872,7 +872,7 @@ export function UserManualOverlay({ calendar, onClose }) {
   }, /*#__PURE__*/React.createElement("header", {
     style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', marginBottom: '20px' }
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: { display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 10px', borderRadius: 'var(--radius-full)', background: 'rgba(79, 70, 229, 0.1)', color: '#4F46E5', fontSize: 'var(--font-size-md)', fontWeight: 900, marginBottom: '10px' }
+    style: { display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 10px', borderRadius: 'var(--radius-full)', background: 'rgba(79, 70, 229, 0.1)', color: '#0E0E0E', fontSize: 'var(--font-size-md)', fontWeight: 900, marginBottom: '10px' }
   }, "빠른 안내"), /*#__PURE__*/React.createElement("h2", {
     style: { margin: 0, fontSize: 'clamp(1.45rem, 4vw, 2.2rem)', lineHeight: 1.12, letterSpacing: '-0.04em', fontWeight: 950 }
   }, "사용 방법"), /*#__PURE__*/React.createElement("p", {

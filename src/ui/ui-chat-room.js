@@ -1510,7 +1510,7 @@ export function ChatRoomView({
         borderTop: '7px solid transparent',
         borderBottom: '7px solid transparent',
         borderLeft: isSearchFocused
-          ? '7px solid #7C3AED'
+          ? '7px solid #0E0E0E'
           : isSearchMatch
             ? '7px solid rgba(124,58,237,0.45)'
             : '7px solid var(--border-subtle)',
@@ -1568,7 +1568,7 @@ export function ChatRoomView({
         borderTop: '7px solid transparent',
         borderBottom: '7px solid transparent',
         borderRight: isSearchFocused
-          ? '7px solid #7C3AED'
+          ? '7px solid #0E0E0E'
           : isSearchMatch
             ? '7px solid rgba(124,58,237,0.45)'
             : '7px solid var(--border-subtle)',
@@ -1764,8 +1764,10 @@ export function ChatRoomView({
       transform: 'translateX(-50%)',
       display: 'flex',
       alignItems: 'center',
-      fontWeight: 800,
-      fontSize: '0.95rem',
+      fontFamily: 'var(--font-display)',
+      fontWeight: 900,
+      fontSize: '1.1rem',
+      letterSpacing: '-0.02em',
       color: 'var(--text-main)',
       whiteSpace: 'nowrap',
       overflow: 'hidden',
@@ -1843,7 +1845,7 @@ export function ChatRoomView({
       }, "취소"),
       /*#__PURE__*/React.createElement("button", {
         type: "button", className: "btn btn-secondary",
-        style: { flex: 1, height: '44px', minHeight: '44px', backgroundColor: '#0F172A', borderColor: '#0F172A', color: '#FFFFFF', justifyContent: 'center' },
+        style: { flex: 1, height: '44px', minHeight: '44px', backgroundColor: '#0E0E0E', borderColor: '#0E0E0E', color: '#FFFFFF', justifyContent: 'center' },
         onClick: () => {
           const trimmed = noticeInput.trim();
           if (!trimmed) { if (showToast) showToast('공지 내용을 입력해 주세요', 'error'); return; }
@@ -1882,7 +1884,7 @@ export function ChatRoomView({
     /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
       /*#__PURE__*/React.createElement("button", {
         type: "button",
-        style: { flex: 1, border: '1px solid #0F172A', borderRadius: 'var(--radius-md)', padding: '10px', fontWeight: 800, cursor: 'pointer', backgroundColor: '#0F172A', color: '#FFFFFF' },
+        style: { flex: 1, border: '1px solid #0E0E0E', borderRadius: 'var(--radius-md)', padding: '10px', fontWeight: 800, cursor: 'pointer', backgroundColor: '#0E0E0E', color: '#FFFFFF' },
         onClick: () => { setNoticeInput(''); setNoticePanelMode('add'); }
       }, "공지 추가"),
       /*#__PURE__*/React.createElement("button", {
@@ -1961,7 +1963,7 @@ export function ChatRoomView({
       gap: '6px',
       padding: '8px 16px',
       borderRadius: 'var(--radius-full)',
-      backgroundColor: '#4F46E5',
+      backgroundColor: '#0E0E0E',
       color: '#FFFFFF',
       border: 'none',
       boxShadow: '0 4px 12px rgba(79,70,229,0.35)',
@@ -2235,14 +2237,15 @@ export function ChatRoomView({
             onPointerDown: handleSendPointerDown,
             onClick: handleSendClick,
             style: {
-              height: '32px',
-              padding: '0 16px',
-              fontSize: 'var(--font-size-md)',
-              fontWeight: 'bold',
-              backgroundColor: '#57606F',
-              color: '#FFFFFF',
+              height: '34px',
+              padding: '0 18px',
+              fontFamily: 'var(--font-display)',
+              fontSize: '0.85rem',
+              fontWeight: 800,
+              backgroundColor: '#0E0E0E',
+              color: '#C6FF3D',
               border: 'none',
-              borderRadius: '16px',
+              borderRadius: 'var(--radius-full)',
               cursor: 'pointer',
               whiteSpace: 'nowrap',
               opacity: (chatInput.trim() || chatImages.length > 0) && !isChatSubmitting ? 1 : 0.6

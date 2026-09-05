@@ -1468,7 +1468,7 @@ export function CalendarGrid({
     const cornerText = isHoliday
       ? holidayLabel
       : isConfirmed ? '확정' : isAllAvailable ? '전원' : solarTermName;
-    const cornerColor = isHoliday ? '#EF4444' : isConfirmed ? '#7C3AED' : isAllAvailable ? 'var(--status-green)' : '#94A3B8';
+    const cornerColor = isHoliday ? '#EF4444' : isConfirmed ? '#0E0E0E' : isAllAvailable ? 'var(--status-green)' : '#94A3B8';
     const cornerTitle = isHoliday
       ? ((lunarLabel ? `${holidayNames.join(', ')} (${lunarLabel})` : holidayNames.join(', ')) + (isConfirmed ? ' · 확정' : ''))
       : (isConfirmed ? '모임 확정' : undefined);
@@ -1562,7 +1562,7 @@ export function CalendarGrid({
           }
         }, cornerText, isHoliday && isConfirmed ? /*#__PURE__*/React.createElement("span", {
           style: {
-            color: '#7C3AED'
+            color: '#0E0E0E'
           }
         }, "·확정") : null)
       ),
@@ -1814,9 +1814,32 @@ export function CalendarGrid({
     }, touchDragBadge.name), document.body)
     : null;
 
+  /* Color-key legend under the month grid (Nike-style redesign) -- the day-cell states
+     (today/confirmed/all-available) were previously conveyed only by color+corner-label with
+     no on-screen key at all; this spells them out once, directly under the grid they describe. */
+  const gridLegend = compact ? null : /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex', flexWrap: 'wrap', gap: '14px',
+      padding: '12px 2px 2px', marginTop: '4px', borderTop: '1px solid var(--border-subtle)'
+    }
+  },
+    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
+      /*#__PURE__*/React.createElement("span", { style: { width: '10px', height: '10px', borderRadius: '3px', background: 'var(--accent-lime)', flexShrink: 0 } }),
+      /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--text-muted)' } }, "오늘")
+    ),
+    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
+      /*#__PURE__*/React.createElement("span", { style: { width: '10px', height: '10px', borderRadius: '3px', background: 'var(--text-main)', flexShrink: 0 } }),
+      /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--text-muted)' } }, "확정된 모임")
+    ),
+    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px' } },
+      /*#__PURE__*/React.createElement("span", { style: { width: '10px', height: '10px', borderRadius: '3px', border: '1.5px solid var(--status-green)', flexShrink: 0 } }),
+      /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--text-muted)' } }, "전원 가능")
+    )
+  );
+
   return touchDragIndicator
-    ? /*#__PURE__*/React.createElement(React.Fragment, null, gridTree, touchDragIndicator)
-    : gridTree;
+    ? /*#__PURE__*/React.createElement(React.Fragment, null, gridTree, gridLegend, touchDragIndicator)
+    : /*#__PURE__*/React.createElement(React.Fragment, null, gridTree, gridLegend);
 }
 
 export function CommentsSection({

@@ -7875,30 +7875,31 @@ function CalendarApp() {
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: '8px 10px',
-          minWidth: '70px',
-          minHeight: '66px',
-          borderRadius: '12px',
-          background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%)',
+          padding: '10px 12px',
+          minWidth: '82px',
+          minHeight: '78px',
+          borderRadius: '16px',
+          background: '#0E0E0E',
           color: '#FFFFFF',
           border: 'none',
           cursor: 'pointer',
-          boxShadow: '0 2px 8px rgba(168, 85, 247, 0.25)',
+          boxShadow: '0 2px 8px rgba(14, 14, 14, 0.3)',
           userSelect: 'none',
           WebkitTapHighlightColor: 'transparent'
         }
       },
         /* Date YY.MM.DD */
         /*#__PURE__*/React.createElement("span", {
-          style: { fontSize: 'var(--font-size-xs)', fontWeight: 800, color: '#FFFFFF', lineHeight: 1.1, textShadow: '0 1px 2px rgba(0,0,0,0.15)' }
+          style: { fontFamily: 'var(--font-display)', fontSize: '0.75rem', fontWeight: 800, color: '#FFFFFF', lineHeight: 1.1, textShadow: '0 1px 2px rgba(0,0,0,0.15)' }
         }, yyMMdd),
         /* Day Name */
         /*#__PURE__*/React.createElement("span", {
           style: {
-            fontSize: 'var(--font-size-base)',
-            fontWeight: 800,
-            color: shortDayName === '일' ? '#B7F34A' : '#FFFFFF',
-            marginTop: '2px',
+            fontFamily: 'var(--font-display)',
+            fontSize: '1rem',
+            fontWeight: 900,
+            color: shortDayName === '일' ? '#C6FF3D' : '#FFFFFF',
+            marginTop: '3px',
             lineHeight: 1.1,
             textShadow: '0 1px 2px rgba(0,0,0,0.15)'
           }
@@ -7906,13 +7907,14 @@ function CalendarApp() {
         /* D-day Pill Badge */
         /*#__PURE__*/React.createElement("span", {
           style: {
-            backgroundColor: 'rgba(26, 16, 47, 0.85)',
-            color: '#F472B6',
-            padding: '2px 8px',
+            backgroundColor: 'rgba(255, 255, 255, 0.14)',
+            color: '#C6FF3D',
+            padding: '3px 9px',
             borderRadius: 'var(--radius-full)',
-            fontSize: 'var(--font-size-xs)',
+            fontFamily: 'var(--font-display)',
+            fontSize: '0.72rem',
             fontWeight: 800,
-            marginTop: '4px',
+            marginTop: '5px',
             whiteSpace: 'nowrap',
             letterSpacing: '0.02em',
             boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
@@ -7945,9 +7947,9 @@ function CalendarApp() {
           justifyContent: 'space-between',
           width: '100%',
           flex: '1 1 100%',
-          padding: '10px 14px',
-          borderRadius: '12px',
-          background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%)',
+          padding: '14px 18px',
+          borderRadius: '18px',
+          background: '#0E0E0E',
           color: '#FFFFFF',
           border: 'none',
           cursor: 'pointer',
@@ -8024,7 +8026,7 @@ function CalendarApp() {
             }
           },
           style: {
-            backgroundColor: 'rgba(26, 16, 47, 0.88)',
+            backgroundColor: 'rgba(255, 255, 255, 0.14)',
             borderRadius: 'var(--radius-md)',
             padding: '6px 14px',
             display: 'flex',
@@ -8038,7 +8040,7 @@ function CalendarApp() {
           }
         },
           /*#__PURE__*/React.createElement("span", {
-            style: { color: '#F472B6', fontSize: 'var(--font-size-xs)', fontWeight: 800, lineHeight: 1.2 }
+            style: { color: '#C6FF3D', fontSize: 'var(--font-size-xs)', fontWeight: 800, lineHeight: 1.2 }
           }, ddayText),
           /*#__PURE__*/React.createElement("span", {
             style: { color: '#FFFFFF', fontSize: 'var(--font-size-sm)', fontWeight: 800, lineHeight: 1.2, marginTop: '1px' }
