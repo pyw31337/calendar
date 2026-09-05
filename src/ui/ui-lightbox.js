@@ -1000,15 +1000,11 @@ function CommentThread({ comments = [], onCommentsChange, calendar, showToast, o
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const ChatParticipantSheet = __comp.ChatParticipantSheet || __deps.ChatParticipantSheet;
   const ParticipantPickerButton = __comp.ParticipantPickerButton || __deps.ParticipantPickerButton;
-  const MessageCommentIcon = __comp.MessageCommentIcon || __deps.MessageCommentIcon;
   const PencilIcon = __comp.PencilIcon || __deps.PencilIcon;
   const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
   const AutoGrowTextarea = __comp.AutoGrowTextarea || __deps.AutoGrowTextarea;
   const sanitizeText = __deps.sanitizeText;
 
-  // 라이트박스 초기화면에서부터 댓글 입력창이 바로 보여야 하므로(memo 카드와 달리 별도 클릭 불필요)
-  // 기본값을 열림으로 둔다 -- 이 컴포넌트는 memo 쪽과 완전히 분리되어 라이트박스 전용이라 안전하다.
-  const [isCommentComposerOpen, setIsCommentComposerOpen] = React.useState(true);
   const [commentText, setCommentText] = React.useState('');
   const [commentParticipantId, setCommentParticipantId] = React.useState(() => getStoredChatParticipantId(calendar?.id, calendar));
   const [isCommentPartOpen, setIsCommentPartOpen] = React.useState(false);
@@ -1035,7 +1031,6 @@ function CommentThread({ comments = [], onCommentsChange, calendar, showToast, o
       if (saved === false) return;
       setCommentText('');
       setEditingCommentId(null);
-      setIsCommentComposerOpen(false);
       if (typeof showToast === 'function') {
         showToast(wasEditing ? '댓글이 수정되었습니다' : '댓글이 등록되었습니다', 'success');
       }
@@ -1048,7 +1043,6 @@ function CommentThread({ comments = [], onCommentsChange, calendar, showToast, o
     if (e) e.stopPropagation();
     setEditingCommentId(null);
     setCommentText('');
-    setIsCommentComposerOpen(false);
   };
 
   const handleStartEditComment = (e, comment) => {
@@ -1056,7 +1050,6 @@ function CommentThread({ comments = [], onCommentsChange, calendar, showToast, o
     setEditingCommentId(comment.id);
     setCommentText(comment.text);
     setCommentParticipantId(comment.participantId);
-    setIsCommentComposerOpen(true);
   };
 
   const handleDeleteComment = (e, comment) => {
@@ -1077,7 +1070,6 @@ function CommentThread({ comments = [], onCommentsChange, calendar, showToast, o
       if (editingCommentId === commentId) {
         setEditingCommentId(null);
         setCommentText('');
-        setIsCommentComposerOpen(false);
       }
       if (typeof showToast === 'function') {
         showToast('댓글이 삭제되었습니다', 'delete', 5000, async () => {
@@ -1092,23 +1084,6 @@ function CommentThread({ comments = [], onCommentsChange, calendar, showToast, o
   };
 
   return /*#__PURE__*/React.createElement("div", { onClick: e => e.stopPropagation() },
-    /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      onClick: (e) => {
-        e.stopPropagation();
-        setEditingCommentId(null);
-        setCommentText('');
-        setIsCommentComposerOpen(v => !v);
-      },
-      title: "댓글",
-      "aria-label": "댓글",
-      style: {
-        display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 2px',
-        color: (comments.length > 0 || isCommentComposerOpen) ? 'var(--accent-primary)' : '#94A3B8',
-        fontSize: 'var(--font-size-sm)', fontWeight: 700
-      }
-    }, /*#__PURE__*/React.createElement(MessageCommentIcon, { size: 18 }), `댓글${comments.length > 0 ? ` ${comments.length}` : ''}`),
-
     comments.length > 0 && /*#__PURE__*/React.createElement("div", {
       style: { display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '4px' }
     },
@@ -1162,10 +1137,10 @@ function CommentThread({ comments = [], onCommentsChange, calendar, showToast, o
       })
     ),
 
-    isCommentComposerOpen && /*#__PURE__*/React.createElement("div", {
+    /*#__PURE__*/React.createElement("div", {
       className: "comment-composer",
       onClick: e => e.stopPropagation(),
-      style: { marginTop: '8px' }
+      style: { marginTop: comments.length > 0 ? '8px' : '0' }
     },
       AutoGrowTextarea && /*#__PURE__*/React.createElement(AutoGrowTextarea, {
         className: "comment-composer-input",
@@ -1444,7 +1419,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar, sho
       key: `comments-${photoCommentKey}`,
       className: "lightbox-comment-thread lightbox-comment-thread-dark",
       style: {
-        width: '92vw', maxWidth: '480px', maxHeight: '22vh', overflowY: 'auto', marginTop: '16px', padding: '10px 14px',
+        width: '92vw', maxHeight: '22vh', overflowY: 'auto', marginTop: '16px', padding: '10px 14px',
         backgroundColor: 'rgba(15, 23, 42, 0.72)', border: '1px solid rgba(255,255,255,0.12)',
         borderRadius: 'var(--radius-md)', boxSizing: 'border-box'
       }
