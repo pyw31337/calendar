@@ -2823,6 +2823,24 @@ function CalendarApp() {
     }
   };
 
+  // 추억 탭의 "삭제" -- 흔들도시락처럼 반복 일정용으로만 등록한 기념일은 날짜 구간이 우연히
+  // 사진과 겹치면 추억 탭에 여행처럼 그룹으로 잡혀버린다. 기념일(반복 일정)과 사진은 그대로 두고,
+  // 이 플래그만 켜서 추억 탭 그룹핑 대상에서만 숨긴다.
+  const handleHideMemoryGroup = async (anniversaryId) => {
+    if (!activeCal?.id || !anniversaryId) return false;
+    try {
+      const saved = await writeCollectionDocumentWithFallback('anniversaries', activeCal.id, anniversaryId, { hiddenFromMemories: true }, 'update', '추억 목록에서 숨김');
+      if (!saved?.success) throw new Error('hide memory group failed');
+      handleAnniversarySaved({ id: anniversaryId, hiddenFromMemories: true });
+      showToast('추억 목록에서 삭제했습니다.', 'success');
+      return true;
+    } catch (err) {
+      console.error('Failed to hide memory group:', err);
+      showToast('삭제 실패', 'error');
+      return false;
+    }
+  };
+
   // 보관함 > 컨텐츠 등록 / 컨텐츠 페이지: calendar-owned custom culture/festival/sports cards
   // merged into the CulturePerformancesTab lists alongside crawled JSON snapshots.
   React.useEffect(() => {
@@ -7592,6 +7610,7 @@ function CalendarApp() {
         onRequestConfirm: showConfirmDialog,
         onRemovePhotoFromMemory: handleRemovePhotoFromTravelMemory,
         onRemovePhotosFromMemory: handleRemovePhotosFromTravelMemory,
+        onHideMemoryGroup: handleHideMemoryGroup,
         onFetchPhotoComments: handleFetchPhotoComments,
         onSavePhotoComments: handleSavePhotoComments,
         ...navMenuProps

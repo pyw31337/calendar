@@ -1822,7 +1822,8 @@ export function HistoryView({
   onDeletePhoto = null, onReplacePhoto = null,
   onJumpToChatMessage = null, onJumpToMemo = null, onJumpToMeetingDate = null,
   onGetChatMessageOrdinal = null, onGetGalleryPhotoOrdinal = null, onRequestConfirm = null,
-  onRemovePhotoFromMemory = null, onRemovePhotosFromMemory = null, onFetchPhotoComments = null, onSavePhotoComments = null
+  onRemovePhotoFromMemory = null, onRemovePhotosFromMemory = null, onFetchPhotoComments = null, onSavePhotoComments = null,
+  onHideMemoryGroup = null
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -1968,6 +1969,25 @@ export function HistoryView({
       onRequestConfirm('사진 제외', `총 ${keys.length}장의 사진을 ${group.title}에서 제외할까요?`, doExclude);
     }
   };
+  // 흔들도시락처럼 매월 반복 일정용으로 등록한 기념일은 사진이 우연히 그 기간에 걸리면
+  // 추억 탭에 여행처럼 그룹으로 잡혀버린다 -- 실제 반복 일정 자체(및 그 사진)는 그대로 두고,
+  // 이 기념일만 추억 탭 그룹핑 대상에서 숨기는 플래그(hiddenFromMemories)를 남긴다.
+  const [isHidingMemoryGroup, setIsHidingMemoryGroup] = React.useState(false);
+  const handleClickDeleteMemoryGroup = group => {
+    if (typeof onHideMemoryGroup !== 'function') return;
+    const doHide = async () => {
+      setIsHidingMemoryGroup(true);
+      try {
+        const ok = await onHideMemoryGroup(group.id);
+        if (ok !== false) setSelectedMemoryGroupId(null);
+      } finally {
+        setIsHidingMemoryGroup(false);
+      }
+    };
+    if (typeof onRequestConfirm === 'function') {
+      onRequestConfirm('추억 삭제', `'${group.title}'을(를) 추억 목록에서 삭제할까요? (사진과 원래 일정은 그대로 유지됩니다)`, doHide);
+    }
+  };
   const entryTagTokens = entry => String(entry?.tags || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean);
   // 한국식 성+이름 태그 매칭: "박영우"로 등록된 참여자는 "영우"라고만 붙은 사진 해시태그도
   // 같은 사람으로 인식해야 한다. 성 1자를 뗀 이름만으로도 같은 사람을 부르는 경우가 흔하기
@@ -2031,7 +2051,7 @@ export function HistoryView({
     // "기간: 정보없음" 버그와 같은 원인) -- a.date를 폴백으로 읽지 않으면 하루짜리로 등록한
     // 여행은 사진이 있어도 추억 탭에서 통째로 사라진다.
     return (anniversaries || [])
-      .filter(a => a && (a.startDate || a.date))
+      .filter(a => a && (a.startDate || a.date) && !a.hiddenFromMemories)
       .map(a => {
         const start = a.startDate || a.date;
         const end = a.endDate || a.startDate || a.date;
@@ -2314,15 +2334,28 @@ export function HistoryView({
                     }
                   }, `제외${selectedMemoryPhotoKeys.size > 0 ? ` (${selectedMemoryPhotoKeys.size})` : ''}`)
                 )
-              : /*#__PURE__*/React.createElement("button", {
-                  type: "button",
-                  onClick: () => setIsMemoryEditMode(true),
-                  style: {
-                    flexShrink: 0, height: '32px', padding: '0 12px', borderRadius: 'var(--radius-md)',
-                    border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)',
-                    fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer'
-                  }
-                }, "편집")
+              : /*#__PURE__*/React.createElement(React.Fragment, null,
+                  /*#__PURE__*/React.createElement("button", {
+                    type: "button",
+                    onClick: () => setIsMemoryEditMode(true),
+                    style: {
+                      flexShrink: 0, height: '32px', padding: '0 12px', borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)',
+                      fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer'
+                    }
+                  }, "편집"),
+                  typeof onHideMemoryGroup === 'function' && /*#__PURE__*/React.createElement("button", {
+                    type: "button",
+                    onClick: () => handleClickDeleteMemoryGroup(group),
+                    disabled: isHidingMemoryGroup,
+                    style: {
+                      flexShrink: 0, height: '32px', padding: '0 12px', borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', color: '#EF4444',
+                      fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: isHidingMemoryGroup ? 'default' : 'pointer',
+                      opacity: isHidingMemoryGroup ? 0.5 : 1
+                    }
+                  }, "삭제")
+                )
           )
         ),
         /*#__PURE__*/React.createElement("div", {
