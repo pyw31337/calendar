@@ -2841,6 +2841,28 @@ function CalendarApp() {
     }
   };
 
+  // 추억 탭의 "추가" -- handleRemovePhotosFromTravelMemory로 제외했던 사진을 다시 이 추억에
+  // 넣을 수 있게, excludedMemoryPhotoKeys에서 골라낸 키들만 제거한다.
+  const handleAddPhotosBackToTravelMemory = async (anniversaryId, photoKeys) => {
+    if (!activeCal?.id || !anniversaryId || !Array.isArray(photoKeys) || photoKeys.length === 0) return false;
+    const ann = (anniversaries || []).find(a => a.id === anniversaryId);
+    const existing = Array.isArray(ann?.excludedMemoryPhotoKeys) ? ann.excludedMemoryPhotoKeys : [];
+    const remove = new Set(photoKeys);
+    const next = existing.filter(k => !remove.has(k));
+    if (next.length === existing.length) return true;
+    try {
+      const saved = await writeCollectionDocumentWithFallback('anniversaries', activeCal.id, anniversaryId, { excludedMemoryPhotoKeys: next }, 'update', '추억에 사진 다시 추가');
+      if (!saved?.success) throw new Error('add photos back to travel memory failed');
+      handleAnniversarySaved({ id: anniversaryId, excludedMemoryPhotoKeys: next });
+      showToast(`사진 ${photoKeys.length}장을 추억에 다시 추가했습니다.`, 'success');
+      return true;
+    } catch (err) {
+      console.error('Failed to add photos back to travel memory:', err);
+      showToast('추가 실패', 'error');
+      return false;
+    }
+  };
+
   // 보관함 > 컨텐츠 등록 / 컨텐츠 페이지: calendar-owned custom culture/festival/sports cards
   // merged into the CulturePerformancesTab lists alongside crawled JSON snapshots.
   React.useEffect(() => {
@@ -7627,6 +7649,7 @@ function CalendarApp() {
         onRemovePhotoFromMemory: handleRemovePhotoFromTravelMemory,
         onRemovePhotosFromMemory: handleRemovePhotosFromTravelMemory,
         onHideMemoryGroup: handleHideMemoryGroup,
+        onAddPhotosBackToMemory: handleAddPhotosBackToTravelMemory,
         onFetchPhotoComments: handleFetchPhotoComments,
         onSavePhotoComments: handleSavePhotoComments,
         ...navMenuProps
