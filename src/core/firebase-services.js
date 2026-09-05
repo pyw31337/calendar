@@ -800,13 +800,88 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     }
   }
 
+  // Real-time chat listener. Firestore's orderBy() silently EXCLUDES any document missing the
+  // ordered field from the result set (see fetchRecentChatMessages above for the same issue on
+  // the one-shot path) -- and unlike a one-shot read, an onSnapshot subscription only fires once
+  // for a query that keeps matching zero documents, so nothing ever re-checks it. If some message
+  // docs in this calendar lack a `timestamp` field (a bad write, an old migration, a manual edit),
+  // this listener would report "empty" forever and never recover on its own, no matter how much
+  // real chat history exists in the collection -- exactly the "count says there's chat, chat room
+  // shows nothing" symptom, but for the live listener rather than a single fetch. When the ordered
+  // query's first snapshot comes back empty, fall back to an unordered live listener (which has no
+  // such exclusion), sorting/limiting the results client-side before handing them to the caller in
+  // the same snapshot-like shape (a `forEach`) callers already rely on.
   function subscribeMessages(calId, options, onSnapshot, onError) {
+    const firebaseDb = getDb();
+    if (!firebaseDb || !isValidCalId(calId)) return noop;
     options = options || {};
-    return subscribeCalSubcollection(
-      calId, 'messages',
-      { orderBy: options.orderBy || 'timestamp', direction: options.direction || 'desc', limit: options.limit },
-      onSnapshot, onError
-    );
+    const orderField = options.orderBy || 'timestamp';
+    const direction = options.direction || 'desc';
+    const limitN = Number(options.limit) > 0 ? Number(options.limit) : null;
+
+    let stopped = false;
+    let innerUnsub = noop;
+
+    function sortedSnapshotFrom(docs) {
+      const sorted = docs.slice().sort(function (a, b) {
+        const ta = Number(a.data()[orderField]) || 0;
+        const tb = Number(b.data()[orderField]) || 0;
+        return direction === 'desc' ? tb - ta : ta - tb;
+      });
+      const limited = limitN ? sorted.slice(0, limitN) : sorted;
+      return { forEach: function (fn) { limited.forEach(fn); } };
+    }
+
+    function attachUnordered() {
+      if (stopped) return;
+      try {
+        let q = firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages');
+        // No orderBy to apply server-side, so widen the raw window before sorting/limiting
+        // client-side -- otherwise an arbitrary-order limit() could clip out the very messages
+        // that should have been "most recent".
+        q = q.limit(limitN ? Math.max(limitN * 4, 200) : 200);
+        innerUnsub = q.onSnapshot(function (snap) {
+          if (stopped) return;
+          onSnapshot(sortedSnapshotFrom(snap.docs));
+        }, onError || noop);
+      } catch (err) {
+        console.warn('subscribeMessages unordered fallback', err);
+        if (typeof onError === 'function') onError(err);
+      }
+    }
+
+    function attachOrdered() {
+      let usedFallback = false;
+      try {
+        let q = firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
+          .orderBy(orderField, direction);
+        if (limitN) q = q.limit(limitN);
+        innerUnsub = q.onSnapshot(function (snap) {
+          if (stopped) return;
+          if (snap.empty && !usedFallback) {
+            usedFallback = true;
+            const prevUnsub = innerUnsub;
+            attachUnordered();
+            if (typeof prevUnsub === 'function') prevUnsub();
+            return;
+          }
+          onSnapshot(snap);
+        }, function (err) {
+          console.warn('subscribeMessages ordered', err);
+          if (typeof onError === 'function') onError(err);
+        });
+      } catch (err) {
+        console.warn('subscribeMessages ordered attach', err);
+        if (typeof onError === 'function') onError(err);
+      }
+    }
+
+    attachOrdered();
+
+    return function () {
+      stopped = true;
+      if (typeof innerUnsub === 'function') innerUnsub();
+    };
   }
 
   function subscribePlaces(calId, onSnapshot, onError) {
