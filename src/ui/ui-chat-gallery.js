@@ -888,6 +888,29 @@ function GalleryLinkCard({ item }) {
   );
 }
 
+// 다른 캘린더의 라이트박스에서 "URL 복사하기"로 복사한 URL을 이 갤러리 페이지에 붙여넣을 때
+// 쓰는 파서(ImageUrlModal, ui-remaining.js가 붙여넣은 대응 인코더). URL 자체는 그대로 두고
+// 눈에 보이지 않는 프래그먼트(#gatherPhoto=<base64 JSON>)에 태그만 실어 보냈으므로, 여기서는
+// 그 프래그먼트만 떼어내 태그를 복원하고 나머지(원본 URL)는 그대로 이미지 주소로 쓴다. 형식이
+// 안 맞으면(다른 사이트에서 복사한 평범한 이미지 URL 등) null을 반환해 기존 "링크 추가" 등
+// 다른 붙여넣기 경로로 자연스럽게 넘어가게 한다.
+function parseGatherPhotoClipboardText(text) {
+  const raw = String(text || '').trim();
+  if (!/^https?:\/\//i.test(raw)) return null;
+  const markerIndex = raw.indexOf('#gatherPhoto=');
+  if (markerIndex === -1) return null;
+  const url = raw.slice(0, markerIndex);
+  const b64 = raw.slice(markerIndex + '#gatherPhoto='.length);
+  try {
+    const json = decodeURIComponent(escape(atob(b64)));
+    const payload = JSON.parse(json);
+    if (!payload || payload.kind !== 'gather-photo' || !url) return null;
+    return { url, tags: String(payload.tags || '').trim() };
+  } catch (_) {
+    return null;
+  }
+}
+
 export function ChatGalleryModal({
   chatMessages,
   memos = [],
@@ -925,6 +948,7 @@ export function ChatGalleryModal({
   memoLastTitleWord = null,
   showToast,
   onDeletePhoto = null,
+  onPasteGatherPhoto = null,
   syncStatus = null
 }) {
   const React = window.React;
@@ -975,6 +999,8 @@ export function ChatGalleryModal({
   const uploadInputRef = React.useRef(null);
   const hasClipboardImage = useClipboardHasImage(true);
   const [pastePreview, setPastePreview] = React.useState(null); // { files, previewUrls } | null
+  const [gatherPhotoPastePreview, setGatherPhotoPastePreview] = React.useState(null); // { url, tags } | null
+  const [isSavingGatherPhotoPaste, setIsSavingGatherPhotoPaste] = React.useState(false);
   const brokenPhotoKeysRef = React.useRef((GATHER_APP_UTILS.getPersistentBrokenPhotoUrls || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.getPersistentBrokenPhotoUrls) || (() => new Set()))());
   const brokenPhotoUrlsRef = React.useRef((GATHER_APP_UTILS.getPersistentBrokenPhotoUrls || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.getPersistentBrokenPhotoUrls) || (() => new Set()))());
   const [brokenPhotoRevision, setBrokenPhotoRevision] = React.useState(0);
@@ -1435,6 +1461,16 @@ export function ChatGalleryModal({
   };
   const handlePasteGalleryUpload = async e => {
     if (e) e.stopPropagation();
+    // Other-calendar 사진(gather-photo URL)인지 먼저 확인 -- 클립보드 이미지 파일 읽기보다
+    // 먼저 시도해서, 다른 캘린더에서 복사해온 URL이 있을 땐 그쪽을 우선한다.
+    let clipboardText = '';
+    try { clipboardText = await navigator.clipboard.readText(); } catch (_) { /* not granted/available */ }
+    const gatherPhoto = parseGatherPhotoClipboardText(clipboardText);
+    if (gatherPhoto) {
+      setIsMenuOpen(false);
+      setGatherPhotoPastePreview(gatherPhoto);
+      return;
+    }
     const files = await readClipboardImageFiles(showToast);
     if (files && files.length > 0) {
       // Show what will be uploaded and let the user confirm instead of uploading immediately --
@@ -1451,6 +1487,20 @@ export function ChatGalleryModal({
     const files = pastePreview.files;
     setPastePreview(null);
     await uploadFiles(files);
+  };
+  const handleCancelGatherPhotoPaste = () => setGatherPhotoPastePreview(null);
+  const handleConfirmGatherPhotoPaste = async () => {
+    if (!gatherPhotoPastePreview || typeof onPasteGatherPhoto !== 'function' || isSavingGatherPhotoPaste) return;
+    setIsSavingGatherPhotoPaste(true);
+    try {
+      const ok = await onPasteGatherPhoto(gatherPhotoPastePreview.url, gatherPhotoPastePreview.tags);
+      if (ok !== false) {
+        setGatherPhotoPastePreview(null);
+        setActiveTab('photos');
+      }
+    } finally {
+      setIsSavingGatherPhotoPaste(false);
+    }
   };
   const uploadFiles = async files => {
     if (!files.length || typeof onUploadImages !== 'function') return;
@@ -1536,8 +1586,22 @@ export function ChatGalleryModal({
   // event -- otherwise a stray Ctrl+V uploads whatever happens to be on the clipboard with no
   // chance to back out.
   React.useEffect(() => {
-    if (typeof onUploadImages !== 'function') return;
+    if (typeof onUploadImages !== 'function' && typeof onPasteGatherPhoto !== 'function') return;
     const handlePaste = e => {
+      // 다른 캘린더 사진(gather-photo URL)이 먼저 -- clipboardData는 이 이벤트에서만 동기적으로
+      // 읽을 수 있어(navigator.clipboard 비동기 API와 달리 권한 프롬프트 없이) Ctrl+V 쪽은
+      // 이 경로로 확인한다.
+      if (typeof onPasteGatherPhoto === 'function') {
+        const text = e.clipboardData ? e.clipboardData.getData('text/plain') : '';
+        const gatherPhoto = parseGatherPhotoClipboardText(text);
+        if (gatherPhoto) {
+          e.preventDefault();
+          setIsMenuOpen(false);
+          setGatherPhotoPastePreview(gatherPhoto);
+          return;
+        }
+      }
+      if (typeof onUploadImages !== 'function') return;
       const files = getImageFilesFromClipboardEvent(e);
       if (!files.length) return;
       e.preventDefault();
@@ -1546,7 +1610,7 @@ export function ChatGalleryModal({
     };
     document.addEventListener('paste', handlePaste);
     return () => document.removeEventListener('paste', handlePaste);
-  }, [onUploadImages]);
+  }, [onUploadImages, onPasteGatherPhoto]);
   const renderMenuIcon = () => MenuIcon
     ? /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M4 6h16", "M4 12h16", "M4 18h16"] })
     : /*#__PURE__*/React.createElement("svg", {
@@ -1602,6 +1666,61 @@ export function ChatGalleryModal({
         onClick: handleConfirmPastePreview,
         style: { flex: 1, height: '36px', fontSize: 'var(--font-size-base)' }
       }, "업로드")
+    )
+  )) : null;
+
+  const gatherPhotoTagList = gatherPhotoPastePreview
+    ? String(gatherPhotoPastePreview.tags || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean)
+    : [];
+  // 다른 캘린더 라이트박스에서 복사해온 사진을 붙여넣기 전 확인하는 모달 -- 사진과 그 사진의
+  // 해시태그를 함께 보여줘, 붙여넣은 뒤에는 이 캘린더에서 독립적으로 관리된다는 걸 알 수 있게
+  // 태그 개수를 명시한다.
+  const gatherPhotoPasteModal = gatherPhotoPastePreview ? /*#__PURE__*/React.createElement("div", {
+    className: "modal-overlay",
+    style: { zIndex: 30000 },
+    onClick: handleCancelGatherPhotoPaste
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-container confirm-dialog-modal",
+    onClick: e => e.stopPropagation(),
+    style: { maxWidth: '360px', borderRadius: 'var(--radius-md)' }
+  },
+    /*#__PURE__*/React.createElement("h3", {
+      style: { fontSize: '1.05rem', fontWeight: 800, marginBottom: '12px', color: 'var(--text-main)', textAlign: 'center' }
+    }, "다른 캘린더 사진을 붙여넣을까요?"),
+    /*#__PURE__*/React.createElement("img", {
+      src: gatherPhotoPastePreview.url,
+      alt: "붙여넣을 사진 미리보기",
+      style: { width: '100%', maxHeight: '40vh', objectFit: 'contain', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)', marginBottom: '12px' }
+    }),
+    gatherPhotoTagList.length > 0 && /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '16px', justifyContent: 'center' }
+    }, gatherPhotoTagList.map(tag => /*#__PURE__*/React.createElement("span", {
+      key: tag,
+      style: {
+        display: 'inline-flex', alignItems: 'center', padding: '3px 10px', borderRadius: 'var(--radius-full)',
+        border: '1px solid var(--border-subtle)', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', fontWeight: 700
+      }
+    }, `#${tag}`))),
+    /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', textAlign: 'center', marginBottom: '16px' }
+    }, gatherPhotoTagList.length > 0
+      ? `사진과 해시태그 ${gatherPhotoTagList.length}개를 이 캘린더 갤러리에 붙여넣습니다. 이후 태그 변경은 서로 영향을 주지 않습니다.`
+      : '사진을 이 캘린더 갤러리에 붙여넣습니다.'),
+    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '10px', justifyContent: 'center' } },
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "btn btn-secondary",
+        onClick: handleCancelGatherPhotoPaste,
+        disabled: isSavingGatherPhotoPaste,
+        style: { flex: 1, height: '36px', fontSize: 'var(--font-size-base)' }
+      }, "취소"),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "btn btn-action-dark",
+        onClick: handleConfirmGatherPhotoPaste,
+        disabled: isSavingGatherPhotoPaste,
+        style: { flex: 1, height: '36px', fontSize: 'var(--font-size-base)', opacity: isSavingGatherPhotoPaste ? 0.6 : 1 }
+      }, isSavingGatherPhotoPaste ? "붙여넣는 중..." : "붙여넣기")
     )
   )) : null;
 
@@ -2328,7 +2447,7 @@ export function ChatGalleryModal({
     )),
     document.body
   );
-  return /*#__PURE__*/React.createElement(React.Fragment, null, galleryTree, pastePreviewModal, galleryYearMonthPickerSheet);
+  return /*#__PURE__*/React.createElement(React.Fragment, null, galleryTree, pastePreviewModal, gatherPhotoPasteModal, galleryYearMonthPickerSheet);
 }
 
   if (typeof window !== 'undefined') {

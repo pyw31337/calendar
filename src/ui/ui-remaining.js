@@ -1504,7 +1504,28 @@ export function PlacesSection({ calendar, onViewAll, onSelectPlace }) {
   );
 }
 
-export function ImageUrlModal({ imageUrl, onClose, showToast, onEnsureShareUrl }) {
+// 다른 캘린더의 갤러리 페이지에 이 URL을 붙여넣으면(붙여넣기 버튼 또는 Ctrl+V) 사진과 해시태그를
+// 그대로 들고 가되, 그 이후로는 서로 완전히 독립적으로 관리되도록(한쪽에서 태그를 추가/삭제해도
+// 다른 쪽에 영향 없음) -- URL 자체는 그대로 두고(다른 곳에 붙여넣어도 정상 동작하는 이미지 링크로
+// 남도록) 눈에 보이지 않는 URL 프래그먼트(#)에 태그만 실어 보낸다. 프래그먼트는 서버로 전송되지
+// 않고 이미지 로딩에도 영향을 주지 않아 원본 URL의 용도를 해치지 않는다. 파일정보(타입/용량/
+// 해상도)는 URL과 업로드 시각만 있으면 붙여넣은 쪽에서도 똑같이 다시 계산되므로 여기 실어보낼
+// 필요가 없다 -- 오직 태그(해시태그)만 앱이 스스로 다시 계산해낼 수 없는 값이라 실어 보낸다.
+const GATHER_PHOTO_FRAGMENT_PREFIX = '#gatherPhoto=';
+function encodeGatherPhotoFragment(tags) {
+  const cleanTags = String(tags || '').trim();
+  if (!cleanTags) return '';
+  try {
+    const payload = { v: 1, kind: 'gather-photo', tags: cleanTags };
+    const json = JSON.stringify(payload);
+    const b64 = typeof btoa === 'function' ? btoa(unescape(encodeURIComponent(json))) : '';
+    return b64 ? GATHER_PHOTO_FRAGMENT_PREFIX + b64 : '';
+  } catch (_) {
+    return '';
+  }
+}
+
+export function ImageUrlModal({ imageUrl, tags = '', onClose, showToast, onEnsureShareUrl }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -1586,7 +1607,9 @@ export function ImageUrlModal({ imageUrl, onClose, showToast, onEnsureShareUrl }
     disabled: isGenerating || !isShareableUrl,
     style: { opacity: isGenerating || !isShareableUrl ? 0.65 : 1, cursor: isGenerating || !isShareableUrl ? 'not-allowed' : 'pointer' },
     onClick: async () => {
-      const ok = await copyTextToClipboard(resolvedUrl || '');
+      const fragment = encodeGatherPhotoFragment(tags);
+      const copyText = fragment ? `${resolvedUrl || ''}${fragment}` : (resolvedUrl || '');
+      const ok = await copyTextToClipboard(copyText);
       const message = ok ? '이미지 URL이 복사되었습니다.' : '복사에 실패했습니다. URL을 직접 선택해 복사해 주세요.';
       if (showToast) showToast(message, ok ? 'success' : 'error');
         else console.warn(message);
