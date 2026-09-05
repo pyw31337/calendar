@@ -2134,6 +2134,10 @@ function CalendarApp() {
   const visibleTotalChatCount = typeof totalChatCount === 'number'
     ? Math.max(0, totalChatCount - meetingPhotoMessageIds.size)
     : totalChatCount;
+  // Mirrors visibleTotalChatCount for the hydration-retry effect below, which must NOT restart
+  // every time this number changes -- see that effect for why.
+  const visibleTotalChatCountRef = React.useRef(visibleTotalChatCount);
+  visibleTotalChatCountRef.current = visibleTotalChatCount;
   const canUseSettlement = !!(activeCal && isSettlementEnabledCalendarId(activeCal.id || activeCalId));
   const syncStatus = saveSyncState;
   React.useEffect(() => {
@@ -3197,7 +3201,9 @@ function CalendarApp() {
   React.useEffect(() => {
     if (!activeCalId || isInitialDataLoading) return;
     setChatPreviewHydrationExhausted(false);
-    if (typeof visibleTotalChatCount !== 'number' || visibleTotalChatCount <= 0) return;
+    // Read via ref (not the reactive `visibleTotalChatCount` value) so this guard doesn't also
+    // sit in the dependency array below -- see the note there for why that mattered.
+    if (typeof visibleTotalChatCountRef.current !== 'number' || visibleTotalChatCountRef.current <= 0) return;
     if (visibleChatMessages.length > 0) return;
     let cancelled = false;
     let attempt = 0;
@@ -3244,7 +3250,8 @@ function CalendarApp() {
         // count, the meeting-linked-photo correction, or the fetch itself is the mismatch.
         console.info('[chat-preview] hydration exhausted', {
           calendarId: activeCalId, rawTotalChatCount: totalChatCount,
-          meetingLinkedCount: meetingPhotoMessageIdsRef.current.size, visibleTotalChatCount,
+          meetingLinkedCount: meetingPhotoMessageIdsRef.current.size,
+          visibleTotalChatCount: visibleTotalChatCountRef.current,
           visibleChatMessagesLength: visibleChatMessages.length,
           finalFetchLimit: HYDRATE_FETCH_LIMITS[HYDRATE_FETCH_LIMITS.length - 1]
         });
@@ -3259,7 +3266,18 @@ function CalendarApp() {
       cancelled = true;
       if (retryTimer) clearTimeout(retryTimer);
     };
-  }, [activeCalId, isInitialDataLoading, visibleTotalChatCount, visibleChatMessages.length]);
+  // Deliberately NOT depending on `visibleTotalChatCount` here (read via ref above instead) --
+  // it's `totalChatCount - meetingPhotoMessageIds.size`, and that subtrahend changes its actual
+  // NUMBER (not just object identity) every time a new 일정/갤러리 photo is confirmed while this
+  // effect is mid-retry. With the number in this array, every such upload tore the effect down
+  // and rebuilt it, resetting `attempt` back to 0 and `chatPreviewHydrationExhausted` back to
+  // false before the backoff loop could ever reach MAX_ATTEMPTS -- so on a calendar where photos
+  // keep getting confirmed more often than the ~22s retry sequence takes to finish, the widget
+  // could stay on "불러오는 중…" indefinitely even though every individual fetch was completing
+  // fine and correctly finding nothing renderable. visibleChatMessages.length stays in the array
+  // on purpose: it only ever needs to fire once real chat text actually arrives (0 -> N), which
+  // is exactly when this effect should bail out early instead of continuing to retry.
+  }, [activeCalId, isInitialDataLoading, visibleChatMessages.length]);
 
   React.useEffect(() => {
     // Same reasoning as above -- wait for the initial calendar document load to finish before
