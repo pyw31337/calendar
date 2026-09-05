@@ -1951,12 +1951,16 @@ export function HistoryView({
   // 등장하는 사진"은 다른 개념이라, 음식/풍경/서류 스캔처럼 본인이 안 나온 사진까지 전부
   // 잡혀버려 인물 탭이 실제와 동떨어지게 부풀려지는 문제가 있었다. 인물 태그는 해시태그(#이름)로
   // 명시적으로 붙인 사진만 인정한다 -- participantId는 더 이상 매칭에 쓰지 않는다.
+  // "#해맑은도연"처럼 이름 앞뒤에 다른 글자가 붙은 해시태그도 같은 사람으로 인식해야 하므로
+  // 완전일치 대신 부분일치(포함)로 비교한다. 다만 성을 뗀 1음절 변형("도연" -> "연")까지 부분일치를
+  // 허용하면 "연"이 들어간 무관한 태그까지 잡혀 인물 탭이 부풀려지므로, 1음절 변형은 기존처럼
+  // 완전일치만 인정한다.
   const getPhotosForTagLabel = React.useCallback((label) => {
     if (!label) return [];
     const variants = getPersonNameVariants(label).map(v => v.toLowerCase());
     return historyPhotoEntries.filter(entry => {
       const tokens = entryTagTokens(entry).map(t => t.toLowerCase());
-      return variants.some(v => tokens.includes(v));
+      return variants.some(v => v.length <= 1 ? tokens.includes(v) : tokens.some(t => t.includes(v)));
     });
   }, [historyPhotoEntries]);
   const photosForPersonTag = React.useMemo(

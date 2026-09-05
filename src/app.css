@@ -2529,6 +2529,11 @@ select.form-select {
     order: 3;
   }
 }
+/* 라이트박스 댓글창은 어두운 라이트박스 오버레이 위에 얹히므로, memo 카드가 쓰는 위 흰 배경
+   규칙(!important)을 이 컨텍스트에서만 어둡게 덮어쓴다. */
+.lightbox-comment-thread-dark .comment-composer-input {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
 
 .summary-title { font-size: 1.05rem; font-weight: 800; color: var(--text-main); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
 @media (min-width: 640px) {
