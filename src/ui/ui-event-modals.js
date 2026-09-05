@@ -1943,24 +1943,16 @@ export function AnniversaryModal({
 
             /* Multi day (연일) fields */
             dayMode === 'range' && /*#__PURE__*/React.createElement("div", {
-              style: { display: 'flex', gap: '8px', flexWrap: 'wrap', padding: '10px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)' }
+              style: { padding: '10px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)' }
             },
-              /*#__PURE__*/React.createElement("div", { style: { flex: '1 1 130px' } },
-                /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginBottom: '3px' } }, "시작일자"),
-                /*#__PURE__*/React.createElement(DeadlineDateTimePicker, {
-                  dateOnly: true,
-                  value: rangeStartDate,
-                  onChange: v => setRangeStartDate(v.slice(0, 10))
-                })
-              ),
-              /*#__PURE__*/React.createElement("div", { style: { flex: '1 1 130px' } },
-                /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginBottom: '3px' } }, "종료일자"),
-                /*#__PURE__*/React.createElement(DeadlineDateTimePicker, {
-                  dateOnly: true,
-                  value: rangeEndDate,
-                  onChange: v => setRangeEndDate(v.slice(0, 10))
-                })
-              )
+              /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginBottom: '3px' } }, "여행 기간"),
+              /*#__PURE__*/React.createElement(DeadlineDateTimePicker, {
+                dateOnly: true,
+                rangeMode: true,
+                rangeStart: rangeStartDate,
+                rangeEnd: rangeEndDate,
+                onChangeRange: ({ start, end }) => { setRangeStartDate(start); setRangeEndDate(end); }
+              })
             )
           ),
 

@@ -1845,17 +1845,17 @@ export function HistoryView({
       const saved = localStorage.getItem(HISTORY_TAB_STORAGE_KEY);
       if (VALID_HISTORY_TABS.includes(saved)) return saved;
     } catch (_) { /* private browsing / disabled storage */ }
-    return 'meetings';
+    return 'memories';
   });
   const changeHistoryTab = (tab) => {
     if (!VALID_HISTORY_TABS.includes(tab)) return;
     setHistoryTab(tab);
     try { localStorage.setItem(HISTORY_TAB_STORAGE_KEY, tab); } catch (_) { /* best-effort */ }
   };
-  // When the side menu navigates to 보관함 again (or any view), force the 지난모임 tab so
+  // When the side menu navigates to 기록 again (or any view), force the 추억 tab so
   // re-entry always lands there rather than whatever tab was last open.
   const handleHistoryChangeView = (view) => {
-    if (view === 'history') changeHistoryTab('meetings');
+    if (view === 'history') changeHistoryTab('memories');
     if (typeof onChangeView === 'function') onChangeView(view);
   };
   // 인물 탭: 기본 태그는 현재 캘린더 참여자, 그 외에 사용자가 직접 추가한 커스텀 태그
@@ -2017,7 +2017,8 @@ export function HistoryView({
     }));
     setHistoryLightbox({ urls, index, meta, memoryId });
   };
-  // 추억 탭: '여행' 카테고리 기념일의 제목을 기준으로, 그 기간에 등록된 사진을 모아 보여준다.
+  // 추억 탭: 날짜(startDate/date)가 등록된 기념일이면 카테고리와 상관없이, 그 기간에 등록된
+  // 사진을 모아 보여준다 (여행만이 아니라 행사/축제/생일 등도 사진이 있으면 노출).
   const entryDateStr = entry => {
     const ts = Number(entry?.timestamp) || 0;
     if (!ts) return '';
@@ -2030,11 +2031,11 @@ export function HistoryView({
     // "기간: 정보없음" 버그와 같은 원인) -- a.date를 폴백으로 읽지 않으면 하루짜리로 등록한
     // 여행은 사진이 있어도 추억 탭에서 통째로 사라진다.
     return (anniversaries || [])
-      .filter(a => a && a.category === 'travel' && (a.startDate || a.date))
+      .filter(a => a && (a.startDate || a.date))
       .map(a => {
         const start = a.startDate || a.date;
         const end = a.endDate || a.startDate || a.date;
-        // 날짜 구간으로 자동 수집되다 보니 그 여행과 상관없는 사진이 섞여 들어올 수 있어,
+        // 날짜 구간으로 자동 수집되다 보니 그 기념일과 상관없는 사진이 섞여 들어올 수 있어,
         // 라이트박스의 '이 추억에서 제거' 버튼으로 뺀 사진(excludedMemoryPhotoKeys)은 제외한다.
         const excluded = new Set(Array.isArray(a.excludedMemoryPhotoKeys) ? a.excludedMemoryPhotoKeys : []);
         const photos = historyPhotoEntries.filter(entry => {
@@ -2043,7 +2044,7 @@ export function HistoryView({
           const key = entry.mediaKey || entry.refKey;
           return !key || !excluded.has(key);
         });
-        return { id: a.id, title: a.title || '여행', startDate: start, endDate: end, photos };
+        return { id: a.id, title: a.title || '기록', startDate: start, endDate: end, photos };
       })
       // 등록된 사진이 없는 여행은 목록에서 아예 숨긴다 -- 빈 여행 카드를 계속 보여주는 것보다
       // 실제로 추억(사진)이 쌓인 여행만 보여주는 게 이 탭의 취지에 맞다.
@@ -2118,9 +2119,9 @@ export function HistoryView({
       value: historyTab,
       onChange: changeHistoryTab,
       options: [
-        { value: 'meetings', label: '지난모임' },
         { value: 'memories', label: '추억' },
-        { value: 'people', label: '인물' }
+        { value: 'people', label: '인물' },
+        { value: 'meetings', label: '지난모임' }
       ]
     })
     ), // end history-header-stack
