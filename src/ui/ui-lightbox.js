@@ -1006,7 +1006,9 @@ function CommentThread({ comments = [], onCommentsChange, calendar, showToast, o
   const AutoGrowTextarea = __comp.AutoGrowTextarea || __deps.AutoGrowTextarea;
   const sanitizeText = __deps.sanitizeText;
 
-  const [isCommentComposerOpen, setIsCommentComposerOpen] = React.useState(false);
+  // 라이트박스 초기화면에서부터 댓글 입력창이 바로 보여야 하므로(memo 카드와 달리 별도 클릭 불필요)
+  // 기본값을 열림으로 둔다 -- 이 컴포넌트는 memo 쪽과 완전히 분리되어 라이트박스 전용이라 안전하다.
+  const [isCommentComposerOpen, setIsCommentComposerOpen] = React.useState(true);
   const [commentText, setCommentText] = React.useState('');
   const [commentParticipantId, setCommentParticipantId] = React.useState(() => getStoredChatParticipantId(calendar?.id, calendar));
   const [isCommentPartOpen, setIsCommentPartOpen] = React.useState(false);
@@ -1116,7 +1118,7 @@ function CommentThread({ comments = [], onCommentsChange, calendar, showToast, o
         style: {
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
           alignSelf: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px',
-          fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--text-muted)'
+          fontSize: 'var(--font-size-sm)', fontWeight: 700, color: '#94A3B8'
         }
       },
         /*#__PURE__*/React.createElement("svg", {
@@ -1133,7 +1135,7 @@ function CommentThread({ comments = [], onCommentsChange, calendar, showToast, o
           onClick: e => e.stopPropagation(),
           style: {
             display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 2px',
-            borderTop: commentIdx > 0 ? '1px solid color-mix(in srgb, var(--bg-primary) 96%, black)' : 'none'
+            borderTop: commentIdx > 0 ? '1px solid rgba(255,255,255,0.12)' : 'none'
           }
         },
           /*#__PURE__*/React.createElement("span", {
@@ -1146,15 +1148,15 @@ function CommentThread({ comments = [], onCommentsChange, calendar, showToast, o
             style: { width: '8px', height: '8px', borderRadius: '50%', backgroundColor: author?.color || '#94A3B8', flexShrink: 0 }
           }),
           /*#__PURE__*/React.createElement("span", {
-            style: { flex: 1, minWidth: 0, fontSize: 'var(--font-size-md)', color: 'var(--text-main)', wordBreak: 'break-word' }
+            style: { flex: 1, minWidth: 0, fontSize: 'var(--font-size-md)', color: '#E2E8F0', wordBreak: 'break-word' }
           }, comment.text),
           /*#__PURE__*/React.createElement("button", {
             type: "button", onClick: e => handleStartEditComment(e, comment), title: "편집", "aria-label": "댓글 편집",
-            style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)', flexShrink: 0 }
+            style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: '#94A3B8', flexShrink: 0 }
           }, /*#__PURE__*/React.createElement(PencilIcon, { size: 12 })),
           /*#__PURE__*/React.createElement("button", {
             type: "button", onClick: e => handleDeleteComment(e, comment), title: "삭제", "aria-label": "댓글 삭제",
-            style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)', flexShrink: 0 }
+            style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: '#94A3B8', flexShrink: 0 }
           }, /*#__PURE__*/React.createElement(TrashIcon, { size: 12 }))
         );
       })
@@ -1185,11 +1187,11 @@ function CommentThread({ comments = [], onCommentsChange, calendar, showToast, o
         style: {
           width: '100%',
           fontSize: '0.8rem',
-          border: '1px solid var(--border-subtle)',
+          border: '1px solid rgba(255,255,255,0.18)',
           borderRadius: 'var(--radius-sm)',
           padding: '6px 8px',
-          backgroundColor: '#fff',
-          color: 'var(--text-main)',
+          backgroundColor: 'rgba(255,255,255,0.08)',
+          color: '#E2E8F0',
           outline: 'none',
           boxSizing: 'border-box'
         }
@@ -1205,7 +1207,7 @@ function CommentThread({ comments = [], onCommentsChange, calendar, showToast, o
             onClick: handleCancelComment,
             style: {
               flexShrink: 0, height: '30px', padding: '0 12px', borderRadius: 'var(--radius-sm)',
-              border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)', color: 'var(--text-muted)',
+              border: '1px solid rgba(255,255,255,0.18)', backgroundColor: 'rgba(255,255,255,0.08)', color: '#CBD5E1',
               fontSize: 'var(--font-size-md)', fontWeight: 'bold', cursor: 'pointer'
             }
           }, "취소"),
@@ -1412,14 +1414,13 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar, sho
   // 사진 댓글 -- mediaKey/refKey(currentIdentity, 항상 값이 있음)를 사진의 안정적인 식별자로
   // 써서 calendars/cal_{id}/photoComments 문서 하나에 매칭한다(app-main.js의
   // handleFetchPhotoComments/handleSavePhotoComments). 여러 장을 스와이프해도 슬라이드별로
-  // 따로 캐싱해서, 이미 한 번 불러온 사진은 다시 불러오지 않는다. 댓글은 info 패널이 열려
-  // 있을 때만(showInfo) 필요하므로 그때만 불러온다 -- 스와이프 도중 지나치는 사진마다 매번
-  // Firestore 읽기가 발생하지 않도록.
+  // 따로 캐싱해서, 이미 한 번 불러온 사진은 다시 불러오지 않는다. 초기화면에서부터 기존 댓글이
+  // 바로 보여야 하므로(showInfo 토글과 무관하게) 현재 사진이 바뀔 때마다 불러온다.
   const photoCommentKey = currentIdentity.mediaKey || currentIdentity.refKey || '';
   const [photoCommentsByKey, setPhotoCommentsByKey] = React.useState({});
   const photoCommentsFetchedRef = React.useRef(new Set());
   React.useEffect(() => {
-    if (!showInfo || !photoCommentKey || typeof onFetchPhotoComments !== 'function') return;
+    if (!photoCommentKey || typeof onFetchPhotoComments !== 'function') return;
     if (photoCommentsFetchedRef.current.has(photoCommentKey)) return;
     photoCommentsFetchedRef.current.add(photoCommentKey);
     let cancelled = false;
@@ -1427,22 +1428,25 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar, sho
       if (!cancelled && Array.isArray(list)) setPhotoCommentsByKey(prev => ({ ...prev, [photoCommentKey]: list }));
     });
     return () => { cancelled = true; };
-  }, [showInfo, photoCommentKey, onFetchPhotoComments]);
+  }, [photoCommentKey, onFetchPhotoComments]);
   const handlePhotoCommentsChange = async nextComments => {
     if (!photoCommentKey || typeof onSavePhotoComments !== 'function') return false;
     setPhotoCommentsByKey(prev => ({ ...prev, [photoCommentKey]: nextComments }));
     return Promise.resolve(onSavePhotoComments(photoCommentKey, nextComments));
   };
-  // 댓글은 라이트박스 안에서만 쓰고 볼 수 있어야 한다는 요구사항에 맞춰, info 패널(showInfo)이
-  // 열려 있을 때만 렌더링한다 -- 별도 토글 없이 기존 info 토글에 얹혀간다.
+  // 댓글은 라이트박스 안에서만 쓰고 볼 수 있어야 한다는 요구사항에 맞춰 여기서만 렌더링하지만,
+  // "초기화면에서 바로 보여야 한다"는 요구에 맞춰 showInfo(정보 패널) 토글과는 무관하게 사진 박스와
+  // 페이지네이션 사이에 항상 자리를 갖는다 -- 기본 라이트박스가 어둡기 때문에 배경/글자색도 별도로
+  // 어둡게 강제한다(라이트박스 전용으로 완전히 분리된 컴포넌트라 memo 쪽 라이트 테마와 무관).
   const renderCommentThread = () => {
-    if (!showInfo || zoomLevel !== ZOOM_DEFAULT || !CommentThread) return null;
+    if (zoomLevel !== ZOOM_DEFAULT || !CommentThread) return null;
     return /*#__PURE__*/React.createElement("div", {
       key: `comments-${photoCommentKey}`,
-      className: "lightbox-comment-thread",
+      className: "lightbox-comment-thread lightbox-comment-thread-dark",
       style: {
-        width: '92vw', maxWidth: '480px', maxHeight: '22vh', overflowY: 'auto', marginTop: '8px', padding: '10px 14px',
-        backgroundColor: 'var(--bg-card)', borderRadius: 'var(--radius-md)', boxSizing: 'border-box'
+        width: '92vw', maxWidth: '480px', maxHeight: '22vh', overflowY: 'auto', marginTop: '16px', padding: '10px 14px',
+        backgroundColor: 'rgba(15, 23, 42, 0.72)', border: '1px solid rgba(255,255,255,0.12)',
+        borderRadius: 'var(--radius-md)', boxSizing: 'border-box'
       }
     }, /*#__PURE__*/React.createElement(CommentThread, {
       comments: photoCommentsByKey[photoCommentKey] || [],
@@ -2378,6 +2382,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar, sho
     onRemoveFromMemory: onRemoveFromMemory ? handleRemoveFromMemoryClick : null,
     isRemovingFromMemory: isRemovingFromMemory
   })),
+  renderCommentThread(),
   total > 1 && (() => {
     const maxVisibleDots = 10;
     const startIdx = total <= maxVisibleDots
@@ -2425,7 +2430,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar, sho
         })
       )
     );
-  })(), renderCommentThread(), imageUrlModalOpen && /*#__PURE__*/React.createElement(ImageUrlModal, {
+  })(), imageUrlModalOpen && /*#__PURE__*/React.createElement(ImageUrlModal, {
     imageUrl: currentUrl,
     onClose: () => setImageUrlModalOpen(false),
     showToast,
