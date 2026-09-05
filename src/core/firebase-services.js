@@ -104,7 +104,14 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
 
   async function fetchRecentChatMessages(calId, limit) {
     if (!isValidCalId(calId)) return [];
-    const pageSize = Math.max(1, Math.min(100, Number(limit) || 60));
+    // Capped at 400 (not the old 100) so the main-screen chat preview's hydration safety net
+    // (app-main.js) can escalate its raw window deep enough to outlast a burst of dozens of
+    // 일정(meeting)/갤러리 photo uploads, which share this same `messages` collection but are
+    // filtered out client-side (isChatRenderableMessage) -- a caller asking for more than the
+    // old cap used to get silently truncated back to 100 raw docs, which a large-enough photo
+    // burst could still fully occupy, leaving genuinely recent chat text undiscoverable no
+    // matter how many times the caller retried the same query.
+    const pageSize = Math.max(1, Math.min(400, Number(limit) || 60));
     const firebaseDb = getDb();
     // Firestore's orderBy() silently excludes any document that is missing the field being
     // ordered on -- not just sorts it oddly, drops it from the result set entirely, at any limit.

@@ -3204,16 +3204,20 @@ function CalendarApp() {
     let retryTimer = null;
     const MAX_ATTEMPTS = 5;
     const RETRY_DELAYS_MS = [1500, 3000, 6000, 12000];
+    // Escalates the raw window on every retry instead of re-issuing the exact same 20-doc
+    // query -- a burst of 일정(meeting)/갤러리 photo uploads (each its own message doc, filtered
+    // out client-side by isChatRenderableMessage) can easily exceed 20, even 60 or 150,
+    // consecutive raw docs. Retrying the identical query would then deterministically return
+    // the same all-filtered-out result every single time regardless of attempt count, leaving
+    // the widget stuck (or wrongly settling on "no chat" once attempts ran out) even though real
+    // chat text existed just a bit further back. Escalating means a bulk photo upload of any
+    // realistic size still gets outrun within the existing bounded fetchRecentChatMessages cap.
+    const HYDRATE_FETCH_LIMITS = [20, 60, 150, 300, 400];
     const tryHydrate = async () => {
       attempt += 1;
       try {
-        // Fetch more than the widget's own 5-message display window -- the last 5 raw chat
-        // documents can be entirely meeting/gallery-linked photos (isChatRenderableMessage
-        // filters those out), in which case a 5-message fetch "succeeds" (non-empty list) but
-        // renders nothing, and this loop used to return on that first "success" without ever
-        // re-checking whether anything was actually renderable -- leaving the widget stuck on
-        // "불러오는 중…" forever even though real, older chat existed just outside that window.
-        const list = await fetchRecentChatMessages(activeCalId, 20);
+        const fetchLimit = HYDRATE_FETCH_LIMITS[Math.min(attempt - 1, HYDRATE_FETCH_LIMITS.length - 1)];
+        const list = await fetchRecentChatMessages(activeCalId, fetchLimit);
         if (cancelled) return;
         // Read meetingPhotoMessageIds via the ref (not the effect's own closure) -- this value
         // is recomputed from `activeCal`, whose object identity changes on essentially every
@@ -3241,7 +3245,8 @@ function CalendarApp() {
         console.info('[chat-preview] hydration exhausted', {
           calendarId: activeCalId, rawTotalChatCount: totalChatCount,
           meetingLinkedCount: meetingPhotoMessageIdsRef.current.size, visibleTotalChatCount,
-          visibleChatMessagesLength: visibleChatMessages.length
+          visibleChatMessagesLength: visibleChatMessages.length,
+          finalFetchLimit: HYDRATE_FETCH_LIMITS[HYDRATE_FETCH_LIMITS.length - 1]
         });
         setChatPreviewHydrationExhausted(true);
         return;
