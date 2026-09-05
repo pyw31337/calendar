@@ -1351,13 +1351,22 @@ export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = f
               const day = i + 1;
               const mm = String(pMonth + 1).padStart(2, '0');
               const dateStr = rangeMode ? `${pYear}-${mm}-${String(day).padStart(2, '0')}` : '';
-              const isRangeEndpoint = rangeMode && (dateStr === localRangeStart || dateStr === localRangeEnd);
+              const isStart = rangeMode && !!localRangeStart && dateStr === localRangeStart;
+              const isEnd = rangeMode && !!localRangeEnd && dateStr === localRangeEnd;
+              const isRangeEndpoint = isStart || isEnd;
               const isInRange = rangeMode && localRangeStart && localRangeEnd && dateStr > localRangeStart && dateStr < localRangeEnd;
               const isSelected = rangeMode ? isRangeEndpoint : pDay === day;
+              // 시작일/종료일 두 칸이 하나의 구간 막대처럼 보이도록, 시작일은 좌측만, 종료일은
+              // 우측만 둥글게 -- 하루만 선택된 경우(시작=종료)에는 기존처럼 네 모서리 다 둥글게.
+              const rangeRadius = isStart && isEnd
+                ? 'var(--radius-sm)'
+                : isStart ? 'var(--radius-sm) 0 0 var(--radius-sm)'
+                : isEnd ? '0 var(--radius-sm) var(--radius-sm) 0'
+                : isInRange ? '0' : 'var(--radius-sm)';
               return /*#__PURE__*/React.createElement('button', {
                 key: day, type: 'button', onClick: () => handleDayClick(day),
                 style: {
-                  padding: '6px 0', borderRadius: 'var(--radius-sm)',
+                  padding: '6px 0', borderRadius: rangeMode ? rangeRadius : 'var(--radius-sm)',
                   border: isSelected ? '2px solid var(--accent-primary)' : '1px solid transparent',
                   background: isSelected ? 'rgba(99, 102, 241, 0.15)' : (isInRange ? 'rgba(99, 102, 241, 0.06)' : 'transparent'),
                   color: isSelected ? 'var(--accent-primary)' : 'var(--text-main)',
