@@ -742,60 +742,13 @@ function getAnniversaryDisplayColor(...args) {
 }
 
 
-export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSearchTag, showToast, sourceInfo = null, showZoomControls = false, zoomLevel = 100, zoomMin = 50, zoomMax = 300, onZoomIn, onZoomOut, onZoomReset, onRemoveFromMemory = null, isRemovingFromMemory = false }) {
+// i 버튼(정보 토글)이 여는 패널 -- 업로드/출처/파일정보만 보여준다. 해시태그 편집은
+// 사진을 탭했을 때 별도로 뜨는 LightboxTagPanel로 분리되어 있다(아래).
+export function LightboxInfoPanel({ info, sourceInfo = null, onRemoveFromMemory = null, isRemovingFromMemory = false }) {
   const React = window.React;
-  const __deps = window.GATHER_UI_DEPS || {};
-  const TrashIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.TrashIcon) || __deps.TrashIcon;
-  const LinkIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LinkIcon) || __deps.LinkIcon;
-  const ConfirmDialog = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ConfirmDialog) || __deps.ConfirmDialog;
-
-  const tagTokens = String(tags || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean);
-  const [tagInput, setTagInput] = React.useState('');
-  const [isSavingTags, setIsSavingTags] = React.useState(false);
-  const [confirmDeleteTag, setConfirmDeleteTag] = React.useState(null);
-  const [isDeletingTag, setIsDeletingTag] = React.useState(false);
-  React.useEffect(() => { setTagInput(''); }, [tags]);
-  if (!info.dateLabel && !info.typeLabel && !onSaveTags && !sourceInfo && !onRemoveFromMemory) return null;
-  const MAX_TAGS = 10;
-  const handleSaveTags = async () => {
-    if (!onSaveTags || isSavingTags) return;
-    // Parse new tokens from input
-    const newTokens = String(tagInput || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean);
-    if (newTokens.length === 0) return;
-    // Merge with existing, deduplicate, enforce limit
-    const merged = Array.from(new Set([...tagTokens, ...newTokens]));
-    if (merged.length > MAX_TAGS) {
-      // Check if any of the new tokens would actually be added
-      const wouldAdd = newTokens.filter(t => !tagTokens.includes(t));
-      if (tagTokens.length >= MAX_TAGS || (tagTokens.length + wouldAdd.length) > MAX_TAGS) {
-        if (typeof showToast === 'function') showToast('태그는 최대 10개 저장 가능', 'error');
-        return;
-      }
-    }
-    const finalTags = merged.slice(0, MAX_TAGS);
-    setIsSavingTags(true);
-    try {
-      const saved = await onSaveTags(finalTags.join(' '));
-      if (saved !== false) setTagInput('');
-    } finally {
-      setIsSavingTags(false);
-    }
-  };
-  const handleConfirmDeleteTag = async () => {
-    if (!onSaveTags || !confirmDeleteTag || isDeletingTag) return;
-    setIsDeletingTag(true);
-    try {
-      const saved = await onSaveTags(tagTokens.filter(t => t !== confirmDeleteTag).join(' '));
-      if (saved !== false) setConfirmDeleteTag(null);
-    } catch (err) {
-      console.error('Lightbox tag delete failed:', err);
-      if (typeof showToast === 'function') showToast('태그 삭제 실패', 'error');
-    } finally {
-      setIsDeletingTag(false);
-    }
-  };
+  if (!info.dateLabel && !info.typeLabel && !sourceInfo && !onRemoveFromMemory) return null;
   const labelStyle = { opacity: 0.7, flexShrink: 0, minWidth: '52px' };
-  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  return /*#__PURE__*/React.createElement("div", {
     className: "lightbox-info-panel",
     style: {
       position: 'absolute', left: 0, right: 0, bottom: 0, minWidth: '190px',
@@ -844,42 +797,106 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
         )
       ),
     ),
-    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' } },
-      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', minWidth: 0 } },
-        /*#__PURE__*/React.createElement("span", { style: labelStyle }, "해시태그"),
-        tagTokens.map(tag => /*#__PURE__*/React.createElement("span", {
-          key: tag,
-          className: "lightbox-tag-badge",
-          onClick: () => onSearchTag && onSearchTag(tag),
-          style: {
-            display: 'inline-flex', alignItems: 'center', gap: '6px', borderRadius: 'var(--radius-full)',
-            padding: '3px 4px 3px 10px', fontSize: 'var(--font-size-sm)', fontWeight: 900, lineHeight: 1,
-            border: '1px solid #FFFFFF', color: '#FFFFFF', background: 'transparent',
-            cursor: onSearchTag ? 'pointer' : 'default'
-          }
-        }, `#${tag}`, onSaveTags && /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          title: `#${tag} 태그 삭제`,
-          onClick: e => { e.stopPropagation(); setConfirmDeleteTag(tag); },
-          style: {
-            width: '17px', height: '17px', border: 0, borderRadius: '50%',
-            background: '#FFFFFF', color: 'var(--text-main)', display: 'inline-flex',
-            alignItems: 'center', justifyContent: 'center', padding: 0, cursor: 'pointer',
-            flexShrink: 0
-          }
-        }, /*#__PURE__*/React.createElement(TrashIcon, { size: 10 }))))
-      ),
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "lightbox-url-btn",
-        onClick: () => onOpenUrl && onOpenUrl(),
+    onRemoveFromMemory && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: e => { e.stopPropagation(); onRemoveFromMemory(); },
+      disabled: isRemovingFromMemory,
+      style: {
+        marginTop: '6px', width: '100%', height: '32px', borderRadius: 'var(--radius-sm)',
+        border: '1px solid rgba(255,255,255,0.32)', background: 'rgba(255,255,255,0.1)',
+        color: '#FFFFFF', fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer',
+        opacity: isRemovingFromMemory ? 0.55 : 1
+      }
+    }, isRemovingFromMemory ? '제거 중...' : '이 추억에서 제거')
+  );
+}
+
+// 사진을 탭하면 뜨는 패널 -- 해시태그 목록 + 태그입력만 보여준다(i 패널과 분리).
+export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast }) {
+  const React = window.React;
+  const __deps = window.GATHER_UI_DEPS || {};
+  const TrashIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.TrashIcon) || __deps.TrashIcon;
+  const ConfirmDialog = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ConfirmDialog) || __deps.ConfirmDialog;
+
+  const tagTokens = String(tags || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean);
+  const [tagInput, setTagInput] = React.useState('');
+  const [isSavingTags, setIsSavingTags] = React.useState(false);
+  const [confirmDeleteTag, setConfirmDeleteTag] = React.useState(null);
+  const [isDeletingTag, setIsDeletingTag] = React.useState(false);
+  React.useEffect(() => { setTagInput(''); }, [tags]);
+  if (!tagTokens.length && !onSaveTags) return null;
+  const MAX_TAGS = 10;
+  const labelStyle = { opacity: 0.7, flexShrink: 0, minWidth: '52px' };
+  const handleSaveTags = async () => {
+    if (!onSaveTags || isSavingTags) return;
+    const newTokens = String(tagInput || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean);
+    if (newTokens.length === 0) return;
+    const merged = Array.from(new Set([...tagTokens, ...newTokens]));
+    if (merged.length > MAX_TAGS) {
+      const wouldAdd = newTokens.filter(t => !tagTokens.includes(t));
+      if (tagTokens.length >= MAX_TAGS || (tagTokens.length + wouldAdd.length) > MAX_TAGS) {
+        if (typeof showToast === 'function') showToast('태그는 최대 10개 저장 가능', 'error');
+        return;
+      }
+    }
+    const finalTags = merged.slice(0, MAX_TAGS);
+    setIsSavingTags(true);
+    try {
+      const saved = await onSaveTags(finalTags.join(' '));
+      if (saved !== false) setTagInput('');
+    } finally {
+      setIsSavingTags(false);
+    }
+  };
+  const handleConfirmDeleteTag = async () => {
+    if (!onSaveTags || !confirmDeleteTag || isDeletingTag) return;
+    setIsDeletingTag(true);
+    try {
+      const saved = await onSaveTags(tagTokens.filter(t => t !== confirmDeleteTag).join(' '));
+      if (saved !== false) setConfirmDeleteTag(null);
+    } catch (err) {
+      console.error('Lightbox tag delete failed:', err);
+      if (typeof showToast === 'function') showToast('태그 삭제 실패', 'error');
+    } finally {
+      setIsDeletingTag(false);
+    }
+  };
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "lightbox-info-panel",
+    style: {
+      position: 'absolute', left: 0, right: 0, bottom: 0, minWidth: '190px',
+      padding: '34px 14px 12px',
+      background: 'linear-gradient(to top, rgba(0,0,0,0.84) 0%, rgba(0,0,0,0.84) 55%, rgba(0,0,0,0.5) 82%, transparent)',
+      borderRadius: '0 0 var(--radius-md) var(--radius-md)',
+      color: '#FFFFFF', fontSize: 'var(--font-size-sm)', lineHeight: 1.7,
+      display: 'flex', flexDirection: 'column', gap: '4px',
+      pointerEvents: 'auto'
+    },
+    onClick: e => e.stopPropagation()
+  },
+    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', minWidth: 0 } },
+      /*#__PURE__*/React.createElement("span", { style: labelStyle }, "해시태그"),
+      tagTokens.map(tag => /*#__PURE__*/React.createElement("span", {
+        key: tag,
+        className: "lightbox-tag-badge",
+        onClick: () => onSearchTag && onSearchTag(tag),
         style: {
-          flexShrink: 0, height: '30px', padding: '0 10px', borderRadius: 'var(--radius-full)',
-          border: '1px solid rgba(255,255,255,0.32)', background: 'rgba(255,255,255,0.14)',
-          color: '#FFFFFF', display: 'inline-flex', alignItems: 'center', gap: '5px',
-          cursor: 'pointer', fontSize: 'var(--font-size-sm)', fontWeight: 800, WebkitBackdropFilter: 'blur(6px)', backdropFilter: 'blur(6px)'
+          display: 'inline-flex', alignItems: 'center', gap: '6px', borderRadius: 'var(--radius-full)',
+          padding: '3px 4px 3px 10px', fontSize: 'var(--font-size-sm)', fontWeight: 900, lineHeight: 1,
+          border: '1px solid #FFFFFF', color: '#FFFFFF', background: 'transparent',
+          cursor: onSearchTag ? 'pointer' : 'default'
         }
-      }, /*#__PURE__*/React.createElement(LinkIcon, { size: 14 }), "URL")
+      }, `#${tag}`, onSaveTags && /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        title: `#${tag} 태그 삭제`,
+        onClick: e => { e.stopPropagation(); setConfirmDeleteTag(tag); },
+        style: {
+          width: '17px', height: '17px', border: 0, borderRadius: '50%',
+          background: '#FFFFFF', color: 'var(--text-main)', display: 'inline-flex',
+          alignItems: 'center', justifyContent: 'center', padding: 0, cursor: 'pointer',
+          flexShrink: 0
+        }
+      }, /*#__PURE__*/React.createElement(TrashIcon, { size: 10 }))))
     ),
     onSaveTags && /*#__PURE__*/React.createElement("div", {
       style: { display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }
@@ -916,18 +933,7 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
           opacity: (isSavingTags || tagTokens.length >= 10) ? 0.45 : 1
         }
       }, isSavingTags ? '...' : '저장')
-    ),
-    onRemoveFromMemory && /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      onClick: e => { e.stopPropagation(); onRemoveFromMemory(); },
-      disabled: isRemovingFromMemory,
-      style: {
-        marginTop: '6px', width: '100%', height: '32px', borderRadius: 'var(--radius-sm)',
-        border: '1px solid rgba(255,255,255,0.32)', background: 'rgba(255,255,255,0.1)',
-        color: '#FFFFFF', fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer',
-        opacity: isRemovingFromMemory ? 0.55 : 1
-      }
-    }, isRemovingFromMemory ? '제거 중...' : '이 추억에서 제거')
+    )
   ), confirmDeleteTag && /*#__PURE__*/React.createElement(ConfirmDialog, {
     title: "해시태그 삭제",
     message: `#${confirmDeleteTag} 태그를 삭제하시겠습니까?`,
@@ -1217,10 +1223,15 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar, sho
   const PencilIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PencilIcon) || __deps.PencilIcon;
   const ImageUrlModal = __deps.ImageUrlModal;
   const LightboxInfoPanel = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LightboxInfoPanel;
+  const LightboxTagPanel = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LightboxTagPanel;
+  const LinkIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LinkIcon) || __deps.LinkIcon;
   const buildLightboxImageInfo = __deps.buildLightboxImageInfo;
 
   const total = urls.length;
+  // i 버튼은 업로드/출처/파일정보(showInfo)만, 사진 탭은 해시태그(showTags)만 연다 -- 서로
+  // 다른 트리거로 여는 별개의 패널이라 한쪽을 열면 다른 쪽은 닫아 겹치지 않게 한다.
   const [showInfo, setShowInfo] = React.useState(false);
+  const [showTags, setShowTags] = React.useState(false);
   const [imageUrlModalOpen, setImageUrlModalOpen] = React.useState(false);
   const [imageDimensions, setImageDimensions] = React.useState({});
   const [displayUrls, setDisplayUrls] = React.useState(urls);
@@ -1419,7 +1430,12 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar, sho
       key: `comments-${photoCommentKey}`,
       className: "lightbox-comment-thread lightbox-comment-thread-dark",
       style: {
-        width: '92vw', maxHeight: '22vh', overflowY: 'auto', marginTop: '16px', padding: '10px 14px',
+        // 내용 길이에 맞게 세로폭이 자동으로 늘어나되(높이를 고정하지 않음), 댓글이 많아 뷰포트를
+        // 넘어서는 경우에만 maxHeight에서 스크롤이 생기도록 한다. resize: vertical + overflow
+        // auto 조합은 우측하단에 브라우저 네이티브 리사이즈 손잡이를 만들어준다 -- 별도 아이콘 없이
+        // textarea와 동일한 방식으로 사용자가 세로폭을 직접 늘리거나 줄일 수 있다.
+        width: '92vw', minHeight: '64px', maxHeight: '55vh', overflowY: 'auto', resize: 'vertical',
+        marginTop: '4px', padding: '10px 14px',
         backgroundColor: 'rgba(15, 23, 42, 0.72)', border: '1px solid rgba(255,255,255,0.12)',
         borderRadius: 'var(--radius-md)', boxSizing: 'border-box'
       }
@@ -1702,7 +1718,8 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar, sho
   const handleImageTap = e => {
     e.stopPropagation();
     if (wasDraggedRef.current) { wasDraggedRef.current = false; return; }
-    setShowInfo(prev => !prev);
+    setShowTags(prev => !prev);
+    setShowInfo(false);
   };
   const imgAreaRef = React.useRef(null);
   const widthRef = React.useRef(0);
@@ -2003,7 +2020,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar, sho
   // 보이는 버튼으로 노출해서 언제든 누르면 정보 패널이 열리게 한다.
   const renderInfoToggleButton = () => zoomLevel === ZOOM_DEFAULT && /*#__PURE__*/React.createElement("button", {
     type: "button",
-    onClick: e => { e.stopPropagation(); setShowInfo(v => !v); },
+    onClick: e => { e.stopPropagation(); setShowInfo(v => !v); setShowTags(false); },
     "aria-label": showInfo ? "사진 정보 닫기" : "사진 정보 보기",
     title: showInfo ? "사진 정보 닫기" : "사진 정보 보기",
     style: {
@@ -2017,6 +2034,19 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar, sho
   }, /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "12", r: "9" }),
     /*#__PURE__*/React.createElement("line", { x1: "12", y1: "11", x2: "12", y2: "16" }),
     /*#__PURE__*/React.createElement("line", { x1: "12", y1: "8", x2: "12.01", y2: "8" })));
+  // URL 버튼 -- 예전엔 정보 패널(i) 안에 텍스트("URL")까지 붙은 버튼으로 있었는데, i 버튼과
+  // 나란히 항상 보이는 아이콘 전용 버튼으로 옮겨서 정보 패널을 열지 않고도 바로 접근할 수 있게 한다.
+  const renderUrlButton = () => zoomLevel === ZOOM_DEFAULT && LinkIcon && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: e => { e.stopPropagation(); setImageUrlModalOpen(true); },
+    "aria-label": "이미지 URL",
+    title: "이미지 URL",
+    style: {
+      width: '30px', height: '30px', borderRadius: '50%', border: 'none',
+      background: 'rgba(15,23,42,0.62)', color: '#FFFFFF', display: 'flex',
+      alignItems: 'center', justifyContent: 'center', cursor: 'pointer', pointerEvents: 'auto', flexShrink: 0
+    }
+  }, /*#__PURE__*/React.createElement(LinkIcon, { size: 15 }));
   const renderPhotoActions = () => /*#__PURE__*/React.createElement("div", {
     style: {
       position: 'absolute',
@@ -2060,7 +2090,8 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar, sho
           opacity: (isReplacingPhoto || isDeletingPhoto) ? 0.5 : 1
         }
       }, isReplacingPhoto ? '...' : /*#__PURE__*/React.createElement(PencilIcon, { size: 15 })),
-      renderInfoToggleButton()
+      renderInfoToggleButton(),
+      renderUrlButton()
     ),
     showInfo && isDesktop && /*#__PURE__*/React.createElement("div", {
       // top: 0 pins this to the row's own top edge explicitly -- without it, this absolutely
@@ -2192,24 +2223,20 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar, sho
           maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 'var(--radius-md)',
           display: 'block', ...zoomImageStyle
         }
-      }), renderPhotoActions(), showInfo && zoomLevel === ZOOM_DEFAULT && /*#__PURE__*/React.createElement(LightboxInfoPanel, {
-      key: tagOverrideKey || String(currentUrl || index),
+      }), renderPhotoActions(),
+      showInfo && zoomLevel === ZOOM_DEFAULT && /*#__PURE__*/React.createElement(LightboxInfoPanel, {
+        key: `info-${tagOverrideKey || String(currentUrl || index)}`,
         info: currentInfo,
+        sourceInfo: sourceInfo,
+        onRemoveFromMemory: onRemoveFromMemory ? handleRemoveFromMemoryClick : null,
+        isRemovingFromMemory: isRemovingFromMemory
+      }),
+      showTags && zoomLevel === ZOOM_DEFAULT && /*#__PURE__*/React.createElement(LightboxTagPanel, {
+        key: `tags-${tagOverrideKey || String(currentUrl || index)}`,
         tags: currentTags,
         onSaveTags: saveCurrentTags,
         onSearchTag: onSearchTag,
-        onOpenUrl: () => setImageUrlModalOpen(true),
-        showToast: showToast,
-        sourceInfo: sourceInfo,
-        showZoomControls: isDesktop,
-        zoomLevel: zoomLevel,
-        zoomMin: ZOOM_MIN,
-        zoomMax: ZOOM_MAX,
-        onZoomIn: handleZoomIn,
-        onZoomOut: handleZoomOut,
-        onZoomReset: handleZoomReset,
-        onRemoveFromMemory: onRemoveFromMemory ? handleRemoveFromMemoryClick : null,
-        isRemovingFromMemory: isRemovingFromMemory
+        showToast: showToast
       })));
     }
 
@@ -2338,24 +2365,20 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar, sho
       maxWidth: '92vw', maxHeight: '82vh', borderRadius: 'var(--radius-md)', objectFit: 'contain',
       display: 'block', ...zoomImageStyle
     }
-  }), renderPhotoActions(), showInfo && zoomLevel === ZOOM_DEFAULT && /*#__PURE__*/React.createElement(LightboxInfoPanel, {
-      key: tagOverrideKey || String(currentUrl || index),
+  }), renderPhotoActions(),
+  showInfo && zoomLevel === ZOOM_DEFAULT && /*#__PURE__*/React.createElement(LightboxInfoPanel, {
+    key: `info-${tagOverrideKey || String(currentUrl || index)}`,
     info: currentInfo,
+    sourceInfo: sourceInfo,
+    onRemoveFromMemory: onRemoveFromMemory ? handleRemoveFromMemoryClick : null,
+    isRemovingFromMemory: isRemovingFromMemory
+  }),
+  showTags && zoomLevel === ZOOM_DEFAULT && /*#__PURE__*/React.createElement(LightboxTagPanel, {
+    key: `tags-${tagOverrideKey || String(currentUrl || index)}`,
     tags: currentTags,
     onSaveTags: saveCurrentTags,
     onSearchTag: onSearchTag,
-    onOpenUrl: () => setImageUrlModalOpen(true),
-    showToast: showToast,
-    sourceInfo: sourceInfo,
-    showZoomControls: isDesktop,
-    zoomLevel: zoomLevel,
-    zoomMin: ZOOM_MIN,
-    zoomMax: ZOOM_MAX,
-    onZoomIn: handleZoomIn,
-    onZoomOut: handleZoomOut,
-    onZoomReset: handleZoomReset,
-    onRemoveFromMemory: onRemoveFromMemory ? handleRemoveFromMemoryClick : null,
-    isRemovingFromMemory: isRemovingFromMemory
+    showToast: showToast
   })),
   renderCommentThread(),
   total > 1 && (() => {
@@ -2380,8 +2403,8 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar, sho
       /*#__PURE__*/React.createElement("span", {
         style: { color: 'rgba(255, 255, 255, 0.75)', fontSize: 'var(--font-size-md)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }
       }, `${index + 1} / ${total}`),
-      /* Dots container */
-      /*#__PURE__*/React.createElement("div", {
+      /* Dots container -- 모바일에서는 숫자 표시("1 / 9")만으로 충분해 점은 생략한다 */
+      isDesktop && /*#__PURE__*/React.createElement("div", {
         onClick: e => e.stopPropagation(),
         style: { display: 'flex', alignItems: 'center', gap: '7px' }
       },
@@ -2417,6 +2440,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar, sho
   if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
     LightboxInfoPanel: LightboxInfoPanel,
+    LightboxTagPanel: LightboxTagPanel,
     Lightbox: Lightbox,
   });
 }
