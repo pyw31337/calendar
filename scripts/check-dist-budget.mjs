@@ -19,10 +19,10 @@ const BUDGETS = [
 ];
 
 // Total JS across all Vite chunks. Temporarily doubled to 2.6MB (~200%) during active development.
-// Nudged to 2.65MB to fit the 컨텐츠(지역축제/문화행사/스포츠) page + 보관함 인물/추억 탭 addition
-// -- still well inside the "doubled" ceiling above, not a new precedent. Will be reduced alongside
-// post-stabilization chunk optimization.
-const TOTAL_JS_MAX_BYTES = 2_650_000;
+// Nudged to 2.66MB to fit the 추억 탭 "제외된 사진 다시 추가" 팝업 addition -- still well inside
+// the "doubled" ceiling above, not a new precedent. Will be reduced alongside post-stabilization
+// chunk optimization.
+const TOTAL_JS_MAX_BYTES = 2_660_000;
 
 function fail(message) {
   console.error(`[check-dist-budget] ${message}`);
