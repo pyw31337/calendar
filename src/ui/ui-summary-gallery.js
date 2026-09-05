@@ -1104,13 +1104,14 @@ export function MemoPreviewSection({ memos = [], calendar = null, onViewAll, onO
   );
 }
 
-export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalGalleryCount, onViewAll, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag, onDeletePhoto, onReplacePhoto, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, onJumpToGallery, onGetChatMessageOrdinal, onGetGalleryPhotoOrdinal, onRequestConfirm }) {
+export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalGalleryCount, onViewAll, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag, onDeletePhoto, onReplacePhoto, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, onJumpToGallery, onGetChatMessageOrdinal, onGetGalleryPhotoOrdinal, onRequestConfirm, onFetchPhotoComments, onSavePhotoComments, photoCommentCounts = {} }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const GalleryIcon = __deps.GalleryIcon;
   const Lightbox = __comp.Lightbox || __deps.Lightbox;
   const MediaThumb = __comp.MediaThumb || __deps.MediaThumb;
+  const PhotoCommentCountBadge = __comp.PhotoCommentCountBadge || __deps.PhotoCommentCountBadge;
   const resolveMeetingPhotoDisplay = __deps.resolveMeetingPhotoDisplay;
   const SectionCountBadge = __comp.SectionCountBadge;
 
@@ -1232,28 +1233,36 @@ export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalG
         className: "gallery-thumb-grid",
         style: { display: 'grid', gap: '6px', marginTop: '12px' }
       },
-        displayedEntries.map((entry, idx) => /*#__PURE__*/React.createElement(MediaThumb, {
+        displayedEntries.map((entry, idx) => /*#__PURE__*/React.createElement("div", {
           key: entry.mediaKey || entry.refKey || entry.full || entry.thumb,
-          src: (entry.thumb && String(entry.thumb)) || (entry.full && String(entry.full)) || '',
-          fallbackSrc: (entry.full && String(entry.full)) || (entry.thumb && String(entry.thumb)) || '',
-          alt: "채팅에 첨부된 사진",
-          loading: "lazy",
-          decoding: "async",
-          referrerPolicy: 'no-referrer',
-          onClick: () => setLightbox({
-            urls: displayedEntries.map(e => e.full),
-            meta: displayedEntries.map(e => ({ timestamp: e.timestamp, messageId: e.messageId, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, directMediaUrl: e.directMediaUrl, source: e.source, uploadSource: e.uploadSource, meetingDate: e.meetingDate, photoId: e.photoId, sourceMessageId: e.sourceMessageId, sourceImageIndex: e.sourceImageIndex, mediaKey: e.mediaKey, refKey: e.refKey })),
-            index: idx
+          style: { position: 'relative' }
+        },
+          /*#__PURE__*/React.createElement(MediaThumb, {
+            src: (entry.thumb && String(entry.thumb)) || (entry.full && String(entry.full)) || '',
+            fallbackSrc: (entry.full && String(entry.full)) || (entry.thumb && String(entry.thumb)) || '',
+            alt: "채팅에 첨부된 사진",
+            loading: "lazy",
+            decoding: "async",
+            referrerPolicy: 'no-referrer',
+            onClick: () => setLightbox({
+              urls: displayedEntries.map(e => e.full),
+              meta: displayedEntries.map(e => ({ timestamp: e.timestamp, messageId: e.messageId, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, directMediaUrl: e.directMediaUrl, source: e.source, uploadSource: e.uploadSource, meetingDate: e.meetingDate, photoId: e.photoId, sourceMessageId: e.sourceMessageId, sourceImageIndex: e.sourceImageIndex, mediaKey: e.mediaKey, refKey: e.refKey })),
+              index: idx
+            }),
+            onBroken: (e, brokenInfo) => handleBrokenPhoto(entry, brokenInfo),
+            style: { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }
           }),
-          onBroken: (e, brokenInfo) => handleBrokenPhoto(entry, brokenInfo),
-          style: { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }
-        }))
+          PhotoCommentCountBadge && /*#__PURE__*/React.createElement(PhotoCommentCountBadge, {
+            count: photoCommentCounts[entry.mediaKey || entry.refKey] || 0
+          })
+        ))
       )
     ),
     lightbox && /*#__PURE__*/React.createElement(Lightbox, {
       urls: lightbox.urls,
       index: lightbox.index,
       meta: lightbox.meta,
+      calendar,
       onClose: () => setLightbox(null),
       onNavigate: i => setLightbox(prev => prev ? { ...prev, index: i } : prev),
       showToast,
@@ -1268,7 +1277,9 @@ export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalG
       onJumpToGallery: (msgId, idx, url) => { setLightbox(null); if (typeof onJumpToGallery === 'function') onJumpToGallery(msgId, idx, url); },
       onGetChatMessageOrdinal,
       onGetGalleryPhotoOrdinal,
-      onRequestConfirm
+      onRequestConfirm,
+      onFetchPhotoComments,
+      onSavePhotoComments
     })
   );
 }
@@ -1811,7 +1822,7 @@ export function HistoryView({
   onDeletePhoto = null, onReplacePhoto = null,
   onJumpToChatMessage = null, onJumpToMemo = null, onJumpToMeetingDate = null,
   onGetChatMessageOrdinal = null, onGetGalleryPhotoOrdinal = null, onRequestConfirm = null,
-  onRemovePhotoFromMemory = null
+  onRemovePhotoFromMemory = null, onFetchPhotoComments = null, onSavePhotoComments = null
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -2365,6 +2376,7 @@ export function HistoryView({
       urls: historyLightbox.urls,
       index: historyLightbox.index,
       meta: historyLightbox.meta,
+      calendar,
       onClose: () => setHistoryLightbox(null),
       onNavigate: i => setHistoryLightbox(prev => prev ? { ...prev, index: i } : prev),
       showToast,
@@ -2381,7 +2393,9 @@ export function HistoryView({
       onRequestConfirm,
       onRemoveFromMemory: (historyLightbox.memoryId && typeof onRemovePhotoFromMemory === 'function')
         ? (photoMeta => onRemovePhotoFromMemory(historyLightbox.memoryId, photoMeta?.mediaKey || photoMeta?.refKey))
-        : null
+        : null,
+      onFetchPhotoComments,
+      onSavePhotoComments
     }),
 
     /*#__PURE__*/React.createElement(SideMenuOverlay, {

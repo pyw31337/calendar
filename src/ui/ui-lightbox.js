@@ -974,13 +974,14 @@ const LIGHTBOX_TRANSITION_MS = 230;
 const LIGHTBOX_TRANSITION_FALLBACK_MS = LIGHTBOX_TRANSITION_MS + 90;
 const LIGHTBOX_TRANSITION_EASING = 'cubic-bezier(0.22, 0.61, 0.36, 1)';
 
-export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag, onDeletePhoto, onReplacePhoto, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, onJumpToGallery, onGetChatMessageOrdinal, onGetGalleryPhotoOrdinal, onRequestConfirm, onRemoveFromMemory }) {
+export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag, onDeletePhoto, onReplacePhoto, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, onJumpToGallery, onGetChatMessageOrdinal, onGetGalleryPhotoOrdinal, onRequestConfirm, onRemoveFromMemory, onFetchPhotoComments, onSavePhotoComments }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const TrashIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.TrashIcon) || __deps.TrashIcon;
   const PencilIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PencilIcon) || __deps.PencilIcon;
   const ImageUrlModal = __deps.ImageUrlModal;
   const LightboxInfoPanel = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LightboxInfoPanel;
+  const CommentThread = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CommentThread) || __deps.CommentThread;
   const buildLightboxImageInfo = __deps.buildLightboxImageInfo;
 
   const total = urls.length;
@@ -1150,6 +1151,49 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
   // entries DO carry a truthy messageId (the memo's own id), but that id only resolves against
   // the messages collection, not memos -- tags there are a whole-memo field with no single-photo
   // target, so editing is intentionally left disabled rather than silently failing to save.
+  // 사진 댓글 -- mediaKey/refKey(currentIdentity, 항상 값이 있음)를 사진의 안정적인 식별자로
+  // 써서 calendars/cal_{id}/photoComments 문서 하나에 매칭한다(app-main.js의
+  // handleFetchPhotoComments/handleSavePhotoComments). 여러 장을 스와이프해도 슬라이드별로
+  // 따로 캐싱해서, 이미 한 번 불러온 사진은 다시 불러오지 않는다. 댓글은 info 패널이 열려
+  // 있을 때만(showInfo) 필요하므로 그때만 불러온다 -- 스와이프 도중 지나치는 사진마다 매번
+  // Firestore 읽기가 발생하지 않도록.
+  const photoCommentKey = currentIdentity.mediaKey || currentIdentity.refKey || '';
+  const [photoCommentsByKey, setPhotoCommentsByKey] = React.useState({});
+  const photoCommentsFetchedRef = React.useRef(new Set());
+  React.useEffect(() => {
+    if (!showInfo || !photoCommentKey || typeof onFetchPhotoComments !== 'function') return;
+    if (photoCommentsFetchedRef.current.has(photoCommentKey)) return;
+    photoCommentsFetchedRef.current.add(photoCommentKey);
+    let cancelled = false;
+    Promise.resolve(onFetchPhotoComments(photoCommentKey)).then(list => {
+      if (!cancelled && Array.isArray(list)) setPhotoCommentsByKey(prev => ({ ...prev, [photoCommentKey]: list }));
+    });
+    return () => { cancelled = true; };
+  }, [showInfo, photoCommentKey, onFetchPhotoComments]);
+  const handlePhotoCommentsChange = async nextComments => {
+    if (!photoCommentKey || typeof onSavePhotoComments !== 'function') return false;
+    setPhotoCommentsByKey(prev => ({ ...prev, [photoCommentKey]: nextComments }));
+    return Promise.resolve(onSavePhotoComments(photoCommentKey, nextComments));
+  };
+  // 댓글은 라이트박스 안에서만 쓰고 볼 수 있어야 한다는 요구사항에 맞춰, info 패널(showInfo)이
+  // 열려 있을 때만 렌더링한다 -- 별도 토글 없이 기존 info 토글에 얹혀간다.
+  const renderCommentThread = () => {
+    if (!showInfo || zoomLevel !== ZOOM_DEFAULT || !CommentThread) return null;
+    return /*#__PURE__*/React.createElement("div", {
+      key: `comments-${photoCommentKey}`,
+      className: "lightbox-comment-thread",
+      style: {
+        width: '92vw', maxWidth: '480px', maxHeight: '22vh', overflowY: 'auto', marginTop: '8px', padding: '10px 14px',
+        backgroundColor: 'var(--bg-card)', borderRadius: 'var(--radius-md)', boxSizing: 'border-box'
+      }
+    }, /*#__PURE__*/React.createElement(CommentThread, {
+      comments: photoCommentsByKey[photoCommentKey] || [],
+      onCommentsChange: handlePhotoCommentsChange,
+      calendar: calendar,
+      showToast: showToast,
+      onRequestConfirm: onRequestConfirm
+    }));
+  };
   const isMeetingPhoto = currentMeta?.source === 'meeting' && !!currentMeta?.meetingDate && !!currentMeta?.photoId;
   // Anniversary photos live on the anniversary doc's photos[] array (not a chat message), so
   // they identify by anniversaryId + imageIndex -- same shape handleSaveAnniversaryPhotoTags
@@ -1240,7 +1284,12 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     if (typeof onGetGalleryPhotoOrdinal !== 'function') return;
     const messageId = currentMeta.messageId;
     if (!messageId) return;
-    const key = currentIdentity.assetKey || currentIdentity.refKey || currentIdentity.mediaKey || `${messageId}_${currentMeta.imageIndex || 0}`;
+    // 이 key는 아래 sourceInfo의 galleryOrdinalCache 조회 키(`${messageId}_${imageIndex||0}`)와
+    // 반드시 똑같아야 한다 -- 예전엔 여기서만 currentIdentity.assetKey/refKey/mediaKey를 우선
+    // 사용했는데, 그 값은 "gallery:msgId:0" 같은 형식이라 조회 쪽의 단순 "msgId_0" 형식과 전혀
+    // 달라서 캐시가 항상 miss였다. 그 결과 갤러리로 올린 사진은 순번을 절대 못 받아와서 "출처"에
+    // 늘 "갤러리"만 보이고 "갤러리 #17" 같은 순번이 절대 안 나오는 버그였다.
+    const key = `${messageId}_${currentMeta.imageIndex || 0}`;
     if (galleryOrdinalFetchedRef.current.has(key)) return;
     galleryOrdinalFetchedRef.current.add(key);
     let cancelled = false;
@@ -2098,7 +2147,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
         })
       )
     );
-  })(), imageUrlModalOpen && /*#__PURE__*/React.createElement(ImageUrlModal, {
+  })(), renderCommentThread(), imageUrlModalOpen && /*#__PURE__*/React.createElement(ImageUrlModal, {
     imageUrl: currentUrl,
     onClose: () => setImageUrlModalOpen(false),
     showToast,

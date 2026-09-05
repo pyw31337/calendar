@@ -2316,8 +2316,27 @@ export function HandballIcon({ size = 18 } = {}) {
   );
 }
 
+// 썸네일 우측 상단에 얹는 댓글 개수 뱃지 -- 0개면 아예 렌더링하지 않는다(자리도 안 차지함).
+// 썸네일을 감싸는 컨테이너에 position:'relative'가 있어야 정상적으로 우측 상단에 붙는다.
+export function PhotoCommentCountBadge({ count = 0 } = {}) {
+  const React = window.React;
+  if (!count) return null;
+  return /*#__PURE__*/React.createElement('span', {
+    className: 'photo-comment-count-badge',
+    "aria-label": `댓글 ${count}개`,
+    style: {
+      position: 'absolute', top: '2px', right: '2px', zIndex: 2,
+      minWidth: '16px', height: '16px', padding: '0 4px', borderRadius: 'var(--radius-full)',
+      backgroundColor: '#EF4444', color: '#fff', fontSize: '10px', fontWeight: 800,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      boxShadow: '0 1px 2px rgba(0,0,0,0.35)', pointerEvents: 'none', lineHeight: 1
+    }
+  }, count > 99 ? '99+' : String(count));
+}
+
   if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
+    PhotoCommentCountBadge: PhotoCommentCountBadge,
     KakaoTalkIcon: KakaoTalkIcon,
     MenuIcon: MenuIcon,
     CakeIcon: CakeIcon,
