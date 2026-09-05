@@ -1614,7 +1614,7 @@ export function SummaryList({
     onKeyDown: event => handleSectionTitleKeyDown(event, 'confirmed'),
     "data-no-press-feedback": true,
     style: {
-      color: '#7C3AED',
+      color: '#0E0E0E',
       marginBottom: '12px'
     }
   }, /*#__PURE__*/React.createElement("svg", {
@@ -1925,7 +1925,7 @@ export function HistoryView({
 
   const customPersonTags = Array.isArray(calendar?.customPersonTags) ? calendar.customPersonTags : [];
   const personTagChips = [
-    ...activeParticipants.map(p => ({ id: p.id, participantId: p.id, label: p.name, color: p.color || '#7C3AED' })),
+    ...activeParticipants.map(p => ({ id: p.id, participantId: p.id, label: p.name, color: p.color || '#0E0E0E' })),
     ...customPersonTags.filter(t => !activeParticipants.some(p => p.name === t)).map(t => ({ id: `custom_${t}`, participantId: null, label: t, color: '#64748B' }))
   ];
 
@@ -2157,7 +2157,7 @@ export function HistoryView({
                   padding: '7px 10px', width: '100%', boxSizing: 'border-box'
                 }
               },
-                MapPinIcon && /*#__PURE__*/React.createElement(MapPinIcon, { size: 14, style: { flexShrink: 0, marginTop: '2px', color: '#7C3AED' } }),
+                MapPinIcon && /*#__PURE__*/React.createElement(MapPinIcon, { size: 14, style: { flexShrink: 0, marginTop: '2px', color: '#0E0E0E' } }),
                 /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0 } },
                   mapUrl
                     ? /*#__PURE__*/React.createElement("a", {
@@ -3604,7 +3604,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
               }, item.venue || CULTURE_MISSING_LABEL)
             ),
             registered && /*#__PURE__*/React.createElement("div", {
-              style: { position: 'absolute', top: '6px', right: '6px', backgroundColor: '#7C3AED', color: '#fff', borderRadius: 'var(--radius-full)', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 800, boxShadow: '0 1px 3px rgba(0,0,0,0.25)' }
+              style: { position: 'absolute', top: '6px', right: '6px', backgroundColor: '#0E0E0E', color: '#fff', borderRadius: 'var(--radius-full)', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 800, boxShadow: '0 1px 3px rgba(0,0,0,0.25)' }
             }, "✓")
           ),
           /*#__PURE__*/React.createElement("div", { style: { padding: '8px 10px 10px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px' } },
@@ -3752,7 +3752,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
             href: selected.link, target: "_blank", rel: "noreferrer",
             style: {
               display: 'block', flexShrink: 0, textAlign: 'center', padding: '10px', borderRadius: 'var(--radius-md)',
-              backgroundColor: '#7C3AED', color: '#fff', fontWeight: 800, fontSize: 'var(--font-size-md)', textDecoration: 'none'
+              backgroundColor: '#0E0E0E', color: '#fff', fontWeight: 800, fontSize: 'var(--font-size-md)', textDecoration: 'none'
             }
           }, selected.source === 'custom' ? "링크 열기" : "자세히보기")
         )
