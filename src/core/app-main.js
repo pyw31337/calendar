@@ -716,14 +716,10 @@ function buildCultureEventMemoText(item) {
 }
 
 function App() {
-  if (isAdminDashboardRoute()) {
-    const initialCalendars = loadLocalCache();
-    return /*#__PURE__*/React.createElement(AdminLoginGate, null,
-      /*#__PURE__*/React.createElement(AdminDashboard, {
-        initialCalendars
-      })
-    );
-  }
+  // Keep hooks unconditional. The app can switch between the admin route and the regular
+  // calendar route through SPA/browser-history navigation; returning before these hooks on only
+  // one route changes the hook count between renders and triggers React invariant #310.
+  const adminRoute = isAdminDashboardRoute();
   // 컨텐츠 상세의 "공유" 버튼으로 받은 URL(#gatherContent=...)을 열면, 어느 화면에 있든/캘린더가
   // 로드됐든 안 됐든 상관없이 그 컨텐츠 백드롭이 바로 보이도록 최상위에서 한 번만 파싱한다.
   // 실제 등록(Firestore 쓰기)은 하지 않는 읽기 전용 미리보기 -- 등록은 컨텐츠 등록 화면의
@@ -744,6 +740,12 @@ function App() {
     if (!sharedContentItem) return;
     try { window.history.replaceState({}, '', window.location.pathname + window.location.search); } catch (_) { /* best-effort */ }
   }, []);
+  if (adminRoute) {
+    const initialCalendars = loadLocalCache();
+    return /*#__PURE__*/React.createElement(AdminLoginGate, null,
+      /*#__PURE__*/React.createElement(AdminDashboard, { initialCalendars })
+    );
+  }
   const SharedContentPreviewModal = (window.GATHER_UI_COMPONENTS || {}).SharedContentPreviewModal;
   return /*#__PURE__*/React.createElement(React.Fragment, null,
     /*#__PURE__*/React.createElement(CalendarApp, null),
