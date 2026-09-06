@@ -722,7 +722,34 @@ function App() {
       })
     );
   }
-  return /*#__PURE__*/React.createElement(CalendarApp, null);
+  // 컨텐츠 상세의 "공유" 버튼으로 받은 URL(#gatherContent=...)을 열면, 어느 화면에 있든/캘린더가
+  // 로드됐든 안 됐든 상관없이 그 컨텐츠 백드롭이 바로 보이도록 최상위에서 한 번만 파싱한다.
+  // 실제 등록(Firestore 쓰기)은 하지 않는 읽기 전용 미리보기 -- 등록은 컨텐츠 등록 화면의
+  // "붙여넣기"에서 사용자가 명시적으로 한다.
+  const [sharedContentItem, setSharedContentItem] = React.useState(() => {
+    try {
+      const hash = window.location.hash || '';
+      const marker = '#gatherContent=';
+      const idx = hash.indexOf(marker);
+      if (idx === -1) return null;
+      const json = decodeURIComponent(escape(atob(hash.slice(idx + marker.length))));
+      const payload = JSON.parse(json);
+      if (!payload || payload.kind !== 'gather-content' || !payload.item || !payload.item.title) return null;
+      return payload.item;
+    } catch (_) { return null; }
+  });
+  React.useEffect(() => {
+    if (!sharedContentItem) return;
+    try { window.history.replaceState({}, '', window.location.pathname + window.location.search); } catch (_) { /* best-effort */ }
+  }, []);
+  const SharedContentPreviewModal = (window.GATHER_UI_COMPONENTS || {}).SharedContentPreviewModal;
+  return /*#__PURE__*/React.createElement(React.Fragment, null,
+    /*#__PURE__*/React.createElement(CalendarApp, null),
+    sharedContentItem && SharedContentPreviewModal && /*#__PURE__*/React.createElement(SharedContentPreviewModal, {
+      item: sharedContentItem,
+      onClose: () => setSharedContentItem(null)
+    })
+  );
 }
 
 function CalendarApp() {

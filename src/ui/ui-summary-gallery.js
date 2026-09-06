@@ -3370,6 +3370,47 @@ function filterAndSortCultureItems(items, category) {
   });
 }
 
+// 컨텐츠 상세의 "공유" 버튼/컨텐츠 등록의 "붙여넣기"가 쓰는 인코더/파서 -- 사진 공유와 같은
+// 원칙으로, 카드의 모든 필드(포스터~설명)를 URL 프래그먼트에 실어 보낸다. 복사 시점의 데이터를
+// 그대로 복제하는 개념이라, 공유한 뒤 원본을 수정/삭제해도 이미 붙여넣은 쪽에는 영향이 없다.
+const GATHER_CONTENT_FRAGMENT_PREFIX = '#gatherContent=';
+const GATHER_CONTENT_FIELDS = [
+  'id', 'kind', 'title', 'startDate', 'endDate', 'dateLabel', 'venue', 'address', 'link',
+  'description', 'image', 'price', 'contact', 'director', 'cast', 'ageRating', 'audienceCount',
+  'bookingRate', 'isOpenEnded', 'genre'
+];
+function encodeGatherContentFragment(item) {
+  try {
+    const picked = {};
+    GATHER_CONTENT_FIELDS.forEach(f => {
+      const v = item && item[f];
+      if (v !== undefined && v !== null && v !== '') picked[f] = v;
+    });
+    if (!picked.title) return '';
+    const payload = { v: 1, kind: 'gather-content', item: picked };
+    const json = JSON.stringify(payload);
+    const b64 = typeof btoa === 'function' ? btoa(unescape(encodeURIComponent(json))) : '';
+    return b64 ? GATHER_CONTENT_FRAGMENT_PREFIX + b64 : '';
+  } catch (_) {
+    return '';
+  }
+}
+function parseGatherContentClipboardText(text) {
+  const raw = String(text || '').trim();
+  if (!/^https?:\/\//i.test(raw)) return null;
+  const markerIndex = raw.indexOf(GATHER_CONTENT_FRAGMENT_PREFIX);
+  if (markerIndex === -1) return null;
+  const b64 = raw.slice(markerIndex + GATHER_CONTENT_FRAGMENT_PREFIX.length);
+  try {
+    const json = decodeURIComponent(escape(atob(b64)));
+    const payload = JSON.parse(json);
+    if (!payload || payload.kind !== 'gather-content' || !payload.item || !payload.item.title) return null;
+    return payload.item;
+  } catch (_) {
+    return null;
+  }
+}
+
 // Layer popup for manually registering 문화공연 / 지역축제 items into the archive tabs.
 // Portaled to document.body (same pattern as CulturePerformancesTab's detail sheet) so it sits
 // above the side menu / page chrome. Persists via onSave → app-main customCultureItems write.
@@ -3414,6 +3455,53 @@ function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind =
     setCast(Array.isArray(initialItem.cast) ? initialItem.cast.join(', ') : (initialItem.cast || ''));
     setRating(initialItem.ageRating || ''); setAudience(initialItem.audienceCount || ''); setBookingRate(initialItem.bookingRate || '');
   }, [initialItem, initialKind]);
+
+  // 다른 캘린더의 컨텐츠 상세 "공유" 버튼으로 복사한 URL을 붙여넣으면, 그 카드의 모든 필드를
+  // 이 폼에 그대로 채워 넣는다 -- 등록 자체는 여느 등록과 동일하게 사용자가 내용을 확인하고
+  // 아래 "등록" 버튼을 눌러야 저장되므로, 붙여넣기 한 번으로 검토 없이 바로 써지지 않는다.
+  const applyPastedContent = (item) => {
+    if (!item) return false;
+    setKind(['festival', 'sports', 'movie'].includes(item.kind) ? item.kind : 'performance');
+    setTitle(item.title || '');
+    setStartDate(item.startDate || '');
+    setEndDate(item.endDate || '');
+    setVenue(item.venue || '');
+    setAddress(item.address || '');
+    setLink(item.link || '');
+    setDescription(item.description || '');
+    setImage(item.image || '');
+    setPrice(item.price || '');
+    setContact(item.contact || '');
+    setDirector(item.director || '');
+    setCast(Array.isArray(item.cast) ? item.cast.join(', ') : (item.cast || ''));
+    setRating(item.ageRating || '');
+    setAudience(item.audienceCount || '');
+    setBookingRate(item.bookingRate || '');
+    return true;
+  };
+  const handlePasteContentClick = async () => {
+    let text = '';
+    try { text = await navigator.clipboard.readText(); } catch (_) { /* not granted/available */ }
+    const item = parseGatherContentClipboardText(text);
+    if (!item) {
+      if (typeof showToast === 'function') showToast('클립보드에 공유된 컨텐츠가 없습니다.', 'error');
+      return;
+    }
+    applyPastedContent(item);
+    if (typeof showToast === 'function') showToast('컨텐츠 정보를 붙여넣었습니다. 확인 후 등록해 주세요.', 'success');
+  };
+  React.useEffect(() => {
+    const handlePaste = e => {
+      const text = e.clipboardData ? e.clipboardData.getData('text/plain') : '';
+      const item = parseGatherContentClipboardText(text);
+      if (!item) return;
+      e.preventDefault();
+      applyPastedContent(item);
+      if (typeof showToast === 'function') showToast('컨텐츠 정보를 붙여넣었습니다. 확인 후 등록해 주세요.', 'success');
+    };
+    document.addEventListener('paste', handlePaste);
+    return () => document.removeEventListener('paste', handlePaste);
+  }, []);
 
   const handleSave = async () => {
     const cleanTitle = (title || '').trim();
@@ -3512,10 +3600,20 @@ function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind =
       },
         /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' } },
           /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)' } }, initialItem ? "컨텐츠 수정" : "컨텐츠 등록"),
-          /*#__PURE__*/React.createElement("button", {
-            type: "button", onClick: () => !saving && onClose && onClose(), "aria-label": "닫기",
-            style: { background: 'none', border: 'none', cursor: 'pointer', padding: '6px', color: 'var(--text-muted)', display: 'flex' }
-          }, SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }) : "✕")
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '4px' } },
+            !initialItem && /*#__PURE__*/React.createElement("button", {
+              type: "button", onClick: handlePasteContentClick, disabled: saving,
+              style: {
+                height: '30px', padding: '0 10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)',
+                backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)', fontSize: 'var(--font-size-sm)', fontWeight: 700,
+                cursor: saving ? 'default' : 'pointer'
+              }
+            }, "붙여넣기"),
+            /*#__PURE__*/React.createElement("button", {
+              type: "button", onClick: () => !saving && onClose && onClose(), "aria-label": "닫기",
+              style: { background: 'none', border: 'none', cursor: 'pointer', padding: '6px', color: 'var(--text-muted)', display: 'flex' }
+            }, SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }) : "✕")
+          )
         ),
         UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
           ariaLabel: "컨텐츠 종류",
@@ -3633,10 +3731,25 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
+  const ShareIcon = __comp.ShareIcon || __deps.ShareIcon;
   const [items, setItems] = React.useState(null); // null = loading, [] = loaded-empty
   const [loadError, setLoadError] = React.useState(false);
   const [selected, setSelected] = React.useState(null);
   const [pendingId, setPendingId] = React.useState(null);
+  // 상세 시트의 "공유" 버튼 -- 이 카드의 전체 필드를 URL 프래그먼트에 실어(사진 공유와 동일한
+  // 원칙) 복사한다. 이 URL을 열면 그 카드 백드롭이 바로 뜨고(App의 SharedContentPreviewModal),
+  // 컨텐츠 등록 폼에 붙여넣으면 포스터~설명까지 그대로 복제 등록된다.
+  const [contentShareUrl, setContentShareUrl] = React.useState('');
+  const handleShareContent = async (item) => {
+    const fragment = encodeGatherContentFragment(item);
+    if (!fragment) return;
+    const shareUrl = `${window.location.origin}${window.location.pathname}${fragment}`;
+    const ok = await copyTextToClipboard(shareUrl);
+    setContentShareUrl(shareUrl);
+    // showToast isn't a prop here; a silent copy + the URL shown in the modal below is enough
+    // feedback either way (a visible "복사됨" toast would need threading a new prop through).
+    void ok;
+  };
   const [isMemoOpen, setIsMemoOpen] = React.useState(false);
   const openMovieVideoSearch = item => {
     if (!item) return;
@@ -4260,22 +4373,140 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
               }
             }, "메모 저장")
           ),
-          selected.link && /*#__PURE__*/React.createElement("a", {
-            href: selected.link, target: "_blank", rel: "noreferrer",
-            style: {
-              display: 'block', flexShrink: 0, textAlign: 'center', padding: '10px', borderRadius: 'var(--radius-md)',
-              backgroundColor: '#7C3AED', color: '#fff', fontWeight: 800, fontSize: 'var(--font-size-md)', textDecoration: 'none'
-            }
-          }, selected.source === 'custom' ? "링크 열기" : "자세히보기")
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', flexShrink: 0 } },
+            /*#__PURE__*/React.createElement("button", {
+              type: "button", onClick: () => handleShareContent(selected), "aria-label": "공유",
+              style: {
+                width: '44px', height: '44px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)',
+                backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)', cursor: 'pointer'
+              }
+            }, ShareIcon ? /*#__PURE__*/React.createElement(ShareIcon, { size: 20 }) : "🔗"),
+            selected.link && /*#__PURE__*/React.createElement("a", {
+              href: selected.link, target: "_blank", rel: "noreferrer",
+              style: {
+                display: 'block', flex: 1, textAlign: 'center', padding: '10px', borderRadius: 'var(--radius-md)',
+                backgroundColor: '#7C3AED', color: '#fff', fontWeight: 800, fontSize: 'var(--font-size-md)', textDecoration: 'none'
+              }
+            }, selected.source === 'custom' ? "링크 열기" : "자세히보기")
+          )
         )
       ),
+      document.body
+    ),
+    contentShareUrl && ReactDOM.createPortal(
+      /*#__PURE__*/React.createElement("div", {
+        onClick: () => setContentShareUrl(''),
+        style: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 30000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }
+      }, /*#__PURE__*/React.createElement("div", {
+        onClick: e => e.stopPropagation(),
+        style: { width: '100%', maxWidth: '400px', backgroundColor: 'var(--bg-card)', borderRadius: 'var(--radius-md)', padding: '20px', boxSizing: 'border-box' }
+      },
+        /*#__PURE__*/React.createElement("h3", { style: { fontSize: '1.05rem', fontWeight: 800, marginBottom: '12px', color: 'var(--text-main)', textAlign: 'center' } }, "공유 URL"),
+        /*#__PURE__*/React.createElement("input", {
+          type: "text", className: "form-input", readOnly: true, value: contentShareUrl,
+          style: { width: '100%', marginBottom: '12px', boxSizing: 'border-box' }
+        }),
+        /*#__PURE__*/React.createElement("div", {
+          style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', textAlign: 'center', marginBottom: '16px' }
+        }, "URL이 클립보드에 복사되었습니다. 이 URL을 열면 이 컨텐츠가 바로 보이고, 다른 캘린더의 '컨텐츠 등록'에 붙여넣으면 포스터부터 내용까지 그대로 등록됩니다."),
+        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '10px' } },
+          /*#__PURE__*/React.createElement("button", {
+            type: "button", className: "btn btn-secondary", onClick: () => setContentShareUrl(''),
+            style: { flex: 1, height: '36px', fontSize: 'var(--font-size-base)' }
+          }, "닫기"),
+          /*#__PURE__*/React.createElement("button", {
+            type: "button", className: "btn btn-action-dark",
+            onClick: () => copyTextToClipboard(contentShareUrl),
+            style: { flex: 1, height: '36px', fontSize: 'var(--font-size-base)' }
+          }, "다시 복사")
+        )
+      )),
       document.body
     )
   );
 }
 
+// 다른 캘린더의 컨텐츠 상세 "공유" 버튼으로 받은 URL(#gatherContent=...)을 열었을 때, 로그인/
+// 캘린더 상태와 무관하게 바로 띄우는 읽기 전용 미리보기 -- app-main.js의 App()이 URL을 한 번
+// 파싱해 이 컴포넌트에 item을 넘겨준다. 실제 등록(Firestore 쓰기)은 여기서 하지 않고, 등록하고
+// 싶으면 컨텐츠 등록 화면의 "붙여넣기"를 쓰도록 안내만 한다.
+function SharedContentPreviewModal({ item, onClose }) {
+  const React = window.React;
+  const ReactDOM = window.ReactDOM;
+  const __deps = window.GATHER_UI_DEPS || {};
+  const __comp = window.GATHER_UI_COMPONENTS || {};
+  const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
+  if (!item || typeof document === 'undefined' || !ReactDOM) return null;
+  return ReactDOM.createPortal(
+    /*#__PURE__*/React.createElement("div", {
+      onClick: onClose,
+      style: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 40000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }
+    },
+      /*#__PURE__*/React.createElement("div", {
+        onClick: e => e.stopPropagation(),
+        style: {
+          position: 'relative', width: '100%', maxWidth: '480px', maxHeight: '85vh',
+          backgroundColor: 'var(--bg-card)', borderRadius: '16px 16px 0 0', padding: '20px',
+          display: 'flex', flexDirection: 'column', gap: '10px', boxSizing: 'border-box'
+        }
+      },
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", onClick: onClose, "aria-label": "닫기",
+          style: {
+            position: 'absolute', top: '12px', right: '12px', zIndex: 1,
+            width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            border: 'none', borderRadius: 'var(--radius-full)', cursor: 'pointer',
+            backgroundColor: 'rgba(0,0,0,0.45)', color: '#fff'
+          }
+        }, SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 18 }) : "✕"),
+        item.image && /*#__PURE__*/React.createElement("img", {
+          src: item.image, alt: item.title, loading: 'lazy',
+          style: { width: '100%', maxHeight: '260px', objectFit: 'contain', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)', flexShrink: 0 },
+          onError: e => { e.currentTarget.style.display = 'none'; }
+        }),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)', flexShrink: 0, paddingRight: '36px' } }, item.title),
+        /*#__PURE__*/React.createElement("div", {
+          style: { flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }
+        },
+          [
+            ['기간', item.dateLabel || (item.startDate && item.endDate && item.startDate !== item.endDate ? `${item.startDate} ~ ${item.endDate}` : item.startDate)],
+            ['장소', item.venue],
+            ['주소', item.address],
+            ['문의', item.contact],
+            ['가격', item.price],
+            ['감독', item.director],
+            ['출연', Array.isArray(item.cast) ? item.cast.join(', ') : item.cast]
+          ].filter(([, value]) => value && String(value).trim())
+            .map(([label, value]) => /*#__PURE__*/React.createElement("div", {
+              key: label, style: { display: 'flex', gap: '8px', fontSize: 'var(--font-size-sm)' }
+            },
+              /*#__PURE__*/React.createElement("span", { style: { flexShrink: 0, width: '84px', color: 'var(--text-muted)', fontWeight: 700 } }, label),
+              /*#__PURE__*/React.createElement("span", { style: { color: 'var(--text-main)', wordBreak: 'break-word' } }, value)
+            )),
+          item.description && /*#__PURE__*/React.createElement("div", {
+            style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-main)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }
+          }, item.description)
+        ),
+        /*#__PURE__*/React.createElement("div", {
+          style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', textAlign: 'center', flexShrink: 0 }
+        }, "다른 사람이 공유한 컨텐츠입니다. 내 캘린더에 등록하려면 컨텐츠 등록 화면의 '붙여넣기'를 사용하세요."),
+        item.link && /*#__PURE__*/React.createElement("a", {
+          href: item.link, target: "_blank", rel: "noreferrer",
+          style: {
+            display: 'block', flexShrink: 0, textAlign: 'center', padding: '10px', borderRadius: 'var(--radius-md)',
+            backgroundColor: '#7C3AED', color: '#fff', fontWeight: 800, fontSize: 'var(--font-size-md)', textDecoration: 'none'
+          }
+        }, "자세히보기")
+      )
+    ),
+    document.body
+  );
+}
+
   if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
+    SharedContentPreviewModal: SharedContentPreviewModal,
     SectionCountBadge: SectionCountBadge,
     SectionToggleButton: SectionToggleButton,
     SearchCategoryTabs: SearchCategoryTabs,
