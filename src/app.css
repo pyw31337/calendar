@@ -1203,14 +1203,16 @@ button, input, textarea, select {
 .main-header-inner {
   max-width: 1100px;
   margin: 0 auto;
-  padding: 18px 10px 8px;
+  /* Standalone iOS PWAs place the status indicators inside the viewport. Keep the
+     header content below that inset so the title and actions remain tappable. */
+  padding: calc(18px + env(safe-area-inset-top, 0px)) 10px 8px;
   display: flex;
   flex-direction: column;
   gap: 10px;
   min-width: 0;
 }
 @media (min-width: 768px) {
-  .main-header-inner { padding: 18px 10px 8px; }
+  .main-header-inner { padding: calc(18px + env(safe-area-inset-top, 0px)) 10px 8px; }
 }
 
 /* Calendar name + search/settings buttons share one row (space-between); the description
@@ -2918,7 +2920,8 @@ select.form-select {
   background: var(--bg-card);
   color: var(--text-main);
   box-shadow: -12px 0 34px rgba(15, 23, 42, 0.12);
-  padding: 22px 16px 16px;
+  /* The drawer is not a modal-overlay, so it must apply the iOS status-bar inset itself. */
+  padding: calc(22px + env(safe-area-inset-top, 0px)) 16px calc(16px + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
   gap: 0;
