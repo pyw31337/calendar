@@ -1551,25 +1551,21 @@ function CalendarApp() {
       return () => { cancelled = true; };
     }
     let cancelled = false;
+    // Deliberately unscoped (no uploadSource filter): this read feeds galleryChatMessages (the
+    // 갤러리 페이지's full photo grid) and HistoryView's 인물/추억 tag matching via
+    // displayChatMessages/fullChatHistoryByCalendar, both of which must include every message
+    // regardless of channel -- gallery/meeting-photo uploads carry their own explicit
+    // uploadSource ('gallery'/'meeting') and are exactly the messages these views need to find,
+    // not exclude. Scoping this specific read to uploadSource=='chat' (as a since-reverted change
+    // briefly did) silently dropped every meeting/gallery-uploaded photo from the gallery grid
+    // once a calendar had at least one 'chat'-tagged text message, since a non-empty scoped
+    // result never fell through to any fallback. The REST branch above has always read this
+    // collection unscoped for the same reason.
     withTimeout(liveFirebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages')
-      .where('uploadSource', '==', 'chat').get({ source: 'server' }), 9000, 'full chat history read').then(snapshot => {
+      .get({ source: 'server' }), 9000, 'full chat history read').then(snapshot => {
       if (cancelled) return;
-      if (snapshot.docs.length > 0) {
-        const list = snapshot.docs.map(doc => slimMessageForClient({ id: doc.id, ...doc.data() }));
-        setFullChatHistoryByCalendar(prev => ({ ...prev, [activeCalId]: list }));
-        return;
-      }
-      // uploadSource=='chat' scoped query found nothing -- on a calendar whose real history
-      // predates that field (see isLegacyOrChatUpload in firebase-services.js), that scoping
-      // alone would make search/history's 인물·추억 탭 report "no messages" forever even though
-      // the actual chat history is intact. Fall back to an unscoped read, same as the no-SDK
-      // REST branch above already does unconditionally.
-      withTimeout(liveFirebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages')
-        .get({ source: 'server' }), 9000, 'full chat history read (legacy fallback)').then(fallbackSnapshot => {
-        if (cancelled) return;
-        const list = fallbackSnapshot.docs.map(doc => slimMessageForClient({ id: doc.id, ...doc.data() }));
-        setFullChatHistoryByCalendar(prev => ({ ...prev, [activeCalId]: list }));
-      }).catch(err => console.warn('full chat history legacy fallback failed:', err));
+      const list = snapshot.docs.map(doc => slimMessageForClient({ id: doc.id, ...doc.data() }));
+      setFullChatHistoryByCalendar(prev => ({ ...prev, [activeCalId]: list }));
     }).catch(err => console.warn('full chat history load failed:', err));
     return () => { cancelled = true; };
   }, [activeCalId, isGlobalSearchOpen, activeView, firebaseDb, firebaseConnectionVersion, fullChatHistoryByCalendar]);
