@@ -2111,6 +2111,34 @@ export function HistoryView({
     const d = new Date(ts);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   };
+  // Chat/memo photos can be attached to a meeting by a compact date hashtag (26.09.04,
+  // 260904, etc.) rather than by a meeting-photo reference. Treat those explicit dates as the
+  // source of truth before falling back to the upload timestamp; otherwise photos uploaded later
+  // than the trip disappear from its memories group even though the date modal shows them.
+  const entryTaggedDates = entry => {
+    const text = String(entry?.tags || '');
+    const dates = [];
+    const dotted = /(?:^|[^\d])(20\d{2})[.\-/](\d{1,2})[.\-/](\d{1,2})(?!\d)/g;
+    let match;
+    while ((match = dotted.exec(text))) {
+      dates.push(`${match[1]}-${String(match[2]).padStart(2, '0')}-${String(match[3]).padStart(2, '0')}`);
+    }
+    const compact = /(?:^|[^\d])(\d{2})(\d{2})(\d{2})(?!\d)/g;
+    while ((match = compact.exec(text))) {
+      dates.push(`20${match[1]}-${match[2]}-${match[3]}`);
+    }
+    return dates;
+  };
+  const entryMatchesDateRange = (entry, start, end) => {
+    if (!entry || !start || !end) return false;
+    if (entry.meetingDate) {
+      const meetingDate = String(entry.meetingDate).slice(0, 10);
+      if (meetingDate >= start && meetingDate <= end) return true;
+    }
+    if (entryTaggedDates(entry).some(date => date >= start && date <= end)) return true;
+    const fallbackDate = entryDateStr(entry);
+    return !!fallbackDate && fallbackDate >= start && fallbackDate <= end;
+  };
   const travelMemoryGroups = React.useMemo(() => {
     // range 타입(dayMode==='range')이 아닌 once/yearly 타입(하루짜리) 여행 기념일은
     // a.startDate/a.endDate가 비어 있고 대신 a.date에 날짜가 저장된다 (컨텐츠 상세 시트의
@@ -2125,8 +2153,7 @@ export function HistoryView({
         // 라이트박스의 '이 추억에서 제거' 버튼으로 뺀 사진(excludedMemoryPhotoKeys)은 제외한다.
         const excluded = new Set(Array.isArray(a.excludedMemoryPhotoKeys) ? a.excludedMemoryPhotoKeys : []);
         const photosInRange = historyPhotoEntries.filter(entry => {
-          const d = entryDateStr(entry);
-          return d && d >= start && d <= end;
+          return entryMatchesDateRange(entry, start, end);
         });
         const photos = photosInRange.filter(entry => {
           const key = entry.mediaKey || entry.refKey;
@@ -2442,7 +2469,7 @@ export function HistoryView({
                   }, `제외${selectedMemoryPhotoKeys.size > 0 ? ` (${selectedMemoryPhotoKeys.size})` : ''}`)
                 )
               : [
-                  { show: typeof onAddPhotosBackToMemory === 'function' && group.excludedPhotos.length > 0, key: 'add', onClick: () => setIsAddBackModalOpen(true), label: '제외된 사진 추가', css: { border: 'none', backgroundColor: '#111827', color: '#fff', fontSize: '1.1rem', fontWeight: 800, lineHeight: 1 }, content: "+" },
+                  { show: typeof onAddPhotosBackToMemory === 'function', key: 'add', onClick: () => setIsAddBackModalOpen(true), label: '사진 추가', css: { border: 'none', backgroundColor: '#111827', color: '#fff', fontSize: '1.1rem', fontWeight: 800, lineHeight: 1 }, content: "+" },
                   { show: true, key: 'edit', onClick: () => setIsMemoryEditMode(true), label: '편집', css: { border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)' }, content: PencilIcon ? /*#__PURE__*/React.createElement(PencilIcon, { size: 15 }) : "✎" },
                   { show: typeof onHideMemoryGroup === 'function', key: 'delete', onClick: () => handleClickDeleteMemoryGroup(group), disabled: isHidingMemoryGroup, label: '삭제', css: { border: '1px solid #EF4444', backgroundColor: 'var(--bg-primary)', color: '#EF4444', cursor: isHidingMemoryGroup ? 'default' : 'pointer', opacity: isHidingMemoryGroup ? 0.5 : 1 }, content: TrashIcon ? /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }) : "✕" }
                 ].map(cfg => cfg.show && /*#__PURE__*/React.createElement("button", {
@@ -2468,7 +2495,7 @@ export function HistoryView({
         onClick: e => e.stopPropagation()
       },
         /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-header" },
-          /*#__PURE__*/React.createElement("h4", null, "제외된 사진"),
+          /*#__PURE__*/React.createElement("h4", null, "추억에 사진 추가"),
           /*#__PURE__*/React.createElement("button", {
             type: "button",
             style: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer' },
@@ -2477,7 +2504,7 @@ export function HistoryView({
         ),
         /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-body" },
           group.excludedPhotos.length === 0
-            ? /*#__PURE__*/React.createElement("p", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', textAlign: 'center', padding: '24px 0' } }, "제외된 사진이 없습니다.")
+            ? /*#__PURE__*/React.createElement("p", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', textAlign: 'center', padding: '24px 0' } }, "추가할 사진이 없습니다.")
             : /*#__PURE__*/React.createElement(React.Fragment, null,
                 renderPhotoThumbGrid(group.excludedPhotos, {
                   checkable: true,
