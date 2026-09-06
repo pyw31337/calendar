@@ -874,6 +874,7 @@ export function DateModal({
   const ConfettiIcon = __comp.ConfettiIcon || __deps.ConfettiIcon;
   const TicketsPlaneIcon = __comp.TicketsPlaneIcon || __deps.TicketsPlaneIcon;
   const MessageCircleMoreIcon = __comp.MessageCircleMoreIcon || __deps.MessageCircleMoreIcon;
+  const ClapperboardIcon = __comp.ClapperboardIcon || __deps.ClapperboardIcon;
   const CookingPotIcon = __comp.CookingPotIcon || __deps.CookingPotIcon;
   const MapPinIcon = __comp.MapPinIcon || __deps.MapPinIcon;
   const CalendarIcon = __comp.CalendarIcon || __deps.CalendarIcon;
@@ -906,7 +907,7 @@ export function DateModal({
       }) : null));
     }
     if (ann.type === 'dday') return ann.icon;
-    const iconMap = { '🎂': CakeIcon, '🎈': BalloonIcon, '🎉': ConfettiIcon, '✈️': TicketsPlaneIcon, '💬': MessageCircleMoreIcon };
+    const iconMap = { '🎂': CakeIcon, '🎈': BalloonIcon, '🎉': ConfettiIcon, '✈️': TicketsPlaneIcon, '💬': MessageCircleMoreIcon, '🎬': ClapperboardIcon };
     const Icon = iconMap[ann.icon];
     return Icon ? /*#__PURE__*/React.createElement(Icon, { size }) : ann.icon;
   };
@@ -2601,7 +2602,7 @@ export function DateModal({
         // 보여주는 카드)이고, 없어도 category가 festival/event/sports면 기념일 등록으로 직접
         // 만든 항목(HistoryView의 selfAuthoredCultureItems가 이 기념일 자신의 id로 카드를 만듦)
         // 이라 마찬가지로 이동 대상이 있다 -- 그 외(생일 등 일반 기념일)만 이동 대상이 없다.
-        const CULTURE_ANNIVERSARY_CATEGORIES = ['festival', 'event', 'sports'];
+        const CULTURE_ANNIVERSARY_CATEGORIES = ['festival', 'event', 'sports', 'movie'];
         const canFocusCultureSource = !!(
           typeof onFocusCultureSource === 'function' &&
           (ann.cultureSourceId || CULTURE_ANNIVERSARY_CATEGORIES.includes(ann.category))
