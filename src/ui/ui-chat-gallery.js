@@ -1000,6 +1000,7 @@ export function ChatGalleryModal({
   const BackArrowIcon = __deps.BackArrowIcon;
   const PlusIcon = __comp.PlusIcon || __deps.PlusIcon;
   const PencilIcon = __comp.PencilIcon || __deps.PencilIcon;
+  const PhotoCommentCountBadge = __comp.PhotoCommentCountBadge || __deps.PhotoCommentCountBadge;
   const getMediaIdentityKeys = __deps.getMediaIdentityKeys;
   const SharedSideMenuSettings = __comp.SharedSideMenuSettings || __deps.SharedSideMenuSettings;
   const SharedSideMenuFooter = __comp.SharedSideMenuFooter || __deps.SharedSideMenuFooter;
@@ -2002,15 +2003,7 @@ export function ChatGalleryModal({
         display: 'block'
       }
     });
-    const commentBadge = commentCount > 0 && /*#__PURE__*/React.createElement("span", {
-      "aria-hidden": true,
-      style: {
-        position: 'absolute', top: '4px', right: '4px', minWidth: '18px', height: '18px', padding: '0 4px',
-        borderRadius: 'var(--radius-full)', backgroundColor: 'rgba(0,0,0,0.65)', color: '#fff',
-        fontSize: '11px', fontWeight: 800, lineHeight: '18px', textAlign: 'center',
-        pointerEvents: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.4)'
-      }
-    }, commentCount > 99 ? '99+' : commentCount);
+    const commentBadge = PhotoCommentCountBadge && /*#__PURE__*/React.createElement(PhotoCommentCountBadge, { count: commentCount });
     if (!isBulkShareMode && !commentBadge) return thumb;
     return /*#__PURE__*/React.createElement("div", {
       key: itemKey,

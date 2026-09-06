@@ -1398,7 +1398,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   const [tagOverrides, setTagOverrides] = React.useState({});
   const currentMeta = meta && meta[index];
   const currentIdentity = currentMeta
-    ? (getMediaIdentityKeys(currentMeta, { source: currentMeta.source, meetingDate: currentMeta.meetingDate }) || {})
+    ? (getMediaIdentityKeys({ ...currentMeta, full: currentMeta.full || currentUrl }, { source: currentMeta.source, meetingDate: currentMeta.meetingDate }) || {})
     : {};
   // 사진 댓글 -- mediaKey/refKey(currentIdentity, 항상 값이 있음)를 사진의 안정적인 식별자로
   // 써서 calendars/cal_{id}/photoComments 문서 하나에 매칭한다(app-main.js의
