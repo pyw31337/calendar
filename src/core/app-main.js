@@ -4072,6 +4072,54 @@ function CalendarApp() {
     }
   };
 
+  // 위 handlePasteGatherPhoto의 일괄(여러 장) 버전 -- 갤러리 "편집" 모드에서 여러 장을 골라
+  // "일괄공유"로 묶어 보낸 URL을 붙여넣을 때 쓴다. 사진마다 독립된 메시지 문서로 저장해, 이후
+  // 어느 캘린더에서 태그를 바꾸거나 사진을 지워도 서로 전혀 영향이 없다(단일 붙여넣기와 동일).
+  const handlePasteGatherPhotos = async (photos) => {
+    if (!guardLoadedCalendar()) return false;
+    const list = Array.isArray(photos)
+      ? photos.filter(p => p && /^https?:\/\//i.test(String(p.url || '')))
+      : [];
+    if (!list.length) {
+      showToast('올바른 사진이 없습니다.', 'error');
+      return false;
+    }
+    const fallbackParticipantId = chatParticipantId || getActiveParticipants(activeCal)[0]?.id || '';
+    const baseTs = Date.now();
+    let anyQueued = false;
+    try {
+      for (let i = 0; i < list.length; i++) {
+        const cleanUrl = String(list[i].url).trim();
+        const tagTokens = String(list[i].tags || '').split(/[,\s#]+/).map(t => sanitizeText(t.trim(), 30)).filter(Boolean).slice(0, 10);
+        const cleanTags = sanitizeText(tagTokens.join(' '), 100);
+        const messageOperationId = `gather_photos_paste_${activeCal.id}_${baseTs}_${i}_${Math.random().toString(36).slice(2, 8)}`;
+        const messageData = {
+          participantId: fallbackParticipantId,
+          text: '',
+          imageUrl: cleanUrl,
+          thumbUrl: cleanUrl,
+          imageUrls: [cleanUrl],
+          thumbUrls: [cleanUrl],
+          imageTags: [cleanTags],
+          timestamp: baseTs + i,
+          uploadSource: 'gallery'
+        };
+        const sent = await writeCollectionDocumentWithFallback('messages', activeCal.id, '', messageData, 'add', '사진 일괄 붙여넣기(다른 캘린더)', { documentId: messageOperationId });
+        if (!sent) throw new Error(`Gather photos paste save failed at index ${i}`);
+        if (sent.id) upsertLocalChatMessage({ ...messageData, id: sent.id });
+        if (sent.queued) anyQueued = true;
+      }
+      showToast(anyQueued
+        ? '네트워크가 불안정하여 일부를 대기열에 저장했습니다. 연결되면 자동으로 반영됩니다.'
+        : `사진 ${list.length}장을 붙여넣었습니다.`, anyQueued ? 'info' : 'success');
+      return true;
+    } catch (err) {
+      console.error('handlePasteGatherPhotos failed:', err);
+      showToast('사진 붙여넣기 실패', 'error');
+      return false;
+    }
+  };
+
   const handleDeleteMessage = (msg) => {
     const deletingMessage = { ...msg, calId: activeCalId };
     const participants = getActiveParticipants(activeCal);
@@ -7572,6 +7620,7 @@ function CalendarApp() {
         onUploadImages: handleUploadGalleryImages,
         onAddLink: handleAddGalleryLink,
         onPasteGatherPhoto: handlePasteGatherPhoto,
+        onPasteGatherPhotos: handlePasteGatherPhotos,
         onOpenShare: () => {
           if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsGalleryShareOpen(true);
         },
@@ -8007,6 +8056,7 @@ function CalendarApp() {
     onUploadImages: handleUploadGalleryImages,
     onAddLink: handleAddGalleryLink,
     onPasteGatherPhoto: handlePasteGatherPhoto,
+    onPasteGatherPhotos: handlePasteGatherPhotos,
     onOpenShare: () => {
       if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsGalleryShareOpen(true);
     },

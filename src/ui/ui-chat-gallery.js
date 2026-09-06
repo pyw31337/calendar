@@ -911,6 +911,45 @@ function parseGatherPhotoClipboardText(text) {
   }
 }
 
+// 여러 장을 한 번에 공유("일괄공유")할 때 쓰는 인코더/파서 -- 단일 사진과 달리 사진마다 URL이
+// 달라 그 URL 자체를 프래그먼트 앞에 실을 수 없으므로, 이번엔 프래그먼트 안에 (URL, 태그) 쌍의
+// 배열을 통째로 담는다. 프래그먼트 앞의 URL은 그냥 유효한 https 링크 형태를 갖추기 위한 것으로
+// (현재 페이지 주소), 실제로 어느 사진의 URL도 아니다 -- 붙여넣는 쪽은 프래그먼트만 읽는다.
+const GATHER_PHOTOS_FRAGMENT_PREFIX = '#gatherPhotos=';
+function encodeGatherPhotosFragment(photos) {
+  try {
+    const payload = {
+      v: 1,
+      kind: 'gather-photos',
+      photos: (photos || []).map(p => ({ url: String(p?.url || ''), tags: String(p?.tags || '').trim() })).filter(p => p.url)
+    };
+    if (!payload.photos.length) return '';
+    const json = JSON.stringify(payload);
+    const b64 = typeof btoa === 'function' ? btoa(unescape(encodeURIComponent(json))) : '';
+    return b64 ? GATHER_PHOTOS_FRAGMENT_PREFIX + b64 : '';
+  } catch (_) {
+    return '';
+  }
+}
+function parseGatherPhotosClipboardText(text) {
+  const raw = String(text || '').trim();
+  if (!/^https?:\/\//i.test(raw)) return null;
+  const markerIndex = raw.indexOf(GATHER_PHOTOS_FRAGMENT_PREFIX);
+  if (markerIndex === -1) return null;
+  const b64 = raw.slice(markerIndex + GATHER_PHOTOS_FRAGMENT_PREFIX.length);
+  try {
+    const json = decodeURIComponent(escape(atob(b64)));
+    const payload = JSON.parse(json);
+    if (!payload || payload.kind !== 'gather-photos' || !Array.isArray(payload.photos)) return null;
+    const photos = payload.photos
+      .map(p => ({ url: String(p?.url || '').trim(), tags: String(p?.tags || '').trim() }))
+      .filter(p => /^https?:\/\//i.test(p.url));
+    return photos.length ? photos : null;
+  } catch (_) {
+    return null;
+  }
+}
+
 export function ChatGalleryModal({
   chatMessages,
   memos = [],
@@ -949,6 +988,7 @@ export function ChatGalleryModal({
   showToast,
   onDeletePhoto = null,
   onPasteGatherPhoto = null,
+  onPasteGatherPhotos = null,
   syncStatus = null
 }) {
   const React = window.React;
@@ -1001,6 +1041,14 @@ export function ChatGalleryModal({
   const [pastePreview, setPastePreview] = React.useState(null); // { files, previewUrls } | null
   const [gatherPhotoPastePreview, setGatherPhotoPastePreview] = React.useState(null); // { url, tags } | null
   const [isSavingGatherPhotoPaste, setIsSavingGatherPhotoPaste] = React.useState(false);
+  const [gatherPhotosPastePreview, setGatherPhotosPastePreview] = React.useState(null); // [{ url, tags }] | null
+  const [isSavingGatherPhotosPaste, setIsSavingGatherPhotosPaste] = React.useState(false);
+  // "편집" -> 일괄공유 모드: 사진 탭 썸네일마다 체크박스를 켜고, 고른 사진들을 태그와 함께
+  // 하나의 URL로 묶어 다른 캘린더 갤러리에 붙여넣을 수 있게 한다(위 gather-photos 프래그먼트).
+  const [isBulkShareMode, setIsBulkShareMode] = React.useState(false);
+  const [selectedBulkShareKeys, setSelectedBulkShareKeys] = React.useState(() => new Set());
+  const [isGeneratingBulkShareUrl, setIsGeneratingBulkShareUrl] = React.useState(false);
+  const [bulkShareResultUrl, setBulkShareResultUrl] = React.useState('');
   const brokenPhotoKeysRef = React.useRef((GATHER_APP_UTILS.getPersistentBrokenPhotoUrls || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.getPersistentBrokenPhotoUrls) || (() => new Set()))());
   const brokenPhotoUrlsRef = React.useRef((GATHER_APP_UTILS.getPersistentBrokenPhotoUrls || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.getPersistentBrokenPhotoUrls) || (() => new Set()))());
   const [brokenPhotoRevision, setBrokenPhotoRevision] = React.useState(0);
@@ -1471,6 +1519,12 @@ export function ChatGalleryModal({
       setGatherPhotoPastePreview(gatherPhoto);
       return;
     }
+    const gatherPhotos = parseGatherPhotosClipboardText(clipboardText);
+    if (gatherPhotos) {
+      setIsMenuOpen(false);
+      setGatherPhotosPastePreview(gatherPhotos);
+      return;
+    }
     const files = await readClipboardImageFiles(showToast);
     if (files && files.length > 0) {
       // Show what will be uploaded and let the user confirm instead of uploading immediately --
@@ -1500,6 +1554,59 @@ export function ChatGalleryModal({
       }
     } finally {
       setIsSavingGatherPhotoPaste(false);
+    }
+  };
+  const handleCancelGatherPhotosPaste = () => setGatherPhotosPastePreview(null);
+  const handleConfirmGatherPhotosPaste = async () => {
+    if (!gatherPhotosPastePreview || typeof onPasteGatherPhotos !== 'function' || isSavingGatherPhotosPaste) return;
+    setIsSavingGatherPhotosPaste(true);
+    try {
+      const ok = await onPasteGatherPhotos(gatherPhotosPastePreview);
+      if (ok !== false) {
+        setGatherPhotosPastePreview(null);
+        setActiveTab('photos');
+      }
+    } finally {
+      setIsSavingGatherPhotosPaste(false);
+    }
+  };
+  const toggleBulkShareSelected = key => {
+    setSelectedBulkShareKeys(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+  const handleToggleBulkShareMode = () => {
+    setIsBulkShareMode(v => !v);
+    setSelectedBulkShareKeys(new Set());
+  };
+  // 선택한 사진들을 하나의 URL로 묶어 공유("일괄공유") -- 복사 시점의 사진 URL과 태그를 그대로
+  // 실어 보내고(encodeGatherPhotosFragment), 이후 원본/사본 어느 쪽에서 태그를 바꾸거나 사진을
+  // 지워도 서로 영향이 없다(단일 사진 공유와 동일한 원칙).
+  const handleClickBulkShare = async () => {
+    const keys = Array.from(selectedBulkShareKeys);
+    if (!keys.length) return;
+    setIsGeneratingBulkShareUrl(true);
+    try {
+      const keySet = new Set(keys);
+      const photos = visiblePhotos
+        .filter(photo => keySet.has(getPhotoKey(photo)))
+        .map(photo => ({ url: photo.full || photo.thumb, tags: photo.tags || '' }));
+      const fragment = encodeGatherPhotosFragment(photos);
+      if (!fragment) {
+        if (showToast) showToast('공유 URL 생성 실패', 'error');
+        return;
+      }
+      const baseUrl = `${window.location.origin}${window.location.pathname}`;
+      const shareUrl = `${baseUrl}${fragment}`;
+      const ok = await copyTextToClipboard(shareUrl);
+      setBulkShareResultUrl(shareUrl);
+      setIsBulkShareMode(false);
+      setSelectedBulkShareKeys(new Set());
+      if (showToast) showToast(ok ? '공유 URL이 복사되었습니다.' : 'URL 생성은 됐지만 복사에 실패했습니다. 아래 URL을 직접 복사해 주세요.', ok ? 'success' : 'error');
+    } finally {
+      setIsGeneratingBulkShareUrl(false);
     }
   };
   const uploadFiles = async files => {
@@ -1586,7 +1693,7 @@ export function ChatGalleryModal({
   // event -- otherwise a stray Ctrl+V uploads whatever happens to be on the clipboard with no
   // chance to back out.
   React.useEffect(() => {
-    if (typeof onUploadImages !== 'function' && typeof onPasteGatherPhoto !== 'function') return;
+    if (typeof onUploadImages !== 'function' && typeof onPasteGatherPhoto !== 'function' && typeof onPasteGatherPhotos !== 'function') return;
     const handlePaste = e => {
       // 다른 캘린더 사진(gather-photo URL)이 먼저 -- clipboardData는 이 이벤트에서만 동기적으로
       // 읽을 수 있어(navigator.clipboard 비동기 API와 달리 권한 프롬프트 없이) Ctrl+V 쪽은
@@ -1601,6 +1708,16 @@ export function ChatGalleryModal({
           return;
         }
       }
+      if (typeof onPasteGatherPhotos === 'function') {
+        const text = e.clipboardData ? e.clipboardData.getData('text/plain') : '';
+        const gatherPhotos = parseGatherPhotosClipboardText(text);
+        if (gatherPhotos) {
+          e.preventDefault();
+          setIsMenuOpen(false);
+          setGatherPhotosPastePreview(gatherPhotos);
+          return;
+        }
+      }
       if (typeof onUploadImages !== 'function') return;
       const files = getImageFilesFromClipboardEvent(e);
       if (!files.length) return;
@@ -1610,7 +1727,7 @@ export function ChatGalleryModal({
     };
     document.addEventListener('paste', handlePaste);
     return () => document.removeEventListener('paste', handlePaste);
-  }, [onUploadImages, onPasteGatherPhoto]);
+  }, [onUploadImages, onPasteGatherPhoto, onPasteGatherPhotos]);
   const renderMenuIcon = () => MenuIcon
     ? /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M4 6h16", "M4 12h16", "M4 18h16"] })
     : /*#__PURE__*/React.createElement("svg", {
@@ -1724,6 +1841,88 @@ export function ChatGalleryModal({
     )
   )) : null;
 
+  // 다른 캘린더에서 "일괄공유"로 묶어 보낸 사진 여러 장을 한꺼번에 붙여넣기 전 확인하는 모달.
+  const gatherPhotosPasteModal = gatherPhotosPastePreview ? /*#__PURE__*/React.createElement("div", {
+    className: "modal-overlay",
+    style: { zIndex: 30000 },
+    onClick: handleCancelGatherPhotosPaste
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-container confirm-dialog-modal",
+    onClick: e => e.stopPropagation(),
+    style: { maxWidth: '400px', borderRadius: 'var(--radius-md)' }
+  },
+    /*#__PURE__*/React.createElement("h3", {
+      style: { fontSize: '1.05rem', fontWeight: 800, marginBottom: '12px', color: 'var(--text-main)', textAlign: 'center' }
+    }, `다른 캘린더 사진 ${gatherPhotosPastePreview.length}장을 붙여넣을까요?`),
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(76px, 1fr))', gap: '8px', marginBottom: '12px', maxHeight: '50vh', overflowY: 'auto' }
+    }, gatherPhotosPastePreview.map((photo, i) => /*#__PURE__*/React.createElement("img", {
+      key: i,
+      src: photo.url,
+      alt: "붙여넣을 사진 미리보기",
+      style: { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)' }
+    }))),
+    /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', textAlign: 'center', marginBottom: '16px' }
+    }, "사진과 각자의 해시태그를 이 캘린더 갤러리에 붙여넣습니다. 이후 태그 변경/삭제는 서로 영향을 주지 않습니다."),
+    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '10px', justifyContent: 'center' } },
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "btn btn-secondary",
+        onClick: handleCancelGatherPhotosPaste,
+        disabled: isSavingGatherPhotosPaste,
+        style: { flex: 1, height: '36px', fontSize: 'var(--font-size-base)' }
+      }, "취소"),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "btn btn-action-dark",
+        onClick: handleConfirmGatherPhotosPaste,
+        disabled: isSavingGatherPhotosPaste,
+        style: { flex: 1, height: '36px', fontSize: 'var(--font-size-base)', opacity: isSavingGatherPhotosPaste ? 0.6 : 1 }
+      }, isSavingGatherPhotosPaste ? "붙여넣는 중..." : "붙여넣기")
+    )
+  )) : null;
+
+  // "일괄공유" 결과 URL 모달 -- 복사는 이미 handleClickBulkShare에서 자동으로 시도하지만,
+  // 클립보드 권한이 없는 환경을 위해 URL을 직접 보고 복사할 수 있게 남겨둔다.
+  const bulkShareResultModal = bulkShareResultUrl ? /*#__PURE__*/React.createElement("div", {
+    className: "modal-overlay",
+    style: { zIndex: 30000 },
+    onClick: () => setBulkShareResultUrl('')
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal-container confirm-dialog-modal",
+    onClick: e => e.stopPropagation(),
+    style: { maxWidth: '400px', borderRadius: 'var(--radius-md)' }
+  },
+    /*#__PURE__*/React.createElement("h3", {
+      style: { fontSize: '1.05rem', fontWeight: 800, marginBottom: '12px', color: 'var(--text-main)', textAlign: 'center' }
+    }, "공유 URL"),
+    /*#__PURE__*/React.createElement("input", {
+      type: "text", className: "form-input", readOnly: true, value: bulkShareResultUrl,
+      style: { width: '100%', marginBottom: '12px' }
+    }),
+    /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', textAlign: 'center', marginBottom: '16px' }
+    }, "이 URL을 다른 캘린더 갤러리의 '붙여넣기' 버튼이나 Ctrl+V로 붙여넣으면 선택한 사진들이 그대로 등록됩니다."),
+    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '10px', justifyContent: 'center' } },
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "btn btn-secondary",
+        onClick: () => setBulkShareResultUrl(''),
+        style: { flex: 1, height: '36px', fontSize: 'var(--font-size-base)' }
+      }, "닫기"),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "btn btn-action-dark",
+        onClick: async () => {
+          const ok = await copyTextToClipboard(bulkShareResultUrl);
+          if (showToast) showToast(ok ? 'URL이 복사되었습니다.' : '복사에 실패했습니다. URL을 직접 선택해 복사해 주세요.', ok ? 'success' : 'error');
+        },
+        style: { flex: 1, height: '36px', fontSize: 'var(--font-size-base)' }
+      }, "다시 복사")
+    )
+  )) : null;
+
   const galleryShellStyle = asPage ? {
     position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1005,
     backgroundColor: 'var(--bg-primary)', display: 'flex', flexDirection: 'column',
@@ -1761,9 +1960,11 @@ export function ChatGalleryModal({
     }
   }, (items || []).map((photo, idx) => {
     const photoKey = getPhotoKey(photo);
+    const itemKey = photo.mediaKey || photo.refKey || `${photo.messageId || photo.source || 'photo'}-${photo.meetingDate || ''}-${photo.directMediaUrl ? 'direct' : photo.imageIndex}-${photo.timestamp || idx}`;
     const lightboxIndex = (lightboxItems || []).findIndex(entry => getPhotoKey(entry) === photoKey);
-    return /*#__PURE__*/React.createElement(MediaThumb, {
-      key: photo.mediaKey || photo.refKey || `${photo.messageId || photo.source || 'photo'}-${photo.meetingDate || ''}-${photo.directMediaUrl ? 'direct' : photo.imageIndex}-${photo.timestamp || idx}`,
+    const isChecked = isBulkShareMode && selectedBulkShareKeys.has(photoKey);
+    const thumb = /*#__PURE__*/React.createElement(MediaThumb, {
+      key: isBulkShareMode ? undefined : itemKey,
       "data-photo-url": photo.full || photo.thumb,
       "data-message-id": photo.messageId || photo.sourceMessageId,
       src: (photo.thumb && String(photo.thumb)) || (photo.full && String(photo.full)) || '',
@@ -1772,11 +1973,11 @@ export function ChatGalleryModal({
       loading: "lazy",
       decoding: "async",
       referrerPolicy: 'no-referrer',
-      onClick: () => setActiveLightbox && setActiveLightbox({
+      onClick: () => isBulkShareMode ? toggleBulkShareSelected(photoKey) : (setActiveLightbox && setActiveLightbox({
         urls: (lightboxItems || []).map(p => p.full),
         index: lightboxIndex >= 0 ? lightboxIndex : idx,
         meta: (lightboxItems || []).map(p => ({ timestamp: p.timestamp, messageId: p.messageId, imageIndex: p.imageIndex, thumb: p.thumb, tags: p.tags, directMediaUrl: p.directMediaUrl, source: p.source, uploadSource: p.uploadSource, meetingDate: p.meetingDate, photoId: p.photoId, sourceMessageId: p.sourceMessageId, sourceImageIndex: p.sourceImageIndex, assetKey: p.assetKey, mediaKey: p.mediaKey, refKey: p.refKey }))
-      }),
+      })),
       onBroken: (e, brokenInfo) => handleBrokenPhoto(photo, brokenInfo),
       style: {
         width: '100%',
@@ -1789,6 +1990,26 @@ export function ChatGalleryModal({
         display: 'block'
       }
     });
+    if (!isBulkShareMode) return thumb;
+    return /*#__PURE__*/React.createElement("div", {
+      key: itemKey,
+      style: { position: 'relative' }
+    },
+      thumb,
+      /*#__PURE__*/React.createElement("span", {
+        "aria-hidden": true,
+        style: {
+          position: 'absolute', top: '4px', left: '4px', width: '20px', height: '20px', borderRadius: '5px',
+          border: isChecked ? 'none' : '2px solid rgba(255,255,255,0.9)',
+          backgroundColor: isChecked ? 'var(--accent-primary)' : 'rgba(0,0,0,0.35)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.4)', pointerEvents: 'none'
+        }
+      }, isChecked && /*#__PURE__*/React.createElement("svg", {
+        xmlns: "http://www.w3.org/2000/svg", width: "14", height: "14", viewBox: "0 0 24 24",
+        fill: "none", stroke: "#fff", strokeWidth: "3", strokeLinecap: "round", strokeLinejoin: "round"
+      }, /*#__PURE__*/React.createElement("path", { d: "M20 6 9 17l-5-5" })))
+    );
   }));
   const renderGalleryLinkList = items => /*#__PURE__*/React.createElement(React.Fragment, null,
     (items || []).map(item => /*#__PURE__*/React.createElement(GalleryLinkCard, {
@@ -1909,18 +2130,47 @@ export function ChatGalleryModal({
     /*#__PURE__*/React.createElement("div", {
       style: { display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }
     },
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "btn btn-action btn-action-outline",
-        onClick: handlePasteGalleryUpload,
-        style: { height: '36px', padding: '0 12px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: 'pointer' }
-      }, "붙여넣기"),
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "btn btn-action btn-action-dark",
-        onClick: handleUploadClick,
-        style: { height: '36px', padding: '0 12px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: 'pointer' }
-      }, "추가")
+      isBulkShareMode
+        ? /*#__PURE__*/React.createElement(React.Fragment, null,
+            /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              className: "btn btn-action btn-action-outline",
+              onClick: handleToggleBulkShareMode,
+              disabled: isGeneratingBulkShareUrl,
+              style: { height: '36px', padding: '0 12px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: 'pointer' }
+            }, "취소"),
+            /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              className: "btn btn-action btn-action-dark",
+              onClick: handleClickBulkShare,
+              disabled: selectedBulkShareKeys.size === 0 || isGeneratingBulkShareUrl,
+              style: {
+                height: '36px', padding: '0 12px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900,
+                cursor: (selectedBulkShareKeys.size === 0 || isGeneratingBulkShareUrl) ? 'default' : 'pointer',
+                opacity: (selectedBulkShareKeys.size === 0 || isGeneratingBulkShareUrl) ? 0.5 : 1
+              }
+            }, isGeneratingBulkShareUrl ? "생성 중..." : `일괄공유${selectedBulkShareKeys.size > 0 ? ` (${selectedBulkShareKeys.size})` : ''}`)
+          )
+        : /*#__PURE__*/React.createElement(React.Fragment, null,
+            /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              className: "btn btn-action btn-action-outline",
+              onClick: handlePasteGalleryUpload,
+              style: { height: '36px', padding: '0 12px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: 'pointer' }
+            }, "붙여넣기"),
+            /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              className: "btn btn-action btn-action-dark",
+              onClick: handleUploadClick,
+              style: { height: '36px', padding: '0 12px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: 'pointer' }
+            }, "추가"),
+            /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              className: "btn btn-action btn-action-outline",
+              onClick: handleToggleBulkShareMode,
+              style: { height: '36px', padding: '0 12px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: 'pointer' }
+            }, "편집")
+          )
     )
   );
   const renderLinkListHeader = () => /*#__PURE__*/React.createElement("div", {
@@ -2447,7 +2697,7 @@ export function ChatGalleryModal({
     )),
     document.body
   );
-  return /*#__PURE__*/React.createElement(React.Fragment, null, galleryTree, pastePreviewModal, gatherPhotoPasteModal, galleryYearMonthPickerSheet);
+  return /*#__PURE__*/React.createElement(React.Fragment, null, galleryTree, pastePreviewModal, gatherPhotoPasteModal, gatherPhotosPasteModal, bulkShareResultModal, galleryYearMonthPickerSheet);
 }
 
   if (typeof window !== 'undefined') {
