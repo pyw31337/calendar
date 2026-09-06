@@ -3924,6 +3924,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
     },
       visibleItems.map(item => {
         const registered = !!findRegisteredAnniversary(item.id);
+        const isMovieCard = anniversaryCategory === 'movie' || item.genre === 'movie' || item.kind === 'movie';
         return /*#__PURE__*/React.createElement("button", {
           key: item.id,
           type: "button",
@@ -4026,10 +4027,20 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
           /*#__PURE__*/React.createElement("div", { style: { padding: '8px 10px 10px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px' } },
             /*#__PURE__*/React.createElement("div", {
               style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
-            }, item.dateLabel || formatCultureDateLabel(item.startDate, item.endDate) || (item.releaseDate ? `${item.releaseDate} 개봉` : CULTURE_MISSING_LABEL)),
+            }, isMovieCard
+              ? `개봉일 ${item.releaseDate || item.startDate || CULTURE_MISSING_LABEL}`
+              : (item.dateLabel || formatCultureDateLabel(item.startDate, item.endDate) || CULTURE_MISSING_LABEL)),
             /*#__PURE__*/React.createElement("div", {
               style: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--text-main)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', wordBreak: 'break-word' }
             }, item.title),
+            isMovieCard ? /*#__PURE__*/React.createElement(React.Fragment, null,
+              /*#__PURE__*/React.createElement("div", {
+                style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+              }, item.ageRating || '등급 정보 없음'),
+              /*#__PURE__*/React.createElement("div", {
+                style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+              }, `[${item.director || '감독 정보 없음'}] ${Array.isArray(item.cast) && item.cast.length ? item.cast.join(', ') : '출연 정보 없음'}`)
+            ) : /*#__PURE__*/React.createElement(React.Fragment, null,
             // 지역축제는 '장소'와 '주소'가 사실상 같은 정보를 가리키는 경우가 대부분이라
             // (예: 장소="영등포아트홀", 주소="서울 영등포구 ...") 축제 카드에서는 장소 줄을
             // 생략하고 주소만 보여준다. 문화공연(anniversaryCategory 'event')은 공연장 이름이
@@ -4039,7 +4050,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
             }, item.venue || CULTURE_MISSING_LABEL),
             /*#__PURE__*/React.createElement("div", {
               style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
-            }, item.address || CULTURE_MISSING_LABEL)
+            }, item.address || CULTURE_MISSING_LABEL))
           )
         );
       }),
