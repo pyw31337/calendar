@@ -2470,7 +2470,7 @@ export function HistoryView({
       },
         /*#__PURE__*/React.createElement("button", {
           type: "button", "aria-label": "추억 추가", onClick: () => setIsMemoryAddModalOpen(true),
-          style: { width: '34px', height: '34px', padding: 0, borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)', fontSize: '1.35rem', lineHeight: 1, cursor: 'pointer' }
+          style: { width: '36px', minWidth: '36px', height: '36px', minHeight: '36px', padding: 0, borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)', fontSize: '1.35rem', lineHeight: 1, cursor: 'pointer' }
         }, "+"),
         isMemoryListEditMode
           ? /*#__PURE__*/React.createElement(React.Fragment, null,
@@ -2485,7 +2485,7 @@ export function HistoryView({
             )
           : /*#__PURE__*/React.createElement("button", {
               type: "button", "aria-label": "추억 편집", onClick: () => setIsMemoryListEditMode(true),
-              style: { width: '34px', height: '34px', padding: 0, borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }
+              style: { width: '36px', minWidth: '36px', height: '36px', minHeight: '36px', padding: 0, borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }
             }, PencilIcon ? /*#__PURE__*/React.createElement(PencilIcon, { size: 16 }) : "✎")
       ),
       /*#__PURE__*/React.createElement("div", { style: {} },
@@ -2611,7 +2611,7 @@ export function HistoryView({
                   { show: typeof onHideMemoryGroup === 'function', key: 'delete', onClick: () => handleClickDeleteMemoryGroup(group), disabled: isHidingMemoryGroup, label: '삭제', css: { border: '1px solid #EF4444', backgroundColor: 'var(--bg-primary)', color: '#EF4444', cursor: isHidingMemoryGroup ? 'default' : 'pointer', opacity: isHidingMemoryGroup ? 0.5 : 1 }, content: TrashIcon ? /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }) : "✕" }
                 ].map(cfg => cfg.show && /*#__PURE__*/React.createElement("button", {
                   key: cfg.key, type: "button", onClick: cfg.onClick, disabled: cfg.disabled, "aria-label": cfg.label,
-                  style: Object.assign({ flexShrink: 0, width: '32px', height: '32px', padding: 0, borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }, cfg.css)
+                  style: Object.assign({ flexShrink: 0, width: '36px', minWidth: '36px', height: '36px', minHeight: '36px', padding: 0, borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }, cfg.css)
                 }, cfg.content))
           )
         ),
