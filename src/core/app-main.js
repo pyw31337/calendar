@@ -140,6 +140,7 @@ import {
   notifyRepeatScheduleReminder,
   getContrastTextColor,
   formatDateWithDayName,
+  normalizeDateString,
   formatShortDateWithDayName,
   formatConfirmedMeetingLabel,
   formatDDayLabel,
@@ -2661,7 +2662,7 @@ function CalendarApp() {
     if (!activeCal?.id || !item?.id || !item?.title) return null;
     const stamp = Date.now();
     const anniversaryId = 'anniversary_culture_' + stamp + '_' + Math.random().toString(36).slice(2, 8);
-    const startDate = item.startDate || item.endDate;
+    const startDate = normalizeDateString(item.startDate || item.endDate);
     if (!startDate) { showToast('공연 기간 정보가 없어 등록할 수 없습니다.', 'error'); return null; }
     // 문화행사 tab → event(행사), 지역축제 tab → festival(축제), 스포츠 tab도 event로 등록한다 --
     // 기념일 수동 등록 폼(ANNIVERSARY_CATEGORY_OPTIONS.filter(opt => opt.value !== 'sports'),
@@ -2687,7 +2688,7 @@ function CalendarApp() {
       category,
       type: 'range',
       startDate,
-      endDate: item.endDate || startDate,
+      endDate: normalizeDateString(item.endDate || startDate) || startDate,
       cultureSourceId: item.id,
       cultureSnapshot,
       createdAt: stamp,
@@ -3018,11 +3019,16 @@ function CalendarApp() {
   const handleSaveCustomCultureItem = async (item) => {
     if (!activeCal?.id || !item?.id || !item?.title) return false;
     try {
-      const saved = await writeCollectionDocumentWithFallback('customCultureItems', activeCal.id, item.id, item, 'set', '컨텐츠 등록');
+      const normalizedItem = { ...item };
+      if (normalizedItem.startDate) normalizedItem.startDate = normalizeDateString(normalizedItem.startDate) || normalizedItem.startDate;
+      if (normalizedItem.endDate) normalizedItem.endDate = normalizeDateString(normalizedItem.endDate) || normalizedItem.endDate;
+      if (normalizedItem.releaseDate) normalizedItem.releaseDate = normalizeDateString(normalizedItem.releaseDate) || normalizedItem.releaseDate;
+      if (normalizedItem.startDate) normalizedItem.dateLabel = formatDateWithDayName(normalizedItem.startDate) + (normalizedItem.endDate && normalizedItem.endDate !== normalizedItem.startDate ? ` ~ ${formatDateWithDayName(normalizedItem.endDate)}` : '');
+      const saved = await writeCollectionDocumentWithFallback('customCultureItems', activeCal.id, item.id, normalizedItem, 'set', '컨텐츠 등록');
       if (!saved?.success) throw new Error('Custom culture item save failed');
       setCustomCultureItems(prev => {
-        const list = Array.isArray(prev) ? prev.filter(x => x && x.id !== item.id) : [];
-        list.unshift(item);
+        const list = Array.isArray(prev) ? prev.filter(x => x && x.id !== normalizedItem.id) : [];
+        list.unshift(normalizedItem);
         return list;
       });
       showToast('컨텐츠가 등록되었습니다.', 'success');

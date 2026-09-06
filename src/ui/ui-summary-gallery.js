@@ -110,6 +110,10 @@ function formatDateWithDayName(...args) {
   const f = __gatherUiDeps().formatDateWithDayName || GATHER_APP_UTILS.formatDateWithDayName;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function normalizeDateString(...args) {
+  const f = __gatherUiDeps().normalizeDateString || GATHER_APP_UTILS.normalizeDateString;
+  return typeof f === 'function' ? f(...args) : '';
+}
 function formatPlaceBadgeDate(...args) {
   const f = __gatherUiDeps().formatPlaceBadgeDate || GATHER_APP_UTILS.formatPlaceBadgeDate;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -3493,9 +3497,8 @@ export function RegionFilterBackdrop({ isOpen, onClose, selections = [], onAdd, 
 
 function formatCultureDateLabel(startDate, endDate) {
   const fmt = (s) => {
-    if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return '';
-    const [y, m, d] = s.split('-');
-    return `${y}.${m}.${d}`;
+    const normalized = normalizeDateString(s);
+    return normalized ? formatDateWithDayName(normalized) : '';
   };
   const a = fmt(startDate);
   const b = fmt(endDate || startDate);
@@ -3680,18 +3683,18 @@ function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind =
 
   const handleSave = async () => {
     const cleanTitle = (title || '').trim();
-    const cleanStart = (startDate || '').trim();
+    const cleanStart = normalizeDateString((startDate || '').trim());
     if (!cleanTitle) {
       if (typeof showToast === 'function') showToast('제목을 입력해 주세요.', 'error');
       return;
     }
     if (!cleanStart || !/^\d{4}-\d{2}-\d{2}$/.test(cleanStart)) {
-      if (typeof showToast === 'function') showToast('시작일을 YYYY-MM-DD 형식으로 입력해 주세요.', 'error');
+      if (typeof showToast === 'function') showToast('시작일을 2026.04.17 또는 2026-04-17 형식으로 입력해 주세요.', 'error');
       return;
     }
-    const cleanEnd = kind === 'movie' ? ((endDate || '').trim()) : ((endDate || '').trim() || cleanStart);
-    if (cleanEnd && !/^\d{4}-\d{2}-\d{2}$/.test(cleanEnd)) {
-      if (typeof showToast === 'function') showToast('종료일을 YYYY-MM-DD 형식으로 입력해 주세요.', 'error');
+    const cleanEnd = kind === 'movie' ? normalizeDateString((endDate || '').trim()) : (normalizeDateString((endDate || '').trim()) || cleanStart);
+    if ((endDate || '').trim() && !cleanEnd) {
+      if (typeof showToast === 'function') showToast('종료일을 2026.04.17 또는 2026-04-17 형식으로 입력해 주세요.', 'error');
       return;
     }
     if (typeof onSave !== 'function') {

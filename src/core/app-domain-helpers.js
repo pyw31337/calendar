@@ -1167,6 +1167,10 @@ function getContrastTextColor(...args) {
   const f = (window.GATHER_APP_UTILS || {}).getContrastTextColor;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function normalizeDateString(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).normalizeDateString;
+  return typeof f === 'function' ? f(...args) : '';
+}
 // Standard Formatter for Korean Date Display: 2026.09.19 (토)
 function formatDateWithDayName(...args) {
   const f = (window.GATHER_APP_UTILS || {}).formatDateWithDayName;
@@ -2300,6 +2304,7 @@ export {
   notifyMeetingReminder,
   notifyRepeatScheduleReminder,
   getContrastTextColor,
+  normalizeDateString,
   formatDateWithDayName,
   formatShortDateWithDayName,
   formatConfirmedMeetingLabel,

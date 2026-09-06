@@ -21,9 +21,26 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
     return (r * 299 + g * 587 + b * 114) / 1000 >= 128 ? '#0F172A' : '#FFFFFF';
   }
 
+  function normalizeDateString(dateStr) {
+    const source = String(dateStr || '').trim();
+    if (!source) return '';
+    let match = source.match(/(?:^|[^\d])(\d{2,4})\s*[.\-/]\s*(\d{1,2})\s*[.\-/]\s*(\d{1,2})(?=$|[^\d])/);
+    if (!match) match = source.match(/(?:^|[^\d])(\d{2})(\d{2})(\d{2})(?=$|[^\d])/);
+    if (!match) return '';
+    let year = Number(match[1]);
+    if (year < 100) year += 2000;
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const dateObj = new Date(year, month - 1, day);
+    if (year < 2000 || year > 2099 || month < 1 || month > 12 || day < 1 ||
+        dateObj.getFullYear() !== year || dateObj.getMonth() !== month - 1 || dateObj.getDate() !== day) return '';
+    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  }
+
   function formatDateWithDayName(dateStr) {
-    if (!dateStr) return '';
-    const parts = dateStr.split('-');
+    const normalized = normalizeDateString(dateStr);
+    if (!normalized) return String(dateStr || '');
+    const parts = normalized.split('-');
     if (parts.length === 3) {
       const y = parts[0];
       const m = parts[1];
@@ -34,7 +51,7 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
         return `${y}.${m}.${d} (${dayName})`;
       }
     }
-    return dateStr;
+    return normalized;
   }
 
   function formatShortDateWithDayName(dateStr) {
@@ -1005,6 +1022,7 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
     useChatSendGuard,
     getContrastTextColor,
     formatDateWithDayName,
+    normalizeDateString,
     formatShortDateWithDayName,
     formatConfirmedMeetingLabel,
     formatDDayLabel,
