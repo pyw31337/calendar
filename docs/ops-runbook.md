@@ -92,6 +92,12 @@ console.cloud.google.com → 결제 → 예산 및 알림 (월 5~10달러 권장
 - Media integrity audit: `npm run ops:media-audit`가 이미지 URL과 확정 모임 사진까지 읽기 전용으로 점검한다. `invalidCount`가 있으면 자동 삭제 대신 백업·수동 확인을 먼저 한다.
 - Firebase write E2E: `npm run e2e:firebase-write`는 운영 캘린더와 분리된 `stress_*` 문서로 동시 저장·수정·삭제 흐름을 재현한다. 익명 삭제 규칙에 막힐 수 있으므로 실행 뒤 `npm run ops:clean-stress` 결과를 확인한다.
 
+## 9. 백업 범위
+
+- `npm run ops:export`는 root 캘린더 문서뿐 아니라 메시지·메모·장소·확정 모임·활동 로그·기념일·개별 콘텐츠·사진 댓글·meetingPhotoIndex를 페이지 단위로 함께 백업한다.
+- `npm run ops:import <backup.json>`는 root 문서를 복구한 뒤 durable subcollection 문서를 additive 방식으로 복구한다. 오래된 문서 삭제는 자동으로 하지 않으므로, 복구 전후 `npm run ops:audit`로 대조하고 별도 승인 후 정리한다.
+- push subscription과 rate-limit 문서는 장치 자격증명/운영 상태이므로 백업에서 제외한다. 복구 후 사용자가 다시 등록한다.
+
 ## 7. 다음 큰 단계 (우선순위 순, 2026-09-03 갱신)
 
 **진행 방식 원칙**: 위험도가 낮은 것부터, 한 번에 작은 단위로, 매 단계마다 `npm run build` → `npm run check:all` → 배포 → build-sha 라이브 확인까지 끝내고 다음 단계로 넘어간다. 실기기/실사용자 회귀 확인이 필요한 항목은 그렇게 표시해뒀다.

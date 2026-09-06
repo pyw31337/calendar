@@ -2908,9 +2908,14 @@ function CalendarApp() {
         || (item.genre === 'movie' ? 'movie' : '');
       return { ...item, kind: inferredKind || 'performance' };
     };
-    const applyList = (list) => {
+    const applyList = (list, preserveExisting = false) => {
       if (!isMounted) return;
       const arr = (Array.isArray(list) ? list : []).map(normalizeCustomCultureItem).filter(Boolean);
+      if (preserveExisting) {
+        const seen = new Set(arr.map(item => item.id).filter(Boolean));
+        const existing = Array.isArray(customCultureItems) ? customCultureItems.filter(item => item?.id && !seen.has(item.id)) : [];
+        arr.push(...existing);
+      }
       arr.sort((a, b) => (Number(b.createdAt) || Number(b.updatedAt) || 0) - (Number(a.createdAt) || Number(a.updatedAt) || 0));
       setCustomCultureItems(arr);
     };
@@ -2920,11 +2925,21 @@ function CalendarApp() {
       });
       return () => { isMounted = false; };
     }
+    // Keep the realtime window bounded. The REST fallback above remains the authoritative
+    // archive path, while the listener only tracks the newest registrations and prevents an
+    // ever-growing collection from being re-sent on every reconnect.
+    // Hydrate the complete archive once, then keep only a bounded recent listener attached.
+    // This preserves older individually registered cards without making every reconnect stream
+    // the entire collection.
+    fetchCustomCultureItemsRest(activeCalId).then(list => applyList(list)).catch(err => {
+      console.warn('Custom culture archive hydration failed:', err);
+    });
     const unsub = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('customCultureItems')
+      .orderBy('createdAt', 'desc').limit(200)
       .onSnapshot(snapshot => {
         const list = [];
         snapshot.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
-        applyList(list);
+        applyList(list, true);
       }, err => {
         console.warn('Firestore customCultureItems subscription error:', err);
         // A transient listener failure must never replace a previously received authoritative

@@ -2249,19 +2249,17 @@ async function writePlacesToFirestore(calendarId, places) {
 async function fetchPlacesFromFirestore(calendarId) {
   const basePath = `calendars/cal_${calendarId}/places`;
   try {
-    if (firebaseDb) {
-      const snap = await withTimeout(firebaseDb.collection('calendars').doc(`cal_${calendarId}`).collection('places').get({ source: 'server' }), FIRESTORE_REQUEST_TIMEOUT_MS, 'places read timeout');
-      return snap.docs.map(doc => doc.data());
-    }
-  } catch (e) {
-    console.warn(`Failed to fetch places for ${calendarId} via SDK, trying REST:`, e);
-  }
-  try {
-    const res = await fetchFirestoreRequest(`https://firestore.googleapis.com/v1/projects/metro-live-2918e/databases/(default)/documents/${basePath}?pageSize=500`);
-    if (!res.ok) return [];
-    const data = await res.json();
-    const docs = data.documents || [];
-    return docs.map(doc => firestoreDocumentToJs(doc));
+    const result = [];
+    let pageToken = '';
+    do {
+      const query = pageToken ? `?pageSize=300&pageToken=${encodeURIComponent(pageToken)}` : '?pageSize=300';
+      const res = await fetchFirestoreRequest(`https://firestore.googleapis.com/v1/projects/metro-live-2918e/databases/(default)/documents/${basePath}${query}`);
+      if (!res.ok) return result;
+      const data = await res.json();
+      result.push(...(data.documents || []).map(doc => firestoreDocumentToJs(doc)));
+      pageToken = data.nextPageToken || '';
+    } while (pageToken);
+    return result;
   } catch (e) {
     console.warn(`Failed to fetch places for ${calendarId} via REST:`, e);
     return [];
@@ -2478,19 +2476,17 @@ async function writeConfirmedMeetingsToFirestore(calendarId, meetings) {
 async function fetchConfirmedMeetingsFromFirestore(calendarId) {
   const basePath = `calendars/cal_${calendarId}/confirmedMeetings`;
   try {
-    if (firebaseDb) {
-      const snap = await withTimeout(firebaseDb.collection('calendars').doc(`cal_${calendarId}`).collection('confirmedMeetings').get({ source: 'server' }), FIRESTORE_REQUEST_TIMEOUT_MS, 'confirmed meetings read timeout');
-      return snap.docs.map(doc => doc.data());
-    }
-  } catch (e) {
-    console.warn(`Failed to fetch confirmed meetings for ${calendarId} via SDK, trying REST:`, e);
-  }
-  try {
-    const res = await fetchFirestoreRequest(`https://firestore.googleapis.com/v1/projects/metro-live-2918e/databases/(default)/documents/${basePath}?pageSize=500`);
-    if (!res.ok) return [];
-    const data = await res.json();
-    const docs = data.documents || [];
-    return docs.map(doc => firestoreDocumentToJs(doc));
+    const result = [];
+    let pageToken = '';
+    do {
+      const query = pageToken ? `?pageSize=300&pageToken=${encodeURIComponent(pageToken)}` : '?pageSize=300';
+      const res = await fetchFirestoreRequest(`https://firestore.googleapis.com/v1/projects/metro-live-2918e/databases/(default)/documents/${basePath}${query}`);
+      if (!res.ok) return result;
+      const data = await res.json();
+      result.push(...(data.documents || []).map(doc => firestoreDocumentToJs(doc)));
+      pageToken = data.nextPageToken || '';
+    } while (pageToken);
+    return result;
   } catch (e) {
     console.warn(`Failed to fetch confirmed meetings for ${calendarId} via REST:`, e);
     return [];
@@ -3165,18 +3161,7 @@ async function fetchCalendarCollectionDocs(calendarId, collectionName) {
   const cleanCollection = sanitizeText(collectionName || '', 80);
   if (!cleanCalId || !cleanCollection) return [];
   const results = [];
-  if (firebaseDb) {
-    try {
-      const snap = await withTimeout(firebaseDb.collection('calendars').doc(`cal_${cleanCalId}`).collection(cleanCollection).get({ source: 'server' }), FIRESTORE_REQUEST_TIMEOUT_MS, `${cleanCollection} read timeout`);
-      snap.forEach(doc => {
-        results.push({ docId: doc.id, data: cloneJsonSafe(doc.data() || {}) });
-      });
-    } catch (e) {
-      console.warn(`Failed to fetch ${cleanCollection} for ${cleanCalId} via SDK, trying REST:`, e);
-    }
-  }
-  if (results.length === 0) {
-    try {
+  try {
       let pageToken = '';
       do {
         const query = pageToken ? `?pageSize=300&pageToken=${encodeURIComponent(pageToken)}` : '?pageSize=300';
@@ -3192,9 +3177,8 @@ async function fetchCalendarCollectionDocs(calendarId, collectionName) {
         });
         pageToken = data.nextPageToken || '';
       } while (pageToken);
-    } catch (e) {
-      console.warn(`Failed to fetch ${cleanCollection} for ${cleanCalId} via REST:`, e);
-    }
+  } catch (e) {
+    console.warn(`Failed to fetch ${cleanCollection} for ${cleanCalId} via REST:`, e);
   }
   results.sort((a, b) => compareBackupDocs(cleanCollection, a, b));
   return results;

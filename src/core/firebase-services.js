@@ -24,6 +24,27 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     });
     return Promise.race([promise, deadline]).finally(function () { if (timer) clearTimeout(timer); });
   }
+
+  // Firestore SDK queries must never fall back to an unbounded collection get.  The REST
+  // path already follows page tokens, but the SDK path is used on normal browsers and used to
+  // read an entire messages/memos collection in one response.  Keep this helper deliberately
+  // small so every archive-style SDK query gets the same cursor behaviour.
+  async function fetchSdkDocsPaged(buildQuery, pageSize) {
+    const size = Math.max(1, Math.min(500, Number(pageSize) || 300));
+    const all = [];
+    let lastDoc = null;
+    for (;;) {
+      let query = buildQuery();
+      if (lastDoc && typeof query.startAfter === 'function') query = query.startAfter(lastDoc);
+      query = query.limit(size);
+      const snap = await withSdkTimeout(query.get({ source: 'server' }), FIRESTORE_REST_TIMEOUT_MS);
+      if (!snap || snap.empty) break;
+      snap.forEach(doc => all.push(doc));
+      if (snap.size < size) break;
+      lastDoc = snap.docs[snap.docs.length - 1];
+    }
+    return all;
+  }
   function isValidCalId(calId) {
     return typeof calId === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(calId);
   }
@@ -285,9 +306,9 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     const firebaseDb = getDb();
     if (firebaseDb) {
       try {
-        const snap = await withSdkTimeout(firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages').get({ source: 'server' }), FIRESTORE_REST_TIMEOUT_MS);
+        const docs = await fetchSdkDocsPaged(() => firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages'), 300);
         const list = [];
-        snap.forEach(function (doc) {
+        docs.forEach(function (doc) {
           const msg = slimMessage({ id: doc.id, ...doc.data() });
           if (hasTag(msg)) list.push(msg);
         });
@@ -334,9 +355,9 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     const firebaseDb = getDb();
     if (firebaseDb) {
       try {
-        const snap = await withSdkTimeout(firebaseDb.collection('calendars').doc('cal_' + calId).collection('memos').get({ source: 'server' }), FIRESTORE_REST_TIMEOUT_MS);
+        const docs = await fetchSdkDocsPaged(() => firebaseDb.collection('calendars').doc('cal_' + calId).collection('memos'), 300);
         const list = [];
-        snap.forEach(function (doc) {
+        docs.forEach(function (doc) {
           const memo = { id: doc.id, ...doc.data() };
           if (hasTag(memo)) list.push(memo);
         });
@@ -460,10 +481,10 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     const firebaseDb = getDb();
     if (firebaseDb) {
       try {
-        const snap = await withSdkTimeout(firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
-          .where('uploadSource', '==', uploadSource).get(), FIRESTORE_REST_TIMEOUT_MS);
+        const docs = await fetchSdkDocsPaged(() => firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
+          .where('uploadSource', '==', uploadSource), 300);
         const list = [];
-        snap.forEach(function (doc) { list.push(slimMessage({ id: doc.id, ...doc.data() })); });
+        docs.forEach(function (doc) { list.push(slimMessage({ id: doc.id, ...doc.data() })); });
         return list;
       } catch (err) {
         console.warn('fetchMessagesByUploadSource sdk', uploadSource, err);
@@ -659,10 +680,9 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     let docs = null;
     if (firebaseDb) {
       try {
-        const snap = await withSdkTimeout(firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
-          .where('uploadSource', '==', 'gallery').get(), FIRESTORE_REST_TIMEOUT_MS);
-        docs = [];
-        snap.forEach(function (doc) { docs.push({ id: doc.id, ...doc.data() }); });
+        const sdkDocs = await fetchSdkDocsPaged(() => firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
+          .where('uploadSource', '==', 'gallery'), 300);
+        docs = sdkDocs.map(function (doc) { return { id: doc.id, ...doc.data() }; });
       } catch (err) {
         console.warn('fetchGalleryPhotoOrdinal sdk', err);
       }
