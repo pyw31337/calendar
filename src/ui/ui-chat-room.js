@@ -225,6 +225,10 @@ function reformatMemoIntoDateLines(...args) {
   const f = __gatherUiDeps().reformatMemoIntoDateLines || GATHER_APP_UTILS.reformatMemoIntoDateLines;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function readClipboardImageFiles(...args) {
+  const f = __gatherUiDeps().readClipboardImageFiles || GATHER_APP_UTILS.readClipboardImageFiles;
+  return typeof f === 'function' ? f(...args) : Promise.resolve([]);
+}
 function removeFirstUrl(...args) {
   const f = __gatherUiDeps().removeFirstUrl || GATHER_APP_UTILS.removeFirstUrl;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -930,6 +934,23 @@ export function ChatRoomView({
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
     if (distanceFromBottom > 200) setHasNewMessageBelow(true);
   }, [visibleChatMessages]);
+
+  // Older-history pagination only fires from a scroll event (see onScroll below), but a chat
+  // with just a handful of messages never overflows the container in the first place -- nothing
+  // to scroll means the scroll event that would trigger onLoadOlderChat never fires, so "위로
+  // 스크롤하면 이전 대화가 로드됩니다" sits there forever with no way to actually reach it. After
+  // every render of the message list, top up automatically while there's still more history and
+  // the container isn't scrollable yet -- this also keeps paging in the (rarer) case where one
+  // page of older messages still doesn't fill the view.
+  React.useEffect(() => {
+    if (!hasMoreOlderChat || loadingOlderChat || typeof onLoadOlderChat !== 'function') return;
+    const el = chatMessagesContainerRef.current;
+    if (!el) return;
+    const raf = requestAnimationFrame(() => {
+      if (el.scrollHeight <= el.clientHeight + 1) onLoadOlderChat();
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [visibleChatMessages, hasMoreOlderChat, loadingOlderChat, onLoadOlderChat]);
   // Confetti burst around a newly-sent bubble -- only for messages I just sent myself (not
   // ones arriving from other participants, and not the initial batch on mount). Anchors the
   // burst to the actual bubble's on-screen position via its data-msg-row-id, same pattern as
@@ -1203,6 +1224,24 @@ export function ChatRoomView({
       });
     } catch (err) {
       console.error('handlePasteImagesChat unexpected error:', err);
+      if (showToast) showToast('붙여넣은 사진 첨부 중 오류', 'error', 5000);
+    } finally {
+      setImageProcessingChat(null);
+    }
+  };
+  const handleClickPasteImagesChat = async () => {
+    const files = await readClipboardImageFiles(showToast);
+    if (!files || files.length === 0) return;
+    try {
+      await appendChatImageFiles({
+        files,
+        currentCount: chatImages.length,
+        setImageProcessing: setImageProcessingChat,
+        setChatImages,
+        showToast
+      });
+    } catch (err) {
+      console.error('handleClickPasteImagesChat unexpected error:', err);
       if (showToast) showToast('붙여넣은 사진 첨부 중 오류', 'error', 5000);
     } finally {
       setImageProcessingChat(null);
@@ -2227,6 +2266,37 @@ export function ChatRoomView({
             /*#__PURE__*/React.createElement("path", { d: "M16 19h6" }),
             /*#__PURE__*/React.createElement("path", { d: "M19 16v6" })
           )),
+
+          /* Clipboard Paste Button (mobile has no Ctrl+V, so this reads the OS clipboard directly) */
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            onClick: handleClickPasteImagesChat,
+            title: "붙여넣기",
+            style: {
+              width: '32px',
+              height: '32px',
+              borderRadius: '50%',
+              border: '1px solid var(--border-subtle)',
+              backgroundColor: 'var(--bg-card)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              padding: 0,
+              color: 'var(--text-muted)'
+            }
+          }, /*#__PURE__*/React.createElement("svg", {
+            xmlns: "http://www.w3.org/2000/svg",
+            width: "18",
+            height: "18",
+            viewBox: "0 0 24 24",
+            fill: "none",
+            stroke: "currentColor",
+            strokeWidth: "2",
+            strokeLinecap: "round",
+            strokeLinejoin: "round"
+          }, /*#__PURE__*/React.createElement("path", { d: "M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" }), /*#__PURE__*/React.createElement("rect", { x: "9", y: "3", width: "6", height: "4", rx: "1" }))),
 
           /* Send Button */
           /*#__PURE__*/React.createElement("button", {

@@ -1809,6 +1809,32 @@ select.form-select {
     display: flex !important;
   }
 }
+/* Range-type (연일 festival/event) bars -- same desktop/mobile split as the single-day
+   anniversary badges above, see festivalBars.flatMap in ui-calendar-core.js. */
+.festival-bar-mobile {
+  display: none;
+}
+@media (max-width: 640px) {
+  .festival-bar-desktop {
+    display: none !important;
+  }
+  .festival-bar-mobile {
+    display: flex !important;
+  }
+}
+/* Bottom spacer that reserves room under a day cell for its festival bar(s) -- see
+   .festival-bar-spacer in ui-calendar-core.js. Matches FESTIVAL_BAR_HEIGHT (24px) +
+   FESTIVAL_BAR_STACK_GAP (2px) per level on desktop/tablet, and FESTIVAL_BAR_HEIGHT_MOBILE
+   (4px) + the same 2px gap on mobile, same breakpoint as the bar itself above, so the reserved
+   space never outsizes the stack it's making room for. */
+.festival-bar-spacer {
+  height: calc(var(--festival-stack-depth, 0) * 26px);
+}
+@media (max-width: 640px) {
+  .festival-bar-spacer {
+    height: calc(var(--festival-stack-depth, 0) * 6px);
+  }
+}
 
 /* 흔들도시락 cooking-pot jiggle: .day-cell normally clips with overflow:hidden — lift that
    for cells that host this anniversary so scale~1.5 shake is not cut off. Modest z-index so
@@ -2451,6 +2477,13 @@ select.form-select {
   white-space: pre-wrap;
   word-break: break-word;
   overflow-wrap: anywhere;
+}
+/* Lightbox comment composer sits on a dark overlay, not the light card background the shared
+   rule above assumes -- override just there (higher specificity beats the !important above)
+   instead of touching the shared class other (light-themed) comment threads still rely on. */
+.lightbox-comment-thread .comment-composer-input {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  color: #E2E8F0 !important;
 }
 /* Desktop-only: mobile textareas stay at the blanket 1rem mobile input rule (app.css ~1433) --
    a class-selector !important here would otherwise beat that tag-selector !important on
