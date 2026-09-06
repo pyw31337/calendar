@@ -1689,9 +1689,10 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           padding: '6px 12px', borderRadius: '16px', backgroundColor: 'var(--bg-primary)',
           border: '1px solid var(--border-subtle)', color: '#3B82F6', fontSize: 'var(--font-size-sm)',
           fontWeight: 'bold', cursor: 'pointer', flexShrink: 0,
-          maxWidth: '35vw', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+          maxWidth: '35vw', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          display: 'inline-flex', alignItems: 'center', gap: '4px'
         }
-      }, selectedTag, " ✕") : null,
+      }, selectedTag, /*#__PURE__*/React.createElement(TrashIcon, { size: 12 })) : null,
       onClose: () => { setIsSearchOpen(false); setSearchQuery(''); setSelectedTag(''); }
     }),
 

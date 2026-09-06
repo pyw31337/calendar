@@ -849,6 +849,7 @@ export function AnniversaryModal({
     return React.createElement('option', { key: String(item.value), value: item.value }, item.label ?? item.value);
   })));
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon || (function () { return '×'; });
+  const TrashIcon = __comp.TrashIcon || __deps.TrashIcon || (function () { return '🗑'; });
   const CakeIcon = __comp.CakeIcon || __deps.CakeIcon;
   const BalloonIcon = __comp.BalloonIcon || __deps.BalloonIcon;
   const ConfettiIcon = __comp.ConfettiIcon || __deps.ConfettiIcon;
@@ -1707,9 +1708,10 @@ export function AnniversaryModal({
                   style: {
                     position: 'absolute', top: '-6px', right: '-6px', width: '18px', height: '18px', borderRadius: '50%',
                     border: 'none', backgroundColor: 'rgba(0,0,0,0.65)', color: '#FFFFFF', fontSize: '11px',
-                    lineHeight: '18px', textAlign: 'center', cursor: 'pointer', padding: 0
+                    lineHeight: '18px', textAlign: 'center', cursor: 'pointer', padding: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
                   }
-                }, "✕")
+                }, /*#__PURE__*/React.createElement(TrashIcon, { size: 10 }))
               )),
               /*#__PURE__*/React.createElement("button", {
                 type: "button",

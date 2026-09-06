@@ -1187,13 +1187,7 @@ button, input, textarea, select {
    same max-width as .app-container so it lines up with the page content below it. */
 .main-header {
   position: fixed;
-  /* iOS home-screen install (standalone display-mode, apple-mobile-web-app-status-bar-style:
-     black-translucent) renders web content full-bleed under the status bar instead of Safari's
-     own chrome reserving that space -- without this, the status bar's time/battery/signal icons
-     sit on top of the header and its buttons become untappable (the status bar area intercepts
-     the touch). env(safe-area-inset-top) is exactly the notch/status-bar height and resolves to
-     0px in a normal browser tab, so this is a no-op everywhere else. */
-  top: env(safe-area-inset-top, 0px);
+  top: 0;
   left: 0;
   right: 0;
   max-width: 100%;
@@ -1336,14 +1330,6 @@ button, input, textarea, select {
   background-color: #EF4444;
   color: #FFFFFF;
 }
-.main-menu-dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background-color: #EF4444;
-  flex-shrink: 0;
-}
 @media (max-width: 480px) {
   .main-menu-item { font-size: 0.74rem; padding: 6px 2px; }
   .main-menu-sep { margin: 0 1px; }
@@ -1372,6 +1358,7 @@ button, input, textarea, select {
 @media (min-width: 768px) { .calendar-desc { font-size: 0.875rem; } }
 
 /* Buttons */
+
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   padding: 10px 16px; border-radius: var(--radius-md); font-size: 0.875rem; font-weight: 700;
@@ -1736,13 +1723,7 @@ select.form-select {
 .day-cell {
   min-height: 58px; background: #FAFAFA; border: 1px solid transparent;
   border-radius: var(--radius-sm); padding: 4px; cursor: pointer; transition: all 0.2s ease;
-  /* flex-start (not space-between): participant name badges must pack immediately under the
-     date header, not float toward mid/bottom on a day that has no anniversary content to pair
-     with them. The day-anniversary-desktop/mobile block's own marginTop:'auto' (see
-     ui-calendar-core.js) is what pushes anniversary badges down to the bottom edge instead --
-     auto margins already take priority over justify-content, so flex-start here only affects
-     cells where that block isn't even rendered (no anniversary that day). */
-  display: flex; flex-direction: column; justify-content: flex-start; position: relative;
+  display: flex; flex-direction: column; justify-content: space-between; position: relative;
   overflow: hidden;
 }
 @media (min-width: 640px) {
@@ -1826,32 +1807,6 @@ select.form-select {
   }
   .day-anniversary-mobile {
     display: flex !important;
-  }
-}
-/* Range-type (연일 festival/event) bars -- same desktop/mobile split as the single-day
-   anniversary badges above, see festivalBars.flatMap in ui-calendar-core.js. */
-.festival-bar-mobile {
-  display: none;
-}
-@media (max-width: 640px) {
-  .festival-bar-desktop {
-    display: none !important;
-  }
-  .festival-bar-mobile {
-    display: flex !important;
-  }
-}
-/* Bottom spacer that reserves room under a day cell for its festival bar(s) -- see
-   .festival-bar-spacer in ui-calendar-core.js. Matches FESTIVAL_BAR_HEIGHT (24px) +
-   FESTIVAL_BAR_STACK_GAP (2px) per level on desktop/tablet, and FESTIVAL_BAR_HEIGHT_MOBILE
-   (4px) + the same 2px gap on mobile, same breakpoint as the bar itself above, so the reserved
-   space never outsizes the stack it's making room for. */
-.festival-bar-spacer {
-  height: calc(var(--festival-stack-depth, 0) * 26px);
-}
-@media (max-width: 640px) {
-  .festival-bar-spacer {
-    height: calc(var(--festival-stack-depth, 0) * 6px);
   }
 }
 
@@ -2000,12 +1955,8 @@ select.form-select {
   100% { transform: scale(7); opacity: 0; }
 }
 
-/* margin-top separates the badge row from the date-number header row above it -- the day-number
-   "today" circle badge and the first participant badge used to sit almost flush against each
-   other with only the day-cell's own 4-8px padding between them, since .day-cell has no gap of
-   its own between its header row and this badges-container. */
-.badges-container { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; margin-top: 3px; }
-@media (min-width: 640px) { .badges-container { gap: 4px; margin-top: 5px; } }
+.badges-container { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; }
+@media (min-width: 640px) { .badges-container { gap: 4px; } }
 @media (max-width: 640px) {
   .badges-container { justify-content: center; }
 }
@@ -2463,13 +2414,12 @@ select.form-select {
   }
 }
 
-/* Gallery preview thumbnails: 3 columns (9 shown, see the isMobile-gated slice below) under
-   1024px -- this covers both phone and tablet widths, since 6 columns at tablet width shrank
-   each thumbnail too small to make out -- 6 columns (18 shown) only at real desktop widths. */
+/* Gallery preview thumbnails: 3 columns (9 shown, see PhotoGallery's isMobile-gated slice)
+   below the shared 640px breakpoint, 6 columns (18 shown) at/above it. */
 .gallery-thumb-grid {
   grid-template-columns: repeat(3, 1fr);
 }
-@media (min-width: 1024px) {
+@media (min-width: 640px) {
   .gallery-thumb-grid {
     grid-template-columns: repeat(6, 1fr);
   }
@@ -2528,11 +2478,6 @@ select.form-select {
   .comment-composer-buttons {
     order: 3;
   }
-}
-/* 라이트박스 댓글창은 어두운 라이트박스 오버레이 위에 얹히므로, memo 카드가 쓰는 위 흰 배경
-   규칙(!important)을 이 컨텍스트에서만 어둡게 덮어쓴다. */
-.lightbox-comment-thread-dark .comment-composer-input {
-  background-color: rgba(255, 255, 255, 0.08) !important;
 }
 
 .summary-title { font-size: 1.05rem; font-weight: 800; color: var(--text-main); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
@@ -2940,16 +2885,7 @@ select.form-select {
   background: var(--bg-card);
   color: var(--text-main);
   box-shadow: -12px 0 34px rgba(15, 23, 42, 0.12);
-  /* Shared by every side panel in the app (main hamburger menu, admin, chat/memo/places/gallery
-     side menus -- see .admin-side-menu-overlay usage sites) -- this one fix covers them all.
-     The overlay is position:fixed;inset:0, so on iOS home-screen install (standalone display-
-     mode, status bar rendered full-bleed over web content, same as .main-header) this panel's
-     own top edge sits right under the status bar with no adjustment. Adding
-     env(safe-area-inset-top) on top of the original 22px (rather than replacing it, which would
-     leave awkwardly little breathing room since the inset itself is already ~44-59px) keeps the
-     same visual spacing below the status bar/notch as before; 0px in a normal browser tab, so
-     this is a no-op everywhere else. */
-  padding: calc(22px + env(safe-area-inset-top, 0px)) 16px 16px;
+  padding: 22px 16px 16px;
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -3771,7 +3707,7 @@ select.form-select {
 /* Badges now sit below the trigger row (tabs → toolbar → badges → chips → grid). When present,
    shrink the badges' own top padding so the gap under the toolbar doesn't stack with the old
    "first-row-under-tabs" top padding the badges used to carry when they preceded the toolbar. */
-.region-filter-trigger-row + .region-selection-badges-row { padding-top: 0; padding-bottom: 10px; }
+.region-filter-trigger-row + .region-selection-badges-row { padding-top: 0; padding-bottom: 0; }
 @media (max-width: 640px) {
   .region-filter-trigger-row { padding: 10px 16px 12px; }
 }
@@ -3855,7 +3791,7 @@ select.form-select {
    Top padding is for the rare case badges render without a preceding trigger; when they follow
    the toolbar, .region-filter-trigger-row + .region-selection-badges-row zeroes it. */
 .region-selection-badges-row {
-  display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 12px 16px 10px;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 12px 16px 0;
 }
 .region-selection-badges-row .region-filter-reset-btn { margin-left: auto; flex-shrink: 0; }
 .region-selection-badges {
@@ -3869,7 +3805,7 @@ select.form-select {
 }
 .region-selection-badge-remove {
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-  width: 18px; height: 18px; padding: 0; border: none; border-radius: 50%;
+  width: 18px; height: 18px; min-height: 0 !important; padding: 0; border: none; border-radius: 50%;
   background: var(--accent-primary); color: #fff; cursor: pointer;
 }
 
@@ -3893,12 +3829,17 @@ select.form-select {
 }
 .region-filter-save-btn:disabled { opacity: 0.4; cursor: default; }
 
+/* Poster cards are <button>s with % padding aspect-ratio; never apply touch min-heights */
+.culture-items-grid > button {
+  min-height: 0;
+}
+
 /* 문화공연 / 지역축제 포스터 그리드.
    is-cols-2 (default): 모바일 2단 / 태블릿 4단 / PC 6단.
    is-cols-1: 모바일 1단 / 640px+ 2단 / 1024px+ 3단 (single-column denser on wide screens). */
 .culture-items-grid,
 .culture-items-grid.is-cols-2 {
-  display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 10px;
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;
 }
 @media (min-width: 640px) and (max-width: 1023px) {
   .culture-items-grid,
