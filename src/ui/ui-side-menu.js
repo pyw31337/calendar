@@ -1284,7 +1284,7 @@ export function SharedAppNavBlock({
     } },
       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-icon" }, FolderClockIcon ? /*#__PURE__*/React.createElement(FolderClockIcon, { size: 20 }) : null),
       /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
-        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title", style: { display: "flex", alignItems: "center", gap: "6px" } }, "보관함")
+        /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title", style: { display: "flex", alignItems: "center", gap: "6px" } }, "기록")
       )
     )
   );

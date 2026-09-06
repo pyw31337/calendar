@@ -10,6 +10,18 @@ const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
 const BULK_NO_PARTICIPANT_ID = GATHER_APP_CONSTANTS.BULK_NO_PARTICIPANT_ID || '__none__';
 const GATHER_APP_CONFIG = window.GATHER_APP_CONFIG || {};
 function __gatherUiDeps() { return window.GATHER_UI_DEPS || {}; }
+// 영화는 실제 상영관(장소)이 없는데도, 공공 영화 데이터 API 스키마가 venue 필드를 필수로 요구해서
+// 크롤링 원본이 항상 이 문자열을 채워 넣어 온다(scripts/sync-culture-performances.mjs가 그대로
+// 전달, culture-movies.json 확인). handleRegisterCultureEvent(app-main.js)가 이 값을 실제 장소로
+// 착각해 기념일의 place.name에 그대로 저장한 과거 데이터가 있어, 일정팝업에 "장소 확인 필요"라는
+// 의미 없는 텍스트가 위치 아이콘과 함께 나타났었다 -- 정보가 없을 뿐인데 마치 사용자가 확인해야
+// 할 일이 있는 것처럼 보이므로, 장소 자체가 아예 없는 것과 똑같이 취급해 그 줄을 숨긴다.
+const CULTURE_VENUE_PLACEHOLDER = '장소 확인 필요';
+function hasRealAnnPlace(ann) {
+  if (!ann || !ann.place) return false;
+  const name = String(ann.place.alias || ann.place.name || '').trim();
+  return !!name && name !== CULTURE_VENUE_PLACEHOLDER;
+}
 function getActiveAvailabilities(calendar) {
   const f = __gatherUiDeps().getActiveAvailabilities || GATHER_APP_UTILS.getActiveAvailabilities;
   return typeof f === 'function' ? f(calendar) : [];
@@ -874,6 +886,7 @@ export function DateModal({
   const ConfettiIcon = __comp.ConfettiIcon || __deps.ConfettiIcon;
   const TicketsPlaneIcon = __comp.TicketsPlaneIcon || __deps.TicketsPlaneIcon;
   const MessageCircleMoreIcon = __comp.MessageCircleMoreIcon || __deps.MessageCircleMoreIcon;
+  const ClapperboardIcon = __comp.ClapperboardIcon || __deps.ClapperboardIcon;
   const CookingPotIcon = __comp.CookingPotIcon || __deps.CookingPotIcon;
   const MapPinIcon = __comp.MapPinIcon || __deps.MapPinIcon;
   const CalendarIcon = __comp.CalendarIcon || __deps.CalendarIcon;
@@ -906,7 +919,7 @@ export function DateModal({
       }) : null));
     }
     if (ann.type === 'dday') return ann.icon;
-    const iconMap = { '🎂': CakeIcon, '🎈': BalloonIcon, '🎉': ConfettiIcon, '✈️': TicketsPlaneIcon, '💬': MessageCircleMoreIcon };
+    const iconMap = { '🎂': CakeIcon, '🎈': BalloonIcon, '🎉': ConfettiIcon, '✈️': TicketsPlaneIcon, '💬': MessageCircleMoreIcon, '🎬': ClapperboardIcon };
     const Icon = iconMap[ann.icon];
     return Icon ? /*#__PURE__*/React.createElement(Icon, { size }) : ann.icon;
   };
@@ -1581,14 +1594,14 @@ export function DateModal({
     }));
     const directPhotos = [...indexedPhotos, ...(Array.isArray(confirmedMeetingEntry?.photos) ? confirmedMeetingEntry.photos : [])]
       .filter(photo => photo && !isTombstone(photo) && (photo.imageUrl || photo.thumbUrl))
-      .map(photo => {
+      .map((photo, photoIndex) => {
         const resolved = resolveMeetingPhotoDisplay(photo, chatMessagesWithFetchedSources) || {};
         const mediaKey = resolved.mediaKey
           || photo.mediaKey
           || (photo.sourceMessageId && Number.isInteger(photo.sourceImageIndex)
             ? `chat:${photo.sourceMessageId}:${photo.sourceImageIndex}`
-            : `meeting:${dateStr}:${photo.id || 'photo'}`);
-        const refKey = resolved.refKey || photo.refKey || `meeting:${dateStr}:${photo.id || 'photo'}`;
+            : `meeting:${dateStr}:${photo.id || `photo-${photoIndex}`}`);
+        const refKey = resolved.refKey || photo.refKey || `meeting:${dateStr}:${photo.id || `photo-${photoIndex}`}`;
         return {
           ...photo,
           imageUrl: resolved.imageUrl || photo.imageUrl,
@@ -2573,7 +2586,7 @@ export function DateModal({
         const bannerKey = ann.id || aIdx;
         const isExpanded = expandedAnnBannerIds.has(bannerKey);
         const cultureLink = (ann.cultureSourceLink && String(ann.cultureSourceLink).trim()) || '';
-        const hasDetail = !!(ann.place || ann.description || getAnnBannerDateDisplay(ann) || cultureLink);
+        const hasDetail = !!(hasRealAnnPlace(ann) || ann.description || getAnnBannerDateDisplay(ann) || cultureLink);
         const photos = getAnnBannerPhotos(ann);
         const listIdx = Array.isArray(anniversaries) ? anniversaries.findIndex(a => a && a.id === ann.id) : -1;
         const anniversaryIndex = listIdx >= 0 ? listIdx + 1 : (aIdx + 1);
@@ -2596,9 +2609,16 @@ export function DateModal({
         };
         const dateDisplay = getAnnBannerDateDisplay(ann);
         // 컨텐츠(지역축제/문화행사/스포츠)에서 등록한 기념일은 원본 카드로 바로 이동할 수 있게
-        // 제목을 누르면 해당 탭을 열고 그 항목 상세를 자동으로 펼친다 (직접 만든 기념일은 대상이
-        // 없으므로 cultureSourceId가 있을 때만).
-        const canFocusCultureSource = !!(ann.cultureSourceId && typeof onFocusCultureSource === 'function');
+        // 제목을 누르면 해당 탭을 열고 그 항목 상세를 자동으로 펼친다. cultureSourceId가 있으면
+        // 포털에서 등록한 항목(또는 그 항목이 이후 피드에서 빠져 컨텐츠 페이지가 자체 복원해
+        // 보여주는 카드)이고, 없어도 category가 festival/event/sports면 기념일 등록으로 직접
+        // 만든 항목(HistoryView의 selfAuthoredCultureItems가 이 기념일 자신의 id로 카드를 만듦)
+        // 이라 마찬가지로 이동 대상이 있다 -- 그 외(생일 등 일반 기념일)만 이동 대상이 없다.
+        const CULTURE_ANNIVERSARY_CATEGORIES = ['festival', 'event', 'sports', 'movie'];
+        const canFocusCultureSource = !!(
+          typeof onFocusCultureSource === 'function' &&
+          (ann.cultureSourceId || CULTURE_ANNIVERSARY_CATEGORIES.includes(ann.category))
+        );
         const titleRow = /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
           renderAnniversaryIcon(ann, 14), " ",
           /*#__PURE__*/React.createElement("span", {
@@ -2630,7 +2650,7 @@ export function DateModal({
             : /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6 6-6" })
           ))
         );
-        const placeBlock = ann.place ? (() => {
+        const placeBlock = hasRealAnnPlace(ann) ? (() => {
           const mapUrl = getAnnBannerKakaoMapLinkUrl(ann.place);
           const placeName = ann.place.alias || ann.place.name || '';
           const placeAddress = getDisplayPlaceAddress(ann.place) || '';

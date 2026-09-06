@@ -110,6 +110,10 @@ function formatDateWithDayName(...args) {
   const f = __gatherUiDeps().formatDateWithDayName || GATHER_APP_UTILS.formatDateWithDayName;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function normalizeDateString(...args) {
+  const f = __gatherUiDeps().normalizeDateString || GATHER_APP_UTILS.normalizeDateString;
+  return typeof f === 'function' ? f(...args) : '';
+}
 function formatPlaceBadgeDate(...args) {
   const f = __gatherUiDeps().formatPlaceBadgeDate || GATHER_APP_UTILS.formatPlaceBadgeDate;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -550,7 +554,7 @@ function getMessageDirectMediaEntry(...args) {
 // Combines chat message images, memo images, and confirmed-meeting photos into one flat, deduped,
 // newest-first list -- shared by PhotoGallery (갤러리 페이지) and HistoryView's 인물/추억 tabs so
 // both browse exactly the same photo set instead of two independently-built ones drifting apart.
-function buildCombinedPhotoEntries(chatMessages, memos, calendar) {
+function buildCombinedPhotoEntries(chatMessages, memos, calendar, anniversaries = []) {
   const __deps = window.GATHER_UI_DEPS || {};
   const resolveMeetingPhotoDisplay = __deps.resolveMeetingPhotoDisplay;
   const sorted = [...(chatMessages || [])].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
@@ -605,9 +609,41 @@ function buildCombinedPhotoEntries(chatMessages, memos, calendar) {
       });
     });
   });
+  // Anniversary photos live on the anniversary document itself rather than in chat/memo or
+  // confirmed-meeting photo arrays. Keep them in the same flat source used by the History
+  // memories tab so a calendar event with an attached photo is always discoverable there.
+  const anniversaryEntries = [];
+  (Array.isArray(anniversaries) ? anniversaries : []).forEach(anniversary => {
+    const photos = Array.isArray(anniversary?.photos) ? anniversary.photos : [];
+    const anniversaryDate = String(anniversary?.date || anniversary?.startDate || anniversary?.endDate || '').slice(0, 10);
+    photos.forEach((photo, index) => {
+      const full = String(photo?.imageUrl || photo?.url || photo?.full || photo?.src || '');
+      const thumb = String(photo?.thumbUrl || photo?.thumbnailUrl || photo?.thumb || full);
+      if (!full && !thumb) return;
+      const mediaKey = photo?.mediaKey || `anniversary:${anniversary?.id || anniversaryDate || 'date'}:${photo?.id || index}`;
+      const refKey = photo?.refKey || mediaKey;
+      anniversaryEntries.push({
+        full: full || thumb,
+        thumb: thumb || full,
+        imageIndex: index,
+        messageId: null,
+        photoId: photo?.id || '',
+        sourceMessageId: '',
+        sourceImageIndex: null,
+        timestamp: Number(photo?.createdAt || photo?.updatedAt || anniversary?.updatedAt || 0),
+        tags: String(photo?.tags || ''),
+        directMediaUrl: '',
+        source: 'anniversary',
+        anniversaryId: anniversary?.id || '',
+        meetingDate: anniversaryDate,
+        mediaKey,
+        refKey
+      });
+    });
+  });
   const byUrl = new Map();
-  const sourceRank = { chat: 0, memo: 1, meeting: 2 };
-  [...chatEntries, ...memoEntries, ...meetingEntries].forEach(entry => {
+  const sourceRank = { chat: 0, memo: 1, meeting: 2, anniversary: 3 };
+  [...chatEntries, ...memoEntries, ...meetingEntries, ...anniversaryEntries].forEach(entry => {
     const key = entry.mediaKey || entry.refKey || entry.full || entry.thumb;
     if (!key) return;
     const existing = byUrl.get(key);
@@ -1822,7 +1858,8 @@ export function HistoryView({
   onDeletePhoto = null, onReplacePhoto = null,
   onJumpToChatMessage = null, onJumpToMemo = null, onJumpToMeetingDate = null,
   onGetChatMessageOrdinal = null, onGetGalleryPhotoOrdinal = null, onRequestConfirm = null,
-  onRemovePhotoFromMemory = null, onFetchPhotoComments = null, onSavePhotoComments = null
+  onRemovePhotoFromMemory = null, onRemovePhotosFromMemory = null, onFetchPhotoComments = null, onSavePhotoComments = null,
+  onHideMemoryGroup = null, onRestoreMemoryGroup = null, onAddPhotosBackToMemory = null
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -1834,28 +1871,65 @@ export function HistoryView({
   const InlineSearchBar = __comp.InlineSearchBar || __deps.InlineSearchBar;
   const UnderlineTabs = __comp.UnderlineTabs || __deps.UnderlineTabs;
   const Lightbox = __comp.Lightbox || __deps.Lightbox;
+  const PencilIcon = __comp.PencilIcon || __deps.PencilIcon;
+  const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
 
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState('');
-  const HISTORY_TAB_STORAGE_KEY = 'gather_history_tab';
   const VALID_HISTORY_TABS = ['meetings', 'memories', 'people'];
-  const [historyTab, setHistoryTab] = React.useState(() => {
-    try {
-      const saved = localStorage.getItem(HISTORY_TAB_STORAGE_KEY);
-      if (VALID_HISTORY_TABS.includes(saved)) return saved;
-    } catch (_) { /* private browsing / disabled storage */ }
-    return 'meetings';
-  });
+  // 기록 페이지는 매번 새로 마운트되며(activeView==='history'일 때만 렌더), 언제 들어오든
+  // 항상 추억 탭이 첫화면이어야 한다 -- 예전에는 localStorage에 마지막으로 보던 탭을 저장해
+  // 재진입 시 그대로 복원했지만, 그러면 지난모임 탭을 보다 나간 사용자는 계속 지난모임이
+  // 먼저 나와 이 요구사항과 어긋나므로 탭 기억 기능 자체를 제거했다.
+  const readHistoryTabFromUrl = () => {
+    const value = new URLSearchParams(window.location.search).get('historyTab');
+    return VALID_HISTORY_TABS.includes(value) ? value : 'memories';
+  };
+  const [historyTab, setHistoryTab] = React.useState(readHistoryTabFromUrl);
+  const [selectedMemoryGroupId, setSelectedMemoryGroupId] = React.useState(() => new URLSearchParams(window.location.search).get('memory') || null);
+  const pushHistoryState = (tab, memoryId = null) => {
+    const params = new URLSearchParams(window.location.search);
+    params.set('historyTab', tab);
+    if (memoryId) params.set('memory', memoryId); else params.delete('memory');
+    const qs = params.toString();
+    window.history.pushState({ historyTab: tab, memory: memoryId || null }, '', `${window.location.pathname}?${qs}`);
+  };
+  const openMemoryGroup = id => {
+    setSelectedMemoryGroupId(id);
+    pushHistoryState(historyTab, id);
+  };
+  const clearMemoryGroup = (useBrowserBack = false) => {
+    const params = new URLSearchParams(window.location.search);
+    if (useBrowserBack && params.get('memory')) {
+      window.history.back();
+      return;
+    }
+    setSelectedMemoryGroupId(null);
+    params.delete('memory');
+    const qs = params.toString();
+    window.history.replaceState({ historyTab }, '', `${window.location.pathname}?${qs}`);
+  };
   const changeHistoryTab = (tab) => {
     if (!VALID_HISTORY_TABS.includes(tab)) return;
     setHistoryTab(tab);
-    try { localStorage.setItem(HISTORY_TAB_STORAGE_KEY, tab); } catch (_) { /* best-effort */ }
+    setSelectedMemoryGroupId(null);
+    pushHistoryState(tab);
   };
-  // When the side menu navigates to 보관함 again (or any view), force the 지난모임 tab so
+  React.useEffect(() => {
+    const handleHistoryPopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get('historyTab');
+      setHistoryTab(VALID_HISTORY_TABS.includes(tab) ? tab : 'memories');
+      setSelectedMemoryGroupId(params.get('memory') || null);
+    };
+    window.addEventListener('popstate', handleHistoryPopState);
+    return () => window.removeEventListener('popstate', handleHistoryPopState);
+  }, []);
+  // When the side menu navigates to 기록 again (or any view), force the 추억 tab so
   // re-entry always lands there rather than whatever tab was last open.
   const handleHistoryChangeView = (view) => {
-    if (view === 'history') changeHistoryTab('meetings');
+    if (view === 'history') changeHistoryTab('memories');
     if (typeof onChangeView === 'function') onChangeView(view);
   };
   // 인물 탭: 기본 태그는 현재 캘린더 참여자, 그 외에 사용자가 직접 추가한 커스텀 태그
@@ -1931,10 +2005,101 @@ export function HistoryView({
 
   // 인물/추억 탭이 공유하는 사진 목록 -- 갤러리 페이지(PhotoGallery)와 동일한 소스(채팅/메모/모임
   // 사진)를 결합해, 태그(인물)나 날짜(추억)로 걸러 보여준다.
-  const historyPhotoEntries = React.useMemo(() => buildCombinedPhotoEntries(chatMessages, memos, calendar), [chatMessages, memos, calendar]);
+  const historyPhotoEntries = React.useMemo(() => buildCombinedPhotoEntries(chatMessages, memos, calendar, anniversaries), [chatMessages, memos, calendar, anniversaries]);
   const [selectedPersonTag, setSelectedPersonTag] = React.useState(null);
-  const [selectedMemoryGroupId, setSelectedMemoryGroupId] = React.useState(null);
   React.useEffect(() => { setSelectedPersonTag(null); setSelectedMemoryGroupId(null); }, [historyTab]);
+  const [isMemoryListEditMode, setIsMemoryListEditMode] = React.useState(false);
+  const [selectedMemoryGroupIds, setSelectedMemoryGroupIds] = React.useState(() => new Set());
+  const [isMemoryAddModalOpen, setIsMemoryAddModalOpen] = React.useState(false);
+  const [isChangingMemoryGroups, setIsChangingMemoryGroups] = React.useState(false);
+  React.useEffect(() => {
+    setIsMemoryListEditMode(false);
+    setSelectedMemoryGroupIds(new Set());
+    setIsMemoryAddModalOpen(false);
+  }, [historyTab]);
+  // 추억 상세 페이지의 사진 일괄 제외 -- 사진 하나하나 라이트박스를 열어 개별적으로 "이 추억에서
+  // 제거"를 누르기엔 사진이 수십~수백 장인 여행에서는 너무 번거로워서, 편집 모드에서 체크박스로
+  // 여러 장을 골라 한 번에 제외할 수 있게 한다.
+  const [isMemoryEditMode, setIsMemoryEditMode] = React.useState(false);
+  const [selectedMemoryPhotoKeys, setSelectedMemoryPhotoKeys] = React.useState(() => new Set());
+  const [isExcludingMemoryPhotos, setIsExcludingMemoryPhotos] = React.useState(false);
+  React.useEffect(() => { setIsMemoryEditMode(false); setSelectedMemoryPhotoKeys(new Set()); }, [selectedMemoryGroupId]);
+  const toggleMemoryPhotoSelected = key => {
+    setSelectedMemoryPhotoKeys(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+  const handleClickExcludeMemoryPhotos = group => {
+    const keys = Array.from(selectedMemoryPhotoKeys);
+    if (!keys.length || typeof onRemovePhotosFromMemory !== 'function') return;
+    const doExclude = async () => {
+      setIsExcludingMemoryPhotos(true);
+      try {
+        const ok = await onRemovePhotosFromMemory(group.id, keys);
+        if (ok !== false) {
+          setIsMemoryEditMode(false);
+          setSelectedMemoryPhotoKeys(new Set());
+          // 이번에 제외한 사진이 이 그룹의 전부였다면 목록에서 그룹 자체가 사라진다 --
+          // 그대로 두면 상세 화면(뒤로가기 버튼 포함)이 통째로 안 보이는 먹통 상태가 되므로
+          // 미리 목록으로 돌아간다.
+          if (keys.length >= group.photos.length) clearMemoryGroup();
+        }
+      } finally {
+        setIsExcludingMemoryPhotos(false);
+      }
+    };
+    if (typeof onRequestConfirm === 'function') {
+      onRequestConfirm('사진 제외', `총 ${keys.length}장의 사진을 ${group.title}에서 제외할까요?`, doExclude);
+    }
+  };
+  // 흔들도시락처럼 매월 반복 일정용으로 등록한 기념일은 사진이 우연히 그 기간에 걸리면
+  // 추억 탭에 여행처럼 그룹으로 잡혀버린다 -- 실제 반복 일정 자체(및 그 사진)는 그대로 두고,
+  // 이 기념일만 추억 탭 그룹핑 대상에서 숨기는 플래그(hiddenFromMemories)를 남긴다.
+  const [isHidingMemoryGroup, setIsHidingMemoryGroup] = React.useState(false);
+  const handleClickDeleteMemoryGroup = group => {
+    if (typeof onHideMemoryGroup !== 'function') return;
+    const doHide = async () => {
+      setIsHidingMemoryGroup(true);
+      try {
+        const ok = await onHideMemoryGroup(group.id);
+        if (ok !== false) clearMemoryGroup();
+      } finally {
+        setIsHidingMemoryGroup(false);
+      }
+    };
+    if (typeof onRequestConfirm === 'function') {
+      onRequestConfirm('추억 삭제', `'${group.title}'을(를) 추억 목록에서 삭제할까요? (사진과 원래 일정은 그대로 유지됩니다)`, doHide);
+    }
+  };
+  // "추가" -- 라이트박스/편집 모드에서 제외했던 사진을 다시 이 추억에 넣을 수 있게, 제외된
+  // 사진 목록을 레이어 팝업으로 보여주고 체크박스로 골라 되돌린다.
+  const [isAddBackModalOpen, setIsAddBackModalOpen] = React.useState(false);
+  const [selectedAddBackKeys, setSelectedAddBackKeys] = React.useState(() => new Set());
+  const [isAddingBackPhotos, setIsAddingBackPhotos] = React.useState(false);
+  React.useEffect(() => { setIsAddBackModalOpen(false); setSelectedAddBackKeys(new Set()); }, [selectedMemoryGroupId]);
+  const toggleAddBackPhotoSelected = key => {
+    setSelectedAddBackKeys(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+  const handleClickAddBackPhotos = async (group) => {
+    const keys = Array.from(selectedAddBackKeys);
+    if (!keys.length || typeof onAddPhotosBackToMemory !== 'function') return;
+    setIsAddingBackPhotos(true);
+    try {
+      const ok = await onAddPhotosBackToMemory(group.id, keys);
+      if (ok !== false) {
+        setIsAddBackModalOpen(false);
+        setSelectedAddBackKeys(new Set());
+      }
+    } finally {
+      setIsAddingBackPhotos(false);
+    }
+  };
   const entryTagTokens = entry => String(entry?.tags || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean);
   // 한국식 성+이름 태그 매칭: "박영우"로 등록된 참여자는 "영우"라고만 붙은 사진 해시태그도
   // 같은 사람으로 인식해야 한다. 성 1자를 뗀 이름만으로도 같은 사람을 부르는 경우가 흔하기
@@ -1951,12 +2116,16 @@ export function HistoryView({
   // 등장하는 사진"은 다른 개념이라, 음식/풍경/서류 스캔처럼 본인이 안 나온 사진까지 전부
   // 잡혀버려 인물 탭이 실제와 동떨어지게 부풀려지는 문제가 있었다. 인물 태그는 해시태그(#이름)로
   // 명시적으로 붙인 사진만 인정한다 -- participantId는 더 이상 매칭에 쓰지 않는다.
+  // "#해맑은도연"처럼 이름 앞뒤에 다른 글자가 붙은 해시태그도 같은 사람으로 인식해야 하므로
+  // 완전일치 대신 부분일치(포함)로 비교한다. 다만 성을 뗀 1음절 변형("도연" -> "연")까지 부분일치를
+  // 허용하면 "연"이 들어간 무관한 태그까지 잡혀 인물 탭이 부풀려지므로, 1음절 변형은 기존처럼
+  // 완전일치만 인정한다.
   const getPhotosForTagLabel = React.useCallback((label) => {
     if (!label) return [];
     const variants = getPersonNameVariants(label).map(v => v.toLowerCase());
     return historyPhotoEntries.filter(entry => {
       const tokens = entryTagTokens(entry).map(t => t.toLowerCase());
-      return variants.some(v => tokens.includes(v));
+      return variants.some(v => v.length <= 1 ? tokens.includes(v) : tokens.some(t => t.includes(v)));
     });
   }, [historyPhotoEntries]);
   const photosForPersonTag = React.useMemo(
@@ -1975,17 +2144,51 @@ export function HistoryView({
     const meta = photos.map(p => ({
       timestamp: p.timestamp, messageId: p.messageId, imageIndex: p.imageIndex, thumb: p.thumb,
       tags: p.tags, directMediaUrl: p.directMediaUrl, source: p.source, uploadSource: p.uploadSource,
+      anniversaryId: p.anniversaryId,
       meetingDate: p.meetingDate, photoId: p.photoId, sourceMessageId: p.sourceMessageId,
       sourceImageIndex: p.sourceImageIndex, mediaKey: p.mediaKey, refKey: p.refKey
     }));
     setHistoryLightbox({ urls, index, meta, memoryId });
   };
-  // 추억 탭: '여행' 카테고리 기념일의 제목을 기준으로, 그 기간에 등록된 사진을 모아 보여준다.
+  // 추억 탭: 날짜(startDate/date)가 등록된 기념일이면 카테고리와 상관없이, 그 기간에 등록된
+  // 사진을 모아 보여준다 (여행만이 아니라 행사/축제/생일 등도 사진이 있으면 노출).
+  // 모임(meeting) 사진은 timestamp(업로드/확정 시각)와 실제 모임 날짜(meetingDate)가 다른 경우가
+  // 많다 -- 모임 당일이 아니라 나중에 사진을 올리거나 확정하는 경우가 흔하기 때문. 그래서
+  // meetingDate가 있으면 그걸 우선 쓰고, 채팅/메모처럼 모임과 무관한 사진만 timestamp로 폴백한다.
   const entryDateStr = entry => {
+    if (entry?.meetingDate) return String(entry.meetingDate).slice(0, 10);
     const ts = Number(entry?.timestamp) || 0;
     if (!ts) return '';
     const d = new Date(ts);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+  // Chat/memo photos can be attached to a meeting by a compact date hashtag (26.09.04,
+  // 260904, etc.) rather than by a meeting-photo reference. Treat those explicit dates as the
+  // source of truth before falling back to the upload timestamp; otherwise photos uploaded later
+  // than the trip disappear from its memories group even though the date modal shows them.
+  const entryTaggedDates = entry => {
+    const text = String(entry?.tags || '');
+    const dates = [];
+    const dotted = /(?:^|[^\d])(20\d{2})[.\-/](\d{1,2})[.\-/](\d{1,2})(?!\d)/g;
+    let match;
+    while ((match = dotted.exec(text))) {
+      dates.push(`${match[1]}-${String(match[2]).padStart(2, '0')}-${String(match[3]).padStart(2, '0')}`);
+    }
+    const compact = /(?:^|[^\d])(\d{2})(\d{2})(\d{2})(?!\d)/g;
+    while ((match = compact.exec(text))) {
+      dates.push(`20${match[1]}-${match[2]}-${match[3]}`);
+    }
+    return dates;
+  };
+  const entryMatchesDateRange = (entry, start, end) => {
+    if (!entry || !start || !end) return false;
+    if (entry.meetingDate) {
+      const meetingDate = String(entry.meetingDate).slice(0, 10);
+      if (meetingDate >= start && meetingDate <= end) return true;
+    }
+    if (entryTaggedDates(entry).some(date => date >= start && date <= end)) return true;
+    const fallbackDate = entryDateStr(entry);
+    return !!fallbackDate && fallbackDate >= start && fallbackDate <= end;
   };
   const travelMemoryGroups = React.useMemo(() => {
     // range 타입(dayMode==='range')이 아닌 once/yearly 타입(하루짜리) 여행 기념일은
@@ -1993,26 +2196,108 @@ export function HistoryView({
     // "기간: 정보없음" 버그와 같은 원인) -- a.date를 폴백으로 읽지 않으면 하루짜리로 등록한
     // 여행은 사진이 있어도 추억 탭에서 통째로 사라진다.
     return (anniversaries || [])
-      .filter(a => a && a.category === 'travel' && (a.startDate || a.date))
+      .filter(a => a && (a.startDate || a.date) && !a.hiddenFromMemories)
       .map(a => {
         const start = a.startDate || a.date;
         const end = a.endDate || a.startDate || a.date;
-        // 날짜 구간으로 자동 수집되다 보니 그 여행과 상관없는 사진이 섞여 들어올 수 있어,
+        // 날짜 구간으로 자동 수집되다 보니 그 기념일과 상관없는 사진이 섞여 들어올 수 있어,
         // 라이트박스의 '이 추억에서 제거' 버튼으로 뺀 사진(excludedMemoryPhotoKeys)은 제외한다.
         const excluded = new Set(Array.isArray(a.excludedMemoryPhotoKeys) ? a.excludedMemoryPhotoKeys : []);
-        const photos = historyPhotoEntries.filter(entry => {
-          const d = entryDateStr(entry);
-          if (!d || d < start || d > end) return false;
+        const photosInRange = historyPhotoEntries.filter(entry => {
+          return entryMatchesDateRange(entry, start, end);
+        });
+        const photos = photosInRange.filter(entry => {
           const key = entry.mediaKey || entry.refKey;
           return !key || !excluded.has(key);
         });
-        return { id: a.id, title: a.title || '여행', startDate: start, endDate: end, photos };
+        // 제외된 사진 목록 -- "추가" 버튼에서 다시 추억에 넣을 수 있게 보여준다.
+        const excludedPhotos = photosInRange.filter(entry => {
+          const key = entry.mediaKey || entry.refKey;
+          return key && excluded.has(key);
+        });
+        return { id: a.id, title: a.title || '기록', startDate: start, endDate: end, photos, excludedPhotos };
       })
       // 등록된 사진이 없는 여행은 목록에서 아예 숨긴다 -- 빈 여행 카드를 계속 보여주는 것보다
       // 실제로 추억(사진)이 쌓인 여행만 보여주는 게 이 탭의 취지에 맞다.
       .filter(group => group.photos.length > 0)
       .sort((a, b) => (b.startDate || '').localeCompare(a.startDate || ''));
   }, [anniversaries, historyPhotoEntries]);
+
+  const toggleMemoryGroupSelected = id => {
+    setSelectedMemoryGroupIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const handleExcludeMemoryGroups = async () => {
+    const ids = Array.from(selectedMemoryGroupIds);
+    if (!ids.length || typeof onHideMemoryGroup !== 'function') return;
+    const doExclude = async () => {
+      setIsChangingMemoryGroups(true);
+      try {
+        for (const id of ids) await onHideMemoryGroup(id);
+        setIsMemoryListEditMode(false);
+        setSelectedMemoryGroupIds(new Set());
+      } finally {
+        setIsChangingMemoryGroups(false);
+      }
+    };
+    if (typeof onRequestConfirm === 'function') onRequestConfirm('추억 제외', `선택한 추억 ${ids.length}개를 목록에서 제외할까요?`, doExclude);
+  };
+  // 이미 추억 목록에 있는 기념일을 제외하고, 사진이 있거나 이전에 숨긴 기록이 있는
+  // 기념일만 추가 후보로 보여준다. 실제 추가/복원은 기존 기념일 문서 모듈을 재사용한다.
+  const memoryGroupIds = new Set(travelMemoryGroups.map(group => group.id));
+  const availableMemoryGroups = React.useMemo(() => (anniversaries || []).filter(a => {
+    if (!a || !a.id || memoryGroupIds.has(a.id)) return false;
+    const start = a.startDate || a.date;
+    const end = a.endDate || a.startDate || a.date;
+    if (!start || !end) return false;
+    return historyPhotoEntries.some(entry => entryMatchesDateRange(entry, start, end));
+  }).map(a => ({ id: a.id, title: a.title || '기록', startDate: a.startDate || a.date, endDate: a.endDate || a.startDate || a.date, hidden: !!a.hiddenFromMemories }))
+    .sort((a, b) => (b.startDate || '').localeCompare(a.startDate || '')), [anniversaries, historyPhotoEntries, travelMemoryGroups]);
+  const handleRestoreMemoryGroup = async id => {
+    if (typeof onRestoreMemoryGroup !== 'function') return;
+    setIsChangingMemoryGroups(true);
+    try {
+      const ok = await onRestoreMemoryGroup(id);
+      if (ok !== false) setIsMemoryAddModalOpen(false);
+    } finally { setIsChangingMemoryGroups(false); }
+  };
+
+  // 추억 상세/제외된 사진 팝업이 공유하는 썸네일 그리드 -- checkable이면 체크박스 오버레이를 켜고
+  // 탭할 때 onToggle을, 아니면 onOpen(라이트박스)을 부른다.
+  const renderPhotoThumbGrid = (photos, { checkable, selectedKeys, onToggle, onOpen, keyPrefix }) => (
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '4px' }
+    }, photos.map((photo, idx) => {
+      const photoKey = photo.mediaKey || photo.refKey || `${keyPrefix}${idx}`;
+      const isChecked = checkable && selectedKeys.has(photoKey);
+      return /*#__PURE__*/React.createElement("button", {
+        key: photoKey, type: "button",
+        onClick: () => checkable ? onToggle(photoKey) : onOpen(idx),
+        style: { position: 'relative', padding: 0, border: 'none', borderRadius: 'var(--radius-sm)', overflow: 'hidden', aspectRatio: '1 / 1', cursor: 'pointer', backgroundColor: 'var(--bg-primary)' }
+      },
+        /*#__PURE__*/React.createElement("img", {
+          src: photo.thumb || photo.full, alt: "", loading: "lazy", decoding: "async",
+          style: { width: '100%', height: '100%', objectFit: 'cover' }
+        }),
+        checkable && /*#__PURE__*/React.createElement("span", {
+          "aria-hidden": true,
+          style: {
+            position: 'absolute', top: '4px', left: '4px', width: '20px', height: '20px', borderRadius: '5px',
+            border: isChecked ? 'none' : '2px solid rgba(255,255,255,0.9)',
+            backgroundColor: isChecked ? 'var(--accent-primary)' : 'rgba(0,0,0,0.35)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.4)'
+          }
+        }, isChecked && /*#__PURE__*/React.createElement("svg", {
+          xmlns: "http://www.w3.org/2000/svg", width: "14", height: "14", viewBox: "0 0 24 24",
+          fill: "none", stroke: "#fff", strokeWidth: "3", strokeLinecap: "round", strokeLinejoin: "round"
+        }, /*#__PURE__*/React.createElement("path", { d: "M20 6 9 17l-5-5" })))
+      );
+    }))
+  );
 
   return /*#__PURE__*/React.createElement("div", {
     className: "places-view-container",
@@ -2058,10 +2343,10 @@ export function HistoryView({
           display: 'flex', alignItems: 'center', fontWeight: 800, fontSize: '0.95rem',
           color: 'var(--text-main)', whiteSpace: 'nowrap', pointerEvents: 'none'
         }
-      }, calendar.title, " 보관함"),
+      }, calendar.title, " 기록"),
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
         /*#__PURE__*/React.createElement("button", {
-          type: "button", onClick: () => setIsSearchOpen(v => !v), title: "보관함 검색", "aria-label": "보관함 검색",
+          type: "button", onClick: () => setIsSearchOpen(v => !v), title: "기록 검색", "aria-label": "기록 검색",
           style: { background: 'none', border: 'none', cursor: 'pointer', padding: '6px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }
         }, SearchIcon ? /*#__PURE__*/React.createElement(SearchIcon, null) : "🔍"),
         /*#__PURE__*/React.createElement("button", {
@@ -2077,13 +2362,13 @@ export function HistoryView({
       onClose: () => { setIsSearchOpen(false); setSearchQuery(''); }
     }),
     UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
-      ariaLabel: "보관함 탭",
+      ariaLabel: "기록 탭",
       value: historyTab,
       onChange: changeHistoryTab,
       options: [
-        { value: 'meetings', label: '지난모임' },
         { value: 'memories', label: '추억' },
-        { value: 'people', label: '인물' }
+        { value: 'people', label: '인물' },
+        { value: 'meetings', label: '지난모임' }
       ]
     })
     ), // end history-header-stack
@@ -2179,7 +2464,31 @@ export function HistoryView({
     // 상세 페이지로 들어간다.
     historyTab === 'memories' && !selectedMemoryGroupId && /*#__PURE__*/React.createElement("div", {
       style: { flex: 1, overflowY: 'auto', padding: '118px 16px 16px' }
-    }, /*#__PURE__*/React.createElement("div", { style: {} },
+    }, /*#__PURE__*/React.createElement(React.Fragment, null,
+      /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '8px', marginBottom: '10px' }
+      },
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", "aria-label": "추억 추가", onClick: () => setIsMemoryAddModalOpen(true),
+          style: { width: '36px', minWidth: '36px', height: '36px', minHeight: '36px', padding: 0, borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)', fontSize: '1.35rem', lineHeight: 1, cursor: 'pointer' }
+        }, "+"),
+        isMemoryListEditMode
+          ? /*#__PURE__*/React.createElement(React.Fragment, null,
+              /*#__PURE__*/React.createElement("button", {
+                type: "button", "aria-label": "추억 편집 취소", onClick: () => { setIsMemoryListEditMode(false); setSelectedMemoryGroupIds(new Set()); }, disabled: isChangingMemoryGroups,
+                style: { height: '34px', padding: '0 10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' }
+              }, "취소"),
+              /*#__PURE__*/React.createElement("button", {
+                type: "button", "aria-label": "추억 제외", onClick: handleExcludeMemoryGroups, disabled: selectedMemoryGroupIds.size === 0 || isChangingMemoryGroups,
+                style: { height: '34px', padding: '0 10px', borderRadius: 'var(--radius-md)', border: 'none', backgroundColor: '#EF4444', color: '#fff', fontSize: 'var(--font-size-sm)', fontWeight: 700, opacity: selectedMemoryGroupIds.size === 0 || isChangingMemoryGroups ? 0.5 : 1, cursor: 'pointer' }
+              }, `제외${selectedMemoryGroupIds.size ? ` (${selectedMemoryGroupIds.size})` : ''}`)
+            )
+          : /*#__PURE__*/React.createElement("button", {
+              type: "button", "aria-label": "추억 편집", onClick: () => setIsMemoryListEditMode(true),
+              style: { width: '36px', minWidth: '36px', height: '36px', minHeight: '36px', padding: 0, borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }
+            }, PencilIcon ? /*#__PURE__*/React.createElement(PencilIcon, { size: 16 }) : "✎")
+      ),
+      /*#__PURE__*/React.createElement("div", { style: {} },
       travelMemoryGroups.length === 0
         ? /*#__PURE__*/React.createElement("div", {
             style: {
@@ -2188,8 +2497,8 @@ export function HistoryView({
             }
           },
             /*#__PURE__*/React.createElement("span", { style: { fontSize: '2rem' } }, "🗂️"),
-            /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-main)' } }, "등록된 여행 일정이 없습니다"),
-            /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)' } }, "기념일 등록에서 '여행' 카테고리로 일정을 추가하면, 그 기간에 등록된 사진을 여기 모아 보여줘요.")
+            /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-main)' } }, "등록된 추억이 없습니다"),
+            /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)' } }, "기념일을 등록하면, 그 날짜(구간)에 올라온 사진을 여기 모아 보여줘요.")
           )
         : /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px' } },
             travelMemoryGroups.map(group => {
@@ -2197,7 +2506,7 @@ export function HistoryView({
               return /*#__PURE__*/React.createElement("button", {
                 key: group.id,
                 type: "button",
-                onClick: () => setSelectedMemoryGroupId(group.id),
+                onClick: () => openMemoryGroup(group.id),
                 style: {
                   position: 'relative', aspectRatio: '1 / 1', borderRadius: 'var(--radius-lg)', overflow: 'hidden',
                   border: 'none', padding: 0, cursor: 'pointer', backgroundColor: 'var(--bg-card)'
@@ -2227,43 +2536,135 @@ export function HistoryView({
               );
             })
           )
+      ),
+      isMemoryAddModalOpen && /*#__PURE__*/React.createElement("div", {
+        className: "bottom-sheet-overlay", onClick: () => setIsMemoryAddModalOpen(false), style: { zIndex: 12000 }
+      }, /*#__PURE__*/React.createElement("div", { className: "bottom-sheet", onClick: e => e.stopPropagation() },
+        /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-header" },
+          /*#__PURE__*/React.createElement("h4", null, "추억에 추가할 기념일"),
+          /*#__PURE__*/React.createElement("button", { type: "button", onClick: () => setIsMemoryAddModalOpen(false), style: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer' } }, '✕')
+        ),
+        /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-body" },
+          availableMemoryGroups.length === 0
+            ? /*#__PURE__*/React.createElement("p", { style: { color: 'var(--text-muted)', textAlign: 'center', padding: '24px 0' } }, "추가할 미등록 기념일이 없습니다.")
+            : availableMemoryGroups.map(item => /*#__PURE__*/React.createElement("button", {
+                key: item.id, type: "button", disabled: isChangingMemoryGroups, onClick: () => handleRestoreMemoryGroup(item.id),
+                style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '12px', marginBottom: '8px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', background: 'var(--bg-primary)', color: 'var(--text-main)', textAlign: 'left', cursor: 'pointer' }
+              }, /*#__PURE__*/React.createElement("span", null,
+                /*#__PURE__*/React.createElement("strong", { style: { display: 'block' } }, item.title),
+                /*#__PURE__*/React.createElement("small", { style: { color: 'var(--text-muted)' } }, item.startDate === item.endDate ? item.startDate : `${item.startDate} ~ ${item.endDate}`)
+              ), /*#__PURE__*/React.createElement("span", { style: { color: 'var(--accent-primary)', fontWeight: 800 } }, "+")))
+        )
+      ))
     )),
     // 추억 상세 페이지: 특정 여행 칸을 눌렀을 때 그 여행 사진만 모아 보여준다.
     historyTab === 'memories' && !!selectedMemoryGroupId && (() => {
       const group = travelMemoryGroups.find(g => g.id === selectedMemoryGroupId);
       if (!group) return null;
-      return /*#__PURE__*/React.createElement("div", {
+      const canBulkExclude = typeof onRemovePhotosFromMemory === 'function';
+      return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
         style: { flex: 1, overflowY: 'auto', padding: '118px 16px 16px' }
       }, /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
         /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
           /*#__PURE__*/React.createElement("button", {
-            type: "button", onClick: () => setSelectedMemoryGroupId(null), "aria-label": "추억 목록으로",
+            type: "button", onClick: () => clearMemoryGroup(true), "aria-label": "추억 목록으로",
             style: {
               width: '32px', height: '32px', borderRadius: '50%', border: 'none', background: 'transparent',
               display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)', flexShrink: 0
             }
           }, BackArrowIcon ? /*#__PURE__*/React.createElement(BackArrowIcon, { size: 20 }) : "←"),
-          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', minWidth: 0 } },
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 } },
             /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-lg)', fontWeight: 800, color: 'var(--text-main)' } }, group.title),
             /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' } },
               group.startDate === group.endDate ? group.startDate : `${group.startDate} ~ ${group.endDate}`,
               ` · 사진 ${group.photos.length}장`
             )
+          ),
+          canBulkExclude && (
+            isMemoryEditMode
+              ? /*#__PURE__*/React.createElement(React.Fragment, null,
+                  /*#__PURE__*/React.createElement("button", {
+                    type: "button",
+                    onClick: () => { setIsMemoryEditMode(false); setSelectedMemoryPhotoKeys(new Set()); },
+                    disabled: isExcludingMemoryPhotos,
+                    style: {
+                      flexShrink: 0, height: '32px', padding: '0 12px', borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)',
+                      fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer'
+                    }
+                  }, "취소"),
+                  /*#__PURE__*/React.createElement("button", {
+                    type: "button",
+                    onClick: () => handleClickExcludeMemoryPhotos(group),
+                    disabled: selectedMemoryPhotoKeys.size === 0 || isExcludingMemoryPhotos,
+                    style: {
+                      flexShrink: 0, height: '32px', padding: '0 12px', borderRadius: 'var(--radius-md)', border: 'none',
+                      backgroundColor: '#EF4444', color: '#fff', fontSize: 'var(--font-size-sm)', fontWeight: 700,
+                      cursor: (selectedMemoryPhotoKeys.size === 0 || isExcludingMemoryPhotos) ? 'default' : 'pointer',
+                      opacity: (selectedMemoryPhotoKeys.size === 0 || isExcludingMemoryPhotos) ? 0.5 : 1
+                    }
+                  }, `제외${selectedMemoryPhotoKeys.size > 0 ? ` (${selectedMemoryPhotoKeys.size})` : ''}`)
+                )
+              : [
+                  { show: typeof onAddPhotosBackToMemory === 'function', key: 'add', onClick: () => setIsAddBackModalOpen(true), label: '사진 추가', css: { border: 'none', backgroundColor: '#111827', color: '#fff', fontSize: '1.1rem', fontWeight: 800, lineHeight: 1 }, content: "+" },
+                  { show: true, key: 'edit', onClick: () => setIsMemoryEditMode(true), label: '편집', css: { border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)' }, content: PencilIcon ? /*#__PURE__*/React.createElement(PencilIcon, { size: 15 }) : "✎" },
+                  { show: typeof onHideMemoryGroup === 'function', key: 'delete', onClick: () => handleClickDeleteMemoryGroup(group), disabled: isHidingMemoryGroup, label: '삭제', css: { border: '1px solid #EF4444', backgroundColor: 'var(--bg-primary)', color: '#EF4444', cursor: isHidingMemoryGroup ? 'default' : 'pointer', opacity: isHidingMemoryGroup ? 0.5 : 1 }, content: TrashIcon ? /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }) : "✕" }
+                ].map(cfg => cfg.show && /*#__PURE__*/React.createElement("button", {
+                  key: cfg.key, type: "button", onClick: cfg.onClick, disabled: cfg.disabled, "aria-label": cfg.label,
+                  style: Object.assign({ flexShrink: 0, width: '36px', minWidth: '36px', height: '36px', minHeight: '36px', padding: 0, borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }, cfg.css)
+                }, cfg.content))
           )
         ),
-        /*#__PURE__*/React.createElement("div", {
-          style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '4px' }
-        }, group.photos.map((photo, idx) => /*#__PURE__*/React.createElement("button", {
-          key: photo.mediaKey || photo.refKey || `${group.id}_${idx}`,
-          type: "button",
-          onClick: () => openHistoryLightbox(group.photos, idx, group.id),
-          style: { padding: 0, border: 'none', borderRadius: 'var(--radius-sm)', overflow: 'hidden', aspectRatio: '1 / 1', cursor: 'pointer', backgroundColor: 'var(--bg-primary)' }
-        }, /*#__PURE__*/React.createElement("img", {
-          src: photo.thumb || photo.full, alt: "", loading: "lazy", decoding: "async",
-          style: { width: '100%', height: '100%', objectFit: 'cover' }
-        })))
+        renderPhotoThumbGrid(group.photos, {
+          checkable: isMemoryEditMode,
+          selectedKeys: selectedMemoryPhotoKeys,
+          onToggle: toggleMemoryPhotoSelected,
+          onOpen: idx => openHistoryLightbox(group.photos, idx, group.id),
+          keyPrefix: `${group.id}_`
+        })
+      )),
+      isAddBackModalOpen && /*#__PURE__*/React.createElement("div", {
+        className: "bottom-sheet-overlay",
+        onClick: () => setIsAddBackModalOpen(false),
+        style: { zIndex: 12000 }
+      }, /*#__PURE__*/React.createElement("div", {
+        className: "bottom-sheet",
+        onClick: e => e.stopPropagation()
+      },
+        /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-header" },
+          /*#__PURE__*/React.createElement("h4", null, "추억에 사진 추가"),
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            style: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer' },
+            onClick: () => setIsAddBackModalOpen(false)
+          }, '✕')
+        ),
+        /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-body" },
+          group.excludedPhotos.length === 0
+            ? /*#__PURE__*/React.createElement("p", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', textAlign: 'center', padding: '24px 0' } }, "추가할 사진이 없습니다.")
+            : /*#__PURE__*/React.createElement(React.Fragment, null,
+                renderPhotoThumbGrid(group.excludedPhotos, {
+                  checkable: true,
+                  selectedKeys: selectedAddBackKeys,
+                  onToggle: toggleAddBackPhotoSelected,
+                  onOpen: () => {},
+                  keyPrefix: `excluded_${group.id}_`
+                }),
+                /*#__PURE__*/React.createElement("button", {
+                  type: "button",
+                  className: "btn btn-primary",
+                  disabled: selectedAddBackKeys.size === 0 || isAddingBackPhotos,
+                  onClick: () => handleClickAddBackPhotos(group),
+                  style: {
+                    width: '100%', height: '44px', minHeight: '44px', fontSize: '0.95rem', fontWeight: 800,
+                    borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    marginTop: '14px', opacity: (selectedAddBackKeys.size === 0 || isAddingBackPhotos) ? 0.5 : 1
+                  }
+                }, `추가${selectedAddBackKeys.size > 0 ? ` (${selectedAddBackKeys.size})` : ''}`)
+              )
         )
-      ));
+      ))
+      );
     })(),
     // 인물 탭: 인물별 벤또 그리드(칸마다 그 사람 사진이 붙은 사진 중 하나를 커버로 보여줌).
     // 칸을 누르면 그 사람으로 태그된 사진만 모아 보여주는 상세 페이지로 들어간다.
@@ -2392,7 +2793,16 @@ export function HistoryView({
       onGetGalleryPhotoOrdinal,
       onRequestConfirm,
       onRemoveFromMemory: (historyLightbox.memoryId && typeof onRemovePhotoFromMemory === 'function')
-        ? (photoMeta => onRemovePhotoFromMemory(historyLightbox.memoryId, photoMeta?.mediaKey || photoMeta?.refKey))
+        ? (async photoMeta => {
+            const memoryId = historyLightbox.memoryId;
+            const key = photoMeta?.mediaKey || photoMeta?.refKey;
+            const grp = travelMemoryGroups.find(g => g.id === memoryId);
+            const ok = await onRemovePhotoFromMemory(memoryId, key);
+            // 이 사진이 그룹의 마지막 한 장이었다면 제거 후 그룹 자체가 목록에서 사라진다 --
+            // 그대로 두면 상세 화면(뒤로가기 버튼 포함)이 통째로 안 보이는 먹통 상태가 된다.
+            if (ok !== false && grp && grp.photos.length <= 1) clearMemoryGroup();
+            return ok;
+          })
         : null,
       onFetchPhotoComments,
       onSavePhotoComments
@@ -2401,14 +2811,14 @@ export function HistoryView({
     /*#__PURE__*/React.createElement(SideMenuOverlay, {
       isOpen: isMenuOpen,
       onClose: () => setIsMenuOpen(false),
-      homeLabel: "보관함",
-      ariaLabel: "보관함 메뉴",
+      homeLabel: "기록",
+      ariaLabel: "기록 메뉴",
       calendar,
       onGoHome: () => { setIsMenuOpen(false); if (typeof onChangeView === 'function') onChangeView('calendar'); else if (typeof onBack === 'function') onBack(); },
       extraItems: [{
         onClick: () => { setIsMenuOpen(false); setIsSearchOpen(true); },
         icon: SearchIcon ? /*#__PURE__*/React.createElement(SearchIcon, null) : "🔍",
-        title: "보관함 검색",
+        title: "기록 검색",
         desc: "지난모임 날짜·참여자·메모·장소 검색"
       }],
       navBlockProps: {
@@ -2438,13 +2848,18 @@ export function ContentView({
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const BackArrowIcon = __comp.BackArrowIcon || __deps.BackArrowIcon;
   const ThreeLinesIcon = __comp.ThreeLinesIcon || __deps.ThreeLinesIcon;
+  const SearchIcon = __comp.SearchIcon || __deps.SearchIcon;
+  const InlineSearchBar = __comp.InlineSearchBar || __deps.InlineSearchBar;
   const LocateFixedIcon = __comp.LocateFixedIcon || __deps.LocateFixedIcon;
   const UnderlineTabs = __comp.UnderlineTabs || __deps.UnderlineTabs;
 
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
+  const [isSearchOpen, setIsSearchOpen] = React.useState(false);
+  const [searchQuery, setSearchQuery] = React.useState('');
   const [isContentRegisterOpen, setIsContentRegisterOpen] = React.useState(false);
+  const [editingContentItem, setEditingContentItem] = React.useState(null);
   const CONTENT_TAB_STORAGE_KEY = 'gather_content_tab';
-  const VALID_CONTENT_TABS = ['festival', 'culture', 'sports'];
+  const VALID_CONTENT_TABS = ['festival', 'culture', 'sports', 'movies'];
   const [contentTab, setContentTab] = React.useState(() => {
     try {
       const saved = localStorage.getItem(CONTENT_TAB_STORAGE_KEY);
@@ -2462,20 +2877,35 @@ export function ContentView({
   const [focusItemId] = React.useState(() => {
     try { return localStorage.getItem('gather_content_focus_item_id') || null; } catch (_) { return null; }
   });
+  // id 매칭 실패에 대비한 안전망(app-main.js의 onFocusCultureSource 참고) -- 크롤링 스냅샷의 id
+  // 생성 규칙이 과거에 바뀐 적이 있어, 그 이전에 등록된 기념일은 cultureSourceId가 오늘자
+  // 스냅샷/orphan 폴백 어느 쪽과도 더 이상 일치하지 않을 수 있다. 제목이 일치하는 항목을 찾는
+  // 마지막 수단으로만 쓰인다(CulturePerformancesTab 참고).
+  const [focusTitle] = React.useState(() => {
+    try { return localStorage.getItem('gather_content_focus_title') || ''; } catch (_) { return ''; }
+  });
   React.useEffect(() => {
     if (!focusItemId) return;
-    try { localStorage.removeItem('gather_content_focus_item_id'); } catch (_) { /* best-effort */ }
+    try {
+      localStorage.removeItem('gather_content_focus_item_id');
+      localStorage.removeItem('gather_content_focus_title');
+    } catch (_) { /* best-effort */ }
   }, [focusItemId]);
   // 컨텐츠 메뉴를 다시 누르면 항상 지역축제 탭부터 보이도록.
   const handleContentChangeView = (view) => {
     if (view === 'content') changeContentTab('festival');
     if (typeof onChangeView === 'function') onChangeView(view);
   };
+  const openContentEditor = (item) => {
+    if (!item) return;
+    setEditingContentItem(item);
+    setIsContentRegisterOpen(true);
+  };
 
   // 기념일 등록(AnniversaryModal)으로 직접 만든 festival/event/sports도 각 탭에 보이도록,
   // 문화포털에서 등록된 것(cultureSourceId 있음)은 제외하고 사용자가 직접 만든 것만 카드 형태로 변환.
   const selfAuthoredCultureItems = React.useMemo(() => {
-    const kindByCategory = { festival: 'festival', event: 'performance', sports: 'sports' };
+    const kindByCategory = { festival: 'festival', event: 'performance', sports: 'sports', movie: 'movie' };
     return (anniversaries || [])
       .filter(a => a && !a.cultureSourceId && kindByCategory[a.category])
       .map(a => ({
@@ -2493,6 +2923,13 @@ export function ContentView({
         venue: a.place ? (a.place.alias || a.place.name || '') : '',
         address: a.place ? (a.place.address || '') : '',
         description: a.description || '',
+        releaseDate: a.movieMeta?.releaseDate || a.date,
+        director: a.movieMeta?.director || '',
+        cast: Array.isArray(a.movieMeta?.cast) ? a.movieMeta.cast : [],
+        ageRating: a.movieMeta?.ageRating || '',
+        bookingRate: a.movieMeta?.bookingRate || '',
+        audienceCount: a.movieMeta?.audienceCount || '',
+        isOpenEnded: a.movieMeta?.isOpenEnded !== false,
         // 컨텐츠 페이지 카드 커버 사진 -- 문화포털 자동 등록 항목은 a.image(포털 썸네일 URL)를
         // 쓰지만, AnniversaryModal에서 직접 첨부한 사진은 a.photos 배열(url/thumbUrl)에 저장되어
         // a.image는 항상 비어 있다. a.image가 없을 때는 첫 번째 첨부 사진으로 대체해야
@@ -2500,6 +2937,32 @@ export function ContentView({
         image: a.image || (Array.isArray(a.photos) && a.photos[0] ? (a.photos[0].thumbUrl || a.photos[0].url || '') : '')
       }));
   }, [anniversaries]);
+
+  // Memoized per-kind so each stays reference-stable across renders when its actual contents
+  // haven't changed. Building these inline in JSX (as a fresh .filter()/.filter() spread every
+  // render) used to hand CulturePerformancesTab a brand-new `extraItems` array identity on every
+  // single ContentView render -- and since that tab's onItemsLoaded effect reports its merged
+  // list back up via setRegionFilterItems (ContentView's own state) whenever `extraItems`'s
+  // *reference* changes, every report caused this exact re-render that just handed it yet another
+  // new reference, live-locking the two components into an unthrottled render loop (visible as
+  // "Maximum update depth exceeded" and continuous CPU/battery drain with no other visible symptom,
+  // which is exactly why it went unnoticed).
+  const performanceExtraItems = React.useMemo(
+    () => [...selfAuthoredCultureItems.filter(i => getCultureItemKind(i) === 'performance'), ...(customCultureItems || []).filter(i => getCultureItemKind(i) === 'performance')],
+    [selfAuthoredCultureItems, customCultureItems]
+  );
+  const festivalExtraItems = React.useMemo(
+    () => [...selfAuthoredCultureItems.filter(i => getCultureItemKind(i) === 'festival'), ...(customCultureItems || []).filter(i => getCultureItemKind(i) === 'festival')],
+    [selfAuthoredCultureItems, customCultureItems]
+  );
+  const sportsExtraItems = React.useMemo(
+    () => [...selfAuthoredCultureItems.filter(i => getCultureItemKind(i) === 'sports'), ...(customCultureItems || []).filter(i => getCultureItemKind(i) === 'sports')],
+    [selfAuthoredCultureItems, customCultureItems]
+  );
+  const movieExtraItems = React.useMemo(
+    () => [...selfAuthoredCultureItems.filter(i => getCultureItemKind(i) === 'movie'), ...(customCultureItems || []).filter(i => getCultureItemKind(i) === 'movie')],
+    [selfAuthoredCultureItems, customCultureItems]
+  );
 
   // Shared 지역 filter for the 지역축제/문화공연/스포츠 tabs. Restored from localStorage so a
   // region picked on a previous visit still applies next time.
@@ -2611,11 +3074,21 @@ export function ContentView({
       }, calendar.title, " 컨텐츠"),
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
         /*#__PURE__*/React.createElement("button", {
+          type: "button", onClick: () => setIsSearchOpen(v => !v), title: "컨텐츠 검색", "aria-label": "컨텐츠 검색",
+          style: { background: 'none', border: 'none', cursor: 'pointer', padding: '6px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }
+        }, SearchIcon ? /*#__PURE__*/React.createElement(SearchIcon, null) : "🔍"),
+        /*#__PURE__*/React.createElement("button", {
           type: "button", onClick: () => setIsMenuOpen(true), title: "메뉴", "aria-label": "메뉴 열기",
           style: { background: 'none', border: 'none', cursor: 'pointer', padding: '6px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }
         }, ThreeLinesIcon ? /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 22 }) : "≡")
       )
     ),
+    isSearchOpen && InlineSearchBar && /*#__PURE__*/React.createElement(InlineSearchBar, {
+      value: searchQuery,
+      placeholder: "제목으로 검색...",
+      onChange: e => setSearchQuery(e.target.value),
+      onClose: () => { setIsSearchOpen(false); setSearchQuery(''); }
+    }),
     UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
       ariaLabel: "컨텐츠 탭",
       value: contentTab,
@@ -2623,7 +3096,8 @@ export function ContentView({
       options: [
         { value: 'festival', label: '지역축제' },
         { value: 'culture', label: '문화행사' },
-        { value: 'sports', label: '스포츠' }
+        { value: 'sports', label: '스포츠' },
+        { value: 'movies', label: '영화' }
       ]
     }),
     /*#__PURE__*/React.createElement("div", {
@@ -2714,25 +3188,32 @@ export function ContentView({
       calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo, dataUrl: CULTURE_PERFORMANCES_URL,
       emptyLabel: "상영중이거나 예정된 문화행사가 없습니다.", regionSelections, onItemsLoaded: setRegionFilterItems,
       anniversaryCategory: "event",
-      extraItems: [...selfAuthoredCultureItems.filter(i => i.kind === 'performance'), ...(customCultureItems || []).filter(i => i && i.kind === 'performance')],
+      extraItems: performanceExtraItems,
       chipRowSlot, contentPaddingTop, onScroll: handleContentScroll,
-      gridCols, focusItemId
+      gridCols, focusItemId, focusTitle, searchQuery, onEditContent: openContentEditor
     }),
     contentTab === 'festival' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
       calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo, dataUrl: CULTURE_FESTIVALS_URL,
       emptyLabel: "진행중이거나 예정된 지역축제가 없습니다.", regionSelections, onItemsLoaded: setRegionFilterItems,
       anniversaryCategory: "festival",
-      extraItems: [...selfAuthoredCultureItems.filter(i => i.kind === 'festival'), ...(customCultureItems || []).filter(i => i && i.kind === 'festival')],
+      extraItems: festivalExtraItems,
       chipRowSlot, contentPaddingTop, onScroll: handleContentScroll,
-      gridCols, focusItemId
+      gridCols, focusItemId, focusTitle, searchQuery, onEditContent: openContentEditor
     }),
     contentTab === 'sports' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
       calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo, dataUrl: CULTURE_SPORTS_URL,
       emptyLabel: "진행중이거나 예정된 스포츠 경기가 없습니다.", regionSelections, onItemsLoaded: setRegionFilterItems,
       anniversaryCategory: "sports",
-      extraItems: [...selfAuthoredCultureItems.filter(i => i.kind === 'sports'), ...(customCultureItems || []).filter(i => i && i.kind === 'sports')],
+      extraItems: sportsExtraItems,
       chipRowSlot, contentPaddingTop, onScroll: handleContentScroll,
-      gridCols, focusItemId
+      gridCols, focusItemId, focusTitle, searchQuery, onEditContent: openContentEditor
+    }),
+    contentTab === 'movies' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
+      calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo, dataUrl: CULTURE_MOVIES_URL,
+      emptyLabel: "등록된 영화가 없습니다.", regionSelections, onItemsLoaded: setRegionFilterItems,
+      anniversaryCategory: "movie", extraItems: movieExtraItems,
+      chipRowSlot, contentPaddingTop, onScroll: handleContentScroll,
+      gridCols, focusItemId, focusTitle, searchQuery, onEditContent: openContentEditor
     }),
 
     /*#__PURE__*/React.createElement(SideMenuOverlay, {
@@ -2743,7 +3224,7 @@ export function ContentView({
       calendar,
       onGoHome: () => { setIsMenuOpen(false); if (typeof onChangeView === 'function') onChangeView('calendar'); else if (typeof onBack === 'function') onBack(); },
       extraItems: [{
-        onClick: () => { setIsMenuOpen(false); setIsContentRegisterOpen(true); },
+        onClick: () => { setIsMenuOpen(false); setEditingContentItem(null); setIsContentRegisterOpen(true); },
         icon: /*#__PURE__*/React.createElement("svg", {
           xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24",
           fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true"
@@ -2753,7 +3234,7 @@ export function ContentView({
           /*#__PURE__*/React.createElement("path", { d: "M8 12h8" })
         ),
         title: "컨텐츠 등록",
-        desc: "문화행사·지역축제·스포츠 직접 등록"
+        desc: "문화행사·지역축제·스포츠·영화 직접 등록"
       }],
       navBlockProps: {
         onClose: () => setIsMenuOpen(false),
@@ -2765,10 +3246,12 @@ export function ContentView({
       onOpenAppSettings
     }),
     isContentRegisterOpen && /*#__PURE__*/React.createElement(ContentRegisterModal, {
-      onClose: () => setIsContentRegisterOpen(false),
+      onClose: () => { setIsContentRegisterOpen(false); setEditingContentItem(null); },
       onSave: onSaveCustomCultureItem,
-      showToast: showToast
-    })
+      showToast: showToast,
+      initialItem: editingContentItem,
+      initialKind: contentTab === 'festival' ? 'festival' : (contentTab === 'sports' ? 'sports' : (contentTab === 'movies' ? 'movie' : 'performance'))
+    }),
   );
 }
 
@@ -2776,6 +3259,7 @@ const CULTURE_DATA_BASE = (typeof import.meta !== 'undefined' && import.meta.env
 const CULTURE_PERFORMANCES_URL = `${CULTURE_DATA_BASE}data/culture-performances.json`;
 const CULTURE_FESTIVALS_URL = `${CULTURE_DATA_BASE}data/culture-festivals.json`;
 const CULTURE_SPORTS_URL = `${CULTURE_DATA_BASE}data/culture-sports.json`;
+const CULTURE_MOVIES_URL = `${CULTURE_DATA_BASE}data/culture-movies.json`;
 const CULTURE_MISSING_LABEL = '정보없음';
 const culturePerf = value => (value && String(value).trim()) || CULTURE_MISSING_LABEL;
 
@@ -2795,6 +3279,7 @@ const CULTURE_GENRE_LABELS = {
   volleyball: '배구',
   soccer: '축구',
   handball: '핸드볼'
+  ,movie: '영화'
 };
 const cultureGenreLabel = genre => CULTURE_GENRE_LABELS[genre] || genre || '기타';
 
@@ -3050,9 +3535,8 @@ export function RegionFilterBackdrop({ isOpen, onClose, selections = [], onAdd, 
 
 function formatCultureDateLabel(startDate, endDate) {
   const fmt = (s) => {
-    if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return '';
-    const [y, m, d] = s.split('-');
-    return `${y}.${m}.${d}`;
+    const normalized = normalizeDateString(s);
+    return normalized ? formatDateWithDayName(normalized) : '';
   };
   const a = fmt(startDate);
   const b = fmt(endDate || startDate);
@@ -3060,10 +3544,93 @@ function formatCultureDateLabel(startDate, endDate) {
   return a === b ? a : `${a} ~ ${b}`;
 }
 
+// Older individually registered cards were written with `category` (or no kind at all)
+// before customCultureItems gained a strict kind field. Normalize at the rendering boundary too,
+// so one legacy document can never be silently filtered out of its festival/performance tab.
+function getCultureItemKind(item) {
+  if (!item) return '';
+  if (item.kind) return item.kind;
+  const byCategory = { festival: 'festival', event: 'performance', performance: 'performance', sports: 'sports', movie: 'movie' };
+  return byCategory[item.category] || byCategory[item.anniversaryCategory] || (item.genre === 'movie' ? 'movie' : '');
+}
+
+function todayIsoLocal() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
+function cultureItemDay(item) {
+  const value = item?.releaseDate || item?.startDate;
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(value || '')) ? String(value) : '';
+}
+
+function filterAndSortCultureItems(items, category) {
+  if (category !== 'sports' && category !== 'movie') return items;
+  const today = todayIsoLocal();
+  const visible = items.filter(item => {
+    const start = cultureItemDay(item);
+    if (!start) return true;
+    if (category === 'sports') {
+      const end = item.endDate || start;
+      return end >= today;
+    }
+    // 영화는 수집된 전체 목록을 보여준다. 오래된 항목도 원본 스냅샷과 캘린더 연동을 위해
+    // 보존되며, 미래 개봉작 역시 영화 탭에서 계속 확인할 수 있다.
+    return true;
+  });
+  return visible.sort((a, b) => {
+    const aDay = cultureItemDay(a), bDay = cultureItemDay(b);
+    if (!aDay || !bDay) return aDay ? -1 : (bDay ? 1 : 0);
+    return Math.abs(Date.parse(`${aDay}T00:00:00`) - Date.parse(`${today}T00:00:00`))
+      - Math.abs(Date.parse(`${bDay}T00:00:00`) - Date.parse(`${today}T00:00:00`));
+  });
+}
+
+// 컨텐츠 상세의 "공유" 버튼/컨텐츠 등록의 "붙여넣기"가 쓰는 인코더/파서 -- 사진 공유와 같은
+// 원칙으로, 카드의 모든 필드(포스터~설명)를 URL 프래그먼트에 실어 보낸다. 복사 시점의 데이터를
+// 그대로 복제하는 개념이라, 공유한 뒤 원본을 수정/삭제해도 이미 붙여넣은 쪽에는 영향이 없다.
+const GATHER_CONTENT_FRAGMENT_PREFIX = '#gatherContent=';
+const GATHER_CONTENT_FIELDS = [
+  'id', 'kind', 'title', 'startDate', 'endDate', 'dateLabel', 'venue', 'address', 'link',
+  'description', 'image', 'price', 'contact', 'director', 'cast', 'ageRating', 'audienceCount',
+  'bookingRate', 'isOpenEnded', 'genre'
+];
+function encodeGatherContentFragment(item) {
+  try {
+    const picked = {};
+    GATHER_CONTENT_FIELDS.forEach(f => {
+      const v = item && item[f];
+      if (v !== undefined && v !== null && v !== '') picked[f] = v;
+    });
+    if (!picked.title) return '';
+    const payload = { v: 1, kind: 'gather-content', item: picked };
+    const json = JSON.stringify(payload);
+    const b64 = typeof btoa === 'function' ? btoa(unescape(encodeURIComponent(json))) : '';
+    return b64 ? GATHER_CONTENT_FRAGMENT_PREFIX + b64 : '';
+  } catch (_) {
+    return '';
+  }
+}
+function parseGatherContentClipboardText(text) {
+  const raw = String(text || '').trim();
+  if (!/^https?:\/\//i.test(raw)) return null;
+  const markerIndex = raw.indexOf(GATHER_CONTENT_FRAGMENT_PREFIX);
+  if (markerIndex === -1) return null;
+  const b64 = raw.slice(markerIndex + GATHER_CONTENT_FRAGMENT_PREFIX.length);
+  try {
+    const json = decodeURIComponent(escape(atob(b64)));
+    const payload = JSON.parse(json);
+    if (!payload || payload.kind !== 'gather-content' || !payload.item || !payload.item.title) return null;
+    return payload.item;
+  } catch (_) {
+    return null;
+  }
+}
+
 // Layer popup for manually registering 문화공연 / 지역축제 items into the archive tabs.
 // Portaled to document.body (same pattern as CulturePerformancesTab's detail sheet) so it sits
 // above the side menu / page chrome. Persists via onSave → app-main customCultureItems write.
-function ContentRegisterModal({ onClose, onSave, showToast = null }) {
+function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind = 'performance', initialItem = null }) {
   const React = window.React;
   const ReactDOM = window.ReactDOM;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -3073,7 +3640,10 @@ function ContentRegisterModal({ onClose, onSave, showToast = null }) {
   const AutoGrowTextarea = __comp.AutoGrowTextarea || __deps.AutoGrowTextarea;
   const autoGrowTextarea = __deps.autoGrowTextarea || (window.GATHER_APP_UTILS || {}).autoGrowTextarea || (() => {});
 
-  const [kind, setKind] = React.useState('performance'); // 'performance' | 'festival'
+  // 'performance' | 'festival' | 'sports' -- defaults to whichever 컨텐츠 탭 the user opened this
+  // from (initialKind), instead of always 'performance', so registering while already on 지역축제
+  // or 스포츠 doesn't silently save into 문화행사 unless the user notices and switches this tab.
+  const [kind, setKind] = React.useState(['festival', 'sports', 'movie'].includes(initialKind) ? initialKind : 'performance');
   const [title, setTitle] = React.useState('');
   const [startDate, setStartDate] = React.useState('');
   const [endDate, setEndDate] = React.useState('');
@@ -3084,22 +3654,85 @@ function ContentRegisterModal({ onClose, onSave, showToast = null }) {
   const [image, setImage] = React.useState('');
   const [price, setPrice] = React.useState('');
   const [contact, setContact] = React.useState('');
+  const [director, setDirector] = React.useState('');
+  const [cast, setCast] = React.useState('');
+  const [rating, setRating] = React.useState('');
+  const [audience, setAudience] = React.useState('');
+  const [bookingRate, setBookingRate] = React.useState('');
   const [saving, setSaving] = React.useState(false);
+  React.useEffect(() => {
+    if (!initialItem) return;
+    const nextKind = initialItem.kind || (initialItem.genre === 'movie' ? 'movie' : initialItem.kind) || initialKind;
+    setKind(['festival', 'sports', 'movie'].includes(nextKind) ? nextKind : 'performance');
+    setTitle(initialItem.title || ''); setStartDate(initialItem.releaseDate || initialItem.startDate || '');
+    setEndDate(initialItem.endDate || ''); setVenue(initialItem.venue || ''); setAddress(initialItem.address || '');
+    setLink(initialItem.link || ''); setDescription(initialItem.description || ''); setImage(initialItem.image || '');
+    setPrice(initialItem.price || ''); setContact(initialItem.contact || ''); setDirector(initialItem.director || '');
+    setCast(Array.isArray(initialItem.cast) ? initialItem.cast.join(', ') : (initialItem.cast || ''));
+    setRating(initialItem.ageRating || ''); setAudience(initialItem.audienceCount || ''); setBookingRate(initialItem.bookingRate || '');
+  }, [initialItem, initialKind]);
+
+  // 다른 캘린더의 컨텐츠 상세 "공유" 버튼으로 복사한 URL을 붙여넣으면, 그 카드의 모든 필드를
+  // 이 폼에 그대로 채워 넣는다 -- 등록 자체는 여느 등록과 동일하게 사용자가 내용을 확인하고
+  // 아래 "등록" 버튼을 눌러야 저장되므로, 붙여넣기 한 번으로 검토 없이 바로 써지지 않는다.
+  const applyPastedContent = (item) => {
+    if (!item) return false;
+    setKind(['festival', 'sports', 'movie'].includes(item.kind) ? item.kind : 'performance');
+    setTitle(item.title || '');
+    setStartDate(item.startDate || '');
+    setEndDate(item.endDate || '');
+    setVenue(item.venue || '');
+    setAddress(item.address || '');
+    setLink(item.link || '');
+    setDescription(item.description || '');
+    setImage(item.image || '');
+    setPrice(item.price || '');
+    setContact(item.contact || '');
+    setDirector(item.director || '');
+    setCast(Array.isArray(item.cast) ? item.cast.join(', ') : (item.cast || ''));
+    setRating(item.ageRating || '');
+    setAudience(item.audienceCount || '');
+    setBookingRate(item.bookingRate || '');
+    return true;
+  };
+  const handlePasteContentClick = async () => {
+    let text = '';
+    try { text = await navigator.clipboard.readText(); } catch (_) { /* not granted/available */ }
+    const item = parseGatherContentClipboardText(text);
+    if (!item) {
+      if (typeof showToast === 'function') showToast('클립보드에 공유된 컨텐츠가 없습니다.', 'error');
+      return;
+    }
+    applyPastedContent(item);
+    if (typeof showToast === 'function') showToast('컨텐츠 정보를 붙여넣었습니다. 확인 후 등록해 주세요.', 'success');
+  };
+  React.useEffect(() => {
+    const handlePaste = e => {
+      const text = e.clipboardData ? e.clipboardData.getData('text/plain') : '';
+      const item = parseGatherContentClipboardText(text);
+      if (!item) return;
+      e.preventDefault();
+      applyPastedContent(item);
+      if (typeof showToast === 'function') showToast('컨텐츠 정보를 붙여넣었습니다. 확인 후 등록해 주세요.', 'success');
+    };
+    document.addEventListener('paste', handlePaste);
+    return () => document.removeEventListener('paste', handlePaste);
+  }, []);
 
   const handleSave = async () => {
     const cleanTitle = (title || '').trim();
-    const cleanStart = (startDate || '').trim();
+    const cleanStart = normalizeDateString((startDate || '').trim());
     if (!cleanTitle) {
       if (typeof showToast === 'function') showToast('제목을 입력해 주세요.', 'error');
       return;
     }
     if (!cleanStart || !/^\d{4}-\d{2}-\d{2}$/.test(cleanStart)) {
-      if (typeof showToast === 'function') showToast('시작일을 YYYY-MM-DD 형식으로 입력해 주세요.', 'error');
+      if (typeof showToast === 'function') showToast('시작일을 2026.04.17 또는 2026-04-17 형식으로 입력해 주세요.', 'error');
       return;
     }
-    const cleanEnd = ((endDate || '').trim() || cleanStart);
-    if (cleanEnd && !/^\d{4}-\d{2}-\d{2}$/.test(cleanEnd)) {
-      if (typeof showToast === 'function') showToast('종료일을 YYYY-MM-DD 형식으로 입력해 주세요.', 'error');
+    const cleanEnd = kind === 'movie' ? normalizeDateString((endDate || '').trim()) : (normalizeDateString((endDate || '').trim()) || cleanStart);
+    if ((endDate || '').trim() && !cleanEnd) {
+      if (typeof showToast === 'function') showToast('종료일을 2026.04.17 또는 2026-04-17 형식으로 입력해 주세요.', 'error');
       return;
     }
     if (typeof onSave !== 'function') {
@@ -3107,9 +3740,12 @@ function ContentRegisterModal({ onClose, onSave, showToast = null }) {
       return;
     }
     const stamp = Date.now();
-    const prefix = kind === 'festival' ? 'custom_fest_' : 'custom_perf_';
-    const id = prefix + stamp + '_' + Math.random().toString(36).slice(2, 8);
+    const idPrefixByKind = { festival: 'custom_fest_', sports: 'custom_sport_', movie: 'custom_movie_' };
+    const prefix = idPrefixByKind[kind] || 'custom_perf_';
+    const id = initialItem?.id || (prefix + stamp + '_' + Math.random().toString(36).slice(2, 8));
+    const normalizedKind = ['festival', 'sports', 'movie'].includes(kind) ? kind : 'performance';
     const item = {
+      ...(initialItem || {}),
       id,
       title: cleanTitle,
       startDate: cleanStart,
@@ -3122,11 +3758,17 @@ function ContentRegisterModal({ onClose, onSave, showToast = null }) {
       image: (image || '').trim(),
       price: (price || '').trim(),
       contact: (contact || '').trim(),
-      source: 'custom',
-      kind: kind === 'festival' ? 'festival' : 'performance',
-      createdAt: stamp,
+      source: initialItem?.source || 'custom',
+      kind: normalizedKind,
+      createdAt: initialItem?.createdAt || stamp,
       updatedAt: stamp
     };
+    if (normalizedKind === 'movie') Object.assign(item, {
+      genre: 'movie', releaseDate: cleanStart, endDate: cleanEnd || null,
+      director: (director || '').trim(), cast: (cast || '').split(',').map(s => s.trim()).filter(Boolean),
+      ageRating: (rating || '').trim(), audienceCount: (audience || '').trim(), bookingRate: (bookingRate || '').trim(),
+      isOpenEnded: !cleanEnd
+    });
     // Drop empty optional strings so Firestore never sees unnecessary keys (and to keep card
     // rendering identical to crawled items that omit missing fields).
     Object.keys(item).forEach(k => {
@@ -3137,9 +3779,9 @@ function ContentRegisterModal({ onClose, onSave, showToast = null }) {
     item.title = cleanTitle;
     item.startDate = cleanStart;
     item.endDate = cleanEnd;
-    item.source = 'custom';
-    item.kind = kind === 'festival' ? 'festival' : 'performance';
-    item.createdAt = stamp;
+    item.source = initialItem?.source || 'custom';
+    item.kind = normalizedKind;
+    item.createdAt = initialItem?.createdAt || stamp;
     item.updatedAt = stamp;
     if (!item.dateLabel) item.dateLabel = formatCultureDateLabel(cleanStart, cleanEnd);
 
@@ -3173,11 +3815,21 @@ function ContentRegisterModal({ onClose, onSave, showToast = null }) {
         }
       },
         /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' } },
-          /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)' } }, "컨텐츠 등록"),
-          /*#__PURE__*/React.createElement("button", {
-            type: "button", onClick: () => !saving && onClose && onClose(), "aria-label": "닫기",
-            style: { background: 'none', border: 'none', cursor: 'pointer', padding: '6px', color: 'var(--text-muted)', display: 'flex' }
-          }, SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }) : "✕")
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)' } }, initialItem ? "컨텐츠 수정" : "컨텐츠 등록"),
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '4px' } },
+            !initialItem && /*#__PURE__*/React.createElement("button", {
+              type: "button", onClick: handlePasteContentClick, disabled: saving,
+              style: {
+                height: '30px', padding: '0 10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)',
+                backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)', fontSize: 'var(--font-size-sm)', fontWeight: 700,
+                cursor: saving ? 'default' : 'pointer'
+              }
+            }, "붙여넣기"),
+            /*#__PURE__*/React.createElement("button", {
+              type: "button", onClick: () => !saving && onClose && onClose(), "aria-label": "닫기",
+              style: { background: 'none', border: 'none', cursor: 'pointer', padding: '6px', color: 'var(--text-muted)', display: 'flex' }
+            }, SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }) : "✕")
+          )
         ),
         UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
           ariaLabel: "컨텐츠 종류",
@@ -3186,24 +3838,26 @@ function ContentRegisterModal({ onClose, onSave, showToast = null }) {
           style: { backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)' },
           options: [
             { value: 'performance', label: '문화공연' },
-            { value: 'festival', label: '지역축제' }
+            { value: 'festival', label: '지역축제' },
+            { value: 'sports', label: '스포츠' },
+            { value: 'movie', label: '영화' }
           ]
         }),
         field("제목 *", /*#__PURE__*/React.createElement("input", {
           className: "form-input", type: "text", value: title, onChange: e => setTitle(e.target.value),
-          placeholder: kind === 'festival' ? "축제 이름" : "공연 제목", maxLength: 120
+          placeholder: kind === 'festival' ? "축제 이름" : (kind === 'sports' ? "경기/대회 이름" : (kind === 'movie' ? "영화 제목" : "공연 제목")), maxLength: 120
         })),
         /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: '10px', width: '100%' } },
           field("시작일 *", /*#__PURE__*/React.createElement("input", {
             className: "form-input", type: "date", value: startDate, onChange: e => setStartDate(e.target.value),
             style: { width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }
           }), { minWidth: 0, maxWidth: '100%', overflow: 'hidden' }),
-          field("종료일", /*#__PURE__*/React.createElement("input", {
+          field(kind === 'movie' ? "상영종료일 (선택)" : "종료일", /*#__PURE__*/React.createElement("input", {
             className: "form-input", type: "date", value: endDate, onChange: e => setEndDate(e.target.value),
             style: { width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }
           }), { minWidth: 0, maxWidth: '100%', overflow: 'hidden' })
         ),
-        field(kind === 'festival' ? "장소" : "공연장", /*#__PURE__*/React.createElement("input", {
+        kind !== 'movie' && field(kind === 'festival' ? "장소" : (kind === 'sports' ? "경기장" : "공연장"), /*#__PURE__*/React.createElement("input", {
           className: "form-input", type: "text", value: venue, onChange: e => setVenue(e.target.value),
           placeholder: "장소 / 공연장", maxLength: 120
         })),
@@ -3228,6 +3882,15 @@ function ContentRegisterModal({ onClose, onSave, showToast = null }) {
             className: "form-input", type: "text", value: contact, onChange: e => setContact(e.target.value),
             placeholder: "연락처 / 문의처", maxLength: 120
           }))
+        ),
+        kind === 'movie' && /*#__PURE__*/React.createElement(React.Fragment, null,
+          field("감독", /*#__PURE__*/React.createElement("input", { className: "form-input", value: director, onChange: e => setDirector(e.target.value), placeholder: "감독", maxLength: 120 })),
+          field("출연 (쉼표로 구분)", /*#__PURE__*/React.createElement("input", { className: "form-input", value: cast, onChange: e => setCast(e.target.value), placeholder: "배우1, 배우2", maxLength: 500 })),
+          /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' } },
+            field("관람등급", /*#__PURE__*/React.createElement("input", { className: "form-input", value: rating, onChange: e => setRating(e.target.value), placeholder: "전체" })),
+            field("예매율", /*#__PURE__*/React.createElement("input", { className: "form-input", value: bookingRate, onChange: e => setBookingRate(e.target.value), placeholder: "%" })),
+            field("관객수", /*#__PURE__*/React.createElement("input", { className: "form-input", value: audience, onChange: e => setAudience(e.target.value), placeholder: "명" }))
+          )
         ),
         field("설명", AutoGrowTextarea
           ? /*#__PURE__*/React.createElement(AutoGrowTextarea, {
@@ -3273,22 +3936,42 @@ function buildQuickMemoPlaceholder(item) {
   const lines = [];
   const period = item.dateLabel || [item.startDate, item.endDate].filter(Boolean).join(' ~ ');
   if (period) lines.push(`기간: ${period}`);
-  if (item.venue) lines.push(`장소: ${item.venue}`);
+  if (item.venue && item.kind !== 'movie' && item.genre !== 'movie') lines.push(`장소: ${item.venue}`);
   if (item.address) lines.push(`주소: ${item.address}`);
   return lines.join('\n') || '비워두면 행사 정보가 그대로 저장됩니다';
 }
 
-export function CulturePerformancesTab({ calendar, anniversaries = [], onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo = null, dataUrl = CULTURE_PERFORMANCES_URL, emptyLabel = "상영중이거나 예정된 문화공연이 없습니다.", regionSelections = [], onItemsLoaded, anniversaryCategory = 'event', extraItems = [], chipRowSlot = null, contentPaddingTop = 0, onScroll, gridCols = '2', focusItemId = null }) {
+export function CulturePerformancesTab({ calendar, anniversaries = [], onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo = null, onEditContent = null, dataUrl = CULTURE_PERFORMANCES_URL, emptyLabel = "상영중이거나 예정된 문화공연이 없습니다.", regionSelections = [], onItemsLoaded, anniversaryCategory = 'event', extraItems = [], chipRowSlot = null, contentPaddingTop = 0, onScroll, gridCols = '2', focusItemId = null, focusTitle = '', searchQuery = '' }) {
   const React = window.React;
   const ReactDOM = window.ReactDOM;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
+  const ShareIcon = __comp.ShareIcon || __deps.ShareIcon;
   const [items, setItems] = React.useState(null); // null = loading, [] = loaded-empty
   const [loadError, setLoadError] = React.useState(false);
   const [selected, setSelected] = React.useState(null);
   const [pendingId, setPendingId] = React.useState(null);
+  // 상세 시트의 "공유" 버튼 -- 이 카드의 전체 필드를 URL 프래그먼트에 실어(사진 공유와 동일한
+  // 원칙) 복사한다. 이 URL을 열면 그 카드 백드롭이 바로 뜨고(App의 SharedContentPreviewModal),
+  // 컨텐츠 등록 폼에 붙여넣으면 포스터~설명까지 그대로 복제 등록된다.
+  const [contentShareUrl, setContentShareUrl] = React.useState('');
+  const handleShareContent = async (item) => {
+    const fragment = encodeGatherContentFragment(item);
+    if (!fragment) return;
+    const shareUrl = `${window.location.origin}${window.location.pathname}${fragment}`;
+    const ok = await copyTextToClipboard(shareUrl);
+    setContentShareUrl(shareUrl);
+    // showToast isn't a prop here; a silent copy + the URL shown in the modal below is enough
+    // feedback either way (a visible "복사됨" toast would need threading a new prop through).
+    void ok;
+  };
   const [isMemoOpen, setIsMemoOpen] = React.useState(false);
+  const openMovieVideoSearch = item => {
+    if (!item) return;
+    const query = encodeURIComponent(`${item.title || ''} 영화 예고편 리뷰`.trim());
+    window.open(`https://www.youtube.com/results?search_query=${query}`, '_blank', 'noopener,noreferrer');
+  };
   const [memoDraft, setMemoDraft] = React.useState('');
   const [isSavingMemo, setIsSavingMemo] = React.useState(false);
   // Reset the memo composer whenever a different card is opened (or the sheet is closed),
@@ -3348,18 +4031,31 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
   // a.id === itemId for cards built directly from a self-authored anniversary (기념일 등록으로
   // 만든 festival/event -- see HistoryView's selfAuthoredCultureItems), which never gets its own
   // cultureSourceId since it wasn't registered through this tab in the first place.
-  const findRegisteredAnniversary = itemId =>
-    (anniversaries || []).find(a => a?.cultureSourceId === itemId || a?.id === itemId) || null;
+  //
+  // itemTitle is a last-resort fallback for the same id-mismatch case orphanedSourceItems above
+  // guards against (crawled id-generation scheme drift, or a Korean Unicode normalization
+  // mismatch): a live crawled card whose id no longer equals what was captured at registration
+  // time would otherwise show as "not registered" even though it plainly still is -- checking by
+  // exact title (scoped to this tab's own category, so an unrelated same-titled sports/movie
+  // entry can't false-match) keeps the checkbox/체크마크 correct without needing a data migration.
+  const findRegisteredAnniversary = (itemId, itemTitle) => {
+    const list = anniversaries || [];
+    const byId = list.find(a => a?.cultureSourceId === itemId || a?.id === itemId);
+    if (byId) return byId;
+    const title = String(itemTitle || '').trim();
+    if (!title) return null;
+    return list.find(a => a && a.category === anniversaryCategory && String(a.title || '').trim() === title) || null;
+  };
 
   const handleToggleRegister = async (item) => {
     if (!item || pendingId) return;
     setPendingId(item.id);
     try {
-      const existing = findRegisteredAnniversary(item.id);
+      const existing = findRegisteredAnniversary(item.id, item.title);
       if (existing) {
         if (typeof onUnregisterCultureEvent === 'function') await onUnregisterCultureEvent(existing.id);
       } else {
-        const category = (anniversaryCategory === 'festival' || anniversaryCategory === 'sports') ? anniversaryCategory : 'event';
+        const category = ['festival', 'sports', 'movie'].includes(anniversaryCategory) ? anniversaryCategory : 'event';
         if (typeof onRegisterCultureEvent === 'function') await onRegisterCultureEvent({ ...item, anniversaryCategory: category }, { category });
       }
     } finally {
@@ -3367,19 +4063,93 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
     }
   };
 
+  // A cultureSourceId-linked anniversary's card normally comes entirely from the live crawled
+  // snapshot (`items`) -- the anniversary itself only stores the source id, not a copy of the
+  // card's own fields. The daily sync (scripts/sync-culture-performances.mjs) drops items whose
+  // listing has expired or was removed upstream, which silently erases that card from every tab
+  // even though the calendar's own registration/confirmation of it is still completely intact --
+  // from the user's side it looks exactly like "I registered this and it just vanished." Once the
+  // snapshot has loaded, synthesize a fallback card (same shape HistoryView's selfAuthoredCultureItems
+  // builds for anniversaries with no cultureSourceId at all) for any registered anniversary whose
+  // source id is no longer present, so a user's own confirmed content never just disappears because
+  // an external feed happened to drop it that day.
+  const orphanedSourceItems = React.useMemo(() => {
+    if (items === null) return [];
+    const presentIds = new Set(items.map(i => i && i.id).filter(Boolean));
+    // Also check by title: an id mismatch (e.g. the crawled snapshot's id-generation scheme
+    // changed, or a Unicode normalization difference in the Korean title between the day this
+    // was registered and today's snapshot) must not be treated the same as "genuinely dropped
+    // from the feed" when a live item with the identical title still exists -- that live item
+    // already renders normally via `crawled` below, and synthesizing a SECOND, poorer-fidelity
+    // card for the same real-world listing here is exactly the "이중으로 관리되는" duplicate
+    // bug (하나는 풍부한 크롤링 카드, 하나는 기념일 자신의 제한된 필드로만 채워진 카드).
+    const presentTitles = new Set(items.map(i => i && String(i.title || '').trim()).filter(Boolean));
+    const kindByCategory = { festival: 'festival', event: 'performance', sports: 'sports', movie: 'movie' };
+    return (anniversaries || [])
+      .filter(a => a && a.cultureSourceId && a.category === anniversaryCategory
+        && !presentIds.has(a.cultureSourceId)
+        && !presentTitles.has(String(a.title || '').trim()))
+      .map(a => {
+        // Full parity with the original crawled card, not just the handful of fields the
+        // anniversary itself structurally tracks (place/description/movieMeta) -- see
+        // cultureSnapshot's own comment in handleRegisterCultureEvent (app-main.js). Anniversaries
+        // registered before this field existed have no cultureSnapshot at all; snapshot stays an
+        // empty object for those and every field below falls back to the anniversary's own
+        // limited set exactly as it always has, so nothing regresses for pre-existing data.
+        const snapshot = (a.cultureSnapshot && typeof a.cultureSnapshot === 'object') ? a.cultureSnapshot : {};
+        return {
+          ...snapshot,
+          id: a.cultureSourceId,
+          kind: kindByCategory[a.category] || 'performance',
+          title: a.title || snapshot.title || '',
+          startDate: a.startDate || a.date || snapshot.startDate,
+          endDate: a.endDate || a.date || snapshot.endDate,
+          dateLabel: (a.startDate && a.endDate && a.startDate !== a.endDate)
+            ? `${a.startDate} ~ ${a.endDate}`
+            : (a.startDate || a.date || snapshot.dateLabel || ''),
+          venue: a.place ? (a.place.alias || a.place.name || '') : (snapshot.venue || ''),
+          address: a.place ? (a.place.address || '') : (snapshot.address || ''),
+          description: a.description || snapshot.description || '',
+          releaseDate: a.movieMeta?.releaseDate || snapshot.releaseDate || a.date,
+          director: a.movieMeta?.director || snapshot.director || '',
+          cast: Array.isArray(a.movieMeta?.cast) ? a.movieMeta.cast : (Array.isArray(snapshot.cast) ? snapshot.cast : []),
+          ageRating: a.movieMeta?.ageRating || snapshot.ageRating || '',
+          bookingRate: a.movieMeta?.bookingRate || snapshot.bookingRate || '',
+          audienceCount: a.movieMeta?.audienceCount || snapshot.audienceCount || '',
+          isOpenEnded: a.movieMeta ? a.movieMeta.isOpenEnded !== false : (snapshot.isOpenEnded !== false),
+          image: a.image || (Array.isArray(a.photos) && a.photos[0] ? (a.photos[0].thumbUrl || a.photos[0].url || '') : (snapshot.image || ''))
+        };
+      });
+  }, [items, anniversaries, anniversaryCategory]);
+
   // Merge calendar-owned custom items (컨텐츠 등록) ahead of the crawled snapshot. Custom ids
   // use custom_perf_/custom_fest_ prefixes so they never collide with crawled perf_/fest_ ids,
   // but still de-dupe by id in case a write echoes twice.
   const mergedItems = React.useMemo(() => {
     if (items === null) return null;
+    // A self-authored anniversary (기념일 등록으로 직접 typed, no cultureSourceId at all) or a
+    // manually 개별등록-ed card can coincidentally share its title with something that's also
+    // sitting right there in today's live crawled feed -- the user typed/found it independently,
+    // unaware it was already a registerable listing. Without this check both would render as two
+    // separate cards for the same real-world event: the rich crawled one, and the other holding
+    // only whatever the user themselves typed -- exactly the "이중으로 관리되는" duplicate this
+    // caused. Prefer the live crawled version (richer, and always the freshest available data)
+    // over a same-titled self-authored/custom entry.
+    const crawledTitles = new Set((items || []).map(i => i && String(i.title || '').trim()).filter(Boolean));
     // isCustomRegistered marks every self-authored/컨텐츠-등록 item (as opposed to crawled from
     // the portal snapshot) so the "개별등록" category chip below can filter on it directly,
     // instead of guessing from genre/id-prefix which crawled items can also lack.
-    const extras = (Array.isArray(extraItems) ? extraItems.filter(Boolean) : []).map(e => ({ ...e, isCustomRegistered: true }));
+    const extras = (Array.isArray(extraItems) ? extraItems.filter(Boolean) : [])
+      .filter(e => !crawledTitles.has(String(e.title || '').trim()))
+      .map(e => ({ ...e, isCustomRegistered: true }));
     const seen = new Set(extras.map(e => e && e.id).filter(Boolean));
+    const orphaned = orphanedSourceItems
+      .filter(o => o && o.id && !seen.has(o.id))
+      .map(o => ({ ...o, isCustomRegistered: true }));
+    orphaned.forEach(o => seen.add(o.id));
     const crawled = (items || []).filter(i => i && i.id && !seen.has(i.id));
-    return [...extras, ...crawled];
-  }, [items, extraItems]);
+    return [...extras, ...orphaned, ...crawled];
+  }, [items, extraItems, orphanedSourceItems]);
 
   // Reported unfiltered (crawled snapshot + any custom items merged in above) -- RegionFilterBackdrop's
   // per-region counts should always reflect every item available in this tab, not just whatever the
@@ -3390,13 +4160,18 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
 
   // 일정 팝업에서 "기념일 제목"을 눌러 넘어온 경우, 그 항목을 찾아 상세 시트를 자동으로 연다.
   // 한 번만 시도하면 되므로 mergedItems가 (아직 못 찾았더라도) 로드된 뒤로는 다시 확인하지 않는다.
+  // id로 못 찾으면 제목으로 한 번 더 찾는다 -- 크롤링 스냅샷의 id 생성 규칙이 과거에 바뀐 적이
+  // 있어(예: 날짜 기반 -> 제목 기반), 그 변경 이전에 등록된 기념일은 cultureSourceId가 오늘자
+  // 스냅샷/orphan 폴백 어느 쪽과도 더 이상 일치하지 않게 될 수 있다 -- 이때도 같은 제목의
+  // 항목이 오늘자 스냅샷에 그대로 있다면 그거라도 열어 주는 게, 아무것도 안 열리는 것보다 낫다.
   const focusAttemptedRef = React.useRef(false);
   React.useEffect(() => {
     if (!focusItemId || focusAttemptedRef.current || mergedItems === null) return;
     focusAttemptedRef.current = true;
-    const match = mergedItems.find(i => i && i.id === focusItemId);
+    const match = mergedItems.find(i => i && i.id === focusItemId)
+      || (focusTitle ? mergedItems.find(i => i && String(i.title || '').trim() === focusTitle.trim()) : null);
     if (match) setSelected(match);
-  }, [focusItemId, mergedItems]);
+  }, [focusItemId, focusTitle, mergedItems]);
 
   if (mergedItems === null) {
     return /*#__PURE__*/React.createElement("div", {
@@ -3412,7 +4187,8 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
 
   // Multi-select OR: with no selections at all, every item passes (전국); with one or more,
   // an item matches if it satisfies ANY saved { sido, gugun } pair (gugun '' means that 시/도 전체).
-  const regionFilteredItems = mergedItems.filter(item => {
+  const lifecycleItems = filterAndSortCultureItems(mergedItems, anniversaryCategory);
+  const regionFilteredItems = lifecycleItems.filter(item => {
     if (!regionSelections || regionSelections.length === 0) return true;
     return regionSelections.some(sel => {
       if (sel.sido && item.region !== sel.sido) return false;
@@ -3427,32 +4203,48 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
     }, "선택한 지역에 해당하는 항목이 없습니다.");
   }
 
-  // Counts (and which genres even exist) are computed off the region-filtered set, not the raw
-  // snapshot -- so switching region can change which category chips show up / their counts,
-  // consistent with how RegionFilterBackdrop's own counts work off whichever tab is mounted.
+  const searchNeedle = (searchQuery || '').trim().toLowerCase();
+  const searchFilteredItems = searchNeedle
+    ? regionFilteredItems.filter(item => String(item?.title || '').toLowerCase().includes(searchNeedle))
+    : regionFilteredItems;
+
+  if (searchFilteredItems.length === 0) {
+    return /*#__PURE__*/React.createElement("div", {
+      style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)', paddingTop: contentPaddingTop }
+    }, "검색 결과가 없습니다.");
+  }
+
+  // Counts (and which genres even exist) are computed off the region+search-filtered set, not the
+  // raw snapshot -- so switching region/search can change which category chips show up / their
+  // counts, consistent with how RegionFilterBackdrop's own counts work off whichever tab is mounted.
   const categoryCounts = new Map();
-  regionFilteredItems.forEach(item => {
-    const key = item.genre || '';
+  searchFilteredItems.forEach(item => {
+    const key = anniversaryCategory === 'movie' ? (item.subGenre || '기타') : (item.genre || '');
     categoryCounts.set(key, (categoryCounts.get(key) || 0) + 1);
   });
   const categoryOptions = [...categoryCounts.entries()]
+    .filter(([genre]) => !!genre)
     .sort((a, b) => b[1] - a[1])
     .map(([genre, count]) => ({ value: genre, label: cultureGenreLabel(genre), count }));
   const CUSTOM_CATEGORY_VALUE = '__custom__';
-  const customRegisteredCount = regionFilteredItems.filter(item => item && item.isCustomRegistered).length;
+  const customRegisteredCount = searchFilteredItems.filter(item => item && item.isCustomRegistered).length;
 
   const filteredItems = categoryFilter === CUSTOM_CATEGORY_VALUE
-    ? regionFilteredItems.filter(item => item && item.isCustomRegistered)
+    ? searchFilteredItems.filter(item => item && item.isCustomRegistered)
     : categoryFilter
-      ? regionFilteredItems.filter(item => (item.genre || '') === categoryFilter)
-      : regionFilteredItems;
+      ? searchFilteredItems.filter(item => (anniversaryCategory === 'movie' ? (item.subGenre || '기타') : (item.genre || '')) === categoryFilter)
+      : searchFilteredItems;
 
-  const categoryChipRow = (categoryOptions.length > 1 || customRegisteredCount > 0) && /*#__PURE__*/React.createElement("div", {
+  // "개별등록"은 전체/장르 칩과 마찬가지로 항상 고정 노출한다 -- 지금 등록된 개수가 0이어도
+  // (예: 등록해둔 항목이 피드 갱신으로 잠시 사라진 경우) 사용자가 바로 눌러서 확인할 수 있는
+  // 자리가 계속 있어야 하며, 개수만 보고 매번 나타났다 사라지는 건 "전체 / 개별등록 / 장르..."
+  // 로 항상 구성해 달라던 요청과 어긋난다.
+  const categoryChipRow = /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', gap: '6px', padding: '0 16px 12px', overflowX: 'auto', flexShrink: 0, alignItems: 'center' }
   },
     [
-      { value: '', label: '전체', count: regionFilteredItems.length },
-      ...(customRegisteredCount > 0 ? [{ value: CUSTOM_CATEGORY_VALUE, label: '개별등록', count: customRegisteredCount }] : []),
+      { value: '', label: '전체', count: searchFilteredItems.length },
+      { value: CUSTOM_CATEGORY_VALUE, label: '개별등록', count: customRegisteredCount },
       ...categoryOptions
     ].map(opt => {
       const isActive = categoryFilter === opt.value;
@@ -3502,15 +4294,55 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
     }
   };
 
+  // 상세보기 설명(selected.description)은 외부 지역축제/문화행사 피드의 원본 텍스트를 그대로
+  // 보여주는 자유 텍스트라, 공식 홈페이지처럼 별도 구조화된 필드 없이 URL이 그냥 문장 중간에
+  // 섞여 들어오는 경우가 있다(예: 운영시간 뒤에 홈페이지 주소가 이어지는 식) -- 그런 URL도
+  // 클릭해서 새 창으로 열 수 있도록 설명 텍스트 안의 http(s) 링크만 찾아 <a>로 바꿔준다.
+  const renderDescriptionWithLinks = text => {
+    const raw = String(text || '');
+    return raw.split(/(https?:\/\/[^\s]+)/g).map((part, i) => {
+      if (!/^https?:\/\//.test(part)) return part;
+      const trailingMatch = part.match(/[).,!?"'”’]+$/);
+      const trailing = trailingMatch ? trailingMatch[0] : '';
+      const url = trailing ? part.slice(0, part.length - trailing.length) : part;
+      return /*#__PURE__*/React.createElement(React.Fragment, { key: i },
+        /*#__PURE__*/React.createElement("a", {
+          href: url, target: "_blank", rel: "noopener noreferrer",
+          onClick: e => e.stopPropagation(),
+          style: { color: 'var(--accent-primary)', textDecoration: 'underline', wordBreak: 'break-all' }
+        }, url),
+        trailing
+      );
+    });
+  };
+  const renderPersonLinks = value => {
+    const people = Array.isArray(value) ? value : String(value || '').split(',').map(s => s.trim()).filter(Boolean);
+    return people.flatMap((person, index) => [
+      index > 0 ? /*#__PURE__*/React.createElement(React.Fragment, { key: `sep-${index}` }, ', ') : null,
+      /*#__PURE__*/React.createElement("a", {
+        key: `${person}-${index}`,
+        href: `https://search.naver.com/search.naver?query=${encodeURIComponent(person)}`,
+        target: "_blank", rel: "noopener noreferrer",
+        onClick: e => e.stopPropagation(),
+        style: { color: 'var(--accent-primary)', textDecoration: 'underline' }
+      }, person)
+    ]);
+  };
+
   return /*#__PURE__*/React.createElement(React.Fragment, null,
     renderedCategoryChipRow,
     /*#__PURE__*/React.createElement("div", {
       className: "culture-items-grid is-cols-" + (gridCols === '1' ? '1' : '2'),
       onScroll: handleGridScroll,
-      style: { flex: 1, overflowY: 'auto', padding: '16px', paddingTop: contentPaddingTop, alignContent: 'start' }
+      style: { flex: 1, overflowY: 'auto', padding: '16px', paddingTop: contentPaddingTop, alignContent: 'start', gridAutoRows: 'max-content' }
     },
       visibleItems.map(item => {
-        const registered = !!findRegisteredAnniversary(item.id);
+        const registered = !!findRegisteredAnniversary(item.id, item.title);
+        const isMovieCard = anniversaryCategory === 'movie' || item.genre === 'movie' || item.kind === 'movie';
+        const isMovieNowShowing = isMovieCard
+          && cultureItemDay(item)
+          && cultureItemDay(item) <= todayIsoLocal()
+          && (!item.endDate || item.endDate >= todayIsoLocal());
         return /*#__PURE__*/React.createElement("button", {
           key: item.id,
           type: "button",
@@ -3519,26 +4351,11 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
             display: 'flex', flexDirection: 'column', gap: '6px', padding: 0,
             border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)',
             backgroundColor: 'var(--bg-card)', cursor: 'pointer', textAlign: 'left',
-            // No overflow:hidden here -- this is a CSS Grid item, and per the sizing spec a grid
-            // (or flex) item's *automatic* minimum size resolves to 0 whenever the item itself has
-            // a non-visible overflow, which made every card collapse to ~6px (grid-auto-rows:auto
-            // sizes rows off that same automatic-minimum-size mechanism). Same root cause as the
-            // 히스토리 date-row flex-shrink bug fixed earlier -- see .date-item-btn in app.css --
-            // just tripped via Grid's row auto-sizing instead of Flexbox shrinking. Rounding the
-            // poster's own top corners below achieves the same clipped look without it.
-            //
-            // minWidth:0 is the width-axis counterpart of that same bug: this button is also a
-            // `repeat(2/4/6, 1fr)` grid item, and a 1fr track's automatic minimum uses the
-            // item's min-content contribution -- which the venue line below inflates to its full
-            // unwrapped text width (white-space:nowrap's min-content IS its full width) unless
-            // this is capped. Left uncapped, one long unbroken address (real festival data
-            // regularly has these) forces every column wider than the grid's own box, so the
-            // whole grid silently overflows past the viewport with no scrollbar (clipped by the
-            // page's own overflow-x safety net) instead of the ellipsis actually kicking in.
-            minWidth: 0
+            minWidth: 0,
+            overflow: 'hidden'
           }
         },
-          /*#__PURE__*/React.createElement("div", { style: { position: 'relative', width: '100%', paddingTop: '133%', backgroundColor: 'var(--bg-primary)', flexShrink: 0, borderRadius: 'var(--radius-md) var(--radius-md) 0 0', overflow: 'hidden' } },
+          /*#__PURE__*/React.createElement("div", { style: { position: 'relative', width: '100%', aspectRatio: '3 / 4', backgroundColor: 'var(--bg-primary)', flexShrink: 0, overflow: 'hidden' } },
             // "포스터 없음" is always the base layer (not just the no-image branch's fallback) so
             // a broken image URL -- the daily snapshot's festival items all carry an
             // /images/fallbacks/*.jpg path that was never actually committed as a real asset,
@@ -3550,6 +4367,15 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
               style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' },
               onError: e => { e.currentTarget.style.display = 'none'; }
             }),
+            isMovieNowShowing && /*#__PURE__*/React.createElement("span", {
+              style: {
+                position: 'absolute', top: '8px', left: '8px', zIndex: 2,
+                display: 'inline-flex', alignItems: 'center', padding: '4px 9px',
+                borderRadius: 'var(--radius-full)', backgroundColor: '#16A34A', color: '#FFFFFF',
+                fontSize: 'var(--font-size-2xs)', fontWeight: 800, lineHeight: 1,
+                boxShadow: '0 1px 4px rgba(0,0,0,0.28)'
+              }
+            }, "상영중"),
             // 스포츠 경기 카드: 포스터(팀 관계없는 종목 기본 이미지) 위에 날짜/양팀 로고/경기장을
             // 오버레이로 얹는다. 로고를 크게 꽉 채우고, 날짜/경기장은 로고 쪽으로 촘촘하게 붙인다
             // (컬처플로우 스포츠 카드 레이아웃 참고).
@@ -3563,11 +4389,11 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
             },
               /*#__PURE__*/React.createElement("div", {
                 style: {
-                  fontSize: '1.3rem', fontWeight: 800, textShadow: '0 1px 3px rgba(0,0,0,0.7)',
+                  fontSize: '0.9rem', fontWeight: 800, textShadow: '0 1px 3px rgba(0,0,0,0.7)',
                   backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 'var(--radius-full)', padding: '2px 14px',
                   maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
                 }
-              }, item.dateLabel || formatCultureDateLabel(item.startDate, item.endDate) || CULTURE_MISSING_LABEL),
+              }, item.dateLabel || formatCultureDateLabel(item.startDate, item.endDate) || (item.releaseDate ? `${item.releaseDate} 개봉` : CULTURE_MISSING_LABEL)),
               /*#__PURE__*/React.createElement("div", {
                 style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', width: '100%' }
               },
@@ -3582,7 +4408,10 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
                   }, item.homeTeam)
                 ),
                 /*#__PURE__*/React.createElement("span", {
-                  style: { fontSize: '1.3rem', fontWeight: 800, textShadow: '0 1px 2px rgba(0,0,0,0.6)', flexShrink: 0 }
+                  style: {
+                    fontSize: '1.3rem', fontWeight: 800, textShadow: '0 1px 2px rgba(0,0,0,0.6)', flexShrink: 0,
+                    backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 'var(--radius-full)', padding: '2px 10px'
+                  }
                 }, "vs"),
                 /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', flex: '1 1 0', minWidth: 0 } },
                   item.awayTeamLogo && /*#__PURE__*/React.createElement("img", {
@@ -3597,7 +4426,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
               ),
               /*#__PURE__*/React.createElement("div", {
                 style: {
-                  fontSize: '1.2rem', fontWeight: 700, textShadow: '0 1px 3px rgba(0,0,0,0.7)',
+                  fontSize: '0.9rem', fontWeight: 700, textShadow: '0 1px 3px rgba(0,0,0,0.7)',
                   backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 'var(--radius-full)', padding: '2px 14px',
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%'
                 }
@@ -3607,23 +4436,33 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
               style: { position: 'absolute', top: '6px', right: '6px', backgroundColor: '#0E0E0E', color: '#fff', borderRadius: 'var(--radius-full)', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 800, boxShadow: '0 1px 3px rgba(0,0,0,0.25)' }
             }, "✓")
           ),
-          /*#__PURE__*/React.createElement("div", { style: { padding: '8px 10px 10px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px' } },
+          /*#__PURE__*/React.createElement("div", { style: { padding: '8px 10px 10px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px', flex: 1 } },
             /*#__PURE__*/React.createElement("div", {
               style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
-            }, item.dateLabel || formatCultureDateLabel(item.startDate, item.endDate) || CULTURE_MISSING_LABEL),
+            }, isMovieCard
+              ? `개봉일 ${item.releaseDate || item.startDate || CULTURE_MISSING_LABEL}`
+              : (item.dateLabel || formatCultureDateLabel(item.startDate, item.endDate) || CULTURE_MISSING_LABEL)),
             /*#__PURE__*/React.createElement("div", {
               style: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--text-main)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', wordBreak: 'break-word' }
             }, item.title),
+            isMovieCard ? /*#__PURE__*/React.createElement(React.Fragment, null,
+              /*#__PURE__*/React.createElement("div", {
+                style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+              }, item.ageRating || '등급 정보 없음'),
+              /*#__PURE__*/React.createElement("div", {
+                style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+              }, `[${item.director || '감독 정보 없음'}] ${Array.isArray(item.cast) && item.cast.length ? item.cast.join(', ') : '출연 정보 없음'}`)
+            ) : /*#__PURE__*/React.createElement(React.Fragment, null,
             // 지역축제는 '장소'와 '주소'가 사실상 같은 정보를 가리키는 경우가 대부분이라
             // (예: 장소="영등포아트홀", 주소="서울 영등포구 ...") 축제 카드에서는 장소 줄을
             // 생략하고 주소만 보여준다. 문화공연(anniversaryCategory 'event')은 공연장 이름이
             // 주소만으로는 알 수 없는 별도 정보라 계속 둘 다 보여준다.
-            anniversaryCategory !== 'festival' && /*#__PURE__*/React.createElement("div", {
+            anniversaryCategory !== 'festival' && anniversaryCategory !== 'movie' && /*#__PURE__*/React.createElement("div", {
               style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
             }, item.venue || CULTURE_MISSING_LABEL),
             /*#__PURE__*/React.createElement("div", {
               style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
-            }, item.address || CULTURE_MISSING_LABEL)
+            }, item.address || CULTURE_MISSING_LABEL))
           )
         );
       }),
@@ -3659,11 +4498,38 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
               backgroundColor: 'rgba(0,0,0,0.45)', color: '#fff'
             }
           }, SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 18 }) : "✕"),
-          selected.image && /*#__PURE__*/React.createElement("img", {
-            src: selected.image, alt: selected.title, loading: 'lazy',
-            style: { width: '100%', maxHeight: '260px', objectFit: 'contain', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)', flexShrink: 0 },
-            onError: e => { e.currentTarget.style.display = 'none'; }
-          }),
+          typeof onEditContent === 'function' && /*#__PURE__*/React.createElement("button", {
+            type: "button", onClick: () => { setSelected(null); onEditContent(selected); },
+            "aria-label": "컨텐츠 편집", title: "편집",
+            style: {
+              position: 'absolute', top: '12px', left: '12px', zIndex: 2,
+              width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              border: 'none', borderRadius: 'var(--radius-full)', cursor: 'pointer',
+              backgroundColor: 'rgba(0,0,0,0.45)', color: '#fff', fontSize: '18px', lineHeight: 1
+            }
+          }, "✎"),
+          selected.image && /*#__PURE__*/React.createElement("div", {
+            role: (anniversaryCategory === 'movie' || selected.genre === 'movie') ? 'button' : undefined,
+            tabIndex: (anniversaryCategory === 'movie' || selected.genre === 'movie') ? 0 : undefined,
+            onClick: (anniversaryCategory === 'movie' || selected.genre === 'movie') ? () => openMovieVideoSearch(selected) : undefined,
+            onKeyDown: (anniversaryCategory === 'movie' || selected.genre === 'movie') ? e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openMovieVideoSearch(selected); } } : undefined,
+            'aria-label': (anniversaryCategory === 'movie' || selected.genre === 'movie') ? '유튜브에서 예고편 및 리뷰 보기' : undefined,
+            style: { position: 'relative', width: '100%', flexShrink: 0, cursor: (anniversaryCategory === 'movie' || selected.genre === 'movie') ? 'pointer' : 'default' }
+          },
+            /*#__PURE__*/React.createElement("img", {
+              src: selected.image, alt: selected.title, loading: 'lazy',
+              style: { width: '100%', maxHeight: '260px', objectFit: 'contain', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)', display: 'block' },
+              onError: e => { e.currentTarget.style.display = 'none'; }
+            }),
+            (anniversaryCategory === 'movie' || selected.genre === 'movie') && /*#__PURE__*/React.createElement("span", {
+              'aria-hidden': 'true', style: {
+                position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)',
+                width: '56px', height: '56px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                backgroundColor: 'rgba(0,0,0,0.55)', color: '#fff', fontSize: '25px', paddingLeft: '4px', boxSizing: 'border-box',
+                boxShadow: '0 2px 10px rgba(0,0,0,0.3)', pointerEvents: 'none'
+              }
+            }, "▶")
+          ),
           /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)', flexShrink: 0, paddingRight: '36px' } }, selected.title),
           // 기간~설명까지 한 블록으로 스크롤 -- 예전엔 설명 칸만 따로 120px 높이로 스크롤돼서
           // 모바일 세로폭에선 몇 줄 보이지도 않는 좁은 창으로 긴 설명을 읽어야 했다. 이미지/제목은
@@ -3673,9 +4539,17 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
             style: { flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }
           },
             [
-              ['기간', selected.dateLabel],
-              ['장소', selected.venue],
-              ['주소', selected.address],
+              ['개봉일', selected.releaseDate || ((anniversaryCategory === 'movie' || selected.genre === 'movie') ? selected.startDate : '')],
+              ['상영기간', (anniversaryCategory === 'movie' || selected.genre === 'movie') && !selected.endDate ? '종료일 미정 · 상영정보 유지' : selected.dateLabel],
+              ['감독', selected.director],
+              ['출연', Array.isArray(selected.cast) ? selected.cast.join(', ') : selected.cast],
+              ['관람등급', selected.ageRating],
+              ['예매율', selected.bookingRate],
+              ['관객수', selected.audienceCount],
+              ['러닝타임', selected.runningTime],
+              ['장르', selected.subGenre],
+              ['장소', anniversaryCategory === 'movie' || selected.genre === 'movie' ? '' : selected.venue],
+              ['주소', anniversaryCategory === 'movie' || selected.genre === 'movie' ? '' : selected.address],
               ['주최', selected.organizer],
               ['문의', selected.contact],
               ['가격', selected.price],
@@ -3685,11 +4559,12 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
               key: label, style: { display: 'flex', gap: '8px', fontSize: 'var(--font-size-sm)' }
             },
               /*#__PURE__*/React.createElement("span", { style: { flexShrink: 0, width: '84px', color: 'var(--text-muted)', fontWeight: 700 } }, label),
-              /*#__PURE__*/React.createElement("span", { style: { color: 'var(--text-main)', wordBreak: 'break-word' } }, value)
+              /*#__PURE__*/React.createElement("span", { style: { color: 'var(--text-main)', wordBreak: 'break-word' } },
+                (label === '감독' || label === '출연') ? renderPersonLinks(value) : value)
             )),
             selected.description && /*#__PURE__*/React.createElement("div", {
               style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-main)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }
-            }, selected.description)
+            }, renderDescriptionWithLinks(selected.description))
           ),
           /*#__PURE__*/React.createElement("div", {
             style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }
@@ -3699,7 +4574,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
             },
               /*#__PURE__*/React.createElement("input", {
                 type: "checkbox",
-                checked: !!findRegisteredAnniversary(selected.id),
+                checked: !!findRegisteredAnniversary(selected.id, selected.title),
                 disabled: !!pendingId,
                 onChange: () => handleToggleRegister(selected)
               }),
@@ -3748,22 +4623,140 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
               }
             }, "메모 저장")
           ),
-          selected.link && /*#__PURE__*/React.createElement("a", {
-            href: selected.link, target: "_blank", rel: "noreferrer",
-            style: {
-              display: 'block', flexShrink: 0, textAlign: 'center', padding: '10px', borderRadius: 'var(--radius-md)',
-              backgroundColor: '#0E0E0E', color: '#fff', fontWeight: 800, fontSize: 'var(--font-size-md)', textDecoration: 'none'
-            }
-          }, selected.source === 'custom' ? "링크 열기" : "자세히보기")
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', flexShrink: 0 } },
+            /*#__PURE__*/React.createElement("button", {
+              type: "button", onClick: () => handleShareContent(selected), "aria-label": "공유",
+              style: {
+                width: '44px', height: '44px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)',
+                backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)', cursor: 'pointer'
+              }
+            }, ShareIcon ? /*#__PURE__*/React.createElement(ShareIcon, { size: 20 }) : "🔗"),
+            selected.link && /*#__PURE__*/React.createElement("a", {
+              href: selected.link, target: "_blank", rel: "noreferrer",
+              style: {
+                display: 'block', flex: 1, textAlign: 'center', padding: '10px', borderRadius: 'var(--radius-md)',
+                backgroundColor: '#0E0E0E', color: '#fff', fontWeight: 800, fontSize: 'var(--font-size-md)', textDecoration: 'none'
+              }
+            }, selected.source === 'custom' ? "링크 열기" : "자세히보기")
+          )
         )
       ),
+      document.body
+    ),
+    contentShareUrl && ReactDOM.createPortal(
+      /*#__PURE__*/React.createElement("div", {
+        onClick: () => setContentShareUrl(''),
+        style: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 30000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }
+      }, /*#__PURE__*/React.createElement("div", {
+        onClick: e => e.stopPropagation(),
+        style: { width: '100%', maxWidth: '400px', backgroundColor: 'var(--bg-card)', borderRadius: 'var(--radius-md)', padding: '20px', boxSizing: 'border-box' }
+      },
+        /*#__PURE__*/React.createElement("h3", { style: { fontSize: '1.05rem', fontWeight: 800, marginBottom: '12px', color: 'var(--text-main)', textAlign: 'center' } }, "공유 URL"),
+        /*#__PURE__*/React.createElement("input", {
+          type: "text", className: "form-input", readOnly: true, value: contentShareUrl,
+          style: { width: '100%', marginBottom: '12px', boxSizing: 'border-box' }
+        }),
+        /*#__PURE__*/React.createElement("div", {
+          style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', textAlign: 'center', marginBottom: '16px' }
+        }, "URL이 클립보드에 복사되었습니다. 이 URL을 열면 이 컨텐츠가 바로 보이고, 다른 캘린더의 '컨텐츠 등록'에 붙여넣으면 포스터부터 내용까지 그대로 등록됩니다."),
+        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '10px' } },
+          /*#__PURE__*/React.createElement("button", {
+            type: "button", className: "btn btn-secondary", onClick: () => setContentShareUrl(''),
+            style: { flex: 1, height: '36px', fontSize: 'var(--font-size-base)' }
+          }, "닫기"),
+          /*#__PURE__*/React.createElement("button", {
+            type: "button", className: "btn btn-action-dark",
+            onClick: () => copyTextToClipboard(contentShareUrl),
+            style: { flex: 1, height: '36px', fontSize: 'var(--font-size-base)' }
+          }, "다시 복사")
+        )
+      )),
       document.body
     )
   );
 }
 
+// 다른 캘린더의 컨텐츠 상세 "공유" 버튼으로 받은 URL(#gatherContent=...)을 열었을 때, 로그인/
+// 캘린더 상태와 무관하게 바로 띄우는 읽기 전용 미리보기 -- app-main.js의 App()이 URL을 한 번
+// 파싱해 이 컴포넌트에 item을 넘겨준다. 실제 등록(Firestore 쓰기)은 여기서 하지 않고, 등록하고
+// 싶으면 컨텐츠 등록 화면의 "붙여넣기"를 쓰도록 안내만 한다.
+function SharedContentPreviewModal({ item, onClose }) {
+  const React = window.React;
+  const ReactDOM = window.ReactDOM;
+  const __deps = window.GATHER_UI_DEPS || {};
+  const __comp = window.GATHER_UI_COMPONENTS || {};
+  const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
+  if (!item || typeof document === 'undefined' || !ReactDOM) return null;
+  return ReactDOM.createPortal(
+    /*#__PURE__*/React.createElement("div", {
+      onClick: onClose,
+      style: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 40000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }
+    },
+      /*#__PURE__*/React.createElement("div", {
+        onClick: e => e.stopPropagation(),
+        style: {
+          position: 'relative', width: '100%', maxWidth: '480px', maxHeight: '85vh',
+          backgroundColor: 'var(--bg-card)', borderRadius: '16px 16px 0 0', padding: '20px',
+          display: 'flex', flexDirection: 'column', gap: '10px', boxSizing: 'border-box'
+        }
+      },
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", onClick: onClose, "aria-label": "닫기",
+          style: {
+            position: 'absolute', top: '12px', right: '12px', zIndex: 1,
+            width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            border: 'none', borderRadius: 'var(--radius-full)', cursor: 'pointer',
+            backgroundColor: 'rgba(0,0,0,0.45)', color: '#fff'
+          }
+        }, SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 18 }) : "✕"),
+        item.image && /*#__PURE__*/React.createElement("img", {
+          src: item.image, alt: item.title, loading: 'lazy',
+          style: { width: '100%', maxHeight: '260px', objectFit: 'contain', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)', flexShrink: 0 },
+          onError: e => { e.currentTarget.style.display = 'none'; }
+        }),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)', flexShrink: 0, paddingRight: '36px' } }, item.title),
+        /*#__PURE__*/React.createElement("div", {
+          style: { flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }
+        },
+          [
+            ['기간', item.dateLabel || (item.startDate && item.endDate && item.startDate !== item.endDate ? `${item.startDate} ~ ${item.endDate}` : item.startDate)],
+            ['장소', item.venue],
+            ['주소', item.address],
+            ['문의', item.contact],
+            ['가격', item.price],
+            ['감독', item.director],
+            ['출연', Array.isArray(item.cast) ? item.cast.join(', ') : item.cast]
+          ].filter(([, value]) => value && String(value).trim())
+            .map(([label, value]) => /*#__PURE__*/React.createElement("div", {
+              key: label, style: { display: 'flex', gap: '8px', fontSize: 'var(--font-size-sm)' }
+            },
+              /*#__PURE__*/React.createElement("span", { style: { flexShrink: 0, width: '84px', color: 'var(--text-muted)', fontWeight: 700 } }, label),
+              /*#__PURE__*/React.createElement("span", { style: { color: 'var(--text-main)', wordBreak: 'break-word' } }, value)
+            )),
+          item.description && /*#__PURE__*/React.createElement("div", {
+            style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-main)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }
+          }, item.description)
+        ),
+        /*#__PURE__*/React.createElement("div", {
+          style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', textAlign: 'center', flexShrink: 0 }
+        }, "다른 사람이 공유한 컨텐츠입니다. 내 캘린더에 등록하려면 컨텐츠 등록 화면의 '붙여넣기'를 사용하세요."),
+        item.link && /*#__PURE__*/React.createElement("a", {
+          href: item.link, target: "_blank", rel: "noreferrer",
+          style: {
+            display: 'block', flexShrink: 0, textAlign: 'center', padding: '10px', borderRadius: 'var(--radius-md)',
+            backgroundColor: '#7C3AED', color: '#fff', fontWeight: 800, fontSize: 'var(--font-size-md)', textDecoration: 'none'
+          }
+        }, "자세히보기")
+      )
+    ),
+    document.body
+  );
+}
+
   if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
+    SharedContentPreviewModal: SharedContentPreviewModal,
     SectionCountBadge: SectionCountBadge,
     SectionToggleButton: SectionToggleButton,
     SearchCategoryTabs: SearchCategoryTabs,

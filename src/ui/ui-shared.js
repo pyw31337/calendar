@@ -1203,10 +1203,13 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = fals
     host = new URL(url).hostname.replace(/^www\./i, '');
   } catch (_) {}
 
+  const [imgFailed, setImgFailed] = React.useState(false);
+
   // Cached OpenGraph data is user/content supplied and older records may contain a malformed
   // image value. Do not let it become an invalid <img src>, which produces noisy browser errors
   // and can break page smoke checks. Valid network/data URLs still use the normal thumbnail.
   const imageSrc = (() => {
+    if (imgFailed) return '';
     const candidate = typeof image === 'string' ? image.trim() : '';
     const validator = GATHER_APP_UTILS.isRenderableImageUrl;
     if (typeof validator === 'function' && validator(candidate)) return candidate;
@@ -1259,6 +1262,7 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = fals
       loading: 'lazy',
       decoding: 'async',
       referrerPolicy: 'no-referrer',
+      onError: () => setImgFailed(true),
       style: {
         width: '72px',
         height: '72px',

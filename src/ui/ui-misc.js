@@ -902,6 +902,9 @@ export function ImageShareViewer({ shareId }) {
 
 export function ImageThumbRemoveButton({ onClick, title = '삭제' }) {
   const React = window.React;
+  const __comp = window.GATHER_UI_COMPONENTS || {};
+  const __deps = window.GATHER_UI_DEPS || {};
+  const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
 
   return /*#__PURE__*/React.createElement("button", {
     type: "button",
@@ -915,10 +918,7 @@ export function ImageThumbRemoveButton({ onClick, title = '삭제' }) {
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       padding: 0, color: '#FFFFFF'
     }
-  }, /*#__PURE__*/React.createElement("svg", {
-    xmlns: "http://www.w3.org/2000/svg", width: "10", height: "10", viewBox: "0 0 24 24",
-    fill: "none", stroke: "#FFFFFF", strokeWidth: "3", strokeLinecap: "round", strokeLinejoin: "round"
-  }, /*#__PURE__*/React.createElement("line", { x1: "18", y1: "6", x2: "6", y2: "18" }), /*#__PURE__*/React.createElement("line", { x1: "6", y1: "6", x2: "18", y2: "18" })));
+  }, /*#__PURE__*/React.createElement(TrashIcon, { size: 10 }));
 }
 
 export function InlineSearchBar({

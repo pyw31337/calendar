@@ -830,6 +830,19 @@ export function MessageCommentIcon({ size = 24 } = {}) {
   );
 }
 
+export function PlusIcon({ size = 14 } = {}) {
+  const React = window.React;
+
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg", width: String(size), height: String(size), viewBox: "0 0 24 24",
+    fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round"
+  },
+    /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
+    /*#__PURE__*/React.createElement("path", { d: "M12 5l0 14" }),
+    /*#__PURE__*/React.createElement("path", { d: "M5 12l14 0" })
+  );
+}
+
 export function PencilIcon({ size = 12 } = {}) {
   const React = window.React;
 
@@ -2316,6 +2329,23 @@ export function HandballIcon({ size = 18 } = {}) {
   );
 }
 
+// 영화 기념일 뱃지용 아이콘 (lucide clapperboard) -- 다른 카테고리 뱃지들처럼 🎬 이모지 대신
+// SVG 라인 아이콘으로 통일한다. renderAnniversaryIcon(ui-calendar-core.js/ui-date-modal.js)의
+// iconMap이 ann.icon(=🎬, getAnniversaryCategoryBadge가 저장)을 이 아이콘으로 매핑한다.
+export function ClapperboardIcon({ size = 18 } = {}) {
+  const React = window.React;
+  return /*#__PURE__*/React.createElement('svg', {
+    xmlns: 'http://www.w3.org/2000/svg', width: String(size), height: String(size), viewBox: '0 0 24 24',
+    fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round',
+    'aria-hidden': 'true'
+  },
+    /*#__PURE__*/React.createElement('path', { d: 'm12.296 3.464 3.02 3.956' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3z' }),
+    /*#__PURE__*/React.createElement('path', { d: 'M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z' }),
+    /*#__PURE__*/React.createElement('path', { d: 'm6.18 5.276 3.1 3.899' })
+  );
+}
+
 // 썸네일 우측 상단에 얹는 댓글 개수 뱃지 -- 0개면 아예 렌더링하지 않는다(자리도 안 차지함).
 // 썸네일을 감싸는 컨테이너에 position:'relative'가 있어야 정상적으로 우측 상단에 붙는다.
 export function PhotoCommentCountBadge({ count = 0 } = {}) {
@@ -2354,11 +2384,13 @@ export function PhotoCommentCountBadge({ count = 0 } = {}) {
     VolleyballIcon: VolleyballIcon,
     SoccerBallIcon: SoccerBallIcon,
     HandballIcon: HandballIcon,
+    ClapperboardIcon: ClapperboardIcon,
     NotepadTextIcon: NotepadTextIcon,
     ChatSectionIcon: ChatSectionIcon,
     LinkIcon: LinkIcon,
     MessageCommentIcon: MessageCommentIcon,
     PencilIcon: PencilIcon,
+    PlusIcon: PlusIcon,
     ReplyIcon: ReplyIcon,
     BuildingIcon: BuildingIcon,
     BackArrowIcon: BackArrowIcon,

@@ -77,6 +77,37 @@ async function restoreCalendar(calData) {
   
   const result = await response.json();
   console.log(`Successfully restored ${docId}. Commit time: ${result.commitTime}`);
+
+  // New backups also carry durable subcollections. Restore them additively in batches so a
+  // recovery can be performed without exposing a delete-all operation to a normal import.
+  // Stale documents are intentionally retained until an operator explicitly reconciles them;
+  // this makes a mistaken backup path recoverable rather than destructive.
+  const collections = calData.collections && typeof calData.collections === 'object' ? calData.collections : {};
+  const writes = [];
+  for (const [collectionName, entries] of Object.entries(collections)) {
+    if (!Array.isArray(entries)) continue;
+    for (const entry of entries) {
+      if (!entry?.docId || !entry.data || typeof entry.data !== 'object') continue;
+      writes.push({
+        update: {
+          name: `${docPath}/${collectionName}/${entry.docId}`,
+          fields: Object.fromEntries(Object.entries(entry.data).map(([key, value]) => [key, jsToFirestoreValue(value)]))
+        }
+      });
+    }
+  }
+  for (let offset = 0; offset < writes.length; offset += 450) {
+    const chunk = writes.slice(offset, offset + 450);
+    const collectionResponse = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ writes: chunk })
+    });
+    if (!collectionResponse.ok) {
+      throw new Error(`Failed to restore ${docId} subcollections: ${collectionResponse.status} ${await collectionResponse.text()}`);
+    }
+  }
+  if (writes.length) console.log(`Restored ${writes.length} durable subcollection document(s) for ${docId}.`);
 }
 
 async function main() {

@@ -24,6 +24,27 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     });
     return Promise.race([promise, deadline]).finally(function () { if (timer) clearTimeout(timer); });
   }
+
+  // Firestore SDK queries must never fall back to an unbounded collection get.  The REST
+  // path already follows page tokens, but the SDK path is used on normal browsers and used to
+  // read an entire messages/memos collection in one response.  Keep this helper deliberately
+  // small so every archive-style SDK query gets the same cursor behaviour.
+  async function fetchSdkDocsPaged(buildQuery, pageSize) {
+    const size = Math.max(1, Math.min(500, Number(pageSize) || 300));
+    const all = [];
+    let lastDoc = null;
+    for (;;) {
+      let query = buildQuery();
+      if (lastDoc && typeof query.startAfter === 'function') query = query.startAfter(lastDoc);
+      query = query.limit(size);
+      const snap = await withSdkTimeout(query.get({ source: 'server' }), FIRESTORE_REST_TIMEOUT_MS);
+      if (!snap || snap.empty) break;
+      snap.forEach(doc => all.push(doc));
+      if (snap.size < size) break;
+      lastDoc = snap.docs[snap.docs.length - 1];
+    }
+    return all;
+  }
   function isValidCalId(calId) {
     return typeof calId === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(calId);
   }
@@ -62,18 +83,10 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
   }
 
   async function fetchChatMessagesRest(calId) {
-    try {
-      const url = 'https://firestore.googleapis.com/v1/projects/' + projectId() + '/databases/(default)/documents/calendars/cal_' + calId + '/messages?orderBy=timestamp%20desc&pageSize=' + liveLimit();
-      const res = await fetchWithTimeout(url, { cache: 'no-store' });
-      if (!res.ok) return [];
-      const data = await res.json();
-      return (data.documents || []).map(function (doc) {
-        return slimMessage({ id: doc.name.split('/').pop(), ...docToJs(doc) });
-      }).reverse();
-    } catch (err) {
-      console.warn('fetchChatMessagesRest error:', err);
-      return [];
-    }
+    // Keep the REST fallback on the exact same channel-scoped query as the SDK path. A raw
+    // messages collection read here would reintroduce gallery/meeting uploads on browsers where
+    // the realtime SDK is unavailable.
+    return fetchRecentChatMessages(calId, liveLimit());
   }
 
   // Deliberate full-history read for views whose correctness depends on every message
@@ -102,9 +115,57 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     }
   }
 
+  // Shared server-side search index hydration. Every collection is read in cursor pages;
+  // callers never issue an unbounded collection GET and can safely search the full archive
+  // without making the initial chat/memo/gallery screens download their entire history.
+  async function fetchCalendarSearchIndex(calId) {
+    if (!isValidCalId(calId)) return { chatMessages: [], memos: [], customCultureItems: [] };
+    async function fetchCollection(collection, mapper) {
+      const all = [];
+      let pageToken = '';
+      do {
+        let url = 'https://firestore.googleapis.com/v1/projects/' + projectId() + '/databases/(default)/documents/calendars/cal_' + calId + '/' + collection + '?pageSize=300';
+        if (pageToken) url += '&pageToken=' + encodeURIComponent(pageToken);
+        const res = await fetchWithTimeout(url, { cache: 'no-store' });
+        if (!res.ok) throw new Error('search index ' + collection + ' status ' + res.status);
+        const data = await res.json();
+        (data.documents || []).forEach(function (doc) {
+          all.push(mapper({ id: doc.name.split('/').pop(), ...docToJs(doc) }));
+        });
+        pageToken = data.nextPageToken || '';
+      } while (pageToken);
+      return all;
+    }
+    try {
+      const [chatMessages, memos, customCultureItems] = await Promise.all([
+        fetchCollection('messages', slimMessage),
+        fetchCollection('memos', function (memo) { return memo; }),
+        fetchCollection('customCultureItems', function (item) { return item; })
+      ]);
+      return { chatMessages, memos, customCultureItems };
+    } catch (err) {
+      console.warn('fetchCalendarSearchIndex error:', err);
+      throw err;
+    }
+  }
+
+  // IMPORTANT: this and every other read that feeds the shared chatMessages/olderChatMessages
+  // state (subscribeMessages, fetchOlderChatMessages) must stay UNSCOPED (no uploadSource
+  // where-clause). That shared state is the single source not just for the chat room, but for
+  // the 갤러리 페이지's full photo grid, HistoryView's 인물/추억 tag matching, and
+  // meetingPhotoMessageIds -- all of which need every message regardless of channel. The chat
+  // ROOM's own "hide gallery/meeting uploads" need is already handled correctly at the
+  // *rendering* layer via isChatRenderableMessage (app-main.js), which filters
+  // allChatMessages/chatMessages down to visibleChatMessages just for the bubble list. A prior
+  // change briefly pushed that filter down into these queries via
+  // where('uploadSource','==','chat') to cut read cost, but that silently dropped every
+  // gallery/meeting-uploaded photo from every OTHER consumer of this same state the moment a
+  // calendar had at least one 'chat'-tagged message (since a non-empty scoped result never fell
+  // through to any fallback) -- exactly the "meeting photos missing from the gallery grid"
+  // symptom. Do not reintroduce that where-clause here.
   async function fetchRecentChatMessages(calId, limit) {
     if (!isValidCalId(calId)) return [];
-    const pageSize = Math.max(1, Math.min(100, Number(limit) || 60));
+    const pageSize = Math.max(1, Math.min(400, Number(limit) || 60));
     const firebaseDb = getDb();
     // Firestore's orderBy() silently excludes any document that is missing the field being
     // ordered on -- not just sorts it oddly, drops it from the result set entirely, at any limit.
@@ -245,9 +306,9 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     const firebaseDb = getDb();
     if (firebaseDb) {
       try {
-        const snap = await withSdkTimeout(firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages').get({ source: 'server' }), FIRESTORE_REST_TIMEOUT_MS);
+        const docs = await fetchSdkDocsPaged(() => firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages'), 300);
         const list = [];
-        snap.forEach(function (doc) {
+        docs.forEach(function (doc) {
           const msg = slimMessage({ id: doc.id, ...doc.data() });
           if (hasTag(msg)) list.push(msg);
         });
@@ -294,9 +355,9 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     const firebaseDb = getDb();
     if (firebaseDb) {
       try {
-        const snap = await withSdkTimeout(firebaseDb.collection('calendars').doc('cal_' + calId).collection('memos').get({ source: 'server' }), FIRESTORE_REST_TIMEOUT_MS);
+        const docs = await fetchSdkDocsPaged(() => firebaseDb.collection('calendars').doc('cal_' + calId).collection('memos'), 300);
         const list = [];
-        snap.forEach(function (doc) {
+        docs.forEach(function (doc) {
           const memo = { id: doc.id, ...doc.data() };
           if (hasTag(memo)) list.push(memo);
         });
@@ -420,10 +481,10 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     const firebaseDb = getDb();
     if (firebaseDb) {
       try {
-        const snap = await withSdkTimeout(firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
-          .where('uploadSource', '==', uploadSource).get(), FIRESTORE_REST_TIMEOUT_MS);
+        const docs = await fetchSdkDocsPaged(() => firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
+          .where('uploadSource', '==', uploadSource), 300);
         const list = [];
-        snap.forEach(function (doc) { list.push(slimMessage({ id: doc.id, ...doc.data() })); });
+        docs.forEach(function (doc) { list.push(slimMessage({ id: doc.id, ...doc.data() })); });
         return list;
       } catch (err) {
         console.warn('fetchMessagesByUploadSource sdk', uploadSource, err);
@@ -619,10 +680,9 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     let docs = null;
     if (firebaseDb) {
       try {
-        const snap = await withSdkTimeout(firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
-          .where('uploadSource', '==', 'gallery').get(), FIRESTORE_REST_TIMEOUT_MS);
-        docs = [];
-        snap.forEach(function (doc) { docs.push({ id: doc.id, ...doc.data() }); });
+        const sdkDocs = await fetchSdkDocsPaged(() => firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
+          .where('uploadSource', '==', 'gallery'), 300);
+        docs = sdkDocs.map(function (doc) { return { id: doc.id, ...doc.data() }; });
       } catch (err) {
         console.warn('fetchGalleryPhotoOrdinal sdk', err);
       }
@@ -671,6 +731,9 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     return null;
   }
 
+  // Unscoped for the same reason as fetchRecentChatMessages above: this feeds the same shared
+  // olderChatMessages state that the 갤러리 페이지's full photo grid and HistoryView depend on
+  // containing every message regardless of uploadSource.
   async function fetchOlderChatMessages(calId, beforeTimestamp, pageSize) {
     if (!isValidCalId(calId) || !beforeTimestamp) return [];
     const size = pageSize != null ? pageSize : olderPageSize();
@@ -692,13 +755,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
       const body = {
         structuredQuery: {
           from: [{ collectionId: 'messages' }],
-          where: {
-            fieldFilter: {
-              field: { fieldPath: 'timestamp' },
-              op: 'LESS_THAN',
-              value: { integerValue: String(beforeTimestamp) }
-            }
-          },
+          where: { fieldFilter: { field: { fieldPath: 'timestamp' }, op: 'LESS_THAN', value: { integerValue: String(beforeTimestamp) } } },
           orderBy: [{ field: { fieldPath: 'timestamp' }, direction: 'DESCENDING' }],
           limit: size
         }
@@ -793,13 +850,93 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     }
   }
 
+  // Real-time chat listener. Deliberately UNSCOPED (no uploadSource where-clause) -- see the
+  // long comment above fetchRecentChatMessages for why: this drives the shared
+  // chatMessages/olderChatMessages state that the 갤러리 페이지's full photo grid,
+  // HistoryView's 인물/추억 tag matching, and meetingPhotoMessageIds all depend on containing
+  // every message regardless of channel. Scoping this query to uploadSource=='chat' (as a since-
+  // reverted change briefly did, to cut read cost) silently dropped every gallery/meeting-
+  // uploaded photo from all of those other consumers. The chat ROOM's own "hide non-chat
+  // uploads" need is handled correctly at the rendering layer instead, via
+  // isChatRenderableMessage (app-main.js).
+  //
+  // orderBy() still silently excludes any document missing the field being ordered on -- not
+  // just sorts it oddly, drops it from the result set entirely, at any limit. A message doc that
+  // somehow ended up without a `timestamp` field (a bad write, an old migration, manual Firestore
+  // console edits) would then be invisible to every orderBy('timestamp') query forever. Unlike a
+  // one-shot read, onSnapshot only fires once for a query that keeps matching zero documents --
+  // nothing ever re-checks it -- so a calendar hitting this would report "no chat" forever no
+  // matter how much real history exists. When the ordered query's first snapshot comes back
+  // empty, fall back to an unordered live listener (which has no such exclusion), sorting/
+  // limiting the results client-side before handing them to the caller in the same snapshot-like
+  // shape (a `forEach`) callers already rely on.
   function subscribeMessages(calId, options, onSnapshot, onError) {
+    const firebaseDb = getDb();
+    if (!firebaseDb || !isValidCalId(calId)) return noop;
     options = options || {};
-    return subscribeCalSubcollection(
-      calId, 'messages',
-      { orderBy: options.orderBy || 'timestamp', direction: options.direction || 'desc', limit: options.limit },
-      onSnapshot, onError
-    );
+    const orderField = options.orderBy || 'timestamp';
+    const direction = options.direction || 'desc';
+    const limitN = Number(options.limit) > 0 ? Number(options.limit) : null;
+
+    let stopped = false;
+    let innerUnsub = noop;
+    const messagesRef = firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages');
+
+    function sortedSnapshotFrom(docs) {
+      const sorted = docs.slice().sort(function (a, b) {
+        const ta = Number(a.data()[orderField]) || 0;
+        const tb = Number(b.data()[orderField]) || 0;
+        return direction === 'desc' ? tb - ta : ta - tb;
+      });
+      const limited = limitN ? sorted.slice(0, limitN) : sorted;
+      return { forEach: function (fn) { limited.forEach(fn); } };
+    }
+
+    function attachUnordered() {
+      if (stopped) return;
+      try {
+        let q = messagesRef.limit(limitN ? Math.max(limitN * 4, 200) : 200);
+        innerUnsub = q.onSnapshot(function (snap) {
+          if (stopped) return;
+          onSnapshot(sortedSnapshotFrom(snap.docs));
+        }, onError || noop);
+      } catch (err) {
+        console.warn('subscribeMessages unordered fallback', err);
+        if (typeof onError === 'function') onError(err);
+      }
+    }
+
+    function attachOrdered() {
+      let usedFallback = false;
+      try {
+        let q = messagesRef.orderBy(orderField, direction);
+        if (limitN) q = q.limit(limitN);
+        innerUnsub = q.onSnapshot(function (snap) {
+          if (stopped) return;
+          if (snap.empty && !usedFallback) {
+            usedFallback = true;
+            const prevUnsub = innerUnsub;
+            attachUnordered();
+            if (typeof prevUnsub === 'function') prevUnsub();
+            return;
+          }
+          onSnapshot(snap);
+        }, function (err) {
+          console.warn('subscribeMessages ordered', err);
+          if (typeof onError === 'function') onError(err);
+        });
+      } catch (err) {
+        console.warn('subscribeMessages ordered attach', err);
+        if (typeof onError === 'function') onError(err);
+      }
+    }
+
+    attachOrdered();
+
+    return function () {
+      stopped = true;
+      if (typeof innerUnsub === 'function') innerUnsub();
+    };
   }
 
   function subscribePlaces(calId, onSnapshot, onError) {
@@ -829,6 +966,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     isScaffold: false,
     fetchChatMessagesRest: fetchChatMessagesRest,
     fetchAllChatMessagesRest: fetchAllChatMessagesRest,
+    fetchCalendarSearchIndex: fetchCalendarSearchIndex,
     fetchRecentChatMessages: fetchRecentChatMessages,
     fetchRecentGalleryMessages: fetchRecentGalleryMessages,
     fetchMessagesByImageTag: fetchMessagesByImageTag,

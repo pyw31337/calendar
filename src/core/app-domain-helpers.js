@@ -1167,6 +1167,10 @@ function getContrastTextColor(...args) {
   const f = (window.GATHER_APP_UTILS || {}).getContrastTextColor;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function normalizeDateString(...args) {
+  const f = (window.GATHER_APP_UTILS || {}).normalizeDateString;
+  return typeof f === 'function' ? f(...args) : '';
+}
 // Standard Formatter for Korean Date Display: 2026.09.19 (토)
 function formatDateWithDayName(...args) {
   const f = (window.GATHER_APP_UTILS || {}).formatDateWithDayName;
@@ -2078,6 +2082,13 @@ function getMediaIdentityKeys(photo = {}, opts = {}) {
   const directMediaUrl = typeof photo?.directMediaUrl === 'string' && photo.directMediaUrl
     ? photo.directMediaUrl
     : '';
+  // Some legacy/lightbox entry points only provide the rendered URL (without a message/photo
+  // id). Never collapse those photos into the shared `*:unknown` document: a URL hash is a
+  // stable per-asset fallback and keeps each photo's comment thread isolated.
+  const fallbackMediaUrl = !directMediaUrl && !messageId && !photoId
+    ? String(photo?.full || photo?.url || photo?.imageUrl || photo?.thumb || photo?.thumbUrl || '').trim()
+    : '';
+  const fallbackMediaKey = fallbackMediaUrl ? getDirectMediaTagKey(fallbackMediaUrl) : '';
   const directKey = directMediaUrl ? getDirectMediaTagKey(directMediaUrl) : '';
   const isMeetingReference = sourceHint === 'meeting'
     || photo?.uploadSource === 'meeting'
@@ -2098,7 +2109,9 @@ function getMediaIdentityKeys(photo = {}, opts = {}) {
   }
 
   if (isMeetingReference) {
-    const key = `meeting:${meetingDate || 'date'}:${photoId || messageId || 'photo'}`;
+    const meetingPhotoIdentity = photoId || messageId
+      || (Number.isInteger(imageIndex) ? `photo-${imageIndex}` : (fallbackMediaKey ? `url-${fallbackMediaKey}` : 'photo'));
+    const key = `meeting:${meetingDate || 'date'}:${meetingPhotoIdentity}`;
     return { assetKey: key, mediaKey: key, refKey: key };
   }
 
@@ -2113,11 +2126,12 @@ function getMediaIdentityKeys(photo = {}, opts = {}) {
   }
 
   if (photoId || meetingDate) {
-    const key = `${baseSource}:${photoId || meetingDate || 'photo'}`;
+    const photoIdentity = photoId || (meetingDate ? `${meetingDate}${Number.isInteger(imageIndex) ? `:${imageIndex}` : ''}` : 'photo');
+    const key = `${baseSource}:${photoIdentity}`;
     return { assetKey: key, mediaKey: key, refKey: key };
   }
 
-  const key = `${baseSource}:unknown`;
+  const key = fallbackMediaKey ? `${baseSource}:url:${fallbackMediaKey}` : `${baseSource}:unknown`;
   return { assetKey: key, mediaKey: key, refKey: key };
 }
 
@@ -2300,6 +2314,7 @@ export {
   notifyMeetingReminder,
   notifyRepeatScheduleReminder,
   getContrastTextColor,
+  normalizeDateString,
   formatDateWithDayName,
   formatShortDateWithDayName,
   formatConfirmedMeetingLabel,

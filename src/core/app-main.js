@@ -140,6 +140,7 @@ import {
   notifyRepeatScheduleReminder,
   getContrastTextColor,
   formatDateWithDayName,
+  normalizeDateString,
   formatShortDateWithDayName,
   formatConfirmedMeetingLabel,
   formatDDayLabel,
@@ -473,6 +474,7 @@ import {
   fetchRecentMessagesRest,
   fetchChatMessagesRest,
   fetchAllChatMessagesRest,
+  fetchCalendarSearchIndex,
   fetchRecentChatMessages,
   fetchRecentGalleryMessages,
   fetchMessagesByImageTag,
@@ -722,7 +724,34 @@ function App() {
       })
     );
   }
-  return /*#__PURE__*/React.createElement(CalendarApp, null);
+  // 컨텐츠 상세의 "공유" 버튼으로 받은 URL(#gatherContent=...)을 열면, 어느 화면에 있든/캘린더가
+  // 로드됐든 안 됐든 상관없이 그 컨텐츠 백드롭이 바로 보이도록 최상위에서 한 번만 파싱한다.
+  // 실제 등록(Firestore 쓰기)은 하지 않는 읽기 전용 미리보기 -- 등록은 컨텐츠 등록 화면의
+  // "붙여넣기"에서 사용자가 명시적으로 한다.
+  const [sharedContentItem, setSharedContentItem] = React.useState(() => {
+    try {
+      const hash = window.location.hash || '';
+      const marker = '#gatherContent=';
+      const idx = hash.indexOf(marker);
+      if (idx === -1) return null;
+      const json = decodeURIComponent(escape(atob(hash.slice(idx + marker.length))));
+      const payload = JSON.parse(json);
+      if (!payload || payload.kind !== 'gather-content' || !payload.item || !payload.item.title) return null;
+      return payload.item;
+    } catch (_) { return null; }
+  });
+  React.useEffect(() => {
+    if (!sharedContentItem) return;
+    try { window.history.replaceState({}, '', window.location.pathname + window.location.search); } catch (_) { /* best-effort */ }
+  }, []);
+  const SharedContentPreviewModal = (window.GATHER_UI_COMPONENTS || {}).SharedContentPreviewModal;
+  return /*#__PURE__*/React.createElement(React.Fragment, null,
+    /*#__PURE__*/React.createElement(CalendarApp, null),
+    sharedContentItem && SharedContentPreviewModal && /*#__PURE__*/React.createElement(SharedContentPreviewModal, {
+      item: sharedContentItem,
+      onClose: () => setSharedContentItem(null)
+    })
+  );
 }
 
 function CalendarApp() {
@@ -1541,21 +1570,14 @@ function CalendarApp() {
     // 정확히 태그해도 인물 탭에서 영원히 안 보였다 -- 태그 매칭 로직 자체는 멀쩡했지만
     // 매칭할 데이터 자체가 애초에 없었던 것.
     if (!activeCalId || (!isGlobalSearchOpen && activeView !== 'history') || fullChatHistoryByCalendar[activeCalId] !== undefined) return;
-    const liveFirebaseDb = (typeof window !== 'undefined' && window.__gatherFirebaseDb) || firebaseDb;
-    if (!liveFirebaseDb) {
-      let cancelled = false;
-      fetchAllChatMessagesRest(activeCalId).then(list => {
-        if (cancelled) return;
-        setFullChatHistoryByCalendar(prev => ({ ...prev, [activeCalId]: Array.isArray(list) ? list : [] }));
-      }).catch(err => console.warn('full REST chat history load failed:', err));
-      return () => { cancelled = true; };
-    }
     let cancelled = false;
-    withTimeout(liveFirebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').get({ source: 'server' }), 9000, 'full chat history read').then(snapshot => {
+    // Full-history consumers still receive every message (this remains the full chat history read), but the data layer walks the
+    // collection in cursor pages instead of issuing one unbounded SDK GET. This keeps the
+    // gallery/person-tag/search index correct without making the initial realtime window huge.
+    fetchAllChatMessagesRest(activeCalId).then(list => {
       if (cancelled) return;
-      const list = snapshot.docs.map(doc => slimMessageForClient({ id: doc.id, ...doc.data() }));
-      setFullChatHistoryByCalendar(prev => ({ ...prev, [activeCalId]: list }));
-    }).catch(err => console.warn('full chat history load failed:', err));
+      setFullChatHistoryByCalendar(prev => ({ ...prev, [activeCalId]: Array.isArray(list) ? list : [] }));
+    }).catch(err => console.warn('full paged chat history load failed:', err));
     return () => { cancelled = true; };
   }, [activeCalId, isGlobalSearchOpen, activeView, firebaseDb, firebaseConnectionVersion, fullChatHistoryByCalendar]);
   // The chat embed the user tapped play on -- { key, embedUrl, provider, orientation, title } |
@@ -2134,6 +2156,10 @@ function CalendarApp() {
   const visibleTotalChatCount = typeof totalChatCount === 'number'
     ? Math.max(0, totalChatCount - meetingPhotoMessageIds.size)
     : totalChatCount;
+  // Mirrors visibleTotalChatCount for the hydration-retry effect below, which must NOT restart
+  // every time this number changes -- see that effect for why.
+  const visibleTotalChatCountRef = React.useRef(visibleTotalChatCount);
+  visibleTotalChatCountRef.current = visibleTotalChatCount;
   const canUseSettlement = !!(activeCal && isSettlementEnabledCalendarId(activeCal.id || activeCalId));
   const syncStatus = saveSyncState;
   React.useEffect(() => {
@@ -2325,15 +2351,15 @@ function CalendarApp() {
   // chatMessages to an all-filtered-out list, permanently re-triggering (and then immediately
   // stomping) the separate hydration-retry effect below -- the widget could never settle on
   // real content and stayed on "최근 채팅을 불러오는 중…" no matter how long you waited.
-  // CHAT_LIVE_MESSAGE_LIMIT (20, already used for the chat/gallery windows) gives the client-side
-  // filter enough raw docs to actually find renderable messages within the live window.
+  // The chat room gets a wider raw window because a calendar can have a long run of hidden
+  // gallery/meeting uploads at the head of the collection. The calendar preview remains bounded.
   React.useEffect(() => {
     if (!activeCalId) {
       setChatMessages([]);
       return;
     }
     const chatLimit = activeView === 'chat'
-      ? chatLiveLimit
+      ? Math.max(chatLiveLimit, 60)
       : activeView === 'gallery' ? Math.min(12, CHAT_LIVE_MESSAGE_LIMIT) : CHAT_LIVE_MESSAGE_LIMIT;
     if (!firebaseDb) {
       // No live SDK channel at all (not just a stalled stream -- see the watchdog below for
@@ -2409,7 +2435,7 @@ function CalendarApp() {
   // every tick); only starts actually re-fetching once the stream has genuinely stopped.
   React.useEffect(() => {
     if (!activeCalId || !firebaseDb) return undefined;
-    const chatLimit = activeView === 'chat' ? chatLiveLimit : CHAT_INITIAL_MESSAGE_LIMIT;
+    const chatLimit = activeView === 'chat' ? Math.max(chatLiveLimit, 60) : CHAT_INITIAL_MESSAGE_LIMIT;
     // Tightened from 9000/5000: on a connection where the realtime stream never recovers (see
     // the long-polling notes above attemptFirebaseInit), this fallback is the only thing that
     // ever shows the other participant's message, and 9-14s felt like "it's broken" in a chat UI.
@@ -2467,8 +2493,15 @@ function CalendarApp() {
   // Anniversaries: full collection (no orderBy) + client sort so docs without createdAt still show.
   // Also active on history (보관함) so culture/festival "캘린더와 연동" checkboxes can resolve
   // cultureSourceId matches without requiring a prior visit to the calendar view this session.
+  // 컨텐츠 페이지(지역축제/문화행사/스포츠/영화 탭)의 selfAuthoredCultureItems/orphanedSourceItems
+  // (ui-summary-gallery.js)도 이 anniversaries 데이터가 있어야 기념일 등록으로 직접 만든 항목과,
+  // 크롤링 피드에서 빠졌지만 등록은 살아있는 항목("개별등록")을 찾아낼 수 있다. 'content'가
+  // 빠져 있으면, 캘린더/보관함을 먼저 들르지 않고 컨텐츠 페이지로 곧장 들어온 세션(북마크,
+  // onFocusCultureSource 이동, PWA 바로가기 등)에서는 anniversaries가 아예 로드되지 않아 그런
+  // 항목들이 통째로 안 보였다 -- 새로고침 후 캘린더부터 방문하면 다시 로드되어 "고치면 잠깐
+  // 보이고 다시 안 보인다"처럼 보이는 원인 중 하나.
   const needsAnniversariesData = React.useMemo(
-    () => activeView === 'calendar' || activeView === 'history',
+    () => activeView === 'calendar' || activeView === 'history' || activeView === 'content',
     [activeView]
   );
   React.useEffect(() => {
@@ -2614,16 +2647,40 @@ function CalendarApp() {
   // venue/link) is already complete and doesn't need a form. cultureSourceId lets the checkbox
   // find its own registered anniversary again (to show checked, or to unregister) without the
   // culture item and the anniversary doc needing the same id.
+  // 영화는 실제 상영관(장소)이 없는데도 공공 영화 데이터 API 스키마가 venue 필드를 필수로 요구해서,
+  // 크롤링 원본(culture-movies.json, scripts/sync-culture-performances.mjs)이 항상 이 문자열을 채워
+  // 넣어 온다. 이걸 실제 장소로 착각해 그대로 저장/표시하면 일정팝업에 "장소 확인 필요"라는 의미
+  // 없는 텍스트가 위치 아이콘과 함께 나타나고(마치 사용자가 확인해야 할 일이 있는 것처럼 보임),
+  // 설명 텍스트 맨 앞에도 같은 문구가 섞여 붙는다 -- 정보가 없을 뿐이니 장소 자체가 아예 없는
+  // 것과 똑같이 취급한다(ui-date-modal.js의 hasRealAnnPlace와 동일한 판단).
+  const CULTURE_VENUE_PLACEHOLDER = '장소 확인 필요';
+  const hasRealVenue = (venue) => {
+    const v = String(venue || '').trim();
+    return !!v && v !== CULTURE_VENUE_PLACEHOLDER;
+  };
   const handleRegisterCultureEvent = async (item, options = {}) => {
     if (!activeCal?.id || !item?.id || !item?.title) return null;
     const stamp = Date.now();
     const anniversaryId = 'anniversary_culture_' + stamp + '_' + Math.random().toString(36).slice(2, 8);
-    const startDate = item.startDate || item.endDate;
+    const startDate = normalizeDateString(item.startDate || item.endDate);
     if (!startDate) { showToast('공연 기간 정보가 없어 등록할 수 없습니다.', 'error'); return null; }
-    // 문화행사 tab → event(행사), 지역축제 tab → festival(축제), 스포츠 tab → sports. Prefer explicit
-    // options.category, then item.anniversaryCategory / item.kind from the register checkbox path.
+    // 문화행사 tab → event(행사), 지역축제 tab → festival(축제), 스포츠 tab도 event로 등록한다 --
+    // 기념일 수동 등록 폼(ANNIVERSARY_CATEGORY_OPTIONS.filter(opt => opt.value !== 'sports'),
+    // ui-event-modals.js)이 애초에 '스포츠'를 사용자가 고를 수 있는 카테고리로 노출하지 않으므로,
+    // 여기서만 별도로 'sports' 값을 만들어내면 사용자가 그 값을 다시 고를 방법이 없는 카테고리가
+    // 생겨버린다. Prefer explicit options.category, then item.anniversaryCategory / item.kind from
+    // the register checkbox path.
     const rawCategory = (options && options.category) || item.anniversaryCategory || item.kind || 'event';
-    const category = (rawCategory === 'festival' || rawCategory === 'sports') ? rawCategory : 'event';
+    const category = rawCategory === 'festival' ? 'festival' : (rawCategory === 'sports' ? 'sports' : (rawCategory === 'movie' ? 'movie' : 'event'));
+    // Full copy of the crawled/portal card as-is (minus the two plumbing fields this call adds
+    // itself, anniversaryCategory/kind -- see handleToggleRegister/ContentRegisterModal, neither
+    // of which is a real content field). 기념일 등록(이 함수)과 컨텐츠 카드가 서로 다른 필드
+    // 집합을 따로 관리하던 게 "등록했더니 정보가 다 날아갔다" 버그의 근본 원인이었다 -- 등록
+    // 당시 이 카드가 가진 필드가 앞으로 몇 개든, 뭐든, 항상 그대로 보존되도록 필드를 하나하나
+    // 골라 옮기는 대신 카드 전체를 스냅샷으로 저장한다. orphanedSourceItems(ui-summary-gallery.js)가
+    // 크롤링 피드에서 이 항목이 사라졌을 때(또는 id가 어긋났을 때) 이 스냅샷으로 원래 카드와
+    // 동일한 상세 정보를 그대로 복원한다.
+    const { anniversaryCategory: _omitAnniversaryCategory, kind: _omitKind, ...cultureSnapshot } = item;
     const annData = {
       id: anniversaryId,
       calendarId: activeCal.id,
@@ -2631,23 +2688,39 @@ function CalendarApp() {
       category,
       type: 'range',
       startDate,
-      endDate: item.endDate || startDate,
+      endDate: normalizeDateString(item.endDate || startDate) || startDate,
       cultureSourceId: item.id,
+      cultureSnapshot,
       createdAt: stamp,
       updatedAt: stamp
     };
+    if (category === 'movie') {
+      annData.movieMeta = {
+        releaseDate: item.releaseDate || item.startDate || startDate,
+        endDate: item.endDate || null,
+        isOpenEnded: item.isOpenEnded !== false,
+        director: item.director || '',
+        cast: Array.isArray(item.cast) ? item.cast : [],
+        bookingRate: item.bookingRate || '',
+        audienceCount: item.audienceCount || '',
+        ageRating: item.ageRating || ''
+      };
+    }
     // Conditionally-added, not `field: value || undefined` -- Firestore's set() rejects a literal
     // undefined property value outright, so an always-present key here would throw on exactly the
     // items missing that field (same pattern AnniversaryModal's own handleSaveAnniversary uses).
-    const descriptionParts = [item.venue, item.address];
+    const descriptionParts = [hasRealVenue(item.venue) ? item.venue : null, item.address];
     if (item.description) descriptionParts.push(String(item.description).trim());
     if (item.link) descriptionParts.push(String(item.link).trim());
     const descriptionText = descriptionParts.filter(Boolean).join(' · ');
     if (descriptionText) annData.description = descriptionText;
     if (item.link) annData.cultureSourceLink = item.link;
-    // 스포츠 종목(야구/축구/농구/...) -- getAnniversaryCategoryBadge가 이 값으로 종목별 아이콘을
-    // 고른다. 문화행사/축제는 genre가 없으므로 자연히 생략됨.
-    if (category === 'sports' && item.genre) annData.genre = item.genre;
+    // 크롤링된 장소명(item.venue)을 기념일 자신의 구조화된 place 필드에도 그대로 채워 넣는다 --
+    // 이게 없으면 일정 팝업의 "장소" 줄이 공란으로 보였다(장소 자체는 registerCulturePlaceForEvent가
+    // 별도로 장소 목록에는 등록해두지만, 그 등록은 이 anniversaries 문서와 연결되지 않았다).
+    // 좌표(lat/lng)는 없어도 되도록 만들어져 있다(getAnnBannerKakaoMapLinkUrl/getDisplayPlaceAddress
+    // 모두 이름/주소만으로 동작) -- 지오코딩 성공 여부와 무관하게 항상 채워지도록 동기적으로 넣는다.
+    if (hasRealVenue(item.venue)) annData.place = { name: item.venue, address: item.address || '' };
     // Copy archive-card poster so DateModal anniversary banners can show the same image.
     const poster = item.image ? String(item.image).trim() : '';
     if (poster) {
@@ -2677,7 +2750,8 @@ function CalendarApp() {
   // Silently does nothing if the venue can't be found (no address/lat-lng to save) or the app is
   // offline -- this is a convenience on top of the calendar registration, never a requirement.
   const registerCulturePlaceForEvent = async (item, visitDate) => {
-    const venueQuery = String(item?.venue || '').trim() || String(item?.title || '').trim();
+    const realVenue = hasRealVenue(item?.venue) ? String(item.venue).trim() : '';
+    const venueQuery = realVenue || String(item?.title || '').trim();
     if (!venueQuery) return;
     const api = window.GATHER_APP_PLACE_SEARCH;
     if (!api || typeof api.searchPlaces !== 'function') return;
@@ -2685,7 +2759,7 @@ function CalendarApp() {
     const top = Array.isArray(results) ? results[0] : null;
     if (!top || !Number.isFinite(top.lat) || !Number.isFinite(top.lng)) return;
     handleSavePlace({
-      name: item.venue || top.name,
+      name: realVenue || top.name,
       address: item.address || top.address || '',
       lat: top.lat,
       lng: top.lng,
@@ -2790,41 +2864,171 @@ function CalendarApp() {
     }
   };
 
+  // 위 handleRemovePhotoFromTravelMemory의 일괄(여러 장) 버전 -- 추억 상세 페이지의 편집 모드에서
+  // 체크박스로 여러 장을 골라 한 번에 제외할 때 쓴다. 장 수만큼 반복 호출하는 대신 병합된 제외
+  // 목록 하나로 한 번만 쓴다.
+  const handleRemovePhotosFromTravelMemory = async (anniversaryId, photoKeys) => {
+    if (!activeCal?.id || !anniversaryId || !Array.isArray(photoKeys) || photoKeys.length === 0) return false;
+    const ann = (anniversaries || []).find(a => a.id === anniversaryId);
+    const existing = Array.isArray(ann?.excludedMemoryPhotoKeys) ? ann.excludedMemoryPhotoKeys : [];
+    const next = Array.from(new Set([...existing, ...photoKeys]));
+    if (next.length === existing.length) return true;
+    try {
+      const saved = await writeCollectionDocumentWithFallback('anniversaries', activeCal.id, anniversaryId, { excludedMemoryPhotoKeys: next }, 'update', '추억에서 사진 일괄 제외');
+      if (!saved?.success) throw new Error('remove photos from travel memory failed');
+      handleAnniversarySaved({ id: anniversaryId, excludedMemoryPhotoKeys: next });
+      showToast(`사진 ${photoKeys.length}장을 추억에서 제외했습니다.`, 'success');
+      return true;
+    } catch (err) {
+      console.error('Failed to bulk-remove photos from travel memory:', err);
+      showToast('제외 실패', 'error');
+      return false;
+    }
+  };
+
+  // 추억 탭의 "삭제" -- 흔들도시락처럼 반복 일정용으로만 등록한 기념일은 날짜 구간이 우연히
+  // 사진과 겹치면 추억 탭에 여행처럼 그룹으로 잡혀버린다. 기념일(반복 일정)과 사진은 그대로 두고,
+  // 이 플래그만 켜서 추억 탭 그룹핑 대상에서만 숨긴다.
+  const handleHideMemoryGroup = async (anniversaryId) => {
+    if (!activeCal?.id || !anniversaryId) return false;
+    try {
+      const saved = await writeCollectionDocumentWithFallback('anniversaries', activeCal.id, anniversaryId, { hiddenFromMemories: true }, 'update', '추억 목록에서 숨김');
+      if (!saved?.success) throw new Error('hide memory group failed');
+      handleAnniversarySaved({ id: anniversaryId, hiddenFromMemories: true });
+      showToast('추억 목록에서 삭제했습니다.', 'success');
+      return true;
+    } catch (err) {
+      console.error('Failed to hide memory group:', err);
+      showToast('삭제 실패', 'error');
+      return false;
+    }
+  };
+
+  // 추억 목록의 "추가" -- 숨겨 두었던 기념일을 다시 추억 목록에 노출한다.
+  const handleRestoreMemoryGroup = async (anniversaryId) => {
+    if (!activeCal?.id || !anniversaryId) return false;
+    try {
+      const saved = await writeCollectionDocumentWithFallback('anniversaries', activeCal.id, anniversaryId, { hiddenFromMemories: false }, 'update', '추억 목록에 추가');
+      if (!saved?.success) throw new Error('restore memory group failed');
+      handleAnniversarySaved({ id: anniversaryId, hiddenFromMemories: false });
+      showToast('추억 목록에 추가했습니다.', 'success');
+      return true;
+    } catch (err) {
+      console.error('Failed to restore memory group:', err);
+      showToast('추억 추가 실패', 'error');
+      return false;
+    }
+  };
+
+  // 추억 탭의 "추가" -- handleRemovePhotosFromTravelMemory로 제외했던 사진을 다시 이 추억에
+  // 넣을 수 있게, excludedMemoryPhotoKeys에서 골라낸 키들만 제거한다.
+  const handleAddPhotosBackToTravelMemory = async (anniversaryId, photoKeys) => {
+    if (!activeCal?.id || !anniversaryId || !Array.isArray(photoKeys) || photoKeys.length === 0) return false;
+    const ann = (anniversaries || []).find(a => a.id === anniversaryId);
+    const existing = Array.isArray(ann?.excludedMemoryPhotoKeys) ? ann.excludedMemoryPhotoKeys : [];
+    const remove = new Set(photoKeys);
+    const next = existing.filter(k => !remove.has(k));
+    if (next.length === existing.length) return true;
+    try {
+      const saved = await writeCollectionDocumentWithFallback('anniversaries', activeCal.id, anniversaryId, { excludedMemoryPhotoKeys: next }, 'update', '추억에 사진 다시 추가');
+      if (!saved?.success) throw new Error('add photos back to travel memory failed');
+      handleAnniversarySaved({ id: anniversaryId, excludedMemoryPhotoKeys: next });
+      showToast(`사진 ${photoKeys.length}장을 추억에 다시 추가했습니다.`, 'success');
+      return true;
+    } catch (err) {
+      console.error('Failed to add photos back to travel memory:', err);
+      showToast('추가 실패', 'error');
+      return false;
+    }
+  };
+
   // 보관함 > 컨텐츠 등록 / 컨텐츠 페이지: calendar-owned custom culture/festival/sports cards
   // merged into the CulturePerformancesTab lists alongside crawled JSON snapshots.
+  //
+  // needsCustomCultureData is memoized (rather than depending on raw `activeView` directly)
+  // for the same reason needsPlacesData is below: history and content both need this exact same
+  // subscription, so switching back and forth between them must NOT tear the Firestore listener
+  // down and recreate it on every single navigation -- only a genuine transition across the
+  // needs-it/doesn't-need-it boundary should resubscribe. Before this, `[activeCalId, activeView,
+  // ...]` resubscribed on every 보관함<->컨텐츠 switch, exactly the "unsubscribe+resubscribe
+  // within milliseconds of a nav" churn already identified (see needsPlacesData's own comment)
+  // as the likely trigger for Firestore's "INTERNAL ASSERTION FAILED: Unexpected state" listener
+  // corruption -- a torn-down-and-rebuilt listener can come back delivering a stale/incomplete
+  // snapshot, which reads exactly like "개별등록 items keep vanishing, and refreshing briefly
+  // fixes it" even though the documents were never actually lost.
+  const needsCustomCultureData = React.useMemo(
+    () => activeView === 'history' || activeView === 'content',
+    [activeView]
+  );
   React.useEffect(() => {
-    if (!activeCalId || (activeView !== 'history' && activeView !== 'content')) return;
+    if (!activeCalId || !needsCustomCultureData) return;
     let isMounted = true;
-    const applyList = (list) => {
+    const kindByCategory = { festival: 'festival', event: 'performance', performance: 'performance', sports: 'sports', movie: 'movie' };
+    const normalizeCustomCultureItem = item => {
+      if (!item || typeof item !== 'object') return null;
+      const inferredKind = item.kind || kindByCategory[item.category] || kindByCategory[item.anniversaryCategory]
+        || (item.genre === 'movie' ? 'movie' : '');
+      return { ...item, kind: inferredKind || 'performance' };
+    };
+    const applyList = (list, preserveExisting = false) => {
       if (!isMounted) return;
-      const arr = Array.isArray(list) ? list.slice() : [];
-      arr.sort((a, b) => (Number(b.createdAt) || Number(b.updatedAt) || 0) - (Number(a.createdAt) || Number(a.updatedAt) || 0));
-      setCustomCultureItems(arr);
+      const arr = (Array.isArray(list) ? list : []).map(normalizeCustomCultureItem).filter(Boolean);
+      setCustomCultureItems(prev => {
+        let merged = arr;
+        if (preserveExisting) {
+          const seen = new Set(arr.map(item => item.id).filter(Boolean));
+          const existing = Array.isArray(prev) ? prev.filter(item => item?.id && !seen.has(item.id)) : [];
+          merged = [...arr, ...existing];
+        }
+        merged.sort((a, b) => (Number(b.createdAt) || Number(b.updatedAt) || 0) - (Number(a.createdAt) || Number(a.updatedAt) || 0));
+        return merged;
+      });
     };
     if (!firebaseDb) {
-      fetchCustomCultureItemsRest(activeCalId).then(list => applyList(list)).catch(() => applyList([]));
+      fetchCustomCultureItemsRest(activeCalId).then(list => applyList(list)).catch(err => {
+        console.warn('Custom culture REST fallback failed; retaining existing items:', err);
+      });
       return () => { isMounted = false; };
     }
+    // Keep the realtime window bounded. The REST fallback above remains the authoritative
+    // archive path, while the listener only tracks the newest registrations and prevents an
+    // ever-growing collection from being re-sent on every reconnect.
+    // Hydrate the complete archive once, then keep only a bounded recent listener attached.
+    // This preserves older individually registered cards without making every reconnect stream
+    // the entire collection.
+    fetchCustomCultureItemsRest(activeCalId).then(list => applyList(list)).catch(err => {
+      console.warn('Custom culture archive hydration failed:', err);
+    });
     const unsub = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('customCultureItems')
+      .orderBy('createdAt', 'desc').limit(200)
       .onSnapshot(snapshot => {
         const list = [];
         snapshot.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
-        applyList(list);
+        applyList(list, true);
       }, err => {
         console.warn('Firestore customCultureItems subscription error:', err);
-        fetchCustomCultureItemsRest(activeCalId).then(list => applyList(list)).catch(() => applyList([]));
+        // A transient listener failure must never replace a previously received authoritative
+        // collection with []. Keep the current list unless REST returns actual documents.
+        fetchCustomCultureItemsRest(activeCalId).then(list => {
+          if (Array.isArray(list) && list.length > 0) applyList(list);
+        }).catch(fallbackErr => console.warn('Custom culture REST fallback failed; retaining existing items:', fallbackErr));
       });
     return () => { isMounted = false; unsub(); };
-  }, [activeCalId, activeView, firebaseDb, firebaseConnectionVersion]);
+  }, [activeCalId, needsCustomCultureData, firebaseDb, firebaseConnectionVersion]);
 
   const handleSaveCustomCultureItem = async (item) => {
     if (!activeCal?.id || !item?.id || !item?.title) return false;
     try {
-      const saved = await writeCollectionDocumentWithFallback('customCultureItems', activeCal.id, item.id, item, 'set', '컨텐츠 등록');
+      const normalizedItem = { ...item };
+      if (normalizedItem.startDate) normalizedItem.startDate = normalizeDateString(normalizedItem.startDate) || normalizedItem.startDate;
+      if (normalizedItem.endDate) normalizedItem.endDate = normalizeDateString(normalizedItem.endDate) || normalizedItem.endDate;
+      if (normalizedItem.releaseDate) normalizedItem.releaseDate = normalizeDateString(normalizedItem.releaseDate) || normalizedItem.releaseDate;
+      if (normalizedItem.startDate) normalizedItem.dateLabel = formatDateWithDayName(normalizedItem.startDate) + (normalizedItem.endDate && normalizedItem.endDate !== normalizedItem.startDate ? ` ~ ${formatDateWithDayName(normalizedItem.endDate)}` : '');
+      const saved = await writeCollectionDocumentWithFallback('customCultureItems', activeCal.id, item.id, normalizedItem, 'set', '컨텐츠 등록');
       if (!saved?.success) throw new Error('Custom culture item save failed');
       setCustomCultureItems(prev => {
-        const list = Array.isArray(prev) ? prev.filter(x => x && x.id !== item.id) : [];
-        list.unshift(item);
+        const list = Array.isArray(prev) ? prev.filter(x => x && x.id !== normalizedItem.id) : [];
+        list.unshift(normalizedItem);
         return list;
       });
       showToast('컨텐츠가 등록되었습니다.', 'success');
@@ -3062,15 +3266,16 @@ function CalendarApp() {
     };
   }, [activeCalId, needsMemoCollection, memosLimit, firebaseDb, firebaseConnectionVersion]);
 
-  // Dynamic body padding override for full-screen subviews (chat, settlement, memo, places, history).
-  // Each of these renders its own `position:fixed; top/left/right/bottom:0` container with an
-  // internal `overflowY:auto` scroll region, sized to exactly fill the viewport. Leaving body's
-  // default padding (24px top + 60px bottom, see `body` in app.css) in place while one of these
-  // is mounted makes body's own box 84px taller than the viewport regardless of content -- since
-  // a fixed-position child doesn't shrink its ancestor -- so `html`/`body` end up with their own
-  // ~84px scrollbar on top of the subview's internal one, i.e. a visible double vertical scrollbar.
+  // Dynamic body padding override for full-screen subviews (chat, settlement, memo, places,
+  // history, content). Each of these renders its own `position:fixed; top/left/right/bottom:0`
+  // container with an internal `overflowY:auto` scroll region, sized to exactly fill the viewport.
+  // Leaving body's default padding (24px top + 60px bottom, see `body` in app.css) in place while
+  // one of these is mounted makes body's own box 84px taller than the viewport regardless of
+  // content -- since a fixed-position child doesn't shrink its ancestor -- so `html`/`body` end up
+  // with their own ~84px scrollbar on top of the subview's internal one, i.e. a visible double
+  // vertical scrollbar.
   React.useEffect(() => {
-    if (activeView === 'memo' || activeView === 'chat' || activeView === 'settlement' || activeView === 'places' || activeView === 'history') {
+    if (activeView === 'memo' || activeView === 'chat' || activeView === 'settlement' || activeView === 'places' || activeView === 'history' || activeView === 'content') {
       document.body.classList.add('no-body-padding');
     } else {
       document.body.classList.remove('no-body-padding');
@@ -3182,79 +3387,139 @@ function CalendarApp() {
 
   // Main-screen chat preview safety net:
   // if the count says chat history exists but the live recent window is still empty,
-  // hydrate the newest messages so the summary widget can render at least the latest
-  // chat instead of getting stuck on "최근 채팅을 불러오는 중…" forever. Prefer the SDK-backed
-  // recent-chat path here so a REST hiccup does not leave the summary looking empty even
-  // though the live listener/count are still healthy.
+  // hydrate the newest renderable messages so the summary widget can render at least the
+  // latest real chat instead of getting stuck on "최근 채팅을 불러오는 중…" forever.
   //
-  // fetchRecentChatMessages swallows its own SDK/REST errors and resolves to `[]` rather than
-  // throwing, so a transient failure (a flaky network tick, or the live listener/token state
-  // being in one of the broken states the Firestore SDK watchdog above exists to recover from)
-  // used to end this effect's one and only attempt with nothing to show -- and since neither
-  // `totalChatCount` nor `visibleChatMessages.length` would ever change again on their own,
-  // the widget was left permanently stuck. Retry a few times with backoff instead of giving up
-  // after the first empty result.
+  // This used to re-fetch the "top N raw docs" from scratch on every retry with N escalating
+  // (20 -> 60 -> 150 -> 300 -> 400), which has two structural problems: (1) it re-reads the
+  // same already-seen photo docs from scratch on every attempt instead of making forward
+  // progress, and (2) it's still a hard ceiling -- a calendar whose real text chat sits behind
+  // more than 400 consecutive 일정(meeting)/갤러리 photo uploads (each its own message doc,
+  // filtered out client-side by isChatRenderableMessage -- there is no server-side field that
+  // reliably excludes them, see isNonChatUploadSource/meetingPhotoMessageIds) permanently
+  // exhausts every attempt and wrongly settles on "표시할 최근 채팅이 없습니다." even though real
+  // chat exists a bit further back. Walking backward with a cursor (the same startAfter/limit
+  // pagination "이전 메시지 더 보기" already uses) instead removes both: each page only scans
+  // docs the previous page hasn't already covered, and there's no arbitrary point at which a
+  // deep-enough photo backlog forces a wrong "no chat" conclusion -- it only stops for real once
+  // a page comes back shorter than requested, meaning the collection is genuinely exhausted.
+  // Deliberately does NOT gate on `visibleTotalChatCount > 0` before attempting a hydrate pass
+  // (it used to). That count comes from a separate server-side aggregation query
+  // (fetchSubcollectionCount) rather than the same timestamp-ordered query this walk itself
+  // uses, so the two can disagree -- e.g. a message document missing its `timestamp` field
+  // entirely (a partial write, a pre-migration doc, ...) is invisible to every orderBy('timestamp')
+  // query below (Firestore excludes documents missing an ordered field from the result set) but
+  // still gets counted by a plain aggregation count(). That mismatch means the count can report
+  // "chat exists" forever while every walk -- no matter how many pages -- correctly and
+  // immediately finds nothing, which used to leave the widget trusting the wrong signal and
+  // stuck showing "최근 채팅을 불러오는 중…" well past when the actual collection had already
+  // been proven empty. Always attempting one real query and trusting ITS outcome (a page shorter
+  // than requested means the collection is actually exhausted, full stop) costs at most one extra
+  // Firestore read for a calendar that has genuinely never had any chat, and removes an entire
+  // class of "count lied" bugs.
   React.useEffect(() => {
     if (!activeCalId || isInitialDataLoading) return;
     setChatPreviewHydrationExhausted(false);
-    if (typeof visibleTotalChatCount !== 'number' || visibleTotalChatCount <= 0) return;
     if (visibleChatMessages.length > 0) return;
     let cancelled = false;
-    let attempt = 0;
+    let page = 0;
+    let cursorTs = null; // null = start from the newest message; otherwise walk strictly older
     let retryTimer = null;
-    const MAX_ATTEMPTS = 5;
-    const RETRY_DELAYS_MS = [1500, 3000, 6000, 12000];
+    const PAGE_SIZE = 150;
+    const MAX_PAGES = 6; // safety valve: 900 raw docs scanned before giving up for good
+    const ERROR_RETRY_DELAY_MS = 3000; // only used when a page fetch itself fails (network hiccup)
     const tryHydrate = async () => {
-      attempt += 1;
+      page += 1;
+      let list;
       try {
-        // Fetch more than the widget's own 5-message display window -- the last 5 raw chat
-        // documents can be entirely meeting/gallery-linked photos (isChatRenderableMessage
-        // filters those out), in which case a 5-message fetch "succeeds" (non-empty list) but
-        // renders nothing, and this loop used to return on that first "success" without ever
-        // re-checking whether anything was actually renderable -- leaving the widget stuck on
-        // "불러오는 중…" forever even though real, older chat existed just outside that window.
-        const list = await fetchRecentChatMessages(activeCalId, 20);
-        if (cancelled) return;
-        // Read meetingPhotoMessageIds via the ref (not the effect's own closure) -- this value
-        // is recomputed from `activeCal`, whose object identity changes on essentially every
-        // realtime listener tick (even for fields unrelated to chat). It used to sit in this
-        // effect's dependency array, which meant the effect itself was torn down and restarted
-        // on every such tick, resetting `attempt` back to 0 before the backoff loop could ever
-        // reach MAX_ATTEMPTS -- so the widget could get stuck on "불러오는 중…" forever on an
-        // active calendar even though the fetch itself was working fine. A ref lets this read
-        // the latest value without making the effect depend on (and restart with) it.
-        const renderable = Array.isArray(list) ? list.filter(m => isChatRenderableMessage(m, meetingPhotoMessageIdsRef.current)) : [];
-        if (renderable.length > 0) {
-          setChatMessages(prev => (Array.isArray(prev) && prev.length > 0) ? prev : list.slice());
-          return;
-        }
+        list = cursorTs == null
+          ? await fetchRecentChatMessages(activeCalId, PAGE_SIZE)
+          : await fetchOlderChatMessages(activeCalId, cursorTs, PAGE_SIZE);
       } catch (err) {
         console.warn('chat preview hydration failed:', err);
+        if (cancelled) return;
+        if (page >= MAX_PAGES) { setChatPreviewHydrationExhausted(true); return; }
+        page -= 1; // this attempt didn't actually consume a page -- retry the same one
+        retryTimer = setTimeout(tryHydrate, ERROR_RETRY_DELAY_MS);
+        return;
       }
       if (cancelled) return;
-      if (attempt >= MAX_ATTEMPTS) {
-        // All retries came back empty -- rather than leaving the widget stuck on "불러오는
-        // 중…" forever, let CommentsSection fall back to a resolved "no chat to show" state.
+      // Both fetchRecentChatMessages and fetchOlderChatMessages return ascending order (oldest
+      // first), so list[0] is the oldest doc seen in this page -- exactly the cursor the next
+      // page needs to keep walking backward without re-covering ground already scanned.
+      // Read meetingPhotoMessageIds via the ref (not the effect's own closure) -- this value is
+      // recomputed from `activeCal`, whose object identity changes on essentially every realtime
+      // listener tick (even for fields unrelated to chat), so reading it via a plain closure
+      // would go stale mid-walk instead of reflecting whatever meeting got confirmed most recently.
+      const renderable = Array.isArray(list) ? list.filter(m => isChatRenderableMessage(m, meetingPhotoMessageIdsRef.current)) : [];
+      if (renderable.length > 0) {
+        // The realtime listener may already have populated state with only hidden gallery/
+        // meeting uploads. Merge the wider recovery page instead of treating that raw array as
+        // a successful chat load and discarding the actual conversation.
+        setChatMessages(prev => {
+          const byId = new Map();
+          (Array.isArray(prev) ? prev : []).forEach(message => { if (message?.id) byId.set(message.id, message); });
+          list.forEach(message => { if (message?.id) byId.set(message.id, message); });
+          return Array.from(byId.values()).sort((a, b) => (Number(a.timestamp) || 0) - (Number(b.timestamp) || 0));
+        });
+        return;
+      }
+      if (!Array.isArray(list) || list.length < PAGE_SIZE) {
+        // Fewer docs than requested came back -- there is nothing older left in the collection,
+        // so this is a genuine "no real chat exists" conclusion, not a ceiling being hit.
+        setChatPreviewHydrationExhausted(true);
+        return;
+      }
+      cursorTs = Number(list[0].timestamp) || cursorTs;
+      if (page >= MAX_PAGES) {
         // Diagnostic breadcrumb for this exact "count>0 but nothing renders" case -- if it
         // recurs, checking devtools console for this line pins down whether the raw server
         // count, the meeting-linked-photo correction, or the fetch itself is the mismatch.
         console.info('[chat-preview] hydration exhausted', {
           calendarId: activeCalId, rawTotalChatCount: totalChatCount,
-          meetingLinkedCount: meetingPhotoMessageIdsRef.current.size, visibleTotalChatCount,
-          visibleChatMessagesLength: visibleChatMessages.length
+          meetingLinkedCount: meetingPhotoMessageIdsRef.current.size,
+          visibleTotalChatCount: visibleTotalChatCountRef.current,
+          visibleChatMessagesLength: visibleChatMessages.length,
+          pagesScanned: page, docsScanned: page * PAGE_SIZE
         });
         setChatPreviewHydrationExhausted(true);
         return;
       }
-      const delay = RETRY_DELAYS_MS[Math.min(attempt - 1, RETRY_DELAYS_MS.length - 1)];
-      retryTimer = setTimeout(tryHydrate, delay);
+      void tryHydrate();
     };
     void tryHydrate();
     return () => {
       cancelled = true;
       if (retryTimer) clearTimeout(retryTimer);
     };
-  }, [activeCalId, isInitialDataLoading, visibleTotalChatCount, visibleChatMessages.length]);
+  // Deliberately NOT depending on `visibleTotalChatCount` here (read via ref above instead) --
+  // it's `totalChatCount - meetingPhotoMessageIds.size`, and that subtrahend changes its actual
+  // NUMBER (not just object identity) every time a new 일정/갤러리 photo is confirmed while this
+  // effect is mid-walk. With the number in this array, every such upload tore the effect down
+  // and rebuilt it, resetting the walk back to page 0 before it could ever reach MAX_PAGES -- so
+  // on a calendar where photos keep getting confirmed faster than the walk can finish, the widget
+  // could stay on "불러오는 중…" indefinitely even though every individual fetch was completing
+  // fine and correctly finding nothing renderable yet. visibleChatMessages.length stays in the
+  // array on purpose: it only ever needs to fire once real chat text actually arrives (0 -> N),
+  // which is exactly when this effect should bail out early instead of continuing to walk.
+  }, [activeCalId, isInitialDataLoading, visibleChatMessages.length]);
+
+  // Absolute backstop for the hydration safety net above, independent of its own retry/backoff
+  // bookkeeping -- this exact widget has already needed several rounds of fixes for new ways to
+  // get permanently stuck on "불러오는 중…" (a filtered-out raw window, then a dependency-churn
+  // reset loop, ...), and each fix only closed the one mechanism found. Rather than trust that no
+  // further such mechanism exists, this timer guarantees a hard ceiling regardless of cause: no
+  // matter what goes wrong in the retry effect above (a bug not yet found, a future regression, a
+  // network condition none of the above anticipated), the widget can never show "불러오는 중…"
+  // for longer than this timeout before settling to a definitive resolved state. If real messages
+  // arrive after this fires, they still render immediately (visibleChatMessages.length > 0 always
+  // wins in CommentsSection's own emptyChatMessage check) -- this only forces the terminal
+  // "nothing found" state to stop waiting indefinitely.
+  React.useEffect(() => {
+    if (!activeCalId || isInitialDataLoading) return undefined;
+    const timer = setTimeout(() => setChatPreviewHydrationExhausted(true), 15000);
+    return () => clearTimeout(timer);
+  }, [activeCalId, isInitialDataLoading]);
 
   React.useEffect(() => {
     // Same reasoning as above -- wait for the initial calendar document load to finish before
@@ -3611,6 +3876,7 @@ function CalendarApp() {
             participantId: chatParticipantId,
             text: chatInput.trim(),
             timestamp: Date.now(),
+            uploadSource: 'chat',
             images: chatImages.map(image => ({ originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob })),
             ...(replyToPayload ? { replyTo: replyToPayload } : {})
           }
@@ -3627,7 +3893,8 @@ function CalendarApp() {
         const messageData = {
           participantId: chatParticipantId,
           text: chatInput.trim(),
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          uploadSource: 'chat'
         };
         if (linkPreview) messageData.linkPreview = linkPreview;
         if (replyToPayload) messageData.replyTo = replyToPayload;
@@ -3666,7 +3933,8 @@ function CalendarApp() {
             thumbUrl: chunkImages[0].thumbUrl,
             imageUrls: chunkImages.map(r => r.imageUrl),
             thumbUrls: chunkImages.map(r => r.thumbUrl),
-            timestamp: baseTimestamp + i
+            timestamp: baseTimestamp + i,
+            uploadSource: 'chat'
           };
           if (i === 0 && linkPreview) messageData.linkPreview = linkPreview;
           if (i === 0 && replyToPayload) messageData.replyTo = replyToPayload;
@@ -3868,6 +4136,95 @@ function CalendarApp() {
     } catch (err) {
       console.error('handleAddGalleryLink failed:', err);
       showToast('링크 저장 실패', 'error');
+      return false;
+    }
+  };
+
+  // 다른 캘린더의 라이트박스에서 "URL 복사하기"로 복사한 사진을 이 갤러리에 붙여넣는다
+  // (ui-chat-gallery.js의 onPasteGatherPhoto). URL은 그대로 재사용한다 -- 사진 삭제는 어느
+  // 캘린더에서든 이 메시지 문서(참조)만 지울 뿐 Storage 원본 파일은 건드리지 않으므로(기존
+  // 사진 삭제 기능도 동일), 두 캘린더 중 어느 쪽에서 지워도 다른 쪽엔 전혀 영향이 없다. 태그도
+  // 붙여넣는 시점의 값을 이 메시지 문서 자신의 imageTags에 그대로 복사해 넣으므로, 그 이후
+  // 어느 쪽에서 태그를 추가/삭제해도 서로 완전히 독립적이다(한쪽 문서만 바뀔 뿐).
+  const handlePasteGatherPhoto = async (url, tags) => {
+    if (!guardLoadedCalendar()) return false;
+    const cleanUrl = String(url || '').trim();
+    if (!/^https?:\/\//i.test(cleanUrl)) {
+      showToast('올바른 사진 URL이 아닙니다.', 'error');
+      return false;
+    }
+    const fallbackParticipantId = chatParticipantId || getActiveParticipants(activeCal)[0]?.id || '';
+    const messageOperationId = `gather_photo_paste_${activeCal.id}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const tagTokens = String(tags || '').split(/[,\s#]+/).map(t => sanitizeText(t.trim(), 30)).filter(Boolean).slice(0, 10);
+    const cleanTags = sanitizeText(tagTokens.join(' '), 100);
+    const messageData = {
+      participantId: fallbackParticipantId,
+      text: '',
+      imageUrl: cleanUrl,
+      thumbUrl: cleanUrl,
+      imageUrls: [cleanUrl],
+      thumbUrls: [cleanUrl],
+      imageTags: [cleanTags],
+      timestamp: Date.now(),
+      uploadSource: 'gallery'
+    };
+    try {
+      const sent = await writeCollectionDocumentWithFallback('messages', activeCal.id, '', messageData, 'add', '사진 붙여넣기(다른 캘린더)', { documentId: messageOperationId });
+      if (!sent) throw new Error('Gather photo paste save failed');
+      if (sent.id) upsertLocalChatMessage({ ...messageData, id: sent.id });
+      showToast(sent.queued ? '네트워크가 불안정하여 대기열에 저장했습니다. 연결되면 자동으로 반영됩니다.' : '사진을 붙여넣었습니다.', sent.queued ? 'info' : 'success');
+      return sent.queued ? 'queued' : true;
+    } catch (err) {
+      console.error('handlePasteGatherPhoto failed:', err);
+      showToast('사진 붙여넣기 실패', 'error');
+      return false;
+    }
+  };
+
+  // 위 handlePasteGatherPhoto의 일괄(여러 장) 버전 -- 갤러리 "편집" 모드에서 여러 장을 골라
+  // "일괄공유"로 묶어 보낸 URL을 붙여넣을 때 쓴다. 사진마다 독립된 메시지 문서로 저장해, 이후
+  // 어느 캘린더에서 태그를 바꾸거나 사진을 지워도 서로 전혀 영향이 없다(단일 붙여넣기와 동일).
+  const handlePasteGatherPhotos = async (photos) => {
+    if (!guardLoadedCalendar()) return false;
+    const list = Array.isArray(photos)
+      ? photos.filter(p => p && /^https?:\/\//i.test(String(p.url || '')))
+      : [];
+    if (!list.length) {
+      showToast('올바른 사진이 없습니다.', 'error');
+      return false;
+    }
+    const fallbackParticipantId = chatParticipantId || getActiveParticipants(activeCal)[0]?.id || '';
+    const baseTs = Date.now();
+    let anyQueued = false;
+    try {
+      for (let i = 0; i < list.length; i++) {
+        const cleanUrl = String(list[i].url).trim();
+        const tagTokens = String(list[i].tags || '').split(/[,\s#]+/).map(t => sanitizeText(t.trim(), 30)).filter(Boolean).slice(0, 10);
+        const cleanTags = sanitizeText(tagTokens.join(' '), 100);
+        const messageOperationId = `gather_photos_paste_${activeCal.id}_${baseTs}_${i}_${Math.random().toString(36).slice(2, 8)}`;
+        const messageData = {
+          participantId: fallbackParticipantId,
+          text: '',
+          imageUrl: cleanUrl,
+          thumbUrl: cleanUrl,
+          imageUrls: [cleanUrl],
+          thumbUrls: [cleanUrl],
+          imageTags: [cleanTags],
+          timestamp: baseTs + i,
+          uploadSource: 'gallery'
+        };
+        const sent = await writeCollectionDocumentWithFallback('messages', activeCal.id, '', messageData, 'add', '사진 일괄 붙여넣기(다른 캘린더)', { documentId: messageOperationId });
+        if (!sent) throw new Error(`Gather photos paste save failed at index ${i}`);
+        if (sent.id) upsertLocalChatMessage({ ...messageData, id: sent.id });
+        if (sent.queued) anyQueued = true;
+      }
+      showToast(anyQueued
+        ? '네트워크가 불안정하여 일부를 대기열에 저장했습니다. 연결되면 자동으로 반영됩니다.'
+        : `사진 ${list.length}장을 붙여넣었습니다.`, anyQueued ? 'info' : 'success');
+      return true;
+    } catch (err) {
+      console.error('handlePasteGatherPhotos failed:', err);
+      showToast('사진 붙여넣기 실패', 'error');
       return false;
     }
   };
@@ -6580,6 +6937,7 @@ function CalendarApp() {
       calendar: activeCal,
       chatMessages: displayChatMessages,
       memos: memos,
+      customCultureItems: customCultureItems,
       onSave: handleSaveAvailability,
       onDelete: handleDeleteAvailability,
       onReorderAvailability: handleReorderAvailability,
@@ -6616,13 +6974,25 @@ function CalendarApp() {
         setIsAnniversariesOpen(true);
       },
       onFocusCultureSource: (ann) => {
-        if (!ann?.cultureSourceId) return;
+        // cultureSourceId가 있으면 포털에서 등록한(또는 등록 당시의) 항목의 원래 id, 없으면
+        // 기념일 등록으로 직접 만든 항목이라 이 기념일 자신의 id가 곧 컨텐츠 페이지 카드의 id다
+        // (HistoryView의 selfAuthoredCultureItems가 자기 id를 그대로 카드 id로 쓴다).
+        const focusId = ann?.cultureSourceId || ann?.id;
+        if (!focusId) return;
         // 문화행사/지역축제/스포츠 탭 중 이 기념일의 원래 카테고리에 맞는 탭을 열고, 그 항목의
         // 상세를 자동으로 펼치도록 ContentView에 전달 -- 실제 매칭/표시는 컨텐츠 페이지 쪽에서.
-        const tabByCategory = { festival: 'festival', event: 'culture', sports: 'sports' };
+        const tabByCategory = { festival: 'festival', event: 'culture', sports: 'sports', movie: 'movies' };
         try {
           localStorage.setItem('gather_content_tab', tabByCategory[ann.category] || 'festival');
-          localStorage.setItem('gather_content_focus_item_id', ann.cultureSourceId);
+          localStorage.setItem('gather_content_focus_item_id', focusId);
+          // id-only 매칭의 안전망: 크롤링 스냅샷의 id 생성 규칙이 과거에 바뀐 적이 있어(예:
+          // 날짜 기반 -> 제목 기반), 그 변경 이전에 등록된 오래된 기념일은 cultureSourceId가
+          // 오늘자 스냅샷의 어떤 항목과도 더 이상 일치하지 않을 수 있다 -- 그 경우 orphan 카드
+          // 폴백(ui-summary-gallery.js orphanedSourceItems)도 같은 옛 id로만 찾아지므로 여전히
+          // 열리기는 하지만, 제목까지 함께 넘겨두면 컨텐츠 페이지 쪽에서 id 매칭이 실패했을 때
+          // 제목으로 한 번 더 찾아볼 수 있다.
+          if (ann.title) localStorage.setItem('gather_content_focus_title', ann.title);
+          else localStorage.removeItem('gather_content_focus_title');
         } catch (_) { /* best-effort */ }
         setIsModalOpen(false);
         changeView('content');
@@ -7367,11 +7737,14 @@ function CalendarApp() {
         onClose: () => changeView('calendar'),
         onUploadImages: handleUploadGalleryImages,
         onAddLink: handleAddGalleryLink,
+        onPasteGatherPhoto: handlePasteGatherPhoto,
+        onPasteGatherPhotos: handlePasteGatherPhotos,
         onOpenShare: () => {
           if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsGalleryShareOpen(true);
         },
         setActiveLightbox: setActiveLightbox,
         onDeletePhoto: handleDeletePhoto,
+        photoCommentCounts: photoCommentCounts,
         hasMoreOlderChat: !Array.isArray(fullChatMessages) && hasMoreOlderChat,
         loadingOlderChat: loadingOlderChat,
         onLoadOlderChat: loadOlderChatMessages,
@@ -7480,6 +7853,10 @@ function CalendarApp() {
         onGetGalleryPhotoOrdinal: handleGetGalleryPhotoOrdinal,
         onRequestConfirm: showConfirmDialog,
         onRemovePhotoFromMemory: handleRemovePhotoFromTravelMemory,
+        onRemovePhotosFromMemory: handleRemovePhotosFromTravelMemory,
+        onHideMemoryGroup: handleHideMemoryGroup,
+        onRestoreMemoryGroup: handleRestoreMemoryGroup,
+        onAddPhotosBackToMemory: handleAddPhotosBackToTravelMemory,
         onFetchPhotoComments: handleFetchPhotoComments,
         onSavePhotoComments: handleSavePhotoComments,
         ...navMenuProps
@@ -7798,11 +8175,14 @@ function CalendarApp() {
     onClose: () => setIsGalleryOpen(false),
     onUploadImages: handleUploadGalleryImages,
     onAddLink: handleAddGalleryLink,
+    onPasteGatherPhoto: handlePasteGatherPhoto,
+    onPasteGatherPhotos: handlePasteGatherPhotos,
     onOpenShare: () => {
       if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsGalleryShareOpen(true);
     },
     setActiveLightbox: setActiveLightbox,
     onDeletePhoto: handleDeletePhoto,
+    photoCommentCounts: photoCommentCounts,
     showToast: showToast
   }), isGalleryShareOpen && activeCal && /*#__PURE__*/React.createElement(ShareModal, {
     calendar: activeCal,
@@ -11206,6 +11586,7 @@ function getAnniversaryCategoryBadge(category, genre) {
     event: { badgeColor: '#3B82F6', icon: '🎈' },
     festival: { badgeColor: '#F59E0B', icon: '🎉' },
     sports: { badgeColor: '#0EA5E9', icon: SPORTS_GENRE_ICONS[genre] || '⚽' },
+    movie: { badgeColor: '#8B5CF6', icon: '🎬' },
     travel: { badgeColor: '#10B981', icon: '✈️' },
     other: { badgeColor: '#6B7280', icon: '💬' }
   };
@@ -12009,6 +12390,7 @@ function bindGatherUiDeps() {
     fetchActivityLogsFromFirestore: typeof fetchActivityLogsFromFirestore === 'function' ? fetchActivityLogsFromFirestore : null,
     fetchChatMessagesRest: typeof fetchChatMessagesRest === 'function' ? fetchChatMessagesRest : null,
     fetchAllChatMessagesRest: typeof fetchAllChatMessagesRest === 'function' ? fetchAllChatMessagesRest : null,
+    fetchCalendarSearchIndex: typeof fetchCalendarSearchIndex === 'function' ? fetchCalendarSearchIndex : null,
     fetchImageShareDocument: typeof fetchImageShareDocument === 'function' ? fetchImageShareDocument : null,
     fetchRecentMessagesRest: typeof fetchRecentMessagesRest === 'function' ? fetchRecentMessagesRest : null,
     fetchSingleCalendarWithRest: typeof fetchSingleCalendarWithRest === 'function' ? fetchSingleCalendarWithRest : null,

@@ -1206,13 +1206,7 @@ button, input, textarea, select {
    same max-width as .app-container so it lines up with the page content below it. */
 .main-header {
   position: fixed;
-  /* iOS home-screen install (standalone display-mode, apple-mobile-web-app-status-bar-style:
-     black-translucent) renders web content full-bleed under the status bar instead of Safari's
-     own chrome reserving that space -- without this, the status bar's time/battery/signal icons
-     sit on top of the header and its buttons become untappable (the status bar area intercepts
-     the touch). env(safe-area-inset-top) is exactly the notch/status-bar height and resolves to
-     0px in a normal browser tab, so this is a no-op everywhere else. */
-  top: env(safe-area-inset-top, 0px);
+  top: 0;
   left: 0;
   right: 0;
   max-width: 100%;
@@ -1228,14 +1222,16 @@ button, input, textarea, select {
 .main-header-inner {
   max-width: 1100px;
   margin: 0 auto;
-  padding: 18px 10px 8px;
+  /* Standalone iOS PWAs place the status indicators inside the viewport. Keep the
+     header content below that inset so the title and actions remain tappable. */
+  padding: calc(18px + env(safe-area-inset-top, 0px)) 10px 8px;
   display: flex;
   flex-direction: column;
   gap: 10px;
   min-width: 0;
 }
 @media (min-width: 768px) {
-  .main-header-inner { padding: 18px 10px 8px; }
+  .main-header-inner { padding: calc(18px + env(safe-area-inset-top, 0px)) 10px 8px; }
 }
 
 /* Calendar name + search/settings buttons share one row (space-between); the description
@@ -1361,14 +1357,6 @@ button, input, textarea, select {
   background-color: #EF4444;
   color: #FFFFFF;
 }
-.main-menu-dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background-color: #EF4444;
-  flex-shrink: 0;
-}
 @media (max-width: 480px) {
   .main-menu-item { font-size: 0.74rem; padding: 6px 2px; }
   .main-menu-sep { margin: 0 1px; }
@@ -1398,6 +1386,7 @@ button, input, textarea, select {
 @media (min-width: 768px) { .calendar-desc { font-size: 0.875rem; } }
 
 /* Buttons */
+
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   padding: 10px 16px; border-radius: var(--radius-md); font-size: 0.875rem; font-weight: 700;
@@ -2042,12 +2031,8 @@ select.form-select {
   100% { transform: scale(7); opacity: 0; }
 }
 
-/* margin-top separates the badge row from the date-number header row above it -- the day-number
-   "today" circle badge and the first participant badge used to sit almost flush against each
-   other with only the day-cell's own 4-8px padding between them, since .day-cell has no gap of
-   its own between its header row and this badges-container. */
-.badges-container { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; margin-top: 3px; }
-@media (min-width: 640px) { .badges-container { gap: 4px; margin-top: 5px; } }
+.badges-container { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; }
+@media (min-width: 640px) { .badges-container { gap: 4px; } }
 @media (max-width: 640px) {
   .badges-container { justify-content: center; }
 }
@@ -2505,13 +2490,12 @@ select.form-select {
   }
 }
 
-/* Gallery preview thumbnails: 3 columns (9 shown, see the isMobile-gated slice below) under
-   1024px -- this covers both phone and tablet widths, since 6 columns at tablet width shrank
-   each thumbnail too small to make out -- 6 columns (18 shown) only at real desktop widths. */
+/* Gallery preview thumbnails: 3 columns (9 shown, see PhotoGallery's isMobile-gated slice)
+   below the shared 640px breakpoint, 6 columns (18 shown) at/above it. */
 .gallery-thumb-grid {
   grid-template-columns: repeat(3, 1fr);
 }
-@media (min-width: 1024px) {
+@media (min-width: 640px) {
   .gallery-thumb-grid {
     grid-template-columns: repeat(6, 1fr);
   }
@@ -2543,6 +2527,13 @@ select.form-select {
   white-space: pre-wrap;
   word-break: break-word;
   overflow-wrap: anywhere;
+}
+/* Lightbox comment composer sits on a dark overlay, not the light card background the shared
+   rule above assumes -- override just there (higher specificity beats the !important above)
+   instead of touching the shared class other (light-themed) comment threads still rely on. */
+.lightbox-comment-thread .comment-composer-input {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  color: #E2E8F0 !important;
 }
 /* Desktop-only: mobile textareas stay at the blanket 1rem mobile input rule (app.css ~1433) --
    a class-selector !important here would otherwise beat that tag-selector !important on
@@ -2977,16 +2968,8 @@ select.form-select {
   background: var(--bg-card);
   color: var(--text-main);
   box-shadow: -12px 0 34px rgba(15, 23, 42, 0.12);
-  /* Shared by every side panel in the app (main hamburger menu, admin, chat/memo/places/gallery
-     side menus -- see .admin-side-menu-overlay usage sites) -- this one fix covers them all.
-     The overlay is position:fixed;inset:0, so on iOS home-screen install (standalone display-
-     mode, status bar rendered full-bleed over web content, same as .main-header) this panel's
-     own top edge sits right under the status bar with no adjustment. Adding
-     env(safe-area-inset-top) on top of the original 22px (rather than replacing it, which would
-     leave awkwardly little breathing room since the inset itself is already ~44-59px) keeps the
-     same visual spacing below the status bar/notch as before; 0px in a normal browser tab, so
-     this is a no-op everywhere else. */
-  padding: calc(22px + env(safe-area-inset-top, 0px)) 16px 16px;
+  /* The drawer is not a modal-overlay, so it must apply the iOS status-bar inset itself. */
+  padding: calc(22px + env(safe-area-inset-top, 0px)) 16px calc(16px + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -3807,8 +3790,10 @@ select.form-select {
 }
 /* Badges now sit below the trigger row (tabs → toolbar → badges → chips → grid). When present,
    shrink the badges' own top padding so the gap under the toolbar doesn't stack with the old
-   "first-row-under-tabs" top padding the badges used to carry when they preceded the toolbar. */
-.region-filter-trigger-row + .region-selection-badges-row { padding-top: 0; padding-bottom: 10px; }
+   "first-row-under-tabs" top padding the badges used to carry when they preceded the toolbar.
+   Bottom padding stays intact (see .region-selection-badges-row) so the badges don't end up flush
+   against the category chip row rendered right after them. */
+.region-filter-trigger-row + .region-selection-badges-row { padding-top: 0; }
 @media (max-width: 640px) {
   .region-filter-trigger-row { padding: 10px 16px 12px; }
 }
@@ -3818,7 +3803,11 @@ select.form-select {
      out to that min-height anyway (min-height wins when it exceeds height), so the box actually
      rendered at 44px while .current-location-btn (no .form-select class) rendered at its own
      literal height -- the two never matched. Both are 44px explicitly now. */
-  flex: 1 1 0%; min-width: 0; font-size: 0.8rem;
+  /* Shrunk to fit its own "지역 선택" label instead of stretching to fill the row (.form-select's
+     own width:100% overridden here) -- the row now groups 현재위치+지역선택 at the left, with
+     .culture-grid-cols-toggle's margin-left:auto pushing 2단/1단 to the right edge. */
+  flex: 0 0 auto; width: auto; min-width: 0; font-size: 0.8rem;
+  padding-left: 14px; padding-right: 10px;
 }
 /* "현재 위치" sits LEFT of the 지역 선택 trigger -- always a 44×44 icon-only dark square so the
    row stays compact next to the flex-1 region select and the 1·2단 cols toggle on the right. */
@@ -3836,7 +3825,9 @@ select.form-select {
 /* 1단/2단 poster-grid density toggle -- pill group matching gallery visit-filter-toggle-mobile
    (border + 3px padding, active filled #4F46E5). Square icon buttons keep the row at 44px. */
 .culture-grid-cols-toggle {
-  flex: 0 0 auto; display: inline-flex; align-items: center; box-sizing: border-box;
+  /* margin-left:auto pushes this to the row's right edge, leaving 현재위치+지역선택 grouped
+     together at the left (both flex:0 0 auto now, so no third element is left to grow/fill). */
+  flex: 0 0 auto; margin-left: auto; display: inline-flex; align-items: center; box-sizing: border-box;
   height: 44px; padding: 3px; border-radius: var(--radius-md);
   border: 1px solid var(--border-subtle); background: var(--bg-card);
 }
@@ -3892,7 +3883,10 @@ select.form-select {
    Top padding is for the rare case badges render without a preceding trigger; when they follow
    the toolbar, .region-filter-trigger-row + .region-selection-badges-row zeroes it. */
 .region-selection-badges-row {
-  display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 12px 16px 10px;
+  /* Bottom padding (previously 0, flush against the category chip row rendered right after it)
+     gives the badges their own breathing room above the chips instead of the two rows visually
+     merging into one. */
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 12px 16px 12px;
 }
 .region-selection-badges-row .region-filter-reset-btn { margin-left: auto; flex-shrink: 0; }
 .region-selection-badges {
@@ -3906,7 +3900,7 @@ select.form-select {
 }
 .region-selection-badge-remove {
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-  width: 18px; height: 18px; padding: 0; border: none; border-radius: 50%;
+  width: 18px; height: 18px; min-height: 0 !important; padding: 0; border: none; border-radius: 50%;
   background: var(--accent-primary); color: #fff; cursor: pointer;
 }
 
@@ -3930,12 +3924,18 @@ select.form-select {
 }
 .region-filter-save-btn:disabled { opacity: 0.4; cursor: default; }
 
+/* Poster cards inside culture grid */
+.culture-items-grid > button {
+  min-height: auto;
+  height: 100%;
+}
+
 /* 문화공연 / 지역축제 포스터 그리드.
    is-cols-2 (default): 모바일 2단 / 태블릿 4단 / PC 6단.
    is-cols-1: 모바일 1단 / 640px+ 2단 / 1024px+ 3단 (single-column denser on wide screens). */
 .culture-items-grid,
 .culture-items-grid.is-cols-2 {
-  display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 10px;
+  display: grid; grid-template-columns: repeat(2, 1fr); grid-auto-rows: max-content; gap: 12px;
 }
 @media (min-width: 640px) and (max-width: 1023px) {
   .culture-items-grid,
@@ -3946,7 +3946,7 @@ select.form-select {
   .culture-items-grid.is-cols-2 { grid-template-columns: repeat(6, 1fr); }
 }
 .culture-items-grid.is-cols-1 {
-  display: grid; grid-template-columns: 1fr; gap: 12px;
+  display: grid; grid-template-columns: 1fr; grid-auto-rows: max-content; gap: 12px;
 }
 @media (min-width: 640px) and (max-width: 1023px) {
   .culture-items-grid.is-cols-1 { grid-template-columns: repeat(2, 1fr); }

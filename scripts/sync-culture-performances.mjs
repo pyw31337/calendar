@@ -34,7 +34,8 @@ const SPORTS_GENRES = new Set(['baseball', 'basketball', 'volleyball', 'soccer',
 const FEEDS = [
   { file: 'culture-performances.json', sources: new Set(['culture-portal', 'kopis']), label: 'performances' },
   { file: 'culture-festivals.json', sources: new Set(['festival']), label: 'festivals' },
-  { file: 'culture-sports.json', genres: SPORTS_GENRES, label: 'sports' }
+  { file: 'culture-sports.json', genres: SPORTS_GENRES, label: 'sports' },
+  { file: 'culture-movies.json', sources: new Set(['movie']), label: 'movies', keepHistorical: true }
 ];
 
 function parseDateRange(raw) {
@@ -72,23 +73,56 @@ function resolveImageUrl(raw) {
   return `${CULTURE_FLOW_ORIGIN}${value.startsWith('/') ? '' : '/'}${value}`;
 }
 
+function isFallbackPoster(url) {
+  return !url || /fallbacks\/movie\.(svg|png|jpg)$/i.test(String(url));
+}
+
+// Culture Flow may legitimately have no poster yet for a newly announced title. Naver's movie
+// search result exposes a small poster thumbnail even in that case; cache that URL in our static
+// snapshot so runtime users never have to scrape a search engine or pay for another API call.
+async function enrichMovieFromNaver(item) {
+  if (!item || item.genre !== 'movie' || !isFallbackPoster(item.image)) return item;
+  try {
+    const response = await fetch(`https://search.naver.com/search.naver?query=${encodeURIComponent(`${item.title} 영화`)}`, {
+      headers: { 'user-agent': 'Mozilla/5.0 (compatible; CalendarContentSync/1.0)' },
+      signal: AbortSignal.timeout(10000)
+    });
+    if (!response.ok) return item;
+    const html = await response.text();
+    const posterCandidates = [...html.matchAll(/https?:[^"'\\ ]+(?:jpg|jpeg|png|webp)/gi)]
+      .map(match => match[0].replaceAll('\\u0026', '&'))
+      .filter(url => /movie\.phinf|imgmovie/i.test(url));
+    const poster = posterCandidates.find(url => /type=o|size=\d+x\d+/i.test(url)) || posterCandidates[0] || '';
+    if (poster) item.image = poster;
+    if (!item.ageRating || /미정|정보없음|정보 없음/i.test(item.ageRating)) {
+      const rating = html.match(/(전체관람가|12세이상관람가|15세이상관람가|청소년관람불가)/)?.[1];
+      if (rating) item.ageRating = rating;
+    }
+  } catch (error) {
+    console.warn(`[sync-culture-performances] movie enrichment skipped for ${item.title}: ${error.message}`);
+  }
+  return item;
+}
+
 function normalizeItem(raw) {
   const { startDate, endDate } = parseDateRange(raw.date);
+  const movie = raw.genre === 'movie';
+  const normalizedEndDate = movie ? null : endDate;
   return {
-    startDate, endDate,
+    startDate, endDate: normalizedEndDate,
     item: {
       id: String(raw.id || `${raw.title}::${raw.date}`),
       title: String(raw.title),
       dateLabel: String(raw.date),
       startDate,
-      endDate,
+      endDate: normalizedEndDate,
       venue: raw.venue || raw.venueKey || '',
       address: raw.address || '',
       region: raw.region || '',
       lat: typeof raw.lat === 'number' ? raw.lat : null,
       lng: typeof raw.lng === 'number' ? raw.lng : null,
       genre: raw.genre || '',
-      image: resolveImageUrl(raw.image || raw.backupPoster),
+      image: resolveImageUrl(raw.image || raw.backupPoster || raw.posterUrl || raw.poster),
       link: String(raw.link),
       price: raw.price || '',
       contact: raw.contact || '',
@@ -106,6 +140,18 @@ function normalizeItem(raw) {
       awayTeam: raw.awayTeam || '',
       homeTeamLogo: resolveImageUrl(raw.homeTeamLogo),
       awayTeamLogo: resolveImageUrl(raw.awayTeamLogo)
+      ,releaseDate: movie ? (raw.dateRaw ? String(raw.dateRaw).replace(/^(\d{4})(\d{2})(\d{2}).*$/, '$1-$2-$3') : startDate) : '',
+      isOpenEnded: movie,
+      director: raw.director || '',
+      cast: Array.isArray(raw.cast) ? raw.cast : [],
+      ageRating: raw.ageRating || '',
+      audienceCount: raw.audienceCount ?? raw.audience ?? '',
+      bookingRate: raw.bookingRate ?? raw.reservationRate ?? '',
+      runningTime: raw.runningTime || '',
+      subGenre: raw.subGenre || '',
+      originalTitle: raw.originalTitle || '',
+      synopsis: raw.synopsis || '',
+      posterSources: [raw.image, raw.backupPoster, raw.posterUrl, raw.poster].filter(Boolean)
     }
   };
 }
@@ -252,10 +298,13 @@ async function main() {
       if (!matches) continue;
       if (REQUIRED_FIELDS.some(f => !raw[f])) continue;
       const { startDate, endDate, item } = normalizeItem(raw);
-      if (!isVisible(endDate, startDate, todayIso)) continue;
+      if (!feed.keepHistorical && !isVisible(endDate, startDate, todayIso)) continue;
       normalized.push(item);
     }
     if (feed.sources && feed.sources.size > 1) normalized = mergeDuplicates(normalized);
+    if (feed.label === 'movies') {
+      for (const item of normalized) await enrichMovieFromNaver(item);
+    }
     writeFeedIfHealthy(path.resolve(DATA_DIR, feed.file), normalized, feed.label);
   }
 }

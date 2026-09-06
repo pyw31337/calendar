@@ -288,6 +288,10 @@ function reformatMemoIntoDateLines(...args) {
   const f = __gatherUiDeps().reformatMemoIntoDateLines || GATHER_APP_UTILS.reformatMemoIntoDateLines;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function readClipboardImageFiles(...args) {
+  const f = __gatherUiDeps().readClipboardImageFiles || GATHER_APP_UTILS.readClipboardImageFiles;
+  return typeof f === 'function' ? f(...args) : Promise.resolve([]);
+}
 function removeFirstUrl(...args) {
   const f = __gatherUiDeps().removeFirstUrl || GATHER_APP_UTILS.removeFirstUrl;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -793,6 +797,7 @@ const ANNIVERSARY_CATEGORY_OPTIONS = [
   { value: 'event', label: '행사' },
   { value: 'festival', label: '축제' },
   { value: 'sports', label: '스포츠' },
+  { value: 'movie', label: '영화' },
   { value: 'travel', label: '여행' },
   { value: 'other', label: '기타' }
 ];
@@ -800,13 +805,14 @@ const ANNIVERSARY_CATEGORY_OPTIONS = [
 // 색상 -- 목록에서도 같은 색으로 구분되게 그대로 재사용한다.
 const ANNIVERSARY_CATEGORY_COLORS = {
   birthday: '#EF4444', event: '#3B82F6', festival: '#F59E0B',
-  sports: '#0EA5E9', travel: '#10B981', other: '#6B7280'
+  sports: '#0EA5E9', movie: '#8B5CF6', travel: '#10B981', other: '#6B7280'
 };
 const ANNIVERSARY_CATEGORY_TITLE_LABEL = {
   birthday: '생일 이름',
   event: '행사 이름',
   festival: '축제 이름',
   sports: '경기 이름',
+  movie: '영화 제목',
   travel: '여행 이름',
   other: '기념일 이름'
 };
@@ -847,17 +853,25 @@ export function AnniversaryModal({
     return React.createElement('option', { key: String(item.value), value: item.value }, item.label ?? item.value);
   })));
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon || (function () { return '×'; });
+  const TrashIcon = __comp.TrashIcon || __deps.TrashIcon || (function () { return '🗑'; });
   const CakeIcon = __comp.CakeIcon || __deps.CakeIcon;
   const BalloonIcon = __comp.BalloonIcon || __deps.BalloonIcon;
   const ConfettiIcon = __comp.ConfettiIcon || __deps.ConfettiIcon;
   const TicketsPlaneIcon = __comp.TicketsPlaneIcon || __deps.TicketsPlaneIcon;
   const MessageCircleMoreIcon = __comp.MessageCircleMoreIcon || __deps.MessageCircleMoreIcon;
+  const TrophyIcon = __comp.TrophyIcon || __deps.TrophyIcon;
+  const ClapperboardIcon = __comp.ClapperboardIcon || __deps.ClapperboardIcon;
   const MapPinIcon = __comp.MapPinIcon || __deps.MapPinIcon;
   const ItemEditDeleteActions = __comp.ItemEditDeleteActions || __deps.ItemEditDeleteActions;
   const SectionCountBadge = __comp.SectionCountBadge || __deps.SectionCountBadge;
   const firebaseConfig = __deps.firebaseConfig || window.firebaseConfig;
+  // sports/movie가 빠져 있던 자리 -- getAnniversaryCategoryBadge(app-main.js, 캘린더 셀 뱃지)는
+  // 이미 sports를 하늘색(#0EA5E9) + 종목 이모지로, movie를 보라색(#8B5CF6) + 🎬로 별도 처리하는데,
+  // 이 목록/등록 모달의 아이콘 맵에는 없어서 해당 항목이 여기서만 "카테고리 없음" 취급되어
+  // 생일(빨간 케이크)로 표시되고 있었다 -- 실제 저장된 category는 맞는데 이 화면의 아이콘/색상만
+  // 잘못 보였던 것.
   const ANNIVERSARY_CATEGORY_ICONS = {
-    birthday: CakeIcon, event: BalloonIcon, festival: ConfettiIcon, travel: TicketsPlaneIcon, other: MessageCircleMoreIcon
+    birthday: CakeIcon, event: BalloonIcon, festival: ConfettiIcon, sports: TrophyIcon, movie: ClapperboardIcon, travel: TicketsPlaneIcon, other: MessageCircleMoreIcon
   };
   const getActiveParticipants = __deps.getActiveParticipants;
   const [activeTab, setActiveTab] = React.useState('list'); // 'list', 'add', 'bulk'
@@ -1068,6 +1082,10 @@ export function AnniversaryModal({
       showToast
     });
     setPhotoProcessing(null);
+  };
+  const handleClickPastePhotoButton = async () => {
+    const files = await readClipboardImageFiles(showToast);
+    if (files && files.length > 0) handleAttachPhotoFiles(files);
   };
   const handlePhotoPaste = e => {
     const pastedFiles = getImageFilesFromClipboardEvent(e);
@@ -1698,9 +1716,10 @@ export function AnniversaryModal({
                   style: {
                     position: 'absolute', top: '-6px', right: '-6px', width: '18px', height: '18px', borderRadius: '50%',
                     border: 'none', backgroundColor: 'rgba(0,0,0,0.65)', color: '#FFFFFF', fontSize: '11px',
-                    lineHeight: '18px', textAlign: 'center', cursor: 'pointer', padding: 0
+                    lineHeight: '18px', textAlign: 'center', cursor: 'pointer', padding: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
                   }
-                }, "✕")
+                }, /*#__PURE__*/React.createElement(TrashIcon, { size: 10 }))
               )),
               /*#__PURE__*/React.createElement("button", {
                 type: "button",
@@ -1712,6 +1731,16 @@ export function AnniversaryModal({
                   cursor: 'pointer', fontSize: 'var(--font-size-xs)'
                 }
               }, "+", /*#__PURE__*/React.createElement("span", null, "업로드")),
+              /*#__PURE__*/React.createElement("button", {
+                type: "button",
+                onClick: handleClickPastePhotoButton,
+                style: {
+                  width: '56px', height: '56px', flexShrink: 0, display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', justifyContent: 'center', gap: '2px', border: '1px solid var(--border-subtle)',
+                  borderRadius: 'var(--radius-sm)', backgroundColor: 'var(--bg-card)', color: 'var(--text-muted)',
+                  cursor: 'pointer', fontSize: 'var(--font-size-xs)'
+                }
+              }, /*#__PURE__*/React.createElement("span", null, "붙여넣기")),
               photoProcessing && /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } },
                 `처리 중... (${photoProcessing.current}/${photoProcessing.total})`
               ),
@@ -1937,24 +1966,16 @@ export function AnniversaryModal({
 
             /* Multi day (연일) fields */
             dayMode === 'range' && /*#__PURE__*/React.createElement("div", {
-              style: { display: 'flex', gap: '8px', flexWrap: 'wrap', padding: '10px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)' }
+              style: { padding: '10px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)' }
             },
-              /*#__PURE__*/React.createElement("div", { style: { flex: '1 1 130px' } },
-                /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginBottom: '3px' } }, "시작일자"),
-                /*#__PURE__*/React.createElement(DeadlineDateTimePicker, {
-                  dateOnly: true,
-                  value: rangeStartDate,
-                  onChange: v => setRangeStartDate(v.slice(0, 10))
-                })
-              ),
-              /*#__PURE__*/React.createElement("div", { style: { flex: '1 1 130px' } },
-                /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginBottom: '3px' } }, "종료일자"),
-                /*#__PURE__*/React.createElement(DeadlineDateTimePicker, {
-                  dateOnly: true,
-                  value: rangeEndDate,
-                  onChange: v => setRangeEndDate(v.slice(0, 10))
-                })
-              )
+              /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginBottom: '3px' } }, "여행 기간"),
+              /*#__PURE__*/React.createElement(DeadlineDateTimePicker, {
+                dateOnly: true,
+                rangeMode: true,
+                rangeStart: rangeStartDate,
+                rangeEnd: rangeEndDate,
+                onChangeRange: ({ start, end }) => { setRangeStartDate(start); setRangeEndDate(end); }
+              })
             )
           ),
 

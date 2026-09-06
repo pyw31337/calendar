@@ -1194,7 +1194,7 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
   );
 }
 
-export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = false, placeholder }) {
+export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = false, placeholder, rangeMode = false, rangeStart, rangeEnd, onChangeRange }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -1211,8 +1211,25 @@ export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = f
   const [pMonth, setPMonth] = React.useState(isValid ? parsed.getMonth() : now.getMonth());
   const [pDay, setPDay] = React.useState(isValid ? parsed.getDate() : now.getDate());
   const [pTime, setPTime] = React.useState(isValid && !dateOnly ? value.slice(11, 16) : '23:59');
+  // rangeMode: 호텔스닷컴/야놀자 스타일 2탭 구간 선택 -- 백드롭 하나를 열고 1번째 클릭은
+  // 시작일, 2번째 클릭은 종료일로 자동 인식하며, 3번째 클릭은 다시 새 시작일로 리셋된다.
+  const [localRangeStart, setLocalRangeStart] = React.useState(rangeStart || null);
+  const [localRangeEnd, setLocalRangeEnd] = React.useState(rangeEnd || null);
+  const [rangePickStep, setRangePickStep] = React.useState('start');
 
   const openPicker = () => {
+    if (rangeMode) {
+      const anchor = rangeStart || null;
+      const d = anchor ? new Date(`${anchor}T00:00`) : null;
+      const v = d && !Number.isNaN(d.getTime());
+      setPYear(v ? d.getFullYear() : now.getFullYear());
+      setPMonth(v ? d.getMonth() : now.getMonth());
+      setLocalRangeStart(rangeStart || null);
+      setLocalRangeEnd(rangeEnd || null);
+      setRangePickStep('start');
+      setIsOpen(true);
+      return;
+    }
     const d = value ? new Date(dateOnly ? `${value}T00:00` : value) : null;
     const v = d && !Number.isNaN(d.getTime());
     setPYear(v ? d.getFullYear() : now.getFullYear());
@@ -1225,7 +1242,27 @@ export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = f
   const daysInMonth = new Date(pYear, pMonth + 1, 0).getDate();
   const firstWeekday = new Date(pYear, pMonth, 1).getDay();
 
+  const handleDayClick = day => {
+    if (!rangeMode) { setPDay(day); return; }
+    const mm = String(pMonth + 1).padStart(2, '0');
+    const dd = String(day).padStart(2, '0');
+    const dateStr = `${pYear}-${mm}-${dd}`;
+    if (rangePickStep === 'start') {
+      setLocalRangeStart(dateStr);
+      setLocalRangeEnd(null);
+      setRangePickStep('end');
+      return;
+    }
+    const start = dateStr < localRangeStart ? dateStr : localRangeStart;
+    const end = dateStr < localRangeStart ? localRangeStart : dateStr;
+    setLocalRangeStart(start);
+    setLocalRangeEnd(end);
+    setRangePickStep('start');
+    if (typeof onChangeRange === 'function') onChangeRange({ start, end });
+  };
+
   const handleApply = () => {
+    if (rangeMode) { setIsOpen(false); return; }
     const mm = String(pMonth + 1).padStart(2, '0');
     const dd = String(pDay).padStart(2, '0');
     onChange(dateOnly ? `${pYear}-${mm}-${dd}` : `${pYear}-${mm}-${dd}T${pTime}`);
@@ -1234,11 +1271,20 @@ export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = f
 
   const dayNamesKo = ['일', '월', '화', '수', '목', '금', '토'];
   const dayNameStr = isValid ? dayNamesKo[parsed.getDay()] : '';
-  const displayText = isValid
-    ? dateOnly
-      ? `${parsed.getFullYear()}.${String(parsed.getMonth() + 1).padStart(2, '0')}.${String(parsed.getDate()).padStart(2, '0')} (${dayNameStr})`
-      : `${parsed.getFullYear()}.${String(parsed.getMonth() + 1).padStart(2, '0')}.${String(parsed.getDate()).padStart(2, '0')} (${dayNameStr}) ${value.slice(11, 16)}`
-    : (placeholder || (dateOnly ? '날짜 선택' : '날짜/시간 선택'));
+  const fmtRangeDate = d => {
+    if (!d) return '';
+    const dt = new Date(`${d}T00:00`);
+    return `${dt.getMonth() + 1}.${dt.getDate()}(${dayNamesKo[dt.getDay()]})`;
+  };
+  const displayText = rangeMode
+    ? (rangeStart || rangeEnd)
+      ? `${fmtRangeDate(rangeStart) || '시작일'} ~ ${fmtRangeDate(rangeEnd) || '종료일'}`
+      : (placeholder || '기간 선택')
+    : isValid
+      ? dateOnly
+        ? `${parsed.getFullYear()}.${String(parsed.getMonth() + 1).padStart(2, '0')}.${String(parsed.getDate()).padStart(2, '0')} (${dayNameStr})`
+        : `${parsed.getFullYear()}.${String(parsed.getMonth() + 1).padStart(2, '0')}.${String(parsed.getDate()).padStart(2, '0')} (${dayNameStr}) ${value.slice(11, 16)}`
+      : (placeholder || (dateOnly ? '날짜 선택' : '날짜/시간 선택'));
 
   return /*#__PURE__*/React.createElement('div', { style: { position: 'relative' } },
     /*#__PURE__*/React.createElement('button', {
@@ -1252,7 +1298,7 @@ export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = f
       onClick: openPicker
     },
       /*#__PURE__*/React.createElement('span', { style: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, displayText),
-      dateOnly && /*#__PURE__*/React.createElement(CalendarSearchIcon, { size: 18 })
+      (dateOnly || rangeMode) && /*#__PURE__*/React.createElement(CalendarSearchIcon, { size: 18 })
     ),
     (() => {
       const sheet = isOpen && /*#__PURE__*/React.createElement('div', {
@@ -1264,7 +1310,7 @@ export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = f
         onClick: e => e.stopPropagation()
       },
         /*#__PURE__*/React.createElement('div', { className: 'bottom-sheet-header' },
-          /*#__PURE__*/React.createElement('h4', null, dateOnly ? '날짜 선택' : '날짜/시간 선택'),
+          /*#__PURE__*/React.createElement('h4', null, rangeMode ? (rangePickStep === 'start' ? '시작일 선택' : '종료일 선택') : (dateOnly ? '날짜 선택' : '날짜/시간 선택')),
           /*#__PURE__*/React.createElement('button', {
             type: 'button',
             style: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer' },
@@ -1283,7 +1329,7 @@ export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = f
               onClick: () => {
                 setPMonth(idx);
                 const dim = new Date(pYear, idx + 1, 0).getDate();
-                if (pDay > dim) setPDay(dim);
+                if (!rangeMode && pDay > dim) setPDay(dim);
               },
               style: {
                 padding: '6px 4px', borderRadius: 'var(--radius-sm)',
@@ -1303,13 +1349,26 @@ export function DeadlineDateTimePicker({ value, onChange, disabled, dateOnly = f
             Array.from({ length: firstWeekday }).map((_, i) => /*#__PURE__*/React.createElement('div', { key: `blank-${i}` })),
             Array.from({ length: daysInMonth }).map((_, i) => {
               const day = i + 1;
-              const isSelected = pDay === day;
+              const mm = String(pMonth + 1).padStart(2, '0');
+              const dateStr = rangeMode ? `${pYear}-${mm}-${String(day).padStart(2, '0')}` : '';
+              const isStart = rangeMode && !!localRangeStart && dateStr === localRangeStart;
+              const isEnd = rangeMode && !!localRangeEnd && dateStr === localRangeEnd;
+              const isRangeEndpoint = isStart || isEnd;
+              const isInRange = rangeMode && localRangeStart && localRangeEnd && dateStr > localRangeStart && dateStr < localRangeEnd;
+              const isSelected = rangeMode ? isRangeEndpoint : pDay === day;
+              // 시작일/종료일 두 칸이 하나의 구간 막대처럼 보이도록, 시작일은 좌측만, 종료일은
+              // 우측만 둥글게 -- 하루만 선택된 경우(시작=종료)에는 기존처럼 네 모서리 다 둥글게.
+              const rangeRadius = isStart && isEnd
+                ? 'var(--radius-sm)'
+                : isStart ? 'var(--radius-sm) 0 0 var(--radius-sm)'
+                : isEnd ? '0 var(--radius-sm) var(--radius-sm) 0'
+                : isInRange ? '0' : 'var(--radius-sm)';
               return /*#__PURE__*/React.createElement('button', {
-                key: day, type: 'button', onClick: () => setPDay(day),
+                key: day, type: 'button', onClick: () => handleDayClick(day),
                 style: {
-                  padding: '6px 0', borderRadius: 'var(--radius-sm)',
+                  padding: '6px 0', borderRadius: rangeMode ? rangeRadius : 'var(--radius-sm)',
                   border: isSelected ? '2px solid var(--accent-primary)' : '1px solid transparent',
-                  background: isSelected ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
+                  background: isSelected ? 'rgba(99, 102, 241, 0.15)' : (isInRange ? 'rgba(99, 102, 241, 0.06)' : 'transparent'),
                   color: isSelected ? 'var(--accent-primary)' : 'var(--text-main)',
                   fontWeight: isSelected ? 800 : 500, fontSize: 'var(--font-size-md)', cursor: 'pointer'
                 }
@@ -1504,7 +1563,28 @@ export function PlacesSection({ calendar, onViewAll, onSelectPlace }) {
   );
 }
 
-export function ImageUrlModal({ imageUrl, onClose, showToast, onEnsureShareUrl }) {
+// 다른 캘린더의 갤러리 페이지에 이 URL을 붙여넣으면(붙여넣기 버튼 또는 Ctrl+V) 사진과 해시태그를
+// 그대로 들고 가되, 그 이후로는 서로 완전히 독립적으로 관리되도록(한쪽에서 태그를 추가/삭제해도
+// 다른 쪽에 영향 없음) -- URL 자체는 그대로 두고(다른 곳에 붙여넣어도 정상 동작하는 이미지 링크로
+// 남도록) 눈에 보이지 않는 URL 프래그먼트(#)에 태그만 실어 보낸다. 프래그먼트는 서버로 전송되지
+// 않고 이미지 로딩에도 영향을 주지 않아 원본 URL의 용도를 해치지 않는다. 파일정보(타입/용량/
+// 해상도)는 URL과 업로드 시각만 있으면 붙여넣은 쪽에서도 똑같이 다시 계산되므로 여기 실어보낼
+// 필요가 없다 -- 오직 태그(해시태그)만 앱이 스스로 다시 계산해낼 수 없는 값이라 실어 보낸다.
+const GATHER_PHOTO_FRAGMENT_PREFIX = '#gatherPhoto=';
+function encodeGatherPhotoFragment(tags) {
+  const cleanTags = String(tags || '').trim();
+  if (!cleanTags) return '';
+  try {
+    const payload = { v: 1, kind: 'gather-photo', tags: cleanTags };
+    const json = JSON.stringify(payload);
+    const b64 = typeof btoa === 'function' ? btoa(unescape(encodeURIComponent(json))) : '';
+    return b64 ? GATHER_PHOTO_FRAGMENT_PREFIX + b64 : '';
+  } catch (_) {
+    return '';
+  }
+}
+
+export function ImageUrlModal({ imageUrl, tags = '', onClose, showToast, onEnsureShareUrl }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -1586,7 +1666,9 @@ export function ImageUrlModal({ imageUrl, onClose, showToast, onEnsureShareUrl }
     disabled: isGenerating || !isShareableUrl,
     style: { opacity: isGenerating || !isShareableUrl ? 0.65 : 1, cursor: isGenerating || !isShareableUrl ? 'not-allowed' : 'pointer' },
     onClick: async () => {
-      const ok = await copyTextToClipboard(resolvedUrl || '');
+      const fragment = encodeGatherPhotoFragment(tags);
+      const copyText = fragment ? `${resolvedUrl || ''}${fragment}` : (resolvedUrl || '');
+      const ok = await copyTextToClipboard(copyText);
       const message = ok ? '이미지 URL이 복사되었습니다.' : '복사에 실패했습니다. URL을 직접 선택해 복사해 주세요.';
       if (showToast) showToast(message, ok ? 'success' : 'error');
         else console.warn(message);

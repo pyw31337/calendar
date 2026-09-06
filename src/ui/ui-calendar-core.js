@@ -236,6 +236,10 @@ function reformatMemoIntoDateLines(...args) {
   const f = __gatherUiDeps().reformatMemoIntoDateLines || GATHER_APP_UTILS.reformatMemoIntoDateLines;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function readClipboardImageFiles(...args) {
+  const f = __gatherUiDeps().readClipboardImageFiles || GATHER_APP_UTILS.readClipboardImageFiles;
+  return typeof f === 'function' ? f(...args) : Promise.resolve([]);
+}
 function removeFirstUrl(...args) {
   const f = __gatherUiDeps().removeFirstUrl || GATHER_APP_UTILS.removeFirstUrl;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -794,6 +798,7 @@ export function CalendarGrid({
   const VolleyballIcon = __comp.VolleyballIcon || __deps.VolleyballIcon;
   const SoccerBallIcon = __comp.SoccerBallIcon || __deps.SoccerBallIcon;
   const HandballIcon = __comp.HandballIcon || __deps.HandballIcon;
+  const ClapperboardIcon = __comp.ClapperboardIcon || __deps.ClapperboardIcon;
   const ParticipantBadge = __comp.ParticipantBadge || __deps.ParticipantBadge;
   // 흔들도시락 anniversary: cooking-pot icon + jiggle (title match, not category emoji).
   const isHeundeulDosirakAnn = (ann) => {
@@ -826,7 +831,8 @@ export function CalendarGrid({
     if (ann.type === 'dday') return ann.icon;
     const iconMap = {
       '🎂': CakeIcon, '🎈': BalloonIcon, '🎉': ConfettiIcon, '✈️': TicketsPlaneIcon, '💬': MessageCircleMoreIcon,
-      '⚾': BaseballIcon, '🏀': BasketballIcon, '🏐': VolleyballIcon, '⚽': SoccerBallIcon, '🤾': HandballIcon
+      '⚾': BaseballIcon, '🏀': BasketballIcon, '🏐': VolleyballIcon, '⚽': SoccerBallIcon, '🤾': HandballIcon,
+      '🎬': ClapperboardIcon
     };
     const Icon = iconMap[ann.icon];
     return Icon ? /*#__PURE__*/React.createElement(Icon, { size }) : ann.icon;
@@ -2111,252 +2117,6 @@ export function CommentsSection({
   }) : null));
 }
 
-// 메모 카드(MemoCard, 아래)가 쓰는 것과 똑같은 댓글 스레드 UI/로직(참여자 선택 + 입력 +
-// 편집/삭제, 3개 초과 시 접기)을, 사진 라이트박스에서도 그대로 쓸 수 있도록 독립 컴포넌트로
-// 뽑아낸 버전. 데이터 모양도 동일하다 -- comments: [{id, participantId, text, createdAt,
-// updatedAt?}], onCommentsChange(nextComments) 하나로 저장을 위임한다. MemoCard 쪽 로직은
-// 이미 검증되어 실사용 중이라 그대로 두고 건드리지 않았다(회귀 위험 최소화) -- 대신 여기서는
-// 토글 버튼까지 포함해 완전히 자기완결적인(self-contained) 블록 하나로 렌더링한다. 메모처럼
-// "태그 행 안에 버튼, 그 아래 목록"으로 나눌 자리가 따로 없는 라이트박스에도 통째로 넣을 수
-// 있도록 하기 위함.
-export function CommentThread({ comments = [], onCommentsChange, calendar, showToast, onRequestConfirm }) {
-  const React = window.React;
-  const __deps = window.GATHER_UI_DEPS || {};
-  const __comp = window.GATHER_UI_COMPONENTS || {};
-  const ChatParticipantSheet = __comp.ChatParticipantSheet || __deps.ChatParticipantSheet;
-  const ParticipantPickerButton = __comp.ParticipantPickerButton || __deps.ParticipantPickerButton;
-  const MessageCommentIcon = __comp.MessageCommentIcon || __deps.MessageCommentIcon;
-  const PencilIcon = __comp.PencilIcon || __deps.PencilIcon;
-  const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
-  const AutoGrowTextarea = __comp.AutoGrowTextarea || __deps.AutoGrowTextarea;
-  const sanitizeText = __deps.sanitizeText;
-
-  const [isCommentComposerOpen, setIsCommentComposerOpen] = React.useState(false);
-  const [commentText, setCommentText] = React.useState('');
-  const [commentParticipantId, setCommentParticipantId] = React.useState(() => getStoredChatParticipantId(calendar?.id, calendar));
-  const [isCommentPartOpen, setIsCommentPartOpen] = React.useState(false);
-  const [editingCommentId, setEditingCommentId] = React.useState(null);
-  const [isSavingComment, setIsSavingComment] = React.useState(false);
-  const commentPart = (calendar?.participants || []).find(p => p.id === commentParticipantId);
-  const COMMENT_COLLAPSE_LIMIT = 3;
-  const [isCommentsExpanded, setIsCommentsExpanded] = React.useState(false);
-  const hasMoreComments = comments.length > COMMENT_COLLAPSE_LIMIT;
-  const visibleComments = (!hasMoreComments || isCommentsExpanded) ? comments : comments.slice(-COMMENT_COLLAPSE_LIMIT);
-
-  const handleSaveComment = async (e) => {
-    if (e) e.stopPropagation();
-    const text = commentText.trim();
-    if (!text || !commentParticipantId || isSavingComment) return;
-    const now = Date.now();
-    const wasEditing = !!editingCommentId;
-    const nextComments = editingCommentId
-      ? comments.map(c => c.id === editingCommentId ? { ...c, text, participantId: commentParticipantId, updatedAt: now } : c)
-      : [...comments, { id: `cmt_${now}_${Math.random().toString(36).slice(2, 8)}`, participantId: commentParticipantId, text, createdAt: now }];
-    setIsSavingComment(true);
-    try {
-      const saved = await Promise.resolve(onCommentsChange(nextComments));
-      if (saved === false) return;
-      setCommentText('');
-      setEditingCommentId(null);
-      setIsCommentComposerOpen(false);
-      if (typeof showToast === 'function') {
-        showToast(wasEditing ? '댓글이 수정되었습니다' : '댓글이 등록되었습니다', 'success');
-      }
-    } finally {
-      setIsSavingComment(false);
-    }
-  };
-
-  const handleCancelComment = e => {
-    if (e) e.stopPropagation();
-    setEditingCommentId(null);
-    setCommentText('');
-    setIsCommentComposerOpen(false);
-  };
-
-  const handleStartEditComment = (e, comment) => {
-    if (e) e.stopPropagation();
-    setEditingCommentId(comment.id);
-    setCommentText(comment.text);
-    setCommentParticipantId(comment.participantId);
-    setIsCommentComposerOpen(true);
-  };
-
-  const handleDeleteComment = (e, comment) => {
-    if (e) e.stopPropagation();
-    const commentId = typeof comment === 'string' ? comment : comment?.id;
-    if (!commentId) return;
-    const target = typeof comment === 'object' && comment ? comment : comments.find(c => c.id === commentId);
-    const author = (calendar?.participants || []).find(p => p.id === (target?.participantId || ''));
-    const authorName = author?.name || '참여자';
-    const snippet = sanitizeText(String(target?.text || ''), 40);
-    const message = snippet
-      ? `${authorName}님의 '${snippet}' 댓글을 삭제하시겠습니까?`
-      : `${authorName}님의 댓글을 삭제하시겠습니까?`;
-    const doDelete = async () => {
-      const previousComments = comments.slice();
-      const saved = await Promise.resolve(onCommentsChange(previousComments.filter(c => c.id !== commentId)));
-      if (saved === false) return;
-      if (editingCommentId === commentId) {
-        setEditingCommentId(null);
-        setCommentText('');
-        setIsCommentComposerOpen(false);
-      }
-      if (typeof showToast === 'function') {
-        showToast('댓글이 삭제되었습니다', 'delete', 5000, async () => {
-          const restored = await Promise.resolve(onCommentsChange(previousComments));
-          if (restored !== false && typeof showToast === 'function') showToast('댓글 삭제를 되돌렸습니다', 'success', 3000);
-        });
-      }
-    };
-    if (typeof onRequestConfirm === 'function') {
-      onRequestConfirm('댓글 삭제', message, doDelete);
-    }
-  };
-
-  return /*#__PURE__*/React.createElement("div", { onClick: e => e.stopPropagation() },
-    /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      onClick: (e) => {
-        e.stopPropagation();
-        setEditingCommentId(null);
-        setCommentText('');
-        setIsCommentComposerOpen(v => !v);
-      },
-      title: "댓글",
-      "aria-label": "댓글",
-      style: {
-        display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 2px',
-        color: (comments.length > 0 || isCommentComposerOpen) ? 'var(--accent-primary)' : '#94A3B8',
-        fontSize: 'var(--font-size-sm)', fontWeight: 700
-      }
-    }, /*#__PURE__*/React.createElement(MessageCommentIcon, { size: 18 }), `댓글${comments.length > 0 ? ` ${comments.length}` : ''}`),
-
-    comments.length > 0 && /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '4px' }
-    },
-      hasMoreComments && /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: e => { e.stopPropagation(); setIsCommentsExpanded(v => !v); },
-        style: {
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
-          alignSelf: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px',
-          fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--text-muted)'
-        }
-      },
-        /*#__PURE__*/React.createElement("svg", {
-          width: "12", height: "12", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2",
-          strokeLinecap: "round", strokeLinejoin: "round",
-          style: { transform: isCommentsExpanded ? 'none' : 'rotate(180deg)' }
-        }, /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" })),
-        isCommentsExpanded ? '댓글 접기' : `댓글 더보기 (${comments.length - COMMENT_COLLAPSE_LIMIT}개)`
-      ),
-      visibleComments.map((comment, commentIdx) => {
-        const author = (calendar?.participants || []).find(p => p.id === comment.participantId);
-        return /*#__PURE__*/React.createElement("div", {
-          key: comment.id,
-          onClick: e => e.stopPropagation(),
-          style: {
-            display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 2px',
-            borderTop: commentIdx > 0 ? '1px solid color-mix(in srgb, var(--bg-primary) 96%, black)' : 'none'
-          }
-        },
-          /*#__PURE__*/React.createElement("span", {
-            className: "memo-comment-author-dot",
-            role: "img",
-            tabIndex: 0,
-            "aria-label": `${author?.name || '알 수 없는 작성자'} 작성자`,
-            "data-author-name": author?.name || '알 수 없는 작성자',
-            title: author?.name || '알 수 없는 작성자',
-            style: { width: '8px', height: '8px', borderRadius: '50%', backgroundColor: author?.color || '#94A3B8', flexShrink: 0 }
-          }),
-          /*#__PURE__*/React.createElement("span", {
-            style: { flex: 1, minWidth: 0, fontSize: 'var(--font-size-md)', color: 'var(--text-main)', wordBreak: 'break-word' }
-          }, comment.text),
-          /*#__PURE__*/React.createElement("button", {
-            type: "button", onClick: e => handleStartEditComment(e, comment), title: "편집", "aria-label": "댓글 편집",
-            style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)', flexShrink: 0 }
-          }, /*#__PURE__*/React.createElement(PencilIcon, { size: 12 })),
-          /*#__PURE__*/React.createElement("button", {
-            type: "button", onClick: e => handleDeleteComment(e, comment), title: "삭제", "aria-label": "댓글 삭제",
-            style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)', flexShrink: 0 }
-          }, /*#__PURE__*/React.createElement(TrashIcon, { size: 12 }))
-        );
-      })
-    ),
-
-    isCommentComposerOpen && /*#__PURE__*/React.createElement("div", {
-      className: "comment-composer",
-      onClick: e => e.stopPropagation(),
-      style: { marginTop: '8px' }
-    },
-      AutoGrowTextarea && /*#__PURE__*/React.createElement(AutoGrowTextarea, {
-        className: "comment-composer-input",
-        value: commentText,
-        onChange: e => setCommentText(e.target.value),
-        onClick: e => e.stopPropagation(),
-        onKeyDown: e => {
-          e.stopPropagation();
-          if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-            if (e.nativeEvent && e.nativeEvent.isComposing) return;
-            e.preventDefault();
-            handleSaveComment(e);
-          }
-        },
-        placeholder: "댓글을 입력하세요...",
-        rows: 1,
-        minHeight: 30,
-        maxHeight: 200,
-        style: {
-          width: '100%',
-          fontSize: '0.8rem',
-          border: '1px solid var(--border-subtle)',
-          borderRadius: 'var(--radius-sm)',
-          padding: '6px 8px',
-          backgroundColor: '#fff',
-          color: 'var(--text-main)',
-          outline: 'none',
-          boxSizing: 'border-box'
-        }
-      }),
-      /*#__PURE__*/React.createElement("div", { className: "comment-composer-footer" },
-        /*#__PURE__*/React.createElement(ParticipantPickerButton, {
-          participant: commentPart,
-          onClick: () => setIsCommentPartOpen(true)
-        }),
-        /*#__PURE__*/React.createElement("div", { className: "comment-composer-buttons" },
-          /*#__PURE__*/React.createElement("button", {
-            type: "button",
-            onClick: handleCancelComment,
-            style: {
-              flexShrink: 0, height: '30px', padding: '0 12px', borderRadius: 'var(--radius-sm)',
-              border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)', color: 'var(--text-muted)',
-              fontSize: 'var(--font-size-md)', fontWeight: 'bold', cursor: 'pointer'
-            }
-          }, "취소"),
-          /*#__PURE__*/React.createElement("button", {
-            type: "button",
-            onClick: handleSaveComment,
-            disabled: !commentText.trim() || !commentParticipantId || isSavingComment,
-            style: {
-              flexShrink: 0, height: '30px', padding: '0 12px', borderRadius: 'var(--radius-sm)', border: 'none',
-              backgroundColor: 'var(--accent-primary)', color: '#FFFFFF', fontSize: 'var(--font-size-md)', fontWeight: 'bold',
-              cursor: isSavingComment ? 'wait' : 'pointer', opacity: (commentText.trim() && commentParticipantId && !isSavingComment) ? 1 : 0.5
-            }
-          }, isSavingComment ? "저장 중…" : "저장")
-        )
-      )
-    ),
-
-    isCommentPartOpen && /*#__PURE__*/React.createElement(ChatParticipantSheet, {
-      calendar: calendar,
-      selectedId: commentParticipantId,
-      onSelect: id => { setCommentParticipantId(id); setIsCommentPartOpen(false); },
-      onClose: () => setIsCommentPartOpen(false)
-    })
-  );
-}
-
 export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onSelectTag, onCommentsChange, getBorderColor, onRequestConfirm, showToast, effectivePinned, hidePinButton = false, variant = 'page' }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -3146,6 +2906,7 @@ export function GlobalSearchModal({
   calendar,
   chatMessages,
   memos,
+  customCultureItems = [],
   onClose,
   onSelectDate,
   onOpenChatMessage,
@@ -3173,24 +2934,65 @@ export function GlobalSearchModal({
   // server source instead of silently returning a plausible-looking recent-only answer.
   const [fullHistory, setFullHistory] = React.useState(null);
   const [isLoadingFullHistory, setIsLoadingFullHistory] = React.useState(false);
+  const [catalogContent, setCatalogContent] = React.useState([]);
   React.useEffect(() => {
-    if (!q || fullHistory || isLoadingFullHistory || !calendar?.id || !__fb()) return;
+    if (!q || fullHistory || isLoadingFullHistory || !calendar?.id) return;
     setIsLoadingFullHistory(true);
-    Promise.all([
-      withFirestoreReadTimeout(__fb().collection('calendars').doc(`cal_${calendar.id}`).collection('messages').get({ source: 'server' })),
-      withFirestoreReadTimeout(__fb().collection('calendars').doc(`cal_${calendar.id}`).collection('memos').get({ source: 'server' }))
-    ]).then(([messagesSnap, memosSnap]) => {
-      setFullHistory({
+    const fetchIndex = __gatherUiDeps().fetchCalendarSearchIndex;
+    let indexPromise;
+    if (typeof fetchIndex === 'function') indexPromise = fetchIndex(calendar.id);
+    else if (__fb()) indexPromise = Promise.all([
+        withFirestoreReadTimeout(__fb().collection('calendars').doc(`cal_${calendar.id}`).collection('messages').get({ source: 'server' })),
+        withFirestoreReadTimeout(__fb().collection('calendars').doc(`cal_${calendar.id}`).collection('memos').get({ source: 'server' }))
+      ]).then(([messagesSnap, memosSnap]) => ({
         chatMessages: messagesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })),
-        memos: memosSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
-      });
+        memos: memosSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+        customCultureItems: []
+      }));
+    else indexPromise = Promise.reject(new Error('search index unavailable'));
+    indexPromise.then(index => {
+      setFullHistory(index || { chatMessages: [], memos: [], customCultureItems: [] });
     }).catch(err => {
       console.warn('Full-history search fetch failed, falling back to already-loaded data:', err);
+      setFullHistory({ chatMessages: [], memos: [], customCultureItems: [] });
     }).finally(() => {
       setIsLoadingFullHistory(false);
     });
   }, [q, fullHistory, isLoadingFullHistory, calendar?.id]);
 
+  // Content feeds are static, immutable snapshots. Hydrate them only when a search is
+  // actually requested, then search the complete catalog rather than the currently mounted
+  // content tab's 60-card render window.
+  React.useEffect(() => {
+    if (!q || catalogContent.length > 0) return;
+    const path = (typeof window !== 'undefined' && window.location.pathname) || '/';
+    const base = path.endsWith('/') ? path : path.slice(0, path.lastIndexOf('/') + 1);
+    Promise.all(['culture-performances', 'culture-festivals', 'culture-sports', 'culture-movies'].map(name =>
+      fetch(`${base}data/${name}.json`, { cache: 'no-store' }).then(res => res.ok ? res.json() : { items: [] }).catch(() => ({ items: [] }))
+    )).then(payloads => {
+      const byId = new Map();
+      payloads.forEach(payload => (Array.isArray(payload?.items) ? payload.items : []).forEach(item => {
+        if (item?.id) byId.set(item.id, item);
+      }));
+      setCatalogContent(Array.from(byId.values()));
+    });
+  }, [q, catalogContent.length]);
+
+  const contentSearchItems = React.useMemo(() => {
+    const byId = new Map();
+    [...(fullHistory?.customCultureItems || []), ...(customCultureItems || []), ...catalogContent].forEach(item => {
+      if (item?.id) byId.set(item.id, item);
+    });
+    return Array.from(byId.values());
+  }, [fullHistory, customCultureItems, catalogContent]);
+  const contentMatches = React.useMemo(() => {
+    if (!q) return [];
+    return contentSearchItems.filter(item => {
+      const haystack = [item?.title, item?.description, item?.genre, item?.subGenre, item?.venue, item?.address]
+        .filter(Boolean).join(' ').toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [contentSearchItems, q]);
   const matches = React.useMemo(
     () => computeCalendarSearchMatches(calendar, fullHistory?.chatMessages || chatMessages, fullHistory?.memos || memos, q),
     [calendar, fullHistory, chatMessages, memos, q]
@@ -3208,7 +3010,8 @@ export function GlobalSearchModal({
     { key: 'places', label: '장소', count: (matches.places || []).length },
     { key: 'tags', label: '사진 태그', count: (matches.tags || []).length },
     { key: 'expenses', label: '정산', count: (matches.expenses || []).length },
-    { key: 'memos', label: '메모', count: (matches.memos || []).length }
+    { key: 'memos', label: '메모', count: (matches.memos || []).length },
+    { key: 'content', label: '콘텐츠', count: contentMatches.length }
   ];
   const hasResults = tabDefs.some(t => t.count > 0);
 
@@ -3223,7 +3026,7 @@ export function GlobalSearchModal({
       const firstNonEmpty = tabDefs.find(t => t.count > 0);
       return firstNonEmpty ? firstNonEmpty.key : prev;
     });
-  }, [q, matches.schedules.length, matches.chat.length, (matches.photos || []).length, (matches.places || []).length, (matches.tags || []).length, matches.expenses.length, matches.memos.length]);
+  }, [q, matches.schedules.length, matches.chat.length, (matches.photos || []).length, (matches.places || []).length, (matches.tags || []).length, matches.expenses.length, matches.memos.length, contentMatches.length]);
 
   // The default view is a single chronological result stream. Category tabs remain
   // available for drilling down, but users no longer need to guess which tab contains
@@ -3259,8 +3062,13 @@ export function GlobalSearchModal({
       timeStr: formatLogTimestamp(item.createdAt), content: [item.title, item.text].filter(Boolean).join(' · '),
       onClick: () => { onOpenMemo?.(item.id); onClose(); }, sortStamp: String(item.createdAt || 0).padStart(14, '0')
     }));
+    contentMatches.forEach(item => rows.push({
+      id: `content_${item.id}`, badgeName: `콘텐츠 · ${item.title || '제목 없음'}`, badgeColor: '#F97316',
+      timeStr: item.dateLabel || item.startDate || item.releaseDate || '', content: [item.subGenre || item.genre, item.venue || item.address].filter(Boolean).join(' · '),
+      onClick: () => onClose(), sortStamp: String(item.startDate || item.releaseDate || item.createdAt || '')
+    }));
     return rows.sort((a, b) => String(b.sortStamp || '').localeCompare(String(a.sortStamp || '')));
-  }, [matches, onClose, onOpenChatMessage, onOpenMemo, onSelectDate]);
+  }, [matches, contentMatches, onClose, onOpenChatMessage, onOpenMemo, onSelectDate]);
 
   return /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",
@@ -3417,6 +3225,16 @@ export function GlobalSearchModal({
           memo.title && /*#__PURE__*/React.createElement("div", { style: { fontWeight: 800, marginBottom: '2px' } }, highlightKeyword(memo.title, q)),
           memo.text && highlightKeyword(memo.text.length > 80 ? memo.text.slice(0, 80) + '...' : memo.text, q)
         ))
+      ),
+
+      q && hasResults && activeTab === 'content' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
+        contentMatches.map(item => /*#__PURE__*/React.createElement(SearchResultLogRow, {
+          key: item.id,
+          badgeName: item.title || '콘텐츠',
+          badgeColor: '#F97316',
+          timeStr: item.dateLabel || item.startDate || item.releaseDate || '',
+          onClick: () => onClose()
+        }, highlightKeyword([item.subGenre || item.genre, item.description || item.venue || item.address].filter(Boolean).join(' · '), q)))
       )
     )
   ));
@@ -3583,6 +3401,25 @@ export function EditMessageModal({
     }
   };
 
+  const handleClickPasteImagesEdit = async () => {
+    const files = await readClipboardImageFiles(showToast);
+    if (!files || files.length === 0) return;
+    try {
+      await appendChatImageFiles({
+        files,
+        currentCount: images.length,
+        setImageProcessing: setImageProcessingEdit,
+        setChatImages: setImages,
+        showToast
+      });
+    } catch (err) {
+      console.error('handleClickPasteImagesEdit unexpected error:', err);
+      if (showToast) showToast('붙여넣은 사진 첨부 중 오류', 'error', 5000);
+    } finally {
+      setImageProcessingEdit(null);
+    }
+  };
+
   return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",
     onClick: e => { if (!isSubmitting) overlayOnClick(e); },
@@ -3738,7 +3575,28 @@ export function EditMessageModal({
       strokeWidth: "2",
       strokeLinecap: "round",
       strokeLinejoin: "round"
-    }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M15 8h.01" }), /*#__PURE__*/React.createElement("path", { d: "M12.5 21h-6.5a3 3 0 0 1 -3 -3v-12a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v6.5" }), /*#__PURE__*/React.createElement("path", { d: "M3 16l5 -5c.928 -.893 2.072 -.893 3 0l4 4" }), /*#__PURE__*/React.createElement("path", { d: "M14 14l1 -1c.67 -.644 1.45 -.824 2.182 -.54" }), /*#__PURE__*/React.createElement("path", { d: "M16 19h6" }), /*#__PURE__*/React.createElement("path", { d: "M19 16v6" }))))
+    }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M15 8h.01" }), /*#__PURE__*/React.createElement("path", { d: "M12.5 21h-6.5a3 3 0 0 1 -3 -3v-12a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v6.5" }), /*#__PURE__*/React.createElement("path", { d: "M3 16l5 -5c.928 -.893 2.072 -.893 3 0l4 4" }), /*#__PURE__*/React.createElement("path", { d: "M14 14l1 -1c.67 -.644 1.45 -.824 2.182 -.54" }), /*#__PURE__*/React.createElement("path", { d: "M16 19h6" }), /*#__PURE__*/React.createElement("path", { d: "M19 16v6" }))),
+    /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: handleClickPasteImagesEdit,
+      title: "붙여넣기",
+      style: {
+        width: '32px',
+        height: '32px',
+        borderRadius: '50%',
+        border: '1px solid var(--border-subtle)',
+        backgroundColor: 'var(--bg-card)',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+        padding: 0,
+        color: 'var(--text-muted)'
+      }
+    }, /*#__PURE__*/React.createElement("svg", {
+      xmlns: "http://www.w3.org/2000/svg", width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+    }, /*#__PURE__*/React.createElement("path", { d: "M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" }), /*#__PURE__*/React.createElement("rect", { x: "9", y: "3", width: "6", height: "4", rx: "1" }))))
   )), /*#__PURE__*/React.createElement("div", {
     className: "modal-footer",
     style: { padding: '16px', justifyContent: 'space-between', alignItems: 'center' }
@@ -3780,7 +3638,6 @@ export function EditMessageModal({
     CalendarGrid: CalendarGrid,
     CommentsSection: CommentsSection,
     MemoCard: MemoCard,
-    CommentThread: CommentThread,
     PollList: PollList,
     GlobalSearchModal: GlobalSearchModal,
     EditMessageModal: EditMessageModal,
