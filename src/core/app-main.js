@@ -722,7 +722,34 @@ function App() {
       })
     );
   }
-  return /*#__PURE__*/React.createElement(CalendarApp, null);
+  // 컨텐츠 상세의 "공유" 버튼으로 받은 URL(#gatherContent=...)을 열면, 어느 화면에 있든/캘린더가
+  // 로드됐든 안 됐든 상관없이 그 컨텐츠 백드롭이 바로 보이도록 최상위에서 한 번만 파싱한다.
+  // 실제 등록(Firestore 쓰기)은 하지 않는 읽기 전용 미리보기 -- 등록은 컨텐츠 등록 화면의
+  // "붙여넣기"에서 사용자가 명시적으로 한다.
+  const [sharedContentItem, setSharedContentItem] = React.useState(() => {
+    try {
+      const hash = window.location.hash || '';
+      const marker = '#gatherContent=';
+      const idx = hash.indexOf(marker);
+      if (idx === -1) return null;
+      const json = decodeURIComponent(escape(atob(hash.slice(idx + marker.length))));
+      const payload = JSON.parse(json);
+      if (!payload || payload.kind !== 'gather-content' || !payload.item || !payload.item.title) return null;
+      return payload.item;
+    } catch (_) { return null; }
+  });
+  React.useEffect(() => {
+    if (!sharedContentItem) return;
+    try { window.history.replaceState({}, '', window.location.pathname + window.location.search); } catch (_) { /* best-effort */ }
+  }, []);
+  const SharedContentPreviewModal = (window.GATHER_UI_COMPONENTS || {}).SharedContentPreviewModal;
+  return /*#__PURE__*/React.createElement(React.Fragment, null,
+    /*#__PURE__*/React.createElement(CalendarApp, null),
+    sharedContentItem && SharedContentPreviewModal && /*#__PURE__*/React.createElement(SharedContentPreviewModal, {
+      item: sharedContentItem,
+      onClose: () => setSharedContentItem(null)
+    })
+  );
 }
 
 function CalendarApp() {
@@ -2891,14 +2918,23 @@ function CalendarApp() {
   React.useEffect(() => {
     if (!activeCalId || (activeView !== 'history' && activeView !== 'content')) return;
     let isMounted = true;
+    const kindByCategory = { festival: 'festival', event: 'performance', performance: 'performance', sports: 'sports', movie: 'movie' };
+    const normalizeCustomCultureItem = item => {
+      if (!item || typeof item !== 'object') return null;
+      const inferredKind = item.kind || kindByCategory[item.category] || kindByCategory[item.anniversaryCategory]
+        || (item.genre === 'movie' ? 'movie' : '');
+      return { ...item, kind: inferredKind || 'performance' };
+    };
     const applyList = (list) => {
       if (!isMounted) return;
-      const arr = Array.isArray(list) ? list.slice() : [];
+      const arr = (Array.isArray(list) ? list : []).map(normalizeCustomCultureItem).filter(Boolean);
       arr.sort((a, b) => (Number(b.createdAt) || Number(b.updatedAt) || 0) - (Number(a.createdAt) || Number(a.updatedAt) || 0));
       setCustomCultureItems(arr);
     };
     if (!firebaseDb) {
-      fetchCustomCultureItemsRest(activeCalId).then(list => applyList(list)).catch(() => applyList([]));
+      fetchCustomCultureItemsRest(activeCalId).then(list => applyList(list)).catch(err => {
+        console.warn('Custom culture REST fallback failed; retaining existing items:', err);
+      });
       return () => { isMounted = false; };
     }
     const unsub = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('customCultureItems')
@@ -2908,7 +2944,11 @@ function CalendarApp() {
         applyList(list);
       }, err => {
         console.warn('Firestore customCultureItems subscription error:', err);
-        fetchCustomCultureItemsRest(activeCalId).then(list => applyList(list)).catch(() => applyList([]));
+        // A transient listener failure must never replace a previously received authoritative
+        // collection with []. Keep the current list unless REST returns actual documents.
+        fetchCustomCultureItemsRest(activeCalId).then(list => {
+          if (Array.isArray(list) && list.length > 0) applyList(list);
+        }).catch(fallbackErr => console.warn('Custom culture REST fallback failed; retaining existing items:', fallbackErr));
       });
     return () => { isMounted = false; unsub(); };
   }, [activeCalId, activeView, firebaseDb, firebaseConnectionVersion]);

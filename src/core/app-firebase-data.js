@@ -1539,15 +1539,24 @@ async function fetchAnniversariesRest(calId) {
 
 async function fetchCustomCultureItemsRest(calId) {
   try {
-    const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}/customCultureItems`;
-    const res = await fetchFirestoreRequest(url);
-    if (!res.ok) return [];
-    const data = await res.json();
-    const docs = data.documents || [];
-    const list = docs.map(doc => ({
-      id: doc.name.split('/').pop(),
-      ...firestoreDocumentToJs(doc)
-    }));
+    const baseUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}/customCultureItems`;
+    const list = [];
+    let pageToken = '';
+    // REST listDocuments defaults to a small page. Without following nextPageToken,
+    // older individually registered festival/performance cards silently disappear when
+    // the collection grows beyond the first page (the SDK listener does not have this limit).
+    do {
+      const query = new URLSearchParams({ pageSize: '300' });
+      if (pageToken) query.set('pageToken', pageToken);
+      const res = await fetchFirestoreRequest(`${baseUrl}?${query.toString()}`);
+      if (!res.ok) return list;
+      const data = await res.json();
+      (data.documents || []).forEach(doc => list.push({
+        id: doc.name.split('/').pop(),
+        ...firestoreDocumentToJs(doc)
+      }));
+      pageToken = data.nextPageToken || '';
+    } while (pageToken);
     list.sort((a, b) => (Number(b.createdAt) || Number(b.updatedAt) || 0) - (Number(a.createdAt) || Number(a.updatedAt) || 0));
     return list;
   } catch (err) {
