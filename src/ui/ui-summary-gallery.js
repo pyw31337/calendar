@@ -3318,6 +3318,39 @@ function formatCultureDateLabel(startDate, endDate) {
   return a === b ? a : `${a} ~ ${b}`;
 }
 
+function todayIsoLocal() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
+function cultureItemDay(item) {
+  const value = item?.releaseDate || item?.startDate;
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(value || '')) ? String(value) : '';
+}
+
+function filterAndSortCultureItems(items, category) {
+  if (category !== 'sports' && category !== 'movie') return items;
+  const today = todayIsoLocal();
+  const cutoff = new Date(`${today}T00:00:00`);
+  cutoff.setDate(cutoff.getDate() - 30);
+  const cutoffIso = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}-${String(cutoff.getDate()).padStart(2, '0')}`;
+  const visible = items.filter(item => {
+    const start = cultureItemDay(item);
+    if (!start) return true;
+    if (category === 'sports') {
+      const end = item.endDate || start;
+      return end >= today;
+    }
+    return start >= cutoffIso;
+  });
+  return visible.sort((a, b) => {
+    const aDay = cultureItemDay(a), bDay = cultureItemDay(b);
+    if (!aDay || !bDay) return aDay ? -1 : (bDay ? 1 : 0);
+    return Math.abs(Date.parse(`${aDay}T00:00:00`) - Date.parse(`${today}T00:00:00`))
+      - Math.abs(Date.parse(`${bDay}T00:00:00`) - Date.parse(`${today}T00:00:00`));
+  });
+}
+
 // Layer popup for manually registering 문화공연 / 지역축제 items into the archive tabs.
 // Portaled to document.body (same pattern as CulturePerformancesTab's detail sheet) so it sits
 // above the side menu / page chrome. Persists via onSave → app-main customCultureItems write.
@@ -3558,7 +3591,7 @@ function buildQuickMemoPlaceholder(item) {
   const lines = [];
   const period = item.dateLabel || [item.startDate, item.endDate].filter(Boolean).join(' ~ ');
   if (period) lines.push(`기간: ${period}`);
-  if (item.venue) lines.push(`장소: ${item.venue}`);
+  if (item.venue && item.kind !== 'movie' && item.genre !== 'movie') lines.push(`장소: ${item.venue}`);
   if (item.address) lines.push(`주소: ${item.address}`);
   return lines.join('\n') || '비워두면 행사 정보가 그대로 저장됩니다';
 }
@@ -3740,7 +3773,8 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
 
   // Multi-select OR: with no selections at all, every item passes (전국); with one or more,
   // an item matches if it satisfies ANY saved { sido, gugun } pair (gugun '' means that 시/도 전체).
-  const regionFilteredItems = mergedItems.filter(item => {
+  const lifecycleItems = filterAndSortCultureItems(mergedItems, anniversaryCategory);
+  const regionFilteredItems = lifecycleItems.filter(item => {
     if (!regionSelections || regionSelections.length === 0) return true;
     return regionSelections.some(sel => {
       if (sel.sido && item.region !== sel.sido) return false;
@@ -3867,6 +3901,19 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
       );
     });
   };
+  const renderPersonLinks = value => {
+    const people = Array.isArray(value) ? value : String(value || '').split(',').map(s => s.trim()).filter(Boolean);
+    return people.flatMap((person, index) => [
+      index > 0 ? /*#__PURE__*/React.createElement(React.Fragment, { key: `sep-${index}` }, ', ') : null,
+      /*#__PURE__*/React.createElement("a", {
+        key: `${person}-${index}`,
+        href: `https://search.naver.com/search.naver?query=${encodeURIComponent(person)}`,
+        target: "_blank", rel: "noopener noreferrer",
+        onClick: e => e.stopPropagation(),
+        style: { color: 'var(--accent-primary)', textDecoration: 'underline' }
+      }, person)
+    ]);
+  };
 
   return /*#__PURE__*/React.createElement(React.Fragment, null,
     renderedCategoryChipRow,
@@ -3987,7 +4034,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
             // (예: 장소="영등포아트홀", 주소="서울 영등포구 ...") 축제 카드에서는 장소 줄을
             // 생략하고 주소만 보여준다. 문화공연(anniversaryCategory 'event')은 공연장 이름이
             // 주소만으로는 알 수 없는 별도 정보라 계속 둘 다 보여준다.
-            anniversaryCategory !== 'festival' && /*#__PURE__*/React.createElement("div", {
+            anniversaryCategory !== 'festival' && anniversaryCategory !== 'movie' && /*#__PURE__*/React.createElement("div", {
               style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
             }, item.venue || CULTURE_MISSING_LABEL),
             /*#__PURE__*/React.createElement("div", {
@@ -4042,8 +4089,8 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
             style: { flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }
           },
             [
-              ['개봉일', selected.releaseDate || (selected.kind === 'movie' ? selected.startDate : '')],
-              ['상영기간', selected.kind === 'movie' && !selected.endDate ? '종료일 미정 · 상영정보 유지' : selected.dateLabel],
+              ['개봉일', selected.releaseDate || ((anniversaryCategory === 'movie' || selected.genre === 'movie') ? selected.startDate : '')],
+              ['상영기간', (anniversaryCategory === 'movie' || selected.genre === 'movie') && !selected.endDate ? '종료일 미정 · 상영정보 유지' : selected.dateLabel],
               ['감독', selected.director],
               ['출연', Array.isArray(selected.cast) ? selected.cast.join(', ') : selected.cast],
               ['관람등급', selected.ageRating],
@@ -4051,8 +4098,8 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
               ['관객수', selected.audienceCount],
               ['러닝타임', selected.runningTime],
               ['장르', selected.subGenre],
-              ['장소', selected.venue],
-              ['주소', selected.address],
+              ['장소', anniversaryCategory === 'movie' || selected.genre === 'movie' ? '' : selected.venue],
+              ['주소', anniversaryCategory === 'movie' || selected.genre === 'movie' ? '' : selected.address],
               ['주최', selected.organizer],
               ['문의', selected.contact],
               ['가격', selected.price],
@@ -4062,7 +4109,8 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
               key: label, style: { display: 'flex', gap: '8px', fontSize: 'var(--font-size-sm)' }
             },
               /*#__PURE__*/React.createElement("span", { style: { flexShrink: 0, width: '84px', color: 'var(--text-muted)', fontWeight: 700 } }, label),
-              /*#__PURE__*/React.createElement("span", { style: { color: 'var(--text-main)', wordBreak: 'break-word' } }, value)
+              /*#__PURE__*/React.createElement("span", { style: { color: 'var(--text-main)', wordBreak: 'break-word' } },
+                (label === '감독' || label === '출연') ? renderPersonLinks(value) : value)
             )),
             selected.description && /*#__PURE__*/React.createElement("div", {
               style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-main)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }
