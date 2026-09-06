@@ -322,6 +322,10 @@ function parseVisitEntriesFromMemo(...args) {
   const f = __gatherUiDeps().parseVisitEntriesFromMemo || GATHER_APP_UTILS.parseVisitEntriesFromMemo;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function readClipboardImageFiles(...args) {
+  const f = __gatherUiDeps().readClipboardImageFiles || GATHER_APP_UTILS.readClipboardImageFiles;
+  return typeof f === 'function' ? f(...args) : Promise.resolve([]);
+}
 function reformatMemoIntoDateLines(...args) {
   const f = __gatherUiDeps().reformatMemoIntoDateLines || GATHER_APP_UTILS.reformatMemoIntoDateLines;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -1012,8 +1016,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   // (processImageFilesSequentially -> compressImageToDataUrls), so memo photos get
   // identical quality handling, HEIC support, and a { original, thumbnail, originalBlob,
   // thumbnailBlob } shape that resolveMemoImageBatch and the thumbnail <img> below expect.
-  const handleComposerFileSelect = async (e) => {
-    const files = e.target.files;
+  const attachComposerFiles = async (files) => {
     if (!files || files.length === 0) return;
     try {
       const remainingSlots = 50 - newImages.length;
@@ -1040,16 +1043,23 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         showToast(`${succeeded.length}장 첨부완료`, 'success', 3000);
       }
     } catch (err) {
-      console.error('handleComposerFileSelect unexpected error:', err);
+      console.error('attachComposerFiles unexpected error:', err);
       if (showToast) showToast('사진 첨부 중 오류', 'error', 5000);
     } finally {
       setImageProcessingNew(null);
-      e.target.value = '';
     }
   };
-
-  const handleEditFileSelect = async (e) => {
+  const handleComposerFileSelect = async (e) => {
     const files = e.target.files;
+    await attachComposerFiles(files);
+    e.target.value = '';
+  };
+  const handleComposerPasteClick = async () => {
+    const files = await readClipboardImageFiles(showToast);
+    if (files && files.length > 0) await attachComposerFiles(files);
+  };
+
+  const attachEditFiles = async (files) => {
     if (!files || files.length === 0) return;
     try {
       const remainingSlots = 50 - editImages.length;
@@ -1076,12 +1086,20 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         showToast(`${succeeded.length}장 첨부완료`, 'success', 3000);
       }
     } catch (err) {
-      console.error('handleEditFileSelect unexpected error:', err);
+      console.error('attachEditFiles unexpected error:', err);
       if (showToast) showToast('사진 첨부 중 오류', 'error', 5000);
     } finally {
       setImageProcessingEdit(null);
-      e.target.value = '';
     }
+  };
+  const handleEditFileSelect = async (e) => {
+    const files = e.target.files;
+    await attachEditFiles(files);
+    e.target.value = '';
+  };
+  const handleEditPasteClick = async () => {
+    const files = await readClipboardImageFiles(showToast);
+    if (files && files.length > 0) await attachEditFiles(files);
   };
 
   const handleSaveMemo = async () => {
@@ -1966,7 +1984,17 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
                   /*#__PURE__*/React.createElement("svg", {
                     xmlns: "http://www.w3.org/2000/svg", width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
                   }, /*#__PURE__*/React.createElement("rect", { width: "18", height: "18", x: "3", y: "3", rx: "2", ry: "2" }), /*#__PURE__*/React.createElement("circle", { cx: "9", cy: "9", r: "2" }), /*#__PURE__*/React.createElement("path", { d: "m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" }))
-                )
+                ),
+
+                /* Clipboard paste trigger (mobile has no Ctrl+V, so this reads the OS clipboard directly) */
+                /*#__PURE__*/React.createElement("button", {
+                  type: "button",
+                  onClick: handleComposerPasteClick,
+                  style: { background: 'none', border: 'none', padding: '4px', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center' },
+                  title: "붙여넣기"
+                }, /*#__PURE__*/React.createElement("svg", {
+                  xmlns: "http://www.w3.org/2000/svg", width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+                }, /*#__PURE__*/React.createElement("path", { d: "M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" }), /*#__PURE__*/React.createElement("rect", { x: "9", y: "3", width: "6", height: "4", rx: "1" })))
               )
             ),
 
@@ -2368,7 +2396,17 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
               /*#__PURE__*/React.createElement("svg", {
                 xmlns: "http://www.w3.org/2000/svg", width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2"
               }, /*#__PURE__*/React.createElement("rect", { width: "18", height: "18", x: "3", y: "3", rx: "2", ry: "2" }), /*#__PURE__*/React.createElement("circle", { cx: "9", cy: "9", r: "2" }), /*#__PURE__*/React.createElement("path", { d: "m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" }))
-            )
+            ),
+
+            /* Clipboard paste trigger (mobile has no Ctrl+V, so this reads the OS clipboard directly) */
+            /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              onClick: handleEditPasteClick,
+              style: { background: 'none', border: 'none', padding: '4px', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center' },
+              title: "붙여넣기"
+            }, /*#__PURE__*/React.createElement("svg", {
+              xmlns: "http://www.w3.org/2000/svg", width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+            }, /*#__PURE__*/React.createElement("path", { d: "M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" }), /*#__PURE__*/React.createElement("rect", { x: "9", y: "3", width: "6", height: "4", rx: "1" })))
           )
         ),
 

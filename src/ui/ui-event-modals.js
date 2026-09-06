@@ -288,6 +288,10 @@ function reformatMemoIntoDateLines(...args) {
   const f = __gatherUiDeps().reformatMemoIntoDateLines || GATHER_APP_UTILS.reformatMemoIntoDateLines;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function readClipboardImageFiles(...args) {
+  const f = __gatherUiDeps().readClipboardImageFiles || GATHER_APP_UTILS.readClipboardImageFiles;
+  return typeof f === 'function' ? f(...args) : Promise.resolve([]);
+}
 function removeFirstUrl(...args) {
   const f = __gatherUiDeps().removeFirstUrl || GATHER_APP_UTILS.removeFirstUrl;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -1079,6 +1083,10 @@ export function AnniversaryModal({
     });
     setPhotoProcessing(null);
   };
+  const handleClickPastePhotoButton = async () => {
+    const files = await readClipboardImageFiles(showToast);
+    if (files && files.length > 0) handleAttachPhotoFiles(files);
+  };
   const handlePhotoPaste = e => {
     const pastedFiles = getImageFilesFromClipboardEvent(e);
     if (pastedFiles.length === 0) return;
@@ -1723,6 +1731,16 @@ export function AnniversaryModal({
                   cursor: 'pointer', fontSize: 'var(--font-size-xs)'
                 }
               }, "+", /*#__PURE__*/React.createElement("span", null, "업로드")),
+              /*#__PURE__*/React.createElement("button", {
+                type: "button",
+                onClick: handleClickPastePhotoButton,
+                style: {
+                  width: '56px', height: '56px', flexShrink: 0, display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', justifyContent: 'center', gap: '2px', border: '1px solid var(--border-subtle)',
+                  borderRadius: 'var(--radius-sm)', backgroundColor: 'var(--bg-card)', color: 'var(--text-muted)',
+                  cursor: 'pointer', fontSize: 'var(--font-size-xs)'
+                }
+              }, /*#__PURE__*/React.createElement("span", null, "붙여넣기")),
               photoProcessing && /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } },
                 `처리 중... (${photoProcessing.current}/${photoProcessing.total})`
               ),
