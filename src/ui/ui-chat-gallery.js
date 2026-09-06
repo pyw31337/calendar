@@ -987,6 +987,7 @@ export function ChatGalleryModal({
   memoLastTitleWord = null,
   showToast,
   onDeletePhoto = null,
+  photoCommentCounts = {},
   onPasteGatherPhoto = null,
   onPasteGatherPhotos = null,
   syncStatus = null
@@ -997,6 +998,9 @@ export function ChatGalleryModal({
   const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer || (function Shell(p) { return React.createElement('div', p, p.children); });
   const SmallXIcon = __deps.SmallXIcon;
   const BackArrowIcon = __deps.BackArrowIcon;
+  const PlusIcon = __comp.PlusIcon || __deps.PlusIcon;
+  const PencilIcon = __comp.PencilIcon || __deps.PencilIcon;
+  const getMediaIdentityKeys = __deps.getMediaIdentityKeys;
   const SharedSideMenuSettings = __comp.SharedSideMenuSettings || __deps.SharedSideMenuSettings;
   const SharedSideMenuFooter = __comp.SharedSideMenuFooter || __deps.SharedSideMenuFooter;
   const SharedAppNavBlock = __comp.SharedAppNavBlock || __deps.SharedAppNavBlock;
@@ -1963,6 +1967,14 @@ export function ChatGalleryModal({
     const itemKey = photo.mediaKey || photo.refKey || `${photo.messageId || photo.source || 'photo'}-${photo.meetingDate || ''}-${photo.directMediaUrl ? 'direct' : photo.imageIndex}-${photo.timestamp || idx}`;
     const lightboxIndex = (lightboxItems || []).findIndex(entry => getPhotoKey(entry) === photoKey);
     const isChecked = isBulkShareMode && selectedBulkShareKeys.has(photoKey);
+    // Same mediaKey/refKey identity the Lightbox itself computes to key a photo's comment thread
+    // (see ui-lightbox.js's currentIdentity) -- reusing it here (rather than photoKey/itemKey,
+    // which are this grid's own React-key/dedup identifiers with a different shape for most
+    // photos) is what lets this thumbnail badge and the Lightbox's comment count agree.
+    const commentIdentity = typeof getMediaIdentityKeys === 'function'
+      ? (getMediaIdentityKeys(photo, { source: photo.source, meetingDate: photo.meetingDate }) || {})
+      : {};
+    const commentCount = photoCommentCounts[commentIdentity.mediaKey] || photoCommentCounts[commentIdentity.refKey] || 0;
     const thumb = /*#__PURE__*/React.createElement(MediaThumb, {
       key: isBulkShareMode ? undefined : itemKey,
       "data-photo-url": photo.full || photo.thumb,
@@ -1990,13 +2002,22 @@ export function ChatGalleryModal({
         display: 'block'
       }
     });
-    if (!isBulkShareMode) return thumb;
+    const commentBadge = commentCount > 0 && /*#__PURE__*/React.createElement("span", {
+      "aria-hidden": true,
+      style: {
+        position: 'absolute', top: '4px', right: '4px', minWidth: '18px', height: '18px', padding: '0 4px',
+        borderRadius: 'var(--radius-full)', backgroundColor: 'rgba(0,0,0,0.65)', color: '#fff',
+        fontSize: '11px', fontWeight: 800, lineHeight: '18px', textAlign: 'center',
+        pointerEvents: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.4)'
+      }
+    }, commentCount > 99 ? '99+' : commentCount);
+    if (!isBulkShareMode && !commentBadge) return thumb;
     return /*#__PURE__*/React.createElement("div", {
       key: itemKey,
       style: { position: 'relative' }
     },
       thumb,
-      /*#__PURE__*/React.createElement("span", {
+      isBulkShareMode && /*#__PURE__*/React.createElement("span", {
         "aria-hidden": true,
         style: {
           position: 'absolute', top: '4px', left: '4px', width: '20px', height: '20px', borderRadius: '5px',
@@ -2008,7 +2029,8 @@ export function ChatGalleryModal({
       }, isChecked && /*#__PURE__*/React.createElement("svg", {
         xmlns: "http://www.w3.org/2000/svg", width: "14", height: "14", viewBox: "0 0 24 24",
         fill: "none", stroke: "#fff", strokeWidth: "3", strokeLinecap: "round", strokeLinejoin: "round"
-      }, /*#__PURE__*/React.createElement("path", { d: "M20 6 9 17l-5-5" })))
+      }, /*#__PURE__*/React.createElement("path", { d: "M20 6 9 17l-5-5" }))),
+      commentBadge
     );
   }));
   const renderGalleryLinkList = items => /*#__PURE__*/React.createElement(React.Fragment, null,
@@ -2152,24 +2174,30 @@ export function ChatGalleryModal({
             }, isGeneratingBulkShareUrl ? "생성 중..." : `일괄공유${selectedBulkShareKeys.size > 0 ? ` (${selectedBulkShareKeys.size})` : ''}`)
           )
         : /*#__PURE__*/React.createElement(React.Fragment, null,
+            // 배경 없이 텍스트만 -- 이 헤더의 나머지 두 버튼(추가/편집)은 아이콘 전용이라
+            // 시각적 무게가 가벼워졌으므로, 가장 덜 쓰이는 이 버튼까지 배경을 남겨두면 상대적으로
+            // 튀어 보인다.
             /*#__PURE__*/React.createElement("button", {
               type: "button",
-              className: "btn btn-action btn-action-outline",
               onClick: handlePasteGalleryUpload,
-              style: { height: '36px', padding: '0 12px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: 'pointer' }
+              style: { height: '36px', padding: '0 8px', border: 'none', background: 'none', color: 'var(--text-main)', fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: 'pointer' }
             }, "붙여넣기"),
             /*#__PURE__*/React.createElement("button", {
               type: "button",
               className: "btn btn-action btn-action-dark",
               onClick: handleUploadClick,
-              style: { height: '36px', padding: '0 12px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: 'pointer' }
-            }, "추가"),
+              title: "추가",
+              "aria-label": "추가",
+              style: { height: '36px', width: '36px', padding: 0, borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }
+            }, PlusIcon ? /*#__PURE__*/React.createElement(PlusIcon, { size: 16 }) : "+"),
             /*#__PURE__*/React.createElement("button", {
               type: "button",
               className: "btn btn-action btn-action-outline",
               onClick: handleToggleBulkShareMode,
-              style: { height: '36px', padding: '0 12px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: 'pointer' }
-            }, "편집")
+              title: "편집",
+              "aria-label": "편집",
+              style: { height: '36px', width: '36px', padding: 0, borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }
+            }, PencilIcon ? /*#__PURE__*/React.createElement(PencilIcon, { size: 15 }) : "편집")
           )
     )
   );

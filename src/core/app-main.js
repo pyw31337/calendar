@@ -7722,6 +7722,7 @@ function CalendarApp() {
         },
         setActiveLightbox: setActiveLightbox,
         onDeletePhoto: handleDeletePhoto,
+        photoCommentCounts: photoCommentCounts,
         hasMoreOlderChat: !Array.isArray(fullChatMessages) && hasMoreOlderChat,
         loadingOlderChat: loadingOlderChat,
         onLoadOlderChat: loadOlderChatMessages,
@@ -8158,6 +8159,7 @@ function CalendarApp() {
     },
     setActiveLightbox: setActiveLightbox,
     onDeletePhoto: handleDeletePhoto,
+    photoCommentCounts: photoCommentCounts,
     showToast: showToast
   }), isGalleryShareOpen && activeCal && /*#__PURE__*/React.createElement(ShareModal, {
     calendar: activeCal,
