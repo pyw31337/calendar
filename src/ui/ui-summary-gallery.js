@@ -550,7 +550,7 @@ function getMessageDirectMediaEntry(...args) {
 // Combines chat message images, memo images, and confirmed-meeting photos into one flat, deduped,
 // newest-first list -- shared by PhotoGallery (갤러리 페이지) and HistoryView's 인물/추억 tabs so
 // both browse exactly the same photo set instead of two independently-built ones drifting apart.
-function buildCombinedPhotoEntries(chatMessages, memos, calendar) {
+function buildCombinedPhotoEntries(chatMessages, memos, calendar, anniversaries = []) {
   const __deps = window.GATHER_UI_DEPS || {};
   const resolveMeetingPhotoDisplay = __deps.resolveMeetingPhotoDisplay;
   const sorted = [...(chatMessages || [])].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
@@ -605,9 +605,41 @@ function buildCombinedPhotoEntries(chatMessages, memos, calendar) {
       });
     });
   });
+  // Anniversary photos live on the anniversary document itself rather than in chat/memo or
+  // confirmed-meeting photo arrays. Keep them in the same flat source used by the History
+  // memories tab so a calendar event with an attached photo is always discoverable there.
+  const anniversaryEntries = [];
+  (Array.isArray(anniversaries) ? anniversaries : []).forEach(anniversary => {
+    const photos = Array.isArray(anniversary?.photos) ? anniversary.photos : [];
+    const anniversaryDate = String(anniversary?.date || anniversary?.startDate || anniversary?.endDate || '').slice(0, 10);
+    photos.forEach((photo, index) => {
+      const full = String(photo?.imageUrl || photo?.url || photo?.full || photo?.src || '');
+      const thumb = String(photo?.thumbUrl || photo?.thumbnailUrl || photo?.thumb || full);
+      if (!full && !thumb) return;
+      const mediaKey = photo?.mediaKey || `anniversary:${anniversary?.id || anniversaryDate || 'date'}:${photo?.id || index}`;
+      const refKey = photo?.refKey || mediaKey;
+      anniversaryEntries.push({
+        full: full || thumb,
+        thumb: thumb || full,
+        imageIndex: index,
+        messageId: null,
+        photoId: photo?.id || '',
+        sourceMessageId: '',
+        sourceImageIndex: null,
+        timestamp: Number(photo?.createdAt || photo?.updatedAt || anniversary?.updatedAt || 0),
+        tags: String(photo?.tags || ''),
+        directMediaUrl: '',
+        source: 'anniversary',
+        anniversaryId: anniversary?.id || '',
+        meetingDate: anniversaryDate,
+        mediaKey,
+        refKey
+      });
+    });
+  });
   const byUrl = new Map();
-  const sourceRank = { chat: 0, memo: 1, meeting: 2 };
-  [...chatEntries, ...memoEntries, ...meetingEntries].forEach(entry => {
+  const sourceRank = { chat: 0, memo: 1, meeting: 2, anniversary: 3 };
+  [...chatEntries, ...memoEntries, ...meetingEntries, ...anniversaryEntries].forEach(entry => {
     const key = entry.mediaKey || entry.refKey || entry.full || entry.thumb;
     if (!key) return;
     const existing = byUrl.get(key);
@@ -1930,7 +1962,7 @@ export function HistoryView({
 
   // 인물/추억 탭이 공유하는 사진 목록 -- 갤러리 페이지(PhotoGallery)와 동일한 소스(채팅/메모/모임
   // 사진)를 결합해, 태그(인물)나 날짜(추억)로 걸러 보여준다.
-  const historyPhotoEntries = React.useMemo(() => buildCombinedPhotoEntries(chatMessages, memos, calendar), [chatMessages, memos, calendar]);
+  const historyPhotoEntries = React.useMemo(() => buildCombinedPhotoEntries(chatMessages, memos, calendar, anniversaries), [chatMessages, memos, calendar, anniversaries]);
   const [selectedPersonTag, setSelectedPersonTag] = React.useState(null);
   const [selectedMemoryGroupId, setSelectedMemoryGroupId] = React.useState(null);
   React.useEffect(() => { setSelectedPersonTag(null); setSelectedMemoryGroupId(null); }, [historyTab]);
@@ -2061,6 +2093,7 @@ export function HistoryView({
     const meta = photos.map(p => ({
       timestamp: p.timestamp, messageId: p.messageId, imageIndex: p.imageIndex, thumb: p.thumb,
       tags: p.tags, directMediaUrl: p.directMediaUrl, source: p.source, uploadSource: p.uploadSource,
+      anniversaryId: p.anniversaryId,
       meetingDate: p.meetingDate, photoId: p.photoId, sourceMessageId: p.sourceMessageId,
       sourceImageIndex: p.sourceImageIndex, mediaKey: p.mediaKey, refKey: p.refKey
     }));
