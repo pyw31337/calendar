@@ -2879,6 +2879,7 @@ export function GlobalSearchModal({
   calendar,
   chatMessages,
   memos,
+  customCultureItems = [],
   onClose,
   onSelectDate,
   onOpenChatMessage,
@@ -2906,17 +2907,24 @@ export function GlobalSearchModal({
   // server source instead of silently returning a plausible-looking recent-only answer.
   const [fullHistory, setFullHistory] = React.useState(null);
   const [isLoadingFullHistory, setIsLoadingFullHistory] = React.useState(false);
+  const [catalogContent, setCatalogContent] = React.useState([]);
   React.useEffect(() => {
-    if (!q || fullHistory || isLoadingFullHistory || !calendar?.id || !__fb()) return;
+    if (!q || fullHistory || isLoadingFullHistory || !calendar?.id) return;
     setIsLoadingFullHistory(true);
-    Promise.all([
-      withFirestoreReadTimeout(__fb().collection('calendars').doc(`cal_${calendar.id}`).collection('messages').get({ source: 'server' })),
-      withFirestoreReadTimeout(__fb().collection('calendars').doc(`cal_${calendar.id}`).collection('memos').get({ source: 'server' }))
-    ]).then(([messagesSnap, memosSnap]) => {
-      setFullHistory({
+    const fetchIndex = __gatherUiDeps().fetchCalendarSearchIndex;
+    let indexPromise;
+    if (typeof fetchIndex === 'function') indexPromise = fetchIndex(calendar.id);
+    else if (__fb()) indexPromise = Promise.all([
+        withFirestoreReadTimeout(__fb().collection('calendars').doc(`cal_${calendar.id}`).collection('messages').get({ source: 'server' })),
+        withFirestoreReadTimeout(__fb().collection('calendars').doc(`cal_${calendar.id}`).collection('memos').get({ source: 'server' }))
+      ]).then(([messagesSnap, memosSnap]) => ({
         chatMessages: messagesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })),
-        memos: memosSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
-      });
+        memos: memosSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+        customCultureItems: []
+      }));
+    else indexPromise = Promise.reject(new Error('search index unavailable'));
+    indexPromise.then(index => {
+      setFullHistory(index || { chatMessages: [], memos: [], customCultureItems: [] });
     }).catch(err => {
       console.warn('Full-history search fetch failed, falling back to already-loaded data:', err);
     }).finally(() => {
@@ -2924,6 +2932,39 @@ export function GlobalSearchModal({
     });
   }, [q, fullHistory, isLoadingFullHistory, calendar?.id]);
 
+  // Content feeds are static, immutable snapshots. Hydrate them only when a search is
+  // actually requested, then search the complete catalog rather than the currently mounted
+  // content tab's 60-card render window.
+  React.useEffect(() => {
+    if (!q || catalogContent.length > 0) return;
+    const path = (typeof window !== 'undefined' && window.location.pathname) || '/';
+    const base = path.endsWith('/') ? path : path.slice(0, path.lastIndexOf('/') + 1);
+    Promise.all(['culture-performances', 'culture-festivals', 'culture-sports', 'culture-movies'].map(name =>
+      fetch(`${base}data/${name}.json`, { cache: 'no-store' }).then(res => res.ok ? res.json() : { items: [] }).catch(() => ({ items: [] }))
+    )).then(payloads => {
+      const byId = new Map();
+      payloads.forEach(payload => (Array.isArray(payload?.items) ? payload.items : []).forEach(item => {
+        if (item?.id) byId.set(item.id, item);
+      }));
+      setCatalogContent(Array.from(byId.values()));
+    });
+  }, [q, catalogContent.length]);
+
+  const contentSearchItems = React.useMemo(() => {
+    const byId = new Map();
+    [...(fullHistory?.customCultureItems || []), ...(customCultureItems || []), ...catalogContent].forEach(item => {
+      if (item?.id) byId.set(item.id, item);
+    });
+    return Array.from(byId.values());
+  }, [fullHistory, customCultureItems, catalogContent]);
+  const contentMatches = React.useMemo(() => {
+    if (!q) return [];
+    return contentSearchItems.filter(item => {
+      const haystack = [item?.title, item?.description, item?.genre, item?.subGenre, item?.venue, item?.address]
+        .filter(Boolean).join(' ').toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [contentSearchItems, q]);
   const matches = React.useMemo(
     () => computeCalendarSearchMatches(calendar, fullHistory?.chatMessages || chatMessages, fullHistory?.memos || memos, q),
     [calendar, fullHistory, chatMessages, memos, q]
@@ -2941,7 +2982,8 @@ export function GlobalSearchModal({
     { key: 'places', label: '장소', count: (matches.places || []).length },
     { key: 'tags', label: '사진 태그', count: (matches.tags || []).length },
     { key: 'expenses', label: '정산', count: (matches.expenses || []).length },
-    { key: 'memos', label: '메모', count: (matches.memos || []).length }
+    { key: 'memos', label: '메모', count: (matches.memos || []).length },
+    { key: 'content', label: '콘텐츠', count: contentMatches.length }
   ];
   const hasResults = tabDefs.some(t => t.count > 0);
 
@@ -2956,7 +2998,7 @@ export function GlobalSearchModal({
       const firstNonEmpty = tabDefs.find(t => t.count > 0);
       return firstNonEmpty ? firstNonEmpty.key : prev;
     });
-  }, [q, matches.schedules.length, matches.chat.length, (matches.photos || []).length, (matches.places || []).length, (matches.tags || []).length, matches.expenses.length, matches.memos.length]);
+  }, [q, matches.schedules.length, matches.chat.length, (matches.photos || []).length, (matches.places || []).length, (matches.tags || []).length, matches.expenses.length, matches.memos.length, contentMatches.length]);
 
   // The default view is a single chronological result stream. Category tabs remain
   // available for drilling down, but users no longer need to guess which tab contains
@@ -2992,8 +3034,13 @@ export function GlobalSearchModal({
       timeStr: formatLogTimestamp(item.createdAt), content: [item.title, item.text].filter(Boolean).join(' · '),
       onClick: () => { onOpenMemo?.(item.id); onClose(); }, sortStamp: String(item.createdAt || 0).padStart(14, '0')
     }));
+    contentMatches.forEach(item => rows.push({
+      id: `content_${item.id}`, badgeName: `콘텐츠 · ${item.title || '제목 없음'}`, badgeColor: '#F97316',
+      timeStr: item.dateLabel || item.startDate || item.releaseDate || '', content: [item.subGenre || item.genre, item.venue || item.address].filter(Boolean).join(' · '),
+      onClick: () => onClose(), sortStamp: String(item.startDate || item.releaseDate || item.createdAt || '')
+    }));
     return rows.sort((a, b) => String(b.sortStamp || '').localeCompare(String(a.sortStamp || '')));
-  }, [matches, onClose, onOpenChatMessage, onOpenMemo, onSelectDate]);
+  }, [matches, contentMatches, onClose, onOpenChatMessage, onOpenMemo, onSelectDate]);
 
   return /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",
@@ -3150,6 +3197,16 @@ export function GlobalSearchModal({
           memo.title && /*#__PURE__*/React.createElement("div", { style: { fontWeight: 800, marginBottom: '2px' } }, highlightKeyword(memo.title, q)),
           memo.text && highlightKeyword(memo.text.length > 80 ? memo.text.slice(0, 80) + '...' : memo.text, q)
         ))
+      ),
+
+      q && hasResults && activeTab === 'content' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
+        contentMatches.map(item => /*#__PURE__*/React.createElement(SearchResultLogRow, {
+          key: item.id,
+          badgeName: item.title || '콘텐츠',
+          badgeColor: '#F97316',
+          timeStr: item.dateLabel || item.startDate || item.releaseDate || '',
+          onClick: () => onClose()
+        }, highlightKeyword([item.subGenre || item.genre, item.description || item.venue || item.address].filter(Boolean).join(' · '), q)))
       )
     )
   ));

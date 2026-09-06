@@ -1393,6 +1393,15 @@ async function fetchAllChatMessagesRest() {
   return [];
 }
 
+async function fetchCalendarSearchIndex() {
+  const svc = window.GATHER_FIREBASE_SERVICES;
+  if (svc && typeof svc.fetchCalendarSearchIndex === 'function' && !svc.isScaffold) {
+    return svc.fetchCalendarSearchIndex.apply(null, arguments);
+  }
+  console.warn('fetchCalendarSearchIndex: GATHER_FIREBASE_SERVICES missing');
+  return { chatMessages: [], memos: [], customCultureItems: [] };
+}
+
 async function fetchRecentChatMessages() {
   const svc = window.GATHER_FIREBASE_SERVICES;
   if (svc && typeof svc.fetchRecentChatMessages === 'function' && !svc.isScaffold) {
@@ -3734,6 +3743,7 @@ export {
   fetchRecentMessagesRest,
   fetchChatMessagesRest,
   fetchAllChatMessagesRest,
+  fetchCalendarSearchIndex,
   fetchRecentChatMessages,
   fetchRecentGalleryMessages,
   fetchMessagesByImageTag,

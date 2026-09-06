@@ -473,6 +473,7 @@ import {
   fetchRecentMessagesRest,
   fetchChatMessagesRest,
   fetchAllChatMessagesRest,
+  fetchCalendarSearchIndex,
   fetchRecentChatMessages,
   fetchRecentGalleryMessages,
   fetchMessagesByImageTag,
@@ -1568,32 +1569,14 @@ function CalendarApp() {
     // 정확히 태그해도 인물 탭에서 영원히 안 보였다 -- 태그 매칭 로직 자체는 멀쩡했지만
     // 매칭할 데이터 자체가 애초에 없었던 것.
     if (!activeCalId || (!isGlobalSearchOpen && activeView !== 'history') || fullChatHistoryByCalendar[activeCalId] !== undefined) return;
-    const liveFirebaseDb = (typeof window !== 'undefined' && window.__gatherFirebaseDb) || firebaseDb;
-    if (!liveFirebaseDb) {
-      let cancelled = false;
-      fetchAllChatMessagesRest(activeCalId).then(list => {
-        if (cancelled) return;
-        setFullChatHistoryByCalendar(prev => ({ ...prev, [activeCalId]: Array.isArray(list) ? list : [] }));
-      }).catch(err => console.warn('full REST chat history load failed:', err));
-      return () => { cancelled = true; };
-    }
     let cancelled = false;
-    // Deliberately unscoped (no uploadSource filter): this read feeds galleryChatMessages (the
-    // 갤러리 페이지's full photo grid) and HistoryView's 인물/추억 tag matching via
-    // displayChatMessages/fullChatHistoryByCalendar, both of which must include every message
-    // regardless of channel -- gallery/meeting-photo uploads carry their own explicit
-    // uploadSource ('gallery'/'meeting') and are exactly the messages these views need to find,
-    // not exclude. Scoping this specific read to uploadSource=='chat' (as a since-reverted change
-    // briefly did) silently dropped every meeting/gallery-uploaded photo from the gallery grid
-    // once a calendar had at least one 'chat'-tagged text message, since a non-empty scoped
-    // result never fell through to any fallback. The REST branch above has always read this
-    // collection unscoped for the same reason.
-    withTimeout(liveFirebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages')
-      .get({ source: 'server' }), 9000, 'full chat history read').then(snapshot => {
+    // Full-history consumers still receive every message (this remains the full chat history read), but the data layer walks the
+    // collection in cursor pages instead of issuing one unbounded SDK GET. This keeps the
+    // gallery/person-tag/search index correct without making the initial realtime window huge.
+    fetchAllChatMessagesRest(activeCalId).then(list => {
       if (cancelled) return;
-      const list = snapshot.docs.map(doc => slimMessageForClient({ id: doc.id, ...doc.data() }));
-      setFullChatHistoryByCalendar(prev => ({ ...prev, [activeCalId]: list }));
-    }).catch(err => console.warn('full chat history load failed:', err));
+      setFullChatHistoryByCalendar(prev => ({ ...prev, [activeCalId]: Array.isArray(list) ? list : [] }));
+    }).catch(err => console.warn('full paged chat history load failed:', err));
     return () => { cancelled = true; };
   }, [activeCalId, isGlobalSearchOpen, activeView, firebaseDb, firebaseConnectionVersion, fullChatHistoryByCalendar]);
   // The chat embed the user tapped play on -- { key, embedUrl, provider, orientation, title } |
@@ -6868,6 +6851,7 @@ function CalendarApp() {
       calendar: activeCal,
       chatMessages: displayChatMessages,
       memos: memos,
+      customCultureItems: customCultureItems,
       onSave: handleSaveAvailability,
       onDelete: handleDeleteAvailability,
       onReorderAvailability: handleReorderAvailability,
@@ -12307,6 +12291,7 @@ function bindGatherUiDeps() {
     fetchActivityLogsFromFirestore: typeof fetchActivityLogsFromFirestore === 'function' ? fetchActivityLogsFromFirestore : null,
     fetchChatMessagesRest: typeof fetchChatMessagesRest === 'function' ? fetchChatMessagesRest : null,
     fetchAllChatMessagesRest: typeof fetchAllChatMessagesRest === 'function' ? fetchAllChatMessagesRest : null,
+    fetchCalendarSearchIndex: typeof fetchCalendarSearchIndex === 'function' ? fetchCalendarSearchIndex : null,
     fetchImageShareDocument: typeof fetchImageShareDocument === 'function' ? fetchImageShareDocument : null,
     fetchRecentMessagesRest: typeof fetchRecentMessagesRest === 'function' ? fetchRecentMessagesRest : null,
     fetchSingleCalendarWithRest: typeof fetchSingleCalendarWithRest === 'function' ? fetchSingleCalendarWithRest : null,

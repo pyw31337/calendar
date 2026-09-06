@@ -94,6 +94,40 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     }
   }
 
+  // Shared server-side search index hydration. Every collection is read in cursor pages;
+  // callers never issue an unbounded collection GET and can safely search the full archive
+  // without making the initial chat/memo/gallery screens download their entire history.
+  async function fetchCalendarSearchIndex(calId) {
+    if (!isValidCalId(calId)) return { chatMessages: [], memos: [], customCultureItems: [] };
+    async function fetchCollection(collection, mapper) {
+      const all = [];
+      let pageToken = '';
+      do {
+        let url = 'https://firestore.googleapis.com/v1/projects/' + projectId() + '/databases/(default)/documents/calendars/cal_' + calId + '/' + collection + '?pageSize=300';
+        if (pageToken) url += '&pageToken=' + encodeURIComponent(pageToken);
+        const res = await fetchWithTimeout(url, { cache: 'no-store' });
+        if (!res.ok) throw new Error('search index ' + collection + ' status ' + res.status);
+        const data = await res.json();
+        (data.documents || []).forEach(function (doc) {
+          all.push(mapper({ id: doc.name.split('/').pop(), ...docToJs(doc) }));
+        });
+        pageToken = data.nextPageToken || '';
+      } while (pageToken);
+      return all;
+    }
+    try {
+      const [chatMessages, memos, customCultureItems] = await Promise.all([
+        fetchCollection('messages', slimMessage),
+        fetchCollection('memos', function (memo) { return memo; }),
+        fetchCollection('customCultureItems', function (item) { return item; })
+      ]);
+      return { chatMessages, memos, customCultureItems };
+    } catch (err) {
+      console.warn('fetchCalendarSearchIndex error:', err);
+      throw err;
+    }
+  }
+
   // IMPORTANT: this and every other read that feeds the shared chatMessages/olderChatMessages
   // state (subscribeMessages, fetchOlderChatMessages) must stay UNSCOPED (no uploadSource
   // where-clause). That shared state is the single source not just for the chat room, but for
@@ -912,6 +946,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     isScaffold: false,
     fetchChatMessagesRest: fetchChatMessagesRest,
     fetchAllChatMessagesRest: fetchAllChatMessagesRest,
+    fetchCalendarSearchIndex: fetchCalendarSearchIndex,
     fetchRecentChatMessages: fetchRecentChatMessages,
     fetchRecentGalleryMessages: fetchRecentGalleryMessages,
     fetchMessagesByImageTag: fetchMessagesByImageTag,
