@@ -1551,11 +1551,25 @@ function CalendarApp() {
       return () => { cancelled = true; };
     }
     let cancelled = false;
-        withTimeout(liveFirebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages')
-          .where('uploadSource', '==', 'chat').get({ source: 'server' }), 9000, 'full chat history read').then(snapshot => {
+    withTimeout(liveFirebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages')
+      .where('uploadSource', '==', 'chat').get({ source: 'server' }), 9000, 'full chat history read').then(snapshot => {
       if (cancelled) return;
-      const list = snapshot.docs.map(doc => slimMessageForClient({ id: doc.id, ...doc.data() }));
-      setFullChatHistoryByCalendar(prev => ({ ...prev, [activeCalId]: list }));
+      if (snapshot.docs.length > 0) {
+        const list = snapshot.docs.map(doc => slimMessageForClient({ id: doc.id, ...doc.data() }));
+        setFullChatHistoryByCalendar(prev => ({ ...prev, [activeCalId]: list }));
+        return;
+      }
+      // uploadSource=='chat' scoped query found nothing -- on a calendar whose real history
+      // predates that field (see isLegacyOrChatUpload in firebase-services.js), that scoping
+      // alone would make search/history's 인물·추억 탭 report "no messages" forever even though
+      // the actual chat history is intact. Fall back to an unscoped read, same as the no-SDK
+      // REST branch above already does unconditionally.
+      withTimeout(liveFirebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages')
+        .get({ source: 'server' }), 9000, 'full chat history read (legacy fallback)').then(fallbackSnapshot => {
+        if (cancelled) return;
+        const list = fallbackSnapshot.docs.map(doc => slimMessageForClient({ id: doc.id, ...doc.data() }));
+        setFullChatHistoryByCalendar(prev => ({ ...prev, [activeCalId]: list }));
+      }).catch(err => console.warn('full chat history legacy fallback failed:', err));
     }).catch(err => console.warn('full chat history load failed:', err));
     return () => { cancelled = true; };
   }, [activeCalId, isGlobalSearchOpen, activeView, firebaseDb, firebaseConnectionVersion, fullChatHistoryByCalendar]);
