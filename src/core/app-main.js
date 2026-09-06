@@ -1551,7 +1551,8 @@ function CalendarApp() {
       return () => { cancelled = true; };
     }
     let cancelled = false;
-    withTimeout(liveFirebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').get({ source: 'server' }), 9000, 'full chat history read').then(snapshot => {
+        withTimeout(liveFirebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages')
+          .where('uploadSource', '==', 'chat').get({ source: 'server' }), 9000, 'full chat history read').then(snapshot => {
       if (cancelled) return;
       const list = snapshot.docs.map(doc => slimMessageForClient({ id: doc.id, ...doc.data() }));
       setFullChatHistoryByCalendar(prev => ({ ...prev, [activeCalId]: list }));
@@ -3744,6 +3745,7 @@ function CalendarApp() {
             participantId: chatParticipantId,
             text: chatInput.trim(),
             timestamp: Date.now(),
+            uploadSource: 'chat',
             images: chatImages.map(image => ({ originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob })),
             ...(replyToPayload ? { replyTo: replyToPayload } : {})
           }
@@ -3760,7 +3762,8 @@ function CalendarApp() {
         const messageData = {
           participantId: chatParticipantId,
           text: chatInput.trim(),
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          uploadSource: 'chat'
         };
         if (linkPreview) messageData.linkPreview = linkPreview;
         if (replyToPayload) messageData.replyTo = replyToPayload;
@@ -3799,7 +3802,8 @@ function CalendarApp() {
             thumbUrl: chunkImages[0].thumbUrl,
             imageUrls: chunkImages.map(r => r.imageUrl),
             thumbUrls: chunkImages.map(r => r.thumbUrl),
-            timestamp: baseTimestamp + i
+            timestamp: baseTimestamp + i,
+            uploadSource: 'chat'
           };
           if (i === 0 && linkPreview) messageData.linkPreview = linkPreview;
           if (i === 0 && replyToPayload) messageData.replyTo = replyToPayload;

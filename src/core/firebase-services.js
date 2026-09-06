@@ -62,18 +62,10 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
   }
 
   async function fetchChatMessagesRest(calId) {
-    try {
-      const url = 'https://firestore.googleapis.com/v1/projects/' + projectId() + '/databases/(default)/documents/calendars/cal_' + calId + '/messages?orderBy=timestamp%20desc&pageSize=' + liveLimit();
-      const res = await fetchWithTimeout(url, { cache: 'no-store' });
-      if (!res.ok) return [];
-      const data = await res.json();
-      return (data.documents || []).map(function (doc) {
-        return slimMessage({ id: doc.name.split('/').pop(), ...docToJs(doc) });
-      }).reverse();
-    } catch (err) {
-      console.warn('fetchChatMessagesRest error:', err);
-      return [];
-    }
+    // Keep the REST fallback on the exact same channel-scoped query as the SDK path. A raw
+    // messages collection read here would reintroduce gallery/meeting uploads on browsers where
+    // the realtime SDK is unavailable.
+    return fetchRecentChatMessages(calId, liveLimit());
   }
 
   // Deliberate full-history read for views whose correctness depends on every message
@@ -104,13 +96,8 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
 
   async function fetchRecentChatMessages(calId, limit) {
     if (!isValidCalId(calId)) return [];
-    // Capped at 400 (not the old 100) so the main-screen chat preview's hydration safety net
-    // (app-main.js) can escalate its raw window deep enough to outlast a burst of dozens of
-    // 일정(meeting)/갤러리 photo uploads, which share this same `messages` collection but are
-    // filtered out client-side (isChatRenderableMessage) -- a caller asking for more than the
-    // old cap used to get silently truncated back to 100 raw docs, which a large-enough photo
-    // burst could still fully occupy, leaving genuinely recent chat text undiscoverable no
-    // matter how many times the caller retried the same query.
+    // Chat reads are channel-scoped. Gallery/meeting uploads remain in the shared legacy
+    // messages collection for media indexing, but are never part of this query or its read cost.
     const pageSize = Math.max(1, Math.min(400, Number(limit) || 60));
     const firebaseDb = getDb();
     // Firestore's orderBy() silently excludes any document that is missing the field being
@@ -125,7 +112,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     try {
       if (firebaseDb) {
         const snap = await withSdkTimeout(firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
-          .orderBy('timestamp', 'desc').limit(pageSize).get(), FIRESTORE_REST_TIMEOUT_MS);
+          .where('uploadSource', '==', 'chat').orderBy('timestamp', 'desc').limit(pageSize).get(), FIRESTORE_REST_TIMEOUT_MS);
         const list = [];
         snap.forEach(function (doc) { list.push(slimMessage({ id: doc.id, ...doc.data() })); });
         if (list.length > 0) return list.reverse();
@@ -137,7 +124,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     if (orderedEmpty && firebaseDb) {
       try {
         const snap = await withSdkTimeout(firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
-          .limit(pageSize).get(), FIRESTORE_REST_TIMEOUT_MS);
+          .where('uploadSource', '==', 'chat').limit(pageSize).get(), FIRESTORE_REST_TIMEOUT_MS);
         const list = [];
         snap.forEach(function (doc) { list.push(slimMessage({ id: doc.id, ...doc.data() })); });
         if (list.length > 0) {
@@ -150,11 +137,16 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
       }
     }
     try {
-      const url = 'https://firestore.googleapis.com/v1/projects/' + projectId() + '/databases/(default)/documents/calendars/cal_' + calId + '/messages?orderBy=timestamp%20desc&pageSize=' + pageSize;
-      const res = await fetchWithTimeout(url, { cache: 'no-store' });
+      const url = 'https://firestore.googleapis.com/v1/projects/' + projectId() + '/databases/(default)/documents/calendars/cal_' + calId + ':runQuery';
+      const res = await fetchWithTimeout(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, cache: 'no-store', body: JSON.stringify({ structuredQuery: {
+        from: [{ collectionId: 'messages' }],
+        where: { fieldFilter: { field: { fieldPath: 'uploadSource' }, op: 'EQUAL', value: { stringValue: 'chat' } } },
+        orderBy: [{ field: { fieldPath: 'timestamp' }, direction: 'DESCENDING' }], limit: pageSize
+      } }) });
       if (!res.ok) return [];
-      const data = await res.json();
-      const list = (data.documents || []).map(function (doc) {
+      const rows = await res.json();
+      const list = (Array.isArray(rows) ? rows : []).filter(row => row && row.document).map(function (row) {
+        const doc = row.document;
         return slimMessage({ id: doc.name.split('/').pop(), ...docToJs(doc) });
       });
       if (list.length > 0) return list.reverse();
@@ -163,11 +155,15 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     }
     // Same unordered-fallback reasoning as the SDK path above, for when only REST is available.
     try {
-      const url = 'https://firestore.googleapis.com/v1/projects/' + projectId() + '/databases/(default)/documents/calendars/cal_' + calId + '/messages?pageSize=' + pageSize;
-      const res = await fetchWithTimeout(url, { cache: 'no-store' });
+      const url = 'https://firestore.googleapis.com/v1/projects/' + projectId() + '/databases/(default)/documents/calendars/cal_' + calId + ':runQuery';
+      const res = await fetchWithTimeout(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, cache: 'no-store', body: JSON.stringify({ structuredQuery: {
+        from: [{ collectionId: 'messages' }],
+        where: { fieldFilter: { field: { fieldPath: 'uploadSource' }, op: 'EQUAL', value: { stringValue: 'chat' } } }, limit: pageSize
+      } }) });
       if (!res.ok) return [];
-      const data = await res.json();
-      const list = (data.documents || []).map(function (doc) {
+      const rows = await res.json();
+      const list = (Array.isArray(rows) ? rows : []).filter(row => row && row.document).map(function (row) {
+        const doc = row.document;
         return slimMessage({ id: doc.name.split('/').pop(), ...docToJs(doc) });
       });
       list.sort(function (a, b) { return (Number(a.timestamp) || 0) - (Number(b.timestamp) || 0); });
@@ -685,7 +681,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     if (firebaseDb) {
       try {
         const snap = await withSdkTimeout(firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
-          .orderBy('timestamp', 'desc').startAfter(beforeTimestamp).limit(size).get(), FIRESTORE_REST_TIMEOUT_MS);
+          .where('uploadSource', '==', 'chat').orderBy('timestamp', 'desc').startAfter(beforeTimestamp).limit(size).get(), FIRESTORE_REST_TIMEOUT_MS);
         const list = [];
         snap.forEach(function (doc) { list.push(slimMessage({ id: doc.id, ...doc.data() })); });
         return list.reverse();
@@ -699,13 +695,10 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
       const body = {
         structuredQuery: {
           from: [{ collectionId: 'messages' }],
-          where: {
-            fieldFilter: {
-              field: { fieldPath: 'timestamp' },
-              op: 'LESS_THAN',
-              value: { integerValue: String(beforeTimestamp) }
-            }
-          },
+          where: { compositeFilter: { op: 'AND', filters: [
+            { fieldFilter: { field: { fieldPath: 'uploadSource' }, op: 'EQUAL', value: { stringValue: 'chat' } } },
+            { fieldFilter: { field: { fieldPath: 'timestamp' }, op: 'LESS_THAN', value: { integerValue: String(beforeTimestamp) } } }
+          ] } },
           orderBy: [{ field: { fieldPath: 'timestamp' }, direction: 'DESCENDING' }],
           limit: size
         }
@@ -804,7 +797,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     options = options || {};
     return subscribeCalSubcollection(
       calId, 'messages',
-      { orderBy: options.orderBy || 'timestamp', direction: options.direction || 'desc', limit: options.limit },
+      { where: ['uploadSource', '==', 'chat'], orderBy: options.orderBy || 'timestamp', direction: options.direction || 'desc', limit: options.limit },
       onSnapshot, onError
     );
   }

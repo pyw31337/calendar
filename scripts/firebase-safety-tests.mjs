@@ -49,6 +49,7 @@ assert(linkPreviewHook && !/fetchLinkPreview\s*\(/.test(linkPreviewHook), 'link 
 assert(appMainSource.includes('Render-time link previews are intentionally read-only'), 'link preview render path must document its no-fetch contract');
 assert(/activeView === 'chat'[\s\S]{0,120}Math\.max\(chatLiveLimit, 60\)/.test(appMainSource), 'chat room must look past hidden media uploads when hydrating recent messages');
 assert(/const PAGE_SIZE = 150/.test(appMainSource), 'chat preview fallback must page past a burst of hidden media uploads');
+assert(appMainSource.includes("uploadSource: 'chat'"), 'new chat writes must carry an explicit chat channel');
 
 // Dragging the attendee list re-sends the SAME set of entries for that date in a new order, no
 // content change. Regression guard for a bug where the merge always fell back to the server's
@@ -226,6 +227,8 @@ assert(functionsSource.includes("timeoutSeconds: 15") && functionsSource.include
 assert(functionsSource.includes('setPublicCacheHeaders') && functionsSource.includes('stale-while-revalidate'), 'public proxy responses must advertise bounded browser/shared caching');
 assert(/collection\('push_subscriptions'\)\.limit\(500\)/.test(functionsSource), 'push fan-out must have a bounded subscription query');
 assert(/new AbortController\(\)[\s\S]{0,220}api\.peekalink\.io/.test(functionsSource), 'paid link preview requests must have an upstream timeout');
+assert(firestoreRules.includes("data.uploadSource == 'chat'"), 'message rules must permit the explicit chat channel');
+assert(firebaseServicesScript.includes("where('uploadSource', '==', 'chat')") && firebaseServicesScript.includes("fieldPath: 'uploadSource'"), 'chat reads must be channel-scoped at the query layer');
 assert(firebaseServicesScript.includes('FIRESTORE_REST_TIMEOUT_MS = 9000') && firebaseServicesScript.includes('fetchWithTimeout') && firebaseServicesScript.includes('withSdkTimeout'), 'Firebase SDK and REST reads must have bounded timeouts');
 assert(/fetchFirestoreRequest/.test(firebaseDataScript) && /image share read timeout/.test(firebaseDataScript), 'Firestore fallback and share reads must have bounded timeouts');
 assert(calendarCoreScript.includes('withFirestoreReadTimeout') && calendarCoreScript.includes('Firestore search read timed out'), 'full-history search reads must have a bounded timeout');
