@@ -2903,6 +2903,22 @@ function CalendarApp() {
     }
   };
 
+  // 추억 목록의 "추가" -- 숨겨 두었던 기념일을 다시 추억 목록에 노출한다.
+  const handleRestoreMemoryGroup = async (anniversaryId) => {
+    if (!activeCal?.id || !anniversaryId) return false;
+    try {
+      const saved = await writeCollectionDocumentWithFallback('anniversaries', activeCal.id, anniversaryId, { hiddenFromMemories: false }, 'update', '추억 목록에 추가');
+      if (!saved?.success) throw new Error('restore memory group failed');
+      handleAnniversarySaved({ id: anniversaryId, hiddenFromMemories: false });
+      showToast('추억 목록에 추가했습니다.', 'success');
+      return true;
+    } catch (err) {
+      console.error('Failed to restore memory group:', err);
+      showToast('추억 추가 실패', 'error');
+      return false;
+    }
+  };
+
   // 추억 탭의 "추가" -- handleRemovePhotosFromTravelMemory로 제외했던 사진을 다시 이 추억에
   // 넣을 수 있게, excludedMemoryPhotoKeys에서 골라낸 키들만 제거한다.
   const handleAddPhotosBackToTravelMemory = async (anniversaryId, photoKeys) => {
@@ -7833,6 +7849,7 @@ function CalendarApp() {
         onRemovePhotoFromMemory: handleRemovePhotoFromTravelMemory,
         onRemovePhotosFromMemory: handleRemovePhotosFromTravelMemory,
         onHideMemoryGroup: handleHideMemoryGroup,
+        onRestoreMemoryGroup: handleRestoreMemoryGroup,
         onAddPhotosBackToMemory: handleAddPhotosBackToTravelMemory,
         onFetchPhotoComments: handleFetchPhotoComments,
         onSavePhotoComments: handleSavePhotoComments,
