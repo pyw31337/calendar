@@ -1882,11 +1882,50 @@ export function HistoryView({
   // 항상 추억 탭이 첫화면이어야 한다 -- 예전에는 localStorage에 마지막으로 보던 탭을 저장해
   // 재진입 시 그대로 복원했지만, 그러면 지난모임 탭을 보다 나간 사용자는 계속 지난모임이
   // 먼저 나와 이 요구사항과 어긋나므로 탭 기억 기능 자체를 제거했다.
-  const [historyTab, setHistoryTab] = React.useState('memories');
+  const readHistoryTabFromUrl = () => {
+    const value = new URLSearchParams(window.location.search).get('historyTab');
+    return VALID_HISTORY_TABS.includes(value) ? value : 'memories';
+  };
+  const [historyTab, setHistoryTab] = React.useState(readHistoryTabFromUrl);
+  const [selectedMemoryGroupId, setSelectedMemoryGroupId] = React.useState(() => new URLSearchParams(window.location.search).get('memory') || null);
+  const pushHistoryState = (tab, memoryId = null) => {
+    const params = new URLSearchParams(window.location.search);
+    params.set('historyTab', tab);
+    if (memoryId) params.set('memory', memoryId); else params.delete('memory');
+    const qs = params.toString();
+    window.history.pushState({ historyTab: tab, memory: memoryId || null }, '', `${window.location.pathname}?${qs}`);
+  };
+  const openMemoryGroup = id => {
+    setSelectedMemoryGroupId(id);
+    pushHistoryState(historyTab, id);
+  };
+  const clearMemoryGroup = (useBrowserBack = false) => {
+    const params = new URLSearchParams(window.location.search);
+    if (useBrowserBack && params.get('memory')) {
+      window.history.back();
+      return;
+    }
+    setSelectedMemoryGroupId(null);
+    params.delete('memory');
+    const qs = params.toString();
+    window.history.replaceState({ historyTab }, '', `${window.location.pathname}?${qs}`);
+  };
   const changeHistoryTab = (tab) => {
     if (!VALID_HISTORY_TABS.includes(tab)) return;
     setHistoryTab(tab);
+    setSelectedMemoryGroupId(null);
+    pushHistoryState(tab);
   };
+  React.useEffect(() => {
+    const handleHistoryPopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get('historyTab');
+      setHistoryTab(VALID_HISTORY_TABS.includes(tab) ? tab : 'memories');
+      setSelectedMemoryGroupId(params.get('memory') || null);
+    };
+    window.addEventListener('popstate', handleHistoryPopState);
+    return () => window.removeEventListener('popstate', handleHistoryPopState);
+  }, []);
   // When the side menu navigates to 기록 again (or any view), force the 추억 tab so
   // re-entry always lands there rather than whatever tab was last open.
   const handleHistoryChangeView = (view) => {
@@ -1968,7 +2007,6 @@ export function HistoryView({
   // 사진)를 결합해, 태그(인물)나 날짜(추억)로 걸러 보여준다.
   const historyPhotoEntries = React.useMemo(() => buildCombinedPhotoEntries(chatMessages, memos, calendar, anniversaries), [chatMessages, memos, calendar, anniversaries]);
   const [selectedPersonTag, setSelectedPersonTag] = React.useState(null);
-  const [selectedMemoryGroupId, setSelectedMemoryGroupId] = React.useState(null);
   React.useEffect(() => { setSelectedPersonTag(null); setSelectedMemoryGroupId(null); }, [historyTab]);
   const [isMemoryListEditMode, setIsMemoryListEditMode] = React.useState(false);
   const [selectedMemoryGroupIds, setSelectedMemoryGroupIds] = React.useState(() => new Set());
@@ -2006,7 +2044,7 @@ export function HistoryView({
           // 이번에 제외한 사진이 이 그룹의 전부였다면 목록에서 그룹 자체가 사라진다 --
           // 그대로 두면 상세 화면(뒤로가기 버튼 포함)이 통째로 안 보이는 먹통 상태가 되므로
           // 미리 목록으로 돌아간다.
-          if (keys.length >= group.photos.length) setSelectedMemoryGroupId(null);
+          if (keys.length >= group.photos.length) clearMemoryGroup();
         }
       } finally {
         setIsExcludingMemoryPhotos(false);
@@ -2026,7 +2064,7 @@ export function HistoryView({
       setIsHidingMemoryGroup(true);
       try {
         const ok = await onHideMemoryGroup(group.id);
-        if (ok !== false) setSelectedMemoryGroupId(null);
+        if (ok !== false) clearMemoryGroup();
       } finally {
         setIsHidingMemoryGroup(false);
       }
@@ -2468,7 +2506,7 @@ export function HistoryView({
               return /*#__PURE__*/React.createElement("button", {
                 key: group.id,
                 type: "button",
-                onClick: () => setSelectedMemoryGroupId(group.id),
+                onClick: () => openMemoryGroup(group.id),
                 style: {
                   position: 'relative', aspectRatio: '1 / 1', borderRadius: 'var(--radius-lg)', overflow: 'hidden',
                   border: 'none', padding: 0, cursor: 'pointer', backgroundColor: 'var(--bg-card)'
@@ -2529,7 +2567,7 @@ export function HistoryView({
       }, /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
         /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
           /*#__PURE__*/React.createElement("button", {
-            type: "button", onClick: () => setSelectedMemoryGroupId(null), "aria-label": "추억 목록으로",
+            type: "button", onClick: () => clearMemoryGroup(true), "aria-label": "추억 목록으로",
             style: {
               width: '32px', height: '32px', borderRadius: '50%', border: 'none', background: 'transparent',
               display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)', flexShrink: 0
@@ -2762,7 +2800,7 @@ export function HistoryView({
             const ok = await onRemovePhotoFromMemory(memoryId, key);
             // 이 사진이 그룹의 마지막 한 장이었다면 제거 후 그룹 자체가 목록에서 사라진다 --
             // 그대로 두면 상세 화면(뒤로가기 버튼 포함)이 통째로 안 보이는 먹통 상태가 된다.
-            if (ok !== false && grp && grp.photos.length <= 1) setSelectedMemoryGroupId(null);
+            if (ok !== false && grp && grp.photos.length <= 1) clearMemoryGroup();
             return ok;
           })
         : null,
