@@ -2671,6 +2671,15 @@ function CalendarApp() {
     // the register checkbox path.
     const rawCategory = (options && options.category) || item.anniversaryCategory || item.kind || 'event';
     const category = rawCategory === 'festival' ? 'festival' : (rawCategory === 'sports' ? 'sports' : (rawCategory === 'movie' ? 'movie' : 'event'));
+    // Full copy of the crawled/portal card as-is (minus the two plumbing fields this call adds
+    // itself, anniversaryCategory/kind -- see handleToggleRegister/ContentRegisterModal, neither
+    // of which is a real content field). 기념일 등록(이 함수)과 컨텐츠 카드가 서로 다른 필드
+    // 집합을 따로 관리하던 게 "등록했더니 정보가 다 날아갔다" 버그의 근본 원인이었다 -- 등록
+    // 당시 이 카드가 가진 필드가 앞으로 몇 개든, 뭐든, 항상 그대로 보존되도록 필드를 하나하나
+    // 골라 옮기는 대신 카드 전체를 스냅샷으로 저장한다. orphanedSourceItems(ui-summary-gallery.js)가
+    // 크롤링 피드에서 이 항목이 사라졌을 때(또는 id가 어긋났을 때) 이 스냅샷으로 원래 카드와
+    // 동일한 상세 정보를 그대로 복원한다.
+    const { anniversaryCategory: _omitAnniversaryCategory, kind: _omitKind, ...cultureSnapshot } = item;
     const annData = {
       id: anniversaryId,
       calendarId: activeCal.id,
@@ -2680,6 +2689,7 @@ function CalendarApp() {
       startDate,
       endDate: item.endDate || startDate,
       cultureSourceId: item.id,
+      cultureSnapshot,
       createdAt: stamp,
       updatedAt: stamp
     };

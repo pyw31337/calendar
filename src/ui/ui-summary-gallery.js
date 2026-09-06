@@ -3835,14 +3835,27 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
   // a.id === itemId for cards built directly from a self-authored anniversary (기념일 등록으로
   // 만든 festival/event -- see HistoryView's selfAuthoredCultureItems), which never gets its own
   // cultureSourceId since it wasn't registered through this tab in the first place.
-  const findRegisteredAnniversary = itemId =>
-    (anniversaries || []).find(a => a?.cultureSourceId === itemId || a?.id === itemId) || null;
+  //
+  // itemTitle is a last-resort fallback for the same id-mismatch case orphanedSourceItems above
+  // guards against (crawled id-generation scheme drift, or a Korean Unicode normalization
+  // mismatch): a live crawled card whose id no longer equals what was captured at registration
+  // time would otherwise show as "not registered" even though it plainly still is -- checking by
+  // exact title (scoped to this tab's own category, so an unrelated same-titled sports/movie
+  // entry can't false-match) keeps the checkbox/체크마크 correct without needing a data migration.
+  const findRegisteredAnniversary = (itemId, itemTitle) => {
+    const list = anniversaries || [];
+    const byId = list.find(a => a?.cultureSourceId === itemId || a?.id === itemId);
+    if (byId) return byId;
+    const title = String(itemTitle || '').trim();
+    if (!title) return null;
+    return list.find(a => a && a.category === anniversaryCategory && String(a.title || '').trim() === title) || null;
+  };
 
   const handleToggleRegister = async (item) => {
     if (!item || pendingId) return;
     setPendingId(item.id);
     try {
-      const existing = findRegisteredAnniversary(item.id);
+      const existing = findRegisteredAnniversary(item.id, item.title);
       if (existing) {
         if (typeof onUnregisterCultureEvent === 'function') await onUnregisterCultureEvent(existing.id);
       } else {
@@ -3867,30 +3880,50 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
   const orphanedSourceItems = React.useMemo(() => {
     if (items === null) return [];
     const presentIds = new Set(items.map(i => i && i.id).filter(Boolean));
+    // Also check by title: an id mismatch (e.g. the crawled snapshot's id-generation scheme
+    // changed, or a Unicode normalization difference in the Korean title between the day this
+    // was registered and today's snapshot) must not be treated the same as "genuinely dropped
+    // from the feed" when a live item with the identical title still exists -- that live item
+    // already renders normally via `crawled` below, and synthesizing a SECOND, poorer-fidelity
+    // card for the same real-world listing here is exactly the "이중으로 관리되는" duplicate
+    // bug (하나는 풍부한 크롤링 카드, 하나는 기념일 자신의 제한된 필드로만 채워진 카드).
+    const presentTitles = new Set(items.map(i => i && String(i.title || '').trim()).filter(Boolean));
     const kindByCategory = { festival: 'festival', event: 'performance', sports: 'sports', movie: 'movie' };
     return (anniversaries || [])
-      .filter(a => a && a.cultureSourceId && a.category === anniversaryCategory && !presentIds.has(a.cultureSourceId))
-      .map(a => ({
-        id: a.cultureSourceId,
-        kind: kindByCategory[a.category] || 'performance',
-        title: a.title || '',
-        startDate: a.startDate || a.date,
-        endDate: a.endDate || a.date,
-        dateLabel: (a.startDate && a.endDate && a.startDate !== a.endDate)
-          ? `${a.startDate} ~ ${a.endDate}`
-          : (a.startDate || a.date || ''),
-        venue: a.place ? (a.place.alias || a.place.name || '') : '',
-        address: a.place ? (a.place.address || '') : '',
-        description: a.description || '',
-        releaseDate: a.movieMeta?.releaseDate || a.date,
-        director: a.movieMeta?.director || '',
-        cast: Array.isArray(a.movieMeta?.cast) ? a.movieMeta.cast : [],
-        ageRating: a.movieMeta?.ageRating || '',
-        bookingRate: a.movieMeta?.bookingRate || '',
-        audienceCount: a.movieMeta?.audienceCount || '',
-        isOpenEnded: a.movieMeta?.isOpenEnded !== false,
-        image: a.image || (Array.isArray(a.photos) && a.photos[0] ? (a.photos[0].thumbUrl || a.photos[0].url || '') : '')
-      }));
+      .filter(a => a && a.cultureSourceId && a.category === anniversaryCategory
+        && !presentIds.has(a.cultureSourceId)
+        && !presentTitles.has(String(a.title || '').trim()))
+      .map(a => {
+        // Full parity with the original crawled card, not just the handful of fields the
+        // anniversary itself structurally tracks (place/description/movieMeta) -- see
+        // cultureSnapshot's own comment in handleRegisterCultureEvent (app-main.js). Anniversaries
+        // registered before this field existed have no cultureSnapshot at all; snapshot stays an
+        // empty object for those and every field below falls back to the anniversary's own
+        // limited set exactly as it always has, so nothing regresses for pre-existing data.
+        const snapshot = (a.cultureSnapshot && typeof a.cultureSnapshot === 'object') ? a.cultureSnapshot : {};
+        return {
+          ...snapshot,
+          id: a.cultureSourceId,
+          kind: kindByCategory[a.category] || 'performance',
+          title: a.title || snapshot.title || '',
+          startDate: a.startDate || a.date || snapshot.startDate,
+          endDate: a.endDate || a.date || snapshot.endDate,
+          dateLabel: (a.startDate && a.endDate && a.startDate !== a.endDate)
+            ? `${a.startDate} ~ ${a.endDate}`
+            : (a.startDate || a.date || snapshot.dateLabel || ''),
+          venue: a.place ? (a.place.alias || a.place.name || '') : (snapshot.venue || ''),
+          address: a.place ? (a.place.address || '') : (snapshot.address || ''),
+          description: a.description || snapshot.description || '',
+          releaseDate: a.movieMeta?.releaseDate || snapshot.releaseDate || a.date,
+          director: a.movieMeta?.director || snapshot.director || '',
+          cast: Array.isArray(a.movieMeta?.cast) ? a.movieMeta.cast : (Array.isArray(snapshot.cast) ? snapshot.cast : []),
+          ageRating: a.movieMeta?.ageRating || snapshot.ageRating || '',
+          bookingRate: a.movieMeta?.bookingRate || snapshot.bookingRate || '',
+          audienceCount: a.movieMeta?.audienceCount || snapshot.audienceCount || '',
+          isOpenEnded: a.movieMeta ? a.movieMeta.isOpenEnded !== false : (snapshot.isOpenEnded !== false),
+          image: a.image || (Array.isArray(a.photos) && a.photos[0] ? (a.photos[0].thumbUrl || a.photos[0].url || '') : (snapshot.image || ''))
+        };
+      });
   }, [items, anniversaries, anniversaryCategory]);
 
   // Merge calendar-owned custom items (컨텐츠 등록) ahead of the crawled snapshot. Custom ids
@@ -3898,10 +3931,21 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
   // but still de-dupe by id in case a write echoes twice.
   const mergedItems = React.useMemo(() => {
     if (items === null) return null;
+    // A self-authored anniversary (기념일 등록으로 직접 typed, no cultureSourceId at all) or a
+    // manually 개별등록-ed card can coincidentally share its title with something that's also
+    // sitting right there in today's live crawled feed -- the user typed/found it independently,
+    // unaware it was already a registerable listing. Without this check both would render as two
+    // separate cards for the same real-world event: the rich crawled one, and the other holding
+    // only whatever the user themselves typed -- exactly the "이중으로 관리되는" duplicate this
+    // caused. Prefer the live crawled version (richer, and always the freshest available data)
+    // over a same-titled self-authored/custom entry.
+    const crawledTitles = new Set((items || []).map(i => i && String(i.title || '').trim()).filter(Boolean));
     // isCustomRegistered marks every self-authored/컨텐츠-등록 item (as opposed to crawled from
     // the portal snapshot) so the "개별등록" category chip below can filter on it directly,
     // instead of guessing from genre/id-prefix which crawled items can also lack.
-    const extras = (Array.isArray(extraItems) ? extraItems.filter(Boolean) : []).map(e => ({ ...e, isCustomRegistered: true }));
+    const extras = (Array.isArray(extraItems) ? extraItems.filter(Boolean) : [])
+      .filter(e => !crawledTitles.has(String(e.title || '').trim()))
+      .map(e => ({ ...e, isCustomRegistered: true }));
     const seen = new Set(extras.map(e => e && e.id).filter(Boolean));
     const orphaned = orphanedSourceItems
       .filter(o => o && o.id && !seen.has(o.id))
@@ -4097,7 +4141,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
       style: { flex: 1, overflowY: 'auto', padding: '16px', paddingTop: contentPaddingTop, alignContent: 'start', gridAutoRows: 'max-content' }
     },
       visibleItems.map(item => {
-        const registered = !!findRegisteredAnniversary(item.id);
+        const registered = !!findRegisteredAnniversary(item.id, item.title);
         const isMovieCard = anniversaryCategory === 'movie' || item.genre === 'movie' || item.kind === 'movie';
         const isMovieNowShowing = isMovieCard
           && cultureItemDay(item)
@@ -4334,7 +4378,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
             },
               /*#__PURE__*/React.createElement("input", {
                 type: "checkbox",
-                checked: !!findRegisteredAnniversary(selected.id),
+                checked: !!findRegisteredAnniversary(selected.id, selected.title),
                 disabled: !!pendingId,
                 onChange: () => handleToggleRegister(selected)
               }),
