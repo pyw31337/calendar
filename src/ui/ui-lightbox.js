@@ -1439,6 +1439,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
         borderRadius: 'var(--radius-md)', boxSizing: 'border-box'
       }
     }, /*#__PURE__*/React.createElement(CommentThread, {
+      key: `comment-thread-${photoCommentKey}`,
       comments: photoCommentsByKey[photoCommentKey] || [],
       onCommentsChange: handlePhotoCommentsChange,
       calendar: calendar,

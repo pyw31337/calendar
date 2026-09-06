@@ -1594,14 +1594,14 @@ export function DateModal({
     }));
     const directPhotos = [...indexedPhotos, ...(Array.isArray(confirmedMeetingEntry?.photos) ? confirmedMeetingEntry.photos : [])]
       .filter(photo => photo && !isTombstone(photo) && (photo.imageUrl || photo.thumbUrl))
-      .map(photo => {
+      .map((photo, photoIndex) => {
         const resolved = resolveMeetingPhotoDisplay(photo, chatMessagesWithFetchedSources) || {};
         const mediaKey = resolved.mediaKey
           || photo.mediaKey
           || (photo.sourceMessageId && Number.isInteger(photo.sourceImageIndex)
             ? `chat:${photo.sourceMessageId}:${photo.sourceImageIndex}`
-            : `meeting:${dateStr}:${photo.id || 'photo'}`);
-        const refKey = resolved.refKey || photo.refKey || `meeting:${dateStr}:${photo.id || 'photo'}`;
+            : `meeting:${dateStr}:${photo.id || `photo-${photoIndex}`}`);
+        const refKey = resolved.refKey || photo.refKey || `meeting:${dateStr}:${photo.id || `photo-${photoIndex}`}`;
         return {
           ...photo,
           imageUrl: resolved.imageUrl || photo.imageUrl,

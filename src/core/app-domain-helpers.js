@@ -2085,7 +2085,7 @@ function getMediaIdentityKeys(photo = {}, opts = {}) {
   // Some legacy/lightbox entry points only provide the rendered URL (without a message/photo
   // id). Never collapse those photos into the shared `*:unknown` document: a URL hash is a
   // stable per-asset fallback and keeps each photo's comment thread isolated.
-  const fallbackMediaUrl = !directMediaUrl && !messageId && !photoId && !meetingDate
+  const fallbackMediaUrl = !directMediaUrl && !messageId && !photoId
     ? String(photo?.full || photo?.url || photo?.imageUrl || photo?.thumb || photo?.thumbUrl || '').trim()
     : '';
   const fallbackMediaKey = fallbackMediaUrl ? getDirectMediaTagKey(fallbackMediaUrl) : '';
@@ -2109,7 +2109,8 @@ function getMediaIdentityKeys(photo = {}, opts = {}) {
   }
 
   if (isMeetingReference) {
-    const meetingPhotoIdentity = photoId || messageId || (Number.isInteger(imageIndex) ? `photo-${imageIndex}` : 'photo');
+    const meetingPhotoIdentity = photoId || messageId
+      || (Number.isInteger(imageIndex) ? `photo-${imageIndex}` : (fallbackMediaKey ? `url-${fallbackMediaKey}` : 'photo'));
     const key = `meeting:${meetingDate || 'date'}:${meetingPhotoIdentity}`;
     return { assetKey: key, mediaKey: key, refKey: key };
   }
