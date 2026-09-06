@@ -2492,8 +2492,15 @@ function CalendarApp() {
   // Anniversaries: full collection (no orderBy) + client sort so docs without createdAt still show.
   // Also active on history (보관함) so culture/festival "캘린더와 연동" checkboxes can resolve
   // cultureSourceId matches without requiring a prior visit to the calendar view this session.
+  // 컨텐츠 페이지(지역축제/문화행사/스포츠/영화 탭)의 selfAuthoredCultureItems/orphanedSourceItems
+  // (ui-summary-gallery.js)도 이 anniversaries 데이터가 있어야 기념일 등록으로 직접 만든 항목과,
+  // 크롤링 피드에서 빠졌지만 등록은 살아있는 항목("개별등록")을 찾아낼 수 있다. 'content'가
+  // 빠져 있으면, 캘린더/보관함을 먼저 들르지 않고 컨텐츠 페이지로 곧장 들어온 세션(북마크,
+  // onFocusCultureSource 이동, PWA 바로가기 등)에서는 anniversaries가 아예 로드되지 않아 그런
+  // 항목들이 통째로 안 보였다 -- 새로고침 후 캘린더부터 방문하면 다시 로드되어 "고치면 잠깐
+  // 보이고 다시 안 보인다"처럼 보이는 원인 중 하나.
   const needsAnniversariesData = React.useMemo(
-    () => activeView === 'calendar' || activeView === 'history',
+    () => activeView === 'calendar' || activeView === 'history' || activeView === 'content',
     [activeView]
   );
   React.useEffect(() => {
@@ -2910,8 +2917,24 @@ function CalendarApp() {
 
   // 보관함 > 컨텐츠 등록 / 컨텐츠 페이지: calendar-owned custom culture/festival/sports cards
   // merged into the CulturePerformancesTab lists alongside crawled JSON snapshots.
+  //
+  // needsCustomCultureData is memoized (rather than depending on raw `activeView` directly)
+  // for the same reason needsPlacesData is below: history and content both need this exact same
+  // subscription, so switching back and forth between them must NOT tear the Firestore listener
+  // down and recreate it on every single navigation -- only a genuine transition across the
+  // needs-it/doesn't-need-it boundary should resubscribe. Before this, `[activeCalId, activeView,
+  // ...]` resubscribed on every 보관함<->컨텐츠 switch, exactly the "unsubscribe+resubscribe
+  // within milliseconds of a nav" churn already identified (see needsPlacesData's own comment)
+  // as the likely trigger for Firestore's "INTERNAL ASSERTION FAILED: Unexpected state" listener
+  // corruption -- a torn-down-and-rebuilt listener can come back delivering a stale/incomplete
+  // snapshot, which reads exactly like "개별등록 items keep vanishing, and refreshing briefly
+  // fixes it" even though the documents were never actually lost.
+  const needsCustomCultureData = React.useMemo(
+    () => activeView === 'history' || activeView === 'content',
+    [activeView]
+  );
   React.useEffect(() => {
-    if (!activeCalId || (activeView !== 'history' && activeView !== 'content')) return;
+    if (!activeCalId || !needsCustomCultureData) return;
     let isMounted = true;
     const kindByCategory = { festival: 'festival', event: 'performance', performance: 'performance', sports: 'sports', movie: 'movie' };
     const normalizeCustomCultureItem = item => {
@@ -2961,7 +2984,7 @@ function CalendarApp() {
         }).catch(fallbackErr => console.warn('Custom culture REST fallback failed; retaining existing items:', fallbackErr));
       });
     return () => { isMounted = false; unsub(); };
-  }, [activeCalId, activeView, firebaseDb, firebaseConnectionVersion]);
+  }, [activeCalId, needsCustomCultureData, firebaseDb, firebaseConnectionVersion]);
 
   const handleSaveCustomCultureItem = async (item) => {
     if (!activeCal?.id || !item?.id || !item?.title) return false;
