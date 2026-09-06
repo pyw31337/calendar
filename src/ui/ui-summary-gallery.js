@@ -1958,6 +1958,10 @@ export function HistoryView({
         if (ok !== false) {
           setIsMemoryEditMode(false);
           setSelectedMemoryPhotoKeys(new Set());
+          // 이번에 제외한 사진이 이 그룹의 전부였다면 목록에서 그룹 자체가 사라진다 --
+          // 그대로 두면 상세 화면(뒤로가기 버튼 포함)이 통째로 안 보이는 먹통 상태가 되므로
+          // 미리 목록으로 돌아간다.
+          if (keys.length >= group.photos.length) setSelectedMemoryGroupId(null);
         }
       } finally {
         setIsExcludingMemoryPhotos(false);
@@ -2592,7 +2596,16 @@ export function HistoryView({
       onGetGalleryPhotoOrdinal,
       onRequestConfirm,
       onRemoveFromMemory: (historyLightbox.memoryId && typeof onRemovePhotoFromMemory === 'function')
-        ? (photoMeta => onRemovePhotoFromMemory(historyLightbox.memoryId, photoMeta?.mediaKey || photoMeta?.refKey))
+        ? (async photoMeta => {
+            const memoryId = historyLightbox.memoryId;
+            const key = photoMeta?.mediaKey || photoMeta?.refKey;
+            const grp = travelMemoryGroups.find(g => g.id === memoryId);
+            const ok = await onRemovePhotoFromMemory(memoryId, key);
+            // 이 사진이 그룹의 마지막 한 장이었다면 제거 후 그룹 자체가 목록에서 사라진다 --
+            // 그대로 두면 상세 화면(뒤로가기 버튼 포함)이 통째로 안 보이는 먹통 상태가 된다.
+            if (ok !== false && grp && grp.photos.length <= 1) setSelectedMemoryGroupId(null);
+            return ok;
+          })
         : null,
       onFetchPhotoComments,
       onSavePhotoComments
