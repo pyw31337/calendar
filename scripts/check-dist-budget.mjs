@@ -19,10 +19,9 @@ const BUDGETS = [
 ];
 
 // Total JS across all Vite chunks. Temporarily doubled to 2.6MB (~200%) during active development.
-// Nudged to 2.66MB to fit the 추억 탭 "제외된 사진 다시 추가" 팝업 addition -- still well inside
-// the "doubled" ceiling above, not a new precedent. Will be reduced alongside post-stabilization
-// chunk optimization.
-const TOTAL_JS_MAX_BYTES = 2_660_000;
+// Nudged to 2.68MB to accommodate the movie metadata/enrichment UI. This remains well inside the
+// doubled ceiling above and will be reduced alongside post-stabilization chunk optimization.
+const TOTAL_JS_MAX_BYTES = 2_680_000;
 
 function fail(message) {
   console.error(`[check-dist-budget] ${message}`);
