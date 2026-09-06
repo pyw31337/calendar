@@ -830,6 +830,19 @@ export function MessageCommentIcon({ size = 24 } = {}) {
   );
 }
 
+export function PlusIcon({ size = 14 } = {}) {
+  const React = window.React;
+
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg", width: String(size), height: String(size), viewBox: "0 0 24 24",
+    fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round"
+  },
+    /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
+    /*#__PURE__*/React.createElement("path", { d: "M12 5l0 14" }),
+    /*#__PURE__*/React.createElement("path", { d: "M5 12l14 0" })
+  );
+}
+
 export function PencilIcon({ size = 12 } = {}) {
   const React = window.React;
 
@@ -2377,6 +2390,7 @@ export function PhotoCommentCountBadge({ count = 0 } = {}) {
     LinkIcon: LinkIcon,
     MessageCommentIcon: MessageCommentIcon,
     PencilIcon: PencilIcon,
+    PlusIcon: PlusIcon,
     ReplyIcon: ReplyIcon,
     BuildingIcon: BuildingIcon,
     BackArrowIcon: BackArrowIcon,
