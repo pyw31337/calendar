@@ -2632,7 +2632,7 @@ function CalendarApp() {
     // 생겨버린다. Prefer explicit options.category, then item.anniversaryCategory / item.kind from
     // the register checkbox path.
     const rawCategory = (options && options.category) || item.anniversaryCategory || item.kind || 'event';
-    const category = rawCategory === 'festival' ? 'festival' : 'event';
+    const category = rawCategory === 'festival' ? 'festival' : (rawCategory === 'sports' ? 'sports' : (rawCategory === 'movie' ? 'movie' : 'event'));
     const annData = {
       id: anniversaryId,
       calendarId: activeCal.id,
@@ -2645,6 +2645,18 @@ function CalendarApp() {
       createdAt: stamp,
       updatedAt: stamp
     };
+    if (category === 'movie') {
+      annData.movieMeta = {
+        releaseDate: item.releaseDate || item.startDate || startDate,
+        endDate: item.endDate || null,
+        isOpenEnded: item.isOpenEnded !== false,
+        director: item.director || '',
+        cast: Array.isArray(item.cast) ? item.cast : [],
+        bookingRate: item.bookingRate || '',
+        audienceCount: item.audienceCount || '',
+        ageRating: item.ageRating || ''
+      };
+    }
     // Conditionally-added, not `field: value || undefined` -- Firestore's set() rejects a literal
     // undefined property value outright, so an always-present key here would throw on exactly the
     // items missing that field (same pattern AnniversaryModal's own handleSaveAnniversary uses).
@@ -6801,7 +6813,7 @@ function CalendarApp() {
         if (!focusId) return;
         // 문화행사/지역축제/스포츠 탭 중 이 기념일의 원래 카테고리에 맞는 탭을 열고, 그 항목의
         // 상세를 자동으로 펼치도록 ContentView에 전달 -- 실제 매칭/표시는 컨텐츠 페이지 쪽에서.
-        const tabByCategory = { festival: 'festival', event: 'culture', sports: 'sports' };
+        const tabByCategory = { festival: 'festival', event: 'culture', sports: 'sports', movie: 'movies' };
         try {
           localStorage.setItem('gather_content_tab', tabByCategory[ann.category] || 'festival');
           localStorage.setItem('gather_content_focus_item_id', focusId);
@@ -11391,6 +11403,7 @@ function getAnniversaryCategoryBadge(category, genre) {
     event: { badgeColor: '#3B82F6', icon: '🎈' },
     festival: { badgeColor: '#F59E0B', icon: '🎉' },
     sports: { badgeColor: '#0EA5E9', icon: SPORTS_GENRE_ICONS[genre] || '⚽' },
+    movie: { badgeColor: '#8B5CF6', icon: '🎬' },
     travel: { badgeColor: '#10B981', icon: '✈️' },
     other: { badgeColor: '#6B7280', icon: '💬' }
   };

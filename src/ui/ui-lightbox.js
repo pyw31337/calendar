@@ -2082,19 +2082,8 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar, sho
     zoomLevel === ZOOM_DEFAULT && /*#__PURE__*/React.createElement("div", {
       style: { display: 'flex', alignItems: 'center', gap: '6px', pointerEvents: 'auto' }
     },
-      showInfo && canEditPhoto && onDeletePhoto && /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: handleDeletePhotoClick,
-        disabled: isReplacingPhoto || isDeletingPhoto,
-        "aria-label": "사진 삭제",
-        title: "사진 삭제",
-        style: {
-          width: '30px', height: '30px', borderRadius: '50%', border: 'none',
-          background: 'rgba(15,23,42,0.62)', color: '#FFFFFF', display: 'flex',
-          alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 'var(--font-size-sm)',
-          opacity: (isReplacingPhoto || isDeletingPhoto) ? 0.5 : 1
-        }
-      }, isDeletingPhoto ? '...' : /*#__PURE__*/React.createElement(TrashIcon, { size: 15 })),
+      renderInfoToggleButton(),
+      renderUrlButton(),
       showInfo && canEditPhoto && onReplacePhoto && /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: () => replacePhotoInputRef.current && replacePhotoInputRef.current.click(),
@@ -2108,10 +2097,21 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar, sho
           opacity: (isReplacingPhoto || isDeletingPhoto) ? 0.5 : 1
         }
       }, isReplacingPhoto ? '...' : /*#__PURE__*/React.createElement(PencilIcon, { size: 15 })),
-      renderInfoToggleButton(),
-      renderUrlButton()
+      showInfo && canEditPhoto && onDeletePhoto && /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: handleDeletePhotoClick,
+        disabled: isReplacingPhoto || isDeletingPhoto,
+        "aria-label": "사진 삭제",
+        title: "사진 삭제",
+        style: {
+          width: '30px', height: '30px', borderRadius: '50%', border: 'none',
+          background: 'rgba(15,23,42,0.62)', color: '#FFFFFF', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 'var(--font-size-sm)',
+          opacity: (isReplacingPhoto || isDeletingPhoto) ? 0.5 : 1
+        }
+      }, isDeletingPhoto ? '...' : /*#__PURE__*/React.createElement(TrashIcon, { size: 15 }))
     ),
-    showInfo && isDesktop && /*#__PURE__*/React.createElement("div", {
+    isDesktop && /*#__PURE__*/React.createElement("div", {
       // top: 0 pins this to the row's own top edge explicitly -- without it, this absolutely
       // positioned group has no top of its own, so its vertical position falls back to the
       // flex row's alignItems:center "static position", which is computed against the row's
@@ -2153,7 +2153,6 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar, sho
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: handleZoomReset,
-        disabled: zoomLevel === ZOOM_DEFAULT,
         "aria-label": "100%로 초기화",
         title: "100%로 초기화",
         style: {
@@ -2166,10 +2165,10 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar, sho
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          cursor: zoomLevel === ZOOM_DEFAULT ? 'default' : 'pointer',
+          cursor: 'pointer',
           fontSize: 'var(--font-size-2xs)',
           fontWeight: 900,
-          opacity: zoomLevel === ZOOM_DEFAULT ? 0.7 : 1
+          opacity: 1
         }
       }, `${zoomLevel}%`),
       /*#__PURE__*/React.createElement("button", {

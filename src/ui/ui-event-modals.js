@@ -793,6 +793,7 @@ const ANNIVERSARY_CATEGORY_OPTIONS = [
   { value: 'event', label: '행사' },
   { value: 'festival', label: '축제' },
   { value: 'sports', label: '스포츠' },
+  { value: 'movie', label: '영화' },
   { value: 'travel', label: '여행' },
   { value: 'other', label: '기타' }
 ];
@@ -800,13 +801,14 @@ const ANNIVERSARY_CATEGORY_OPTIONS = [
 // 색상 -- 목록에서도 같은 색으로 구분되게 그대로 재사용한다.
 const ANNIVERSARY_CATEGORY_COLORS = {
   birthday: '#EF4444', event: '#3B82F6', festival: '#F59E0B',
-  sports: '#0EA5E9', travel: '#10B981', other: '#6B7280'
+  sports: '#0EA5E9', movie: '#8B5CF6', travel: '#10B981', other: '#6B7280'
 };
 const ANNIVERSARY_CATEGORY_TITLE_LABEL = {
   birthday: '생일 이름',
   event: '행사 이름',
   festival: '축제 이름',
   sports: '경기 이름',
+  movie: '영화 제목',
   travel: '여행 이름',
   other: '기념일 이름'
 };

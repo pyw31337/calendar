@@ -34,7 +34,8 @@ const SPORTS_GENRES = new Set(['baseball', 'basketball', 'volleyball', 'soccer',
 const FEEDS = [
   { file: 'culture-performances.json', sources: new Set(['culture-portal', 'kopis']), label: 'performances' },
   { file: 'culture-festivals.json', sources: new Set(['festival']), label: 'festivals' },
-  { file: 'culture-sports.json', genres: SPORTS_GENRES, label: 'sports' }
+  { file: 'culture-sports.json', genres: SPORTS_GENRES, label: 'sports' },
+  { file: 'culture-movies.json', sources: new Set(['movie']), label: 'movies', keepHistorical: true }
 ];
 
 function parseDateRange(raw) {
@@ -74,14 +75,16 @@ function resolveImageUrl(raw) {
 
 function normalizeItem(raw) {
   const { startDate, endDate } = parseDateRange(raw.date);
+  const movie = raw.genre === 'movie';
+  const normalizedEndDate = movie ? null : endDate;
   return {
-    startDate, endDate,
+    startDate, endDate: normalizedEndDate,
     item: {
       id: String(raw.id || `${raw.title}::${raw.date}`),
       title: String(raw.title),
       dateLabel: String(raw.date),
       startDate,
-      endDate,
+      endDate: normalizedEndDate,
       venue: raw.venue || raw.venueKey || '',
       address: raw.address || '',
       region: raw.region || '',
@@ -106,6 +109,17 @@ function normalizeItem(raw) {
       awayTeam: raw.awayTeam || '',
       homeTeamLogo: resolveImageUrl(raw.homeTeamLogo),
       awayTeamLogo: resolveImageUrl(raw.awayTeamLogo)
+      ,releaseDate: movie ? (raw.dateRaw ? String(raw.dateRaw).replace(/^(\d{4})(\d{2})(\d{2}).*$/, '$1-$2-$3') : startDate) : '',
+      isOpenEnded: movie,
+      director: raw.director || '',
+      cast: Array.isArray(raw.cast) ? raw.cast : [],
+      ageRating: raw.ageRating || '',
+      audienceCount: raw.audienceCount ?? raw.audience ?? '',
+      bookingRate: raw.bookingRate ?? raw.reservationRate ?? '',
+      runningTime: raw.runningTime || '',
+      subGenre: raw.subGenre || '',
+      originalTitle: raw.originalTitle || '',
+      synopsis: raw.synopsis || ''
     }
   };
 }
@@ -252,7 +266,7 @@ async function main() {
       if (!matches) continue;
       if (REQUIRED_FIELDS.some(f => !raw[f])) continue;
       const { startDate, endDate, item } = normalizeItem(raw);
-      if (!isVisible(endDate, startDate, todayIso)) continue;
+      if (!feed.keepHistorical && !isVisible(endDate, startDate, todayIso)) continue;
       normalized.push(item);
     }
     if (feed.sources && feed.sources.size > 1) normalized = mergeDuplicates(normalized);

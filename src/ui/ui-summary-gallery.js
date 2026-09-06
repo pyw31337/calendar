@@ -2648,7 +2648,7 @@ export function ContentView({
   const [searchQuery, setSearchQuery] = React.useState('');
   const [isContentRegisterOpen, setIsContentRegisterOpen] = React.useState(false);
   const CONTENT_TAB_STORAGE_KEY = 'gather_content_tab';
-  const VALID_CONTENT_TABS = ['festival', 'culture', 'sports'];
+  const VALID_CONTENT_TABS = ['festival', 'culture', 'sports', 'movies'];
   const [contentTab, setContentTab] = React.useState(() => {
     try {
       const saved = localStorage.getItem(CONTENT_TAB_STORAGE_KEY);
@@ -2679,7 +2679,7 @@ export function ContentView({
   // 기념일 등록(AnniversaryModal)으로 직접 만든 festival/event/sports도 각 탭에 보이도록,
   // 문화포털에서 등록된 것(cultureSourceId 있음)은 제외하고 사용자가 직접 만든 것만 카드 형태로 변환.
   const selfAuthoredCultureItems = React.useMemo(() => {
-    const kindByCategory = { festival: 'festival', event: 'performance', sports: 'sports' };
+    const kindByCategory = { festival: 'festival', event: 'performance', sports: 'sports', movie: 'movie' };
     return (anniversaries || [])
       .filter(a => a && !a.cultureSourceId && kindByCategory[a.category])
       .map(a => ({
@@ -2697,6 +2697,13 @@ export function ContentView({
         venue: a.place ? (a.place.alias || a.place.name || '') : '',
         address: a.place ? (a.place.address || '') : '',
         description: a.description || '',
+        releaseDate: a.movieMeta?.releaseDate || a.date,
+        director: a.movieMeta?.director || '',
+        cast: Array.isArray(a.movieMeta?.cast) ? a.movieMeta.cast : [],
+        ageRating: a.movieMeta?.ageRating || '',
+        bookingRate: a.movieMeta?.bookingRate || '',
+        audienceCount: a.movieMeta?.audienceCount || '',
+        isOpenEnded: a.movieMeta?.isOpenEnded !== false,
         // 컨텐츠 페이지 카드 커버 사진 -- 문화포털 자동 등록 항목은 a.image(포털 썸네일 URL)를
         // 쓰지만, AnniversaryModal에서 직접 첨부한 사진은 a.photos 배열(url/thumbUrl)에 저장되어
         // a.image는 항상 비어 있다. a.image가 없을 때는 첫 번째 첨부 사진으로 대체해야
@@ -2724,6 +2731,10 @@ export function ContentView({
   );
   const sportsExtraItems = React.useMemo(
     () => [...selfAuthoredCultureItems.filter(i => i.kind === 'sports'), ...(customCultureItems || []).filter(i => i && i.kind === 'sports')],
+    [selfAuthoredCultureItems, customCultureItems]
+  );
+  const movieExtraItems = React.useMemo(
+    () => [...selfAuthoredCultureItems.filter(i => i.kind === 'movie'), ...(customCultureItems || []).filter(i => i && i.kind === 'movie')],
     [selfAuthoredCultureItems, customCultureItems]
   );
 
@@ -2859,7 +2870,8 @@ export function ContentView({
       options: [
         { value: 'festival', label: '지역축제' },
         { value: 'culture', label: '문화행사' },
-        { value: 'sports', label: '스포츠' }
+        { value: 'sports', label: '스포츠' },
+        { value: 'movies', label: '영화' }
       ]
     }),
     /*#__PURE__*/React.createElement("div", {
@@ -2970,6 +2982,13 @@ export function ContentView({
       chipRowSlot, contentPaddingTop, onScroll: handleContentScroll,
       gridCols, focusItemId, searchQuery
     }),
+    contentTab === 'movies' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
+      calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo, dataUrl: CULTURE_MOVIES_URL,
+      emptyLabel: "등록된 영화가 없습니다.", regionSelections, onItemsLoaded: setRegionFilterItems,
+      anniversaryCategory: "movie", extraItems: movieExtraItems,
+      chipRowSlot, contentPaddingTop, onScroll: handleContentScroll,
+      gridCols, focusItemId, searchQuery
+    }),
 
     /*#__PURE__*/React.createElement(SideMenuOverlay, {
       isOpen: isMenuOpen,
@@ -2989,7 +3008,7 @@ export function ContentView({
           /*#__PURE__*/React.createElement("path", { d: "M8 12h8" })
         ),
         title: "컨텐츠 등록",
-        desc: "문화행사·지역축제·스포츠 직접 등록"
+        desc: "문화행사·지역축제·스포츠·영화 직접 등록"
       }],
       navBlockProps: {
         onClose: () => setIsMenuOpen(false),
@@ -3004,7 +3023,7 @@ export function ContentView({
       onClose: () => setIsContentRegisterOpen(false),
       onSave: onSaveCustomCultureItem,
       showToast: showToast,
-      initialKind: contentTab === 'festival' ? 'festival' : (contentTab === 'sports' ? 'sports' : 'performance')
+      initialKind: contentTab === 'festival' ? 'festival' : (contentTab === 'sports' ? 'sports' : (contentTab === 'movies' ? 'movie' : 'performance'))
     })
   );
 }
@@ -3013,6 +3032,7 @@ const CULTURE_DATA_BASE = (typeof import.meta !== 'undefined' && import.meta.env
 const CULTURE_PERFORMANCES_URL = `${CULTURE_DATA_BASE}data/culture-performances.json`;
 const CULTURE_FESTIVALS_URL = `${CULTURE_DATA_BASE}data/culture-festivals.json`;
 const CULTURE_SPORTS_URL = `${CULTURE_DATA_BASE}data/culture-sports.json`;
+const CULTURE_MOVIES_URL = `${CULTURE_DATA_BASE}data/culture-movies.json`;
 const CULTURE_MISSING_LABEL = '정보없음';
 const culturePerf = value => (value && String(value).trim()) || CULTURE_MISSING_LABEL;
 
@@ -3032,6 +3052,7 @@ const CULTURE_GENRE_LABELS = {
   volleyball: '배구',
   soccer: '축구',
   handball: '핸드볼'
+  ,movie: '영화'
 };
 const cultureGenreLabel = genre => CULTURE_GENRE_LABELS[genre] || genre || '기타';
 
@@ -3313,7 +3334,7 @@ function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind =
   // 'performance' | 'festival' | 'sports' -- defaults to whichever 컨텐츠 탭 the user opened this
   // from (initialKind), instead of always 'performance', so registering while already on 지역축제
   // or 스포츠 doesn't silently save into 문화행사 unless the user notices and switches this tab.
-  const [kind, setKind] = React.useState(initialKind === 'festival' || initialKind === 'sports' ? initialKind : 'performance');
+  const [kind, setKind] = React.useState(['festival', 'sports', 'movie'].includes(initialKind) ? initialKind : 'performance');
   const [title, setTitle] = React.useState('');
   const [startDate, setStartDate] = React.useState('');
   const [endDate, setEndDate] = React.useState('');
@@ -3324,6 +3345,11 @@ function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind =
   const [image, setImage] = React.useState('');
   const [price, setPrice] = React.useState('');
   const [contact, setContact] = React.useState('');
+  const [director, setDirector] = React.useState('');
+  const [cast, setCast] = React.useState('');
+  const [rating, setRating] = React.useState('');
+  const [audience, setAudience] = React.useState('');
+  const [bookingRate, setBookingRate] = React.useState('');
   const [saving, setSaving] = React.useState(false);
 
   const handleSave = async () => {
@@ -3337,7 +3363,7 @@ function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind =
       if (typeof showToast === 'function') showToast('시작일을 YYYY-MM-DD 형식으로 입력해 주세요.', 'error');
       return;
     }
-    const cleanEnd = ((endDate || '').trim() || cleanStart);
+    const cleanEnd = kind === 'movie' ? ((endDate || '').trim()) : ((endDate || '').trim() || cleanStart);
     if (cleanEnd && !/^\d{4}-\d{2}-\d{2}$/.test(cleanEnd)) {
       if (typeof showToast === 'function') showToast('종료일을 YYYY-MM-DD 형식으로 입력해 주세요.', 'error');
       return;
@@ -3347,10 +3373,10 @@ function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind =
       return;
     }
     const stamp = Date.now();
-    const idPrefixByKind = { festival: 'custom_fest_', sports: 'custom_sport_' };
+    const idPrefixByKind = { festival: 'custom_fest_', sports: 'custom_sport_', movie: 'custom_movie_' };
     const prefix = idPrefixByKind[kind] || 'custom_perf_';
     const id = prefix + stamp + '_' + Math.random().toString(36).slice(2, 8);
-    const normalizedKind = kind === 'festival' || kind === 'sports' ? kind : 'performance';
+    const normalizedKind = ['festival', 'sports', 'movie'].includes(kind) ? kind : 'performance';
     const item = {
       id,
       title: cleanTitle,
@@ -3369,6 +3395,12 @@ function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind =
       createdAt: stamp,
       updatedAt: stamp
     };
+    if (normalizedKind === 'movie') Object.assign(item, {
+      genre: 'movie', releaseDate: cleanStart, endDate: cleanEnd || null,
+      director: (director || '').trim(), cast: (cast || '').split(',').map(s => s.trim()).filter(Boolean),
+      ageRating: (rating || '').trim(), audienceCount: (audience || '').trim(), bookingRate: (bookingRate || '').trim(),
+      isOpenEnded: !cleanEnd
+    });
     // Drop empty optional strings so Firestore never sees unnecessary keys (and to keep card
     // rendering identical to crawled items that omit missing fields).
     Object.keys(item).forEach(k => {
@@ -3429,24 +3461,25 @@ function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind =
           options: [
             { value: 'performance', label: '문화공연' },
             { value: 'festival', label: '지역축제' },
-            { value: 'sports', label: '스포츠' }
+            { value: 'sports', label: '스포츠' },
+            { value: 'movie', label: '영화' }
           ]
         }),
         field("제목 *", /*#__PURE__*/React.createElement("input", {
           className: "form-input", type: "text", value: title, onChange: e => setTitle(e.target.value),
-          placeholder: kind === 'festival' ? "축제 이름" : (kind === 'sports' ? "경기/대회 이름" : "공연 제목"), maxLength: 120
+          placeholder: kind === 'festival' ? "축제 이름" : (kind === 'sports' ? "경기/대회 이름" : (kind === 'movie' ? "영화 제목" : "공연 제목")), maxLength: 120
         })),
         /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: '10px', width: '100%' } },
           field("시작일 *", /*#__PURE__*/React.createElement("input", {
             className: "form-input", type: "date", value: startDate, onChange: e => setStartDate(e.target.value),
             style: { width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }
           }), { minWidth: 0, maxWidth: '100%', overflow: 'hidden' }),
-          field("종료일", /*#__PURE__*/React.createElement("input", {
+          field(kind === 'movie' ? "상영종료일 (선택)" : "종료일", /*#__PURE__*/React.createElement("input", {
             className: "form-input", type: "date", value: endDate, onChange: e => setEndDate(e.target.value),
             style: { width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }
           }), { minWidth: 0, maxWidth: '100%', overflow: 'hidden' })
         ),
-        field(kind === 'festival' ? "장소" : (kind === 'sports' ? "경기장" : "공연장"), /*#__PURE__*/React.createElement("input", {
+        field(kind === 'festival' ? "장소" : (kind === 'sports' ? "경기장" : (kind === 'movie' ? "대표 상영관" : "공연장")), /*#__PURE__*/React.createElement("input", {
           className: "form-input", type: "text", value: venue, onChange: e => setVenue(e.target.value),
           placeholder: "장소 / 공연장", maxLength: 120
         })),
@@ -3471,6 +3504,15 @@ function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind =
             className: "form-input", type: "text", value: contact, onChange: e => setContact(e.target.value),
             placeholder: "연락처 / 문의처", maxLength: 120
           }))
+        ),
+        kind === 'movie' && /*#__PURE__*/React.createElement(React.Fragment, null,
+          field("감독", /*#__PURE__*/React.createElement("input", { className: "form-input", value: director, onChange: e => setDirector(e.target.value), placeholder: "감독", maxLength: 120 })),
+          field("출연 (쉼표로 구분)", /*#__PURE__*/React.createElement("input", { className: "form-input", value: cast, onChange: e => setCast(e.target.value), placeholder: "배우1, 배우2", maxLength: 500 })),
+          /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' } },
+            field("관람등급", /*#__PURE__*/React.createElement("input", { className: "form-input", value: rating, onChange: e => setRating(e.target.value), placeholder: "전체" })),
+            field("예매율", /*#__PURE__*/React.createElement("input", { className: "form-input", value: bookingRate, onChange: e => setBookingRate(e.target.value), placeholder: "%" })),
+            field("관객수", /*#__PURE__*/React.createElement("input", { className: "form-input", value: audience, onChange: e => setAudience(e.target.value), placeholder: "명" }))
+          )
         ),
         field("설명", AutoGrowTextarea
           ? /*#__PURE__*/React.createElement(AutoGrowTextarea, {
@@ -3602,7 +3644,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
       if (existing) {
         if (typeof onUnregisterCultureEvent === 'function') await onUnregisterCultureEvent(existing.id);
       } else {
-        const category = (anniversaryCategory === 'festival' || anniversaryCategory === 'sports') ? anniversaryCategory : 'event';
+        const category = ['festival', 'sports', 'movie'].includes(anniversaryCategory) ? anniversaryCategory : 'event';
         if (typeof onRegisterCultureEvent === 'function') await onRegisterCultureEvent({ ...item, anniversaryCategory: category }, { category });
       }
     } finally {
@@ -3623,7 +3665,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
   const orphanedSourceItems = React.useMemo(() => {
     if (items === null) return [];
     const presentIds = new Set(items.map(i => i && i.id).filter(Boolean));
-    const kindByCategory = { festival: 'festival', event: 'performance', sports: 'sports' };
+    const kindByCategory = { festival: 'festival', event: 'performance', sports: 'sports', movie: 'movie' };
     return (anniversaries || [])
       .filter(a => a && a.cultureSourceId && a.category === anniversaryCategory && !presentIds.has(a.cultureSourceId))
       .map(a => ({
@@ -3638,6 +3680,13 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
         venue: a.place ? (a.place.alias || a.place.name || '') : '',
         address: a.place ? (a.place.address || '') : '',
         description: a.description || '',
+        releaseDate: a.movieMeta?.releaseDate || a.date,
+        director: a.movieMeta?.director || '',
+        cast: Array.isArray(a.movieMeta?.cast) ? a.movieMeta.cast : [],
+        ageRating: a.movieMeta?.ageRating || '',
+        bookingRate: a.movieMeta?.bookingRate || '',
+        audienceCount: a.movieMeta?.audienceCount || '',
+        isOpenEnded: a.movieMeta?.isOpenEnded !== false,
         image: a.image || (Array.isArray(a.photos) && a.photos[0] ? (a.photos[0].thumbUrl || a.photos[0].url || '') : '')
       }));
   }, [items, anniversaries, anniversaryCategory]);
@@ -3726,6 +3775,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
     categoryCounts.set(key, (categoryCounts.get(key) || 0) + 1);
   });
   const categoryOptions = [...categoryCounts.entries()]
+    .filter(([genre]) => !!genre)
     .sort((a, b) => b[1] - a[1])
     .map(([genre, count]) => ({ value: genre, label: cultureGenreLabel(genre), count }));
   const CUSTOM_CATEGORY_VALUE = '__custom__';
@@ -3883,7 +3933,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
                   backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 'var(--radius-full)', padding: '2px 14px',
                   maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
                 }
-              }, item.dateLabel || formatCultureDateLabel(item.startDate, item.endDate) || CULTURE_MISSING_LABEL),
+              }, item.dateLabel || formatCultureDateLabel(item.startDate, item.endDate) || (item.releaseDate ? `${item.releaseDate} 개봉` : CULTURE_MISSING_LABEL)),
               /*#__PURE__*/React.createElement("div", {
                 style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', width: '100%' }
               },
@@ -3929,7 +3979,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
           /*#__PURE__*/React.createElement("div", { style: { padding: '8px 10px 10px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px' } },
             /*#__PURE__*/React.createElement("div", {
               style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
-            }, item.dateLabel || formatCultureDateLabel(item.startDate, item.endDate) || CULTURE_MISSING_LABEL),
+            }, item.dateLabel || formatCultureDateLabel(item.startDate, item.endDate) || (item.releaseDate ? `${item.releaseDate} 개봉` : CULTURE_MISSING_LABEL)),
             /*#__PURE__*/React.createElement("div", {
               style: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--text-main)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', wordBreak: 'break-word' }
             }, item.title),
@@ -3992,7 +4042,15 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
             style: { flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }
           },
             [
-              ['기간', selected.dateLabel],
+              ['개봉일', selected.releaseDate || (selected.kind === 'movie' ? selected.startDate : '')],
+              ['상영기간', selected.kind === 'movie' && !selected.endDate ? '종료일 미정 · 상영정보 유지' : selected.dateLabel],
+              ['감독', selected.director],
+              ['출연', Array.isArray(selected.cast) ? selected.cast.join(', ') : selected.cast],
+              ['관람등급', selected.ageRating],
+              ['예매율', selected.bookingRate],
+              ['관객수', selected.audienceCount],
+              ['러닝타임', selected.runningTime],
+              ['장르', selected.subGenre],
               ['장소', selected.venue],
               ['주소', selected.address],
               ['주최', selected.organizer],
