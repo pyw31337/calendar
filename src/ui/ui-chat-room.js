@@ -934,6 +934,23 @@ export function ChatRoomView({
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
     if (distanceFromBottom > 200) setHasNewMessageBelow(true);
   }, [visibleChatMessages]);
+
+  // Older-history pagination only fires from a scroll event (see onScroll below), but a chat
+  // with just a handful of messages never overflows the container in the first place -- nothing
+  // to scroll means the scroll event that would trigger onLoadOlderChat never fires, so "위로
+  // 스크롤하면 이전 대화가 로드됩니다" sits there forever with no way to actually reach it. After
+  // every render of the message list, top up automatically while there's still more history and
+  // the container isn't scrollable yet -- this also keeps paging in the (rarer) case where one
+  // page of older messages still doesn't fill the view.
+  React.useEffect(() => {
+    if (!hasMoreOlderChat || loadingOlderChat || typeof onLoadOlderChat !== 'function') return;
+    const el = chatMessagesContainerRef.current;
+    if (!el) return;
+    const raf = requestAnimationFrame(() => {
+      if (el.scrollHeight <= el.clientHeight + 1) onLoadOlderChat();
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [visibleChatMessages, hasMoreOlderChat, loadingOlderChat, onLoadOlderChat]);
   // Confetti burst around a newly-sent bubble -- only for messages I just sent myself (not
   // ones arriving from other participants, and not the initial batch on mount). Anchors the
   // burst to the actual bubble's on-screen position via its data-msg-row-id, same pattern as
