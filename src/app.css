@@ -2478,6 +2478,13 @@ select.form-select {
   word-break: break-word;
   overflow-wrap: anywhere;
 }
+/* Lightbox comment composer sits on a dark overlay, not the light card background the shared
+   rule above assumes -- override just there (higher specificity beats the !important above)
+   instead of touching the shared class other (light-themed) comment threads still rely on. */
+.lightbox-comment-thread .comment-composer-input {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  color: #E2E8F0 !important;
+}
 /* Desktop-only: mobile textareas stay at the blanket 1rem mobile input rule (app.css ~1433) --
    a class-selector !important here would otherwise beat that tag-selector !important on
    specificity and drop this composer to 0.8rem on phones, risking iOS Safari's

@@ -843,7 +843,7 @@ function CommentThread({ comments = [], onCommentsChange, calendar, showToast, o
     }
   };
 
-  return /*#__PURE__*/React.createElement("div", { onClick: e => e.stopPropagation() },
+  return /*#__PURE__*/React.createElement("div", { className: "lightbox-comment-thread", onClick: e => e.stopPropagation() },
     comments.length > 0 && /*#__PURE__*/React.createElement("div", {
       style: { display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '4px' }
     },
@@ -970,11 +970,90 @@ function CommentThread({ comments = [], onCommentsChange, calendar, showToast, o
 }
 
 
-export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSearchTag, showToast, sourceInfo = null, showZoomControls = false, zoomLevel = 100, zoomMin = 50, zoomMax = 300, onZoomIn, onZoomOut, onZoomReset, onRemoveFromMemory = null, isRemovingFromMemory = false }) {
+// 공통 하단 패널 래퍼 -- 라이트박스 전체에서 표준으로 쓰는 배경/그라디언트/모양을 한 곳에
+// 모아둔다(모듈화). LightboxInfoPanel(메타데이터)과 LightboxTagPanel(태그) 둘 다 이 래퍼를
+// 그대로 재사용해 두 패널이 서로 다른 시점에 열려도 항상 같은 모양으로 보이게 한다.
+function LightboxBottomPanel({ children }) {
+  const React = window.React;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "lightbox-info-panel",
+    style: {
+      position: 'absolute', left: 0, right: 0, bottom: 0, minWidth: '190px',
+      padding: '34px 14px 12px',
+      background: 'linear-gradient(to top, rgba(0,0,0,0.84) 0%, rgba(0,0,0,0.84) 55%, rgba(0,0,0,0.5) 82%, transparent)',
+      borderRadius: '0 0 var(--radius-md) var(--radius-md)',
+      color: '#FFFFFF', fontSize: 'var(--font-size-sm)', lineHeight: 1.7,
+      display: 'flex', flexDirection: 'column', gap: '4px',
+      pointerEvents: 'auto'
+    },
+    onClick: e => e.stopPropagation()
+  }, children);
+}
+
+// "i" 버튼으로 여는 메타데이터 패널 -- 업로드 날짜/출처/파일정보와 (추억 상세에서 열린 경우)
+// "이 추억에서 제거" 버튼만 보여준다. 태그와 URL 버튼은 각각 LightboxTagPanel과 좌측 상단
+// 상시 노출 URL 버튼으로 옮겨갔다.
+export function LightboxInfoPanel({ info, sourceInfo = null, onRemoveFromMemory = null, isRemovingFromMemory = false }) {
+  const React = window.React;
+  if (!info.dateLabel && !info.typeLabel && !sourceInfo && !onRemoveFromMemory) return null;
+  const labelStyle = { opacity: 0.7, flexShrink: 0, minWidth: '52px' };
+  return /*#__PURE__*/React.createElement(LightboxBottomPanel, null,
+    info.dateLabel && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
+      /*#__PURE__*/React.createElement("span", { style: labelStyle }, "업로드"),
+      /*#__PURE__*/React.createElement("span", { style: { wordBreak: 'break-all' } }, info.dateLabel)
+    ),
+    sourceInfo && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
+      /*#__PURE__*/React.createElement("span", { style: labelStyle }, "출처"),
+      sourceInfo.onClick
+        ? /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          onClick: e => { e.stopPropagation(); sourceInfo.onClick(); },
+          style: {
+            border: 'none', background: 'none', padding: 0, color: '#93C5FD', fontSize: 'inherit',
+            fontWeight: 800, textDecoration: 'underline', cursor: 'pointer'
+          }
+        }, sourceInfo.label)
+        : /*#__PURE__*/React.createElement("span", null, sourceInfo.label)
+    ),
+    info.typeLabel && /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }
+    },
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', minWidth: 0 } },
+        info.typeLabel && /*#__PURE__*/React.createElement(React.Fragment, null,
+          /*#__PURE__*/React.createElement("span", { style: labelStyle }, "파일정보"),
+          /*#__PURE__*/React.createElement("span", {
+            style: {
+              display: 'inline-flex', alignItems: 'center', padding: '1px 8px', borderRadius: 'var(--radius-full)',
+              border: '1px solid #FFFFFF', color: '#FFFFFF', fontSize: 'var(--font-size-xs)', fontWeight: 800
+            }
+          }, info.typeLabel),
+          /*#__PURE__*/React.createElement("span", null, "/"),
+          /*#__PURE__*/React.createElement("span", null, info.sizeLabel || '-'),
+          /*#__PURE__*/React.createElement("span", null, "/"),
+          /*#__PURE__*/React.createElement("span", null, info.dimensionLabel || '-')
+        )
+      ),
+    ),
+    onRemoveFromMemory && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: e => { e.stopPropagation(); onRemoveFromMemory(); },
+      disabled: isRemovingFromMemory,
+      style: {
+        marginTop: '6px', width: '100%', height: '32px', borderRadius: 'var(--radius-sm)',
+        border: '1px solid rgba(255,255,255,0.32)', background: 'rgba(255,255,255,0.1)',
+        color: '#FFFFFF', fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer',
+        opacity: isRemovingFromMemory ? 0.55 : 1
+      }
+    }, isRemovingFromMemory ? '제거 중...' : '이 추억에서 제거')
+  );
+}
+
+// 사진을 탭하면 여는 태그 패널 -- 해시태그 목록과 태그입력만 보여준다. URL 버튼은 좌측 상단
+// 상시 노출 URL 버튼으로 옮겨갔으므로 여기서는 렌더링하지 않는다.
+export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const TrashIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.TrashIcon) || __deps.TrashIcon;
-  const LinkIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LinkIcon) || __deps.LinkIcon;
   const ConfirmDialog = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ConfirmDialog) || __deps.ConfirmDialog;
 
   const tagTokens = String(tags || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean);
@@ -983,7 +1062,7 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
   const [confirmDeleteTag, setConfirmDeleteTag] = React.useState(null);
   const [isDeletingTag, setIsDeletingTag] = React.useState(false);
   React.useEffect(() => { setTagInput(''); }, [tags]);
-  if (!info.dateLabel && !info.typeLabel && !onSaveTags && !sourceInfo) return null;
+  if (tagTokens.length === 0 && !onSaveTags) return null;
   const MAX_TAGS = 10;
   const handleSaveTags = async () => {
     if (!onSaveTags || isSavingTags) return;
@@ -1023,91 +1102,30 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
     }
   };
   const labelStyle = { opacity: 0.7, flexShrink: 0, minWidth: '52px' };
-  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
-    className: "lightbox-info-panel",
-    style: {
-      position: 'absolute', left: 0, right: 0, bottom: 0, minWidth: '190px',
-      padding: '34px 14px 12px',
-      background: 'linear-gradient(to top, rgba(0,0,0,0.84) 0%, rgba(0,0,0,0.84) 55%, rgba(0,0,0,0.5) 82%, transparent)',
-      borderRadius: '0 0 var(--radius-md) var(--radius-md)',
-      color: '#FFFFFF', fontSize: 'var(--font-size-sm)', lineHeight: 1.7,
-      display: 'flex', flexDirection: 'column', gap: '4px',
-      pointerEvents: 'auto'
-    },
-    onClick: e => e.stopPropagation()
-  },
-    info.dateLabel && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
-      /*#__PURE__*/React.createElement("span", { style: labelStyle }, "업로드"),
-      /*#__PURE__*/React.createElement("span", { style: { wordBreak: 'break-all' } }, info.dateLabel)
-    ),
-    sourceInfo && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
-      /*#__PURE__*/React.createElement("span", { style: labelStyle }, "출처"),
-      sourceInfo.onClick
-        ? /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          onClick: e => { e.stopPropagation(); sourceInfo.onClick(); },
-          style: {
-            border: 'none', background: 'none', padding: 0, color: '#93C5FD', fontSize: 'inherit',
-            fontWeight: 800, textDecoration: 'underline', cursor: 'pointer'
-          }
-        }, sourceInfo.label)
-        : /*#__PURE__*/React.createElement("span", null, sourceInfo.label)
-    ),
-    info.typeLabel && /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }
-    },
-      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', minWidth: 0 } },
-        info.typeLabel && /*#__PURE__*/React.createElement(React.Fragment, null,
-          /*#__PURE__*/React.createElement("span", { style: labelStyle }, "파일정보"),
-          /*#__PURE__*/React.createElement("span", {
-            style: {
-              display: 'inline-flex', alignItems: 'center', padding: '1px 8px', borderRadius: 'var(--radius-full)',
-              border: '1px solid #FFFFFF', color: '#FFFFFF', fontSize: 'var(--font-size-xs)', fontWeight: 800
-            }
-          }, info.typeLabel),
-          /*#__PURE__*/React.createElement("span", null, "/"),
-          /*#__PURE__*/React.createElement("span", null, info.sizeLabel || '-'),
-          /*#__PURE__*/React.createElement("span", null, "/"),
-          /*#__PURE__*/React.createElement("span", null, info.dimensionLabel || '-')
-        )
-      ),
-    ),
-    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' } },
-      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', minWidth: 0 } },
-        /*#__PURE__*/React.createElement("span", { style: labelStyle }, "해시태그"),
-        tagTokens.map(tag => /*#__PURE__*/React.createElement("span", {
-          key: tag,
-          className: "lightbox-tag-badge",
-          onClick: () => onSearchTag && onSearchTag(tag),
-          style: {
-            display: 'inline-flex', alignItems: 'center', gap: '6px', borderRadius: 'var(--radius-full)',
-            padding: '3px 4px 3px 10px', fontSize: 'var(--font-size-sm)', fontWeight: 900, lineHeight: 1,
-            border: '1px solid #FFFFFF', color: '#FFFFFF', background: 'transparent',
-            cursor: onSearchTag ? 'pointer' : 'default'
-          }
-        }, `#${tag}`, onSaveTags && /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          title: `#${tag} 태그 삭제`,
-          onClick: e => { e.stopPropagation(); setConfirmDeleteTag(tag); },
-          style: {
-            width: '17px', height: '17px', border: 0, borderRadius: '50%',
-            background: '#FFFFFF', color: 'var(--text-main)', display: 'inline-flex',
-            alignItems: 'center', justifyContent: 'center', padding: 0, cursor: 'pointer',
-            flexShrink: 0
-          }
-        }, /*#__PURE__*/React.createElement(TrashIcon, { size: 10 }))))
-      ),
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "lightbox-url-btn",
-        onClick: () => onOpenUrl && onOpenUrl(),
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(LightboxBottomPanel, null,
+    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', minWidth: 0 } },
+      /*#__PURE__*/React.createElement("span", { style: labelStyle }, "해시태그"),
+      tagTokens.map(tag => /*#__PURE__*/React.createElement("span", {
+        key: tag,
+        className: "lightbox-tag-badge",
+        onClick: () => onSearchTag && onSearchTag(tag),
         style: {
-          flexShrink: 0, height: '30px', padding: '0 10px', borderRadius: 'var(--radius-full)',
-          border: '1px solid rgba(255,255,255,0.32)', background: 'rgba(255,255,255,0.14)',
-          color: '#FFFFFF', display: 'inline-flex', alignItems: 'center', gap: '5px',
-          cursor: 'pointer', fontSize: 'var(--font-size-sm)', fontWeight: 800, WebkitBackdropFilter: 'blur(6px)', backdropFilter: 'blur(6px)'
+          display: 'inline-flex', alignItems: 'center', gap: '6px', borderRadius: 'var(--radius-full)',
+          padding: '3px 4px 3px 10px', fontSize: 'var(--font-size-sm)', fontWeight: 900, lineHeight: 1,
+          border: '1px solid #FFFFFF', color: '#FFFFFF', background: 'transparent',
+          cursor: onSearchTag ? 'pointer' : 'default'
         }
-      }, /*#__PURE__*/React.createElement(LinkIcon, { size: 14 }), "URL")
+      }, `#${tag}`, onSaveTags && /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        title: `#${tag} 태그 삭제`,
+        onClick: e => { e.stopPropagation(); setConfirmDeleteTag(tag); },
+        style: {
+          width: '17px', height: '17px', border: 0, borderRadius: '50%',
+          background: '#FFFFFF', color: 'var(--text-main)', display: 'inline-flex',
+          alignItems: 'center', justifyContent: 'center', padding: 0, cursor: 'pointer',
+          flexShrink: 0
+        }
+      }, /*#__PURE__*/React.createElement(TrashIcon, { size: 10 }))))
     ),
     onSaveTags && /*#__PURE__*/React.createElement("div", {
       style: { display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }
@@ -1149,18 +1167,7 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
           opacity: (isSavingTags || tagTokens.length >= 10) ? 0.45 : 1
         }
       }, isSavingTags ? '...' : '저장')
-    ),
-    onRemoveFromMemory && /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      onClick: e => { e.stopPropagation(); onRemoveFromMemory(); },
-      disabled: isRemovingFromMemory,
-      style: {
-        marginTop: '6px', width: '100%', height: '32px', borderRadius: 'var(--radius-sm)',
-        border: '1px solid rgba(255,255,255,0.32)', background: 'rgba(255,255,255,0.1)',
-        color: '#FFFFFF', fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer',
-        opacity: isRemovingFromMemory ? 0.55 : 1
-      }
-    }, isRemovingFromMemory ? '제거 중...' : '이 추억에서 제거')
+    )
   ), confirmDeleteTag && /*#__PURE__*/React.createElement(ConfirmDialog, {
     title: "해시태그 삭제",
     message: `#${confirmDeleteTag} 태그를 삭제하시겠습니까?`,
@@ -1218,7 +1225,22 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   const buildLightboxImageInfo = __deps.buildLightboxImageInfo;
 
   const total = urls.length;
+  // Two independent bottom panels, each with its own trigger -- the "i" button opens the
+  // metadata panel (업로드/출처/파일정보), tapping the photo opens the tag panel (해시태그/태그
+  // 입력). Both anchor to the same bottom-of-image spot, so opening one closes the other instead
+  // of letting them stack on top of each other.
   const [showInfo, setShowInfo] = React.useState(false);
+  const [showTags, setShowTags] = React.useState(false);
+  const toggleShowInfo = () => setShowInfo(prev => {
+    const next = !prev;
+    if (next) setShowTags(false);
+    return next;
+  });
+  const toggleShowTags = () => setShowTags(prev => {
+    const next = !prev;
+    if (next) setShowInfo(false);
+    return next;
+  });
   const [imageUrlModalOpen, setImageUrlModalOpen] = React.useState(false);
   const [imageDimensions, setImageDimensions] = React.useState({});
   const [displayUrls, setDisplayUrls] = React.useState(urls);
@@ -1353,7 +1375,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     onClose();
   };
   React.useEffect(() => { setDisplayUrls(urls); }, [urls]);
-  React.useEffect(() => { setShowInfo(false); setImageLoadFailed(false); }, [index]);
+  React.useEffect(() => { setShowInfo(false); setShowTags(false); setImageLoadFailed(false); }, [index]);
   const currentUrl = displayUrls[index] || urls[index];
   React.useEffect(() => {
     setImageLoadFailed(false);
@@ -1701,7 +1723,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   const handleImageTap = e => {
     e.stopPropagation();
     if (wasDraggedRef.current) { wasDraggedRef.current = false; return; }
-    setShowInfo(prev => !prev);
+    toggleShowTags();
   };
   const imgAreaRef = React.useRef(null);
   const widthRef = React.useRef(0);
@@ -1751,7 +1773,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
 
   const goTo = i => {
     if (i < 0 || i >= total || i === index) return;
-    setShowInfo(false);
+    setShowInfo(false); setShowTags(false);
     onNavigate(i);
   };
   // Adjacent (±1) navigation slides the track by exactly one container-width, same visual
@@ -1766,7 +1788,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     // nothing.
     const from = pendingNavRef.current != null ? pendingNavRef.current : index;
     if (newIndex < 0 || newIndex >= total || newIndex === from) return;
-    setShowInfo(false);
+    setShowInfo(false); setShowTags(false);
     if (pendingNavRef.current != null) {
       // Commit the in-flight nav immediately (skipping its remaining animation) so the new one
       // starts from a clean, consistent state instead of stacking on top of it.
@@ -1833,7 +1855,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     dragStartXRef.current = null;
     const width = widthRef.current || window.innerWidth * 0.92 || 1;
     const threshold = width * SWIPE_THRESHOLD_RATIO;
-    if (Math.abs(dragPx) >= threshold) setShowInfo(false);
+    if (Math.abs(dragPx) >= threshold) { setShowInfo(false); setShowTags(false); }
     setTransitionOn(true);
     setDragPx(current => {
       if (current <= -threshold && index < total - 1) {
@@ -1898,7 +1920,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
       isPanningRef.current = true;
       setIsPanning(true);
       wasDraggedRef.current = true;
-      setShowInfo(false);
+      setShowInfo(false); setShowTags(false);
       return;
     }
     const touch = e.touches[0];
@@ -1995,12 +2017,11 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     setImageLoadFailed(true);
   };
 
-  // 정보 토글 버튼("i") -- 이미지를 탭해도(handleImageTap) 업로드/출처/파일정보가 열리지만, 그
-  // 제스처를 처음 보는 사용자는 발견할 방법이 없었다. showInfo와 무관하게 항상 보이는 버튼으로
-  // 노출해서 언제든 누르면 정보 패널이 열리게 한다.
+  // 정보 토글 버튼("i") -- 좌측 상단 기본 화면에 항상 떠 있는 버튼. 누르면 편집/삭제 버튼이
+  // 함께 나타나고 하단에 업로드/출처/파일정보 패널이 열린다. 다시 누르면 i/url 두 개만 남는다.
   const renderInfoToggleButton = () => zoomLevel === ZOOM_DEFAULT && /*#__PURE__*/React.createElement("button", {
     type: "button",
-    onClick: e => { e.stopPropagation(); setShowInfo(v => !v); },
+    onClick: e => { e.stopPropagation(); toggleShowInfo(); },
     "aria-label": showInfo ? "사진 정보 닫기" : "사진 정보 보기",
     title: showInfo ? "사진 정보 닫기" : "사진 정보 보기",
     style: {
@@ -2014,8 +2035,8 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   }, /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "12", r: "9" }),
     /*#__PURE__*/React.createElement("line", { x1: "12", y1: "11", x2: "12", y2: "16" }),
     /*#__PURE__*/React.createElement("line", { x1: "12", y1: "8", x2: "12.01", y2: "8" })));
-  // URL 버튼 -- 정보 패널 안에도 있지만, i 버튼과 나란히 항상 보이는 아이콘 전용 버튼으로도 둬서
-  // 정보 패널을 열지 않고도 바로 접근할 수 있게 한다.
+  // URL 버튼 -- i 버튼과 나란히 항상 보이는 아이콘 전용 버튼으로 둬서 정보 패널을 열지 않고도
+  // 바로 URL 공유 레이어를 열 수 있게 한다.
   const renderUrlButton = () => zoomLevel === ZOOM_DEFAULT && LinkIcon && /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: e => { e.stopPropagation(); setImageUrlModalOpen(true); },
@@ -2027,8 +2048,35 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
       alignItems: 'center', justifyContent: 'center', cursor: 'pointer', pointerEvents: 'auto', flexShrink: 0
     }
   }, /*#__PURE__*/React.createElement(LinkIcon, { size: 15 }));
+  // 편집(교체)/삭제 버튼 -- i 버튼을 눌러 정보 패널이 열려 있을 때만 i/url 옆에 나타난다.
+  const renderReplaceButton = () => canEditPhoto && onReplacePhoto && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => replacePhotoInputRef.current && replacePhotoInputRef.current.click(),
+    disabled: isReplacingPhoto || isDeletingPhoto,
+    "aria-label": "사진 편집",
+    title: "사진 교체",
+    style: {
+      width: '30px', height: '30px', borderRadius: '50%', border: 'none',
+      background: 'rgba(15,23,42,0.62)', color: '#FFFFFF', display: 'flex',
+      alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 'var(--font-size-sm)',
+      opacity: (isReplacingPhoto || isDeletingPhoto) ? 0.5 : 1
+    }
+  }, isReplacingPhoto ? '...' : /*#__PURE__*/React.createElement(PencilIcon, { size: 15 }));
+  const renderDeleteButton = () => canEditPhoto && onDeletePhoto && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: handleDeletePhotoClick,
+    disabled: isReplacingPhoto || isDeletingPhoto,
+    "aria-label": "사진 삭제",
+    title: "사진 삭제",
+    style: {
+      width: '30px', height: '30px', borderRadius: '50%', border: 'none',
+      background: 'rgba(15,23,42,0.62)', color: '#FFFFFF', display: 'flex',
+      alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 'var(--font-size-sm)',
+      opacity: (isReplacingPhoto || isDeletingPhoto) ? 0.5 : 1
+    }
+  }, isDeletingPhoto ? '...' : /*#__PURE__*/React.createElement(TrashIcon, { size: 15 }));
   // Shared by both the carousel's "current" slot and the single-image layout below --
-  // left-aligned edit/delete buttons plus centered zoom controls on the same row.
+  // left-aligned i/url(/편집/삭제) buttons plus centered zoom controls on the same row.
   const renderPhotoActions = () => /*#__PURE__*/React.createElement("div", {
     style: {
       position: 'absolute',
@@ -2046,34 +2094,10 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     zoomLevel === ZOOM_DEFAULT && /*#__PURE__*/React.createElement("div", {
       style: { display: 'flex', alignItems: 'center', gap: '6px', pointerEvents: 'auto' }
     },
-      canEditPhoto && onDeletePhoto && /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: handleDeletePhotoClick,
-        disabled: isReplacingPhoto || isDeletingPhoto,
-        "aria-label": "사진 삭제",
-        title: "사진 삭제",
-        style: {
-          width: '30px', height: '30px', borderRadius: '50%', border: 'none',
-          background: 'rgba(15,23,42,0.62)', color: '#FFFFFF', display: 'flex',
-          alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 'var(--font-size-sm)',
-          opacity: (isReplacingPhoto || isDeletingPhoto) ? 0.5 : 1
-        }
-      }, isDeletingPhoto ? '...' : /*#__PURE__*/React.createElement(TrashIcon, { size: 15 })),
-      canEditPhoto && onReplacePhoto && /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: () => replacePhotoInputRef.current && replacePhotoInputRef.current.click(),
-        disabled: isReplacingPhoto || isDeletingPhoto,
-        "aria-label": "사진 편집",
-        title: "사진 교체",
-        style: {
-          width: '30px', height: '30px', borderRadius: '50%', border: 'none',
-          background: 'rgba(15,23,42,0.62)', color: '#FFFFFF', display: 'flex',
-          alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 'var(--font-size-sm)',
-          opacity: (isReplacingPhoto || isDeletingPhoto) ? 0.5 : 1
-        }
-      }, isReplacingPhoto ? '...' : /*#__PURE__*/React.createElement(PencilIcon, { size: 15 })),
       renderInfoToggleButton(),
-      renderUrlButton()
+      renderUrlButton(),
+      showInfo && renderReplaceButton(),
+      showInfo && renderDeleteButton()
     ),
     isDesktop && /*#__PURE__*/React.createElement("div", {
       // top: 0 pins this to the row's own top edge explicitly -- without it, this absolutely
@@ -2205,25 +2229,21 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
           maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 'var(--radius-md)',
           display: 'block', ...zoomImageStyle
         }
-      }), renderPhotoActions(), showInfo && zoomLevel === ZOOM_DEFAULT && /*#__PURE__*/React.createElement(LightboxInfoPanel, {
-      key: tagOverrideKey || String(currentUrl || index),
-        info: currentInfo,
-        tags: currentTags,
-        onSaveTags: saveCurrentTags,
-        onSearchTag: onSearchTag,
-        onOpenUrl: () => setImageUrlModalOpen(true),
-        showToast: showToast,
-        sourceInfo: sourceInfo,
-        showZoomControls: isDesktop,
-        zoomLevel: zoomLevel,
-        zoomMin: ZOOM_MIN,
-        zoomMax: ZOOM_MAX,
-        onZoomIn: handleZoomIn,
-        onZoomOut: handleZoomOut,
-        onZoomReset: handleZoomReset,
-        onRemoveFromMemory: onRemoveFromMemory ? handleRemoveFromMemoryClick : null,
-        isRemovingFromMemory: isRemovingFromMemory
-      })));
+      }), renderPhotoActions(),
+        showInfo && zoomLevel === ZOOM_DEFAULT && /*#__PURE__*/React.createElement(LightboxInfoPanel, {
+          key: `meta-${tagOverrideKey || String(currentUrl || index)}`,
+          info: currentInfo,
+          sourceInfo: sourceInfo,
+          onRemoveFromMemory: onRemoveFromMemory ? handleRemoveFromMemoryClick : null,
+          isRemovingFromMemory: isRemovingFromMemory
+        }),
+        showTags && zoomLevel === ZOOM_DEFAULT && /*#__PURE__*/React.createElement(LightboxTagPanel, {
+          key: `tags-${tagOverrideKey || String(currentUrl || index)}`,
+          tags: currentTags,
+          onSaveTags: saveCurrentTags,
+          onSearchTag: onSearchTag,
+          showToast: showToast
+        })));
     }
 
     return /*#__PURE__*/React.createElement("div", { style: wrapperStyle }, /*#__PURE__*/React.createElement("img", {
@@ -2351,25 +2371,21 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
       maxWidth: '92vw', maxHeight: '82vh', borderRadius: 'var(--radius-md)', objectFit: 'contain',
       display: 'block', ...zoomImageStyle
     }
-  }), renderPhotoActions(), showInfo && zoomLevel === ZOOM_DEFAULT && /*#__PURE__*/React.createElement(LightboxInfoPanel, {
-      key: tagOverrideKey || String(currentUrl || index),
-    info: currentInfo,
-    tags: currentTags,
-    onSaveTags: saveCurrentTags,
-    onSearchTag: onSearchTag,
-    onOpenUrl: () => setImageUrlModalOpen(true),
-    showToast: showToast,
-    sourceInfo: sourceInfo,
-    showZoomControls: isDesktop,
-    zoomLevel: zoomLevel,
-    zoomMin: ZOOM_MIN,
-    zoomMax: ZOOM_MAX,
-    onZoomIn: handleZoomIn,
-    onZoomOut: handleZoomOut,
-    onZoomReset: handleZoomReset,
-    onRemoveFromMemory: onRemoveFromMemory ? handleRemoveFromMemoryClick : null,
-    isRemovingFromMemory: isRemovingFromMemory
-  })),
+  }), renderPhotoActions(),
+    showInfo && zoomLevel === ZOOM_DEFAULT && /*#__PURE__*/React.createElement(LightboxInfoPanel, {
+      key: `meta-${tagOverrideKey || String(currentUrl || index)}`,
+      info: currentInfo,
+      sourceInfo: sourceInfo,
+      onRemoveFromMemory: onRemoveFromMemory ? handleRemoveFromMemoryClick : null,
+      isRemovingFromMemory: isRemovingFromMemory
+    }),
+    showTags && zoomLevel === ZOOM_DEFAULT && /*#__PURE__*/React.createElement(LightboxTagPanel, {
+      key: `tags-${tagOverrideKey || String(currentUrl || index)}`,
+      tags: currentTags,
+      onSaveTags: saveCurrentTags,
+      onSearchTag: onSearchTag,
+      showToast: showToast
+    })),
   renderCommentThread(),
   total > 1 && (() => {
     const maxVisibleDots = 10;
@@ -2431,6 +2447,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
     LightboxInfoPanel: LightboxInfoPanel,
+    LightboxTagPanel: LightboxTagPanel,
     Lightbox: Lightbox,
   });
 }
