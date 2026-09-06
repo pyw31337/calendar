@@ -2512,26 +2512,50 @@ function CalendarApp() {
       arr.sort((a, b) => (Number(b.createdAt) || Number(b.updatedAt) || 0) - (Number(a.createdAt) || Number(a.updatedAt) || 0));
       return arr;
     };
-    // The realtime listener delivers the initial server snapshot and keeps it fresh. Avoid a
-    // second REST collection read on every calendar open; REST remains the fallback when the
-    // Firebase SDK is unavailable.
+    const applyList = (list, preserveExisting = false) => {
+      if (!isMounted) return;
+      const arr = Array.isArray(list) ? list : [];
+      setAnniversaries(prev => {
+        let merged = arr;
+        if (preserveExisting) {
+          const seen = new Set(arr.map(item => item?.id).filter(Boolean));
+          const existing = Array.isArray(prev) ? prev.filter(item => item?.id && !seen.has(item.id)) : [];
+          merged = [...arr, ...existing];
+        }
+        return sortAnns(merged);
+      });
+    };
     if (!firebaseDb) {
       fetchAnniversariesRest(activeCalId).then(list => {
-        if (isMounted && Array.isArray(list) && list.length > 0) setAnniversaries(sortAnns(list));
+        if (Array.isArray(list) && list.length > 0) applyList(list);
       }).catch(() => {});
       return () => { isMounted = false; };
     }
-
-    const unsub = subscribeAnniversaries(activeCalId, snapshot => {
+    // A years-old family calendar's anniversaries collection only ever grows, and the plain
+    // subscribeAnniversaries() listener below has no limit -- every single reconnect (a phone
+    // waking up, a network handoff, a fresh tab) re-reads the ENTIRE collection from scratch,
+    // regardless of how little actually changed. Same fix already applied to customCultureItems:
+    // hydrate the complete archive once via REST, then attach a listener bounded to just the
+    // newest documents to catch live edits/additions, merging (never replacing) into local state
+    // so older entries hydrated via REST are never dropped.
+    fetchAnniversariesRest(activeCalId).then(list => {
+      if (Array.isArray(list) && list.length > 0) applyList(list);
+    }).catch(err => console.warn('Anniversaries archive hydration failed:', err));
+    // orderBy(createdAt) is safe ONLY for this bounded recent-window listener -- legacy docs
+    // missing createdAt (excluded by this orderBy) are already covered by the REST hydration
+    // above, which sorts client-side instead of relying on the field being present.
+    const unsub = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('anniversaries')
+      .orderBy('createdAt', 'desc').limit(200)
+      .onSnapshot(snapshot => {
         if (!isMounted) return;
         const list = [];
         snapshot.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
-        setAnniversaries(sortAnns(list));
+        applyList(list, true);
       }, err => {
         console.warn(`Firestore anniversaries subscription error:`, err);
         fetchAnniversariesRest(activeCalId).then(list => {
-          if (isMounted) setAnniversaries(sortAnns(list));
-        });
+          if (Array.isArray(list) && list.length > 0) applyList(list);
+        }).catch(fallbackErr => console.warn('Anniversaries REST fallback failed:', fallbackErr));
       });
     return () => { isMounted = false; unsub(); };
   }, [activeCalId, needsAnniversariesData, firebaseDb, firebaseConnectionVersion]);
