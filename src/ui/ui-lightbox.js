@@ -742,7 +742,235 @@ function getAnniversaryDisplayColor(...args) {
 }
 
 
-export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSearchTag, showToast, sourceInfo = null, showZoomControls = false, zoomLevel = 100, zoomMin = 50, zoomMax = 300, onZoomIn, onZoomOut, onZoomReset }) {
+// 메모 카드(MemoCard, ui-calendar-core.js)가 쓰는 것과 똑같은 댓글 스레드 UI/로직(참여자
+// 선택 + 입력 + 편집/삭제, 3개 초과 시 접기)을 그대로 재현한 라이트박스 전용 버전. 데이터
+// 모양도 동일하다 -- comments: [{id, participantId, text, createdAt, updatedAt?}],
+// onCommentsChange(nextComments) 하나로 저장을 위임한다. MemoCard 쪽 로직은 이미 검증되어
+// 실사용 중이라 건드리지 않았다(회귀 위험 최소화).
+//
+// 처음엔 ui-calendar-core.js에서 export해서 Lightbox가 window.GATHER_UI_COMPONENTS로 가져다
+// 쓰게 했었는데, 실제 배포본에서는 이 두 파일이 서로 다른 코드 스플릿 청크로 나뉘어 있어서
+// Lightbox가 먼저(또는 ui-calendar-core.js 청크가 아직 로드되기 전에) 렌더링되는 경로에서는
+// CommentThread가 아예 없어 조용히 렌더링을 건너뛰었다 -- 라이트박스를 열어도 댓글 UI 자체가
+// 통째로 안 보이는 버그였다. Lightbox와 항상 같은 청크에 있도록 이 파일로 옮겨서 그 문제를
+// 원천적으로 없앴다.
+function CommentThread({ comments = [], onCommentsChange, calendar, showToast, onRequestConfirm }) {
+  const React = window.React;
+  const __deps = window.GATHER_UI_DEPS || {};
+  const __comp = window.GATHER_UI_COMPONENTS || {};
+  const ChatParticipantSheet = __comp.ChatParticipantSheet || __deps.ChatParticipantSheet;
+  const ParticipantPickerButton = __comp.ParticipantPickerButton || __deps.ParticipantPickerButton;
+  const PencilIcon = __comp.PencilIcon || __deps.PencilIcon;
+  const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
+  const AutoGrowTextarea = __comp.AutoGrowTextarea || __deps.AutoGrowTextarea;
+  const sanitizeText = __deps.sanitizeText;
+
+  const [commentText, setCommentText] = React.useState('');
+  const [commentParticipantId, setCommentParticipantId] = React.useState(() => getStoredChatParticipantId(calendar?.id, calendar));
+  const [isCommentPartOpen, setIsCommentPartOpen] = React.useState(false);
+  const [editingCommentId, setEditingCommentId] = React.useState(null);
+  const [isSavingComment, setIsSavingComment] = React.useState(false);
+  const commentPart = (calendar?.participants || []).find(p => p.id === commentParticipantId);
+  const COMMENT_COLLAPSE_LIMIT = 3;
+  const [isCommentsExpanded, setIsCommentsExpanded] = React.useState(false);
+  const hasMoreComments = comments.length > COMMENT_COLLAPSE_LIMIT;
+  const visibleComments = (!hasMoreComments || isCommentsExpanded) ? comments : comments.slice(-COMMENT_COLLAPSE_LIMIT);
+
+  const handleSaveComment = async (e) => {
+    if (e) e.stopPropagation();
+    const text = commentText.trim();
+    if (!text || !commentParticipantId || isSavingComment) return;
+    const now = Date.now();
+    const wasEditing = !!editingCommentId;
+    const nextComments = editingCommentId
+      ? comments.map(c => c.id === editingCommentId ? { ...c, text, participantId: commentParticipantId, updatedAt: now } : c)
+      : [...comments, { id: `cmt_${now}_${Math.random().toString(36).slice(2, 8)}`, participantId: commentParticipantId, text, createdAt: now }];
+    setIsSavingComment(true);
+    try {
+      const saved = await Promise.resolve(onCommentsChange(nextComments));
+      if (saved === false) return;
+      setCommentText('');
+      setEditingCommentId(null);
+      if (typeof showToast === 'function') {
+        showToast(wasEditing ? '댓글이 수정되었습니다' : '댓글이 등록되었습니다', 'success');
+      }
+    } finally {
+      setIsSavingComment(false);
+    }
+  };
+
+  const handleCancelComment = e => {
+    if (e) e.stopPropagation();
+    setEditingCommentId(null);
+    setCommentText('');
+  };
+
+  const handleStartEditComment = (e, comment) => {
+    if (e) e.stopPropagation();
+    setEditingCommentId(comment.id);
+    setCommentText(comment.text);
+    setCommentParticipantId(comment.participantId);
+  };
+
+  const handleDeleteComment = (e, comment) => {
+    if (e) e.stopPropagation();
+    const commentId = typeof comment === 'string' ? comment : comment?.id;
+    if (!commentId) return;
+    const target = typeof comment === 'object' && comment ? comment : comments.find(c => c.id === commentId);
+    const author = (calendar?.participants || []).find(p => p.id === (target?.participantId || ''));
+    const authorName = author?.name || '참여자';
+    const snippet = sanitizeText(String(target?.text || ''), 40);
+    const message = snippet
+      ? `${authorName}님의 '${snippet}' 댓글을 삭제하시겠습니까?`
+      : `${authorName}님의 댓글을 삭제하시겠습니까?`;
+    const doDelete = async () => {
+      const previousComments = comments.slice();
+      const saved = await Promise.resolve(onCommentsChange(previousComments.filter(c => c.id !== commentId)));
+      if (saved === false) return;
+      if (editingCommentId === commentId) {
+        setEditingCommentId(null);
+        setCommentText('');
+      }
+      if (typeof showToast === 'function') {
+        showToast('댓글이 삭제되었습니다', 'delete', 5000, async () => {
+          const restored = await Promise.resolve(onCommentsChange(previousComments));
+          if (restored !== false && typeof showToast === 'function') showToast('댓글 삭제를 되돌렸습니다', 'success', 3000);
+        });
+      }
+    };
+    if (typeof onRequestConfirm === 'function') {
+      onRequestConfirm('댓글 삭제', message, doDelete);
+    }
+  };
+
+  return /*#__PURE__*/React.createElement("div", { onClick: e => e.stopPropagation() },
+    comments.length > 0 && /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '4px' }
+    },
+      hasMoreComments && /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: e => { e.stopPropagation(); setIsCommentsExpanded(v => !v); },
+        style: {
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+          alignSelf: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px',
+          fontSize: 'var(--font-size-sm)', fontWeight: 700, color: '#94A3B8'
+        }
+      },
+        /*#__PURE__*/React.createElement("svg", {
+          width: "12", height: "12", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2",
+          strokeLinecap: "round", strokeLinejoin: "round",
+          style: { transform: isCommentsExpanded ? 'none' : 'rotate(180deg)' }
+        }, /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" })),
+        isCommentsExpanded ? '댓글 접기' : `댓글 더보기 (${comments.length - COMMENT_COLLAPSE_LIMIT}개)`
+      ),
+      visibleComments.map((comment, commentIdx) => {
+        const author = (calendar?.participants || []).find(p => p.id === comment.participantId);
+        return /*#__PURE__*/React.createElement("div", {
+          key: comment.id,
+          onClick: e => e.stopPropagation(),
+          style: {
+            display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 2px',
+            borderTop: commentIdx > 0 ? '1px solid rgba(255,255,255,0.12)' : 'none'
+          }
+        },
+          /*#__PURE__*/React.createElement("span", {
+            className: "memo-comment-author-dot",
+            role: "img",
+            tabIndex: 0,
+            "aria-label": `${author?.name || '알 수 없는 작성자'} 작성자`,
+            "data-author-name": author?.name || '알 수 없는 작성자',
+            title: author?.name || '알 수 없는 작성자',
+            style: { width: '8px', height: '8px', borderRadius: '50%', backgroundColor: author?.color || '#94A3B8', flexShrink: 0 }
+          }),
+          /*#__PURE__*/React.createElement("span", {
+            style: { flex: 1, minWidth: 0, fontSize: 'var(--font-size-md)', color: '#E2E8F0', wordBreak: 'break-word' }
+          }, comment.text),
+          /*#__PURE__*/React.createElement("button", {
+            type: "button", onClick: e => handleStartEditComment(e, comment), title: "편집", "aria-label": "댓글 편집",
+            style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: '#94A3B8', flexShrink: 0 }
+          }, /*#__PURE__*/React.createElement(PencilIcon, { size: 12 })),
+          /*#__PURE__*/React.createElement("button", {
+            type: "button", onClick: e => handleDeleteComment(e, comment), title: "삭제", "aria-label": "댓글 삭제",
+            style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: '#94A3B8', flexShrink: 0 }
+          }, /*#__PURE__*/React.createElement(TrashIcon, { size: 12 }))
+        );
+      })
+    ),
+
+    /*#__PURE__*/React.createElement("div", {
+      className: "comment-composer",
+      onClick: e => e.stopPropagation(),
+      style: { marginTop: comments.length > 0 ? '8px' : '0' }
+    },
+      AutoGrowTextarea && /*#__PURE__*/React.createElement(AutoGrowTextarea, {
+        className: "comment-composer-input",
+        value: commentText,
+        onChange: e => setCommentText(e.target.value),
+        onClick: e => e.stopPropagation(),
+        onKeyDown: e => {
+          e.stopPropagation();
+          if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            if (e.nativeEvent && e.nativeEvent.isComposing) return;
+            e.preventDefault();
+            handleSaveComment(e);
+          }
+        },
+        placeholder: "댓글을 입력하세요...",
+        rows: 1,
+        minHeight: 30,
+        maxHeight: 200,
+        style: {
+          width: '100%',
+          fontSize: '0.8rem',
+          border: '1px solid rgba(255,255,255,0.18)',
+          borderRadius: 'var(--radius-sm)',
+          padding: '6px 8px',
+          backgroundColor: 'rgba(255,255,255,0.08)',
+          color: '#E2E8F0',
+          outline: 'none',
+          boxSizing: 'border-box'
+        }
+      }),
+      /*#__PURE__*/React.createElement("div", { className: "comment-composer-footer" },
+        /*#__PURE__*/React.createElement(ParticipantPickerButton, {
+          participant: commentPart,
+          onClick: () => setIsCommentPartOpen(true)
+        }),
+        /*#__PURE__*/React.createElement("div", { className: "comment-composer-buttons" },
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            onClick: handleCancelComment,
+            style: {
+              flexShrink: 0, height: '30px', padding: '0 12px', borderRadius: 'var(--radius-sm)',
+              border: '1px solid rgba(255,255,255,0.18)', backgroundColor: 'rgba(255,255,255,0.08)', color: '#CBD5E1',
+              fontSize: 'var(--font-size-md)', fontWeight: 'bold', cursor: 'pointer'
+            }
+          }, "취소"),
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            onClick: handleSaveComment,
+            disabled: !commentText.trim() || !commentParticipantId || isSavingComment,
+            style: {
+              flexShrink: 0, height: '30px', padding: '0 12px', borderRadius: 'var(--radius-sm)', border: 'none',
+              backgroundColor: 'var(--accent-primary)', color: '#FFFFFF', fontSize: 'var(--font-size-md)', fontWeight: 'bold',
+              cursor: isSavingComment ? 'wait' : 'pointer', opacity: (commentText.trim() && commentParticipantId && !isSavingComment) ? 1 : 0.5
+            }
+          }, isSavingComment ? "저장 중…" : "저장")
+        )
+      )
+    ),
+
+    isCommentPartOpen && /*#__PURE__*/React.createElement(ChatParticipantSheet, {
+      calendar: calendar,
+      selectedId: commentParticipantId,
+      onSelect: id => { setCommentParticipantId(id); setIsCommentPartOpen(false); },
+      onClose: () => setIsCommentPartOpen(false)
+    })
+  );
+}
+
+
+export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSearchTag, showToast, sourceInfo = null, showZoomControls = false, zoomLevel = 100, zoomMin = 50, zoomMax = 300, onZoomIn, onZoomOut, onZoomReset, onRemoveFromMemory = null, isRemovingFromMemory = false }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const TrashIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.TrashIcon) || __deps.TrashIcon;
@@ -897,6 +1125,11 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
             handleSaveTags();
           }
         },
+        // 모바일 가상 키보드가 이 입력을 "다음(next)" 필드로 넘어가는 것으로 오인해, 리턴키를
+        // 누르면 태그가 저장되기 전에 포커스가 아래 댓글 입력창으로 넘어가버리는 문제가 있었다.
+        // 태그는 한 번에 짧게 입력하고 바로 저장하는 용도라 "완료"로 명시해 다음 필드로 넘어가지
+        // 않게 한다.
+        enterKeyHint: "done",
         placeholder: tagTokens.length >= 10 ? "태그 최대 10개 도달" : `태그 입력 (${tagTokens.length}/10)`,
         maxLength: 100,
         style: {
@@ -916,7 +1149,18 @@ export function LightboxInfoPanel({ info, onOpenUrl, tags = '', onSaveTags, onSe
           opacity: (isSavingTags || tagTokens.length >= 10) ? 0.45 : 1
         }
       }, isSavingTags ? '...' : '저장')
-    )
+    ),
+    onRemoveFromMemory && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: e => { e.stopPropagation(); onRemoveFromMemory(); },
+      disabled: isRemovingFromMemory,
+      style: {
+        marginTop: '6px', width: '100%', height: '32px', borderRadius: 'var(--radius-sm)',
+        border: '1px solid rgba(255,255,255,0.32)', background: 'rgba(255,255,255,0.1)',
+        color: '#FFFFFF', fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer',
+        opacity: isRemovingFromMemory ? 0.55 : 1
+      }
+    }, isRemovingFromMemory ? '제거 중...' : '이 추억에서 제거')
   ), confirmDeleteTag && /*#__PURE__*/React.createElement(ConfirmDialog, {
     title: "해시태그 삭제",
     message: `#${confirmDeleteTag} 태그를 삭제하시겠습니까?`,
@@ -963,11 +1207,12 @@ const LIGHTBOX_TRANSITION_MS = 230;
 const LIGHTBOX_TRANSITION_FALLBACK_MS = LIGHTBOX_TRANSITION_MS + 90;
 const LIGHTBOX_TRANSITION_EASING = 'cubic-bezier(0.22, 0.61, 0.36, 1)';
 
-export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag, onDeletePhoto, onReplacePhoto, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, onJumpToGallery, onGetChatMessageOrdinal, onGetGalleryPhotoOrdinal, onRequestConfirm }) {
+export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = null, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag, onDeletePhoto, onReplacePhoto, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, onJumpToGallery, onGetChatMessageOrdinal, onGetGalleryPhotoOrdinal, onRequestConfirm, onRemoveFromMemory = null, onFetchPhotoComments = null, onSavePhotoComments = null }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const TrashIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.TrashIcon) || __deps.TrashIcon;
   const PencilIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PencilIcon) || __deps.PencilIcon;
+  const LinkIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LinkIcon) || __deps.LinkIcon;
   const ImageUrlModal = __deps.ImageUrlModal;
   const LightboxInfoPanel = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LightboxInfoPanel;
   const buildLightboxImageInfo = __deps.buildLightboxImageInfo;
@@ -1133,6 +1378,52 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
   const currentIdentity = currentMeta
     ? (getMediaIdentityKeys(currentMeta, { source: currentMeta.source, meetingDate: currentMeta.meetingDate }) || {})
     : {};
+  // 사진 댓글 -- mediaKey/refKey(currentIdentity, 항상 값이 있음)를 사진의 안정적인 식별자로
+  // 써서 calendars/cal_{id}/photoComments 문서 하나에 매칭한다(app-main.js의
+  // handleFetchPhotoComments/handleSavePhotoComments). 여러 장을 스와이프해도 슬라이드별로
+  // 따로 캐싱해서, 이미 한 번 불러온 사진은 다시 불러오지 않는다. 초기화면에서부터 기존 댓글이
+  // 바로 보여야 하므로(showInfo 토글과 무관하게) 현재 사진이 바뀔 때마다 불러온다.
+  const photoCommentKey = currentIdentity.mediaKey || currentIdentity.refKey || '';
+  const [photoCommentsByKey, setPhotoCommentsByKey] = React.useState({});
+  const photoCommentsFetchedRef = React.useRef(new Set());
+  React.useEffect(() => {
+    if (!photoCommentKey || typeof onFetchPhotoComments !== 'function') return;
+    if (photoCommentsFetchedRef.current.has(photoCommentKey)) return;
+    photoCommentsFetchedRef.current.add(photoCommentKey);
+    let cancelled = false;
+    Promise.resolve(onFetchPhotoComments(photoCommentKey)).then(list => {
+      if (!cancelled && Array.isArray(list)) setPhotoCommentsByKey(prev => ({ ...prev, [photoCommentKey]: list }));
+    });
+    return () => { cancelled = true; };
+  }, [photoCommentKey, onFetchPhotoComments]);
+  const handlePhotoCommentsChange = async nextComments => {
+    if (!photoCommentKey || typeof onSavePhotoComments !== 'function') return false;
+    setPhotoCommentsByKey(prev => ({ ...prev, [photoCommentKey]: nextComments }));
+    return Promise.resolve(onSavePhotoComments(photoCommentKey, nextComments));
+  };
+  // 댓글은 라이트박스 안에서만 쓰고 볼 수 있어야 한다는 요구사항에 맞춰 여기서만 렌더링하지만,
+  // "초기화면에서 바로 보여야 한다"는 요구에 맞춰 showInfo(정보 패널) 토글과는 무관하게 사진 박스와
+  // 페이지네이션 사이에 항상 자리를 갖는다 -- 기본 라이트박스가 어둡기 때문에 배경/글자색도 별도로
+  // 어둡게 강제한다(라이트박스 전용으로 완전히 분리된 컴포넌트라 memo 쪽 라이트 테마와 무관).
+  const renderCommentThread = () => {
+    if (zoomLevel !== ZOOM_DEFAULT) return null;
+    return /*#__PURE__*/React.createElement("div", {
+      key: `comments-${photoCommentKey}`,
+      className: "lightbox-comment-thread lightbox-comment-thread-dark",
+      style: {
+        width: '92vw', minHeight: '64px', maxHeight: '55vh', overflowY: 'auto', resize: 'vertical',
+        marginTop: isDesktop ? '4px' : '0px', padding: '10px 14px',
+        backgroundColor: 'rgba(15, 23, 42, 0.72)', border: '1px solid rgba(255,255,255,0.12)',
+        borderRadius: 'var(--radius-md)', boxSizing: 'border-box'
+      }
+    }, /*#__PURE__*/React.createElement(CommentThread, {
+      comments: photoCommentsByKey[photoCommentKey] || [],
+      onCommentsChange: handlePhotoCommentsChange,
+      calendar: calendar,
+      showToast: showToast,
+      onRequestConfirm: onRequestConfirm
+    }));
+  };
   // 'meeting' entries never carry a messageId (they're archival copies stored on the
   // confirmedMeeting record, not a chat message -- see linkTaggedImageToMeetingDates in
   // app-main.js), so they need meetingDate+photoId to identify which photo instead. 'memo'
@@ -1229,7 +1520,12 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     if (typeof onGetGalleryPhotoOrdinal !== 'function') return;
     const messageId = currentMeta.messageId;
     if (!messageId) return;
-    const key = currentIdentity.assetKey || currentIdentity.refKey || currentIdentity.mediaKey || `${messageId}_${currentMeta.imageIndex || 0}`;
+    // 이 key는 아래 sourceInfo의 galleryOrdinalCache 조회 키(`${messageId}_${imageIndex||0}`)와
+    // 반드시 똑같아야 한다 -- currentIdentity.assetKey/refKey/mediaKey는 "gallery:msgId:0" 같은
+    // 형식이라 조회 쪽의 단순 "msgId_0" 형식과 전혀 달라서 캐시가 항상 miss였다. 그 결과 갤러리로
+    // 올린 사진은 순번을 절대 못 받아와서 "출처"에 늘 "갤러리"만 보이고 "갤러리 #17" 같은 순번이
+    // 절대 안 나오는 버그였다.
+    const key = `${messageId}_${currentMeta.imageIndex || 0}`;
     if (galleryOrdinalFetchedRef.current.has(key)) return;
     galleryOrdinalFetchedRef.current.add(key);
     let cancelled = false;
@@ -1311,6 +1607,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
   const replacePhotoInputRef = React.useRef(null);
   const [isReplacingPhoto, setIsReplacingPhoto] = React.useState(false);
   const [isDeletingPhoto, setIsDeletingPhoto] = React.useState(false);
+  const [isRemovingFromMemory, setIsRemovingFromMemory] = React.useState(false);
   const replacePhotoWithFile = async file => {
     if (!file || !onReplacePhoto || !currentMeta || isReplacingPhoto) return;
     setIsReplacingPhoto(true);
@@ -1357,6 +1654,26 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     };
     if (typeof onRequestConfirm === 'function') {
       onRequestConfirm('사진 삭제', '이 사진을 삭제하시겠습니까?', confirmAction);
+    }
+  };
+  // 추억(여행) 사진 모음은 날짜 구간으로 자동으로 모아지는 목록이라, 같이 찍혔지만 그 여행과
+  // 상관없는 사진이 섞여 들어올 수 있다 -- 원본 사진 자체는 지우지 않고 그 추억 모음에서만
+  // 빼는 조작. onRemoveFromMemory가 전달된 경우(추억 탭에서 연 라이트박스)에만 버튼이 뜬다.
+  const handleRemoveFromMemoryClick = () => {
+    if (!onRemoveFromMemory || !currentMeta || isRemovingFromMemory) return;
+    const confirmAction = async () => {
+      setIsRemovingFromMemory(true);
+      try {
+        const ok = await onRemoveFromMemory({ ...currentMeta, imageUrl: currentUrl });
+        if (ok) closeLightbox();
+      } finally {
+        setIsRemovingFromMemory(false);
+      }
+    };
+    if (typeof onRequestConfirm === 'function') {
+      onRequestConfirm('추억에서 제거', '이 사진을 이 추억 모음에서 제거하시겠습니까? (사진 자체는 삭제되지 않습니다)', confirmAction);
+    } else {
+      void confirmAction();
     }
   };
   const ensureCurrentShareUrl = async url => {
@@ -1678,9 +1995,41 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     setImageLoadFailed(true);
   };
 
+  // 정보 토글 버튼("i") -- 이미지를 탭해도(handleImageTap) 업로드/출처/파일정보가 열리지만, 그
+  // 제스처를 처음 보는 사용자는 발견할 방법이 없었다. showInfo와 무관하게 항상 보이는 버튼으로
+  // 노출해서 언제든 누르면 정보 패널이 열리게 한다.
+  const renderInfoToggleButton = () => zoomLevel === ZOOM_DEFAULT && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: e => { e.stopPropagation(); setShowInfo(v => !v); },
+    "aria-label": showInfo ? "사진 정보 닫기" : "사진 정보 보기",
+    title: showInfo ? "사진 정보 닫기" : "사진 정보 보기",
+    style: {
+      width: '30px', height: '30px', borderRadius: '50%', border: 'none',
+      background: showInfo ? 'var(--accent-primary)' : 'rgba(15,23,42,0.62)', color: '#FFFFFF', display: 'flex',
+      alignItems: 'center', justifyContent: 'center', cursor: 'pointer', pointerEvents: 'auto', flexShrink: 0
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg", width: "16", height: "16", viewBox: "0 0 24 24",
+    fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+  }, /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "12", r: "9" }),
+    /*#__PURE__*/React.createElement("line", { x1: "12", y1: "11", x2: "12", y2: "16" }),
+    /*#__PURE__*/React.createElement("line", { x1: "12", y1: "8", x2: "12.01", y2: "8" })));
+  // URL 버튼 -- 정보 패널 안에도 있지만, i 버튼과 나란히 항상 보이는 아이콘 전용 버튼으로도 둬서
+  // 정보 패널을 열지 않고도 바로 접근할 수 있게 한다.
+  const renderUrlButton = () => zoomLevel === ZOOM_DEFAULT && LinkIcon && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: e => { e.stopPropagation(); setImageUrlModalOpen(true); },
+    "aria-label": "이미지 URL",
+    title: "이미지 URL",
+    style: {
+      width: '30px', height: '30px', borderRadius: '50%', border: 'none',
+      background: 'rgba(15,23,42,0.62)', color: '#FFFFFF', display: 'flex',
+      alignItems: 'center', justifyContent: 'center', cursor: 'pointer', pointerEvents: 'auto', flexShrink: 0
+    }
+  }, /*#__PURE__*/React.createElement(LinkIcon, { size: 15 }));
   // Shared by both the carousel's "current" slot and the single-image layout below --
   // left-aligned edit/delete buttons plus centered zoom controls on the same row.
-  const renderPhotoActions = () => (showInfo && (canEditPhoto || isDesktop)) && /*#__PURE__*/React.createElement("div", {
+  const renderPhotoActions = () => /*#__PURE__*/React.createElement("div", {
     style: {
       position: 'absolute',
       top: '8px',
@@ -1722,7 +2071,9 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
           alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 'var(--font-size-sm)',
           opacity: (isReplacingPhoto || isDeletingPhoto) ? 0.5 : 1
         }
-      }, isReplacingPhoto ? '...' : /*#__PURE__*/React.createElement(PencilIcon, { size: 15 }))
+      }, isReplacingPhoto ? '...' : /*#__PURE__*/React.createElement(PencilIcon, { size: 15 })),
+      renderInfoToggleButton(),
+      renderUrlButton()
     ),
     isDesktop && /*#__PURE__*/React.createElement("div", {
       // top: 0 pins this to the row's own top edge explicitly -- without it, this absolutely
@@ -1869,7 +2220,9 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
         zoomMax: ZOOM_MAX,
         onZoomIn: handleZoomIn,
         onZoomOut: handleZoomOut,
-        onZoomReset: handleZoomReset
+        onZoomReset: handleZoomReset,
+        onRemoveFromMemory: onRemoveFromMemory ? handleRemoveFromMemoryClick : null,
+        isRemovingFromMemory: isRemovingFromMemory
       })));
     }
 
@@ -2013,8 +2366,11 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     zoomMax: ZOOM_MAX,
     onZoomIn: handleZoomIn,
     onZoomOut: handleZoomOut,
-    onZoomReset: handleZoomReset
+    onZoomReset: handleZoomReset,
+    onRemoveFromMemory: onRemoveFromMemory ? handleRemoveFromMemoryClick : null,
+    isRemovingFromMemory: isRemovingFromMemory
   })),
+  renderCommentThread(),
   total > 1 && (() => {
     const maxVisibleDots = 10;
     const startIdx = total <= maxVisibleDots
@@ -2037,8 +2393,8 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
       /*#__PURE__*/React.createElement("span", {
         style: { color: 'rgba(255, 255, 255, 0.75)', fontSize: 'var(--font-size-md)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }
       }, `${index + 1} / ${total}`),
-      /* Dots container */
-      /*#__PURE__*/React.createElement("div", {
+      /* Dots container -- 모바일에서는 숫자 표시("1 / 9")만으로 충분해 점은 생략한다 */
+      isDesktop && /*#__PURE__*/React.createElement("div", {
         onClick: e => e.stopPropagation(),
         style: { display: 'flex', alignItems: 'center', gap: '7px' }
       },
@@ -2064,6 +2420,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, showToast, on
     );
   })(), imageUrlModalOpen && /*#__PURE__*/React.createElement(ImageUrlModal, {
     imageUrl: currentUrl,
+    tags: currentTags,
     onClose: () => setImageUrlModalOpen(false),
     showToast,
     onEnsureShareUrl: ensureCurrentShareUrl
