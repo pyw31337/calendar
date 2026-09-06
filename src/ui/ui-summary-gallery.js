@@ -3512,7 +3512,7 @@ function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind =
             style: { width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }
           }), { minWidth: 0, maxWidth: '100%', overflow: 'hidden' })
         ),
-        field(kind === 'festival' ? "장소" : (kind === 'sports' ? "경기장" : (kind === 'movie' ? "대표 상영관" : "공연장")), /*#__PURE__*/React.createElement("input", {
+        kind !== 'movie' && field(kind === 'festival' ? "장소" : (kind === 'sports' ? "경기장" : "공연장"), /*#__PURE__*/React.createElement("input", {
           className: "form-input", type: "text", value: venue, onChange: e => setVenue(e.target.value),
           placeholder: "장소 / 공연장", maxLength: 120
         })),
