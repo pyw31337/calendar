@@ -2329,15 +2329,15 @@ function CalendarApp() {
   // chatMessages to an all-filtered-out list, permanently re-triggering (and then immediately
   // stomping) the separate hydration-retry effect below -- the widget could never settle on
   // real content and stayed on "최근 채팅을 불러오는 중…" no matter how long you waited.
-  // CHAT_LIVE_MESSAGE_LIMIT (20, already used for the chat/gallery windows) gives the client-side
-  // filter enough raw docs to actually find renderable messages within the live window.
+  // The chat room gets a wider raw window because a calendar can have a long run of hidden
+  // gallery/meeting uploads at the head of the collection. The calendar preview remains bounded.
   React.useEffect(() => {
     if (!activeCalId) {
       setChatMessages([]);
       return;
     }
     const chatLimit = activeView === 'chat'
-      ? chatLiveLimit
+      ? Math.max(chatLiveLimit, 60)
       : activeView === 'gallery' ? Math.min(12, CHAT_LIVE_MESSAGE_LIMIT) : CHAT_LIVE_MESSAGE_LIMIT;
     if (!firebaseDb) {
       // No live SDK channel at all (not just a stalled stream -- see the watchdog below for
@@ -2413,7 +2413,7 @@ function CalendarApp() {
   // every tick); only starts actually re-fetching once the stream has genuinely stopped.
   React.useEffect(() => {
     if (!activeCalId || !firebaseDb) return undefined;
-    const chatLimit = activeView === 'chat' ? chatLiveLimit : CHAT_INITIAL_MESSAGE_LIMIT;
+    const chatLimit = activeView === 'chat' ? Math.max(chatLiveLimit, 60) : CHAT_INITIAL_MESSAGE_LIMIT;
     // Tightened from 9000/5000: on a connection where the realtime stream never recovers (see
     // the long-polling notes above attemptFirebaseInit), this fallback is the only thing that
     // ever shows the other participant's message, and 9-14s felt like "it's broken" in a chat UI.
@@ -3321,7 +3321,15 @@ function CalendarApp() {
       // would go stale mid-walk instead of reflecting whatever meeting got confirmed most recently.
       const renderable = Array.isArray(list) ? list.filter(m => isChatRenderableMessage(m, meetingPhotoMessageIdsRef.current)) : [];
       if (renderable.length > 0) {
-        setChatMessages(prev => (Array.isArray(prev) && prev.length > 0) ? prev : list.slice());
+        // The realtime listener may already have populated state with only hidden gallery/
+        // meeting uploads. Merge the wider recovery page instead of treating that raw array as
+        // a successful chat load and discarding the actual conversation.
+        setChatMessages(prev => {
+          const byId = new Map();
+          (Array.isArray(prev) ? prev : []).forEach(message => { if (message?.id) byId.set(message.id, message); });
+          list.forEach(message => { if (message?.id) byId.set(message.id, message); });
+          return Array.from(byId.values()).sort((a, b) => (Number(a.timestamp) || 0) - (Number(b.timestamp) || 0));
+        });
         return;
       }
       if (!Array.isArray(list) || list.length < PAGE_SIZE) {

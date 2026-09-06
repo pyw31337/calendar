@@ -47,6 +47,8 @@ assert(appMainSource.includes('pendingRemotePlacesRef') && appMainSource.include
 const linkPreviewHook = appMainSource.match(/function useLinkPreview\(url, cachedData\) \{([\s\S]*?)\n\}/)?.[1] || '';
 assert(linkPreviewHook && !/fetchLinkPreview\s*\(/.test(linkPreviewHook), 'link preview render hook must not fetch external previews');
 assert(appMainSource.includes('Render-time link previews are intentionally read-only'), 'link preview render path must document its no-fetch contract');
+assert(/activeView === 'chat'[\s\S]{0,120}Math\.max\(chatLiveLimit, 60\)/.test(appMainSource), 'chat room must look past hidden media uploads when hydrating recent messages');
+assert(appMainSource.includes('fetchRecentChatMessages(activeCalId, 60)'), 'chat preview fallback must look past a burst of hidden media uploads');
 
 // Dragging the attendee list re-sends the SAME set of entries for that date in a new order, no
 // content change. Regression guard for a bug where the merge always fell back to the server's
