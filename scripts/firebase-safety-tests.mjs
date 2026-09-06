@@ -228,7 +228,17 @@ assert(functionsSource.includes('setPublicCacheHeaders') && functionsSource.incl
 assert(/collection\('push_subscriptions'\)\.limit\(500\)/.test(functionsSource), 'push fan-out must have a bounded subscription query');
 assert(/new AbortController\(\)[\s\S]{0,220}api\.peekalink\.io/.test(functionsSource), 'paid link preview requests must have an upstream timeout');
 assert(firestoreRules.includes("data.uploadSource == 'chat'"), 'message rules must permit the explicit chat channel');
-assert(firebaseServicesScript.includes("where('uploadSource', '==', 'chat')") && firebaseServicesScript.includes("fieldPath: 'uploadSource'"), 'chat reads must be channel-scoped at the query layer');
+// subscribeMessages/fetchRecentChatMessages/fetchOlderChatMessages back the SHARED
+// chatMessages/olderChatMessages state that the 갤러리 페이지's full photo grid, HistoryView's
+// 인물/추억 tag matching, and meetingPhotoMessageIds all depend on containing every message
+// regardless of channel. A where('uploadSource','=='.'chat') filter at this query layer once
+// silently dropped every gallery/meeting-uploaded photo from all of those other consumers the
+// moment a calendar had at least one 'chat'-tagged message -- hiding non-chat uploads from the
+// chat bubble list belongs at the render layer (isChatRenderableMessage) instead.
+assert(!/function subscribeMessages[\s\S]{0,3000}?where\('uploadSource'/.test(firebaseServicesScript), 'subscribeMessages must stay unscoped so gallery/meeting uploads remain visible to every other consumer of chatMessages');
+assert(!/async function fetchRecentChatMessages[\s\S]{0,4000}?where\('uploadSource'/.test(firebaseServicesScript), 'fetchRecentChatMessages must stay unscoped so gallery/meeting uploads remain visible to every other consumer of chatMessages');
+assert(!/async function fetchOlderChatMessages[\s\S]{0,3000}?where\('uploadSource'/.test(firebaseServicesScript), 'fetchOlderChatMessages must stay unscoped so gallery/meeting uploads remain visible to every other consumer of chatMessages');
+assert(appMainSource.includes('function isChatRenderableMessage') && appMainSource.includes('visibleChatMessages'), 'hiding non-chat uploads from the chat bubble list must happen at the render layer, not the query layer');
 assert(firebaseServicesScript.includes('FIRESTORE_REST_TIMEOUT_MS = 9000') && firebaseServicesScript.includes('fetchWithTimeout') && firebaseServicesScript.includes('withSdkTimeout'), 'Firebase SDK and REST reads must have bounded timeouts');
 assert(/fetchFirestoreRequest/.test(firebaseDataScript) && /image share read timeout/.test(firebaseDataScript), 'Firestore fallback and share reads must have bounded timeouts');
 assert(calendarCoreScript.includes('withFirestoreReadTimeout') && calendarCoreScript.includes('Firestore search read timed out'), 'full-history search reads must have a bounded timeout');

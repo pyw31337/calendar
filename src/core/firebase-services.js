@@ -94,22 +94,22 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     }
   }
 
-  // `uploadSource == 'chat'` was only added to new writes -- every message sent before that
-  // change (which, on a calendar with real history, is most or all of it) has no `uploadSource`
-  // field at all and is silently excluded by that where-clause, exactly like orderBy() excludes
-  // docs missing its sort field. scripts/migrate-chat-upload-sources.mjs exists to backfill that
-  // field onto legacy docs, but it is a manual one-time script that needs production credentials
-  // -- it is not guaranteed to have been run yet. Until it has, a doc with no `uploadSource`
-  // must still be treated as chat (gallery/meeting uploads always set an explicit uploadSource,
-  // so "missing" only ever means "predates the channel marker").
-  function isLegacyOrChatUpload(data) {
-    return !data || data.uploadSource === undefined || data.uploadSource === null || data.uploadSource === 'chat';
-  }
-
+  // IMPORTANT: this and every other read that feeds the shared chatMessages/olderChatMessages
+  // state (subscribeMessages, fetchOlderChatMessages) must stay UNSCOPED (no uploadSource
+  // where-clause). That shared state is the single source not just for the chat room, but for
+  // the 갤러리 페이지's full photo grid, HistoryView's 인물/추억 tag matching, and
+  // meetingPhotoMessageIds -- all of which need every message regardless of channel. The chat
+  // ROOM's own "hide gallery/meeting uploads" need is already handled correctly at the
+  // *rendering* layer via isChatRenderableMessage (app-main.js), which filters
+  // allChatMessages/chatMessages down to visibleChatMessages just for the bubble list. A prior
+  // change briefly pushed that filter down into these queries via
+  // where('uploadSource','==','chat') to cut read cost, but that silently dropped every
+  // gallery/meeting-uploaded photo from every OTHER consumer of this same state the moment a
+  // calendar had at least one 'chat'-tagged message (since a non-empty scoped result never fell
+  // through to any fallback) -- exactly the "meeting photos missing from the gallery grid"
+  // symptom. Do not reintroduce that where-clause here.
   async function fetchRecentChatMessages(calId, limit) {
     if (!isValidCalId(calId)) return [];
-    // Chat reads are channel-scoped. Gallery/meeting uploads remain in the shared legacy
-    // messages collection for media indexing, but are never part of this query or its read cost.
     const pageSize = Math.max(1, Math.min(400, Number(limit) || 60));
     const firebaseDb = getDb();
     // Firestore's orderBy() silently excludes any document that is missing the field being
@@ -124,7 +124,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     try {
       if (firebaseDb) {
         const snap = await withSdkTimeout(firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
-          .where('uploadSource', '==', 'chat').orderBy('timestamp', 'desc').limit(pageSize).get(), FIRESTORE_REST_TIMEOUT_MS);
+          .orderBy('timestamp', 'desc').limit(pageSize).get(), FIRESTORE_REST_TIMEOUT_MS);
         const list = [];
         snap.forEach(function (doc) { list.push(slimMessage({ id: doc.id, ...doc.data() })); });
         if (list.length > 0) return list.reverse();
@@ -136,7 +136,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     if (orderedEmpty && firebaseDb) {
       try {
         const snap = await withSdkTimeout(firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
-          .where('uploadSource', '==', 'chat').limit(pageSize).get(), FIRESTORE_REST_TIMEOUT_MS);
+          .limit(pageSize).get(), FIRESTORE_REST_TIMEOUT_MS);
         const list = [];
         snap.forEach(function (doc) { list.push(slimMessage({ id: doc.id, ...doc.data() })); });
         if (list.length > 0) {
@@ -148,86 +148,19 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
         console.warn('fetchRecentChatMessages unordered fallback', err);
       }
     }
-    // Both `uploadSource == 'chat'`-scoped reads above came back empty. Before concluding there
-    // is genuinely no chat, check whether this calendar's history simply predates the
-    // `uploadSource` field entirely (see isLegacyOrChatUpload) -- a calendar with a lot of real
-    // accumulated chat and no `uploadSource` on any doc would otherwise be reported as empty
-    // forever, even though every single message is sitting right there in the collection.
-    if (firebaseDb) {
-      try {
-        const snap = await withSdkTimeout(firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
-          .orderBy('timestamp', 'desc').limit(pageSize).get(), FIRESTORE_REST_TIMEOUT_MS);
-        const list = [];
-        snap.forEach(function (doc) {
-          const data = doc.data();
-          if (isLegacyOrChatUpload(data)) list.push(slimMessage({ id: doc.id, ...data }));
-        });
-        if (list.length > 0) {
-          console.warn('fetchRecentChatMessages: recovered', list.length, 'legacy message(s) missing uploadSource -- run scripts/migrate-chat-upload-sources.mjs to backfill');
-          return list.reverse();
-        }
-      } catch (err) {
-        console.warn('fetchRecentChatMessages legacy fallback', err);
-      }
-      try {
-        const snap = await withSdkTimeout(firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
-          .limit(pageSize).get(), FIRESTORE_REST_TIMEOUT_MS);
-        const list = [];
-        snap.forEach(function (doc) {
-          const data = doc.data();
-          if (isLegacyOrChatUpload(data)) list.push(slimMessage({ id: doc.id, ...data }));
-        });
-        if (list.length > 0) {
-          list.sort(function (a, b) { return (Number(a.timestamp) || 0) - (Number(b.timestamp) || 0); });
-          console.warn('fetchRecentChatMessages: recovered', list.length, 'legacy message(s) via unordered/unscoped fallback');
-          return list;
-        }
-      } catch (err) {
-        console.warn('fetchRecentChatMessages legacy unordered fallback', err);
-      }
-    }
     try {
-      const url = 'https://firestore.googleapis.com/v1/projects/' + projectId() + '/databases/(default)/documents/calendars/cal_' + calId + ':runQuery';
-      const res = await fetchWithTimeout(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, cache: 'no-store', body: JSON.stringify({ structuredQuery: {
-        from: [{ collectionId: 'messages' }],
-        where: { fieldFilter: { field: { fieldPath: 'uploadSource' }, op: 'EQUAL', value: { stringValue: 'chat' } } },
-        orderBy: [{ field: { fieldPath: 'timestamp' }, direction: 'DESCENDING' }], limit: pageSize
-      } }) });
-      if (res.ok) {
-        const rows = await res.json();
-        const list = (Array.isArray(rows) ? rows : []).filter(row => row && row.document).map(function (row) {
-          const doc = row.document;
-          return slimMessage({ id: doc.name.split('/').pop(), ...docToJs(doc) });
-        });
-        if (list.length > 0) return list.reverse();
-      }
+      const url = 'https://firestore.googleapis.com/v1/projects/' + projectId() + '/databases/(default)/documents/calendars/cal_' + calId + '/messages?orderBy=timestamp%20desc&pageSize=' + pageSize;
+      const res = await fetchWithTimeout(url, { cache: 'no-store' });
+      if (!res.ok) return [];
+      const data = await res.json();
+      const list = (data.documents || []).map(function (doc) {
+        return slimMessage({ id: doc.name.split('/').pop(), ...docToJs(doc) });
+      });
+      if (list.length > 0) return list.reverse();
     } catch (err) {
       console.warn('fetchRecentChatMessages rest', err);
     }
     // Same unordered-fallback reasoning as the SDK path above, for when only REST is available.
-    try {
-      const url = 'https://firestore.googleapis.com/v1/projects/' + projectId() + '/databases/(default)/documents/calendars/cal_' + calId + ':runQuery';
-      const res = await fetchWithTimeout(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, cache: 'no-store', body: JSON.stringify({ structuredQuery: {
-        from: [{ collectionId: 'messages' }],
-        where: { fieldFilter: { field: { fieldPath: 'uploadSource' }, op: 'EQUAL', value: { stringValue: 'chat' } } }, limit: pageSize
-      } }) });
-      if (res.ok) {
-        const rows = await res.json();
-        const list = (Array.isArray(rows) ? rows : []).filter(row => row && row.document).map(function (row) {
-          const doc = row.document;
-          return slimMessage({ id: doc.name.split('/').pop(), ...docToJs(doc) });
-        });
-        list.sort(function (a, b) { return (Number(a.timestamp) || 0) - (Number(b.timestamp) || 0); });
-        if (list.length > 0) {
-          console.warn('fetchRecentChatMessages: recovered', list.length, 'message(s) via unordered REST fallback');
-          return list;
-        }
-      }
-    } catch (err) {
-      console.warn('fetchRecentChatMessages unordered rest fallback', err);
-    }
-    // Last resort, REST-only: an unscoped read filtered client-side for the same legacy-doc
-    // reasoning as the SDK path above.
     try {
       const url = 'https://firestore.googleapis.com/v1/projects/' + projectId() + '/databases/(default)/documents/calendars/cal_' + calId + '/messages?pageSize=' + pageSize;
       const res = await fetchWithTimeout(url, { cache: 'no-store' });
@@ -235,12 +168,12 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
       const data = await res.json();
       const list = (data.documents || []).map(function (doc) {
         return slimMessage({ id: doc.name.split('/').pop(), ...docToJs(doc) });
-      }).filter(isLegacyOrChatUpload);
+      });
       list.sort(function (a, b) { return (Number(a.timestamp) || 0) - (Number(b.timestamp) || 0); });
-      if (list.length > 0) console.warn('fetchRecentChatMessages: recovered', list.length, 'legacy message(s) via unscoped REST fallback');
+      if (list.length > 0) console.warn('fetchRecentChatMessages: recovered', list.length, 'message(s) via unordered REST fallback');
       return list;
     } catch (err) {
-      console.warn('fetchRecentChatMessages unscoped rest fallback', err);
+      console.warn('fetchRecentChatMessages unordered rest fallback', err);
       return [];
     }
   }
@@ -744,6 +677,9 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     return null;
   }
 
+  // Unscoped for the same reason as fetchRecentChatMessages above: this feeds the same shared
+  // olderChatMessages state that the 갤러리 페이지's full photo grid and HistoryView depend on
+  // containing every message regardless of uploadSource.
   async function fetchOlderChatMessages(calId, beforeTimestamp, pageSize) {
     if (!isValidCalId(calId) || !beforeTimestamp) return [];
     const size = pageSize != null ? pageSize : olderPageSize();
@@ -751,60 +687,13 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     if (firebaseDb) {
       try {
         const snap = await withSdkTimeout(firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
-          .where('uploadSource', '==', 'chat').orderBy('timestamp', 'desc').startAfter(beforeTimestamp).limit(size).get(), FIRESTORE_REST_TIMEOUT_MS);
+          .orderBy('timestamp', 'desc').startAfter(beforeTimestamp).limit(size).get(), FIRESTORE_REST_TIMEOUT_MS);
         const list = [];
         snap.forEach(function (doc) { list.push(slimMessage({ id: doc.id, ...doc.data() })); });
-        if (list.length > 0) return list.reverse();
+        return list.reverse();
       } catch (err) {
         console.warn('fetchOlderChatMessages sdk', err);
       }
-      // Same legacy-doc reasoning as fetchRecentChatMessages: a run of older messages that
-      // predate the `uploadSource` field would otherwise look like "no more history" and
-      // silently truncate scrollback right at the boundary of the newest legacy-tagged page.
-      try {
-        const snap = await withSdkTimeout(firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
-          .orderBy('timestamp', 'desc').startAfter(beforeTimestamp).limit(size).get(), FIRESTORE_REST_TIMEOUT_MS);
-        const list = [];
-        snap.forEach(function (doc) {
-          const data = doc.data();
-          if (isLegacyOrChatUpload(data)) list.push(slimMessage({ id: doc.id, ...data }));
-        });
-        if (list.length > 0) return list.reverse();
-      } catch (err) {
-        console.warn('fetchOlderChatMessages legacy fallback', err);
-      }
-    }
-    try {
-      const parent = 'projects/' + projectId() + '/databases/(default)/documents/calendars/cal_' + calId;
-      const url = 'https://firestore.googleapis.com/v1/' + parent + ':runQuery';
-      const body = {
-        structuredQuery: {
-          from: [{ collectionId: 'messages' }],
-          where: { compositeFilter: { op: 'AND', filters: [
-            { fieldFilter: { field: { fieldPath: 'uploadSource' }, op: 'EQUAL', value: { stringValue: 'chat' } } },
-            { fieldFilter: { field: { fieldPath: 'timestamp' }, op: 'LESS_THAN', value: { integerValue: String(beforeTimestamp) } } }
-          ] } },
-          orderBy: [{ field: { fieldPath: 'timestamp' }, direction: 'DESCENDING' }],
-          limit: size
-        }
-      };
-      const res = await fetchWithTimeout(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-      if (res.ok) {
-        const rows = await res.json();
-        const list = [];
-        (Array.isArray(rows) ? rows : []).forEach(function (row) {
-          const doc = row.document;
-          if (!doc || !doc.name) return;
-          list.push(slimMessage({ id: doc.name.split('/').pop(), ...docToJs(doc) }));
-        });
-        if (list.length > 0) return list.reverse();
-      }
-    } catch (err) {
-      console.warn('fetchOlderChatMessages rest', err);
     }
     try {
       const parent = 'projects/' + projectId() + '/databases/(default)/documents/calendars/cal_' + calId;
@@ -828,12 +717,11 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
       (Array.isArray(rows) ? rows : []).forEach(function (row) {
         const doc = row.document;
         if (!doc || !doc.name) return;
-        const data = docToJs(doc);
-        if (isLegacyOrChatUpload(data)) list.push(slimMessage({ id: doc.name.split('/').pop(), ...data }));
+        list.push(slimMessage({ id: doc.name.split('/').pop(), ...docToJs(doc) }));
       });
       return list.reverse();
     } catch (err) {
-      console.warn('fetchOlderChatMessages legacy rest fallback', err);
+      console.warn('fetchOlderChatMessages rest', err);
       return [];
     }
   }
@@ -908,20 +796,26 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     }
   }
 
-  // Real-time chat listener. Two independent ways a message doc can be silently excluded from
-  // the ordered, channel-scoped query below, neither of which is an error Firestore reports:
-  //  1) orderBy() excludes any doc missing the sort field (a bad write / manual edit missing
-  //     `timestamp`).
-  //  2) where('uploadSource','==','chat') excludes every doc that predates that field -- which,
-  //     on a calendar with real accumulated history, can be most or all of it (see
-  //     isLegacyOrChatUpload above and scripts/migrate-chat-upload-sources.mjs, the one-time
-  //     backfill for this that needs production credentials and is not guaranteed to have run).
-  // Unlike a one-shot read, onSnapshot only fires once for a query that keeps matching zero
-  // documents -- nothing ever re-checks it -- so a calendar hitting either case would report
-  // "no chat" forever no matter how much real history exists. When the current tier's first
-  // snapshot comes back empty, cascade to the next, progressively less scoped/ordered tier
-  // (still handing the caller the same snapshot-like shape, a `forEach`) until real messages are
-  // found or every tier has been tried.
+  // Real-time chat listener. Deliberately UNSCOPED (no uploadSource where-clause) -- see the
+  // long comment above fetchRecentChatMessages for why: this drives the shared
+  // chatMessages/olderChatMessages state that the 갤러리 페이지's full photo grid,
+  // HistoryView's 인물/추억 tag matching, and meetingPhotoMessageIds all depend on containing
+  // every message regardless of channel. Scoping this query to uploadSource=='chat' (as a since-
+  // reverted change briefly did, to cut read cost) silently dropped every gallery/meeting-
+  // uploaded photo from all of those other consumers. The chat ROOM's own "hide non-chat
+  // uploads" need is handled correctly at the rendering layer instead, via
+  // isChatRenderableMessage (app-main.js).
+  //
+  // orderBy() still silently excludes any document missing the field being ordered on -- not
+  // just sorts it oddly, drops it from the result set entirely, at any limit. A message doc that
+  // somehow ended up without a `timestamp` field (a bad write, an old migration, manual Firestore
+  // console edits) would then be invisible to every orderBy('timestamp') query forever. Unlike a
+  // one-shot read, onSnapshot only fires once for a query that keeps matching zero documents --
+  // nothing ever re-checks it -- so a calendar hitting this would report "no chat" forever no
+  // matter how much real history exists. When the ordered query's first snapshot comes back
+  // empty, fall back to an unordered live listener (which has no such exclusion), sorting/
+  // limiting the results client-side before handing them to the caller in the same snapshot-like
+  // shape (a `forEach`) callers already rely on.
   function subscribeMessages(calId, options, onSnapshot, onError) {
     const firebaseDb = getDb();
     if (!firebaseDb || !isValidCalId(calId)) return noop;
@@ -929,15 +823,13 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     const orderField = options.orderBy || 'timestamp';
     const direction = options.direction || 'desc';
     const limitN = Number(options.limit) > 0 ? Number(options.limit) : null;
-    const wideLimit = limitN ? Math.max(limitN * 4, 200) : 200;
 
     let stopped = false;
     let innerUnsub = noop;
     const messagesRef = firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages');
 
-    function sortedSnapshotFrom(docs, filterFn) {
-      const filtered = filterFn ? docs.filter(function (d) { return filterFn(d.data()); }) : docs;
-      const sorted = filtered.slice().sort(function (a, b) {
+    function sortedSnapshotFrom(docs) {
+      const sorted = docs.slice().sort(function (a, b) {
         const ta = Number(a.data()[orderField]) || 0;
         const tb = Number(b.data()[orderField]) || 0;
         return direction === 'desc' ? tb - ta : ta - tb;
@@ -946,47 +838,46 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
       return { forEach: function (fn) { limited.forEach(fn); } };
     }
 
-    function attach(tier) {
+    function attachUnordered() {
       if (stopped) return;
       try {
-        let q = messagesRef;
-        let unordered = false;
-        let legacy = false;
-        if (tier === 0) {
-          q = q.where('uploadSource', '==', 'chat').orderBy(orderField, direction);
-          if (limitN) q = q.limit(limitN);
-        } else if (tier === 1) {
-          q = q.where('uploadSource', '==', 'chat').limit(wideLimit);
-          unordered = true;
-        } else if (tier === 2) {
-          q = q.orderBy(orderField, direction).limit(limitN || wideLimit);
-          legacy = true;
-        } else {
-          q = q.limit(wideLimit);
-          unordered = true;
-          legacy = true;
-        }
+        let q = messagesRef.limit(limitN ? Math.max(limitN * 4, 200) : 200);
         innerUnsub = q.onSnapshot(function (snap) {
           if (stopped) return;
-          if (snap.empty && tier < 3) {
-            const prevUnsub = innerUnsub;
-            attach(tier + 1);
-            if (typeof prevUnsub === 'function') prevUnsub();
-            return;
-          }
-          const filterFn = legacy ? isLegacyOrChatUpload : null;
-          onSnapshot(unordered ? sortedSnapshotFrom(snap.docs, filterFn) : (filterFn ? sortedSnapshotFrom(snap.docs, filterFn) : snap));
-        }, function (err) {
-          console.warn('subscribeMessages tier', tier, err);
-          if (typeof onError === 'function') onError(err);
-        });
+          onSnapshot(sortedSnapshotFrom(snap.docs));
+        }, onError || noop);
       } catch (err) {
-        console.warn('subscribeMessages attach tier', tier, err);
+        console.warn('subscribeMessages unordered fallback', err);
         if (typeof onError === 'function') onError(err);
       }
     }
 
-    attach(0);
+    function attachOrdered() {
+      let usedFallback = false;
+      try {
+        let q = messagesRef.orderBy(orderField, direction);
+        if (limitN) q = q.limit(limitN);
+        innerUnsub = q.onSnapshot(function (snap) {
+          if (stopped) return;
+          if (snap.empty && !usedFallback) {
+            usedFallback = true;
+            const prevUnsub = innerUnsub;
+            attachUnordered();
+            if (typeof prevUnsub === 'function') prevUnsub();
+            return;
+          }
+          onSnapshot(snap);
+        }, function (err) {
+          console.warn('subscribeMessages ordered', err);
+          if (typeof onError === 'function') onError(err);
+        });
+      } catch (err) {
+        console.warn('subscribeMessages ordered attach', err);
+        if (typeof onError === 'function') onError(err);
+      }
+    }
+
+    attachOrdered();
 
     return function () {
       stopped = true;
