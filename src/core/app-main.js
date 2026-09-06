@@ -2639,6 +2639,17 @@ function CalendarApp() {
   // venue/link) is already complete and doesn't need a form. cultureSourceId lets the checkbox
   // find its own registered anniversary again (to show checked, or to unregister) without the
   // culture item and the anniversary doc needing the same id.
+  // 영화는 실제 상영관(장소)이 없는데도 공공 영화 데이터 API 스키마가 venue 필드를 필수로 요구해서,
+  // 크롤링 원본(culture-movies.json, scripts/sync-culture-performances.mjs)이 항상 이 문자열을 채워
+  // 넣어 온다. 이걸 실제 장소로 착각해 그대로 저장/표시하면 일정팝업에 "장소 확인 필요"라는 의미
+  // 없는 텍스트가 위치 아이콘과 함께 나타나고(마치 사용자가 확인해야 할 일이 있는 것처럼 보임),
+  // 설명 텍스트 맨 앞에도 같은 문구가 섞여 붙는다 -- 정보가 없을 뿐이니 장소 자체가 아예 없는
+  // 것과 똑같이 취급한다(ui-date-modal.js의 hasRealAnnPlace와 동일한 판단).
+  const CULTURE_VENUE_PLACEHOLDER = '장소 확인 필요';
+  const hasRealVenue = (venue) => {
+    const v = String(venue || '').trim();
+    return !!v && v !== CULTURE_VENUE_PLACEHOLDER;
+  };
   const handleRegisterCultureEvent = async (item, options = {}) => {
     if (!activeCal?.id || !item?.id || !item?.title) return null;
     const stamp = Date.now();
@@ -2680,7 +2691,7 @@ function CalendarApp() {
     // Conditionally-added, not `field: value || undefined` -- Firestore's set() rejects a literal
     // undefined property value outright, so an always-present key here would throw on exactly the
     // items missing that field (same pattern AnniversaryModal's own handleSaveAnniversary uses).
-    const descriptionParts = [item.venue, item.address];
+    const descriptionParts = [hasRealVenue(item.venue) ? item.venue : null, item.address];
     if (item.description) descriptionParts.push(String(item.description).trim());
     if (item.link) descriptionParts.push(String(item.link).trim());
     const descriptionText = descriptionParts.filter(Boolean).join(' · ');
@@ -2691,7 +2702,7 @@ function CalendarApp() {
     // 별도로 장소 목록에는 등록해두지만, 그 등록은 이 anniversaries 문서와 연결되지 않았다).
     // 좌표(lat/lng)는 없어도 되도록 만들어져 있다(getAnnBannerKakaoMapLinkUrl/getDisplayPlaceAddress
     // 모두 이름/주소만으로 동작) -- 지오코딩 성공 여부와 무관하게 항상 채워지도록 동기적으로 넣는다.
-    if (item.venue) annData.place = { name: item.venue, address: item.address || '' };
+    if (hasRealVenue(item.venue)) annData.place = { name: item.venue, address: item.address || '' };
     // Copy archive-card poster so DateModal anniversary banners can show the same image.
     const poster = item.image ? String(item.image).trim() : '';
     if (poster) {
@@ -2721,7 +2732,8 @@ function CalendarApp() {
   // Silently does nothing if the venue can't be found (no address/lat-lng to save) or the app is
   // offline -- this is a convenience on top of the calendar registration, never a requirement.
   const registerCulturePlaceForEvent = async (item, visitDate) => {
-    const venueQuery = String(item?.venue || '').trim() || String(item?.title || '').trim();
+    const realVenue = hasRealVenue(item?.venue) ? String(item.venue).trim() : '';
+    const venueQuery = realVenue || String(item?.title || '').trim();
     if (!venueQuery) return;
     const api = window.GATHER_APP_PLACE_SEARCH;
     if (!api || typeof api.searchPlaces !== 'function') return;
@@ -2729,7 +2741,7 @@ function CalendarApp() {
     const top = Array.isArray(results) ? results[0] : null;
     if (!top || !Number.isFinite(top.lat) || !Number.isFinite(top.lng)) return;
     handleSavePlace({
-      name: item.venue || top.name,
+      name: realVenue || top.name,
       address: item.address || top.address || '',
       lat: top.lat,
       lng: top.lng,
@@ -6914,6 +6926,14 @@ function CalendarApp() {
         try {
           localStorage.setItem('gather_content_tab', tabByCategory[ann.category] || 'festival');
           localStorage.setItem('gather_content_focus_item_id', focusId);
+          // id-only 매칭의 안전망: 크롤링 스냅샷의 id 생성 규칙이 과거에 바뀐 적이 있어(예:
+          // 날짜 기반 -> 제목 기반), 그 변경 이전에 등록된 오래된 기념일은 cultureSourceId가
+          // 오늘자 스냅샷의 어떤 항목과도 더 이상 일치하지 않을 수 있다 -- 그 경우 orphan 카드
+          // 폴백(ui-summary-gallery.js orphanedSourceItems)도 같은 옛 id로만 찾아지므로 여전히
+          // 열리기는 하지만, 제목까지 함께 넘겨두면 컨텐츠 페이지 쪽에서 id 매칭이 실패했을 때
+          // 제목으로 한 번 더 찾아볼 수 있다.
+          if (ann.title) localStorage.setItem('gather_content_focus_title', ann.title);
+          else localStorage.removeItem('gather_content_focus_title');
         } catch (_) { /* best-effort */ }
         setIsModalOpen(false);
         changeView('content');

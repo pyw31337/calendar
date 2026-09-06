@@ -2680,9 +2680,19 @@ export function ContentView({
   const [focusItemId] = React.useState(() => {
     try { return localStorage.getItem('gather_content_focus_item_id') || null; } catch (_) { return null; }
   });
+  // id 매칭 실패에 대비한 안전망(app-main.js의 onFocusCultureSource 참고) -- 크롤링 스냅샷의 id
+  // 생성 규칙이 과거에 바뀐 적이 있어, 그 이전에 등록된 기념일은 cultureSourceId가 오늘자
+  // 스냅샷/orphan 폴백 어느 쪽과도 더 이상 일치하지 않을 수 있다. 제목이 일치하는 항목을 찾는
+  // 마지막 수단으로만 쓰인다(CulturePerformancesTab 참고).
+  const [focusTitle] = React.useState(() => {
+    try { return localStorage.getItem('gather_content_focus_title') || ''; } catch (_) { return ''; }
+  });
   React.useEffect(() => {
     if (!focusItemId) return;
-    try { localStorage.removeItem('gather_content_focus_item_id'); } catch (_) { /* best-effort */ }
+    try {
+      localStorage.removeItem('gather_content_focus_item_id');
+      localStorage.removeItem('gather_content_focus_title');
+    } catch (_) { /* best-effort */ }
   }, [focusItemId]);
   // 컨텐츠 메뉴를 다시 누르면 항상 지역축제 탭부터 보이도록.
   const handleContentChangeView = (view) => {
@@ -2983,7 +2993,7 @@ export function ContentView({
       anniversaryCategory: "event",
       extraItems: performanceExtraItems,
       chipRowSlot, contentPaddingTop, onScroll: handleContentScroll,
-      gridCols, focusItemId, searchQuery, onEditContent: openContentEditor
+      gridCols, focusItemId, focusTitle, searchQuery, onEditContent: openContentEditor
     }),
     contentTab === 'festival' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
       calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo, dataUrl: CULTURE_FESTIVALS_URL,
@@ -2991,7 +3001,7 @@ export function ContentView({
       anniversaryCategory: "festival",
       extraItems: festivalExtraItems,
       chipRowSlot, contentPaddingTop, onScroll: handleContentScroll,
-      gridCols, focusItemId, searchQuery, onEditContent: openContentEditor
+      gridCols, focusItemId, focusTitle, searchQuery, onEditContent: openContentEditor
     }),
     contentTab === 'sports' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
       calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo, dataUrl: CULTURE_SPORTS_URL,
@@ -2999,14 +3009,14 @@ export function ContentView({
       anniversaryCategory: "sports",
       extraItems: sportsExtraItems,
       chipRowSlot, contentPaddingTop, onScroll: handleContentScroll,
-      gridCols, focusItemId, searchQuery, onEditContent: openContentEditor
+      gridCols, focusItemId, focusTitle, searchQuery, onEditContent: openContentEditor
     }),
     contentTab === 'movies' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
       calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo, dataUrl: CULTURE_MOVIES_URL,
       emptyLabel: "등록된 영화가 없습니다.", regionSelections, onItemsLoaded: setRegionFilterItems,
       anniversaryCategory: "movie", extraItems: movieExtraItems,
       chipRowSlot, contentPaddingTop, onScroll: handleContentScroll,
-      gridCols, focusItemId, searchQuery, onEditContent: openContentEditor
+      gridCols, focusItemId, focusTitle, searchQuery, onEditContent: openContentEditor
     }),
 
     /*#__PURE__*/React.createElement(SideMenuOverlay, {
@@ -3735,7 +3745,7 @@ function buildQuickMemoPlaceholder(item) {
   return lines.join('\n') || '비워두면 행사 정보가 그대로 저장됩니다';
 }
 
-export function CulturePerformancesTab({ calendar, anniversaries = [], onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo = null, onEditContent = null, dataUrl = CULTURE_PERFORMANCES_URL, emptyLabel = "상영중이거나 예정된 문화공연이 없습니다.", regionSelections = [], onItemsLoaded, anniversaryCategory = 'event', extraItems = [], chipRowSlot = null, contentPaddingTop = 0, onScroll, gridCols = '2', focusItemId = null, searchQuery = '' }) {
+export function CulturePerformancesTab({ calendar, anniversaries = [], onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo = null, onEditContent = null, dataUrl = CULTURE_PERFORMANCES_URL, emptyLabel = "상영중이거나 예정된 문화공연이 없습니다.", regionSelections = [], onItemsLoaded, anniversaryCategory = 'event', extraItems = [], chipRowSlot = null, contentPaddingTop = 0, onScroll, gridCols = '2', focusItemId = null, focusTitle = '', searchQuery = '' }) {
   const React = window.React;
   const ReactDOM = window.ReactDOM;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -3910,13 +3920,18 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
 
   // 일정 팝업에서 "기념일 제목"을 눌러 넘어온 경우, 그 항목을 찾아 상세 시트를 자동으로 연다.
   // 한 번만 시도하면 되므로 mergedItems가 (아직 못 찾았더라도) 로드된 뒤로는 다시 확인하지 않는다.
+  // id로 못 찾으면 제목으로 한 번 더 찾는다 -- 크롤링 스냅샷의 id 생성 규칙이 과거에 바뀐 적이
+  // 있어(예: 날짜 기반 -> 제목 기반), 그 변경 이전에 등록된 기념일은 cultureSourceId가 오늘자
+  // 스냅샷/orphan 폴백 어느 쪽과도 더 이상 일치하지 않게 될 수 있다 -- 이때도 같은 제목의
+  // 항목이 오늘자 스냅샷에 그대로 있다면 그거라도 열어 주는 게, 아무것도 안 열리는 것보다 낫다.
   const focusAttemptedRef = React.useRef(false);
   React.useEffect(() => {
     if (!focusItemId || focusAttemptedRef.current || mergedItems === null) return;
     focusAttemptedRef.current = true;
-    const match = mergedItems.find(i => i && i.id === focusItemId);
+    const match = mergedItems.find(i => i && i.id === focusItemId)
+      || (focusTitle ? mergedItems.find(i => i && String(i.title || '').trim() === focusTitle.trim()) : null);
     if (match) setSelected(match);
-  }, [focusItemId, mergedItems]);
+  }, [focusItemId, focusTitle, mergedItems]);
 
   if (mergedItems === null) {
     return /*#__PURE__*/React.createElement("div", {
