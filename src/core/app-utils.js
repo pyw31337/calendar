@@ -55,8 +55,8 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
   }
 
   function formatShortDateWithDayName(dateStr) {
-    const formatted = formatDateWithDayName(dateStr);
-    return formatted.replace(/^(\d{2})(\d{2})\./, '$2.');
+    // Date labels use one canonical display format across crawled and user-entered content.
+    return formatDateWithDayName(dateStr);
   }
 
   function formatConfirmedMeetingLabel(dateStr) {
@@ -64,7 +64,7 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
     const [y, m, d] = dateStr.split('-');
     const dateObj = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
     const dayName = DAY_NAMES_KO[dateObj.getDay()];
-    return `[모임확정] ${y.slice(2)}.${m}.${d} (${dayName})`;
+    return `[모임확정] ${y}.${m}.${d} (${dayName})`;
   }
 
   function formatDDayLabel(dateStr) {
