@@ -2647,6 +2647,7 @@ export function ContentView({
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [isContentRegisterOpen, setIsContentRegisterOpen] = React.useState(false);
+  const [editingContentItem, setEditingContentItem] = React.useState(null);
   const CONTENT_TAB_STORAGE_KEY = 'gather_content_tab';
   const VALID_CONTENT_TABS = ['festival', 'culture', 'sports', 'movies'];
   const [contentTab, setContentTab] = React.useState(() => {
@@ -2674,6 +2675,11 @@ export function ContentView({
   const handleContentChangeView = (view) => {
     if (view === 'content') changeContentTab('festival');
     if (typeof onChangeView === 'function') onChangeView(view);
+  };
+  const openContentEditor = (item) => {
+    if (!item) return;
+    setEditingContentItem(item);
+    setIsContentRegisterOpen(true);
   };
 
   // 기념일 등록(AnniversaryModal)으로 직접 만든 festival/event/sports도 각 탭에 보이도록,
@@ -2964,7 +2970,7 @@ export function ContentView({
       anniversaryCategory: "event",
       extraItems: performanceExtraItems,
       chipRowSlot, contentPaddingTop, onScroll: handleContentScroll,
-      gridCols, focusItemId, searchQuery
+      gridCols, focusItemId, searchQuery, onEditContent: openContentEditor
     }),
     contentTab === 'festival' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
       calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo, dataUrl: CULTURE_FESTIVALS_URL,
@@ -2972,7 +2978,7 @@ export function ContentView({
       anniversaryCategory: "festival",
       extraItems: festivalExtraItems,
       chipRowSlot, contentPaddingTop, onScroll: handleContentScroll,
-      gridCols, focusItemId, searchQuery
+      gridCols, focusItemId, searchQuery, onEditContent: openContentEditor
     }),
     contentTab === 'sports' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
       calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo, dataUrl: CULTURE_SPORTS_URL,
@@ -2980,14 +2986,14 @@ export function ContentView({
       anniversaryCategory: "sports",
       extraItems: sportsExtraItems,
       chipRowSlot, contentPaddingTop, onScroll: handleContentScroll,
-      gridCols, focusItemId, searchQuery
+      gridCols, focusItemId, searchQuery, onEditContent: openContentEditor
     }),
     contentTab === 'movies' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
       calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo, dataUrl: CULTURE_MOVIES_URL,
       emptyLabel: "등록된 영화가 없습니다.", regionSelections, onItemsLoaded: setRegionFilterItems,
       anniversaryCategory: "movie", extraItems: movieExtraItems,
       chipRowSlot, contentPaddingTop, onScroll: handleContentScroll,
-      gridCols, focusItemId, searchQuery
+      gridCols, focusItemId, searchQuery, onEditContent: openContentEditor
     }),
 
     /*#__PURE__*/React.createElement(SideMenuOverlay, {
@@ -2998,7 +3004,7 @@ export function ContentView({
       calendar,
       onGoHome: () => { setIsMenuOpen(false); if (typeof onChangeView === 'function') onChangeView('calendar'); else if (typeof onBack === 'function') onBack(); },
       extraItems: [{
-        onClick: () => { setIsMenuOpen(false); setIsContentRegisterOpen(true); },
+        onClick: () => { setIsMenuOpen(false); setEditingContentItem(null); setIsContentRegisterOpen(true); },
         icon: /*#__PURE__*/React.createElement("svg", {
           xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24",
           fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true"
@@ -3020,11 +3026,12 @@ export function ContentView({
       onOpenAppSettings
     }),
     isContentRegisterOpen && /*#__PURE__*/React.createElement(ContentRegisterModal, {
-      onClose: () => setIsContentRegisterOpen(false),
+      onClose: () => { setIsContentRegisterOpen(false); setEditingContentItem(null); },
       onSave: onSaveCustomCultureItem,
       showToast: showToast,
+      initialItem: editingContentItem,
       initialKind: contentTab === 'festival' ? 'festival' : (contentTab === 'sports' ? 'sports' : (contentTab === 'movies' ? 'movie' : 'performance'))
-    })
+    }),
   );
 }
 
@@ -3331,9 +3338,6 @@ function cultureItemDay(item) {
 function filterAndSortCultureItems(items, category) {
   if (category !== 'sports' && category !== 'movie') return items;
   const today = todayIsoLocal();
-  const cutoff = new Date(`${today}T00:00:00`);
-  cutoff.setDate(cutoff.getDate() - 30);
-  const cutoffIso = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}-${String(cutoff.getDate()).padStart(2, '0')}`;
   const visible = items.filter(item => {
     const start = cultureItemDay(item);
     if (!start) return true;
@@ -3341,7 +3345,9 @@ function filterAndSortCultureItems(items, category) {
       const end = item.endDate || start;
       return end >= today;
     }
-    return start >= cutoffIso;
+    // 영화는 수집된 전체 목록을 보여준다. 오래된 항목도 원본 스냅샷과 캘린더 연동을 위해
+    // 보존되며, 미래 개봉작 역시 영화 탭에서 계속 확인할 수 있다.
+    return true;
   });
   return visible.sort((a, b) => {
     const aDay = cultureItemDay(a), bDay = cultureItemDay(b);
@@ -3354,7 +3360,7 @@ function filterAndSortCultureItems(items, category) {
 // Layer popup for manually registering 문화공연 / 지역축제 items into the archive tabs.
 // Portaled to document.body (same pattern as CulturePerformancesTab's detail sheet) so it sits
 // above the side menu / page chrome. Persists via onSave → app-main customCultureItems write.
-function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind = 'performance' }) {
+function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind = 'performance', initialItem = null }) {
   const React = window.React;
   const ReactDOM = window.ReactDOM;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -3384,6 +3390,17 @@ function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind =
   const [audience, setAudience] = React.useState('');
   const [bookingRate, setBookingRate] = React.useState('');
   const [saving, setSaving] = React.useState(false);
+  React.useEffect(() => {
+    if (!initialItem) return;
+    const nextKind = initialItem.kind || (initialItem.genre === 'movie' ? 'movie' : initialItem.kind) || initialKind;
+    setKind(['festival', 'sports', 'movie'].includes(nextKind) ? nextKind : 'performance');
+    setTitle(initialItem.title || ''); setStartDate(initialItem.releaseDate || initialItem.startDate || '');
+    setEndDate(initialItem.endDate || ''); setVenue(initialItem.venue || ''); setAddress(initialItem.address || '');
+    setLink(initialItem.link || ''); setDescription(initialItem.description || ''); setImage(initialItem.image || '');
+    setPrice(initialItem.price || ''); setContact(initialItem.contact || ''); setDirector(initialItem.director || '');
+    setCast(Array.isArray(initialItem.cast) ? initialItem.cast.join(', ') : (initialItem.cast || ''));
+    setRating(initialItem.ageRating || ''); setAudience(initialItem.audienceCount || ''); setBookingRate(initialItem.bookingRate || '');
+  }, [initialItem, initialKind]);
 
   const handleSave = async () => {
     const cleanTitle = (title || '').trim();
@@ -3408,9 +3425,10 @@ function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind =
     const stamp = Date.now();
     const idPrefixByKind = { festival: 'custom_fest_', sports: 'custom_sport_', movie: 'custom_movie_' };
     const prefix = idPrefixByKind[kind] || 'custom_perf_';
-    const id = prefix + stamp + '_' + Math.random().toString(36).slice(2, 8);
+    const id = initialItem?.id || (prefix + stamp + '_' + Math.random().toString(36).slice(2, 8));
     const normalizedKind = ['festival', 'sports', 'movie'].includes(kind) ? kind : 'performance';
     const item = {
+      ...(initialItem || {}),
       id,
       title: cleanTitle,
       startDate: cleanStart,
@@ -3423,9 +3441,9 @@ function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind =
       image: (image || '').trim(),
       price: (price || '').trim(),
       contact: (contact || '').trim(),
-      source: 'custom',
+      source: initialItem?.source || 'custom',
       kind: normalizedKind,
-      createdAt: stamp,
+      createdAt: initialItem?.createdAt || stamp,
       updatedAt: stamp
     };
     if (normalizedKind === 'movie') Object.assign(item, {
@@ -3444,9 +3462,9 @@ function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind =
     item.title = cleanTitle;
     item.startDate = cleanStart;
     item.endDate = cleanEnd;
-    item.source = 'custom';
+    item.source = initialItem?.source || 'custom';
     item.kind = normalizedKind;
-    item.createdAt = stamp;
+    item.createdAt = initialItem?.createdAt || stamp;
     item.updatedAt = stamp;
     if (!item.dateLabel) item.dateLabel = formatCultureDateLabel(cleanStart, cleanEnd);
 
@@ -3480,7 +3498,7 @@ function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind =
         }
       },
         /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' } },
-          /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)' } }, "컨텐츠 등록"),
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)' } }, initialItem ? "컨텐츠 수정" : "컨텐츠 등록"),
           /*#__PURE__*/React.createElement("button", {
             type: "button", onClick: () => !saving && onClose && onClose(), "aria-label": "닫기",
             style: { background: 'none', border: 'none', cursor: 'pointer', padding: '6px', color: 'var(--text-muted)', display: 'flex' }
@@ -3596,7 +3614,7 @@ function buildQuickMemoPlaceholder(item) {
   return lines.join('\n') || '비워두면 행사 정보가 그대로 저장됩니다';
 }
 
-export function CulturePerformancesTab({ calendar, anniversaries = [], onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo = null, dataUrl = CULTURE_PERFORMANCES_URL, emptyLabel = "상영중이거나 예정된 문화공연이 없습니다.", regionSelections = [], onItemsLoaded, anniversaryCategory = 'event', extraItems = [], chipRowSlot = null, contentPaddingTop = 0, onScroll, gridCols = '2', focusItemId = null, searchQuery = '' }) {
+export function CulturePerformancesTab({ calendar, anniversaries = [], onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo = null, onEditContent = null, dataUrl = CULTURE_PERFORMANCES_URL, emptyLabel = "상영중이거나 예정된 문화공연이 없습니다.", regionSelections = [], onItemsLoaded, anniversaryCategory = 'event', extraItems = [], chipRowSlot = null, contentPaddingTop = 0, onScroll, gridCols = '2', focusItemId = null, searchQuery = '' }) {
   const React = window.React;
   const ReactDOM = window.ReactDOM;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -3607,6 +3625,11 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
   const [selected, setSelected] = React.useState(null);
   const [pendingId, setPendingId] = React.useState(null);
   const [isMemoOpen, setIsMemoOpen] = React.useState(false);
+  const openMovieVideoSearch = item => {
+    if (!item) return;
+    const query = encodeURIComponent(`${item.title || ''} 영화 예고편 리뷰`.trim());
+    window.open(`https://www.youtube.com/results?search_query=${query}`, '_blank', 'noopener,noreferrer');
+  };
   const [memoDraft, setMemoDraft] = React.useState('');
   const [isSavingMemo, setIsSavingMemo] = React.useState(false);
   // Reset the memo composer whenever a different card is opened (or the sheet is closed),
@@ -3805,7 +3828,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
   // counts, consistent with how RegionFilterBackdrop's own counts work off whichever tab is mounted.
   const categoryCounts = new Map();
   searchFilteredItems.forEach(item => {
-    const key = item.genre || '';
+    const key = anniversaryCategory === 'movie' ? (item.subGenre || '기타') : (item.genre || '');
     categoryCounts.set(key, (categoryCounts.get(key) || 0) + 1);
   });
   const categoryOptions = [...categoryCounts.entries()]
@@ -3818,7 +3841,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
   const filteredItems = categoryFilter === CUSTOM_CATEGORY_VALUE
     ? searchFilteredItems.filter(item => item && item.isCustomRegistered)
     : categoryFilter
-      ? searchFilteredItems.filter(item => (item.genre || '') === categoryFilter)
+      ? searchFilteredItems.filter(item => (anniversaryCategory === 'movie' ? (item.subGenre || '기타') : (item.genre || '')) === categoryFilter)
       : searchFilteredItems;
 
   // "개별등록"은 전체/장르 칩과 마찬가지로 항상 고정 노출한다 -- 지금 등록된 개수가 0이어도
@@ -4099,11 +4122,38 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
               backgroundColor: 'rgba(0,0,0,0.45)', color: '#fff'
             }
           }, SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 18 }) : "✕"),
-          selected.image && /*#__PURE__*/React.createElement("img", {
-            src: selected.image, alt: selected.title, loading: 'lazy',
-            style: { width: '100%', maxHeight: '260px', objectFit: 'contain', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)', flexShrink: 0 },
-            onError: e => { e.currentTarget.style.display = 'none'; }
-          }),
+          typeof onEditContent === 'function' && /*#__PURE__*/React.createElement("button", {
+            type: "button", onClick: () => { setSelected(null); onEditContent(selected); },
+            "aria-label": "컨텐츠 편집", title: "편집",
+            style: {
+              position: 'absolute', top: '12px', left: '12px', zIndex: 2,
+              width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              border: 'none', borderRadius: 'var(--radius-full)', cursor: 'pointer',
+              backgroundColor: 'rgba(0,0,0,0.45)', color: '#fff', fontSize: '18px', lineHeight: 1
+            }
+          }, "✎"),
+          selected.image && /*#__PURE__*/React.createElement("div", {
+            role: (anniversaryCategory === 'movie' || selected.genre === 'movie') ? 'button' : undefined,
+            tabIndex: (anniversaryCategory === 'movie' || selected.genre === 'movie') ? 0 : undefined,
+            onClick: (anniversaryCategory === 'movie' || selected.genre === 'movie') ? () => openMovieVideoSearch(selected) : undefined,
+            onKeyDown: (anniversaryCategory === 'movie' || selected.genre === 'movie') ? e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openMovieVideoSearch(selected); } } : undefined,
+            'aria-label': (anniversaryCategory === 'movie' || selected.genre === 'movie') ? '유튜브에서 예고편 및 리뷰 보기' : undefined,
+            style: { position: 'relative', width: '100%', flexShrink: 0, cursor: (anniversaryCategory === 'movie' || selected.genre === 'movie') ? 'pointer' : 'default' }
+          },
+            /*#__PURE__*/React.createElement("img", {
+              src: selected.image, alt: selected.title, loading: 'lazy',
+              style: { width: '100%', maxHeight: '260px', objectFit: 'contain', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)', display: 'block' },
+              onError: e => { e.currentTarget.style.display = 'none'; }
+            }),
+            (anniversaryCategory === 'movie' || selected.genre === 'movie') && /*#__PURE__*/React.createElement("span", {
+              'aria-hidden': 'true', style: {
+                position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)',
+                width: '56px', height: '56px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                backgroundColor: 'rgba(0,0,0,0.55)', color: '#fff', fontSize: '25px', paddingLeft: '4px', boxSizing: 'border-box',
+                boxShadow: '0 2px 10px rgba(0,0,0,0.3)', pointerEvents: 'none'
+              }
+            }, "▶")
+          ),
           /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)', flexShrink: 0, paddingRight: '36px' } }, selected.title),
           // 기간~설명까지 한 블록으로 스크롤 -- 예전엔 설명 칸만 따로 120px 높이로 스크롤돼서
           // 모바일 세로폭에선 몇 줄 보이지도 않는 좁은 창으로 긴 설명을 읽어야 했다. 이미지/제목은
