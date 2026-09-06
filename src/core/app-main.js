@@ -2946,13 +2946,16 @@ function CalendarApp() {
     const applyList = (list, preserveExisting = false) => {
       if (!isMounted) return;
       const arr = (Array.isArray(list) ? list : []).map(normalizeCustomCultureItem).filter(Boolean);
-      if (preserveExisting) {
-        const seen = new Set(arr.map(item => item.id).filter(Boolean));
-        const existing = Array.isArray(customCultureItems) ? customCultureItems.filter(item => item?.id && !seen.has(item.id)) : [];
-        arr.push(...existing);
-      }
-      arr.sort((a, b) => (Number(b.createdAt) || Number(b.updatedAt) || 0) - (Number(a.createdAt) || Number(a.updatedAt) || 0));
-      setCustomCultureItems(arr);
+      setCustomCultureItems(prev => {
+        let merged = arr;
+        if (preserveExisting) {
+          const seen = new Set(arr.map(item => item.id).filter(Boolean));
+          const existing = Array.isArray(prev) ? prev.filter(item => item?.id && !seen.has(item.id)) : [];
+          merged = [...arr, ...existing];
+        }
+        merged.sort((a, b) => (Number(b.createdAt) || Number(b.updatedAt) || 0) - (Number(a.createdAt) || Number(a.updatedAt) || 0));
+        return merged;
+      });
     };
     if (!firebaseDb) {
       fetchCustomCultureItemsRest(activeCalId).then(list => applyList(list)).catch(err => {

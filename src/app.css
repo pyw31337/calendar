@@ -3829,9 +3829,10 @@ select.form-select {
 }
 .region-filter-save-btn:disabled { opacity: 0.4; cursor: default; }
 
-/* Poster cards are <button>s with % padding aspect-ratio; never apply touch min-heights */
+/* Poster cards inside culture grid */
 .culture-items-grid > button {
-  min-height: 0;
+  min-height: auto;
+  height: 100%;
 }
 
 /* 문화공연 / 지역축제 포스터 그리드.
@@ -3839,7 +3840,7 @@ select.form-select {
    is-cols-1: 모바일 1단 / 640px+ 2단 / 1024px+ 3단 (single-column denser on wide screens). */
 .culture-items-grid,
 .culture-items-grid.is-cols-2 {
-  display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;
+  display: grid; grid-template-columns: repeat(2, 1fr); grid-auto-rows: max-content; gap: 12px;
 }
 @media (min-width: 640px) and (max-width: 1023px) {
   .culture-items-grid,
@@ -3850,7 +3851,7 @@ select.form-select {
   .culture-items-grid.is-cols-2 { grid-template-columns: repeat(6, 1fr); }
 }
 .culture-items-grid.is-cols-1 {
-  display: grid; grid-template-columns: 1fr; gap: 12px;
+  display: grid; grid-template-columns: 1fr; grid-auto-rows: max-content; gap: 12px;
 }
 @media (min-width: 640px) and (max-width: 1023px) {
   .culture-items-grid.is-cols-1 { grid-template-columns: repeat(2, 1fr); }

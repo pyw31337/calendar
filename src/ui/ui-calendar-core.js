@@ -2927,6 +2927,7 @@ export function GlobalSearchModal({
       setFullHistory(index || { chatMessages: [], memos: [], customCultureItems: [] });
     }).catch(err => {
       console.warn('Full-history search fetch failed, falling back to already-loaded data:', err);
+      setFullHistory({ chatMessages: [], memos: [], customCultureItems: [] });
     }).finally(() => {
       setIsLoadingFullHistory(false);
     });
