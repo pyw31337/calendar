@@ -2741,19 +2741,19 @@ export function ContentView({
   // "Maximum update depth exceeded" and continuous CPU/battery drain with no other visible symptom,
   // which is exactly why it went unnoticed).
   const performanceExtraItems = React.useMemo(
-    () => [...selfAuthoredCultureItems.filter(i => i.kind === 'performance'), ...(customCultureItems || []).filter(i => i && i.kind === 'performance')],
+    () => [...selfAuthoredCultureItems.filter(i => getCultureItemKind(i) === 'performance'), ...(customCultureItems || []).filter(i => getCultureItemKind(i) === 'performance')],
     [selfAuthoredCultureItems, customCultureItems]
   );
   const festivalExtraItems = React.useMemo(
-    () => [...selfAuthoredCultureItems.filter(i => i.kind === 'festival'), ...(customCultureItems || []).filter(i => i && i.kind === 'festival')],
+    () => [...selfAuthoredCultureItems.filter(i => getCultureItemKind(i) === 'festival'), ...(customCultureItems || []).filter(i => getCultureItemKind(i) === 'festival')],
     [selfAuthoredCultureItems, customCultureItems]
   );
   const sportsExtraItems = React.useMemo(
-    () => [...selfAuthoredCultureItems.filter(i => i.kind === 'sports'), ...(customCultureItems || []).filter(i => i && i.kind === 'sports')],
+    () => [...selfAuthoredCultureItems.filter(i => getCultureItemKind(i) === 'sports'), ...(customCultureItems || []).filter(i => getCultureItemKind(i) === 'sports')],
     [selfAuthoredCultureItems, customCultureItems]
   );
   const movieExtraItems = React.useMemo(
-    () => [...selfAuthoredCultureItems.filter(i => i.kind === 'movie'), ...(customCultureItems || []).filter(i => i && i.kind === 'movie')],
+    () => [...selfAuthoredCultureItems.filter(i => getCultureItemKind(i) === 'movie'), ...(customCultureItems || []).filter(i => getCultureItemKind(i) === 'movie')],
     [selfAuthoredCultureItems, customCultureItems]
   );
 
@@ -3336,6 +3336,16 @@ function formatCultureDateLabel(startDate, endDate) {
   const b = fmt(endDate || startDate);
   if (!a) return '';
   return a === b ? a : `${a} ~ ${b}`;
+}
+
+// Older individually registered cards were written with `category` (or no kind at all)
+// before customCultureItems gained a strict kind field. Normalize at the rendering boundary too,
+// so one legacy document can never be silently filtered out of its festival/performance tab.
+function getCultureItemKind(item) {
+  if (!item) return '';
+  if (item.kind) return item.kind;
+  const byCategory = { festival: 'festival', event: 'performance', performance: 'performance', sports: 'sports', movie: 'movie' };
+  return byCategory[item.category] || byCategory[item.anniversaryCategory] || (item.genre === 'movie' ? 'movie' : '');
 }
 
 function todayIsoLocal() {

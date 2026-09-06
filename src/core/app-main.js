@@ -2918,14 +2918,23 @@ function CalendarApp() {
   React.useEffect(() => {
     if (!activeCalId || (activeView !== 'history' && activeView !== 'content')) return;
     let isMounted = true;
+    const kindByCategory = { festival: 'festival', event: 'performance', performance: 'performance', sports: 'sports', movie: 'movie' };
+    const normalizeCustomCultureItem = item => {
+      if (!item || typeof item !== 'object') return null;
+      const inferredKind = item.kind || kindByCategory[item.category] || kindByCategory[item.anniversaryCategory]
+        || (item.genre === 'movie' ? 'movie' : '');
+      return { ...item, kind: inferredKind || 'performance' };
+    };
     const applyList = (list) => {
       if (!isMounted) return;
-      const arr = Array.isArray(list) ? list.slice() : [];
+      const arr = (Array.isArray(list) ? list : []).map(normalizeCustomCultureItem).filter(Boolean);
       arr.sort((a, b) => (Number(b.createdAt) || Number(b.updatedAt) || 0) - (Number(a.createdAt) || Number(a.updatedAt) || 0));
       setCustomCultureItems(arr);
     };
     if (!firebaseDb) {
-      fetchCustomCultureItemsRest(activeCalId).then(list => applyList(list)).catch(() => applyList([]));
+      fetchCustomCultureItemsRest(activeCalId).then(list => applyList(list)).catch(err => {
+        console.warn('Custom culture REST fallback failed; retaining existing items:', err);
+      });
       return () => { isMounted = false; };
     }
     const unsub = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('customCultureItems')
@@ -2935,7 +2944,11 @@ function CalendarApp() {
         applyList(list);
       }, err => {
         console.warn('Firestore customCultureItems subscription error:', err);
-        fetchCustomCultureItemsRest(activeCalId).then(list => applyList(list)).catch(() => applyList([]));
+        // A transient listener failure must never replace a previously received authoritative
+        // collection with []. Keep the current list unless REST returns actual documents.
+        fetchCustomCultureItemsRest(activeCalId).then(list => {
+          if (Array.isArray(list) && list.length > 0) applyList(list);
+        }).catch(fallbackErr => console.warn('Custom culture REST fallback failed; retaining existing items:', fallbackErr));
       });
     return () => { isMounted = false; unsub(); };
   }, [activeCalId, activeView, firebaseDb, firebaseConnectionVersion]);
