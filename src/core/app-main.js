@@ -9370,6 +9370,7 @@ async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_T
 // GPS is reverse-geocoded on a best-effort basis and cached by rounded coordinates so a batch
 // from one place does not issue one request per image.
 const photoLocationCache = new Map();
+let photoLocationRequestAt = 0;
 async function extractPhotoMetadata(file) {
   if (!file || typeof exifr?.parse !== 'function') return null;
   const exif = await exifr.parse(file, { pick: ['DateTimeOriginal', 'CreateDate', 'Make', 'Model', 'latitude', 'longitude'] });
@@ -9387,6 +9388,9 @@ async function extractPhotoMetadata(file) {
     if (photoLocationCache.has(key)) result.location = photoLocationCache.get(key);
     else if (lat >= 33 && lat <= 39 && lon >= 124 && lon <= 132) {
       try {
+        const waitMs = Math.max(0, 1100 - (Date.now() - photoLocationRequestAt));
+        if (waitMs) await new Promise(resolve => setTimeout(resolve, waitMs));
+        photoLocationRequestAt = Date.now();
         const response = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=jsonv2&accept-language=ko&zoom=10`, { headers: { 'Accept': 'application/json' } });
         if (response.ok) {
           const address = await response.json();
