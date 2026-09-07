@@ -1415,24 +1415,47 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   // when the current key comes up empty, so its existing comments still surface here.
   const legacyPhotoCommentKey = currentMeta ? (getLegacyMeetingMediaKey(currentMeta, { meetingDate: currentMeta.meetingDate }) || '') : '';
   const [photoCommentsByKey, setPhotoCommentsByKey] = React.useState({});
+  const [photoCommentsStatusByKey, setPhotoCommentsStatusByKey] = React.useState({});
   const photoCommentsFetchedRef = React.useRef(new Set());
   React.useEffect(() => {
-    if (!photoCommentKey || typeof onFetchPhotoComments !== 'function') return;
+    if (!photoCommentKey) return;
+    if (typeof onFetchPhotoComments !== 'function') {
+      setPhotoCommentsStatusByKey(prev => ({ ...prev, [photoCommentKey]: 'ready' }));
+      return;
+    }
     if (photoCommentsFetchedRef.current.has(photoCommentKey)) return;
     photoCommentsFetchedRef.current.add(photoCommentKey);
+    setPhotoCommentsStatusByKey(prev => ({ ...prev, [photoCommentKey]: 'loading' }));
     let cancelled = false;
-    Promise.resolve(onFetchPhotoComments(photoCommentKey)).then(async list => {
-      let resolved = Array.isArray(list) ? list : [];
+    Promise.resolve(onFetchPhotoComments(photoCommentKey)).then(async result => {
+      const resultObject = result && typeof result === 'object' && !Array.isArray(result);
+      const success = resultObject ? result.success === true : Array.isArray(result);
+      if (!success) {
+        if (!cancelled) setPhotoCommentsStatusByKey(prev => ({ ...prev, [photoCommentKey]: 'error' }));
+        return;
+      }
+      let resolved = resultObject ? result.comments : result;
       if (resolved.length === 0 && legacyPhotoCommentKey && legacyPhotoCommentKey !== photoCommentKey) {
-        const legacyList = await Promise.resolve(onFetchPhotoComments(legacyPhotoCommentKey));
+        const legacyResult = await Promise.resolve(onFetchPhotoComments(legacyPhotoCommentKey));
+        const legacyList = legacyResult && typeof legacyResult === 'object' && !Array.isArray(legacyResult)
+          ? (legacyResult.success === true ? legacyResult.comments : []) : legacyResult;
         if (Array.isArray(legacyList) && legacyList.length > 0) resolved = legacyList;
       }
-      if (!cancelled) setPhotoCommentsByKey(prev => ({ ...prev, [photoCommentKey]: resolved }));
+      if (!cancelled && Array.isArray(resolved)) {
+        setPhotoCommentsByKey(prev => ({ ...prev, [photoCommentKey]: resolved }));
+        setPhotoCommentsStatusByKey(prev => ({ ...prev, [photoCommentKey]: 'ready' }));
+      }
+    }).catch(() => {
+      if (!cancelled) setPhotoCommentsStatusByKey(prev => ({ ...prev, [photoCommentKey]: 'error' }));
     });
     return () => { cancelled = true; };
   }, [photoCommentKey, legacyPhotoCommentKey, onFetchPhotoComments]);
   const handlePhotoCommentsChange = async nextComments => {
     if (!photoCommentKey || typeof onSavePhotoComments !== 'function') return false;
+    if (photoCommentsStatusByKey[photoCommentKey] !== 'ready') {
+      if (typeof showToast === 'function') showToast('댓글을 불러오는 중이거나 조회에 실패했습니다. 다시 열어주세요.', 'error');
+      return false;
+    }
     setPhotoCommentsByKey(prev => ({ ...prev, [photoCommentKey]: nextComments }));
     return Promise.resolve(onSavePhotoComments(photoCommentKey, nextComments));
   };
@@ -1442,6 +1465,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   // 어둡게 강제한다(라이트박스 전용으로 완전히 분리된 컴포넌트라 memo 쪽 라이트 테마와 무관).
   const renderCommentThread = () => {
     if (zoomLevel !== ZOOM_DEFAULT) return null;
+    const commentStatus = photoCommentsStatusByKey[photoCommentKey];
     return /*#__PURE__*/React.createElement("div", {
       key: `comments-${photoCommentKey}`,
       className: "lightbox-comment-thread lightbox-comment-thread-dark",
@@ -1451,14 +1475,16 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
         backgroundColor: 'rgba(15, 23, 42, 0.72)', border: '1px solid rgba(255,255,255,0.12)',
         borderRadius: 'var(--radius-md)', boxSizing: 'border-box'
       }
-    }, /*#__PURE__*/React.createElement(CommentThread, {
+    }, commentStatus === 'ready' ? /*#__PURE__*/React.createElement(CommentThread, {
       key: `comment-thread-${photoCommentKey}`,
       comments: photoCommentsByKey[photoCommentKey] || [],
       onCommentsChange: handlePhotoCommentsChange,
       calendar: calendar,
       showToast: showToast,
       onRequestConfirm: onRequestConfirm
-    }));
+    }) : /*#__PURE__*/React.createElement("div", {
+      style: { minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8', fontSize: 'var(--font-size-sm)' }
+    }, commentStatus === 'error' ? '댓글을 불러오지 못했습니다. 라이트박스를 다시 열어주세요.' : '댓글을 불러오는 중입니다...'));
   };
   // 'meeting' entries never carry a messageId (they're archival copies stored on the
   // confirmedMeeting record, not a chat message -- see linkTaggedImageToMeetingDates in

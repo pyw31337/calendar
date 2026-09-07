@@ -6036,15 +6036,15 @@ function CalendarApp() {
     try {
       if (firebaseDb) {
         const snap = await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('photoComments').doc(docId).get();
-        return snap?.exists && Array.isArray(snap.data()?.comments) ? snap.data().comments : [];
+        return { success: true, comments: snap?.exists && Array.isArray(snap.data()?.comments) ? snap.data().comments : [] };
       }
       const res = await fetch(`https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${activeCalId}/photoComments/${docId}`);
-      if (!res.ok) return [];
+      if (!res.ok) return { success: false, comments: [] };
       const data = firestoreDocumentToJs(await res.json());
-      return Array.isArray(data?.comments) ? data.comments : [];
+      return { success: true, comments: Array.isArray(data?.comments) ? data.comments : [] };
     } catch (readErr) {
       console.warn('handleFetchPhotoComments failed:', readErr);
-      return [];
+      return { success: false, comments: [] };
     }
   };
   const handleSavePhotoComments = async (photoKey, nextComments) => {
