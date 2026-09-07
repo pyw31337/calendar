@@ -6062,8 +6062,15 @@ function CalendarApp() {
   const handleSavePhotoComments = async (photoKey, nextComments) => {
     const docId = sanitizePhotoCommentDocId(photoKey);
     if (!docId || !activeCalId) return false;
+    // An empty thread has no durable state. Delete the document instead of leaving an empty
+    // placeholder behind; this keeps the comment index authoritative and makes a delete on a
+    // previously contaminated/shared key actually remove the visible thread and badge.
+    if (!Array.isArray(nextComments) || nextComments.length === 0) {
+      const deleted = await writeCollectionDocumentWithFallback('photoComments', activeCalId, docId, null, 'delete', '사진 댓글 삭제');
+      return !!deleted?.success;
+    }
     const saved = await writeCollectionDocumentWithFallback('photoComments', activeCalId, docId, {
-      comments: Array.isArray(nextComments) ? nextComments : [],
+      comments: nextComments,
       updatedAt: Date.now()
     }, 'set', '사진 댓글 저장');
     return !!saved?.success;
