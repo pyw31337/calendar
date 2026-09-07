@@ -1177,6 +1177,11 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = fals
 
   const preview = useLinkPreview(url, cachedData);
   const hasPreviewData = !!(preview && preview.status === 'success' && preview.data);
+  // Keep every hook before the conditional empty-state return below. Link previews resolve
+  // asynchronously: the first render often has no data (and returns null), while a later render
+  // has data. Calling this hook only after the return changes the hook count and triggers React
+  // invariant #310 ("Rendered more hooks than during the previous render") in chat bubbles.
+  const [imgFailed, setImgFailed] = React.useState(false);
 
   // Notify parents (e.g. DirectChatMediaText) when preview settles so they can hide the raw URL
   // from bubble text once a card is successfully showing -- while loading/failed the URL stays
@@ -1202,8 +1207,6 @@ export function LinkPreviewCard({ url, fallbackTitle, cachedData, stretch = fals
   try {
     host = new URL(url).hostname.replace(/^www\./i, '');
   } catch (_) {}
-
-  const [imgFailed, setImgFailed] = React.useState(false);
 
   // Cached OpenGraph data is user/content supplied and older records may contain a malformed
   // image value. Do not let it become an invalid <img src>, which produces noisy browser errors
