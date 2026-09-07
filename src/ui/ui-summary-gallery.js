@@ -550,6 +550,11 @@ function getMessageDirectMediaEntry(...args) {
   const f = __gatherUiDeps().getMessageDirectMediaEntry || GATHER_APP_UTILS.getMessageDirectMediaEntry;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function normalizePhotoUrl(value) {
+  const candidate = typeof value === 'string' ? value.trim() : '';
+  const validator = GATHER_APP_UTILS.isRenderableImageUrl;
+  return typeof validator === 'function' && validator(candidate) ? candidate : '';
+}
 
 // Combines chat message images, memo images, and confirmed-meeting photos into one flat, deduped,
 // newest-first list -- shared by PhotoGallery (갤러리 페이지) and HistoryView's 인물/추억 tabs so
@@ -582,8 +587,8 @@ function buildCombinedPhotoEntries(chatMessages, memos, calendar, anniversaries 
     const photos = Array.isArray(meeting?.photos) ? meeting.photos : [];
     photos.forEach((photo, index) => {
       const resolved = resolveMeetingPhotoDisplay ? resolveMeetingPhotoDisplay(photo, chatMessages) : null;
-      const full = String(resolved?.imageUrl || photo?.imageUrl || photo?.full || '');
-      const thumb = String(resolved?.thumbUrl || photo?.thumbUrl || photo?.thumb || full);
+      const full = normalizePhotoUrl(resolved?.imageUrl || photo?.imageUrl || photo?.full || '');
+      const thumb = normalizePhotoUrl(resolved?.thumbUrl || photo?.thumbUrl || photo?.thumb || full);
       if (!full && !thumb) return;
       const mediaKey = resolved?.mediaKey
         || photo?.mediaKey
@@ -617,8 +622,8 @@ function buildCombinedPhotoEntries(chatMessages, memos, calendar, anniversaries 
     const photos = Array.isArray(anniversary?.photos) ? anniversary.photos : [];
     const anniversaryDate = String(anniversary?.date || anniversary?.startDate || anniversary?.endDate || '').slice(0, 10);
     photos.forEach((photo, index) => {
-      const full = String(photo?.imageUrl || photo?.url || photo?.full || photo?.src || '');
-      const thumb = String(photo?.thumbUrl || photo?.thumbnailUrl || photo?.thumb || full);
+      const full = normalizePhotoUrl(photo?.imageUrl || photo?.url || photo?.full || photo?.src || '');
+      const thumb = normalizePhotoUrl(photo?.thumbUrl || photo?.thumbnailUrl || photo?.thumb || full);
       if (!full && !thumb) return;
       const mediaKey = photo?.mediaKey || `anniversary:${anniversary?.id || anniversaryDate || 'date'}:${photo?.id || index}`;
       const refKey = photo?.refKey || mediaKey;
