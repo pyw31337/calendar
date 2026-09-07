@@ -1000,7 +1000,14 @@ export function ChatGalleryModal({
   const BackArrowIcon = __deps.BackArrowIcon;
   const PlusIcon = __comp.PlusIcon || __deps.PlusIcon;
   const PencilIcon = __comp.PencilIcon || __deps.PencilIcon;
-  const PhotoCommentCountBadge = __comp.PhotoCommentCountBadge || __deps.PhotoCommentCountBadge;
+  const PhotoCommentCountBadge = __comp.PhotoCommentCountBadge || __deps.PhotoCommentCountBadge || function InlinePhotoCommentCountBadge({ count = 0 } = {}) {
+    if (!count) return null;
+    return React.createElement('span', {
+      className: 'photo-comment-count-badge',
+      'aria-label': `댓글 ${count}개`,
+      style: { position: 'absolute', top: '2px', right: '2px', zIndex: 2, minWidth: '16px', height: '16px', padding: '0 4px', borderRadius: '999px', backgroundColor: '#EF4444', color: '#fff', fontSize: '10px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.35)', pointerEvents: 'none', lineHeight: 1 }
+    }, count > 99 ? '99+' : String(count));
+  };
   const getMediaIdentityKeys = __deps.getMediaIdentityKeys;
   const getLegacyMeetingMediaKey = __deps.getLegacyMeetingMediaKey;
   const SharedSideMenuSettings = __comp.SharedSideMenuSettings || __deps.SharedSideMenuSettings;
