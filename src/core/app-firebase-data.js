@@ -1110,8 +1110,8 @@ function attemptFirebaseInit() {
       // the SDK's own baked-in default of experimentalAutoDetectLongPolling:true, so the two
       // always collided. Caught by the try/catch below, so this silently never took effect on ANY
       // browser (mobile just happened to work fine on Firestore's untouched default transport;
-      // PC Whale didn't). Passing both flags explicitly, without merge, is what actually applies
-      // forced long-polling instead of just failing quietly.
+      // PC Whale didn't). Passing both flags explicitly while merging the settings applies
+      // forced long-polling without inheriting auto-detection or replacing the default host.
       if (!firestoreSettingsApplied) {
         // Safari/WebKit intermittently rejects the forced WebChannel XHR as an access-control
         // failure on image-heavy pages. Let its SDK select the transport automatically; keep the
@@ -1120,6 +1120,12 @@ function attemptFirebaseInit() {
         const isAppleWebKit = /AppleWebKit/i.test(userAgent)
           && !/(Chrome|Chromium|Edg|OPR|Whale|SamsungBrowser)/i.test(userAgent);
         firebase.firestore().settings({
+          // Preserve the SDK's existing/default host (and any future settings) instead of
+          // replacing the entire settings object. Without merge:true the compat SDK warns
+          // that this call is overriding the original host because `host` is omitted here.
+          // Both transport flags stay explicit so the SDK default auto-detection cannot be
+          // combined with forced long-polling on Chromium/Firefox.
+          merge: true,
           experimentalForceLongPolling: !isAppleWebKit,
           experimentalAutoDetectLongPolling: isAppleWebKit
         });

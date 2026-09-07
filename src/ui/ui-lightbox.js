@@ -1425,10 +1425,14 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   // 따로 캐싱해서, 이미 한 번 불러온 사진은 다시 불러오지 않는다. 초기화면에서부터 기존 댓글이
   // 바로 보여야 하므로(showInfo 토글과 무관하게) 현재 사진이 바뀔 때마다 불러온다.
   const photoCommentKey = currentIdentity.mediaKey || currentIdentity.refKey || '';
+  const legacyPhotoCommentKeys = Array.from(new Set([
+    ...(Array.isArray(currentIdentity.legacyKeys) ? currentIdentity.legacyKeys : []),
+    currentMeta ? (getLegacyMeetingMediaKey(currentMeta, { meetingDate: currentMeta.meetingDate }) || '') : ''
+  ].filter(key => key && key !== photoCommentKey)));
+  const legacyPhotoCommentKeysToken = legacyPhotoCommentKeys.join('|');
   // A meeting photo whose comment thread predates photoId/sourceImageIndex being part of the
   // key (see getLegacyMeetingMediaKey) is filed under this coarser key instead -- checked only
   // when the current key comes up empty, so its existing comments still surface here.
-  const legacyPhotoCommentKey = currentMeta ? (getLegacyMeetingMediaKey(currentMeta, { meetingDate: currentMeta.meetingDate }) || '') : '';
   const [photoCommentsByKey, setPhotoCommentsByKey] = React.useState({});
   const [photoCommentsStatusByKey, setPhotoCommentsStatusByKey] = React.useState({});
   const photoCommentsFetchedRef = React.useRef(new Set());
@@ -1457,10 +1461,15 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
         return;
       }
       let resolved = normalized.comments;
-      if (resolved.length === 0 && legacyPhotoCommentKey && legacyPhotoCommentKey !== photoCommentKey) {
-        const legacyResult = await Promise.resolve(onFetchPhotoComments(legacyPhotoCommentKey));
-        const legacyNormalized = normalizeCommentsResult(legacyResult);
-        if (legacyNormalized.success && legacyNormalized.comments.length > 0) resolved = legacyNormalized.comments;
+      if (resolved.length === 0) {
+        for (const legacyKey of legacyPhotoCommentKeys) {
+          const legacyResult = await Promise.resolve(onFetchPhotoComments(legacyKey));
+          const legacyNormalized = normalizeCommentsResult(legacyResult);
+          if (legacyNormalized.success && legacyNormalized.comments.length > 0) {
+            resolved = legacyNormalized.comments;
+            break;
+          }
+        }
       }
       if (!cancelled && Array.isArray(resolved)) {
         setPhotoCommentsByKey(prev => ({ ...prev, [photoCommentKey]: resolved }));
@@ -1470,7 +1479,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
       if (!cancelled) setPhotoCommentsStatusByKey(prev => ({ ...prev, [photoCommentKey]: 'error' }));
     });
     return () => { cancelled = true; };
-  }, [photoCommentKey, legacyPhotoCommentKey, onFetchPhotoComments]);
+  }, [photoCommentKey, legacyPhotoCommentKeysToken, onFetchPhotoComments]);
   const handlePhotoCommentsChange = async nextComments => {
     if (!photoCommentKey || typeof onSavePhotoComments !== 'function') return false;
     if (photoCommentsStatusByKey[photoCommentKey] !== 'ready') {

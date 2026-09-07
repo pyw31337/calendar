@@ -13,6 +13,10 @@ function getPhotoCommentIdentity(...args) {
   const f = __gatherUiDeps().getPhotoCommentIdentity || GATHER_APP_UTILS.getPhotoCommentIdentity;
   return typeof f === 'function' ? f(...args) : {};
 }
+function getPhotoCommentCount(...args) {
+  const f = __gatherUiDeps().getPhotoCommentCount || GATHER_APP_UTILS.getPhotoCommentCount;
+  return typeof f === 'function' ? f(...args) : 0;
+}
 function getActiveAvailabilities(calendar) {
   const f = __gatherUiDeps().getActiveAvailabilities || GATHER_APP_UTILS.getActiveAvailabilities;
   return typeof f === 'function' ? f(calendar) : [];
@@ -743,7 +747,10 @@ function getDirectMediaTagsForUrl(...args) {
 // already does via getMessageImageEntries.
 function getAllDirectMediaImageEntries(msgLike) {
   if (!msgLike?.text) return [];
-  const sourceHint = msgLike?.uploadSource === 'memo' ? 'memo' : 'chat';
+  const declaredSource = String(msgLike?.uploadSource || '').trim().toLowerCase();
+  const sourceHint = ['chat', 'gallery', 'meeting', 'memo'].includes(declaredSource)
+    ? declaredSource
+    : 'chat';
   return extractAllUrlInfosLoose(msgLike.text)
     .filter(info => getDirectChatMediaInfo(info.url)?.type === 'image')
     .map((info, idx) => ({
@@ -1219,7 +1226,7 @@ export function ChatGalleryModal({
           ...entry,
           text: msg.text || '',
           participantId: msg.participantId || '',
-          source: 'chat'
+          source: entry.source || 'chat'
         });
       });
     });
@@ -2012,14 +2019,10 @@ export function ChatGalleryModal({
     // comment document key even after the meeting photo receives its own photoId.
     // Include that key as a read fallback so the badge follows the same thread as
     // the lightbox instead of silently showing zero.
-    const chatMediaKey = photo.sourceMessageId && Number.isInteger(photo.sourceImageIndex)
-      ? `chat:${photo.sourceMessageId}:${photo.sourceImageIndex}`
-      : (photo.messageId && Number.isInteger(photo.imageIndex) ? `chat:${photo.messageId}:${photo.imageIndex}` : '');
-    const commentCount = photoCommentCounts[commentIdentity.mediaKey]
-      || photoCommentCounts[commentIdentity.refKey]
-      || (chatMediaKey ? photoCommentCounts[chatMediaKey] : 0)
-      || (legacyMeetingKey ? photoCommentCounts[legacyMeetingKey] : 0)
-      || 0;
+    const commentCount = getPhotoCommentCount({
+      ...commentIdentity,
+      legacyKeys: [...(commentIdentity.legacyKeys || []), legacyMeetingKey].filter(Boolean)
+    }, photoCommentCounts);
     const thumb = /*#__PURE__*/React.createElement(MediaThumb, {
       key: isBulkShareMode ? undefined : itemKey,
       "data-photo-url": photo.full || photo.thumb,

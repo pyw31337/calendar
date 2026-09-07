@@ -14,6 +14,10 @@ function getPhotoCommentIdentity(...args) {
   const f = __gatherUiDeps().getPhotoCommentIdentity || GATHER_APP_UTILS.getPhotoCommentIdentity;
   return typeof f === 'function' ? f(...args) : {};
 }
+function getPhotoCommentCount(...args) {
+  const f = __gatherUiDeps().getPhotoCommentCount || GATHER_APP_UTILS.getPhotoCommentCount;
+  return typeof f === 'function' ? f(...args) : 0;
+}
 function getActiveAvailabilities(calendar) {
   const f = __gatherUiDeps().getActiveAvailabilities || GATHER_APP_UTILS.getActiveAvailabilities;
   return typeof f === 'function' ? f(calendar) : [];
@@ -571,7 +575,7 @@ function buildCombinedPhotoEntries(chatMessages, memos, calendar, anniversaries 
     if (!msg || isTombstone(msg)) return [];
     const directEntry = getMessageDirectMediaEntry(msg);
     const entries = directEntry ? [...getMessageImageEntries(msg), directEntry] : getMessageImageEntries(msg);
-    return entries.map((entry) => ({ ...entry, source: 'chat', timestamp: msg.timestamp }));
+    return entries.map((entry) => ({ ...entry, source: entry.source || 'chat', timestamp: msg.timestamp }));
   });
   const memoEntries = (memos || []).flatMap(memo => {
     if (!memo || isTombstone(memo)) return [];
@@ -1306,12 +1310,8 @@ export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalG
           }),
           PhotoCommentCountBadge && /*#__PURE__*/React.createElement(PhotoCommentCountBadge, {
             count: (() => {
-              const identity = getPhotoCommentIdentity(entry, displayedEntries, { source: entry.source, meetingDate: entry.meetingDate }) || {};
-              return photoCommentCounts[identity.mediaKey || identity.refKey]
-                || (entry.sourceMessageId && Number.isInteger(entry.sourceImageIndex)
-                  ? photoCommentCounts[`chat:${entry.sourceMessageId}:${entry.sourceImageIndex}`]
-                  : 0)
-                || 0;
+              const identity = getPhotoCommentIdentity(entry, visibleEntries, { source: entry.source, meetingDate: entry.meetingDate }) || {};
+              return getPhotoCommentCount(identity, photoCommentCounts);
             })()
           })
         ))

@@ -33,9 +33,49 @@ globalThis.window = {
   GATHER_APP_CHAT_DATA: {},
   location: { pathname: '/' }
 };
-const { unionConfirmedMeetings, unionPlaces } = await import('../src/core/app-domain-helpers.js');
+const {
+  unionConfirmedMeetings,
+  unionPlaces,
+  getPhotoCommentIdentity,
+  getPhotoAssetCommentKey,
+  getPhotoCommentCount,
+  getMessageImageEntries
+} = await import('../src/core/app-domain-helpers.js');
 const { mergeCalendarSettingsDelta, mergeCalendarAvailabilityDelta } = await import('../src/core/app-firebase-data.js');
 const writeQueueSource = fs.readFileSync(new URL('../src/core/app-write-queue.js', import.meta.url), 'utf8');
+
+// Photo comments are keyed by the image asset, never by a mutable array slot. Six distinct
+// assets carrying the same corrupt legacy message/index metadata must still produce six isolated
+// threads, while the same asset surfaced from two features intentionally resolves to one key.
+{
+  const duplicatedLegacyMeta = Array.from({ length: 6 }, (_, index) => ({
+    source: 'chat',
+    messageId: 'gallery_batch_1',
+    imageIndex: 0,
+    full: `https://firebasestorage.googleapis.com/v0/b/example/o/photo_${index}.jpg?alt=media&token=token_${index}`
+  }));
+  const identities = duplicatedLegacyMeta.map(photo => getPhotoCommentIdentity(photo, duplicatedLegacyMeta));
+  assert(new Set(identities.map(identity => identity.mediaKey)).size === 6, 'distinct images with duplicated legacy metadata shared a photo comment key');
+  assert(identities.every(identity => identity.legacyKeys.length === 0), 'ambiguous legacy photo comment keys must never be used as read fallbacks');
+
+  const stableBeforeDelete = getPhotoAssetCommentKey({ full: 'https://example.com/gallery/photo-a.jpg', messageId: 'm1', imageIndex: 5 });
+  const stableAfterDelete = getPhotoAssetCommentKey({ full: 'https://example.com/gallery/photo-a.jpg', messageId: 'm1', imageIndex: 4 });
+  assert(stableBeforeDelete === stableAfterDelete, 'photo comment key changed when a preceding array item was deleted');
+
+  const tokenA = getPhotoAssetCommentKey({ full: 'https://firebasestorage.googleapis.com/v0/b/example/o/photo.jpg?alt=media&token=a' });
+  const tokenB = getPhotoAssetCommentKey({ full: 'https://firebasestorage.googleapis.com/v0/b/example/o/photo.jpg?alt=media&token=b' });
+  assert(tokenA === tokenB, 'Firebase download-token rotation changed a photo comment key');
+
+  const sharedAssetA = getPhotoCommentIdentity({ source: 'chat', messageId: 'm1', imageIndex: 0, full: 'https://example.com/shared.jpg' });
+  const sharedAssetB = getPhotoCommentIdentity({ source: 'meeting', photoId: 'p9', full: 'https://example.com/shared.jpg' });
+  assert(sharedAssetA.mediaKey === sharedAssetB.mediaKey, 'the same rendered asset did not keep one comment thread across views');
+  assert(getPhotoCommentCount({ mediaKey: 'asset:new', legacyKeys: ['chat:old:0'] }, { 'chat:old:0': 3 }) === 3, 'unique legacy comment count fallback was lost');
+
+  for (const uploadSource of ['chat', 'gallery', 'meeting', 'memo']) {
+    const [entry] = getMessageImageEntries({ id: `source-${uploadSource}`, uploadSource, imageUrl: `https://example.com/${uploadSource}.jpg` });
+    assert(entry?.source === uploadSource, `${uploadSource} image was incorrectly reclassified as ${entry?.source || 'missing'}`);
+  }
+}
 assert(writeQueueSource.includes('nextAttemptAt: Number(operation.nextAttemptAt) || 0'), 'queued operations must persist retry backoff metadata');
 assert(writeQueueSource.includes("await deferOperation(operation, new Error('대기 저장이 완료되지 않았습니다.'))"), 'false queue handler results must be deferred with backoff');
 const appMainSource = fs.readFileSync(new URL('../src/core/app-main.js', import.meta.url), 'utf8');

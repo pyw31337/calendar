@@ -94,6 +94,10 @@ const rootIndex = readFileSync(join(ROOT, 'index.html'), 'utf8');
 const serviceWorker = readFileSync(join(ROOT, 'sw.js'), 'utf8');
 const copyStatic = readFileSync(join(ROOT, 'scripts/copy-static-to-dist.mjs'), 'utf8');
 
+if (!/firebase\.firestore\(\)\.settings\(\{[\s\S]{0,500}merge:\s*true,[\s\S]{0,500}experimentalForceLongPolling:[\s\S]{0,200}experimentalAutoDetectLongPolling:/.test(firebaseData)) {
+  fail('Firestore transport settings must merge with SDK defaults while explicitly selecting exactly one long-polling mode.');
+}
+
 if (!/function getAdminSelectedCalendarIdFromUrl\(fallback = 'kkot'\)/.test(appMainAndData)) {
   fail('Admin dashboard must read its selected calendar from ?id= so refresh keeps the selected calendar.');
 }

@@ -90,6 +90,9 @@ function isIgnorableConsoleError(text, url = '') {
     'has been rejected because it is in a cross-site context', 'inline-speculation-rules']
     .some(marker => text.includes(marker));
 }
+function isActionableConsoleWarning(text) {
+  return text.includes('You are overriding the original host');
+}
 function collectSameOriginAsset404(response, baseUrl, bucket) {
   if (response.status() !== 404) return;
   const resourceType = response.request().resourceType();
@@ -143,10 +146,19 @@ async function checkPage(browser, baseUrl, viewport, calId, view) {
   });
   const page = await context.newPage();
   const consoleErrors = [];
+  const consoleWarnings = [];
   const pageErrors = [];
   const failedRequests = [];
   const asset404s = [];
-  page.on('console', msg => { if (msg.type() === 'error') { const loc = msg.location(); if (!isIgnorableConsoleError(msg.text(), loc?.url || '')) consoleErrors.push(`${msg.text()}${loc?.url ? ` @${loc.url}:${loc.lineNumber || 0}` : ''}`); } });
+  page.on('console', msg => {
+    const loc = msg.location();
+    if (msg.type() === 'error' && !isIgnorableConsoleError(msg.text(), loc?.url || '')) {
+      consoleErrors.push(`${msg.text()}${loc?.url ? ` @${loc.url}:${loc.lineNumber || 0}` : ''}`);
+    }
+    if (msg.type() === 'warning' && isActionableConsoleWarning(msg.text())) {
+      consoleWarnings.push(`${msg.text()}${loc?.url ? ` @${loc.url}:${loc.lineNumber || 0}` : ''}`);
+    }
+  });
   page.on('pageerror', err => {
     if (BROWSER_NAME === 'webkit' && /firestore\.googleapis\.com\/(?:google\.firestore\.v1\.Firestore\/(?:Listen|Write)\/channel|google\.firestore\.v1\.Firestore\/channel).*due to access control checks/i.test(err.message)) {
       knownExternalWarningCount += 1;
@@ -181,10 +193,11 @@ async function checkPage(browser, baseUrl, viewport, calId, view) {
   if (overflow > 2) fail(label, `가로 스크롤 발생 (화면 밖으로 ${overflow}px 벗어남)`);
 
   if (consoleErrors.length) fail(label, `콘솔 에러 ${consoleErrors.length}건: ${consoleErrors.slice(0, 2).join(' | ')}${failedRequests.length ? `; 요청 실패: ${failedRequests.filter(item => item.includes('ERR_INVALID_URL')).slice(0, 2).join(' | ') || failedRequests.slice(0, 2).join(' | ')}` : ''}`);
+  if (consoleWarnings.length) fail(label, `조치 필요 콘솔 경고 ${consoleWarnings.length}건: ${consoleWarnings.slice(0, 2).join(' | ')}`);
   if (pageErrors.length) fail(label, `처리되지 않은 JS 예외 ${pageErrors.length}건: ${pageErrors.slice(0, 2).join(' | ')}`);
   if (asset404s.length) fail(label, `동일 출처 리소스 404 ${asset404s.length}건: ${asset404s.slice(0, 2).join(' | ')}`);
 
-  if (!consoleErrors.length && !pageErrors.length && !asset404s.length && overflow <= 2) pass(label);
+  if (!consoleErrors.length && !consoleWarnings.length && !pageErrors.length && !asset404s.length && overflow <= 2) pass(label);
   await context.close();
 }
 
@@ -249,6 +262,37 @@ async function checkLightboxZoomControls(browser, baseUrl) {
     await page.locator('button[title="축소"]').waitFor({ state: 'visible', timeout: 5000 });
     pass(label);
     await page.keyboard.press('Escape');
+  } catch (err) {
+    fail(label, err.message);
+  } finally {
+    await context.close();
+  }
+}
+
+async function checkPhotoCommentIsolation(browser, baseUrl) {
+  const label = '사진별 댓글 키 격리';
+  const context = await browser.newContext(mobileContextOptions());
+  const page = await context.newPage();
+  try {
+    await gotoBootReady(page, `${baseUrl}?id=cw&view=gallery`);
+    const result = await page.evaluate(() => {
+      const getIdentity = window.GATHER_UI_DEPS?.getPhotoCommentIdentity;
+      if (typeof getIdentity !== 'function') return { error: '댓글 식별 헬퍼가 번들에 연결되지 않음' };
+      const photos = Array.from({ length: 6 }, (_, index) => ({
+        source: 'gallery',
+        messageId: 'duplicated-batch-meta',
+        imageIndex: 0,
+        full: `https://firebasestorage.googleapis.com/v0/b/example/o/browser_${index}.jpg?alt=media&token=${index}`
+      }));
+      const identities = photos.map(photo => getIdentity(photo, photos));
+      return {
+        keyCount: new Set(identities.map(identity => identity.mediaKey)).size,
+        legacyFallbackCount: identities.reduce((sum, identity) => sum + (identity.legacyKeys?.length || 0), 0)
+      };
+    });
+    if (result.error) fail(label, result.error);
+    else if (result.keyCount !== 6 || result.legacyFallbackCount !== 0) fail(label, `6개 사진이 ${result.keyCount}개 댓글창으로 식별됨; 모호한 구형 키 ${result.legacyFallbackCount}개`);
+    else pass(label);
   } catch (err) {
     fail(label, err.message);
   } finally {
@@ -495,6 +539,7 @@ async function main() {
     console.log('\n-- 상호작용 스모크 (읽기 전용) --');
     await checkEmojiCategories(browser, baseUrl);
     await checkLightboxZoomControls(browser, baseUrl);
+    await checkPhotoCommentIsolation(browser, baseUrl);
     await checkDeferredManual(browser, baseUrl);
     await checkMemoTagInput(browser, baseUrl);
     await checkSettlementModalEntryPoints(browser, baseUrl);

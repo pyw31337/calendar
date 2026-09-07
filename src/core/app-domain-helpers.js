@@ -2096,7 +2096,10 @@ function getMessageImageEntries(msg) {
   // Prefer multi-image arrays; fall back to legacy singular fields.
   // Do NOT require thumbnails — slimMessageForClient may drop oversized base64 thumbs
   // while keeping https Storage imageUrls. Requiring thumbs looked like data loss.
-  const sourceHint = msg?.uploadSource === 'memo' ? 'memo' : 'chat';
+  const declaredSource = String(msg?.uploadSource || '').trim().toLowerCase();
+  const sourceHint = ['chat', 'gallery', 'meeting', 'memo'].includes(declaredSource)
+    ? declaredSource
+    : 'chat';
   const urls = Array.isArray(msg.imageUrls) && msg.imageUrls.length > 0
     ? msg.imageUrls.filter(u => typeof u === 'string' && u)
     : (typeof msg.imageUrl === 'string' && msg.imageUrl ? [msg.imageUrl] : []);
@@ -2153,6 +2156,49 @@ function getDirectMediaTagKey(url) {
     hash = Math.imul(hash, 16777619);
   }
   return `u_${(hash >>> 0).toString(36)}`;
+}
+
+// Photo comments belong to the rendered asset, not to the container and array slot that happen
+// to reference it. messageId:imageIndex is not durable: deleting an earlier image shifts every
+// later index, and several legacy import/upload paths copied one slot's metadata across a batch.
+// Normalize Firebase Storage download URLs to their object path (tokens may rotate without the
+// image changing) and use two independent 32-bit hashes plus the source length. The resulting
+// key is compact, Firestore-document-id safe, deterministic, and effectively collision-proof for
+// the scale of this app without depending on async WebCrypto during render.
+function normalizePhotoAssetUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (raw.startsWith('data:') || raw.startsWith('blob:')) return raw;
+  try {
+    const parsed = new URL(raw, typeof window !== 'undefined' ? window.location?.href : undefined);
+    parsed.hash = '';
+    if (parsed.hostname === 'firebasestorage.googleapis.com' || parsed.hostname.endsWith('.firebasestorage.app')) {
+      parsed.search = '';
+    }
+    return parsed.toString();
+  } catch (_) {
+    return raw.split('#')[0];
+  }
+}
+
+function hashPhotoAssetIdentity(value) {
+  const source = String(value || '');
+  let fnv = 2166136261;
+  let djb = 5381;
+  for (let i = 0; i < source.length; i++) {
+    const code = source.charCodeAt(i);
+    fnv ^= code;
+    fnv = Math.imul(fnv, 16777619);
+    djb = Math.imul(djb, 33) ^ code;
+  }
+  return `${(fnv >>> 0).toString(36)}-${(djb >>> 0).toString(36)}-${source.length.toString(36)}`;
+}
+
+function getPhotoAssetCommentKey(photo = {}) {
+  const url = normalizePhotoAssetUrl(
+    photo?.full || photo?.imageUrl || photo?.url || photo?.src || photo?.thumb || photo?.thumbUrl || ''
+  );
+  return url ? `asset:v1:${hashPhotoAssetIdentity(url)}` : '';
 }
 
 function getDirectMediaTagsForUrl(msg, url) {
@@ -2250,18 +2296,46 @@ function getMediaIdentityKeys(photo = {}, opts = {}) {
 // thread instead of inheriting a sibling's comments.
 function getPhotoCommentIdentity(photo = {}, collection = [], opts = {}) {
   const base = getMediaIdentityKeys(photo, opts) || {};
-  if (!base.mediaKey || !Array.isArray(collection) || collection.length < 2) return base;
-  const occurrences = collection.reduce((count, item) => {
-    const itemKeys = getMediaIdentityKeys(item || {}, {
-      source: item?.source || opts.source,
-      meetingDate: item?.meetingDate || opts.meetingDate
-    }) || {};
-    return count + (itemKeys.mediaKey === base.mediaKey ? 1 : 0);
-  }, 0);
-  if (occurrences < 2) return base;
-  const url = String(photo?.full || photo?.url || photo?.imageUrl || photo?.thumb || photo?.thumbUrl || '').trim();
-  if (!url) return base;
-  return getMediaIdentityKeys({ source: photo?.source || opts.source, meetingDate: photo?.meetingDate || opts.meetingDate, full: url, imageUrl: url, thumb: url }, opts) || base;
+  const canonicalKey = getPhotoAssetCommentKey(photo);
+  if (!canonicalKey) return { ...base, legacyKeys: [] };
+
+  const candidateLegacyKeys = Array.from(new Set([base.mediaKey, base.refKey].filter(key => key && key !== canonicalKey)));
+  const collectionItems = Array.isArray(collection) ? collection : [];
+  const safeLegacyKeys = candidateLegacyKeys.filter(candidate => {
+    if (collectionItems.length < 2) return true;
+    const matchingAssetKeys = new Set();
+    collectionItems.forEach(item => {
+      const itemKeys = getMediaIdentityKeys(item || {}, {
+        source: item?.source || opts.source,
+        meetingDate: item?.meetingDate || opts.meetingDate
+      }) || {};
+      if (itemKeys.mediaKey !== candidate && itemKeys.refKey !== candidate) return;
+      const itemAssetKey = getPhotoAssetCommentKey(item);
+      matchingAssetKeys.add(itemAssetKey || `legacy:${candidate}`);
+    });
+    return matchingAssetKeys.size <= 1;
+  });
+
+  return {
+    ...base,
+    assetKey: canonicalKey,
+    mediaKey: canonicalKey,
+    refKey: canonicalKey,
+    legacyKeys: safeLegacyKeys
+  };
+}
+
+function getPhotoCommentCount(identity = {}, counts = {}) {
+  const keys = Array.from(new Set([
+    identity?.mediaKey,
+    identity?.refKey,
+    ...(Array.isArray(identity?.legacyKeys) ? identity.legacyKeys : [])
+  ].filter(Boolean)));
+  for (const key of keys) {
+    const count = Number(counts?.[key] || 0);
+    if (Number.isFinite(count) && count > 0) return count;
+  }
+  return 0;
 }
 
 // Before photoId/sourceImageIndex became reliably present on every confirmedMeeting.photos[]
@@ -2281,7 +2355,10 @@ function getMessageDirectMediaEntry(msg, options = {}) {
   const firstUrl = extractFirstUrl(msg?.text || '');
   const mediaInfo = getDirectChatMediaInfo(firstUrl);
   if (!mediaInfo || (mediaInfo.type !== 'image' && !(options && options.allowVideo))) return null;
-  const sourceHint = msg?.uploadSource === 'memo' ? 'memo' : 'chat';
+  const declaredSource = String(msg?.uploadSource || '').trim().toLowerCase();
+  const sourceHint = ['chat', 'gallery', 'meeting', 'memo'].includes(declaredSource)
+    ? declaredSource
+    : 'chat';
   const keys = getMediaIdentityKeys({
     messageId: msg.id,
     imageIndex: 0,
@@ -2541,6 +2618,8 @@ export {
   getDirectMediaTagsForUrl,
   getMediaIdentityKeys,
   getPhotoCommentIdentity,
+  getPhotoAssetCommentKey,
+  getPhotoCommentCount,
   getLegacyMeetingMediaKey,
   getMessageDirectMediaEntry,
   formatBytes,
