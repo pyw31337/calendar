@@ -1373,6 +1373,33 @@ exports.listAllCalendars = functions.https.onRequest(async (req, res) => {
   }
 });
 
+// Admin-only server audit log reader. Raw network evidence never enters the shared calendar
+// documents; this endpoint returns it only after the same admin password check used elsewhere.
+exports.listServerAuditLogs = functions.https.onRequest(async (req, res) => {
+  setAdminCorsHeaders(res);
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  if (req.method !== 'POST') { res.status(405).json({ ok: false }); return; }
+  const { password, calendarId, limit } = req.body || {};
+  if (typeof password !== 'string' || !password.trim()) { res.status(400).json({ ok: false }); return; }
+  if (calendarId != null && !/^[A-Za-z0-9_-]{1,64}$/.test(String(calendarId))) { res.status(400).json({ ok: false }); return; }
+  const rateState = await checkAdminAuthRateLimit(req.ip);
+  if (rateState.blocked) { res.status(429).json({ ok: false }); return; }
+  const matches = sha256Hex(password.trim()) === await getStoredAdminPasswordHash();
+  await recordAdminAuthResult(rateState, matches);
+  if (!matches) { res.status(401).json({ ok: false }); return; }
+  try {
+    const max = Math.min(Math.max(Number(limit) || 300, 1), 1000);
+    let query = admin.firestore().collection('serverAuditLogs').orderBy('receivedAt', 'desc').limit(max);
+    if (calendarId) query = query.where('calendarId', '==', String(calendarId));
+    const snap = await query.get();
+    const logs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    res.status(200).json({ ok: true, logs });
+  } catch (err) {
+    console.error('listServerAuditLogs failed:', err);
+    res.status(500).json({ ok: false });
+  }
+});
+
 // Changes the admin password after verifying the current one server-side -- appConfig/adminAuth
 // no longer accepts a direct client write, so this is the only way to change it now.
 exports.adminChangePassword = functions.https.onRequest(async (req, res) => {

@@ -706,6 +706,15 @@ async function listAllCalendarsRemote(password, options = {}) {
   return { calendars: result?.calendars || [], lastModified: result?.lastModified || 0, mode: result?.mode || mode };
 }
 
+async function listServerAuditLogsRemote(password, options = {}) {
+  const result = await callAdminFunction('listServerAuditLogs', {
+    password,
+    calendarId: options.calendarId || undefined,
+    limit: options.limit || 300
+  });
+  return Array.isArray(result?.logs) ? result.logs : [];
+}
+
 async function changeAdminPasswordRemote(oldPassword, newPasswordHash) {
   await callAdminFunction('adminChangePassword', { oldPassword, newPasswordHash });
 }
@@ -2362,6 +2371,7 @@ export {
   callAdminFunction,
   verifyAdminPasswordRemote,
   listAllCalendarsRemote,
+  listServerAuditLogsRemote,
   changeAdminPasswordRemote,
   copyTextToClipboard,
   isNotificationSupported,

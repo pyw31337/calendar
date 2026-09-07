@@ -418,6 +418,10 @@ function listAllCalendarsRemote(...args) {
   const f = __gatherUiDeps().listAllCalendarsRemote || GATHER_APP_UTILS.listAllCalendarsRemote;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function listServerAuditLogsRemote(...args) {
+  const f = __gatherUiDeps().listServerAuditLogsRemote || GATHER_APP_UTILS.listServerAuditLogsRemote;
+  return typeof f === 'function' ? f(...args) : [];
+}
 function mergeCalendarCollections(...args) {
   const f = __gatherUiDeps().mergeCalendarCollections || GATHER_APP_UTILS.mergeCalendarCollections;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -809,7 +813,7 @@ export function AdminDashboard({ initialCalendars }) {
   const isRestoreMode = isAdminRestoreRoute();
 
   // Tab control state
-  const [activeTab, setActiveTab] = React.useState('settings'); // 'settings' (일반), 'metrics' (통계), 'logs', 'recovery'
+  const [activeTab, setActiveTab] = React.useState('settings'); // 'settings' (일반), 'metrics' (통계), 'logs', 'audit', 'recovery'
 
   // Selected calendar for settings and recovery tabs
   const [selectedCalId, setSelectedCalId] = React.useState(() => getAdminSelectedCalendarIdFromUrl('kkot'));
@@ -845,6 +849,22 @@ export function AdminDashboard({ initialCalendars }) {
   // activityLogs subcollection. Fetched in full (no limit) since point-in-time recovery needs
   // every entry, not just a recent window, to correctly replay state up to a cutoff.
   const [selectedCalActivityLogs, setSelectedCalActivityLogs] = React.useState([]);
+  const [serverAuditLogs, setServerAuditLogs] = React.useState([]);
+  const [auditLoading, setAuditLoading] = React.useState(false);
+  const [auditQuery, setAuditQuery] = React.useState('');
+
+  React.useEffect(() => {
+    if (activeTab !== 'audit') return;
+    const session = getAdminSession();
+    if (!session) return;
+    let cancelled = false;
+    setAuditLoading(true);
+    listServerAuditLogsRemote(session.password, { calendarId: selectedCalId, limit: 300 })
+      .then(logs => { if (!cancelled) setServerAuditLogs(logs); })
+      .catch(err => { if (!cancelled) { setServerAuditLogs([]); showAdminToast(`감사 로그 조회 실패: ${err.message || '오류'}`, 'error'); } })
+      .finally(() => { if (!cancelled) setAuditLoading(false); });
+    return () => { cancelled = true; };
+  }, [activeTab, selectedCalId]);
 
   // Timeline filters and pagination for Tab 4 (Recovery logs)
   const [timelineSearchQuery, setTimelineSearchQuery] = React.useState('');
@@ -2247,12 +2267,44 @@ export function AdminDashboard({ initialCalendars }) {
           type: "button", className: "admin-tab-button", onClick: () => setActiveTab('logs'),
           style: styles.tabButton(activeTab === 'logs')
         }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(ChatSectionIcon, null)), "채팅"),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", className: "admin-tab-button", onClick: () => setActiveTab('audit'),
+          style: styles.tabButton(activeTab === 'audit')
+        }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(ShieldCheckIcon, null)), "감사 로그"),
         /* Tab 4 button */
         /*#__PURE__*/React.createElement("button", {
           type: "button", className: "admin-tab-button", onClick: () => setActiveTab('recovery'),
           style: styles.tabButton(activeTab === 'recovery')
         }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(HourglassIcon, null)), "복구")
       )
+    ),
+
+    activeTab === 'audit' && /*#__PURE__*/React.createElement("section", { style: styles.card },
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '12px' } },
+        /*#__PURE__*/React.createElement("div", null,
+          /*#__PURE__*/React.createElement("h4", { style: styles.cardTitle }, /*#__PURE__*/React.createElement(ShieldCheckIcon, null), "서버 감사 로그"),
+          /*#__PURE__*/React.createElement("p", { style: { margin: '3px 0 0', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' } }, "관리자 전용 기록입니다. IP는 원문이 아닌 해시로 보관되며, actor/session은 익명 상관관계 식별자입니다.")
+        ),
+        /*#__PURE__*/React.createElement("input", { className: "form-input", value: auditQuery, onChange: e => setAuditQuery(e.target.value), placeholder: "actor, 작업, 브라우저, IP 해시 검색", style: { maxWidth: '320px' } })
+      ),
+      auditLoading ? /*#__PURE__*/React.createElement("div", { style: { padding: '28px', textAlign: 'center', color: 'var(--text-muted)' } }, "감사 로그 불러오는 중...") :
+      (() => {
+        const q = auditQuery.trim().toLowerCase();
+        const rows = serverAuditLogs.filter(log => !q || [log.action, log.actorId, log.sessionId, log.client, log.ipHash, log.userAgent, log.target].some(v => String(v || '').toLowerCase().includes(q)));
+        if (!rows.length) return /*#__PURE__*/React.createElement("div", { style: { padding: '28px', textAlign: 'center', color: 'var(--text-muted)' } }, "표시할 감사 로그가 없습니다.");
+        return /*#__PURE__*/React.createElement("div", { style: { overflowX: 'auto' } }, /*#__PURE__*/React.createElement("table", { style: { width: '100%', borderCollapse: 'collapse', fontSize: 'var(--font-size-sm)' } },
+          /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, ['시각','작업','actor/session','클라이언트','IP 해시','User-Agent','대상'].map(h => /*#__PURE__*/React.createElement("th", { key: h, style: { textAlign: 'left', padding: '8px', borderBottom: '1px solid var(--border-subtle)', whiteSpace: 'nowrap' } }, h)))),
+          /*#__PURE__*/React.createElement("tbody", null, rows.map(log => /*#__PURE__*/React.createElement("tr", { key: log.id },
+            /*#__PURE__*/React.createElement("td", { style: { padding: '8px', whiteSpace: 'nowrap' } }, new Date(Number(log.receivedAt) || 0).toLocaleString('ko-KR')),
+            /*#__PURE__*/React.createElement("td", { style: { padding: '8px', whiteSpace: 'nowrap', fontWeight: 700 } }, log.action || '-'),
+            /*#__PURE__*/React.createElement("td", { style: { padding: '8px', minWidth: '180px' } }, log.actorId || '-', /*#__PURE__*/React.createElement("br"), /*#__PURE__*/React.createElement("small", { style: { color: 'var(--text-muted)' } }, log.sessionId || '-')),
+            /*#__PURE__*/React.createElement("td", { style: { padding: '8px', whiteSpace: 'nowrap' } }, log.client || '-'),
+            /*#__PURE__*/React.createElement("td", { style: { padding: '8px', fontFamily: 'monospace', fontSize: '11px' } }, log.ipHash || '-'),
+            /*#__PURE__*/React.createElement("td", { style: { padding: '8px', maxWidth: '300px', wordBreak: 'break-word' } }, log.userAgent || '-'),
+            /*#__PURE__*/React.createElement("td", { style: { padding: '8px', maxWidth: '240px', wordBreak: 'break-word' } }, log.target || '-')
+          )))
+        ));
+      })()
     ),
 
     isAdminMenuOpen && /*#__PURE__*/React.createElement("div", {
