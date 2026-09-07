@@ -9375,7 +9375,43 @@ function revokeCompressedObjectUrls(compressed) {
   compressed._objectUrls = [];
 }
 
+// Keep mobile screens awake for the complete image pipeline (compression + Storage upload +
+// Firestore write). A long multi-photo upload otherwise gets suspended when iOS/Android dims
+// the display. Wake Lock is best-effort: browsers without support continue normally, while the
+// visibility listener reacquires it after a tab is briefly backgrounded.
+let activeMediaUploadCount = 0;
+let mediaUploadWakeLock = null;
+let mediaUploadWakeLockVisibilityHandler = null;
+async function acquireMediaUploadWakeLock() {
+  activeMediaUploadCount += 1;
+  if (typeof navigator === 'undefined' || !navigator.wakeLock?.request) return;
+  const request = async () => {
+    if (activeMediaUploadCount <= 0 || document.visibilityState !== 'visible' || mediaUploadWakeLock) return;
+    try {
+      mediaUploadWakeLock = await navigator.wakeLock.request('screen');
+      mediaUploadWakeLock.addEventListener?.('release', () => { mediaUploadWakeLock = null; request(); });
+    } catch (_) { /* unsupported, permission denied, or document hidden */ }
+  };
+  await request();
+  if (!mediaUploadWakeLockVisibilityHandler) {
+    mediaUploadWakeLockVisibilityHandler = () => { if (document.visibilityState === 'visible') request(); };
+    document.addEventListener('visibilitychange', mediaUploadWakeLockVisibilityHandler);
+  }
+}
+function releaseMediaUploadWakeLock() {
+  activeMediaUploadCount = Math.max(0, activeMediaUploadCount - 1);
+  if (activeMediaUploadCount > 0) return;
+  try { mediaUploadWakeLock?.release?.(); } catch (_) {}
+  mediaUploadWakeLock = null;
+  if (mediaUploadWakeLockVisibilityHandler) {
+    document.removeEventListener('visibilitychange', mediaUploadWakeLockVisibilityHandler);
+    mediaUploadWakeLockVisibilityHandler = null;
+  }
+}
+
 async function processImageFilesSequentially(files, onProgress) {
+  await acquireMediaUploadWakeLock();
+  try {
   await checkFirebaseStorageHealth().catch(() => {});
   const list = Array.from(files || []);
   const succeeded = new Array(list.length);
@@ -9424,6 +9460,9 @@ async function processImageFilesSequentially(files, onProgress) {
   await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
   if (onProgress) onProgress({ current: list.length, total: list.length, fileName: null, pct: 100, remainingSec: 0 });
   return { succeeded: succeeded.filter(Boolean), failed };
+  } finally {
+    releaseMediaUploadWakeLock();
+  }
 }
 
 // Groups resolved images ({ imageUrl, thumbUrl }) into per-message chunks that stay safely
@@ -9861,6 +9900,8 @@ async function resolveImageUrls(calendarId, compressed, index, onBytes, uploadFn
 }
 
 async function resolveImageBatch(calendarId, compressedList, onProgress, uploadFn, options = {}) {
+  await acquireMediaUploadWakeLock();
+  try {
   const uploadIndexes = compressedList
     .map((c, idx) => ({ c, idx }))
     .filter(({ c }) => !c.isExisting);
@@ -9935,6 +9976,9 @@ async function resolveImageBatch(calendarId, compressedList, onProgress, uploadF
   if (onProgress) onProgress({ pct: 100, remainingSec: 0, current: total, total });
   Object.defineProperty(results, 'failed', { value: failed, enumerable: false, configurable: true });
   return results;
+  } finally {
+    releaseMediaUploadWakeLock();
+  }
 }
 
 async function resolveChatImageBatch(calendarId, compressedList, onProgress, options = {}) {

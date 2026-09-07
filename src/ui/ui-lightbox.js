@@ -1065,7 +1065,8 @@ export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast
   const [isSavingTags, setIsSavingTags] = React.useState(false);
   const [confirmDeleteTag, setConfirmDeleteTag] = React.useState(null);
   const [isDeletingTag, setIsDeletingTag] = React.useState(false);
-  React.useEffect(() => { setTagInput(''); }, [tags]);
+  // Keep the draft while navigating between photos. The lightbox intentionally reuses this
+  // panel so a user can tap a photo once, then enter tags continuously with previous/next.
   if (tagTokens.length === 0 && !onSaveTags) return null;
   const MAX_TAGS = 10;
   const handleSaveTags = async () => {
@@ -1379,7 +1380,9 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     onClose();
   };
   React.useEffect(() => { setDisplayUrls(urls); }, [urls]);
-  React.useEffect(() => { setShowInfo(false); setShowTags(false); setImageLoadFailed(false); }, [index]);
+  // Metadata is photo-specific, but tag editing stays active while moving through the lightbox
+  // so consecutive photos can be tagged without reopening the panel each time.
+  React.useEffect(() => { setShowInfo(false); setImageLoadFailed(false); }, [index]);
   const currentUrl = displayUrls[index] || urls[index];
   React.useEffect(() => {
     setImageLoadFailed(false);
@@ -2284,7 +2287,6 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
           isRemovingFromMemory: isRemovingFromMemory
         }),
         showTags && zoomLevel === ZOOM_DEFAULT && /*#__PURE__*/React.createElement(LightboxTagPanel, {
-          key: `tags-${tagOverrideKey || String(currentUrl || index)}`,
           tags: currentTags,
           onSaveTags: saveCurrentTags,
           onSearchTag: onSearchTag,
@@ -2428,7 +2430,6 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
       isRemovingFromMemory: isRemovingFromMemory
     }),
     showTags && zoomLevel === ZOOM_DEFAULT && /*#__PURE__*/React.createElement(LightboxTagPanel, {
-      key: `tags-${tagOverrideKey || String(currentUrl || index)}`,
       tags: currentTags,
       onSaveTags: saveCurrentTags,
       onSearchTag: onSearchTag,
