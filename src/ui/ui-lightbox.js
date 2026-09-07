@@ -1403,10 +1403,24 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   // Lightbox stays open on the same image -- track successful saves here so the info panel
   // shows the result immediately instead of only after the Lightbox is closed and reopened.
   const [tagOverrides, setTagOverrides] = React.useState({});
-  const currentMeta = meta && meta[index];
-  const currentIdentity = currentMeta
-    ? (getMediaIdentityKeys({ ...currentMeta, full: currentMeta.full || currentUrl }, { source: currentMeta.source, meetingDate: currentMeta.meetingDate }) || {})
-    : {};
+  const currentMeta = Array.isArray(meta) ? (meta[index] || {}) : (meta || {});
+  // Never trust a duplicated legacy identity when the rendered assets are different.  A few
+  // upload/import paths historically copied the first image's messageId/imageIndex into every
+  // metadata row; using that key here made one Firestore comment document appear on the whole
+  // batch.  Qualify such collisions with the rendered URL so each visible asset has its own
+  // deterministic thread until the source metadata is repaired.
+  const identityInput = { ...currentMeta, full: currentMeta.full || currentUrl, imageUrl: currentMeta.imageUrl || currentUrl };
+  const baseIdentity = getMediaIdentityKeys(identityInput, { source: currentMeta.source, meetingDate: currentMeta.meetingDate }) || {};
+  const mediaKeyOccurrences = Array.isArray(meta) && baseIdentity.mediaKey
+    ? meta.reduce((count, item, itemIndex) => {
+      const itemUrl = displayUrls[itemIndex] || urls[itemIndex] || item?.full || item?.imageUrl || item?.thumb || '';
+      const itemIdentity = getMediaIdentityKeys({ ...(item || {}), full: item?.full || itemUrl, imageUrl: item?.imageUrl || itemUrl }, { source: item?.source, meetingDate: item?.meetingDate }) || {};
+      return count + (itemIdentity.mediaKey === baseIdentity.mediaKey ? 1 : 0);
+    }, 0)
+    : 0;
+  const currentIdentity = mediaKeyOccurrences > 1 && currentUrl
+    ? (getMediaIdentityKeys({ source: currentMeta.source, full: currentUrl, imageUrl: currentUrl, thumb: currentUrl }, { source: currentMeta.source, meetingDate: currentMeta.meetingDate }) || baseIdentity)
+    : baseIdentity;
   // 사진 댓글 -- mediaKey/refKey(currentIdentity, 항상 값이 있음)를 사진의 안정적인 식별자로
   // 써서 calendars/cal_{id}/photoComments 문서 하나에 매칭한다(app-main.js의
   // handleFetchPhotoComments/handleSavePhotoComments). 여러 장을 스와이프해도 슬라이드별로
