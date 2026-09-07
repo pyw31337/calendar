@@ -2372,6 +2372,8 @@ export {
   verifyAdminPasswordRemote,
   listAllCalendarsRemote,
   listServerAuditLogsRemote,
+  queueServerAuditEvent,
+  getClientAuditContext,
   changeAdminPasswordRemote,
   copyTextToClipboard,
   isNotificationSupported,

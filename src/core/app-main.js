@@ -105,6 +105,8 @@ import {
   verifyAdminPasswordRemote,
   listAllCalendarsRemote,
   listServerAuditLogsRemote,
+  queueServerAuditEvent,
+  getClientAuditContext,
   changeAdminPasswordRemote,
   copyTextToClipboard,
   isNotificationSupported,
@@ -6068,12 +6070,14 @@ function CalendarApp() {
     // previously contaminated/shared key actually remove the visible thread and badge.
     if (!Array.isArray(nextComments) || nextComments.length === 0) {
       const deleted = await writeCollectionDocumentWithFallback('photoComments', activeCalId, docId, null, 'delete', '사진 댓글 삭제');
+      queueServerAuditEvent(activeCalId, 'photo_comment_delete', `${docId} · 0건`, getClientAuditContext());
       return !!deleted?.success;
     }
     const saved = await writeCollectionDocumentWithFallback('photoComments', activeCalId, docId, {
       comments: nextComments,
       updatedAt: Date.now()
     }, 'set', '사진 댓글 저장');
+    queueServerAuditEvent(activeCalId, 'photo_comment_save', `${docId} · ${nextComments.length}건`, getClientAuditContext());
     return !!saved?.success;
   };
 
