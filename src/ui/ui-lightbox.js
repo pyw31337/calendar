@@ -1427,19 +1427,25 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     photoCommentsFetchedRef.current.add(photoCommentKey);
     setPhotoCommentsStatusByKey(prev => ({ ...prev, [photoCommentKey]: 'loading' }));
     let cancelled = false;
+    const normalizeCommentsResult = value => {
+      if (Array.isArray(value)) return { success: true, comments: value };
+      if (value && typeof value === 'object') {
+        return { success: value.success !== false, comments: Array.isArray(value.comments) ? value.comments : [] };
+      }
+      return { success: false, comments: [] };
+    };
     Promise.resolve(onFetchPhotoComments(photoCommentKey)).then(async result => {
-      const resultObject = result && typeof result === 'object' && !Array.isArray(result);
-      const success = resultObject ? result.success === true : Array.isArray(result);
+      const normalized = normalizeCommentsResult(result);
+      const success = normalized.success;
       if (!success) {
         if (!cancelled) setPhotoCommentsStatusByKey(prev => ({ ...prev, [photoCommentKey]: 'error' }));
         return;
       }
-      let resolved = resultObject ? result.comments : result;
+      let resolved = normalized.comments;
       if (resolved.length === 0 && legacyPhotoCommentKey && legacyPhotoCommentKey !== photoCommentKey) {
         const legacyResult = await Promise.resolve(onFetchPhotoComments(legacyPhotoCommentKey));
-        const legacyList = legacyResult && typeof legacyResult === 'object' && !Array.isArray(legacyResult)
-          ? (legacyResult.success === true ? legacyResult.comments : []) : legacyResult;
-        if (Array.isArray(legacyList) && legacyList.length > 0) resolved = legacyList;
+        const legacyNormalized = normalizeCommentsResult(legacyResult);
+        if (legacyNormalized.success && legacyNormalized.comments.length > 0) resolved = legacyNormalized.comments;
       }
       if (!cancelled && Array.isArray(resolved)) {
         setPhotoCommentsByKey(prev => ({ ...prev, [photoCommentKey]: resolved }));

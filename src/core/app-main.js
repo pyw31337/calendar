@@ -6046,6 +6046,10 @@ function CalendarApp() {
         return { success: true, comments: snap?.exists && Array.isArray(snap.data()?.comments) ? snap.data().comments : [] };
       }
       const res = await fetch(`https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${activeCalId}/photoComments/${docId}`);
+      // A missing photoComments document is the normal state for a photo with no
+      // comments. Firestore SDK returns exists=false for this case, so mirror that
+      // behavior in the REST fallback instead of showing a false load error.
+      if (res.status === 404) return { success: true, comments: [] };
       if (!res.ok) return { success: false, comments: [] };
       const data = firestoreDocumentToJs(await res.json());
       return { success: true, comments: Array.isArray(data?.comments) ? data.comments : [] };
