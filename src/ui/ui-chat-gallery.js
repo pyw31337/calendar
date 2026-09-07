@@ -2139,7 +2139,7 @@ export function ChatGalleryModal({
   const renderVisitFilterToggleMobile = () => /*#__PURE__*/React.createElement("div", {
     className: "visit-filter-toggle-mobile",
     style: {
-      display: 'inline-flex', alignItems: 'center', height: '36px', boxSizing: 'border-box',
+      display: 'inline-flex', alignItems: 'center', height: '44px', boxSizing: 'border-box',
       padding: '3px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)',
       backgroundColor: 'var(--bg-card)', flexShrink: 0
     }
@@ -2152,7 +2152,7 @@ export function ChatGalleryModal({
       type: "button",
       onClick: () => setGalleryViewMode(tab.key),
       style: {
-        height: '100%', boxSizing: 'border-box', padding: '0 12px', fontSize: 'var(--font-size-md)', fontWeight: 900,
+        height: '100%', minHeight: '44px', boxSizing: 'border-box', padding: '0 14px', fontSize: 'var(--font-size-md)', fontWeight: 900,
         borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer',
         backgroundColor: galleryViewMode === tab.key ? '#4F46E5' : 'transparent',
         color: galleryViewMode === tab.key ? '#FFFFFF' : 'var(--text-muted)'
@@ -2177,7 +2177,7 @@ export function ChatGalleryModal({
               className: "btn btn-action btn-action-outline",
               onClick: handleToggleBulkShareMode,
               disabled: isGeneratingBulkShareUrl,
-              style: { height: '36px', padding: '0 12px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: 'pointer' }
+              style: { height: '44px', minHeight: '44px', padding: '0 14px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: 'pointer' }
             }, "취소"),
             /*#__PURE__*/React.createElement("button", {
               type: "button",
@@ -2185,7 +2185,7 @@ export function ChatGalleryModal({
               onClick: handleClickBulkShare,
               disabled: selectedBulkShareKeys.size === 0 || isGeneratingBulkShareUrl,
               style: {
-                height: '36px', padding: '0 12px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900,
+                height: '44px', minHeight: '44px', padding: '0 14px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900,
                 cursor: (selectedBulkShareKeys.size === 0 || isGeneratingBulkShareUrl) ? 'default' : 'pointer',
                 opacity: (selectedBulkShareKeys.size === 0 || isGeneratingBulkShareUrl) ? 0.5 : 1
               }
@@ -2199,7 +2199,7 @@ export function ChatGalleryModal({
               type: "button",
               className: "btn btn-action btn-action-outline",
               onClick: handlePasteGalleryUpload,
-              style: { height: '36px', padding: '0 12px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: 'pointer' }
+              style: { height: '44px', minHeight: '44px', padding: '0 14px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: 'pointer' }
             }, "붙여넣기"),
             /*#__PURE__*/React.createElement("button", {
               type: "button",
@@ -2207,7 +2207,7 @@ export function ChatGalleryModal({
               onClick: handleUploadClick,
               title: "추가",
               "aria-label": "추가",
-              style: { height: '36px', width: '36px', padding: 0, borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }
+              style: { height: '44px', minHeight: '44px', width: '48px', minWidth: '48px', padding: 0, borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }
             }, PlusIcon ? /*#__PURE__*/React.createElement(PlusIcon, { size: 16 }) : "+"),
             /*#__PURE__*/React.createElement("button", {
               type: "button",
@@ -2215,7 +2215,7 @@ export function ChatGalleryModal({
               onClick: handleToggleBulkShareMode,
               title: "편집",
               "aria-label": "편집",
-              style: { height: '36px', width: '36px', padding: 0, borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }
+              style: { height: '44px', minHeight: '44px', width: '48px', minWidth: '48px', padding: 0, borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }
             }, PencilIcon ? /*#__PURE__*/React.createElement(PencilIcon, { size: 15 }) : "편집")
           )
     )
