@@ -543,7 +543,7 @@ export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalG
     return React.createElement('span', {
       className: 'photo-comment-count-badge',
       'aria-label': `댓글 ${count}개`,
-      style: { position: 'absolute', top: '2px', right: '2px', zIndex: 2, minWidth: '16px', height: '16px', padding: '0 4px', borderRadius: '999px', backgroundColor: '#EF4444', color: '#fff', fontSize: '10px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.35)', pointerEvents: 'none', lineHeight: 1 }
+      style: { position: 'absolute', top: '6px', right: '6px', zIndex: 3, minWidth: '24px', height: '24px', padding: '0 6px', borderRadius: '999px', background: 'rgba(15,23,42,0.78)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', lineHeight: 1 }
     }, String(count));
   };
       const [collapsed, setCollapsed] = React.useState(false);
@@ -1256,7 +1256,8 @@ export function HistoryView({
   onJumpToChatMessage = null, onJumpToMemo = null, onJumpToMeetingDate = null,
   onGetChatMessageOrdinal = null, onGetGalleryPhotoOrdinal = null, onRequestConfirm = null,
   onRemovePhotoFromMemory = null, onRemovePhotosFromMemory = null, onFetchPhotoComments = null, onSavePhotoComments = null,
-  onHideMemoryGroup = null, onRestoreMemoryGroup = null, onAddPhotosBackToMemory = null
+  onHideMemoryGroup = null, onRestoreMemoryGroup = null, onAddPhotosBackToMemory = null,
+  photoCommentCounts = {}
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -1270,6 +1271,14 @@ export function HistoryView({
   const Lightbox = __comp.Lightbox || __deps.Lightbox;
   const PencilIcon = __comp.PencilIcon || __deps.PencilIcon;
   const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
+  const PhotoCommentCountBadge = __comp.PhotoCommentCountBadge || __deps.PhotoCommentCountBadge || function InlinePhotoCommentCountBadge({ count = 0 } = {}) {
+    if (!count) return null;
+    return /*#__PURE__*/React.createElement('span', {
+      className: 'photo-comment-count-badge',
+      "aria-label": `댓글 ${count}개`,
+      style: { position: 'absolute', top: '6px', right: '6px', zIndex: 3, minWidth: '24px', height: '24px', padding: '0 6px', borderRadius: '999px', background: 'rgba(15,23,42,0.78)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none', lineHeight: 1 }
+    }, String(count));
+  };
   const formatHistoryDate = value => {
     const text = String(value || '').slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return '';
@@ -1731,6 +1740,8 @@ export function HistoryView({
     }, photos.map((photo, idx) => {
       const photoKey = photo.mediaKey || photo.refKey || `${keyPrefix}${idx}`;
       const isChecked = checkable && selectedKeys.has(photoKey);
+      const identity = getPhotoCommentIdentity(photo, photos, { source: photo.source, meetingDate: photo.meetingDate }) || {};
+      const commentCount = getPhotoCommentCount(identity, photoCommentCounts) || Math.max(0, Number(photo.commentCount || 0));
       return /*#__PURE__*/React.createElement("button", {
         key: photoKey, type: "button",
         onClick: () => checkable ? onToggle(photoKey) : onOpen(idx),
@@ -1740,6 +1751,7 @@ export function HistoryView({
           src: photo.thumb || photo.full, alt: "", loading: "lazy", decoding: "async",
           style: { width: '100%', height: '100%', objectFit: 'cover' }
         }),
+        PhotoCommentCountBadge && /*#__PURE__*/React.createElement(PhotoCommentCountBadge, { count: commentCount }),
         checkable && /*#__PURE__*/React.createElement("span", {
           "aria-hidden": true,
           style: {
@@ -2280,15 +2292,22 @@ export function HistoryView({
         ? /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' } }, `#${selectedPersonTag} 태그가 달린 사진이 아직 없어요.`)
         : /*#__PURE__*/React.createElement("div", {
             style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '4px' }
-          }, photosForPersonTag.map((photo, idx) => /*#__PURE__*/React.createElement("button", {
-            key: photo.mediaKey || photo.refKey || `person_${idx}`,
-            type: "button",
-            onClick: () => openHistoryLightbox(photosForPersonTag, idx),
-            style: { padding: 0, border: 'none', borderRadius: 'var(--radius-sm)', overflow: 'hidden', aspectRatio: '1 / 1', cursor: 'pointer', backgroundColor: 'var(--bg-primary)' }
-          }, /*#__PURE__*/React.createElement("img", {
-            src: photo.thumb || photo.full, alt: "", loading: "lazy", decoding: "async",
-            style: { width: '100%', height: '100%', objectFit: 'cover' }
-          })))
+          }, photosForPersonTag.map((photo, idx) => {
+            const identity = getPhotoCommentIdentity(photo, photosForPersonTag, { source: photo.source, meetingDate: photo.meetingDate }) || {};
+            const commentCount = getPhotoCommentCount(identity, photoCommentCounts) || Math.max(0, Number(photo.commentCount || 0));
+            return /*#__PURE__*/React.createElement("button", {
+              key: photo.mediaKey || photo.refKey || `person_${idx}`,
+              type: "button",
+              onClick: () => openHistoryLightbox(photosForPersonTag, idx),
+              style: { position: 'relative', padding: 0, border: 'none', borderRadius: 'var(--radius-sm)', overflow: 'hidden', aspectRatio: '1 / 1', cursor: 'pointer', backgroundColor: 'var(--bg-primary)' }
+            },
+              /*#__PURE__*/React.createElement("img", {
+                src: photo.thumb || photo.full, alt: "", loading: "lazy", decoding: "async",
+                style: { width: '100%', height: '100%', objectFit: 'cover' }
+              }),
+              PhotoCommentCountBadge && /*#__PURE__*/React.createElement(PhotoCommentCountBadge, { count: commentCount })
+            );
+          })
           )
     )),
 
@@ -3951,8 +3970,28 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
               }, item.venue || CULTURE_MISSING_LABEL)
             ),
             registered && /*#__PURE__*/React.createElement("div", {
-              style: { position: 'absolute', top: '6px', right: '6px', backgroundColor: '#7C3AED', color: '#fff', borderRadius: 'var(--radius-full)', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 800, boxShadow: '0 1px 3px rgba(0,0,0,0.25)' }
-            }, "✓")
+              title: "캘린더 등록됨",
+              "aria-label": "캘린더 등록됨",
+              style: { position: 'absolute', top: '6px', right: '6px', backgroundColor: '#7C3AED', color: '#fff', borderRadius: 'var(--radius-full)', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.25)' }
+            }, /*#__PURE__*/React.createElement("svg", {
+              xmlns: "http://www.w3.org/2000/svg",
+              width: 13,
+              height: 13,
+              viewBox: "0 0 24 24",
+              fill: "none",
+              stroke: "currentColor",
+              strokeWidth: 2,
+              strokeLinecap: "round",
+              strokeLinejoin: "round",
+              "aria-hidden": true
+            },
+              /*#__PURE__*/React.createElement("path", { d: "M12.5 21h-6.5a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v5" }),
+              /*#__PURE__*/React.createElement("path", { d: "M16 3v4" }),
+              /*#__PURE__*/React.createElement("path", { d: "M8 3v4" }),
+              /*#__PURE__*/React.createElement("path", { d: "M4 11h16" }),
+              /*#__PURE__*/React.createElement("path", { d: "M19 22v-6" }),
+              /*#__PURE__*/React.createElement("path", { d: "M22 19l-3 -3l-3 3" })
+            ))
           ),
           /*#__PURE__*/React.createElement("div", { style: { padding: '8px 10px 10px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px', flex: 1 } },
             /*#__PURE__*/React.createElement("div", {

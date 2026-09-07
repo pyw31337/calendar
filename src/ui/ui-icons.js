@@ -1639,11 +1639,11 @@ export function PhotoCommentCountBadge({ count = 0 } = {}) {
     className: 'photo-comment-count-badge',
     "aria-label": `댓글 ${count}개`,
     style: {
-      position: 'absolute', top: '2px', right: '2px', zIndex: 2,
-      minWidth: '16px', height: '16px', padding: '0 4px', borderRadius: 'var(--radius-full)',
-      backgroundColor: '#EF4444', color: '#fff', fontSize: '10px', fontWeight: 800,
+      position: 'absolute', top: '6px', right: '6px', zIndex: 3,
+      minWidth: '24px', height: '24px', padding: '0 6px', borderRadius: '999px',
+      background: 'rgba(15,23,42,0.78)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      boxShadow: '0 1px 2px rgba(0,0,0,0.35)', pointerEvents: 'none', lineHeight: 1
+      pointerEvents: 'none', lineHeight: 1
     }
   }, String(count));
 }

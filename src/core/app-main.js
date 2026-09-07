@@ -7910,6 +7910,7 @@ function CalendarApp() {
         onAddPhotosBackToMemory: handleAddPhotosBackToTravelMemory,
         onFetchPhotoComments: handleFetchPhotoComments,
         onSavePhotoComments: handleSavePhotoComments,
+        photoCommentCounts: photoCommentCounts,
         ...navMenuProps
       }),
       isHistoryShareOpen && activeCal && /*#__PURE__*/React.createElement(ShareModal, {
