@@ -1294,7 +1294,11 @@ export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalG
             style: { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }
           }),
           PhotoCommentCountBadge && /*#__PURE__*/React.createElement(PhotoCommentCountBadge, {
-            count: photoCommentCounts[entry.mediaKey || entry.refKey] || 0
+            count: photoCommentCounts[entry.mediaKey || entry.refKey]
+              || (entry.sourceMessageId && Number.isInteger(entry.sourceImageIndex)
+                ? photoCommentCounts[`chat:${entry.sourceMessageId}:${entry.sourceImageIndex}`]
+                : 0)
+              || 0
           })
         ))
       )
