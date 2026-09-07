@@ -1,6 +1,7 @@
 /** P6 ESM adapter for app-main — live assets/app-main.js unchanged */
 import './../react-globals.js';
 import { uploadBlobWithWatchdog, retryMediaTask, getAdaptiveMediaUploadConcurrency } from './app-media-upload.js';
+import exifr from 'exifr';
 import {
   computeKoreanHolidaysForYear,
   getHolidayNamesForDate,
@@ -4013,6 +4014,7 @@ function CalendarApp() {
             thumbUrl: chunkImages[0].thumbUrl,
             imageUrls: chunkImages.map(r => r.imageUrl),
             thumbUrls: chunkImages.map(r => r.thumbUrl),
+            imageTags: chunkImages.map(r => buildMetadataTags(r.metadata)),
             timestamp: baseTimestamp + i,
             uploadSource: 'chat'
           };
@@ -4143,6 +4145,7 @@ function CalendarApp() {
           thumbUrl: chunkImages[0].thumbUrl,
           imageUrls: chunkImages.map(r => r.imageUrl),
           thumbUrls: chunkImages.map(r => r.thumbUrl),
+          imageTags: chunkImages.map(r => buildMetadataTags(r.metadata)),
           timestamp: now + i,
           // Marks this message as gallery-uploaded (vs typed into the chat composer) so the
           // Lightbox info panel can show "갤러리에서 업로드됨" instead of "채팅방에서 업로드됨".
@@ -5561,7 +5564,7 @@ function CalendarApp() {
           thumbUrl: chunkImages[0].thumbUrl,
           imageUrls: chunkImages.map(r => r.imageUrl),
           thumbUrls: chunkImages.map(r => r.thumbUrl),
-          imageTags: chunkImages.map(() => dateStrToHashtag(dateStr)),
+          imageTags: chunkImages.map(img => buildMetadataTags(img.metadata, dateStr)),
           timestamp: now + i,
           uploadSource: 'meeting'
         };
@@ -9139,6 +9142,7 @@ function loadImageElement(objectUrl, timeoutMs = 20000) {
 
 async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_THUMB_BASE64_LENGTH } = {}) {
   let sourceBlob = file;
+  const metadata = await extractPhotoMetadata(file).catch(() => null);
   let img = null;
 
   if (isHeicFile(file)) {
@@ -9343,6 +9347,7 @@ async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_T
         originalBlob: origBlob,
         thumbnailBlob: thumbBlob,
         needsBase64Fallback: preferStorage,
+        metadata,
         _objectUrls: objectUrls
       });
     };
@@ -9359,6 +9364,51 @@ async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_T
     };
     getOrig(origBlob => getThumb(thumbBlob => finish(origBlob, thumbBlob)));
   });
+}
+
+// Extract only the small, user-facing subset of EXIF. The original EXIF block is never stored.
+// GPS is reverse-geocoded on a best-effort basis and cached by rounded coordinates so a batch
+// from one place does not issue one request per image.
+const photoLocationCache = new Map();
+async function extractPhotoMetadata(file) {
+  if (!file || typeof exifr?.parse !== 'function') return null;
+  const exif = await exifr.parse(file, { pick: ['DateTimeOriginal', 'CreateDate', 'Make', 'Model', 'latitude', 'longitude'] });
+  if (!exif) return null;
+  const result = {};
+  const date = exif.DateTimeOriginal || exif.CreateDate;
+  if (date instanceof Date && !Number.isNaN(date.getTime())) result.capturedAt = date.toISOString();
+  const make = String(exif.Make || '').trim();
+  const model = String(exif.Model || '').trim();
+  if (make || model) result.device = [make, model].filter(Boolean).join(' ').replace(/\s+/g, ' ').slice(0, 100);
+  const lat = Number(exif.latitude), lon = Number(exif.longitude);
+  if (Number.isFinite(lat) && Number.isFinite(lon)) {
+    result.latitude = Number(lat.toFixed(6)); result.longitude = Number(lon.toFixed(6));
+    const key = `${lat.toFixed(3)},${lon.toFixed(3)}`;
+    if (photoLocationCache.has(key)) result.location = photoLocationCache.get(key);
+    else if (lat >= 33 && lat <= 39 && lon >= 124 && lon <= 132) {
+      try {
+        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=jsonv2&accept-language=ko&zoom=10`, { headers: { 'Accept': 'application/json' } });
+        if (response.ok) {
+          const address = await response.json();
+          const a = address?.address || {};
+          const location = [a.province || a.city, a.city || a.county || a.municipality].filter(Boolean).filter((v, i, arr) => arr.indexOf(v) === i).join(' ').trim().slice(0, 80);
+          if (location) { photoLocationCache.set(key, location); result.location = location; }
+        }
+      } catch (_) {}
+    }
+  }
+  return result;
+}
+
+function buildMetadataTags(metadata, scheduledDate = '') {
+  const tags = [];
+  const add = value => { const t = String(value || '').trim(); if (t && !tags.includes(t)) tags.push(t); };
+  if (scheduledDate && /^\d{4}-\d{2}-\d{2}$/.test(scheduledDate)) add(dateStrToHashtag(scheduledDate));
+  const captured = String(metadata?.capturedAt || '').slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(captured)) add(dateStrToHashtag(captured));
+  if (metadata?.location) add(metadata.location);
+  if (metadata?.device) add(metadata.device);
+  return tags.join(' ');
 }
 
 async function buildBase64FallbackFromCompressed(compressed) {
@@ -9930,7 +9980,7 @@ async function resolveImageUrls(calendarId, compressed, index, onBytes, uploadFn
     const uploaded = await retryMediaTask(() => uploadFn(calendarId, compressed, index, onBytes), options.requireStorage ? 3 : 1);
     if (uploaded && uploaded.imageUrl && uploaded.thumbUrl) {
       revokeCompressedObjectUrls(compressed);
-      return uploaded;
+      return { ...uploaded, metadata: compressed?.metadata || null };
     }
   } catch (e) {
     if (options.requireStorage) {
@@ -9962,7 +10012,8 @@ async function resolveImageUrls(calendarId, compressed, index, onBytes, uploadFn
   if (original || thumbnail) {
     return {
       imageUrl: original || thumbnail,
-      thumbUrl: thumbnail || original
+      thumbUrl: thumbnail || original,
+      metadata: compressed?.metadata || null
     };
   }
   throw new Error('이미지 처리 중 오류가 발생했습니다.');
