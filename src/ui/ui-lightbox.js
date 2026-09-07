@@ -516,7 +516,7 @@ const LIGHTBOX_TRANSITION_MS = 230;
 const LIGHTBOX_TRANSITION_FALLBACK_MS = LIGHTBOX_TRANSITION_MS + 90;
 const LIGHTBOX_TRANSITION_EASING = 'cubic-bezier(0.22, 0.61, 0.36, 1)';
 
-export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = null, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag, onDeletePhoto, onReplacePhoto, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, onJumpToGallery, onGetChatMessageOrdinal, onGetGalleryPhotoOrdinal, onRequestConfirm, onRemoveFromMemory = null, onFetchPhotoComments = null, onSavePhotoComments = null }) {
+export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = null, showToast, onPromoteImageUrl, onSaveImageTags, onSearchTag, onDeletePhoto, onReplacePhoto, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, onJumpToGallery, onGetChatMessageOrdinal, onGetGalleryPhotoOrdinal, onRequestConfirm, onRemoveFromMemory = null, onFetchPhotoComments = null, onSavePhotoComments = null, preloadedPhotoComments = {}, preloadedPhotoCommentsReady = false }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const TrashIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.TrashIcon) || __deps.TrashIcon;
@@ -723,14 +723,34 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     currentMeta ? (getLegacyMeetingMediaKey(currentMeta, { meetingDate: currentMeta.meetingDate }) || '') : ''
   ].filter(key => key && key !== photoCommentKey)));
   const legacyPhotoCommentKeysToken = legacyPhotoCommentKeys.join('|');
+  const getPreloadedComments = () => {
+    const keys = [photoCommentKey, ...legacyPhotoCommentKeys].filter(Boolean);
+    for (const key of keys) {
+      if (!Object.prototype.hasOwnProperty.call(preloadedPhotoComments || {}, key)) continue;
+      const comments = preloadedPhotoComments[key];
+      if (Array.isArray(comments) && comments.length > 0) return comments;
+    }
+    return preloadedPhotoCommentsReady ? [] : null;
+  };
   // A meeting photo whose comment thread predates photoId/sourceImageIndex being part of the
   // key (see getLegacyMeetingMediaKey) is filed under this coarser key instead -- checked only
   // when the current key comes up empty, so its existing comments still surface here.
-  const [photoCommentsByKey, setPhotoCommentsByKey] = React.useState({});
-  const [photoCommentsStatusByKey, setPhotoCommentsStatusByKey] = React.useState({});
+  const initialPreloadedComments = getPreloadedComments();
+  const [photoCommentsByKey, setPhotoCommentsByKey] = React.useState(() => initialPreloadedComments !== null
+    ? { [photoCommentKey]: initialPreloadedComments }
+    : {});
+  const [photoCommentsStatusByKey, setPhotoCommentsStatusByKey] = React.useState(() => initialPreloadedComments !== null
+    ? { [photoCommentKey]: 'ready' }
+    : {});
   const photoCommentsFetchedRef = React.useRef(new Set());
   React.useEffect(() => {
     if (!photoCommentKey) return;
+    const preloaded = getPreloadedComments();
+    if (preloaded !== null) {
+      setPhotoCommentsByKey(prev => ({ ...prev, [photoCommentKey]: preloaded }));
+      setPhotoCommentsStatusByKey(prev => ({ ...prev, [photoCommentKey]: 'ready' }));
+      return;
+    }
     if (typeof onFetchPhotoComments !== 'function') {
       setPhotoCommentsStatusByKey(prev => ({ ...prev, [photoCommentKey]: 'ready' }));
       return;
@@ -772,7 +792,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
       if (!cancelled) setPhotoCommentsStatusByKey(prev => ({ ...prev, [photoCommentKey]: 'error' }));
     });
     return () => { cancelled = true; };
-  }, [photoCommentKey, legacyPhotoCommentKeysToken, onFetchPhotoComments]);
+  }, [photoCommentKey, legacyPhotoCommentKeysToken, onFetchPhotoComments, preloadedPhotoComments, preloadedPhotoCommentsReady]);
   const handlePhotoCommentsChange = async nextComments => {
     if (!photoCommentKey || typeof onSavePhotoComments !== 'function') return false;
     if (photoCommentsStatusByKey[photoCommentKey] !== 'ready') {
@@ -793,8 +813,9 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
       key: `comments-${photoCommentKey}`,
       className: "lightbox-comment-thread lightbox-comment-thread-dark",
       style: {
-        width: '92vw', minHeight: '64px', maxHeight: '55vh', overflowY: 'auto', resize: 'vertical',
-        marginTop: isDesktop ? '4px' : '0px', padding: '10px 14px',
+        width: '92vw', minHeight: isDesktop ? '64px' : '58px', maxHeight: isDesktop ? '55vh' : 'none',
+        overflowY: isDesktop ? 'auto' : 'visible', resize: isDesktop ? 'vertical' : 'none',
+        marginTop: isDesktop ? '4px' : '1px', padding: isDesktop ? '10px 14px' : '6px 10px',
         backgroundColor: 'rgba(15, 23, 42, 0.72)', border: '1px solid rgba(255,255,255,0.12)',
         borderRadius: 'var(--radius-md)', boxSizing: 'border-box'
       }
@@ -1558,7 +1579,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   );
 
   const renderSlide = (url, slot) => {
-    const wrapperStyle = { width: '33.3333%', flexShrink: 0, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' };
+    const wrapperStyle = { width: '33.3333%', flexShrink: 0, height: '100%', display: 'flex', alignItems: isDesktop ? 'center' : 'flex-end', justifyContent: 'center' };
     if (!url) return /*#__PURE__*/React.createElement("div", { style: wrapperStyle });
 
     if (slot === 'current') {
@@ -1639,8 +1660,10 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     style: {
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
       backgroundColor: 'rgba(15, 23, 42, 0.92)', WebkitBackdropFilter: 'blur(8px)', backdropFilter: 'blur(8px)', zIndex: 50000,
-      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      width: '100%', maxWidth: '100%', overflow: 'hidden',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: isDesktop ? 'center' : 'flex-start',
+      width: '100%', maxWidth: '100%', overflowX: 'hidden', overflowY: isDesktop ? 'hidden' : 'auto',
+      paddingTop: isDesktop ? 0 : 'max(52px, calc(env(safe-area-inset-top, 0px) + 44px))',
+      paddingBottom: isDesktop ? 0 : '8px', boxSizing: 'border-box',
       userSelect: 'none'
     }
   }, /*#__PURE__*/React.createElement("input", {
@@ -1712,7 +1735,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     onTouchEnd: handleTouchEnd,
     onTouchCancel: handleTouchEnd,
     style: {
-      width: '92vw', height: '82vh', overflow: 'hidden',
+      width: '92vw', height: isDesktop ? '82vh' : '56dvh', overflow: 'hidden',
       cursor: isDragging ? 'grabbing' : 'grab',
       touchAction: 'none'
     }
@@ -1726,7 +1749,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     }
   }, renderSlide(index > 0 ? displayUrls[index - 1] : null, 'prev'), renderSlide(currentUrl, 'current'), renderSlide(index < total - 1 ? displayUrls[index + 1] : null, 'next')))
     : /*#__PURE__*/React.createElement("div", {
-    style: { position: 'relative', display: 'inline-flex', maxWidth: '92vw', maxHeight: '82vh', touchAction: 'none' },
+    style: { position: 'relative', display: 'inline-flex', maxWidth: '92vw', maxHeight: isDesktop ? '82vh' : '56dvh', touchAction: 'none' },
     onTouchStart: handleTouchStart,
     onTouchMove: handleTouchMove,
     onTouchEnd: handleTouchEnd,
@@ -1742,7 +1765,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     onLoad: e => recordImageDimensions(currentUrl, e),
     onMouseDown: handleZoomedImageMouseDown,
     style: {
-      maxWidth: '92vw', maxHeight: '82vh', borderRadius: 'var(--radius-md)', objectFit: 'contain',
+      maxWidth: '92vw', maxHeight: isDesktop ? '82vh' : '56dvh', borderRadius: 'var(--radius-md)', objectFit: 'contain',
       display: 'block', ...zoomImageStyle
     }
   }), renderPhotoActions(),
@@ -1773,8 +1796,8 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        gap: '6px',
-        marginTop: '16px',
+        gap: isDesktop ? '6px' : '2px',
+        marginTop: isDesktop ? '16px' : '4px',
         zIndex: 9001
       }
     },

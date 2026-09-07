@@ -121,9 +121,16 @@ const writeQueueSource = fs.readFileSync(new URL('../src/core/app-write-queue.js
 assert(writeQueueSource.includes('nextAttemptAt: Number(operation.nextAttemptAt) || 0'), 'queued operations must persist retry backoff metadata');
 assert(writeQueueSource.includes("await deferOperation(operation, new Error('대기 저장이 완료되지 않았습니다.'))"), 'false queue handler results must be deferred with backoff');
 const appMainSource = fs.readFileSync(new URL('../src/core/app-main.js', import.meta.url), 'utf8');
+const chatGallerySource = fs.readFileSync(new URL('../src/ui/ui-chat-gallery.js', import.meta.url), 'utf8');
 const lightboxSource = fs.readFileSync(new URL('../src/ui/ui-lightbox.js', import.meta.url), 'utf8');
 assert(lightboxSource.includes('isMeetingMessageTagTarget'), 'meeting message uploads must expose per-photo tag controls');
 assert(appMainSource.includes('Number.isInteger(imageIndex) && !meta.meetingDate'), 'meeting message tag edits must route to their messages document');
+assert(appMainSource.includes("activeView !== 'gallery'"), 'gallery route must hydrate the complete paged message history');
+assert(appMainSource.includes('getPhotoAssetCommentKey: typeof getPhotoAssetCommentKey'), 'gallery UI must receive the source-agnostic photo identity helper');
+assert(chatGallerySource.includes('const itemKey = photoKey'), 'gallery render keys must use the canonical photo identity');
+assert(appMainSource.includes('photoCommentsCacheReadyRef'), 'photo comment subscription must prime the lightbox comment cache');
+assert(lightboxSource.includes('preloadedPhotoCommentsReady'), 'lightbox must initialize from the subscribed comment documents');
+assert(lightboxSource.includes("overflowY: isDesktop ? 'auto' : 'visible'"), 'mobile photo comments must not use an inner vertical scrollbar');
 assert(appMainSource.includes("console.info('[calendar-save]'"), 'calendar saves must emit an operation diagnostic');
 assert(appMainSource.includes("console.warn('[calendar-save-failed]'"), 'failed calendar saves must emit an operation diagnostic');
 assert(appMainSource.includes('pendingRemotePlacesRef') && appMainSource.includes('pendingRemoteMeetingsRef'), 'realtime subcollection snapshots must be retained during local saves');

@@ -135,6 +135,7 @@ import {
   getDirectMediaTagKey,
   getDirectMediaTagsForUrl,
   getMediaIdentityKeys,
+  getPhotoAssetCommentKey,
   getPhotoCommentIdentity,
   getPhotoCommentCount,
   getLegacyMeetingMediaKey,
@@ -1356,6 +1357,12 @@ function CalendarApp() {
   // 문서가 존재하므로(빈 배열은 안 씀) 컬렉션 크기가 항상 작게 유지된다 -- see the realtime
   // listener below.
   const [photoCommentCounts, setPhotoCommentCounts] = React.useState({});
+  const [preloadedPhotoComments, setPreloadedPhotoComments] = React.useState({});
+  const [preloadedPhotoCommentsReady, setPreloadedPhotoCommentsReady] = React.useState(false);
+  // The badge subscription already receives every small photoComments document. Retain the
+  // comment arrays too, so opening a lightbox does not perform several serial document reads.
+  const photoCommentsCacheRef = React.useRef(new Map());
+  const photoCommentsCacheReadyRef = React.useRef(false);
   const [chatInput, setChatInput] = React.useState('');
   const [chatParticipantId, setChatParticipantId] = React.useState('');
   const chatParticipantIdRef = React.useRef(chatParticipantId);
@@ -1440,7 +1447,7 @@ function CalendarApp() {
     // 묶여 있어서, 그 창보다 오래된 사진에 붙은 해시태그(#도연/#도은/#서준 등)는 아무리
     // 정확히 태그해도 인물 탭에서 영원히 안 보였다 -- 태그 매칭 로직 자체는 멀쩡했지만
     // 매칭할 데이터 자체가 애초에 없었던 것.
-    if (!activeCalId || (!isGlobalSearchOpen && activeView !== 'history') || fullChatHistoryByCalendar[activeCalId] !== undefined) return;
+    if (!activeCalId || (!isGlobalSearchOpen && activeView !== 'history' && activeView !== 'gallery') || fullChatHistoryByCalendar[activeCalId] !== undefined) return;
     let cancelled = false;
     // Full-history consumers still receive every message (this remains the full chat history read), but the data layer walks the
     // collection in cursor pages instead of issuing one unbounded SDK GET. This keeps the
@@ -3098,6 +3105,10 @@ function CalendarApp() {
   );
   React.useEffect(() => {
     if (!activeCalId || !needsPhotoCommentCounts) return;
+    photoCommentsCacheRef.current = new Map();
+    photoCommentsCacheReadyRef.current = false;
+    setPreloadedPhotoComments({});
+    setPreloadedPhotoCommentsReady(false);
     if (!firebaseDb) {
       let cancelled = false;
       fetchPhotoCommentCountsRest(activeCalId).then(counts => {
@@ -3110,11 +3121,28 @@ function CalendarApp() {
       .onSnapshot(snapshot => {
         if (!isMounted) return;
         const next = {};
+        const nextCache = new Map();
         snapshot.forEach(doc => {
           const data = doc.data();
-          const n = Array.isArray(data?.comments) ? data.comments.length : 0;
+          const comments = Array.isArray(data?.comments) ? data.comments : [];
+          const n = comments.length;
           if (n > 0) next[doc.id] = n;
+          nextCache.set(doc.id, comments);
         });
+        if (snapshot.metadata.fromCache) {
+          const merged = new Map(photoCommentsCacheRef.current);
+          nextCache.forEach((comments, key) => merged.set(key, comments));
+          photoCommentsCacheRef.current = merged;
+          setPreloadedPhotoComments(previous => ({
+            ...previous,
+            ...Object.fromEntries(nextCache)
+          }));
+        } else {
+          photoCommentsCacheRef.current = nextCache;
+          photoCommentsCacheReadyRef.current = true;
+          setPreloadedPhotoComments(Object.fromEntries(nextCache));
+          setPreloadedPhotoCommentsReady(true);
+        }
         // A reconnect can briefly replay an incomplete cache snapshot before the authoritative
         // server snapshot. Never let that transient cache erase badges already confirmed in the
         // current session; server-confirmed snapshots still replace the map (including deletes).
@@ -5967,6 +5995,13 @@ function CalendarApp() {
   // isValidPhotoCommentDocId와 같은 문자셋으로 한 번 더 다듬어(콜론/점/하이픈/밑줄/영숫자만,
   // 300자 캡) 규칙에 안 걸리는 값만 서버로 보낸다.
   const handleFetchPhotoComments = async photoKey => {
+    const docId = String(photoKey || '').replace(/[^A-Za-z0-9_:.-]/g, '_').slice(0, 300);
+    if (docId && photoCommentsCacheRef.current.has(docId)) {
+      return { success: true, comments: photoCommentsCacheRef.current.get(docId) || [] };
+    }
+    if (docId && photoCommentsCacheReadyRef.current) {
+      return { success: true, comments: [] };
+    }
     return fetchPhotoComments({
       photoKey,
       calendarId: activeCalId,
@@ -5976,13 +6011,34 @@ function CalendarApp() {
     });
   };
   const handleSavePhotoComments = async (photoKey, nextComments) => {
-    return savePhotoComments({
+    const saved = await savePhotoComments({
       photoKey,
       comments: nextComments,
       calendarId: activeCalId,
       writeDocument: writeCollectionDocumentWithFallback,
       audit: (type, detail) => queueServerAuditEvent(activeCalId, type, detail, getClientAuditContext())
     });
+    if (saved) {
+      const docId = String(photoKey || '').replace(/[^A-Za-z0-9_:.-]/g, '_').slice(0, 300);
+      if (docId) {
+        const comments = Array.isArray(nextComments) ? nextComments : [];
+        if (comments.length > 0) photoCommentsCacheRef.current.set(docId, comments);
+        else photoCommentsCacheRef.current.delete(docId);
+        setPreloadedPhotoComments(previous => {
+          const next = { ...previous };
+          if (comments.length > 0) next[docId] = comments;
+          else delete next[docId];
+          return next;
+        });
+        setPhotoCommentCounts(previous => {
+          const next = { ...previous };
+          if (comments.length > 0) next[docId] = comments.length;
+          else delete next[docId];
+          return next;
+        });
+      }
+    }
+    return saved;
   };
 
   const findMemoById = async memoId => {
@@ -7225,7 +7281,9 @@ function CalendarApp() {
       onGetGalleryPhotoOrdinal: handleGetGalleryPhotoOrdinal,
       onRequestConfirm: showConfirmDialog,
       onFetchPhotoComments: handleFetchPhotoComments,
-      onSavePhotoComments: handleSavePhotoComments
+      onSavePhotoComments: handleSavePhotoComments,
+      preloadedPhotoComments: preloadedPhotoComments,
+      preloadedPhotoCommentsReady: preloadedPhotoCommentsReady
     }) : null
   );
   const localGalleryCount = (() => {
@@ -12253,6 +12311,7 @@ function bindGatherUiDeps() {
     getMessageImageEntries: typeof getMessageImageEntries === 'function' ? getMessageImageEntries : null,
     dateStrToHashtag: typeof dateStrToHashtag === 'function' ? dateStrToHashtag : null,
     getMediaIdentityKeys: typeof getMediaIdentityKeys === 'function' ? getMediaIdentityKeys : null,
+    getPhotoAssetCommentKey: typeof getPhotoAssetCommentKey === 'function' ? getPhotoAssetCommentKey : null,
     getPhotoCommentIdentity: typeof getPhotoCommentIdentity === 'function' ? getPhotoCommentIdentity : null,
     getPhotoCommentCount: typeof getPhotoCommentCount === 'function' ? getPhotoCommentCount : null,
     getLegacyMeetingMediaKey: typeof getLegacyMeetingMediaKey === 'function' ? getLegacyMeetingMediaKey : null,

@@ -13,6 +13,10 @@ function getPhotoCommentCount(...args) {
   const f = __gatherUiDeps().getPhotoCommentCount || GATHER_APP_UTILS.getPhotoCommentCount;
   return typeof f === 'function' ? f(...args) : 0;
 }
+function getPhotoAssetCommentKey(...args) {
+  const f = __gatherUiDeps().getPhotoAssetCommentKey || GATHER_APP_UTILS.getPhotoAssetCommentKey;
+  return typeof f === 'function' ? f(...args) : '';
+}
 /* __fb() bridge */
 function __fb() {
   const deps = __gatherUiDeps();
@@ -425,7 +429,10 @@ export function ChatGalleryModal({
   const brokenPhotoKeysRef = React.useRef((GATHER_APP_UTILS.getPersistentBrokenPhotoUrls || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.getPersistentBrokenPhotoUrls) || (() => new Set()))());
   const brokenPhotoUrlsRef = React.useRef((GATHER_APP_UTILS.getPersistentBrokenPhotoUrls || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.getPersistentBrokenPhotoUrls) || (() => new Set()))());
   const [brokenPhotoRevision, setBrokenPhotoRevision] = React.useState(0);
-  const getPhotoKey = photo => photo?.mediaKey || photo?.refKey || `${photo?.messageId || photo?.photoId || photo?.sourceMessageId || ''}_${photo?.imageIndex ?? photo?.sourceImageIndex ?? ''}`;
+  const getPhotoKey = photo => getPhotoAssetCommentKey(photo)
+    || photo?.mediaKey
+    || photo?.refKey
+    || `${photo?.messageId || photo?.photoId || photo?.sourceMessageId || ''}_${photo?.imageIndex ?? photo?.sourceImageIndex ?? ''}`;
   const normalizeBrokenPhotoUrl = value => {
     const url = String(value || '').trim();
     if (!url) return '';
@@ -588,7 +595,9 @@ export function ChatGalleryModal({
       photos.forEach((photo, index) => {
         if (photo?.sourceMessageId) {
           const sourceMsg = (chatMessages || []).find(m => m && m.id === photo.sourceMessageId);
-          if (!sourceMsg || isTombstone(sourceMsg)) return;
+          // The archived meeting photo already carries its own URL. An older source message may
+          // not be in the current paginated window; that must not hide the schedule photo itself.
+          if (sourceMsg && isTombstone(sourceMsg)) return;
         }
         const resolved = resolveMeetingPhotoDisplay ? resolveMeetingPhotoDisplay(photo, chatMessages) : null;
         const full = String(resolved?.imageUrl || photo?.imageUrl || photo?.full || '');
@@ -622,14 +631,16 @@ export function ChatGalleryModal({
       });
     });
     const byUrl = new Map();
-    const sourceRank = { chat: 0, memo: 1, meeting: 2 };
+    const sourceRank = entry => entry?.messageId ? 0 : (entry?.source === 'memo' ? 1 : 2);
     list.forEach(entry => {
-      const key = entry.mediaKey || entry.refKey || entry.full || entry.thumb;
+      // Feature-prefixed media keys treated one physical photo as different chat/gallery/meeting
+      // items. A normalized asset key provides real source-agnostic deduplication.
+      const key = getPhotoAssetCommentKey(entry) || entry.full || entry.thumb || entry.mediaKey || entry.refKey;
       if (!key) return;
       const existing = byUrl.get(key);
       if (!existing) {
         byUrl.set(key, { ...entry });
-      } else if ((sourceRank[entry.source] ?? 9) < (sourceRank[existing.source] ?? 9)) {
+      } else if (sourceRank(entry) < sourceRank(existing)) {
         byUrl.set(key, { ...entry, meetingDate: entry.meetingDate || existing.meetingDate || '' });
       } else if (!existing.meetingDate && entry.meetingDate) {
         existing.meetingDate = entry.meetingDate;
@@ -681,6 +692,18 @@ export function ChatGalleryModal({
       return;
     }
     if (typeof onLoadOlderChat === 'function' && hasMoreOlderChat && !loadingOlderChat) onLoadOlderChat();
+  };
+  const handleGalleryContentScroll = e => {
+    handleGalleryScroll(e);
+    if (!asPage || activeTab !== 'photos' || galleryViewMode !== 'all' || !hasLocallyHiddenPhotos) return;
+    const el = e?.currentTarget;
+    if (!el) return;
+    // Keep the initial DOM light, then progressively reveal the complete already-hydrated
+    // gallery before the user reaches the bottom. The button remains as an accessibility and
+    // slow-device fallback, but ordinary scrolling no longer requires repeated manual taps.
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 900) {
+      setPhotoRenderLimit(limit => Math.min(visiblePhotos.length, limit + 40));
+    }
   };
 
   const handleBrokenPhoto = (photo, brokenInfo = {}) => {
@@ -1326,7 +1349,7 @@ export function ChatGalleryModal({
     }
   }, (items || []).map((photo, idx) => {
     const photoKey = getPhotoKey(photo);
-    const itemKey = photo.mediaKey || photo.refKey || `${photo.messageId || photo.source || 'photo'}-${photo.meetingDate || ''}-${photo.directMediaUrl ? 'direct' : photo.imageIndex}-${photo.timestamp || idx}`;
+    const itemKey = photoKey || `${photo.messageId || photo.source || 'photo'}-${photo.meetingDate || ''}-${photo.directMediaUrl ? 'direct' : photo.imageIndex}-${photo.timestamp || idx}`;
     const lightboxIndex = (lightboxItems || []).findIndex(entry => getPhotoKey(entry) === photoKey);
     const isChecked = isBulkShareMode && selectedBulkShareKeys.has(photoKey);
     // Same mediaKey/refKey identity the Lightbox itself computes to key a photo's comment thread
@@ -1719,7 +1742,9 @@ export function ChatGalleryModal({
         })
       );
     }
-    const sortedPhotos = sortGalleryFlatItems(renderedPhotos);
+    const sortedVisiblePhotos = sortGalleryFlatItems(visiblePhotos);
+    const renderedKeys = new Set(renderedPhotos.map(getPhotoKey));
+    const sortedPhotos = sortedVisiblePhotos.filter(photo => renderedKeys.has(getPhotoKey(photo)));
     return /*#__PURE__*/React.createElement(React.Fragment, null,
       renderPhotoListHeader(),
       sortedPhotos.length === 0 ? /*#__PURE__*/React.createElement("div", {
@@ -1727,7 +1752,7 @@ export function ChatGalleryModal({
       }, searchQuery
         ? "검색 결과가 없습니다."
         : describeGalleryPhotoEmptyState("공유된 사진이 없습니다."))
-      : renderGalleryPhotoGrid(sortedPhotos, sortedPhotos),
+      : renderGalleryPhotoGrid(sortedPhotos, sortedVisiblePhotos),
       (hasLocallyHiddenPhotos || hasMoreOlderChat || loadingOlderChat) && !(searchQuery || '').trim() && renderGalleryLoadMoreButton({
         label: hasLocallyHiddenPhotos ? `사진 더 보기 (${visiblePhotos.length}장 불러옴)` : `이전 사진 더 보기 (${visiblePhotos.length}장 불러옴)`,
         loadingLabel: '이전 사진을 불러오는 중…',
@@ -2007,7 +2032,7 @@ export function ChatGalleryModal({
   ), /*#__PURE__*/React.createElement("div", {
     ref: gridHostRef,
     className: asPage ? "gallery-page-scroll" : undefined,
-    onScroll: asPage ? handleGalleryScroll : undefined,
+    onScroll: asPage ? handleGalleryContentScroll : undefined,
     style: {
       flex: 1, overflowY: 'auto', minHeight: 0,
       overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch',
