@@ -1746,11 +1746,15 @@ export function ParticipantSelectSheet({ calendar, participants, title, isOption
     style: {
       alignItems: 'flex-end',
       backgroundColor: 'rgba(15, 23, 42, 0.68)',
-      zIndex: 11000
+      // Above the Lightbox's own overlay (ui-lightbox.js, zIndex: 50000) -- this sheet is also
+      // opened from inside the Lightbox's comment composer (ParticipantPickerButton), and at
+      // 11000 it rendered fully behind the Lightbox, making its options unclickable. Still well
+      // below the toast/confirm-dialog layer (100000+) everywhere else this sheet is used.
+      zIndex: 51000
     }
   }), /*#__PURE__*/React.createElement("div", {
     className: "poll-voter-sheet",
-    style: { zIndex: 11001 }
+    style: { zIndex: 51001 }
   }, /*#__PURE__*/React.createElement("div", {
     className: "poll-voter-sheet-header"
   }, /*#__PURE__*/React.createElement("span", null, title), /*#__PURE__*/React.createElement("button", {
