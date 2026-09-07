@@ -2197,8 +2197,9 @@ export function ChatGalleryModal({
             // 튀어 보인다.
             /*#__PURE__*/React.createElement("button", {
               type: "button",
+              className: "btn btn-action btn-action-outline",
               onClick: handlePasteGalleryUpload,
-              style: { height: '36px', padding: '0 8px', border: 'none', background: 'none', color: 'var(--text-main)', fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: 'pointer' }
+              style: { height: '36px', padding: '0 12px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: 'pointer' }
             }, "붙여넣기"),
             /*#__PURE__*/React.createElement("button", {
               type: "button",
