@@ -993,6 +993,23 @@ export function ChatGalleryModal({
   syncStatus = null
 }) {
   const React = window.React;
+  // The full-page gallery owns scrolling through .gallery-page-scroll.  Lock the document
+  // underneath it so the browser cannot expose a second (outer) scrollbar beside the gallery's
+  // intentional inner scrollbar, especially on desktop where the fixed shell still leaves the
+  // app root's previous height in the layout.
+  React.useEffect(() => {
+    if (!asPage || typeof document === 'undefined') return undefined;
+    const html = document.documentElement;
+    const body = document.body;
+    const previousHtmlOverflow = html.style.overflow;
+    const previousBodyOverflow = body.style.overflow;
+    html.style.overflow = 'hidden';
+    body.style.overflow = 'hidden';
+    return () => {
+      html.style.overflow = previousHtmlOverflow;
+      body.style.overflow = previousBodyOverflow;
+    };
+  }, [asPage]);
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer || (function Shell(p) { return React.createElement('div', p, p.children); });
