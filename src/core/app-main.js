@@ -3115,7 +3115,12 @@ function CalendarApp() {
           const n = Array.isArray(data?.comments) ? data.comments.length : 0;
           if (n > 0) next[doc.id] = n;
         });
-        setPhotoCommentCounts(next);
+        // A reconnect can briefly replay an incomplete cache snapshot before the authoritative
+        // server snapshot. Never let that transient cache erase badges already confirmed in the
+        // current session; server-confirmed snapshots still replace the map (including deletes).
+        setPhotoCommentCounts(previous => snapshot.metadata.fromCache
+          ? { ...previous, ...next }
+          : next);
       }, err => {
         console.warn('Firestore photoComments subscription error:', err);
         queueServerAuditEvent(activeCalId, 'realtime_fallback', `photoComments:${String(err?.code || 'unknown')}`, getClientAuditContext());
@@ -4692,6 +4697,12 @@ function CalendarApp() {
       // writes to its own standalone tags field via handleSaveMeetingPhotoTags.
       if (meta.sourceMessageId && Number.isInteger(meta.sourceImageIndex)) {
         return handleSaveImageTags(meta.sourceMessageId, meta.sourceImageIndex, tagsText, {});
+      }
+      // Meeting-composer uploads live in messages just like chat/gallery uploads. Before they
+      // are linked to a confirmed date they have no meetingDate/photoId, so route them back to
+      // their own message instead of attempting an impossible confirmedMeeting photo update.
+      if (messageId && Number.isInteger(imageIndex) && !meta.meetingDate) {
+        return handleSaveImageTags(messageId, imageIndex, tagsText, {});
       }
       return handleSaveMeetingPhotoTags(meta.meetingDate, meta.photoId, tagsText);
     }

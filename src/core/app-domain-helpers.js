@@ -2299,17 +2299,38 @@ function getPhotoCommentIdentity(photo = {}, collection = [], opts = {}) {
   const canonicalKey = getPhotoAssetCommentKey(photo);
   if (!canonicalKey) return { ...base, legacyKeys: [] };
 
-  const candidateLegacyKeys = Array.from(new Set([base.mediaKey, base.refKey].filter(key => key && key !== canonicalKey)));
+  // Until upload streams were separated, every message-backed image was filed below a
+  // `chat:<messageId>:<imageIndex>` photoComments document -- including uploads whose real
+  // source was gallery or meeting.  Keep that historical key as a read-only alias.  New writes
+  // always use canonicalKey (the normalized asset URL), so this restores old comments without
+  // allowing a mutable message slot to become the owner of a new thread.
+  const legacyCandidatesFor = (item = {}, itemOpts = {}) => {
+    const itemBase = getMediaIdentityKeys(item, itemOpts) || {};
+    const itemMessageId = typeof item?.messageId === 'string' && item.messageId
+      ? item.messageId
+      : (typeof itemOpts.messageId === 'string' ? itemOpts.messageId : '');
+    const itemImageIndex = Number.isInteger(item?.imageIndex) ? item.imageIndex : null;
+    const itemSourceMessageId = typeof item?.sourceMessageId === 'string' ? item.sourceMessageId : '';
+    const itemSourceImageIndex = Number.isInteger(item?.sourceImageIndex) ? item.sourceImageIndex : null;
+    return Array.from(new Set([
+      itemBase.mediaKey,
+      itemBase.refKey,
+      itemMessageId && itemImageIndex != null ? `chat:${itemMessageId}:${itemImageIndex}` : '',
+      itemSourceMessageId && itemSourceImageIndex != null ? `chat:${itemSourceMessageId}:${itemSourceImageIndex}` : ''
+    ].filter(Boolean)));
+  };
+  const candidateLegacyKeys = legacyCandidatesFor(photo, opts)
+    .filter(key => key !== canonicalKey);
   const collectionItems = Array.isArray(collection) ? collection : [];
   const safeLegacyKeys = candidateLegacyKeys.filter(candidate => {
     if (collectionItems.length < 2) return true;
     const matchingAssetKeys = new Set();
     collectionItems.forEach(item => {
-      const itemKeys = getMediaIdentityKeys(item || {}, {
+      const itemOpts = {
         source: item?.source || opts.source,
         meetingDate: item?.meetingDate || opts.meetingDate
-      }) || {};
-      if (itemKeys.mediaKey !== candidate && itemKeys.refKey !== candidate) return;
+      };
+      if (!legacyCandidatesFor(item || {}, itemOpts).includes(candidate)) return;
       const itemAssetKey = getPhotoAssetCommentKey(item);
       matchingAssetKeys.add(itemAssetKey || `legacy:${candidate}`);
     });

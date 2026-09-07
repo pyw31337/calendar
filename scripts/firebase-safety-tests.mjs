@@ -86,6 +86,20 @@ const writeQueueSource = fs.readFileSync(new URL('../src/core/app-write-queue.js
   assert(new Set(identities.map(identity => identity.mediaKey)).size === 6, 'distinct images with duplicated legacy metadata shared a photo comment key');
   assert(identities.every(identity => identity.legacyKeys.length === 0), 'ambiguous legacy photo comment keys must never be used as read fallbacks');
 
+  const galleryBatch = [0, 1, 2].map(index => ({
+    source: 'gallery',
+    uploadSource: 'gallery',
+    messageId: 'gallery_batch_2',
+    imageIndex: index,
+    full: `https://example.com/gallery-${index}.jpg`
+  }));
+  const galleryIdentities = galleryBatch.map(photo => getPhotoCommentIdentity(photo, galleryBatch));
+  galleryIdentities.forEach((identity, index) => {
+    assert(identity.legacyKeys.includes(`chat:gallery_batch_2:${index}`), 'gallery photo lost its historical chat comment alias');
+    assert(getPhotoCommentCount(identity, { [`chat:gallery_batch_2:${index}`]: index + 1 }) === index + 1, 'historical gallery comment badge count was not resolved');
+  });
+  assert(!galleryIdentities[0].legacyKeys.includes('chat:gallery_batch_2:1'), 'a gallery photo inherited a sibling comment alias');
+
   const stableBeforeDelete = getPhotoAssetCommentKey({ full: 'https://example.com/gallery/photo-a.jpg', messageId: 'm1', imageIndex: 5 });
   const stableAfterDelete = getPhotoAssetCommentKey({ full: 'https://example.com/gallery/photo-a.jpg', messageId: 'm1', imageIndex: 4 });
   assert(stableBeforeDelete === stableAfterDelete, 'photo comment key changed when a preceding array item was deleted');
@@ -107,6 +121,9 @@ const writeQueueSource = fs.readFileSync(new URL('../src/core/app-write-queue.js
 assert(writeQueueSource.includes('nextAttemptAt: Number(operation.nextAttemptAt) || 0'), 'queued operations must persist retry backoff metadata');
 assert(writeQueueSource.includes("await deferOperation(operation, new Error('대기 저장이 완료되지 않았습니다.'))"), 'false queue handler results must be deferred with backoff');
 const appMainSource = fs.readFileSync(new URL('../src/core/app-main.js', import.meta.url), 'utf8');
+const lightboxSource = fs.readFileSync(new URL('../src/ui/ui-lightbox.js', import.meta.url), 'utf8');
+assert(lightboxSource.includes('isMeetingMessageTagTarget'), 'meeting message uploads must expose per-photo tag controls');
+assert(appMainSource.includes('Number.isInteger(imageIndex) && !meta.meetingDate'), 'meeting message tag edits must route to their messages document');
 assert(appMainSource.includes("console.info('[calendar-save]'"), 'calendar saves must emit an operation diagnostic');
 assert(appMainSource.includes("console.warn('[calendar-save-failed]'"), 'failed calendar saves must emit an operation diagnostic');
 assert(appMainSource.includes('pendingRemotePlacesRef') && appMainSource.includes('pendingRemoteMeetingsRef'), 'realtime subcollection snapshots must be retained during local saves');

@@ -419,14 +419,15 @@ export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast
       }, `#${tag}`, onSaveTags && /*#__PURE__*/React.createElement("button", {
         type: "button",
         title: `#${tag} 태그 삭제`,
+        "aria-label": `#${tag} 태그 삭제`,
         onClick: e => { e.stopPropagation(); setConfirmDeleteTag(tag); },
         style: {
-          width: '17px', height: '17px', border: 0, borderRadius: '50%',
+          width: '22px', height: '22px', minWidth: '22px', border: 0, borderRadius: '50%',
           background: '#FFFFFF', color: 'var(--text-main)', display: 'inline-flex',
           alignItems: 'center', justifyContent: 'center', padding: 0, cursor: 'pointer',
           flexShrink: 0
         }
-      }, /*#__PURE__*/React.createElement(TrashIcon, { size: 10 }))))
+      }, /*#__PURE__*/React.createElement(TrashIcon, { size: 13 }))))
     ),
     onSaveTags && /*#__PURE__*/React.createElement("div", {
       style: { display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }
@@ -815,6 +816,16 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   // the messages collection, not memos -- tags there are a whole-memo field with no single-photo
   // target, so editing is intentionally left disabled rather than silently failing to save.
   const isMeetingPhoto = currentMeta?.source === 'meeting' && !!currentMeta?.meetingDate && !!currentMeta?.photoId;
+  const isMeetingTagTarget = currentMeta?.source === 'meeting' && !!currentMeta?.meetingDate && (
+    (!!currentMeta?.sourceMessageId && Number.isInteger(currentMeta?.sourceImageIndex))
+    || !!currentMeta?.photoId
+  );
+  // A photo uploaded from the meeting composer is still stored as a normal messages document.
+  // It has source="meeting" but no meetingDate/photoId until (and unless) it is linked into a
+  // confirmed meeting. Treat its own messageId/index as the editable tag target.
+  const isMeetingMessageTagTarget = currentMeta?.source === 'meeting'
+    && !!currentMeta?.messageId
+    && Number.isInteger(currentMeta?.imageIndex);
   // Anniversary photos live on the anniversary doc's photos[] array (not a chat message), so
   // they identify by anniversaryId + imageIndex -- same shape handleSaveAnniversaryPhotoTags
   // expects in app-main.js.
@@ -827,7 +838,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   // to -- see the comment above), anniversary uses anniversaryId+imageIndex, and everything else
   // (chat, chat-tag, or an untagged directMediaUrl entry) just needs a real messageId.
   const canEditTags = currentMeta && (
-    currentMeta.source === 'meeting' ? isMeetingPhoto :
+    currentMeta.source === 'meeting' ? (isMeetingTagTarget || isMeetingMessageTagTarget) :
     currentMeta.source === 'anniversary' ? isAnniversaryPhoto :
     currentMeta.source === 'memo' ? false :
     currentMeta.messageId != null
