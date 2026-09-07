@@ -2135,6 +2135,21 @@ function getMediaIdentityKeys(photo = {}, opts = {}) {
   return { assetKey: key, mediaKey: key, refKey: key };
 }
 
+// Before photoId/sourceImageIndex became reliably present on every confirmedMeeting.photos[]
+// entry, getMediaIdentityKeys fell back to a plain `meeting:<date>:<sourceMessageId>` key with
+// no per-image index -- so a photo comment thread saved back then is still filed under that
+// coarser key, while getMediaIdentityKeys now computes a finer one (photoId- or index-qualified)
+// for the same photo. This reconstructs that older key purely as a read fallback, so existing
+// comment counts/threads are still found; new saves always use getMediaIdentityKeys' current key.
+function getLegacyMeetingMediaKey(photo = {}, opts = {}) {
+  const sourceMessageId = typeof photo?.sourceMessageId === 'string' && photo.sourceMessageId ? photo.sourceMessageId : '';
+  const meetingDate = typeof photo?.meetingDate === 'string' && photo.meetingDate
+    ? photo.meetingDate
+    : (typeof opts.meetingDate === 'string' && opts.meetingDate ? opts.meetingDate : '');
+  if (!sourceMessageId || !meetingDate) return '';
+  return `meeting:${meetingDate}:${sourceMessageId}`;
+}
+
 function getMessageDirectMediaEntry(msg, options = {}) {
   const firstUrl = extractFirstUrl(msg?.text || '');
   const mediaInfo = getDirectChatMediaInfo(firstUrl);
@@ -2394,6 +2409,7 @@ export {
   getDirectMediaTagKey,
   getDirectMediaTagsForUrl,
   getMediaIdentityKeys,
+  getLegacyMeetingMediaKey,
   getMessageDirectMediaEntry,
   formatBytes,
   getDataUrlInfo
