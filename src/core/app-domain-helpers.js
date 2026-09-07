@@ -1765,6 +1765,15 @@ function normalizeActivityLog(calendarId, log, participantIds = null, idRedirect
     sessionId: sanitizeText(log.actor.sessionId || '', 100),
     client: sanitizeText(log.actor.client || '', 120)
   } : null;
+  const resource = log.resource && typeof log.resource === 'object' ? {
+    resourceType: sanitizeText(log.resource.resourceType || '', 60),
+    resourceId: sanitizeText(log.resource.resourceId || '', 300),
+    source: sanitizeText(log.resource.source || '', 60),
+    sourceMessageId: sanitizeText(log.resource.sourceMessageId || '', 200),
+    ...(Number.isInteger(log.resource.imageIndex) ? { imageIndex: log.resource.imageIndex } : {}),
+    before: sanitizeText(log.resource.before || '', 500),
+    after: sanitizeText(log.resource.after || '', 500)
+  } : null;
   return {
     id,
     calendarId,
@@ -1773,7 +1782,8 @@ function normalizeActivityLog(calendarId, log, participantIds = null, idRedirect
     action,
     note,
     timestamp,
-    ...(actor && (actor.actorId || actor.sessionId || actor.client) ? { actor } : {})
+    ...(actor && (actor.actorId || actor.sessionId || actor.client) ? { actor } : {}),
+    ...(resource && (resource.resourceType || resource.resourceId || resource.source || resource.sourceMessageId || Number.isInteger(resource.imageIndex) || resource.before || resource.after) ? { resource } : {})
   };
 }
 
@@ -1852,7 +1862,8 @@ function formatDetailedLogNote(log) {
     const isAdd = action === 'tag_add';
     const tagStr = rawNote.startsWith('#') ? rawNote : `#${rawNote}`;
     const datePrefix = dateStr ? `'${dateStr}' 일정 ` : '';
-    return `${datePrefix}사진에 태그 ${tagStr} ${isAdd ? '추가' : '삭제'}`;
+    const target = log?.resource?.resourceId ? ` (${log.resource.resourceId})` : '';
+    return `${datePrefix}사진에 태그 ${tagStr} ${isAdd ? '추가' : '삭제'}${target}`;
   }
 
   if (action === 'photo_create' || action === 'photo_delete') {
@@ -1885,12 +1896,22 @@ function formatDetailedLogNote(log) {
   return rawNote;
 }
 
-function createActivityLog(calendarId, action, dateStr, participantId, timestamp = Date.now(), note = '') {
+function createActivityLog(calendarId, action, dateStr, participantId, timestamp = Date.now(), note = '', details = {}) {
   let richNote = sanitizeText(note, 2000);
   if (dateStr && richNote && !richNote.includes('[일자:')) {
     richNote = `[일자: ${dateStr}] ${richNote}`;
   }
   const actor = getClientAuditContext();
+  const resource = details && typeof details === 'object' ? {
+    resourceType: sanitizeText(details.resourceType || '', 60),
+    resourceId: sanitizeText(details.resourceId || '', 300),
+    source: sanitizeText(details.source || '', 60),
+    sourceMessageId: sanitizeText(details.sourceMessageId || '', 200),
+    ...(Number.isInteger(details.imageIndex) ? { imageIndex: details.imageIndex } : {}),
+    before: sanitizeText(details.before || '', 500),
+    after: sanitizeText(details.after || '', 500)
+  } : null;
+  const hasResource = resource && (resource.resourceType || resource.resourceId || resource.source || resource.sourceMessageId || Number.isInteger(resource.imageIndex) || resource.before || resource.after);
   const normalized = normalizeActivityLog(calendarId, {
     id: `${calendarId}_${dateStr}_${participantId}_${action}_${timestamp}_${Math.random().toString(36).slice(2, 8)}`,
     calendarId,
@@ -1899,9 +1920,10 @@ function createActivityLog(calendarId, action, dateStr, participantId, timestamp
     action,
     note: richNote,
     timestamp,
-    actor
+    actor,
+    ...(hasResource ? { resource } : {})
   });
-  if (normalized) queueServerAuditEvent(calendarId, action, richNote, actor);
+  if (normalized) queueServerAuditEvent(calendarId, action, resource?.resourceId || richNote, { ...actor, resource });
   return normalized;
 }
 

@@ -2976,6 +2976,10 @@ export function AdminDashboard({ initialCalendars }) {
                 const pMap = (selectedCal.participants || []).reduce((acc, p) => { acc[p.id] = p; return acc; }, {});
                 const p = resolveParticipant(log, pMap);
                 const detailedNoteText = formatNote(log);
+                const resource = log.resource && typeof log.resource === 'object' ? log.resource : null;
+                const resourceText = resource?.resourceId
+                  ? `원본: ${resource.resourceId}${resource.source ? ` · 출처: ${resource.source}` : ''}${Number.isInteger(resource.imageIndex) ? ` · 이미지 ${resource.imageIndex + 1}` : ''}`
+                  : '';
 
                 const actLabel = log.type === 'chat' ? '채팅 전송' :
                                  {
@@ -3027,6 +3031,7 @@ export function AdminDashboard({ initialCalendars }) {
 
                   /* Middle: memo, ellipsized on wide screens like admin-chat-text, wraps on narrow */
                   detailedNoteText && detailedNoteText !== (log.date ? formatShortDateWithDayName(log.date) : '') && /*#__PURE__*/React.createElement("span", { className: "admin-chat-text", title: detailedNoteText || '' }, detailedNoteText || ''),
+                  resourceText && /*#__PURE__*/React.createElement("span", { className: "admin-chat-text", title: resourceText, style: { color: '#475569', fontSize: 'var(--font-size-xs)' } }, resourceText),
 
                   /* Right: timestamp + restore button -- the button drops to its own full-width
                      row on mobile (recovery-restore-footer) rather than squeezing onto the

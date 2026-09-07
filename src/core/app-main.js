@@ -4858,9 +4858,24 @@ function CalendarApp() {
       const now = Date.now();
       const added = nextTokens.filter(t => !prevTokens.includes(t));
       const removed = prevTokens.filter(t => !nextTokens.includes(t));
+      const tagIdentity = getMediaIdentityKeys({
+        messageId,
+        imageIndex: isDirectMedia ? 0 : imageIndex,
+        directMediaUrl: isDirectMedia ? meta.directMediaUrl : '',
+        source: 'chat'
+      }, { source: 'chat', messageId });
+      const tagResource = {
+        resourceType: 'photo-tag',
+        resourceId: tagIdentity.mediaKey,
+        source: 'chat',
+        sourceMessageId: messageId,
+        imageIndex: isDirectMedia ? 0 : imageIndex,
+        before: prevTokens.join(' '),
+        after: cleanTags
+      };
       const tagLogs = [
-        ...added.map((t, i) => createActivityLog(activeCalId, 'tag_add', '', '', now + i, `#${t}`)),
-        ...removed.map((t, i) => createActivityLog(activeCalId, 'tag_remove', '', '', now + added.length + i, `#${t}`))
+        ...added.map((t, i) => createActivityLog(activeCalId, 'tag_add', '', '', now + i, `#${t}`, tagResource)),
+        ...removed.map((t, i) => createActivityLog(activeCalId, 'tag_remove', '', '', now + added.length + i, `#${t}`, tagResource))
       ].filter(Boolean);
       if (tagLogs.length > 0) {
         try {

@@ -347,7 +347,7 @@ service cloud.firestore {
       match /activityLogs/{logId} {
         allow get, list: if isCalendarDoc(calendarDocId);
         allow create, update: if isCalendarDoc(calendarDocId)
-          && request.resource.data.keys().hasOnly(['id', 'calendarId', 'participantId', 'date', 'action', 'note', 'timestamp', 'actor'])
+          && request.resource.data.keys().hasOnly(['id', 'calendarId', 'participantId', 'date', 'action', 'note', 'timestamp', 'actor', 'resource'])
           && request.resource.data.id is string
           && request.resource.data.id.size() <= 200
           && request.resource.data.calendarId is string
@@ -371,6 +371,17 @@ service cloud.firestore {
             && request.resource.data.actor.actorId is string && request.resource.data.actor.actorId.size() <= 80
             && request.resource.data.actor.sessionId is string && request.resource.data.actor.sessionId.size() <= 100
             && request.resource.data.actor.client is string && request.resource.data.actor.client.size() <= 120
+          ))
+          && (!('resource' in request.resource.data) || (
+            request.resource.data.resource is map
+            && request.resource.data.resource.keys().hasOnly(['resourceType', 'resourceId', 'source', 'sourceMessageId', 'imageIndex', 'before', 'after'])
+            && request.resource.data.resource.resourceType is string && request.resource.data.resource.resourceType.size() <= 60
+            && request.resource.data.resource.resourceId is string && request.resource.data.resource.resourceId.size() <= 300
+            && request.resource.data.resource.source is string && request.resource.data.resource.source.size() <= 60
+            && request.resource.data.resource.sourceMessageId is string && request.resource.data.resource.sourceMessageId.size() <= 200
+            && (!('imageIndex' in request.resource.data.resource) || request.resource.data.resource.imageIndex is number)
+            && request.resource.data.resource.before is string && request.resource.data.resource.before.size() <= 500
+            && request.resource.data.resource.after is string && request.resource.data.resource.after.size() <= 500
           ));
         allow update: if false;
         allow delete: if isCalendarDoc(calendarDocId);
