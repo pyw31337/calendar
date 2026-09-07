@@ -9421,15 +9421,37 @@ function buildMetadataTags(metadata, scheduledDate = '') {
   if (metadata?.device) {
     const raw = String(metadata.device).replace(/\s+/g, ' ').trim();
     const lower = raw.toLowerCase();
-    let deviceTag = raw;
+    let deviceTag = '';
     if (lower.includes('iphone')) {
       const model = raw.match(/iphone\s*([0-9]+(?:\s*pro(?:\s*max)?|\s*plus|\s*mini)?)/i);
       deviceTag = model ? `아이폰${model[1].replace(/\s+/g, '').replace(/pro/i, '프로').replace(/max/i, '맥스').replace(/plus/i, '플러스').replace(/mini/i, '미니')}` : '아이폰';
     } else if (lower.includes('galaxy') || /^sm[- ]/i.test(raw)) {
-      const model = raw.match(/(?:galaxy\s*)?(z\s*(?:fold|flip)\s*\d+|s\s*\d+|note\s*\d+)/i);
-      deviceTag = model ? `갤럭시${model[1].replace(/\s+/g, '').replace(/fold/i, '폴드').replace(/flip/i, '플립').replace(/note/i, '노트')}` : '갤럭시';
+      // Samsung EXIF stores opaque codes (for example SM-F916N). Never expose those
+      // codes, nor the generic manufacturer name, as user-facing hashtags. Only emit a
+      // Korean product name when the code is in this verified map.
+      const samsungModels = [
+        [/SM-F916[A-Z0-9]*/i, '갤럭시Z폴드2'],
+        [/SM-F926[A-Z0-9]*/i, '갤럭시Z폴드3'],
+        [/SM-F936[A-Z0-9]*/i, '갤럭시Z폴드4'],
+        [/SM-F946[A-Z0-9]*/i, '갤럭시Z폴드5'],
+        [/SM-F956[A-Z0-9]*/i, '갤럭시Z폴드6'],
+        [/SM-F700[A-Z0-9]*/i, '갤럭시Z플립'],
+        [/SM-F711[A-Z0-9]*/i, '갤럭시Z플립3'],
+        [/SM-F721[A-Z0-9]*/i, '갤럭시Z플립4'],
+        [/SM-F731[A-Z0-9]*/i, '갤럭시Z플립5'],
+        [/SM-F741[A-Z0-9]*/i, '갤럭시Z플립6'],
+        [/SM-S911[A-Z0-9]*/i, '갤럭시S23'],
+        [/SM-S921[A-Z0-9]*/i, '갤럭시S24'],
+        [/SM-S931[A-Z0-9]*/i, '갤럭시S25']
+      ];
+      const mapped = samsungModels.find(([pattern]) => pattern.test(raw));
+      if (mapped) deviceTag = mapped[1];
+      else {
+        const model = raw.match(/(?:galaxy\s*)?(z\s*(?:fold|flip)\s*\d+|s\s*\d+|note\s*\d+)/i);
+        if (model) deviceTag = `갤럭시${model[1].replace(/\s+/g, '').replace(/fold/i, '폴드').replace(/flip/i, '플립').replace(/note/i, '노트')}`;
+      }
     }
-    add(deviceTag);
+    if (deviceTag) add(deviceTag);
   }
   return tags.join(' ');
 }
