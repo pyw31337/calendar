@@ -1273,7 +1273,22 @@ export function HistoryView({
   const formatHistoryDate = value => {
     const text = String(value || '').slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return '';
-    return typeof __deps.formatShortDateWithDayName === 'function' ? __deps.formatShortDateWithDayName(text) : text.replace(/^(\d{4})-(\d{2})-(\d{2})$/, '$1.$2.$3');
+    if (typeof formatDateWithDayName === 'function') {
+      const labeled = formatDateWithDayName(text);
+      if (labeled) return labeled;
+    }
+    if (typeof __deps.formatShortDateWithDayName === 'function') return __deps.formatShortDateWithDayName(text);
+    return text.replace(/^(\d{4})-(\d{2})-(\d{2})$/, '$1.$2.$3');
+  };
+  const formatHistoryDateRange = (start, end) => {
+    const startText = String(start || '').slice(0, 10);
+    const endText = String(end || start || '').slice(0, 10);
+    const a = formatHistoryDate(startText);
+    if (!a) return '';
+    if (!endText || endText === startText) return a;
+    const b = formatHistoryDate(endText);
+    if (!b) return a;
+    return `${a} ~ ${b.replace(/^20(?=\d{2}\.)/, '')}`;
   };
   const getTaggedDate = photo => {
     const meetingDate = String(photo?.meetingDate || '').slice(0, 10);
@@ -1996,7 +2011,7 @@ export function HistoryView({
                 style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '12px', marginBottom: '8px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', background: 'var(--bg-primary)', color: 'var(--text-main)', textAlign: 'left', cursor: 'pointer' }
               }, /*#__PURE__*/React.createElement("span", null,
                 /*#__PURE__*/React.createElement("strong", { style: { display: 'block' } }, item.title),
-                /*#__PURE__*/React.createElement("small", { style: { color: 'var(--text-muted)' } }, item.startDate === item.endDate ? item.startDate : `${item.startDate} ~ ${item.endDate}`)
+                /*#__PURE__*/React.createElement("small", { style: { color: 'var(--text-muted)' } }, formatHistoryDateRange(item.startDate, item.endDate))
               ), /*#__PURE__*/React.createElement("span", { style: { color: 'var(--accent-primary)', fontWeight: 800 } }, "+")))
         )
       ))
@@ -2020,7 +2035,7 @@ export function HistoryView({
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 } },
             /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-lg)', fontWeight: 800, color: 'var(--text-main)' } }, group.title),
             /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' } },
-              group.startDate === group.endDate ? group.startDate : `${group.startDate} ~ ${group.endDate}`
+              formatHistoryDateRange(group.startDate, group.endDate)
             )
           ),
           canBulkExclude && (
@@ -2421,9 +2436,7 @@ export function ContentView({
         // 기간이 항상 비어보인다(-> 컨텐츠 상세 시트에서 "정보없음"으로 표시됨).
         startDate: a.startDate || a.date,
         endDate: a.endDate || a.date,
-        dateLabel: (a.startDate && a.endDate && a.startDate !== a.endDate)
-          ? `${a.startDate} ~ ${a.endDate}`
-          : (a.startDate || a.date || ''),
+        dateLabel: formatCultureDateLabel(a.startDate || a.date, a.endDate || a.date),
         venue: a.place ? (a.place.alias || a.place.name || '') : '',
         address: a.place ? (a.place.address || '') : '',
         description: a.description || '',
@@ -3606,9 +3619,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
           title: a.title || snapshot.title || '',
           startDate: a.startDate || a.date || snapshot.startDate,
           endDate: a.endDate || a.date || snapshot.endDate,
-          dateLabel: (a.startDate && a.endDate && a.startDate !== a.endDate)
-            ? `${a.startDate} ~ ${a.endDate}`
-            : (a.startDate || a.date || snapshot.dateLabel || ''),
+          dateLabel: formatCultureDateLabel(a.startDate || a.date || snapshot.startDate, a.endDate || a.date || snapshot.endDate) || snapshot.dateLabel || '',
           venue: a.place ? (a.place.alias || a.place.name || '') : (snapshot.venue || ''),
           address: a.place ? (a.place.address || '') : (snapshot.address || ''),
           description: a.description || snapshot.description || '',
@@ -4227,7 +4238,7 @@ function SharedContentPreviewModal({ item, onClose }) {
           style: { flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }
         },
           [
-            ['기간', item.dateLabel || (item.startDate && item.endDate && item.startDate !== item.endDate ? `${item.startDate} ~ ${item.endDate}` : item.startDate)],
+            ['기간', item.dateLabel || formatCultureDateLabel(item.startDate, item.endDate) || item.startDate],
             ['장소', item.venue],
             ['주소', item.address],
             ['문의', item.contact],
