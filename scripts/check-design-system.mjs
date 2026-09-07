@@ -1,5 +1,5 @@
 /** Regression guards for the shared UI design system. */
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -11,6 +11,8 @@ const picker = read('src/ui/ui-summary-gallery.js');
 const confirm = read('src/ui/ui-confirm-dialog.js');
 const sideMenu = read('src/ui/ui-side-menu.js');
 const uiSources = ['ui-calendar-core.js', 'ui-misc.js', 'ui-remaining.js', 'ui-admin-modals.js', 'ui-share-modal.js', 'ui-event-modals.js']
+  .map(file => read(`src/ui/${file}`)).join('\n');
+const allUiSources = readdirSync(resolve(root, 'src/ui')).filter(file => file.endsWith('.js'))
   .map(file => read(`src/ui/${file}`)).join('\n');
 
 const failures = [];
@@ -24,6 +26,7 @@ requireText(picker, /SimpleBottomSheetPicker: SimpleBottomSheetPicker/, 'shared 
 requireText(confirm, /height: '44px'[\s\S]*minHeight: '44px'/, 'confirm actions must use 44px targets');
 if (/window\.confirm\s*\(/.test(sideMenu)) failures.push('settings must not use native window.confirm');
 if (/\balert\s*\(/.test(uiSources)) failures.push('shared UI flows must use toast/dialog primitives instead of native alert');
+if (/"stroke-(?:width|linecap|linejoin)"\s*:/.test(allUiSources)) failures.push('React SVG props must use strokeWidth/strokeLinecap/strokeLinejoin');
 
 if (failures.length) {
   failures.forEach(message => console.error('[check-design-system]', message));

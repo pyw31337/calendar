@@ -17,5 +17,8 @@ assert(!/allow\s+(?:read|write|read,\s*write)\s*:\s*if\s+true\s*;/.test(storage)
 assert(/match \/calendars\/\{calendarDocId\}[\s\S]*allow get: if isCalendarDoc\(calendarDocId\);/.test(firestore), 'calendar reads must stay scoped to validated document IDs');
 assert(/match \/messages\/\{messageId\}[\s\S]*allow get, list: if isCalendarDoc\(calendarDocId\);/.test(firestore), 'message reads must stay calendar-scoped');
 assert(/match \/meetingPhotoIndex\/\{photoId\}[\s\S]*allow write: if false;/.test(firestore), 'meeting photo index must remain server-maintained');
+const activityLogRules = firestore.match(/match \/activityLogs\/\{logId\} \{([\s\S]*?)\n\s{6}\}/)?.[1] || '';
+assert(/allow create:/.test(activityLogRules) && /allow update: if false;/.test(activityLogRules), 'activity logs must be append-only');
+assert(!/allow create,\s*update:/.test(activityLogRules), 'activity log updates must not be granted by an earlier rule');
 
 console.log('[rules-safety] passed: wildcard denies, scoped calendar reads, and server-only index are intact');

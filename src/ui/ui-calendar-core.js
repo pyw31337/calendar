@@ -692,9 +692,9 @@ export function CalendarGrid({
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
     className: "icon icon-tabler icons-tabler-outline icon-tabler-chevron-down"
   }, /*#__PURE__*/React.createElement("path", {
     stroke: "none",
@@ -721,9 +721,9 @@ export function CalendarGrid({
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
     style: { transform: 'rotate(90deg)' },
     className: "icon icon-tabler icons-tabler-outline icon-tabler-chevron-down"
   }, /*#__PURE__*/React.createElement("path", {
@@ -753,9 +753,9 @@ export function CalendarGrid({
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
     style: { transform: 'rotate(-90deg)' },
     className: "icon icon-tabler icons-tabler-outline icon-tabler-chevron-down"
   }, /*#__PURE__*/React.createElement("path", {

@@ -17,6 +17,19 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     });
     return Promise.race([request, deadline]).finally(function () { if (timer) clearTimeout(timer); });
   }
+  async function fetchWithRetry(url, init, timeoutMs, attempts) {
+    const maxAttempts = Math.max(1, Math.min(3, Number(attempts) || 2));
+    let lastError = null;
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      try {
+        return await fetchWithTimeout(url, init, timeoutMs);
+      } catch (err) {
+        lastError = err;
+        if (attempt + 1 < maxAttempts) await new Promise(resolve => setTimeout(resolve, 120 * (attempt + 1)));
+      }
+    }
+    throw lastError || new Error('Firestore REST read failed');
+  }
   function withSdkTimeout(promise, timeoutMs) {
     let timer = null;
     const deadline = new Promise(function (_, reject) {
@@ -459,11 +472,11 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
           aggregations: [{ alias: 'total', count: {} }]
         }
       };
-      const res = await fetchWithTimeout(url, {
+      const res = await fetchWithRetry(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(aggBody)
-      });
+      }, FIRESTORE_REST_TIMEOUT_MS, 2);
       if (res.ok) {
         const data = await res.json();
         const rows = Array.isArray(data) ? data : [data];
@@ -568,11 +581,11 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
           aggregations: [{ alias: 'total', count: {} }]
         }
       };
-      const res = await fetchWithTimeout(url, {
+      const res = await fetchWithRetry(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(aggBody)
-      });
+      }, FIRESTORE_REST_TIMEOUT_MS, 2);
       if (res.ok) {
         const data = await res.json();
         const rows = Array.isArray(data) ? data : [data];

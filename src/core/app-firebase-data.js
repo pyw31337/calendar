@@ -2311,12 +2311,29 @@ function stripEmbeddedConfirmedMeetingField(calendar) {
   const { confirmedMeeting: _confirmedMeeting, ...rest } = calendar;
   return rest;
 }
+function normalizeConfirmedMeetingPhotoUrl(value) {
+  const raw = typeof value === 'string' ? value.trim() : '';
+  if (!raw) return '';
+  if (/^https?:\/\//i.test(raw)) return sanitizeText(raw, 4000);
+  if (!/^data:image\/[a-z0-9.+-]+;base64,/i.test(raw) || raw.length > 6000) return '';
+  const payload = raw.slice(raw.indexOf(',') + 1);
+  if (!payload || payload.length % 4 === 1 || /[^a-z0-9+/=]/i.test(payload)) return '';
+  try {
+    atob(payload);
+    return raw;
+  } catch (_) {
+    return '';
+  }
+}
 function normalizeConfirmedMeetingPhoto(photo) {
   if (!photo || typeof photo !== 'object') return null;
   const normalized = {};
   const id = sanitizeText(photo.id || photo.photoId || '', 120);
-  const imageUrl = sanitizeText(photo.imageUrl || '', 2000);
-  const thumbUrl = sanitizeText(photo.thumbUrl || '', 2000);
+  // Never slice a data URL. The previous generic 2,000-character cap produced a non-image that
+  // still looked truthy and was written into both imageUrl and thumbUrl. Keep only complete,
+  // bounded inline fallbacks; normal Storage URLs receive a conventional URL cap.
+  const imageUrl = normalizeConfirmedMeetingPhotoUrl(photo.imageUrl);
+  const thumbUrl = normalizeConfirmedMeetingPhotoUrl(photo.thumbUrl);
   const refKey = sanitizeText(photo.refKey || '', 220);
   const mediaKey = sanitizeText(photo.mediaKey || '', 220);
   const assetKey = sanitizeText(photo.assetKey || '', 220);

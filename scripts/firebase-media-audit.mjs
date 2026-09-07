@@ -28,6 +28,10 @@ function decode(value) {
   return undefined;
 }
 
+function decodeFields(fields) {
+  return Object.fromEntries(Object.entries(fields || {}).map(([key, value]) => [key, decode(value)]));
+}
+
 async function list(path) {
   const documents = [];
   let pageToken = '';
@@ -59,20 +63,39 @@ for (const calendarId of CALENDAR_IDS) {
   if (!documentResponse.ok) throw new Error(`media audit fetch failed for ${calendarId}: ${documentResponse.status} ${await documentResponse.text()}`);
   const document = await documentResponse.json();
   result.scannedCalendars += 1;
-  inspectRecord(decode(document.fields?.calendar) || {}, 'calendar', calendarId, result);
+  const calendar = decode(document.fields?.calendar) || {};
+  inspectRecord(calendar, 'calendar', calendarId, result);
   const messages = await list(`calendars/cal_${encodeURIComponent(calendarId)}/messages`);
   const memos = await list(`calendars/cal_${encodeURIComponent(calendarId)}/memos`);
   result.scannedMessages += messages.length;
   result.scannedMemos += memos.length;
   const meetings = await list(`calendars/cal_${encodeURIComponent(calendarId)}/confirmedMeetings`);
-  result.scannedMeetings += meetings.length;
-  messages.forEach(item => inspectRecord(decode(item.fields) || {}, 'message', item.name.split('/').pop(), result));
-  memos.forEach(item => inspectRecord(decode(item.fields) || {}, 'memo', item.name.split('/').pop(), result));
-  meetings.forEach(item => {
-    const meeting = decode(item.fields) || {};
+  messages.forEach(item => inspectRecord(decodeFields(item.fields), 'message', item.name.split('/').pop(), result));
+  memos.forEach(item => inspectRecord(decodeFields(item.fields), 'memo', item.name.split('/').pop(), result));
+  // Older calendars can still hold the authoritative photo list in the embedded
+  // calendar.confirmedMeeting array while the migrated subcollection row contains only the
+  // meeting shell. Audit the union, matching the application read path, instead of reporting
+  // zero photos just because the subcollection copy is sparse.
+  const meetingByDate = new Map();
+  const addMeeting = (meeting, fallbackId) => {
+    const date = String(meeting?.date || fallbackId || '');
+    const current = meetingByDate.get(date) || { date, photos: [] };
+    const photos = [...(Array.isArray(current.photos) ? current.photos : []), ...(Array.isArray(meeting?.photos) ? meeting.photos : [])];
+    const uniquePhotos = new Map();
+    photos.forEach((photo, index) => {
+      const key = String(photo?.sourceMessageId || photo?.messageId || photo?.photoId || photo?.imageUrl || photo?.full || `${date}:${index}`)
+        + `:${Number(photo?.sourceImageIndex ?? photo?.imageIndex ?? index)}`;
+      if (!uniquePhotos.has(key)) uniquePhotos.set(key, photo);
+    });
+    meetingByDate.set(date, { ...current, ...meeting, date, photos: [...uniquePhotos.values()] });
+  };
+  (Array.isArray(calendar.confirmedMeeting) ? calendar.confirmedMeeting : []).forEach(meeting => addMeeting(meeting, meeting?.date));
+  meetings.forEach(item => addMeeting(decodeFields(item.fields), item.name.split('/').pop()));
+  result.scannedMeetings += meetingByDate.size;
+  meetingByDate.forEach((meeting, date) => {
     const photos = Array.isArray(meeting.photos) ? meeting.photos : [];
     result.scannedMeetingPhotos += photos.length;
-    photos.forEach((photo, index) => inspectRecord(photo || {}, 'meetingPhoto', `${item.name.split('/').pop()}[${index}]`, result));
+    photos.forEach((photo, index) => inspectRecord(photo || {}, 'meetingPhoto', `${date}[${index}]`, result));
   });
 }
 console.log(JSON.stringify({ ...result, invalidCount: result.invalid.length }, null, 2));

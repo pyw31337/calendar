@@ -1332,9 +1332,9 @@ export function ChatRoomView({
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
-    "stroke-width": "2",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round"
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round"
   }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" }))), hasNewMessageBelow && /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: handleNewMessageBannerClick,
@@ -1366,9 +1366,9 @@ export function ChatRoomView({
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
-    "stroke-width": "2.5",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round"
+    strokeWidth: "2.5",
+    strokeLinecap: "round",
+    strokeLinejoin: "round"
   }, /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" })))), /*#__PURE__*/React.createElement("div", {
     className: "chat-composer",
     ref: chatComposerRef,

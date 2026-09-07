@@ -85,6 +85,11 @@ function isIgnorableConsoleError(text, url = '') {
     knownExternalWarningCount += 1;
     return true;
   }
+  if (BROWSER_NAME === 'webkit' && text.includes('[Report Only] Refused to load')
+    && text.includes('youtube.com/') && text.includes('Content Security Policy')) {
+    knownExternalWarningCount += 1;
+    return true;
+  }
   return ['compute-pressure', 'Permissions policy', 'status of 503', 'status of 502',
     'ERR_NAME_NOT_RESOLVED', 'ERR_CONNECTION_REFUSED', 'downloadable font: download failed',
     'has been rejected because it is in a cross-site context', 'inline-speculation-rules']
@@ -95,8 +100,12 @@ function isActionableConsoleWarning(text) {
 }
 function isKnownBrowserPageError(message) {
   if (/ResizeObserver loop (?:completed with undelivered notifications|limit exceeded)/i.test(message)) return true;
-  return BROWSER_NAME === 'webkit'
-    && /firestore\.googleapis\.com\/(?:google\.firestore\.v1\.Firestore\/(?:Listen|Write)\/channel|google\.firestore\.v1\.Firestore\/channel).*due to access control checks/i.test(message);
+  if (BROWSER_NAME !== 'webkit') return false;
+  if (/firestore\.googleapis\.com\/(?:google\.firestore\.v1\.Firestore\/(?:Listen|Write)\/channel|google\.firestore\.v1\.Firestore\/channel).*due to access control checks/i.test(message)) return true;
+  // WebKit reports a SecurityError when TikTok's HTTPS embed script probes its parent while the
+  // production build is exercised through Vite's local HTTP preview. The deployed site is HTTPS,
+  // and this third-party iframe exception does not escape or affect the app frame.
+  return /tiktok\.com[\s\S]*accessing a frame[\s\S]*protocols must match/i.test(message);
 }
 function collectSameOriginAsset404(response, baseUrl, bucket) {
   if (response.status() !== 404) return;

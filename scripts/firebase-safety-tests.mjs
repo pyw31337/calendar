@@ -134,6 +134,9 @@ assert(lightboxSource.includes("overflowY: isDesktop ? 'auto' : 'visible'"), 'mo
 assert(appMainSource.includes("console.info('[calendar-save]'"), 'calendar saves must emit an operation diagnostic');
 assert(appMainSource.includes("console.warn('[calendar-save-failed]'"), 'failed calendar saves must emit an operation diagnostic');
 assert(appMainSource.includes('pendingRemotePlacesRef') && appMainSource.includes('pendingRemoteMeetingsRef'), 'realtime subcollection snapshots must be retained during local saves');
+const firebaseDataSource = fs.readFileSync(new URL('../src/core/app-firebase-data.js', import.meta.url), 'utf8');
+assert(firebaseDataSource.includes('function normalizeConfirmedMeetingPhotoUrl'), 'meeting photo URLs must use media-aware normalization');
+assert(!/sanitizeText\(photo\.imageUrl \|\| '', 2000\)/.test(firebaseDataSource), 'meeting image data URLs must never be truncated to 2,000 characters');
 // A rendered link is a read path: it must never fan out into Firestore/Peekalink requests just
 // because a chat, memo, or gallery card mounted. Preview fetching belongs to explicit write flows.
 const linkPreviewHook = appMainSource.match(/function useLinkPreview\(url, cachedData\) \{([\s\S]*?)\n\}/)?.[1] || '';

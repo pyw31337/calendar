@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import vm from 'node:vm';
+import { spawnSync } from 'node:child_process';
 
 const PROJECT_ID = 'metro-live-2918e';
 const DATABASE = '(default)';
@@ -104,6 +105,14 @@ const testCalendars = [
   { id: `stress_cw_${stamp}`, title: 'Stress CW' }
 ];
 
+function cleanupCalendar(target) {
+  assert(/^stress_[A-Za-z0-9_-]{1,57}$/.test(target.id), `refusing unsafe cleanup id: ${target.id}`);
+  const result = spawnSync('firebase', [
+    'firestore:delete', `calendars/cal_${target.id}`, '--recursive', '--force', '--project', PROJECT_ID
+  ], { encoding: 'utf8' });
+  assert(result.status === 0, `cleanup failed for ${target.id}: ${result.stderr || result.stdout || result.status}`);
+}
+
 async function runCalendarStress(target) {
   const context = createContext(`https://pyw31337.github.io/calendar/?id=${target.id}`);
   context.window.__ALLOW_INTERNAL_TEST_CALENDARS__ = true;
@@ -196,6 +205,7 @@ async function runCalendarStress(target) {
   assert(failures.length === 0, `${target.id} worker failures: ${failures.join(', ')}`);
 }
 
+try {
 await Promise.all(testCalendars.map(runCalendarStress));
 
 for (const target of testCalendars) {
@@ -239,3 +249,6 @@ console.log(JSON.stringify({
   ok: true,
   calendars: testCalendars.map((target) => target.summary)
 }, null, 2));
+} finally {
+  testCalendars.forEach(cleanupCalendar);
+}
