@@ -4110,7 +4110,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
               ['주최', selected.organizer],
               ['문의', selected.contact],
               ['가격', selected.price],
-              ['공식 홈페이지', selected.website]
+              ['공식 홈페이지', selected.website || selected.link]
             ].filter(([, value]) => value && String(value).trim())
               .map(([label, value]) => /*#__PURE__*/React.createElement("div", {
               key: label, style: { display: 'flex', gap: '8px', fontSize: 'var(--font-size-sm)' }
@@ -4189,13 +4189,19 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
                 backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)', cursor: 'pointer'
               }
             }, ShareIcon ? /*#__PURE__*/React.createElement(ShareIcon, { size: 20 }) : "🔗"),
-            selected.link && /*#__PURE__*/React.createElement("a", {
-              href: selected.link, target: "_blank", rel: "noreferrer",
-              style: {
-                display: 'block', flex: 1, textAlign: 'center', padding: '10px', borderRadius: 'var(--radius-md)',
-                backgroundColor: '#7C3AED', color: '#fff', fontWeight: 800, fontSize: 'var(--font-size-md)', textDecoration: 'none'
-              }
-            }, selected.source === 'custom' ? "링크 열기" : "자세히보기")
+            (() => {
+              // 개별등록(custom)은 link, 포털/스냅샷·고아 카드는 website 를 쓴다.
+              // URL이 어느 쪽이든 있으면 하단 자세히보기로 새 창 이동.
+              const detailUrl = String(selected.link || selected.website || '').trim();
+              if (!detailUrl) return null;
+              return /*#__PURE__*/React.createElement("a", {
+                href: detailUrl, target: "_blank", rel: "noopener noreferrer",
+                style: {
+                  display: 'block', flex: 1, textAlign: 'center', padding: '10px', borderRadius: 'var(--radius-md)',
+                  backgroundColor: '#7C3AED', color: '#fff', fontWeight: 800, fontSize: 'var(--font-size-md)', textDecoration: 'none'
+                }
+              }, "자세히보기");
+            })()
           )
         )
       ),
@@ -4298,13 +4304,17 @@ function SharedContentPreviewModal({ item, onClose }) {
         /*#__PURE__*/React.createElement("div", {
           style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', textAlign: 'center', flexShrink: 0 }
         }, "다른 사람이 공유한 컨텐츠입니다. 내 캘린더에 등록하려면 컨텐츠 등록 화면의 '붙여넣기'를 사용하세요."),
-        item.link && /*#__PURE__*/React.createElement("a", {
-          href: item.link, target: "_blank", rel: "noreferrer",
-          style: {
-            display: 'block', flexShrink: 0, textAlign: 'center', padding: '10px', borderRadius: 'var(--radius-md)',
-            backgroundColor: '#7C3AED', color: '#fff', fontWeight: 800, fontSize: 'var(--font-size-md)', textDecoration: 'none'
-          }
-        }, "자세히보기")
+        (() => {
+          const detailUrl = String(item.link || item.website || '').trim();
+          if (!detailUrl) return null;
+          return /*#__PURE__*/React.createElement("a", {
+            href: detailUrl, target: "_blank", rel: "noopener noreferrer",
+            style: {
+              display: 'block', flexShrink: 0, textAlign: 'center', padding: '10px', borderRadius: 'var(--radius-md)',
+              backgroundColor: '#7C3AED', color: '#fff', fontWeight: 800, fontSize: 'var(--font-size-md)', textDecoration: 'none'
+            }
+          }, "자세히보기");
+        })()
       )
     ),
     document.body
