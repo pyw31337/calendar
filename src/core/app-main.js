@@ -1414,6 +1414,7 @@ function CalendarApp() {
   };
   // Chat-related states
   const [chatMessages, setChatMessages] = React.useState([]);
+  const [galleryLiveMessages, setGalleryLiveMessages] = React.useState([]);
   const [olderChatMessages, setOlderChatMessages] = React.useState([]);
   const [hasMoreOlderChat, setHasMoreOlderChat] = React.useState(true);
   const [loadingOlderChat, setLoadingOlderChat] = React.useState(false);
@@ -1428,9 +1429,10 @@ function CalendarApp() {
   const allChatMessages = React.useMemo(() => {
     const byId = new Map();
     (olderChatMessages || []).forEach(m => { if (m && m.id) byId.set(m.id, m); });
+    (galleryLiveMessages || []).forEach(m => { if (m && m.id) byId.set(m.id, m); });
     (chatMessages || []).forEach(m => { if (m && m.id) byId.set(m.id, m); });
     return Array.from(byId.values()).sort((a, b) => Number(a.timestamp || 0) - Number(b.timestamp || 0));
-  }, [olderChatMessages, chatMessages]);
+  }, [olderChatMessages, galleryLiveMessages, chatMessages]);
   const [memos, setMemos] = React.useState([]);
   const [memosLimit, setMemosLimit] = React.useState(MEMOS_PAGE_SIZE);
   const [hasMoreMemos, setHasMoreMemos] = React.useState(false);
@@ -2397,7 +2399,10 @@ function CalendarApp() {
     // ascending order for rendering.
     let hasSeenInitialChatSnapshot = false;
     let lastNotifiedMessageId = null;
-    const unsubscribeChat = subscribeMessages(activeCalId, { orderBy: 'timestamp', direction: 'desc', limit: chatLimit }, snapshot => {
+    const unsubscribeChat = subscribeMessages(activeCalId, {
+      where: ['uploadSource', '==', 'chat'],
+      orderBy: 'timestamp', direction: 'desc', limit: chatLimit
+    }, snapshot => {
         if (!isMounted) return;
         lastChatSnapshotAtRef.current = Date.now();
         const list = [];
@@ -2436,6 +2441,30 @@ function CalendarApp() {
   // attached onSnapshot until a full reload, so messages from other users appeared
   // only after refreshing.
   }, [activeCalId, activeView, chatLiveLimit, firebaseDb, firebaseConnectionVersion, CHAT_INITIAL_MESSAGE_LIMIT]);
+
+  // Gallery media has its own unscoped live window. Keeping this separate from the channel-
+  // scoped chat listener prevents photo uploads from displacing the main screen's recent chat,
+  // while the gallery still receives other participants' new gallery/meeting uploads live.
+  React.useEffect(() => {
+    if (!activeCalId || activeView !== 'gallery' || !firebaseDb) {
+      setGalleryLiveMessages([]);
+      return undefined;
+    }
+    let mounted = true;
+    const unsubscribe = subscribeMessages(activeCalId, {
+      orderBy: 'timestamp', direction: 'desc', limit: CHAT_LIVE_MESSAGE_LIMIT
+    }, snapshot => {
+      if (!mounted) return;
+      const list = [];
+      snapshot.forEach(doc => list.push(slimMessageForClient({ id: doc.id, ...doc.data() })));
+      list.reverse();
+      setGalleryLiveMessages(list);
+    }, err => console.warn('Firestore gallery media subscription error:', err));
+    return () => {
+      mounted = false;
+      if (unsubscribe) unsubscribe();
+    };
+  }, [activeCalId, activeView, firebaseDb, firebaseConnectionVersion]);
 
   // Chat listener watchdog: self-heals a silently stalled onSnapshot stream. Checks periodically
   // whether the listener above has gone quiet for too long and, if so, pulls the same recent
@@ -3426,6 +3455,7 @@ function CalendarApp() {
     setTotalMemoCount(null);
     setTotalGalleryCount(null);
     setGalleryPreviewMessages([]);
+    setGalleryLiveMessages([]);
     // These counts/migration scan are non-essential background work -- deferred until the
     // initial calendar document has actually finished loading (isInitialDataLoading false) so
     // they queue up behind the one fetch that matters on a cold start instead of racing it. A

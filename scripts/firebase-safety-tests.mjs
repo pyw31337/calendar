@@ -87,7 +87,8 @@ assert(appMainSource.includes('pendingRemotePlacesRef') && appMainSource.include
 const linkPreviewHook = appMainSource.match(/function useLinkPreview\(url, cachedData\) \{([\s\S]*?)\n\}/)?.[1] || '';
 assert(linkPreviewHook && !/fetchLinkPreview\s*\(/.test(linkPreviewHook), 'link preview render hook must not fetch external previews');
 assert(appMainSource.includes('Render-time link previews are intentionally read-only'), 'link preview render path must document its no-fetch contract');
-assert(/activeView === 'chat'[\s\S]{0,120}Math\.max\(chatLiveLimit, 60\)/.test(appMainSource), 'chat room must look past hidden media uploads when hydrating recent messages');
+assert(/where: \['uploadSource', '==', 'chat'\]/.test(appMainSource), 'chat realtime listener must use the dedicated chat channel');
+assert(/Firestore gallery media subscription error/.test(appMainSource), 'gallery must keep a separate unscoped realtime media listener');
 assert(/const PAGE_SIZE = 150/.test(appMainSource), 'chat preview fallback must page past a burst of hidden media uploads');
 assert(appMainSource.includes("uploadSource: 'chat'"), 'new chat writes must carry an explicit chat channel');
 
@@ -268,15 +269,11 @@ assert(functionsSource.includes('setPublicCacheHeaders') && functionsSource.incl
 assert(/collection\('push_subscriptions'\)\.limit\(500\)/.test(functionsSource), 'push fan-out must have a bounded subscription query');
 assert(/new AbortController\(\)[\s\S]{0,220}api\.peekalink\.io/.test(functionsSource), 'paid link preview requests must have an upstream timeout');
 assert(firestoreRules.includes("data.uploadSource == 'chat'"), 'message rules must permit the explicit chat channel');
-// subscribeMessages/fetchRecentChatMessages/fetchOlderChatMessages back the SHARED
-// chatMessages/olderChatMessages state that the 갤러리 페이지's full photo grid, HistoryView's
-// 인물/추억 tag matching, and meetingPhotoMessageIds all depend on containing every message
-// regardless of channel. A where('uploadSource','=='.'chat') filter at this query layer once
-// silently dropped every gallery/meeting-uploaded photo from all of those other consumers the
-// moment a calendar had at least one 'chat'-tagged message -- hiding non-chat uploads from the
-// chat bubble list belongs at the render layer (isChatRenderableMessage) instead.
-assert(!/function subscribeMessages[\s\S]{0,3000}?where\('uploadSource'/.test(firebaseServicesScript), 'subscribeMessages must stay unscoped so gallery/meeting uploads remain visible to every other consumer of chatMessages');
-assert(!/async function fetchRecentChatMessages[\s\S]{0,4000}?where\('uploadSource'/.test(firebaseServicesScript), 'fetchRecentChatMessages must stay unscoped so gallery/meeting uploads remain visible to every other consumer of chatMessages');
+// Chat and media now have independent read paths: recent chat is server-scoped, while gallery
+// preview/full-history and the gallery live listener remain unscoped so no media disappears.
+assert(/async function fetchRecentChatMessages[\s\S]{0,2200}?where\('uploadSource', '==', 'chat'\)/.test(firebaseServicesScript), 'recent chat reads must be scoped before applying their bounded limit');
+assert(/function subscribeMessages[\s\S]{0,1400}?options\.where[\s\S]{0,1400}?q = q\.where/.test(firebaseServicesScript), 'message subscriptions must support an explicit channel scope');
+assert(/async function fetchRecentGalleryMessages[\s\S]{0,1800}?collection\('messages'\)[\s\S]{0,300}?orderBy\('timestamp'/.test(firebaseServicesScript), 'gallery preview must retain its independent unscoped media read');
 assert(!/async function fetchOlderChatMessages[\s\S]{0,3000}?where\('uploadSource'/.test(firebaseServicesScript), 'fetchOlderChatMessages must stay unscoped so gallery/meeting uploads remain visible to every other consumer of chatMessages');
 assert(appMainSource.includes('function isChatRenderableMessage') && appMainSource.includes('visibleChatMessages'), 'hiding non-chat uploads from the chat bubble list must happen at the render layer, not the query layer');
 assert(firebaseServicesScript.includes('FIRESTORE_REST_TIMEOUT_MS = 9000') && firebaseServicesScript.includes('fetchWithTimeout') && firebaseServicesScript.includes('withSdkTimeout'), 'Firebase SDK and REST reads must have bounded timeouts');

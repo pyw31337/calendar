@@ -82,6 +82,11 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     return typeof d.getMessageDirectMediaEntry === 'function' ? d.getMessageDirectMediaEntry(msg) : null;
   }
 
+  function isChatChannelMessage(msg) {
+    const source = String(msg && msg.uploadSource || '').trim().toLowerCase();
+    return !source || source === 'chat';
+  }
+
   async function fetchChatMessagesRest(calId) {
     // Keep the REST fallback on the exact same channel-scoped query as the SDK path. A raw
     // messages collection read here would reintroduce gallery/meeting uploads on browsers where
@@ -149,20 +154,10 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     }
   }
 
-  // IMPORTANT: this and every other read that feeds the shared chatMessages/olderChatMessages
-  // state (subscribeMessages, fetchOlderChatMessages) must stay UNSCOPED (no uploadSource
-  // where-clause). That shared state is the single source not just for the chat room, but for
-  // the 갤러리 페이지's full photo grid, HistoryView's 인물/추억 tag matching, and
-  // meetingPhotoMessageIds -- all of which need every message regardless of channel. The chat
-  // ROOM's own "hide gallery/meeting uploads" need is already handled correctly at the
-  // *rendering* layer via isChatRenderableMessage (app-main.js), which filters
-  // allChatMessages/chatMessages down to visibleChatMessages just for the bubble list. A prior
-  // change briefly pushed that filter down into these queries via
-  // where('uploadSource','==','chat') to cut read cost, but that silently dropped every
-  // gallery/meeting-uploaded photo from every OTHER consumer of this same state the moment a
-  // calendar had at least one 'chat'-tagged message (since a non-empty scoped result never fell
-  // through to any fallback) -- exactly the "meeting photos missing from the gallery grid"
-  // symptom. Do not reintroduce that where-clause here.
+  // Chat previews and the chat room have their own channel-scoped read. Gallery/history media
+  // use fetchRecentGalleryMessages/fetchAllChatMessagesRest and a separate unscoped listener in
+  // app-main, so bursts of gallery/meeting uploads can no longer evict real conversations from
+  // this bounded window. Records without uploadSource are accepted only by the legacy fallback.
   async function fetchRecentChatMessages(calId, limit) {
     if (!isValidCalId(calId)) return [];
     const pageSize = Math.max(1, Math.min(400, Number(limit) || 60));
@@ -179,9 +174,12 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     try {
       if (firebaseDb) {
         const snap = await withSdkTimeout(firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
-          .orderBy('timestamp', 'desc').limit(pageSize).get(), FIRESTORE_REST_TIMEOUT_MS);
+          .where('uploadSource', '==', 'chat').orderBy('timestamp', 'desc').limit(pageSize).get(), FIRESTORE_REST_TIMEOUT_MS);
         const list = [];
-        snap.forEach(function (doc) { list.push(slimMessage({ id: doc.id, ...doc.data() })); });
+        snap.forEach(function (doc) {
+          const message = slimMessage({ id: doc.id, ...doc.data() });
+          if (isChatChannelMessage(message)) list.push(message);
+        });
         if (list.length > 0) return list.reverse();
         orderedEmpty = true;
       }
@@ -204,13 +202,24 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
       }
     }
     try {
-      const url = 'https://firestore.googleapis.com/v1/projects/' + projectId() + '/databases/(default)/documents/calendars/cal_' + calId + '/messages?orderBy=timestamp%20desc&pageSize=' + pageSize;
-      const res = await fetchWithTimeout(url, { cache: 'no-store' });
+      const parent = 'projects/' + projectId() + '/databases/(default)/documents/calendars/cal_' + calId;
+      const url = 'https://firestore.googleapis.com/v1/' + parent + ':runQuery';
+      const res = await fetchWithTimeout(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ structuredQuery: {
+          from: [{ collectionId: 'messages' }],
+          where: { fieldFilter: { field: { fieldPath: 'uploadSource' }, op: 'EQUAL', value: { stringValue: 'chat' } } },
+          orderBy: [{ field: { fieldPath: 'timestamp' }, direction: 'DESCENDING' }],
+          limit: pageSize
+        } })
+      });
       if (!res.ok) return [];
       const data = await res.json();
-      const list = (data.documents || []).map(function (doc) {
+      const list = (Array.isArray(data) ? data : []).filter(function (row) { return row.document; }).map(function (row) {
+        const doc = row.document;
         return slimMessage({ id: doc.name.split('/').pop(), ...docToJs(doc) });
-      });
+      }).filter(isChatChannelMessage);
       if (list.length > 0) return list.reverse();
     } catch (err) {
       console.warn('fetchRecentChatMessages rest', err);
@@ -223,7 +232,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
       const data = await res.json();
       const list = (data.documents || []).map(function (doc) {
         return slimMessage({ id: doc.name.split('/').pop(), ...docToJs(doc) });
-      });
+      }).filter(isChatChannelMessage);
       list.sort(function (a, b) { return (Number(a.timestamp) || 0) - (Number(b.timestamp) || 0); });
       if (list.length > 0) console.warn('fetchRecentChatMessages: recovered', list.length, 'message(s) via unordered REST fallback');
       return list;
@@ -877,6 +886,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     const orderField = options.orderBy || 'timestamp';
     const direction = options.direction || 'desc';
     const limitN = Number(options.limit) > 0 ? Number(options.limit) : null;
+    const where = Array.isArray(options.where) && options.where.length >= 3 ? options.where : null;
 
     let stopped = false;
     let innerUnsub = noop;
@@ -895,7 +905,9 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     function attachUnordered() {
       if (stopped) return;
       try {
-        let q = messagesRef.limit(limitN ? Math.max(limitN * 4, 200) : 200);
+        let q = messagesRef;
+        if (where) q = q.where(where[0], where[1], where[2]);
+        q = q.limit(limitN ? Math.max(limitN * 4, 200) : 200);
         innerUnsub = q.onSnapshot(function (snap) {
           if (stopped) return;
           onSnapshot(sortedSnapshotFrom(snap.docs));
@@ -909,7 +921,9 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     function attachOrdered() {
       let usedFallback = false;
       try {
-        let q = messagesRef.orderBy(orderField, direction);
+        let q = messagesRef;
+        if (where) q = q.where(where[0], where[1], where[2]);
+        q = q.orderBy(orderField, direction);
         if (limitN) q = q.limit(limitN);
         innerUnsub = q.onSnapshot(function (snap) {
           if (stopped) return;

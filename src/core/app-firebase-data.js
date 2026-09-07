@@ -963,6 +963,7 @@ function subscribeMessages(calId, options, onSnapshot, onError) {
   let q = firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages');
   const orderBy = (options && options.orderBy) || 'timestamp';
   const direction = (options && options.direction) || 'desc';
+  if (options && options.where) q = q.where(options.where[0], options.where[1], options.where[2]);
   q = q.orderBy(orderBy, direction);
   if (options && options.limit) q = q.limit(options.limit);
   return q.onSnapshot(onSnapshot, onError || function () {});
