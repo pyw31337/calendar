@@ -4477,6 +4477,8 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
           && cultureItemDay(item)
           && cultureItemDay(item) <= todayIsoLocal()
           && (!item.endDate || item.endDate >= todayIsoLocal());
+        const posterDateText = item.dateLabel || formatCultureDateLabel(item.startDate, item.endDate) || (item.releaseDate ? `${item.releaseDate} 개봉` : CULTURE_MISSING_LABEL);
+        const posterDateParts = !isMovieCard && String(posterDateText).match(/^(.*?\([^)]*\))\s*[·•]?\s*(\d{1,2}:\d{2})\s*$/);
         return /*#__PURE__*/React.createElement("button", {
           key: item.id,
           type: "button",
@@ -4527,7 +4529,10 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
                   backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 'var(--radius-full)', padding: '2px 14px',
                   maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
                 }
-              }, item.dateLabel || formatCultureDateLabel(item.startDate, item.endDate) || (item.releaseDate ? `${item.releaseDate} 개봉` : CULTURE_MISSING_LABEL)),
+              }, posterDateParts ? /*#__PURE__*/React.createElement(React.Fragment, null,
+                /*#__PURE__*/React.createElement("span", { style: { display: 'block', whiteSpace: 'nowrap' } }, posterDateParts[1]),
+                /*#__PURE__*/React.createElement("span", { style: { display: 'block', whiteSpace: 'nowrap', marginTop: '2px' } }, posterDateParts[2])
+              ) : posterDateText),
               /*#__PURE__*/React.createElement("div", {
                 style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', width: '100%' }
               },
