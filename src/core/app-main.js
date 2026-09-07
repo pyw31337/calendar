@@ -2418,6 +2418,7 @@ function CalendarApp() {
         if (latest) lastNotifiedMessageId = latest.id;
       }, err => {
         console.warn(`Firestore chat history subscription error:`, err);
+        queueServerAuditEvent(activeCalId, 'realtime_fallback', `messages:${String(err?.code || 'unknown')}`, getClientAuditContext());
         fetchRecentChatMessages(activeCalId, chatLimit).then(list => {
           if (isMounted) setChatMessages(list);
         });
@@ -3151,6 +3152,7 @@ function CalendarApp() {
         setPlacesSubcollection(list);
       }, err => {
         console.warn(`Firestore places subscription error:`, err);
+        queueServerAuditEvent(activeCalId, 'realtime_fallback', `places:${String(err?.code || 'unknown')}`, getClientAuditContext());
         fetchPlacesFromFirestore(activeCalId).then(list => {
           if (isMounted) setPlacesSubcollection(list);
         });
@@ -3183,6 +3185,7 @@ function CalendarApp() {
         setConfirmedMeetingsSubcollection(list);
       }, err => {
         console.warn(`Firestore confirmedMeetings subscription error:`, err);
+        queueServerAuditEvent(activeCalId, 'realtime_fallback', `confirmedMeetings:${String(err?.code || 'unknown')}`, getClientAuditContext());
         fetchConfirmedMeetingsFromFirestore(activeCalId).then(list => {
           if (isMounted) setConfirmedMeetingsSubcollection(list);
         });
@@ -3222,7 +3225,10 @@ function CalendarApp() {
           if (n > 0) next[doc.id] = n;
         });
         setPhotoCommentCounts(next);
-      }, err => console.warn('Firestore photoComments subscription error:', err));
+      }, err => {
+        console.warn('Firestore photoComments subscription error:', err);
+        queueServerAuditEvent(activeCalId, 'realtime_fallback', `photoComments:${String(err?.code || 'unknown')}`, getClientAuditContext());
+      });
     return () => { isMounted = false; unsub(); };
   }, [activeCalId, needsPhotoCommentCounts, firebaseDb, firebaseConnectionVersion]);
 
@@ -3323,6 +3329,7 @@ function CalendarApp() {
         applyMerged();
       }, err => {
         console.warn(`Firestore memos subscription error:`, err);
+        queueServerAuditEvent(activeCalId, 'realtime_fallback', `memos:${String(err?.code || 'unknown')}`, getClientAuditContext());
         fetchMemosRest(activeCalId, effectiveMemosLimit).then(list => {
           if (!isMounted) return;
           recentList = list;
