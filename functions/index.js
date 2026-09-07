@@ -1410,6 +1410,40 @@ exports.listServerAuditLogs = functions.https.onRequest(async (req, res) => {
   }
 });
 
+// Admin-only aggregate health view for Web Push subscriptions. Endpoints and encryption keys
+// are never returned; this is intentionally a diagnostic summary to explain missed pushes and
+// bound fan-out costs without exposing credentials.
+exports.listPushSubscriptionHealth = functions.https.onRequest(async (req, res) => {
+  setAdminCorsHeaders(res);
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  if (req.method !== 'POST') { res.status(405).json({ ok: false }); return; }
+  const { password, calendarId } = req.body || {};
+  if (typeof password !== 'string' || !password.trim() || !/^[A-Za-z0-9_-]{1,64}$/.test(String(calendarId || ''))) { res.status(400).json({ ok: false }); return; }
+  const rateState = await checkAdminAuthRateLimit(req.ip);
+  if (rateState.blocked) { res.status(429).json({ ok: false }); return; }
+  const matches = sha256Hex(password.trim()) === await getStoredAdminPasswordHash();
+  await recordAdminAuthResult(rateState, matches);
+  if (!matches) { res.status(401).json({ ok: false }); return; }
+  try {
+    const snap = await admin.firestore().collection('calendars').doc(`cal_${calendarId}`).collection('push_subscriptions').limit(1000).get();
+    const now = Date.now();
+    const summary = { total: snap.size, active: 0, stale30d: 0, sent: 0, failed: 0, channels: { chat: 0, memo: 0, poll: 0, schedule: 0 } };
+    snap.forEach(doc => {
+      const data = doc.data() || {};
+      if (data.lastPushStatus === 'sent') summary.sent += 1;
+      if (data.lastPushStatus && data.lastPushStatus !== 'sent') summary.failed += 1;
+      if (now - Number(data.lastSeenAt || data.updatedAt || data.createdAt || 0) > 30 * 24 * 60 * 60 * 1000) summary.stale30d += 1;
+      else summary.active += 1;
+      const channels = data.channels && typeof data.channels === 'object' ? data.channels : { chat: true };
+      Object.keys(summary.channels).forEach(channel => { if (channels[channel] !== false) summary.channels[channel] += 1; });
+    });
+    res.status(200).json({ ok: true, calendarId, summary, generatedAt: now });
+  } catch (err) {
+    console.error('listPushSubscriptionHealth failed:', err);
+    res.status(500).json({ ok: false });
+  }
+});
+
 // Changes the admin password after verifying the current one server-side -- appConfig/adminAuth
 // no longer accepts a direct client write, so this is the only way to change it now.
 exports.adminChangePassword = functions.https.onRequest(async (req, res) => {

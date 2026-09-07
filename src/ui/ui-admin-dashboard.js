@@ -422,6 +422,10 @@ function listServerAuditLogsRemote(...args) {
   const f = __gatherUiDeps().listServerAuditLogsRemote || GATHER_APP_UTILS.listServerAuditLogsRemote;
   return typeof f === 'function' ? f(...args) : [];
 }
+function listPushSubscriptionHealthRemote(...args) {
+  const f = __gatherUiDeps().listPushSubscriptionHealthRemote || GATHER_APP_UTILS.listPushSubscriptionHealthRemote;
+  return typeof f === 'function' ? f(...args) : Promise.resolve(null);
+}
 function mergeCalendarCollections(...args) {
   const f = __gatherUiDeps().mergeCalendarCollections || GATHER_APP_UTILS.mergeCalendarCollections;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -850,6 +854,7 @@ export function AdminDashboard({ initialCalendars }) {
   // every entry, not just a recent window, to correctly replay state up to a cutoff.
   const [selectedCalActivityLogs, setSelectedCalActivityLogs] = React.useState([]);
   const [serverAuditLogs, setServerAuditLogs] = React.useState([]);
+  const [pushHealth, setPushHealth] = React.useState(null);
   const [auditLoading, setAuditLoading] = React.useState(false);
   const [auditQuery, setAuditQuery] = React.useState('');
 
@@ -863,6 +868,9 @@ export function AdminDashboard({ initialCalendars }) {
       .then(logs => { if (!cancelled) setServerAuditLogs(logs); })
       .catch(err => { if (!cancelled) { setServerAuditLogs([]); showAdminToast(`감사 로그 조회 실패: ${err.message || '오류'}`, 'error'); } })
       .finally(() => { if (!cancelled) setAuditLoading(false); });
+    listPushSubscriptionHealthRemote(session.password, selectedCalId)
+      .then(summary => { if (!cancelled) setPushHealth(summary); })
+      .catch(() => { if (!cancelled) setPushHealth(null); });
     return () => { cancelled = true; };
   }, [activeTab, selectedCalId]);
 
@@ -2286,6 +2294,9 @@ export function AdminDashboard({ initialCalendars }) {
           /*#__PURE__*/React.createElement("p", { style: { margin: '3px 0 0', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' } }, "관리자 전용 기록입니다. IP는 원문이 아닌 해시로 보관되며, actor/session은 익명 상관관계 식별자입니다.")
         ),
         /*#__PURE__*/React.createElement("input", { className: "form-input", value: auditQuery, onChange: e => setAuditQuery(e.target.value), placeholder: "actor, 작업, 브라우저, IP 해시 검색", style: { maxWidth: '320px' } })
+      ),
+      pushHealth && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px', fontSize: 'var(--font-size-xs)' } },
+        [['전체', pushHealth.total], ['활성', pushHealth.active], ['30일 이상 미사용', pushHealth.stale30d], ['발송 성공', pushHealth.sent], ['실패 기록', pushHealth.failed]].map(([label, value]) => /*#__PURE__*/React.createElement("span", { key: label, style: { padding: '5px 8px', borderRadius: '999px', background: '#F1F5F9', color: '#334155', fontWeight: 700 } }, `${label} ${value}`))
       ),
       auditLoading ? /*#__PURE__*/React.createElement("div", { style: { padding: '28px', textAlign: 'center', color: 'var(--text-muted)' } }, "감사 로그 불러오는 중...") :
       (() => {

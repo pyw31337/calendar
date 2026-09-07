@@ -715,6 +715,11 @@ async function listServerAuditLogsRemote(password, options = {}) {
   return Array.isArray(result?.logs) ? result.logs : [];
 }
 
+async function listPushSubscriptionHealthRemote(password, calendarId) {
+  const result = await callAdminFunction('listPushSubscriptionHealth', { password, calendarId });
+  return result?.summary || null;
+}
+
 async function changeAdminPasswordRemote(oldPassword, newPasswordHash) {
   await callAdminFunction('adminChangePassword', { oldPassword, newPasswordHash });
 }
@@ -2394,6 +2399,7 @@ export {
   verifyAdminPasswordRemote,
   listAllCalendarsRemote,
   listServerAuditLogsRemote,
+  listPushSubscriptionHealthRemote,
   queueServerAuditEvent,
   getClientAuditContext,
   changeAdminPasswordRemote,
