@@ -2605,7 +2605,7 @@ export function HistoryView({
                   }
                 },
                   /*#__PURE__*/React.createElement("span", { style: { color: '#fff', fontWeight: 800, fontSize: 'var(--font-size-sm)' } }, group.title),
-                  /*#__PURE__*/React.createElement("span", { style: { color: 'rgba(255,255,255,0.85)', fontSize: 'var(--font-size-2xs)' } }, `${formatHistoryDate(group.startDate)} · 사진 ${group.photos.length}장`)
+                  /*#__PURE__*/React.createElement("span", { style: { color: 'rgba(255,255,255,0.85)', fontSize: 'var(--font-size-2xs)' } }, formatHistoryDate(group.startDate))
                 )
               );
             })
@@ -2650,8 +2650,7 @@ export function HistoryView({
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 } },
             /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-lg)', fontWeight: 800, color: 'var(--text-main)' } }, group.title),
             /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' } },
-              group.startDate === group.endDate ? group.startDate : `${group.startDate} ~ ${group.endDate}`,
-              ` · 사진 ${group.photos.length}장`
+              group.startDate === group.endDate ? group.startDate : `${group.startDate} ~ ${group.endDate}`
             )
           ),
           canBulkExclude && (
@@ -2811,7 +2810,7 @@ export function HistoryView({
                   }
                 },
                   /*#__PURE__*/React.createElement("span", { style: { color: '#fff', fontWeight: 800, fontSize: 'var(--font-size-sm)' } }, tag.label),
-                  /*#__PURE__*/React.createElement("span", { style: { color: 'rgba(255,255,255,0.85)', fontSize: 'var(--font-size-2xs)' } }, `${formatHistoryDate(getTaggedDate(tagPhotos[0])) || '최근 일정'} · 사진 ${tagPhotos.length}장`)
+                  /*#__PURE__*/React.createElement("span", { style: { color: 'rgba(255,255,255,0.85)', fontSize: 'var(--font-size-2xs)' } }, formatHistoryDate(getTaggedDate(tagPhotos[0])) || '최근 일정')
                 )
               );
             })
@@ -2867,7 +2866,6 @@ export function HistoryView({
             )
           : /*#__PURE__*/React.createElement(React.Fragment, null,
               /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-lg)', fontWeight: 800, color: 'var(--text-main)' } }, selectedPersonTag),
-              /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', flexShrink: 0 } }, `사진 ${photosForPersonTag.length}장`),
               // 참여자 태그(캘린더 참여자 명단에서 온 것)는 여기서 이름을 바꾸거나 지울 수 없다 --
               // 참여자 관리는 캘린더 설정의 몫이고, 이 화면은 사진과 별개로 관리되는 customPersonTags
               // 커스텀 태그만 손댈 수 있어야 한다.
