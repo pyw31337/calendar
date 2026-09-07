@@ -1546,6 +1546,35 @@ async function fetchAnniversariesRest(calId) {
   }
 }
 
+// REST fallback for gallery comment badges when the Firebase SDK/WebChannel is unavailable.
+// The gallery itself already uses this same Firestore REST transport in degraded mode, so
+// comment counts must not disappear merely because realtime listeners could not initialize.
+async function fetchPhotoCommentCountsRest(calId) {
+  try {
+    const baseUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}/photoComments`;
+    const counts = {};
+    let pageToken = '';
+    do {
+      const query = new URLSearchParams({ pageSize: '300' });
+      if (pageToken) query.set('pageToken', pageToken);
+      const res = await fetchFirestoreRequest(`${baseUrl}?${query.toString()}`);
+      if (!res.ok) return counts;
+      const data = await res.json();
+      (data.documents || []).forEach(doc => {
+        const id = doc.name.split('/').pop();
+        const value = firestoreDocumentToJs(doc);
+        const count = Array.isArray(value?.comments) ? value.comments.length : 0;
+        if (id && count > 0) counts[id] = count;
+      });
+      pageToken = data.nextPageToken || '';
+    } while (pageToken);
+    return counts;
+  } catch (err) {
+    console.warn('fetchPhotoCommentCountsRest error:', err);
+    return {};
+  }
+}
+
 async function fetchCustomCultureItemsRest(calId) {
   try {
     const baseUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}/customCultureItems`;
@@ -3743,6 +3772,7 @@ export {
   invalidateGalleryItemCount,
   fetchMemosRest,
   fetchAnniversariesRest,
+  fetchPhotoCommentCountsRest,
   fetchCustomCultureItemsRest,
   sendChatMessageRest,
   writeCollectionDocumentWithFallback,

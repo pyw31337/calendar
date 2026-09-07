@@ -491,6 +491,7 @@ import {
   invalidateGalleryItemCount,
   fetchMemosRest,
   fetchAnniversariesRest,
+  fetchPhotoCommentCountsRest,
   fetchCustomCultureItemsRest,
   sendChatMessageRest,
   writeCollectionDocumentWithFallback,
@@ -3200,7 +3201,13 @@ function CalendarApp() {
   );
   React.useEffect(() => {
     if (!activeCalId || !needsPhotoCommentCounts) return;
-    if (!firebaseDb) { setPhotoCommentCounts({}); return; }
+    if (!firebaseDb) {
+      let cancelled = false;
+      fetchPhotoCommentCountsRest(activeCalId).then(counts => {
+        if (!cancelled) setPhotoCommentCounts(counts || {});
+      }).catch(() => {});
+      return () => { cancelled = true; };
+    }
     let isMounted = true;
     const unsub = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('photoComments')
       .onSnapshot(snapshot => {
