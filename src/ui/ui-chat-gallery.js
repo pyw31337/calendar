@@ -1981,8 +1981,16 @@ export function ChatGalleryModal({
     const legacyMeetingKey = typeof getLegacyMeetingMediaKey === 'function'
       ? getLegacyMeetingMediaKey(photo, { meetingDate: photo.meetingDate })
       : '';
+    // Meeting photos that originated in a chat can retain the original chat-based
+    // comment document key even after the meeting photo receives its own photoId.
+    // Include that key as a read fallback so the badge follows the same thread as
+    // the lightbox instead of silently showing zero.
+    const chatMediaKey = photo.sourceMessageId && Number.isInteger(photo.sourceImageIndex)
+      ? `chat:${photo.sourceMessageId}:${photo.sourceImageIndex}`
+      : (photo.messageId && Number.isInteger(photo.imageIndex) ? `chat:${photo.messageId}:${photo.imageIndex}` : '');
     const commentCount = photoCommentCounts[commentIdentity.mediaKey]
       || photoCommentCounts[commentIdentity.refKey]
+      || (chatMediaKey ? photoCommentCounts[chatMediaKey] : 0)
       || (legacyMeetingKey ? photoCommentCounts[legacyMeetingKey] : 0)
       || 0;
     const thumb = /*#__PURE__*/React.createElement(MediaThumb, {
