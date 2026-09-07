@@ -1282,10 +1282,20 @@ exports.auditEvent = functions.https.onRequest(async (req, res) => {
   const userAgent = String(req.get('user-agent') || '').slice(0, 600);
   const client = String(body.client || '').slice(0, 120);
   const target = String(body.target || '').slice(0, 200);
+  const rawResource = body.resource && typeof body.resource === 'object' ? body.resource : null;
+  const resource = rawResource ? {
+    resourceType: String(rawResource.resourceType || '').slice(0, 60),
+    resourceId: String(rawResource.resourceId || '').slice(0, 300),
+    source: String(rawResource.source || '').slice(0, 60),
+    sourceMessageId: String(rawResource.sourceMessageId || '').slice(0, 200),
+    ...(Number.isInteger(rawResource.imageIndex) ? { imageIndex: rawResource.imageIndex } : {}),
+    before: String(rawResource.before || '').slice(0, 500),
+    after: String(rawResource.after || '').slice(0, 500)
+  } : null;
   try {
     await admin.firestore().collection('serverAuditLogs').add({
       calendarId, action, actorId: actorId.slice(0, 80), sessionId: sessionId.slice(0, 100),
-      client, target, ipHash, userAgent, receivedAt: Date.now()
+      client, target, ...(resource ? { resource } : {}), ipHash, userAgent, receivedAt: Date.now()
     });
     res.status(204).send('');
   } catch (err) {
