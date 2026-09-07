@@ -20,7 +20,12 @@ copyDir(path.join(root, 'share'), path.join(dist, 'share'));
 copyDir(path.join(root, 'icons'), path.join(dist, 'icons'));
 for (const f of ['og-thumb.jpg', 'sw.js', 'favicon.ico', 'manifest.json', 'manifest-kkot.json', 'manifest-cw.json', 'manifest-jhair.json']) {
   const s = path.join(root, f);
-  if (fs.existsSync(s)) fs.copyFileSync(s, path.join(dist, f));
+  if (!fs.existsSync(s)) continue;
+  if (f === 'sw.js') {
+    const buildSha = process.env.VITE_BUILD_SHA || process.env.GITHUB_SHA || 'dev';
+    const source = fs.readFileSync(s, 'utf8').replaceAll('__BUILD_SHA__', buildSha);
+    fs.writeFileSync(path.join(dist, f), source);
+  } else fs.copyFileSync(s, path.join(dist, f));
 }
 const pv = path.join(root, 'public-vite');
 if (fs.existsSync(pv)) {

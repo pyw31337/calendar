@@ -9,6 +9,10 @@ const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
 const GATHER_APP_CONFIG = window.GATHER_APP_CONFIG || {};
 function __gatherUiDeps() { return window.GATHER_UI_DEPS || {}; }
+function getPhotoCommentIdentity(...args) {
+  const f = __gatherUiDeps().getPhotoCommentIdentity || GATHER_APP_UTILS.getPhotoCommentIdentity;
+  return typeof f === 'function' ? f(...args) : {};
+}
 function getActiveAvailabilities(calendar) {
   const f = __gatherUiDeps().getActiveAvailabilities || GATHER_APP_UTILS.getActiveAvailabilities;
   return typeof f === 'function' ? f(calendar) : [];
@@ -1023,7 +1027,7 @@ export function ChatGalleryModal({
       className: 'photo-comment-count-badge',
       'aria-label': `댓글 ${count}개`,
       style: { position: 'absolute', top: '2px', right: '2px', zIndex: 2, minWidth: '16px', height: '16px', padding: '0 4px', borderRadius: '999px', backgroundColor: '#EF4444', color: '#fff', fontSize: '10px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.35)', pointerEvents: 'none', lineHeight: 1 }
-    }, count > 99 ? '99+' : String(count));
+    }, String(count));
   };
   const getMediaIdentityKeys = __deps.getMediaIdentityKeys;
   const getLegacyMeetingMediaKey = __deps.getLegacyMeetingMediaKey;
@@ -1997,9 +2001,8 @@ export function ChatGalleryModal({
     // (see ui-lightbox.js's currentIdentity) -- reusing it here (rather than photoKey/itemKey,
     // which are this grid's own React-key/dedup identifiers with a different shape for most
     // photos) is what lets this thumbnail badge and the Lightbox's comment count agree.
-    const commentIdentity = typeof getMediaIdentityKeys === 'function'
-      ? (getMediaIdentityKeys(photo, { source: photo.source, meetingDate: photo.meetingDate }) || {})
-      : {};
+    const commentIdentity = getPhotoCommentIdentity(photo, lightboxItems || [], { source: photo.source, meetingDate: photo.meetingDate })
+      || (typeof getMediaIdentityKeys === 'function' ? getMediaIdentityKeys(photo, { source: photo.source, meetingDate: photo.meetingDate }) : {});
     // Falls back to the pre-photoId/index era key (see getLegacyMeetingMediaKey) so meeting
     // photo comment threads saved before that data shape existed still show their badge here.
     const legacyMeetingKey = typeof getLegacyMeetingMediaKey === 'function'

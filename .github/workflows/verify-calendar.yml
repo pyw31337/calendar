@@ -27,6 +27,8 @@ jobs:
         run: npm run restore:rehearsal
       - name: Static design and isolation guards
         run: npm run check:all
+      - name: Verify fixed places/settlement/map regression scenarios
+        run: npm run check:ci-scenarios
       - name: Build
         run: npm run build
       - name: Check Vite build output budget

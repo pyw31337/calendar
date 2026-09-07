@@ -2361,7 +2361,7 @@ export function PhotoCommentCountBadge({ count = 0 } = {}) {
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       boxShadow: '0 1px 2px rgba(0,0,0,0.35)', pointerEvents: 'none', lineHeight: 1
     }
-  }, count > 99 ? '99+' : String(count));
+  }, String(count));
 }
 
   if (typeof window !== 'undefined') {

@@ -10,6 +10,10 @@ const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
 const BULK_NO_PARTICIPANT_ID = GATHER_APP_CONSTANTS.BULK_NO_PARTICIPANT_ID || '__none__';
 const GATHER_APP_CONFIG = window.GATHER_APP_CONFIG || {};
 function __gatherUiDeps() { return window.GATHER_UI_DEPS || {}; }
+function getPhotoCommentIdentity(...args) {
+  const f = __gatherUiDeps().getPhotoCommentIdentity || GATHER_APP_UTILS.getPhotoCommentIdentity;
+  return typeof f === 'function' ? f(...args) : {};
+}
 function getActiveAvailabilities(calendar) {
   const f = __gatherUiDeps().getActiveAvailabilities || GATHER_APP_UTILS.getActiveAvailabilities;
   return typeof f === 'function' ? f(calendar) : [];
@@ -1158,7 +1162,7 @@ export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalG
       className: 'photo-comment-count-badge',
       'aria-label': `댓글 ${count}개`,
       style: { position: 'absolute', top: '2px', right: '2px', zIndex: 2, minWidth: '16px', height: '16px', padding: '0 4px', borderRadius: '999px', backgroundColor: '#EF4444', color: '#fff', fontSize: '10px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.35)', pointerEvents: 'none', lineHeight: 1 }
-    }, count > 99 ? '99+' : String(count));
+    }, String(count));
   };
   const resolveMeetingPhotoDisplay = __deps.resolveMeetingPhotoDisplay;
   const SectionCountBadge = __comp.SectionCountBadge;
@@ -1301,11 +1305,14 @@ export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalG
             style: { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }
           }),
           PhotoCommentCountBadge && /*#__PURE__*/React.createElement(PhotoCommentCountBadge, {
-            count: photoCommentCounts[entry.mediaKey || entry.refKey]
-              || (entry.sourceMessageId && Number.isInteger(entry.sourceImageIndex)
-                ? photoCommentCounts[`chat:${entry.sourceMessageId}:${entry.sourceImageIndex}`]
-                : 0)
-              || 0
+            count: (() => {
+              const identity = getPhotoCommentIdentity(entry, displayedEntries, { source: entry.source, meetingDate: entry.meetingDate }) || {};
+              return photoCommentCounts[identity.mediaKey || identity.refKey]
+                || (entry.sourceMessageId && Number.isInteger(entry.sourceImageIndex)
+                  ? photoCommentCounts[`chat:${entry.sourceMessageId}:${entry.sourceImageIndex}`]
+                  : 0)
+                || 0;
+            })()
           })
         ))
       )

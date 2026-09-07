@@ -7,7 +7,6 @@
 - 캘린더: https://pyw31337.github.io/calendar/?id=kkot
 - 공식 공유 URL: https://pyw31337.github.io/calendar/share/kkot/
 - 제이헤어: https://pyw31337.github.io/calendar/?id=jhair
-- 관리자 대시보드: https://pyw31337.github.io/calendar/?admin=1
 
 ## 주요 기능
 

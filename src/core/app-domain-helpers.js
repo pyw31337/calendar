@@ -2244,6 +2244,26 @@ function getMediaIdentityKeys(photo = {}, opts = {}) {
   return { assetKey: key, mediaKey: key, refKey: key };
 }
 
+// Resolve the identity used by photo comments consistently across thumbnails and lightboxes.
+// Legacy uploads may repeat message/photo metadata for every asset in a batch; when that
+// collision is detected, qualify the key with the rendered URL so each asset keeps its own
+// thread instead of inheriting a sibling's comments.
+function getPhotoCommentIdentity(photo = {}, collection = [], opts = {}) {
+  const base = getMediaIdentityKeys(photo, opts) || {};
+  if (!base.mediaKey || !Array.isArray(collection) || collection.length < 2) return base;
+  const occurrences = collection.reduce((count, item) => {
+    const itemKeys = getMediaIdentityKeys(item || {}, {
+      source: item?.source || opts.source,
+      meetingDate: item?.meetingDate || opts.meetingDate
+    }) || {};
+    return count + (itemKeys.mediaKey === base.mediaKey ? 1 : 0);
+  }, 0);
+  if (occurrences < 2) return base;
+  const url = String(photo?.full || photo?.url || photo?.imageUrl || photo?.thumb || photo?.thumbUrl || '').trim();
+  if (!url) return base;
+  return getMediaIdentityKeys({ source: photo?.source || opts.source, meetingDate: photo?.meetingDate || opts.meetingDate, full: url, imageUrl: url, thumb: url }, opts) || base;
+}
+
 // Before photoId/sourceImageIndex became reliably present on every confirmedMeeting.photos[]
 // entry, getMediaIdentityKeys fell back to a plain `meeting:<date>:<sourceMessageId>` key with
 // no per-image index -- so a photo comment thread saved back then is still filed under that
@@ -2520,6 +2540,7 @@ export {
   getDirectMediaTagKey,
   getDirectMediaTagsForUrl,
   getMediaIdentityKeys,
+  getPhotoCommentIdentity,
   getLegacyMeetingMediaKey,
   getMessageDirectMediaEntry,
   formatBytes,

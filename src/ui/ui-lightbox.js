@@ -545,6 +545,10 @@ function getMediaIdentityKeys(...args) {
   const f = __gatherUiDeps().getMediaIdentityKeys || GATHER_APP_UTILS.getMediaIdentityKeys;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function getPhotoCommentIdentity(...args) {
+  const f = __gatherUiDeps().getPhotoCommentIdentity || GATHER_APP_UTILS.getPhotoCommentIdentity;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
 function getLegacyMeetingMediaKey(...args) {
   const f = __gatherUiDeps().getLegacyMeetingMediaKey || GATHER_APP_UTILS.getLegacyMeetingMediaKey;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -1410,17 +1414,11 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   // batch.  Qualify such collisions with the rendered URL so each visible asset has its own
   // deterministic thread until the source metadata is repaired.
   const identityInput = { ...currentMeta, full: currentMeta.full || currentUrl, imageUrl: currentMeta.imageUrl || currentUrl };
-  const baseIdentity = getMediaIdentityKeys(identityInput, { source: currentMeta.source, meetingDate: currentMeta.meetingDate }) || {};
-  const mediaKeyOccurrences = Array.isArray(meta) && baseIdentity.mediaKey
-    ? meta.reduce((count, item, itemIndex) => {
-      const itemUrl = displayUrls[itemIndex] || urls[itemIndex] || item?.full || item?.imageUrl || item?.thumb || '';
-      const itemIdentity = getMediaIdentityKeys({ ...(item || {}), full: item?.full || itemUrl, imageUrl: item?.imageUrl || itemUrl }, { source: item?.source, meetingDate: item?.meetingDate }) || {};
-      return count + (itemIdentity.mediaKey === baseIdentity.mediaKey ? 1 : 0);
-    }, 0)
-    : 0;
-  const currentIdentity = mediaKeyOccurrences > 1 && currentUrl
-    ? (getMediaIdentityKeys({ source: currentMeta.source, full: currentUrl, imageUrl: currentUrl, thumb: currentUrl }, { source: currentMeta.source, meetingDate: currentMeta.meetingDate }) || baseIdentity)
-    : baseIdentity;
+  const identityItems = Array.isArray(meta)
+    ? meta.map((item, itemIndex) => ({ ...(item || {}), full: item?.full || displayUrls[itemIndex] || urls[itemIndex] || item?.imageUrl || item?.thumb || '' }))
+    : [];
+  const currentIdentity = getPhotoCommentIdentity(identityInput, identityItems, { source: currentMeta.source, meetingDate: currentMeta.meetingDate })
+    || getMediaIdentityKeys(identityInput, { source: currentMeta.source, meetingDate: currentMeta.meetingDate }) || {};
   // 사진 댓글 -- mediaKey/refKey(currentIdentity, 항상 값이 있음)를 사진의 안정적인 식별자로
   // 써서 calendars/cal_{id}/photoComments 문서 하나에 매칭한다(app-main.js의
   // handleFetchPhotoComments/handleSavePhotoComments). 여러 장을 스와이프해도 슬라이드별로
