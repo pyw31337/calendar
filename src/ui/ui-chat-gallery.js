@@ -2239,14 +2239,14 @@ export function ChatGalleryModal({
           className: "btn btn-action btn-action-outline",
           disabled: isSavingLink,
           onClick: handlePasteLinkFromClipboard,
-          style: { height: '36px', padding: '0 12px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: isSavingLink ? 'wait' : 'pointer' }
+          style: { height: '44px', minHeight: '44px', padding: '0 14px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: isSavingLink ? 'wait' : 'pointer' }
         }, "붙여넣기"),
         /*#__PURE__*/React.createElement("button", {
           type: "button",
           className: "btn btn-action btn-action-dark",
           disabled: isSavingLink,
           onClick: handleToggleAddLink,
-          style: { height: '36px', padding: '0 12px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: isSavingLink ? 'wait' : 'pointer' }
+          style: { height: '44px', minHeight: '44px', padding: '0 14px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: isSavingLink ? 'wait' : 'pointer' }
         }, isSavingLink ? "저장 중..." : (isAddingLink ? "취소" : "추가"))
       )
     ),
