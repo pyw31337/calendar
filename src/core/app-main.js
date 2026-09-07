@@ -4155,6 +4155,7 @@ function CalendarApp() {
       } else {
         showToast('갤러리에 사진이 추가되었습니다.', 'success');
       }
+      forgetPreprocessedImages(files);
       return true;
     } catch (err) {
       console.error('handleUploadGalleryImages failed:', err);
@@ -9375,6 +9376,33 @@ function revokeCompressedObjectUrls(compressed) {
   compressed._objectUrls = [];
 }
 
+// Successful image preprocessing is reusable across a retry. Selecting the same files again
+// creates new File objects, so use stable browser metadata rather than object identity. Failed
+// items are never cached; the bounded map prevents a long-lived page from retaining unlimited
+// full-size blobs.
+const imagePreprocessCache = new Map();
+const IMAGE_PREPROCESS_CACHE_LIMIT = 80;
+function getImagePreprocessCacheKey(file) {
+  if (!file) return '';
+  return [file.name || '', file.size || 0, file.lastModified || 0, file.type || ''].join('::');
+}
+function rememberPreprocessedImage(file, compressed) {
+  const key = getImagePreprocessCacheKey(file);
+  if (!key || !compressed) return;
+  imagePreprocessCache.delete(key);
+  imagePreprocessCache.set(key, compressed);
+  while (imagePreprocessCache.size > IMAGE_PREPROCESS_CACHE_LIMIT) {
+    const oldest = imagePreprocessCache.keys().next().value;
+    imagePreprocessCache.delete(oldest);
+  }
+}
+function forgetPreprocessedImages(files) {
+  Array.from(files || []).forEach(file => {
+    const key = getImagePreprocessCacheKey(file);
+    if (key) imagePreprocessCache.delete(key);
+  });
+}
+
 // Keep mobile screens awake for the complete image pipeline (compression + Storage upload +
 // Firestore write). A long multi-photo upload otherwise gets suspended when iOS/Android dims
 // the display. Wake Lock is best-effort: browsers without support continue normally, while the
@@ -9446,7 +9474,14 @@ async function processImageFilesSequentially(files, onProgress) {
       report(file && file.name);
       try {
         await new Promise(resolve => setTimeout(resolve, 0));
-        succeeded[i] = await compressImageToDataUrls(file);
+        const cacheKey = getImagePreprocessCacheKey(file);
+        const cached = cacheKey ? imagePreprocessCache.get(cacheKey) : null;
+        if (cached) {
+          succeeded[i] = cached;
+        } else {
+          succeeded[i] = await compressImageToDataUrls(file);
+          rememberPreprocessedImage(file, succeeded[i]);
+        }
         await new Promise(resolve => setTimeout(resolve, 0));
       } catch (err) {
         failed.push({ fileName: file && file.name, error: err });
