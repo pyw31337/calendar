@@ -1822,7 +1822,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
 
   const goTo = i => {
     if (i < 0 || i >= total || i === index) return;
-    setShowInfo(false); setShowTags(false);
+    setShowInfo(false);
     onNavigate(i);
   };
   // Adjacent (±1) navigation slides the track by exactly one container-width, same visual
@@ -1837,7 +1837,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     // nothing.
     const from = pendingNavRef.current != null ? pendingNavRef.current : index;
     if (newIndex < 0 || newIndex >= total || newIndex === from) return;
-    setShowInfo(false); setShowTags(false);
+    setShowInfo(false);
     if (pendingNavRef.current != null) {
       // Commit the in-flight nav immediately (skipping its remaining animation) so the new one
       // starts from a clean, consistent state instead of stacking on top of it.
@@ -1904,7 +1904,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     dragStartXRef.current = null;
     const width = widthRef.current || window.innerWidth * 0.92 || 1;
     const threshold = width * SWIPE_THRESHOLD_RATIO;
-    if (Math.abs(dragPx) >= threshold) { setShowInfo(false); setShowTags(false); }
+    if (Math.abs(dragPx) >= threshold) { setShowInfo(false); }
     setTransitionOn(true);
     setDragPx(current => {
       if (current <= -threshold && index < total - 1) {
