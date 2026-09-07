@@ -1255,6 +1255,45 @@ function setAdminCorsHeaders(res) {
   res.set('Access-Control-Allow-Headers', 'Content-Type');
 }
 
+// Server-side audit sink for unauthenticated calendar actions. The client supplies only a
+// pseudonymous actor/session and event details; network evidence is captured here, outside the
+// participant-readable calendar documents. IP is stored as a salted hash (not plaintext) so an
+// incident can correlate repeated activity without turning the shared calendar into a tracker.
+exports.auditEvent = functions.https.onRequest(async (req, res) => {
+  setAdminCorsHeaders(res);
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  if (req.method !== 'POST') { res.status(405).json({ ok: false }); return; }
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const calendarId = String(body.calendarId || '').trim();
+  const action = String(body.action || '').trim();
+  const actorId = String(body.actorId || '').trim();
+  const sessionId = String(body.sessionId || '').trim();
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(calendarId) || !/^[A-Za-z0-9_:-]{1,80}$/.test(action)) {
+    res.status(400).json({ ok: false }); return;
+  }
+  if (actorId.length > 80 || sessionId.length > 100) { res.status(400).json({ ok: false }); return; }
+  if (!(await checkProxyRateLimit('auditEvent', req.ip, 60 * 60 * 1000, 120))) {
+    res.status(429).json({ ok: false }); return;
+  }
+  const ip = String(req.ip || req.headers['x-forwarded-for'] || 'unknown').split(',')[0].trim();
+  const ipHash = crypto.createHash('sha256')
+    .update(`${process.env.AUDIT_IP_SALT || 'metro-live-audit-v1'}:${ip}`)
+    .digest('hex');
+  const userAgent = String(req.get('user-agent') || '').slice(0, 600);
+  const client = String(body.client || '').slice(0, 120);
+  const target = String(body.target || '').slice(0, 200);
+  try {
+    await admin.firestore().collection('serverAuditLogs').add({
+      calendarId, action, actorId: actorId.slice(0, 80), sessionId: sessionId.slice(0, 100),
+      client, target, ipHash, userAgent, receivedAt: Date.now()
+    });
+    res.status(204).send('');
+  } catch (err) {
+    console.error('auditEvent failed:', err);
+    res.status(500).json({ ok: false });
+  }
+});
+
 // Verifies a submitted password against the stored admin hash, without returning any calendar
 // data -- used by the login screen itself (see AdminLoginGate in index.html), separately from
 // listAllCalendars below so the login check stays cheap even when the dashboard doesn't need

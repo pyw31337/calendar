@@ -1718,6 +1718,21 @@ function getClientAuditContext() {
   };
 }
 
+function queueServerAuditEvent(calendarId, action, note, actor) {
+  if (typeof fetch !== 'function' || !calendarId || !action) return;
+  const target = sanitizeText(note || '', 200);
+  const payload = { calendarId, action, target, ...(actor || {}) };
+  // Audit transport is deliberately best-effort and never blocks or changes the user action.
+  try {
+    setTimeout(() => {
+      fetch('https://us-central1-metro-live-2918e.cloudfunctions.net/auditEvent', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload), keepalive: true
+      }).catch(() => {});
+    }, 0);
+  } catch (_) {}
+}
+
 function normalizeActivityLog(calendarId, log, participantIds = null, idRedirects = new Map()) {
   if (!log || typeof log !== 'object') return null;
   if (log.calendarId && log.calendarId !== calendarId) return null;
@@ -1866,7 +1881,8 @@ function createActivityLog(calendarId, action, dateStr, participantId, timestamp
   if (dateStr && richNote && !richNote.includes('[일자:')) {
     richNote = `[일자: ${dateStr}] ${richNote}`;
   }
-  return normalizeActivityLog(calendarId, {
+  const actor = getClientAuditContext();
+  const normalized = normalizeActivityLog(calendarId, {
     id: `${calendarId}_${dateStr}_${participantId}_${action}_${timestamp}_${Math.random().toString(36).slice(2, 8)}`,
     calendarId,
     participantId: sanitizeText(participantId || '', 120),
@@ -1874,8 +1890,10 @@ function createActivityLog(calendarId, action, dateStr, participantId, timestamp
     action,
     note: richNote,
     timestamp,
-    actor: getClientAuditContext()
+    actor
   });
+  if (normalized) queueServerAuditEvent(calendarId, action, richNote, actor);
+  return normalized;
 }
 
 function createPollActivityLog(calendarId, action, participantId = '', timestamp = Date.now(), note = '') {
