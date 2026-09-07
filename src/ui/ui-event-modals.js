@@ -5,11 +5,8 @@
 import { calculateSettlementRows } from '../core/settlement-calculator.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
-const GATHER_APP_CALENDAR_DATA = window.GATHER_APP_CALENDAR_DATA || {};
-const GATHER_APP_CHAT_DATA = window.GATHER_APP_CHAT_DATA || {};
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
-const GATHER_APP_CONFIG = window.GATHER_APP_CONFIG || {};
 const BULK_NO_PARTICIPANT_ID = GATHER_APP_CONSTANTS.BULK_NO_PARTICIPANT_ID || '__none__';
 const BULK_WEEK_OPTIONS = Object.freeze([
   Object.freeze({ value: 1, label: '첫째주' }),
@@ -49,16 +46,8 @@ function __gatherUiDeps() { return window.GATHER_UI_DEPS || {}; }
 function maskSettlementAccountNumber(value) {
   return String(value || '').replace(/\d/g, '*');
 }
-function getActiveAvailabilities(calendar) {
-  const f = __gatherUiDeps().getActiveAvailabilities || GATHER_APP_UTILS.getActiveAvailabilities;
-  return typeof f === 'function' ? f(calendar) : [];
-}
 function getActiveParticipants(calendar) {
   const f = __gatherUiDeps().getActiveParticipants || GATHER_APP_UTILS.getActiveParticipants;
-  return typeof f === 'function' ? f(calendar) : [];
-}
-function getCalendarPolls(calendar) {
-  const f = __gatherUiDeps().getCalendarPolls || GATHER_APP_UTILS.getCalendarPolls;
   return typeof f === 'function' ? f(calendar) : [];
 }
 function getCalendarPlaces(calendar) {
@@ -69,43 +58,9 @@ function isSettlementEnabledCalendarId(...args) {
   const f = __gatherUiDeps().isSettlementEnabledCalendarId || (window.GATHER_APP_UTILS || {}).isSettlementEnabledCalendarId;
   return typeof f === 'function' ? f(...args) : true;
 }
-function useChatSendGuard(onSend, canSend = true) {
-  const sharedGuard = window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.useChatSendGuard;
-  if (typeof sharedGuard === 'function') return sharedGuard(onSend, canSend);
-  const React = window.React;
-  const lockRef = React.useRef(false);
-  return React.useCallback((...args) => {
-    const isAllowed = typeof canSend === 'function' ? canSend(...args) : Boolean(canSend);
-    if (!isAllowed || lockRef.current) return;
-    lockRef.current = true;
-    let result;
-    try {
-      result = onSend && onSend(...args);
-    } catch (error) {
-      setTimeout(() => { lockRef.current = false; }, 250);
-      console.error('chat send failed:', error);
-      return;
-    }
-    Promise.resolve(result).catch(error => {
-      console.error('chat send failed:', error);
-    }).finally(() => {
-      setTimeout(() => {
-        lockRef.current = false;
-      }, 250);
-    });
-  }, [onSend, canSend]);
-}
 function useModalDirtyGuard(...args) {
   return __gatherUiDeps().useModalDirtyGuard(...args);
 }
-function computeKoreanHolidaysForYear(year) {
-  const f = __gatherUiDeps().computeKoreanHolidaysForYear;
-  return typeof f === 'function' ? f(year) : [];
-}
-function getFooterFamilyLinks() {
-  return __gatherUiDeps().FOOTER_FAMILY_LINKS || [];
-}
-
 /* __fb() bridge */
 function __fb() {
   const deps = __gatherUiDeps();
@@ -119,49 +74,8 @@ function writeSharedCollection(...args) {
   return typeof f === 'function' ? f(...args) : null;
 }
 
-function getStoredChatParticipantId(...args) {
-  const fn = (window.GATHER_APP_NOTIFICATIONS || {}).getStoredChatParticipantId;
-  return typeof fn === 'function' ? fn(...args) : '';
-}
-function setStoredChatParticipantId(...args) {
-  const fn = (window.GATHER_APP_NOTIFICATIONS || {}).setStoredChatParticipantId;
-  return typeof fn === 'function' ? fn(...args) : undefined;
-}
-
-function extractExpenseTimePrefix(...args) {
-  const f = __gatherUiDeps().extractExpenseTimePrefix || GATHER_APP_UTILS.extractExpenseTimePrefix;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function extractFirstUrl(...args) {
-  const f = __gatherUiDeps().extractFirstUrl || GATHER_APP_UTILS.extractFirstUrl;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function extractLeadingMemoDate(...args) {
-  const f = __gatherUiDeps().extractLeadingMemoDate || GATHER_APP_UTILS.extractLeadingMemoDate;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function formatChatDividerDate(...args) {
-  const f = __gatherUiDeps().formatChatDividerDate || GATHER_APP_UTILS.formatChatDividerDate;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function formatChatTime(...args) {
-  const f = __gatherUiDeps().formatChatTime || GATHER_APP_UTILS.formatChatTime;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function formatCommentDate(...args) {
-  const f = __gatherUiDeps().formatCommentDate || GATHER_APP_UTILS.formatCommentDate;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
 function formatDateWithDayName(...args) {
   const f = __gatherUiDeps().formatDateWithDayName || GATHER_APP_UTILS.formatDateWithDayName;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function formatPlaceBadgeDate(...args) {
-  const f = __gatherUiDeps().formatPlaceBadgeDate || GATHER_APP_UTILS.formatPlaceBadgeDate;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function formatPollDeadline(...args) {
-  const f = __gatherUiDeps().formatPollDeadline || GATHER_APP_UTILS.formatPollDeadline;
   return typeof f === 'function' ? f(...args) : undefined;
 }
 function formatRegisteredAt(...args) {
@@ -176,18 +90,6 @@ function getActivePollOptions(...args) {
   const f = __gatherUiDeps().getActivePollOptions || GATHER_APP_UTILS.getActivePollOptions;
   return typeof f === 'function' ? f(...args) : undefined;
 }
-function getActivityLogStamp(...args) {
-  const f = __gatherUiDeps().getActivityLogStamp || GATHER_APP_UTILS.getActivityLogStamp;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function getContrastTextColor(...args) {
-  const f = __gatherUiDeps().getContrastTextColor || GATHER_APP_UTILS.getContrastTextColor;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function getDisplayExpenseCategory(...args) {
-  const f = __gatherUiDeps().getDisplayExpenseCategory || GATHER_APP_UTILS.getDisplayExpenseCategory;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
 function getDisplayPlaceAddress(...args) {
   const f = __gatherUiDeps().getDisplayPlaceAddress || GATHER_APP_UTILS.getDisplayPlaceAddress;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -199,11 +101,6 @@ function searchPlaces(...args) {
 // Opens Kakao Map centered on a specific point with a labeled marker -- a plain link URL, no API
 // key needed. getPlaceKakaoRouteUrl exists as a cross-file bridge but has no real implementation
 // anywhere in the app (always resolves to undefined), so this builds the link directly instead.
-function getKakaoMapLinkUrl(place) {
-  if (!place || !Number.isFinite(place.lat) || !Number.isFinite(place.lng)) return null;
-  const label = encodeURIComponent(place.alias || place.name || '장소');
-  return `https://map.kakao.com/link/map/${label},${place.lat},${place.lng}`;
-}
 function getExpenseCategories(...args) {
   const f = __gatherUiDeps().getExpenseCategories || GATHER_APP_UTILS.getExpenseCategories;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -212,36 +109,8 @@ function getExpenseCategory(...args) {
   const f = __gatherUiDeps().getExpenseCategory || GATHER_APP_UTILS.getExpenseCategory;
   return typeof f === 'function' ? f(...args) : undefined;
 }
-function getExpenseCategoryIcon(...args) {
-  const f = __gatherUiDeps().getExpenseCategoryIcon || GATHER_APP_UTILS.getExpenseCategoryIcon;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function getExpenseCategoryLabel(...args) {
-  const f = __gatherUiDeps().getExpenseCategoryLabel || GATHER_APP_UTILS.getExpenseCategoryLabel;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function getPlaceCategoryById(...args) {
-  const f = __gatherUiDeps().getPlaceCategoryById || GATHER_APP_UTILS.getPlaceCategoryById;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function getPlaceCategoryIcon(...args) {
-  const f = __gatherUiDeps().getPlaceCategoryIcon || GATHER_APP_UTILS.getPlaceCategoryIcon;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function getPlaceCategoryLabel(...args) {
-  const f = __gatherUiDeps().getPlaceCategoryLabel || GATHER_APP_UTILS.getPlaceCategoryLabel;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function isDomesticLatLng(...args) {
-  const f = __gatherUiDeps().isDomesticLatLng || GATHER_APP_UTILS.isDomesticLatLng;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
 function isExpenseIncomeEntry(...args) {
   const f = __gatherUiDeps().isExpenseIncomeEntry || GATHER_APP_UTILS.isExpenseIncomeEntry;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function isInternalTestCalendarId(...args) {
-  const f = __gatherUiDeps().isInternalTestCalendarId || GATHER_APP_UTILS.isInternalTestCalendarId;
   return typeof f === 'function' ? f(...args) : undefined;
 }
 function isPollClosed(...args) {
@@ -252,42 +121,6 @@ function isTombstone(...args) {
   const f = __gatherUiDeps().isTombstone || GATHER_APP_UTILS.isTombstone;
   return typeof f === 'function' ? f(...args) : undefined;
 }
-function isValidCalendarId(...args) {
-  const f = __gatherUiDeps().isValidCalendarId || GATHER_APP_UTILS.isValidCalendarId;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function isValidDateString(...args) {
-  const f = __gatherUiDeps().isValidDateString || GATHER_APP_UTILS.isValidDateString;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function normalizeColorValue(...args) {
-  const f = __gatherUiDeps().normalizeColorValue || GATHER_APP_UTILS.normalizeColorValue;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function normalizeExpenseCategories(...args) {
-  const f = __gatherUiDeps().normalizeExpenseCategories || GATHER_APP_UTILS.normalizeExpenseCategories;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function normalizePlaceAddressForSave(...args) {
-  const f = __gatherUiDeps().normalizePlaceAddressForSave || GATHER_APP_UTILS.normalizePlaceAddressForSave;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function normalizePlaceCategories(...args) {
-  const f = __gatherUiDeps().normalizePlaceCategories || GATHER_APP_UTILS.normalizePlaceCategories;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function normalizePlaceDateForSort(...args) {
-  const f = __gatherUiDeps().normalizePlaceDateForSort || GATHER_APP_UTILS.normalizePlaceDateForSort;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function parseVisitEntriesFromMemo(...args) {
-  const f = __gatherUiDeps().parseVisitEntriesFromMemo || GATHER_APP_UTILS.parseVisitEntriesFromMemo;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function reformatMemoIntoDateLines(...args) {
-  const f = __gatherUiDeps().reformatMemoIntoDateLines || GATHER_APP_UTILS.reformatMemoIntoDateLines;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
 function readClipboardImageFiles(...args) {
   const f = __gatherUiDeps().readClipboardImageFiles || GATHER_APP_UTILS.readClipboardImageFiles;
   return typeof f === 'function' ? f(...args) : Promise.resolve([]);
@@ -296,15 +129,6 @@ function removeFirstUrl(...args) {
   const f = __gatherUiDeps().removeFirstUrl || GATHER_APP_UTILS.removeFirstUrl;
   return typeof f === 'function' ? f(...args) : undefined;
 }
-function sortVisitEntriesRecentFirst(...args) {
-  const f = __gatherUiDeps().sortVisitEntriesRecentFirst || GATHER_APP_UTILS.sortVisitEntriesRecentFirst;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function trimLatLngOutliers(...args) {
-  const f = __gatherUiDeps().trimLatLngOutliers || GATHER_APP_UTILS.trimLatLngOutliers;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-
 function appendChatImageFiles(...args) {
   const f = __gatherUiDeps().appendChatImageFiles || GATHER_APP_UTILS.appendChatImageFiles;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -313,311 +137,22 @@ function autoGrowTextarea(...args) {
   const f = __gatherUiDeps().autoGrowTextarea || GATHER_APP_UTILS.autoGrowTextarea;
   return typeof f === 'function' ? f(...args) : undefined;
 }
-function buildActivityLogsFromAvailabilities(...args) {
-  const f = __gatherUiDeps().buildActivityLogsFromAvailabilities || GATHER_APP_UTILS.buildActivityLogsFromAvailabilities;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function buildAdminDashboardMetrics(...args) {
-  const f = __gatherUiDeps().buildAdminDashboardMetrics || GATHER_APP_UTILS.buildAdminDashboardMetrics;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function buildFieldChangeNote(...args) {
-  const f = __gatherUiDeps().buildFieldChangeNote || GATHER_APP_UTILS.buildFieldChangeNote;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function changeAdminPasswordRemote(...args) {
-  const f = __gatherUiDeps().changeAdminPasswordRemote || GATHER_APP_UTILS.changeAdminPasswordRemote;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function clearAdminSession(...args) {
-  const f = __gatherUiDeps().clearAdminSession || GATHER_APP_UTILS.clearAdminSession;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function cloneCalendarList(...args) {
-  const f = __gatherUiDeps().cloneCalendarList || GATHER_APP_UTILS.cloneCalendarList;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function computeCalendarSearchMatches(...args) {
-  const f = __gatherUiDeps().computeCalendarSearchMatches || GATHER_APP_UTILS.computeCalendarSearchMatches;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function createCalendarBackupPayload(...args) {
-  const f = __gatherUiDeps().createCalendarBackupPayload || GATHER_APP_UTILS.createCalendarBackupPayload;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function createDefaultCalendar(...args) {
-  const f = __gatherUiDeps().createDefaultCalendar || GATHER_APP_UTILS.createDefaultCalendar;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function createMemoActivityLog(...args) {
-  const f = __gatherUiDeps().createMemoActivityLog || GATHER_APP_UTILS.createMemoActivityLog;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function createPollActivityLog(...args) {
-  const f = __gatherUiDeps().createPollActivityLog || GATHER_APP_UTILS.createPollActivityLog;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function deleteActivityLogsAfterTimestamp(...args) {
-  const f = __gatherUiDeps().deleteActivityLogsAfterTimestamp || GATHER_APP_UTILS.deleteActivityLogsAfterTimestamp;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function deleteAllChatImagesFromStorage(...args) {
-  const f = __gatherUiDeps().deleteAllChatImagesFromStorage || GATHER_APP_UTILS.deleteAllChatImagesFromStorage;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function deleteMessageRest(...args) {
-  const f = __gatherUiDeps().deleteMessageRest || GATHER_APP_UTILS.deleteMessageRest;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function describeImageProcessingFailures(...args) {
-  const f = __gatherUiDeps().describeImageProcessingFailures || GATHER_APP_UTILS.describeImageProcessingFailures;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function doesPlaceMatchDate(...args) {
-  const f = __gatherUiDeps().doesPlaceMatchDate || GATHER_APP_UTILS.doesPlaceMatchDate;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function downloadJsonFile(...args) {
-  const f = __gatherUiDeps().downloadJsonFile || GATHER_APP_UTILS.downloadJsonFile;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function exportCalendarConfirmedMeetingsToICS(...args) {
-  const f = __gatherUiDeps().exportCalendarConfirmedMeetingsToICS || GATHER_APP_UTILS.exportCalendarConfirmedMeetingsToICS;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function extractCalendarsFromBackup(...args) {
-  const f = __gatherUiDeps().extractCalendarsFromBackup || GATHER_APP_UTILS.extractCalendarsFromBackup;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function fetchActivityLogsFromFirestore(...args) {
-  const f = __gatherUiDeps().fetchActivityLogsFromFirestore || GATHER_APP_UTILS.fetchActivityLogsFromFirestore;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function fetchChatMessagesRest(...args) {
-  const f = __gatherUiDeps().fetchChatMessagesRest || GATHER_APP_UTILS.fetchChatMessagesRest;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function fetchImageShareDocument(...args) {
-  const f = __gatherUiDeps().fetchImageShareDocument || GATHER_APP_UTILS.fetchImageShareDocument;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function fetchRecentMessagesRest(...args) {
-  const f = __gatherUiDeps().fetchRecentMessagesRest || GATHER_APP_UTILS.fetchRecentMessagesRest;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function fetchSingleCalendarWithRest(...args) {
-  const f = __gatherUiDeps().fetchSingleCalendarWithRest || GATHER_APP_UTILS.fetchSingleCalendarWithRest;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function fetchSubcollectionCount(...args) {
-  const f = __gatherUiDeps().fetchSubcollectionCount || GATHER_APP_UTILS.fetchSubcollectionCount;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function fetchWithTimeout(...args) {
-  const f = __gatherUiDeps().fetchWithTimeout || GATHER_APP_UTILS.fetchWithTimeout;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function formatLogTimestamp(...args) {
-  const f = __gatherUiDeps().formatLogTimestamp || GATHER_APP_UTILS.formatLogTimestamp;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function getAdminSearchFilterFromUrl(...args) {
-  const f = __gatherUiDeps().getAdminSearchFilterFromUrl || GATHER_APP_UTILS.getAdminSearchFilterFromUrl;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function getAdminSearchQueryFromUrl(...args) {
-  const f = __gatherUiDeps().getAdminSearchQueryFromUrl || GATHER_APP_UTILS.getAdminSearchQueryFromUrl;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function getAdminSearchResultTargetUrl(...args) {
-  const f = __gatherUiDeps().getAdminSearchResultTargetUrl || GATHER_APP_UTILS.getAdminSearchResultTargetUrl;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function getAdminSelectedCalendarIdFromUrl(...args) {
-  const f = __gatherUiDeps().getAdminSelectedCalendarIdFromUrl || GATHER_APP_UTILS.getAdminSelectedCalendarIdFromUrl;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function getAdminSession(...args) {
-  const f = __gatherUiDeps().getAdminSession || GATHER_APP_UTILS.getAdminSession;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
 function getImageFilesFromClipboardEvent(...args) {
   const f = __gatherUiDeps().getImageFilesFromClipboardEvent || GATHER_APP_UTILS.getImageFilesFromClipboardEvent;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function getKnownPlaceParticipantNames(...args) {
-  const f = __gatherUiDeps().getKnownPlaceParticipantNames || GATHER_APP_UTILS.getKnownPlaceParticipantNames;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function getPlaceCategoryMarkerContent(...args) {
-  const f = __gatherUiDeps().getPlaceCategoryMarkerContent || GATHER_APP_UTILS.getPlaceCategoryMarkerContent;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function getSolarFromLunar(...args) {
-  const f = __gatherUiDeps().getSolarFromLunar || GATHER_APP_UTILS.getSolarFromLunar;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function getWeatherIcon(...args) {
-  const f = __gatherUiDeps().getWeatherIcon || GATHER_APP_UTILS.getWeatherIcon;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function isAdminRestoreRoute(...args) {
-  const f = __gatherUiDeps().isAdminRestoreRoute || GATHER_APP_UTILS.isAdminRestoreRoute;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function listAllCalendarsRemote(...args) {
-  const f = __gatherUiDeps().listAllCalendarsRemote || GATHER_APP_UTILS.listAllCalendarsRemote;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function mergeCalendarCollections(...args) {
-  const f = __gatherUiDeps().mergeCalendarCollections || GATHER_APP_UTILS.mergeCalendarCollections;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function mergePollRecord(...args) {
-  const f = __gatherUiDeps().mergePollRecord || GATHER_APP_UTILS.mergePollRecord;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function normalizeCalendarForSave(...args) {
-  const f = __gatherUiDeps().normalizeCalendarForSave || GATHER_APP_UTILS.normalizeCalendarForSave;
   return typeof f === 'function' ? f(...args) : undefined;
 }
 function normalizePollOptionInput(...args) {
   const f = __gatherUiDeps().normalizePollOptionInput || GATHER_APP_UTILS.normalizePollOptionInput;
   return typeof f === 'function' ? f(...args) : undefined;
 }
-function processImageFilesSequentially(...args) {
-  const f = __gatherUiDeps().processImageFilesSequentially || GATHER_APP_UTILS.processImageFilesSequentially;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function pushSingleCloudCalendar(...args) {
-  const f = __gatherUiDeps().pushSingleCloudCalendar || GATHER_APP_UTILS.pushSingleCloudCalendar;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function resolveMemoImageBatch(...args) {
-  const f = __gatherUiDeps().resolveMemoImageBatch || GATHER_APP_UTILS.resolveMemoImageBatch;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
 function resolveAnniversaryImageBatch(...args) {
   const f = __gatherUiDeps().resolveAnniversaryImageBatch || GATHER_APP_UTILS.resolveAnniversaryImageBatch;
   return typeof f === 'function' ? f(...args) : undefined;
 }
-function sanitizeMemoForFirestore(...args) {
-  const f = __gatherUiDeps().sanitizeMemoForFirestore || GATHER_APP_UTILS.sanitizeMemoForFirestore;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function setAdminSession(...args) {
-  const f = __gatherUiDeps().setAdminSession || GATHER_APP_UTILS.setAdminSession;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function sha256Hex(...args) {
-  const f = __gatherUiDeps().sha256Hex || GATHER_APP_UTILS.sha256Hex;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function subscribeUserToPushWithPermission(...args) {
-  const f = __gatherUiDeps().subscribeUserToPushWithPermission || GATHER_APP_UTILS.subscribeUserToPushWithPermission;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function translateKoreanToEnglish(...args) {
-  const f = __gatherUiDeps().translateKoreanToEnglish || GATHER_APP_UTILS.translateKoreanToEnglish;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function unsubscribeUserFromPush(...args) {
-  const f = __gatherUiDeps().unsubscribeUserFromPush || GATHER_APP_UTILS.unsubscribeUserFromPush;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function validateBackupCalendars(...args) {
-  const f = __gatherUiDeps().validateBackupCalendars || GATHER_APP_UTILS.validateBackupCalendars;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function validateCalendarShape(...args) {
-  const f = __gatherUiDeps().validateCalendarShape || GATHER_APP_UTILS.validateCalendarShape;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function verifyAdminPasswordRemote(...args) {
-  const f = __gatherUiDeps().verifyAdminPasswordRemote || GATHER_APP_UTILS.verifyAdminPasswordRemote;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-
-const ADMIN_MESSAGE_LIVE_LIMIT = (__gatherUiDeps().ADMIN_MESSAGE_LIVE_LIMIT
-  || (window.__GATHER_ADMIN_LIMITS && window.__GATHER_ADMIN_LIMITS.ADMIN_MESSAGE_LIVE_LIMIT)
-  || 50);
-const ADMIN_MEMO_LIVE_LIMIT = (__gatherUiDeps().ADMIN_MEMO_LIVE_LIMIT
-  || (window.__GATHER_ADMIN_LIMITS && window.__GATHER_ADMIN_LIMITS.ADMIN_MEMO_LIVE_LIMIT)
-  || 50);
-
-const PEEKALINK_HOUR_BUCKET_MS = Number.isFinite(GATHER_APP_CHAT_DATA.PEEKALINK_HOUR_BUCKET_MS) ? GATHER_APP_CHAT_DATA.PEEKALINK_HOUR_BUCKET_MS : 3600000;
-const PEEKALINK_FREE_HOURLY_LIMIT = Number.isFinite(GATHER_APP_CHAT_DATA.PEEKALINK_FREE_HOURLY_LIMIT) ? GATHER_APP_CHAT_DATA.PEEKALINK_FREE_HOURLY_LIMIT : 50;
-const ENABLE_FIRESTORE_WRITES = (window.GATHER_APP_CONFIG || {}).ENABLE_FIRESTORE_WRITES !== false;
-const GLOBAL_SEARCH_HISTORY_LIMIT = 100;
-const EXPENSE_ACTIVITY_ACTIONS = GATHER_APP_CONSTANTS.EXPENSE_ACTIVITY_ACTIONS || [];
-const IMAGE_TAG_ACTIVITY_ACTIONS = GATHER_APP_CONSTANTS.IMAGE_TAG_ACTIVITY_ACTIONS || [];
-const MEETING_ACTIVITY_ACTIONS = GATHER_APP_CONSTANTS.MEETING_ACTIVITY_ACTIONS || [];
-const PLACE_ACTIVITY_ACTIONS = GATHER_APP_CONSTANTS.PLACE_ACTIVITY_ACTIONS || [];
-const POLL_ACTIVITY_ACTIONS = GATHER_APP_CONSTANTS.POLL_ACTIVITY_ACTIONS || [];
 const KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY = GATHER_APP_CONSTANTS.KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY || {};
-const KOREAN_LUNAR_HOLIDAY_DATES = GATHER_APP_CALENDAR_DATA.KOREAN_LUNAR_HOLIDAY_DATES || {};
-const KOREAN_TEMPORARY_HOLIDAYS = GATHER_APP_CALENDAR_DATA.KOREAN_TEMPORARY_HOLIDAYS || [];
-const KOREAN_FIXED_HOLIDAYS = GATHER_APP_CALENDAR_DATA.KOREAN_FIXED_HOLIDAYS || [];
-const KOREAN_SOLAR_TERMS = GATHER_APP_CALENDAR_DATA.KOREAN_SOLAR_TERMS || [];
-const MONTH_NAMES = GATHER_APP_CALENDAR_DATA.MONTH_NAMES || ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
-const PRESET_COLORS = GATHER_APP_CONSTANTS.PRESET_COLORS || [];
-const DEFAULT_EXPENSE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_EXPENSE_CATEGORIES || [];
-const DEFAULT_PLACE_CATEGORIES = GATHER_APP_CONSTANTS.DEFAULT_PLACE_CATEGORIES || GATHER_APP_UTILS.DEFAULT_PLACE_CATEGORIES || [];
-const EMOJI_CATEGORIES = GATHER_APP_CHAT_DATA.EMOJI_CATEGORIES || [];
 const INCOME_EXPENSE_CATEGORY = GATHER_APP_UTILS.INCOME_EXPENSE_CATEGORY || { id: 'income', name: '수입', color: 'var(--status-green)' };
-const PLACE_MAP_DEFAULT_CENTER = __gatherUiDeps().PLACE_MAP_DEFAULT_CENTER || [37.5665, 126.978];
-const PLACE_MAP_DEFAULT_ZOOM = __gatherUiDeps().PLACE_MAP_DEFAULT_ZOOM || 11;
-const PLACE_MARKER_SIZE = __gatherUiDeps().PLACE_MARKER_SIZE || 28;
-const CONFETTI_Z_INDEX = 9999;
-const DEADLINE_PICKER_MONTH_NAMES = GATHER_APP_CALENDAR_DATA.MONTH_NAMES || ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
-
-function getKoreanSolarTermsForYear(...args) {
-  const f = __gatherUiDeps().getKoreanSolarTermsForYear || GATHER_APP_UTILS.getKoreanSolarTermsForYear;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function useTapRevealedMsgId() {
-  const React = window.React;
-  const [tapRevealedMsgId, setTapRevealedMsgId] = React.useState(null);
-  return [tapRevealedMsgId, setTapRevealedMsgId];
-}
 function getConfirmedMeetings(...args) {
   const f = __gatherUiDeps().getConfirmedMeetings || GATHER_APP_UTILS.getConfirmedMeetings;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function getHolidayNamesForDate(...args) {
-  const f = __gatherUiDeps().getHolidayNamesForDate || GATHER_APP_UTILS.getHolidayNamesForDate;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function getAnniversariesForDate(...args) {
-  const f = __gatherUiDeps().getAnniversariesForDate || GATHER_APP_UTILS.getAnniversariesForDate;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function getPinnedNotices(...args) {
-  const f = __gatherUiDeps().getPinnedNotices || GATHER_APP_UTILS.getPinnedNotices;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function getMessageImageEntries(...args) {
-  const f = __gatherUiDeps().getMessageImageEntries || GATHER_APP_UTILS.getMessageImageEntries;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function getMessageDirectMediaEntry(...args) {
-  const f = __gatherUiDeps().getMessageDirectMediaEntry || GATHER_APP_UTILS.getMessageDirectMediaEntry;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function renderTextWithUrlBadge(...args) {
-  const f = __gatherUiDeps().renderTextWithUrlBadge || GATHER_APP_UTILS.renderTextWithUrlBadge;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function renderChatMessageBody(...args) {
-  const f = __gatherUiDeps().renderChatMessageBody || GATHER_APP_UTILS.renderChatMessageBody;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function parseTextWithLinks(...args) {
-  const f = __gatherUiDeps().parseTextWithLinks || GATHER_APP_UTILS.parseTextWithLinks;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function highlightKeyword(...args) {
-  const f = __gatherUiDeps().highlightKeyword || GATHER_APP_UTILS.highlightKeyword;
   return typeof f === 'function' ? f(...args) : undefined;
 }
 function highlightTextWithYellowMarker(...args) {
@@ -627,64 +162,6 @@ function highlightTextWithYellowMarker(...args) {
 function copyTextToClipboard(...args) {
   const f = __gatherUiDeps().copyTextToClipboard || GATHER_APP_UTILS.copyTextToClipboard;
   return typeof f === 'function' ? f(...args) : undefined;
-}
-function getCalendarShareUrl(...args) {
-  const f = __gatherUiDeps().getCalendarShareUrl || GATHER_APP_UTILS.getCalendarShareUrl;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function getViewShareUrl(...args) {
-  const f = __gatherUiDeps().getViewShareUrl || GATHER_APP_UTILS.getViewShareUrl;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function getMemoItemShareUrl(...args) {
-  const f = __gatherUiDeps().getMemoItemShareUrl || GATHER_APP_UTILS.getMemoItemShareUrl;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function buildLightboxImageInfo(...args) {
-  const f = __gatherUiDeps().buildLightboxImageInfo || GATHER_APP_UTILS.buildLightboxImageInfo;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function normalizeTagsForDisplay(...args) {
-  const f = __gatherUiDeps().normalizeTagsForDisplay || GATHER_APP_UTILS.normalizeTagsForDisplay;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function getRecentEmojis(...args) {
-  const f = __gatherUiDeps().getRecentEmojis || GATHER_APP_UTILS.getRecentEmojis;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function addRecentEmoji(...args) {
-  const f = __gatherUiDeps().addRecentEmoji || GATHER_APP_UTILS.addRecentEmoji;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function fetchLinkPreview(...args) {
-  const f = __gatherUiDeps().fetchLinkPreview || GATHER_APP_UTILS.fetchLinkPreview;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function useLinkPreview(url, cachedData) {
-  const React = window.React;
-  const [state, setState] = React.useState(() => {
-    if (cachedData) return { status: 'success', data: cachedData };
-    return null;
-  });
-  React.useEffect(() => {
-    if (cachedData) {
-      setState({ status: 'success', data: cachedData });
-      return;
-    }
-    if (!url) return;
-    let cancelled = false;
-    setState({ status: 'loading' });
-    const f = __gatherUiDeps().fetchLinkPreview || (typeof fetchLinkPreview === 'function' ? fetchLinkPreview : null);
-    if (typeof f === 'function') {
-      f(url).then(result => {
-        if (!cancelled) setState(result);
-      });
-    }
-    return () => {
-      cancelled = true;
-    };
-  }, [url, cachedData]);
-  return state;
 }
 function useScrollHideHeader() {
   const React = window.React;
@@ -711,87 +188,6 @@ function useScrollHideHeader() {
   }, []);
   return { isHeaderVisible, onScroll };
 }
-function buildPlaceMarkerHtml(...args) {
-  const f = __gatherUiDeps().buildPlaceMarkerHtml || GATHER_APP_UTILS.buildPlaceMarkerHtml;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function panMapToFitMarkerPopup(...args) {
-  const f = __gatherUiDeps().panMapToFitMarkerPopup || GATHER_APP_UTILS.panMapToFitMarkerPopup;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function getPlaceCategories(...args) {
-  const f = __gatherUiDeps().getPlaceCategories || GATHER_APP_UTILS.getPlaceCategories;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function getPlaceSortDateKey(...args) {
-  const f = __gatherUiDeps().getPlaceSortDateKey || GATHER_APP_UTILS.getPlaceSortDateKey;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function getPlaceExternalMapUrl(...args) {
-  const f = __gatherUiDeps().getPlaceExternalMapUrl || GATHER_APP_UTILS.getPlaceExternalMapUrl;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function extractKnownParticipantNames(...args) {
-  const f = __gatherUiDeps().extractKnownParticipantNames || GATHER_APP_UTILS.extractKnownParticipantNames;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function getChatLastReadTimestamp(...args) {
-  const f = __gatherUiDeps().getChatLastReadTimestamp || GATHER_APP_UTILS.getChatLastReadTimestamp;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function setChatLastReadTimestamp(...args) {
-  const f = __gatherUiDeps().setChatLastReadTimestamp || GATHER_APP_UTILS.setChatLastReadTimestamp;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function isDateConfirmedMeeting(...args) {
-  const f = __gatherUiDeps().isDateConfirmedMeeting || GATHER_APP_UTILS.isDateConfirmedMeeting;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function calculateDday(...args) {
-  const f = __gatherUiDeps().calculateDday || GATHER_APP_UTILS.calculateDday;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function formatChatHeaderTitle(...args) {
-  const f = __gatherUiDeps().formatChatHeaderTitle || GATHER_APP_UTILS.formatChatHeaderTitle;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function getShortTitleParts(...args) {
-  const f = __gatherUiDeps().getShortTitleParts || GATHER_APP_UTILS.getShortTitleParts;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function isEmojiOnlyChatText(...args) {
-  const f = __gatherUiDeps().isEmojiOnlyChatText || GATHER_APP_UTILS.isEmojiOnlyChatText;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function twemojiImageUrl(...args) {
-  const f = __gatherUiDeps().twemojiImageUrl || GATHER_APP_UTILS.twemojiImageUrl;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function getDirectChatMediaInfo(...args) {
-  const f = __gatherUiDeps().getDirectChatMediaInfo || GATHER_APP_UTILS.getDirectChatMediaInfo;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function getPollOptionVoterIds(...args) {
-  const f = __gatherUiDeps().getPollOptionVoterIds || GATHER_APP_UTILS.getPollOptionVoterIds;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function getPollTotalVoteCount(...args) {
-  const f = __gatherUiDeps().getPollTotalVoteCount || GATHER_APP_UTILS.getPollTotalVoteCount;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function getCalendarActivityLogs(...args) {
-  const f = __gatherUiDeps().getCalendarActivityLogs || GATHER_APP_UTILS.getCalendarActivityLogs;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function getCalendarAccentColor(...args) {
-  const f = __gatherUiDeps().getCalendarAccentColor || GATHER_APP_UTILS.getCalendarAccentColor;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function getAnniversaryDisplayColor(...args) {
-  const f = __gatherUiDeps().getAnniversaryDisplayColor || GATHER_APP_UTILS.getAnniversaryDisplayColor;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-
 const ANNIVERSARY_CATEGORY_OPTIONS = [
   { value: 'birthday', label: '생일' },
   { value: 'event', label: '행사' },
@@ -843,16 +239,7 @@ export function AnniversaryModal({
   const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer || (function Shell(p) { return React.createElement('div', p, p.children); });
   const SegmentedToggle = __comp.SegmentedToggle || __deps.SegmentedToggle || (function Shell(p) { return React.createElement('div', p, p.children); });
   const UnderlineTabs = __comp.UnderlineTabs || __deps.UnderlineTabs;
-  const SimpleBottomSheetPicker = __comp.SimpleBottomSheetPicker || __deps.SimpleBottomSheetPicker || ((props) => React.createElement('select', {
-    value: props.value ?? '',
-    onChange: event => props.onSelect?.(event.target.value),
-    disabled: props.disabled,
-    style: props.style
-  }, (props.options || []).map(option => {
-    const item = typeof option === 'object' ? option : { value: option, label: option };
-    return React.createElement('option', { key: String(item.value), value: item.value }, item.label ?? item.value);
-  })));
-  const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon || (function () { return '×'; });
+    const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon || (function () { return '×'; });
   const TrashIcon = __comp.TrashIcon || __deps.TrashIcon || (function () { return '🗑'; });
   const CakeIcon = __comp.CakeIcon || __deps.CakeIcon;
   const BalloonIcon = __comp.BalloonIcon || __deps.BalloonIcon;
@@ -861,8 +248,7 @@ export function AnniversaryModal({
   const MessageCircleMoreIcon = __comp.MessageCircleMoreIcon || __deps.MessageCircleMoreIcon;
   const TrophyIcon = __comp.TrophyIcon || __deps.TrophyIcon;
   const ClapperboardIcon = __comp.ClapperboardIcon || __deps.ClapperboardIcon;
-  const MapPinIcon = __comp.MapPinIcon || __deps.MapPinIcon;
-  const ItemEditDeleteActions = __comp.ItemEditDeleteActions || __deps.ItemEditDeleteActions;
+    const ItemEditDeleteActions = __comp.ItemEditDeleteActions || __deps.ItemEditDeleteActions;
   const SectionCountBadge = __comp.SectionCountBadge || __deps.SectionCountBadge;
   const firebaseConfig = __deps.firebaseConfig || window.firebaseConfig;
   // sports/movie가 빠져 있던 자리 -- getAnniversaryCategoryBadge(app-main.js, 캘린더 셀 뱃지)는
@@ -975,9 +361,7 @@ export function AnniversaryModal({
 
   const participants = getActiveParticipants(calendar);
   const isBulkNoParticipant = bulkParticipantId === BULK_NO_PARTICIPANT_ID;
-  const bulkParticipant = isBulkNoParticipant ? null : (participants.find(p => p.id === bulkParticipantId) || null);
-  const bulkParticipantLabel = isBulkNoParticipant ? '참여자 없음' : (bulkParticipant ? bulkParticipant.name : '참여자');
-  const bulkWeeksLabel = formatBulkWeeksLabel(bulkWeeks);
+      const bulkWeeksLabel = formatBulkWeeksLabel(bulkWeeks);
   const bulkWeekdaysLabel = formatBulkWeekdaysLabel(bulkWeekdays) || '요일 선택';
   const bulkPatternLabel = formatBulkPatternLabel(bulkWeeks, bulkWeekdays);
   const toggleBulkWeek = (weekValue) => {
@@ -1394,24 +778,7 @@ export function AnniversaryModal({
     return ann.isLunar ? `음력 ${label}${ann.isLeap ? ' (윤달)' : ''}` : label;
   };
 
-  const getDDayBadge = (ann) => {
-    if (!ann.targetDate) return null;
-    const target = new Date(`${ann.targetDate}T00:00:00`);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const diffDays = Math.round((target - today) / (1000 * 60 * 60 * 24));
-
-    if (ann.isCountDown) {
-      if (diffDays === 0) return 'D-Day';
-      if (diffDays > 0) return `D-${diffDays}`;
-      return `D+${Math.abs(diffDays)}`;
-    }
-    const elapsed = Math.abs(diffDays) + 1;
-    return `${elapsed}일째`;
-  };
-
-  const getOnceDisplay = (ann) => {
+    const getOnceDisplay = (ann) => {
     const parts = (ann.date || '').split('-');
     const y = Number(parts[0]);
     const m = Number(parts[1]);
@@ -1420,15 +787,7 @@ export function AnniversaryModal({
     return ann.isLunar ? `음력 ${label}${ann.isLeap ? ' (윤달)' : ''}` : label;
   };
 
-  const getAnniversaryTypeLabel = (ann) => {
-    if (ann.type === 'yearly') return '매년 반복';
-    if (ann.type === 'once') return '단발성';
-    if (ann.type === 'range') return ANNIVERSARY_CATEGORY_OPTIONS.find(o => o.value === ann.category)?.label || '기간';
-    if (ann.type === 'repeat') return ann.patternLabel || formatBulkPatternLabel(ann.weeks || [], ann.weekdays || []) || '반복 일정';
-    return getDDayBadge(ann);
-  };
-
-  const getAnniversaryDateDisplay = (ann) => {
+    const getAnniversaryDateDisplay = (ann) => {
     if (ann.type === 'yearly') return getYearlyDisplay(ann);
     if (ann.type === 'once') return getOnceDisplay(ann);
     if (ann.type === 'range') return `${formatDateWithDayName(ann.startDate)} ~ ${formatDateWithDayName(ann.endDate)}`;
@@ -3631,8 +2990,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   const PiggyBankIcon = __comp.PiggyBankIcon || __deps.PiggyBankIcon || (function () { return '🐷'; });
   const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer || (function Shell(p) { return React.createElement('div', p, p.children); });
   const SectionToggleButton = __comp.SectionToggleButton || __deps.SectionToggleButton || (function Shell(p) { return React.createElement('div', p, p.children); });
-  const SegmentedToggle = __comp.SegmentedToggle || __deps.SegmentedToggle || (function Shell(p) { return React.createElement('div', p, p.children); });
-  const UnderlineTabs = __comp.UnderlineTabs || __deps.UnderlineTabs;
+    const UnderlineTabs = __comp.UnderlineTabs || __deps.UnderlineTabs;
   const ShareIcon = __comp.ShareIcon || __deps.ShareIcon || (function () { return '🔗'; });
   const SharedSideMenuFooter = __comp.SharedSideMenuFooter || __deps.SharedSideMenuFooter || (function Shell(p) { return React.createElement('div', p, p.children); });
   const SharedAppNavBlock = __comp.SharedAppNavBlock || __deps.SharedAppNavBlock || (function Shell(p) { return React.createElement('div', p, p.children); });
@@ -3758,17 +3116,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     const items = meetingMatches ? row.items : row.items.filter(item => [item.label, item.category?.name, item.category?.id, item.url].filter(Boolean).join(' ').toLowerCase().includes(settlementSearchNeedle));
     return { ...row, items, expenseTotal: items.filter(item => !item.isIncome && !item.isSelfPay).reduce((sum, item) => sum + Math.abs(item.amount), 0), incomeTotal: items.filter(item => item.isIncome).reduce((sum, item) => sum + Math.abs(item.amount), 0) };
   };
-  const matchesSettlementSearch = row => {
-    if (!settlementSearchNeedle) return true;
-    const haystack = [
-      row.meeting?.date,
-      row.meeting?.note,
-      ...(row.items || []).flatMap(item => [item.label, item.category?.name, item.category?.id, item.url])
-    ].filter(Boolean).join(' ').toLowerCase();
-    return haystack.includes(settlementSearchNeedle);
-  };
-
-  const allTimeRows = getConfirmedMeetings(calendar).slice().sort((a, b) => b.date.localeCompare(a.date))
+    const allTimeRows = getConfirmedMeetings(calendar).slice().sort((a, b) => b.date.localeCompare(a.date))
     .map(meeting => {
       const items = orderSettlementItemsForDisplay((Array.isArray(meeting.expenses) ? meeting.expenses : [])
         .filter(expense => !isTombstone(expense) && Number.isFinite(Number(expense.amount)) && Number(expense.amount) !== 0)
@@ -3898,90 +3246,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   // long-pressing the image to save works everywhere, and the download link below it covers
   // desktop/Android.
   const [shareImageUrl, setShareImageUrl] = React.useState(null);
-  const periodLabel = activeTab === 'total' ? '전체 기간' : `${year}년 ${month + 1}월`;
-  const handleGenerateShareImage = () => {
-    const canvas = document.createElement('canvas');
-    const W = 720, H = 960;
-    canvas.width = W;
-    canvas.height = H;
-    const ctx = canvas.getContext('2d');
-
-    ctx.fillStyle = '#F8FAFC';
-    ctx.fillRect(0, 0, W, H);
-
-    ctx.fillStyle = '#4F46E5';
-    ctx.fillRect(0, 0, W, 160);
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = '700 22px sans-serif';
-    ctx.fillText(calendar?.title || '모여라 캘린더', 40, 60);
-    ctx.font = '900 34px sans-serif';
-    ctx.fillText('회비 정산 결과', 40, 105);
-    ctx.font = '500 18px sans-serif';
-    ctx.fillText(periodLabel, 40, 138);
-
-    const rowsStats = [
-      { label: activeTab === 'total' ? '총 수입' : `${monthLabelPrefix} 수입`, value: displayIncome, color: 'var(--status-green)' },
-      { label: activeTab === 'total' ? '총 지출' : `${monthLabelPrefix} 지출`, value: displayExpense, color: '#DC2626' },
-      { label: activeTab === 'total' ? '현재 잔액' : `${monthLabelPrefix} 잔액`, value: displayBalance, color: 'var(--text-main)' }
-    ];
-    let y = 230;
-    rowsStats.forEach(stat => {
-      ctx.fillStyle = '#64748B';
-      ctx.font = '600 18px sans-serif';
-      ctx.fillText(stat.label, 40, y);
-      ctx.fillStyle = stat.color;
-      ctx.font = '900 30px sans-serif';
-      ctx.textAlign = 'right';
-      ctx.fillText(`${stat.value < 0 ? '-' : ''}${Math.abs(stat.value).toLocaleString()}원`, W - 40, y + 2);
-      ctx.textAlign = 'left';
-      y += 56;
-    });
-
-    y += 16;
-    ctx.strokeStyle = '#E2E8F0';
-    ctx.beginPath();
-    ctx.moveTo(40, y);
-    ctx.lineTo(W - 40, y);
-    ctx.stroke();
-    y += 40;
-
-    ctx.fillStyle = '#0F172A';
-    ctx.font = '800 18px sans-serif';
-    ctx.fillText('카테고리별 지출', 40, y);
-    y += 30;
-
-    const topCategories = categoryTotals.slice().sort((a, b) => b.total - a.total).slice(0, 6);
-    const maxCategoryTotal = Math.max(1, ...topCategories.map(c => c.total));
-    topCategories.forEach(item => {
-      ctx.fillStyle = '#334155';
-      ctx.font = '600 15px sans-serif';
-      ctx.fillText(item.category.name, 40, y);
-      ctx.textAlign = 'right';
-      ctx.fillText(`${item.total.toLocaleString()}원`, W - 40, y);
-      ctx.textAlign = 'left';
-      y += 10;
-      const barW = Math.max(6, Math.round((item.total / maxCategoryTotal) * (W - 80)));
-      ctx.fillStyle = '#E2E8F0';
-      ctx.fillRect(40, y, W - 80, 8);
-      ctx.fillStyle = item.category.color || '#6366F1';
-      ctx.fillRect(40, y, barW, 8);
-      y += 34;
-    });
-    if (topCategories.length === 0) {
-      ctx.fillStyle = '#94A3B8';
-      ctx.font = '500 15px sans-serif';
-      ctx.fillText('등록된 지출 항목이 없습니다.', 40, y);
-      y += 34;
-    }
-
-    ctx.fillStyle = '#94A3B8';
-    ctx.font = '500 13px sans-serif';
-    ctx.fillText(`모여라 캘린더 · ${new Date().toLocaleDateString('ko-KR')} 생성`, 40, H - 30);
-
-    setShareImageUrl(canvas.toDataURL('image/png'));
-  };
-
-  const categoryBadge = category => /*#__PURE__*/React.createElement("span", {
+      const categoryBadge = category => /*#__PURE__*/React.createElement("span", {
     style: {
       display: 'inline-flex',
       alignItems: 'center',

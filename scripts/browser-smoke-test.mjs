@@ -93,6 +93,11 @@ function isIgnorableConsoleError(text, url = '') {
 function isActionableConsoleWarning(text) {
   return text.includes('You are overriding the original host');
 }
+function isKnownBrowserPageError(message) {
+  if (/ResizeObserver loop (?:completed with undelivered notifications|limit exceeded)/i.test(message)) return true;
+  return BROWSER_NAME === 'webkit'
+    && /firestore\.googleapis\.com\/(?:google\.firestore\.v1\.Firestore\/(?:Listen|Write)\/channel|google\.firestore\.v1\.Firestore\/channel).*due to access control checks/i.test(message);
+}
 function collectSameOriginAsset404(response, baseUrl, bucket) {
   if (response.status() !== 404) return;
   const resourceType = response.request().resourceType();
@@ -160,7 +165,7 @@ async function checkPage(browser, baseUrl, viewport, calId, view) {
     }
   });
   page.on('pageerror', err => {
-    if (BROWSER_NAME === 'webkit' && /firestore\.googleapis\.com\/(?:google\.firestore\.v1\.Firestore\/(?:Listen|Write)\/channel|google\.firestore\.v1\.Firestore\/channel).*due to access control checks/i.test(err.message)) {
+    if (isKnownBrowserPageError(err.message)) {
       knownExternalWarningCount += 1;
       return;
     }
@@ -365,7 +370,10 @@ async function checkSettlementModalEntryPoints(browser, baseUrl) {
       const loc = msg.location();
       if (!isIgnorableConsoleError(msg.text(), loc?.url || '')) errors.push(msg.text());
     });
-    page.on('pageerror', err => errors.push(err.message));
+    page.on('pageerror', err => {
+      if (isKnownBrowserPageError(err.message)) knownExternalWarningCount += 1;
+      else errors.push(err.message);
+    });
     try {
       await gotoBootReady(page, `${baseUrl}?id=kkot&view=settlement`);
 
@@ -431,7 +439,7 @@ async function checkSideMenuNavigation(browser, baseUrl) {
           }
         });
         page.on('pageerror', err => {
-          if (BROWSER_NAME === 'webkit' && /firestore\.googleapis\.com\/google\.firestore\.v1\.Firestore\/(?:Listen|Write)\/channel.*due to access control checks/i.test(err.message)) {
+          if (isKnownBrowserPageError(err.message)) {
             knownExternalWarningCount += 1;
             return;
           }

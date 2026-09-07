@@ -14,95 +14,48 @@ if (!React || !ReactDOM || typeof ReactDOM.createRoot !== 'function') {
 }
 
 import {
-  PRESET_COLORS,
-  DEFAULT_EXPENSE_CATEGORIES,
-  EXPENSE_CATEGORY_ICONS,
-  normalizeExpenseCategories,
   getExpenseCategories,
-  getExpenseCategory,
-  getExpenseCategoryIcon,
-  getExpenseCategoryLabel,
-  extractExpenseTimePrefix,
-  INCOME_EXPENSE_CATEGORY,
   isExpenseIncomeEntry,
-  getDisplayExpenseCategory,
-  clampNumber,
-  pad2,
-  isDataUrl,
-  isHttpUrl,
-  DEFAULT_PLACE_CATEGORIES,
-  PLACE_CATEGORY_ICONS,
-  normalizePlaceCategories,
   getPlaceCategories,
-  getPlaceCategoryById,
   getPlaceCategoryIcon,
-  getPlaceCategoryLabel,
-  KOREA_BBOX,
-  isDomesticLatLng,
   normalizePlaceAddressForSave,
-  getDisplayPlaceAddress,
-  normalizePlaces,
   deduplicateCalendarPlaces,
-  mergePlaceMemos,
   derivePlaceVisitStatus,
   countPlaceVisits,
   getCalendarPlaces,
   unionPlaces,
-  MEMO_DATE_RE,
-  normalizeMemoDateMatch,
   extractLeadingMemoDate,
   parseVisitEntriesFromMemo,
-  reformatMemoIntoDateLines,
   sortVisitEntriesRecentFirst,
   parsePlaceMemoEntries,
-  serializePlaceMemoEntries,
   toMemoDateFormat,
   upsertPlaceMemoEntry,
   removePlaceMemoEntry,
   getPlaceMemoEntryForDate,
-  KNOWN_PLACE_PARTICIPANT_NAME_TAGS,
   getKnownPlaceParticipantNames,
-  isHouseholdNameToken,
   extractKnownParticipantNames,
   normalizePlaceDateForSort,
-  formatPlaceBadgeDate,
   getPlaceSortDateKey,
-  getNaverMapSearchRegionHint,
-  getNaverMapPlaceUrl,
-  getGoogleMapPlaceUrl,
   getPlaceExternalMapUrl,
   getPlaceKakaoRouteUrl,
   getPlaceNaverRouteUrl,
   getPlaceGoogleRouteUrl,
   getCalendarSettlementCards,
   readConfigNumber,
-  readConfigObject,
-  ENABLE_FIRESTORE_SYNC,
-  ENABLE_FIRESTORE_WRITES,
-  ENABLE_PLACES_SUBCOLLECTION_MIGRATION,
-  PUBLIC_CALENDAR_IDS,
   FIREBASE_LOAD_TIMEOUT_MS,
   FIREBASE_LOAD_MAX_ATTEMPTS,
   MEMOS_PAGE_SIZE,
-  FIRESTORE_FREE_LIMITS,
-  GITHUB_PAGES_FREE_LIMITS,
   MAX_CHAT_THUMB_BASE64_LENGTH,
   CHAT_LIVE_MESSAGE_LIMIT,
   ADMIN_MESSAGE_LIVE_LIMIT,
   ADMIN_MEMO_LIVE_LIMIT,
-  GLOBAL_SEARCH_HISTORY_LIMIT,
-  MAX_FIRESTORE_DATA_URL_CHARS,
   sanitizeMessageForFirestore,
   sanitizeMemoForFirestore,
   slimMessageForClient,
-  CALENDAR_DOC_SAFE_BYTE_LIMIT,
-  ADMIN_SESSION_STORAGE_KEY,
-  ADMIN_SESSION_MAX_AGE_MS,
   sha256Hex,
   getAdminSession,
   setAdminSession,
   clearAdminSession,
-  callAdminFunction,
   verifyAdminPasswordRemote,
   listAllCalendarsRemote,
   listServerAuditLogsRemote,
@@ -111,29 +64,17 @@ import {
   changeAdminPasswordRemote,
   copyTextToClipboard,
   isNotificationSupported,
-  requestChatNotificationPermission,
   ensureChatNotificationPermission,
-  getChatNotifyPrefKey,
   isChatNotifyEnabledForCalendar,
   setChatNotifyEnabledForCalendar,
-  getChatParticipantPrefKey,
-  getStoredChatParticipantId,
   setStoredChatParticipantId,
   describePushSubscribeFailure,
-  getNotificationDiagnostics,
-  classifyPushSubscribeError,
   getBrowserLabelForNotifications,
   getNotificationPermissionHelpSteps,
-  shouldShowNotifOnboarding,
   setNotifGuideSeen,
   getNotifyChannels,
   setNotifyChannel,
-  isIOSDevice,
-  isInstalledStandalonePwa,
   probeNotificationCapability,
-  urlBase64ToUint8Array,
-  arrayBufferToBase64,
-  getSubscriptionHashId,
   subscribeUserToPush,
   ensurePushSubscriptionHealthy,
   syncPushSubscriptionChannels,
@@ -142,10 +83,8 @@ import {
   notifyNewChatMessage,
   notifyMeetingReminder,
   notifyRepeatScheduleReminder,
-  getContrastTextColor,
   formatDateWithDayName,
   normalizeDateString,
-  formatShortDateWithDayName,
   formatConfirmedMeetingLabel,
   formatDDayLabel,
   getConfirmedMeetings,
@@ -157,13 +96,10 @@ import {
   getPinnedNotices,
   formatChatHeaderTitle,
   isValidCalendarId,
-  isInternalTestCalendarId,
   isAllowedCalendarId,
   isSettlementEnabledCalendarId,
   sanitizeText,
-  stripUrlEdgePunctuation,
   describeFirebaseWriteError,
-  normalizeColorValue,
   isValidDateString,
   parseSharePathFromLocation,
   getCalendarIdFromURL,
@@ -174,41 +110,20 @@ import {
   getCalendarShareUrl,
   getViewShareUrl,
   getMemoItemShareUrl,
-  buildDynamicManifest,
-  activeManifestBlobUrl,
   applyDynamicManifest,
-  formatRegisteredAt,
-  cloneParticipant,
-  cloneAvailability,
-  cloneActivityLog,
-  clonePoll,
-  getItemStamp,
   isTombstone,
-  normalizeParticipantName,
   getActiveParticipants,
   getActiveAvailabilities,
   getCalendarActivityLogs,
   unionActivityLogs,
   getCalendarPolls,
   getActivePollOptions,
-  normalizeDeletedActivityLogIds,
-  getDeletedActivityLogIds,
   mergeDeletedActivityLogIds,
-  getActivityLogStamp,
-  SCHEDULE_ACTIVITY_ACTIONS,
   POLL_ACTIVITY_ACTIONS,
-  EXPENSE_ACTIVITY_ACTIONS,
-  IMAGE_TAG_ACTIVITY_ACTIONS,
-  MEETING_ACTIVITY_ACTIONS,
-  MEMO_ACTIVITY_ACTIONS,
-  PLACE_ACTIVITY_ACTIONS,
-  ACTIVITY_ACTIONS,
   normalizeActivityLog,
-  mergeActivityLogs,
   buildFieldChangeNote,
   createActivityLog,
   createPollActivityLog,
-  extractFirstUrlInfo,
   extractFirstUrl,
   extractAllUrlInfos,
   extractAllUrlInfosLoose,
@@ -227,10 +142,9 @@ import {
   formatBytes,
   getDataUrlInfo,
 } from './app-domain-helpers.js';
+import { fetchPhotoComments, savePhotoComments } from './photo-comments.js';
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
-const GATHER_APP_NOTIFICATIONS = window.GATHER_APP_NOTIFICATIONS || {};
-
 // 입력필드 규칙: 멀티라인 텍스트는 값(로드/입력/붙여넣기)에 맞춰 세로로 자동 확장
 function ResizableModalContainer(props) {
   const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer;
@@ -296,14 +210,6 @@ function OperationProgressOverlay(props) {
 }
 function ToggleSwitch(props) {
   const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ToggleSwitch;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function SyncStatusChip(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SyncStatusChip;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function SyncStatusBanner(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SyncStatusBanner;
   return typeof C === 'function' ? React.createElement(C, props) : null;
 }
 function Footer(props) {
@@ -435,7 +341,6 @@ import {
   getPollOptionVoterIds,
   getPollTotalVoteCount,
   isPollClosed,
-  formatPollDeadline,
   normalizePoll,
   mergePollRecord,
   mergePolls,
@@ -443,38 +348,22 @@ import {
   validateCalendarShape,
   normalizeCalendarForSave,
   assertCalendarLinks,
-  mergeParticipantRecord,
-  mergeAvailabilityRecord,
-  mergeCalendarRecord,
-  mergeCalendarAvailabilityDelta,
-  mergeCalendarSettingsDelta,
-  mergeCalendarPollsDelta,
   cloneCalendar,
   cloneCalendarList,
   mergeCalendarCollections,
-  INITIAL_CALENDARS,
-  GATHER_LOCAL_CACHE_KEY,
-  GATHER_LOCAL_META_KEY,
   __gatherSafeLocalStorage,
   loadLocalCache,
   saveLocalCache,
-  isLoadingCalendarShell,
   isUsableCalendarRecord,
-  getLoadingCalendarTitle,
   createLoadingCalendarShell,
-  bindGatherFirebaseDeps,
   subscribeMessages,
   subscribePlaces,
   subscribeMemos,
-  subscribeAnniversaries,
   firebaseConfig,
   __setFirebaseDb,
   firebaseInitError,
   firebaseRetryExhausted,
   isStorageDisabled,
-  lastStorageHealthCheckAt,
-  lastStorageHealthOk,
-  STORAGE_HEALTH_RECHECK_COOLDOWN_MS,
   ensureFirebaseStorageReady,
   checkFirebaseStorageHealth,
   fetchSingleCalendarWithRest,
@@ -493,44 +382,26 @@ import {
   fetchOlderChatMessages,
   fetchMessageOrdinal,
   fetchGalleryPhotoOrdinal,
-  fetchGalleryItemCount,
   invalidateGalleryItemCount,
   fetchMemosRest,
   fetchAnniversariesRest,
   fetchPhotoCommentCountsRest,
   fetchCustomCultureItemsRest,
-  sendChatMessageRest,
   writeCollectionDocumentWithFallback,
   writeRootCollectionDocumentWithFallback,
   deleteMessageRest,
   fetchMessageRest,
-  updateMessageRest,
-  waitForTimeout,
   fetchSingleCloudCalendar,
-  isUsableCloudCalendarPayload,
   getCloudDocCalendar,
-  firestoreValueToJs,
-  jsToFirestoreValue,
   firestoreDocumentToJs,
-  getImageSharePageUrl,
-  sanitizeShareIdPart,
   createImageShareDocument,
   fetchImageShareDocument,
-  estimateCalendarDocWireBytes,
-  stripEmbeddedActivityLogsField,
   writeActivityLogsToFirestore,
   fetchActivityLogsFromFirestore,
   deleteActivityLogsAfterTimestamp,
-  stripEmbeddedPlacesField,
-  writePlacesToFirestore,
   fetchPlacesFromFirestore,
-  stripEmbeddedConfirmedMeetingField,
-  writeConfirmedMeetingsToFirestore,
   fetchConfirmedMeetingsFromFirestore,
-  isRetryableFirestoreConflict,
   describeUpdateCalendarsFailure,
-  getFirestoreRetryDelay,
-  pushSingleCalendarWithRest,
   pushSingleCloudCalendar,
   persistCalendarAuxiliaryData,
   loadLocalMeta,
@@ -545,21 +416,10 @@ import {
   getAdminSearchQueryFromUrl,
   getAdminSearchFilterFromUrl,
   createDefaultCalendar,
-  getMonthKey,
-  estimateFirestoreDocumentSize,
-  estimateMonthlyOutboundBytes,
-  buildServiceUsageMetrics,
   createCalendarBackupPayload,
   createCalendarDataBackupPayload,
   downloadJsonFile,
-  downloadTextFile,
-  escapeICSText,
-  formatICSDateOnly,
   dateStrToHashtag,
-  addDaysToDateStr,
-  buildICSTimestamp,
-  buildCalendarConfirmedMeetingsICS,
-  buildConfirmedMeetingDescription,
   exportCalendarConfirmedMeetingsToICS,
   extractCalendarsFromBackup,
   extractCalendarBackupEntries,
@@ -567,7 +427,6 @@ import {
   restoreCalendarBackupEntries,
   validateBackupCalendars,
   buildAdminDashboardMetrics,
-  CALENDAR_ACCENT_PALETTE,
   getCalendarAccentColor
 } from './app-firebase-data.js';
 import { enqueueWriteOperation, flushWriteQueue } from './app-write-queue.js';
@@ -1357,14 +1216,14 @@ function CalendarApp() {
       return true;
     }
   });
-  const [isBrowserOnline, setIsBrowserOnline] = React.useState(() => {
+  const [, setIsBrowserOnline] = React.useState(() => {
     try {
       return typeof navigator === 'undefined' ? true : navigator.onLine !== false;
     } catch (_) {
       return true;
     }
   });
-  const [syncDiag, setSyncDiag] = React.useState(null);
+  const [, setSyncDiag] = React.useState(null);
   React.useEffect(() => {
     if (typeof window === 'undefined') return undefined;
     const handleOnline = () => setIsBrowserOnline(true);
@@ -5517,7 +5376,6 @@ function CalendarApp() {
     if (nextExpenses.length !== existingExpenses.length) return false;
     const same = existingExpenses.every((e, i) => e.id === nextExpenses[i].id);
     if (same) return true;
-    const now = Date.now();
     const nextConfirmedMeetings = existingMeetings.map((m, i) => i === meetingIndex ? { ...m, expenses: nextExpenses } : m);
     return commitConfirmedMeetings(nextConfirmedMeetings, '지출 순서 저장완료');
   };
@@ -6097,45 +5955,23 @@ function CalendarApp() {
   // calendars/cal_{id}/photoComments 문서 id로 그대로 쓴다. firestore.rules의
   // isValidPhotoCommentDocId와 같은 문자셋으로 한 번 더 다듬어(콜론/점/하이픈/밑줄/영숫자만,
   // 300자 캡) 규칙에 안 걸리는 값만 서버로 보낸다.
-  const sanitizePhotoCommentDocId = key => String(key || '').replace(/[^A-Za-z0-9_:.-]/g, '_').slice(0, 300);
   const handleFetchPhotoComments = async photoKey => {
-    const docId = sanitizePhotoCommentDocId(photoKey);
-    if (!docId || !activeCalId) return [];
-    try {
-      if (firebaseDb) {
-        const snap = await firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('photoComments').doc(docId).get();
-        return { success: true, comments: snap?.exists && Array.isArray(snap.data()?.comments) ? snap.data().comments : [] };
-      }
-      const res = await fetch(`https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${activeCalId}/photoComments/${docId}`);
-      // A missing photoComments document is the normal state for a photo with no
-      // comments. Firestore SDK returns exists=false for this case, so mirror that
-      // behavior in the REST fallback instead of showing a false load error.
-      if (res.status === 404) return { success: true, comments: [] };
-      if (!res.ok) return { success: false, comments: [] };
-      const data = firestoreDocumentToJs(await res.json());
-      return { success: true, comments: Array.isArray(data?.comments) ? data.comments : [] };
-    } catch (readErr) {
-      console.warn('handleFetchPhotoComments failed:', readErr);
-      return { success: false, comments: [] };
-    }
+    return fetchPhotoComments({
+      photoKey,
+      calendarId: activeCalId,
+      db: firebaseDb,
+      projectId: firebaseConfig.projectId,
+      decodeDocument: firestoreDocumentToJs
+    });
   };
   const handleSavePhotoComments = async (photoKey, nextComments) => {
-    const docId = sanitizePhotoCommentDocId(photoKey);
-    if (!docId || !activeCalId) return false;
-    // An empty thread has no durable state. Delete the document instead of leaving an empty
-    // placeholder behind; this keeps the comment index authoritative and makes a delete on a
-    // previously contaminated/shared key actually remove the visible thread and badge.
-    if (!Array.isArray(nextComments) || nextComments.length === 0) {
-      const deleted = await writeCollectionDocumentWithFallback('photoComments', activeCalId, docId, null, 'delete', '사진 댓글 삭제');
-      queueServerAuditEvent(activeCalId, 'photo_comment_delete', `${docId} · 0건`, getClientAuditContext());
-      return !!deleted?.success;
-    }
-    const saved = await writeCollectionDocumentWithFallback('photoComments', activeCalId, docId, {
+    return savePhotoComments({
+      photoKey,
       comments: nextComments,
-      updatedAt: Date.now()
-    }, 'set', '사진 댓글 저장');
-    queueServerAuditEvent(activeCalId, 'photo_comment_save', `${docId} · ${nextComments.length}건`, getClientAuditContext());
-    return !!saved?.success;
+      calendarId: activeCalId,
+      writeDocument: writeCollectionDocumentWithFallback,
+      audit: (type, detail) => queueServerAuditEvent(activeCalId, type, detail, getClientAuditContext())
+    });
   };
 
   const findMemoById = async memoId => {
@@ -8774,7 +8610,6 @@ function cacheLinkPreview(url, result) {
 }
 // Peekalink's free plan is a 50-request-per-hour rate limit, not a fixed lifetime quota --
 // it resets every clock hour rather than depleting over time. See PEEKALINK_HOUR_BUCKET_MS below.
-const PEEKALINK_FREE_HOURLY_LIMIT = Number.isFinite(GATHER_APP_CHAT_DATA.PEEKALINK_FREE_HOURLY_LIMIT) ? GATHER_APP_CHAT_DATA.PEEKALINK_FREE_HOURLY_LIMIT : 50;
 const PEEKALINK_HOUR_BUCKET_MS = Number.isFinite(GATHER_APP_CHAT_DATA.PEEKALINK_HOUR_BUCKET_MS) ? GATHER_APP_CHAT_DATA.PEEKALINK_HOUR_BUCKET_MS : 3600000;
 
 // Deterministic, synchronous 64-bit FNV-1a hash used as the Firestore doc ID for the shared
@@ -9775,10 +9610,6 @@ function ImageProcessingOverlay(props) {
   const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ImageProcessingOverlay;
   return typeof C === 'function' ? React.createElement(C, props) : null;
 }
-function EmojiGridButton(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.EmojiGridButton;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
 function EmojiPickerSheet(props) {
   const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.EmojiPickerSheet;
   return typeof C === 'function' ? React.createElement(C, props) : null;
@@ -10328,10 +10159,6 @@ function ExternalLinkIcon(props) {
   const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ExternalLinkIcon;
   return typeof C === 'function' ? React.createElement(C, props) : null;
 }
-function ShareIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ShareIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
 function WalletIcon(props) {
   const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.WalletIcon;
   return typeof C === 'function' ? React.createElement(C, props) : null;
@@ -10517,14 +10344,6 @@ function isEmojiOnlyChatText(text) {
 
 function formatCommentDate(...args) {
   const f = (window.GATHER_APP_UTILS || {}).formatCommentDate;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function formatChatTime(...args) {
-  const f = (window.GATHER_APP_UTILS || {}).formatChatTime;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function formatChatDividerDate(...args) {
-  const f = (window.GATHER_APP_UTILS || {}).formatChatDividerDate;
   return typeof f === 'function' ? f(...args) : undefined;
 }
 // Returns paired {full, thumb} entries for a chat message's attached image(s), handling both
@@ -10725,10 +10544,6 @@ function buildLightboxImageInfo(url, timestamp) {
 // buttons and dot indicators when there's more than one image, matching the KakaoTalk-style
 // multi-photo gallery UX the chat bubbles are modeled after. `meta` (optional, parallel to
 // `urls`) supplies each image's { timestamp } for the tap-to-toggle info overlay.
-function LightboxInfoPanel(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LightboxInfoPanel;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
 function Lightbox(props) {
   const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.Lightbox;
   return typeof C === 'function' ? React.createElement(C, props) : null;
@@ -10849,16 +10664,6 @@ function twemojiCodepoint(emoji) {
 function twemojiImageUrl(emoji) {
   return `${TWEMOJI_CDN_BASE}${twemojiCodepoint(emoji)}.svg`;
 }
-
-const EMOJI_CATEGORIES = Array.isArray(GATHER_APP_CHAT_DATA.EMOJI_CATEGORIES) ? GATHER_APP_CHAT_DATA.EMOJI_CATEGORIES : [
-  { label: '표정', emojis: ['😀', '😁', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😍', '🥰', '😘', '😋', '😜', '🤪', '😎', '🤩', '🥳', '😏', '😢', '😭', '😤', '😡', '🥺', '😱', '😨', '😴', '🤔', '🙄', '😅', '😐', '🤗', '🤭'] },
-  { label: '손동작·사람', emojis: ['👍', '👎', '👏', '🙌', '🙏', '👋', '🤝', '💪', '✌️', '🤞', '👌', '🤙', '👊', '🤟', '🖐️', '🙇', '🙇‍♂️', '🙇‍♀️', '🤦', '🤷'] },
-  { label: '하트', emojis: ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '💕', '💖', '💗', '💘', '💝', '😻'] },
-  { label: '동물·자연', emojis: ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐷', '🐸', '🐵', '🌸', '🌼', '🌻', '🌈', '⭐', '☀️', '☁️', '❄️'] },
-  { label: '음식', emojis: ['🍎', '🍕', '🍔', '🍟', '🍗', '🍺', '🍻', '☕', '🍰', '🎂', '🍫', '🍭', '🍜', '🍱', '🍚', '🥗'] },
-  { label: '활동·사물', emojis: ['🎉', '🎊', '🎁', '🎈', '🎵', '🎶', '⚽', '📷', '📱', '💻', '⏰', '🔥', '💤', '💯', '✅', '❌', '⚠️', '📌', '📍', '🚗'] },
-  { label: '기호', emojis: ['✨', '💥', '💫', '💦', '💨', '🆗', '🆒', '🔔', '🚫', '❓', '❗', '➕', '➖'] }
-];
 
 const RECENT_EMOJI_STORAGE_KEY = typeof GATHER_APP_CHAT_DATA.RECENT_EMOJI_STORAGE_KEY === 'string' ? GATHER_APP_CHAT_DATA.RECENT_EMOJI_STORAGE_KEY : 'gather_recent_emojis_v1';
 function getRecentEmojis() {
@@ -10992,7 +10797,7 @@ const rebuildCalendarToTimestamp = (calendar, T, logs = []) => {
     .filter(p => (p.updatedAt || 0) <= T)
     .map(p => {
       if (p.removedAt && p.removedAt > T) {
-        const { removedAt, ...rest } = p;
+        const { removedAt: _removedAt, ...rest } = p;
         return rest;
       }
       return p;
@@ -11464,10 +11269,6 @@ function translateKoreanToEnglish(query) {
 
 
 
-function SharedSideMenuSettings(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SharedSideMenuSettings;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
 function MainSideMenu(props) {
   const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MainSideMenu;
   return typeof C === 'function' ? React.createElement(C, props) : null;
@@ -11494,12 +11295,6 @@ function MemoShareModal(props) {
   const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MemoShareModal;
   return typeof C === 'function' ? React.createElement(C, props) : null;
 }
-function ChatSideMenu(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChatSideMenu;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-
-
 function ChatGalleryModal(props) {
   const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChatGalleryModal;
   return typeof C === 'function' ? React.createElement(C, props) : null;
@@ -12070,11 +11865,6 @@ function PollModal(props) {
 // Custom date+time picker replacing the browser's native <input type="datetime-local"> overlay
 // (which renders with its own OS-styled chrome that doesn't follow the app's dark mode) with a
 // layer-popup matching the main calendar's year/month picker look and feel.
-const DEADLINE_PICKER_MONTH_NAMES = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
-
-
-
-
 // Summary List - Displays both "Partial Availability" (N+ members) and "Full Availability" lists
 
 
@@ -12155,27 +11945,6 @@ const PLACE_MAP_DEFAULT_ZOOM = 11;
 // Rough bounding box for South+North Korea -- used only to decide which registered places count
 // as "domestic" for the main-screen preview map's auto-fit (see preferDomesticBounds below), not
 // as a precise border.
-function stripKoreaCountryPrefix(...args) {
-  const f = (window.GATHER_APP_UTILS || {}).stripKoreaCountryPrefix;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-function normalizeDomesticKoreanAddress(...args) {
-  const f = (window.GATHER_APP_UTILS || {}).normalizeDomesticKoreanAddress;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
-const trimLatLngOutliers = GATHER_APP_UTILS.trimLatLngOutliers || function trimLatLngOutliers(points) {
-  if (!Array.isArray(points) || points.length <= 5) return points || [];
-  const lats = points.map(p => p[0]).slice().sort((a, b) => a - b);
-  const lngs = points.map(p => p[1]).slice().sort((a, b) => a - b);
-  const pct = (arr, p) => arr[Math.min(arr.length - 1, Math.max(0, Math.round(p * (arr.length - 1))))];
-  const latLo = pct(lats, 0.1), latHi = pct(lats, 0.9);
-  const lngLo = pct(lngs, 0.1), lngHi = pct(lngs, 0.9);
-  const trimmed = points.filter(([lat, lng]) => lat >= latLo && lat <= latHi && lng >= lngLo && lng <= lngHi);
-  return trimmed.length >= 3 ? trimmed : points;
-};
-
-
-
 // Small monochrome (white, via stroke="#fff") lucide-style glyph per category id. Each icon is
 // stored as an array of shape descriptors -- { tag: 'path', d } / { tag: 'rect', ... } /
 // { tag: 'circle', ... } -- rather than just path "d" strings, since several of these icons (예:

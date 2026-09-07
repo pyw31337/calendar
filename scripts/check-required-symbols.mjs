@@ -6,31 +6,25 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const main = readFileSync(resolve(root, 'src/core/app-main.js'), 'utf8');
 const utils = readFileSync(resolve(root, 'src/core/app-utils.js'), 'utf8');
 const firebaseServices = readFileSync(resolve(root, 'src/core/firebase-services.js'), 'utf8');
+const domainHelpers = readFileSync(resolve(root, 'src/core/app-domain-helpers.js'), 'utf8');
 
 const requiredInMain = [
   'getPlaceSortDateKey',
-  'normalizePlaces',
   'unionPlaces',
   'parseVisitEntriesFromMemo',
-  'reformatMemoIntoDateLines',
   'sortVisitEntriesRecentFirst',
   'extractLeadingMemoDate',
   'normalizePlaceAddressForSave',
-  'isDomesticLatLng',
   'getPlaceExternalMapUrl',
-  'formatPlaceBadgeDate',
   'isExpenseIncomeEntry',
-  'getDisplayExpenseCategory',
   'getPlaceCategories',
   'AdminLoginGate',
   'PlacesView',
   'DateModal',
-  'trimLatLngOutliers',
   'parseSharePathFromLocation',
   'getCalendarShareUrl',
   'getViewShareUrl',
   'getMessageImageEntries',
-  'fetchGalleryItemCount',
   'fetchRecentChatMessages',
   'fetchSubcollectionCount',
   'ChatGalleryModal',
@@ -49,7 +43,15 @@ const requiredInUtils = [
   'formatConfirmedMeetingLabel',
   'isExpenseIncomeEntry',
   'normalizePlaceCategories',
+  'reformatMemoIntoDateLines',
+  'trimLatLngOutliers',
   'GATHER_APP_UTILS'
+];
+
+const requiredInDomainHelpers = [
+  'normalizePlaces',
+  'getPhotoCommentIdentity',
+  'getPhotoCommentCount'
 ];
 
 function hasSymbol(source, name) {
@@ -74,6 +76,12 @@ for (const name of requiredInUtils) {
     failed = true;
   }
 }
+for (const name of requiredInDomainHelpers) {
+  if (!hasSymbol(domainHelpers, name)) {
+    console.error(`[check-required-symbols] MISSING in app-domain-helpers.js: ${name}`);
+    failed = true;
+  }
+}
 const requiredInFirebaseServices = [
   'fetchChatMessagesRest',
   'fetchRecentChatMessages',
@@ -92,4 +100,4 @@ for (const name of requiredInFirebaseServices) {
   }
 }
 if (failed) process.exit(1);
-console.log(`[check-required-symbols] OK (${requiredInMain.length} main, ${requiredInUtils.length} utils, ${requiredInFirebaseServices.length} firebase-services)`);
+console.log(`[check-required-symbols] OK (${requiredInMain.length} main, ${requiredInUtils.length} utils, ${requiredInDomainHelpers.length} domain, ${requiredInFirebaseServices.length} firebase-services)`);

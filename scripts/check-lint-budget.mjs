@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 
-const baselineWarnings = 4304;
+const baselineWarnings = 0;
 const output = execFileSync('npx', ['eslint', '.', '-f', 'json'], {
   encoding: 'utf8',
   maxBuffer: 32 * 1024 * 1024

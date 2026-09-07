@@ -40,6 +40,12 @@ let missingCount = 0;
 
 for (const filePath of uiFiles) {
   const content = fs.readFileSync(filePath, 'utf8');
+  // This audit only needs executable call sites. Comments often mention a helper with `name(`
+  // while documenting an alternative implementation; treating that prose as a call forced
+  // dead compatibility wrappers to remain in every split UI chunk.
+  const executableContent = content
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:])\/\/.*$/gm, '$1');
   const relPath = path.relative(process.cwd(), filePath);
 
   for (const helperName of globalHelperNames) {
@@ -47,7 +53,7 @@ for (const filePath of uiFiles) {
     
     // Check if `helperName` is called in `content`
     const callRegex = new RegExp(`(?<![.\\w$])${helperName}\\s*\\(`, 'g');
-    if (!callRegex.test(content)) continue;
+    if (!callRegex.test(executableContent)) continue;
 
     // `helperName` IS called in this file. Check if it is declared or guarded with `typeof === 'function'`
     const isDeclaredInFile =

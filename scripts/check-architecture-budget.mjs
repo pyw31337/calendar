@@ -1,12 +1,9 @@
 import fs from 'node:fs';
 
-// Budgets raised (2026-08-30) to give active feature development room to breathe -- app-main.js
-// was hovering right at its old 10,750-line cap and flipping this check red/green from one
-// commit to the next regardless of whether the commit had any actual problem. Once the current
-// growth phase stabilizes, revisit alongside splitting app-main.js/app-firebase-data.js into
-// smaller modules and bring these back down.
+// Keep the coordinator from absorbing extracted feature code again. Photo-comment persistence
+// now lives in photo-comments.js and UI compatibility wrappers are local to their actual chunk.
 const targets = [
-  { file: 'src/core/app-main.js', maxLines: 13000, label: 'app-main.js' },
+  { file: 'src/core/app-main.js', maxLines: 12700, label: 'app-main.js' },
   { file: 'src/core/app-firebase-data.js', maxLines: 4500, label: 'app-firebase-data.js' }
 ];
 

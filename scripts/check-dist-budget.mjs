@@ -3,18 +3,15 @@ import { join } from 'node:path';
 
 const DIST_ASSETS_DIR = join(process.cwd(), 'dist', 'assets');
 
-// Per-chunk caps: Temporarily doubled (200%) during active feature development
-// to prevent routine commits and minor platform variations (Linux vs macOS) from tripping CI.
-// Plan: Once the service stabilizes, apply dynamic code-splitting (chunk distribution)
-// and bring these thresholds back down.
+// Per-chunk caps retain practical release headroom while catching accidental eager growth.
 const BUDGETS = [
-  // src/core/app-main.js (single source file; cannot be split by manualChunks)
-  { pattern: /^app-main-.*\.js$/, maxBytes: 640_000 },
+  { pattern: /^app-main-.*\.js$/, maxBytes: 360_000 },
+  { pattern: /^photo-comments-.*\.js$/, maxBytes: 40_000 },
   // ui-views split halves (vite.config.js manualChunks)
-  { pattern: /^ui-views-calendar-.*\.js$/, maxBytes: 360_000 },
-  { pattern: /^ui-views-modals-.*\.js$/, maxBytes: 380_000 },
-  { pattern: /^ui-admin-.*\.js$/, maxBytes: 320_000 },
-  { pattern: /^vendor-react-dom-.*\.js$/, maxBytes: 320_000 },
+  { pattern: /^ui-views-calendar-.*\.js$/, maxBytes: 240_000 },
+  { pattern: /^ui-views-modals-.*\.js$/, maxBytes: 280_000 },
+  { pattern: /^ui-admin-.*\.js$/, maxBytes: 200_000 },
+  { pattern: /^vendor-react-dom-.*\.js$/, maxBytes: 180_000 },
   { pattern: /^index-.*\.css$/, maxBytes: 240_000 }
 ];
 
@@ -33,7 +30,7 @@ const LAZY_CHUNK_PATTERNS = [/^vendor-map-.*\.js$/];
 // actually loads before the app becomes interactive. Sized with real headroom so routine
 // feature work (this cap already accounts for the movie metadata/enrichment UI) doesn't
 // trip CI for a few KB.
-const TOTAL_JS_MAX_BYTES = 1_850_000;
+const TOTAL_JS_MAX_BYTES = 1_800_000;
 
 function fail(message) {
   console.error(`[check-dist-budget] ${message}`);

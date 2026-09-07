@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import { GATHER_APP_UTILS, omitUndefinedDeep } from '../src/core/app-utils.js';
 import { calculateSettlementRows } from '../src/core/settlement-calculator.js';
+import { fetchPhotoComments, savePhotoComments } from '../src/core/photo-comments.js';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -10,6 +11,33 @@ function assert(condition, message) {
 const undefinedProbe = omitUndefinedDeep({ description: undefined, nested: { keep: 'ok', drop: undefined }, list: [1, undefined] });
 assert(!('description' in undefinedProbe) && !('drop' in undefinedProbe.nested), 'Firestore payload sanitizer must omit undefined object fields');
 assert(undefinedProbe.list.length === 2 && undefinedProbe.list[1] === null, 'Firestore payload sanitizer must preserve array positions');
+
+{
+  const fetched = await fetchPhotoComments({
+    photoKey: 'asset:v1:test',
+    calendarId: 'cw',
+    db: {
+      collection: () => ({ doc: () => ({ collection: () => ({ doc: () => ({
+        get: async () => ({ exists: true, data: () => ({ comments: [{ id: 'comment-1' }] }) })
+      }) }) }) })
+    },
+    projectId: 'unused',
+    decodeDocument: value => value
+  });
+  assert(fetched.success && fetched.comments.length === 1, 'split photo-comment reader lost the selected asset thread');
+
+  const writes = [];
+  const audits = [];
+  const saved = await savePhotoComments({
+    photoKey: 'asset:v1:test',
+    comments: [{ id: 'comment-2' }],
+    calendarId: 'cw',
+    writeDocument: async (...args) => { writes.push(args); return { success: true }; },
+    audit: (...args) => audits.push(args)
+  });
+  assert(saved && writes[0]?.[2] === 'asset:v1:test' && writes[0]?.[4] === 'set', 'split photo-comment writer changed the canonical document target');
+  assert(audits[0]?.[0] === 'photo_comment_save', 'split photo-comment writer lost its audit event');
+}
 
 const settlementSimulation = calculateSettlementRows(
   536000,

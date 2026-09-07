@@ -79,6 +79,7 @@ export default defineConfig({
           // its source internally.
           if (id.includes('/core/app-domain-helpers')) return 'app-domain-helpers';
           if (id.includes('/core/app-firebase-data')) return 'app-firebase-data';
+          if (id.includes('/core/photo-comments')) return 'photo-comments';
           if (id.includes('/core/app-main')) return 'app-main';
         }
       }
