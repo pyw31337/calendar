@@ -1679,6 +1679,45 @@ const MEMO_ACTIVITY_ACTIONS = Array.isArray(GATHER_APP_CONSTANTS.MEMO_ACTIVITY_A
 const PLACE_ACTIVITY_ACTIONS = Array.isArray(GATHER_APP_CONSTANTS.PLACE_ACTIVITY_ACTIONS) ? GATHER_APP_CONSTANTS.PLACE_ACTIVITY_ACTIONS : ['place_create', 'place_update', 'place_delete'];
 const ACTIVITY_ACTIONS = [...SCHEDULE_ACTIVITY_ACTIONS, ...POLL_ACTIVITY_ACTIONS, ...EXPENSE_ACTIVITY_ACTIONS, ...IMAGE_TAG_ACTIVITY_ACTIONS, ...MEETING_ACTIVITY_ACTIONS, ...MEMO_ACTIVITY_ACTIONS, ...PLACE_ACTIVITY_ACTIONS];
 
+// Anonymous, privacy-preserving actor context for client-side audit entries. This is deliberately
+// not an IP address or a raw user-agent: activityLogs are readable by calendar participants and
+// direct Firestore writes cannot provide a trustworthy network identity. The values are only
+// correlation hints (and can be spoofed); authoritative network attribution belongs in a
+// server-only audit sink introduced with an authenticated/session-backed write path.
+let auditSessionId = '';
+function getClientAuditContext() {
+  let actorId = '';
+  try {
+    const storage = typeof localStorage !== 'undefined' ? localStorage : null;
+    if (storage) {
+      actorId = String(storage.getItem('gather_audit_actor_v1') || '');
+      if (!actorId) {
+        const randomPart = (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
+          ? crypto.randomUUID()
+          : `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`;
+        actorId = `actor_${randomPart}`;
+        storage.setItem('gather_audit_actor_v1', actorId);
+      }
+    }
+  } catch (_) {}
+  if (!actorId) actorId = 'actor_anon';
+  if (!auditSessionId) {
+    const randomPart = (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
+      ? crypto.randomUUID()
+      : `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`;
+    auditSessionId = `session_${randomPart}`;
+  }
+  let client = '알 수 없음';
+  try {
+    client = typeof getDeviceLabel === 'function' ? String(getDeviceLabel() || client) : client;
+  } catch (_) {}
+  return {
+    actorId: sanitizeText(actorId, 80),
+    sessionId: sanitizeText(auditSessionId, 100),
+    client: sanitizeText(client, 120)
+  };
+}
+
 function normalizeActivityLog(calendarId, log, participantIds = null, idRedirects = new Map()) {
   if (!log || typeof log !== 'object') return null;
   if (log.calendarId && log.calendarId !== calendarId) return null;
@@ -1697,6 +1736,11 @@ function normalizeActivityLog(calendarId, log, participantIds = null, idRedirect
   const idParticipantPart = participantId || 'system';
   const id = sanitizeText(log.id || `${calendarId}_${idDatePart}_${idParticipantPart}_${action}_${timestamp}`, 160);
   const note = sanitizeText(log.note || '', 320);
+  const actor = log.actor && typeof log.actor === 'object' ? {
+    actorId: sanitizeText(log.actor.actorId || '', 80),
+    sessionId: sanitizeText(log.actor.sessionId || '', 100),
+    client: sanitizeText(log.actor.client || '', 120)
+  } : null;
   return {
     id,
     calendarId,
@@ -1704,7 +1748,8 @@ function normalizeActivityLog(calendarId, log, participantIds = null, idRedirect
     date,
     action,
     note,
-    timestamp
+    timestamp,
+    ...(actor && (actor.actorId || actor.sessionId || actor.client) ? { actor } : {})
   };
 }
 
@@ -1828,7 +1873,8 @@ function createActivityLog(calendarId, action, dateStr, participantId, timestamp
     date: dateStr,
     action,
     note: richNote,
-    timestamp
+    timestamp,
+    actor: getClientAuditContext()
   });
 }
 

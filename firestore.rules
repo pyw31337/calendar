@@ -347,7 +347,7 @@ service cloud.firestore {
       match /activityLogs/{logId} {
         allow get, list: if isCalendarDoc(calendarDocId);
         allow create, update: if isCalendarDoc(calendarDocId)
-          && request.resource.data.keys().hasOnly(['id', 'calendarId', 'participantId', 'date', 'action', 'note', 'timestamp'])
+          && request.resource.data.keys().hasOnly(['id', 'calendarId', 'participantId', 'date', 'action', 'note', 'timestamp', 'actor'])
           && request.resource.data.id is string
           && request.resource.data.id.size() <= 200
           && request.resource.data.calendarId is string
@@ -364,7 +364,14 @@ service cloud.firestore {
           // of bug as the messages/{messageId} hasOnly() mismatch fixed above, just smaller blast
           // radius (an audit-trail entry going missing, not a whole photo upload failing).
           && request.resource.data.note.size() <= 320
-          && request.resource.data.timestamp is number;
+          && request.resource.data.timestamp is number
+          && (!('actor' in request.resource.data) || (
+            request.resource.data.actor is map
+            && request.resource.data.actor.keys().hasOnly(['actorId', 'sessionId', 'client'])
+            && request.resource.data.actor.actorId is string && request.resource.data.actor.actorId.size() <= 80
+            && request.resource.data.actor.sessionId is string && request.resource.data.actor.sessionId.size() <= 100
+            && request.resource.data.actor.client is string && request.resource.data.actor.client.size() <= 120
+          ));
         allow update: if false;
         allow delete: if isCalendarDoc(calendarDocId);
       }
