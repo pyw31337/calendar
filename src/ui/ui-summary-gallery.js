@@ -3951,8 +3951,28 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
               }, item.venue || CULTURE_MISSING_LABEL)
             ),
             registered && /*#__PURE__*/React.createElement("div", {
-              style: { position: 'absolute', top: '6px', right: '6px', backgroundColor: '#7C3AED', color: '#fff', borderRadius: 'var(--radius-full)', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 800, boxShadow: '0 1px 3px rgba(0,0,0,0.25)' }
-            }, "✓")
+              title: "캘린더 등록됨",
+              "aria-label": "캘린더 등록됨",
+              style: { position: 'absolute', top: '6px', right: '6px', backgroundColor: '#7C3AED', color: '#fff', borderRadius: 'var(--radius-full)', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.25)' }
+            }, /*#__PURE__*/React.createElement("svg", {
+              xmlns: "http://www.w3.org/2000/svg",
+              width: 13,
+              height: 13,
+              viewBox: "0 0 24 24",
+              fill: "none",
+              stroke: "currentColor",
+              strokeWidth: 2,
+              strokeLinecap: "round",
+              strokeLinejoin: "round",
+              "aria-hidden": true
+            },
+              /*#__PURE__*/React.createElement("path", { d: "M12.5 21h-6.5a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v5" }),
+              /*#__PURE__*/React.createElement("path", { d: "M16 3v4" }),
+              /*#__PURE__*/React.createElement("path", { d: "M8 3v4" }),
+              /*#__PURE__*/React.createElement("path", { d: "M4 11h16" }),
+              /*#__PURE__*/React.createElement("path", { d: "M19 22v-6" }),
+              /*#__PURE__*/React.createElement("path", { d: "M22 19l-3 -3l-3 3" })
+            ))
           ),
           /*#__PURE__*/React.createElement("div", { style: { padding: '8px 10px 10px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px', flex: 1 } },
             /*#__PURE__*/React.createElement("div", {
