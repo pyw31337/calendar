@@ -2031,7 +2031,8 @@ export function ChatGalleryModal({
     if (!isBulkShareMode && !commentBadge) return thumb;
     return /*#__PURE__*/React.createElement("div", {
       key: itemKey,
-      style: { position: 'relative' }
+      className: commentCount ? 'gallery-comment-heartbeat' : '',
+      style: { position: 'relative', animationDelay: `${(idx % 7) * 0.9}s` }
     },
       thumb,
       isBulkShareMode && /*#__PURE__*/React.createElement("span", {

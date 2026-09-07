@@ -531,6 +531,23 @@ button.confirmed-meeting-icon-btn.confirmed-meeting-surface.is-heartbeat {
   70% { transform: scale(1); }
   100% { transform: scale(1); }
 }
+
+/* A quiet, staggered cue for gallery thumbnails with comments. The delay is deterministic
+   per grid position, so badges do not pulse in lockstep or create visual noise. */
+.gallery-comment-heartbeat {
+  animation: gallery-comment-heartbeat 2.8s ease-in-out infinite;
+  will-change: transform;
+}
+@keyframes gallery-comment-heartbeat {
+  0%, 72%, 100% { transform: scale(1); }
+  76% { transform: scale(1.018); }
+  80% { transform: scale(0.994); }
+  84% { transform: scale(1.012); }
+  88% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gallery-comment-heartbeat { animation: none; }
+}
 @media (prefers-reduced-motion: reduce) {
   .confirmed-meeting-icon-btn.is-heartbeat {
     animation: none;

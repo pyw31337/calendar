@@ -1889,6 +1889,17 @@ export function HistoryView({
   const Lightbox = __comp.Lightbox || __deps.Lightbox;
   const PencilIcon = __comp.PencilIcon || __deps.PencilIcon;
   const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
+  const formatHistoryDate = value => {
+    const text = String(value || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return '';
+    return typeof __deps.formatShortDateWithDayName === 'function' ? __deps.formatShortDateWithDayName(text) : text.replace(/^(\d{4})-(\d{2})-(\d{2})$/, '$1.$2.$3');
+  };
+  const getTaggedDate = photo => {
+    const meetingDate = String(photo?.meetingDate || '').slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(meetingDate)) return meetingDate;
+    const match = String(photo?.tags || '').match(/(?:^|[^\d])(20\d{2})[.\-/](\d{1,2})[.\-/](\d{1,2})(?!\d)/);
+    return match ? `${match[1]}-${String(match[2]).padStart(2, '0')}-${String(match[3]).padStart(2, '0')}` : '';
+  };
 
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
@@ -2574,6 +2585,7 @@ export function HistoryView({
                   border: 'none', padding: 0, cursor: 'pointer', backgroundColor: 'var(--bg-card)'
                 }
               },
+                /*#__PURE__*/React.createElement("span", { style: { position: 'absolute', top: '6px', right: '6px', zIndex: 3, minWidth: '24px', height: '24px', padding: '0 6px', borderRadius: '999px', background: 'rgba(15,23,42,0.78)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, String(group.photos.length)),
                 cover
                   ? /*#__PURE__*/React.createElement("img", {
                       src: cover.thumb || cover.full, alt: "", loading: "lazy", decoding: "async",
@@ -2593,7 +2605,7 @@ export function HistoryView({
                   }
                 },
                   /*#__PURE__*/React.createElement("span", { style: { color: '#fff', fontWeight: 800, fontSize: 'var(--font-size-sm)' } }, group.title),
-                  /*#__PURE__*/React.createElement("span", { style: { color: 'rgba(255,255,255,0.85)', fontSize: 'var(--font-size-2xs)' } }, `사진 ${group.photos.length}장`)
+                  /*#__PURE__*/React.createElement("span", { style: { color: 'rgba(255,255,255,0.85)', fontSize: 'var(--font-size-2xs)' } }, `${formatHistoryDate(group.startDate)} · 사진 ${group.photos.length}장`)
                 )
               );
             })
@@ -2779,6 +2791,7 @@ export function HistoryView({
                   border: 'none', padding: 0, cursor: 'pointer', backgroundColor: tag.color
                 }
               },
+                /*#__PURE__*/React.createElement("span", { style: { position: 'absolute', top: '6px', right: '6px', zIndex: 3, minWidth: '24px', height: '24px', padding: '0 6px', borderRadius: '999px', background: 'rgba(15,23,42,0.78)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, String(tagPhotos.length)),
                 cover
                   ? /*#__PURE__*/React.createElement("img", {
                       src: cover.thumb || cover.full, alt: "", loading: "lazy", decoding: "async",
@@ -2798,7 +2811,7 @@ export function HistoryView({
                   }
                 },
                   /*#__PURE__*/React.createElement("span", { style: { color: '#fff', fontWeight: 800, fontSize: 'var(--font-size-sm)' } }, tag.label),
-                  /*#__PURE__*/React.createElement("span", { style: { color: 'rgba(255,255,255,0.85)', fontSize: 'var(--font-size-2xs)' } }, `사진 ${tagPhotos.length}장`)
+                  /*#__PURE__*/React.createElement("span", { style: { color: 'rgba(255,255,255,0.85)', fontSize: 'var(--font-size-2xs)' } }, `${formatHistoryDate(getTaggedDate(tagPhotos[0])) || '최근 일정'} · 사진 ${tagPhotos.length}장`)
                 )
               );
             })
