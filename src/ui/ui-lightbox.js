@@ -545,6 +545,10 @@ function getMediaIdentityKeys(...args) {
   const f = __gatherUiDeps().getMediaIdentityKeys || GATHER_APP_UTILS.getMediaIdentityKeys;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function getLegacyMeetingMediaKey(...args) {
+  const f = __gatherUiDeps().getLegacyMeetingMediaKey || GATHER_APP_UTILS.getLegacyMeetingMediaKey;
+  return typeof f === 'function' ? f(...args) : undefined;
+}
 function renderTextWithUrlBadge(...args) {
   const f = __gatherUiDeps().renderTextWithUrlBadge || GATHER_APP_UTILS.renderTextWithUrlBadge;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -1406,6 +1410,10 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   // 따로 캐싱해서, 이미 한 번 불러온 사진은 다시 불러오지 않는다. 초기화면에서부터 기존 댓글이
   // 바로 보여야 하므로(showInfo 토글과 무관하게) 현재 사진이 바뀔 때마다 불러온다.
   const photoCommentKey = currentIdentity.mediaKey || currentIdentity.refKey || '';
+  // A meeting photo whose comment thread predates photoId/sourceImageIndex being part of the
+  // key (see getLegacyMeetingMediaKey) is filed under this coarser key instead -- checked only
+  // when the current key comes up empty, so its existing comments still surface here.
+  const legacyPhotoCommentKey = currentMeta ? (getLegacyMeetingMediaKey(currentMeta, { meetingDate: currentMeta.meetingDate }) || '') : '';
   const [photoCommentsByKey, setPhotoCommentsByKey] = React.useState({});
   const photoCommentsFetchedRef = React.useRef(new Set());
   React.useEffect(() => {
@@ -1413,11 +1421,16 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     if (photoCommentsFetchedRef.current.has(photoCommentKey)) return;
     photoCommentsFetchedRef.current.add(photoCommentKey);
     let cancelled = false;
-    Promise.resolve(onFetchPhotoComments(photoCommentKey)).then(list => {
-      if (!cancelled && Array.isArray(list)) setPhotoCommentsByKey(prev => ({ ...prev, [photoCommentKey]: list }));
+    Promise.resolve(onFetchPhotoComments(photoCommentKey)).then(async list => {
+      let resolved = Array.isArray(list) ? list : [];
+      if (resolved.length === 0 && legacyPhotoCommentKey && legacyPhotoCommentKey !== photoCommentKey) {
+        const legacyList = await Promise.resolve(onFetchPhotoComments(legacyPhotoCommentKey));
+        if (Array.isArray(legacyList) && legacyList.length > 0) resolved = legacyList;
+      }
+      if (!cancelled) setPhotoCommentsByKey(prev => ({ ...prev, [photoCommentKey]: resolved }));
     });
     return () => { cancelled = true; };
-  }, [photoCommentKey, onFetchPhotoComments]);
+  }, [photoCommentKey, legacyPhotoCommentKey, onFetchPhotoComments]);
   const handlePhotoCommentsChange = async nextComments => {
     if (!photoCommentKey || typeof onSavePhotoComments !== 'function') return false;
     setPhotoCommentsByKey(prev => ({ ...prev, [photoCommentKey]: nextComments }));

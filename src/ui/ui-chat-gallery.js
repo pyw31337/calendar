@@ -1002,6 +1002,7 @@ export function ChatGalleryModal({
   const PencilIcon = __comp.PencilIcon || __deps.PencilIcon;
   const PhotoCommentCountBadge = __comp.PhotoCommentCountBadge || __deps.PhotoCommentCountBadge;
   const getMediaIdentityKeys = __deps.getMediaIdentityKeys;
+  const getLegacyMeetingMediaKey = __deps.getLegacyMeetingMediaKey;
   const SharedSideMenuSettings = __comp.SharedSideMenuSettings || __deps.SharedSideMenuSettings;
   const SharedSideMenuFooter = __comp.SharedSideMenuFooter || __deps.SharedSideMenuFooter;
   const SharedAppNavBlock = __comp.SharedAppNavBlock || __deps.SharedAppNavBlock;
@@ -1975,7 +1976,15 @@ export function ChatGalleryModal({
     const commentIdentity = typeof getMediaIdentityKeys === 'function'
       ? (getMediaIdentityKeys(photo, { source: photo.source, meetingDate: photo.meetingDate }) || {})
       : {};
-    const commentCount = photoCommentCounts[commentIdentity.mediaKey] || photoCommentCounts[commentIdentity.refKey] || 0;
+    // Falls back to the pre-photoId/index era key (see getLegacyMeetingMediaKey) so meeting
+    // photo comment threads saved before that data shape existed still show their badge here.
+    const legacyMeetingKey = typeof getLegacyMeetingMediaKey === 'function'
+      ? getLegacyMeetingMediaKey(photo, { meetingDate: photo.meetingDate })
+      : '';
+    const commentCount = photoCommentCounts[commentIdentity.mediaKey]
+      || photoCommentCounts[commentIdentity.refKey]
+      || (legacyMeetingKey ? photoCommentCounts[legacyMeetingKey] : 0)
+      || 0;
     const thumb = /*#__PURE__*/React.createElement(MediaThumb, {
       key: isBulkShareMode ? undefined : itemKey,
       "data-photo-url": photo.full || photo.thumb,
