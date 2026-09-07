@@ -2089,6 +2089,8 @@ function getMediaIdentityKeys(photo = {}, opts = {}) {
     ? String(photo?.full || photo?.url || photo?.imageUrl || photo?.thumb || photo?.thumbUrl || '').trim()
     : '';
   const fallbackMediaKey = fallbackMediaUrl ? getDirectMediaTagKey(fallbackMediaUrl) : '';
+  const renderedMediaUrl = String(photo?.full || photo?.url || photo?.imageUrl || photo?.thumb || photo?.thumbUrl || '').trim();
+  const renderedMediaKey = renderedMediaUrl ? getDirectMediaTagKey(renderedMediaUrl) : '';
   const directKey = directMediaUrl ? getDirectMediaTagKey(directMediaUrl) : '';
   const isMeetingReference = sourceHint === 'meeting'
     || photo?.uploadSource === 'meeting'
@@ -2109,8 +2111,15 @@ function getMediaIdentityKeys(photo = {}, opts = {}) {
   }
 
   if (isMeetingReference) {
-    const meetingPhotoIdentity = photoId || messageId
-      || (Number.isInteger(imageIndex) ? `photo-${imageIndex}` : (fallbackMediaKey ? `url-${fallbackMediaKey}` : 'photo'));
+    // Older meeting photo records reused the source message id as photoId for every image.
+    // Treat that combination as ambiguous and qualify it with the rendered asset URL; otherwise
+    // one photo's comment document is presented for every photo in the meeting.
+    const sourceIdentity = photo?.sourceMessageId || messageId || '';
+    const ambiguousSharedPhotoId = photoId && sourceIdentity && photoId === sourceIdentity && !Number.isInteger(imageIndex);
+    const meetingPhotoIdentity = ambiguousSharedPhotoId
+      ? (renderedMediaKey ? `${photoId}:url-${renderedMediaKey}` : `${photoId}:photo`)
+      : (photoId || messageId
+        || (Number.isInteger(imageIndex) ? `photo-${imageIndex}` : (renderedMediaKey ? `url-${renderedMediaKey}` : 'photo')));
     const key = `meeting:${meetingDate || 'date'}:${meetingPhotoIdentity}`;
     return { assetKey: key, mediaKey: key, refKey: key };
   }
@@ -2142,12 +2151,10 @@ function getMediaIdentityKeys(photo = {}, opts = {}) {
 // for the same photo. This reconstructs that older key purely as a read fallback, so existing
 // comment counts/threads are still found; new saves always use getMediaIdentityKeys' current key.
 function getLegacyMeetingMediaKey(photo = {}, opts = {}) {
-  const sourceMessageId = typeof photo?.sourceMessageId === 'string' && photo.sourceMessageId ? photo.sourceMessageId : '';
-  const meetingDate = typeof photo?.meetingDate === 'string' && photo.meetingDate
-    ? photo.meetingDate
-    : (typeof opts.meetingDate === 'string' && opts.meetingDate ? opts.meetingDate : '');
-  if (!sourceMessageId || !meetingDate) return '';
-  return `meeting:${meetingDate}:${sourceMessageId}`;
+  // The former key was shared by every image from one meeting/source message. It cannot be
+  // safely read without an exact per-photo discriminator, so never use it as a fallback; showing
+  // an old ambiguous thread is worse than showing an empty thread for the current photo.
+  return '';
 }
 
 function getMessageDirectMediaEntry(msg, options = {}) {
