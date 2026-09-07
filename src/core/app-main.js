@@ -9386,7 +9386,7 @@ async function extractPhotoMetadata(file) {
     result.latitude = Number(lat.toFixed(6)); result.longitude = Number(lon.toFixed(6));
     const key = `${lat.toFixed(3)},${lon.toFixed(3)}`;
     if (photoLocationCache.has(key)) result.location = photoLocationCache.get(key);
-    else if (lat >= 33 && lat <= 39 && lon >= 124 && lon <= 132) {
+    else {
       try {
         const waitMs = Math.max(0, 1100 - (Date.now() - photoLocationRequestAt));
         if (waitMs) await new Promise(resolve => setTimeout(resolve, waitMs));
@@ -9395,7 +9395,9 @@ async function extractPhotoMetadata(file) {
         if (response.ok) {
           const address = await response.json();
           const a = address?.address || {};
-          const location = [a.province || a.city, a.city || a.county || a.municipality].filter(Boolean).filter((v, i, arr) => arr.indexOf(v) === i).join(' ').trim().slice(0, 80);
+          const country = String(a.country || '').trim();
+          const location = [(country === '대한민국' || country.toLowerCase() === 'south korea') ? '' : country, a.province || a.state || a.city, a.city || a.county || a.municipality]
+            .filter(Boolean).filter((v, i, arr) => arr.indexOf(v) === i).join(' ').replace(/\s+/g, ' ').trim().slice(0, 80);
           if (location) { photoLocationCache.set(key, location); result.location = location; }
         }
       } catch (_) {}
@@ -9406,12 +9408,29 @@ async function extractPhotoMetadata(file) {
 
 function buildMetadataTags(metadata, scheduledDate = '') {
   const tags = [];
-  const add = value => { const t = String(value || '').trim(); if (t && !tags.includes(t)) tags.push(t); };
+  const add = value => {
+    let t = String(value || '').trim().replace(/\s+/g, ' ');
+    if (!t) return;
+    if (!t.startsWith('#')) t = `#${t.replace(/^#+/, '')}`;
+    if (!tags.includes(t)) tags.push(t);
+  };
   if (scheduledDate && /^\d{4}-\d{2}-\d{2}$/.test(scheduledDate)) add(dateStrToHashtag(scheduledDate));
   const captured = String(metadata?.capturedAt || '').slice(0, 10);
   if (/^\d{4}-\d{2}-\d{2}$/.test(captured)) add(dateStrToHashtag(captured));
   if (metadata?.location) add(metadata.location);
-  if (metadata?.device) add(metadata.device);
+  if (metadata?.device) {
+    const raw = String(metadata.device).replace(/\s+/g, ' ').trim();
+    const lower = raw.toLowerCase();
+    let deviceTag = raw;
+    if (lower.includes('iphone')) {
+      const model = raw.match(/iphone\s*([0-9]+(?:\s*pro(?:\s*max)?|\s*plus|\s*mini)?)/i);
+      deviceTag = model ? `아이폰${model[1].replace(/\s+/g, '').replace(/pro/i, '프로').replace(/max/i, '맥스').replace(/plus/i, '플러스').replace(/mini/i, '미니')}` : '아이폰';
+    } else if (lower.includes('galaxy') || /^sm[- ]/i.test(raw)) {
+      const model = raw.match(/(?:galaxy\s*)?(z\s*(?:fold|flip)\s*\d+|s\s*\d+|note\s*\d+)/i);
+      deviceTag = model ? `갤럭시${model[1].replace(/\s+/g, '').replace(/fold/i, '폴드').replace(/flip/i, '플립').replace(/note/i, '노트')}` : '갤럭시';
+    }
+    add(deviceTag);
+  }
   return tags.join(' ');
 }
 
