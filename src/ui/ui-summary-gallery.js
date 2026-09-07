@@ -1852,7 +1852,7 @@ export function HistoryView({
   showSettlement = true, onOpenCreateSettlement,
   isDarkTheme, onToggleTheme, fontScalePercent, onDecreaseFont, onIncreaseFont,
   isChatNotifyEnabled, onToggleChatNotifications, syncStatus = null,
-  onAddPersonTag = null, showToast = null,
+  onAddPersonTag = null, onRenamePersonTag = null, onDeletePersonTag = null, showToast = null,
   anniversaries = [], chatMessages = [], memos = [], setActiveLightbox = null,
   onPromoteImageUrl = null, onSaveImageTags = null, onSearchTag = null,
   onDeletePhoto = null, onReplacePhoto = null,
@@ -1947,6 +1947,46 @@ export function HistoryView({
       setIsAddingPersonTag(false);
     }
   };
+  // 인물 상세 헤더의 편집(연필)/삭제(휴지통) 버튼 -- 참여자 태그는 캘린더 참여자 명단 자체를
+  // 바꾸는 셈이라 여기서 손대면 안 되고, calendar.customPersonTags에 직접 추가한 커스텀 태그만
+  // 이름 변경/삭제가 가능하다. 이 목록은 실제 사진과 별개로 관리되는 "태그 이름표"일 뿐이라
+  // (사진 쪽 해시태그는 getPhotosForTagLabel이 그때그때 매칭), 이름을 바꾸면 다음부터 그 새
+  // 이름과 매칭되는 사진들을 보여줄 뿐 사진 자체는 전혀 건드리지 않는다.
+  const [isEditingPersonTagLabel, setIsEditingPersonTagLabel] = React.useState(false);
+  const [editPersonTagLabelDraft, setEditPersonTagLabelDraft] = React.useState('');
+  const [isSavingPersonTagLabel, setIsSavingPersonTagLabel] = React.useState(false);
+  const handleStartEditPersonTag = () => {
+    if (!selectedPersonTag) return;
+    setEditPersonTagLabelDraft(selectedPersonTag);
+    setIsEditingPersonTagLabel(true);
+  };
+  const handleCancelEditPersonTag = () => {
+    setIsEditingPersonTagLabel(false);
+    setEditPersonTagLabelDraft('');
+  };
+  const handleConfirmEditPersonTag = async () => {
+    const nextLabel = editPersonTagLabelDraft.trim();
+    if (!nextLabel || nextLabel === selectedPersonTag || typeof onRenamePersonTag !== 'function' || isSavingPersonTagLabel) return;
+    setIsSavingPersonTagLabel(true);
+    try {
+      const ok = await onRenamePersonTag(selectedPersonTag, nextLabel);
+      if (ok) {
+        setSelectedPersonTag(nextLabel);
+        setIsEditingPersonTagLabel(false);
+        setEditPersonTagLabelDraft('');
+      }
+    } finally {
+      setIsSavingPersonTagLabel(false);
+    }
+  };
+  const handleDeletePersonTagClick = () => {
+    if (!selectedPersonTag || typeof onDeletePersonTag !== 'function' || typeof onRequestConfirm !== 'function') return;
+    const label = selectedPersonTag;
+    onRequestConfirm('태그 삭제', `'#${label}' 인물 태그를 삭제할까요? 태그가 달린 사진은 그대로 유지됩니다.`, async () => {
+      const ok = await onDeletePersonTag(label);
+      if (ok) setSelectedPersonTag(null);
+    });
+  };
   // 채팅방/갤러리 페이지의 고정 헤더와 같은 방식: 상단 헤더+탭을 하나의 position:fixed 묶음으로
   // 만들어서, 아래로 스크롤하면 위로 숨고 위로 스크롤하면 다시 나타나게 한다. 묶음의 실제 높이는
   // ResizeObserver로 직접 측정 -- 갤러리 헤더처럼 고정 픽셀값을 하드코딩하지 않는다.
@@ -2007,6 +2047,12 @@ export function HistoryView({
   // 사진)를 결합해, 태그(인물)나 날짜(추억)로 걸러 보여준다.
   const historyPhotoEntries = React.useMemo(() => buildCombinedPhotoEntries(chatMessages, memos, calendar, anniversaries), [chatMessages, memos, calendar, anniversaries]);
   const [selectedPersonTag, setSelectedPersonTag] = React.useState(null);
+  // Selecting a different person tag (or leaving the detail view) must not leave a stale rename
+  // draft armed for whichever tag comes next.
+  React.useEffect(() => {
+    setIsEditingPersonTagLabel(false);
+    setEditPersonTagLabelDraft('');
+  }, [selectedPersonTag]);
   React.useEffect(() => { setSelectedPersonTag(null); setSelectedMemoryGroupId(null); }, [historyTab]);
   const [isMemoryListEditMode, setIsMemoryListEditMode] = React.useState(false);
   const [selectedMemoryGroupIds, setSelectedMemoryGroupIds] = React.useState(() => new Set());
@@ -2754,8 +2800,69 @@ export function HistoryView({
             display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)', flexShrink: 0
           }
         }, BackArrowIcon ? /*#__PURE__*/React.createElement(BackArrowIcon, { size: 20 }) : "←"),
-        /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-lg)', fontWeight: 800, color: 'var(--text-main)' } }, selectedPersonTag),
-        /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } }, `사진 ${photosForPersonTag.length}장`)
+        isEditingPersonTagLabel
+          ? /*#__PURE__*/React.createElement(React.Fragment, null,
+              /*#__PURE__*/React.createElement("input", {
+                type: "text",
+                autoFocus: true,
+                value: editPersonTagLabelDraft,
+                onChange: e => setEditPersonTagLabelDraft(e.target.value),
+                onKeyDown: e => {
+                  if (e.key === 'Enter') { e.preventDefault(); handleConfirmEditPersonTag(); }
+                  if (e.key === 'Escape') { e.preventDefault(); handleCancelEditPersonTag(); }
+                },
+                style: {
+                  flex: 1, minWidth: 0, height: '36px', padding: '0 12px', borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)',
+                  color: 'var(--text-main)', fontSize: 'var(--font-size-lg)', fontWeight: 800
+                }
+              }),
+              /*#__PURE__*/React.createElement("button", {
+                type: "button", onClick: handleConfirmEditPersonTag,
+                disabled: isSavingPersonTagLabel || !editPersonTagLabelDraft.trim(),
+                "aria-label": "이름 저장",
+                style: {
+                  flexShrink: 0, width: '36px', height: '36px', padding: 0, borderRadius: 'var(--radius-md)', border: 'none',
+                  backgroundColor: '#111827', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', opacity: (isSavingPersonTagLabel || !editPersonTagLabelDraft.trim()) ? 0.5 : 1
+                }
+              }, "✓"),
+              /*#__PURE__*/React.createElement("button", {
+                type: "button", onClick: handleCancelEditPersonTag, disabled: isSavingPersonTagLabel, "aria-label": "취소",
+                style: {
+                  flexShrink: 0, width: '36px', height: '36px', padding: 0, borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-muted)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
+                }
+              }, "✕")
+            )
+          : /*#__PURE__*/React.createElement(React.Fragment, null,
+              /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-lg)', fontWeight: 800, color: 'var(--text-main)' } }, selectedPersonTag),
+              /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', flexShrink: 0 } }, `사진 ${photosForPersonTag.length}장`),
+              // 참여자 태그(캘린더 참여자 명단에서 온 것)는 여기서 이름을 바꾸거나 지울 수 없다 --
+              // 참여자 관리는 캘린더 설정의 몫이고, 이 화면은 사진과 별개로 관리되는 customPersonTags
+              // 커스텀 태그만 손댈 수 있어야 한다.
+              customPersonTags.includes(selectedPersonTag) && /*#__PURE__*/React.createElement("div", {
+                style: { display: 'flex', gap: '6px', marginLeft: 'auto', flexShrink: 0 }
+              },
+                typeof onRenamePersonTag === 'function' && /*#__PURE__*/React.createElement("button", {
+                  type: "button", onClick: handleStartEditPersonTag, "aria-label": "태그 이름 수정",
+                  style: {
+                    width: '32px', height: '32px', padding: 0, borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
+                  }
+                }, PencilIcon ? /*#__PURE__*/React.createElement(PencilIcon, { size: 15 }) : "✎"),
+                typeof onDeletePersonTag === 'function' && /*#__PURE__*/React.createElement("button", {
+                  type: "button", onClick: handleDeletePersonTagClick, "aria-label": "태그 삭제",
+                  style: {
+                    width: '32px', height: '32px', padding: 0, borderRadius: 'var(--radius-md)',
+                    border: '1px solid #EF4444', backgroundColor: 'var(--bg-primary)', color: '#EF4444',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
+                  }
+                }, TrashIcon ? /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }) : "✕")
+              )
+            )
       ),
       photosForPersonTag.length === 0
         ? /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' } }, `#${selectedPersonTag} 태그가 달린 사진이 아직 없어요.`)

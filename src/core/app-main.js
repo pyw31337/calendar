@@ -2866,6 +2866,42 @@ function CalendarApp() {
     return ok;
   };
 
+  // 인물 탭 상세 헤더의 연필 버튼 -- customPersonTags에 저장된 이름표 문자열 자체를 바꾼다.
+  // 사진 쪽 해시태그(getPhotosForTagLabel이 매칭에 쓰는 값)는 전혀 건드리지 않으므로, 개명 후에는
+  // 새 이름과 일치하는 사진들이 다음부터 이 칸에 모이게 된다 -- 기존 사진에 붙은 실제 해시태그를
+  // 바꿔주는 기능은 아니다.
+  const handleRenamePersonTag = async (oldLabel, newLabel) => {
+    const trimmedOld = String(oldLabel || '').trim();
+    const trimmedNew = String(newLabel || '').trim();
+    if (!trimmedOld || !trimmedNew || trimmedOld === trimmedNew || !activeCal) return false;
+    const existing = Array.isArray(activeCal.customPersonTags) ? activeCal.customPersonTags : [];
+    if (!existing.includes(trimmedOld)) return false;
+    if (existing.includes(trimmedNew)) {
+      showToast('이미 같은 이름의 태그가 있습니다.', 'error');
+      return false;
+    }
+    const nextCalendars = calendars.map(c => c.id === activeCal.id
+      ? { ...c, customPersonTags: existing.map(t => t === trimmedOld ? trimmedNew : t) }
+      : c);
+    const ok = await updateCalendars(nextCalendars, '태그 이름이 변경되었습니다.', 'success', activeCal.id, 'settings', [], { settingsFields: ['customPersonTags'] });
+    return ok;
+  };
+
+  // 인물 탭 상세 헤더의 휴지통 버튼 -- customPersonTags 이름표만 목록에서 제거한다. 사진에 붙은
+  // 해시태그나 사진 자체는 그대로 남으므로, 같은 이름을 다시 태그로 추가하면 그 사진들은 그대로
+  // 다시 모여 보인다.
+  const handleDeletePersonTag = async (label) => {
+    const trimmed = String(label || '').trim();
+    if (!trimmed || !activeCal) return false;
+    const existing = Array.isArray(activeCal.customPersonTags) ? activeCal.customPersonTags : [];
+    if (!existing.includes(trimmed)) return true;
+    const nextCalendars = calendars.map(c => c.id === activeCal.id
+      ? { ...c, customPersonTags: existing.filter(t => t !== trimmed) }
+      : c);
+    const ok = await updateCalendars(nextCalendars, '태그가 삭제되었습니다.', 'success', activeCal.id, 'settings', [], { settingsFields: ['customPersonTags'] });
+    return ok;
+  };
+
   // 보관함 > 추억 탭의 라이트박스 "이 추억에서 제거" -- 여행 사진 모음은 날짜 구간으로 자동
   // 수집되므로, 같이 찍혔지만 그 여행과 무관한 사진이 섞일 수 있다. 사진 자체는 지우지 않고
   // 이 여행(anniversary) 문서에 제외 목록(mediaKey/refKey)만 추가해 다음부터 그 모음에서 빠지게
@@ -7862,6 +7898,8 @@ function CalendarApp() {
         },
         syncStatus: syncStatus,
         onAddPersonTag: handleAddPersonTag,
+        onRenamePersonTag: handleRenamePersonTag,
+        onDeletePersonTag: handleDeletePersonTag,
         anniversaries: anniversaries,
         chatMessages: galleryChatMessages,
         memos: historyMemosSnapshot,
