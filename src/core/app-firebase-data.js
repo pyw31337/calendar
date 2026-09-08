@@ -1770,6 +1770,11 @@ async function writeCollectionDocumentWithFallback(collectionName, calId, docId,
     },
     lastError: `${warnLabel} network failure`
   });
+  // Lightbox tags/comments must not toast success on a local queue — refresh would look like
+  // data vanished. Callers that need a durable ack pass requirePersisted: true.
+  if (queued && options?.requirePersisted) {
+    return { success: false, queued: true, id: restDocId || operationId, transport: 'queue' };
+  }
   return queued ? { success: true, queued: true, id: restDocId || operationId, transport: 'queue' } : restResult;
 }
 
