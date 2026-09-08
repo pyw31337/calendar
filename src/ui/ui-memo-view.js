@@ -116,6 +116,65 @@ async function fetchMemoForClone(share) {
   return { id: share.memoId, ...(typeof decode === 'function' ? decode(json) : {}) };
 }
 
+// Cross-calendar memo clone: source participantId is scoped to the SOURCE calendar, so writing
+// it into the target calendar leaves MemoCard unable to resolve a writer badge (looks like
+// "작성자 없음"). Resolve the source author's display name, then map to a same-named participant
+// on the target calendar. Fall back to the composer selection, never keep a foreign id.
+async function fetchSourceParticipantName(calendarId, participantId) {
+  const pid = String(participantId || '').trim();
+  if (!calendarId || !pid || pid === 'anonymous') return '';
+  const db = __fb();
+  try {
+    if (db) {
+      const snapshot = await withMemoFirestoreTimeout(
+        db.collection('calendars').doc(`cal_${calendarId}`).get(),
+        9000
+      );
+      const parts = snapshot?.exists ? (snapshot.data()?.participants || []) : [];
+      const hit = (Array.isArray(parts) ? parts : []).find(p => p && p.id === pid);
+      return hit ? String(hit.name || '').trim() : '';
+    }
+    const projectId = window.GATHER_FIREBASE_DEPS?.projectId || '';
+    if (!projectId) return '';
+    const response = await withMemoFirestoreTimeout(fetch(
+      `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/(default)/documents/calendars/cal_${encodeURIComponent(calendarId)}`,
+      { cache: 'no-store' }
+    ), 9000);
+    if (!response.ok) return '';
+    const json = await response.json();
+    const decode = window.GATHER_FIREBASE_DEPS?.firestoreDocumentToJs;
+    const data = typeof decode === 'function' ? decode(json) : {};
+    const parts = data?.participants || [];
+    const hit = (Array.isArray(parts) ? parts : []).find(p => p && p.id === pid);
+    return hit ? String(hit.name || '').trim() : '';
+  } catch (_) {
+    return '';
+  }
+}
+
+function matchParticipantIdByName(calendar, name) {
+  const needle = String(name || '').trim().toLowerCase();
+  if (!needle) return '';
+  const parts = Array.isArray(calendar?.participants) ? calendar.participants : [];
+  const hit = parts.find(p => p && String(p.name || '').trim().toLowerCase() === needle);
+  return hit && hit.id ? String(hit.id) : '';
+}
+
+async function resolveCloneParticipantId(sourceMemo, sourceCalendarId, targetCalendar, composerParticipantId) {
+  const sourcePid = String(sourceMemo?.participantId || '').trim();
+  const targetId = String(targetCalendar?.id || '').trim();
+  // Same calendar: keep the original id.
+  if (sourcePid && sourceCalendarId && targetId && sourceCalendarId === targetId) return sourcePid;
+  if (sourcePid && sourceCalendarId) {
+    const sourceName = await fetchSourceParticipantName(sourceCalendarId, sourcePid);
+    const mapped = matchParticipantIdByName(targetCalendar, sourceName);
+    if (mapped) return mapped;
+  }
+  const composer = String(composerParticipantId || '').trim();
+  if (composer && (targetCalendar?.participants || []).some(p => p && p.id === composer)) return composer;
+  return composer || 'anonymous';
+}
+
 function getStoredChatParticipantId(...args) {
   const fn = (window.GATHER_APP_NOTIFICATIONS || {}).getStoredChatParticipantId;
   return typeof fn === 'function' ? fn(...args) : '';
@@ -515,7 +574,9 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
 
       const stamp = Date.now();
       memoId = 'memo_' + stamp + '_' + Math.random().toString(36).slice(2, 8);
-      const participantId = sourceMemo?.participantId || composerParticipantId || 'anonymous';
+      const participantId = sourceMemo
+        ? await resolveCloneParticipantId(sourceMemo, sharedMemoShare?.calendarId, calendar, composerParticipantId)
+        : (composerParticipantId || 'anonymous');
       if (typeof navigator !== 'undefined' && navigator.onLine === false && memoImagesCanBeQueued(newImages)) {
         const queued = await enqueueMemoMediaSave({
           id: `memo_media_${calendarId}_${memoId}`,
@@ -562,7 +623,8 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         createdAt: stamp,
         updatedAt: stamp,
         linkPreview: previewPack.linkPreview,
-        linkPreviews: previewPack.linkPreviews
+        linkPreviews: previewPack.linkPreviews,
+        ...(Array.isArray(sourceMemo?.imageTags) ? { imageTags: sourceMemo.imageTags.slice() } : {})
       };
 
       if (typeof onUpsertMemo === 'function') onUpsertMemo(memoData);
