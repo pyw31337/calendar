@@ -119,7 +119,9 @@ function getPhotoIndexEntries(sourceType, sourceId, data) {
     const source = sourceType === 'message'
       ? (['chat', 'gallery', 'meeting'].includes(data.uploadSource) ? data.uploadSource : 'chat')
       : sourceType;
-    const messageId = sourceType === 'message' ? sourceId : '';
+    // Memo lightbox tags key off messageId === memo.id (same convention as MemoCard).
+    // Previously memo index rows left messageId empty, so gallery→lightbox tag save was a no-op.
+    const messageId = (sourceType === 'message' || sourceType === 'memo') ? sourceId : '';
     const imageIndex = Number.isInteger(photo?.index) ? photo.index : index;
     entries.push({
       assetKey,
