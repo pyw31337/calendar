@@ -1533,13 +1533,15 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     if (url && memo.linkPreview && (memo.linkPreview.url === url || url === memoFirstUrl)) return memo.linkPreview;
     return null;
   };
-  const memoMediaInfo = memoFirstUrl ? getDirectChatMediaInfo(memoFirstUrl) : null;
-  // Only media that actually plays inline here (YouTube/Vimeo embeds, direct video files) gets
-  // the "영상 바로보기" toggle -- TikTok's façade just opens a new tab instead of playing on this
-  // page, which read as the button lying/glitching. memoMediaInfo (any recognized media, not just
-  // the inline-playable ones) still governs stripping the raw URL out of the displayed text below,
-  // since the TikTok widget/preview card renders regardless of whether the toggle button does.
-  const isVideoMedia = !!(memoMediaInfo && memoMediaInfo.playsInline);
+  // Per-URL media info so each link preview can show its own "영상 바로보기" when that URL
+  // plays inline (YouTube/Vimeo/direct video). A single first-URL flag left later cards looking
+  // like plain OG previews with no play button. TikTok stays playsInline:false (opens externally).
+  const mediaInfoForUrl = (url) => (url ? getDirectChatMediaInfo(url) : null);
+  const memoMediaInfo = mediaInfoForUrl(memoFirstUrl);
+  const isInlinePlayableUrl = (url) => {
+    const info = mediaInfoForUrl(url);
+    return !!(info && info.playsInline);
+  };
   const displayMemoText = (() => {
     if (!memo.text) return '';
     if (!(memo.linkPreview || memoLinkPreviews.length || memoMediaInfo || memoPreviewUrls.length)) return memo.text;
@@ -1552,7 +1554,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
   const memoTextLineCount = displayMemoText ? displayMemoText.split(/\r?\n/).length : 0;
   const hasLongMemoText = displayMemoText.length > 280 || memoTextLineCount > 8;
   const [isMemoTextExpanded, setIsMemoTextExpanded] = React.useState(false);
-  const [isVideoOpen, setIsVideoOpen] = React.useState(false);
+  const [openVideoByUrl, setOpenVideoByUrl] = React.useState({});
 
   // Comments: stored inline on the memo doc as a size-capped array (see hasValidMemoShape in
   // firestore.rules -- comments.size() <= 200, no per-comment shape lock). Composer mirrors the
@@ -1847,64 +1849,70 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       "data-stop-card-open": "true",
       onClick: e => e.stopPropagation()
     },
-      /* Link preview card(s) — one per distinct URL in memo text */
-      memoPreviewUrls.map((url, idx) => /*#__PURE__*/React.createElement(LinkPreviewCard, {
-        key: url,
-        url: url,
-        fallbackTitle: idx === 0 ? (memo.title || (memo.text ? removeFirstUrl(memo.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '')) : '',
-        cachedData: cachedPreviewForUrl(url),
-        stretch: true,
-        noBorder: isPreview,
-        marginTop: idx > 0 ? 8 : null
-      })),
-
-      /* Video Toggle button if this URL is a video */
-      isVideoMedia && /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: e => {
-          e.stopPropagation();
-          setIsVideoOpen(prev => !prev);
+      /* One preview + optional play button per URL (same pattern as date-modal / gallery link cards) */
+      memoPreviewUrls.map((url, idx) => {
+        const urlMediaInfo = mediaInfoForUrl(url);
+        const urlIsVideo = isInlinePlayableUrl(url);
+        const urlVideoOpen = !!openVideoByUrl[url];
+        return /*#__PURE__*/React.createElement(React.Fragment, {
+          key: url
         },
-        style: {
-          display: 'inline-flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '6px',
-          width: '100%',
-          height: '32px',
-          minHeight: '32px',
-          padding: '0 12px',
-          marginTop: '6px',
-          boxSizing: 'border-box',
-          borderRadius: 'var(--radius-md)',
-          border: 'none',
-          backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
-          color: isVideoOpen ? 'var(--text-muted)' : 'var(--primary)',
-          fontSize: 'var(--font-size-sm)',
-          fontWeight: 700,
-          cursor: 'pointer'
-        }
-      },
-        isVideoOpen ? [
-          /*#__PURE__*/React.createElement(SmallXIcon, { size: 13 }),
-          " 영상 닫기"
-        ] : [
-          /*#__PURE__*/React.createElement("svg", {
-            viewBox: "0 0 24 24", width: "13", height: "13", fill: "currentColor"
-          }, /*#__PURE__*/React.createElement("path", { d: "M8 5v14l11-7z" })),
-          " 영상 바로보기"
-        ]
-      ),
-
-      /* Video Player when expanded */
-      isVideoMedia && isVideoOpen && /*#__PURE__*/React.createElement("div", {
-        style: { marginTop: '8px', width: '100%' }
-      }, /*#__PURE__*/React.createElement(ClickToPlayVideoCard, {
-        url: memoFirstUrl,
-        mediaInfo: memoMediaInfo,
-        fallbackTitle: memo.title || (memo.text ? removeFirstUrl(memo.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : ''),
-        cachedData: memo.linkPreview
-      }))
+          /*#__PURE__*/React.createElement(LinkPreviewCard, {
+            url: url,
+            fallbackTitle: idx === 0 ? (memo.title || (memo.text ? removeFirstUrl(memo.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '')) : '',
+            cachedData: cachedPreviewForUrl(url),
+            stretch: true,
+            noBorder: isPreview,
+            marginTop: idx > 0 ? 8 : null
+          }),
+          urlIsVideo && /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            onClick: e => {
+              e.stopPropagation();
+              setOpenVideoByUrl(prev => ({ ...prev, [url]: !prev[url] }));
+            },
+            style: {
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              width: '100%',
+              height: '32px',
+              minHeight: '32px',
+              padding: '0 12px',
+              marginTop: '6px',
+              boxSizing: 'border-box',
+              borderRadius: 'var(--radius-md)',
+              border: 'none',
+              backgroundColor: 'color-mix(in srgb, var(--bg-primary) 96%, black)',
+              color: urlVideoOpen ? 'var(--text-muted)' : 'var(--primary)',
+              fontSize: 'var(--font-size-sm)',
+              fontWeight: 700,
+              cursor: 'pointer'
+            }
+          },
+            urlVideoOpen ? [
+              /*#__PURE__*/React.createElement(SmallXIcon, { size: 13 }),
+              " 영상 닫기"
+            ] : [
+              /*#__PURE__*/React.createElement("svg", {
+                viewBox: "0 0 24 24", width: "13", height: "13", fill: "currentColor"
+              }, /*#__PURE__*/React.createElement("path", { d: "M8 5v14l11-7z" })),
+              " 영상 바로보기"
+            ]
+          ),
+          urlIsVideo && urlVideoOpen && /*#__PURE__*/React.createElement("div", {
+            style: { marginTop: '8px', width: '100%' }
+          }, /*#__PURE__*/React.createElement(ClickToPlayVideoCard, {
+            url: url,
+            mediaInfo: urlMediaInfo,
+            fallbackTitle: idx === 0
+              ? (memo.title || (memo.text ? removeFirstUrl(memo.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : ''))
+              : (cachedPreviewForUrl(url)?.title || ''),
+            cachedData: cachedPreviewForUrl(url)
+          }))
+        );
+      })
     ),
 
     /* Tags container if exists */
