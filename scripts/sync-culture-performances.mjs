@@ -1,6 +1,6 @@
 // Pulls two slices of Culture Flow's public performances feed
 // (https://pyw31337.github.io/culture/data/performances.json, CORS-open static JSON) once a day,
-// keeps only currently-running or upcoming items, and writes normalized snapshots into this
+// keeps currently-running/upcoming plus a 30-day post-end grace window, and writes normalized snapshots into this
 // repo's own public-vite/data/ so the calendar app never depends on a live cross-origin fetch at
 // runtime:
 //   - culture-performances.json (문화공연 탭): source 'culture-portal' + 'kopis', merged (see
@@ -48,13 +48,23 @@ function parseDateRange(raw) {
   return { startDate, endDate };
 }
 
+function addDaysIso(iso, days) {
+  const d = new Date(`${iso}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return iso;
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
 function isVisible(endDate, startDate, todayIso) {
-  // "상영중 + 예정작만" -- an item is worth showing while it hasn't finished yet. If only a
-  // start date parsed, fall back to that (single-day event). Unparseable dates are dropped
-  // rather than guessed at, since a wrong guess is worse than a missing item here.
+  // Keep shared-pool items through endDate + 30 days. The calendar UI hides past portal
+  // festival/performance items from lists immediately, while this grace window keeps the JSON
+  // available for anniversary badge deep-links / cultureSnapshot orphans. After 30 days past
+  // end, drop from the service pool. Calendar-owned custom cards and anniversary cultureSnapshot
+  // docs are never written here -- they live in Firestore per calendar.
   const effectiveEnd = endDate || startDate;
   if (!effectiveEnd) return false;
-  return effectiveEnd >= todayIso;
+  const retainUntil = addDaysIso(effectiveEnd, 30);
+  return retainUntil >= todayIso;
 }
 
 // Culture Flow's own site is served at basePath '/culture' (Next export on GitHub Pages), and most
