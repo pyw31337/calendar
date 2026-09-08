@@ -1501,12 +1501,19 @@ export function HistoryView({
   // DateModal hydrates meetingPhotoIndex for the open date so album photos appear even when the
   // chat window is incomplete. Memories need the same for anniversary date ranges.
   const [indexedMeetingPhotoEntries, setIndexedMeetingPhotoEntries] = React.useState([]);
+  // People badges and Memories groups share historyPhotoEntries. Only hydrating the meeting
+  // photo index on the Memories tab made People counts jump after the first Memories visit.
+  // Load once for either tab and keep the result across tab switches (same anniversary dates
+  // skip refetch). Server-side denormalized counts would need invalidation on every tag/upload
+  // and drift easily -- session hydrate of the existing index is cheaper and stays accurate.
+  const indexedMeetingDatesKeyRef = React.useRef('');
   React.useEffect(() => {
     if (typeof onFetchMeetingPhotoIndex !== 'function') {
       setIndexedMeetingPhotoEntries([]);
+      indexedMeetingDatesKeyRef.current = '';
       return;
     }
-    if (historyTab !== 'memories') return;
+    if (historyTab !== 'memories' && historyTab !== 'people') return;
     const dateSet = new Set();
     const pushRange = (startRaw, endRaw) => {
       const start = String(startRaw || '').slice(0, 10);
@@ -1526,11 +1533,15 @@ export function HistoryView({
       if (!a || a.hiddenFromMemories) return;
       pushRange(a.startDate || a.date, a.endDate || a.startDate || a.date);
     });
-    const dates = Array.from(dateSet);
+    const dates = Array.from(dateSet).sort();
+    const datesKey = dates.join(',');
     if (!dates.length) {
       setIndexedMeetingPhotoEntries([]);
+      indexedMeetingDatesKeyRef.current = '';
       return;
     }
+    // Already hydrated for this anniversary date set (e.g. switched people <-> memories).
+    if (datesKey && datesKey === indexedMeetingDatesKeyRef.current) return;
     let cancelled = false;
     Promise.all(dates.map(date => Promise.resolve(onFetchMeetingPhotoIndex(date))
       .then(photos => ({ date, photos: Array.isArray(photos) ? photos : [] }))
@@ -1570,6 +1581,7 @@ export function HistoryView({
           });
         });
       });
+      indexedMeetingDatesKeyRef.current = datesKey;
       setIndexedMeetingPhotoEntries(entries);
     });
     return () => { cancelled = true; };
