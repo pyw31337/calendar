@@ -199,7 +199,10 @@ const writeQueueSource = fs.readFileSync(new URL('../src/core/app-write-queue.js
   assert(galleryContractPhotos.length === 3, 'gallery must union chat, memo and schedule photos and dedupe one shared asset');
   assert(new Set(galleryContractPhotos.map(photo => photo.source)).has('meeting'), 'gallery lost a schedule-only photo');
   assert(paginateGalleryItems(Array.from({ length: 205 }), 3).items.length === 5, 'gallery page size must remain 100');
-  assert(getPaginationWindow(6, 12, 5).join(',') === '6,7,8,9,10', 'mobile pagination window must advance in five-page blocks');
+  assert(getPaginationWindow(5, 12, 5).join(',') === '3,4,5,6,7', 'pagination window must center the current page');
+  assert(getPaginationWindow(1, 12, 5).join(',') === '1,2,3,4,5', 'first-page window stays left-aligned');
+  assert(getPaginationWindow(12, 12, 5).join(',') === '8,9,10,11,12', 'last-page window stays right-aligned');
+  assert(getPaginationWindow(6, 12, 5).join(',') === '4,5,6,7,8', 'odd window keeps the active page in the middle');
 }
 assert(writeQueueSource.includes('nextAttemptAt: Number(operation.nextAttemptAt) || 0'), 'queued operations must persist retry backoff metadata');
 assert(writeQueueSource.includes("await deferOperation(operation, new Error('대기 저장이 완료되지 않았습니다.'))"), 'false queue handler results must be deferred with backoff');
@@ -226,6 +229,10 @@ assert(!/if \(!activeCalId \|\| !needsPhotoCommentCounts\) return;\s*setPreloade
 assert(appMainSource.includes('useGalleryPhotoIndex'), 'gallery must consume the canonical server-maintained photo index');
 assert(chatGallerySource.includes('Number(photo.commentCount || 0)'), 'indexed comment counts must paint thumbnail badges without loading comment bodies');
 assert(chatGallerySource.includes('gallery-pagination'), 'large galleries must render bounded 100-photo pagination');
+assert(chatGallerySource.includes('getPaginationWindow'), 'gallery pagination must use the shared centered window helper');
+assert(chatGallerySource.includes("is-mobile"), 'gallery pagination must mark the mobile (no-arrow) variant');
+assert(chatGallerySource.includes('aspectRatio'), 'gallery add/edit actions must stay 1:1 so the mobile header fits');
+
 assert(chatGallerySource.includes('legacyKeys: p.legacyKeys'), 'indexed legacy comment aliases must reach the lightbox');
 assert(lightboxSource.includes('preloadedPhotoCommentsReady'), 'lightbox must initialize from the subscribed comment documents');
 assert(lightboxSource.includes('photoCommentsFetchRef'), 'lightbox comment fetch callback must stay stable across unrelated renders');

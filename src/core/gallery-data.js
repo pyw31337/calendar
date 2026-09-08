@@ -107,8 +107,21 @@ export function getPaginationWindow(currentPage, pageCount, windowSize) {
   const size = Math.max(1, Number(windowSize) || 5);
   const safeCount = Math.max(1, Number(pageCount) || 1);
   const current = Math.min(safeCount, Math.max(1, Number(currentPage) || 1));
-  let start = Math.floor((current - 1) / size) * size + 1;
-  if (start + size - 1 > safeCount) start = Math.max(1, safeCount - size + 1);
-  return Array.from({ length: Math.min(size, safeCount) }, (_, index) => start + index);
+  // Keep the active page centered in the visible window when possible. Near the ends the
+  // window clamps so page 1 / last stay reachable without inventing out-of-range numbers.
+  if (safeCount <= size) {
+    return Array.from({ length: safeCount }, (_, index) => index + 1);
+  }
+  const half = Math.floor(size / 2);
+  let start = current - half;
+  let end = start + size - 1;
+  if (start < 1) {
+    start = 1;
+    end = size;
+  } else if (end > safeCount) {
+    end = safeCount;
+    start = safeCount - size + 1;
+  }
+  return Array.from({ length: size }, (_, index) => start + index);
 }
 

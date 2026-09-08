@@ -2562,6 +2562,11 @@ select.form-select {
 
 .gallery-pagination-arrow {
   padding: 0;
+  min-width: 44px;
+}
+
+.gallery-pagination-arrow span {
+  line-height: 0;
 }
 
 @media (max-width: 640px) {
@@ -2571,9 +2576,14 @@ select.form-select {
   }
 
   .gallery-pagination-button {
-    min-width: 44px;
-    min-height: 44px;
-    padding: 0 7px;
+    min-width: 40px;
+    min-height: 40px;
+    padding: 0 6px;
+  }
+
+  /* Numbers only on phones -- arrow buttons are omitted in markup, keep CSS belt-and-suspenders. */
+  .gallery-pagination.is-mobile .gallery-pagination-arrow {
+    display: none;
   }
 }
 
