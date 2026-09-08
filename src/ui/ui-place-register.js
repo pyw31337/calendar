@@ -75,14 +75,6 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
     name: editingPlace.name, address: editingPlace.address, lat: editingPlace.lat, lng: editingPlace.lng,
     categoryLabel: '', phone: '', url: ''
   } : null);
-  const [tourItems, setTourItems] = React.useState([]);
-  const [tourLoading, setTourLoading] = React.useState(false);
-  const tourGroups = React.useMemo(() => {
-    const api = window.GATHER_APP_PLACE_SEARCH;
-    return api && typeof api.groupTourItemsByType === 'function'
-      ? api.groupTourItemsByType(tourItems)
-      : (tourItems.length ? [{ key: 'etc', label: '주변 여행정보', items: tourItems }] : []);
-  }, [tourItems]);
   // Display alias (별칭) -- optional nickname shown in lists while official search name stays on the place record.
   const [alias, setAlias] = React.useState(editingPlace ? (editingPlace.alias || '') : '');
   // Reformats an existing multi-visit memo into one line per date entry on open (see
@@ -135,26 +127,6 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
     });
   };
 
-  // Tourism enrichment is deliberately read-only and never blocks place saving.
-  // If the optional TourAPI secret is absent or the service is unavailable, the
-  // normal place workflow remains unchanged.
-  React.useEffect(() => {
-    const api = window.GATHER_APP_PLACE_SEARCH;
-    const lat = Number(selected?.lat);
-    const lng = Number(selected?.lng);
-    if (!api || typeof api.searchTourInfo !== 'function' || !Number.isFinite(lat) || !Number.isFinite(lng)) {
-      setTourItems([]);
-      setTourLoading(false);
-      return undefined;
-    }
-    let active = true;
-    setTourLoading(true);
-    api.searchTourInfo(firebaseConfig, { lat, lng, radius: 5000 })
-      .then(items => { if (active) setTourItems(Array.isArray(items) ? items.slice(0, 6) : []); })
-      .catch(() => { if (active) setTourItems([]); })
-      .finally(() => { if (active) setTourLoading(false); });
-    return () => { active = false; };
-  }, [selected?.lat, selected?.lng, firebaseConfig?.projectId]);
 
   // Three-tier fallback chain, cheapest/most-reliable first: Kakao Local (키워드 검색) covers
   // domestic businesses very well and is effectively free at this app's scale, so it's tried
@@ -469,28 +441,7 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
             backgroundColor: 'var(--border-subtle)', color: 'var(--text-muted)', wordBreak: 'break-all', maxWidth: '100%'
           }
         }, selected.url)
-        , tourLoading && /*#__PURE__*/React.createElement("div", { style: { marginTop: '6px', fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } }, '주변 투어 정보 불러오는 중...')
-        , tourItems.length > 0 && /*#__PURE__*/React.createElement("div", {
-          style: { marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(59,130,246,0.16)', display: 'flex', flexDirection: 'column', gap: '5px' }
-        },
-          /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--accent-primary)' } }, '주변 투어 정보 (TourAPI)'),
-          tourGroups.map(group => /*#__PURE__*/React.createElement("div", { key: group.key, style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
-            /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-xs)', fontWeight: 800, color: 'var(--text-muted)', marginTop: '2px' } }, group.label),
-            group.items.map(item => /*#__PURE__*/React.createElement("a", {
-              key: item.id,
-              href: item.homepage || `https://map.kakao.com/?q=${encodeURIComponent(item.title)}`,
-              target: '_blank',
-              rel: 'noreferrer',
-              style: { display: 'flex', alignItems: 'center', gap: '7px', color: 'var(--text-main)', textDecoration: 'none', fontSize: 'var(--font-size-sm)' }
-            },
-              item.imageUrl && /*#__PURE__*/React.createElement('img', { src: item.imageUrl, alt: '', loading: 'lazy', style: { width: '34px', height: '34px', objectFit: 'cover', borderRadius: 'var(--radius-sm)', flexShrink: 0 } }),
-              /*#__PURE__*/React.createElement('span', { style: { minWidth: 0 } },
-                /*#__PURE__*/React.createElement('span', { style: { display: 'block', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, item.title),
-                /*#__PURE__*/React.createElement('span', { style: { display: 'block', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, item.address)
-              )
-            ))
-          ))
-        )
+
       ),
 
       /* Alias (별칭) -- optional nickname; official search name stays as place.name */
