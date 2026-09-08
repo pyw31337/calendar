@@ -591,6 +591,10 @@ async function main() {
   console.log(`\n[browser-smoke-test] ${passCount} passed, ${failCount} failed`
     + (knownExternalWarningCount ? `, ${knownExternalWarningCount} known external-resource warning(s)` : ''));
   if (failCount > 0) process.exit(1);
+  // Playwright, service workers, and Firestore transports can leave platform-specific handles
+  // alive on Linux runners after every assertion and browser close has completed. This script is
+  // a one-shot CLI, so terminate explicitly after the final result instead of delaying deployment.
+  process.exit(0);
 }
 
 main().catch(err => {
