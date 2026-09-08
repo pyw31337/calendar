@@ -3882,6 +3882,7 @@ export {
   stripEmbeddedConfirmedMeetingField,
   mergeConfirmedMeetings,
   mergeConfirmedMeetingItems,
+  fetchExistingConfirmedMeetingsForDates,
   writeConfirmedMeetingsToFirestore,
   fetchConfirmedMeetingsFromFirestore,
   isRetryableFirestoreConflict,
