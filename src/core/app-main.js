@@ -3085,6 +3085,11 @@ function CalendarApp() {
       fetchMeetingPhotoIndex(activeCalId, date)
     ]);
     const meeting = (Array.isArray(meetings) ? meetings : []).find(m => m && m.date === date) || null;
+    if (meeting) {
+      setConfirmedMeetingsSubcollection(previous =>
+        mergeConfirmedMeetings(Array.isArray(previous) ? previous : [], [meeting])
+      );
+    }
     return {
       photos: Array.isArray(meeting?.photos) ? meeting.photos : [],
       indexPhotos: Array.isArray(indexPhotos) ? indexPhotos : []
@@ -10423,8 +10428,8 @@ function resolveMeetingPhotoDisplay(photo, chatMessages) {
     imageUrl: entry.full,
     thumbUrl: entry.thumb,
     tags: entry.tags || '',
-    assetKey: entry.assetKey || fallbackKeys.assetKey,
-    mediaKey: entry.mediaKey || fallbackKeys.mediaKey,
+    assetKey: fallbackKeys.assetKey || entry.assetKey,
+    mediaKey: fallbackKeys.mediaKey || entry.mediaKey,
     refKey: fallbackKeys.refKey
   };
 }
