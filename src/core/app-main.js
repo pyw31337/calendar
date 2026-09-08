@@ -402,6 +402,7 @@ import {
   deleteActivityLogsAfterTimestamp,
   fetchPlacesFromFirestore,
   fetchConfirmedMeetingsFromFirestore,
+  fetchExistingConfirmedMeetingsForDates,
   mergeConfirmedMeetings,
   describeUpdateCalendarsFailure,
   pushSingleCloudCalendar,
@@ -919,7 +920,13 @@ function CalendarApp() {
       if (Array.isArray(pendingPlaces)) setPlacesSubcollection(pendingPlaces);
       const pendingMeetings = pendingRemoteMeetingsRef.current;
       pendingRemoteMeetingsRef.current = null;
-      if (Array.isArray(pendingMeetings)) setConfirmedMeetingsSubcollection(pendingMeetings);
+      if (Array.isArray(pendingMeetings)) {
+        setConfirmedMeetingsSubcollection(prev => {
+          const prevList = Array.isArray(prev) ? prev : [];
+          const snapshotDates = new Set(pendingMeetings.map(m => m && m.date).filter(Boolean));
+          return mergeConfirmedMeetings(prevList, pendingMeetings).filter(m => m && m.date && snapshotDates.has(m.date));
+        });
+      }
     }
   };
 
@@ -3025,7 +3032,12 @@ function CalendarApp() {
     // REST is only a fallback when the SDK is unavailable. With an active SDK, the listeners
     // below deliver the initial server snapshot; doing both would double every collection read.
     const refreshConfirmedMeetings = () => fetchConfirmedMeetingsFromFirestore(activeCalId).then(list => {
-      if (isMounted && Array.isArray(list)) setConfirmedMeetingsSubcollection(list);
+      if (!isMounted || !Array.isArray(list)) return;
+      setConfirmedMeetingsSubcollection(prev => {
+        const prevList = Array.isArray(prev) ? prev : [];
+        const snapshotDates = new Set(list.map(m => m && m.date).filter(Boolean));
+        return mergeConfirmedMeetings(prevList, list).filter(m => m && m.date && snapshotDates.has(m.date));
+      });
     }).catch(() => {});
 
     // REST is a request/response fallback, not a realtime transport. Poll only when the SDK
@@ -3081,12 +3093,24 @@ function CalendarApp() {
         if (snapshot.metadata.fromCache && Date.now() - recentWriteAt < 8000) return;
         const list = [];
         snapshot.forEach(doc => list.push(doc.data()));
-        setConfirmedMeetingsSubcollection(list);
+        // Identity-merge photos/expenses so a brief stale/cached snapshot with a short photos
+        // array cannot shrink a richer album already held in memory. Still replace the date set
+        // with the snapshot so server-side deletions are not retained forever.
+        setConfirmedMeetingsSubcollection(prev => {
+          const prevList = Array.isArray(prev) ? prev : [];
+          const snapshotDates = new Set((list || []).map(m => m && m.date).filter(Boolean));
+          return mergeConfirmedMeetings(prevList, list).filter(m => m && m.date && snapshotDates.has(m.date));
+        });
       }, err => {
         console.warn(`Firestore confirmedMeetings subscription error:`, err);
         queueServerAuditEvent(activeCalId, 'realtime_fallback', `confirmedMeetings:${String(err?.code || 'unknown')}`, getClientAuditContext());
         fetchConfirmedMeetingsFromFirestore(activeCalId).then(list => {
-          if (isMounted) setConfirmedMeetingsSubcollection(list);
+          if (!isMounted || !Array.isArray(list)) return;
+          setConfirmedMeetingsSubcollection(prev => {
+            const prevList = Array.isArray(prev) ? prev : [];
+            const snapshotDates = new Set(list.map(m => m && m.date).filter(Boolean));
+            return mergeConfirmedMeetings(prevList, list).filter(m => m && m.date && snapshotDates.has(m.date));
+          });
         });
       });
     return () => {
@@ -3095,6 +3119,36 @@ function CalendarApp() {
       unsubMeetings();
     };
   }, [activeCalId, needsPlacesData, firebaseDb, firebaseConnectionVersion]);
+
+  // Stable calendar-scoped fetchers for DateModal / History. Inline lambdas recreate every App
+  // render and would cancel in-flight DateModal effects that depend on callback identity.
+  const handleFetchMeetingPhotoIndex = React.useCallback(
+    (date) => fetchMeetingPhotoIndex(activeCalId, date),
+    [activeCalId]
+  );
+  const handleFetchDateTaggedMessages = React.useCallback(
+    (tag) => fetchMessagesByImageTag(activeCalId, tag),
+    [activeCalId]
+  );
+  const handleFetchDateTaggedMemos = React.useCallback(
+    (tag) => fetchMemosByTag(activeCalId, tag),
+    [activeCalId]
+  );
+
+  // When DateModal opens, force a server-sourced read of that date's confirmedMeetings doc and
+  // merge into the live subcollection so richer server photos win over a stale short local array.
+  React.useEffect(() => {
+    if (!isModalOpen || !selectedDate || !activeCalId) return;
+    let cancelled = false;
+    fetchExistingConfirmedMeetingsForDates(activeCalId, [selectedDate]).then(meetings => {
+      if (cancelled || !Array.isArray(meetings) || meetings.length === 0) return;
+      setConfirmedMeetingsSubcollection(prev => mergeConfirmedMeetings(
+        Array.isArray(prev) ? prev : [],
+        meetings
+      ));
+    }).catch(err => console.warn('DateModal confirmed meeting hydrate failed:', selectedDate, err));
+    return () => { cancelled = true; };
+  }, [isModalOpen, selectedDate, activeCalId]);
 
   // 사진 댓글 개수 실시간 구독 -- 썸네일 우측 상단 뱃지(캘린더 일정/갤러리 등)에 쓰인다. 댓글이
   // 실제로 달린 사진만 문서가 존재하므로 컬렉션 자체가 작게 유지되어, 전체 스냅샷을 그대로
@@ -7004,9 +7058,9 @@ function CalendarApp() {
       onDeletePhoto: handleDeletePhoto,
       onDeleteMeetingPhoto: handleDeleteMeetingPhoto,
       onFindChatMessageById: findChatMessageById,
-      onFetchDateTaggedMessages: (tag) => fetchMessagesByImageTag(activeCalId, tag),
-      onFetchDateTaggedMemos: (tag) => fetchMemosByTag(activeCalId, tag),
-      onFetchMeetingPhotoIndex: (date) => fetchMeetingPhotoIndex(activeCalId, date),
+      onFetchDateTaggedMessages: handleFetchDateTaggedMessages,
+      onFetchDateTaggedMemos: handleFetchDateTaggedMemos,
+      onFetchMeetingPhotoIndex: handleFetchMeetingPhotoIndex,
       onLoadOlderChat: loadOlderChatMessages,
       hasMoreOlderChat: !Array.isArray(fullChatMessages) && hasMoreOlderChat,
       loadingOlderChat: loadingOlderChat,
@@ -7917,7 +7971,7 @@ function CalendarApp() {
         onAddPhotosBackToMemory: handleAddPhotosBackToTravelMemory,
         onFetchPhotoComments: handleFetchPhotoComments,
         onSavePhotoComments: handleSavePhotoComments,
-        onFetchMeetingPhotoIndex: (date) => fetchMeetingPhotoIndex(activeCalId, date),
+        onFetchMeetingPhotoIndex: handleFetchMeetingPhotoIndex,
         photoCommentCounts: photoCommentCounts,
         ...navMenuProps
       }),

@@ -943,7 +943,11 @@ export function DateModal({
       if (!cancelled && Array.isArray(photos)) setIndexedMeetingPhotos(photos);
     }).catch(err => console.warn('meeting photo index fetch failed:', err));
     return () => { cancelled = true; };
-  }, [dateStr, onFetchMeetingPhotoIndex]);
+  // App historically passed an inline calendar-scoped lambda. Depending on that function
+  // identity cancelled the in-flight meetingPhotoIndex fetch on every unrelated App re-render
+  // (badge/chat updates), so the tab fell back to the ~1 chat-tag hit. Match the memo-tag
+  // effect above: dateStr is the real query key; DateModal remounts per calendar.
+  }, [dateStr]);
   const allMeetingPhotoMessages = React.useMemo(() => {
     const byId = new Map();
     [...(chatMessagesWithFetchedSources || []), ...(fetchedTaggedMessages || [])].forEach(msg => {
@@ -960,16 +964,26 @@ export function DateModal({
     // already resolves the live values via resolveMeetingPhotoDisplay before displaying; this tab
     // didn't, so the exact same photo could show different tags depending on which page you
     // opened it from. Resolving here keeps this tab's thumbnails and Lightbox in sync with it.
-    const indexedPhotos = (indexedMeetingPhotos || []).map(photo => ({
-      ...photo,
-      imageUrl: photo.imageUrl || photo.thumbUrl,
-      thumbUrl: photo.thumbUrl || photo.imageUrl,
-      sourceMessageId: photo.sourceMessageId,
-      sourceImageIndex: Number(photo.sourceImageIndex),
-      createdAt: photo.createdAt || 0,
-      mediaKey: `chat:${photo.sourceMessageId}:${photo.sourceImageIndex}`,
-      refKey: `meeting-index:${photo.id}`
-    }));
+    const indexedPhotos = (indexedMeetingPhotos || []).map(photo => {
+      const rawIndex = photo.sourceImageIndex;
+      const sourceImageIndex = Number.isInteger(rawIndex)
+        ? rawIndex
+        : (Number.isFinite(Number(rawIndex)) ? Number(rawIndex) : null);
+      const mediaKey = photo.mediaKey
+        || (photo.sourceMessageId && sourceImageIndex != null
+          ? `chat:${photo.sourceMessageId}:${sourceImageIndex}`
+          : `meeting-index:${photo.id || photo.refKey || photo.imageUrl || photo.thumbUrl || ''}`);
+      return {
+        ...photo,
+        imageUrl: photo.imageUrl || photo.thumbUrl,
+        thumbUrl: photo.thumbUrl || photo.imageUrl,
+        sourceMessageId: photo.sourceMessageId,
+        sourceImageIndex,
+        createdAt: photo.createdAt || 0,
+        mediaKey,
+        refKey: photo.refKey || `meeting-index:${photo.id}`
+      };
+    });
     const directPhotos = [...indexedPhotos, ...(Array.isArray(confirmedMeetingEntry?.photos) ? confirmedMeetingEntry.photos : [])]
       .filter(photo => photo && !isTombstone(photo) && (photo.imageUrl || photo.thumbUrl))
       .map((photo, photoIndex) => {
