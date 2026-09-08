@@ -4,6 +4,8 @@ import { GATHER_APP_UTILS, omitUndefinedDeep } from '../src/core/app-utils.js';
 import { calculateSettlementRows } from '../src/core/settlement-calculator.js';
 import { fetchPhotoComments, savePhotoComments } from '../src/core/photo-comments.js';
 import { composeGalleryPhotos, paginateGalleryItems, getPaginationWindow } from '../src/core/gallery-data.js';
+import { cloneConfirmedMeetings, commitConfirmedMeetingChanges } from '../src/core/confirmed-meeting-coordinator.js';
+import { getInitialAppView, buildAppViewUrl } from '../src/core/app-routing-state.js';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -12,6 +14,29 @@ function assert(condition, message) {
 const undefinedProbe = omitUndefinedDeep({ description: undefined, nested: { keep: 'ok', drop: undefined }, list: [1, undefined] });
 assert(!('description' in undefinedProbe) && !('drop' in undefinedProbe.nested), 'Firestore payload sanitizer must omit undefined object fields');
 assert(undefinedProbe.list.length === 2 && undefinedProbe.list[1] === null, 'Firestore payload sanitizer must preserve array positions');
+
+assert(getInitialAppView({ pathname: '/', search: '?view=gallery' }, () => null) === 'gallery', 'route state must initialize from the view query');
+assert(buildAppViewUrl({ pathname: '/calendar/', search: '?id=cw&date=2026-09-08&msg=x' }, 'gallery', new Date(2026, 8, 1)) === '/calendar/?id=cw&year=2026&month=09&view=gallery', 'route changes must retain calendar/month and clear stale deep-link state');
+const clonedMeetingProbe = cloneConfirmedMeetings([{ date: '2026-09-08', photos: [{ id: 'p1' }] }]);
+clonedMeetingProbe[0].photos[0].id = 'changed';
+assert(clonedMeetingProbe[0].photos[0].id === 'changed', 'confirmed meeting clone must remain editable');
+
+{
+  let persistedScope = null;
+  let mergedRows = null;
+  const saved = await commitConfirmedMeetingChanges({
+    activeCalendar: { id: 'test_commit', revision: 2, confirmedMeeting: [{ date: '2026-09-08', photos: [{ id: 'p1' }] }], activityLogs: [] },
+    calendars: [{ id: 'test_commit', revision: 2 }],
+    nextConfirmedMeetings: [{ date: '2026-09-08', photos: [{ id: 'p1' }, { id: 'p2' }] }],
+    getConfirmedMeetings: calendar => calendar.confirmedMeeting || [],
+    getCalendarActivityLogs: calendar => calendar.activityLogs || [],
+    updateCalendars: async (...args) => { persistedScope = args[6]; return true; },
+    setConfirmedMeetingsSubcollection: updater => { mergedRows = updater([]); },
+    mergeConfirmedMeetings: (_old, rows) => rows
+  });
+  assert(saved && persistedScope?.settingsFields?.[0] === 'confirmedMeeting', 'meeting coordinator must persist only the confirmedMeeting field scope');
+  assert(mergedRows?.[0]?.photos?.length === 2, 'meeting coordinator must hydrate the saved photo album locally');
+}
 
 {
   const fetched = await fetchPhotoComments({

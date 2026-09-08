@@ -146,6 +146,8 @@ import {
 import { fetchPhotoComments, savePhotoComments } from './photo-comments.js';
 import { createPhotoCommentStore } from './photo-comment-store.js';
 import { useGalleryPhotoIndex } from './photo-index.js';
+import { cloneConfirmedMeetings, commitConfirmedMeetingChanges } from './confirmed-meeting-coordinator.js';
+import { getInitialAppView, buildAppViewUrl } from './app-routing-state.js';
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 // 입력필드 규칙: 멀티라인 텍스트는 값(로드/입력/붙여넣기)에 맞춰 세로로 자동 확장
@@ -1423,13 +1425,7 @@ function CalendarApp() {
   };
   const [editingMessage, setEditingMessage] = React.useState(null); // {id, participantId, text, imageUrl, thumbUrl, calId}
 
-  const getActiveViewFromURL = () => {
-    const share = parseSharePathFromLocation();
-    if (share && share.view && share.view !== 'calendar') return share.view;
-    const params = new URLSearchParams(window.location.search);
-    return params.get('view') || 'calendar';
-  };
-  const [activeView, setActiveView] = React.useState(getActiveViewFromURL);
+  const [activeView, setActiveView] = React.useState(() => getInitialAppView(window.location, parseSharePathFromLocation));
   const galleryPhotoIndex = useGalleryPhotoIndex({
     React, calendarId: activeCalId, activeView,
     projectId: firebaseConfig.projectId, decodeDocument: firestoreDocumentToJs
@@ -1507,7 +1503,7 @@ function CalendarApp() {
 
   React.useEffect(() => {
     const handleUrlChange = () => {
-      setActiveView(getActiveViewFromURL());
+      setActiveView(getInitialAppView(window.location, parseSharePathFromLocation));
     };
     window.addEventListener('popstate', handleUrlChange);
     return () => window.removeEventListener('popstate', handleUrlChange);
@@ -1697,31 +1693,7 @@ function CalendarApp() {
       lastMainScrollTopRef.current = 0;
       requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'auto' }));
     }
-    const params = new URLSearchParams(window.location.search);
-    const keepId = params.get('id') || params.get('cal');
-    params.delete('id');
-    params.delete('cal');
-    params.delete('date');
-    params.delete('msg');
-    params.delete('img');
-    params.delete('memo');
-    params.delete('place');
-    if (keepId) params.set('id', keepId);
-    if (currentMonthDate instanceof Date && !Number.isNaN(currentMonthDate.getTime())) {
-      params.set('year', String(currentMonthDate.getFullYear()));
-      params.set('month', String(currentMonthDate.getMonth() + 1).padStart(2, '0'));
-    } else {
-      params.delete('year');
-      params.delete('month');
-    }
-    if (view === 'calendar') {
-      params.delete('view');
-    } else {
-      params.set('view', view);
-    }
-    const qs = params.toString();
-    const newUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
-    window.history.pushState({}, '', newUrl);
+    window.history.pushState({}, '', buildAppViewUrl(window.location, view, currentMonthDate));
   };
   const syncCurrentMonthInUrl = nextDate => {
     if (!(nextDate instanceof Date) || Number.isNaN(nextDate.getTime())) return;
@@ -5242,53 +5214,13 @@ function CalendarApp() {
     }, null, 5000);
     return true;
   };
-  const cloneConfirmedMeetings = meetings => meetings.map(meeting => ({
-    ...meeting,
-    photos: Array.isArray(meeting.photos) ? meeting.photos.map(photo => ({ ...photo })) : []
-  }));
   const commitConfirmedMeetings = async (nextConfirmedMeetings, toastMessage = null, activityLogs = [], warnLabel = 'write', toastType = 'success') => {
-    const previousMeetings = getConfirmedMeetings(activeCal);
-    const previousByDate = new Map(previousMeetings.map(meeting => [meeting.date, JSON.stringify(meeting)]));
-    const mutationStamp = Date.now();
-    // Stamp the aggregate itself for every mutation, including deletes, reorder, undo and
-    // confirm/cancel. Child timestamps cannot describe removal, and an unchanged confirmedAt
-    // previously let an older subcollection snapshot win the read-side union after a save.
-    const stampedNextConfirmedMeetings = nextConfirmedMeetings.map(meeting => (
-      previousByDate.get(meeting.date) !== JSON.stringify(meeting)
-        ? { ...meeting, updatedAt: Math.max(Number(meeting.updatedAt || 0) || 0, mutationStamp) }
-        : meeting
-    ));
-    // The subcollection is keyed by date. Persist only dates changed by this action instead of
-    // rewriting every confirmed meeting whenever one expense/photo/note is edited.
-    const changedConfirmedMeetings = stampedNextConfirmedMeetings.filter(meeting => {
-      return previousByDate.get(meeting.date) !== JSON.stringify(meeting);
+    void warnLabel;
+    return commitConfirmedMeetingChanges({
+      activeCalendar: activeCal, calendars, nextConfirmedMeetings, toastMessage, activityLogs,
+      toastType, getConfirmedMeetings, getCalendarActivityLogs, updateCalendars,
+      setConfirmedMeetingsSubcollection, mergeConfirmedMeetings
     });
-    const updatedCal = {
-      ...activeCal,
-      confirmedMeeting: stampedNextConfirmedMeetings,
-      updatedAt: mutationStamp,
-      revision: (activeCal.revision || 0) + 1,
-      activityLogs: activityLogs.length > 0 ? [...getCalendarActivityLogs(activeCal), ...activityLogs] : getCalendarActivityLogs(activeCal)
-    };
-    const nextCalendars = calendars.map(c => c.id === updatedCal.id ? updatedCal : c);
-    const calendarSaved = await updateCalendars(
-      nextCalendars,
-      toastMessage,
-      toastType,
-      updatedCal.id,
-      'settings',
-      activityLogs,
-      { confirmedMeetings: changedConfirmedMeetings, settingsFields: ['confirmedMeeting'] }
-    );
-    if (!calendarSaved) return false;
-    // Preserve richer photos already present in the live subcollection snapshot. Expense/note
-    // commits can stamp a date with an incomplete local photos array; merging by item identity
-    // keeps alive photos visible while still applying newer deletedAt tombstones.
-    setConfirmedMeetingsSubcollection(prev => mergeConfirmedMeetings(
-      Array.isArray(prev) ? prev : [],
-      stampedNextConfirmedMeetings
-    ));
-    return true;
   };
   const handleConfirmMeeting = (dateStr, note) => {
     if (!activeCal || !isValidDateString(dateStr)) return false;
