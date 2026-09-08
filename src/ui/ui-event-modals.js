@@ -3007,6 +3007,11 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   const extractFirstUrl = __deps.extractFirstUrl;
   const formatChatHeaderTitle = __deps.formatChatHeaderTitle;
   const canUseSettlement = isSettlementEnabledCalendarId(calendar?.id);
+  const renderSettlementPortal = node => (
+    typeof document !== 'undefined' && window.ReactDOM?.createPortal
+      ? window.ReactDOM.createPortal(node, document.body)
+      : node
+  );
 
   const handleOpenCreateSettlement = () => {
     setIsSettlementMenuOpen(false);
@@ -3880,9 +3885,8 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
       }, "다운로드")
     )
   )),
-  isSettlementMenuOpen && /*#__PURE__*/React.createElement("div", {
+  isSettlementMenuOpen && renderSettlementPortal(/*#__PURE__*/React.createElement("div", {
     className: "admin-side-menu-overlay",
-    style: { zIndex: 12000 },
     onClick: () => setIsSettlementMenuOpen(false)
   }, /*#__PURE__*/React.createElement("nav", {
     className: "admin-side-menu",
@@ -3982,7 +3986,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
       onOpenSettings: onOpenAppSettings,
       shareLabel: '공유'
     })
-  ))),
+  )))),
 
   /* Settlement list Layer Popup */
   (isSettlementListOpen && canUseSettlement && React.createElement("div", {

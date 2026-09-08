@@ -1490,12 +1490,14 @@ export function ChatGalleryModal({
   // own 사진 tab uses (label left, action buttons right), reused here for visual consistency.
   // Mobile-only 전체|일자 pill (same markup/styles as the former visit-filter-toggle-mobile
   // that lived beside the 사진|링크 tabs). Desktop keeps the filter in the page header.
+  // Shell is 44px + 3px padding; do not set minHeight:44px on inner segments or purple bleed
+  // past the gray pill border on iOS Safari. Clip with overflow:hidden.
   const renderVisitFilterToggleMobile = () => /*#__PURE__*/React.createElement("div", {
     className: "visit-filter-toggle-mobile",
     style: {
       display: 'inline-flex', alignItems: 'center', height: '44px', boxSizing: 'border-box',
       padding: '3px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)',
-      backgroundColor: 'var(--bg-card)', flexShrink: 0
+      backgroundColor: 'var(--bg-card)', flexShrink: 0, overflow: 'hidden'
     }
   },
     [
@@ -1506,7 +1508,7 @@ export function ChatGalleryModal({
       type: "button",
       onClick: () => setGalleryViewMode(tab.key),
       style: {
-        height: '100%', minHeight: '44px', boxSizing: 'border-box', padding: '0 14px', fontSize: 'var(--font-size-md)', fontWeight: 900,
+        height: '100%', boxSizing: 'border-box', padding: '0 14px', fontSize: 'var(--font-size-md)', fontWeight: 900,
         borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer',
         backgroundColor: galleryViewMode === tab.key ? '#4F46E5' : 'transparent',
         color: galleryViewMode === tab.key ? '#FFFFFF' : 'var(--text-muted)'
@@ -1852,10 +1854,10 @@ export function ChatGalleryModal({
     onChange: handleUploadChange,
     style: { display: 'none' }
   }),
-  asPage && isMenuOpen && /*#__PURE__*/React.createElement("div", {
+  asPage && isMenuOpen && typeof document !== 'undefined' && window.ReactDOM && window.ReactDOM.createPortal
+    ? window.ReactDOM.createPortal(/*#__PURE__*/React.createElement("div", {
     className: "admin-side-menu-overlay",
-    onClick: () => setIsMenuOpen(false),
-    style: { zIndex: 12000 }
+    onClick: () => setIsMenuOpen(false)
   }, /*#__PURE__*/React.createElement("nav", {
     className: "admin-side-menu",
     "aria-label": "갤러리 메뉴",
@@ -1958,7 +1960,8 @@ export function ChatGalleryModal({
       onOpenSettings: onOpenAppSettings,
       shareLabel: '공유'
     })
-  )),
+  )), document.body)
+    : null,
   isSearchOpen && /*#__PURE__*/React.createElement(InlineSearchBar, {
     value: searchQuery,
     placeholder: "사진·링크 통합 검색 (태그, 텍스트, URL)",

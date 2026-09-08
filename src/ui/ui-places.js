@@ -1454,7 +1454,8 @@ export function PlacesView({
             borderRadius: 'var(--radius-md)',
             border: '1px solid var(--border-subtle)',
             backgroundColor: 'var(--bg-card)',
-            flexShrink: 0
+            flexShrink: 0,
+            overflow: 'hidden'
           }
         },
           /*#__PURE__*/React.createElement("button", {
@@ -1740,9 +1741,9 @@ export function PlacesView({
       )
     ),
 
-    isPlacesMenuOpen && /*#__PURE__*/React.createElement("div", {
+    isPlacesMenuOpen && typeof document !== 'undefined' && window.ReactDOM && window.ReactDOM.createPortal
+      ? window.ReactDOM.createPortal(/*#__PURE__*/React.createElement("div", {
       className: "admin-side-menu-overlay",
-      style: { zIndex: 12000 },
       onClick: () => setIsPlacesMenuOpen(false)
     }, /*#__PURE__*/React.createElement("div", {
       className: "admin-side-menu",
@@ -1821,7 +1822,8 @@ export function PlacesView({
         onOpenSettings: onOpenAppSettings,
         shareLabel: '공유'
       })
-    )),
+    )), document.body)
+      : null,
     (() => {
       const PlaceRegisterModalComp = PlaceRegisterModal || (typeof window !== 'undefined' && window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlaceRegisterModal) || (typeof window !== 'undefined' && window.GATHER_UI_DEPS && window.GATHER_UI_DEPS.PlaceRegisterModal);
       return isRegisterOpen && PlaceRegisterModalComp ? /*#__PURE__*/React.createElement(PlaceRegisterModalComp, {

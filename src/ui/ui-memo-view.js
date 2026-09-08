@@ -1166,9 +1166,9 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       onClose: () => { setIsSearchOpen(false); setSearchQuery(''); setSelectedTag(''); }
     }),
 
-    isMemoMenuOpen && /*#__PURE__*/React.createElement("div", {
+    isMemoMenuOpen && typeof document !== 'undefined' && window.ReactDOM && window.ReactDOM.createPortal
+      ? window.ReactDOM.createPortal(/*#__PURE__*/React.createElement("div", {
       className: "admin-side-menu-overlay",
-      style: { zIndex: 12000 },
       onClick: () => setIsMemoMenuOpen(false)
     }, /*#__PURE__*/React.createElement("nav", {
       className: "admin-side-menu",
@@ -1236,7 +1236,8 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         onOpenSettings: onOpenAppSettings,
         shareLabel: '공유'
       })
-    )),
+    )), document.body)
+      : null,
 
     /* Main Scrollable Body */
     /*#__PURE__*/React.createElement("div", {
