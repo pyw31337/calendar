@@ -286,7 +286,9 @@ function LightboxBottomPanel({ children }) {
       display: 'flex', flexDirection: 'column', gap: '4px',
       pointerEvents: 'auto'
     },
-    onClick: e => e.stopPropagation()
+    onClick: e => e.stopPropagation(),
+    onMouseDown: e => e.stopPropagation(),
+    onTouchStart: e => e.stopPropagation()
   }, children);
 }
 
@@ -361,15 +363,25 @@ export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast
   const [isSavingTags, setIsSavingTags] = React.useState(false);
   const [confirmDeleteTag, setConfirmDeleteTag] = React.useState(null);
   const [isDeletingTag, setIsDeletingTag] = React.useState(false);
+  const tagInputRef = React.useRef(null);
   // Keep the draft while navigating between photos. The lightbox intentionally reuses this
   // panel so a user can tap a photo once, then enter tags continuously with previous/next.
   if (tagTokens.length === 0 && !onSaveTags) return null;
   const MAX_TAGS = 10;
   const handleSaveTags = async () => {
-    if (!onSaveTags || isSavingTags) return;
-    // Parse new tokens from input
-    const newTokens = String(tagInput || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean);
-    if (newTokens.length === 0) return;
+    if (isSavingTags) return;
+    if (!onSaveTags) {
+      if (typeof showToast === 'function') showToast('이 사진에는 태그를 저장할 수 없습니다.', 'error');
+      return;
+    }
+    // Prefer controlled state, but fall back to the DOM value so a Korean IME composition that
+    // has not yet flushed through onChange (common when tapping 저장 mid-composition) still saves.
+    const rawInput = String(tagInput || (tagInputRef.current && tagInputRef.current.value) || '');
+    const newTokens = rawInput.split(/[,\s#]+/).map(t => t.trim()).filter(Boolean);
+    if (newTokens.length === 0) {
+      if (typeof showToast === 'function') showToast('태그를 입력해 주세요.', 'error');
+      return;
+    }
     // Merge with existing, deduplicate, enforce limit
     const merged = Array.from(new Set([...tagTokens, ...newTokens]));
     if (merged.length > MAX_TAGS) {
@@ -384,7 +396,14 @@ export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast
     setIsSavingTags(true);
     try {
       const saved = await onSaveTags(finalTags.join(' '));
-      if (saved !== false) setTagInput('');
+      if (saved === false) {
+        if (typeof showToast === 'function') showToast('태그 저장 실패', 'error');
+        return;
+      }
+      setTagInput('');
+    } catch (err) {
+      console.error('Lightbox tag save failed:', err);
+      if (typeof showToast === 'function') showToast('태그 저장 실패', 'error');
     } finally {
       setIsSavingTags(false);
     }
@@ -436,8 +455,10 @@ export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast
       /*#__PURE__*/React.createElement("input", {
         type: "text",
         className: "lightbox-tag-input",
+        ref: tagInputRef,
         value: tagInput,
         onChange: e => setTagInput(e.target.value),
+        onCompositionEnd: e => setTagInput(e.target.value),
         onKeyDown: e => {
           if (e.nativeEvent.isComposing) return;
           if (e.key === 'Enter') {
@@ -460,7 +481,9 @@ export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast
       }),
       /*#__PURE__*/React.createElement("button", {
         type: "button",
-        onClick: handleSaveTags,
+        onMouseDown: e => e.stopPropagation(),
+        onTouchStart: e => e.stopPropagation(),
+        onClick: e => { e.stopPropagation(); handleSaveTags(); },
         disabled: isSavingTags || tagTokens.length >= 10,
         style: {
           flexShrink: 0, height: '28px', padding: '0 10px', borderRadius: 'var(--radius-sm)',
@@ -867,33 +890,39 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   // A photo uploaded from the meeting composer is still stored as a normal messages document.
   // It has source="meeting" but no meetingDate/photoId until (and unless) it is linked into a
   // confirmed meeting. Treat its own messageId/index as the editable tag target.
+  // Photo-index / REST payloads sometimes deliver imageIndex as a numeric string. Coerce once so
+  // canEditTags and the save path agree (strict Number.isInteger used to enable 저장 via
+  // messageId, then handleSaveImageTags returned false with no toast).
+  const toTagImageIndex = value => {
+    if (Number.isInteger(value)) return value;
+    const n = Number(value);
+    return Number.isFinite(n) ? Math.max(0, Math.round(n)) : null;
+  };
+  const currentImageIndex = toTagImageIndex(currentMeta?.imageIndex);
+  const currentSourceImageIndex = toTagImageIndex(currentMeta?.sourceImageIndex);
   const isMeetingMessageTagTarget = currentMeta?.source === 'meeting'
     && !!currentMeta?.messageId
-    && Number.isInteger(currentMeta?.imageIndex);
+    && currentImageIndex != null;
   // Anniversary photos live on the anniversary doc's photos[] array (not a chat message), so
   // they identify by anniversaryId + imageIndex -- same shape handleSaveAnniversaryPhotoTags
   // expects in app-main.js.
-  const isAnniversaryPhoto = currentMeta?.source === 'anniversary' && !!currentMeta?.anniversaryId && Number.isInteger(currentMeta?.imageIndex);
-  // Was keyed on source === 'chat' specifically, which left tag editing silently disabled for
-  // any directMediaUrl entry (a link pasted as plain text in a message, single or multi-image --
-  // see DirectChatMediaText) since those never set `source` at all. Reworked to mirror
-  // canEditPhoto's structure below: 'meeting' is the one case needing isMeetingPhoto, 'memo' stays
-  // explicitly disabled (a memo's tags are a whole-memo field, no single-photo target to write
-  // to -- see the comment above), anniversary uses anniversaryId+imageIndex, and everything else
-  // (chat, chat-tag, or an untagged directMediaUrl entry) just needs a real messageId.
+  const isAnniversaryPhoto = currentMeta?.source === 'anniversary' && !!currentMeta?.anniversaryId && currentImageIndex != null;
+  // meeting / anniversary / memo have explicit targets; chat + gallery (+ untagged directMedia)
+  // need a real messageId. Gallery photo-index rows use source:'gallery' but still store tags on
+  // the underlying messages document.
   const canEditTags = currentMeta && (
     currentMeta.source === 'meeting' ? (isMeetingTagTarget || isMeetingMessageTagTarget) :
     currentMeta.source === 'anniversary' ? isAnniversaryPhoto :
-    currentMeta.source === 'memo' ? (!!currentMeta.messageId && Number.isInteger(currentMeta.imageIndex)) :
+    currentMeta.source === 'memo' ? (!!currentMeta.messageId && currentImageIndex != null) :
     currentMeta.messageId != null
   );
   const tagOverrideKey = currentMeta
     ? [
         'lb',
         currentMeta.messageId || currentMeta.sourceMessageId || currentMeta.anniversaryId || '',
-        Number.isInteger(currentMeta.imageIndex)
-          ? currentMeta.imageIndex
-          : (Number.isInteger(currentMeta.sourceImageIndex) ? currentMeta.sourceImageIndex : ''),
+        currentImageIndex != null
+          ? currentImageIndex
+          : (currentSourceImageIndex != null ? currentSourceImageIndex : ''),
         currentUrl || currentMeta.directMediaUrl || currentMeta.thumb || '',
         currentMeta.photoId || currentMeta.meetingDate || currentMeta.anniversaryId || ''
       ].join('::')
@@ -908,8 +937,10 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   )).slice(0, 10).join(' ');
   const saveCurrentTags = onSaveImageTags && canEditTags
     ? async tagsText => {
-        const ok = await onSaveImageTags(currentMeta.messageId, currentMeta.imageIndex, tagsText, {
+        const ok = await onSaveImageTags(currentMeta.messageId, currentImageIndex, tagsText, {
           ...currentMeta,
+          imageIndex: currentImageIndex,
+          sourceImageIndex: currentSourceImageIndex,
           imageUrl: currentUrl
         });
         if (ok && tagOverrideKey) setTagOverrides(prev => ({ ...prev, [tagOverrideKey]: normalizeTagsForDisplay(tagsText) }));

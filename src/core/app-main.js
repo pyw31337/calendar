@@ -4656,7 +4656,13 @@ function CalendarApp() {
   // Persist hashtags onto anniversary.photos[i].tags (anniversary docs live in the
   // anniversaries subcollection -- same write path AnniversaryModal's own save uses).
   const handleSaveAnniversaryPhotoTags = async (anniversaryId, imageIndex, tagsText) => {
-    if (!activeCal?.id || !anniversaryId || !Number.isInteger(imageIndex)) return false;
+    if (!Number.isInteger(imageIndex) && Number.isFinite(Number(imageIndex))) {
+      imageIndex = Math.max(0, Math.round(Number(imageIndex)));
+    }
+    if (!activeCal?.id || !anniversaryId || !Number.isInteger(imageIndex)) {
+      if (activeCal?.id && anniversaryId) showToast('태그 저장 대상 이미지를 찾지 못했습니다.', 'error', 4000);
+      return false;
+    }
     const ann = (anniversaries || []).find(a => a && a.id === anniversaryId);
     const photos = Array.isArray(ann?.photos) ? ann.photos : [];
     if (!ann || imageIndex < 0 || imageIndex >= photos.length) {
@@ -4683,31 +4689,53 @@ function CalendarApp() {
   };
 
   const handleSaveImageTags = async (messageId, imageIndex, tagsText, meta = {}) => {
+    // Photo-index / REST may deliver imageIndex as a numeric string. Coerce before every
+    // Number.isInteger gate so gallery/chat/memo/meeting tag saves do not silently no-op.
+    const coerceTagImageIndex = value => {
+      if (Number.isInteger(value)) return value;
+      const n = Number(value);
+      return Number.isFinite(n) ? Math.max(0, Math.round(n)) : null;
+    };
+    const resolvedIndex = coerceTagImageIndex(imageIndex);
+    const resolvedMetaIndex = coerceTagImageIndex(meta?.imageIndex);
+    const resolvedSourceIndex = coerceTagImageIndex(meta?.sourceImageIndex);
     if (meta?.source === 'anniversary') {
-      return handleSaveAnniversaryPhotoTags(meta.anniversaryId, meta.imageIndex, tagsText);
+      return handleSaveAnniversaryPhotoTags(meta.anniversaryId, resolvedMetaIndex != null ? resolvedMetaIndex : resolvedIndex, tagsText);
     }
     if (meta?.source === 'meeting') {
       // Auto-linked 일정 사진: edit the source chat photo. Meeting-composer uploads (no meetingDate yet): own message.
-      if (meta.sourceMessageId && Number.isInteger(meta.sourceImageIndex)) {
-        return handleSaveImageTags(meta.sourceMessageId, meta.sourceImageIndex, tagsText, {});
+      if (meta.sourceMessageId && resolvedSourceIndex != null) {
+        return handleSaveImageTags(meta.sourceMessageId, resolvedSourceIndex, tagsText, {});
       }
-      if (messageId && Number.isInteger(imageIndex) && !meta.meetingDate) {
-        return handleSaveImageTags(messageId, imageIndex, tagsText, {});
+      if (messageId && resolvedIndex != null && !meta.meetingDate) {
+        return handleSaveImageTags(messageId, resolvedIndex, tagsText, {});
       }
       return handleSaveMeetingPhotoTags(meta.meetingDate, meta.photoId, tagsText);
     }
     if (meta?.source === 'memo') {
-      const memoId = messageId || meta.messageId;
-      if (!memoId || !Number.isInteger(imageIndex)) return false;
+      let memoId = messageId || meta.messageId || '';
+      // Canonical photo-index rows used to store messageId:'' for memos; recover from sourceOwner.
+      if (!memoId) {
+        const owner = String(meta.sourceOwner || (Array.isArray(meta.owners) && meta.owners[0] && meta.owners[0].sourceOwner) || '');
+        const match = owner.match(/^memo:([^:]+):/);
+        if (match) memoId = match[1];
+      }
+      if (!memoId || resolvedIndex == null) {
+        showToast('태그 저장 대상 이미지를 찾지 못했습니다.', 'error', 4000);
+        return false;
+      }
       const memo = await findMemoById(memoId);
       if (!memo) { showToast('태그 저장 대상 이미지를 찾지 못했습니다.', 'error', 4000); return false; }
       const urls = Array.isArray(memo.imageUrls) ? memo.imageUrls : (memo.imageUrl ? [memo.imageUrl] : []);
-      if (imageIndex < 0 || imageIndex >= urls.length) return false;
+      if (resolvedIndex < 0 || resolvedIndex >= urls.length) {
+        showToast('태그 저장 대상 이미지를 찾지 못했습니다.', 'error', 4000);
+        return false;
+      }
       const parseTagTokens = text => Array.from(new Set(String(text || '').split(/[,\s#]+/).map(t => sanitizeText(t.trim(), 30)).filter(Boolean))).slice(0, 10);
       const cleanTags = sanitizeText(parseTagTokens(tagsText).join(' '), 100);
       const nextImageTags = Array.isArray(memo.imageTags) ? [...memo.imageTags] : [];
       while (nextImageTags.length < urls.length) nextImageTags.push('');
-      nextImageTags[imageIndex] = cleanTags;
+      nextImageTags[resolvedIndex] = cleanTags;
       try {
         const ok = await writeCollectionDocumentWithFallback('memos', activeCalId, memoId, sanitizeMemoForFirestore({ imageTags: nextImageTags }), 'update', '메모 이미지 태그 저장');
         if (!ok) throw new Error('Memo image tags update failed');
@@ -4720,7 +4748,12 @@ function CalendarApp() {
         return false;
       }
     }
-    if (!messageId || !Number.isInteger(imageIndex)) return false;
+    // chat / gallery / directMedia (and any other message-backed source)
+    if (!messageId || resolvedIndex == null) {
+      showToast('태그 저장 대상 이미지를 찾지 못했습니다.', 'error', 4000);
+      return false;
+    }
+    imageIndex = resolvedIndex;
     let sourceMessage = (chatMessages || []).find(msg => msg.id === messageId);
     if (!sourceMessage) {
       try {
@@ -4740,7 +4773,10 @@ function CalendarApp() {
     }
     const isDirectMedia = !!meta?.directMediaUrl;
     const entryCount = getMessageImageEntries(sourceMessage).length;
-    if (!isDirectMedia && (imageIndex < 0 || imageIndex >= entryCount)) return false;
+    if (!isDirectMedia && (imageIndex < 0 || imageIndex >= entryCount)) {
+      showToast('태그 저장 대상 이미지를 찾지 못했습니다.', 'error', 4000);
+      return false;
+    }
     const parseTagTokens = text => Array.from(new Set(
       String(text || '').split(/[,\s#]+/).map(t => sanitizeText(t.trim(), 30)).filter(Boolean)
     )).slice(0, 10);

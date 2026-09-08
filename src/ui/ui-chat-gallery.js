@@ -580,7 +580,27 @@ export function ChatGalleryModal({
     if (Array.isArray(indexedPhotos)) {
       return indexedPhotos
         .filter(photo => photo && !isBrokenPhotoValue(photo.full) && !isBrokenPhotoValue(photo.thumb))
-        .map(photo => ({ ...photo, source: photo.source || 'gallery' }));
+        .map(photo => {
+          const source = photo.source || 'gallery';
+          const imageIndex = Number.isInteger(photo.imageIndex)
+            ? photo.imageIndex
+            : (Number.isFinite(Number(photo.imageIndex)) ? Math.max(0, Math.round(Number(photo.imageIndex))) : 0);
+          // Photo-index memo rows historically omitted messageId (''). Recover from sourceOwner
+          // (`memo:<id>:<index>`) so lightbox tag save can resolve the memo document.
+          let messageId = photo.messageId;
+          if ((!messageId || messageId === '') && source === 'memo') {
+            const owner = String(photo.sourceOwner || (Array.isArray(photo.owners) && photo.owners[0] && photo.owners[0].sourceOwner) || '');
+            const match = owner.match(/^memo:([^:]+):/);
+            if (match) messageId = match[1];
+          }
+          return {
+            ...photo,
+            source,
+            uploadSource: photo.uploadSource || (['chat', 'gallery', 'meeting', 'memo'].includes(source) ? source : photo.uploadSource),
+            messageId: messageId || photo.messageId,
+            imageIndex
+          };
+        });
     }
     return composeGalleryPhotos({
       chatMessages, memos, calendar, isTombstone, getMessageImageEntries,

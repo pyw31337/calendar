@@ -17,9 +17,7 @@ export function composeGalleryPhotos({
   });
   memos.forEach(memo => {
     if (!memo || isTombstone(memo)) return;
-    const memoTags = Array.isArray(memo.tags)
-      ? memo.tags.map(tag => String(tag || '').replace(/^#/, '')).filter(Boolean).join(' ')
-      : '';
+    const memoImageTags = Array.isArray(memo.imageTags) ? memo.imageTags : [];
     const asMessage = {
       id: memo.id,
       text: memo.text || memo.content || memo.body || '',
@@ -27,13 +25,20 @@ export function composeGalleryPhotos({
       imageUrls: memo.imageUrls,
       thumbUrl: memo.thumbUrl,
       thumbUrls: memo.thumbUrls,
+      imageTags: memoImageTags,
       timestamp: memo.updatedAt || memo.createdAt || 0,
       participantId: memo.participantId || '',
       uploadSource: 'memo'
     };
     [...getMessageImageEntries(asMessage), ...getAllDirectMediaImageEntries(asMessage)].forEach(entry => {
       if (!entry || isBrokenPhotoValue(entry.full) || isBrokenPhotoValue(entry.thumb)) return;
-      list.push({ ...entry, tags: memoTags, text: asMessage.text, participantId: asMessage.participantId, source: 'memo' });
+      list.push({
+        ...entry,
+        tags: String(entry.tags || memoImageTags[entry.imageIndex] || ''),
+        text: asMessage.text,
+        participantId: asMessage.participantId,
+        source: 'memo'
+      });
     });
   });
   getConfirmedMeetings(calendar).forEach(meeting => {

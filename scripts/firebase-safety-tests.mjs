@@ -177,7 +177,12 @@ const chatGallerySource = fs.readFileSync(new URL('../src/ui/ui-chat-gallery.js'
 const lightboxSource = fs.readFileSync(new URL('../src/ui/ui-lightbox.js', import.meta.url), 'utf8');
 const summaryGallerySource = fs.readFileSync(new URL('../src/ui/ui-summary-gallery.js', import.meta.url), 'utf8');
 assert(lightboxSource.includes('isMeetingMessageTagTarget'), 'meeting message uploads must expose per-photo tag controls');
-assert(appMainSource.includes('Number.isInteger(imageIndex) && !meta.meetingDate'), 'meeting message tag edits must route to their messages document');
+assert(lightboxSource.includes('toTagImageIndex'), 'lightbox tag save must coerce photo-index imageIndex values');
+assert(lightboxSource.includes('태그를 입력해 주세요'), 'empty lightbox tag save must show a toast instead of no-op');
+assert(appMainSource.includes('coerceTagImageIndex'), 'image tag persistence must coerce non-integer imageIndex values');
+assert(chatGallerySource.includes("source === 'memo'"), 'indexed memo photos must recover messageId for tag save');
+
+assert(appMainSource.includes('resolvedIndex != null && !meta.meetingDate'), 'meeting message tag edits must route to their messages document');
 assert(appMainSource.includes("activeView !== 'gallery'"), 'gallery route must hydrate the complete paged message history');
 assert(appMainSource.includes('getPhotoAssetCommentKey: typeof getPhotoAssetCommentKey'), 'gallery UI must receive the source-agnostic photo identity helper');
 assert(chatGallerySource.includes('const itemKey = photoKey'), 'gallery render keys must use the canonical photo identity');
