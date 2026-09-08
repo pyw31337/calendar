@@ -36,7 +36,8 @@ const BROWSER_NAME = process.env.CALENDAR_SMOKE_BROWSER || 'chromium';
 const BROWSER_TYPES = { chromium, firefox, webkit };
 const DEPLOY_SCOPE = process.env.CALENDAR_SMOKE_SCOPE === 'deploy';
 const LOCAL_PORT = process.env.CALENDAR_SMOKE_PORT || '4173';
-const LOCAL_BASE_URL = `http://127.0.0.1:${LOCAL_PORT}/`;
+const LOCAL_BASE_PATH = `/${String(process.env.CALENDAR_SMOKE_BASE_PATH || '').replace(/^\/+|\/+$/g, '')}`;
+const LOCAL_BASE_URL = `http://127.0.0.1:${LOCAL_PORT}${LOCAL_BASE_PATH === '/' ? '/' : `${LOCAL_BASE_PATH}/`}`;
 
 const CALENDARS = [
   ['kkot', '꽃잎반'],
@@ -524,6 +525,13 @@ async function ensureLocalServer() {
   // alive after npx receives SIGTERM, keeping its stdout pipe open and hanging the workflow.
   const proc = spawn(process.execPath, [viteBin, 'preview', '--host', '127.0.0.1', '--port', LOCAL_PORT, '--strictPort'], {
     cwd: repoRoot,
+    // The Pages build uses an absolute subpath. Vite preview evaluates vite.config.js again,
+    // so it must receive the same base or it serves the built HTML at `/` while every
+    // `/calendar/assets/*` request falls through to that HTML and the app never boots.
+    env: {
+      ...process.env,
+      ...(LOCAL_BASE_PATH === '/' ? {} : { VITE_BASE_PATH: `${LOCAL_BASE_PATH}/` })
+    },
     stdio: ['ignore', 'pipe', 'pipe'],
     detached: false
   });
