@@ -187,6 +187,11 @@ assert(appMainSource.includes("activeView !== 'gallery'"), 'gallery route must h
 assert(appMainSource.includes('getPhotoAssetCommentKey: typeof getPhotoAssetCommentKey'), 'gallery UI must receive the source-agnostic photo identity helper');
 assert(chatGallerySource.includes('const itemKey = photoKey'), 'gallery render keys must use the canonical photo identity');
 assert(appMainSource.includes('createPhotoCommentStore'), 'photo comments must use the dedicated bounded cache/store');
+assert(appMainSource.includes('meetingsHydrated'), 'settlement nav badge must wait for meetings hydration');
+assert(appMainSource.includes('enableBulkHydration: true'), 'photo comment badges must bulk-hydrate on gallery too');
+assert(!/needsPlacesData = React\.useMemo\(\s*\(\) => activeView === 'calendar'/.test(appMainSource), 'places/meetings must stay subscribed beyond calendar/places/settlement/history');
+assert(!/needsCustomCultureData = React\.useMemo\(\s*\(\) => activeView === 'history' \|\| activeView === 'content'/.test(appMainSource), 'custom contents must stay subscribed beyond history/content');
+assert(!/if \(!activeCalId \|\| !needsPhotoCommentCounts\) return;\s*setPreloadedPhotoComments\(\{\}\);/.test(appMainSource), 'photo comment counts must not wipe to empty on every view remount');
 assert(appMainSource.includes('useGalleryPhotoIndex'), 'gallery must consume the canonical server-maintained photo index');
 assert(chatGallerySource.includes('Number(photo.commentCount || 0)'), 'indexed comment counts must paint thumbnail badges without loading comment bodies');
 assert(chatGallerySource.includes('gallery-pagination'), 'large galleries must render bounded 100-photo pagination');
