@@ -8616,8 +8616,7 @@ function CalendarApp() {
       onShare: memo => setPreviewSharingMemo(memo),
       onCommentsChange: handleMemoCommentsChangeFromMemoPreview,
       onRequestConfirm: showConfirmDialog,
-      showToast: showToast,
-      setActiveLightbox: setActiveLightbox
+      showToast: showToast, setActiveLightbox: setActiveLightbox
     })
   ), /*#__PURE__*/React.createElement(SummaryList, {
     calendar: activeCal,
