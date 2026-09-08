@@ -5,7 +5,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="build-sha" content="5d915a5e15e96aba9dfcd91275ede6ae4e0c2ba2" />
+    <meta name="build-sha" content="948881d4e39f1bd3517330d7e7f3068f92f4a5ae" />
     <title>모여라 캘린더</title>
     <!-- PWA manifest + icons. Previously present only in the legacy root index.html (not the
          Vite entry actually served by dist/), so the deployed site never linked a manifest at
@@ -42,8 +42,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet" />
     <!-- Same-origin Firebase SDK preload. main.jsx skips these when they are already ready, so
          mobile browsers do not depend on a third-party CDN or duplicate the SDK scripts. -->
-    <script src="vendor/firebase-app-compat.js?v=20260903-sdk-10-14-1" defer></script>
-    <script src="vendor/firebase-firestore-compat.js?v=20260903-sdk-10-14-1" defer></script>
+    <script  src="vendor/firebase-app-compat.js?v=20260903-sdk-10-14-1" defer></script>
+    <script  src="vendor/firebase-firestore-compat.js?v=20260903-sdk-10-14-1" defer></script>
     <!-- Firebase SDK scripts are loaded from main.jsx (loadFirebaseSdk), vendored under
          vendor/ (same origin) instead of from www.gstatic.com -- a real device consistently got
          `window.firebase undefined` even after every retry/timeout adjustment tried, tracing back
@@ -62,21 +62,13 @@
          visitor, that no longer holds up Firebase SDK loading or anything else. -->
     <script async src="https://cdn.jsdelivr.net/npm/korean-lunar-calendar/dist/korean-lunar-calendar.min.js"></script>
     <script async src="https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode.js"></script>
-    <script type="module" crossorigin src="/calendar/assets/index-BLvmiVjR.js"></script>
-    <link rel="modulepreload" crossorigin href="/calendar/assets/vendor-react-DWvtbkLQ.js">
-    <link rel="modulepreload" crossorigin href="/calendar/assets/vendor-D7lhVQIZ.js">
-    <link rel="modulepreload" crossorigin href="/calendar/assets/vendor-react-dom-Dq9HNDty.js">
-    <link rel="modulepreload" crossorigin href="/calendar/assets/app-domain-helpers-Bz5zJYNb.js">
-    <link rel="modulepreload" crossorigin href="/calendar/assets/photo-comments-BskCjMfK.js">
-    <link rel="modulepreload" crossorigin href="/calendar/assets/photo-comment-store-B9gxbDDT.js">
-    <link rel="modulepreload" crossorigin href="/calendar/assets/photo-index-B14OOxHQ.js">
-    <link rel="modulepreload" crossorigin href="/calendar/assets/gallery-archive-state-pTj1WIW5.js">
-    <link rel="modulepreload" crossorigin href="/calendar/assets/notification-pwa-state-DdcU_Z3q.js">
-    <link rel="modulepreload" crossorigin href="/calendar/assets/app-data-bootstrap-QoLgRyeG.js">
-    <link rel="modulepreload" crossorigin href="/calendar/assets/app-write-queue-CooAewUj.js">
-    <link rel="modulepreload" crossorigin href="/calendar/assets/app-firebase-data-BWI_6fp4.js">
-    <link rel="modulepreload" crossorigin href="/calendar/assets/app-main-CKTDvBxu.js">
-    <link rel="stylesheet" crossorigin href="/calendar/assets/index-E6L37Vw1.css">
+    <script type="module" crossorigin src="/calendar/assets/index-F49QArHJ.js"></script>
+    <link rel="modulepreload" crossorigin href="/calendar/assets/rolldown-runtime-D1y7pCx4.js">
+    <link rel="modulepreload" crossorigin href="/calendar/assets/vendor-react-DfXFE28X.js">
+    <link rel="modulepreload" crossorigin href="/calendar/assets/index-F49QArHJ.js">
+    <link rel="modulepreload" crossorigin href="/calendar/assets/vendor-D7AbklhQ.js">
+    <link rel="modulepreload" crossorigin href="/calendar/assets/vendor-react-dom-oRrvgPLb.js">
+    <link rel="stylesheet" crossorigin href="/calendar/assets/index-Bff-bSzf.css">
   </head>
   <body>
     <div id="root"><div style="min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif;color:#64748B;font-size:0.88rem;">모여라 캘린더 불러오는 중…</div></div>
