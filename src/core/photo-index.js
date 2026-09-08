@@ -25,20 +25,54 @@ async function fetchJsonWithRetry(url, init, attempts = 2) {
   throw lastError || new Error('photo index request failed');
 }
 
-export async function fetchPhotoIndexCount({ calendarId, projectId }) {
+function isGalleryContentPosterRow(item) {
+  const source = String(item?.source || '').trim();
+  if (source === 'anniversary') return true;
+  const owners = Array.isArray(item?.owners) ? item.owners : [];
+  if (owners.length && owners.every(owner => String(owner?.source || '').trim() === 'anniversary'
+    || String(owner?.sourceOwner || '').startsWith('anniversary:'))) {
+    return true;
+  }
+  return String(item?.sourceOwner || '').startsWith('anniversary:');
+}
+
+async function fetchPhotoIndexAggregationCount({ calendarId, projectId, sourceEquals = null }) {
   const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/calendars/cal_${calendarId}:runAggregationQuery`;
+  const structuredQuery = { from: [{ collectionId: 'photoIndex' }] };
+  if (sourceEquals) {
+    structuredQuery.where = {
+      fieldFilter: {
+        field: { fieldPath: 'source' },
+        op: 'EQUAL',
+        value: { stringValue: sourceEquals }
+      }
+    };
+  }
   const rows = await fetchJsonWithRetry(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       structuredAggregationQuery: {
-        structuredQuery: { from: [{ collectionId: 'photoIndex' }] },
+        structuredQuery,
         aggregations: [{ alias: 'total', count: {} }]
       }
     })
   });
   const value = rows?.[0]?.result?.aggregateFields?.total?.integerValue;
   return Number.isFinite(Number(value)) ? Number(value) : 0;
+}
+
+export async function fetchPhotoIndexCount({ calendarId, projectId }) {
+  // Movie/sports content posters are indexed as source=anniversary; gallery 사진 must omit them.
+  const [total, anniversaryTotal] = await Promise.all([
+    fetchPhotoIndexAggregationCount({ calendarId, projectId }),
+    fetchPhotoIndexAggregationCount({ calendarId, projectId, sourceEquals: 'anniversary' })
+  ]);
+  return Math.max(0, total - anniversaryTotal);
+}
+
+export function filterGalleryPhotoIndexItems(items) {
+  return (Array.isArray(items) ? items : []).filter(item => !isGalleryContentPosterRow(item));
 }
 
 export async function fetchPhotoIndexPage({ calendarId, projectId, page = 1, decodeDocument, force = false }) {
@@ -62,7 +96,7 @@ export async function fetchPhotoIndexPage({ calendarId, projectId, page = 1, dec
       }
     })
   });
-  const items = (Array.isArray(rows) ? rows : []).filter(row => row?.document).map(row => {
+  const items = filterGalleryPhotoIndexItems((Array.isArray(rows) ? rows : []).filter(row => row?.document).map(row => {
     const data = decodeDocument(row.document) || {};
     return {
       ...data,
@@ -72,7 +106,7 @@ export async function fetchPhotoIndexPage({ calendarId, projectId, page = 1, dec
       refKey: data.assetKey || row.document.name.split('/').pop(),
       indexBacked: true
     };
-  });
+  }));
   pageCache.set(key, { savedAt: Date.now(), items });
   return items;
 }
@@ -122,7 +156,7 @@ export function useGalleryPhotoIndex({ React, calendarId, activeView, projectId,
         pages.push(...await Promise.all(wave));
       }
       setState(previous => ({
-        status: 'ready', items: pages.flat(), total, page: previous.page || 1,
+        status: 'ready', items: filterGalleryPhotoIndexItems(pages.flat()), total, page: previous.page || 1,
         loading: false, complete: true
       }));
       return true;

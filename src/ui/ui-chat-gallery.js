@@ -580,6 +580,12 @@ export function ChatGalleryModal({
     if (Array.isArray(indexedPhotos)) {
       return indexedPhotos
         .filter(photo => photo && !isBrokenPhotoValue(photo.full) && !isBrokenPhotoValue(photo.thumb))
+        // Movie/sports (anniversary) posters belong in 컨텐츠, not gallery 사진.
+        .filter(photo => {
+          const source = String(photo.source || '').trim();
+          if (source === 'anniversary') return false;
+          return !String(photo.sourceOwner || '').startsWith('anniversary:');
+        })
         .map(photo => {
           const source = photo.source || 'gallery';
           const imageIndex = Number.isInteger(photo.imageIndex)

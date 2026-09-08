@@ -237,6 +237,11 @@ const photoIndexSource = fs.readFileSync(new URL('../src/core/photo-index.js', i
 assert(dateModalSource.includes('getPhotoAssetKeys(photo)'), 'schedule albums must dedupe REST/index/live copies by original or thumbnail asset');
 assert(dateModalSource.includes('assetKeys.some(assetKey => directKeys.has(assetKey))'), 'tagged chat/memo photos must use the same asset identity as schedule albums');
 assert(photoIndexSource.includes('complete: true'), 'photo index must support complete hydration for cross-page search/date views');
+assert(photoIndexSource.includes("sourceEquals: 'anniversary'"), 'gallery photo count must subtract anniversary/content posters');
+assert(photoIndexSource.includes('filterGalleryPhotoIndexItems'), 'gallery photo index pages must drop anniversary/content posters');
+assert(chatGallerySource.includes("source === 'anniversary'"), 'gallery 사진 tab must exclude anniversary/content posters');
+const functionsIndexSource = fs.readFileSync(new URL('../functions/index.js', import.meta.url), 'utf8');
+assert(functionsIndexSource.includes('Content posters (movie/sports anniversaries)'), 'CF photoIndex must stop indexing anniversary/content posters');
 const photoCommentsSource = fs.readFileSync(new URL('../src/core/photo-comments.js', import.meta.url), 'utf8');
 assert(photoIndexSource.includes('patchItems'), 'gallery photo index must support local tag patches after save');
 assert(photoCommentsSource.includes('requirePersisted: true'), 'photo comment module must require durable writes');
