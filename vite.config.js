@@ -84,6 +84,7 @@ export default defineConfig({
           if (id.includes('/core/photo-index')) return 'photo-index';
           if (id.includes('/core/notification-pwa-state')) return 'notification-pwa-state';
           if (id.includes('/core/app-data-bootstrap')) return 'app-data-bootstrap';
+          if (id.includes('/core/app-shell-state')) return 'app-shell-state';
           if (id.includes('/core/app-main')) return 'app-main';
         }
       }

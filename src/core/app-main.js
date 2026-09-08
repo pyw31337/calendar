@@ -145,6 +145,7 @@ import { useGalleryArchiveState } from './gallery-archive-state.js';
 import { cloneConfirmedMeetings, commitConfirmedMeetingChanges } from './confirmed-meeting-coordinator.js';
 import { getInitialAppView, buildAppViewUrl } from './app-routing-state.js';
 import { useNotificationPwaState } from './notification-pwa-state.js';
+import { useDisplayPreferences, useMainHeaderState } from './app-shell-state.js';
 import {
   getInitialDataLoadingState,
   subscribeBrowserConnectivity,
@@ -954,118 +955,13 @@ function CalendarApp() {
   const [isGlobalSearchOpen, setIsGlobalSearchOpen] = React.useState(false);
   const [globalSearchInitialQuery, setGlobalSearchInitialQuery] = React.useState('');
 
-  // Theme, font size, and (below) chat notifications are per-calendar preferences, not
-  // per-browser -- someone managing several calendars can want dark mode on one and not
-  // another. Storage keys are scoped by activeCalId, and both re-read from that calendar's own
-  // key whenever activeCalId changes (handleSelectCalendar switches it without a full page
-  // reload, so a plain useState initializer alone wouldn't pick up the new calendar's saved
-  // choice).
-  //
-  // Theme toggle -- mirrors the choice the early <head> theme-init script already applied
-  // before first paint, so this state starts in sync with whatever's on <html> rather than
-  // flashing to a default and then correcting itself.
-  const readThemeForCalendar = (calId) => {
-    if (!calId) return 'system';
-    try {
-      const saved = getLocalStorage().getItem(`gather_theme_preference_${calId}_v1`);
-      return saved === 'dark' || saved === 'light' ? saved : 'system';
-    } catch (e) {
-      return 'system';
-    }
-  };
-  const applyThemeChoice = (choice) => {
-    // Always stamp explicit light|dark. Unset data-theme made
-    // :root:not([data-theme="light"]) darken side menu only while page stayed light
-    // (Samsung Internet / system theme).
-    let resolved = choice;
-    if (choice !== 'dark' && choice !== 'light') {
-      try {
-        resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-      } catch (_) {
-        resolved = 'light';
-      }
-    }
-    document.documentElement.setAttribute('data-theme', resolved);
-  };
-  const [themeChoice, setThemeChoice] = React.useState(() => {
-    if (isAdminDashboardRoute()) return 'light';
-    return readThemeForCalendar(activeCalId);
-  });
-  const toggleTheme = () => {
-    if (isAdminDashboardRoute() || !activeCalId) return;
-    const isDark = themeChoice === 'dark' || (themeChoice === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-    const next = isDark ? 'light' : 'dark';
-    getLocalStorage().setItem(`gather_theme_preference_${activeCalId}_v1`, next);
-    applyThemeChoice(next);
-    setThemeChoice(next);
-  };
-  const isDarkTheme = !isAdminDashboardRoute() && (themeChoice === 'dark' || (themeChoice === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches));
-  const isFirstCalIdRenderRef = React.useRef(true);
-  React.useEffect(() => {
-    if (isAdminDashboardRoute()) {
-      applyThemeChoice('light');
-      setThemeChoice('light');
-      return;
-    }
-    const next = readThemeForCalendar(activeCalId);
-    applyThemeChoice(next);
-    setThemeChoice(next);
-    isFirstCalIdRenderRef.current = false;
-  }, [activeCalId]);
-
-  React.useEffect(() => {
-    if (isAdminDashboardRoute()) return undefined;
-    if (themeChoice === 'dark' || themeChoice === 'light') return undefined;
-    let mql;
-    try {
-      mql = window.matchMedia('(prefers-color-scheme: dark)');
-    } catch (_) {
-      return undefined;
-    }
-    const onChange = () => applyThemeChoice('system');
-    if (mql.addEventListener) mql.addEventListener('change', onChange);
-    else if (mql.addListener) mql.addListener(onChange);
-    applyThemeChoice('system');
-    return () => {
-      if (mql.removeEventListener) mql.removeEventListener('change', onChange);
-      else if (mql.removeListener) mql.removeListener(onChange);
-    };
-  }, [themeChoice, activeCalId]);
-
-  // Text-size preference, relative to the browser's own default (100%).
-  const readFontScaleForCalendar = (calId) => {
-    if (!calId) return 100;
-    const calScale = getLocalStorage().getItem(`gather_font_scale_${calId}_v1`);
-    if (calScale) return Number(calScale) || 100;
-    return 100;
-  };
-  const [fontScalePercent, setFontScalePercent] = React.useState(() => {
-    if (isAdminDashboardRoute()) return 100;
-    return readFontScaleForCalendar(activeCalId);
-  });
-  const skipNextFontWriteRef = React.useRef(false);
-  React.useEffect(() => {
-    if (isAdminDashboardRoute()) {
-      document.documentElement.style.fontSize = '';
-      return;
-    }
-    document.documentElement.style.fontSize = `${fontScalePercent}%`;
-    if (skipNextFontWriteRef.current) {
-      skipNextFontWriteRef.current = false;
-      return;
-    }
-    if (!activeCalId) return;
-    getLocalStorage().setItem(`gather_font_scale_${activeCalId}_v1`, String(fontScalePercent));
-  }, [fontScalePercent, activeCalId]);
-  React.useEffect(() => {
-    if (isAdminDashboardRoute()) {
-      document.documentElement.style.fontSize = '';
-      setFontScalePercent(100);
-      return;
-    }
-    skipNextFontWriteRef.current = true;
-    setFontScalePercent(readFontScaleForCalendar(activeCalId));
-  }, [activeCalId]);
+  const {
+    themeChoice,
+    toggleTheme,
+    isDarkTheme,
+    fontScalePercent,
+    setFontScalePercent
+  } = useDisplayPreferences({ React, activeCalId, isAdminDashboardRoute, getLocalStorage });
 
   const [adminActivityLogs, setAdminActivityLogs] = React.useState([]);
   const [isShareOpen, setIsShareOpen] = React.useState(false);
@@ -1119,38 +1015,6 @@ function CalendarApp() {
   const [, setSyncDiag] = React.useState(null);
   React.useEffect(() => subscribeBrowserConnectivity(setIsBrowserOnline), []);
 
-  // Main header: fixed full-width bar with a menu row, hides on scroll-down and reappears on
-  // scroll-up (same behavior as the chat room header). Refs below are scroll targets for the
-  // 일정잡기/투표하기 menu items; mainHeaderRef measures its own height for the scroll offset
-  // (so the fixed header doesn't cover the section being scrolled to).
-  const [isMainHeaderVisible, setIsMainHeaderVisible] = React.useState(true);
-  const mainHeaderRef = React.useRef(null);
-  const calendarSectionRef = React.useRef(null);
-  const pollsSectionRef = React.useRef(null);
-  const [pollsExpandSignal, setPollsExpandSignal] = React.useState(0);
-  const lastMainScrollTopRef = React.useRef(0);
-  React.useEffect(() => {
-    const handleMainScroll = () => {
-      const scrollTop = window.scrollY;
-      const lastScrollTop = lastMainScrollTopRef.current;
-      if (scrollTop < 10) {
-        setIsMainHeaderVisible(true);
-      } else if (scrollTop > lastScrollTop && scrollTop > 56) {
-        setIsMainHeaderVisible(false);
-      } else if (scrollTop < lastScrollTop) {
-        setIsMainHeaderVisible(true);
-      }
-      lastMainScrollTopRef.current = scrollTop;
-    };
-    window.addEventListener('scroll', handleMainScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleMainScroll);
-  }, []);
-  const scrollToSection = (ref) => {
-    if (!ref.current) return;
-    const headerHeight = mainHeaderRef.current ? mainHeaderRef.current.offsetHeight : 0;
-    const top = ref.current.getBoundingClientRect().top + window.scrollY - headerHeight - 12;
-    window.scrollTo({ top, behavior: 'smooth' });
-  };
   // Chat-related states
   const [chatMessages, setChatMessages] = React.useState([]);
   const [galleryLiveMessages, setGalleryLiveMessages] = React.useState([]);
@@ -1319,6 +1183,17 @@ function CalendarApp() {
   const [editingMessage, setEditingMessage] = React.useState(null); // {id, participantId, text, imageUrl, thumbUrl, calId}
 
   const [activeView, setActiveView] = React.useState(() => getInitialAppView(window.location, parseSharePathFromLocation));
+  const {
+    isMainHeaderVisible,
+    mainHeaderHeight,
+    mainHeaderRef,
+    calendarSectionRef,
+    pollsSectionRef,
+    pollsExpandSignal,
+    setPollsExpandSignal,
+    scrollToSection,
+    resetMainHeader
+  } = useMainHeaderState({ React, activeView, isMainSideMenuOpen });
   const galleryPhotoIndex = useGalleryPhotoIndex({
     React, calendarId: activeCalId, activeView,
     projectId: firebaseConfig.projectId, decodeDocument: firestoreDocumentToJs
@@ -1382,37 +1257,6 @@ function CalendarApp() {
       setIsModalOpen(true);
     }
   }, []);
-
-  // The header is now position:fixed (full-bleed), so page content needs top padding equal to
-  // its rendered height -- measured (not hardcoded) since it varies by title length/wrapping.
-  // The header itself unmounts entirely while activeView is 'chat' (ChatRoomView renders its
-  // own tree with no main header), so re-running this on activeView change is required --
-  // otherwise the ResizeObserver set up on the first mount keeps watching a detached DOM node
-  // after returning from chat, mainHeaderHeight stops tracking the real (remounted) header's
-  // height, and body content ends up hidden behind the fixed header.
-  const [mainHeaderHeight, setMainHeaderHeight] = React.useState(0);
-  React.useEffect(() => {
-    if (!mainHeaderRef.current) return;
-    const measure = () => {
-      if (mainHeaderRef.current) setMainHeaderHeight(mainHeaderRef.current.offsetHeight);
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(mainHeaderRef.current);
-    return () => ro.disconnect();
-  }, [activeView]);
-
-  React.useEffect(() => {
-    if (!isMainSideMenuOpen) return;
-    const originalOverflow = document.body.style.overflow;
-    const originalTouchAction = document.body.style.touchAction;
-    document.body.style.overflow = 'hidden';
-    document.body.style.touchAction = 'none';
-    return () => {
-      document.body.style.overflow = originalOverflow;
-      document.body.style.touchAction = originalTouchAction;
-    };
-  }, [isMainSideMenuOpen]);
 
   // JS fallback for three app.css rules that rely on :has() -- background-scroll lock while any
   // modal/bottom sheet is mounted, the admin screen's forced light-mode override, and its
@@ -1562,8 +1406,7 @@ function CalendarApp() {
     // header cannot leave the new view's menu button translated outside the viewport.
     setIsHeaderVisible(true);
     if (view !== 'chat') {
-      setIsMainHeaderVisible(true);
-      lastMainScrollTopRef.current = 0;
+      resetMainHeader();
       requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'auto' }));
     }
     window.history.pushState({}, '', buildAppViewUrl(window.location, view, currentMonthDate));
