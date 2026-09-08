@@ -1496,7 +1496,7 @@ export function CommentsSection({
   }) : null));
 }
 
-export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onSelectTag, onCommentsChange, getBorderColor, onRequestConfirm, showToast, effectivePinned, hidePinButton = false, variant = 'page' }) {
+export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onSelectTag, onCommentsChange, getBorderColor, onRequestConfirm, showToast, effectivePinned, hidePinButton = false, variant = 'page', setActiveLightbox = null }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -1621,7 +1621,23 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     }
   };
 
-  // Reusable multi-image proportional CSS Grid to cleanly fit layout inside card
+  // Reusable multi-image proportional CSS Grid to cleanly fit layout inside card.
+  // Click opens the shared app Lightbox (same host as chat); stopPropagation so card edit stays closed.
+  const openMemoLightbox = (index) => {
+    if (typeof setActiveLightbox !== 'function' || imageUrls.length === 0) return;
+    const urls = imageUrls.slice();
+    const meta = urls.map((_, imageIndex) => ({
+      timestamp: memo.updatedAt || memo.createdAt || 0,
+      messageId: memo.id,
+      imageIndex,
+      thumb: thumbUrls[imageIndex] || urls[imageIndex],
+      tags: Array.isArray(memo.tags) ? memo.tags.map(t => String(t || '').replace(/^#/, '')).filter(Boolean).join(' ') : '',
+      source: 'memo',
+      uploadSource: 'memo'
+    }));
+    setActiveLightbox({ urls, index: Math.max(0, Math.min(index, urls.length - 1)), meta });
+  };
+
   const renderMemoCardImages = () => {
     if (imageUrls.length === 0) return null;
     if (imageUrls.length === 1) {
@@ -1631,13 +1647,17 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         alt: "메모 첨부 이미지",
         loading: 'lazy',
         decoding: 'async',
-        style: { width: '100%', maxHeight: '140px', objectFit: 'cover', borderRadius: 'var(--radius-sm)', marginBottom: '8px' }
+        "data-stop-card-open": true,
+        onClick: (e) => { if (e) { e.stopPropagation(); e.preventDefault(); } openMemoLightbox(0); },
+        style: { width: '100%', maxHeight: '140px', objectFit: 'cover', borderRadius: 'var(--radius-sm)', marginBottom: '8px', cursor: setActiveLightbox ? 'pointer' : undefined }
       });
     }
 
     const cols = imageUrls.length === 2 ? 2 : 3;
     const maxW = imageUrls.length === 2 ? '100%' : '100%';
+    const count = Math.min(6, imageUrls.length);
     return /*#__PURE__*/React.createElement("div", {
+      "data-stop-card-open": true,
       style: {
         display: 'grid',
         gridTemplateColumns: `repeat(${cols}, 1fr)`,
@@ -1646,19 +1666,22 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         maxWidth: maxW,
         marginBottom: '8px'
       }
-    }, thumbUrls.slice(0, 6).map((thumb, idx) => /*#__PURE__*/React.createElement(MediaThumb, {
+    }, imageUrls.slice(0, count).map((_, idx) => /*#__PURE__*/React.createElement(MediaThumb, {
       key: idx,
-      src: thumb || imageUrls[idx],
-      fallbackSrc: imageUrls[idx] || thumb,
+      src: thumbUrls[idx] || imageUrls[idx],
+      fallbackSrc: imageUrls[idx] || thumbUrls[idx],
       alt: `메모 첨부 이미지 ${idx + 1}`,
       loading: 'lazy',
       decoding: 'async',
+      "data-stop-card-open": true,
+      onClick: (e) => { if (e) { e.stopPropagation(); e.preventDefault(); } openMemoLightbox(idx); },
       style: {
         display: 'block',
         width: '100%',
         aspectRatio: '1',
         borderRadius: '4px',
-        objectFit: 'cover'
+        objectFit: 'cover',
+        cursor: setActiveLightbox ? 'pointer' : undefined
       }
     })));
   };

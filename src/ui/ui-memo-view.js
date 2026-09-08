@@ -1178,6 +1178,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           getBorderColor: getBorderColor,
           onRequestConfirm: onRequestConfirm,
           showToast: showToast,
+          setActiveLightbox: setActiveLightbox,
           effectivePinned: isMemoEffectivelyPinned(sharedMemo)
         })
       ),
@@ -1498,6 +1499,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           getBorderColor: getBorderColor,
           onRequestConfirm: onRequestConfirm,
           showToast: showToast,
+          setActiveLightbox: setActiveLightbox,
           effectivePinned: true
         })))
       ),
@@ -1531,6 +1533,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           getBorderColor: getBorderColor,
           onRequestConfirm: onRequestConfirm,
           showToast: showToast,
+          setActiveLightbox: setActiveLightbox,
           effectivePinned: true
         })))
       ),
@@ -1562,6 +1565,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           getBorderColor: getBorderColor,
           onRequestConfirm: onRequestConfirm,
           showToast: showToast,
+          setActiveLightbox: setActiveLightbox,
           effectivePinned: false
         })))
       ),

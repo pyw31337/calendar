@@ -3223,20 +3223,27 @@ function cultureItemDay(item) {
   return /^\d{4}-\d{2}-\d{2}$/.test(String(value || '')) ? String(value) : '';
 }
 
+function cultureItemEndDay(item) {
+  const end = item?.endDate || item?.releaseDate || item?.startDate;
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(end || '')) ? String(end) : cultureItemDay(item);
+}
+
 function filterAndSortCultureItems(items, category) {
-  if (category !== 'sports' && category !== 'movie') return items;
+  // festival / event(문화행사) / sports: 목록에서는 종료일이 지난 포털 항목을 숨긴다.
+  // 개별등록·캘린더 연동(orphan) 카드(isCustomRegistered)는 뱃지→백드롭·개인 보관용으로
+  // 지난 일정도 목록에 남긴다. movie는 스냅샷 keepHistorical과 맞춰 전체 유지.
+  if (category !== 'festival' && category !== 'event' && category !== 'sports' && category !== 'movie') {
+    return items;
+  }
   const today = todayIsoLocal();
   const visible = items.filter(item => {
-    const start = cultureItemDay(item);
-    if (!start) return true;
-    if (category === 'sports') {
-      const end = item.endDate || start;
-      return end >= today;
-    }
-    // 영화는 수집된 전체 목록을 보여준다. 오래된 항목도 원본 스냅샷과 캘린더 연동을 위해
-    // 보존되며, 미래 개봉작 역시 영화 탭에서 계속 확인할 수 있다.
-    return true;
+    if (category === 'movie') return true;
+    if (item && item.isCustomRegistered) return true;
+    const end = cultureItemEndDay(item);
+    if (!end) return true;
+    return end >= today;
   });
+  if (category === 'festival' || category === 'event') return visible;
   return visible.sort((a, b) => {
     const aDay = cultureItemDay(a), bDay = cultureItemDay(b);
     if (!aDay || !bDay) return aDay ? -1 : (bDay ? 1 : 0);
