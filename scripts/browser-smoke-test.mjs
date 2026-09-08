@@ -34,6 +34,7 @@ const repoRoot = path.resolve(__dirname, '..');
 const EXPLICIT_BASE_URL = process.env.CALENDAR_SMOKE_BASE_URL || null;
 const BROWSER_NAME = process.env.CALENDAR_SMOKE_BROWSER || 'chromium';
 const BROWSER_TYPES = { chromium, firefox, webkit };
+const DEPLOY_SCOPE = process.env.CALENDAR_SMOKE_SCOPE === 'deploy';
 const LOCAL_PORT = process.env.CALENDAR_SMOKE_PORT || '4173';
 const LOCAL_BASE_URL = `http://127.0.0.1:${LOCAL_PORT}/`;
 
@@ -423,11 +424,15 @@ async function checkSideMenuNavigation(browser, baseUrl) {
     ['&view=memo', '메모'],
     ['&view=settlement', '정산']
   ];
+  const selectedSources = DEPLOY_SCOPE
+    ? sources.filter(([, label]) => ['메인', '채팅', '갤러리'].includes(label))
+    : sources;
   const destinations = ['채팅', '갤러리', '장소', '메모', '정산'];
   for (const viewport of VIEWPORTS) {
     for (const [calId] of CALENDARS) {
+      if (DEPLOY_SCOPE && calId !== 'cw') continue;
       const label = `[${viewport.name}] ${calId} 사이드메뉴 전환`;
-      for (const [suffix, sourceLabel] of sources) {
+      for (const [suffix, sourceLabel] of selectedSources) {
         const context = await browser.newContext({
           viewport: { width: viewport.width, height: viewport.height },
           ...(BROWSER_NAME === 'firefox' ? {} : { isMobile: viewport.isMobile }),
@@ -547,6 +552,7 @@ async function main() {
   const browserType = BROWSER_TYPES[BROWSER_NAME];
   if (!browserType) throw new Error(`지원하지 않는 브라우저 엔진: ${BROWSER_NAME}`);
   console.log(`[browser-smoke-test] target: ${baseUrl} (${BROWSER_NAME})\n`);
+  if (DEPLOY_SCOPE) console.log('[browser-smoke-test] scope: deploy-critical (full matrix runs locally)\n');
 
   const browser = await browserType.launch();
   try {
@@ -554,6 +560,8 @@ async function main() {
     for (const viewport of VIEWPORTS) {
       for (const [calId] of CALENDARS) {
         for (const view of VIEWS) {
+          if (DEPLOY_SCOPE && !(viewport.name === 'PC' && calId === 'cw')
+            && !['메인', '채팅', '갤러리'].includes(view.label)) continue;
           await checkPage(browser, baseUrl, viewport, calId, view);
         }
       }
