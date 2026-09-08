@@ -216,6 +216,45 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
   const MemoShareModal = __comp.MemoShareModal || __deps.MemoShareModal;
   const ParticipantPickerButton = __deps.ParticipantPickerButton;
   const extractFirstUrl = __deps.extractFirstUrl;
+  const extractAllUrlInfosLoose = __deps.extractAllUrlInfosLoose || __deps.extractAllUrlInfos;
+  const fetchLinkPreview = __deps.fetchLinkPreview;
+  const collectMemoPreviewUrls = (text) => {
+    const first = extractFirstUrl(text || '');
+    const list = first ? [first] : [];
+    const infos = typeof extractAllUrlInfosLoose === 'function' ? extractAllUrlInfosLoose(text || '') : [];
+    infos.forEach(info => { if (info && info.url && !list.includes(info.url)) list.push(info.url); });
+    return list;
+  };
+  const buildMemoLinkPreviews = (text, existingMemo = null) => {
+    const urls = collectMemoPreviewUrls(text);
+    const existingList = Array.isArray(existingMemo?.linkPreviews) ? existingMemo.linkPreviews : [];
+    const existingByUrl = new Map(existingList.filter(p => p && p.url).map(p => [p.url, p]));
+    if (existingMemo?.linkPreview?.url) existingByUrl.set(existingMemo.linkPreview.url, existingMemo.linkPreview);
+    else if (existingMemo?.linkPreview && urls[0]) existingByUrl.set(urls[0], existingMemo.linkPreview);
+    const linkPreviews = urls.map(url => existingByUrl.get(url) || null).filter(Boolean);
+    return { urls, linkPreview: linkPreviews[0] || null, linkPreviews };
+  };
+  const hydrateMemoLinkPreviewsInBackground = (calendarId, memoId, text, existingMemo = null) => {
+    if (typeof fetchLinkPreview !== 'function' || !calendarId || !memoId) return;
+    const { urls } = buildMemoLinkPreviews(text, existingMemo);
+    if (!urls.length) return;
+    void Promise.all(urls.map(async url => {
+      try {
+        const result = await fetchLinkPreview(url);
+        if (result?.status === 'success' && result.data) return { ...result.data, url: result.data.url || url };
+      } catch (_) {}
+      return null;
+    })).then(async results => {
+      const linkPreviews = results.filter(Boolean);
+      if (!linkPreviews.length) return;
+      const patch = sanitizeMemoForFirestore({ linkPreview: linkPreviews[0] || null, linkPreviews });
+      const updated = await writeMemoDocument('memos', calendarId, memoId, patch, 'update', '메모 링크 미리보기 후처리');
+      if (updated?.success && typeof onUpdateMemo === 'function') onUpdateMemo(memoId, patch);
+      else if (updated?.success && typeof onUpsertMemo === 'function') {
+        /* best-effort local patch via upsert if only upsert is wired */
+      }
+    }).catch(err => console.warn('Background memo link preview failed:', err));
+  };
   const autoGrowTextarea = __deps.autoGrowTextarea;
       const [searchQuery, setSearchQuery] = React.useState('');
   const [selectedTag, setSelectedTag] = React.useState('');
@@ -484,7 +523,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           calendarId,
           payload: {
             memoId,
-            memoData: sanitizeMemoForFirestore({ id: memoId, participantId, title, text, imageUrls: sourceMemo?.imageUrls || [], thumbUrls: sourceMemo?.thumbUrls || [], color: sourceMemo?.color || newColor, isPinned: sourceMemo?.isPinned ?? newIsPinned, tags: tagsArray, createdAt: stamp, updatedAt: stamp, linkPreview: sourceMemo?.linkPreview || null }),
+            memoData: sanitizeMemoForFirestore({ id: memoId, participantId, title, text, imageUrls: sourceMemo?.imageUrls || [], thumbUrls: sourceMemo?.thumbUrls || [], color: sourceMemo?.color || newColor, isPinned: sourceMemo?.isPinned ?? newIsPinned, tags: tagsArray, createdAt: stamp, updatedAt: stamp, ...((() => { const p = buildMemoLinkPreviews(text, sourceMemo); return { linkPreview: p.linkPreview, linkPreviews: p.linkPreviews }; })()) }),
             images: newImages.map(image => ({ originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob }))
           }
         });
@@ -506,9 +545,8 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         uploadedThumbs = resolved.map(r => r.thumbUrl);
       }
 
-      // Link previews are hydrated by the rendered card; a third-party scraper must not delay
-      // the user's memo save.
-      const linkPreview = null;
+      // Link previews are hydrated in the background; a third-party scraper must not delay save.
+      const previewPack = buildMemoLinkPreviews(text, sourceMemo);
 
       // 2. Write to Firestore
       const memoData = {
@@ -522,14 +560,16 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         isPinned: sourceMemo?.isPinned ?? newIsPinned,
         tags: tagsArray,
         createdAt: stamp,
-        updatedAt: stamp
+        updatedAt: stamp,
+        linkPreview: previewPack.linkPreview,
+        linkPreviews: previewPack.linkPreviews
       };
-      memoData.linkPreview = sourceMemo?.linkPreview || linkPreview || null;
 
       if (typeof onUpsertMemo === 'function') onUpsertMemo(memoData);
 
       const saved = await writeMemoDocument('memos', calendarId, memoId, sanitizeMemoForFirestore(memoData), 'set', '메모 저장');
       if (!saved?.success) throw new Error('Memo save failed');
+      hydrateMemoLinkPreviewsInBackground(calendarId, memoId, text, memoData);
 
       // 3. Write Activity Log
       const logNote = title ? `제목: ${title}` : (text ? text.slice(0, 30) + '...' : '사진 첨부');
@@ -576,16 +616,14 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       if (typeof navigator !== 'undefined' && navigator.onLine === false && hasNewEditImages && memoImagesCanBeQueued(editImages)) {
         const tagsArray = editTags.map(t => t.startsWith('#') ? t : '#' + t);
         const participantId = editParticipantId || 'anonymous';
-        const url = extractFirstUrl(editText);
-        const oldUrl = extractFirstUrl(editingMemo.text);
-        const linkPreview = url && oldUrl === url && editingMemo.linkPreview ? editingMemo.linkPreview : null;
+        const previewPack = buildMemoLinkPreviews(editText.trim(), editingMemo);
         const queued = await enqueueMemoMediaSave({
           id: `memo_media_${calendarId}_${editingMemo.id}_${stamp}`,
           type: 'media-memo-save',
           calendarId,
           payload: {
             memoId: editingMemo.id,
-            memoData: sanitizeMemoForFirestore({ ...editingMemo, participantId, title: editTitle.trim(), text: editText.trim(), imageUrls: [], thumbUrls: [], color: editColor, isPinned: editIsPinned, tags: tagsArray, updatedAt: stamp, linkPreview: linkPreview || null }),
+            memoData: sanitizeMemoForFirestore({ ...editingMemo, participantId, title: editTitle.trim(), text: editText.trim(), imageUrls: [], thumbUrls: [], color: editColor, isPinned: editIsPinned, tags: tagsArray, updatedAt: stamp, linkPreview: previewPack.linkPreview, linkPreviews: previewPack.linkPreviews }),
             images: editImages.map(image => ({ original: image.original, thumbnail: image.thumbnail, isExisting: !!image.isExisting, originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob }))
           }
         });
@@ -612,10 +650,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
 
       const participantId = editParticipantId || 'anonymous';
 
-      let linkPreview = null;
-      const url = extractFirstUrl(editText);
-      const oldUrl = extractFirstUrl(editingMemo.text);
-      if (url && oldUrl === url && editingMemo.linkPreview) linkPreview = editingMemo.linkPreview;
+      const previewPack = buildMemoLinkPreviews(editText.trim(), editingMemo);
 
       const createdAt = editingMemo.createdAt || editingMemo.updatedAt || stamp;
       const memoData = {
@@ -630,7 +665,8 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         tags: tagsArray,
         createdAt,
         updatedAt: stamp,
-        linkPreview: linkPreview || null
+        linkPreview: previewPack.linkPreview,
+        linkPreviews: previewPack.linkPreviews
       };
 
       if (typeof onUpsertMemo === 'function') onUpsertMemo(memoData);
@@ -638,6 +674,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
 
       const saved = await writeMemoDocument('memos', calendarId, editingMemo.id, sanitizeMemoForFirestore(memoData), 'set', '메모 수정');
       if (!saved?.success) throw new Error('Memo update failed');
+      hydrateMemoLinkPreviewsInBackground(calendarId, editingMemo.id, editText.trim(), memoData);
 
       // Log Memo Update — before→after detail
       const logNote = buildFieldChangeNote(editTitle.trim() || '메모', [
@@ -1339,10 +1376,11 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
               )
             ),
 
-            /* Live Link Preview Area inside input */
-            extractFirstUrl(newText) && /*#__PURE__*/React.createElement("div", {
-              style: { marginTop: '4px', marginBottom: '4px' }
-            }, /*#__PURE__*/React.createElement(LinkPreviewCard, { url: extractFirstUrl(newText), stretch: true })),
+            /* Live Link Preview Area inside input (one card per distinct URL) */
+            collectMemoPreviewUrls(newText).map((url, idx) => /*#__PURE__*/React.createElement("div", {
+              key: url,
+              style: { marginTop: idx === 0 ? '4px' : '8px', marginBottom: '4px' }
+            }, /*#__PURE__*/React.createElement(LinkPreviewCard, { url: url, stretch: true }))),
 
             /* Images previews list */
             newImages.length > 0 && /*#__PURE__*/React.createElement("div", {
@@ -1754,15 +1792,16 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           )
         ),
 
-        /* Links Card Preview inside edit modal */
-        extractFirstUrl(editText) && (() => {
-          const url = extractFirstUrl(editText);
-          const oldUrl = extractFirstUrl(editingMemo?.text);
-          const cachedData = (oldUrl === url) ? editingMemo?.linkPreview : null;
+        /* Links Card Preview inside edit modal (one card per distinct URL) */
+        collectMemoPreviewUrls(editText).map((url, idx) => {
+          const pack = buildMemoLinkPreviews(editText, editingMemo);
+          const cachedData = pack.linkPreviews.find(p => p && p.url === url)
+            || (editingMemo?.linkPreview && (editingMemo.linkPreview.url === url || idx === 0) ? editingMemo.linkPreview : null);
           return /*#__PURE__*/React.createElement("div", {
-            style: { marginTop: '4px', marginBottom: '4px' }
+            key: url,
+            style: { marginTop: idx === 0 ? '4px' : '8px', marginBottom: '4px' }
           }, /*#__PURE__*/React.createElement(LinkPreviewCard, { url: url, cachedData: cachedData, stretch: true }));
-        })(),
+        }),
 
         /* Images previews list */
         editImages.length > 0 && /*#__PURE__*/React.createElement("div", {

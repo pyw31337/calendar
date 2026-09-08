@@ -597,6 +597,18 @@ function sanitizeMessageForFirestore(messageData) {
     if (typeof lp.image === 'string' && lp.image.startsWith('data:') && lp.image.length > 2000) delete lp.image;
     out.linkPreview = lp;
   }
+  if (Array.isArray(out.linkPreviews)) {
+    out.linkPreviews = out.linkPreviews.filter(p => p && typeof p === 'object').map(p => {
+      const lp = { ...p };
+      if (typeof lp.description === 'string' && lp.description.length > 280) lp.description = lp.description.slice(0, 280);
+      if (typeof lp.title === 'string' && lp.title.length > 120) lp.title = lp.title.slice(0, 120);
+      if (typeof lp.html === 'string') delete lp.html;
+      if (typeof lp.content === 'string') delete lp.content;
+      if (typeof lp.image === 'string' && lp.image.startsWith('data:') && lp.image.length > 2000) delete lp.image;
+      return lp;
+    }).slice(0, 20);
+    if (out.linkPreviews.length === 0) delete out.linkPreviews;
+  }
   return omitUndefinedDeep(out);
 }
 function sanitizeMemoForFirestore(memoData) {
@@ -615,6 +627,15 @@ function slimMessageForClient(message) {
     if (typeof lp.content === 'string') delete lp.content;
     if (typeof lp.description === 'string' && lp.description.length > 280) lp.description = lp.description.slice(0, 280);
     out.linkPreview = lp;
+  }
+  if (Array.isArray(out.linkPreviews)) {
+    out.linkPreviews = out.linkPreviews.filter(p => p && typeof p === 'object').map(p => {
+      const lp = { ...p };
+      if (typeof lp.html === 'string') delete lp.html;
+      if (typeof lp.content === 'string') delete lp.content;
+      if (typeof lp.description === 'string' && lp.description.length > 280) lp.description = lp.description.slice(0, 280);
+      return lp;
+    });
   }
   return out;
 }

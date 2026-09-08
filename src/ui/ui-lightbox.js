@@ -834,8 +834,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   // confirmedMeeting record, not a chat message -- see linkTaggedImageToMeetingDates in
   // app-main.js), so they need meetingDate+photoId to identify which photo instead. 'memo'
   // entries DO carry a truthy messageId (the memo's own id), but that id only resolves against
-  // the messages collection, not memos -- tags there are a whole-memo field with no single-photo
-  // target, so editing is intentionally left disabled rather than silently failing to save.
+  // memos via memo.imageTags[imageIndex] (see handleSaveImageTags memo branch in app-main.js).
   const isMeetingPhoto = currentMeta?.source === 'meeting' && !!currentMeta?.meetingDate && !!currentMeta?.photoId;
   const isMeetingTagTarget = currentMeta?.source === 'meeting' && !!currentMeta?.meetingDate && (
     (!!currentMeta?.sourceMessageId && Number.isInteger(currentMeta?.sourceImageIndex))
@@ -861,7 +860,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   const canEditTags = currentMeta && (
     currentMeta.source === 'meeting' ? (isMeetingTagTarget || isMeetingMessageTagTarget) :
     currentMeta.source === 'anniversary' ? isAnniversaryPhoto :
-    currentMeta.source === 'memo' ? false :
+    currentMeta.source === 'memo' ? (!!currentMeta.messageId && Number.isInteger(currentMeta.imageIndex)) :
     currentMeta.messageId != null
   );
   const tagOverrideKey = currentMeta
@@ -893,9 +892,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
         return ok;
       }
     : null;
-  // Unlike tag editing, memo photos DO have a clean single-item delete/replace target (their
-  // own imageUrls[imageIndex]), even though memo TAGS are a whole-memo field with no such
-  // target -- so this is intentionally broader than canEditTags above.
+  // Memo photos support delete/replace and per-photo tags (imageTags[imageIndex]).
   const canEditPhoto = !!(currentMeta && !currentMeta.directMediaUrl && (
     currentMeta.source === 'meeting' ? isMeetingPhoto : currentMeta.messageId != null
   ));
