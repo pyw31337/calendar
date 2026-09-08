@@ -514,7 +514,10 @@ async function ensureLocalServer() {
   const up = await waitForServer(LOCAL_BASE_URL, 1000);
   if (up) return { baseUrl: LOCAL_BASE_URL, proc: null };
   console.log(`[browser-smoke-test] 로컬 미리보기 서버 시작 (vite preview --port ${LOCAL_PORT}) ...`);
-  const proc = spawn('npx', ['vite', 'preview', '--host', '127.0.0.1', '--port', LOCAL_PORT, '--strictPort'], {
+  const viteBin = path.join(repoRoot, 'node_modules', 'vite', 'bin', 'vite.js');
+  // Spawn Vite itself instead of `npx vite`. On Linux runners npx can leave the Vite child
+  // alive after npx receives SIGTERM, keeping its stdout pipe open and hanging the workflow.
+  const proc = spawn(process.execPath, [viteBin, 'preview', '--host', '127.0.0.1', '--port', LOCAL_PORT, '--strictPort'], {
     cwd: repoRoot,
     stdio: ['ignore', 'pipe', 'pipe'],
     detached: false
