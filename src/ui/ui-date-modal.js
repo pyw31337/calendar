@@ -11,6 +11,12 @@ function getPhotoAssetCommentKey(...args) {
   const f = __gatherUiDeps().getPhotoAssetCommentKey || GATHER_APP_UTILS.getPhotoAssetCommentKey;
   return typeof f === 'function' ? f(...args) : '';
 }
+function getPhotoAssetKeys(photo = {}) {
+  return Array.from(new Set([
+    getPhotoAssetCommentKey({ full: photo.imageUrl || photo.full || '' }),
+    getPhotoAssetCommentKey({ full: photo.thumbUrl || photo.thumb || '' })
+  ].filter(Boolean)));
+}
 // 영화는 실제 상영관(장소)이 없는데도, 공공 영화 데이터 API 스키마가 venue 필드를 필수로 요구해서
 // 크롤링 원본이 항상 이 문자열을 채워 넣어 온다(scripts/sync-culture-performances.mjs가 그대로
 // 전달, culture-movies.json 확인). handleRegisterCultureEvent(app-main.js)가 이 값을 실제 장소로
@@ -1068,20 +1074,27 @@ export function DateModal({
           refKey
         };
       })
-      .filter((photo, index, photos) => {
-        // Album, index and live rows can have different ids for one rendered asset, while legacy
-        // media keys can be shared by many assets. A normalized rendered URL is the only stable
-        // cross-source and photo-specific identity; ids remain the URL-less fallback.
-        const key = getPhotoAssetCommentKey(photo)
-          || photo.id || photo.refKey || photo.mediaKey || photo.imageUrl || photo.thumbUrl;
-        return photos.findIndex(candidate => {
-          const candidateKey = getPhotoAssetCommentKey(candidate)
-            || candidate.id || candidate.refKey || candidate.mediaKey || candidate.imageUrl || candidate.thumbUrl;
-          return candidateKey === key;
-        }) === index;
-      });
+      .filter((() => {
+        const seenAssets = new Set();
+        const seenUrlLessIds = new Set();
+        return photo => {
+          const assetKeys = getPhotoAssetKeys(photo);
+          if (assetKeys.some(key => seenAssets.has(key))) return false;
+          if (assetKeys.length > 0) {
+            assetKeys.forEach(key => seenAssets.add(key));
+            return true;
+          }
+          const fallback = photo.id || photo.refKey || photo.mediaKey || '';
+          if (!fallback || seenUrlLessIds.has(fallback)) return false;
+          seenUrlLessIds.add(fallback);
+          return true;
+        };
+      })());
 
-    const directKeys = new Set(directPhotos.map(p => getPhotoAssetCommentKey(p) || p.id || p.refKey || p.mediaKey).filter(Boolean));
+    const directKeys = new Set(directPhotos.flatMap(photo => {
+      const assetKeys = getPhotoAssetKeys(photo);
+      return assetKeys.length > 0 ? assetKeys : [photo.id || photo.refKey || photo.mediaKey];
+    }).filter(Boolean));
     const targetTag = typeof dateStrToHashtag === 'function' ? dateStrToHashtag(dateStr) : (dateStr ? dateStr.replace(/-/g, '').slice(2) : '');
 
     const chatPhotos = [];
@@ -1096,8 +1109,11 @@ export function DateModal({
           if (matchesTag) {
             const url = entry.full || entry.thumb || entry.imageUrl;
             const key = entry.mediaKey || entry.refKey || url;
-            if (url && key && !directKeys.has(key)) {
+            const assetKeys = getPhotoAssetKeys({ imageUrl: url, thumbUrl: entry.thumb || url });
+            const alreadyIncluded = assetKeys.some(assetKey => directKeys.has(assetKey)) || directKeys.has(key);
+            if (url && key && !alreadyIncluded) {
               directKeys.add(key);
+              assetKeys.forEach(assetKey => directKeys.add(assetKey));
               chatPhotos.push({
                 id: `chat_photo_${msg.id}_${idx}`,
                 imageUrl: url,
@@ -1120,8 +1136,11 @@ export function DateModal({
         const parsedDates = typeof parseFlexibleDateTokens === 'function' ? parseFlexibleDateTokens(tags) : [];
         const matchesTag = (targetTag && tags.includes(targetTag)) || parsedDates.includes(dateStr);
         const fallbackKey = `chat:${msg.id}:0`;
-        if (imageUrl && matchesTag && !directKeys.has(fallbackKey)) {
+        const assetKeys = getPhotoAssetKeys({ imageUrl, thumbUrl: msg.thumbUrl || imageUrl });
+        const alreadyIncluded = assetKeys.some(assetKey => directKeys.has(assetKey)) || directKeys.has(fallbackKey);
+        if (imageUrl && matchesTag && !alreadyIncluded) {
           directKeys.add(fallbackKey);
+          assetKeys.forEach(assetKey => directKeys.add(assetKey));
           chatPhotos.push({
             id: `chat_photo_${msg.id}_0`,
             imageUrl: imageUrl,
@@ -1159,8 +1178,11 @@ export function DateModal({
       imageEntries.forEach((entry, idx) => {
         const full = entry.full || entry.thumb;
         const key = entry.mediaKey || entry.refKey || `memo:${memo.id}:${idx}`;
-        if (full && !directKeys.has(key)) {
+        const assetKeys = getPhotoAssetKeys({ imageUrl: full, thumbUrl: entry.thumb || full });
+        const alreadyIncluded = assetKeys.some(assetKey => directKeys.has(assetKey)) || directKeys.has(key);
+        if (full && !alreadyIncluded) {
           directKeys.add(key);
+          assetKeys.forEach(assetKey => directKeys.add(assetKey));
           memoPhotos.push({ id: `memo_photo_${memo.id}_${idx}`, imageUrl: full, thumbUrl: entry.thumb || full, createdAt: memo.updatedAt || memo.createdAt || 0, source: 'memo-tag', sourceMemoId: memo.id, sourceImageIndex: idx, tags, assetKey: key, mediaKey: key, refKey: `memo:${memo.id}:${idx}` });
         }
       });
