@@ -947,7 +947,6 @@ export function DateModal({
   // identity cancelled the in-flight meetingPhotoIndex fetch on every unrelated App re-render
   // (badge/chat updates), so the tab fell back to the ~1 chat-tag hit. Match the memo-tag
   // effect above: dateStr is the real query key; DateModal remounts per calendar.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateStr]);
   const allMeetingPhotoMessages = React.useMemo(() => {
     const byId = new Map();
