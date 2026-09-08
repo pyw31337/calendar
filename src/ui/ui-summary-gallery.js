@@ -3239,13 +3239,20 @@ function filterAndSortCultureItems(items, category) {
   // festival / event(문화행사) / sports: 목록에서는 종료일이 지난 항목을 모두 숨긴다
   // (포털·개별등록·캘린더 연동 orphan 동일). 데이터 자체는 지우지 않는다 -- 개별등록/연동은
   // Firestore·cultureSnapshot에 남아 일정 뱃지→백드롭 deep-link(mergedItems focus)로 열린다.
-  // 서비스 JSON 풀의 비연동 항목은 sync가 종료+30일 뒤 스냅샷에서 정리한다. movie는 전체 유지.
+  // 서비스 JSON 풀의 비연동 항목은 sync가 종료+30일 뒤 스냅샷에서 정리한다.
+  // movie: 개봉일이 오늘 이전인데 상영중이 아닌 항목만 숨긴다 (예정·상영중은 유지).
   if (category !== 'festival' && category !== 'event' && category !== 'sports' && category !== 'movie') {
     return items;
   }
   const today = todayIsoLocal();
   const visible = items.filter(item => {
-    if (category === 'movie') return true;
+    if (category === 'movie') {
+      const day = cultureItemDay(item);
+      if (!day) return true;
+      if (day >= today) return true; // 예정(오늘 포함)
+      // 개봉일 지남: 상영중 배지와 동일 조건(종료일 없거나 오늘 이상)만 유지
+      return !item.endDate || item.endDate >= today;
+    }
     const end = cultureItemEndDay(item);
     if (!end) return true;
     return end >= today;
@@ -4136,7 +4143,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
             /*#__PURE__*/React.createElement("div", {
               style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
             }, isMovieCard
-              ? `개봉일 ${item.releaseDate || item.startDate || CULTURE_MISSING_LABEL}`
+              ? `개봉일 ${formatDateWithDayName(item.releaseDate || item.startDate) || CULTURE_MISSING_LABEL}`
               : (item.dateLabel || formatCultureDateLabel(item.startDate, item.endDate) || CULTURE_MISSING_LABEL)),
             /*#__PURE__*/React.createElement("div", {
               style: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--text-main)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', wordBreak: 'break-word' }
