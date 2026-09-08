@@ -533,10 +533,41 @@ button.confirmed-meeting-icon-btn.confirmed-meeting-surface.is-heartbeat {
 }
 
 /* A quiet, staggered cue for gallery thumbnails with comments. The delay is deterministic
-   per grid position, so badges do not pulse in lockstep or create visual noise. */
+   per grid position, so badges do not pulse in lockstep or create visual noise.
+   Each beat: scale pulse + purple border flash-in then fade + brief white camera-flash overlay. */
 .gallery-comment-heartbeat {
+  position: relative;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
   animation: gallery-comment-heartbeat 2.8s ease-in-out infinite;
   will-change: transform;
+}
+.gallery-comment-heartbeat::before,
+.gallery-comment-heartbeat::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  animation-duration: 2.8s;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-delay: inherit;
+}
+/* Purple border: pops in at beat start ("두"), fades out by cycle end ("근두근"). */
+.gallery-comment-heartbeat::before {
+  z-index: 1;
+  box-sizing: border-box;
+  border: 2px solid #7C3AED;
+  box-shadow: 0 0 0 1px rgba(124, 58, 237, 0.35);
+  animation-name: gallery-comment-border-flash;
+}
+/* White flash overlay: quick camera-flash feel over the photo. */
+.gallery-comment-heartbeat::after {
+  z-index: 2;
+  background: #fff;
+  animation-name: gallery-comment-white-flash;
 }
 @keyframes gallery-comment-heartbeat {
   0%, 72%, 100% { transform: scale(1); }
@@ -545,8 +576,23 @@ button.confirmed-meeting-icon-btn.confirmed-meeting-surface.is-heartbeat {
   84% { transform: scale(1.012); }
   88% { transform: scale(1); }
 }
+@keyframes gallery-comment-border-flash {
+  0%, 71% { opacity: 0; }
+  72% { opacity: 1; }
+  80% { opacity: 0.65; }
+  90% { opacity: 0.2; }
+  100% { opacity: 0; }
+}
+@keyframes gallery-comment-white-flash {
+  0%, 71% { opacity: 0; }
+  72% { opacity: 0.55; }
+  75% { opacity: 0.18; }
+  78%, 100% { opacity: 0; }
+}
 @media (prefers-reduced-motion: reduce) {
   .gallery-comment-heartbeat { animation: none; }
+  .gallery-comment-heartbeat::before,
+  .gallery-comment-heartbeat::after { animation: none; opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
   .confirmed-meeting-icon-btn.is-heartbeat {
