@@ -2286,9 +2286,14 @@ function getMediaIdentityKeys(photo = {}, opts = {}) {
     // one photo's comment document is presented for every photo in the meeting.
     const sourceIdentity = photo?.sourceMessageId || messageId || '';
     const ambiguousSharedPhotoId = photoId && sourceIdentity && photoId === sourceIdentity && !Number.isInteger(imageIndex);
+    // Multi-image uploadSource:meeting messages pass messageId+imageIndex here (no photoId).
+    // Never short-circuit on messageId alone — that assigned one shared meeting:date:<msgId>
+    // mediaKey to every slot and DateModal collapsed 14→1 after source hydration.
     const meetingPhotoIdentity = ambiguousSharedPhotoId
       ? (renderedMediaKey ? `${photoId}:url-${renderedMediaKey}` : `${photoId}:photo`)
-      : (photoId || messageId
+      : (photoId
+        || (messageId && Number.isInteger(imageIndex) ? `${messageId}:${imageIndex}` : '')
+        || messageId
         || (Number.isInteger(imageIndex) ? `photo-${imageIndex}` : (renderedMediaKey ? `url-${renderedMediaKey}` : 'photo')));
     const key = `meeting:${meetingDate || 'date'}:${meetingPhotoIdentity}`;
     return { assetKey: key, mediaKey: key, refKey: key };

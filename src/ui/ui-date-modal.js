@@ -1048,38 +1048,42 @@ export function DateModal({
       .filter(photo => photo && !isTombstone(photo) && (photo.imageUrl || photo.thumbUrl))
       .map((photo, photoIndex) => {
         const resolved = resolveMeetingPhotoDisplay(photo, chatMessagesWithFetchedSources) || {};
-        const mediaKey = resolved.mediaKey
-          || photo.mediaKey
+        // Prefer the album row's own mediaKey/refKey. Source-message entries for
+        // uploadSource:meeting historically shared one mediaKey across every image slot; letting
+        // that overwrite unique stored keys collapsed the photo tab after hydration.
+        const mediaKey = photo.mediaKey
+          || resolved.mediaKey
           || (photo.sourceMessageId && Number.isInteger(photo.sourceImageIndex)
             ? `chat:${photo.sourceMessageId}:${photo.sourceImageIndex}`
             : `meeting:${dateStr}:${photo.id || `photo-${photoIndex}`}`);
-        const refKey = resolved.refKey || photo.refKey || `meeting:${dateStr}:${photo.id || `photo-${photoIndex}`}`;
+        const refKey = photo.refKey || resolved.refKey || `meeting:${dateStr}:${photo.id || `photo-${photoIndex}`}`;
         return {
           ...photo,
           imageUrl: resolved.imageUrl || photo.imageUrl,
           thumbUrl: resolved.thumbUrl || photo.thumbUrl,
           tags: resolved.tags != null ? resolved.tags : photo.tags,
-          assetKey: resolved.assetKey || photo.assetKey || mediaKey,
+          assetKey: photo.assetKey || resolved.assetKey || mediaKey,
           mediaKey,
           refKey
         };
       })
       .filter((photo, index, photos) => {
-        // Dedupe by photo.id first. resolveMeetingPhotoDisplay(...).mediaKey can collapse many
-        // distinct meeting uploads onto one key (missing/NaN sourceImageIndex → shared fallback),
-        // which made jhair 2026-06-13 show 사진 1 despite 14 alive server rows.
+        // Dedupe by photo.id, then refKey, then mediaKey+url. Never key on mediaKey alone —
+        // a shared meeting:date:<messageId> key must not erase sibling slots.
         if (photo.id) {
           return photos.findIndex(candidate => candidate.id && candidate.id === photo.id) === index;
         }
-        const key = photo.mediaKey || photo.refKey || photo.imageUrl || photo.thumbUrl;
+        const url = photo.imageUrl || photo.thumbUrl || '';
+        const key = photo.refKey || `${photo.mediaKey || ''}::${url}`;
         return photos.findIndex(candidate => {
           if (candidate.id) return false;
-          const candidateKey = candidate.mediaKey || candidate.refKey || candidate.imageUrl || candidate.thumbUrl;
+          const candidateUrl = candidate.imageUrl || candidate.thumbUrl || '';
+          const candidateKey = candidate.refKey || `${candidate.mediaKey || ''}::${candidateUrl}`;
           return candidateKey === key;
         }) === index;
       });
 
-    const directKeys = new Set(directPhotos.map(p => p.mediaKey || p.refKey || p.id).filter(Boolean));
+    const directKeys = new Set(directPhotos.map(p => p.id || p.refKey || p.mediaKey).filter(Boolean));
     const targetTag = typeof dateStrToHashtag === 'function' ? dateStrToHashtag(dateStr) : (dateStr ? dateStr.replace(/-/g, '').slice(2) : '');
 
     const chatPhotos = [];

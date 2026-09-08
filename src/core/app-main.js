@@ -3140,6 +3140,7 @@ function CalendarApp() {
       fetchMeetingPhotoIndex(activeCalId, date)
     ]);
     const meeting = (Array.isArray(meetings) ? meetings : []).find(m => m && m.date === date) || null;
+    if (meeting) setConfirmedMeetingsSubcollection(prev => mergeConfirmedMeetings(Array.isArray(prev) ? prev : [], [meeting]));
     return {
       photos: Array.isArray(meeting?.photos) ? meeting.photos : [],
       indexPhotos: Array.isArray(indexPhotos) ? indexPhotos : []
@@ -5787,7 +5788,6 @@ function CalendarApp() {
   // handleSaveImageTags' own message lookup (local state first, then a direct Firestore/REST
   // read, since the Lightbox can be opened on a message that hasn't been paginated into
   // chatMessages yet).
-  // Stable findChatMessageById for DateModal source-message effect.
   const chatMessagesRef = React.useRef(chatMessages);
   chatMessagesRef.current = chatMessages;
   const findChatMessageById = React.useCallback(async messageId => {
@@ -10511,8 +10511,8 @@ function resolveMeetingPhotoDisplay(photo, chatMessages) {
     imageUrl: entry.full,
     thumbUrl: entry.thumb,
     tags: entry.tags || '',
-    assetKey: entry.assetKey || fallbackKeys.assetKey,
-    mediaKey: entry.mediaKey || fallbackKeys.mediaKey,
+    assetKey: fallbackKeys.assetKey || entry.assetKey,
+    mediaKey: fallbackKeys.mediaKey || entry.mediaKey,
     refKey: fallbackKeys.refKey
   };
 }
