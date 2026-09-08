@@ -114,14 +114,8 @@ export function getPaginationWindow(currentPage, pageCount, windowSize) {
   }
   const half = Math.floor(size / 2);
   let start = current - half;
-  let end = start + size - 1;
-  if (start < 1) {
-    start = 1;
-    end = size;
-  } else if (end > safeCount) {
-    end = safeCount;
-    start = safeCount - size + 1;
-  }
+  if (start < 1) start = 1;
+  else if (start + size - 1 > safeCount) start = safeCount - size + 1;
   return Array.from({ length: size }, (_, index) => start + index);
 }
 
