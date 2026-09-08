@@ -3236,16 +3236,16 @@ function cultureItemEndDay(item) {
 }
 
 function filterAndSortCultureItems(items, category) {
-  // festival / event(문화행사) / sports: 목록에서는 종료일이 지난 포털 항목을 숨긴다.
-  // 개별등록·캘린더 연동(orphan) 카드(isCustomRegistered)는 뱃지→백드롭·개인 보관용으로
-  // 지난 일정도 목록에 남긴다. movie는 스냅샷 keepHistorical과 맞춰 전체 유지.
+  // festival / event(문화행사) / sports: 목록에서는 종료일이 지난 항목을 모두 숨긴다
+  // (포털·개별등록·캘린더 연동 orphan 동일). 데이터 자체는 지우지 않는다 -- 개별등록/연동은
+  // Firestore·cultureSnapshot에 남아 일정 뱃지→백드롭 deep-link(mergedItems focus)로 열린다.
+  // 서비스 JSON 풀의 비연동 항목은 sync가 종료+30일 뒤 스냅샷에서 정리한다. movie는 전체 유지.
   if (category !== 'festival' && category !== 'event' && category !== 'sports' && category !== 'movie') {
     return items;
   }
   const today = todayIsoLocal();
   const visible = items.filter(item => {
     if (category === 'movie') return true;
-    if (item && item.isCustomRegistered) return true;
     const end = cultureItemEndDay(item);
     if (!end) return true;
     return end >= today;
