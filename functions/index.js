@@ -158,7 +158,9 @@ function getPhotoIndexEntries(sourceType, sourceId, data) {
   } else if (sourceType === 'meeting') {
     (Array.isArray(data.photos) ? data.photos : []).forEach((photo, index) => push(photo, index, { meetingDate: data.date || sourceId, text: `${data.date || sourceId} 일정 사진` }));
   } else if (sourceType === 'anniversary') {
-    (Array.isArray(data.photos) ? data.photos : []).forEach((photo, index) => push(photo, index));
+    // Content posters (movie/sports anniversaries) stay on the calendar/컨텐츠 surfaces.
+    // Keep returning [] so sync/rebuild strip any legacy anniversary-owned photoIndex rows.
+    return [];
   }
   return entries;
 }
