@@ -829,9 +829,14 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
       key: `comments-${photoCommentKey}`,
       className: "lightbox-comment-thread lightbox-comment-thread-dark",
       style: {
-        width: '92vw', minHeight: isDesktop ? '64px' : '58px', maxHeight: isDesktop ? '55vh' : 'none',
+        width: '92vw',
+        // Ready threads size to their comment count + composer. A fixed minHeight here used to
+        // keep a tall empty band under sparse threads; only loading/error keep a tap target floor.
+        minHeight: commentStatus === 'ready' ? undefined : (isDesktop ? '64px' : '58px'),
+        maxHeight: isDesktop ? '55vh' : 'none',
         overflowY: isDesktop ? 'auto' : 'visible', resize: isDesktop ? 'vertical' : 'none',
-        marginTop: isDesktop ? '4px' : '1px', padding: isDesktop ? '10px 14px' : '6px 10px',
+        marginTop: isDesktop ? '4px' : '0', padding: isDesktop ? '10px 14px' : '6px 10px',
+        flexShrink: 0,
         backgroundColor: 'rgba(15, 23, 42, 0.72)', border: '1px solid rgba(255,255,255,0.12)',
         borderRadius: 'var(--radius-md)', boxSizing: 'border-box'
       }
@@ -1594,8 +1599,38 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     )
   );
 
+  // Mobile multi-image stage used to reserve a fixed 56dvh frame. Landscape photos only fill
+  // part of that frame, so the leftover dark band read as a large gap between the photo and the
+  // comments card (flex-end only tucked the photo to the bottom of the empty frame — it did not
+  // reclaim the space). Size the stage to the fitted image height (capped at 56dvh) so comments
+  // sit directly under the photo and a short comment list no longer needs an inner/outer scroll
+  // just to bridge empty stage space.
+  const mobileImageMaxPx = !isDesktop && typeof window !== 'undefined'
+    ? Math.round((window.visualViewport?.height || window.innerHeight) * 0.56)
+    : null;
+  const mobileStageHeightPx = (() => {
+    if (isDesktop || mobileImageMaxPx == null) return null;
+    const maxW = Math.min(window.innerWidth * 0.92, window.innerWidth);
+    const size = imageDimensions[currentUrl];
+    if (size?.width && size?.height) {
+      const fitted = maxW * (size.height / size.width);
+      return Math.max(1, Math.min(mobileImageMaxPx, Math.round(fitted)));
+    }
+    // Pre-load placeholder: prefer a compact 4:3 guess over a full 56dvh hole that jumps away.
+    return Math.max(1, Math.min(mobileImageMaxPx, Math.round(maxW * 0.75)));
+  })();
+  const mobileImageStageStyle = isDesktop
+    ? { width: '92vw', height: '82vh', overflow: 'hidden' }
+    : {
+        width: '92vw',
+        height: `${mobileStageHeightPx}px`,
+        maxHeight: '56dvh',
+        overflow: 'hidden',
+        flexShrink: 0
+      };
+
   const renderSlide = (url, slot) => {
-    const wrapperStyle = { width: '33.3333%', flexShrink: 0, height: '100%', display: 'flex', alignItems: isDesktop ? 'center' : 'flex-end', justifyContent: 'center' };
+    const wrapperStyle = { width: '33.3333%', flexShrink: 0, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' };
     if (!url) return /*#__PURE__*/React.createElement("div", { style: wrapperStyle });
 
     if (slot === 'current') {
@@ -1751,7 +1786,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     onTouchEnd: handleTouchEnd,
     onTouchCancel: handleTouchEnd,
     style: {
-      width: '92vw', height: isDesktop ? '82vh' : '56dvh', overflow: 'hidden',
+      ...mobileImageStageStyle,
       cursor: isDragging ? 'grabbing' : 'grab',
       touchAction: 'none'
     }
