@@ -4314,29 +4314,36 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
               }
             }, "메모 저장")
           ),
-          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', flexShrink: 0 } },
-            /*#__PURE__*/React.createElement("button", {
-              type: "button", onClick: () => handleShareContent(selected), "aria-label": "공유",
-              style: {
-                width: '44px', height: '44px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)',
-                backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)', cursor: 'pointer'
-              }
-            }, ShareIcon ? /*#__PURE__*/React.createElement(ShareIcon, { size: 20 }) : "🔗"),
-            (() => {
-              // 개별등록(custom)은 link, 포털/스냅샷·고아 카드는 website 를 쓴다.
-              // 설명/문의에만 URL이 있는 개별등록도 하단 자세히보기로 새 창 이동.
-              const detailUrl = resolveCultureDetailUrl(selected);
-              if (!detailUrl) return null;
-              return /*#__PURE__*/React.createElement("a", {
+          (() => {
+            // 자세히보기 URL이 없으면 공유만 남는데, 44px 아이콘만 두면 로드 깨진 것처럼 보인다.
+            // 그때는 자세히보기 폭까지 써서 아이콘+「공유하기」풀폭 버튼으로 바꾼다.
+            const detailUrl = resolveCultureDetailUrl(selected);
+            return /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', flexShrink: 0 } },
+              /*#__PURE__*/React.createElement("button", {
+                type: "button", onClick: () => handleShareContent(selected), "aria-label": "공유",
+                style: detailUrl ? {
+                  width: '44px', height: '44px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)',
+                  backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)', cursor: 'pointer'
+                } : {
+                  flex: 1, minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                  borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)',
+                  backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)', cursor: 'pointer',
+                  fontWeight: 800, fontSize: 'var(--font-size-md)'
+                }
+              },
+                ShareIcon ? /*#__PURE__*/React.createElement(ShareIcon, { size: 20 }) : "🔗",
+                !detailUrl ? "공유하기" : null
+              ),
+              detailUrl ? /*#__PURE__*/React.createElement("a", {
                 href: detailUrl, target: "_blank", rel: "noopener noreferrer",
                 style: {
                   display: 'block', flex: 1, textAlign: 'center', padding: '10px', borderRadius: 'var(--radius-md)',
                   backgroundColor: '#7C3AED', color: '#fff', fontWeight: 800, fontSize: 'var(--font-size-md)', textDecoration: 'none'
                 }
-              }, "자세히보기");
-            })()
-          )
+              }, "자세히보기") : null
+            );
+          })()
         )
       ),
       document.body
