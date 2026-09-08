@@ -301,12 +301,15 @@ code {
   overflow-wrap: anywhere;
 }
 
-/* Whenever any layer popup (modal, bottom sheet) is mounted anywhere in the document, lock
-   the page's own scroll so a vertical drag/wheel inside the popup can't also scroll the
-   screen behind it -- applies uniformly to every current and future modal without needing
-   a scroll-lock effect wired into each one individually. */
-body:has(.modal-overlay, .bottom-sheet-overlay) {
+/* Whenever any layer popup (modal, bottom sheet, side drawer) is mounted, lock page scroll.
+   html is locked too: iOS Safari / Home Screen PWAs often keep scrolling even with only
+   body { overflow:hidden }. */
+html:has(body .modal-overlay),
+html:has(body .bottom-sheet-overlay),
+html:has(body .admin-side-menu-overlay),
+body:has(.modal-overlay, .bottom-sheet-overlay, .admin-side-menu-overlay) {
   overflow: hidden;
+  overscroll-behavior: none;
 }
 
 body:has(.admin-scope),
@@ -3018,13 +3021,18 @@ select.form-select {
 .admin-side-menu-overlay {
   position: fixed;
   inset: 0;
-  /* Stay above the fixed app header even when an ancestor creates a stacking context (notably
-     iOS standalone/PWA WebKit). */
+  /* Stay above fixed page headers (incl. transform-promoted iOS compositing layers). Drawers
+     must be portaled to document.body -- inline z-index:12000 inside a page shell loses on iOS. */
   z-index: 2147483000;
   background: rgba(15, 23, 42, 0.28);
   display: flex;
   justify-content: flex-end;
   animation: adminMenuFadeIn 0.18s ease-out;
+  overscroll-behavior: none;
+  touch-action: none;
+}
+.admin-side-menu-overlay > .admin-side-menu {
+  touch-action: pan-y;
 }
 .admin-side-menu {
   position: relative;
@@ -3890,6 +3898,20 @@ select.form-select {
 }
 .current-location-btn-label { display: none; }
 
+/* Shared pill segmented controls. Shell height:44px + 3px padding; clip active fill.
+   Inner buttons: height:100% only — never min-height:44px (bleeds past gray border). */
+.visit-filter-toggle-mobile,
+.culture-grid-cols-toggle {
+  box-sizing: border-box;
+  overflow: hidden;
+}
+.visit-filter-toggle-mobile > button,
+.culture-grid-cols-toggle > button {
+  height: 100%;
+  min-height: 0 !important;
+  box-sizing: border-box;
+}
+
 /* 1단/2단 poster-grid density toggle -- pill group matching gallery visit-filter-toggle-mobile
    (border + 3px padding, active filled #4F46E5). Square icon buttons keep the row at 44px. */
 .culture-grid-cols-toggle {
@@ -3898,10 +3920,11 @@ select.form-select {
   flex: 0 0 auto; margin-left: auto; display: inline-flex; align-items: center; box-sizing: border-box;
   height: 44px; padding: 3px; border-radius: var(--radius-md);
   border: 1px solid var(--border-subtle); background: var(--bg-card);
+  overflow: hidden;
 }
 .culture-grid-cols-btn {
   display: flex; align-items: center; justify-content: center;
-  width: 38px; height: 100%; padding: 0; box-sizing: border-box;
+  width: 38px; height: 100%; min-height: 0; padding: 0; box-sizing: border-box;
   border: none; border-radius: var(--radius-sm); cursor: pointer;
   background: transparent; color: var(--text-muted);
 }
@@ -4419,6 +4442,11 @@ select.form-select {
   background: rgba(15, 23, 42, 0.6); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
   z-index: 20000; display: flex; align-items: flex-end; justify-content: center;
   animation: motion-overlay-fade var(--motion-base) ease both;
+  overscroll-behavior: none;
+  touch-action: none;
+}
+.bottom-sheet-overlay > .bottom-sheet {
+  touch-action: pan-y;
 }
 .bottom-sheet {
   background: var(--bg-card); width: 100%; max-width: 480px;
@@ -4525,6 +4553,11 @@ select.form-select {
   padding: max(16px, env(safe-area-inset-top, 0px)) 0 max(16px, env(safe-area-inset-bottom, 0px));
   overflow-x: hidden;
   box-sizing: border-box;
+  overscroll-behavior: none;
+  touch-action: none;
+}
+.modal-overlay > * {
+  touch-action: auto;
 }
 .modal-container,
 .modal {
@@ -5827,4 +5860,19 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
   }
   .manual-mobile-friendly article h3 { font-size: 0.95rem !important; }
   .manual-mobile-friendly article p { font-size: 0.82rem !important; margin-top: 4px !important; }
+}
+
+
+/* Full-page secondary views: one primary scroll pane inside a fixed shell.
+   min-height:0 so flex children shrink and overflow-y:auto scrolls on iOS. */
+.places-view-container {
+  overflow: hidden;
+}
+.places-view-container .history-page-scroll,
+.places-view-container .history-meetings-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
