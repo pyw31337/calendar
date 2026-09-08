@@ -1209,8 +1209,8 @@ function SideMenuOverlay({ isOpen, onClose, homeLabel, ariaLabel, calendar, onGo
   const SharedAppNavBlock = __comp.SharedAppNavBlock || __deps.SharedAppNavBlock;
   const SharedSideMenuFooter = __comp.SharedSideMenuFooter || __deps.SharedSideMenuFooter;
   if (!isOpen) return null;
-  return /*#__PURE__*/React.createElement("div", {
-    className: "admin-side-menu-overlay", style: { zIndex: 12000 }, onClick: onClose
+  const overlay = /*#__PURE__*/React.createElement("div", {
+    className: "admin-side-menu-overlay", onClick: onClose
   }, /*#__PURE__*/React.createElement("div", {
     className: "admin-side-menu", onClick: e => e.stopPropagation(), role: "dialog", "aria-label": ariaLabel
   },
@@ -1248,6 +1248,10 @@ function SideMenuOverlay({ isOpen, onClose, homeLabel, ariaLabel, calendar, onGo
       onClose, onOpenShare, onOpenSettings: onOpenAppSettings
     })
   ));
+  const ReactDOM = window.ReactDOM;
+  return (typeof document !== 'undefined' && ReactDOM && ReactDOM.createPortal)
+    ? ReactDOM.createPortal(overlay, document.body)
+    : overlay;
 }
 
 // Full-page '히스토리' view -- every confirmed meeting date (모임 확정), moved off the main
@@ -1458,6 +1462,21 @@ export function HistoryView({
   // 만들어서, 아래로 스크롤하면 위로 숨고 위로 스크롤하면 다시 나타나게 한다. 묶음의 실제 높이는
   // ResizeObserver로 직접 측정 -- 갤러리 헤더처럼 고정 픽셀값을 하드코딩하지 않는다.
   const { isHeaderVisible, onScroll: handleHistoryScroll } = useScrollHideHeader();
+  // Full-page 기록 owns scrolling via .history-page-scroll panes. Lock document underneath so
+  // iOS Safari/PWA cannot leave vertical gestures on a dead outer scroller.
+  React.useEffect(() => {
+    if (typeof document === 'undefined') return undefined;
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtml = html.style.overflow;
+    const prevBody = body.style.overflow;
+    html.style.overflow = 'hidden';
+    body.style.overflow = 'hidden';
+    return () => {
+      html.style.overflow = prevHtml;
+      body.style.overflow = prevBody;
+    };
+  }, []);
   const headerStackRef = React.useRef(null);
   const [, setHeaderStackHeight] = React.useState(0);
   React.useLayoutEffect(() => {
@@ -1895,7 +1914,7 @@ export function HistoryView({
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
       backgroundColor: 'var(--bg-primary)',
       display: 'flex', flexDirection: 'column',
-      width: '100%', maxWidth: '100%', overflowX: 'hidden'
+      width: '100%', maxWidth: '100%', overflow: 'hidden'
     }
   },
     /*#__PURE__*/React.createElement("div", {
@@ -1963,10 +1982,10 @@ export function HistoryView({
     })
     ), // end history-header-stack
     historyTab === 'meetings' && /*#__PURE__*/React.createElement("div", {
-      className: "history-meetings-grid",
+      className: "history-meetings-grid history-page-scroll",
       onScroll: handleHistoryScroll,
       style: Object.assign(
-        { flex: 1, overflowY: 'auto', padding: '118px 16px 16px' },
+        { flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: '118px 16px 16px' },
         confirmedDates.length === 0 ? { display: 'flex', alignItems: 'center', justifyContent: 'center' } : {}
       )
     },
@@ -2053,7 +2072,9 @@ export function HistoryView({
     // 사진을 배경으로, 딤 처리 위에 여행 타이틀). 칸을 누르면 그 여행 사진만 모아 보여주는
     // 상세 페이지로 들어간다.
     historyTab === 'memories' && !selectedMemoryGroupId && /*#__PURE__*/React.createElement("div", {
-      style: { flex: 1, overflowY: 'auto', padding: '118px 16px 16px' }
+      className: "history-page-scroll",
+      onScroll: handleHistoryScroll,
+      style: { flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: '118px 16px 16px' }
     }, /*#__PURE__*/React.createElement(React.Fragment, null,
       /*#__PURE__*/React.createElement("div", {
         style: { display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '8px', marginBottom: '10px' }
@@ -2154,7 +2175,9 @@ export function HistoryView({
       if (!group) return null;
       const canBulkExclude = typeof onRemovePhotosFromMemory === 'function';
       return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
-        style: { flex: 1, overflowY: 'auto', padding: '118px 16px 16px' }
+        className: "history-page-scroll",
+        onScroll: handleHistoryScroll,
+        style: { flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: '118px 16px 16px' }
       }, /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
         /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
           /*#__PURE__*/React.createElement("button", {
@@ -2259,7 +2282,9 @@ export function HistoryView({
     // 인물 탭: 인물별 벤또 그리드(칸마다 그 사람 사진이 붙은 사진 중 하나를 커버로 보여줌).
     // 칸을 누르면 그 사람으로 태그된 사진만 모아 보여주는 상세 페이지로 들어간다.
     historyTab === 'people' && !selectedPersonTag && /*#__PURE__*/React.createElement("div", {
-      style: { flex: 1, overflowY: 'auto', padding: '118px 16px 16px' }
+      className: "history-page-scroll",
+      onScroll: handleHistoryScroll,
+      style: { flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: '118px 16px 16px' }
     }, /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '16px' } },
       // 새 인물 태그 추가 -- 벤또 그리드 위로 이동(추가 즉시 그리드에 반영되는 걸 바로 보기
       // 쉽도록). 기존 .form-input/.btn-primary만으로는 패딩/높이/모서리가 다른 입력·버튼과
@@ -2335,7 +2360,9 @@ export function HistoryView({
     )),
     // 인물 상세 페이지: 특정 인물 칸을 눌렀을 때 그 사람으로 태그된 사진만 모아 보여준다.
     historyTab === 'people' && !!selectedPersonTag && /*#__PURE__*/React.createElement("div", {
-      style: { flex: 1, overflowY: 'auto', padding: '118px 16px 16px' }
+      className: "history-page-scroll",
+      onScroll: handleHistoryScroll,
+      style: { flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: '118px 16px 16px' }
     }, /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
         /*#__PURE__*/React.createElement("button", {
@@ -2669,6 +2696,19 @@ export function ContentView({
   };
 
   const { isHeaderVisible, onScroll: handleContentScroll } = useScrollHideHeader();
+  React.useEffect(() => {
+    if (typeof document === 'undefined') return undefined;
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtml = html.style.overflow;
+    const prevBody = body.style.overflow;
+    html.style.overflow = 'hidden';
+    body.style.overflow = 'hidden';
+    return () => {
+      html.style.overflow = prevHtml;
+      body.style.overflow = prevBody;
+    };
+  }, []);
   const headerStackRef = React.useRef(null);
   const [headerStackHeight, setHeaderStackHeight] = React.useState(0);
   React.useLayoutEffect(() => {
@@ -2692,7 +2732,7 @@ export function ContentView({
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
       backgroundColor: 'var(--bg-primary)',
       display: 'flex', flexDirection: 'column',
-      width: '100%', maxWidth: '100%', overflowX: 'hidden'
+      width: '100%', maxWidth: '100%', overflow: 'hidden'
     }
   },
     /*#__PURE__*/React.createElement("div", {
