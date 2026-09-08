@@ -1363,6 +1363,14 @@ function CalendarApp() {
   // fetch-on-open pattern.
   const [placesSubcollection, setPlacesSubcollection] = React.useState([]);
   const [confirmedMeetingsSubcollection, setConfirmedMeetingsSubcollection] = React.useState([]);
+  // Side-menu 정산 badge must not render a fake `0` before the first confirmedMeetings
+  // snapshot for this calendar arrives (gallery/chat cold open used to look empty).
+  const [meetingsHydrated, setMeetingsHydrated] = React.useState(false);
+  React.useEffect(() => {
+    setMeetingsHydrated(false);
+    setConfirmedMeetingsSubcollection([]);
+    setPlacesSubcollection([]);
+  }, [activeCalId]);
   // 사진별 댓글 개수(라이트박스 댓글 뱃지용) -- 사진의 mediaKey/refKey를 문서 id로 쓰는
   // calendars/cal_{id}/photoComments 컬렉션을 그대로 구독한다. 댓글이 실제로 달린 사진만
   // 문서가 존재하므로(빈 배열은 안 씀) 컬렉션 크기가 항상 작게 유지된다 -- see the realtime
@@ -2875,9 +2883,11 @@ function CalendarApp() {
   // corruption -- a torn-down-and-rebuilt listener can come back delivering a stale/incomplete
   // snapshot, which reads exactly like "개별등록 items keep vanishing, and refreshing briefly
   // fixes it" even though the documents were never actually lost.
+  // Keep individual contents hydrated for any view that can open the side menu / return to
+  // 컨텐츠 without a wipe. Gating to history|content only made items "vanish" on other tabs.
   const needsCustomCultureData = React.useMemo(
-    () => activeView === 'history' || activeView === 'content',
-    [activeView]
+    () => Boolean(activeCalId),
+    [activeCalId]
   );
   React.useEffect(() => {
     if (!activeCalId || !needsCustomCultureData) return;
@@ -2966,9 +2976,11 @@ function CalendarApp() {
   // screen change. That churn (unsubscribe+resubscribe within milliseconds of a nav) was the
   // most likely trigger for the Firestore "INTERNAL ASSERTION FAILED: Unexpected state" errors:
   // only a genuine transition across the needs-it/doesn't-need-it boundary should resubscribe.
+  // Nav 정산/장소 meta and schedule photos need this on gallery/chat/memo/content too.
+  // Subscribe for the whole calendar session so view switches do not drop hydrated meetings.
   const needsPlacesData = React.useMemo(
-    () => activeView === 'calendar' || activeView === 'places' || activeView === 'settlement' || activeView === 'history',
-    [activeView]
+    () => Boolean(activeCalId),
+    [activeCalId]
   );
   React.useEffect(() => {
     if (!activeCalId || !needsPlacesData) return;
@@ -2983,6 +2995,7 @@ function CalendarApp() {
         const snapshotDates = new Set(list.map(m => m && m.date).filter(Boolean));
         return mergeConfirmedMeetings(prevList, list).filter(m => m && m.date && snapshotDates.has(m.date));
       });
+      setMeetingsHydrated(true);
     }).catch(() => {});
 
     // REST is a request/response fallback, not a realtime transport. Poll only when the SDK
@@ -3046,6 +3059,7 @@ function CalendarApp() {
           const snapshotDates = new Set((list || []).map(m => m && m.date).filter(Boolean));
           return mergeConfirmedMeetings(prevList, list).filter(m => m && m.date && snapshotDates.has(m.date));
         });
+        setMeetingsHydrated(true);
       }, err => {
         console.warn(`Firestore confirmedMeetings subscription error:`, err);
         queueServerAuditEvent(activeCalId, 'realtime_fallback', `confirmedMeetings:${String(err?.code || 'unknown')}`, getClientAuditContext());
@@ -3056,6 +3070,7 @@ function CalendarApp() {
             const snapshotDates = new Set(list.map(m => m && m.date).filter(Boolean));
             return mergeConfirmedMeetings(prevList, list).filter(m => m && m.date && snapshotDates.has(m.date));
           });
+          setMeetingsHydrated(true);
         });
       });
     return () => {
@@ -3104,14 +3119,20 @@ function CalendarApp() {
     () => activeView === 'calendar' || activeView === 'gallery' || activeView === 'history',
     [activeView]
   );
+  // Reset comment caches only when the calendar changes — not on every gallery/calendar hop
+  // (that wipe made every thumbnail badge flash `0` until the next snapshot).
   React.useEffect(() => {
-    if (!activeCalId || !needsPhotoCommentCounts) return;
+    setPhotoCommentCounts({});
     setPreloadedPhotoComments({});
     setPreloadedPhotoCommentsReady(false);
+  }, [activeCalId]);
+  React.useEffect(() => {
+    if (!activeCalId || !needsPhotoCommentCounts) return;
     const store = createPhotoCommentStore({
       calendarId: activeCalId, db: firebaseDb, projectId: firebaseConfig.projectId,
       decodeDocument: firestoreDocumentToJs, fetchCountsRest: fetchPhotoCommentCountsRest,
-      enableBulkHydration: activeView !== 'gallery' || galleryPhotoIndex.status === 'fallback'
+      // Gallery thumbnails still need comment badges; keep bulk hydration on.
+      enableBulkHydration: true
     });
     photoCommentStoreRef.current = store;
     const stop = store.start(state => {
@@ -3123,7 +3144,7 @@ function CalendarApp() {
       stop();
       if (photoCommentStoreRef.current === store) photoCommentStoreRef.current = null;
     };
-  }, [activeCalId, needsPhotoCommentCounts, activeView, galleryPhotoIndex.status, firebaseDb, firebaseConnectionVersion]);
+  }, [activeCalId, needsPhotoCommentCounts, firebaseDb, firebaseConnectionVersion]);
 
   // Memos: paginated newest-first load (rather than subscribing to the entire collection at
   // once, which would download/re-sync thousands of memos on every open as a calendar grows).
@@ -7341,7 +7362,7 @@ function CalendarApp() {
   const navMemoCount = (typeof totalMemoCount === 'number' && totalMemoCount >= 0) ? totalMemoCount : (memos || []).length;
   const navPlaceCount = (activeCal && Array.isArray(activeCal.places)) ? activeCal.places.filter(p => p && !p.deletedAt).length : 0;
   const navHistoryCount = activeCal ? getTrulyConfirmedMeetings(activeCal).filter(m => isValidDateString(m?.date)).length : 0;
-  const navSettlementBadge = canUseSettlement && activeCal && typeof calculateSettlementBalance === 'function' && typeof formatBalanceBadge === 'function'
+  const navSettlementBadge = canUseSettlement && meetingsHydrated && activeCal && typeof calculateSettlementBalance === 'function' && typeof formatBalanceBadge === 'function'
     ? formatBalanceBadge(calculateSettlementBalance(activeCal))
     : null;
 
@@ -8127,7 +8148,7 @@ function CalendarApp() {
     settlementCount: Array.isArray(activeCal && activeCal.expenses)
       ? activeCal.expenses.filter(e => e && !e.deletedAt).length
       : 0,
-    settlementBadge: activeCal && typeof calculateSettlementBalance === 'function' && typeof formatBalanceBadge === 'function'
+    settlementBadge: meetingsHydrated && activeCal && typeof calculateSettlementBalance === 'function' && typeof formatBalanceBadge === 'function'
       ? formatBalanceBadge(calculateSettlementBalance(activeCal))
       : null,
     chatLastAuthor: navChatLastAuthor,
