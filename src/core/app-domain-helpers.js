@@ -2309,7 +2309,9 @@ function getMediaIdentityKeys(photo = {}, opts = {}) {
     const ambiguousSharedPhotoId = photoId && sourceIdentity && photoId === sourceIdentity && !Number.isInteger(imageIndex);
     const meetingPhotoIdentity = ambiguousSharedPhotoId
       ? (renderedMediaKey ? `${photoId}:url-${renderedMediaKey}` : `${photoId}:photo`)
-      : (photoId || messageId
+      : (photoId
+        || (messageId && Number.isInteger(imageIndex) ? `${messageId}:${imageIndex}` : '')
+        || messageId
         || (Number.isInteger(imageIndex) ? `photo-${imageIndex}` : (renderedMediaKey ? `url-${renderedMediaKey}` : 'photo')));
     const key = `meeting:${meetingDate || 'date'}:${meetingPhotoIdentity}`;
     return { assetKey: key, mediaKey: key, refKey: key };
