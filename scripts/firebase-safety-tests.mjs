@@ -428,6 +428,8 @@ assert(/writeRootCollectionDocumentWithFallback[\s\S]{0,900}FIRESTORE_WRITE_DEAD
 assert(/withWeatherTimeout/.test(weatherScript) && /WEATHER_FIRESTORE_TIMEOUT_MS/.test(weatherScript), 'weather cache reads and writes must be bounded');
 assert(/withWeatherTimeout\(fetch\(/.test(weatherScript), 'weather external requests must be bounded');
 assert(/hadServiceWorkerControllerAtStartup[\s\S]{0,900}controllerchange[\s\S]{0,180}hadServiceWorkerControllerAtStartup/.test(domainHelpersScript), 'first service worker install must not reload and destroy the app boot');
+const miscUiScript = fs.readFileSync('src/ui/ui-misc.js', 'utf8');
+assert(miscUiScript.includes('meta[name="build-sha"]') && miscUiScript.includes('extractUpdateBuildId'), 'update banner must compare the loaded build SHA before hashed chunk fallbacks');
 assert(/isAppleWebKit/.test(firebaseDataScript) && /experimentalAutoDetectLongPolling: isAppleWebKit/.test(firebaseDataScript), 'Safari/WebKit must avoid forced Firestore long polling');
 assert(!/push_subscriptions.*get\(\)/s.test(sideMenuScript), 'settings must not fetch implementation-level push device inventory');
 assert(functionsSource.includes('parsePublicHttpUrl') && functionsSource.includes('metadata.google.internal'), 'public proxies must validate URLs and block cloud metadata SSRF targets');

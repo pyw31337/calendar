@@ -18,6 +18,29 @@ function fetchImageShareDocument(...args) {
   const f = __gatherUiDeps().fetchImageShareDocument || GATHER_APP_UTILS.fetchImageShareDocument;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+
+function extractUpdateBuildId(html) {
+  if (!html || typeof html !== 'string') return null;
+  const sha = html.match(/<meta\s+name=["']build-sha["']\s+content=["']([^"']+)["']/i);
+  if (sha?.[1] && !sha[1].includes('%VITE_')) return `sha:${sha[1]}`;
+  const asset = html.match(/app-main-[A-Za-z0-9_-]+\.js/) || html.match(/index-[A-Za-z0-9_-]+\.js/);
+  return asset ? `asset:${asset[0]}` : null;
+}
+
+function readCurrentUpdateBuildId() {
+  try {
+    const metaSha = document.querySelector('meta[name="build-sha"]')?.getAttribute('content') || '';
+    if (metaSha && !metaSha.includes('%VITE_')) return `sha:${metaSha}`;
+    const assets = document.querySelectorAll('script[src], link[rel="modulepreload"]');
+    for (const asset of assets) {
+      const src = asset.getAttribute('src') || asset.getAttribute('href') || '';
+      const match = src.match(/app-main-[A-Za-z0-9_-]+\.js/) || src.match(/index-[A-Za-z0-9_-]+\.js/);
+      if (match) return `asset:${match[0]}`;
+    }
+  } catch (_) {}
+  return null;
+}
+
 export function UpdateAvailableBanner() {
   const React = window.React;
 
@@ -26,34 +49,13 @@ export function UpdateAvailableBanner() {
   React.useEffect(() => {
     let initialBuildId = null;
     let cancelled = false;
-    const extractBuildId = (html) => {
-      if (!html || typeof html !== 'string') return null;
-      const m = html.match(/app-main-[A-Za-z0-9_-]+\.js/) || html.match(/index-[A-Za-z0-9_-]+\.js/);
-      return m ? m[0] : null;
-    };
-    const currentBuildId = (() => {
-      try {
-        const scripts = document.querySelectorAll('script[src]');
-        for (const s of scripts) {
-          const src = s.getAttribute('src') || '';
-          const m = src.match(/app-main-[A-Za-z0-9_-]+\.js/);
-          if (m) return m[0];
-        }
-        const links = document.querySelectorAll('link[rel="modulepreload"]');
-        for (const l of links) {
-          const href = l.getAttribute('href') || '';
-          const m = href.match(/app-main-[A-Za-z0-9_-]+\.js/);
-          if (m) return m[0];
-        }
-      } catch (_) {}
-      return null;
-    })();
+    const currentBuildId = readCurrentUpdateBuildId();
     const checkForUpdate = () => {
       fetch(location.href.split('#')[0], { method: 'GET', cache: 'no-store', credentials: 'same-origin' })
         .then(res => res.text())
         .then(html => {
           if (cancelled) return;
-          const liveId = extractBuildId(html);
+          const liveId = extractUpdateBuildId(html);
           if (!liveId) return;
           if (initialBuildId === null) initialBuildId = liveId;
           const baseline = currentBuildId || initialBuildId;

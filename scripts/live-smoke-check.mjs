@@ -57,7 +57,10 @@ function resolveAssetUrl(path, fallbackBase = baseUrl) {
 }
 
 async function checkUrl(url, validate) {
-  const response = await fetch(url, { redirect: 'follow' });
+  const response = await fetch(url, {
+    redirect: 'follow',
+    headers: { 'Cache-Control': 'no-cache' }
+  });
   const text = await response.text();
   if (!response.ok) throw new Error(`${response.status} ${url}`);
   validate?.(text, url);
@@ -73,20 +76,33 @@ function isClassicHtml(html) {
   return html.includes('assets/app-main.js') && html.includes('assets/app-utils.js');
 }
 
-const indexUrl = new URL('.', baseUrl).toString() + `?_v=${cacheBust}`;
-const indexText = await checkUrl(indexUrl, (html, url) => {
-  if (!html.includes('<div id="root">')) throw new Error(`Missing root element: ${url}`);
-  if (!isViteHtml(html) && !isClassicHtml(html)) {
-    throw new Error(`Unrecognized deployment HTML (neither Vite nor classic): ${url}`);
+const indexBaseUrl = new URL('.', baseUrl).toString();
+let indexText = '';
+const maxDeployAttempts = expectedBuildSha ? 13 : 1;
+for (let attempt = 1; attempt <= maxDeployAttempts; attempt += 1) {
+  const indexUrl = `${indexBaseUrl}?_v=${cacheBust}-${attempt}`;
+  try {
+    indexText = await checkUrl(indexUrl, (html, url) => {
+      if (!html.includes('<div id="root">')) throw new Error(`Missing root element: ${url}`);
+      if (!isViteHtml(html) && !isClassicHtml(html)) {
+        throw new Error(`Unrecognized deployment HTML (neither Vite nor classic): ${url}`);
+      }
+      if (expectedBuildSha) {
+        const match = html.match(/<meta\s+name="build-sha"\s+content="([^"]*)"/i);
+        if (!match || match[1] !== expectedBuildSha) {
+          throw new Error(`Deployed build SHA mismatch at ${url}: expected ${expectedBuildSha}, got ${match?.[1] || 'missing'}`);
+        }
+        console.log(`[live-smoke] build SHA verified ${expectedBuildSha}`);
+      }
+    });
+    break;
+  } catch (error) {
+    const isDeployRace = expectedBuildSha && String(error?.message || '').includes('Deployed build SHA mismatch');
+    if (!isDeployRace || attempt === maxDeployAttempts) throw error;
+    console.log(`[live-smoke] Pages propagation pending (${attempt}/${maxDeployAttempts}); retrying in 10s`);
+    await new Promise(resolve => setTimeout(resolve, 10_000));
   }
-  if (expectedBuildSha) {
-    const match = html.match(/<meta\s+name="build-sha"\s+content="([^"]*)"/i);
-    if (!match || match[1] !== expectedBuildSha) {
-      throw new Error(`Deployed build SHA mismatch at ${url}: expected ${expectedBuildSha}, got ${match?.[1] || 'missing'}`);
-    }
-    console.log(`[live-smoke] build SHA verified ${expectedBuildSha}`);
-  }
-});
+}
 
 const mode = isViteHtml(indexText) ? 'vite' : 'classic';
 console.log(`[live-smoke] deployment mode: ${mode}`);

@@ -514,15 +514,21 @@ async function ensureLocalServer() {
   const up = await waitForServer(LOCAL_BASE_URL, 1000);
   if (up) return { baseUrl: LOCAL_BASE_URL, proc: null };
   console.log(`[browser-smoke-test] 로컬 미리보기 서버 시작 (vite preview --port ${LOCAL_PORT}) ...`);
-  const proc = spawn('npx', ['vite', 'preview', '--port', LOCAL_PORT, '--strictPort'], {
+  const proc = spawn('npx', ['vite', 'preview', '--host', '127.0.0.1', '--port', LOCAL_PORT, '--strictPort'], {
     cwd: repoRoot,
-    stdio: 'ignore',
+    stdio: ['ignore', 'pipe', 'pipe'],
     detached: false
   });
+  let previewOutput = '';
+  const capturePreviewOutput = chunk => {
+    previewOutput = `${previewOutput}${String(chunk)}`.slice(-4000);
+  };
+  proc.stdout.on('data', capturePreviewOutput);
+  proc.stderr.on('data', capturePreviewOutput);
   const ready = await waitForServer(LOCAL_BASE_URL, 20000);
   if (!ready) {
     proc.kill();
-    throw new Error(`로컬 미리보기 서버가 ${LOCAL_BASE_URL} 에서 응답하지 않음 (dist/ 빌드가 되어 있는지 확인)`);
+    throw new Error(`로컬 미리보기 서버가 ${LOCAL_BASE_URL} 에서 응답하지 않음: ${previewOutput.trim() || '출력 없음'}`);
   }
   return { baseUrl: LOCAL_BASE_URL, proc };
 }

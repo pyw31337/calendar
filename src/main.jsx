@@ -308,14 +308,17 @@ async function boot() {
     if (isAdminRoute) {
       await loadAdminUi();
     }
-    const root = document.getElementById('root');
-    if (root) root.dataset.booted = '1';
-    window.__GATHER_BOOT_READY__ = true;
     // firebase SDK is already fully loaded (awaited above, before any imports started), so
     // app-firebase-data.js's top-level firebase.initializeApp() call (evaluated as part of this
     // import) can safely assume window.firebase exists.
     await import('./core/app-main.js');
     if (typeof window.__gatherStartApp === 'function') window.__gatherStartApp();
+    // The ready contract means app-main has bound all shared helpers and started the React tree,
+    // not merely that its prerequisite chunks finished. Vite 8/Rolldown made the final dynamic
+    // import boundary visible enough for tests and fast clients to observe the old premature flag.
+    const root = document.getElementById('root');
+    if (root) root.dataset.booted = '1';
+    window.__GATHER_BOOT_READY__ = true;
     try { sessionStorage.removeItem(BOOT_RETRY_KEY); } catch (_) {}
   } catch (err) {
     console.error('[P6] boot failed', err);
