@@ -1515,10 +1515,24 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
   const isPreview = variant === 'preview';
   const sanitizeText = __deps.sanitizeText;
   const extractFirstUrl = __deps.extractFirstUrl;
+  const extractAllUrlInfosLoose = __deps.extractAllUrlInfosLoose || __deps.extractAllUrlInfos;
 
   const imageUrls = memo.imageUrls || [];
   const thumbUrls = memo.thumbUrls || [];
   const memoFirstUrl = extractFirstUrl(memo.text);
+  const memoPreviewUrls = (() => {
+    const list = memoFirstUrl ? [memoFirstUrl] : [];
+    const infos = typeof extractAllUrlInfosLoose === 'function' ? extractAllUrlInfosLoose(memo.text || '') : [];
+    infos.forEach(info => { if (info && info.url && !list.includes(info.url)) list.push(info.url); });
+    return list;
+  })();
+  const memoLinkPreviews = Array.isArray(memo.linkPreviews) ? memo.linkPreviews : [];
+  const cachedPreviewForUrl = (url) => {
+    const fromArr = memoLinkPreviews.find(p => p && p.url === url);
+    if (fromArr) return fromArr;
+    if (url && memo.linkPreview && (memo.linkPreview.url === url || url === memoFirstUrl)) return memo.linkPreview;
+    return null;
+  };
   const memoMediaInfo = memoFirstUrl ? getDirectChatMediaInfo(memoFirstUrl) : null;
   // Only media that actually plays inline here (YouTube/Vimeo embeds, direct video files) gets
   // the "영상 바로보기" toggle -- TikTok's façade just opens a new tab instead of playing on this
@@ -1526,7 +1540,15 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
   // the inline-playable ones) still governs stripping the raw URL out of the displayed text below,
   // since the TikTok widget/preview card renders regardless of whether the toggle button does.
   const isVideoMedia = !!(memoMediaInfo && memoMediaInfo.playsInline);
-  const displayMemoText = memo.text ? ((memo.linkPreview || memoMediaInfo) ? removeFirstUrl(memo.text) : memo.text) : '';
+  const displayMemoText = (() => {
+    if (!memo.text) return '';
+    if (!(memo.linkPreview || memoLinkPreviews.length || memoMediaInfo || memoPreviewUrls.length)) return memo.text;
+    let text = memo.text;
+    const infos = typeof extractAllUrlInfosLoose === 'function' ? extractAllUrlInfosLoose(memo.text) : [];
+    infos.forEach(info => { if (info && info.raw) text = text.split(info.raw).join(''); });
+    if (memoFirstUrl && text === memo.text) text = removeFirstUrl(text);
+    return text.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  })();
   const memoTextLineCount = displayMemoText ? displayMemoText.split(/\r?\n/).length : 0;
   const hasLongMemoText = displayMemoText.length > 280 || memoTextLineCount > 8;
   const [isMemoTextExpanded, setIsMemoTextExpanded] = React.useState(false);
@@ -1626,12 +1648,13 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
   const openMemoLightbox = (index) => {
     if (typeof setActiveLightbox !== 'function' || imageUrls.length === 0) return;
     const urls = imageUrls.slice();
+    const memoImageTags = Array.isArray(memo.imageTags) ? memo.imageTags : [];
     const meta = urls.map((_, imageIndex) => ({
       timestamp: memo.updatedAt || memo.createdAt || 0,
       messageId: memo.id,
       imageIndex,
       thumb: thumbUrls[imageIndex] || urls[imageIndex],
-      tags: Array.isArray(memo.tags) ? memo.tags.map(t => String(t || '').replace(/^#/, '')).filter(Boolean).join(' ') : '',
+      tags: String(memoImageTags[imageIndex] || ''),
       source: 'memo',
       uploadSource: 'memo'
     }));
@@ -1819,19 +1842,21 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     }, isMemoTextExpanded ? "접기" : "더 보기"),
 
     /* Media Embed or Link Preview Card under the card content if applicable */
-    memoFirstUrl && /*#__PURE__*/React.createElement("div", {
+    memoPreviewUrls.length > 0 && /*#__PURE__*/React.createElement("div", {
       style: { marginTop: '8px', width: '100%' },
       "data-stop-card-open": "true",
       onClick: e => e.stopPropagation()
     },
-      /* Link Preview Card shown primarily */
-      /*#__PURE__*/React.createElement(LinkPreviewCard, {
-        url: memoFirstUrl,
-        fallbackTitle: memo.title || (memo.text ? removeFirstUrl(memo.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : ''),
-        cachedData: memo.linkPreview,
+      /* Link preview card(s) — one per distinct URL in memo text */
+      memoPreviewUrls.map((url, idx) => /*#__PURE__*/React.createElement(LinkPreviewCard, {
+        key: url,
+        url: url,
+        fallbackTitle: idx === 0 ? (memo.title || (memo.text ? removeFirstUrl(memo.text).replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() : '')) : '',
+        cachedData: cachedPreviewForUrl(url),
         stretch: true,
-        noBorder: isPreview
-      }),
+        noBorder: isPreview,
+        marginTop: idx > 0 ? 8 : null
+      })),
 
       /* Video Toggle button if this URL is a video */
       isVideoMedia && /*#__PURE__*/React.createElement("button", {
@@ -1895,7 +1920,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
             backgroundColor: writer.color || '#94A3B8',
             color: '#FFFFFF',
             borderRadius: 'var(--radius-full)',
-            padding: '3px 8px',
+            padding: '4px 8px',
             fontSize: 'var(--font-size-xs)',
             fontWeight: 'bold',
             lineHeight: 1,
@@ -1936,7 +1961,9 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           color: (comments.length > 0 || isCommentComposerOpen) ? 'var(--accent-primary)' : '#94A3B8', flexShrink: 0
         }
-      }, /*#__PURE__*/React.createElement(MessageCommentIcon, { size: 18 }))
+      }, /*#__PURE__*/React.createElement(MessageCommentIcon, { size: 18 }), /*#__PURE__*/React.createElement("span", {
+        style: { marginLeft: '4px', fontSize: '0.75rem', fontWeight: 700 }
+      }, "댓글"))
     ),
 
     /* Comment list -- no background, thin divider line between rows instead */
@@ -1948,7 +1975,10 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         onClick: e => { e.stopPropagation(); setIsCommentsExpanded(v => !v); },
         style: {
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
-          alignSelf: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px',
+          width: '100%', boxSizing: 'border-box', alignSelf: 'stretch',
+          background: 'none', cursor: 'pointer', padding: '6px',
+          border: '1px solid color-mix(in srgb, var(--bg-primary) 96%, black)',
+          borderRadius: '8px',
           fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--text-muted)'
         }
       },
@@ -1992,11 +2022,8 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       );
     })),
 
-    /* Comment composer -- same shape as the tag-input module: participant picker + input + save,
-       plus a cancel button. On mobile this stacks into two rows (input alone, then picker left /
-       cancel+save right); at/above 640px .comment-composer-footer collapses via display:contents
-       so its two children rejoin the input as ordinary siblings in one row (see .comment-composer
-       rules in app.css) -- same DOM, no separate mobile/desktop render branch needed. */
+    /* Comment composer -- always column (input, then picker left / cancel+save right).
+       See .comment-composer rules in app.css. */
     isCommentComposerOpen && /*#__PURE__*/React.createElement("div", {
       className: "comment-composer",
       onClick: e => e.stopPropagation(),

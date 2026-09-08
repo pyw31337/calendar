@@ -566,9 +566,7 @@ function isChatRenderableMessage(message, meetingPhotoMessageIds = null) {
   return true;
 }
 
-// Default memo body for a 문화공연/지역축제 card when the "메모" composer is saved empty --
-// the same fields shown in the detail sheet (기간/장소/주소/주최/문의/가격/설명/링크), one per
-// line, skipping any that are missing.
+// Default empty-composer memo body for a 문화공연/지역축제 card (detail-sheet fields).
 function buildCultureEventMemoText(item) {
   if (!item) return '';
   const lines = [];
@@ -4769,21 +4767,38 @@ function CalendarApp() {
       return handleSaveAnniversaryPhotoTags(meta.anniversaryId, meta.imageIndex, tagsText);
     }
     if (meta?.source === 'meeting') {
-      // An auto-linked 일정 사진 (created via a date hashtag, see linkTaggedImageToMeetingDates)
-      // is just a reference to a real chat photo -- edit its tags there, not on the reference
-      // itself, so the change is visible everywhere that photo appears, not just this one date.
-      // Only a manually-uploaded 일정 사진 (no sourceMessageId, no chat photo behind it) still
-      // writes to its own standalone tags field via handleSaveMeetingPhotoTags.
+      // Auto-linked 일정 사진: edit the source chat photo. Meeting-composer uploads (no meetingDate yet): own message.
       if (meta.sourceMessageId && Number.isInteger(meta.sourceImageIndex)) {
         return handleSaveImageTags(meta.sourceMessageId, meta.sourceImageIndex, tagsText, {});
       }
-      // Meeting-composer uploads live in messages just like chat/gallery uploads. Before they
-      // are linked to a confirmed date they have no meetingDate/photoId, so route them back to
-      // their own message instead of attempting an impossible confirmedMeeting photo update.
       if (messageId && Number.isInteger(imageIndex) && !meta.meetingDate) {
         return handleSaveImageTags(messageId, imageIndex, tagsText, {});
       }
       return handleSaveMeetingPhotoTags(meta.meetingDate, meta.photoId, tagsText);
+    }
+    if (meta?.source === 'memo') {
+      const memoId = messageId || meta.messageId;
+      if (!memoId || !Number.isInteger(imageIndex)) return false;
+      const memo = await findMemoById(memoId);
+      if (!memo) { showToast('태그 저장 대상 이미지를 찾지 못했습니다.', 'error', 4000); return false; }
+      const urls = Array.isArray(memo.imageUrls) ? memo.imageUrls : (memo.imageUrl ? [memo.imageUrl] : []);
+      if (imageIndex < 0 || imageIndex >= urls.length) return false;
+      const parseTagTokens = text => Array.from(new Set(String(text || '').split(/[,\s#]+/).map(t => sanitizeText(t.trim(), 30)).filter(Boolean))).slice(0, 10);
+      const cleanTags = sanitizeText(parseTagTokens(tagsText).join(' '), 100);
+      const nextImageTags = Array.isArray(memo.imageTags) ? [...memo.imageTags] : [];
+      while (nextImageTags.length < urls.length) nextImageTags.push('');
+      nextImageTags[imageIndex] = cleanTags;
+      try {
+        const ok = await writeCollectionDocumentWithFallback('memos', activeCalId, memoId, sanitizeMemoForFirestore({ imageTags: nextImageTags }), 'update', '메모 이미지 태그 저장');
+        if (!ok) throw new Error('Memo image tags update failed');
+        setMemos(prev => prev.map(m => m.id === memoId ? { ...m, imageTags: nextImageTags } : m));
+        showToast('태그 저장완료', 'success');
+        return true;
+      } catch (err) {
+        console.error('Memo image tag save failed:', err);
+        showToast('태그 저장 실패', 'error');
+        return false;
+      }
     }
     if (!messageId || !Number.isInteger(imageIndex)) return false;
     let sourceMessage = (chatMessages || []).find(msg => msg.id === messageId);
@@ -6130,6 +6145,7 @@ function CalendarApp() {
     const removedThumb = thumbs[imageIndex] || removedUrl;
     const nextUrls = urls.filter((_, i) => i !== imageIndex);
     const nextThumbs = thumbs.filter((_, i) => i !== imageIndex);
+    const nextImageTags = Array.isArray(memo.imageTags) ? memo.imageTags.filter((_, i) => i !== imageIndex) : undefined;
     const memoSnapshot = JSON.parse(JSON.stringify(memo));
     const finalizeStorageDeletion = () => {
       deleteChatImageFromStorage(removedUrl);
@@ -6137,7 +6153,7 @@ function CalendarApp() {
     };
     try {
       const deletePaths = nextUrls.length === 0 ? ['imageUrl', 'thumbUrl'] : [];
-      const data = sanitizeMemoForFirestore({ imageUrls: nextUrls, thumbUrls: nextThumbs, imageUrl: nextUrls[0] || null, thumbUrl: nextThumbs[0] || null });
+      const data = sanitizeMemoForFirestore({ imageUrls: nextUrls, thumbUrls: nextThumbs, imageUrl: nextUrls[0] || null, thumbUrl: nextThumbs[0] || null, ...(nextImageTags ? { imageTags: nextImageTags } : {}) });
       const updated = await writeCollectionDocumentWithFallback('memos', activeCalId, memoId, data, 'update', '메모 사진 삭제', { deletePaths });
       if (!updated) throw new Error('Memo photo delete failed');
       setMemos(prev => prev.map(m => m.id === memoId ? { ...m, ...data } : m));
@@ -8728,11 +8744,7 @@ const GATHER_APP_CHAT_DATA = window.GATHER_APP_CHAT_DATA || {};
 const linkPreviewCache = new Map();
 const linkPreviewInflight = new Map();
 const LINK_PREVIEW_CACHE_MAX_ENTRIES = 300;
-// Unlike linkPreviewInflight (self-cleans via .delete() once each fetch settles),
-// linkPreviewCache has no natural cap -- every distinct link ever previewed across the whole
-// session stays in memory. Low severity for a normal session, but a calendar left open for
-// weeks with lots of shared links could accumulate indefinitely, so evict the oldest entry
-// (Map preserves insertion order) once this grows past a generous ceiling.
+// Evict oldest cache entries (Map insertion order) once past the ceiling.
 function cacheLinkPreview(url, result) {
   linkPreviewCache.set(url, result);
   if (linkPreviewCache.size > LINK_PREVIEW_CACHE_MAX_ENTRIES) {
@@ -8740,15 +8752,10 @@ function cacheLinkPreview(url, result) {
     if (oldestKey !== undefined) linkPreviewCache.delete(oldestKey);
   }
 }
-// Peekalink's free plan is a 50-request-per-hour rate limit, not a fixed lifetime quota --
-// it resets every clock hour rather than depleting over time. See PEEKALINK_HOUR_BUCKET_MS below.
+// Peekalink free plan: 50 req/hour bucket.
 const PEEKALINK_HOUR_BUCKET_MS = Number.isFinite(GATHER_APP_CHAT_DATA.PEEKALINK_HOUR_BUCKET_MS) ? GATHER_APP_CHAT_DATA.PEEKALINK_HOUR_BUCKET_MS : 3600000;
 
-// Deterministic, synchronous 64-bit FNV-1a hash used as the Firestore doc ID for the shared
-// linkPreviews cache below (doc IDs can't contain '/', which raw URLs do). Collisions are
-// astronomically unlikely for the number of distinct URLs this app will ever see, and using a
-// plain hash instead of crypto.subtle.digest keeps this working in non-secure contexts too
-// (e.g. file:// during local testing), where Web Crypto isn't available.
+// FNV-1a hash as Firestore linkPreviews doc ID (URLs contain '/'; works without Web Crypto).
 function hashUrlForCache(url) {
   let hash = 0xcbf29ce484222325n;
   const prime = 0x100000001b3n;
@@ -9568,7 +9575,7 @@ async function processImageFilesSequentially(files, onProgress) {
   await acquireMediaUploadWakeLock();
   try {
   await checkFirebaseStorageHealth().catch(() => {});
-  const list = Array.from(files || []);
+  const list = Array.from(files || []).sort((a, b) => String(a && a.name || '').localeCompare(String(b && b.name || ''), undefined, { numeric: true, sensitivity: 'base' }));
   const succeeded = new Array(list.length);
   const failed = [];
   const startedAt = Date.now();
@@ -9627,12 +9634,7 @@ async function processImageFilesSequentially(files, onProgress) {
   }
 }
 
-// Groups resolved images ({ imageUrl, thumbUrl }) into per-message chunks that stay safely
-// under Firestore's 1,048,576-byte/doc limit. When Storage upload succeeded (the normal case),
-// imageUrl/thumbUrl are short download URLs, so this always yields a single chunk regardless of
-// how many photos were sent. Only when images fall back to inline base64 (Storage unavailable)
-// can a batch grow large enough to need more than one chunk -- and even then, each image keeps
-// its full quality; only the number of chat messages sent scales, never the image quality.
+// Chunk resolved images so a base64-fallback batch never exceeds Firestore's 1MiB/doc limit.
 const CHAT_MESSAGE_SAFE_BYTE_BUDGET = 120000; // large images must use Storage URLs, not Firestore
 function chunkResolvedImagesForMessages(resolvedImages) {
   const chunks = [];
@@ -9673,9 +9675,7 @@ function getImageFilesFromClipboardEvent(event) {
     if (!file) return;
     const isImageLike = /^image\//i.test(file.type || '') || isHeicFile(file);
     if (!isImageLike) return;
-    // Some browsers expose the same pasted screenshot both through clipboard.items and
-    // clipboard.files, but with different transient names/lastModified values. Deduplicate
-    // pasted images by stable binary-ish metadata first so one paste never becomes two previews.
+    // Deduplicate pasted images (some browsers expose the same file via items and files).
     const stableKey = `${file.type || 'image'}:${file.size || 0}`;
     const fallbackKey = `${file.name || 'clipboard-image'}:${file.size || 0}:${file.type || ''}:${file.lastModified || 0}`;
     const key = file.size ? stableKey : fallbackKey;

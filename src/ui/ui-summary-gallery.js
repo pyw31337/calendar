@@ -117,16 +117,22 @@ function buildCombinedPhotoEntries(chatMessages, memos, calendar, anniversaries 
   });
   const memoEntries = (memos || []).flatMap(memo => {
     if (!memo || isTombstone(memo)) return [];
-    const memoTagsDisplay = Array.isArray(memo.tags) ? memo.tags.map(t => String(t || '').replace(/^#/, '')).filter(Boolean).join(' ') : '';
+    const memoImageTags = Array.isArray(memo.imageTags) ? memo.imageTags : [];
     const asMsg = {
       id: memo.id, text: memo.text || memo.content || memo.body || '',
       imageUrl: memo.imageUrl, imageUrls: memo.imageUrls, thumbUrl: memo.thumbUrl, thumbUrls: memo.thumbUrls,
+      imageTags: memoImageTags,
       timestamp: memo.updatedAt || memo.createdAt || 0, participantId: memo.participantId || '',
       uploadSource: 'memo'
     };
     const directEntry = getMessageDirectMediaEntry(asMsg);
     const entries = directEntry ? [...getMessageImageEntries(asMsg), directEntry] : getMessageImageEntries(asMsg);
-    return entries.map(entry => ({ ...entry, tags: memoTagsDisplay, source: 'memo', timestamp: asMsg.timestamp }));
+    return entries.map((entry, idx) => ({
+      ...entry,
+      tags: String(entry.tags || memoImageTags[entry.imageIndex ?? idx] || ''),
+      source: 'memo',
+      timestamp: asMsg.timestamp
+    }));
   });
   const meetingEntries = [];
   getConfirmedMeetings(calendar).forEach(meeting => {
