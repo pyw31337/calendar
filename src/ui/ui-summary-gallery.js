@@ -132,6 +132,7 @@ function buildCombinedPhotoEntries(chatMessages, memos, calendar, anniversaries 
   getConfirmedMeetings(calendar).forEach(meeting => {
     const photos = Array.isArray(meeting?.photos) ? meeting.photos : [];
     photos.forEach((photo, index) => {
+      if (!photo || isTombstone(photo)) return;
       const resolved = resolveMeetingPhotoDisplay ? resolveMeetingPhotoDisplay(photo, chatMessages) : null;
       const full = normalizePhotoUrl(resolved?.imageUrl || photo?.imageUrl || photo?.full || '');
       const thumb = normalizePhotoUrl(resolved?.thumbUrl || photo?.thumbUrl || photo?.thumb || full);
@@ -1257,6 +1258,7 @@ export function HistoryView({
   onGetChatMessageOrdinal = null, onGetGalleryPhotoOrdinal = null, onRequestConfirm = null,
   onRemovePhotoFromMemory = null, onRemovePhotosFromMemory = null, onFetchPhotoComments = null, onSavePhotoComments = null,
   onHideMemoryGroup = null, onRestoreMemoryGroup = null, onAddPhotosBackToMemory = null,
+  onFetchMeetingPhotoIndex = null,
   photoCommentCounts = {}
 }) {
   const React = window.React;
@@ -1299,11 +1301,33 @@ export function HistoryView({
     if (!b) return a;
     return `${a} ~ ${b.replace(/^20(?=\d{2}\.)/, '')}`;
   };
+  // Align with app-main parseFlexibleDateTokens so compact tags like 26.06.13 match.
+  const parseHistoryDateTokens = text => {
+    const parseFlexibleDateTokens = __deps.parseFlexibleDateTokens;
+    if (typeof parseFlexibleDateTokens === 'function') return parseFlexibleDateTokens(text);
+    const source = String(text || '').replace(/[()[\]{}'"“”‘’]/g, ' ');
+    const dates = new Set();
+    const pushDate = (yearRaw, monthRaw, dayRaw) => {
+      let year = Number(yearRaw);
+      const month = Number(monthRaw);
+      const day = Number(dayRaw);
+      if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return;
+      if (year < 100) year += 2000;
+      if (year < 2000 || year > 2099 || month < 1 || month > 12 || day < 1 || day > 31) return;
+      const check = new Date(year, month - 1, day);
+      if (check.getFullYear() !== year || check.getMonth() !== month - 1 || check.getDate() !== day) return;
+      dates.add(`${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`);
+    };
+    source.replace(/(?:^|[^\d])(\d{2,4})\s*[.\-/]\s*(\d{1,2})\s*[.\-/]\s*(\d{1,2})(?=$|[^\d])/g, (match, y, m, d) => { pushDate(y, m, d); return match; });
+    source.replace(/(?:^|[^\d])(\d{2,4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일?/g, (match, y, m, d) => { pushDate(y, m, d); return match; });
+    source.replace(/(?:^|[^\d])(\d{4})(\d{2})(\d{2})(?=$|[^\d])/g, (match, y, m, d) => { pushDate(y, m, d); return match; });
+    source.replace(/(?:^|[^\d])(\d{2})(\d{2})(\d{2})(?=$|[^\d])/g, (match, y, m, d) => { pushDate(y, m, d); return match; });
+    return Array.from(dates);
+  };
   const getTaggedDate = photo => {
     const meetingDate = String(photo?.meetingDate || '').slice(0, 10);
     if (/^\d{4}-\d{2}-\d{2}$/.test(meetingDate)) return meetingDate;
-    const match = String(photo?.tags || '').match(/(?:^|[^\d])(20\d{2})[.\-/](\d{1,2})[.\-/](\d{1,2})(?!\d)/);
-    return match ? `${match[1]}-${String(match[2]).padStart(2, '0')}-${String(match[3]).padStart(2, '0')}` : '';
+    return parseHistoryDateTokens(photo?.tags || '')[0] || '';
   };
 
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
@@ -1473,7 +1497,95 @@ export function HistoryView({
 
   // 인물/추억 탭이 공유하는 사진 목록 -- 갤러리 페이지(PhotoGallery)와 동일한 소스(채팅/메모/모임
   // 사진)를 결합해, 태그(인물)나 날짜(추억)로 걸러 보여준다.
-  const historyPhotoEntries = React.useMemo(() => buildCombinedPhotoEntries(chatMessages, memos, calendar, anniversaries), [chatMessages, memos, calendar, anniversaries]);
+  const baseHistoryPhotoEntries = React.useMemo(() => buildCombinedPhotoEntries(chatMessages, memos, calendar, anniversaries), [chatMessages, memos, calendar, anniversaries]);
+  // DateModal hydrates meetingPhotoIndex for the open date so album photos appear even when the
+  // chat window is incomplete. Memories need the same for anniversary date ranges.
+  const [indexedMeetingPhotoEntries, setIndexedMeetingPhotoEntries] = React.useState([]);
+  React.useEffect(() => {
+    if (typeof onFetchMeetingPhotoIndex !== 'function') {
+      setIndexedMeetingPhotoEntries([]);
+      return;
+    }
+    if (historyTab !== 'memories') return;
+    const dateSet = new Set();
+    const pushRange = (startRaw, endRaw) => {
+      const start = String(startRaw || '').slice(0, 10);
+      const end = String(endRaw || startRaw || '').slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(start)) return;
+      const cursor = new Date(`${start}T00:00:00`);
+      const last = new Date(`${(/^\d{4}-\d{2}-\d{2}$/.test(end) ? end : start)}T00:00:00`);
+      if (Number.isNaN(cursor.getTime()) || Number.isNaN(last.getTime()) || cursor > last) return;
+      let guard = 0;
+      while (cursor <= last && guard < 93) {
+        dateSet.add(`${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`);
+        cursor.setDate(cursor.getDate() + 1);
+        guard += 1;
+      }
+    };
+    (anniversaries || []).forEach(a => {
+      if (!a || a.hiddenFromMemories) return;
+      pushRange(a.startDate || a.date, a.endDate || a.startDate || a.date);
+    });
+    const dates = Array.from(dateSet);
+    if (!dates.length) {
+      setIndexedMeetingPhotoEntries([]);
+      return;
+    }
+    let cancelled = false;
+    Promise.all(dates.map(date => Promise.resolve(onFetchMeetingPhotoIndex(date))
+      .then(photos => ({ date, photos: Array.isArray(photos) ? photos : [] }))
+      .catch(err => {
+        console.warn('history meeting photo index fetch failed:', date, err);
+        return { date, photos: [] };
+      }))).then(rows => {
+      if (cancelled) return;
+      const entries = [];
+      rows.forEach(({ date, photos }) => {
+        photos.forEach((photo, index) => {
+          if (!photo || isTombstone(photo)) return;
+          const full = normalizePhotoUrl(photo.imageUrl || photo.full || photo.thumbUrl || photo.thumb || '');
+          const thumb = normalizePhotoUrl(photo.thumbUrl || photo.thumb || photo.imageUrl || full);
+          if (!full && !thumb) return;
+          const sourceImageIndex = Number.isInteger(photo.sourceImageIndex)
+            ? photo.sourceImageIndex
+            : (Number.isFinite(Number(photo.sourceImageIndex)) ? Number(photo.sourceImageIndex) : null);
+          const mediaKey = photo.mediaKey
+            || (photo.sourceMessageId && sourceImageIndex != null ? `chat:${photo.sourceMessageId}:${sourceImageIndex}` : `meeting-index:${date}:${photo.id || index}`);
+          const refKey = photo.refKey || `meeting-index:${photo.id || `${date}:${index}`}`;
+          entries.push({
+            full: full || thumb,
+            thumb: thumb || full,
+            imageIndex: sourceImageIndex != null ? sourceImageIndex : index,
+            messageId: null,
+            photoId: photo.id || '',
+            sourceMessageId: photo.sourceMessageId || '',
+            sourceImageIndex,
+            timestamp: Number(photo.createdAt || photo.updatedAt || 0),
+            tags: String(photo.tags || ''),
+            directMediaUrl: '',
+            source: 'meeting',
+            meetingDate: date,
+            mediaKey,
+            refKey
+          });
+        });
+      });
+      setIndexedMeetingPhotoEntries(entries);
+    });
+    return () => { cancelled = true; };
+  }, [historyTab, anniversaries, onFetchMeetingPhotoIndex]);
+  const historyPhotoEntries = React.useMemo(() => {
+    if (!indexedMeetingPhotoEntries.length) return baseHistoryPhotoEntries;
+    const byKey = new Map();
+    const sourceRank = { chat: 0, memo: 1, meeting: 2, anniversary: 3 };
+    [...baseHistoryPhotoEntries, ...indexedMeetingPhotoEntries].forEach(entry => {
+      const key = entry.mediaKey || entry.refKey || entry.full || entry.thumb;
+      if (!key) return;
+      const prev = byKey.get(key);
+      if (!prev || (sourceRank[entry.source] ?? 9) < (sourceRank[prev.source] ?? 9)) byKey.set(key, entry);
+    });
+    return Array.from(byKey.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+  }, [baseHistoryPhotoEntries, indexedMeetingPhotoEntries]);
   const [selectedPersonTag, setSelectedPersonTag] = React.useState(null);
   // Selecting a different person tag (or leaving the detail view) must not leave a stale rename
   // draft armed for whichever tag comes next.
@@ -1640,20 +1752,7 @@ export function HistoryView({
   // 260904, etc.) rather than by a meeting-photo reference. Treat those explicit dates as the
   // source of truth before falling back to the upload timestamp; otherwise photos uploaded later
   // than the trip disappear from its memories group even though the date modal shows them.
-  const entryTaggedDates = entry => {
-    const text = String(entry?.tags || '');
-    const dates = [];
-    const dotted = /(?:^|[^\d])(20\d{2})[.\-/](\d{1,2})[.\-/](\d{1,2})(?!\d)/g;
-    let match;
-    while ((match = dotted.exec(text))) {
-      dates.push(`${match[1]}-${String(match[2]).padStart(2, '0')}-${String(match[3]).padStart(2, '0')}`);
-    }
-    const compact = /(?:^|[^\d])(\d{2})(\d{2})(\d{2})(?!\d)/g;
-    while ((match = compact.exec(text))) {
-      dates.push(`20${match[1]}-${match[2]}-${match[3]}`);
-    }
-    return dates;
-  };
+  const entryTaggedDates = entry => parseHistoryDateTokens(entry?.tags || '');
   const entryMatchesDateRange = (entry, start, end) => {
     if (!entry || !start || !end) return false;
     if (entry.meetingDate) {

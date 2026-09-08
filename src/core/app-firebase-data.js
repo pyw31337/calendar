@@ -2463,9 +2463,63 @@ function normalizeConfirmedMeetingExpenses(expenses) {
 function normalizeConfirmedMeetingsForSave(meetings) {
   return mergeConfirmedMeetings([], meetings);
 }
+
+// Reads only the date docs about to be overwritten. Expense/note saves often carry a short local
+// photos array; merging with the live server docs keeps alive photos (and their tags) from being
+// clobbered while still allowing newer soft-deletes (deletedAt tombstones) to win.
+async function fetchExistingConfirmedMeetingsForDates(calendarId, dates) {
+  const uniqueDates = Array.from(new Set((Array.isArray(dates) ? dates : []).map(date => String(date || '')).filter(Boolean)));
+  if (!uniqueDates.length) return [];
+  const byDate = new Map();
+  const missing = new Set(uniqueDates);
+
+  if (firebaseDb) {
+    try {
+      const colRef = firebaseDb.collection('calendars').doc(`cal_${calendarId}`).collection('confirmedMeetings');
+      await Promise.all(uniqueDates.map(async date => {
+        try {
+          const snap = await withTimeout(colRef.doc(date).get({ source: 'server' }), FIRESTORE_REQUEST_TIMEOUT_MS, 'confirmedMeeting read timeout');
+          missing.delete(date);
+          if (snap?.exists) byDate.set(date, { date, ...(snap.data() || {}) });
+        } catch (err) {
+          console.warn(`Failed to read confirmed meeting ${date} via SDK:`, err);
+        }
+      }));
+    } catch (err) {
+      console.warn(`Failed to batch-read confirmed meetings for ${calendarId} via SDK:`, err);
+    }
+  }
+
+  if (missing.size > 0) {
+    try {
+      const configuredProjectId = firebaseConfig.projectId;
+      if (configuredProjectId) {
+        await Promise.all(Array.from(missing).map(async date => {
+          try {
+            const res = await fetchFirestoreRequest(
+              `https://firestore.googleapis.com/v1/projects/${configuredProjectId}/databases/(default)/documents/calendars/cal_${calendarId}/confirmedMeetings/${date}`
+            );
+            if (!res.ok) return;
+            const doc = firestoreDocumentToJs(await res.json());
+            if (doc && typeof doc === 'object') byDate.set(date, { ...doc, date: doc.date || date });
+          } catch (err) {
+            console.warn(`Failed to read confirmed meeting ${date} via REST:`, err);
+          }
+        }));
+      }
+    } catch (err) {
+      console.warn(`Failed to REST-read confirmed meetings for ${calendarId}:`, err);
+    }
+  }
+
+  return Array.from(byDate.values());
+}
+
 async function writeConfirmedMeetingsToFirestore(calendarId, meetings) {
   // Fallback contract: if (res.ok) return true; otherwise use if (firebaseDb) SDK fallback.
-  const validMeetings = normalizeConfirmedMeetingsForSave(meetings);
+  const incomingMeetings = normalizeConfirmedMeetingsForSave(meetings);
+  const existingMeetings = await fetchExistingConfirmedMeetingsForDates(calendarId, incomingMeetings.map(meeting => meeting.date));
+  const validMeetings = mergeConfirmedMeetings(existingMeetings, incomingMeetings);
   try {
     const configuredProjectId = firebaseConfig.projectId;
     if (!configuredProjectId) throw new Error('Firebase project id is unavailable');
@@ -2641,12 +2695,13 @@ async function pushSingleCalendarWithRest(normalizedCal, lastModified, saveMode,
         // highest-priority source for the same reason — ensures newly added or edited
         // expenses/notes are actually written to the subcollection instead of being
         // overwritten by the stale serverCalendar or auxiliaryData arrays.
-        const legacyMeetingsByDate = new Map();
-        [...(Array.isArray(serverCalendar?.confirmedMeeting) ? serverCalendar.confirmedMeeting : []),
-          ...(Array.isArray(auxiliaryData?.confirmedMeetings) ? auxiliaryData.confirmedMeetings : []),
-          ...(Array.isArray(mergedCalendar?.confirmedMeeting) ? mergedCalendar.confirmedMeeting : [])]
-          .forEach(m => { if (m?.date) legacyMeetingsByDate.set(m.date, m); });
-        legacyConfirmedMeetings = Array.from(legacyMeetingsByDate.values());
+        legacyConfirmedMeetings = mergeConfirmedMeetings(
+          mergeConfirmedMeetings(
+            Array.isArray(serverCalendar?.confirmedMeeting) ? serverCalendar.confirmedMeeting : [],
+            Array.isArray(auxiliaryData?.confirmedMeetings) ? auxiliaryData.confirmedMeetings : []
+          ),
+          Array.isArray(mergedCalendar?.confirmedMeeting) ? mergedCalendar.confirmedMeeting : []
+        );
         docCalendar = stripEmbeddedConfirmedMeetingField(stripEmbeddedPlacesField(docCalendar));
       }
       const validationError = validateCalendarShape(docCalendar);
@@ -2806,12 +2861,13 @@ async function pushSingleCloudCalendar(targetCal, lastModified, retryCount = 4, 
 	            // highest-priority source for the same reason — ensures newly added or edited
 	            // expenses/notes are actually written to the subcollection instead of being
 	            // overwritten by the stale serverCalendar or auxiliaryData arrays.
-	            const legacyMeetingsByDate = new Map();
-            [...(Array.isArray(serverCalendar?.confirmedMeeting) ? serverCalendar.confirmedMeeting : []),
-              ...(Array.isArray(auxiliaryData?.confirmedMeetings) ? auxiliaryData.confirmedMeetings : []),
-              ...(Array.isArray(mergedCalendar?.confirmedMeeting) ? mergedCalendar.confirmedMeeting : [])]
-	              .forEach(m => { if (m?.date) legacyMeetingsByDate.set(m.date, m); });
-	            legacyConfirmedMeetings = Array.from(legacyMeetingsByDate.values());
+	            legacyConfirmedMeetings = mergeConfirmedMeetings(
+	              mergeConfirmedMeetings(
+	                Array.isArray(serverCalendar?.confirmedMeeting) ? serverCalendar.confirmedMeeting : [],
+	                Array.isArray(auxiliaryData?.confirmedMeetings) ? auxiliaryData.confirmedMeetings : []
+	              ),
+	              Array.isArray(mergedCalendar?.confirmedMeeting) ? mergedCalendar.confirmedMeeting : []
+	            );
 	            docCalendar = stripEmbeddedConfirmedMeetingField(stripEmbeddedPlacesField(docCalendar));
 	          }
 	          const validationError = validateCalendarShape(docCalendar);
@@ -3824,6 +3880,8 @@ export {
   writePlacesToFirestore,
   fetchPlacesFromFirestore,
   stripEmbeddedConfirmedMeetingField,
+  mergeConfirmedMeetings,
+  mergeConfirmedMeetingItems,
   writeConfirmedMeetingsToFirestore,
   fetchConfirmedMeetingsFromFirestore,
   isRetryableFirestoreConflict,
