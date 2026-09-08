@@ -146,6 +146,7 @@ import {
 import { fetchPhotoComments, savePhotoComments } from './photo-comments.js';
 import { createPhotoCommentStore } from './photo-comment-store.js';
 import { useGalleryPhotoIndex } from './photo-index.js';
+import { useGalleryArchiveState } from './gallery-archive-state.js';
 import { cloneConfirmedMeetings, commitConfirmedMeetingChanges } from './confirmed-meeting-coordinator.js';
 import { getInitialAppView, buildAppViewUrl } from './app-routing-state.js';
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
@@ -1430,41 +1431,10 @@ function CalendarApp() {
     React, calendarId: activeCalId, activeView,
     projectId: firebaseConfig.projectId, decodeDocument: firestoreDocumentToJs
   });
-  const [fullChatHistoryByCalendar, setFullChatHistoryByCalendar] = React.useState({});
-  const fullChatMessages = fullChatHistoryByCalendar[activeCalId] || null;
-  const displayChatMessages = React.useMemo(() => {
-    if (!Array.isArray(fullChatMessages)) return allChatMessages;
-    const byId = new Map(fullChatMessages.filter(m => m?.id).map(m => [m.id, m]));
-    allChatMessages.forEach(m => { if (m?.id) byId.set(m.id, m); });
-    return Array.from(byId.values()).sort((a, b) => Number(a.timestamp || 0) - Number(b.timestamp || 0));
-  }, [allChatMessages, fullChatMessages]);
-  const galleryChatMessages = React.useMemo(() => {
-    const byId = new Map();
-    (galleryPreviewMessages || []).forEach(m => { if (m?.id) byId.set(m.id, m); });
-    displayChatMessages.forEach(m => { if (m?.id) byId.set(m.id, m); });
-    return Array.from(byId.values()).sort((a, b) => Number(a.timestamp || 0) - Number(b.timestamp || 0));
-  }, [displayChatMessages, galleryPreviewMessages]);
-  React.useEffect(() => {
-    // Search results must be complete even when the search modal is opened from the calendar
-    // view. Previously the full-history hydration only ran for chat/gallery routes, so a search
-    // opened from the main page silently searched the bounded realtime window instead.
-    //
-    // 보관함(history) 인물/추억 탭도 마찬가지 문제였다: HistoryView가 받는 chatMessages
-    // (galleryChatMessages)는 이 hydration이 없으면 실시간 리스너의 최근 N개짜리 창에만
-    // 묶여 있어서, 그 창보다 오래된 사진에 붙은 해시태그(#도연/#도은/#서준 등)는 아무리
-    // 정확히 태그해도 인물 탭에서 영원히 안 보였다 -- 태그 매칭 로직 자체는 멀쩡했지만
-    // 매칭할 데이터 자체가 애초에 없었던 것.
-    if (!activeCalId || (!isGlobalSearchOpen && activeView !== 'history' && activeView !== 'gallery') || fullChatHistoryByCalendar[activeCalId] !== undefined) return;
-    let cancelled = false;
-    // Full-history consumers still receive every message (this remains the full chat history read), but the data layer walks the
-    // collection in cursor pages instead of issuing one unbounded SDK GET. This keeps the
-    // gallery/person-tag/search index correct without making the initial realtime window huge.
-    fetchAllChatMessagesRest(activeCalId).then(list => {
-      if (cancelled) return;
-      setFullChatHistoryByCalendar(prev => ({ ...prev, [activeCalId]: Array.isArray(list) ? list : [] }));
-    }).catch(err => console.warn('full paged chat history load failed:', err));
-    return () => { cancelled = true; };
-  }, [activeCalId, isGlobalSearchOpen, activeView, firebaseDb, firebaseConnectionVersion, fullChatHistoryByCalendar]);
+  const { fullChatMessages, displayChatMessages, galleryChatMessages, galleryMemos } = useGalleryArchiveState({
+    React, activeCalId, activeView, isGlobalSearchOpen, firebaseDb, firebaseConnectionVersion,
+    allChatMessages, galleryPreviewMessages, memos, fetchAllChatMessagesRest, fetchCalendarSearchIndex
+  });
   // The chat embed the user tapped play on -- { key, embedUrl, provider, orientation, title } |
   // null. Once set, it's rendered through a SINGLE always-mounted portal iframe (StickyVideoBox)
   // that never unmounts across view/tab switches, so playback genuinely never stops -- only its
@@ -7757,7 +7727,7 @@ function CalendarApp() {
       /*#__PURE__*/React.createElement(ChatGalleryModal, {
         calendar: activeCal,
         chatMessages: galleryChatMessages,
-        memos: memos,
+        memos: galleryMemos,
         asPage: true,
         onClose: () => changeView('calendar'),
         onUploadImages: handleUploadGalleryImages,

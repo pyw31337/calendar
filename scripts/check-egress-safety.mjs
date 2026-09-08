@@ -4,9 +4,9 @@ const services = fs.readFileSync('src/core/firebase-services.js', 'utf8');
 const data = fs.readFileSync('src/core/app-firebase-data.js', 'utf8');
 const helpers = fs.readFileSync('src/core/app-domain-helpers.js', 'utf8');
 const config = fs.readFileSync('src/core/app-config.js', 'utf8');
-const main = fs.readFileSync('src/core/app-main.js', 'utf8');
 const gallery = fs.readFileSync('src/ui/ui-chat-gallery.js', 'utf8');
 const photoIndex = fs.readFileSync('src/core/photo-index.js', 'utf8');
+const galleryArchive = fs.readFileSync('src/core/gallery-archive-state.js', 'utf8');
 const index = fs.readFileSync('src/index.html', 'utf8');
 
 function assert(condition, message) {
@@ -23,12 +23,12 @@ assert(/message\.thumbUrl \|\| message\.thumbUrls\?\.\[0\]/.test(helpers), 'noti
 assert(!/getDownloadURL\([^)]*imageUrl/.test(data), 'data records must not resolve Storage URLs repeatedly from render data');
 assert(/CHAT_INITIAL_MESSAGE_LIMIT:\s*5/.test(config), 'chat must retain a five-message critical first window');
 assert(/CHAT_OLDER_PAGE_SIZE:\s*20/.test(config), 'older chat reads must retain small cursor pages');
-// Full chat history hydration is allowed for two deliberate, user-initiated triggers: the
-// global search modal being open, or the 보관함(history) 인물/추억 tabs being the active view
+// Full chat history hydration is allowed for deliberate, user-initiated triggers: global search,
+// 보관함(history), or Gallery (whose contract includes all historic chat/memo links)
 // (their photo-tag matching needs the complete history, not just the bounded realtime window --
 // see the effect's own comment in app-main.js). Both are explicit navigations, not a background
 // effect that could fire unconditionally, so this still guards against unbounded egress.
-assert(/isGlobalSearchOpen[\s\S]{0,40}activeView !== 'history'[\s\S]{0,60}fullChatHistoryByCalendar/.test(main), 'full chat history must only hydrate for an explicit search or the history view');
+assert(/isGlobalSearchOpen[\s\S]{0,40}activeView !== 'history'[\s\S]{0,40}activeView !== 'gallery'/.test(galleryArchive), 'full archives must only hydrate for explicit search, history, or gallery views');
 assert(!/visiblePhotos \|\| \[\]\)\.length >= 60[\s\S]{0,100}onLoadOlderChat/.test(gallery), 'gallery must not auto-chain older history reads');
 assert(/const PAGE_SIZE = 100/.test(photoIndex) && /indexedPhotoTotal[^\n]*\/ 100/.test(gallery), 'gallery must cap each rendered photo page at 100 items');
 assert(!/<script[^>]+firebase-storage-compat/.test(index), 'Storage SDK must stay off the initial document path');

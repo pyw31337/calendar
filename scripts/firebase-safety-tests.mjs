@@ -191,6 +191,7 @@ assert(dateModalSource.includes('getPhotoAssetKeys(photo)'), 'schedule albums mu
 assert(dateModalSource.includes('assetKeys.some(assetKey => directKeys.has(assetKey))'), 'tagged chat/memo photos must use the same asset identity as schedule albums');
 assert(photoIndexSource.includes('complete: true'), 'photo index must support complete hydration for cross-page search/date views');
 assert(chatGallerySource.includes('requiresCompletePhotoIndex'), 'gallery search/date modes must request the complete photo index');
+assert(appMainSource.includes('memos: galleryMemos'), 'gallery must receive the complete paged memo archive for old photos and links');
 assert(lightboxSource.includes("overflowY: isDesktop ? 'auto' : 'visible'"), 'mobile photo comments must not use an inner vertical scrollbar');
 assert(appMainSource.includes("console.info('[calendar-save]'"), 'calendar saves must emit an operation diagnostic');
 assert(appMainSource.includes("console.warn('[calendar-save-failed]'"), 'failed calendar saves must emit an operation diagnostic');
@@ -336,6 +337,7 @@ assert(!deletedPlaceProbe.places.some(place => place.id === 'place_delete'), 'ex
 // <script> -- see check-tab-wiring.mjs for the rationale).
 const script = fs.readFileSync('assets/app-main.js', 'utf8');
 const sourceScript = fs.readFileSync('src/core/app-main.js', 'utf8');
+const galleryArchiveSource = fs.readFileSync('src/core/gallery-archive-state.js', 'utf8');
 const memoScript = fs.readFileSync('src/ui/ui-memo-view.js', 'utf8');
 const eventModalScript = fs.readFileSync('src/ui/ui-event-modals.js', 'utf8');
 const weatherScript = fs.readFileSync('src/ui/ui-weather.js', 'utf8');
@@ -428,7 +430,7 @@ assert(/const saved = typeof onSave === 'function' \? await onSave\(newCard\) : 
 assert(firebaseDataScript.includes("const addDocumentId = method === 'add'") && firebaseDataScript.includes('colRef.doc(addDocumentId).set'), 'collection adds must share one id across SDK and REST retries');
 assert(/const restMethod = method === 'add' \? 'set' : method/.test(firebaseDataScript), 'collection add REST fallback must use the shared document id');
 assert(/const updateCalendars = async[\s\S]{0,420}if \(isSavingRef\.current\) return false/.test(sourceScript), 'calendar saves must reject duplicate in-flight submissions');
-assert(/shared memo read/.test(sourceScript) && /full chat history read/.test(sourceScript), 'screen-level Firestore reads must have bounded timeouts');
+assert(/shared memo read/.test(sourceScript) && /fetchCalendarSearchIndex/.test(galleryArchiveSource), 'screen-level Firestore reads must use bounded data-layer fetchers');
 assert(/메시지 분할 저장'[\s\S]{0,120}documentId: `edit_/.test(sourceScript), 'edited message image chunks must use deterministic document ids');
 assert(!/checkProxyRateLimit\(\$\{bucketKey\}\) failed, allowing request[\s\S]{0,160}return true/.test(fs.readFileSync('functions/index.js', 'utf8')), 'proxy limiter must not fail open');
 const setChatNotifyPrefBody = script.match(/function setChatNotifyEnabledForCalendar\(calId, enabled\) \{([\s\S]*?)\n\}/)?.[1] || '';

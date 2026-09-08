@@ -82,6 +82,7 @@ export default defineConfig({
           if (id.includes('/core/photo-comments')) return 'photo-comments';
           if (id.includes('/core/photo-comment-store')) return 'photo-comment-store';
           if (id.includes('/core/gallery-data')) return 'gallery-data';
+          if (id.includes('/core/gallery-archive-state')) return 'gallery-archive-state';
           if (id.includes('/core/photo-index')) return 'photo-index';
           if (id.includes('/core/app-main')) return 'app-main';
         }
