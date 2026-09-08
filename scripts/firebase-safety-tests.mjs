@@ -3,6 +3,7 @@ import vm from 'node:vm';
 import { GATHER_APP_UTILS, omitUndefinedDeep } from '../src/core/app-utils.js';
 import { calculateSettlementRows } from '../src/core/settlement-calculator.js';
 import { fetchPhotoComments, savePhotoComments } from '../src/core/photo-comments.js';
+import { composeGalleryPhotos, paginateGalleryItems, getPaginationWindow } from '../src/core/gallery-data.js';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -117,12 +118,33 @@ const writeQueueSource = fs.readFileSync(new URL('../src/core/app-write-queue.js
     const [entry] = getMessageImageEntries({ id: `source-${uploadSource}`, uploadSource, imageUrl: `https://example.com/${uploadSource}.jpg` });
     assert(entry?.source === uploadSource, `${uploadSource} image was incorrectly reclassified as ${entry?.source || 'missing'}`);
   }
+
+  const galleryContractPhotos = composeGalleryPhotos({
+    chatMessages: [{ id: 'chat-a', imageUrl: 'https://example.com/a.jpg', timestamp: 30 }],
+    memos: [{ id: 'memo-b', imageUrl: 'https://example.com/b.jpg', createdAt: 20 }],
+    calendar: { confirmedMeetings: [{ date: '2026-09-08', photos: [
+      { id: 'copy-a', imageUrl: 'https://example.com/a.jpg' },
+      { id: 'meeting-c', imageUrl: 'https://example.com/c.jpg' }
+    ] }] },
+    isTombstone: () => false,
+    getMessageImageEntries,
+    getAllDirectMediaImageEntries: () => [],
+    getConfirmedMeetings: calendar => calendar.confirmedMeetings || [],
+    resolveMeetingPhotoDisplay: photo => photo,
+    isBrokenPhotoValue: () => false,
+    getPhotoAssetCommentKey
+  });
+  assert(galleryContractPhotos.length === 3, 'gallery must union chat, memo and schedule photos and dedupe one shared asset');
+  assert(new Set(galleryContractPhotos.map(photo => photo.source)).has('meeting'), 'gallery lost a schedule-only photo');
+  assert(paginateGalleryItems(Array.from({ length: 205 }), 3).items.length === 5, 'gallery page size must remain 100');
+  assert(getPaginationWindow(6, 12, 5).join(',') === '6,7,8,9,10', 'mobile pagination window must advance in five-page blocks');
 }
 assert(writeQueueSource.includes('nextAttemptAt: Number(operation.nextAttemptAt) || 0'), 'queued operations must persist retry backoff metadata');
 assert(writeQueueSource.includes("await deferOperation(operation, new Error('대기 저장이 완료되지 않았습니다.'))"), 'false queue handler results must be deferred with backoff');
 const appMainSource = fs.readFileSync(new URL('../src/core/app-main.js', import.meta.url), 'utf8');
 const chatGallerySource = fs.readFileSync(new URL('../src/ui/ui-chat-gallery.js', import.meta.url), 'utf8');
 const lightboxSource = fs.readFileSync(new URL('../src/ui/ui-lightbox.js', import.meta.url), 'utf8');
+const summaryGallerySource = fs.readFileSync(new URL('../src/ui/ui-summary-gallery.js', import.meta.url), 'utf8');
 assert(lightboxSource.includes('isMeetingMessageTagTarget'), 'meeting message uploads must expose per-photo tag controls');
 assert(appMainSource.includes('Number.isInteger(imageIndex) && !meta.meetingDate'), 'meeting message tag edits must route to their messages document');
 assert(appMainSource.includes("activeView !== 'gallery'"), 'gallery route must hydrate the complete paged message history');
@@ -137,6 +159,7 @@ assert(lightboxSource.includes('preloadedPhotoCommentsReady'), 'lightbox must in
 assert(lightboxSource.includes('photoCommentsFetchRef'), 'lightbox comment fetch callback must stay stable across unrelated renders');
 assert(lightboxSource.includes('photoCommentsFetchedRef.current.delete(photoCommentKey)'), 'cancelled or failed comment requests must remain retryable');
 assert(lightboxSource.includes('댓글 다시 불러오기'), 'failed lightbox comment reads must expose an inline retry action');
+assert(!summaryGallerySource.includes('const fallbackDate = entryDateStr(entry)'), 'memories must not treat upload time as schedule membership');
 const dateModalSource = fs.readFileSync(new URL('../src/ui/ui-date-modal.js', import.meta.url), 'utf8');
 assert(dateModalSource.includes('getPhotoAssetCommentKey(photo)'), 'schedule albums must dedupe REST/index/live copies by rendered asset');
 assert(lightboxSource.includes("overflowY: isDesktop ? 'auto' : 'visible'"), 'mobile photo comments must not use an inner vertical scrollbar');

@@ -15,6 +15,10 @@ function getPhotoCommentCount(...args) {
   const f = __gatherUiDeps().getPhotoCommentCount || GATHER_APP_UTILS.getPhotoCommentCount;
   return typeof f === 'function' ? f(...args) : 0;
 }
+function getPhotoAssetCommentKey(...args) {
+  const f = __gatherUiDeps().getPhotoAssetCommentKey || GATHER_APP_UTILS.getPhotoAssetCommentKey;
+  return typeof f === 'function' ? f(...args) : '';
+}
 function getActiveAvailabilities(calendar) {
   const f = __gatherUiDeps().getActiveAvailabilities || GATHER_APP_UTILS.getActiveAvailabilities;
   return typeof f === 'function' ? f(calendar) : [];
@@ -1598,7 +1602,7 @@ export function HistoryView({
     const byKey = new Map();
     const sourceRank = { chat: 0, memo: 1, meeting: 2, anniversary: 3 };
     [...baseHistoryPhotoEntries, ...indexedMeetingPhotoEntries].forEach(entry => {
-      const key = entry.mediaKey || entry.refKey || entry.full || entry.thumb;
+      const key = getPhotoAssetCommentKey(entry) || entry.mediaKey || entry.refKey || entry.full || entry.thumb;
       if (!key) return;
       const prev = byKey.get(key);
       if (!prev || (sourceRank[entry.source] ?? 9) < (sourceRank[prev.source] ?? 9)) byKey.set(key, entry);
@@ -1751,7 +1755,8 @@ export function HistoryView({
       tags: p.tags, directMediaUrl: p.directMediaUrl, source: p.source, uploadSource: p.uploadSource,
       anniversaryId: p.anniversaryId,
       meetingDate: p.meetingDate, photoId: p.photoId, sourceMessageId: p.sourceMessageId,
-      sourceImageIndex: p.sourceImageIndex, mediaKey: p.mediaKey, refKey: p.refKey
+      sourceImageIndex: p.sourceImageIndex, mediaKey: p.mediaKey, refKey: p.refKey,
+      legacyKeys: p.legacyKeys
     }));
     setHistoryLightbox({ urls, index, meta, memoryId });
   };
@@ -1759,14 +1764,8 @@ export function HistoryView({
   // 사진을 모아 보여준다 (여행만이 아니라 행사/축제/생일 등도 사진이 있으면 노출).
   // 모임(meeting) 사진은 timestamp(업로드/확정 시각)와 실제 모임 날짜(meetingDate)가 다른 경우가
   // 많다 -- 모임 당일이 아니라 나중에 사진을 올리거나 확정하는 경우가 흔하기 때문. 그래서
-  // meetingDate가 있으면 그걸 우선 쓰고, 채팅/메모처럼 모임과 무관한 사진만 timestamp로 폴백한다.
-  const entryDateStr = entry => {
-    if (entry?.meetingDate) return String(entry.meetingDate).slice(0, 10);
-    const ts = Number(entry?.timestamp) || 0;
-    if (!ts) return '';
-    const d = new Date(ts);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  };
+  // Upload time is not schedule membership. Timestamp fallback used to mix unrelated chat or
+  // memo photos uploaded during a trip into that memory.
   // Chat/memo photos can be attached to a meeting by a compact date hashtag (26.09.04,
   // 260904, etc.) rather than by a meeting-photo reference. Treat those explicit dates as the
   // source of truth before falling back to the upload timestamp; otherwise photos uploaded later
@@ -1779,8 +1778,11 @@ export function HistoryView({
       if (meetingDate >= start && meetingDate <= end) return true;
     }
     if (entryTaggedDates(entry).some(date => date >= start && date <= end)) return true;
-    const fallbackDate = entryDateStr(entry);
-    return !!fallbackDate && fallbackDate >= start && fallbackDate <= end;
+    if (entry.source === 'anniversary') {
+      const anniversaryDate = String(entry.meetingDate || '').slice(0, 10);
+      return !!anniversaryDate && anniversaryDate >= start && anniversaryDate <= end;
+    }
+    return false;
   };
   const travelMemoryGroups = React.useMemo(() => {
     // range 타입(dayMode==='range')이 아닌 once/yearly 타입(하루짜리) 여행 기념일은

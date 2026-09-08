@@ -2,6 +2,8 @@
  * Chat / gallery modal (P4-13)
  */
 
+import { composeGalleryPhotos } from '../core/gallery-data.js';
+
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 function __gatherUiDeps() { return window.GATHER_UI_DEPS || {}; }
@@ -556,8 +558,21 @@ export function ChatGalleryModal({
         firstUrlSeen = true;
       });
     });
+    getConfirmedMeetings(calendar).forEach(meeting => {
+      const body = [meeting?.note, meeting?.memo, meeting?.description, meeting?.text].filter(Boolean).join('\n');
+      if (!body) return;
+      extractAllUrlInfosLoose(body).forEach(info => {
+        if (!info.url || seen.has(info.url) || getDirectChatMediaInfo(info.url)?.type === 'image') return;
+        seen.add(info.url);
+        list.push({
+          url: info.url, timestamp: meeting.updatedAt || meeting.confirmedAt || 0,
+          messageId: `meeting:${meeting.date || ''}`, text: body, source: 'meeting',
+          title: meeting.date ? `${meeting.date} 일정` : '일정'
+        });
+      });
+    });
     return list.sort((a, b) => b.timestamp - a.timestamp);
-  }, [chatMessages, memos]);
+  }, [chatMessages, memos, calendar]);
 
   const sharedPhotos = React.useMemo(() => {
     if (Array.isArray(indexedPhotos)) {
@@ -565,98 +580,11 @@ export function ChatGalleryModal({
         .filter(photo => photo && !isBrokenPhotoValue(photo.full) && !isBrokenPhotoValue(photo.thumb))
         .map(photo => ({ ...photo, source: photo.source || 'gallery' }));
     }
-    const list = [];
-    (chatMessages || []).forEach(msg => {
-      if (!msg || isTombstone(msg)) return;
-      const entries = [...getMessageImageEntries(msg), ...getAllDirectMediaImageEntries(msg)];
-      entries.forEach(entry => {
-        if (!entry || isBrokenPhotoValue(entry.full) || isBrokenPhotoValue(entry.thumb)) return;
-        list.push({
-          ...entry,
-          text: msg.text || '',
-          participantId: msg.participantId || '',
-          source: entry.source || 'chat'
-        });
-      });
+    return composeGalleryPhotos({
+      chatMessages, memos, calendar, isTombstone, getMessageImageEntries,
+      getAllDirectMediaImageEntries, getConfirmedMeetings, resolveMeetingPhotoDisplay,
+      isBrokenPhotoValue, getPhotoAssetCommentKey
     });
-    (memos || []).forEach(memo => {
-      if (!memo || isTombstone(memo)) return;
-      const memoTagsDisplay = Array.isArray(memo.tags) ? memo.tags.map(t => String(t || '').replace(/^#/, '')).filter(Boolean).join(' ') : '';
-      const asMsg = {
-        id: memo.id, text: memo.text || memo.content || memo.body || '',
-        imageUrl: memo.imageUrl, imageUrls: memo.imageUrls, thumbUrl: memo.thumbUrl, thumbUrls: memo.thumbUrls,
-        timestamp: memo.updatedAt || memo.createdAt || 0, participantId: memo.participantId || '',
-        uploadSource: 'memo'
-      };
-      const entries = [...getMessageImageEntries(asMsg), ...getAllDirectMediaImageEntries(asMsg)];
-      entries.forEach(entry => {
-        if (!entry || isBrokenPhotoValue(entry.full) || isBrokenPhotoValue(entry.thumb)) return;
-        list.push({
-          ...entry,
-          tags: memoTagsDisplay,
-          text: asMsg.text || '',
-          participantId: asMsg.participantId || '',
-          source: 'memo'
-        });
-      });
-    });
-    getConfirmedMeetings(calendar).forEach(meeting => {
-      const photos = Array.isArray(meeting?.photos) ? meeting.photos : [];
-      photos.forEach((photo, index) => {
-        if (photo?.sourceMessageId) {
-          const sourceMsg = (chatMessages || []).find(m => m && m.id === photo.sourceMessageId);
-          // The archived meeting photo already carries its own URL. An older source message may
-          // not be in the current paginated window; that must not hide the schedule photo itself.
-          if (sourceMsg && isTombstone(sourceMsg)) return;
-        }
-        const resolved = resolveMeetingPhotoDisplay ? resolveMeetingPhotoDisplay(photo, chatMessages) : null;
-        const full = String(resolved?.imageUrl || photo?.imageUrl || photo?.full || '');
-        const thumb = String(resolved?.thumbUrl || photo?.thumbUrl || photo?.thumb || full);
-        if (!full && !thumb) return;
-        if (isBrokenPhotoValue(full) || isBrokenPhotoValue(thumb)) return;
-        const mediaKey = resolved?.mediaKey
-          || photo?.mediaKey
-          || (photo?.sourceMessageId && Number.isInteger(photo?.sourceImageIndex)
-            ? `chat:${photo.sourceMessageId}:${photo.sourceImageIndex}`
-            : `meeting:${meeting.date || 'date'}:${photo?.id || index}`);
-        const refKey = resolved?.refKey || photo?.refKey || `meeting:${meeting.date || 'date'}:${photo?.id || index}`;
-        list.push({
-          full: full || thumb,
-          thumb: thumb || full,
-          imageIndex: index,
-          messageId: null,
-          photoId: photo?.id || '',
-          sourceMessageId: photo?.sourceMessageId || '',
-          sourceImageIndex: Number.isInteger(photo?.sourceImageIndex) ? photo.sourceImageIndex : null,
-          timestamp: Number(photo?.createdAt || photo?.updatedAt || meeting?.confirmedAt || 0),
-          tags: String(resolved?.tags ?? photo?.tags ?? ''),
-          directMediaUrl: '',
-          text: `${meeting.date || ''} 일정 사진`,
-          participantId: '',
-          source: 'meeting',
-          meetingDate: meeting.date || '',
-          mediaKey,
-          refKey
-        });
-      });
-    });
-    const byUrl = new Map();
-    const sourceRank = entry => entry?.messageId ? 0 : (entry?.source === 'memo' ? 1 : 2);
-    list.forEach(entry => {
-      // Feature-prefixed media keys treated one physical photo as different chat/gallery/meeting
-      // items. A normalized asset key provides real source-agnostic deduplication.
-      const key = getPhotoAssetCommentKey(entry) || entry.full || entry.thumb || entry.mediaKey || entry.refKey;
-      if (!key) return;
-      const existing = byUrl.get(key);
-      if (!existing) {
-        byUrl.set(key, { ...entry });
-      } else if (sourceRank(entry) < sourceRank(existing)) {
-        byUrl.set(key, { ...entry, meetingDate: entry.meetingDate || existing.meetingDate || '' });
-      } else if (!existing.meetingDate && entry.meetingDate) {
-        existing.meetingDate = entry.meetingDate;
-      }
-    });
-    return Array.from(byUrl.values()).sort((a, b) => b.timestamp - a.timestamp);
   }, [chatMessages, memos, calendar, indexedPhotos]);
 
   const filteredLinks = React.useMemo(() => {
