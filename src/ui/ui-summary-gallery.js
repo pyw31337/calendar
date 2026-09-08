@@ -1933,10 +1933,10 @@ export function HistoryView({
           display: 'flex', alignItems: 'center', fontWeight: 800, fontSize: '0.95rem',
           color: 'var(--text-main)', whiteSpace: 'nowrap', pointerEvents: 'none'
         }
-      }, calendar.title, " 기록"),
+      }, calendar.title, " 보관함"),
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
         /*#__PURE__*/React.createElement("button", {
-          type: "button", onClick: () => setIsSearchOpen(v => !v), title: "기록 검색", "aria-label": "기록 검색",
+          type: "button", onClick: () => setIsSearchOpen(v => !v), title: "보관함 검색", "aria-label": "보관함 검색",
           style: { background: 'none', border: 'none', cursor: 'pointer', padding: '6px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }
         }, SearchIcon ? /*#__PURE__*/React.createElement(SearchIcon, null) : "🔍"),
         /*#__PURE__*/React.createElement("button", {
@@ -1952,7 +1952,7 @@ export function HistoryView({
       onClose: () => { setIsSearchOpen(false); setSearchQuery(''); }
     }),
     UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
-      ariaLabel: "기록 탭",
+      ariaLabel: "보관함 탭",
       value: historyTab,
       onChange: changeHistoryTab,
       options: [
@@ -2469,14 +2469,14 @@ export function HistoryView({
     /*#__PURE__*/React.createElement(SideMenuOverlay, {
       isOpen: isMenuOpen,
       onClose: () => setIsMenuOpen(false),
-      homeLabel: "기록",
-      ariaLabel: "기록 메뉴",
+      homeLabel: "보관함",
+      ariaLabel: "보관함 메뉴",
       calendar,
       onGoHome: () => { setIsMenuOpen(false); if (typeof onChangeView === 'function') onChangeView('calendar'); else if (typeof onBack === 'function') onBack(); },
       extraItems: [{
         onClick: () => { setIsMenuOpen(false); setIsSearchOpen(true); },
         icon: SearchIcon ? /*#__PURE__*/React.createElement(SearchIcon, null) : "🔍",
-        title: "기록 검색",
+        title: "보관함 검색",
         desc: "지난모임 날짜·참여자·메모·장소 검색"
       }],
       navBlockProps: {
