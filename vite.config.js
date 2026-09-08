@@ -4,6 +4,57 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+process.env.VITE_BUILD_SHA ||= 'dev';
+
+const mapVendorModule = id => (
+  id.includes('/leaflet/')
+  || id.includes('/leaflet.markercluster/')
+  || id.includes('/maplibre-gl/')
+  || id.includes('/@maplibre/')
+  || id.includes('/@mapbox/')
+  || id.includes('/@types/geojson/')
+  || id.includes('/csscolorparser/')
+  || id.includes('/earcut/')
+  || id.includes('/geojson-vt/')
+  || id.includes('/gl-matrix/')
+  || id.includes('/grid-index/')
+  || id.includes('/kdbush/')
+  || id.includes('/murmurhash-js/')
+  || id.includes('/pbf/')
+  || id.includes('/potpack/')
+  || id.includes('/quickselect/')
+  || id.includes('/supercluster/')
+  || id.includes('/tinyqueue/')
+  || id.includes('/vt-pbf/')
+  || id.includes('/@maplibre/maplibre-gl-style-spec/')
+);
+
+const chunkGroups = [
+  { name: 'vendor-map', test: mapVendorModule, priority: 50 },
+  { name: 'vendor-react-dom', test: id => id.includes('node_modules') && id.includes('react-dom'), priority: 45 },
+  { name: 'vendor-react', test: id => id.includes('node_modules') && id.includes('react'), priority: 40 },
+  { name: 'ui-admin', test: /[\\/]ui[\\/]ui-admin-/, priority: 35 },
+  { name: 'ui-calendar-core', test: /[\\/]ui[\\/]ui-calendar-core/, priority: 35 },
+  { name: 'ui-chat-room', test: /[\\/]ui[\\/]ui-chat-room/, priority: 35 },
+  { name: 'ui-places', test: /[\\/]ui[\\/]ui-places/, priority: 35 },
+  { name: 'ui-memo-view', test: /[\\/]ui[\\/]ui-memo-view/, priority: 35 },
+  { name: 'ui-event-modals', test: /[\\/]ui[\\/]ui-event-modals/, priority: 35 },
+  { name: 'ui-date-modal', test: /[\\/]ui[\\/]ui-date-modal/, priority: 35 },
+  { name: 'app-write-queue', test: /[\\/]core[\\/]app-write-queue/, priority: 30 },
+  { name: 'settlement-calculator', test: /[\\/]core[\\/]settlement-calculator/, priority: 30 },
+  { name: 'app-domain-helpers', test: /[\\/]core[\\/]app-domain-helpers/, priority: 30 },
+  { name: 'app-firebase-data', test: /[\\/]core[\\/]app-firebase-data/, priority: 30 },
+  { name: 'photo-comments', test: /[\\/]core[\\/]photo-comments/, priority: 30 },
+  { name: 'photo-comment-store', test: /[\\/]core[\\/]photo-comment-store/, priority: 30 },
+  { name: 'gallery-data', test: /[\\/]core[\\/]gallery-data/, priority: 30 },
+  { name: 'gallery-archive-state', test: /[\\/]core[\\/]gallery-archive-state/, priority: 30 },
+  { name: 'photo-index', test: /[\\/]core[\\/]photo-index/, priority: 30 },
+  { name: 'notification-pwa-state', test: /[\\/]core[\\/]notification-pwa-state/, priority: 30 },
+  { name: 'app-data-bootstrap', test: /[\\/]core[\\/]app-data-bootstrap/, priority: 30 },
+  { name: 'app-shell-state', test: /[\\/]core[\\/]app-shell-state/, priority: 30 },
+  { name: 'app-main', test: /[\\/]core[\\/]app-main/, priority: 20 },
+  { name: 'vendor', test: /node_modules/, priority: 10 }
+];
 
 export default defineConfig({
   plugins: [react()],
@@ -16,6 +67,9 @@ export default defineConfig({
   build: {
     outDir: path.resolve(__dirname, 'dist'),
     emptyOutDir: true,
+    // Vite 8 raised its default browser baseline. Keep the wider compatibility contract the
+    // existing service already supported instead of silently dropping older iOS/webviews.
+    target: ['es2020', 'edge88', 'firefox78', 'chrome87', 'safari14'],
     minify: 'terser',
     terserOptions: {
       compress: {
@@ -23,69 +77,18 @@ export default defineConfig({
       }
     },
     cssCodeSplit: true,
-    rollupOptions: {
+    rolldownOptions: {
+      checks: {
+        // Terser is intentionally used for the production size contract; its render hook is
+        // expected to dominate this small build, so Rolldown's timing notice is only noise.
+        pluginTimings: false
+      },
       output: {
-        manualChunks(id) {
-          if (id.includes('node_modules')) {
-            // Leaflet/MapLibre are only needed by the places map. Keep their sizeable renderer,
-            // bridge and CSS in a lazy chunk so calendar/chat/memo startup never pays for maps.
-            if (
-              id.includes('/leaflet/') ||
-              id.includes('/leaflet.markercluster/') ||
-              id.includes('/maplibre-gl/') ||
-              id.includes('/@maplibre/') ||
-              id.includes('/@mapbox/') ||
-              id.includes('/@types/geojson/') ||
-              id.includes('/csscolorparser/') ||
-              id.includes('/earcut/') ||
-              id.includes('/geojson-vt/') ||
-              id.includes('/gl-matrix/') ||
-              id.includes('/grid-index/') ||
-              id.includes('/kdbush/') ||
-              id.includes('/murmurhash-js/') ||
-              id.includes('/pbf/') ||
-              id.includes('/potpack/') ||
-              id.includes('/quickselect/') ||
-              id.includes('/supercluster/') ||
-              id.includes('/tinyqueue/') ||
-              id.includes('/vt-pbf/') ||
-              id.includes('/@maplibre/maplibre-gl-style-spec/')
-            ) return 'vendor-map';
-            if (id.includes('react-dom')) return 'vendor-react-dom';
-            if (id.includes('react')) return 'vendor-react';
-            return 'vendor';
-          }
-          // These small core modules are shared by app-main and lazy feature views. Assigning
-          // them explicitly prevents Rollup from pulling an entire lazy UI chunk back into the
-          // startup graph merely because that view imports the same coordinator.
-          if (id.includes('/core/app-write-queue')) return 'app-write-queue';
-          if (id.includes('/core/settlement-calculator')) return 'settlement-calculator';
-          if (id.includes('/ui/ui-admin-')) return 'ui-admin';
-          // Preserve real screen-level lazy loading. Grouping calendar-core with chat/places (or
-          // memo with event modals) caused Rollup to download the entire group as soon as one
-          // member was needed, defeating the dynamic loaders in src/main.jsx.
-          if (id.includes('/ui/ui-calendar-core')) return 'ui-calendar-core';
-          if (id.includes('/ui/ui-chat-room')) return 'ui-chat-room';
-          if (id.includes('/ui/ui-places')) return 'ui-places';
-          if (id.includes('/ui/ui-memo-view')) return 'ui-memo-view';
-          if (id.includes('/ui/ui-event-modals')) return 'ui-event-modals';
-          if (id.includes('/ui/ui-date-modal')) return 'ui-date-modal';
-          // app-domain-helpers/app-firebase-data are only ever imported by app-main.js, but each
-          // is given its own chunk explicitly (Rollup's default heuristic would otherwise inline
-          // a single-importer module straight back into its importer's chunk) so splitting them
-          // out of app-main.js actually shrinks the app-main chunk instead of just reorganizing
-          // its source internally.
-          if (id.includes('/core/app-domain-helpers')) return 'app-domain-helpers';
-          if (id.includes('/core/app-firebase-data')) return 'app-firebase-data';
-          if (id.includes('/core/photo-comments')) return 'photo-comments';
-          if (id.includes('/core/photo-comment-store')) return 'photo-comment-store';
-          if (id.includes('/core/gallery-data')) return 'gallery-data';
-          if (id.includes('/core/gallery-archive-state')) return 'gallery-archive-state';
-          if (id.includes('/core/photo-index')) return 'photo-index';
-          if (id.includes('/core/notification-pwa-state')) return 'notification-pwa-state';
-          if (id.includes('/core/app-data-bootstrap')) return 'app-data-bootstrap';
-          if (id.includes('/core/app-shell-state')) return 'app-shell-state';
-          if (id.includes('/core/app-main')) return 'app-main';
+        // Vite 8 uses Rolldown. Keep dependencies out of a matched group's chunk so a small
+        // coordinator never drags lazy screens back into the startup graph.
+        codeSplitting: {
+          includeDependenciesRecursively: false,
+          groups: chunkGroups
         }
       }
     },
