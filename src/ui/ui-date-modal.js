@@ -7,6 +7,10 @@ const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
 const BULK_NO_PARTICIPANT_ID = GATHER_APP_CONSTANTS.BULK_NO_PARTICIPANT_ID || '__none__';
 function __gatherUiDeps() { return window.GATHER_UI_DEPS || {}; }
+function getPhotoAssetCommentKey(...args) {
+  const f = __gatherUiDeps().getPhotoAssetCommentKey || GATHER_APP_UTILS.getPhotoAssetCommentKey;
+  return typeof f === 'function' ? f(...args) : '';
+}
 // 영화는 실제 상영관(장소)이 없는데도, 공공 영화 데이터 API 스키마가 venue 필드를 필수로 요구해서
 // 크롤링 원본이 항상 이 문자열을 채워 넣어 온다(scripts/sync-culture-performances.mjs가 그대로
 // 전달, culture-movies.json 확인). handleRegisterCultureEvent(app-main.js)가 이 값을 실제 장소로
@@ -1065,21 +1069,19 @@ export function DateModal({
         };
       })
       .filter((photo, index, photos) => {
-        // Dedupe by photo.id first. resolveMeetingPhotoDisplay(...).mediaKey can collapse many
-        // distinct meeting uploads onto one key (missing/NaN sourceImageIndex → shared fallback),
-        // which made jhair 2026-06-13 show 사진 1 despite 14 alive server rows.
-        if (photo.id) {
-          return photos.findIndex(candidate => candidate.id && candidate.id === photo.id) === index;
-        }
-        const key = photo.mediaKey || photo.refKey || photo.imageUrl || photo.thumbUrl;
+        // Album, index and live rows can have different ids for one rendered asset, while legacy
+        // media keys can be shared by many assets. A normalized rendered URL is the only stable
+        // cross-source and photo-specific identity; ids remain the URL-less fallback.
+        const key = getPhotoAssetCommentKey(photo)
+          || photo.id || photo.refKey || photo.mediaKey || photo.imageUrl || photo.thumbUrl;
         return photos.findIndex(candidate => {
-          if (candidate.id) return false;
-          const candidateKey = candidate.mediaKey || candidate.refKey || candidate.imageUrl || candidate.thumbUrl;
+          const candidateKey = getPhotoAssetCommentKey(candidate)
+            || candidate.id || candidate.refKey || candidate.mediaKey || candidate.imageUrl || candidate.thumbUrl;
           return candidateKey === key;
         }) === index;
       });
 
-    const directKeys = new Set(directPhotos.map(p => p.mediaKey || p.refKey || p.id).filter(Boolean));
+    const directKeys = new Set(directPhotos.map(p => getPhotoAssetCommentKey(p) || p.id || p.refKey || p.mediaKey).filter(Boolean));
     const targetTag = typeof dateStrToHashtag === 'function' ? dateStrToHashtag(dateStr) : (dateStr ? dateStr.replace(/-/g, '').slice(2) : '');
 
     const chatPhotos = [];

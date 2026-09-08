@@ -130,6 +130,11 @@ assert(appMainSource.includes('getPhotoAssetCommentKey: typeof getPhotoAssetComm
 assert(chatGallerySource.includes('const itemKey = photoKey'), 'gallery render keys must use the canonical photo identity');
 assert(appMainSource.includes('photoCommentsCacheReadyRef'), 'photo comment subscription must prime the lightbox comment cache');
 assert(lightboxSource.includes('preloadedPhotoCommentsReady'), 'lightbox must initialize from the subscribed comment documents');
+assert(lightboxSource.includes('photoCommentsFetchRef'), 'lightbox comment fetch callback must stay stable across unrelated renders');
+assert(lightboxSource.includes('photoCommentsFetchedRef.current.delete(photoCommentKey)'), 'cancelled or failed comment requests must remain retryable');
+assert(lightboxSource.includes('댓글 다시 불러오기'), 'failed lightbox comment reads must expose an inline retry action');
+const dateModalSource = fs.readFileSync(new URL('../src/ui/ui-date-modal.js', import.meta.url), 'utf8');
+assert(dateModalSource.includes('getPhotoAssetCommentKey(photo)'), 'schedule albums must dedupe REST/index/live copies by rendered asset');
 assert(lightboxSource.includes("overflowY: isDesktop ? 'auto' : 'visible'"), 'mobile photo comments must not use an inner vertical scrollbar');
 assert(appMainSource.includes("console.info('[calendar-save]'"), 'calendar saves must emit an operation diagnostic');
 assert(appMainSource.includes("console.warn('[calendar-save-failed]'"), 'failed calendar saves must emit an operation diagnostic');

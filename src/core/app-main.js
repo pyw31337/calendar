@@ -6069,7 +6069,7 @@ function CalendarApp() {
   // calendars/cal_{id}/photoComments 문서 id로 그대로 쓴다. firestore.rules의
   // isValidPhotoCommentDocId와 같은 문자셋으로 한 번 더 다듬어(콜론/점/하이픈/밑줄/영숫자만,
   // 300자 캡) 규칙에 안 걸리는 값만 서버로 보낸다.
-  const handleFetchPhotoComments = async photoKey => {
+  const handleFetchPhotoComments = React.useCallback(async photoKey => {
     const docId = String(photoKey || '').replace(/[^A-Za-z0-9_:.-]/g, '_').slice(0, 300);
     if (docId && photoCommentsCacheRef.current.has(docId)) {
       return { success: true, comments: photoCommentsCacheRef.current.get(docId) || [] };
@@ -6084,7 +6084,7 @@ function CalendarApp() {
       projectId: firebaseConfig.projectId,
       decodeDocument: firestoreDocumentToJs
     });
-  };
+  }, [activeCalId, firebaseDb]);
   const handleSavePhotoComments = async (photoKey, nextComments) => {
     const saved = await savePhotoComments({
       photoKey,
