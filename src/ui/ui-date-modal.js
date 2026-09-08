@@ -233,6 +233,7 @@ export function DateModal({
   onFetchDateTaggedMessages,
   onFetchDateTaggedMemos,
   onFetchMeetingPhotoIndex,
+  onFetchMeetingAlbum,
   onLoadOlderChat,
   hasMoreOlderChat = false,
   loadingOlderChat = false,
@@ -867,11 +868,16 @@ export function DateModal({
   // Gallery's own tag-save path already uses) and fold them in below.
   const [fetchedSourceMessages, setFetchedSourceMessages] = React.useState({});
   const fetchedSourceIdsRef = React.useRef(new Set());
+  // Declared early so source-message hydration can include REST-prefer local album photos.
+  const [localAlbumPhotos, setLocalAlbumPhotos] = React.useState([]);
   React.useEffect(() => {
     if (typeof onFindChatMessageById !== 'function') return;
     const loadedIds = new Set((chatMessages || []).map(m => m && m.id).filter(Boolean));
     const missingIds = Array.from(new Set(
-      (Array.isArray(confirmedMeetingEntry?.photos) ? confirmedMeetingEntry.photos : [])
+      [
+        ...(Array.isArray(localAlbumPhotos) ? localAlbumPhotos : []),
+        ...(Array.isArray(confirmedMeetingEntry?.photos) ? confirmedMeetingEntry.photos : [])
+      ]
         .map(p => p && p.sourceMessageId)
         .filter(id => id && !loadedIds.has(id) && !fetchedSourceIdsRef.current.has(id))
     ));
@@ -889,7 +895,7 @@ export function DateModal({
       });
     });
     return () => { cancelled = true; };
-  }, [confirmedMeetingEntry, chatMessages, onFindChatMessageById]);
+  }, [confirmedMeetingEntry, localAlbumPhotos, chatMessages, onFindChatMessageById]);
   const chatMessagesWithFetchedSources = React.useMemo(() => {
     const extra = Object.values(fetchedSourceMessages);
     return extra.length === 0 ? chatMessages : [...(chatMessages || []), ...extra];
@@ -900,6 +906,7 @@ export function DateModal({
   const [fetchedTaggedMessages, setFetchedTaggedMessages] = React.useState([]);
   const [fetchedTaggedMemos, setFetchedTaggedMemos] = React.useState([]);
   const [indexedMeetingPhotos, setIndexedMeetingPhotos] = React.useState([]);
+  // localAlbumPhotos state is declared above (with source-message hydration).
   const fetchedDateTagRef = React.useRef('');
   React.useEffect(() => {
     const targetTag = typeof dateStrToHashtag === 'function' ? dateStrToHashtag(dateStr) : '';
@@ -937,16 +944,63 @@ export function DateModal({
   // dateStr is the actual query key that should restart this effect.
   }, [dateStr, dateStrToHashtag]);
   React.useEffect(() => {
-    if (typeof onFetchMeetingPhotoIndex !== 'function' || !dateStr) return;
+    if (!dateStr) return;
     let cancelled = false;
-    Promise.resolve(onFetchMeetingPhotoIndex(dateStr)).then(photos => {
-      if (!cancelled && Array.isArray(photos)) setIndexedMeetingPhotos(photos);
-    }).catch(err => console.warn('meeting photo index fetch failed:', err));
+    setLocalAlbumPhotos([]);
+    setIndexedMeetingPhotos([]);
+    const countAlive = (photos) => (Array.isArray(photos) ? photos : []).filter(
+      photo => photo && !isTombstone(photo) && (photo.imageUrl || photo.thumbUrl)
+    ).length;
+    const applyAlbum = (album) => {
+      if (!album || typeof album !== 'object') return { photos: 0, index: 0 };
+      const photos = Array.isArray(album.photos) ? album.photos : [];
+      const indexPhotos = Array.isArray(album.indexPhotos) ? album.indexPhotos : [];
+      setLocalAlbumPhotos(prev => (countAlive(photos) >= countAlive(prev) ? photos : prev));
+      setIndexedMeetingPhotos(prev => (countAlive(indexPhotos) >= countAlive(prev) ? indexPhotos : prev));
+      return { photos: countAlive(photos), index: countAlive(indexPhotos) };
+    };
+    const loadAlbum = async () => {
+      if (typeof onFetchMeetingAlbum === 'function') {
+        return Promise.resolve(onFetchMeetingAlbum(dateStr));
+      }
+      // Fallback: separate stable callbacks when the combined album prop is absent.
+      const [indexPhotos, meetingPhotosFallback] = await Promise.all([
+        typeof onFetchMeetingPhotoIndex === 'function'
+          ? Promise.resolve(onFetchMeetingPhotoIndex(dateStr)).catch(err => {
+            console.warn('meeting photo index fetch failed:', err);
+            return [];
+          })
+          : Promise.resolve([]),
+        Promise.resolve([])
+      ]);
+      return { photos: meetingPhotosFallback, indexPhotos: Array.isArray(indexPhotos) ? indexPhotos : [] };
+    };
+    const run = async (attempt) => {
+      try {
+        const album = await loadAlbum();
+        if (cancelled) return;
+        const counts = applyAlbum(album);
+        // Retry 1–2 times over a few seconds when the album looks thin while the index (or a
+        // later meeting read) still has room to grow — clear-site races can return early thin.
+        const looksThin = counts.photos <= 1 || (counts.index > counts.photos);
+        if (looksThin && attempt < 2) {
+          const delayMs = attempt === 0 ? 1200 : 2400;
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+          if (!cancelled) await run(attempt + 1);
+        }
+      } catch (err) {
+        console.warn('DateModal meeting album fetch failed:', err);
+        if (attempt < 2 && !cancelled) {
+          const delayMs = attempt === 0 ? 1200 : 2400;
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+          if (!cancelled) await run(attempt + 1);
+        }
+      }
+    };
+    run(0);
     return () => { cancelled = true; };
-  // App historically passed an inline calendar-scoped lambda. Depending on that function
-  // identity cancelled the in-flight meetingPhotoIndex fetch on every unrelated App re-render
-  // (badge/chat updates), so the tab fell back to the ~1 chat-tag hit. Match the memo-tag
-  // effect above: dateStr is the real query key; DateModal remounts per calendar.
+  // dateStr is the real query key; stable onFetchMeetingAlbum / index callbacks are preferred
+  // but omitted as deps so an App re-render cannot cancel in-flight album enrichment.
   }, [dateStr]);
   const allMeetingPhotoMessages = React.useMemo(() => {
     const byId = new Map();
@@ -984,7 +1038,13 @@ export function DateModal({
         refKey: photo.refKey || `meeting-index:${photo.id}`
       };
     });
-    const directPhotos = [...indexedPhotos, ...(Array.isArray(confirmedMeetingEntry?.photos) ? confirmedMeetingEntry.photos : [])]
+    // Local REST-prefer album first, then live confirmedMeetingEntry — never let a thin
+    // in-memory entry hide richer server photos already fetched into localAlbumPhotos.
+    const directPhotos = [
+      ...indexedPhotos,
+      ...(Array.isArray(localAlbumPhotos) ? localAlbumPhotos : []),
+      ...(Array.isArray(confirmedMeetingEntry?.photos) ? confirmedMeetingEntry.photos : [])
+    ]
       .filter(photo => photo && !isTombstone(photo) && (photo.imageUrl || photo.thumbUrl))
       .map((photo, photoIndex) => {
         const resolved = resolveMeetingPhotoDisplay(photo, chatMessagesWithFetchedSources) || {};
@@ -1005,8 +1065,18 @@ export function DateModal({
         };
       })
       .filter((photo, index, photos) => {
-        const key = photo.mediaKey || photo.refKey || photo.id || photo.imageUrl || photo.thumbUrl;
-        return photos.findIndex(candidate => (candidate.mediaKey || candidate.refKey || candidate.id || candidate.imageUrl || candidate.thumbUrl) === key) === index;
+        // Dedupe by photo.id first. resolveMeetingPhotoDisplay(...).mediaKey can collapse many
+        // distinct meeting uploads onto one key (missing/NaN sourceImageIndex → shared fallback),
+        // which made jhair 2026-06-13 show 사진 1 despite 14 alive server rows.
+        if (photo.id) {
+          return photos.findIndex(candidate => candidate.id && candidate.id === photo.id) === index;
+        }
+        const key = photo.mediaKey || photo.refKey || photo.imageUrl || photo.thumbUrl;
+        return photos.findIndex(candidate => {
+          if (candidate.id) return false;
+          const candidateKey = candidate.mediaKey || candidate.refKey || candidate.imageUrl || candidate.thumbUrl;
+          return candidateKey === key;
+        }) === index;
       });
 
     const directKeys = new Set(directPhotos.map(p => p.mediaKey || p.refKey || p.id).filter(Boolean));
@@ -1104,7 +1174,7 @@ export function DateModal({
       const bv = b.directMediaUrl ? 0 : 1;
       return av - bv || (b.createdAt || 0) - (a.createdAt || 0);
     });
-  }, [confirmedMeetingEntry, chatMessages, memos, fetchedTaggedMemos, allMeetingPhotoMessages, chatMessagesWithFetchedSources, indexedMeetingPhotos, dateStr]);
+  }, [confirmedMeetingEntry, chatMessages, memos, fetchedTaggedMemos, allMeetingPhotoMessages, chatMessagesWithFetchedSources, indexedMeetingPhotos, localAlbumPhotos, dateStr]);
   const visibleMeetingPhotos = React.useMemo(
     () => meetingPhotos.filter(photo => {
       if (photo.directMediaUrl) return true;
