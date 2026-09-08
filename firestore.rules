@@ -189,6 +189,14 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // Canonical one-row-per-asset gallery index. Only trusted Cloud Functions may maintain
+      // these denormalized rows. A shared calendar id grants content access, but never authority
+      // to forge badge counts, source ownership, or another photo's identity.
+      match /photoIndex/{photoKey} {
+        allow read: if isCalendarDoc(calendarDocId);
+        allow write: if false;
+      }
+
       // Web Push subscriptions. Allows browsers to register their endpoints for offline/background
       // pushes -- write-only from the client (index.html never reads this collection, only
       // .set()/.delete()). Actually sending a push is done server-side via the Admin SDK in

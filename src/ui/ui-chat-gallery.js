@@ -341,6 +341,11 @@ export function ChatGalleryModal({
   showToast,
   onDeletePhoto = null,
   photoCommentCounts = {},
+  indexedPhotos = null,
+  indexedPhotoTotal = null,
+  indexedPhotoPage = 1,
+  indexedPhotoLoading = false,
+  onIndexedPhotoPageChange = null,
   onPasteGatherPhoto = null,
   onPasteGatherPhotos = null,
   syncStatus = null
@@ -555,6 +560,11 @@ export function ChatGalleryModal({
   }, [chatMessages, memos]);
 
   const sharedPhotos = React.useMemo(() => {
+    if (Array.isArray(indexedPhotos)) {
+      return indexedPhotos
+        .filter(photo => photo && !isBrokenPhotoValue(photo.full) && !isBrokenPhotoValue(photo.thumb))
+        .map(photo => ({ ...photo, source: photo.source || 'gallery' }));
+    }
     const list = [];
     (chatMessages || []).forEach(msg => {
       if (!msg || isTombstone(msg)) return;
@@ -647,7 +657,7 @@ export function ChatGalleryModal({
       }
     });
     return Array.from(byUrl.values()).sort((a, b) => b.timestamp - a.timestamp);
-  }, [chatMessages, memos, calendar]);
+  }, [chatMessages, memos, calendar, indexedPhotos]);
 
   const filteredLinks = React.useMemo(() => {
     if (!searchQuery.trim()) return sharedLinks;
@@ -681,11 +691,12 @@ export function ChatGalleryModal({
     return !isBrokenPhotoValue(photo.full) && !isBrokenPhotoValue(photo.thumb);
   }), [filteredPhotos, brokenPhotoRevision]);
   const [photoRenderLimit, setPhotoRenderLimit] = React.useState(24);
+  const usingPhotoIndex = Array.isArray(indexedPhotos);
   const renderedPhotos = React.useMemo(
-    () => asPage ? visiblePhotos.slice(0, photoRenderLimit) : visiblePhotos,
-    [asPage, visiblePhotos, photoRenderLimit]
+    () => asPage && !usingPhotoIndex ? visiblePhotos.slice(0, photoRenderLimit) : visiblePhotos,
+    [asPage, visiblePhotos, photoRenderLimit, usingPhotoIndex]
   );
-  const hasLocallyHiddenPhotos = renderedPhotos.length < visiblePhotos.length;
+  const hasLocallyHiddenPhotos = !usingPhotoIndex && renderedPhotos.length < visiblePhotos.length;
   const loadMorePhotos = () => {
     if (hasLocallyHiddenPhotos) {
       setPhotoRenderLimit(limit => limit + 20);
@@ -723,7 +734,8 @@ export function ChatGalleryModal({
     }
   }, [searchQuery, hasMoreOlderChat, loadingOlderChat, hasMoreMemos, onLoadOlderChat, onLoadMoreMemos]);
 
-  const displayPhotoTabCount = visiblePhotos.length;
+  const displayPhotoTabCount = usingPhotoIndex && Number.isFinite(Number(indexedPhotoTotal))
+    ? Number(indexedPhotoTotal) : visiblePhotos.length;
   const [galleryViewMode, setGalleryViewMode] = React.useState('all'); // 'all' | 'date'
   const [galleryMonthDate, setGalleryMonthDate] = React.useState(() => new Date());
   const [collapsedGalleryDates, setCollapsedGalleryDates] = React.useState(() => new Set());
@@ -1367,10 +1379,10 @@ export function ChatGalleryModal({
     // comment document key even after the meeting photo receives its own photoId.
     // Include that key as a read fallback so the badge follows the same thread as
     // the lightbox instead of silently showing zero.
-    const commentCount = getPhotoCommentCount({
+    const commentCount = Math.max(Number(photo.commentCount || 0), getPhotoCommentCount({
       ...commentIdentity,
       legacyKeys: [...(commentIdentity.legacyKeys || []), legacyMeetingKey].filter(Boolean)
-    }, photoCommentCounts);
+    }, photoCommentCounts));
     const thumb = /*#__PURE__*/React.createElement(MediaThumb, {
       key: isBulkShareMode ? undefined : itemKey,
       "data-photo-url": photo.full || photo.thumb,
@@ -1384,7 +1396,7 @@ export function ChatGalleryModal({
       onClick: () => isBulkShareMode ? toggleBulkShareSelected(photoKey) : (setActiveLightbox && setActiveLightbox({
         urls: (lightboxItems || []).map(p => p.full),
         index: lightboxIndex >= 0 ? lightboxIndex : idx,
-        meta: (lightboxItems || []).map(p => ({ timestamp: p.timestamp, messageId: p.messageId, imageIndex: p.imageIndex, thumb: p.thumb, tags: p.tags, directMediaUrl: p.directMediaUrl, source: p.source, uploadSource: p.uploadSource, meetingDate: p.meetingDate, photoId: p.photoId, sourceMessageId: p.sourceMessageId, sourceImageIndex: p.sourceImageIndex, assetKey: p.assetKey, mediaKey: p.mediaKey, refKey: p.refKey }))
+        meta: (lightboxItems || []).map(p => ({ timestamp: p.timestamp, messageId: p.messageId, imageIndex: p.imageIndex, thumb: p.thumb, tags: p.tags, directMediaUrl: p.directMediaUrl, source: p.source, uploadSource: p.uploadSource, meetingDate: p.meetingDate, photoId: p.photoId, sourceMessageId: p.sourceMessageId, sourceImageIndex: p.sourceImageIndex, assetKey: p.assetKey, mediaKey: p.mediaKey, refKey: p.refKey, legacyKeys: p.legacyKeys }))
       })),
       onBroken: (e, brokenInfo) => handleBrokenPhoto(photo, brokenInfo),
       style: {
@@ -1487,6 +1499,34 @@ export function ChatGalleryModal({
     );
   };
   const renderGalleryLoadMoreButton = props => /*#__PURE__*/React.createElement(GalleryLoadMoreButton, props);
+  const renderGalleryPagination = () => {
+    if (!usingPhotoIndex || typeof onIndexedPhotoPageChange !== 'function') return null;
+    const pageCount = Math.max(1, Math.ceil(Number(indexedPhotoTotal || 0) / 100));
+    if (pageCount <= 1) return null;
+    const windowSize = isMobile ? 5 : 10;
+    const blockStart = Math.floor((Math.max(1, indexedPhotoPage) - 1) / windowSize) * windowSize + 1;
+    const pages = Array.from({ length: Math.min(windowSize, pageCount - blockStart + 1) }, (_, index) => blockStart + index);
+    const go = page => {
+      if (indexedPhotoLoading || page < 1 || page > pageCount || page === indexedPhotoPage) return;
+      void onIndexedPhotoPageChange(page);
+      if (gridHostRef.current) gridHostRef.current.scrollTop = 0;
+    };
+    const arrow = (label, page, disabled, glyph) => /*#__PURE__*/React.createElement("button", {
+      key: label, type: "button", className: "gallery-pagination-button gallery-pagination-arrow",
+      "aria-label": label, disabled: disabled || indexedPhotoLoading, onClick: () => go(page)
+    }, glyph);
+    return /*#__PURE__*/React.createElement("nav", { className: "gallery-pagination", "aria-label": "갤러리 페이지" },
+      arrow('첫 페이지', 1, indexedPhotoPage <= 1, '≪'),
+      arrow('이전 페이지', indexedPhotoPage - 1, indexedPhotoPage <= 1, '‹'),
+      pages.map(page => /*#__PURE__*/React.createElement("button", {
+        key: page, type: "button", className: `gallery-pagination-button${page === indexedPhotoPage ? ' is-active' : ''}`,
+        "aria-current": page === indexedPhotoPage ? 'page' : undefined,
+        disabled: indexedPhotoLoading, onClick: () => go(page)
+      }, String(page))),
+      arrow('다음 페이지', indexedPhotoPage + 1, indexedPhotoPage >= pageCount, '›'),
+      arrow('마지막 페이지', pageCount, indexedPhotoPage >= pageCount, '≫')
+    );
+  };
   // Distinguishes "haven't finished loading this calendar's history yet" from "genuinely no
   // photos here" -- totalGalleryCount (a global, all-months count fetched once) used to stand in
   // for this, which made an empty month falsely claim there was more to load via a '더보기'
@@ -1753,6 +1793,7 @@ export function ChatGalleryModal({
         ? "검색 결과가 없습니다."
         : describeGalleryPhotoEmptyState("공유된 사진이 없습니다."))
       : renderGalleryPhotoGrid(sortedPhotos, sortedVisiblePhotos),
+      usingPhotoIndex && !(searchQuery || '').trim() && renderGalleryPagination(),
       (hasLocallyHiddenPhotos || hasMoreOlderChat || loadingOlderChat) && !(searchQuery || '').trim() && renderGalleryLoadMoreButton({
         label: hasLocallyHiddenPhotos ? `사진 더 보기 (${visiblePhotos.length}장 불러옴)` : `이전 사진 더 보기 (${visiblePhotos.length}장 불러옴)`,
         loadingLabel: '이전 사진을 불러오는 중…',

@@ -128,7 +128,11 @@ assert(appMainSource.includes('Number.isInteger(imageIndex) && !meta.meetingDate
 assert(appMainSource.includes("activeView !== 'gallery'"), 'gallery route must hydrate the complete paged message history');
 assert(appMainSource.includes('getPhotoAssetCommentKey: typeof getPhotoAssetCommentKey'), 'gallery UI must receive the source-agnostic photo identity helper');
 assert(chatGallerySource.includes('const itemKey = photoKey'), 'gallery render keys must use the canonical photo identity');
-assert(appMainSource.includes('photoCommentsCacheReadyRef'), 'photo comment subscription must prime the lightbox comment cache');
+assert(appMainSource.includes('createPhotoCommentStore'), 'photo comments must use the dedicated bounded cache/store');
+assert(appMainSource.includes('useGalleryPhotoIndex'), 'gallery must consume the canonical server-maintained photo index');
+assert(chatGallerySource.includes('Number(photo.commentCount || 0)'), 'indexed comment counts must paint thumbnail badges without loading comment bodies');
+assert(chatGallerySource.includes('gallery-pagination'), 'large galleries must render bounded 100-photo pagination');
+assert(chatGallerySource.includes('legacyKeys: p.legacyKeys'), 'indexed legacy comment aliases must reach the lightbox');
 assert(lightboxSource.includes('preloadedPhotoCommentsReady'), 'lightbox must initialize from the subscribed comment documents');
 assert(lightboxSource.includes('photoCommentsFetchRef'), 'lightbox comment fetch callback must stay stable across unrelated renders');
 assert(lightboxSource.includes('photoCommentsFetchedRef.current.delete(photoCommentKey)'), 'cancelled or failed comment requests must remain retryable');

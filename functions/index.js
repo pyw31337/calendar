@@ -55,6 +55,281 @@ function getMessageImageEntriesForIndex(message) {
   })).filter(entry => entry.imageUrl || entry.thumbUrl);
 }
 
+function getDirectImageEntriesForIndex(message) {
+  const text = String(message?.text || message?.content || message?.body || '');
+  const urls = text.match(/https?:\/\/[^\s<>"']+/gi) || [];
+  const imageExtensions = /\.(?:jpe?g|png|gif|webp|avif|bmp|svg|jfif|pjpeg|pjp|ico)(?:[?#].*)?$/i;
+  const uploaded = new Set(getMessageImageEntriesForIndex(message)
+    .flatMap(entry => [normalizePhotoAssetUrl(entry.imageUrl), normalizePhotoAssetUrl(entry.thumbUrl)]));
+  return Array.from(new Set(urls.map(url => url.replace(/[),.;!?]+$/, ''))))
+    .filter(url => imageExtensions.test(url) && !uploaded.has(normalizePhotoAssetUrl(url)))
+    .map((url, index) => ({ index, imageUrl: url, thumbUrl: url, tags: '', directMediaUrl: url }));
+}
+
+function normalizePhotoAssetUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (raw.startsWith('data:') || raw.startsWith('blob:')) return raw;
+  try {
+    const parsed = new URL(raw);
+    parsed.hash = '';
+    if (parsed.hostname === 'firebasestorage.googleapis.com' || parsed.hostname.endsWith('.firebasestorage.app')) parsed.search = '';
+    return parsed.toString();
+  } catch (_) {
+    return raw.split('#')[0];
+  }
+}
+
+function hashPhotoAssetIdentity(value) {
+  const source = String(value || '');
+  let fnv = 2166136261;
+  let djb = 5381;
+  for (let index = 0; index < source.length; index += 1) {
+    const code = source.charCodeAt(index);
+    fnv ^= code;
+    fnv = Math.imul(fnv, 16777619);
+    djb = Math.imul(djb, 33) ^ code;
+  }
+  return `${(fnv >>> 0).toString(36)}-${(djb >>> 0).toString(36)}-${source.length.toString(36)}`;
+}
+
+function getDirectMediaLegacyKey(value) {
+  const source = String(value || '');
+  let hash = 2166136261;
+  for (let index = 0; index < source.length; index += 1) {
+    hash ^= source.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `chat:url:u_${(hash >>> 0).toString(36)}`;
+}
+
+function getPhotoAssetKey(value) {
+  const normalized = normalizePhotoAssetUrl(value);
+  return normalized ? `asset:v1:${hashPhotoAssetIdentity(normalized)}` : '';
+}
+
+function getPhotoIndexEntries(sourceType, sourceId, data) {
+  if (!data || typeof data !== 'object') return [];
+  const entries = [];
+  const push = (photo, index, context = {}) => {
+    const full = String(photo?.imageUrl || photo?.full || photo?.url || photo?.src || photo?.thumbUrl || photo?.thumb || '').trim();
+    const thumb = String(photo?.thumbUrl || photo?.thumb || photo?.thumbnailUrl || full).trim();
+    const assetKey = getPhotoAssetKey(full || thumb);
+    if (!assetKey) return;
+    const source = sourceType === 'message'
+      ? (['chat', 'gallery', 'meeting'].includes(data.uploadSource) ? data.uploadSource : 'chat')
+      : sourceType;
+    const messageId = sourceType === 'message' ? sourceId : '';
+    const imageIndex = Number.isInteger(photo?.index) ? photo.index : index;
+    entries.push({
+      assetKey,
+      full,
+      thumb,
+      timestamp: Number(photo?.createdAt || photo?.updatedAt || data.timestamp || data.updatedAt || data.createdAt || data.confirmedAt || 0),
+      tags: String(photo?.tags || (Array.isArray(data.imageTags) ? data.imageTags[imageIndex] : '') || ''),
+      text: String(data.text || data.content || data.body || context.text || '').slice(0, 1000),
+      participantId: String(data.participantId || ''),
+      source,
+      messageId,
+      imageIndex,
+      meetingDate: String(context.meetingDate || photo?.meetingDate || ''),
+      photoId: String(photo?.id || photo?.photoId || ''),
+      sourceMessageId: String(photo?.sourceMessageId || ''),
+      sourceImageIndex: Number.isInteger(photo?.sourceImageIndex) ? photo.sourceImageIndex : 0,
+      directMediaUrl: String(context.directMediaUrl || photo?.directMediaUrl || ''),
+      legacyKeys: Array.from(new Set([
+        messageId ? `${source}:${messageId}:${imageIndex}` : '',
+        messageId ? `chat:${messageId}:${imageIndex}` : '',
+        photo?.sourceMessageId ? `chat:${photo.sourceMessageId}:${Number(photo.sourceImageIndex) || 0}` : '',
+        context.meetingDate && photo?.id ? `meeting:${context.meetingDate}:${photo.id}` : '',
+        full ? getDirectMediaLegacyKey(full) : '',
+        (context.directMediaUrl || photo?.directMediaUrl) ? getDirectMediaLegacyKey(context.directMediaUrl || photo.directMediaUrl) : ''
+      ].filter(Boolean))).slice(0, 12),
+      sourceOwner: `${sourceType}:${sourceId}:${imageIndex}`.slice(0, 240),
+      updatedAt: Date.now()
+    });
+  };
+
+  if (sourceType === 'message' || sourceType === 'memo') {
+    getMessageImageEntriesForIndex(data).forEach((photo, index) => push(photo, index));
+    getDirectImageEntriesForIndex(data).forEach((photo, index) => push(photo, index, { directMediaUrl: photo.directMediaUrl }));
+  } else if (sourceType === 'meeting') {
+    (Array.isArray(data.photos) ? data.photos : []).forEach((photo, index) => push(photo, index, { meetingDate: data.date || sourceId, text: `${data.date || sourceId} 일정 사진` }));
+  } else if (sourceType === 'anniversary') {
+    (Array.isArray(data.photos) ? data.photos : []).forEach((photo, index) => push(photo, index));
+  }
+  return entries;
+}
+
+function selectPhotoIndexOwner(owners) {
+  const sourceRank = owner => owner?.source === 'gallery' ? 0
+    : owner?.source === 'chat' ? 1
+      : owner?.source === 'memo' ? 2
+        : owner?.source === 'meeting' ? 3 : 4;
+  return (owners || []).slice().sort((a, b) => sourceRank(a) - sourceRank(b)
+    || Number(b.timestamp || 0) - Number(a.timestamp || 0))[0] || null;
+}
+
+async function rebuildPhotoIndexForCalendarAdmin(calendarId, apply = false) {
+  const db = admin.firestore();
+  const root = db.collection('calendars').doc(`cal_${calendarId}`);
+  const collectionNames = ['messages', 'memos', 'confirmedMeetings', 'anniversaries', 'photoComments', 'photoIndex'];
+  const snapshots = await Promise.all(collectionNames.map(collection => root.collection(collection).get()));
+  const byName = Object.fromEntries(collectionNames.map((name, index) => [name, snapshots[index]]));
+  const commentCounts = new Map(byName.photoComments.docs.map(doc => {
+    const comments = doc.data()?.comments;
+    return [doc.id, Array.isArray(comments) ? comments.length : 0];
+  }));
+  const ownersByAsset = new Map();
+  const addOwners = (sourceType, snapshot, idField = null) => snapshot.docs.forEach(doc => {
+    getPhotoIndexEntries(sourceType, idField ? String(doc.data()?.[idField] || doc.id) : doc.id, doc.data() || {}).forEach(entry => {
+      const owners = ownersByAsset.get(entry.assetKey) || [];
+      if (!owners.some(owner => owner.sourceOwner === entry.sourceOwner)) owners.push(entry);
+      ownersByAsset.set(entry.assetKey, owners.slice(0, 12));
+    });
+  });
+  addOwners('message', byName.messages);
+  addOwners('memo', byName.memos);
+  addOwners('meeting', byName.confirmedMeetings);
+  addOwners('anniversary', byName.anniversaries);
+
+  const rows = [];
+  let dataUrlBytes = 0;
+  let dataUrlRows = 0;
+  ownersByAsset.forEach((owners, assetKey) => {
+    const selected = selectPhotoIndexOwner(owners);
+    if (!selected) return;
+    const legacyKeys = Array.from(new Set(owners.flatMap(owner => owner.legacyKeys || []))).slice(0, 40);
+    const commentCount = Math.max(0, ...[assetKey, ...legacyKeys].map(key => Number(commentCounts.get(key) || 0)));
+    if (String(selected.full || '').startsWith('data:') || String(selected.thumb || '').startsWith('data:')) {
+      dataUrlRows += 1;
+      dataUrlBytes += String(selected.full || '').length + String(selected.thumb || '').length;
+    }
+    rows.push({ ...selected, assetKey, legacyKeys, owners, commentCount, updatedAt: Date.now() });
+  });
+  rows.sort((a, b) => Number(b.timestamp || 0) - Number(a.timestamp || 0));
+  const nextKeys = new Set(rows.map(row => row.assetKey));
+  const staleRefs = byName.photoIndex.docs.filter(doc => !nextKeys.has(doc.id)).map(doc => doc.ref);
+
+  if (apply) {
+    const operations = [
+      ...rows.map(row => ({ type: 'set', ref: root.collection('photoIndex').doc(row.assetKey), row })),
+      ...staleRefs.map(ref => ({ type: 'delete', ref }))
+    ];
+    for (let offset = 0; offset < operations.length; offset += 350) {
+      const batch = db.batch();
+      operations.slice(offset, offset + 350).forEach(operation => {
+        if (operation.type === 'delete') batch.delete(operation.ref);
+        else batch.set(operation.ref, operation.row);
+      });
+      await batch.commit();
+    }
+  }
+  return {
+    calendarId,
+    mode: apply ? 'applied' : 'dry-run',
+    sourceDocuments: Object.fromEntries(collectionNames.slice(0, 5).map(name => [name, byName[name].size])),
+    indexedPhotos: rows.length,
+    commentsMatched: rows.filter(row => row.commentCount > 0).length,
+    existingRows: byName.photoIndex.size,
+    staleRows: staleRefs.length,
+    dataUrlRows,
+    dataUrlBytes
+  };
+}
+
+async function syncCanonicalPhotoIndex(change, context, sourceType, idParam) {
+  const db = admin.firestore();
+  const indexRef = db.collection('calendars').doc(context.params.calendarDocId).collection('photoIndex');
+  const sourceId = context.params[idParam];
+  const before = change.before.exists ? getPhotoIndexEntries(sourceType, sourceId, change.before.data() || {}) : [];
+  const after = change.after.exists ? getPhotoIndexEntries(sourceType, sourceId, change.after.data() || {}) : [];
+  const ownerRoot = `${sourceType}:${sourceId}:`;
+  const beforeKeys = new Set(before.map(entry => entry.assetKey));
+  const afterByKey = new Map(after.map(entry => [entry.assetKey, entry]));
+  const touchedKeys = new Set([...beforeKeys, ...afterByKey.keys()]);
+  const sourceRank = owner => owner?.source === 'gallery' ? 0
+    : owner?.source === 'chat' ? 1
+      : owner?.source === 'memo' ? 2
+        : owner?.source === 'meeting' ? 3 : 4;
+
+  // The same physical asset may be referenced by chat, a meeting and a memo. Keeping bounded
+  // owners inside the canonical row prevents deleting one source from erasing the remaining
+  // references. Each transaction touches one row, so simultaneous edits cannot lose an owner.
+  await Promise.all(Array.from(touchedKeys).map(assetKey => db.runTransaction(async transaction => {
+    const ref = indexRef.doc(assetKey);
+    const snapshot = await transaction.get(ref);
+    const existing = snapshot.exists ? (snapshot.data() || {}) : {};
+    const replacement = afterByKey.get(assetKey);
+    const commentSnapshot = !snapshot.exists && replacement
+      ? await transaction.get(db.collection('calendars').doc(context.params.calendarDocId).collection('photoComments').doc(assetKey))
+      : null;
+    let owners = Array.isArray(existing.owners) ? existing.owners.filter(owner => owner && typeof owner === 'object') : [];
+    if (!owners.length && existing.sourceOwner && existing.full) owners = [{ ...existing }];
+    owners = owners.filter(owner => !String(owner.sourceOwner || '').startsWith(ownerRoot));
+    if (replacement) owners.push(replacement);
+    owners = owners
+      .filter((owner, index, list) => list.findIndex(candidate => candidate.sourceOwner === owner.sourceOwner) === index)
+      .sort((a, b) => sourceRank(a) - sourceRank(b) || Number(b.timestamp || 0) - Number(a.timestamp || 0))
+      .slice(0, 12);
+    if (!owners.length) {
+      transaction.delete(ref);
+      return;
+    }
+    const selected = owners[0];
+    const legacyKeys = Array.from(new Set(owners.flatMap(owner => owner.legacyKeys || []))).slice(0, 40);
+    const existingComments = commentSnapshot?.exists && Array.isArray(commentSnapshot.data()?.comments)
+      ? commentSnapshot.data().comments.length : 0;
+    transaction.set(ref, {
+      ...selected,
+      assetKey,
+      legacyKeys,
+      owners,
+      commentCount: Math.max(0, Number(existing.commentCount || 0), existingComments),
+      updatedAt: Date.now()
+    });
+  })));
+}
+
+exports.onMessagePhotoIndexWrite = functions.firestore
+  .document('calendars/{calendarDocId}/messages/{messageId}')
+  .onWrite((change, context) => syncCanonicalPhotoIndex(change, context, 'message', 'messageId'));
+
+exports.onMemoPhotoIndexWrite = functions.firestore
+  .document('calendars/{calendarDocId}/memos/{memoId}')
+  .onWrite((change, context) => syncCanonicalPhotoIndex(change, context, 'memo', 'memoId'));
+
+exports.onMeetingPhotoIndexWrite = functions.firestore
+  .document('calendars/{calendarDocId}/confirmedMeetings/{dateId}')
+  .onWrite((change, context) => syncCanonicalPhotoIndex(change, context, 'meeting', 'dateId'));
+
+exports.onAnniversaryPhotoIndexWrite = functions.firestore
+  .document('calendars/{calendarDocId}/anniversaries/{anniversaryId}')
+  .onWrite((change, context) => syncCanonicalPhotoIndex(change, context, 'anniversary', 'anniversaryId'));
+
+exports.onPhotoCommentIndexWrite = functions.firestore
+  .document('calendars/{calendarDocId}/photoComments/{photoKey}')
+  .onWrite(async (change, context) => {
+    const comments = change.after.exists && Array.isArray(change.after.data()?.comments) ? change.after.data().comments : [];
+    const indexRef = admin.firestore().collection('calendars').doc(context.params.calendarDocId).collection('photoIndex');
+    const batch = admin.firestore().batch();
+    let writeCount = 0;
+    const canonical = await indexRef.doc(context.params.photoKey).get();
+    // A legacy comment key is not necessarily an asset key. Never create a partial/ghost photo
+    // row for it; update the canonical document only when it already exists.
+    if (canonical.exists) {
+      batch.set(canonical.ref, { commentCount: comments.length, updatedAt: Date.now() }, { merge: true });
+      writeCount += 1;
+    }
+    const aliases = await indexRef.where('legacyKeys', 'array-contains', context.params.photoKey).limit(100).get();
+    aliases.forEach(doc => {
+      if (canonical.exists && doc.id === canonical.id) return;
+      batch.set(doc.ref, { commentCount: comments.length, updatedAt: Date.now() }, { merge: true });
+      writeCount += 1;
+    });
+    if (writeCount > 0) await batch.commit();
+  });
+
 async function syncMeetingPhotoIndex(change, context) {
   const db = admin.firestore();
   const calendarRef = db.collection('calendars').doc(context.params.calendarDocId);
@@ -1496,3 +1771,19 @@ exports.pruneStaleRateLimitDocs = functions.pubsub.schedule('30 9 * * *').timeZo
   }
   return null;
 });
+
+// Deliberately available only inside `firebase functions:shell`: this gives release operations
+// an Admin SDK path for an explicit, audited index rebuild without ever deploying a public
+// backfill endpoint or relaxing Firestore's server-only photoIndex rule.
+if (process.env.FUNCTIONS_EMULATOR === 'true') {
+  exports.photoIndexBackfillLocal = functions.https.onRequest(async (req, res) => {
+    const calendarId = String(req.body?.calendarId || '');
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(calendarId)) { res.status(400).json({ ok: false }); return; }
+    try {
+      res.status(200).json(await rebuildPhotoIndexForCalendarAdmin(calendarId, req.body?.apply === true));
+    } catch (error) {
+      console.error('photoIndexBackfillLocal failed:', error);
+      res.status(500).json({ ok: false, message: String(error?.message || error) });
+    }
+  });
+}

@@ -144,6 +144,8 @@ import {
   getDataUrlInfo,
 } from './app-domain-helpers.js';
 import { fetchPhotoComments, savePhotoComments } from './photo-comments.js';
+import { createPhotoCommentStore } from './photo-comment-store.js';
+import { useGalleryPhotoIndex } from './photo-index.js';
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 // 입력필드 규칙: 멀티라인 텍스트는 값(로드/입력/붙여넣기)에 맞춰 세로로 자동 확장
@@ -1367,8 +1369,7 @@ function CalendarApp() {
   const [preloadedPhotoCommentsReady, setPreloadedPhotoCommentsReady] = React.useState(false);
   // The badge subscription already receives every small photoComments document. Retain the
   // comment arrays too, so opening a lightbox does not perform several serial document reads.
-  const photoCommentsCacheRef = React.useRef(new Map());
-  const photoCommentsCacheReadyRef = React.useRef(false);
+  const photoCommentStoreRef = React.useRef(null);
   const [chatInput, setChatInput] = React.useState('');
   const [chatParticipantId, setChatParticipantId] = React.useState('');
   const chatParticipantIdRef = React.useRef(chatParticipantId);
@@ -1429,6 +1430,10 @@ function CalendarApp() {
     return params.get('view') || 'calendar';
   };
   const [activeView, setActiveView] = React.useState(getActiveViewFromURL);
+  const galleryPhotoIndex = useGalleryPhotoIndex({
+    React, calendarId: activeCalId, activeView,
+    projectId: firebaseConfig.projectId, decodeDocument: firestoreDocumentToJs
+  });
   const [fullChatHistoryByCalendar, setFullChatHistoryByCalendar] = React.useState({});
   const fullChatMessages = fullChatHistoryByCalendar[activeCalId] || null;
   const displayChatMessages = React.useMemo(() => {
@@ -3154,56 +3159,24 @@ function CalendarApp() {
   );
   React.useEffect(() => {
     if (!activeCalId || !needsPhotoCommentCounts) return;
-    photoCommentsCacheRef.current = new Map();
-    photoCommentsCacheReadyRef.current = false;
     setPreloadedPhotoComments({});
     setPreloadedPhotoCommentsReady(false);
-    if (!firebaseDb) {
-      let cancelled = false;
-      fetchPhotoCommentCountsRest(activeCalId).then(counts => {
-        if (!cancelled) setPhotoCommentCounts(counts || {});
-      }).catch(() => {});
-      return () => { cancelled = true; };
-    }
-    let isMounted = true;
-    const unsub = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('photoComments')
-      .onSnapshot(snapshot => {
-        if (!isMounted) return;
-        const next = {};
-        const nextCache = new Map();
-        snapshot.forEach(doc => {
-          const data = doc.data();
-          const comments = Array.isArray(data?.comments) ? data.comments : [];
-          const n = comments.length;
-          if (n > 0) next[doc.id] = n;
-          nextCache.set(doc.id, comments);
-        });
-        if (snapshot.metadata.fromCache) {
-          const merged = new Map(photoCommentsCacheRef.current);
-          nextCache.forEach((comments, key) => merged.set(key, comments));
-          photoCommentsCacheRef.current = merged;
-          setPreloadedPhotoComments(previous => ({
-            ...previous,
-            ...Object.fromEntries(nextCache)
-          }));
-        } else {
-          photoCommentsCacheRef.current = nextCache;
-          photoCommentsCacheReadyRef.current = true;
-          setPreloadedPhotoComments(Object.fromEntries(nextCache));
-          setPreloadedPhotoCommentsReady(true);
-        }
-        // A reconnect can briefly replay an incomplete cache snapshot before the authoritative
-        // server snapshot. Never let that transient cache erase badges already confirmed in the
-        // current session; server-confirmed snapshots still replace the map (including deletes).
-        setPhotoCommentCounts(previous => snapshot.metadata.fromCache
-          ? { ...previous, ...next }
-          : next);
-      }, err => {
-        console.warn('Firestore photoComments subscription error:', err);
-        queueServerAuditEvent(activeCalId, 'realtime_fallback', `photoComments:${String(err?.code || 'unknown')}`, getClientAuditContext());
-      });
-    return () => { isMounted = false; unsub(); };
-  }, [activeCalId, needsPhotoCommentCounts, firebaseDb, firebaseConnectionVersion]);
+    const store = createPhotoCommentStore({
+      calendarId: activeCalId, db: firebaseDb, projectId: firebaseConfig.projectId,
+      decodeDocument: firestoreDocumentToJs, fetchCountsRest: fetchPhotoCommentCountsRest,
+      enableBulkHydration: activeView !== 'gallery' || galleryPhotoIndex.status === 'fallback'
+    });
+    photoCommentStoreRef.current = store;
+    const stop = store.start(state => {
+      setPhotoCommentCounts(state.counts || {});
+      setPreloadedPhotoComments(state.commentsByKey || {});
+      setPreloadedPhotoCommentsReady(Boolean(state.ready));
+    });
+    return () => {
+      stop();
+      if (photoCommentStoreRef.current === store) photoCommentStoreRef.current = null;
+    };
+  }, [activeCalId, needsPhotoCommentCounts, activeView, galleryPhotoIndex.status, firebaseDb, firebaseConnectionVersion]);
 
   // Memos: paginated newest-first load (rather than subscribing to the entire collection at
   // once, which would download/re-sync thousands of memos on every open as a calendar grows).
@@ -6071,12 +6044,7 @@ function CalendarApp() {
   // 300자 캡) 규칙에 안 걸리는 값만 서버로 보낸다.
   const handleFetchPhotoComments = React.useCallback(async photoKey => {
     const docId = String(photoKey || '').replace(/[^A-Za-z0-9_:.-]/g, '_').slice(0, 300);
-    if (docId && photoCommentsCacheRef.current.has(docId)) {
-      return { success: true, comments: photoCommentsCacheRef.current.get(docId) || [] };
-    }
-    if (docId && photoCommentsCacheReadyRef.current) {
-      return { success: true, comments: [] };
-    }
+    if (photoCommentStoreRef.current) return photoCommentStoreRef.current.fetch(docId);
     return fetchPhotoComments({
       photoKey,
       calendarId: activeCalId,
@@ -6097,8 +6065,7 @@ function CalendarApp() {
       const docId = String(photoKey || '').replace(/[^A-Za-z0-9_:.-]/g, '_').slice(0, 300);
       if (docId) {
         const comments = Array.isArray(nextComments) ? nextComments : [];
-        if (comments.length > 0) photoCommentsCacheRef.current.set(docId, comments);
-        else photoCommentsCacheRef.current.delete(docId);
+        if (photoCommentStoreRef.current) photoCommentStoreRef.current.updateLocal(docId, comments);
         setPreloadedPhotoComments(previous => {
           const next = { ...previous };
           if (comments.length > 0) next[docId] = comments;
@@ -7871,6 +7838,11 @@ function CalendarApp() {
         setActiveLightbox: setActiveLightbox,
         onDeletePhoto: handleDeletePhoto,
         photoCommentCounts: photoCommentCounts,
+        indexedPhotos: galleryPhotoIndex.status === 'ready' ? galleryPhotoIndex.items : null,
+        indexedPhotoTotal: galleryPhotoIndex.status === 'ready' ? galleryPhotoIndex.total : null,
+        indexedPhotoPage: galleryPhotoIndex.page,
+        indexedPhotoLoading: galleryPhotoIndex.loading,
+        onIndexedPhotoPageChange: galleryPhotoIndex.loadPage,
         hasMoreOlderChat: !Array.isArray(fullChatMessages) && hasMoreOlderChat,
         loadingOlderChat: loadingOlderChat,
         onLoadOlderChat: loadOlderChatMessages,

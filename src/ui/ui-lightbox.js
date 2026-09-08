@@ -720,6 +720,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   const photoCommentKey = currentIdentity.mediaKey || currentIdentity.refKey || '';
   const legacyPhotoCommentKeys = Array.from(new Set([
     ...(Array.isArray(currentIdentity.legacyKeys) ? currentIdentity.legacyKeys : []),
+    ...(Array.isArray(currentMeta.legacyKeys) ? currentMeta.legacyKeys : []),
     currentMeta ? (getLegacyMeetingMediaKey(currentMeta, { meetingDate: currentMeta.meetingDate }) || '') : ''
   ].filter(key => key && key !== photoCommentKey)));
   const legacyPhotoCommentKeysToken = legacyPhotoCommentKeys.join('|');
