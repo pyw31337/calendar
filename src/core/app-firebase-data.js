@@ -2464,14 +2464,39 @@ function normalizeConfirmedMeetingsForSave(meetings) {
   return mergeConfirmedMeetings([], meetings);
 }
 
+// Count non-tombstone photos that still have a displayable URL. Used when choosing between an
+// SDK snapshot and a parallel REST doc for the same date (clear-site / normal-profile paths can
+// return a thin SDK array while REST still has the full album).
+function countAliveConfirmedMeetingPhotos(meeting) {
+  const photos = Array.isArray(meeting?.photos) ? meeting.photos : [];
+  return photos.filter(photo => photo && !isTombstone(photo) && (photo.imageUrl || photo.thumbUrl)).length;
+}
+
+// Prefer the richer album when both transports return the same date. Identity-merge photos so
+// unique alive ids from either side survive; if one side is strictly thinner, start from the
+// richer doc so stamp-based field overlays cannot shrink the album back to 1.
+function preferRicherConfirmedMeeting(a, b) {
+  if (!a) return b || null;
+  if (!b) return a;
+  const aAlive = countAliveConfirmedMeetingPhotos(a);
+  const bAlive = countAliveConfirmedMeetingPhotos(b);
+  const richer = aAlive >= bAlive ? a : b;
+  const thinner = richer === a ? b : a;
+  const merged = mergeConfirmedMeetings([richer], [thinner])[0];
+  return merged || richer;
+}
+
 // Reads only the date docs about to be overwritten. Expense/note saves often carry a short local
 // photos array; merging with the live server docs keeps alive photos (and their tags) from being
 // clobbered while still allowing newer soft-deletes (deletedAt tombstones) to win.
+// Always also REST-gets each date (not only when SDK misses): after Clear site data, a normal
+// Chrome profile can still surface a thin SDK/cache-shaped result while REST returns the full
+// album. Keep the side with more alive photos via preferRicherConfirmedMeeting.
 async function fetchExistingConfirmedMeetingsForDates(calendarId, dates) {
   const uniqueDates = Array.from(new Set((Array.isArray(dates) ? dates : []).map(date => String(date || '')).filter(Boolean)));
   if (!uniqueDates.length) return [];
-  const byDate = new Map();
-  const missing = new Set(uniqueDates);
+  const byDateSdk = new Map();
+  const byDateRest = new Map();
 
   if (firebaseDb) {
     try {
@@ -2479,8 +2504,7 @@ async function fetchExistingConfirmedMeetingsForDates(calendarId, dates) {
       await Promise.all(uniqueDates.map(async date => {
         try {
           const snap = await withTimeout(colRef.doc(date).get({ source: 'server' }), FIRESTORE_REQUEST_TIMEOUT_MS, 'confirmedMeeting read timeout');
-          missing.delete(date);
-          if (snap?.exists) byDate.set(date, { date, ...(snap.data() || {}) });
+          if (snap?.exists) byDateSdk.set(date, { date, ...(snap.data() || {}) });
         } catch (err) {
           console.warn(`Failed to read confirmed meeting ${date} via SDK:`, err);
         }
@@ -2490,29 +2514,27 @@ async function fetchExistingConfirmedMeetingsForDates(calendarId, dates) {
     }
   }
 
-  if (missing.size > 0) {
-    try {
-      const configuredProjectId = firebaseConfig.projectId;
-      if (configuredProjectId) {
-        await Promise.all(Array.from(missing).map(async date => {
-          try {
-            const res = await fetchFirestoreRequest(
-              `https://firestore.googleapis.com/v1/projects/${configuredProjectId}/databases/(default)/documents/calendars/cal_${calendarId}/confirmedMeetings/${date}`
-            );
-            if (!res.ok) return;
-            const doc = firestoreDocumentToJs(await res.json());
-            if (doc && typeof doc === 'object') byDate.set(date, { ...doc, date: doc.date || date });
-          } catch (err) {
-            console.warn(`Failed to read confirmed meeting ${date} via REST:`, err);
-          }
-        }));
-      }
-    } catch (err) {
-      console.warn(`Failed to REST-read confirmed meetings for ${calendarId}:`, err);
+  try {
+    const configuredProjectId = firebaseConfig.projectId;
+    if (configuredProjectId) {
+      await Promise.all(uniqueDates.map(async date => {
+        try {
+          const res = await fetchFirestoreRequest(
+            `https://firestore.googleapis.com/v1/projects/${configuredProjectId}/databases/(default)/documents/calendars/cal_${calendarId}/confirmedMeetings/${date}`
+          );
+          if (!res.ok) return;
+          const doc = firestoreDocumentToJs(await res.json());
+          if (doc && typeof doc === 'object') byDateRest.set(date, { ...doc, date: doc.date || date });
+        } catch (err) {
+          console.warn(`Failed to read confirmed meeting ${date} via REST:`, err);
+        }
+      }));
     }
+  } catch (err) {
+    console.warn(`Failed to REST-read confirmed meetings for ${calendarId}:`, err);
   }
 
-  return Array.from(byDate.values());
+  return uniqueDates.map(date => preferRicherConfirmedMeeting(byDateSdk.get(date), byDateRest.get(date))).filter(Boolean);
 }
 
 async function writeConfirmedMeetingsToFirestore(calendarId, meetings) {

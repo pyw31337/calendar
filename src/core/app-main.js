@@ -3134,6 +3134,19 @@ function CalendarApp() {
     (tag) => fetchMemosByTag(activeCalId, tag),
     [activeCalId]
   );
+  // Self-contained DateModal album: REST-prefer meeting doc + index in one call so the modal
+  // does not depend on confirmedMeetingsSubcollection staying rich after clear-site.
+  const handleFetchMeetingAlbum = React.useCallback(async (date) => {
+    const [meetings, indexPhotos] = await Promise.all([
+      fetchExistingConfirmedMeetingsForDates(activeCalId, [date]),
+      fetchMeetingPhotoIndex(activeCalId, date)
+    ]);
+    const meeting = (Array.isArray(meetings) ? meetings : []).find(m => m && m.date === date) || null;
+    return {
+      photos: Array.isArray(meeting?.photos) ? meeting.photos : [],
+      indexPhotos: Array.isArray(indexPhotos) ? indexPhotos : []
+    };
+  }, [activeCalId]);
 
   // When DateModal opens, force a server-sourced read of that date's confirmedMeetings doc and
   // merge into the live subcollection so richer server photos win over a stale short local array.
@@ -5791,8 +5804,13 @@ function CalendarApp() {
   // handleSaveImageTags' own message lookup (local state first, then a direct Firestore/REST
   // read, since the Lightbox can be opened on a message that hasn't been paginated into
   // chatMessages yet).
-  const findChatMessageById = async messageId => {
-    const local = (chatMessages || []).find(msg => msg.id === messageId);
+  // Keep a ref so findChatMessageById can stay identity-stable across chatMessages updates.
+  // DateModal's source-message effect depends on this callback; recreating it every render
+  // cancelled in-flight source fetches and left resolveMeetingPhotoDisplay on thin snapshots.
+  const chatMessagesRef = React.useRef(chatMessages);
+  chatMessagesRef.current = chatMessages;
+  const findChatMessageById = React.useCallback(async messageId => {
+    const local = (chatMessagesRef.current || []).find(msg => msg.id === messageId);
     if (local) return local;
     try {
       if (firebaseDb) {
@@ -5804,7 +5822,7 @@ function CalendarApp() {
       console.warn('findChatMessageById failed:', readErr);
       return null;
     }
-  };
+  }, [activeCalId, firebaseDb]);
 
   // Keeps confirmedMeeting.photos[] REFERENCES (see linkTaggedImageToMeetingDates) pointing at
   // the right photo after the chat message they trace back to loses an image -- the entry at
@@ -7061,6 +7079,7 @@ function CalendarApp() {
       onFetchDateTaggedMessages: handleFetchDateTaggedMessages,
       onFetchDateTaggedMemos: handleFetchDateTaggedMemos,
       onFetchMeetingPhotoIndex: handleFetchMeetingPhotoIndex,
+      onFetchMeetingAlbum: handleFetchMeetingAlbum,
       onLoadOlderChat: loadOlderChatMessages,
       hasMoreOlderChat: !Array.isArray(fullChatMessages) && hasMoreOlderChat,
       loadingOlderChat: loadingOlderChat,

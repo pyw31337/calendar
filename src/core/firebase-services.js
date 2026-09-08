@@ -412,6 +412,31 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
 
   async function fetchMeetingPhotoIndex(calId, date) {
     if (!isValidCalId(calId) || !date) return [];
+    const alive = function (photo) {
+      return photo && !(photo.deletedAt || photo.removedAt) && (photo.imageUrl || photo.thumbUrl);
+    };
+    const mergeByIdPreferRicher = function (a, b) {
+      const byId = new Map();
+      (Array.isArray(a) ? a : []).forEach(function (photo) {
+        if (!photo) return;
+        const key = photo.id || photo.refKey || photo.mediaKey || photo.imageUrl || photo.thumbUrl;
+        if (key) byId.set(key, photo);
+      });
+      (Array.isArray(b) ? b : []).forEach(function (photo) {
+        if (!photo) return;
+        const key = photo.id || photo.refKey || photo.mediaKey || photo.imageUrl || photo.thumbUrl;
+        if (!key) return;
+        if (!byId.has(key)) byId.set(key, photo);
+      });
+      const merged = Array.from(byId.values());
+      const aAlive = (Array.isArray(a) ? a : []).filter(alive).length;
+      const bAlive = (Array.isArray(b) ? b : []).filter(alive).length;
+      // Prefer whichever side already had more alive rows when counts differ after id-union
+      // (union usually equals max; this keeps a stable richer baseline if keys diverge).
+      if (merged.filter(alive).length >= Math.max(aAlive, bAlive)) return merged;
+      return aAlive >= bAlive ? (Array.isArray(a) ? a : []) : (Array.isArray(b) ? b : []);
+    };
+    let sdkList = null;
     const db = getDb();
     if (db) {
       try {
@@ -419,9 +444,10 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
           .where('date', '==', String(date)).get({ source: 'server' }), FIRESTORE_REST_TIMEOUT_MS);
         const list = [];
         snap.forEach(function (doc) { list.push({ id: doc.id, ...doc.data(), source: 'meeting-index' }); });
-        return list;
+        sdkList = list;
       } catch (err) { console.warn('fetchMeetingPhotoIndex sdk', date, err); }
     }
+    let restList = null;
     try {
       const parent = 'projects/' + projectId() + '/databases/(default)/documents/calendars/cal_' + calId;
       const res = await fetchWithTimeout('https://firestore.googleapis.com/v1/' + parent + ':runQuery', {
@@ -430,12 +456,17 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
           field: { fieldPath: 'date' }, op: 'EQUAL', value: { stringValue: String(date) }
         }}}})
       });
-      if (!res.ok) return [];
-      const rows = await res.json();
-      return (Array.isArray(rows) ? rows : []).filter(function (row) { return row && row.document; }).map(function (row) {
-        return { id: row.document.name.split('/').pop(), ...docToJs(row.document), source: 'meeting-index' };
-      });
-    } catch (err) { console.warn('fetchMeetingPhotoIndex rest', date, err); return []; }
+      if (res.ok) {
+        const rows = await res.json();
+        restList = (Array.isArray(rows) ? rows : []).filter(function (row) { return row && row.document; }).map(function (row) {
+          return { id: row.document.name.split('/').pop(), ...docToJs(row.document), source: 'meeting-index' };
+        });
+      }
+    } catch (err) { console.warn('fetchMeetingPhotoIndex rest', date, err); }
+    if (sdkList && restList) return mergeByIdPreferRicher(sdkList, restList);
+    if (restList) return restList;
+    if (sdkList) return sdkList;
+    return [];
   }
 
   async function countMessagesByUploadSource(calId, uploadSource) {
