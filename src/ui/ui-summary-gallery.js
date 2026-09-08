@@ -3630,6 +3630,8 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
   const ShareIcon = __comp.ShareIcon || __deps.ShareIcon;
+  const PencilIcon = __comp.PencilIcon || __deps.PencilIcon;
+  const CalendarUpIcon = __comp.CalendarUpIcon || __deps.CalendarUpIcon;
   const [items, setItems] = React.useState(null); // null = loading, [] = loaded-empty
   const [loadError, setLoadError] = React.useState(false);
   const [selected, setSelected] = React.useState(null);
@@ -4121,25 +4123,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
               title: "캘린더 등록됨",
               "aria-label": "캘린더 등록됨",
               style: { position: 'absolute', top: '6px', right: '6px', backgroundColor: '#7C3AED', color: '#fff', borderRadius: 'var(--radius-full)', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.25)' }
-            }, /*#__PURE__*/React.createElement("svg", {
-              xmlns: "http://www.w3.org/2000/svg",
-              width: 13,
-              height: 13,
-              viewBox: "0 0 24 24",
-              fill: "none",
-              stroke: "currentColor",
-              strokeWidth: 2,
-              strokeLinecap: "round",
-              strokeLinejoin: "round",
-              "aria-hidden": true
-            },
-              /*#__PURE__*/React.createElement("path", { d: "M12.5 21h-6.5a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v5" }),
-              /*#__PURE__*/React.createElement("path", { d: "M16 3v4" }),
-              /*#__PURE__*/React.createElement("path", { d: "M8 3v4" }),
-              /*#__PURE__*/React.createElement("path", { d: "M4 11h16" }),
-              /*#__PURE__*/React.createElement("path", { d: "M19 22v-6" }),
-              /*#__PURE__*/React.createElement("path", { d: "M22 19l-3 -3l-3 3" })
-            ))
+            }, CalendarUpIcon ? /*#__PURE__*/React.createElement(CalendarUpIcon, { size: 13 }) : null)
           ),
           /*#__PURE__*/React.createElement("div", { style: { padding: '8px 10px 10px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px', flex: 1 } },
             /*#__PURE__*/React.createElement("div", {
@@ -4212,7 +4196,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
               border: 'none', borderRadius: 'var(--radius-full)', cursor: 'pointer',
               backgroundColor: 'rgba(0,0,0,0.45)', color: '#fff', fontSize: '18px', lineHeight: 1
             }
-          }, "✎"),
+          }, PencilIcon ? /*#__PURE__*/React.createElement(PencilIcon, { size: 14 }) : "✎"),
           selected.image && /*#__PURE__*/React.createElement("div", {
             role: (anniversaryCategory === 'movie' || selected.genre === 'movie') ? 'button' : undefined,
             tabIndex: (anniversaryCategory === 'movie' || selected.genre === 'movie') ? 0 : undefined,
@@ -4284,7 +4268,12 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
                 disabled: !!pendingId,
                 onChange: () => handleToggleRegister(selected)
               }),
-              "캘린더와 연동"
+              /*#__PURE__*/React.createElement("span", {
+                style: { display: 'inline-flex', alignItems: 'center', gap: '4px', minWidth: 0 }
+              },
+                "캘린더와 연동",
+                CalendarUpIcon ? /*#__PURE__*/React.createElement(CalendarUpIcon, { size: 13 }) : null
+              )
             ),
             typeof onQuickSaveMemo === 'function' && /*#__PURE__*/React.createElement("button", {
               type: "button",
