@@ -120,6 +120,16 @@ async function fetchMemoForClone(share) {
 // it into the target calendar leaves MemoCard unable to resolve a writer badge (looks like
 // "작성자 없음"). Resolve the source author's display name, then map to a same-named participant
 // on the target calendar. Fall back to the composer selection, never keep a foreign id.
+function participantsFromCalendarDoc(data) {
+  // Calendar shell is { calendar: { participants, ... }, lastModified, revision }.
+  // Legacy/top-level participants are accepted as a fallback only.
+  if (!data || typeof data !== 'object') return [];
+  const nested = data.calendar?.participants;
+  const top = data.participants;
+  const parts = Array.isArray(nested) ? nested : (Array.isArray(top) ? top : []);
+  return parts;
+}
+
 async function fetchSourceParticipantName(calendarId, participantId) {
   const pid = String(participantId || '').trim();
   if (!calendarId || !pid || pid === 'anonymous') return '';
@@ -130,8 +140,8 @@ async function fetchSourceParticipantName(calendarId, participantId) {
         db.collection('calendars').doc(`cal_${calendarId}`).get(),
         9000
       );
-      const parts = snapshot?.exists ? (snapshot.data()?.participants || []) : [];
-      const hit = (Array.isArray(parts) ? parts : []).find(p => p && p.id === pid);
+      const parts = snapshot?.exists ? participantsFromCalendarDoc(snapshot.data()) : [];
+      const hit = parts.find(p => p && String(p.id || '') === pid);
       return hit ? String(hit.name || '').trim() : '';
     }
     const projectId = window.GATHER_FIREBASE_DEPS?.projectId || '';
@@ -144,8 +154,8 @@ async function fetchSourceParticipantName(calendarId, participantId) {
     const json = await response.json();
     const decode = window.GATHER_FIREBASE_DEPS?.firestoreDocumentToJs;
     const data = typeof decode === 'function' ? decode(json) : {};
-    const parts = data?.participants || [];
-    const hit = (Array.isArray(parts) ? parts : []).find(p => p && p.id === pid);
+    const parts = participantsFromCalendarDoc(data);
+    const hit = parts.find(p => p && String(p.id || '') === pid);
     return hit ? String(hit.name || '').trim() : '';
   } catch (_) {
     return '';
@@ -155,8 +165,11 @@ async function fetchSourceParticipantName(calendarId, participantId) {
 function matchParticipantIdByName(calendar, name) {
   const needle = String(name || '').trim().toLowerCase();
   if (!needle) return '';
+  // Prefer active (non-tombstone) participants so clone does not reattach a removed author.
   const parts = Array.isArray(calendar?.participants) ? calendar.participants : [];
-  const hit = parts.find(p => p && String(p.name || '').trim().toLowerCase() === needle);
+  const active = parts.filter(p => p && !p.removedAt && !p.deletedAt);
+  const pool = active.length > 0 ? active : parts;
+  const hit = pool.find(p => p && String(p.name || '').trim().toLowerCase() === needle);
   return hit && hit.id ? String(hit.id) : '';
 }
 
