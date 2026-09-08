@@ -82,7 +82,7 @@ export function invalidatePhotoIndexCache(calendarId) {
 }
 
 export function useGalleryPhotoIndex({ React, calendarId, activeView, projectId, decodeDocument }) {
-  const [state, setState] = React.useState({ status: 'idle', items: [], total: 0, page: 1, loading: false });
+  const [state, setState] = React.useState({ status: 'idle', items: [], total: 0, page: 1, loading: false, complete: false });
   const loadPage = React.useCallback(async (page = 1, options = {}) => {
     if (!calendarId) return false;
     const requestedPage = Math.max(1, Number(page) || 1);
@@ -93,7 +93,7 @@ export function useGalleryPhotoIndex({ React, calendarId, activeView, projectId,
         fetchPhotoIndexPage({ calendarId, projectId, page: requestedPage, decodeDocument, force: Boolean(options.force) }),
         fetchPhotoIndexCount({ calendarId, projectId })
       ]);
-      setState({ status: total > 0 ? 'ready' : 'fallback', items: Array.isArray(items) ? items : [], total: Math.max(0, Number(total) || 0), page: requestedPage, loading: false });
+      setState({ status: total > 0 ? 'ready' : 'fallback', items: Array.isArray(items) ? items : [], total: Math.max(0, Number(total) || 0), page: requestedPage, loading: false, complete: false });
       return total > 0;
     } catch (error) {
       console.warn('photo index page load failed:', error);
@@ -101,15 +101,46 @@ export function useGalleryPhotoIndex({ React, calendarId, activeView, projectId,
       return false;
     }
   }, [calendarId, projectId, decodeDocument]);
+  const loadAll = React.useCallback(async () => {
+    if (!calendarId) return false;
+    setState(previous => ({ ...previous, loading: true }));
+    try {
+      const total = await fetchPhotoIndexCount({ calendarId, projectId });
+      if (total <= 0) {
+        setState({ status: 'fallback', items: [], total: 0, page: 1, loading: false, complete: false });
+        return false;
+      }
+      const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+      // Full hydration is reserved for an explicit search or month view. Fetch in small waves so
+      // a slow mobile connection is not hit with every Firestore request at once.
+      const pages = [];
+      for (let start = 1; start <= pageCount; start += 3) {
+        const wave = [];
+        for (let page = start; page < Math.min(start + 3, pageCount + 1); page += 1) {
+          wave.push(fetchPhotoIndexPage({ calendarId, projectId, page, decodeDocument }));
+        }
+        pages.push(...await Promise.all(wave));
+      }
+      setState(previous => ({
+        status: 'ready', items: pages.flat(), total, page: previous.page || 1,
+        loading: false, complete: true
+      }));
+      return true;
+    } catch (error) {
+      console.warn('complete photo index load failed:', error);
+      setState(previous => ({ ...previous, loading: false }));
+      return false;
+    }
+  }, [calendarId, projectId, decodeDocument]);
   React.useEffect(() => {
     if (!calendarId || activeView !== 'gallery') {
-      setState({ status: 'idle', items: [], total: 0, page: 1, loading: false });
+      setState({ status: 'idle', items: [], total: 0, page: 1, loading: false, complete: false });
       return undefined;
     }
     void loadPage(1);
     return undefined;
   }, [calendarId, activeView, loadPage]);
-  return { ...state, loadPage };
+  return { ...state, loadPage, loadAll };
 }
 
 export { PAGE_SIZE as PHOTO_INDEX_PAGE_SIZE };

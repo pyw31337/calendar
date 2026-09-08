@@ -186,8 +186,11 @@ assert(lightboxSource.includes('photoCommentsFetchedRef.current.delete(photoComm
 assert(lightboxSource.includes('댓글 다시 불러오기'), 'failed lightbox comment reads must expose an inline retry action');
 assert(!summaryGallerySource.includes('const fallbackDate = entryDateStr(entry)'), 'memories must not treat upload time as schedule membership');
 const dateModalSource = fs.readFileSync(new URL('../src/ui/ui-date-modal.js', import.meta.url), 'utf8');
+const photoIndexSource = fs.readFileSync(new URL('../src/core/photo-index.js', import.meta.url), 'utf8');
 assert(dateModalSource.includes('getPhotoAssetKeys(photo)'), 'schedule albums must dedupe REST/index/live copies by original or thumbnail asset');
 assert(dateModalSource.includes('assetKeys.some(assetKey => directKeys.has(assetKey))'), 'tagged chat/memo photos must use the same asset identity as schedule albums');
+assert(photoIndexSource.includes('complete: true'), 'photo index must support complete hydration for cross-page search/date views');
+assert(chatGallerySource.includes('requiresCompletePhotoIndex'), 'gallery search/date modes must request the complete photo index');
 assert(lightboxSource.includes("overflowY: isDesktop ? 'auto' : 'visible'"), 'mobile photo comments must not use an inner vertical scrollbar');
 assert(appMainSource.includes("console.info('[calendar-save]'"), 'calendar saves must emit an operation diagnostic');
 assert(appMainSource.includes("console.warn('[calendar-save-failed]'"), 'failed calendar saves must emit an operation diagnostic');

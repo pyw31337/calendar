@@ -347,7 +347,9 @@ export function ChatGalleryModal({
   indexedPhotoTotal = null,
   indexedPhotoPage = 1,
   indexedPhotoLoading = false,
+  indexedPhotoComplete = false,
   onIndexedPhotoPageChange = null,
+  onIndexedPhotoLoadAll = null,
   onPasteGatherPhoto = null,
   onPasteGatherPhotos = null,
   syncStatus = null
@@ -671,6 +673,19 @@ export function ChatGalleryModal({
   const [pickerGalleryYear, setPickerGalleryYear] = React.useState(() => new Date().getFullYear());
   const [pickerGalleryMonth, setPickerGalleryMonth] = React.useState(() => new Date().getMonth());
   const galleryMonthKey = `${galleryMonthDate.getFullYear()}-${String(galleryMonthDate.getMonth() + 1).padStart(2, '0')}`;
+  const requiresCompletePhotoIndex = usingPhotoIndex
+    && activeTab === 'photos'
+    && (Boolean(searchQuery.trim()) || galleryViewMode === 'date');
+  React.useEffect(() => {
+    if (!usingPhotoIndex || indexedPhotoLoading) return;
+    if (requiresCompletePhotoIndex && !indexedPhotoComplete && typeof onIndexedPhotoLoadAll === 'function') {
+      void onIndexedPhotoLoadAll();
+      return;
+    }
+    if (!requiresCompletePhotoIndex && indexedPhotoComplete && typeof onIndexedPhotoPageChange === 'function') {
+      void onIndexedPhotoPageChange(indexedPhotoPage || 1);
+    }
+  }, [usingPhotoIndex, requiresCompletePhotoIndex, indexedPhotoComplete, indexedPhotoLoading, indexedPhotoPage, onIndexedPhotoLoadAll, onIndexedPhotoPageChange]);
   const monthNames = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
   const getGalleryItemDateKey = item => {
     const meetingDate = String(item?.meetingDate || '').trim();
@@ -1428,7 +1443,7 @@ export function ChatGalleryModal({
   };
   const renderGalleryLoadMoreButton = props => /*#__PURE__*/React.createElement(GalleryLoadMoreButton, props);
   const renderGalleryPagination = () => {
-    if (!usingPhotoIndex || typeof onIndexedPhotoPageChange !== 'function') return null;
+    if (!usingPhotoIndex || indexedPhotoComplete || typeof onIndexedPhotoPageChange !== 'function') return null;
     const pageCount = Math.max(1, Math.ceil(Number(indexedPhotoTotal || 0) / 100));
     if (pageCount <= 1) return null;
     const windowSize = isMobile ? 5 : 10;
