@@ -3204,6 +3204,20 @@ function todayIsoLocal() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 
+
+// Pull the first http(s) URL out of free text. Custom festival cards often store the homepage
+// only in description, so link/website are empty while a blue URL still shows in the sheet.
+function extractFirstHttpUrl(text) {
+  const match = String(text || '').match(/https?:\/\/[^\s)\]}>"',]+/i);
+  if (!match) return '';
+  return match[0].replace(/[).,!?"'\u201d\u2019]+$/u, '');
+}
+function resolveCultureDetailUrl(item) {
+  const structured = String(item?.link || item?.website || item?.url || '').trim();
+  if (structured) return structured;
+  return extractFirstHttpUrl(item?.description) || extractFirstHttpUrl(item?.contact) || '';
+}
+
 function cultureItemDay(item) {
   const value = item?.releaseDate || item?.startDate;
   return /^\d{4}-\d{2}-\d{2}$/.test(String(value || '')) ? String(value) : '';
@@ -4228,7 +4242,8 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
             },
               /*#__PURE__*/React.createElement("span", { style: { flexShrink: 0, width: '84px', color: 'var(--text-muted)', fontWeight: 700 } }, label),
               /*#__PURE__*/React.createElement("span", { style: { color: 'var(--text-main)', wordBreak: 'break-word' } },
-                (label === '감독' || label === '출연') ? renderPersonLinks(value) : value)
+                (label === '감독' || label === '출연') ? renderPersonLinks(value)
+                  : (label === '공식 홈페이지' ? renderDescriptionWithLinks(value) : value))
             )),
             selected.description && /*#__PURE__*/React.createElement("div", {
               style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-main)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }
@@ -4302,8 +4317,8 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
             }, ShareIcon ? /*#__PURE__*/React.createElement(ShareIcon, { size: 20 }) : "🔗"),
             (() => {
               // 개별등록(custom)은 link, 포털/스냅샷·고아 카드는 website 를 쓴다.
-              // URL이 어느 쪽이든 있으면 하단 자세히보기로 새 창 이동.
-              const detailUrl = String(selected.link || selected.website || '').trim();
+              // 설명/문의에만 URL이 있는 개별등록도 하단 자세히보기로 새 창 이동.
+              const detailUrl = resolveCultureDetailUrl(selected);
               if (!detailUrl) return null;
               return /*#__PURE__*/React.createElement("a", {
                 href: detailUrl, target: "_blank", rel: "noopener noreferrer",
@@ -4416,7 +4431,7 @@ function SharedContentPreviewModal({ item, onClose }) {
           style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', textAlign: 'center', flexShrink: 0 }
         }, "다른 사람이 공유한 컨텐츠입니다. 내 캘린더에 등록하려면 컨텐츠 등록 화면의 '붙여넣기'를 사용하세요."),
         (() => {
-          const detailUrl = String(item.link || item.website || '').trim();
+          const detailUrl = resolveCultureDetailUrl(item);
           if (!detailUrl) return null;
           return /*#__PURE__*/React.createElement("a", {
             href: detailUrl, target: "_blank", rel: "noopener noreferrer",
