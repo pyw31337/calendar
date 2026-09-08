@@ -461,7 +461,7 @@ function getMemoPreviewBorderColor(colorVal) {
 // back to navigating to the memo page (this section owns no edit modal or tag-search UI of its
 // own); onTogglePin/onCommentsChange are real writes (see handleTogglePinFromMemoPreview /
 // handleMemoCommentsChangeFromMemoPreview in app-main.js) since MemoCard calls them unconditionally.
-export function MemoPreviewSection({ memos = [], calendar = null, onViewAll, onOpenEdit, onTogglePin, onSelectTag, onShare, onCommentsChange, onRequestConfirm, showToast }) {
+export function MemoPreviewSection({ memos = [], calendar = null, onViewAll, onOpenEdit, onTogglePin, onSelectTag, onShare, onCommentsChange, onRequestConfirm, showToast, setActiveLightbox = null }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -525,6 +525,7 @@ export function MemoPreviewSection({ memos = [], calendar = null, onViewAll, onO
       getBorderColor: getMemoPreviewBorderColor,
       onRequestConfirm: onRequestConfirm,
       showToast: showToast,
+      setActiveLightbox: setActiveLightbox,
       effectivePinned: !!memo.isPinned,
       hidePinButton: true,
       variant: 'preview'
