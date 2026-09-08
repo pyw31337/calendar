@@ -1236,6 +1236,27 @@ function unionConfirmedMeetings(calendar, subcollectionMeetings) {
     ), 0);
     return Math.max(ownStamp, expenseStamp, photoStamp);
   };
+  const mergeMeetingItems = (existingItems, incomingItems, keyGetter) => {
+    const byKey = new Map();
+    const addItem = (item) => {
+      if (!item) return;
+      const key = typeof keyGetter === 'function' ? keyGetter(item) : '';
+      if (!key) return;
+      const current = byKey.get(key);
+      if (!current) {
+        byKey.set(key, item);
+        return;
+      }
+      const currentStamp = Number(current.updatedAt || current.deletedAt || current.createdAt || 0) || 0;
+      const incomingStamp = Number(item.updatedAt || item.deletedAt || item.createdAt || 0) || 0;
+      byKey.set(key, incomingStamp >= currentStamp ? { ...current, ...item } : current);
+    };
+    (Array.isArray(existingItems) ? existingItems : []).forEach(addItem);
+    (Array.isArray(incomingItems) ? incomingItems : []).forEach(addItem);
+    return Array.from(byKey.values());
+  };
+  const photoKey = photo => photo.id || photo.refKey || photo.mediaKey || photo.assetKey || photo.imageUrl || photo.thumbUrl;
+  const expenseKey = expense => expense.id || `${expense.label || ''}|${expense.url || ''}|${expense.amount ?? ''}|${expense.categoryId || ''}|${expense.createdAt ?? ''}`;
   const byDate = new Map();
   getConfirmedMeetings(calendar).forEach(m => { if (m?.date) byDate.set(m.date, m); });
   (Array.isArray(subcollectionMeetings) ? subcollectionMeetings : []).forEach(subM => {
@@ -1246,11 +1267,14 @@ function unionConfirmedMeetings(calendar, subcollectionMeetings) {
     } else {
       const subTime = getMeetingFreshness(subM);
       const existingTime = getMeetingFreshness(existing);
-      if (subTime >= existingTime) {
-        byDate.set(subM.date, { ...existing, ...subM });
-      } else {
-        byDate.set(subM.date, { ...subM, ...existing });
-      }
+      // Prefer newer scalar fields, but always union photos/expenses by stable ids so an
+      // expense-only subcollection snapshot cannot shrink a richer local photo album.
+      const base = subTime >= existingTime ? { ...existing, ...subM } : { ...subM, ...existing };
+      byDate.set(subM.date, {
+        ...base,
+        photos: mergeMeetingItems(existing.photos, subM.photos, photoKey),
+        expenses: mergeMeetingItems(existing.expenses, subM.expenses, expenseKey)
+      });
     }
   });
   return Array.from(byDate.values());

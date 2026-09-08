@@ -402,6 +402,7 @@ import {
   deleteActivityLogsAfterTimestamp,
   fetchPlacesFromFirestore,
   fetchConfirmedMeetingsFromFirestore,
+  mergeConfirmedMeetings,
   describeUpdateCalendarsFailure,
   pushSingleCloudCalendar,
   persistCalendarAuxiliaryData,
@@ -5242,7 +5243,13 @@ function CalendarApp() {
       { confirmedMeetings: changedConfirmedMeetings, settingsFields: ['confirmedMeeting'] }
     );
     if (!calendarSaved) return false;
-    setConfirmedMeetingsSubcollection(stampedNextConfirmedMeetings);
+    // Preserve richer photos already present in the live subcollection snapshot. Expense/note
+    // commits can stamp a date with an incomplete local photos array; merging by item identity
+    // keeps alive photos visible while still applying newer deletedAt tombstones.
+    setConfirmedMeetingsSubcollection(prev => mergeConfirmedMeetings(
+      Array.isArray(prev) ? prev : [],
+      stampedNextConfirmedMeetings
+    ));
     return true;
   };
   const handleConfirmMeeting = (dateStr, note) => {
@@ -7910,6 +7917,7 @@ function CalendarApp() {
         onAddPhotosBackToMemory: handleAddPhotosBackToTravelMemory,
         onFetchPhotoComments: handleFetchPhotoComments,
         onSavePhotoComments: handleSavePhotoComments,
+        onFetchMeetingPhotoIndex: (date) => fetchMeetingPhotoIndex(activeCalId, date),
         photoCommentCounts: photoCommentCounts,
         ...navMenuProps
       }),
