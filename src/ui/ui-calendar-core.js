@@ -1963,7 +1963,26 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         }
       }, /*#__PURE__*/React.createElement(MessageCommentIcon, { size: 18 }), /*#__PURE__*/React.createElement("span", {
         style: { marginLeft: '4px', fontSize: '0.75rem', fontWeight: 700 }
-      }, "댓글"))
+      }, "댓글"), comments.length > 0 ? /*#__PURE__*/React.createElement("span", {
+        "aria-label": `댓글 ${comments.length}개`,
+        style: {
+          marginLeft: '4px',
+          minWidth: '18px',
+          height: '18px',
+          padding: '0 5px',
+          borderRadius: '999px',
+          backgroundColor: '#2563EB',
+          color: '#FFFFFF',
+          fontSize: '0.7rem',
+          fontWeight: 800,
+          lineHeight: '18px',
+          textAlign: 'center',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxSizing: 'border-box'
+        }
+      }, String(comments.length)) : null)
     ),
 
     /* Comment list -- no background, thin divider line between rows instead */
