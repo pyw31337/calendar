@@ -193,6 +193,8 @@ assert(photoIndexSource.includes('complete: true'), 'photo index must support co
 assert(chatGallerySource.includes('requiresCompletePhotoIndex'), 'gallery search/date modes must request the complete photo index');
 assert(appMainSource.includes('memos: galleryMemos'), 'gallery must receive the complete paged memo archive for old photos and links');
 assert(lightboxSource.includes("overflowY: isDesktop ? 'auto' : 'visible'"), 'mobile photo comments must not use an inner vertical scrollbar');
+assert(lightboxSource.includes('mobileStageHeightPx'), 'mobile lightbox image stage must size to the fitted photo height');
+assert(!/height: isDesktop \? '82vh' : '56dvh'/.test(lightboxSource), 'mobile lightbox must not reserve a fixed 56dvh image frame that gaps above comments');
 assert(appMainSource.includes("console.info('[calendar-save]'"), 'calendar saves must emit an operation diagnostic');
 assert(appMainSource.includes("console.warn('[calendar-save-failed]'"), 'failed calendar saves must emit an operation diagnostic');
 assert(appMainSource.includes('pendingRemotePlacesRef') && appMainSource.includes('pendingRemoteMeetingsRef'), 'realtime subcollection snapshots must be retained during local saves');
