@@ -3240,7 +3240,8 @@ export function DateModal({
                   photoId: p.id,
                   assetKey: p.assetKey,
                   mediaKey: p.mediaKey,
-                  refKey: p.refKey
+                  refKey: p.refKey,
+                  legacyKeys: p.legacyKeys
                 }))
               });
             } else {
