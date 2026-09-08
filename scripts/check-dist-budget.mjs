@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 const DIST_ASSETS_DIR = join(process.cwd(), 'dist', 'assets');
@@ -7,9 +7,11 @@ const DIST_ASSETS_DIR = join(process.cwd(), 'dist', 'assets');
 const BUDGETS = [
   { pattern: /^app-main-.*\.js$/, maxBytes: 360_000 },
   { pattern: /^photo-comments-.*\.js$/, maxBytes: 40_000 },
-  // ui-views split halves (vite.config.js manualChunks)
-  { pattern: /^ui-views-calendar-.*\.js$/, maxBytes: 240_000 },
-  { pattern: /^ui-views-modals-.*\.js$/, maxBytes: 280_000 },
+  { pattern: /^ui-calendar-core-.*\.js$/, maxBytes: 120_000 },
+  { pattern: /^ui-chat-room-.*\.js$/, maxBytes: 100_000 },
+  { pattern: /^ui-places-.*\.js$/, maxBytes: 100_000 },
+  { pattern: /^ui-memo-view-.*\.js$/, maxBytes: 100_000 },
+  { pattern: /^ui-event-modals-.*\.js$/, maxBytes: 200_000 },
   { pattern: /^ui-admin-.*\.js$/, maxBytes: 200_000 },
   { pattern: /^vendor-react-dom-.*\.js$/, maxBytes: 180_000 },
   { pattern: /^index-.*\.css$/, maxBytes: 240_000 }
@@ -24,13 +26,22 @@ const BUDGETS = [
 // cap as eagerly-loaded app code was inflating "total js" without reflecting any actual
 // page-load cost, which is what this budget exists to guard. Reported separately below for
 // visibility, but excluded from TOTAL_JS_MAX_BYTES.
-const LAZY_CHUNK_PATTERNS = [/^vendor-map-.*\.js$/];
+const LAZY_CHUNK_PATTERNS = [
+  /^vendor-map-.*\.js$/,
+  /^ui-admin-.*\.js$/,
+  /^ui-user-manual-.*\.js$/,
+  /^ui-chat-room-.*\.js$/,
+  /^ui-chat-gallery-.*\.js$/,
+  /^ui-places-.*\.js$/,
+  /^ui-memo-view-.*\.js$/,
+  /^ui-event-modals-.*\.js$/
+];
 
 // Total EAGER JS across all Vite chunks (excludes LAZY_CHUNK_PATTERNS above) -- this is what
 // actually loads before the app becomes interactive. Sized with real headroom so routine
 // feature work (this cap already accounts for the movie metadata/enrichment UI) doesn't
 // trip CI for a few KB.
-const TOTAL_JS_MAX_BYTES = 1_800_000;
+const TOTAL_JS_MAX_BYTES = 1_500_000;
 
 function fail(message) {
   console.error(`[check-dist-budget] ${message}`);
@@ -43,6 +54,7 @@ if (!existsSync(DIST_ASSETS_DIR)) {
 }
 
 const files = readdirSync(DIST_ASSETS_DIR);
+const indexHtml = readFileSync(join(process.cwd(), 'dist', 'index.html'), 'utf8');
 const jsFiles = files.filter(file => file.endsWith('.js'));
 const isLazyChunk = file => LAZY_CHUNK_PATTERNS.some(p => p.test(file));
 const lazyJsFiles = jsFiles.filter(isLazyChunk);
@@ -52,6 +64,9 @@ const totalJsBytes = eagerJsFiles.reduce((sum, file) => sum + statSync(join(DIST
 for (const file of lazyJsFiles) {
   const size = statSync(join(DIST_ASSETS_DIR, file)).size;
   console.log(`[check-dist-budget] ${file} ${size} bytes (lazy/on-demand -- excluded from total js)`);
+  if (indexHtml.includes(`modulepreload`) && indexHtml.includes(`/assets/${file}`)) {
+    fail(`${file} is marked lazy but is modulepreloaded by index.html`);
+  }
 }
 
 for (const { pattern, maxBytes } of BUDGETS) {

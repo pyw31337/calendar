@@ -64,18 +64,13 @@ import {
   changeAdminPasswordRemote,
   copyTextToClipboard,
   isNotificationSupported,
-  ensureChatNotificationPermission,
   isChatNotifyEnabledForCalendar,
   setChatNotifyEnabledForCalendar,
   setStoredChatParticipantId,
-  describePushSubscribeFailure,
   getBrowserLabelForNotifications,
   getNotificationPermissionHelpSteps,
   setNotifGuideSeen,
-  getNotifyChannels,
   setNotifyChannel,
-  probeNotificationCapability,
-  subscribeUserToPush,
   ensurePushSubscriptionHealthy,
   syncPushSubscriptionChannels,
   subscribeUserToPushWithPermission,
@@ -149,6 +144,15 @@ import { useGalleryPhotoIndex } from './photo-index.js';
 import { useGalleryArchiveState } from './gallery-archive-state.js';
 import { cloneConfirmedMeetings, commitConfirmedMeetingChanges } from './confirmed-meeting-coordinator.js';
 import { getInitialAppView, buildAppViewUrl } from './app-routing-state.js';
+import { useNotificationPwaState } from './notification-pwa-state.js';
+import {
+  getInitialDataLoadingState,
+  subscribeBrowserConnectivity,
+  subscribeCalendarBootstrap,
+  subscribeFirestoreForegroundRecovery,
+  subscribeAppResumeRefresh,
+  watchFirebaseBootstrap
+} from './app-data-bootstrap.js';
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 // 입력필드 규칙: 멀티라인 텍스트는 값(로드/입력/붙여넣기)에 맞춰 세로로 자동 확장
@@ -1063,136 +1067,6 @@ function CalendarApp() {
     setFontScalePercent(readFontScaleForCalendar(activeCalId));
   }, [activeCalId]);
 
-  const [mainNotifPermission, setMainNotifPermission] = React.useState(() => (isNotificationSupported() ? Notification.permission : 'unsupported'));
-  const [mainChatNotifyEnabled, setMainChatNotifyEnabled] = React.useState(() => isChatNotifyEnabledForCalendar(activeCalId));
-  React.useEffect(() => {
-    setMainChatNotifyEnabled(isChatNotifyEnabledForCalendar(activeCalId));
-    setMainNotifPermission(isNotificationSupported() ? Notification.permission : 'unsupported');
-  }, [activeCalId]);
-
-  React.useEffect(() => {
-    if (!activeCalId || !firebaseDb) return undefined;
-    if (!isChatNotifyEnabledForCalendar(activeCalId)) return undefined;
-    let cancelled = false;
-    const run = async () => {
-      if (cancelled) return;
-      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
-      let pid = null;
-      try {
-        pid = ((window.GATHER_APP_NOTIFICATIONS || {}).getStoredChatParticipantId || (() => null))(activeCalId, null);
-      } catch (_) {}
-      if (!pid) return;
-      try { await ensurePushSubscriptionHealthy(activeCalId, pid); } catch (e) { console.warn('push health:', e); }
-    };
-    run();
-    const onVis = () => { if (document.visibilityState === 'visible') run(); };
-    document.addEventListener('visibilitychange', onVis);
-    window.addEventListener('focus', run);
-    const intervalId = setInterval(run, 6 * 60 * 60 * 1000);
-    return () => {
-      cancelled = true;
-      document.removeEventListener('visibilitychange', onVis);
-      window.removeEventListener('focus', run);
-      clearInterval(intervalId);
-    };
-  }, [activeCalId, mainChatNotifyEnabled]);
-  const getCurrentChatParticipantId = () => {
-    if (chatParticipantIdRef.current) return chatParticipantIdRef.current;
-    return ((window.GATHER_APP_NOTIFICATIONS||{}).getStoredChatParticipantId||(()=>undefined))(activeCalId, activeCal);
-  };
-  const openNotificationHelp = () => {
-    setIsNotificationHelpOpen(true);
-  };
-  const handleMainToggleNotifications = async () => {
-    if (!isNotificationSupported()) {
-      showToast('알림 미지원 브라우저', 'error');
-      openNotificationHelp();
-      return;
-    }
-    if (Notification.permission === 'granted') {
-      const next = !mainChatNotifyEnabled;
-      if (next) {
-        // iOS reports Notification.permission as 'granted' even in a regular (non-installed)
-        // Safari/Chrome/Firefox tab, where push can never actually arrive -- probe before
-        // trusting that flag, same as the other two chat-notification toggles in this app
-        // already do (ChatRoomView/CommentsSection, AdminModal 일반 tab). This one was the odd
-        // one out, missing the probe entirely -- which is exactly the side-menu switch most
-        // people reach for first, and exactly why "I turned it on but nothing ever arrives"
-        // reports kept coming from iPhone/iPad users regardless of what they toggled.
-        const capability = await probeNotificationCapability();
-        if (!capability.ok) {
-          setMainNotifPermission('unsupported');
-          openNotificationHelp();
-          showToast(capability.reason === 'ios-not-installed' ? 'iOS는 홈 화면에 추가한 앱에서만 채팅알림을 받을 수 있습니다.' : '이 환경에서는 채팅알림을 받을 수 없습니다.', 'error', 6000);
-          return;
-        }
-      }
-      setMainChatNotifyEnabled(next);
-      setChatNotifyEnabledForCalendar(activeCalId, next);
-      if (next) {
-        let result = await subscribeUserToPushWithPermission(activeCalId, getCurrentChatParticipantId());
-        if (result && !result.ok) {
-          await new Promise(r => setTimeout(r, 400));
-          result = await subscribeUserToPushWithPermission(activeCalId, getCurrentChatParticipantId());
-        }
-        if (result && !result.ok) {
-          setMainChatNotifyEnabled(false);
-          setChatNotifyEnabledForCalendar(activeCalId, false);
-          if (result.reason === 'permission-not-granted') {
-            openNotificationHelp();
-          } else {
-            showToast(`알림 설정 실패 (${describePushSubscribeFailure(result.reason)})`, 'error', 5000);
-          }
-          console.warn('Main chat notification subscribe failed:', result.reason);
-          return;
-        }
-      } else {
-        await unsubscribeUserFromPush(activeCalId);
-      }
-      showToast(next ? '알림이 켜졌습니다.' : '알림이 꺼졌습니다.', 'success');
-      return;
-    }
-    if (Notification.permission === 'denied') {
-      openNotificationHelp();
-      showToast('브라우저 설정에서 알림 허용 필요', 'error', 6000);
-      return;
-    }
-    const result = await ensureChatNotificationPermission();
-    setMainNotifPermission(result);
-    if (result !== 'granted') {
-      openNotificationHelp();
-      showToast('알림 권한을 허용해야 알림을 받을 수 있습니다.', 'error', 6000);
-      return;
-    }
-    const capability = await probeNotificationCapability();
-    if (!capability.ok) {
-      setMainNotifPermission('unsupported');
-      openNotificationHelp();
-      showToast(capability.reason === 'ios-not-installed' ? 'iOS는 홈 화면에 추가한 앱에서만 알림을 받을 수 있습니다.' : '이 브라우저에서는 알림을 표시할 수 없습니다.', 'error', 6000);
-      return;
-    }
-    setChatNotifyEnabledForCalendar(activeCalId, true);
-    setMainChatNotifyEnabled(true);
-    let subscribeResult = await subscribeUserToPushWithPermission(activeCalId, getCurrentChatParticipantId());
-    if (subscribeResult && !subscribeResult.ok) {
-      await new Promise(r => setTimeout(r, 400));
-      subscribeResult = await subscribeUserToPushWithPermission(activeCalId, getCurrentChatParticipantId());
-    }
-    if (subscribeResult && !subscribeResult.ok) {
-      setMainChatNotifyEnabled(false);
-      setChatNotifyEnabledForCalendar(activeCalId, false);
-      if (subscribeResult.reason === 'permission-not-granted') {
-        openNotificationHelp();
-      } else {
-        showToast(`알림 설정 실패 (${describePushSubscribeFailure(subscribeResult.reason)})`, 'error', 5000);
-      }
-      console.warn('Main chat notification subscribe failed:', subscribeResult.reason);
-      return;
-    }
-    showToast('알림이 켜졌습니다.', 'success');
-    if (typeof setNotifGuideSeen === 'function') setNotifGuideSeen(true);
-  };
-
   const [adminActivityLogs, setAdminActivityLogs] = React.useState([]);
   const [isShareOpen, setIsShareOpen] = React.useState(false);
   const [isChatShareOpen, setIsChatShareOpen] = React.useState(false);
@@ -1202,10 +1076,7 @@ function CalendarApp() {
   const [isHistoryShareOpen, setIsHistoryShareOpen] = React.useState(false);
   const [isMainSideMenuOpen, setIsMainSideMenuOpen] = React.useState(false);
   const confirmedMeetingAnimationTimersRef = React.useRef(new Map());
-  const [isNotificationHelpOpen, setIsNotificationHelpOpen] = React.useState(false);
   const [isAppSettingsOpen, setIsAppSettingsOpen] = React.useState(false);
-  const [isNotifOnboardingOpen, setIsNotifOnboardingOpen] = React.useState(false);
-  const [notifyChannels, setNotifyChannelsState] = React.useState(() => (typeof getNotifyChannels === 'function' ? getNotifyChannels() : { chat: true, memo: true, poll: true, schedule: true }));
   const [isPollModalOpen, setIsPollModalOpen] = React.useState(false);
   const [expandedConfirmedDates, setExpandedConfirmedDates] = React.useState({});
   const [isCreateSettlementOpen, setIsCreateSettlementOpen] = React.useState(false);
@@ -1215,19 +1086,29 @@ function CalendarApp() {
   const [isGuideOpen, setIsGuideOpen] = React.useState(false);
   const [isAnniversariesOpen, setIsAnniversariesOpen] = React.useState(false);
   const [anniversaryEditId, setAnniversaryEditId] = React.useState(null);
+  const withEventUi = (open, failureLabel = '화면') => {
+    const components = window.GATHER_UI_COMPONENTS || {};
+    if (typeof components.AnniversaryModal === 'function'
+      && typeof components.PollModal === 'function'
+      && typeof components.SettlementSummaryModal === 'function') {
+      open();
+      return;
+    }
+    if (typeof window.__gatherLoadEventUi !== 'function') return;
+    window.__gatherLoadEventUi().then(open).catch(error => {
+      console.error(`${failureLabel} UI load failed:`, error);
+      showToast(`${failureLabel}을 불러오지 못했습니다. 다시 시도해 주세요.`, 'error');
+    });
+  };
   // 일정 팝업의 "+ 기념일 등록" 버튼이 채워 넣는 날짜 -- AnniversaryModal이 이 날짜로 바로
   // 등록 폼을 여는 데 쓴다 (initialEditId와는 별개로, 기존 기념일이 아닌 새 등록 전용).
   const [anniversaryInitialDate, setAnniversaryInitialDate] = React.useState(null);
-  const [isInitialDataLoading, setIsInitialDataLoading] = React.useState(() => {
-    if (!firebaseDb) return false;
-    try {
-      const cached = loadLocalCache();
-      const hit = Array.isArray(cached) && cached.some(c => c && c.id === activeCalId && c.title && c.title !== '캘린더 불러오는 중...');
-      return !hit;
-    } catch (_) {
-      return true;
-    }
-  });
+  const [isInitialDataLoading, setIsInitialDataLoading] = React.useState(() => getInitialDataLoadingState({
+    firebaseDb,
+    activeCalId,
+    loadLocalCache,
+    isUsableCalendarRecord
+  }));
   const [, setIsBrowserOnline] = React.useState(() => {
     try {
       return typeof navigator === 'undefined' ? true : navigator.onLine !== false;
@@ -1236,20 +1117,7 @@ function CalendarApp() {
     }
   });
   const [, setSyncDiag] = React.useState(null);
-  React.useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
-    const handleOnline = () => setIsBrowserOnline(true);
-    const handleOffline = () => setIsBrowserOnline(false);
-    try {
-      setIsBrowserOnline(typeof navigator === 'undefined' ? true : navigator.onLine !== false);
-    } catch (_) {}
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
+  React.useEffect(() => subscribeBrowserConnectivity(setIsBrowserOnline), []);
 
   // Main header: fixed full-width bar with a menu row, hides on scroll-down and reappears on
   // scroll-up (same behavior as the chat room header). Refs below are scroll targets for the
@@ -1385,15 +1253,31 @@ function CalendarApp() {
   const [chatParticipantId, setChatParticipantId] = React.useState('');
   const chatParticipantIdRef = React.useRef(chatParticipantId);
   React.useEffect(() => { chatParticipantIdRef.current = chatParticipantId; }, [chatParticipantId]);
-  React.useEffect(() => {
-    if (!activeCalId || !chatParticipantId) return;
-    if (!mainChatNotifyEnabled || mainNotifPermission !== 'granted') return;
-    subscribeUserToPush(activeCalId, chatParticipantId).then(result => {
-      if (result && !result.ok) {
-        console.warn('Main chat notification auto-subscribe skipped:', result.reason);
-      }
-    });
-  }, [activeCalId, chatParticipantId, mainChatNotifyEnabled, mainNotifPermission]);
+  const getCurrentChatParticipantId = () => {
+    if (chatParticipantIdRef.current) return chatParticipantIdRef.current;
+    return ((window.GATHER_APP_NOTIFICATIONS || {}).getStoredChatParticipantId || (() => undefined))(activeCalId, activeCal);
+  };
+  const {
+    mainNotifPermission,
+    setMainNotifPermission,
+    mainChatNotifyEnabled,
+    setMainChatNotifyEnabled,
+    isNotificationHelpOpen,
+    setIsNotificationHelpOpen,
+    isNotifOnboardingOpen,
+    setIsNotifOnboardingOpen,
+    notifyChannels,
+    setNotifyChannelsState,
+    openNotificationHelp,
+    handleMainToggleNotifications
+  } = useNotificationPwaState({
+    React,
+    activeCalId,
+    firebaseDb,
+    chatParticipantId,
+    getCurrentParticipantId: getCurrentChatParticipantId,
+    showToast
+  });
   const [isChatSheetOpen, setIsChatSheetOpen] = React.useState(false);
   const [isChatSubmitting, setIsChatSubmitting] = React.useState(false);
   const [chatUploadProgress, setChatUploadProgress] = React.useState(null);
@@ -1635,6 +1519,17 @@ function CalendarApp() {
   }, []);
 
   const changeView = (view) => {
+    if (view === 'settlement'
+      && !(window.GATHER_UI_COMPONENTS
+        && typeof window.GATHER_UI_COMPONENTS.SettlementSummaryModal === 'function')) {
+      if (typeof window.__gatherLoadEventUi === 'function') {
+        window.__gatherLoadEventUi().then(() => changeView(view)).catch(error => {
+          console.error('Settlement UI load failed:', error);
+          showToast('정산 화면을 불러오지 못했습니다. 다시 시도해 주세요.', 'error');
+        });
+      }
+      return;
+    }
     if ((view === 'chat' || view === 'gallery')
       && !(window.GATHER_UI_COMPONENTS
         && typeof window.GATHER_UI_COMPONENTS.ChatRoomView === 'function'
@@ -1738,215 +1633,43 @@ function CalendarApp() {
   }, [activeCalId]);
 
   // Firebase Firestore Real-Time Listener (ISOLATED per activeCalId)
-  React.useEffect(() => {
-    if (!firebaseDb || !activeCalId) {
-      setIsInitialDataLoading(false);
-      return;
-    }
-    let isMounted = true;
-    let hasLoadedCloudCalendar = false;
-    let unsubscribe = null;
-    let retryTimeoutId = null;
-    const restoredFromCache = restoreActiveCalendarFromCache();
-    const cacheHit = restoredFromCache || (calendarsRef.current || []).some(c => c && c.id === activeCalId && isUsableCalendarRecord(c));
-    setIsInitialDataLoading(!cacheHit);
-
-    const applyLoadedCalendar = (cloudCal, cloudLastMod = Date.now(), cloudRevision = 0, forceApply = false, markLoaded = true) => {
-      if (!isMounted || !cloudCal || cloudCal.id !== activeCalId) return false;
-      const incomingRevision = Number(cloudRevision || 0) || 0;
-      const currentMetaRevision = getMetaRevision(serverRevisionRef.current, activeCalId);
-      if (!forceApply) {
-        if (incomingRevision > 0 && currentMetaRevision > 0 && incomingRevision < currentMetaRevision) return false;
-        if (incomingRevision <= 0 && cloudLastMod < getMetaLastModified(serverRevisionRef.current, activeCalId)) return false;
-      }
-      if (markLoaded) hasLoadedCloudCalendar = true;
-      return applyCalendarSnapshot(cloudCal, cloudLastMod, cloudRevision, forceApply);
-    };
-
-    const runInitialLoad = async () => {
-      // cacheHit means we already have a usable calendar record on screen (from cache or state)
-      // when this effect started -- runInitialLoad still runs in that case as a background
-      // refresh (see the fallbackTimeoutId branch below), most often right after the module-level
-      // visibilitychange handler force-cycles disableNetwork/enableNetwork on returning from a
-      // long background stint (see VISIBILITY_RECONNECT_THRESHOLD_MS), which can leave the
-      // onSnapshot listener briefly slow to redeliver. The app keeps the last usable data visible
-      // and quietly retries in the background instead of surfacing transient reconnect notices to
-      // the user.
-      for (let attempt = 1; attempt <= FIREBASE_LOAD_MAX_ATTEMPTS && isMounted && !hasLoadedCloudCalendar; attempt += 1) {
-        const result = await fetchSingleCloudCalendar(activeCalId, 1, FIREBASE_LOAD_TIMEOUT_MS);
-        // fetchSingleCloudCalendar always does a genuine network round-trip (.get({source:'server'})
-        // or, failing that, an uncached REST fetch) -- never a local/cache read -- so this result
-        // deserves the same unconditional trust (forceApply=true) as the onSnapshot listener's own
-        // fromCache:false case below. Without this, a device whose locally stored revision was ever
-        // corrupted (see the fix in pushSingleCloudCalendar/updateCalendars) stayed stuck rejecting
-        // this explicit fetch's genuinely fresh result too, on every load, until its realtime
-        // listener happened to deliver a live update on its own.
-        if (result?.calendar && applyLoadedCalendar(result.calendar, result.lastModified || Date.now(), result.revision || result.calendar.revision || 0, true)) {
-          return;
-        }
-      }
-      if (isMounted && !hasLoadedCloudCalendar) {
-        const restored = restoreActiveCalendarFromCache();
-        if (restored) {
-          setIsInitialDataLoading(false);
-          if (!cacheHit) console.warn(`Calendar ${activeCalId} refreshed from local state while waiting for Firestore.`);
-        } else {
-          setIsInitialDataLoading(true);
-          if (!cacheHit) console.warn(`Calendar ${activeCalId} data load is still pending; background retry continues.`);
-        }
-        retryTimeoutId = setTimeout(() => {
-          if (isMounted) setCloudReloadToken(token => token + 1);
-        }, 3500);
-      }
-    };
-
-    unsubscribe = firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).onSnapshot({ includeMetadataChanges: true }, doc => {
-      // Hard evidence for the next "다른 기기에 실시간 반영 안 됨" report instead of another
-      // guess: if this stays fromCache:true forever on an affected device, the listener's
-      // connection to the server never actually came up (persistence keeps showing the last
-      // locally-cached snapshot indefinitely in that case) -- readable from DevTools console via
-      // window.__gatherCalendarSyncDiag without needing repro steps from the user.
-      try {
-        if (typeof window !== 'undefined') {
-          window.__gatherCalendarSyncDiag = {
-            calendarId: activeCalId,
-            fromCache: doc.metadata.fromCache,
-            hasPendingWrites: doc.metadata.hasPendingWrites,
-            docUpdatedAt: doc.exists ? (doc.data()?.calendar?.updatedAt || null) : null,
-            receivedAt: Date.now()
-          };
-          setSyncDiag(window.__gatherCalendarSyncDiag);
-        }
-      } catch (_) {}
-      const result = getCloudDocCalendar(doc, activeCalId);
-        if (result && isSavingRef.current) {
-          // Don't apply mid-save (this device's own optimistic local state already reflects its
-          // in-flight edit, and a forced apply here could stomp it with a partial/pending write
-          // echo) -- but a server-confirmed change from another device is stashed instead of
-          // dropped, so it can be replayed the moment this save finishes instead of being lost
-          // until some unrelated future write happens to trigger another onSnapshot event.
-          if (!doc.metadata.fromCache && !doc.metadata.hasPendingWrites) {
-            pendingRemoteSnapshotRef.current = {
-              calendar: result.calendar,
-              lastModified: result.lastModified || Date.now(),
-              revision: result.revision || result.calendar.revision || 0
-            };
-          }
-        } else if (result) {
-          if (doc.metadata.fromCache) {
-            applyLoadedCalendar(result.calendar, result.lastModified || Date.now(), result.revision || result.calendar.revision || 0, false, false);
-          } else {
-            applyLoadedCalendar(result.calendar, result.lastModified || Date.now(), result.revision || result.calendar.revision || 0, true);
-          }
-        }
-    }, err => {
-      console.warn(`Firestore realtime sync notice for cal_${activeCalId}:`, err);
-      try {
-        setSyncDiag(prev => ({
-          ...(prev || {}),
-          calendarId: activeCalId,
-          fromCache: true,
-          hasPendingWrites: false,
-          docUpdatedAt: prev?.docUpdatedAt || null,
-          receivedAt: Date.now(),
-          error: err?.message || String(err || 'realtime sync error')
-        }));
-      } catch (_) {}
-      if (isMounted) {
-        restoreActiveCalendarFromCache();
-        setIsInitialDataLoading(false);
-        retryTimeoutId = setTimeout(() => {
-          if (isMounted) setCloudReloadToken(token => token + 1);
-        }, 2500);
-      }
-    });
-
-    // The onSnapshot listener above already delivers the initial load (from cache first, then
-    // server) the vast majority of the time, so firing runInitialLoad's separate get()+retry
-    // path immediately as well would just duplicate that same request. Give onSnapshot a head
-    // start and only fall back to the explicit fetch/retry loop if it hasn't come through yet --
-    // this keeps the retry safety net for a genuinely stuck listener without doubling up network
-    // calls on every normal calendar open.
-    // Always give onSnapshot a head start, including on a cache miss. Starting the explicit
-    // server fetch in parallel would double the initial calendar document read for normal opens;
-    // it is only a recovery path when the listener has not delivered within the grace window.
-    let fallbackTimeoutId = setTimeout(() => {
-      if (isMounted && !hasLoadedCloudCalendar) runInitialLoad();
-    }, cacheHit ? 1500 : 2500);
-
-    return () => {
-      isMounted = false;
-      if (fallbackTimeoutId) clearTimeout(fallbackTimeoutId);
-      if (retryTimeoutId) clearTimeout(retryTimeoutId);
-      if (unsubscribe) unsubscribe();
-    };
-  }, [activeCalId, cloudReloadToken, firebaseConnectionVersion, restoreActiveCalendarFromCache, applyCalendarSnapshot]);
+  React.useEffect(() => subscribeCalendarBootstrap({
+    firebaseDb,
+    activeCalId,
+    calendarsRef,
+    restoreActiveCalendarFromCache,
+    isUsableCalendarRecord,
+    setIsInitialDataLoading,
+    fetchSingleCloudCalendar,
+    loadMaxAttempts: FIREBASE_LOAD_MAX_ATTEMPTS,
+    loadTimeoutMs: FIREBASE_LOAD_TIMEOUT_MS,
+    applyCalendarSnapshot,
+    getMetaRevision,
+    getMetaLastModified,
+    serverRevisionRef,
+    isSavingRef,
+    pendingRemoteSnapshotRef,
+    getCloudDocCalendar,
+    setSyncDiag,
+    setCloudReloadToken
+  }), [activeCalId, cloudReloadToken, firebaseConnectionVersion, restoreActiveCalendarFromCache, applyCalendarSnapshot]);
 
   // Mobile browsers routinely freeze a tab while it is backgrounded. Firestore can then
   // resume with a cached snapshot without promptly reopening its listen stream. Recreating
   // this calendar listener on return to the foreground also runs the existing source:'server'
   // fallback, so a user never needs DevTools/Clear Storage just to recover a fresh document.
-  React.useEffect(() => {
-    if (typeof document === 'undefined' || !activeCalId) return undefined;
-    let lastVisibleAt = 0;
-    let deferredRefreshId = null;
-    const refreshOnForeground = (eventName = 'foreground') => {
-      if (document.visibilityState !== 'visible' || isSavingRef.current) return;
-      const now = Date.now();
-      // Mobile browsers can emit visibilitychange, pageshow, and online together after
-      // suspending a tab. Coalesce those signals so recovery never creates a reconnect burst.
-      if (now - lastVisibleAt < 1200) return;
-      lastVisibleAt = now;
-      if (firebaseDb && typeof firebaseDb.enableNetwork === 'function') {
-        firebaseDb.enableNetwork().catch(error => {
-          console.warn(`Firestore network resume notice (${eventName}):`, error);
-        });
-      }
-      setCloudReloadToken(token => token + 1);
-    };
-    const handleVisibilityChange = () => refreshOnForeground('visibilitychange');
-    const handlePageShow = () => refreshOnForeground('pageshow');
-    const handleOnline = () => refreshOnForeground('online');
-    const scheduleDeferredRefresh = () => {
-      if (deferredRefreshId) clearTimeout(deferredRefreshId);
-      deferredRefreshId = setTimeout(() => {
-        deferredRefreshId = null;
-        refreshOnForeground('deferred-resume');
-      }, 1800);
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('pageshow', handlePageShow);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('pageshow', scheduleDeferredRefresh);
-    window.addEventListener('online', scheduleDeferredRefresh);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('pageshow', handlePageShow);
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('pageshow', scheduleDeferredRefresh);
-      window.removeEventListener('online', scheduleDeferredRefresh);
-      if (deferredRefreshId) clearTimeout(deferredRefreshId);
-    };
-  }, [activeCalId]);
+  React.useEffect(() => subscribeFirestoreForegroundRecovery({
+    activeCalId,
+    getFirebaseDb: () => firebaseDb,
+    isSavingRef,
+    setCloudReloadToken
+  }), [activeCalId]);
 
-  React.useEffect(() => {
-    if (firebaseDb) return;
-    if (firebaseRetryExhausted) {
-      const detail = firebaseInitError ? ` (${firebaseInitError})` : ' (원인 미상)';
-      console.warn(`Firebase connection error${detail}`);
-      return;
-    }
-    let cancelled = false;
-    const pollId = setInterval(() => {
-      if (cancelled || firebaseDb) { clearInterval(pollId); return; }
-      if (firebaseRetryExhausted) {
-        clearInterval(pollId);
-        const detail = firebaseInitError ? ` (${firebaseInitError})` : ' (원인 미상)';
-        console.warn(`Firebase connection error${detail}`);
-      }
-    }, 2000);
-    return () => { cancelled = true; clearInterval(pollId); };
-  }, []);
+  React.useEffect(() => watchFirebaseBootstrap({
+    getFirebaseDb: () => firebaseDb,
+    getRetryExhausted: () => firebaseRetryExhausted,
+    getInitError: () => firebaseInitError
+  }), []);
   const activeCalLoaded = calendars.some(c => c && c.id === activeCalId && isUsableCalendarRecord(c));
   const activeCalendarFromState = calendars.find(c => c.id === activeCalId);
   const lastUsableActiveCalendarRef = React.useRef(null);
@@ -2009,68 +1732,24 @@ function CalendarApp() {
     }
     changeView('calendar');
   }, [activeView, activeCalId, canUseSettlement, changeView, showToast]);
-  React.useEffect(() => {
-    if (!firebaseDb || !activeCalId) return undefined;
-    let isMounted = true;
-    let lastRefreshAt = 0;
-    const refreshFromResume = async () => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
-      if (isSavingRef.current) return;
-      const now = Date.now();
-      if (now - lastRefreshAt < 1200) return;
-      lastRefreshAt = now;
-      if (activeCalId && isAllowedCalendarId(activeCalId)) {
-        try {
-          const refreshStartedAt = Date.now();
-          const fresh = await fetchSingleCalendarWithRest(activeCalId, 5000);
-          if (isSavingRef.current || refreshStartedAt <= (localWriteStartedAtRef.current[activeCalId] || 0)) return;
-          if (isMounted && fresh?.calendar && applyCalendarSnapshot(fresh.calendar, fresh.lastModified || Date.now(), fresh.revision || fresh.calendar.revision || 0, true)) {
-            // Places and confirmed meetings are already covered by their scoped realtime
-            // listeners. Do not repeat full collection reads on every focus/online resume.
-            if (activeView === 'memo') {
-              fetchMemosRest(activeCalId, memosLimit).then(list => {
-                if (isMounted) {
-                  setMemos(list);
-                  setHasMoreMemos(list.length >= memosLimit);
-                }
-              }).catch(() => {});
-            }
-            return;
-          }
-        } catch (e) {
-          console.warn('refreshFromResume REST fetch notice:', e);
-        }
-      }
-      if (!activeCalLoaded) {
-        const restored = restoreActiveCalendarFromCache();
-        if (isMounted && !restored) {
-          setIsInitialDataLoading(true);
-        }
-        if (isMounted) setCloudReloadToken(token => token + 1);
-      }
-    };
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') {
-        setTimeout(refreshFromResume, 200);
-      }
-    };
-    if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(regs => {
-        regs.forEach(r => r.update());
-      }).catch(() => {});
-    }
-    document.addEventListener('visibilitychange', onVisible);
-    window.addEventListener('focus', refreshFromResume);
-    window.addEventListener('online', refreshFromResume);
-    window.addEventListener('pageshow', refreshFromResume);
-    return () => {
-      isMounted = false;
-      document.removeEventListener('visibilitychange', onVisible);
-      window.removeEventListener('focus', refreshFromResume);
-      window.removeEventListener('online', refreshFromResume);
-      window.removeEventListener('pageshow', refreshFromResume);
-    };
-  }, [activeCalId, activeCalLoaded, activeView, applyCalendarSnapshot, memosLimit, restoreActiveCalendarFromCache]);
+  React.useEffect(() => subscribeAppResumeRefresh({
+    activeCalId,
+    activeCalLoaded,
+    activeView,
+    firebaseDb,
+    isAllowedCalendarId,
+    isSavingRef,
+    localWriteStartedAtRef,
+    fetchSingleCalendarWithRest,
+    applyCalendarSnapshot,
+    fetchMemosRest,
+    memosLimit,
+    setMemos,
+    setHasMoreMemos,
+    restoreActiveCalendarFromCache,
+    setIsInitialDataLoading,
+    setCloudReloadToken
+  }), [activeCalId, activeCalLoaded, activeView, applyCalendarSnapshot, memosLimit, restoreActiveCalendarFromCache]);
   // The chat message listener below only re-subscribes on [activeCalId], so without this ref it
   // would keep using the activeCal snapshot from whenever that effect last ran -- meaning a
   // participant added (or the calendar renamed) mid-session wouldn't be reflected in incoming
@@ -6658,13 +6337,17 @@ function CalendarApp() {
   };
   const handleOpenPollCreate = () => {
     if (!guardLoadedCalendar('Firebase 데이터를 불러온 뒤 투표를 생성해 주세요.')) return;
-    setEditingPoll(null);
-    setIsPollModalOpen(true);
+    withEventUi(() => {
+      setEditingPoll(null);
+      setIsPollModalOpen(true);
+    }, '투표');
   };
   const handleOpenPollEdit = poll => {
     if (!guardLoadedCalendar('Firebase 데이터를 불러온 뒤 투표를 수정해 주세요.')) return;
-    setEditingPoll(poll);
-    setIsPollModalOpen(true);
+    withEventUi(() => {
+      setEditingPoll(poll);
+      setIsPollModalOpen(true);
+    }, '투표');
   };
   const handleSavePoll = poll => {
     if (!guardLoadedCalendar('Firebase 데이터를 불러온 뒤 투표를 저장해 주세요.')) return false;
@@ -7021,12 +6704,20 @@ function CalendarApp() {
       syncStatus: syncStatus,
       onClose: () => { setIsModalOpen(false); setDateModalInitialTab(null); },
       onParticipantClick: handleParticipantClick,
-      onEditAnniversary: (ann) => { if (!ann?.id) return; setAnniversaryEditId(ann.id); setIsAnniversariesOpen(true); },
+      onEditAnniversary: (ann) => {
+        if (!ann?.id) return;
+        withEventUi(() => {
+          setAnniversaryEditId(ann.id);
+          setIsAnniversariesOpen(true);
+        }, '기념일 설정');
+      },
       onAddAnniversaryForDate: (dateStr) => {
         if (!dateStr) return;
         setIsModalOpen(false);
-        setAnniversaryInitialDate(dateStr);
-        setIsAnniversariesOpen(true);
+        withEventUi(() => {
+          setAnniversaryInitialDate(dateStr);
+          setIsAnniversariesOpen(true);
+        }, '기념일 설정');
       },
       onFocusCultureSource: (ann) => {
         // cultureSourceId가 있으면 포털에서 등록한(또는 등록 당시의) 항목의 원래 id, 없으면
@@ -7547,8 +7238,10 @@ function CalendarApp() {
   const navMenuProps = {
     onChangeView: changeView,
     onOpenCreateSettlement: () => {
-      setEditingSettlementCard(null);
-      setIsCreateSettlementOpen(true);
+      withEventUi(() => {
+        setEditingSettlementCard(null);
+        setIsCreateSettlementOpen(true);
+      }, '정산');
     },
     showSettlement: canUseSettlement,
     chatCount: navChatCount,
@@ -8189,7 +7882,7 @@ function CalendarApp() {
     onOpenAnniversaries: () => {
       setIsMainSideMenuOpen(false);
       if (guardLoadedCalendar('Firebase 데이터를 불러온 뒤 기념일 설정을 수정해 주세요.')) {
-        setIsAnniversariesOpen(true);
+        withEventUi(() => setIsAnniversariesOpen(true), '기념일 설정');
         if (activeCalId && typeof fetchAnniversariesRest === 'function') {
           fetchAnniversariesRest(activeCalId).then(list => {
             if (Array.isArray(list) && list.length > 0) {

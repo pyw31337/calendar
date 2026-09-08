@@ -6,6 +6,7 @@ import { fetchPhotoComments, savePhotoComments } from '../src/core/photo-comment
 import { composeGalleryPhotos, paginateGalleryItems, getPaginationWindow } from '../src/core/gallery-data.js';
 import { cloneConfirmedMeetings, commitConfirmedMeetingChanges } from '../src/core/confirmed-meeting-coordinator.js';
 import { getInitialAppView, buildAppViewUrl } from '../src/core/app-routing-state.js';
+import { getInitialDataLoadingState, subscribeCalendarBootstrap } from '../src/core/app-data-bootstrap.js';
 
 globalThis.window ||= {};
 const { getMediaIdentityKeys } = await import('../src/core/app-domain-helpers.js');
@@ -20,6 +21,36 @@ assert(undefinedProbe.list.length === 2 && undefinedProbe.list[1] === null, 'Fir
 
 assert(getInitialAppView({ pathname: '/', search: '?view=gallery' }, () => null) === 'gallery', 'route state must initialize from the view query');
 assert(buildAppViewUrl({ pathname: '/calendar/', search: '?id=cw&date=2026-09-08&msg=x' }, 'gallery', new Date(2026, 8, 1)) === '/calendar/?id=cw&year=2026&month=09&view=gallery', 'route changes must retain calendar/month and clear stale deep-link state');
+assert(getInitialDataLoadingState({ firebaseDb: {}, activeCalId: 'cached', loadLocalCache: () => [{ id: 'cached', title: 'ready' }], isUsableCalendarRecord: row => row?.title === 'ready' }) === false, 'cached usable calendar must render without a loading shell');
+assert(getInitialDataLoadingState({ firebaseDb: {}, activeCalId: 'missing', loadLocalCache: () => [], isUsableCalendarRecord: () => false }) === true, 'missing calendar must retain its initial loading state');
+
+{
+  let applied = null;
+  let unsubscribed = false;
+  const cleanup = subscribeCalendarBootstrap({
+    firebaseDb: { collection: () => ({ doc: () => ({ onSnapshot: (_options, onValue) => { onValue({ metadata: { fromCache: false, hasPendingWrites: false }, exists: true, data: () => ({}) }); return () => { unsubscribed = true; }; } }) }) },
+    activeCalId: 'bootstrap',
+    calendarsRef: { current: [{ id: 'bootstrap', title: 'cached' }] },
+    restoreActiveCalendarFromCache: () => true,
+    isUsableCalendarRecord: row => Boolean(row?.title),
+    setIsInitialDataLoading: () => {},
+    fetchSingleCloudCalendar: async () => null,
+    loadMaxAttempts: 1,
+    loadTimeoutMs: 10,
+    applyCalendarSnapshot: calendar => { applied = calendar; return true; },
+    getMetaRevision: () => 0,
+    getMetaLastModified: () => 0,
+    serverRevisionRef: { current: {} },
+    isSavingRef: { current: false },
+    pendingRemoteSnapshotRef: { current: null },
+    getCloudDocCalendar: () => ({ calendar: { id: 'bootstrap', title: 'server' }, lastModified: 2, revision: 2 }),
+    setSyncDiag: () => {},
+    setCloudReloadToken: () => {}
+  });
+  assert(applied?.title === 'server', 'bootstrap listener must apply a server-confirmed calendar snapshot');
+  cleanup();
+  assert(unsubscribed, 'bootstrap cleanup must detach the Firestore listener');
+}
 const meetingSlot0 = getMediaIdentityKeys({ messageId: 'multi', imageIndex: 0, uploadSource: 'meeting', meetingDate: '2026-06-13' }, { source: 'meeting', meetingDate: '2026-06-13' });
 const meetingSlot1 = getMediaIdentityKeys({ messageId: 'multi', imageIndex: 1, uploadSource: 'meeting', meetingDate: '2026-06-13' }, { source: 'meeting', meetingDate: '2026-06-13' });
 assert(meetingSlot0.mediaKey !== meetingSlot1.mediaKey, 'multi-image meeting uploads must retain one identity per image slot');

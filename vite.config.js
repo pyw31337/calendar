@@ -55,22 +55,20 @@ export default defineConfig({
             if (id.includes('react')) return 'vendor-react';
             return 'vendor';
           }
+          // These small core modules are shared by app-main and lazy feature views. Assigning
+          // them explicitly prevents Rollup from pulling an entire lazy UI chunk back into the
+          // startup graph merely because that view imports the same coordinator.
+          if (id.includes('/core/app-write-queue')) return 'app-write-queue';
+          if (id.includes('/core/settlement-calculator')) return 'settlement-calculator';
           if (id.includes('/ui/ui-admin-')) return 'ui-admin';
-          // Split what used to be one 'ui-views' chunk in two once it crept up near the
-          // per-chunk size budget (check:dist-budget) -- these 6 files are all awaited together
-          // in the same boot-time Promise.all (src/main.jsx), never lazy-loaded independently,
-          // so splitting them doesn't change what downloads or when; it only keeps each output
-          // file comfortably under its own budget instead of one chunk absorbing all 6 files'
-          // combined growth.
-          if (
-            id.includes('/ui/ui-calendar-core') ||
-            id.includes('/ui/ui-chat-room') ||
-            id.includes('/ui/ui-places')
-          ) return 'ui-views-calendar';
-          if (
-            id.includes('/ui/ui-memo-view') ||
-            id.includes('/ui/ui-event-modals')
-          ) return 'ui-views-modals';
+          // Preserve real screen-level lazy loading. Grouping calendar-core with chat/places (or
+          // memo with event modals) caused Rollup to download the entire group as soon as one
+          // member was needed, defeating the dynamic loaders in src/main.jsx.
+          if (id.includes('/ui/ui-calendar-core')) return 'ui-calendar-core';
+          if (id.includes('/ui/ui-chat-room')) return 'ui-chat-room';
+          if (id.includes('/ui/ui-places')) return 'ui-places';
+          if (id.includes('/ui/ui-memo-view')) return 'ui-memo-view';
+          if (id.includes('/ui/ui-event-modals')) return 'ui-event-modals';
           if (id.includes('/ui/ui-date-modal')) return 'ui-date-modal';
           // app-domain-helpers/app-firebase-data are only ever imported by app-main.js, but each
           // is given its own chunk explicitly (Rollup's default heuristic would otherwise inline
@@ -84,6 +82,8 @@ export default defineConfig({
           if (id.includes('/core/gallery-data')) return 'gallery-data';
           if (id.includes('/core/gallery-archive-state')) return 'gallery-archive-state';
           if (id.includes('/core/photo-index')) return 'photo-index';
+          if (id.includes('/core/notification-pwa-state')) return 'notification-pwa-state';
+          if (id.includes('/core/app-data-bootstrap')) return 'app-data-bootstrap';
           if (id.includes('/core/app-main')) return 'app-main';
         }
       }

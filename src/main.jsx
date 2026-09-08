@@ -185,6 +185,24 @@ function loadManualUi() {
 }
 window.__gatherLoadManualUi = loadManualUi;
 
+let eventUiLoadPromise = null;
+function loadEventUi() {
+  const components = window.GATHER_UI_COMPONENTS || {};
+  if (typeof components.AnniversaryModal === 'function'
+    && typeof components.PollModal === 'function'
+    && typeof components.SettlementSummaryModal === 'function') {
+    return Promise.resolve();
+  }
+  if (!eventUiLoadPromise) {
+    eventUiLoadPromise = import('./ui/ui-event-modals.js').catch(error => {
+      eventUiLoadPromise = null;
+      throw error;
+    });
+  }
+  return eventUiLoadPromise;
+}
+window.__gatherLoadEventUi = loadEventUi;
+
 let chatUiLoadPromise = null;
 function loadChatUi() {
   const components = window.GATHER_UI_COMPONENTS || {};
@@ -262,7 +280,6 @@ async function boot() {
       import('./ui/ui-summary-gallery.js'),
       import('./ui/ui-shared.js'),
       import('./ui/ui-date-modal.js'),
-      import('./ui/ui-event-modals.js'),
       import('./ui/ui-calendar-core.js'),
       // ChatParticipantSheet (the actual participant-selection bottom sheet, vs. the button
       // that opens it) lives in this file, but it isn't chat-specific -- the memo composer/edit
@@ -284,6 +301,9 @@ async function boot() {
     }
     if (initialView === 'memo' || initialView === 'places') {
       await loadViewUi(initialView);
+    }
+    if (initialView === 'settlement') {
+      await loadEventUi();
     }
     if (isAdminRoute) {
       await loadAdminUi();
