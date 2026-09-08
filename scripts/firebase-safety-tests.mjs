@@ -237,6 +237,12 @@ const photoIndexSource = fs.readFileSync(new URL('../src/core/photo-index.js', i
 assert(dateModalSource.includes('getPhotoAssetKeys(photo)'), 'schedule albums must dedupe REST/index/live copies by original or thumbnail asset');
 assert(dateModalSource.includes('assetKeys.some(assetKey => directKeys.has(assetKey))'), 'tagged chat/memo photos must use the same asset identity as schedule albums');
 assert(photoIndexSource.includes('complete: true'), 'photo index must support complete hydration for cross-page search/date views');
+const photoCommentsSource = fs.readFileSync(new URL('../src/core/photo-comments.js', import.meta.url), 'utf8');
+assert(photoIndexSource.includes('patchItems'), 'gallery photo index must support local tag patches after save');
+assert(photoCommentsSource.includes('requirePersisted: true'), 'photo comment module must require durable writes');
+assert(appMainSource.includes('invalidatePhotoIndexCache(activeCalId)'), 'tag saves must invalidate the gallery photoIndex cache');
+assert(appMainSource.includes("requirePersisted: true"), 'lightbox tag/comment writes must require durable persistence, not queue success');
+assert(lightboxSource.includes('[photoCommentKey]: previous'), 'failed comment saves must roll back optimistic lightbox state');
 assert(chatGallerySource.includes('requiresCompletePhotoIndex'), 'gallery search/date modes must request the complete photo index');
 assert(appMainSource.includes('memos: galleryMemos'), 'gallery must receive the complete paged memo archive for old photos and links');
 assert(lightboxSource.includes("overflowY: isDesktop ? 'auto' : 'visible'"), 'mobile photo comments must not use an inner vertical scrollbar');

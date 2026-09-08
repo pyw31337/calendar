@@ -132,6 +132,13 @@ export function useGalleryPhotoIndex({ React, calendarId, activeView, projectId,
       return false;
     }
   }, [calendarId, projectId, decodeDocument]);
+  const patchItems = React.useCallback(updater => {
+    setState(previous => {
+      const current = Array.isArray(previous.items) ? previous.items : [];
+      const nextItems = typeof updater === 'function' ? updater(current) : current;
+      return { ...previous, items: Array.isArray(nextItems) ? nextItems : current };
+    });
+  }, []);
   React.useEffect(() => {
     if (!calendarId || activeView !== 'gallery') {
       setState({ status: 'idle', items: [], total: 0, page: 1, loading: false, complete: false });
@@ -140,7 +147,7 @@ export function useGalleryPhotoIndex({ React, calendarId, activeView, projectId,
     void loadPage(1);
     return undefined;
   }, [calendarId, activeView, loadPage]);
-  return { ...state, loadPage, loadAll };
+  return { ...state, loadPage, loadAll, patchItems };
 }
 
 export { PAGE_SIZE as PHOTO_INDEX_PAGE_SIZE };

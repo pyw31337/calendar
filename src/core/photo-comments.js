@@ -34,15 +34,16 @@ export async function savePhotoComments({
   const docId = sanitizePhotoCommentDocId(photoKey);
   if (!docId || !calendarId) return false;
   const nextComments = Array.isArray(comments) ? comments : [];
+  const writeOpts = { requirePersisted: true };
   if (nextComments.length === 0) {
-    const deleted = await writeDocument('photoComments', calendarId, docId, null, 'delete', '사진 댓글 삭제');
+    const deleted = await writeDocument('photoComments', calendarId, docId, null, 'delete', '사진 댓글 삭제', writeOpts);
     audit('photo_comment_delete', `${docId} · 0건`);
-    return Boolean(deleted?.success);
+    return Boolean(deleted?.success) && !deleted?.queued;
   }
   const saved = await writeDocument('photoComments', calendarId, docId, {
     comments: nextComments,
     updatedAt: Date.now()
-  }, 'set', '사진 댓글 저장');
+  }, 'set', '사진 댓글 저장', writeOpts);
   audit('photo_comment_save', `${docId} · ${nextComments.length}건`);
-  return Boolean(saved?.success);
+  return Boolean(saved?.success) && !saved?.queued;
 }

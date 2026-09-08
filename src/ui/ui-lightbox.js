@@ -838,8 +838,19 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
       if (typeof showToast === 'function') showToast('댓글을 불러오는 중이거나 조회에 실패했습니다. 다시 열어주세요.', 'error');
       return false;
     }
+    const previous = photoCommentsByKey[photoCommentKey] || [];
     setPhotoCommentsByKey(prev => ({ ...prev, [photoCommentKey]: nextComments }));
-    return Promise.resolve(onSavePhotoComments(photoCommentKey, nextComments));
+    try {
+      const saved = await Promise.resolve(onSavePhotoComments(photoCommentKey, nextComments));
+      if (saved === false) {
+        setPhotoCommentsByKey(prev => ({ ...prev, [photoCommentKey]: previous }));
+        return false;
+      }
+      return saved;
+    } catch (err) {
+      setPhotoCommentsByKey(prev => ({ ...prev, [photoCommentKey]: previous }));
+      throw err;
+    }
   };
   // 댓글은 라이트박스 안에서만 쓰고 볼 수 있어야 한다는 요구사항에 맞춰 여기서만 렌더링하지만,
   // "초기화면에서 바로 보여야 한다"는 요구에 맞춰 showInfo(정보 패널) 토글과는 무관하게 사진 박스와

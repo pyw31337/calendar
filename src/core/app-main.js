@@ -140,7 +140,7 @@ import {
 } from './app-domain-helpers.js';
 import { fetchPhotoComments, savePhotoComments } from './photo-comments.js';
 import { createPhotoCommentStore } from './photo-comment-store.js';
-import { useGalleryPhotoIndex } from './photo-index.js';
+import { useGalleryPhotoIndex, invalidatePhotoIndexCache } from './photo-index.js';
 import { useGalleryArchiveState } from './gallery-archive-state.js';
 import { cloneConfirmedMeetings, commitConfirmedMeetingChanges } from './confirmed-meeting-coordinator.js';
 import { getInitialAppView, buildAppViewUrl } from './app-routing-state.js';
@@ -4280,9 +4280,25 @@ function CalendarApp() {
       while (nextImageTags.length < urls.length) nextImageTags.push('');
       nextImageTags[resolvedIndex] = cleanTags;
       try {
-        const ok = await writeCollectionDocumentWithFallback('memos', activeCalId, memoId, sanitizeMemoForFirestore({ imageTags: nextImageTags }), 'update', '메모 이미지 태그 저장');
-        if (!ok) throw new Error('Memo image tags update failed');
+        const ok = await writeCollectionDocumentWithFallback('memos', activeCalId, memoId, sanitizeMemoForFirestore({ imageTags: nextImageTags }), 'update', '메모 이미지 태그 저장', { requirePersisted: true });
+        if (!ok?.success || ok?.queued) throw new Error('Memo image tags update failed');
         setMemos(prev => prev.map(m => m.id === memoId ? { ...m, imageTags: nextImageTags } : m));
+        try {
+          invalidatePhotoIndexCache(activeCalId);
+          if (typeof galleryPhotoIndex?.patchItems === 'function') {
+            galleryPhotoIndex.patchItems(items => (items || []).map(photo => {
+              if (photo.messageId === memoId && Number(photo.imageIndex) === Number(resolvedIndex)) {
+                return { ...photo, tags: cleanTags };
+              }
+              return photo;
+            }));
+          }
+          if (galleryPhotoIndex?.status === 'ready' && typeof galleryPhotoIndex.loadPage === 'function') {
+            void galleryPhotoIndex.loadPage(galleryPhotoIndex.page || 1, { force: true });
+          }
+        } catch (indexSyncErr) {
+          console.warn('Gallery photoIndex memo-tag sync skipped:', indexSyncErr);
+        }
         showToast('태그 저장완료', 'success');
         return true;
       } catch (err) {
@@ -4343,8 +4359,8 @@ function CalendarApp() {
       return { imageTags: nextImageTags };
     })();
     try {
-      const ok = await writeCollectionDocumentWithFallback('messages', activeCalId, messageId, data, 'update', '이미지 태그 저장');
-      if (!ok) throw new Error('Image tags update failed');
+      const ok = await writeCollectionDocumentWithFallback('messages', activeCalId, messageId, data, 'update', '이미지 태그 저장', { requirePersisted: true });
+      if (!ok?.success || ok?.queued) throw new Error('Image tags update failed');
       // Read the just-written message back from the server and update every local message
       // snapshot. This prevents a stale onSnapshot/fetched-source snapshot from overwriting a
       // tag that was successfully saved, especially for meeting photos opened from a modal.
@@ -4409,6 +4425,26 @@ function CalendarApp() {
         console.warn('Image tag date link skipped:', dateLinkErr);
         showToast('태그는 저장됐지만 일정 사진 연결은 실패했습니다.', 'error', 5000);
       }
+    }
+    // Gallery reads tags from photoIndex (CF-maintained). Patch local index rows + force
+    // reload so a refresh does not show the pre-save tags while the message already has them.
+    try {
+      invalidatePhotoIndexCache(activeCalId);
+      if (typeof galleryPhotoIndex?.patchItems === 'function') {
+        galleryPhotoIndex.patchItems(items => (items || []).map(photo => {
+          const asset = String(meta?.assetKey || meta?.mediaKey || meta?.refKey || '');
+          const sameAsset = asset && (photo.assetKey === asset || photo.mediaKey === asset || photo.refKey === asset);
+          const sameMessage = messageId && photo.messageId === messageId
+            && Number(photo.imageIndex) === Number(imageIndex);
+          if (sameAsset || sameMessage) return { ...photo, tags: cleanTags };
+          return photo;
+        }));
+      }
+      if (galleryPhotoIndex?.status === 'ready' && typeof galleryPhotoIndex.loadPage === 'function') {
+        void galleryPhotoIndex.loadPage(galleryPhotoIndex.page || 1, { force: true });
+      }
+    } catch (indexSyncErr) {
+      console.warn('Gallery photoIndex tag sync skipped:', indexSyncErr);
     }
     if (!linkedCount) showToast('태그 저장완료', 'success');
     return true;
