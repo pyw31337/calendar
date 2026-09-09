@@ -70,6 +70,10 @@ function CommentThread({ comments = [], onCommentsChange, calendar, showToast, o
   const [isCommentPartOpen, setIsCommentPartOpen] = React.useState(false);
   const [editingCommentId, setEditingCommentId] = React.useState(null);
   const [isSavingComment, setIsSavingComment] = React.useState(false);
+  const commentInputRef = React.useRef(null);
+  const refocusComposerField = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.refocusComposerField)
+    || __deps.refocusComposerField
+    || ((ref) => { const el = ref && ref.current; if (el && el.focus) { try { el.focus({ preventScroll: true }); } catch (_) { el.focus(); } } });
   const commentPart = (calendar?.participants || []).find(p => p.id === commentParticipantId);
   const COMMENT_COLLAPSE_LIMIT = 3;
   const [isCommentsExpanded, setIsCommentsExpanded] = React.useState(false);
@@ -94,6 +98,7 @@ function CommentThread({ comments = [], onCommentsChange, calendar, showToast, o
       if (typeof showToast === 'function') {
         showToast(wasEditing ? '댓글이 수정되었습니다' : '댓글이 등록되었습니다', 'success');
       }
+      refocusComposerField(commentInputRef);
     } finally {
       setIsSavingComment(false);
     }
@@ -204,17 +209,25 @@ function CommentThread({ comments = [], onCommentsChange, calendar, showToast, o
     },
       AutoGrowTextarea && /*#__PURE__*/React.createElement(AutoGrowTextarea, {
         className: "comment-composer-input",
+        textareaRef: commentInputRef,
         value: commentText,
         onChange: e => setCommentText(e.target.value),
         onClick: e => e.stopPropagation(),
         onKeyDown: e => {
           e.stopPropagation();
+          if (e.key === 'Enter' && !e.shiftKey && !(e.ctrlKey || e.metaKey)) {
+            if (e.nativeEvent && e.nativeEvent.isComposing) return;
+            e.preventDefault();
+            handleSaveComment(e);
+            return;
+          }
           if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
             if (e.nativeEvent && e.nativeEvent.isComposing) return;
             e.preventDefault();
             handleSaveComment(e);
           }
         },
+        enterKeyHint: "send",
         placeholder: "댓글을 입력하세요...",
         rows: 1,
         minHeight: 30,
@@ -364,6 +377,15 @@ export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast
   const [confirmDeleteTag, setConfirmDeleteTag] = React.useState(null);
   const [isDeletingTag, setIsDeletingTag] = React.useState(false);
   const tagInputRef = React.useRef(null);
+  const keepTagFocusRef = React.useRef(false);
+  const refocusComposerField = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.refocusComposerField)
+    || __deps.refocusComposerField
+    || ((ref) => { const el = ref && ref.current; if (el && el.focus) { try { el.focus({ preventScroll: true }); } catch (_) { el.focus(); } } });
+  React.useEffect(() => {
+    if (!keepTagFocusRef.current) return;
+    keepTagFocusRef.current = false;
+    refocusComposerField(tagInputRef);
+  }, [tagTokens.length, tagInput]);
   // Keep the draft while navigating between photos. The lightbox intentionally reuses this
   // panel so a user can tap a photo once, then enter tags continuously with previous/next.
   if (tagTokens.length === 0 && !onSaveTags) return null;
@@ -401,6 +423,8 @@ export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast
         return;
       }
       setTagInput('');
+      keepTagFocusRef.current = true;
+      refocusComposerField(tagInputRef);
     } catch (err) {
       console.error('Lightbox tag save failed:', err);
       if (typeof showToast === 'function') showToast('태그 저장 실패', 'error');
@@ -473,7 +497,7 @@ export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast
         // 누르면 태그가 저장되기 전에 포커스가 아래 댓글 입력창으로 넘어가버리는 문제가 있었다.
         // 태그는 한 번에 짧게 입력하고 바로 저장하는 용도라 "완료"로 명시해 다음 필드로 넘어가지
         // 않게 한다.
-        enterKeyHint: "done",
+        enterKeyHint: "enter",
         placeholder: tagTokens.length >= 10 ? "태그 최대 10개 도달" : `태그 입력 (${tagTokens.length}/10)`,
         maxLength: 100,
         style: {

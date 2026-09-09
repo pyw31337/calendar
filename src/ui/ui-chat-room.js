@@ -188,6 +188,7 @@ export function ChatRoomView({
   const setChatLastReadTimestamp = __deps.setChatLastReadTimestamp;
   const appendChatImageFiles = __deps.appendChatImageFiles;
   const classifyChatComposerFiles = __deps.classifyChatComposerFiles || (window.GATHER_CHAT_FILE_ATTACHMENTS && window.GATHER_CHAT_FILE_ATTACHMENTS.classifyChatComposerFiles);
+  const chatComposerAccept = (window.GATHER_CHAT_FILE_ATTACHMENTS && window.GATHER_CHAT_FILE_ATTACHMENTS.CHAT_COMPOSER_ACCEPT) || '.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.csv,.rtf,application/pdf,image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif,image/*';
   const createPendingChatFileAttachment = __deps.createPendingChatFileAttachment || (window.GATHER_CHAT_FILE_ATTACHMENTS && window.GATHER_CHAT_FILE_ATTACHMENTS.createPendingChatFileAttachment);
   const formatChatFileSize = __deps.formatChatFileSize || (window.GATHER_CHAT_FILE_ATTACHMENTS && window.GATHER_CHAT_FILE_ATTACHMENTS.formatChatFileSize);
   const getChatFileTypeLabel = __deps.getChatFileTypeLabel || (window.GATHER_CHAT_FILE_ATTACHMENTS && window.GATHER_CHAT_FILE_ATTACHMENTS.getChatFileTypeLabel);
@@ -534,7 +535,6 @@ export function ChatRoomView({
     return () => window.removeEventListener('resize', measure);
   }, [chatReplyTarget, chatInput, chatImages, isInputFocused, viewportBottom]);
 
-  const fileInputRefChat = React.useRef(null);
   const docFileInputRefChat = React.useRef(null);
   const [imageProcessingChat, setImageProcessingChat] = React.useState(null);
   const [activeDocumentLightbox, setActiveDocumentLightbox] = React.useState(null);
@@ -551,25 +551,6 @@ export function ChatRoomView({
         const pos = start + emoji.length;
         textarea.setSelectionRange(pos, pos);
       });
-    }
-  };
-  const handleFileChangeChat = async (e) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    try {
-      await appendChatImageFiles({
-        files,
-        currentCount: chatImages.length,
-        setImageProcessing: setImageProcessingChat,
-        setChatImages,
-        showToast
-      });
-    } catch (err) {
-      console.error('handleFileChangeChat unexpected error:', err);
-      if (showToast) showToast('사진 첨부 중 오류', 'error', 5000);
-    } finally {
-      setImageProcessingChat(null);
-      e.target.value = '';
     }
   };
   const handleDocFileChangeChat = async (e) => {
@@ -1595,7 +1576,7 @@ export function ChatRoomView({
       },
         /*#__PURE__*/React.createElement("div", { style: { minWidth: 0, flex: 1 } },
           /*#__PURE__*/React.createElement("div", {
-            style: { fontWeight: 800, fontSize: 'var(--font-size-md)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+            style: { fontWeight: 800, fontSize: 'var(--font-size-md)', whiteSpace: 'normal', overflowWrap: 'anywhere', wordBreak: 'break-word' }
           }, file.name || '파일'),
           /*#__PURE__*/React.createElement("div", {
             style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', fontWeight: 600 }
@@ -1609,19 +1590,11 @@ export function ChatRoomView({
         }, '×')
       ))) : null,
 
-      /* Hidden File Input */
-      /*#__PURE__*/React.createElement("input", {
-        ref: fileInputRefChat,
-        type: "file",
-        accept: "image/jpeg, image/png, image/gif, image/webp, image/heic, image/heif, image/*",
-        multiple: true,
-        style: { position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 },
-        onChange: handleFileChangeChat
-      }),
+      /* Hidden file input — single paperclip picker (images → photo pipeline, docs → fileAttachments) */
       /*#__PURE__*/React.createElement("input", {
         ref: docFileInputRefChat,
         type: "file",
-        accept: ".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.csv,.rtf,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain,text/csv,application/rtf,image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif,image/*",
+        accept: chatComposerAccept,
         multiple: true,
         style: { position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 },
         onChange: handleDocFileChangeChat
@@ -1670,51 +1643,12 @@ export function ChatRoomView({
               color: 'var(--text-muted)'
             }
           }, /*#__PURE__*/React.createElement(EmojiPickerIcon, null)),
-          /* Camera/Image Button */
-          /*#__PURE__*/React.createElement("button", {
-            type: "button",
-            onClick: () => fileInputRefChat.current && fileInputRefChat.current.click(),
-            title: "사진 첨부",
-            style: {
-              width: '32px',
-              height: '32px',
-              borderRadius: '50%',
-              border: '1px solid var(--border-subtle)',
-              backgroundColor: 'var(--bg-card)',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-              padding: 0,
-              color: 'var(--text-muted)'
-            }
-          }, /*#__PURE__*/React.createElement("svg", {
-            xmlns: "http://www.w3.org/2000/svg",
-            width: "18",
-            height: "18",
-            viewBox: "0 0 24 24",
-            fill: "none",
-            stroke: "currentColor",
-            strokeWidth: "2",
-            strokeLinecap: "round",
-            strokeLinejoin: "round"
-          },
-            /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
-            /*#__PURE__*/React.createElement("path", { d: "M15 8h.01" }),
-            /*#__PURE__*/React.createElement("path", { d: "M12.5 21h-6.5a3 3 0 0 1 -3 -3v-12a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v6.5" }),
-            /*#__PURE__*/React.createElement("path", { d: "M3 16l5 -5c.928 -.893 2.072 -.893 3 0l4 4" }),
-            /*#__PURE__*/React.createElement("path", { d: "M14 14l1 -1c.67 -.644 1.45 -.824 2.182 -.54" }),
-            /*#__PURE__*/React.createElement("path", { d: "M16 19h6" }),
-            /*#__PURE__*/React.createElement("path", { d: "M19 16v6" })
-          )),
-
           /* File upload button (documents + images; images route to photo pipeline) */
           /*#__PURE__*/React.createElement("button", {
             type: "button",
             onClick: () => docFileInputRefChat.current && docFileInputRefChat.current.click(),
-            title: "파일 업로드",
-            "aria-label": "파일 업로드",
+            title: "파일첨부",
+            "aria-label": "파일첨부",
             style: {
               width: '32px',
               height: '32px',

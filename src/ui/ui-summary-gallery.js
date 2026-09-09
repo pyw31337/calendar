@@ -1334,13 +1334,19 @@ export function HistoryView({
   // (calendar.customPersonTags)도 함께 보여준다.
   const [newPersonTag, setNewPersonTag] = React.useState('');
   const [isAddingPersonTag, setIsAddingPersonTag] = React.useState(false);
+  const newPersonTagRef = React.useRef(null);
   const handleAddPersonTagClick = async () => {
     const label = newPersonTag.trim();
     if (!label || isAddingPersonTag || typeof onAddPersonTag !== 'function') return;
     setIsAddingPersonTag(true);
     try {
       const ok = await onAddPersonTag(label);
-      if (ok) setNewPersonTag('');
+      if (ok) {
+        setNewPersonTag('');
+        const refocus = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.refocusComposerField);
+        if (typeof refocus === 'function') refocus(newPersonTagRef);
+        else if (newPersonTagRef.current) { try { newPersonTagRef.current.focus({ preventScroll: true }); } catch (_) { newPersonTagRef.current.focus(); } }
+      }
     } finally {
       setIsAddingPersonTag(false);
     }
@@ -2228,6 +2234,8 @@ export function HistoryView({
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
         /*#__PURE__*/React.createElement("input", {
           type: "text",
+          ref: newPersonTagRef,
+          enterKeyHint: "enter",
           placeholder: "새 인물 태그 추가 (예: 삼촌)",
           value: newPersonTag,
           onChange: e => setNewPersonTag(e.target.value),
@@ -3237,6 +3245,24 @@ function filterAndSortCultureItems(items, category) {
     return end >= today;
   });
   if (category === 'festival' || category === 'event') return visible;
+  // movie: 「상영중」 first, then by release/start date ascending so future releases sink.
+  // sports (and any other non-festival/event caller): keep near-today proximity sort.
+  if (category === 'movie') {
+    const isNowShowing = (item) => {
+      const day = cultureItemDay(item);
+      if (!day || day > today) return false;
+      return !item.endDate || item.endDate >= today;
+    };
+    return visible.sort((a, b) => {
+      const aNow = isNowShowing(a) ? 0 : 1;
+      const bNow = isNowShowing(b) ? 0 : 1;
+      if (aNow !== bNow) return aNow - bNow;
+      const aDay = cultureItemDay(a) || '9999-12-31';
+      const bDay = cultureItemDay(b) || '9999-12-31';
+      if (aDay !== bDay) return aDay.localeCompare(bDay);
+      return String(a.title || '').localeCompare(String(b.title || ''), 'ko');
+    });
+  }
   return visible.sort((a, b) => {
     const aDay = cultureItemDay(a), bDay = cultureItemDay(b);
     if (!aDay || !bDay) return aDay ? -1 : (bDay ? 1 : 0);

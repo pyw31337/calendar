@@ -1569,6 +1569,10 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
   const [isCommentPartOpen, setIsCommentPartOpen] = React.useState(false);
   const [editingCommentId, setEditingCommentId] = React.useState(null);
   const [isSavingComment, setIsSavingComment] = React.useState(false);
+  const commentInputRef = React.useRef(null);
+  const refocusComposerField = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.refocusComposerField)
+    || __deps.refocusComposerField
+    || ((ref) => { const el = ref && ref.current; if (el && el.focus) { try { el.focus({ preventScroll: true }); } catch (_) { el.focus(); } } });
   const commentPart = (calendar?.participants || []).find(p => p.id === commentParticipantId);
   // Long comment threads otherwise push the composer far below the fold -- collapse to the most
   // recent COMMENT_COLLAPSE_LIMIT by default, with a toggle above the list to see the rest.
@@ -1592,10 +1596,12 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       if (saved === false) return;
       setCommentText('');
       setEditingCommentId(null);
-      setIsCommentComposerOpen(false);
+      // Keep composer open + focused so mobile keyboard stays for the next comment.
+      setIsCommentComposerOpen(true);
       if (typeof showToast === 'function') {
         showToast(wasEditing ? '댓글이 수정되었습니다' : '댓글이 등록되었습니다', 'success');
       }
+      refocusComposerField(commentInputRef);
     } finally {
       setIsSavingComment(false);
     }
@@ -2061,6 +2067,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     },
       AutoGrowTextarea && /*#__PURE__*/React.createElement(AutoGrowTextarea, {
         className: "comment-composer-input",
+        textareaRef: commentInputRef,
         value: commentText,
         onChange: e => setCommentText(e.target.value),
         onClick: e => e.stopPropagation(),
@@ -2718,6 +2725,17 @@ export function EditMessageModal({
   const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer || (function Shell(p) { return React.createElement('div', p, p.children); });
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
   const autoGrowTextarea = __deps.autoGrowTextarea;
+  const appendChatImageFiles = __deps.appendChatImageFiles;
+  const classifyChatComposerFiles = __deps.classifyChatComposerFiles
+    || (window.GATHER_CHAT_FILE_ATTACHMENTS && window.GATHER_CHAT_FILE_ATTACHMENTS.classifyChatComposerFiles);
+  const createPendingChatFileAttachment = __deps.createPendingChatFileAttachment
+    || (window.GATHER_CHAT_FILE_ATTACHMENTS && window.GATHER_CHAT_FILE_ATTACHMENTS.createPendingChatFileAttachment);
+  const formatChatFileSize = __deps.formatChatFileSize
+    || (window.GATHER_CHAT_FILE_ATTACHMENTS && window.GATHER_CHAT_FILE_ATTACHMENTS.formatChatFileSize);
+  const getChatFileTypeLabel = __deps.getChatFileTypeLabel
+    || (window.GATHER_CHAT_FILE_ATTACHMENTS && window.GATHER_CHAT_FILE_ATTACHMENTS.getChatFileTypeLabel);
+  const chatComposerAccept = (window.GATHER_CHAT_FILE_ATTACHMENTS && window.GATHER_CHAT_FILE_ATTACHMENTS.CHAT_COMPOSER_ACCEPT)
+    || '.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.csv,.rtf,application/pdf,image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif,image/*';
 
   const [text, setText] = React.useState(message.text || '');
   const [participantId, setParticipantId] = React.useState(message.participantId || '');
@@ -2733,6 +2751,9 @@ export function EditMessageModal({
       : (message.thumbUrl ? [message.thumbUrl] : []);
     return urls.map((url, idx) => ({ original: url, thumbnail: thumbs[idx] || url, isExisting: true }));
   });
+  const [fileAttachments, setFileAttachments] = React.useState(() => (
+    Array.isArray(message.fileAttachments) ? message.fileAttachments.slice() : []
+  ));
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const fileInputRefEdit = React.useRef(null);
   const [imageProcessingEdit, setImageProcessingEdit] = React.useState(null);
@@ -2754,7 +2775,8 @@ export function EditMessageModal({
   const editMessageDirtySnapshot = () => JSON.stringify([
     text,
     participantId,
-    images.map(img => [img.original, img.thumbnail, img.isExisting ? 1 : 0])
+    images.map(img => [img.original, img.thumbnail, img.isExisting ? 1 : 0]),
+    fileAttachments.map(f => [f.id || '', f.name || '', f.url || '', f.size || 0])
   ]);
   const { requestClose, overlayOnClick } = useModalDirtyGuard(
     onClose,
@@ -2769,37 +2791,53 @@ export function EditMessageModal({
     const files = e.target.files;
     if (!files || files.length === 0) return;
     try {
-      const remainingSlots = 50 - images.length;
-      if (remainingSlots <= 0) {
-        if (showToast) showToast('사진 최대 50장', 'error');
-        return;
+      const classified = typeof classifyChatComposerFiles === 'function'
+        ? classifyChatComposerFiles(files)
+        : { images: Array.from(files || []).filter(f => /^image\//i.test(f.type || '')), documents: [], rejected: [] };
+      if (classified.rejected && classified.rejected.length && showToast) {
+        const hasVideo = classified.rejected.some(r => r.reason === 'video');
+        const hasLarge = classified.rejected.some(r => r.reason === 'too-large');
+        if (hasVideo) showToast('동영상은 업로드할 수 없습니다.', 'error');
+        else if (hasLarge) showToast('파일이 너무 큽니다 (최대 20MB).', 'error');
+        else showToast('지원하지 않는 파일 형식입니다.', 'error');
       }
-
-      const filesToProcess = Array.from(files).slice(0, remainingSlots);
-      if (files.length > remainingSlots && showToast) {
-        showToast(`${remainingSlots}장만 추가됨 (최대 50장)`, 'info');
+      if (classified.images && classified.images.length) {
+        if (typeof appendChatImageFiles === 'function') {
+          await appendChatImageFiles({
+            files: classified.images,
+            currentCount: images.length,
+            setImageProcessing: setImageProcessingEdit,
+            setChatImages: setImages,
+            showToast
+          });
+        } else {
+          const remainingSlots = 50 - images.length;
+          const filesToProcess = classified.images.slice(0, Math.max(0, remainingSlots));
+          if (!filesToProcess.length) {
+            if (showToast) showToast('사진 최대 50장', 'error');
+          } else {
+            setImageProcessingEdit({ current: 0, total: filesToProcess.length });
+            const { succeeded, failed } = await processImageFilesSequentially(
+              filesToProcess,
+              progress => setImageProcessingEdit(progress)
+            );
+            if (succeeded.length > 0) setImages(prev => [...prev, ...succeeded]);
+            if (failed.length > 0 && showToast) showToast(describeImageProcessingFailures(failed), 'error', 5000);
+          }
+        }
       }
-
-      setImageProcessingEdit({ current: 0, total: filesToProcess.length });
-      const { succeeded, failed } = await processImageFilesSequentially(
-        filesToProcess,
-        progress => setImageProcessingEdit(progress)
-      );
-
-      if (succeeded.length > 0) {
-        setImages(prev => [...prev, ...succeeded]);
-      }
-      if (failed.length > 0) {
-        console.error('Image compression failed for:', failed.map(f => f.fileName));
-        const message = describeImageProcessingFailures(failed);
-        if (showToast) showToast(message, 'error', 5000);
-        else console.warn(message);
+      if (classified.documents && classified.documents.length && typeof createPendingChatFileAttachment === 'function') {
+        const remaining = Math.max(0, 20 - (fileAttachments?.length || 0));
+        const docs = classified.documents.slice(0, remaining).map(file => createPendingChatFileAttachment(file));
+        if (classified.documents.length > remaining && showToast) showToast('파일은 최대 20개까지 첨부할 수 있습니다.', 'info');
+        if (docs.length) {
+          setFileAttachments(prev => [...(prev || []), ...docs]);
+          if (showToast) showToast(docs.length + '개 파일 첨부완료', 'success', 3000);
+        }
       }
     } catch (err) {
       console.error('handleFileChangeEdit unexpected error:', err);
-      const message = '사진 첨부 중 오류';
-      if (showToast) showToast(message, 'error', 5000);
-      else console.warn(message);
+      if (showToast) showToast('파일 첨부 중 오류', 'error', 5000);
     } finally {
       setImageProcessingEdit(null);
       e.target.value = '';
@@ -2810,7 +2848,7 @@ export function EditMessageModal({
     if ((!text.trim() && images.length === 0) || isSubmitting) return;
     setIsSubmitting(true);
     try {
-      const saved = await onSave(text.trim(), images, participantId);
+      const saved = await onSave(text.trim(), images, participantId, fileAttachments);
       if (saved !== false) onClose();
     } catch (err) {
       console.error('EditMessageModal save error:', err);
@@ -2976,10 +3014,36 @@ export function EditMessageModal({
       paddingBottom: '4px',
       overflowY: 'hidden'
     }
-  }), /*#__PURE__*/React.createElement("input", {
+  }),
+  fileAttachments && fileAttachments.length > 0 ? /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px', width: '100%' }
+  }, fileAttachments.map((file, index) => /*#__PURE__*/React.createElement("div", {
+    key: file.id || index,
+    style: {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
+      border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)',
+      padding: '8px 10px', backgroundColor: 'var(--bg-secondary)'
+    }
+  },
+    /*#__PURE__*/React.createElement("div", { style: { minWidth: 0, flex: 1 } },
+      /*#__PURE__*/React.createElement("div", {
+        style: { fontWeight: 800, fontSize: 'var(--font-size-md)', whiteSpace: 'normal', overflowWrap: 'anywhere', wordBreak: 'break-word' }
+      }, file.name || '파일'),
+      /*#__PURE__*/React.createElement("div", {
+        style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', fontWeight: 600 }
+      }, [typeof getChatFileTypeLabel === 'function' ? getChatFileTypeLabel(file) : '', typeof formatChatFileSize === 'function' ? formatChatFileSize(file.size) : ''].filter(Boolean).join(' · '))
+    ),
+    /*#__PURE__*/React.createElement("button", {
+      type: 'button',
+      onClick: () => setFileAttachments(prev => prev.filter((_, idx) => idx !== index)),
+      'aria-label': '파일 첨부 제거',
+      style: { border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontWeight: 900, padding: '4px 6px' }
+    }, '×')
+  ))) : null,
+  /*#__PURE__*/React.createElement("input", {
     ref: fileInputRefEdit,
     type: "file",
-    accept: "image/jpeg, image/png, image/gif, image/webp, image/heic, image/heif, image/*",
+    accept: chatComposerAccept,
     multiple: true,
     style: { position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 },
     onChange: handleFileChangeEdit
@@ -3008,7 +3072,8 @@ export function EditMessageModal({
     /*#__PURE__*/React.createElement("button", {
       type: "button",
       onClick: () => fileInputRefEdit.current && fileInputRefEdit.current.click(),
-      title: "사진 첨부",
+      title: "파일첨부",
+      "aria-label": "파일첨부",
       style: {
         width: '32px',
         height: '32px',
@@ -3032,8 +3097,11 @@ export function EditMessageModal({
       stroke: "currentColor",
       strokeWidth: "2",
       strokeLinecap: "round",
-      strokeLinejoin: "round"
-    }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M15 8h.01" }), /*#__PURE__*/React.createElement("path", { d: "M12.5 21h-6.5a3 3 0 0 1 -3 -3v-12a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v6.5" }), /*#__PURE__*/React.createElement("path", { d: "M3 16l5 -5c.928 -.893 2.072 -.893 3 0l4 4" }), /*#__PURE__*/React.createElement("path", { d: "M14 14l1 -1c.67 -.644 1.45 -.824 2.182 -.54" }), /*#__PURE__*/React.createElement("path", { d: "M16 19h6" }), /*#__PURE__*/React.createElement("path", { d: "M19 16v6" }))),
+      strokeLinejoin: "round",
+      className: "lucide lucide-paperclip"
+    }, /*#__PURE__*/React.createElement("path", {
+      d: "m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551"
+    }))),
     /*#__PURE__*/React.createElement("button", {
       type: "button",
       onClick: handleClickPasteImagesEdit,
@@ -3075,9 +3143,9 @@ export function EditMessageModal({
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "btn btn-poll-create",
-        disabled: isSubmitting || (!text.trim() && images.length === 0),
+        disabled: isSubmitting || (!text.trim() && images.length === 0 && !(fileAttachments && fileAttachments.length)),
         onClick: handleSave,
-        style: { height: '44px', minHeight: '44px', fontSize: 'var(--font-size-base)', padding: '0 16px', opacity: (text.trim() || images.length > 0) && !isSubmitting ? 1 : 0.6 }
+        style: { height: '44px', minHeight: '44px', fontSize: 'var(--font-size-base)', padding: '0 16px', opacity: (text.trim() || images.length > 0 || (fileAttachments && fileAttachments.length > 0)) && !isSubmitting ? 1 : 0.6 }
       }, isSubmitting ? '...' : "수정")
     )
   ))), isPartSheetOpen && /*#__PURE__*/React.createElement(ChatParticipantSheet, {
