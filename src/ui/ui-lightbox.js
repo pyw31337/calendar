@@ -453,6 +453,9 @@ export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast
     },
       /*#__PURE__*/React.createElement("span", { style: labelStyle }, "태그입력"),
       /*#__PURE__*/React.createElement("input", {
+        // Remount when token count changes so iOS Safari refreshes placeholder (n/10); it often
+        // keeps a stale "(0/10)" after chips catch up from async gallery tag resolution.
+        key: `tag-input-${tagTokens.length}`,
         type: "text",
         className: "lightbox-tag-input",
         ref: tagInputRef,
@@ -1725,6 +1728,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
           isRemovingFromMemory: isRemovingFromMemory
         }),
         showTags && zoomLevel === ZOOM_DEFAULT && /*#__PURE__*/React.createElement(LightboxTagPanel, {
+          key: `tags-${tagOverrideKey || String(currentUrl || index)}`,
           tags: currentTags,
           onSaveTags: saveCurrentTags,
           onSearchTag: onSearchTag,
@@ -1870,6 +1874,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
       isRemovingFromMemory: isRemovingFromMemory
     }),
     showTags && zoomLevel === ZOOM_DEFAULT && /*#__PURE__*/React.createElement(LightboxTagPanel, {
+      key: `tags-${tagOverrideKey || String(currentUrl || index)}`,
       tags: currentTags,
       onSaveTags: saveCurrentTags,
       onSearchTag: onSearchTag,

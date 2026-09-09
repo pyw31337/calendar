@@ -168,6 +168,28 @@ export function normalizePhotoIndexTagSet(value) {
   )).sort().join(' ');
 }
 
+export function countPhotoTagTokens(value) {
+  const normalized = normalizePhotoIndexTagSet(value);
+  return normalized ? normalized.split(' ').length : 0;
+}
+
+// Prefer the fuller durable tag string. Token order / # prefixes differ across message writes,
+// meeting album copies, and CF denorm — compare as normalized sets and keep the richer source.
+export function pickRicherPhotoTags(...candidates) {
+  let best = '';
+  let bestCount = -1;
+  for (const candidate of candidates) {
+    if (candidate == null) continue;
+    const text = String(candidate);
+    const count = countPhotoTagTokens(text);
+    if (count > bestCount) {
+      best = text;
+      bestCount = count;
+    }
+  }
+  return best;
+}
+
 function photoIndexTagIdentityKeys(photo = {}) {
   const keys = [];
   const asset = String(photo.assetKey || photo.mediaKey || photo.refKey || '').trim();
@@ -220,10 +242,13 @@ export function resolveGalleryLightboxTags(calendarId, photo = {}, { localTags =
   if (calendarId && hasStickyPhotoIndexTags(calendarId, photo)) {
     return peekStickyPhotoIndexTags(calendarId, photo);
   }
-  if (localTags != null) return String(localTags);
+  // Empty/partial in-memory message.imageTags (common after photoIndex rebuild prefers a
+  // message owner whose tags lagged the meeting album copy) must not blank richer index tags.
+  const fromLocal = localTags != null ? String(localTags) : null;
   const fromIndex = indexTags != null ? String(indexTags) : '';
-  if (fromIndex) return fromIndex;
-  return String(photo?.tags || '');
+  const fromPhoto = String(photo?.tags || '');
+  if (fromLocal != null) return pickRicherPhotoTags(fromLocal, fromIndex, fromPhoto);
+  return pickRicherPhotoTags(fromIndex, fromPhoto);
 }
 
 // After a verified message/memo tag write, poll force-reload until sticky clears (CF denorm

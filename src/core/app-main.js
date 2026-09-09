@@ -10072,7 +10072,7 @@ function resolveMeetingPhotoDisplay(photo, chatMessages) {
   return {
     imageUrl: entry.full,
     thumbUrl: entry.thumb,
-    tags: entry.tags || '',
+    tags: ((a, b) => { const ca = String(a||'').split(/[,\s#]+/).map(t=>t.trim()).filter(Boolean).length; const cb = String(b||'').split(/[,\s#]+/).map(t=>t.trim()).filter(Boolean).length; return cb > ca ? String(b||'') : String(a||''); })(entry.tags, photo?.tags),
     // Prefer the live chat slot identity over a stale meeting-local mediaKey.
     assetKey: entry.assetKey || fallbackKeys.assetKey,
     mediaKey: entry.mediaKey || fallbackKeys.mediaKey,

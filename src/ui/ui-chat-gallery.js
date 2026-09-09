@@ -607,7 +607,7 @@ export function ChatGalleryModal({
           // Client cannot write photoIndex. CF denorm can lag empty OR partial (e.g. only
           // #260908 while message.imageTags still has the full save). Session sticky (verified
           // save this tab) wins over stale in-memory imageTags (unpatched galleryLive) and
-          // empty photoIndex; then local message/memo tags; index last.
+          // empty/partial photoIndex; then the richer of local message/memo/meeting tags + index.
           const indexTags = String(photo.tags || '');
           let localTags = null;
           if (messageId) {
@@ -620,6 +620,33 @@ export function ChatGalleryModal({
             } else {
               const msg = (chatMessages || []).find(row => row && row.id === messageId);
               if (msg && Array.isArray(msg.imageTags)) localTags = String(msg.imageTags[imageIndex] || '');
+            }
+          }
+          // Meeting album copies store durable tags on confirmedMeetings.photos[].tags. After
+          // rebuildPhotoIndex, the selected message owner can expose empty/partial imageTags for
+          // the same asset — still consult the meeting-local tags so lightbox reopen stays full.
+          if (source === 'meeting' || photo.meetingDate || photo.photoId || photo.sourceMessageId) {
+            const meetings = typeof getConfirmedMeetings === 'function' ? (getConfirmedMeetings(calendar) || []) : [];
+            for (const meeting of meetings) {
+              const photos = Array.isArray(meeting?.photos) ? meeting.photos : [];
+              const match = photos.find(row => {
+                if (!row) return false;
+                if (photo.photoId && row.id === photo.photoId) return true;
+                if (photo.sourceMessageId && row.sourceMessageId === photo.sourceMessageId
+                  && Number(row.sourceImageIndex) === Number(photo.sourceImageIndex != null ? photo.sourceImageIndex : imageIndex)) {
+                  return true;
+                }
+                return false;
+              });
+              if (match && match.tags != null && String(match.tags)) {
+                localTags = localTags == null ? String(match.tags) : localTags;
+                // Prefer whichever local string is richer; resolveGalleryLightboxTags also merges
+                // against indexTags, but keep local itself non-empty when the meeting copy is.
+                const localCount = String(localTags || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean).length;
+                const meetingCount = String(match.tags || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean).length;
+                if (meetingCount > localCount) localTags = String(match.tags);
+                break;
+              }
             }
           }
           const calendarId = calendar && calendar.id ? calendar.id : '';
