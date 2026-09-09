@@ -3094,32 +3094,20 @@ function CalendarApp() {
       setLoadingOlderChat(false);
     }
   }, [activeCalId, hasMoreOlderChat, allChatMessages, chatMessages, olderChatMessages]);
-  // "Latest ref" mirrors for handleJumpToChatMessage's retry loop below -- that loop runs
-  // across several ticks via setTimeout, outside any single render's closures, so it reads
-  // these refs (updated fresh every render) instead of the plain consts above, which would
-  // otherwise stay frozen at whatever hasMoreOlderChat/loadOlderChatMessages was when the loop
-  // started.
+  // Refs for handleJumpToChatMessage's setTimeout retry (avoid stale hasMore/loadOlder closures).
   const loadOlderChatMessagesRef = React.useRef(loadOlderChatMessages);
   loadOlderChatMessagesRef.current = loadOlderChatMessages;
   const hasMoreOlderChatRef = React.useRef(hasMoreOlderChat);
   hasMoreOlderChatRef.current = hasMoreOlderChat;
 
-  // A single chat message can be locally cached in up to three independent snapshots at once --
-  // `chatMessages` (the live recent window), `olderChatMessages` (manually paginated-in older
-  // history), and `galleryPreviewMessages` (a one-time fetch for the main-screen gallery widget).
-  // Every per-message mutation (tag save, photo delete/replace, share-URL caching) MUST patch all
-  // three, or whichever snapshot wasn't touched keeps showing stale data (e.g. a tag saved from
-  // the main-screen gallery widget's Lightbox wouldn't show up when the same photo is reopened
-  // from the 갤러리 page, since that page reads from a different one of these three arrays).
+  // Patch live/older/gallery-preview AND gallery archive together — miss any and lightbox
+  // reopen (갤러리) can keep stale/partial photoIndex tags for photos outside the live window.
   const patchLocalChatMessage = (messageId, patch) => {
     const patchMessage = msg => msg.id === messageId ? { ...msg, ...patch } : msg;
     setChatMessages(prev => prev.map(patchMessage));
     setOlderChatMessages(prev => prev.map(patchMessage));
     setGalleryPreviewMessages(prev => prev.map(patchMessage));
-    // Gallery archive (fullChatHistoryByCalendar) is a fourth snapshot used for lightbox tag reads.
-    // Without this, a verified tag save never reaches galleryChatMessages for photos outside the
-    // live chat window, so reopen fell back to stale/partial photoIndex tags.
-    if (typeof patchGalleryArchiveMessage === 'function') patchGalleryArchiveMessage(messageId, patch);
+    patchGalleryArchiveMessage(messageId, patch);
   };
   const upsertLocalChatMessage = message => {
     if (!message?.id) return;
@@ -4287,9 +4275,7 @@ function CalendarApp() {
         const ok = await writeCollectionDocumentWithFallback('memos', activeCalId, memoId, sanitizeMemoForFirestore({ imageTags: nextImageTags }), 'update', '메모 이미지 태그 저장', { requirePersisted: true });
         if (!ok?.success || ok?.queued) throw new Error('Memo image tags update failed');
         setMemos(prev => prev.map(m => m.id === memoId ? { ...m, imageTags: nextImageTags } : m));
-        if (typeof patchGalleryArchiveMemo === 'function') {
-          patchGalleryArchiveMemo(memoId, { imageTags: nextImageTags });
-        }
+        patchGalleryArchiveMemo(memoId, { imageTags: nextImageTags });
         try {
           invalidatePhotoIndexCache(activeCalId);
           const memoAsset = String(meta?.assetKey || meta?.mediaKey || meta?.refKey || '');
