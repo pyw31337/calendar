@@ -260,6 +260,7 @@ assert(photoIndexSource.includes('filterGalleryPhotoIndexItems'), 'gallery photo
 assert(chatGallerySource.includes("source === 'anniversary'"), 'gallery 사진 tab must exclude anniversary/content posters');
 const functionsIndexSource = fs.readFileSync(new URL('../functions/index.js', import.meta.url), 'utf8');
 assert(functionsIndexSource.includes('Content posters (movie/sports anniversaries)'), 'CF photoIndex must stop indexing anniversary/content posters');
+assert(functionsIndexSource.includes('exports.rebuildPhotoIndex'), 'CF must expose admin rebuildPhotoIndex for one-calendar gallery backfill');
 const photoCommentsSource = fs.readFileSync(new URL('../src/core/photo-comments.js', import.meta.url), 'utf8');
 assert(photoIndexSource.includes('patchItems'), 'gallery photo index must support local tag patches after save');
 assert(photoCommentsSource.includes('requirePersisted: true'), 'photo comment module must require durable writes');

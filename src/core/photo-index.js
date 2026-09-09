@@ -71,6 +71,44 @@ export async function fetchPhotoIndexCount({ calendarId, projectId }) {
   return Math.max(0, total - anniversaryTotal);
 }
 
+// Client-safe read-only verification for gallery totals. Compares the live photoIndex
+// aggregation (anniversary posters already subtracted) against an optional expected count
+// from a rebuild dry-run / local estimate. Does not write.
+export async function verifyGalleryPhotoIndexTotals({
+  calendarId,
+  projectId,
+  expectedGalleryCount = null
+} = {}) {
+  const indexedGalleryCount = await fetchPhotoIndexCount({ calendarId, projectId });
+  const expected = expectedGalleryCount == null ? null : Number(expectedGalleryCount);
+  const hasExpected = Number.isFinite(expected);
+  return {
+    calendarId,
+    indexedGalleryCount,
+    expectedGalleryCount: hasExpected ? expected : null,
+    matches: hasExpected ? indexedGalleryCount === expected : null,
+    delta: hasExpected ? indexedGalleryCount - expected : null
+  };
+}
+
+// Normalize a rebuildPhotoIndex / photoIndexBackfillLocal report into the gallery-facing
+// totals operators care about (chat∪memo∪meeting; anniversary posters excluded).
+export function summarizePhotoIndexRebuildReport(report = {}) {
+  const bySource = report?.bySource && typeof report.bySource === 'object' ? report.bySource : {};
+  const galleryIndexedPhotos = Number.isFinite(Number(report?.galleryIndexedPhotos))
+    ? Number(report.galleryIndexedPhotos)
+    : Math.max(0, Number(report?.indexedPhotos || 0) - Number(bySource.anniversary || 0));
+  return {
+    calendarId: report?.calendarId || '',
+    mode: report?.mode || 'unknown',
+    galleryIndexedPhotos,
+    bySource,
+    existingRows: Number(report?.existingRows || 0),
+    staleRows: Number(report?.staleRows || 0),
+    sourceDocuments: report?.sourceDocuments || {}
+  };
+}
+
 export function filterGalleryPhotoIndexItems(items) {
   return (Array.isArray(items) ? items : []).filter(item => !isGalleryContentPosterRow(item));
 }

@@ -77,6 +77,40 @@
 4. 공유 URL (`/share/kkot/`, `/share/cw/`, `/share/jhair/`)
 5. 어드민 로그인·탭
 
+## 4b. 갤러리 photoIndex 재구축 (캘린더 1개)
+
+갤러리 합계는 `photoIndex`의 chat∪memo∪meeting 행만 센다(기념일/컨텐츠 포스터 `source=anniversary` 제외). 운영 중 합계가 어긋나면(예: jhair) 아래 중 하나로 한 캘린더만 dry-run → 적용한다.
+
+### A. 관리자 UI (권장)
+1. `firebase deploy --only functions:rebuildPhotoIndex` (또는 `--only functions`)로 CF 배포
+2. 관리자 대시보드 → 복구 탭 → **갤러리 photoIndex 재구축**
+3. 대상 캘린더 선택 후 **dry-run** → 보고서의 `galleryIndexedPhotos` / `staleRows` 확인 → **적용(쓰기)**
+
+### B. curl (관리자 비밀번호 필요)
+```bash
+# dry-run
+curl -sS -X POST \
+  "https://us-central1-<PROJECT_ID>.cloudfunctions.net/rebuildPhotoIndex" \
+  -H 'Content-Type: application/json' \
+  -d '{"password":"<ADMIN_PASSWORD>","calendarId":"jhair","apply":false}' | jq .
+
+# apply
+curl -sS -X POST \
+  "https://us-central1-<PROJECT_ID>.cloudfunctions.net/rebuildPhotoIndex" \
+  -H 'Content-Type: application/json' \
+  -d '{"password":"<ADMIN_PASSWORD>","calendarId":"jhair","apply":true}' | jq .
+```
+
+### C. 에뮬레이터 전용
+`FUNCTIONS_EMULATOR=true`일 때만 `photoIndexBackfillLocal`이 노출된다(비밀번호 없음). 프로덕션에서는 `rebuildPhotoIndex`를 쓴다.
+
+### D. 클라이언트 검증 헬퍼
+- `fetchPhotoIndexCount({ calendarId, projectId })` — 갤러리용 합계(anniversary 차감)
+- `verifyGalleryPhotoIndexTotals({ calendarId, projectId, expectedGalleryCount })` — dry-run의 `galleryIndexedPhotos`와 대조
+- `summarizePhotoIndexRebuildReport(report)` — CF 응답 정규화
+
+적용 후 앱에서 갤러리 메뉴 배지/총 장수가 dry-run의 `galleryIndexedPhotos`와 일치하는지 확인한다.
+
 ## 5. Google Cloud 예산 알림
 console.cloud.google.com → 결제 → 예산 및 알림 (월 5~10달러 권장, 50/90/100%)
 
