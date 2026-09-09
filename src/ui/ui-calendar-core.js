@@ -71,10 +71,6 @@ function removeFirstUrl(...args) {
   const f = __gatherUiDeps().removeFirstUrl || GATHER_APP_UTILS.removeFirstUrl;
   return typeof f === 'function' ? f(...args) : undefined;
 }
-function appendChatImageFiles(...args) {
-  const f = __gatherUiDeps().appendChatImageFiles || GATHER_APP_UTILS.appendChatImageFiles;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
 function computeCalendarSearchMatches(...args) {
   const f = __gatherUiDeps().computeCalendarSearchMatches || GATHER_APP_UTILS.computeCalendarSearchMatches;
   return typeof f === 'function' ? f(...args) : undefined;
