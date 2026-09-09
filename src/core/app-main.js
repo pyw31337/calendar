@@ -140,7 +140,7 @@ import {
 } from './app-domain-helpers.js';
 import { fetchPhotoComments, savePhotoComments } from './photo-comments.js';
 import { createPhotoCommentStore } from './photo-comment-store.js';
-import { useGalleryPhotoIndex, invalidatePhotoIndexCache } from './photo-index.js';
+import { useGalleryPhotoIndex, invalidatePhotoIndexCache, rememberPhotoIndexTags } from './photo-index.js';
 import { useGalleryArchiveState } from './gallery-archive-state.js';
 import { cloneConfirmedMeetings, commitConfirmedMeetingChanges } from './confirmed-meeting-coordinator.js';
 import { getInitialAppView, buildAppViewUrl } from './app-routing-state.js';
@@ -4285,6 +4285,8 @@ function CalendarApp() {
         setMemos(prev => prev.map(m => m.id === memoId ? { ...m, imageTags: nextImageTags } : m));
         try {
           invalidatePhotoIndexCache(activeCalId);
+          const memoTagPatch = { messageId: memoId, imageIndex: resolvedIndex, tags: cleanTags };
+          rememberPhotoIndexTags(activeCalId, [memoTagPatch]);
           if (typeof galleryPhotoIndex?.patchItems === 'function') {
             galleryPhotoIndex.patchItems(items => (items || []).map(photo => {
               if (photo.messageId === memoId && Number(photo.imageIndex) === Number(resolvedIndex)) {
@@ -4293,8 +4295,13 @@ function CalendarApp() {
               return photo;
             }));
           }
+          // Do not force-reload immediately: CF photoIndex denorm races this fetch and used to
+          // wipe the local patch with empty tags, so lightbox reopen lost the just-saved tags.
           if (galleryPhotoIndex?.status === 'ready' && typeof galleryPhotoIndex.loadPage === 'function') {
-            void galleryPhotoIndex.loadPage(galleryPhotoIndex.page || 1, { force: true });
+            const page = galleryPhotoIndex.page || 1;
+            window.setTimeout(() => {
+              void galleryPhotoIndex.loadPage(page, { force: true });
+            }, 1800);
           }
         } catch (indexSyncErr) {
           console.warn('Gallery photoIndex memo-tag sync skipped:', indexSyncErr);
@@ -4426,13 +4433,23 @@ function CalendarApp() {
         showToast('태그는 저장됐지만 일정 사진 연결은 실패했습니다.', 'error', 5000);
       }
     }
-    // Gallery reads tags from photoIndex (CF-maintained). Patch local index rows + force
-    // reload so a refresh does not show the pre-save tags while the message already has them.
+    // Gallery reads tags from photoIndex (CF-maintained). Messages already hold the verified
+    // tags; patch local index rows and remember them for the session. A delayed reload gives
+    // onMessagePhotoIndexWrite time to catch up — an immediate force reload raced CF and wiped
+    // tags, so closing/reopening the lightbox showed empty meta.tags despite "태그 저장완료".
     try {
       invalidatePhotoIndexCache(activeCalId);
+      const asset = String(meta?.assetKey || meta?.mediaKey || meta?.refKey || '');
+      rememberPhotoIndexTags(activeCalId, [{
+        messageId,
+        imageIndex: isDirectMedia ? 0 : imageIndex,
+        assetKey: asset,
+        mediaKey: asset,
+        refKey: asset,
+        tags: cleanTags
+      }]);
       if (typeof galleryPhotoIndex?.patchItems === 'function') {
         galleryPhotoIndex.patchItems(items => (items || []).map(photo => {
-          const asset = String(meta?.assetKey || meta?.mediaKey || meta?.refKey || '');
           const sameAsset = asset && (photo.assetKey === asset || photo.mediaKey === asset || photo.refKey === asset);
           const sameMessage = messageId && photo.messageId === messageId
             && Number(photo.imageIndex) === Number(imageIndex);
@@ -4441,7 +4458,10 @@ function CalendarApp() {
         }));
       }
       if (galleryPhotoIndex?.status === 'ready' && typeof galleryPhotoIndex.loadPage === 'function') {
-        void galleryPhotoIndex.loadPage(galleryPhotoIndex.page || 1, { force: true });
+        const page = galleryPhotoIndex.page || 1;
+        window.setTimeout(() => {
+          void galleryPhotoIndex.loadPage(page, { force: true });
+        }, 1800);
       }
     } catch (indexSyncErr) {
       console.warn('Gallery photoIndex tag sync skipped:', indexSyncErr);

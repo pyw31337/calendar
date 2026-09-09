@@ -115,6 +115,84 @@ export function invalidatePhotoIndexCache(calendarId) {
   for (const key of pageCache.keys()) if (key.startsWith(`${calendarId}:`)) pageCache.delete(key);
 }
 
+// Client cannot write photoIndex (Firestore rules: write false). Tag saves land on messages/memos
+// and Cloud Functions eventually denormalize tags onto photoIndex. Until that catches up — or when
+// a force reload races the trigger — gallery lightbox meta would reopen with empty tags even though
+// the message write + toast already succeeded. Keep a session sticky overlay keyed by asset /
+// message identity so local verified saves survive reload and gallery remount within the tab.
+const stickyPhotoTagsByCalendar = new Map();
+
+function photoIndexTagIdentityKeys(photo = {}) {
+  const keys = [];
+  const asset = String(photo.assetKey || photo.mediaKey || photo.refKey || '').trim();
+  if (asset) keys.push(`asset:${asset}`);
+  const messageId = String(photo.messageId || '').trim();
+  if (messageId) {
+    const imageIndex = Number.isFinite(Number(photo.imageIndex)) ? Number(photo.imageIndex) : 0;
+    keys.push(`msg:${messageId}:${imageIndex}`);
+  }
+  return keys;
+}
+
+export function rememberPhotoIndexTags(calendarId, photos) {
+  if (!calendarId || !Array.isArray(photos) || photos.length === 0) return;
+  let sticky = stickyPhotoTagsByCalendar.get(calendarId);
+  if (!sticky) {
+    sticky = new Map();
+    stickyPhotoTagsByCalendar.set(calendarId, sticky);
+  }
+  photos.forEach(photo => {
+    const tags = String(photo?.tags || '');
+    photoIndexTagIdentityKeys(photo).forEach(key => {
+      if (tags) sticky.set(key, tags);
+      else sticky.delete(key);
+    });
+  });
+}
+
+function applyStickyPhotoIndexTags(calendarId, items) {
+  const list = Array.isArray(items) ? items : [];
+  const sticky = stickyPhotoTagsByCalendar.get(calendarId);
+  if (!sticky || sticky.size === 0) return list;
+  return list.map(photo => {
+    const keys = photoIndexTagIdentityKeys(photo);
+    let stickyTags = '';
+    for (const key of keys) {
+      if (sticky.has(key)) {
+        stickyTags = sticky.get(key);
+        break;
+      }
+    }
+    const serverTags = String(photo?.tags || '');
+    if (!stickyTags) return photo;
+    // Empty CF rows are the reopen-loss case (denorm lag / force-reload race). Non-empty server
+    // tags mean the index caught up (or another writer won) — drop sticky and trust the server.
+    if (!serverTags) return { ...photo, tags: stickyTags };
+    keys.forEach(key => sticky.delete(key));
+    return photo;
+  });
+}
+
+function mergePhotoIndexTags(previousItems, nextItems) {
+  const previous = Array.isArray(previousItems) ? previousItems : [];
+  const next = Array.isArray(nextItems) ? nextItems : [];
+  if (!previous.length) return next;
+  const byKey = new Map();
+  previous.forEach(photo => {
+    const tags = String(photo?.tags || '');
+    if (!tags) return;
+    photoIndexTagIdentityKeys(photo).forEach(key => byKey.set(key, tags));
+  });
+  if (!byKey.size) return next;
+  return next.map(photo => {
+    if (String(photo?.tags || '')) return photo;
+    for (const key of photoIndexTagIdentityKeys(photo)) {
+      if (byKey.has(key)) return { ...photo, tags: byKey.get(key) };
+    }
+    return photo;
+  });
+}
+
 export function useGalleryPhotoIndex({ React, calendarId, activeView, projectId, decodeDocument }) {
   const [state, setState] = React.useState({ status: 'idle', items: [], total: 0, page: 1, loading: false, complete: false });
   const loadPage = React.useCallback(async (page = 1, options = {}) => {
@@ -127,7 +205,20 @@ export function useGalleryPhotoIndex({ React, calendarId, activeView, projectId,
         fetchPhotoIndexPage({ calendarId, projectId, page: requestedPage, decodeDocument, force: Boolean(options.force) }),
         fetchPhotoIndexCount({ calendarId, projectId })
       ]);
-      setState({ status: total > 0 ? 'ready' : 'fallback', items: Array.isArray(items) ? items : [], total: Math.max(0, Number(total) || 0), page: requestedPage, loading: false, complete: false });
+      setState(previous => {
+        const merged = applyStickyPhotoIndexTags(
+          calendarId,
+          mergePhotoIndexTags(previous.items, Array.isArray(items) ? items : [])
+        );
+        return {
+          status: total > 0 ? 'ready' : 'fallback',
+          items: merged,
+          total: Math.max(0, Number(total) || 0),
+          page: requestedPage,
+          loading: false,
+          complete: false
+        };
+      });
       return total > 0;
     } catch (error) {
       console.warn('photo index page load failed:', error);
@@ -156,8 +247,15 @@ export function useGalleryPhotoIndex({ React, calendarId, activeView, projectId,
         pages.push(...await Promise.all(wave));
       }
       setState(previous => ({
-        status: 'ready', items: filterGalleryPhotoIndexItems(pages.flat()), total, page: previous.page || 1,
-        loading: false, complete: true
+        status: 'ready',
+        items: applyStickyPhotoIndexTags(
+          calendarId,
+          mergePhotoIndexTags(previous.items, filterGalleryPhotoIndexItems(pages.flat()))
+        ),
+        total,
+        page: previous.page || 1,
+        loading: false,
+        complete: true
       }));
       return true;
     } catch (error) {
@@ -170,9 +268,22 @@ export function useGalleryPhotoIndex({ React, calendarId, activeView, projectId,
     setState(previous => {
       const current = Array.isArray(previous.items) ? previous.items : [];
       const nextItems = typeof updater === 'function' ? updater(current) : current;
-      return { ...previous, items: Array.isArray(nextItems) ? nextItems : current };
+      const items = Array.isArray(nextItems) ? nextItems : current;
+      // Persist verified local tag edits across the force-reload that used to wipe them.
+      const changed = [];
+      const prevByKey = new Map();
+      current.forEach(photo => photoIndexTagIdentityKeys(photo).forEach(key => prevByKey.set(key, String(photo?.tags || ''))));
+      items.forEach(photo => {
+        const tags = String(photo?.tags || '');
+        const keys = photoIndexTagIdentityKeys(photo);
+        if (!keys.length) return;
+        const prevTags = keys.map(key => prevByKey.get(key)).find(value => value != null) || '';
+        if (tags !== prevTags) changed.push(photo);
+      });
+      if (changed.length) rememberPhotoIndexTags(calendarId, changed);
+      return { ...previous, items };
     });
-  }, []);
+  }, [calendarId]);
   React.useEffect(() => {
     if (!calendarId || activeView !== 'gallery') {
       setState({ status: 'idle', items: [], total: 0, page: 1, loading: false, complete: false });
