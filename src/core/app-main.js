@@ -448,6 +448,7 @@ import {
 } from './app-firebase-data.js';
 import { enqueueWriteOperation, flushWriteQueue } from './app-write-queue.js';
 import { replayQueuedMediaMessage, replayQueuedMemoSave, replayQueuedRootCollectionWrite } from './app-media-outbox.js';
+import { useAppFeedbackState } from './app-feedback-state.js';
 var firebaseDb = (typeof window !== 'undefined' && window.GATHER_APP_FIREBASE_DATA && window.GATHER_APP_FIREBASE_DATA.firebaseDb) || null;
 var firebaseStorage = (typeof window !== 'undefined' && window.GATHER_APP_FIREBASE_DATA && window.GATHER_APP_FIREBASE_DATA.firebaseStorage) || null;
 function getLiveFirebaseStorage() {
@@ -662,35 +663,11 @@ function CalendarApp() {
   React.useEffect(() => {
     calendarsRef.current = calendars;
   }, [calendars]);
-  const [toast, setToast] = React.useState(null);
-  const [operationProgress, setOperationProgress] = React.useState(null);
-  const toastControllerRef = React.useRef(null);
-  if (!toastControllerRef.current) {
-    toastControllerRef.current = GATHER_APP_UTILS.createToastLifecycle(setToast);
-  }
-  const operationTimersRef = React.useRef({ delay: null, interval: null, hide: null });
-  const clearOperationTimers = () => {
-    const timers = operationTimersRef.current;
-    if (timers.delay) clearTimeout(timers.delay);
-    if (timers.interval) clearInterval(timers.interval);
-    if (timers.hide) clearTimeout(timers.hide);
-    operationTimersRef.current = { delay: null, interval: null, hide: null };
-  };
-  React.useEffect(() => {
-    return () => {
-      toastControllerRef.current.clearToastTimers();
-      clearOperationTimers();
-    };
-  }, []);
-
-  const showToast = toastControllerRef.current.showToast;
-  const dismissToast = toastControllerRef.current.dismissToast;
-  const showUndoableDeleteToast = (message, onUndo, onExpire, duration = 5000) => {
-    return showToast(message, 'delete', duration, onUndo, onExpire, '되돌리기');
-  };
-  const showRetryableUploadToast = (message, onRetry, duration = 5000) => {
-    return showToast(message, 'error', duration, onRetry, null, '다시 시도');
-  };
+  const {
+    toast, operationProgress, showToast, dismissToast, showUndoableDeleteToast,
+    showRetryableUploadToast, runWithOperationProgress, confirmDialog, setConfirmDialog,
+    showConfirmDialog, showAlert
+  } = useAppFeedbackState({ React, createToastLifecycle: GATHER_APP_UTILS.createToastLifecycle });
   const flushPendingWrites = React.useCallback(async () => {
     if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
     try {
@@ -727,59 +704,6 @@ function CalendarApp() {
     getFirebaseStateVersion,
     getFirebaseStateVersion
   );
-
-  const runWithOperationProgress = async ({ title, detail, delay = 1000 } = {}, task) => {
-    if (typeof task !== 'function') return undefined;
-    const id = `op_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-    let shown = false;
-    let pct = 12;
-    const finishSoon = () => {
-      clearOperationTimers();
-      if (!shown) return;
-      setOperationProgress(prev => prev?.id === id ? { ...prev, pct: 100, detail: '마무리 중입니다...' } : prev);
-      operationTimersRef.current.hide = setTimeout(() => {
-        setOperationProgress(prev => prev?.id === id ? null : prev);
-      }, 350);
-    };
-    clearOperationTimers();
-    operationTimersRef.current.delay = setTimeout(() => {
-      shown = true;
-      setOperationProgress({ id, title: title || '작업 처리 중...', detail: detail || '서버에 반영하고 있습니다.', pct });
-      operationTimersRef.current.interval = setInterval(() => {
-        pct = Math.min(96, pct + (pct < 55 ? 9 : pct < 80 ? 5 : 2));
-        setOperationProgress(prev => prev?.id === id ? { ...prev, pct } : prev);
-      }, 650);
-    }, delay);
-    try {
-      return await task();
-    } finally {
-      finishSoon();
-    }
-  };
-
-  // ---- Generic Confirm Dialog ----
-  const [confirmDialog, setConfirmDialog] = React.useState(null);
-  const showConfirmDialog = (title, message, onConfirm, showPasswordInput = false) => {
-    setConfirmDialog({
-      title,
-      message,
-      onConfirm: () => {
-        setConfirmDialog(null);
-        onConfirm();
-      },
-      showPasswordInput
-    });
-  };
-  // Single-button notice (no confirm/cancel choice), reusing the same dialog chrome --
-  // e.g. "현재 진행중인 투표가 없습니다" when the 헤더 투표 메뉴 is clicked with nothing to jump to.
-  const showAlert = (title, message) => {
-    setConfirmDialog({
-      title,
-      message,
-      onConfirm: () => setConfirmDialog(null),
-      alertOnly: true
-    });
-  };
 
   const isSavingRef = React.useRef(false);
   const [saveSyncState, setSaveSyncState] = React.useState({ status: 'live', label: '동기화됨', lastSyncedText: '' });

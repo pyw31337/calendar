@@ -7,7 +7,8 @@ const targets = [
   { file: 'src/core/app-firebase-data.js', maxLines: 4500, label: 'app-firebase-data.js' },
   { file: 'src/core/notification-pwa-state.js', maxLines: 240, label: 'notification-pwa-state.js' },
   { file: 'src/core/app-data-bootstrap.js', maxLines: 360, label: 'app-data-bootstrap.js' },
-  { file: 'src/core/app-shell-state.js', maxLines: 240, label: 'app-shell-state.js' }
+  { file: 'src/core/app-shell-state.js', maxLines: 240, label: 'app-shell-state.js' },
+  { file: 'src/core/app-feedback-state.js', maxLines: 120, label: 'app-feedback-state.js' }
 ];
 
 let failed = false;
