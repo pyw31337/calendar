@@ -2,7 +2,7 @@
  * Chat / gallery modal (P4-13)
  */
 
-import { composeGalleryPhotos } from '../core/gallery-data.js';
+import { composeGalleryPhotos, getPaginationWindow } from '../core/gallery-data.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -1473,27 +1473,49 @@ export function ChatGalleryModal({
     const pageCount = Math.max(1, Math.ceil(Number(indexedPhotoTotal || 0) / 100));
     if (pageCount <= 1) return null;
     const windowSize = isMobile ? 5 : 10;
-    const blockStart = Math.floor((Math.max(1, indexedPhotoPage) - 1) / windowSize) * windowSize + 1;
-    const pages = Array.from({ length: Math.min(windowSize, pageCount - blockStart + 1) }, (_, index) => blockStart + index);
+    const pages = getPaginationWindow(indexedPhotoPage, pageCount, windowSize);
     const go = page => {
       if (indexedPhotoLoading || page < 1 || page > pageCount || page === indexedPhotoPage) return;
       void onIndexedPhotoPageChange(page);
       if (gridHostRef.current) gridHostRef.current.scrollTop = 0;
     };
+    // Same chevron used by the month-nav / BackArrowIcon (down path, rotated). Double-stack for
+    // first/last. Mobile hides arrows entirely -- number window alone is enough on a phone.
+    const chevron = (direction, key) => /*#__PURE__*/React.createElement("svg", {
+      key: key,
+      xmlns: "http://www.w3.org/2000/svg", width: "18", height: "18", viewBox: "0 0 24 24",
+      fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round",
+      style: { transform: direction === 'left' ? 'rotate(90deg)' : 'rotate(-90deg)', display: 'inline-block' },
+      className: "icon icon-tabler icons-tabler-outline icon-tabler-chevron-down", "aria-hidden": "true"
+    },
+      /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
+      /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" })
+    );
+    const doubleChevron = direction => /*#__PURE__*/React.createElement("span", {
+      style: { display: 'inline-flex', alignItems: 'center' }
+    },
+      chevron(direction, `${direction}-a`),
+      /*#__PURE__*/React.createElement("span", { style: { display: 'inline-flex', marginLeft: '-11px' } },
+        chevron(direction, `${direction}-b`)
+      )
+    );
     const arrow = (label, page, disabled, glyph) => /*#__PURE__*/React.createElement("button", {
       key: label, type: "button", className: "gallery-pagination-button gallery-pagination-arrow",
       "aria-label": label, disabled: disabled || indexedPhotoLoading, onClick: () => go(page)
     }, glyph);
-    return /*#__PURE__*/React.createElement("nav", { className: "gallery-pagination", "aria-label": "갤러리 페이지" },
-      arrow('첫 페이지', 1, indexedPhotoPage <= 1, '≪'),
-      arrow('이전 페이지', indexedPhotoPage - 1, indexedPhotoPage <= 1, '‹'),
+    return /*#__PURE__*/React.createElement("nav", {
+      className: `gallery-pagination${isMobile ? ' is-mobile' : ''}`,
+      "aria-label": "갤러리 페이지"
+    },
+      !isMobile && arrow('첫 페이지', 1, indexedPhotoPage <= 1, doubleChevron('left')),
+      !isMobile && arrow('이전 페이지', indexedPhotoPage - 1, indexedPhotoPage <= 1, chevron('left')),
       pages.map(page => /*#__PURE__*/React.createElement("button", {
         key: page, type: "button", className: `gallery-pagination-button${page === indexedPhotoPage ? ' is-active' : ''}`,
         "aria-current": page === indexedPhotoPage ? 'page' : undefined,
         disabled: indexedPhotoLoading, onClick: () => go(page)
       }, String(page))),
-      arrow('다음 페이지', indexedPhotoPage + 1, indexedPhotoPage >= pageCount, '›'),
-      arrow('마지막 페이지', pageCount, indexedPhotoPage >= pageCount, '≫')
+      !isMobile && arrow('다음 페이지', indexedPhotoPage + 1, indexedPhotoPage >= pageCount, chevron('right')),
+      !isMobile && arrow('마지막 페이지', pageCount, indexedPhotoPage >= pageCount, doubleChevron('right'))
     );
   };
   // Distinguishes "haven't finished loading this calendar's history yet" from "genuinely no
@@ -1534,7 +1556,7 @@ export function ChatGalleryModal({
       type: "button",
       onClick: () => setGalleryViewMode(tab.key),
       style: {
-        height: '100%', boxSizing: 'border-box', padding: '0 14px', fontSize: 'var(--font-size-md)', fontWeight: 900,
+        height: '100%', boxSizing: 'border-box', padding: isMobile ? '0 10px' : '0 14px', fontSize: 'var(--font-size-md)', fontWeight: 900,
         borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer',
         backgroundColor: galleryViewMode === tab.key ? '#4F46E5' : 'transparent',
         color: galleryViewMode === tab.key ? '#FFFFFF' : 'var(--text-muted)'
@@ -1542,7 +1564,10 @@ export function ChatGalleryModal({
     }, tab.label))
   );
   const renderPhotoListHeader = () => /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '4px' }
+    style: {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      gap: isMobile ? '6px' : '8px', marginBottom: '4px', minWidth: 0
+    }
   },
     isMobile
       ? renderVisitFilterToggleMobile()
@@ -1550,7 +1575,7 @@ export function ChatGalleryModal({
           style: { fontSize: 'var(--font-size-md)', fontWeight: 800, color: 'var(--text-muted)' }
         }, `등록된 사진 (${displayPhotoTabCount}장)`),
     /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }
+      style: { display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '6px', flexShrink: 0, minWidth: 0 }
     },
       isBulkShareMode
         ? /*#__PURE__*/React.createElement(React.Fragment, null,
@@ -1581,7 +1606,12 @@ export function ChatGalleryModal({
               type: "button",
               className: "btn btn-action btn-action-outline",
               onClick: handlePasteGalleryUpload,
-              style: { height: '44px', minHeight: '44px', padding: '0 14px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: 'pointer' }
+              style: {
+                height: '44px', minHeight: '44px',
+                padding: isMobile ? '0 8px' : '0 12px',
+                borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: 'pointer',
+                flexShrink: 0
+              }
             }, "붙여넣기"),
             /*#__PURE__*/React.createElement("button", {
               type: "button",
@@ -1589,7 +1619,12 @@ export function ChatGalleryModal({
               onClick: handleUploadClick,
               title: "추가",
               "aria-label": "추가",
-              style: { height: '44px', minHeight: '44px', width: '48px', minWidth: '48px', padding: 0, borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }
+              style: {
+                height: '44px', minHeight: '44px', width: '44px', minWidth: '44px', maxWidth: '44px',
+                padding: 0, borderRadius: 'var(--radius-md)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                flexShrink: 0, aspectRatio: '1 / 1', boxSizing: 'border-box'
+              }
             }, PlusIcon ? /*#__PURE__*/React.createElement(PlusIcon, { size: 16 }) : "+"),
             /*#__PURE__*/React.createElement("button", {
               type: "button",
@@ -1597,7 +1632,12 @@ export function ChatGalleryModal({
               onClick: handleToggleBulkShareMode,
               title: "편집",
               "aria-label": "편집",
-              style: { height: '44px', minHeight: '44px', width: '48px', minWidth: '48px', padding: 0, borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }
+              style: {
+                height: '44px', minHeight: '44px', width: '44px', minWidth: '44px', maxWidth: '44px',
+                padding: 0, borderRadius: 'var(--radius-md)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                flexShrink: 0, aspectRatio: '1 / 1', boxSizing: 'border-box'
+              }
             }, PencilIcon ? /*#__PURE__*/React.createElement(PencilIcon, { size: 15 }) : "편집")
           )
     )
