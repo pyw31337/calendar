@@ -5,6 +5,7 @@ const admin = require('firebase-admin');
 const crypto = require('crypto');
 const webpush = require('web-push');
 const KoreanLunarCalendar = require('korean-lunar-calendar');
+const { pickCanonicalPhotoIndexTagState } = require('./photo-index-tag-contract');
 
 admin.initializeApp();
 
@@ -48,12 +49,16 @@ function getMessageImageEntriesForIndex(message) {
     ? message.thumbUrls : (message.thumbUrl ? [message.thumbUrl] : []);
   const tags = Array.isArray(message.imageTags) ? message.imageTags : [];
   const count = Math.max(urls.length, thumbs.length);
-  return Array.from({ length: count }, (_, index) => ({
-    index,
-    imageUrl: urls[index] || thumbs[index] || '',
-    thumbUrl: thumbs[index] || urls[index] || '',
-    tags: tags[index] || message.tags || ''
-  })).filter(entry => entry.imageUrl || entry.thumbUrl);
+  return Array.from({ length: count }, (_, index) => {
+    const hasEditableTags = Object.prototype.hasOwnProperty.call(tags, index);
+    return {
+      index,
+      imageUrl: urls[index] || thumbs[index] || '',
+      thumbUrl: thumbs[index] || urls[index] || '',
+      tags: hasEditableTags ? (tags[index] || '') : (message.tags || ''),
+      tagAuthority: hasEditableTags ? 'editable' : ''
+    };
+  }).filter(entry => entry.imageUrl || entry.thumbUrl);
 }
 
 function getDirectMediaTagKeyForIndex(url) {
@@ -80,8 +85,11 @@ function getDirectImageEntriesForIndex(message) {
     .filter(url => imageExtensions.test(url) && !uploaded.has(normalizePhotoAssetUrl(url)))
     .map((url, index) => {
       const tagKey = getDirectMediaTagKeyForIndex(url);
-      const tags = String(directTags[tagKey] || directTags[url] || directTags[normalizePhotoAssetUrl(url)] || '');
-      return { index, imageUrl: url, thumbUrl: url, tags, directMediaUrl: url };
+      const normalizedUrl = normalizePhotoAssetUrl(url);
+      const tagKeys = [tagKey, url, normalizedUrl];
+      const storedKey = tagKeys.find(key => Object.prototype.hasOwnProperty.call(directTags, key));
+      const tags = storedKey ? String(directTags[storedKey] || '') : '';
+      return { index, imageUrl: url, thumbUrl: url, tags, directMediaUrl: url, tagAuthority: storedKey ? 'editable' : '' };
     });
 }
 
@@ -147,7 +155,10 @@ function getPhotoIndexEntries(sourceType, sourceId, data) {
       full,
       thumb,
       timestamp: Number(photo?.createdAt || photo?.updatedAt || data.timestamp || data.updatedAt || data.createdAt || data.confirmedAt || 0),
-      tags: String(photo?.tags || (Array.isArray(data.imageTags) ? data.imageTags[imageIndex] : '') || ''),
+      tags: String(Object.prototype.hasOwnProperty.call(photo || {}, 'tags')
+        ? (photo.tags || '')
+        : ((Array.isArray(data.imageTags) ? data.imageTags[imageIndex] : '') || '')),
+      tagAuthority: String(photo?.tagAuthority || ''),
       text: String(data.text || data.content || data.body || context.text || '').slice(0, 1000),
       participantId: String(data.participantId || ''),
       source,
@@ -205,28 +216,6 @@ function selectPhotoIndexOwner(owners) {
     || Number(b.timestamp || 0) - Number(a.timestamp || 0))[0] || null;
 }
 
-function countPhotoIndexTagTokens(value) {
-  const tokens = Array.from(new Set(String(value || '').split(/[,\s#]+/).map(token => token.trim()).filter(Boolean)));
-  return tokens.length;
-}
-
-// Keep message/memo as the editable owner for identity fields, but never publish empty/partial
-// cached tags when another owner of the same asset (usually the meeting album copy) still holds
-// the fuller durable tag string saved before rebuild/denorm.
-function pickRichestPhotoIndexTags(owners, fallback = '') {
-  let best = String(fallback || '');
-  let bestCount = countPhotoIndexTagTokens(best);
-  (owners || []).forEach(owner => {
-    const tags = String(owner?.tags || '');
-    const count = countPhotoIndexTagTokens(tags);
-    if (count > bestCount) {
-      best = tags;
-      bestCount = count;
-    }
-  });
-  return best;
-}
-
 async function rebuildPhotoIndexForCalendarAdmin(calendarId, apply = false) {
   const db = admin.firestore();
   const root = db.collection('calendars').doc(`cal_${calendarId}`);
@@ -262,15 +251,17 @@ async function rebuildPhotoIndexForCalendarAdmin(calendarId, apply = false) {
       dataUrlRows += 1;
       dataUrlBytes += String(selected.full || '').length + String(selected.thumb || '').length;
     }
+    const tagState = pickCanonicalPhotoIndexTagState(owners, selected.tags, selected.sourceOwner);
     rows.push({
       ...selected,
       assetKey,
       legacyKeys,
       owners,
       commentCount,
-      tags: pickRichestPhotoIndexTags(owners, selected.tags),
+      tags: tagState.tags,
       tagCacheVersion: 2,
-      tagSourceOwner: selected.sourceOwner,
+      tagSourceOwner: tagState.sourceOwner,
+      tagAuthoritative: tagState.authoritative,
       updatedAt: Date.now()
     });
   });
@@ -352,15 +343,17 @@ async function syncCanonicalPhotoIndex(change, context, sourceType, idParam) {
     const legacyKeys = Array.from(new Set(owners.flatMap(owner => owner.legacyKeys || []))).slice(0, 40);
     const existingComments = commentSnapshot?.exists && Array.isArray(commentSnapshot.data()?.comments)
       ? commentSnapshot.data().comments.length : 0;
+    const tagState = pickCanonicalPhotoIndexTagState(owners, selected.tags, selected.sourceOwner);
     transaction.set(ref, {
       ...selected,
       assetKey,
       legacyKeys,
       owners,
       commentCount: Math.max(0, Number(existing.commentCount || 0), existingComments),
-      tags: pickRichestPhotoIndexTags(owners, selected.tags),
+      tags: tagState.tags,
       tagCacheVersion: 2,
-      tagSourceOwner: selected.sourceOwner,
+      tagSourceOwner: tagState.sourceOwner,
+      tagAuthoritative: tagState.authoritative,
       updatedAt: Date.now()
     });
   })));
