@@ -2640,6 +2640,94 @@ export function ContentView({
       .finally(() => setIsLocating(false));
   };
 
+  // Cross-tab search badges: prefetch each feed once (module-level cache below) and score with
+  // the same lifecycle/region/search pipeline the mounted list uses, so a query like 「콧구멍」
+  // can fade empty tabs, badge the ones with hits, and auto-jump off an empty default tab.
+  const cultureFeedCacheRef = React.useRef({});
+  const [searchTabCounts, setSearchTabCounts] = React.useState(null);
+  const contentTabFeedDefs = React.useMemo(() => ([
+    { value: 'festival', url: CULTURE_FESTIVALS_URL, category: 'festival', extras: festivalExtraItems },
+    { value: 'culture', url: CULTURE_PERFORMANCES_URL, category: 'event', extras: performanceExtraItems },
+    { value: 'sports', url: CULTURE_SPORTS_URL, category: 'sports', extras: sportsExtraItems },
+    { value: 'movies', url: CULTURE_MOVIES_URL, category: 'movie', extras: movieExtraItems }
+  ]), [festivalExtraItems, performanceExtraItems, sportsExtraItems, movieExtraItems]);
+
+  React.useEffect(() => {
+    const needle = (searchQuery || '').trim().toLowerCase();
+    if (!needle) {
+      setSearchTabCounts(null);
+      return undefined;
+    }
+    let cancelled = false;
+    (async () => {
+      const next = {};
+      for (const tab of contentTabFeedDefs) {
+        if (!Object.prototype.hasOwnProperty.call(cultureFeedCacheRef.current, tab.url)) {
+          try {
+            const res = await fetch(tab.url);
+            if (!res.ok) throw new Error(`status ${res.status}`);
+            const data = await res.json();
+            cultureFeedCacheRef.current[tab.url] = Array.isArray(data?.items) ? data.items : [];
+          } catch (err) {
+            console.warn('Content search feed prefetch failed:', tab.value, err);
+            cultureFeedCacheRef.current[tab.url] = [];
+          }
+        }
+        if (cancelled) return;
+        next[tab.value] = countCultureSearchMatches(
+          cultureFeedCacheRef.current[tab.url],
+          tab.extras,
+          tab.category,
+          regionSelections,
+          needle
+        );
+      }
+      if (!cancelled) setSearchTabCounts(next);
+    })();
+    return () => { cancelled = true; };
+  }, [searchQuery, regionSelections, contentTabFeedDefs]);
+
+  // When the current/default tab has 0 hits but another tab has results, jump to the first
+  // non-empty tab (festival → culture → sports → movies) once per query. Do not re-bounce if
+  // the user later taps a faded empty tab on purpose.
+  const autoJumpSearchNeedleRef = React.useRef('');
+  React.useEffect(() => {
+    if (!searchTabCounts) {
+      autoJumpSearchNeedleRef.current = '';
+      return;
+    }
+    const needle = (searchQuery || '').trim().toLowerCase();
+    if (!needle) return;
+    if ((searchTabCounts[contentTab] || 0) > 0) {
+      autoJumpSearchNeedleRef.current = needle;
+      return;
+    }
+    if (autoJumpSearchNeedleRef.current === needle) return;
+    const firstHit = ['festival', 'culture', 'sports', 'movies'].find(key => (searchTabCounts[key] || 0) > 0);
+    if (firstHit && firstHit !== contentTab) {
+      autoJumpSearchNeedleRef.current = needle;
+      changeContentTab(firstHit);
+    }
+  }, [searchTabCounts, contentTab, searchQuery]);
+
+  const contentTabOptions = React.useMemo(() => {
+    const base = [
+      { value: 'festival', label: '지역축제' },
+      { value: 'culture', label: '문화행사' },
+      { value: 'sports', label: '스포츠' },
+      { value: 'movies', label: '영화' }
+    ];
+    if (!searchTabCounts) return base;
+    return base.map(opt => {
+      const count = searchTabCounts[opt.value] || 0;
+      return {
+        ...opt,
+        badge: count > 0 ? count : undefined,
+        faded: count === 0
+      };
+    });
+  }, [searchTabCounts]);
+
   const { isHeaderVisible, onScroll: handleContentScroll } = useScrollHideHeader();
   React.useEffect(() => {
     if (typeof document === 'undefined') return undefined;
@@ -2734,12 +2822,7 @@ export function ContentView({
       ariaLabel: "컨텐츠 탭",
       value: contentTab,
       onChange: changeContentTab,
-      options: [
-        { value: 'festival', label: '지역축제' },
-        { value: 'culture', label: '문화행사' },
-        { value: 'sports', label: '스포츠' },
-        { value: 'movies', label: '영화' }
-      ]
+      options: contentTabOptions
     }),
     /*#__PURE__*/React.createElement("div", {
       className: "region-filter-trigger-row"
@@ -3220,6 +3303,46 @@ function cultureItemDay(item) {
 function cultureItemEndDay(item) {
   const end = item?.endDate || item?.releaseDate || item?.startDate;
   return /^\d{4}-\d{2}-\d{2}$/.test(String(end || '')) ? String(end) : cultureItemDay(item);
+}
+
+// Shared by ContentView tab badges and CulturePerformancesTab's own list filter so the tab
+// count badge and the "전체 N" chip never disagree on the same query.
+function cultureItemMatchesSearch(item, needle) {
+  if (!needle) return true;
+  const haystack = [item?.title, item?.venue, item?.address]
+    .filter(Boolean).join(' ').toLowerCase();
+  return haystack.includes(needle);
+}
+
+function filterCultureItemsByRegion(items, regionSelections) {
+  if (!regionSelections || regionSelections.length === 0) return items || [];
+  return (items || []).filter(item => regionSelections.some(sel => {
+    if (sel.sido && item.region !== sel.sido) return false;
+    if (sel.gugun && getCultureItemDistrict(item) !== sel.gugun) return false;
+    return true;
+  }));
+}
+
+// Crawled snapshot + same-titled extras de-dupe (orphans omitted -- they only exist after the
+// active tab has loaded anniversaries against that feed). Used for cross-tab search badges so
+// ContentView can score every tab without mounting four CulturePerformancesTab instances.
+function mergeCultureCrawledWithExtras(crawledItems, extraItems) {
+  const crawled = Array.isArray(crawledItems) ? crawledItems.filter(Boolean) : [];
+  const crawledTitles = new Set(crawled.map(i => String(i.title || '').trim()).filter(Boolean));
+  const extras = (Array.isArray(extraItems) ? extraItems.filter(Boolean) : [])
+    .filter(e => !crawledTitles.has(String(e.title || '').trim()))
+    .map(e => ({ ...e, isCustomRegistered: true }));
+  const seen = new Set(extras.map(e => e && e.id).filter(Boolean));
+  return [...extras, ...crawled.filter(i => i && i.id && !seen.has(i.id))];
+}
+
+function countCultureSearchMatches(crawledItems, extraItems, anniversaryCategory, regionSelections, searchQuery) {
+  const needle = String(searchQuery || '').trim().toLowerCase();
+  if (!needle) return 0;
+  const merged = mergeCultureCrawledWithExtras(crawledItems, extraItems);
+  const lifecycle = filterAndSortCultureItems(merged, anniversaryCategory);
+  const regionFiltered = filterCultureItemsByRegion(lifecycle, regionSelections);
+  return regionFiltered.filter(item => cultureItemMatchesSearch(item, needle)).length;
 }
 
 function filterAndSortCultureItems(items, category) {
@@ -3965,14 +4088,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
   // Multi-select OR: with no selections at all, every item passes (전국); with one or more,
   // an item matches if it satisfies ANY saved { sido, gugun } pair (gugun '' means that 시/도 전체).
   const lifecycleItems = filterAndSortCultureItems(mergedItems, anniversaryCategory);
-  const regionFilteredItems = lifecycleItems.filter(item => {
-    if (!regionSelections || regionSelections.length === 0) return true;
-    return regionSelections.some(sel => {
-      if (sel.sido && item.region !== sel.sido) return false;
-      if (sel.gugun && getCultureItemDistrict(item) !== sel.gugun) return false;
-      return true;
-    });
-  });
+  const regionFilteredItems = filterCultureItemsByRegion(lifecycleItems, regionSelections);
 
   if (regionFilteredItems.length === 0) {
     return /*#__PURE__*/React.createElement("div", {
@@ -3981,8 +4097,10 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
   }
 
   const searchNeedle = (searchQuery || '').trim().toLowerCase();
+  // Title + venue + address (same fields ContentView tab badges score) so a query like
+  // 「오류아트홀」 or 「콧구멍」 can't land a tab badge that the mounted list then hides.
   const searchFilteredItems = searchNeedle
-    ? regionFilteredItems.filter(item => String(item?.title || '').toLowerCase().includes(searchNeedle))
+    ? regionFilteredItems.filter(item => cultureItemMatchesSearch(item, searchNeedle))
     : regionFilteredItems;
 
   if (searchFilteredItems.length === 0) {

@@ -291,7 +291,12 @@ async function boot() {
       // same session found window.GATHER_UI_COMPONENTS.ChatParticipantSheet unset and silently
       // rendered nothing. Loading it here unconditionally, alongside every other always-on
       // shared UI module, makes it available regardless of which view boots first.
-      import('./ui/ui-chat-sheets.js')
+      import('./ui/ui-chat-sheets.js'),
+      // renderChatFileAttachments / FileAttachmentCard used to load only via loadChatUi().
+      // The main-screen chat preview (CommentsSection) calls renderChatMessageBody which needs
+      // those components for file-only bubbles (PDFs etc.); without this eager import the
+      // preview showed name+timestamp and an empty bubble until the user opened full chat.
+      import('./ui/ui-chat-files.js')
     ]);
     // Admin dashboard/modals are normally loaded only for a direct admin route. The main
     // screen can also request AdminModal from its side menu; that path uses loadAdminUi above.
