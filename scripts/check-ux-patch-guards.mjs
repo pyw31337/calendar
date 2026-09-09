@@ -49,17 +49,17 @@ assert.match(gallery, /isNowShowing/);
 assert.match(gallery, /localeCompare\(bDay\)/);
 
 const chatRoom = fs.readFileSync(path.join(root, "src/ui/ui-chat-room.js"), "utf8");
-assert.doesNotMatch(chatRoom, /title: \"사진 첨부\"/);
-assert.match(chatRoom, /title: \"파일 업로드\"/);
+assert.doesNotMatch(chatRoom, /title: "사진 첨부"/);
+assert.match(chatRoom, /title: "파일 업로드"/);
 assert.match(chatRoom, /lucide-paperclip/);
 assert.doesNotMatch(chatRoom, /fileInputRefChat/);
 
 const editModal = fs.readFileSync(path.join(root, "src/ui/ui-calendar-core.js"), "utf8");
-assert.doesNotMatch(editModal, /title: \"사진 첨부\"/);
-assert.match(editModal, /title: \"파일 업로드\"/);
+assert.doesNotMatch(editModal, /title: "사진 첨부"/);
+assert.match(editModal, /title: "파일 업로드"/);
 
 const files = fs.readFileSync(path.join(root, "src/ui/ui-chat-files.js"), "utf8");
-assert.match(files, /overflowWrap: \"anywhere\"/);
+assert.match(files, /overflowWrap: "anywhere"/);
 
 const lightbox = fs.readFileSync(path.join(root, "src/ui/ui-lightbox.js"), "utf8");
 assert.match(lightbox, /keepTagFocusRef/);
