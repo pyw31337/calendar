@@ -3,12 +3,14 @@
 // keeps currently-running/upcoming plus a 30-day post-end grace window, and writes normalized snapshots into this
 // repo's own public-vite/data/ so the calendar app never depends on a live cross-origin fetch at
 // runtime:
-//   - culture-performances.json (문화공연 탭): source 'culture-portal' + 'kopis', merged (see
-//     mergeDuplicates below) since both independently list many of the same shows under
-//     mismatched venue-name formatting with no shared id to join on directly. KOPIS carries far
-//     more currently-active listings than the 문화포털 API alone (~1400-1800 vs ~90 on a typical
-//     day) with near-complete region/district coverage, so both are kept (merged where they
-//     overlap) rather than picking one.
+//   - culture-performances.json (문화공연 탭): sources culture-portal + kopis + interpark +
+//     timeticket + yes24-exclusive, merged (see mergeDuplicates below) since ticketing portals
+//     and KOPIS/문화포털 independently list many of the same shows under mismatched venue-name
+//     formatting with no shared id to join on directly. KOPIS + Interpark together carry far
+//     more currently-active theater/performance listings than 문화포털 alone, with near-complete
+//     region/district coverage, so all ticket/portal sources are kept (merged where they
+//     overlap) rather than picking one. Class/tourism/sports/movie buckets stay on their own
+//     feeds -- this file is the 문화행사 tab only.
 //   - culture-festivals.json (지역축제 탭): source 'festival' -- Culture Flow already aggregates
 //     VisitKorea/문체부/VisitSeoul/경기관광공사 등 지역축제 sources into this one merged bucket, so
 //     this repo doesn't need its own scrapers for any of those sites.
@@ -31,12 +33,30 @@ const DATA_DIR = path.resolve(__dirname, '../public-vite/data');
 // 종목 모두 raw.genre를 baseball/basketball/volleyball/soccer/handball 중 하나로 일관되게 채운다
 // (Culture Flow scripts/generate-performance-json.ts의 GENRE_LABELS/FALLBACK_IMAGES와 동일한 값).
 const SPORTS_GENRES = new Set(['baseball', 'basketball', 'volleyball', 'soccer', 'handball']);
+// 문화행사 탭: Culture Flow ticketing/portal sources that carry 연극·뮤지컬·콘서트·클래식 등.
+// Interpark/TimeTicket/YES24 were historically omitted (early sync only kept culture-portal+kopis),
+// which silently dropped ~1k+ live ticket listings even when upstream already had them.
+const PERFORMANCE_SOURCES = new Set([
+  'culture-portal',
+  'kopis',
+  'interpark',
+  'timeticket',
+  'yes24-exclusive'
+]);
 const FEEDS = [
-  { file: 'culture-performances.json', sources: new Set(['culture-portal', 'kopis']), label: 'performances' },
+  { file: 'culture-performances.json', sources: PERFORMANCE_SOURCES, label: 'performances' },
   { file: 'culture-festivals.json', sources: new Set(['festival']), label: 'festivals' },
   { file: 'culture-sports.json', genres: SPORTS_GENRES, label: 'sports' },
   { file: 'culture-movies.json', sources: new Set(['movie']), label: 'movies', keepHistorical: true }
 ];
+
+
+// TimeTicket (and similar) university-ro / open-ended shows often ship date="OPEN RUN"
+// with no YYYY.MM.DD tokens. Treat those as currently-visible open-ended listings rather
+// than dropping them in isVisible (which previously required a parseable end/start).
+function isOpenRunDate(raw) {
+  return /OPEN\s*RUN|상시\s*공연|상설\s*공연|연중무휴|기간\s*미정/i.test(String(raw || '').trim());
+}
 
 function parseDateRange(raw) {
   // Culture Flow date strings look like "2026.08.28 (금) ~ 2027.02.09 (화)" or a single
@@ -55,12 +75,15 @@ function addDaysIso(iso, days) {
   return d.toISOString().slice(0, 10);
 }
 
-function isVisible(endDate, startDate, todayIso) {
+function isVisible(endDate, startDate, todayIso, { openEnded = false } = {}) {
   // Keep shared-pool items through endDate + 30 days. The calendar UI hides past portal
   // festival/performance items from lists immediately, while this grace window keeps the JSON
   // available for anniversary badge deep-links / cultureSnapshot orphans. After 30 days past
   // end, drop from the service pool. Calendar-owned custom cards and anniversary cultureSnapshot
   // docs are never written here -- they live in Firestore per calendar.
+  // Open-ended / OPEN RUN listings have no parseable end date by design -- keep them while
+  // upstream still publishes them (Culture Flow collect is the lifecycle owner for those).
+  if (openEnded) return true;
   const effectiveEnd = endDate || startDate;
   if (!effectiveEnd) return false;
   const retainUntil = addDaysIso(effectiveEnd, 30);
@@ -115,16 +138,19 @@ async function enrichMovieFromNaver(item) {
 }
 
 function normalizeItem(raw) {
+  const openRun = isOpenRunDate(raw.date);
   const { startDate, endDate } = parseDateRange(raw.date);
   const movie = raw.genre === 'movie';
-  const normalizedEndDate = movie ? null : endDate;
+  const openEnded = movie || openRun;
+  const normalizedStartDate = openRun ? null : startDate;
+  const normalizedEndDate = openEnded ? null : endDate;
   return {
-    startDate, endDate: normalizedEndDate,
+    startDate: normalizedStartDate, endDate: normalizedEndDate, openEnded,
     item: {
       id: String(raw.id || `${raw.title}::${raw.date}`),
       title: String(raw.title),
       dateLabel: String(raw.date),
-      startDate,
+      startDate: normalizedStartDate,
       endDate: normalizedEndDate,
       venue: raw.venue || raw.venueKey || '',
       address: raw.address || '',
@@ -151,7 +177,7 @@ function normalizeItem(raw) {
       homeTeamLogo: resolveImageUrl(raw.homeTeamLogo),
       awayTeamLogo: resolveImageUrl(raw.awayTeamLogo)
       ,releaseDate: movie ? (raw.dateRaw ? String(raw.dateRaw).replace(/^(\d{4})(\d{2})(\d{2}).*$/, '$1-$2-$3') : startDate) : '',
-      isOpenEnded: movie,
+      isOpenEnded: openEnded,
       director: raw.director || '',
       cast: Array.isArray(raw.cast) ? raw.cast : [],
       ageRating: raw.ageRating || '',
@@ -201,8 +227,9 @@ function pickRicher(a, b) {
   return bv.length > av.length ? b : a;
 }
 
-// culture-portal and kopis independently list many of the same show with no shared id, under
-// venue-name formatting that never matches exactly. Groups items by (normalized title, calendar
+// culture-portal / kopis / interpark / timeticket / yes24-exclusive independently list many of
+// the same show with no shared id, under venue-name formatting that never matches exactly.
+// Groups items by (normalized title, calendar
 // month of start date) -- month bucketing keeps groups small on a feed this size (1000+ items)
 // without needing an O(n^2) scan of the whole feed -- then within each group merges any pair
 // whose normalized venue matches AND whose date ranges overlap. Deliberately conservative: title
@@ -252,7 +279,7 @@ function mergeDuplicates(items) {
       merged.push(base);
     }
   }
-  if (mergedCount > 0) console.log(`[sync-culture-performances] merged ${mergedCount} cross-source duplicate(s) (culture-portal <-> kopis)`);
+  if (mergedCount > 0) console.log(`[sync-culture-performances] merged ${mergedCount} cross-source duplicate(s) across performance ticket/portal sources`);
   return merged;
 }
 
@@ -307,8 +334,8 @@ async function main() {
       const matches = feed.genres ? feed.genres.has(raw.genre) : feed.sources.has(raw.source);
       if (!matches) continue;
       if (REQUIRED_FIELDS.some(f => !raw[f])) continue;
-      const { startDate, endDate, item } = normalizeItem(raw);
-      if (!feed.keepHistorical && !isVisible(endDate, startDate, todayIso)) continue;
+      const { startDate, endDate, openEnded, item } = normalizeItem(raw);
+      if (!feed.keepHistorical && !isVisible(endDate, startDate, todayIso, { openEnded })) continue;
       normalized.push(item);
     }
     if (feed.sources && feed.sources.size > 1) normalized = mergeDuplicates(normalized);
