@@ -335,7 +335,10 @@ export function useGalleryPhotoIndex({ React, calendarId, activeView, projectId,
       return total > 0;
     } catch (error) {
       console.warn('photo index page load failed:', error);
-      setState(previous => ({ ...previous, status: 'fallback', loading: false }));
+      // A network/read failure is not evidence that this calendar has no canonical index.
+      // Keep it distinct from the genuine zero-row fallback so the gallery never presents a
+      // handful of locally hydrated photos as the complete result.
+      setState(previous => ({ ...previous, status: 'error', loading: false }));
       return false;
     }
   }, [calendarId, projectId, decodeDocument]);

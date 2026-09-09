@@ -316,6 +316,8 @@ assert(!/needsPlacesData = React\.useMemo\(\s*\(\) => activeView === 'calendar'/
 assert(!/needsCustomCultureData = React\.useMemo\(\s*\(\) => activeView === 'history' \|\| activeView === 'content'/.test(appMainSource), 'custom contents must stay subscribed beyond history/content');
 assert(!/if \(!activeCalId \|\| !needsPhotoCommentCounts\) return;\s*setPreloadedPhotoComments\(\{\}\);/.test(appMainSource), 'photo comment counts must not wipe to empty on every view remount');
 assert(appMainSource.includes('useGalleryPhotoIndex'), 'gallery must consume the canonical server-maintained photo index');
+assert(appMainSource.includes("galleryPhotoIndex.status === 'fallback' ? null : []"), 'gallery must not present a partial local archive while the canonical index is loading or failed');
+assert(chatGallerySource.includes('사진 목록 다시 불러오기'), 'failed canonical gallery reads must expose an explicit retry action');
 assert(chatGallerySource.includes('Number(photo.commentCount || 0)'), 'indexed comment counts must paint thumbnail badges without loading comment bodies');
 assert(chatGallerySource.includes('gallery-pagination'), 'large galleries must render bounded 100-photo pagination');
 assert(chatGallerySource.includes('getPaginationWindow'), 'gallery pagination must use the shared centered window helper');
@@ -330,6 +332,7 @@ assert(lightboxSource.includes('댓글 다시 불러오기'), 'failed lightbox c
 assert(!summaryGallerySource.includes('const fallbackDate = entryDateStr(entry)'), 'memories must not treat upload time as schedule membership');
 const dateModalSource = fs.readFileSync(new URL('../src/ui/ui-date-modal.js', import.meta.url), 'utf8');
 const photoIndexSource = fs.readFileSync(new URL('../src/core/photo-index.js', import.meta.url), 'utf8');
+assert(photoIndexSource.includes("status: 'error'"), 'photo index request failures must stay distinct from a genuine empty-index fallback');
 assert(appMainSource.includes('rememberPhotoIndexTags'), 'tag saves must remember photoIndex tags across CF denorm lag');
 assert(photoIndexSource.includes('applyStickyPhotoIndexTags'), 'photoIndex loads must preserve session sticky tags over empty CF rows');
 assert(photoIndexSource.includes('normalizePhotoIndexTagSet'), 'sticky tags must compare normalized tag sets, not merely non-empty CF rows');
@@ -600,6 +603,7 @@ assert(chatFilesUi.includes('DocumentLightbox') && chatFilesUi.includes('FileAtt
 assert(/async function fetchRecentChatMessages[\s\S]{0,2200}?where\('uploadSource', '==', 'chat'\)/.test(firebaseServicesScript), 'recent chat reads must be scoped before applying their bounded limit');
 assert(/function subscribeMessages[\s\S]{0,1400}?options\.where[\s\S]{0,1400}?q = q\.where/.test(firebaseServicesScript), 'message subscriptions must support an explicit channel scope');
 assert(/async function fetchRecentGalleryMessages[\s\S]{0,1800}?collection\('messages'\)[\s\S]{0,300}?orderBy\('timestamp'/.test(firebaseServicesScript), 'gallery preview must retain its independent unscoped media read');
+assert(appMainSource.includes('fetchRecentGalleryMessages(activeCalId, 18)'), 'desktop main gallery preview must hydrate enough media for its 18-thumbnail cap');
 assert(!/async function fetchOlderChatMessages[\s\S]{0,3000}?where\('uploadSource'/.test(firebaseServicesScript), 'fetchOlderChatMessages must stay unscoped so gallery/meeting uploads remain visible to every other consumer of chatMessages');
 assert(appMainSource.includes('function isChatRenderableMessage') && appMainSource.includes('visibleChatMessages'), 'hiding non-chat uploads from the chat bubble list must happen at the render layer, not the query layer');
 assert(firebaseServicesScript.includes('FIRESTORE_REST_TIMEOUT_MS = 9000') && firebaseServicesScript.includes('fetchWithTimeout') && firebaseServicesScript.includes('withSdkTimeout'), 'Firebase SDK and REST reads must have bounded timeouts');

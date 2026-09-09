@@ -345,6 +345,7 @@ export function ChatGalleryModal({
   onDeletePhoto = null,
   photoCommentCounts = {},
   indexedPhotos = null,
+  indexedPhotoStatus = 'idle',
   indexedPhotoTotal = null,
   indexedPhotoPage = 1,
   indexedPhotoLoading = false,
@@ -1837,6 +1838,23 @@ export function ChatGalleryModal({
     )
   );
   const renderGalleryContent = () => {
+    if (activeTab === 'photos' && usingPhotoIndex && indexedPhotoStatus !== 'ready') {
+      const failed = indexedPhotoStatus === 'error';
+      return /*#__PURE__*/React.createElement(React.Fragment, null,
+        renderPhotoListHeader(),
+        /*#__PURE__*/React.createElement("div", {
+          role: failed ? 'alert' : 'status',
+          style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: 'var(--font-size-base)' }
+        }, failed
+          ? /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              className: "btn btn-action btn-action-outline",
+              onClick: () => { if (typeof onIndexedPhotoPageChange === 'function') void onIndexedPhotoPageChange(indexedPhotoPage || 1, { force: true }); },
+              style: { minHeight: '44px', padding: '0 16px', borderRadius: 'var(--radius-md)', fontWeight: 800 }
+            }, "사진 목록 다시 불러오기")
+          : "사진 목록을 불러오는 중…")
+      );
+    }
     if (galleryViewMode === 'date') {
       const isLinkMode = activeTab === 'links';
       const monthExhausted = !isLinkMode && exhaustedGalleryMonthKey === galleryMonthKey;

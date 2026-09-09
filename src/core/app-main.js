@@ -2978,11 +2978,11 @@ function CalendarApp() {
     if (!activeCalId || (activeView !== 'calendar' && activeView !== 'gallery') || isInitialDataLoading) return;
     let cancelled = false;
     (async () => {
-      // Keeps paging through history until at least 12 photos have been found (matching the
-      // widget's own 12-thumbnail cap below), instead of grabbing the newest 60 messages
+      // Keeps paging through history until at least 18 photos have been found (matching the
+      // desktop widget cap; tablet/mobile still render the newest 9), instead of grabbing the newest 60 messages
       // regardless of content -- a text-heavy recent stretch of chat used to starve the main
       // screen's gallery widget of thumbnails even when far more photos existed further back.
-      const list = await fetchRecentGalleryMessages(activeCalId, 12);
+      const list = await fetchRecentGalleryMessages(activeCalId, 18);
       if (!cancelled && Array.isArray(list)) setGalleryPreviewMessages(list);
     })();
     return () => { cancelled = true; };
@@ -7355,7 +7355,13 @@ function CalendarApp() {
         setActiveLightbox: setActiveLightbox,
         onDeletePhoto: handleDeletePhoto,
         photoCommentCounts: photoCommentCounts,
-        indexedPhotos: galleryPhotoIndex.status === 'ready' ? galleryPhotoIndex.items : null,
+        // Before the canonical index resolves, pass an explicit empty indexed set instead of
+        // the partially hydrated chat/memo archive. Presenting that fallback as a final gallery
+        // is what produced calendar-specific "4 photos" screens on transient index failures.
+        indexedPhotos: galleryPhotoIndex.status === 'ready'
+          ? galleryPhotoIndex.items
+          : (galleryPhotoIndex.status === 'fallback' ? null : []),
+        indexedPhotoStatus: galleryPhotoIndex.status,
         indexedPhotoTotal: galleryPhotoIndex.status === 'ready' ? galleryPhotoIndex.total : null,
         indexedPhotoPage: galleryPhotoIndex.page,
         indexedPhotoLoading: galleryPhotoIndex.loading,

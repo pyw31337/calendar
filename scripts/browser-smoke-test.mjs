@@ -83,6 +83,13 @@ function isIgnorableConsoleError(text, url = '') {
     knownExternalWarningCount += 1;
     return true;
   }
+  // Google faviconV2 is a best-effort decoration for externally shared links. Some source
+  // sites have no resolvable icon and correctly return 404; it is unrelated to an app asset or
+  // gallery image and must not turn an otherwise healthy navigation smoke red.
+  if (/https:\/\/t\d+\.gstatic\.com\/faviconV2/.test(url) && text.includes('status of 404')) {
+    knownExternalWarningCount += 1;
+    return true;
+  }
   if (BROWSER_NAME === 'webkit' && url.includes('gstatic.com/youtube/') && text.includes('access control checks')) {
     knownExternalWarningCount += 1;
     return true;
