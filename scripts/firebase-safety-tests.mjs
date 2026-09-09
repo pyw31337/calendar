@@ -246,9 +246,8 @@ assert(photoIndexSource.includes('applyStickyPhotoIndexTags'), 'photoIndex loads
 assert(photoIndexSource.includes('normalizePhotoIndexTagSet'), 'sticky tags must compare normalized tag sets, not merely non-empty CF rows');
 assert(photoIndexSource.includes('peekStickyPhotoIndexTags'), 'tag saves must poll until sticky photoIndex tags clear');
 assert(photoIndexSource.includes('schedulePhotoIndexTagReload'), 'photoIndex must own delayed reload polling after tag saves');
-assert(photoIndexSource.includes('mergePhotoIndexTags'), 'photoIndex force reload must not wipe locally patched tags');
-assert(photoIndexSource.includes('reconcilePhotoIndexTagItems'), 'photoIndex must reconcile sticky against raw CF tags before merge');
-assert(photoIndexSource.includes('preferRicherPhotoIndexTags'), 'photoIndex merge must prefer richer previous tags over partial CF denorm');
+assert(photoIndexSource.includes('reconcilePhotoIndexTagItems'), 'photoIndex must reconcile verified sticky tags against raw CF tags');
+assert(photoIndexSource.includes('hasStickyPhotoIndexTags'), 'an intentionally empty tag set must remain a pending CF override');
 assert(appMainSource.includes('schedulePhotoIndexTagReload'), 'delayed photoIndex reload must stop once sticky tags match the server');
 assert(appMainSource.includes('patchGalleryArchiveMessage'), 'tag saves must patch the gallery full-chat archive snapshot');
 assert(appMainSource.includes('patchGalleryArchiveMemo'), 'memo tag saves must patch the gallery full-memo archive snapshot');
@@ -273,6 +272,10 @@ assert(chatGallerySource.includes("source === 'anniversary'"), 'gallery 사진 t
 const functionsIndexSource = fs.readFileSync(new URL('../functions/index.js', import.meta.url), 'utf8');
 assert(functionsIndexSource.includes('Content posters (movie/sports anniversaries)'), 'CF photoIndex must stop indexing anniversary/content posters');
 assert(functionsIndexSource.includes('exports.rebuildPhotoIndex'), 'CF must expose admin rebuildPhotoIndex for one-calendar gallery backfill');
+assert(functionsIndexSource.includes('photoIndexOwnerRank'), 'CF photoIndex must rank editable source documents deterministically');
+assert(functionsIndexSource.includes("sourceOwner.startsWith('message:')"), 'meeting uploads must cache source-message tags ahead of album copies');
+assert(functionsIndexSource.includes('tagCacheVersion: 2'), 'photoIndex rows must expose the canonical tag cache contract version');
+assert(functionsIndexSource.includes('tagSourceOwner: selected.sourceOwner'), 'photoIndex rows must identify which source supplied cached tags');
 const photoCommentsSource = fs.readFileSync(new URL('../src/core/photo-comments.js', import.meta.url), 'utf8');
 assert(photoIndexSource.includes('patchItems'), 'gallery photo index must support local tag patches after save');
 assert(photoCommentsSource.includes('requirePersisted: true'), 'photo comment module must require durable writes');
@@ -1138,19 +1141,10 @@ console.log('Firebase-only calendar safety tests passed');
   const {
     rememberPhotoIndexTags,
     peekStickyPhotoIndexTags,
+    hasStickyPhotoIndexTags,
     reconcilePhotoIndexTagItems,
-    preferRicherPhotoIndexTags,
     normalizePhotoIndexTagSet
   } = await import('../src/core/photo-index.js');
-
-  assert(
-    preferRicherPhotoIndexTags('260908 소고기고추볶음', '260908') === '260908 소고기고추볶음',
-    'partial CF denorm must not beat a fuller previous tag patch'
-  );
-  assert(
-    preferRicherPhotoIndexTags('260908', '260908 소고기고추볶음') === '260908 소고기고추볶음',
-    'richer CF catch-up must win over a smaller previous patch'
-  );
   assert(
     normalizePhotoIndexTagSet('#260908 #소고기고추볶음') === normalizePhotoIndexTagSet('소고기고추볶음 260908'),
     'tag set normalize must ignore # and order'
@@ -1179,7 +1173,12 @@ console.log('Firebase-only calendar safety tests passed');
   // Full CF catch-up clears sticky.
   const afterFull = reconcilePhotoIndexTagItems(calId, afterPartial, [{ ...photo, tags: '#260908 #소고기고추볶음' }]);
   assert(normalizePhotoIndexTagSet(afterFull[0]?.tags) === normalizePhotoIndexTagSet(fullTags), 'full CF catch-up must keep full tag set');
-  assert(peekStickyPhotoIndexTags(calId, photo) === '', 'full CF catch-up must clear sticky once raw tags match');
+  assert(!hasStickyPhotoIndexTags(calId, photo), 'full CF catch-up must clear sticky once raw tags match');
+
+  // With no local pending save, the latest server value wins even if it has fewer tags. This is
+  // how edits made in another browser/device propagate instead of being resurrected locally.
+  const remoteReduced = reconcilePhotoIndexTagItems(calId, afterFull, [{ ...photo, tags: '260908' }]);
+  assert(String(remoteReduced[0]?.tags || '') === '260908', 'non-pending server tag removals must remain authoritative');
 
   // Intentional trash-delete: sticky holds reduced set while CF still has the old fuller denorm.
   const reduced = '260908';
@@ -1190,5 +1189,16 @@ console.log('Firebase-only calendar safety tests passed');
     [{ ...photo, tags: fullTags }]
   );
   assert(String(afterReduce[0]?.tags || '') === reduced, 'trash-deleted reduced tags must survive reopen while CF lags');
-}
 
+  // Removing the final tag used to delete the sticky map entry itself. A stale index reload then
+  // restored every old tag even though the source write had succeeded.
+  const emptyCalId = `tag-empty-${Date.now()}`;
+  rememberPhotoIndexTags(emptyCalId, [{ ...photo, tags: '' }]);
+  assert(hasStickyPhotoIndexTags(emptyCalId, photo), 'empty verified tag saves must remain pending');
+  const afterDeleteAllLag = reconcilePhotoIndexTagItems(emptyCalId, [{ ...photo, tags: fullTags }], [{ ...photo, tags: fullTags }]);
+  assert(String(afterDeleteAllLag[0]?.tags || '') === '', 'delete-all must hide stale CF tags while denorm lags');
+  assert(hasStickyPhotoIndexTags(emptyCalId, photo), 'delete-all sticky must remain until raw CF is empty');
+  const afterDeleteAllSync = reconcilePhotoIndexTagItems(emptyCalId, afterDeleteAllLag, [{ ...photo, tags: '' }]);
+  assert(String(afterDeleteAllSync[0]?.tags || '') === '', 'delete-all must stay empty after CF catches up');
+  assert(!hasStickyPhotoIndexTags(emptyCalId, photo), 'delete-all sticky must clear only after raw CF catches up');
+}

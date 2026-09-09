@@ -190,8 +190,9 @@ export function rememberPhotoIndexTags(calendarId, photos) {
   photos.forEach(photo => {
     const tags = String(photo?.tags || '');
     photoIndexTagIdentityKeys(photo).forEach(key => {
-      if (tags) sticky.set(key, tags);
-      else sticky.delete(key);
+      // Empty is a real, verified user choice (delete every tag), not "no override".
+      // Keep it pending until the raw CF index also becomes empty or stale tags can reappear.
+      sticky.set(key, tags);
     });
   });
 }
@@ -203,6 +204,12 @@ export function peekStickyPhotoIndexTags(calendarId, photo = {}) {
     if (sticky.has(key)) return String(sticky.get(key) || '');
   }
   return '';
+}
+
+export function hasStickyPhotoIndexTags(calendarId, photo = {}) {
+  const sticky = stickyPhotoTagsByCalendar.get(calendarId);
+  if (!sticky || sticky.size === 0) return false;
+  return photoIndexTagIdentityKeys(photo).some(key => sticky.has(key));
 }
 
 // After a verified message/memo tag write, poll force-reload until sticky clears (CF denorm
@@ -219,7 +226,7 @@ export function schedulePhotoIndexTagReload(galleryPhotoIndex, calendarId, stick
     attempts += 1;
     void Promise.resolve(galleryPhotoIndex.loadPage(page, { force: true })).finally(() => {
       if (attempts >= maxAttempts) return;
-      if (!peekStickyPhotoIndexTags(calendarId, stickyProbe)) return;
+      if (!hasStickyPhotoIndexTags(calendarId, stickyProbe)) return;
       window.setTimeout(poll, retryDelayMs);
     });
   };
@@ -227,26 +234,6 @@ export function schedulePhotoIndexTagReload(galleryPhotoIndex, calendarId, stick
 }
 
 
-
-export function photoIndexTagTokenSet(value) {
-  const normalized = normalizePhotoIndexTagSet(value);
-  return normalized ? new Set(normalized.split(' ')) : new Set();
-}
-
-// Prefer the richer verified tag set. Partial CF denorm (e.g. only #260908) must not beat a
-// fuller previous patch / message save; intentional deletes rely on sticky until CF catches up.
-export function preferRicherPhotoIndexTags(previousTags, nextTags) {
-  const prev = String(previousTags || '');
-  const next = String(nextTags || '');
-  if (!next) return prev;
-  if (!prev) return next;
-  if (normalizePhotoIndexTagSet(prev) === normalizePhotoIndexTagSet(next)) return next;
-  const prevSet = photoIndexTagTokenSet(prev);
-  const nextSet = photoIndexTagTokenSet(next);
-  const nextSubsetOfPrev = nextSet.size < prevSet.size && [...nextSet].every(token => prevSet.has(token));
-  if (nextSubsetOfPrev) return prev;
-  return next;
-}
 
 function applyStickyPhotoIndexTags(calendarId, items, options = {}) {
   const list = Array.isArray(items) ? items : [];
@@ -256,13 +243,15 @@ function applyStickyPhotoIndexTags(calendarId, items, options = {}) {
   return list.map(photo => {
     const keys = photoIndexTagIdentityKeys(photo);
     let stickyTags = '';
+    let hasSticky = false;
     for (const key of keys) {
       if (sticky.has(key)) {
         stickyTags = sticky.get(key);
+        hasSticky = true;
         break;
       }
     }
-    if (!stickyTags) return photo;
+    if (!hasSticky) return photo;
     const serverTags = String(photo?.tags || '');
     // Only clear sticky against RAW photoIndex/CF tags. Clearing after merge backfilled an empty
     // CF row from a fuller previous patch made the next partial denorm stick permanently.
@@ -274,38 +263,11 @@ function applyStickyPhotoIndexTags(calendarId, items, options = {}) {
   });
 }
 
-function mergePhotoIndexTags(previousItems, nextItems) {
-  const previous = Array.isArray(previousItems) ? previousItems : [];
-  const next = Array.isArray(nextItems) ? nextItems : [];
-  if (!previous.length) return next;
-  const byKey = new Map();
-  previous.forEach(photo => {
-    const tags = String(photo?.tags || '');
-    if (!tags) return;
-    photoIndexTagIdentityKeys(photo).forEach(key => byKey.set(key, tags));
-  });
-  if (!byKey.size) return next;
-  return next.map(photo => {
-    let prevTags = '';
-    for (const key of photoIndexTagIdentityKeys(photo)) {
-      if (byKey.has(key)) {
-        prevTags = byKey.get(key);
-        break;
-      }
-    }
-    if (!prevTags) return photo;
-    const chosen = preferRicherPhotoIndexTags(prevTags, photo?.tags);
-    return chosen === String(photo?.tags || '') ? photo : { ...photo, tags: chosen };
-  });
-}
-
 // Reconcile a force/page fetch with in-memory rows + session sticky.
-// Order matters: sticky may clear only when RAW CF tags match; merge then protects against
-// partial denorm overwriting a fuller previous patch after sticky was correctly cleared.
-export function reconcilePhotoIndexTagItems(calendarId, previousItems, fetchedItems) {
+// Raw server rows are authoritative unless a verified local save is still pending.
+export function reconcilePhotoIndexTagItems(calendarId, _previousItems, fetchedItems) {
   const fetched = Array.isArray(fetchedItems) ? fetchedItems : [];
-  const withStickyFromServer = applyStickyPhotoIndexTags(calendarId, fetched, { clearOnMatch: true });
-  return mergePhotoIndexTags(previousItems, withStickyFromServer);
+  return applyStickyPhotoIndexTags(calendarId, fetched, { clearOnMatch: true });
 }
 
 export function useGalleryPhotoIndex({ React, calendarId, activeView, projectId, decodeDocument }) {

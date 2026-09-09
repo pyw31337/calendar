@@ -183,12 +183,24 @@ function getPhotoIndexEntries(sourceType, sourceId, data) {
   return entries;
 }
 
+function photoIndexOwnerRank(owner) {
+  const sourceOwner = String(owner?.sourceOwner || '');
+  // A meeting upload exists both as its original message and as a confirmedMeeting album copy.
+  // Both expose source="meeting", but only the message owns the editable imageTags array.
+  // Rank the original document first so the server-side gallery cache never publishes the
+  // older/partial tags from the album copy after the source message has been updated.
+  if (sourceOwner.startsWith('message:')) {
+    if (owner?.source === 'gallery') return 0;
+    if (owner?.source === 'chat') return 1;
+    return 3;
+  }
+  if (sourceOwner.startsWith('memo:')) return 2;
+  if (sourceOwner.startsWith('meeting:')) return 4;
+  return 5;
+}
+
 function selectPhotoIndexOwner(owners) {
-  const sourceRank = owner => owner?.source === 'gallery' ? 0
-    : owner?.source === 'chat' ? 1
-      : owner?.source === 'memo' ? 2
-        : owner?.source === 'meeting' ? 3 : 4;
-  return (owners || []).slice().sort((a, b) => sourceRank(a) - sourceRank(b)
+  return (owners || []).slice().sort((a, b) => photoIndexOwnerRank(a) - photoIndexOwnerRank(b)
     || Number(b.timestamp || 0) - Number(a.timestamp || 0))[0] || null;
 }
 
@@ -227,7 +239,16 @@ async function rebuildPhotoIndexForCalendarAdmin(calendarId, apply = false) {
       dataUrlRows += 1;
       dataUrlBytes += String(selected.full || '').length + String(selected.thumb || '').length;
     }
-    rows.push({ ...selected, assetKey, legacyKeys, owners, commentCount, updatedAt: Date.now() });
+    rows.push({
+      ...selected,
+      assetKey,
+      legacyKeys,
+      owners,
+      commentCount,
+      tagCacheVersion: 2,
+      tagSourceOwner: selected.sourceOwner,
+      updatedAt: Date.now()
+    });
   });
   rows.sort((a, b) => Number(b.timestamp || 0) - Number(a.timestamp || 0));
   const nextKeys = new Set(rows.map(row => row.assetKey));
@@ -280,11 +301,6 @@ async function syncCanonicalPhotoIndex(change, context, sourceType, idParam) {
   const beforeKeys = new Set(before.map(entry => entry.assetKey));
   const afterByKey = new Map(after.map(entry => [entry.assetKey, entry]));
   const touchedKeys = new Set([...beforeKeys, ...afterByKey.keys()]);
-  const sourceRank = owner => owner?.source === 'gallery' ? 0
-    : owner?.source === 'chat' ? 1
-      : owner?.source === 'memo' ? 2
-        : owner?.source === 'meeting' ? 3 : 4;
-
   // The same physical asset may be referenced by chat, a meeting and a memo. Keeping bounded
   // owners inside the canonical row prevents deleting one source from erasing the remaining
   // references. Each transaction touches one row, so simultaneous edits cannot lose an owner.
@@ -302,7 +318,7 @@ async function syncCanonicalPhotoIndex(change, context, sourceType, idParam) {
     if (replacement) owners.push(replacement);
     owners = owners
       .filter((owner, index, list) => list.findIndex(candidate => candidate.sourceOwner === owner.sourceOwner) === index)
-      .sort((a, b) => sourceRank(a) - sourceRank(b) || Number(b.timestamp || 0) - Number(a.timestamp || 0))
+      .sort((a, b) => photoIndexOwnerRank(a) - photoIndexOwnerRank(b) || Number(b.timestamp || 0) - Number(a.timestamp || 0))
       .slice(0, 12);
     if (!owners.length) {
       transaction.delete(ref);
@@ -318,6 +334,8 @@ async function syncCanonicalPhotoIndex(change, context, sourceType, idParam) {
       legacyKeys,
       owners,
       commentCount: Math.max(0, Number(existing.commentCount || 0), existingComments),
+      tagCacheVersion: 2,
+      tagSourceOwner: selected.sourceOwner,
       updatedAt: Date.now()
     });
   })));
