@@ -1,11 +1,12 @@
 name: Culture Performances Daily Sync
 
-# Pulls the culture-portal+kopis, festival, and sports (야구/축구/농구/배구/핸드볼) slices of
-# Culture Flow's public performances feed once a day and commits normalized snapshots to
-# public-vite/data/culture-performances.json, public-vite/data/culture-festivals.json, and
-# public-vite/data/culture-sports.json. See scripts/sync-culture-performances.mjs for why this
-# never touches any of these files on a failed/suspicious fetch (Culture Flow is a separate
-# project we don't control the release cadence of).
+# Pulls the culture-portal+kopis+interpark+timeticket+yes24-exclusive, festival, and sports
+# (야구/축구/농구/배구/핸드볼) slices of Culture Flow's public performances feed once a day and
+# commits normalized snapshots to public-vite/data/culture-performances.json,
+# public-vite/data/culture-festivals.json, and public-vite/data/culture-sports.json. See
+# scripts/sync-culture-performances.mjs for why this never touches any of these files on a
+# failed/suspicious fetch (Culture Flow is a separate project we don't control the release
+# cadence of).
 
 on:
   workflow_dispatch:
