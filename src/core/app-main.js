@@ -10048,21 +10048,33 @@ function resolveMeetingPhotoDisplay(photo, chatMessages) {
     thumbUrl: photo?.thumbUrl || photo?.thumb || photo?.imageUrl || photo?.full || '',
     tags: String(photo?.tags || '')
   };
-  const fallbackKeys = getMediaIdentityKeys(photo, { source: 'meeting', meetingDate: photo?.meetingDate || '' });
-  if (!photo?.sourceMessageId || !Number.isInteger(photo?.sourceImageIndex)) {
-    return { ...fallback, ...fallbackKeys };
+  // Photo-index / REST / older writes may store sourceImageIndex as a numeric string. Coerce
+  // before Number.isInteger gates so auto-linked 일정 copies keep chat:<msg>:<idx> identity and
+  // do not fall through to meeting:<date>:<photoId> (which duplicated main-gallery lightbox slides).
+  const coerceIndex = (value) => {
+    if (Number.isInteger(value)) return value;
+    const n = Number(value);
+    return Number.isFinite(n) ? Math.max(0, Math.round(n)) : null;
+  };
+  const sourceImageIndex = coerceIndex(photo?.sourceImageIndex);
+  const photoForKeys = sourceImageIndex == null ? photo : { ...photo, sourceImageIndex };
+  const fallbackKeys = getMediaIdentityKeys(photoForKeys, { source: 'meeting', meetingDate: photo?.meetingDate || '' });
+  if (!photo?.sourceMessageId || sourceImageIndex == null) {
+    return { ...fallback, ...fallbackKeys, sourceImageIndex };
   }
   const sourceMessage = (Array.isArray(chatMessages) ? chatMessages : []).find(m => m && m.id === photo.sourceMessageId);
-  if (!sourceMessage) return { ...fallback, ...fallbackKeys };
-  const entry = getMessageImageEntries(sourceMessage)[photo.sourceImageIndex];
-  if (!entry) return { ...fallback, ...fallbackKeys };
+  if (!sourceMessage) return { ...fallback, ...fallbackKeys, sourceImageIndex };
+  const entry = getMessageImageEntries(sourceMessage)[sourceImageIndex];
+  if (!entry) return { ...fallback, ...fallbackKeys, sourceImageIndex };
   return {
     imageUrl: entry.full,
     thumbUrl: entry.thumb,
     tags: entry.tags || '',
-    assetKey: fallbackKeys.assetKey || entry.assetKey,
-    mediaKey: fallbackKeys.mediaKey || entry.mediaKey,
-    refKey: fallbackKeys.refKey
+    // Prefer the live chat slot identity over a stale meeting-local mediaKey.
+    assetKey: entry.assetKey || fallbackKeys.assetKey,
+    mediaKey: entry.mediaKey || fallbackKeys.mediaKey,
+    refKey: fallbackKeys.refKey || entry.refKey,
+    sourceImageIndex
   };
 }
 

@@ -3,7 +3,7 @@ import vm from 'node:vm';
 import { GATHER_APP_UTILS, omitUndefinedDeep } from '../src/core/app-utils.js';
 import { calculateSettlementRows } from '../src/core/settlement-calculator.js';
 import { fetchPhotoComments, savePhotoComments } from '../src/core/photo-comments.js';
-import { composeGalleryPhotos, paginateGalleryItems, getPaginationWindow } from '../src/core/gallery-data.js';
+import { composeGalleryPhotos, paginateGalleryItems, getPaginationWindow, dedupeGalleryPhotoEntries, getGalleryPhotoDedupeKeys, coerceGalleryImageIndex } from '../src/core/gallery-data.js';
 import { cloneConfirmedMeetings, commitConfirmedMeetingChanges } from '../src/core/confirmed-meeting-coordinator.js';
 import { getInitialAppView, buildAppViewUrl } from '../src/core/app-routing-state.js';
 import { getInitialDataLoadingState, subscribeCalendarBootstrap } from '../src/core/app-data-bootstrap.js';
@@ -198,6 +198,92 @@ const writeQueueSource = fs.readFileSync(new URL('../src/core/app-write-queue.js
   });
   assert(galleryContractPhotos.length === 3, 'gallery must union chat, memo and schedule photos and dedupe one shared asset');
   assert(new Set(galleryContractPhotos.map(photo => photo.source)).has('meeting'), 'gallery lost a schedule-only photo');
+
+  // Main-screen lightbox regression: chat attachment + auto-linked meeting copy (possibly
+  // thumb-only / string sourceImageIndex / mismatched mediaKey prefix) must yield one slide.
+  const mainGalleryDupes = composeGalleryPhotos({
+    chatMessages: [
+      {
+        id: 'msg-1',
+        uploadSource: 'gallery',
+        imageUrls: ['https://example.com/full-1.jpg'],
+        thumbUrls: ['https://example.com/thumb-1.jpg'],
+        timestamp: 200,
+        imageTags: ['#여행']
+      },
+      {
+        id: 'msg-2',
+        uploadSource: 'chat',
+        imageUrl: 'https://example.com/full-2.jpg',
+        thumbUrl: 'https://example.com/thumb-2.jpg',
+        timestamp: 100,
+        text: 'https://example.com/full-2.jpg'
+      }
+    ],
+    memos: [],
+    calendar: {
+      confirmedMeetings: [{
+        date: '2026-09-08',
+        photos: [
+          {
+            id: 'meet-copy-1',
+            imageUrl: 'https://example.com/thumb-1.jpg',
+            thumbUrl: 'https://example.com/thumb-1.jpg',
+            createdAt: 200,
+            sourceMessageId: 'msg-1',
+            sourceImageIndex: '0',
+            mediaKey: 'meeting:2026-09-08:meet-copy-1',
+            tags: '#여행'
+          }
+        ]
+      }]
+    },
+    isTombstone: () => false,
+    getMessageImageEntries,
+    getAllDirectMediaImageEntries: (msg) => {
+      if (!msg?.text) return [];
+      return [{
+        full: msg.text,
+        thumb: msg.text,
+        imageIndex: 0,
+        messageId: msg.id,
+        timestamp: msg.timestamp,
+        tags: '',
+        directMediaUrl: msg.text,
+        mediaKey: `chat:${msg.id}:direct:x`,
+        refKey: `chat:${msg.id}:direct:x`,
+        source: 'chat'
+      }];
+    },
+    getConfirmedMeetings: calendar => calendar.confirmedMeetings || [],
+    resolveMeetingPhotoDisplay: (photo, chatMessages) => {
+      const idx = coerceGalleryImageIndex(photo.sourceImageIndex);
+      const source = (chatMessages || []).find(m => m?.id === photo.sourceMessageId);
+      const entry = source && idx != null ? getMessageImageEntries(source)[idx] : null;
+      if (!entry) return photo;
+      return {
+        imageUrl: entry.full,
+        thumbUrl: entry.thumb,
+        tags: entry.tags || photo.tags || '',
+        mediaKey: entry.mediaKey,
+        assetKey: entry.assetKey,
+        sourceImageIndex: idx
+      };
+    },
+    isBrokenPhotoValue: () => false,
+    getPhotoAssetCommentKey
+  });
+  assert(mainGalleryDupes.length === 2, `main gallery lightbox must keep one slide per unique photo (got ${mainGalleryDupes.length})`);
+  assert(mainGalleryDupes.every((photo, index, arr) => arr.findIndex(other => other.full === photo.full || (other.messageId && other.messageId === photo.messageId && other.imageIndex === photo.imageIndex)) === index), 'main gallery slides still contain adjacent duplicates');
+  assert(coerceGalleryImageIndex('0') === 0, 'gallery index coerce must accept numeric strings');
+  assert(getGalleryPhotoDedupeKeys({
+    messageId: 'msg-1', imageIndex: 0, full: 'https://example.com/full-1.jpg', thumb: 'https://example.com/thumb-1.jpg'
+  }, getPhotoAssetCommentKey).some(key => key.startsWith('slot:msg-1:0')), 'attached photos must expose message-slot dedupe keys');
+  assert(dedupeGalleryPhotoEntries([
+    { source: 'meeting', full: 'https://example.com/thumb-1.jpg', thumb: 'https://example.com/thumb-1.jpg', sourceMessageId: 'msg-1', sourceImageIndex: 0, mediaKey: 'meeting:d:p', timestamp: 1 },
+    { source: 'chat', full: 'https://example.com/full-1.jpg', thumb: 'https://example.com/thumb-1.jpg', messageId: 'msg-1', imageIndex: 0, mediaKey: 'gallery:msg-1:0', timestamp: 1, tags: '#a' }
+  ], getPhotoAssetCommentKey).length === 1, 'slot identity must collapse thumb meeting copy with chat full image');
+
   assert(paginateGalleryItems(Array.from({ length: 205 }), 3).items.length === 5, 'gallery page size must remain 100');
   assert(getPaginationWindow(5, 12, 5).join(',') === '3,4,5,6,7', 'pagination window must center the current page');
   assert(getPaginationWindow(1, 12, 5).join(',') === '1,2,3,4,5', 'first-page window stays left-aligned');
@@ -215,6 +301,9 @@ assert(lightboxSource.includes('toTagImageIndex'), 'lightbox tag save must coerc
 assert(lightboxSource.includes('태그를 입력해 주세요'), 'empty lightbox tag save must show a toast instead of no-op');
 assert(appMainSource.includes('coerceTagImageIndex'), 'image tag persistence must coerce non-integer imageIndex values');
 assert(chatGallerySource.includes("source === 'memo'"), 'indexed memo photos must recover messageId for tag save');
+assert(summaryGallerySource.includes('composeGalleryPhotos'), 'main-screen PhotoGallery must compose via shared gallery dedupe');
+assert(appMainSource.includes('coerceIndex') && appMainSource.includes('resolveMeetingPhotoDisplay'), 'meeting photo display must coerce sourceImageIndex for gallery identity');
+
 
 assert(appMainSource.includes('resolvedIndex != null && !meta.meetingDate'), 'meeting message tag edits must route to their messages document');
 assert(appMainSource.includes("activeView !== 'gallery'"), 'gallery route must hydrate the complete paged message history');
