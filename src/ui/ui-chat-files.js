@@ -79,12 +79,14 @@ function usePdfPreviewUrl(sourceUrl, enabled) {
     }).catch(function(err) {
       if (cancelled) return;
       var ua = typeof navigator !== "undefined" ? String(navigator.userAgent || "") : "";
-      var isAppleMobile = /iP(hone|od|ad)/.test(ua)
+      var isMobileUa = /Android|iP(hone|od|ad)|Mobile/i.test(ua)
         || (typeof navigator !== "undefined" && navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-      // Desktop browsers can often iframe the remote Storage URL; iOS/WebKit usually cannot,
-      // so prefer an explicit open fallback over the native gray-PDF + encoded-path + 「열기」 UI.
-      if (isAppleMobile) {
-        setState({ status: "error", url: null, error: err && err.message ? err.message : "fetch-failed" });
+      if (isMobileUa) {
+        setState({
+          status: "gview",
+          url: "https://docs.google.com/gview?embedded=1&url=" + encodeURIComponent(sourceUrl),
+          error: err && err.message ? err.message : "fetch-failed"
+        });
       } else {
         setState({ status: "remote", url: sourceUrl, error: err && err.message ? err.message : "fetch-failed" });
       }
@@ -298,15 +300,21 @@ export function DocumentLightbox(props) {
     role: "dialog", "aria-modal": "true", "aria-label": "파일 미리보기", onClick: onClose,
     style: {
       position: "fixed", inset: 0, zIndex: 12000, backgroundColor: "rgba(15, 23, 42, 0.72)",
-      display: "flex", alignItems: "center", justifyContent: "center", padding: "16px"
+      display: "flex", alignItems: "center", justifyContent: "center",
+      padding: isMobile ? "0" : "16px",
+      height: "100dvh", maxHeight: "100dvh", boxSizing: "border-box", overflow: "hidden"
     }
   },
     React.createElement("div", {
       onClick: function(e) { e.stopPropagation(); },
       style: {
-        width: "min(1100px, 96vw)", maxHeight: "92vh", backgroundColor: "var(--bg-card)",
-        borderRadius: "16px", border: "1px solid var(--border-subtle)", display: "flex",
-        flexDirection: "column", overflow: "hidden", boxShadow: "0 20px 50px rgba(0,0,0,0.35)"
+        width: isMobile ? "100%" : "min(1100px, 96vw)",
+        height: isMobile ? "100dvh" : "auto",
+        maxHeight: isMobile ? "100dvh" : "92vh",
+        backgroundColor: "var(--bg-card)",
+        borderRadius: isMobile ? "0" : "16px", border: "1px solid var(--border-subtle)", display: "flex",
+        flexDirection: "column", overflow: "hidden", boxShadow: "0 20px 50px rgba(0,0,0,0.35)",
+        boxSizing: "border-box"
       }
     },
       React.createElement("div", {
@@ -316,7 +324,8 @@ export function DocumentLightbox(props) {
           alignItems: isMobile ? "stretch" : "center",
           justifyContent: "space-between",
           gap: isMobile ? "10px" : "12px",
-          padding: "12px 14px", borderBottom: "1px solid var(--border-subtle)"
+          padding: "12px 14px", borderBottom: "1px solid var(--border-subtle)",
+          flexShrink: 0
         }
       },
         // Mirror FileAttachmentCard: type icon + filename + type·size meta.
@@ -392,21 +401,21 @@ export function DocumentLightbox(props) {
       ),
       React.createElement("div", {
         style: {
-          flex: 1, minHeight: "320px", overflow: "auto", background: "var(--bg-primary)",
+          flex: "1 1 auto", minHeight: 0, overflow: "hidden", background: "var(--bg-primary)",
           display: "flex", alignItems: "stretch", justifyContent: "center", padding: pdf ? "0" : "16px"
         }
       },
         pdf
           ? React.createElement("div", {
               style: {
-                width: "100%", minHeight: "70vh", overflow: "auto",
-                background: "#fff", position: "relative"
+                width: "100%", height: "100%", minHeight: 0, overflow: "hidden",
+                background: "#fff", position: "relative", display: "flex", flexDirection: "column"
               }
             },
               preview.status === "loading" || preview.status === "idle"
                 ? React.createElement("div", {
                     style: {
-                      minHeight: "70vh", display: "flex", alignItems: "center",
+                      minHeight: isMobile ? "0" : "240px", display: "flex", alignItems: "center",
                       justifyContent: "center", color: "var(--text-muted)", fontWeight: 700
                     }
                   }, "PDF 불러오는 중...")
@@ -414,7 +423,7 @@ export function DocumentLightbox(props) {
               preview.status === "error"
                 ? React.createElement("div", {
                     style: {
-                      minHeight: "70vh", margin: "auto", display: "flex", flexDirection: "column",
+                      minHeight: isMobile ? "0" : "240px", margin: "auto", display: "flex", flexDirection: "column",
                       alignItems: "center", justifyContent: "center", gap: "12px",
                       textAlign: "center", padding: "16px", color: "var(--text-main)"
                     }
@@ -433,14 +442,14 @@ export function DocumentLightbox(props) {
                       }
                     }, "열기")
                   )
-                : (preview.status === "ready" || preview.status === "remote")
+                : (preview.status === "ready" || preview.status === "remote" || preview.status === "gview")
                 ? React.createElement("div", {
                     style: {
                       transform: "scale(" + scale + ")",
                       transformOrigin: "top left",
                       width: (100 / scale) + "%",
                       height: (100 / scale) + "%",
-                      minHeight: "70vh"
+                      minHeight: 0
                     }
                   },
                     // Mobile WebKit is unreliable with nested object/embed PDF viewers. A
@@ -449,7 +458,7 @@ export function DocumentLightbox(props) {
                       title: current.name || "PDF",
                       src: previewSrc,
                       style: {
-                        width: "100%", minHeight: "70vh", height: "70vh",
+                        width: "100%", minHeight: 0, height: "100%",
                         border: "none", background: "#fff", display: "block"
                       }
                     }) : React.createElement("object", {
@@ -458,8 +467,8 @@ export function DocumentLightbox(props) {
                       title: current.name || "PDF",
                       style: {
                         width: "100%",
-                        minHeight: "70vh",
-                        height: "70vh",
+                        minHeight: 0,
+                        height: "100%",
                         border: "none",
                         background: "#fff",
                         display: "block"
@@ -471,8 +480,8 @@ export function DocumentLightbox(props) {
                         title: current.name || "PDF",
                         style: {
                           width: "100%",
-                          minHeight: "70vh",
-                          height: "70vh",
+                          minHeight: 0,
+                          height: "100%",
                           border: "none",
                           background: "#fff",
                           display: "block"
@@ -483,8 +492,8 @@ export function DocumentLightbox(props) {
                         src: previewSrc,
                         style: {
                           width: "100%",
-                          minHeight: "70vh",
-                          height: "70vh",
+                          minHeight: 0,
+                          height: "100%",
                           border: "none",
                           background: "#fff",
                           display: "block"
@@ -535,7 +544,8 @@ export function DocumentLightbox(props) {
       React.createElement("div", {
         style: {
           display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px",
-          padding: "10px 14px", borderTop: "1px solid var(--border-subtle)"
+          padding: "10px 14px", borderTop: "1px solid var(--border-subtle)",
+          flexShrink: 0
         }
       },
         React.createElement("button", {
