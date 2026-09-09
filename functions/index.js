@@ -1,4 +1,5 @@
-const functions = require('firebase-functions');
+// Keep every existing trigger on Cloud Functions 1st gen while using the current SDK.
+const functions = require('firebase-functions/v1');
 const { defineString } = require('firebase-functions/params');
 const admin = require('firebase-admin');
 const crypto = require('crypto');
