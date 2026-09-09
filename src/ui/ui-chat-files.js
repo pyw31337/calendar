@@ -61,31 +61,32 @@ function DocZoomControls(props) {
   var zoomDefault = props.zoomDefault;
   var btnStyle = function(disabled) {
     return {
-      height: "32px", minWidth: "32px", padding: "0 8px", borderRadius: "8px",
+      height: "32px", minWidth: "28px", padding: "0 6px", borderRadius: "8px",
       border: "1px solid var(--border-subtle)", background: "var(--bg-secondary)",
       color: "var(--text-main)", cursor: disabled ? "default" : "pointer",
       fontWeight: 800, fontSize: "var(--font-size-sm)", opacity: disabled ? 0.45 : 1,
-      display: "inline-flex", alignItems: "center", justifyContent: "center"
+      display: "inline-flex", alignItems: "center", justifyContent: "center",
+      flexShrink: 0, lineHeight: 1
     };
   };
   return React.createElement("div", {
-    style: { display: "inline-flex", alignItems: "center", gap: "6px", flexShrink: 0 }
+    style: { display: "inline-flex", alignItems: "center", gap: "4px", flexShrink: 0 }
   },
     React.createElement("button", {
       type: "button", onClick: onZoomOut, disabled: zoomLevel <= zoomMin,
       "aria-label": "축소", title: "축소", style: btnStyle(zoomLevel <= zoomMin)
-    }, "축소"),
+    }, "-"),
     React.createElement("button", {
       type: "button", onClick: onZoomReset, disabled: zoomLevel === zoomDefault,
       "aria-label": "맞춤", title: "맞춤 (100%)",
       style: Object.assign({}, btnStyle(zoomLevel === zoomDefault), {
-        minWidth: "52px", fontVariantNumeric: "tabular-nums"
+        minWidth: "44px", padding: "0 4px", fontVariantNumeric: "tabular-nums"
       })
     }, zoomLevel + "%"),
     React.createElement("button", {
       type: "button", onClick: onZoomIn, disabled: zoomLevel >= zoomMax,
       "aria-label": "확대", title: "확대", style: btnStyle(zoomLevel >= zoomMax)
-    }, "확대")
+    }, "+")
   );
 }
 
@@ -260,8 +261,10 @@ export function DocumentLightbox(props) {
         ),
         React.createElement("div", {
           style: {
-            display: "flex", alignItems: "center", gap: "8px", flexShrink: 0, flexWrap: "wrap",
-            justifyContent: isMobile ? "flex-start" : "flex-end"
+            display: "flex", alignItems: "center", gap: isMobile ? "4px" : "6px",
+            flexShrink: 1, flexWrap: "nowrap", minWidth: 0,
+            justifyContent: isMobile ? "flex-start" : "flex-end",
+            overflow: "hidden"
           }
         },
           pdf ? React.createElement(DocZoomControls, {
@@ -277,18 +280,21 @@ export function DocumentLightbox(props) {
             href: current.url, target: "_blank", rel: "noopener noreferrer",
             download: current.name || undefined,
             style: {
-              height: "36px", padding: "0 12px", borderRadius: "10px",
-              border: "1px solid var(--border-subtle)", background: "var(--bg-secondary)",
-              color: "var(--text-main)", display: "inline-flex", alignItems: "center",
-              fontWeight: 800, fontSize: "var(--font-size-md)", textDecoration: "none"
+              height: "32px", padding: isMobile ? "0 8px" : "0 10px", borderRadius: "8px",
+              border: "1px solid #000", background: "#000",
+              color: "#fff", display: "inline-flex", alignItems: "center",
+              fontWeight: 800, fontSize: "var(--font-size-sm)", textDecoration: "none",
+              flexShrink: 0, whiteSpace: "nowrap", lineHeight: 1
             }
           }, "다운로드"),
           React.createElement("button", {
             type: "button", onClick: onClose, "aria-label": "닫기",
             style: {
-              width: "36px", height: "36px", borderRadius: "10px",
+              width: "32px", height: "32px", minWidth: "32px", borderRadius: "8px",
               border: "1px solid var(--border-subtle)", background: "var(--bg-secondary)",
-              color: "var(--text-main)", cursor: "pointer", fontWeight: 900
+              color: "var(--text-main)", cursor: "pointer", fontWeight: 900,
+              flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center",
+              lineHeight: 1, padding: 0
             }
           }, "×")
         )
