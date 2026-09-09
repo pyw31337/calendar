@@ -967,6 +967,10 @@ export function DateModal({
       const indexPhotos = Array.isArray(album.indexPhotos) ? album.indexPhotos : [];
       setLocalAlbumPhotos(prev => (countAlive(photos) >= countAlive(prev) ? photos : prev));
       setIndexedMeetingPhotos(prev => (countAlive(indexPhotos) >= countAlive(prev) ? indexPhotos : prev));
+      // Album payload may already include date-tag scans (handleFetchMeetingAlbum) so the
+      // photo tab does not wait on a second round-trip or on view-scoped chat/memo windows.
+      if (Array.isArray(album.taggedMessages)) setFetchedTaggedMessages(album.taggedMessages);
+      if (Array.isArray(album.taggedMemos)) setFetchedTaggedMemos(album.taggedMemos);
       return { photos: countAlive(photos), index: countAlive(indexPhotos) };
     };
     const loadAlbum = async () => {
@@ -1012,6 +1016,29 @@ export function DateModal({
   // dateStr is the real query key; stable onFetchMeetingAlbum / index callbacks are preferred
   // but omitted as deps so an App re-render cannot cancel in-flight album enrichment.
   }, [dateStr]);
+
+  // Full-load rule: when the 사진 tab is open, page older chat if album photos still point at
+  // source messages outside the live window. Prefer onFindChatMessageById (above) for single
+  // ids; this widens the window for any remaining tag matches that only live in older pages.
+  const olderChatPagesRef = React.useRef(0);
+  React.useEffect(() => { olderChatPagesRef.current = 0; }, [dateStr]);
+  React.useEffect(() => {
+    if (activeTab !== 'photo') return;
+    if (!hasMoreOlderChat || loadingOlderChat || typeof onLoadOlderChat !== 'function') return;
+    if (olderChatPagesRef.current >= 8) return;
+    const loadedIds = new Set((chatMessagesWithFetchedSources || []).map(m => m && m.id).filter(Boolean));
+    const albumPhotos = [
+      ...(Array.isArray(localAlbumPhotos) ? localAlbumPhotos : []),
+      ...(Array.isArray(confirmedMeetingEntry?.photos) ? confirmedMeetingEntry.photos : []),
+      ...(Array.isArray(indexedMeetingPhotos) ? indexedMeetingPhotos : [])
+    ];
+    const missingSource = albumPhotos.some(p => p && p.sourceMessageId && !loadedIds.has(p.sourceMessageId));
+    const thinTagged = (fetchedTaggedMessages || []).length === 0 && albumPhotos.length > 0;
+    if (!missingSource && !thinTagged) return;
+    olderChatPagesRef.current += 1;
+    Promise.resolve(onLoadOlderChat()).catch(err => console.warn('DateModal older chat page failed:', err));
+  }, [activeTab, hasMoreOlderChat, loadingOlderChat, onLoadOlderChat, localAlbumPhotos, confirmedMeetingEntry, indexedMeetingPhotos, chatMessagesWithFetchedSources, fetchedTaggedMessages]);
+
   const allMeetingPhotoMessages = React.useMemo(() => {
     const byId = new Map();
     [...(chatMessagesWithFetchedSources || []), ...(fetchedTaggedMessages || [])].forEach(msg => {

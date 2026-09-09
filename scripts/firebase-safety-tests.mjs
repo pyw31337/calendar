@@ -246,6 +246,8 @@ assert(photoIndexSource.includes('applyStickyPhotoIndexTags'), 'photoIndex loads
 assert(photoIndexSource.includes('mergePhotoIndexTags'), 'photoIndex force reload must not wipe locally patched tags');
 assert(/setTimeout\([\s\S]*?loadPage\([\s\S]*?force:\s*true/.test(appMainSource), 'tag saves must delay photoIndex force reload until CF can catch up');
 assert(dateModalSource.includes('getPhotoAssetKeys(photo)'), 'schedule albums must dedupe REST/index/live copies by original or thumbnail asset');
+assert(appMainSource.includes('taggedMessages') && appMainSource.includes('fetchMessagesByImageTag(activeCalId, tag)'), 'handleFetchMeetingAlbum must also date-tag scan chat (not view-window only)');
+assert(dateModalSource.includes('album.taggedMessages') && dateModalSource.includes('onLoadOlderChat'), 'DateModal must apply album taggedMessages and keep older-chat full-load path');
 assert(dateModalSource.includes('assetKeys.some(assetKey => directKeys.has(assetKey))'), 'tagged chat/memo photos must use the same asset identity as schedule albums');
 assert(photoIndexSource.includes('complete: true'), 'photo index must support complete hydration for cross-page search/date views');
 const appMainImageSource = fs.readFileSync(new URL('../src/core/app-main.js', import.meta.url), 'utf8');

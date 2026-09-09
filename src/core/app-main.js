@@ -2613,20 +2613,22 @@ function CalendarApp() {
     (tag) => fetchMemosByTag(activeCalId, tag),
     [activeCalId]
   );
+  // DateModal full album: meeting + index + date-tag chat/memo (not view window).
   const handleFetchMeetingAlbum = React.useCallback(async (date) => {
-    const [meetings, indexPhotos] = await Promise.all([
+    const tag = typeof dateStrToHashtag === 'function' ? dateStrToHashtag(date) : '';
+    const [meetings, indexPhotos, taggedMessages, taggedMemos] = await Promise.all([
       fetchExistingConfirmedMeetingsForDates(activeCalId, [date]),
-      fetchMeetingPhotoIndex(activeCalId, date)
+      fetchMeetingPhotoIndex(activeCalId, date),
+      tag ? fetchMessagesByImageTag(activeCalId, tag).catch(() => []) : Promise.resolve([]),
+      tag ? fetchMemosByTag(activeCalId, tag).catch(() => []) : Promise.resolve([])
     ]);
     const meeting = (Array.isArray(meetings) ? meetings : []).find(m => m && m.date === date) || null;
-    if (meeting) {
-      setConfirmedMeetingsSubcollection(previous =>
-        mergeConfirmedMeetings(Array.isArray(previous) ? previous : [], [meeting])
-      );
-    }
+    if (meeting) setConfirmedMeetingsSubcollection(prev => mergeConfirmedMeetings(Array.isArray(prev) ? prev : [], [meeting]));
     return {
       photos: Array.isArray(meeting?.photos) ? meeting.photos : [],
-      indexPhotos: Array.isArray(indexPhotos) ? indexPhotos : []
+      indexPhotos: Array.isArray(indexPhotos) ? indexPhotos : [],
+      taggedMessages: Array.isArray(taggedMessages) ? taggedMessages : [],
+      taggedMemos: Array.isArray(taggedMemos) ? taggedMemos : []
     };
   }, [activeCalId]);
 
