@@ -59,6 +59,9 @@ import {
   verifyAdminPasswordRemote,
   listAllCalendarsRemote,
   listServerAuditLogsRemote,
+  findCultureLinkedAnniversary,
+  findCultureLinkedMemo,
+  buildCultureLinkedMemoData,
   queueServerAuditEvent,
   getClientAuditContext,
   changeAdminPasswordRemote,
@@ -2194,69 +2197,32 @@ function CalendarApp() {
       showToast('취소 실패', 'error');
     }
   };
-  // 문화공연/지역축제 상세 시트의 "메모" 버튼 -- 사용자가 직접 입력한 내용이 있으면 그걸,
-  // 비워뒀으면(기본 상태) 행사 정보 자체를 메모 본문으로 등록한다. 새 메모 작성 흐름은
-  // ui-memo-view.js의 handleAddMemo와 같은 컬렉션/활동로그 패턴을 따르되, 이미지/태그 등
-  // 이 화면에 없는 입력은 다루지 않는다.
-  //
-  // Also mirrors the text onto the linked anniversary's `memo` field (and stamps
-  // cultureSourceId on the memo doc) so reopening the content backdrop can seed the same
-  // rounded field instead of always looking empty.
+  // Culture backdrop memo: upsert memos doc (+ cultureSourceId) and mirror onto linked anniversary.memo.
   const handleQuickSaveCultureMemo = async (item, customText = '') => {
     if (!activeCal?.id) return false;
     const trimmedCustom = String(customText || '').trim();
-    const text = trimmedCustom || buildCultureEventMemoText(item);
-    if (!text) return false;
+    const body = trimmedCustom || buildCultureEventMemoText(item);
+    if (!body) return false;
     const participantId = getCurrentChatParticipantId() || '';
     const stamp = Date.now();
-    const itemId = String(item?.id || '').trim();
-    const itemTitle = String(item?.title || '').trim();
-    const linkedAnn = (anniversaries || []).find(a => a && (
-      (itemId && (a.cultureSourceId === itemId || a.id === itemId))
-      || (itemTitle && String(a.title || '').trim() === itemTitle && ['festival', 'event', 'sports', 'movie'].includes(a.category))
-    )) || null;
-    const existingMemo = (memos || []).find(m => m && !isTombstone(m) && (
-      (itemId && String(m.cultureSourceId || '').trim() === itemId)
-      || (itemTitle && String(m.title || '').trim() === itemTitle && String(m.cultureSourceId || '').trim() === itemId)
-    )) || (itemTitle
-      ? (memos || [])
-          .filter(m => m && !isTombstone(m) && String(m.title || '').trim() === itemTitle)
-          .sort((a, b) => (Number(b.updatedAt) || Number(b.createdAt) || 0) - (Number(a.updatedAt) || Number(a.createdAt) || 0))[0]
-      : null);
-    const memoId = existingMemo?.id || `memo_${stamp}_${Math.random().toString(36).slice(2, 8)}`;
-    const memoData = {
-      id: memoId,
-      participantId: existingMemo?.participantId || participantId,
-      title: itemTitle || existingMemo?.title || '',
-      text,
-      imageUrls: Array.isArray(existingMemo?.imageUrls) ? existingMemo.imageUrls : [],
-      thumbUrls: Array.isArray(existingMemo?.thumbUrls) ? existingMemo.thumbUrls : [],
-      color: existingMemo?.color || 'var(--bg-card)',
-      isPinned: !!existingMemo?.isPinned,
-      tags: Array.isArray(existingMemo?.tags) ? existingMemo.tags : [],
-      createdAt: existingMemo?.createdAt || stamp,
-      updatedAt: stamp
-    };
-    if (itemId) memoData.cultureSourceId = itemId;
+    const linkedAnn = findCultureLinkedAnniversary(anniversaries, item);
+    const existingMemo = findCultureLinkedMemo(memos, item, isTombstone);
+    const memoData = buildCultureLinkedMemoData({ existingMemo, item, text: body, participantId, stamp });
     try {
-      const saved = await writeCollectionDocumentWithFallback('memos', activeCal.id, memoId, sanitizeMemoForFirestore(memoData), 'set', '문화공연 메모 저장');
+      const saved = await writeCollectionDocumentWithFallback('memos', activeCal.id, memoData.id, sanitizeMemoForFirestore(memoData), 'set', '문화공연 메모 저장');
       if (!saved?.success) throw new Error('Culture event memo save failed');
-      setMemos(prev => {
-        const list = Array.isArray(prev) ? prev.filter(m => m && m.id !== memoId) : [];
-        list.unshift(memoData);
-        return list;
-      });
+      setMemos(prev => [memoData, ...(Array.isArray(prev) ? prev.filter(m => m && m.id !== memoData.id) : [])]);
       if (linkedAnn?.id) {
-        const annPatch = { id: linkedAnn.id, memo: trimmedCustom || text, updatedAt: stamp };
+        const annPatch = { id: linkedAnn.id, memo: trimmedCustom || body, updatedAt: stamp };
         const annSaved = await writeCollectionDocumentWithFallback('anniversaries', activeCal.id, linkedAnn.id, annPatch, 'update', '문화공연 연동 메모 저장');
         if (annSaved?.success) handleAnniversarySaved({ ...linkedAnn, ...annPatch });
       }
       if (!existingMemo) {
-        const logNote = itemTitle ? `제목: ${itemTitle}` : (text.slice(0, 30) + (text.length > 30 ? '...' : ''));
+        const title = String(item?.title || '').trim();
+        const logNote = title ? ('제목: ' + title) : (body.slice(0, 30) + (body.length > 30 ? '...' : ''));
         const activityLog = createMemoActivityLog(activeCal.id, 'memo_create', participantId, stamp, logNote);
         if (activityLog) {
-          const nextCal = { ...activeCal, updatedAt: stamp, revision: (activeCal.revision || 0) + 1 };
-          await pushSingleCloudCalendar(nextCal, stamp, 4, null, 'settings', [activityLog]);
+          await pushSingleCloudCalendar({ ...activeCal, updatedAt: stamp, revision: (activeCal.revision || 0) + 1 }, stamp, 4, null, 'settings', [activityLog]);
         }
       }
       showToast(existingMemo ? '메모가 수정되었습니다.' : '메모에 등록되었습니다.', 'success');
