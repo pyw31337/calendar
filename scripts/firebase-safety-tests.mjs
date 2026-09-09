@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import vm from 'node:vm';
+import { createRequire } from 'node:module';
 import { GATHER_APP_UTILS, omitUndefinedDeep } from '../src/core/app-utils.js';
 import { calculateSettlementRows } from '../src/core/settlement-calculator.js';
 import { fetchPhotoComments, savePhotoComments } from '../src/core/photo-comments.js';
@@ -10,6 +11,8 @@ import { getInitialDataLoadingState, subscribeCalendarBootstrap } from '../src/c
 
 globalThis.window ||= {};
 const { getMediaIdentityKeys } = await import('../src/core/app-domain-helpers.js');
+const require = createRequire(import.meta.url);
+const { pickCanonicalPhotoIndexTagState } = require('../functions/photo-index-tag-contract.js');
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -370,8 +373,25 @@ assert(functionsIndexSource.includes('exports.rebuildPhotoIndex'), 'CF must expo
 assert(functionsIndexSource.includes('photoIndexOwnerRank'), 'CF photoIndex must rank editable source documents deterministically');
 assert(functionsIndexSource.includes("sourceOwner.startsWith('message:')"), 'meeting uploads must cache source-message tags ahead of album copies');
 assert(functionsIndexSource.includes('tagCacheVersion: 2'), 'photoIndex rows must expose the canonical tag cache contract version');
-assert(functionsIndexSource.includes('tagSourceOwner: selected.sourceOwner'), 'photoIndex rows must identify which source supplied cached tags');
-assert(functionsIndexSource.includes('pickRichestPhotoIndexTags'), 'rebuild/sync must publish the richest tags across message/memo/meeting owners');
+assert(functionsIndexSource.includes('tagSourceOwner: tagState.sourceOwner'), 'photoIndex rows must identify which source supplied canonical cached tags');
+assert(functionsIndexSource.includes('pickCanonicalPhotoIndexTagState'), 'rebuild/sync must publish tags through the canonical authority contract');
+{
+  const deleted = pickCanonicalPhotoIndexTagState([
+    { sourceOwner: 'message:m1:0', tagAuthority: 'editable', tags: '' },
+    { sourceOwner: 'meeting:2026-09-09:0', tags: '#구버전 #삭제한태그' }
+  ]);
+  assert(deleted.authoritative && deleted.tags === '', 'explicit empty source tags must not resurrect richer stale album tags');
+  const saved = pickCanonicalPhotoIndexTagState([
+    { sourceOwner: 'message:m1:0', tagAuthority: 'editable', tags: '#260908 #소고기고추볶음' },
+    { sourceOwner: 'meeting:2026-09-08:0', tags: '#260908' }
+  ]);
+  assert(saved.tags === '#260908 #소고기고추볶음', 'editable source tags must beat a partial meeting denormalization');
+  const legacy = pickCanonicalPhotoIndexTagState([
+    { sourceOwner: 'message:m1:0', tags: '' },
+    { sourceOwner: 'meeting:2026-09-08:0', tags: '#레거시 #보존' }
+  ]);
+  assert(!legacy.authoritative && legacy.tags === '#레거시 #보존', 'legacy rows without explicit per-image tags must retain the richest fallback');
+}
 assert(photoIndexSource.includes('pickRicherPhotoTags'), 'lightbox tag resolve must prefer richer durable sources over empty/partial locals');
 assert(chatGallerySource.includes('Meeting album copies store durable tags'), 'gallery must consult confirmedMeetings photo.tags for meeting-sourced lightbox tags');
 assert(lightboxSource.includes('key: `tag-input-${tagTokens.length}`'), 'lightbox tag input must remount when token count changes so iOS refreshes (n/10)');
