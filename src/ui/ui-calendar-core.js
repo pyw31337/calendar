@@ -1519,7 +1519,7 @@ export function CommentsSection({
   }) : null));
 }
 
-export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onSelectTag, onCommentsChange, getBorderColor, onRequestConfirm, showToast, effectivePinned, hidePinButton = false, variant = 'page', setActiveLightbox = null }) {
+export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onSelectTag, onCommentsChange, getBorderColor, onRequestConfirm, showToast, effectivePinned, hidePinButton = false, variant = 'page', setActiveLightbox = null, searchQuery = '' }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -1824,7 +1824,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     /* Title if exists -- paddingRight clears the share icon (and pin icon, when shown) */
     memo.title && /*#__PURE__*/React.createElement("div", {
       style: { fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-main)', marginBottom: '8px', paddingRight: hidePinButton ? '30px' : '44px', wordBreak: 'break-all' }
-    }, memo.title),
+    }, highlightKeyword(memo.title, searchQuery)),
 
     /* Images */
     renderMemoCardImages(),
@@ -1848,7 +1848,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
           overflow: 'hidden'
         } : {})
       }
-    }, parseTextWithLinks(displayMemoText)),
+    }, parseTextWithLinks(displayMemoText, searchQuery)),
 
     hasLongMemoText && /*#__PURE__*/React.createElement("button", {
       type: "button",
@@ -1980,7 +1980,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
           cursor: 'pointer', lineHeight: 1,
           whiteSpace: 'nowrap'
         }
-      }, tag)),
+      }, highlightKeyword(tag, searchQuery))),
 
       /* Comment toggle button -- pushed to the far right of the row */
       /*#__PURE__*/React.createElement("button", {

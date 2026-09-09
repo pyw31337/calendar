@@ -1624,6 +1624,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           onRequestConfirm: onRequestConfirm,
           showToast: showToast,
           setActiveLightbox: setActiveLightbox,
+          searchQuery: searchQuery,
           effectivePinned: true
         })))
       ),
@@ -1658,6 +1659,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           onRequestConfirm: onRequestConfirm,
           showToast: showToast,
           setActiveLightbox: setActiveLightbox,
+          searchQuery: searchQuery,
           effectivePinned: true
         })))
       ),
@@ -1690,6 +1692,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
           onRequestConfirm: onRequestConfirm,
           showToast: showToast,
           setActiveLightbox: setActiveLightbox,
+          searchQuery: searchQuery,
           effectivePinned: false
         })))
       ),

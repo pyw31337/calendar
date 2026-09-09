@@ -402,13 +402,14 @@ export function useGalleryPhotoIndex({ React, calendarId, activeView, projectId,
     });
   }, [calendarId]);
   React.useEffect(() => {
-    if (!calendarId || activeView !== 'gallery') {
+    if (!calendarId || (activeView !== 'gallery' && activeView !== 'history')) {
       setState({ status: 'idle', items: [], total: 0, page: 1, loading: false, complete: false });
       return undefined;
     }
-    void loadPage(1);
+    if (activeView === 'history') void loadAll();
+    else void loadPage(1);
     return undefined;
-  }, [calendarId, activeView, loadPage]);
+  }, [calendarId, activeView, loadPage, loadAll]);
   return { ...state, loadPage, loadAll, patchItems };
 }
 

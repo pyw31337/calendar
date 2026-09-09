@@ -332,6 +332,8 @@ assert(lightboxSource.includes('preloadedPhotoCommentsReady'), 'lightbox must in
 assert(lightboxSource.includes('photoCommentsFetchRef'), 'lightbox comment fetch callback must stay stable across unrelated renders');
 assert(lightboxSource.includes('photoCommentsFetchedRef.current.delete(photoCommentKey)'), 'cancelled or failed comment requests must remain retryable');
 assert(lightboxSource.includes('댓글 다시 불러오기'), 'failed lightbox comment reads must expose an inline retry action');
+assert(lightboxSource.includes('Promise.all(lookupKeys.map'), 'lightbox comment aliases must load in parallel instead of serially blocking date galleries');
+assert(lightboxSource.includes('currentVisualUrl') && lightboxSource.includes('loadedOriginalUrls'), 'lightbox must paint an available thumbnail until the original image finishes loading');
 assert(!summaryGallerySource.includes('const fallbackDate = entryDateStr(entry)'), 'memories must not treat upload time as schedule membership');
 const dateModalSource = fs.readFileSync(new URL('../src/ui/ui-date-modal.js', import.meta.url), 'utf8');
 const photoIndexSource = fs.readFileSync(new URL('../src/core/photo-index.js', import.meta.url), 'utf8');
@@ -359,6 +361,10 @@ assert(appMainSource.includes('taggedMessages') && appMainSource.includes('fetch
 assert(dateModalSource.includes('album.taggedMessages') && dateModalSource.includes('onLoadOlderChat'), 'DateModal must apply album taggedMessages and keep older-chat full-load path');
 assert(dateModalSource.includes('assetKeys.some(assetKey => directKeys.has(assetKey))'), 'tagged chat/memo photos must use the same asset identity as schedule albums');
 assert(photoIndexSource.includes('complete: true'), 'photo index must support complete hydration for cross-page search/date views');
+assert(photoIndexSource.includes("activeView !== 'gallery' && activeView !== 'history'")
+  && photoIndexSource.includes("activeView === 'history') void loadAll()"),
+  'memories and people must hydrate the complete canonical photo index');
+assert(chatGallerySource.includes("activeTab === 'files' ? filteredFiles"), 'gallery date-mode file tab must group files rather than photo rows');
 const appMainImageSource = fs.readFileSync(new URL('../src/core/app-main.js', import.meta.url), 'utf8');
 assert(appMainImageSource.includes('async function sniffImageFormat'), 'image attach must sniff real file bytes before trusting .png names');
 assert(appMainImageSource.includes('withCorrectedImageFile'), 'image attach must rewrite mismatched MIME/extension from sniffed bytes');
@@ -595,7 +601,9 @@ assert(/merge: Boolean\(options\?\.merge\)/.test(firebaseDataScript) && /Boolean
 assert(/writeRootCollectionDocumentWithFallback[\s\S]{0,900}FIRESTORE_WRITE_DEADLINE_MS/.test(firebaseDataScript), 'root collection writes must use the bounded write deadline');
 assert(/withWeatherTimeout/.test(weatherScript) && /WEATHER_FIRESTORE_TIMEOUT_MS/.test(weatherScript), 'weather cache reads and writes must be bounded');
 assert(/withWeatherTimeout\(fetch\(/.test(weatherScript), 'weather external requests must be bounded');
-assert(/hadServiceWorkerControllerAtStartup[\s\S]{0,900}controllerchange[\s\S]{0,180}hadServiceWorkerControllerAtStartup/.test(domainHelpersScript), 'first service worker install must not reload and destroy the app boot');
+assert(/controllerchange[\s\S]{0,400}moyeora:service-worker-updated/.test(domainHelpersScript)
+  && !/controllerchange[\s\S]{0,400}location\.reload/.test(domainHelpersScript),
+  'service worker controller changes must notify without automatically reloading an active session');
 const miscUiScript = fs.readFileSync('src/ui/ui-misc.js', 'utf8');
 assert(miscUiScript.includes('meta[name="build-sha"]') && miscUiScript.includes('extractUpdateBuildId'), 'update banner must compare the loaded build SHA before hashed chunk fallbacks');
 assert(/isAppleWebKit/.test(firebaseDataScript) && /experimentalAutoDetectLongPolling: isAppleWebKit/.test(firebaseDataScript), 'Safari/WebKit must avoid forced Firestore long polling');

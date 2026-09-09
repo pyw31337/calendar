@@ -596,14 +596,15 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   const [imageUrlModalOpen, setImageUrlModalOpen] = React.useState(false);
   const [imageDimensions, setImageDimensions] = React.useState({});
   const [displayUrls, setDisplayUrls] = React.useState(urls);
+  const [loadedOriginalUrls, setLoadedOriginalUrls] = React.useState(() => new Set());
   const [imageLoadFailed, setImageLoadFailed] = React.useState(false);
   // Zoom is PC-only -- mobile already has native pinch-to-zoom on the image, and a live
   // matchMedia listener (not a one-time read) so the buttons correctly appear/disappear if a
   // desktop window is resized narrow or a tablet is rotated while the lightbox is open.
-  const [isDesktop, setIsDesktop] = React.useState(() => typeof window !== 'undefined' && window.matchMedia && !window.matchMedia('(max-width: 640px)').matches);
+  const [isDesktop, setIsDesktop] = React.useState(() => typeof window !== 'undefined' && window.matchMedia && !window.matchMedia('(max-width: 1023px)').matches);
   React.useEffect(() => {
     if (typeof window === 'undefined' || !window.matchMedia) return undefined;
-    const mq = window.matchMedia('(max-width: 640px)');
+    const mq = window.matchMedia('(max-width: 1023px)');
     const onChange = () => setIsDesktop(!mq.matches);
     if (mq.addEventListener) mq.addEventListener('change', onChange);
     else if (mq.addListener) mq.addListener(onChange);
@@ -751,6 +752,28 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   // shows the result immediately instead of only after the Lightbox is closed and reopened.
   const [tagOverrides, setTagOverrides] = React.useState({});
   const currentMeta = Array.isArray(meta) ? (meta[index] || {}) : (meta || {});
+  const currentThumbUrl = String(currentMeta?.thumb || currentMeta?.thumbUrl || '').trim();
+  const currentVisualUrl = currentThumbUrl && currentThumbUrl !== currentUrl && !loadedOriginalUrls.has(currentUrl)
+    ? currentThumbUrl
+    : currentUrl;
+  // Paint the already-loaded thumbnail immediately, then swap in the original only after its
+  // bytes decode. Date-group lightboxes often point at older Storage objects, so binding the
+  // visible <img> directly to the original left a dark blank stage on slow/mobile networks.
+  React.useEffect(() => {
+    if (!currentUrl || !currentThumbUrl || currentThumbUrl === currentUrl || loadedOriginalUrls.has(currentUrl)) return undefined;
+    let cancelled = false;
+    const original = new Image();
+    original.decoding = 'async';
+    original.onload = () => {
+      if (cancelled) return;
+      if (original.naturalWidth && original.naturalHeight) {
+        setImageDimensions(prev => ({ ...prev, [currentUrl]: { width: original.naturalWidth, height: original.naturalHeight } }));
+      }
+      setLoadedOriginalUrls(prev => new Set(prev).add(currentUrl));
+    };
+    original.src = currentUrl;
+    return () => { cancelled = true; original.onload = null; };
+  }, [currentUrl, currentThumbUrl, loadedOriginalUrls]);
   // Never trust a duplicated legacy identity when the rendered assets are different.  A few
   // upload/import paths historically copied the first image's messageId/imageIndex into every
   // metadata row; using that key here made one Firestore comment document appear on the whole
@@ -769,9 +792,9 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   // 바로 보여야 하므로(showInfo 토글과 무관하게) 현재 사진이 바뀔 때마다 불러온다.
   const photoCommentKey = currentIdentity.mediaKey || currentIdentity.refKey || '';
   const legacyPhotoCommentKeys = Array.from(new Set([
+    currentMeta ? (getLegacyMeetingMediaKey(currentMeta, { meetingDate: currentMeta.meetingDate }) || '') : '',
     ...(Array.isArray(currentIdentity.legacyKeys) ? currentIdentity.legacyKeys : []),
-    ...(Array.isArray(currentMeta.legacyKeys) ? currentMeta.legacyKeys : []),
-    currentMeta ? (getLegacyMeetingMediaKey(currentMeta, { meetingDate: currentMeta.meetingDate }) || '') : ''
+    ...(Array.isArray(currentMeta.legacyKeys) ? currentMeta.legacyKeys : [])
   ].filter(key => key && key !== photoCommentKey)));
   const legacyPhotoCommentKeysToken = legacyPhotoCommentKeys.join('|');
   const getPreloadedComments = () => {
@@ -825,24 +848,19 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
       Promise.resolve(photoCommentsFetchRef.current(key)),
       new Promise((_, reject) => setTimeout(() => reject(new Error('photo comments timeout')), 8000))
     ]);
-    fetchWithTimeout(photoCommentKey).then(async result => {
-      const normalized = normalizeCommentsResult(result);
-      const success = normalized.success;
+    const lookupKeys = [photoCommentKey, ...legacyPhotoCommentKeys].slice(0, 12);
+    Promise.all(lookupKeys.map(key => fetchWithTimeout(key)
+      .then(normalizeCommentsResult)
+      .catch(() => ({ success: false, comments: [] })))).then(results => {
+      const success = results.some(result => result.success);
       if (!success) {
         if (!cancelled) setPhotoCommentsStatusByKey(prev => ({ ...prev, [photoCommentKey]: 'error' }));
         return;
       }
-      let resolved = normalized.comments;
-      if (resolved.length === 0) {
-        for (const legacyKey of legacyPhotoCommentKeys) {
-          const legacyResult = await fetchWithTimeout(legacyKey);
-          const legacyNormalized = normalizeCommentsResult(legacyResult);
-          if (legacyNormalized.success && legacyNormalized.comments.length > 0) {
-            resolved = legacyNormalized.comments;
-            break;
-          }
-        }
-      }
+      const canonical = results[0];
+      const resolved = canonical?.comments?.length
+        ? canonical.comments
+        : (results.slice(1).find(result => result.success && result.comments.length > 0)?.comments || []);
       if (!cancelled && Array.isArray(resolved)) {
         completed = true;
         setPhotoCommentsByKey(prev => ({ ...prev, [photoCommentKey]: resolved }));
@@ -1492,10 +1510,8 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     closeLightbox();
   };
   const handleCurrentImageError = () => {
-    const thumbUrl = String(currentMeta && currentMeta.thumb || '').trim();
-    const current = String(currentUrl || '').trim();
-    if (thumbUrl && thumbUrl !== current) {
-      setDisplayUrls(prev => prev.map((item, i) => i === index ? thumbUrl : item));
+    if (currentVisualUrl && currentVisualUrl !== currentUrl) {
+      setLoadedOriginalUrls(prev => new Set(prev).add(currentUrl));
       return;
     }
     setImageLoadFailed(true);
@@ -1701,6 +1717,10 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   const renderSlide = (url, slot) => {
     const wrapperStyle = { width: '33.3333%', flexShrink: 0, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' };
     if (!url) return /*#__PURE__*/React.createElement("div", { style: wrapperStyle });
+    const slideIndex = slot === 'prev' ? index - 1 : (slot === 'next' ? index + 1 : index);
+    const slideMeta = Array.isArray(meta) ? (meta[slideIndex] || {}) : (meta || {});
+    const slideThumb = String(slideMeta.thumb || slideMeta.thumbUrl || '').trim();
+    const visualUrl = slideThumb && slideThumb !== url && !loadedOriginalUrls.has(url) ? slideThumb : url;
 
     if (slot === 'current') {
       if (imageLoadFailed) {
@@ -1730,7 +1750,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
         onClick: handleImageTap
       }, /*#__PURE__*/React.createElement("img", {
         ref: zoomedImgRef,
-        src: url,
+        src: visualUrl,
         alt: "원본 이미지",
         "data-slide": slot,
         draggable: false,
@@ -1761,7 +1781,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     }
 
     return /*#__PURE__*/React.createElement("div", { style: wrapperStyle }, /*#__PURE__*/React.createElement("img", {
-      src: url,
+      src: visualUrl,
       alt: "원본 이미지",
       "data-slide": slot,
       draggable: false,
@@ -1788,7 +1808,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start',
       width: '100%', maxWidth: '100%', overflowX: 'hidden', overflowY: isDesktop ? 'hidden' : 'auto',
       paddingTop: isDesktop ? 0 : 'max(52px, calc(env(safe-area-inset-top, 0px) + 44px))',
-      paddingBottom: isDesktop ? 0 : 'max(8px, env(safe-area-inset-bottom, 0px))', boxSizing: 'border-box',
+      paddingBottom: isDesktop ? 0 : 'max(52px, calc(env(safe-area-inset-bottom, 0px) + 44px))', boxSizing: 'border-box',
       userSelect: 'none'
     }
   }, /*#__PURE__*/React.createElement("input", {
@@ -1897,7 +1917,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     onClick: handleImageTap
   }, /*#__PURE__*/React.createElement("img", {
     ref: zoomedImgRef,
-    src: currentUrl,
+    src: currentVisualUrl,
     alt: "원본 이미지",
     draggable: false,
     decoding: 'async',

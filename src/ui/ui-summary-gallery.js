@@ -79,6 +79,10 @@ function isValidDateString(...args) {
   const f = __gatherUiDeps().isValidDateString || GATHER_APP_UTILS.isValidDateString;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function highlightKeyword(...args) {
+  const f = __gatherUiDeps().highlightKeyword || GATHER_APP_UTILS.highlightKeyword;
+  return typeof f === 'function' ? f(...args) : args[0];
+}
 function removeFirstUrl(...args) {
   const f = __gatherUiDeps().removeFirstUrl || GATHER_APP_UTILS.removeFirstUrl;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -603,9 +607,13 @@ export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalG
         className: "gallery-thumb-grid",
         style: { display: 'grid', gap: '6px', marginTop: '12px' }
       },
-        displayedEntries.map((entry, idx) => /*#__PURE__*/React.createElement("div", {
+        displayedEntries.map((entry, idx) => {
+          const identity = getPhotoCommentIdentity(entry, visibleEntries, { source: entry.source, meetingDate: entry.meetingDate }) || {};
+          const commentCount = getPhotoCommentCount(identity, photoCommentCounts);
+          return /*#__PURE__*/React.createElement("div", {
           key: entry.mediaKey || entry.refKey || entry.full || entry.thumb,
-          style: { position: 'relative' }
+          className: commentCount ? 'gallery-comment-heartbeat' : '',
+          style: { position: 'relative', animationDelay: `${(idx % 7) * 0.9}s` }
         },
           /*#__PURE__*/React.createElement(MediaThumb, {
             src: (entry.thumb && String(entry.thumb)) || (entry.full && String(entry.full)) || '',
@@ -623,12 +631,9 @@ export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalG
             style: { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }
           }),
           PhotoCommentCountBadge && /*#__PURE__*/React.createElement(PhotoCommentCountBadge, {
-            count: (() => {
-              const identity = getPhotoCommentIdentity(entry, visibleEntries, { source: entry.source, meetingDate: entry.meetingDate }) || {};
-              return getPhotoCommentCount(identity, photoCommentCounts);
-            })()
+            count: commentCount
           })
-        ))
+        );})
       )
     ),
     lightbox && /*#__PURE__*/React.createElement(Lightbox, {
@@ -1200,7 +1205,7 @@ export function HistoryView({
   onGetChatMessageOrdinal = null, onGetGalleryPhotoOrdinal = null, onRequestConfirm = null,
   onRemovePhotoFromMemory = null, onRemovePhotosFromMemory = null, onFetchPhotoComments = null, onSavePhotoComments = null,
   onHideMemoryGroup = null, onRestoreMemoryGroup = null, onAddPhotosBackToMemory = null,
-  onFetchMeetingPhotoIndex = null,
+  onFetchMeetingPhotoIndex = null, indexedPhotos = null, indexedPhotoComplete = false, onIndexedPhotoLoadAll = null,
   photoCommentCounts = {}
 }) {
   const React = window.React;
@@ -1462,14 +1467,20 @@ export function HistoryView({
   // 사진)를 결합해, 태그(인물)나 날짜(추억)로 걸러 보여준다.
   const baseHistoryPhotoEntries = React.useMemo(() => {
     const calendarId = calendar && calendar.id ? calendar.id : '';
-    return buildCombinedPhotoEntries(chatMessages, memos, calendar, anniversaries).map(entry => ({
+    const canonical = indexedPhotoComplete && Array.isArray(indexedPhotos)
+      ? indexedPhotos
+      : buildCombinedPhotoEntries(chatMessages, memos, calendar, anniversaries);
+    return canonical.map(entry => ({
       ...entry,
       tags: resolveGalleryLightboxTags(calendarId, entry, {
         localTags: entry.tags != null ? String(entry.tags) : null,
         indexTags: String(entry.tags || '')
       })
     }));
-  }, [chatMessages, memos, calendar, anniversaries]);
+  }, [chatMessages, memos, calendar, anniversaries, indexedPhotos, indexedPhotoComplete]);
+  React.useEffect(() => {
+    if (!indexedPhotoComplete && typeof onIndexedPhotoLoadAll === 'function') void onIndexedPhotoLoadAll();
+  }, [indexedPhotoComplete, onIndexedPhotoLoadAll]);
   // DateModal hydrates meetingPhotoIndex for the open date so album photos appear even when the
   // chat window is incomplete. Memories need the same for anniversary date ranges.
   const [indexedMeetingPhotoEntries, setIndexedMeetingPhotoEntries] = React.useState([]);
@@ -1480,6 +1491,14 @@ export function HistoryView({
   // and drift easily -- session hydrate of the existing index is cheaper and stays accurate.
   const indexedMeetingDatesKeyRef = React.useRef('');
   React.useEffect(() => {
+    // New callers provide the complete canonical photoIndex. Do not also fan out one
+    // meetingPhotoIndex request per anniversary date; that was the main reason History felt
+    // slower than Gallery on mobile. Keep the legacy date loader only as a compatibility fallback.
+    if (typeof onIndexedPhotoLoadAll === 'function') {
+      setIndexedMeetingPhotoEntries([]);
+      indexedMeetingDatesKeyRef.current = '';
+      return;
+    }
     if (typeof onFetchMeetingPhotoIndex !== 'function') {
       setIndexedMeetingPhotoEntries([]);
       indexedMeetingDatesKeyRef.current = '';
@@ -1557,7 +1576,7 @@ export function HistoryView({
       setIndexedMeetingPhotoEntries(entries);
     });
     return () => { cancelled = true; };
-  }, [historyTab, anniversaries, onFetchMeetingPhotoIndex]);
+  }, [historyTab, anniversaries, onFetchMeetingPhotoIndex, onIndexedPhotoLoadAll]);
   const historyPhotoEntries = React.useMemo(() => {
     if (!indexedMeetingPhotoEntries.length) return baseHistoryPhotoEntries;
     const byKey = new Map();
@@ -1825,8 +1844,9 @@ export function HistoryView({
       const commentCount = getPhotoCommentCount(identity, photoCommentCounts) || Math.max(0, Number(photo.commentCount || 0));
       return /*#__PURE__*/React.createElement("button", {
         key: photoKey, type: "button",
+        className: commentCount ? 'gallery-comment-heartbeat' : '',
         onClick: () => checkable ? onToggle(photoKey) : onOpen(idx),
-        style: { position: 'relative', padding: 0, border: 'none', borderRadius: 'var(--radius-sm)', overflow: 'hidden', aspectRatio: '1 / 1', cursor: 'pointer', backgroundColor: 'var(--bg-primary)' }
+        style: { position: 'relative', padding: 0, border: 'none', borderRadius: 'var(--radius-sm)', overflow: 'hidden', aspectRatio: '1 / 1', cursor: 'pointer', backgroundColor: 'var(--bg-primary)', animationDelay: `${(idx % 7) * 0.9}s` }
       },
         /*#__PURE__*/React.createElement("img", {
           src: photo.thumb || photo.full, alt: "", loading: "lazy", decoding: "async",
@@ -2389,8 +2409,9 @@ export function HistoryView({
             return /*#__PURE__*/React.createElement("button", {
               key: photo.mediaKey || photo.refKey || `person_${idx}`,
               type: "button",
+              className: commentCount ? 'gallery-comment-heartbeat' : '',
               onClick: () => openHistoryLightbox(photosForPersonTag, idx),
-              style: { position: 'relative', padding: 0, border: 'none', borderRadius: 'var(--radius-sm)', overflow: 'hidden', aspectRatio: '1 / 1', cursor: 'pointer', backgroundColor: 'var(--bg-primary)' }
+              style: { position: 'relative', padding: 0, border: 'none', borderRadius: 'var(--radius-sm)', overflow: 'hidden', aspectRatio: '1 / 1', cursor: 'pointer', backgroundColor: 'var(--bg-primary)', animationDelay: `${(idx % 7) * 0.9}s` }
             },
               /*#__PURE__*/React.createElement("img", {
                 src: photo.thumb || photo.full, alt: "", loading: "lazy", decoding: "async",
@@ -3736,10 +3757,9 @@ function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind =
 // 이유는 그 프로젝트의 스키마가 바뀌거나 그날 수집이 실패해도 이 탭이 즉시 깨지지 않게 하기
 // 위함 -- 동기화 스크립트가 검증에 실패하면 최근 정상 스냅샷을 그대로 커밋해 유지한다.
 // Resolve already-saved memo text for a culture card so the detail backdrop can seed the
-// composer. Priority: linked anniversary.memo → memos collection (cultureSourceId / title) →
-// date-modal attendance notes on the linked anniversary's start date. Without this, reopening
-// a calendar-linked card always showed an empty memo dropdown even when DateModal already had
-// the note (e.g. "티켓 17,000원").
+// composer. Priority: linked anniversary.memo → content memos collection
+// (cultureSourceId / title). Attendee availability notes belong to DateModal and must never be
+// displayed as the content memo merely because they share a date.
 function resolveExistingCultureMemoText(item, {
   anniversaries = [],
   memos = [],
@@ -3768,20 +3788,7 @@ function resolveExistingCultureMemoText(item, {
     if (byTitle[0]) return String(byTitle[0].text || '').trim();
   }
 
-  // Last-resort: attendance notes the user left on the performance day in DateModal.
-  const getActiveAvailabilities = (__gatherUiDeps().getActiveAvailabilities)
-    || (window.GATHER_APP_UTILS || {}).getActiveAvailabilities;
-  const dateStr = String(ann?.startDate || ann?.date || item.startDate || item.date || '').slice(0, 10);
-  if (dateStr && typeof getActiveAvailabilities === 'function' && calendar) {
-    const notes = getActiveAvailabilities(calendar)
-      .filter(e => e && !isTombstone(e) && e.date === dateStr && String(e.note || '').trim())
-      .map(e => String(e.note || '').trim());
-    if (notes.length === 1) return notes[0];
-    // Prefer a short personal note over multi-line auto text when several exist.
-    const short = notes.find(n => n.length <= 80 && !n.includes('\n'));
-    if (short) return short;
-    if (notes[0]) return notes[0];
-  }
+  void calendar;
   void anniversaryCategory;
   return '';
 }
@@ -4194,7 +4201,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
   // 섞여 들어오는 경우가 있다(예: 운영시간 뒤에 홈페이지 주소가 이어지는 식) -- 그런 URL도
   // 클릭해서 새 창으로 열 수 있도록 설명 텍스트 안의 http(s) 링크만 찾아 <a>로 바꿔준다.
   const renderDescriptionWithLinks = text => {
-    const raw = String(text || '');
+    const raw = String(text || '').replace(/\\r\\n|\\n|\\r/g, '\n').replace(/\r\n?/g, '\n');
     return raw.split(/(https?:\/\/[^\s]+)/g).map((part, i) => {
       if (!/^https?:\/\//.test(part)) return part;
       const trailingMatch = part.match(/[).,!?"'”’]+$/);
@@ -4346,14 +4353,14 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
               : (item.dateLabel || formatCultureDateLabel(item.startDate, item.endDate) || CULTURE_MISSING_LABEL)),
             /*#__PURE__*/React.createElement("div", {
               style: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--text-main)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', wordBreak: 'break-word' }
-            }, item.title),
+            }, highlightKeyword(item.title, searchQuery)),
             isMovieCard ? /*#__PURE__*/React.createElement(React.Fragment, null,
               /*#__PURE__*/React.createElement("div", {
                 style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
-              }, item.ageRating || '등급 정보 없음'),
+              }, highlightKeyword(item.ageRating || '등급 정보 없음', searchQuery)),
               /*#__PURE__*/React.createElement("div", {
                 style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
-              }, `[${item.director || '감독 정보 없음'}] ${Array.isArray(item.cast) && item.cast.length ? item.cast.join(', ') : '출연 정보 없음'}`)
+              }, highlightKeyword(`[${item.director || '감독 정보 없음'}] ${Array.isArray(item.cast) && item.cast.length ? item.cast.join(', ') : '출연 정보 없음'}`, searchQuery))
             ) : /*#__PURE__*/React.createElement(React.Fragment, null,
             // 지역축제는 '장소'와 '주소'가 사실상 같은 정보를 가리키는 경우가 대부분이라
             // (예: 장소="영등포아트홀", 주소="서울 영등포구 ...") 축제 카드에서는 장소 줄을
@@ -4361,10 +4368,10 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
             // 주소만으로는 알 수 없는 별도 정보라 계속 둘 다 보여준다.
             anniversaryCategory !== 'festival' && anniversaryCategory !== 'movie' && /*#__PURE__*/React.createElement("div", {
               style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
-            }, item.venue || CULTURE_MISSING_LABEL),
+            }, highlightKeyword(item.venue || CULTURE_MISSING_LABEL, searchQuery)),
             /*#__PURE__*/React.createElement("div", {
               style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
-            }, item.address || CULTURE_MISSING_LABEL))
+            }, highlightKeyword(item.address || CULTURE_MISSING_LABEL, searchQuery)))
           )
         );
       }),
