@@ -599,12 +599,29 @@ export function ChatGalleryModal({
             const match = owner.match(/^memo:([^:]+):/);
             if (match) messageId = match[1];
           }
+          // Client cannot write photoIndex. When CF denorm lags, index rows reopen with empty
+          // tags even though messages/memos already hold the verified save. Prefer those local
+          // source tags whenever the index row is still empty.
+          let tags = String(photo.tags || '');
+          if (!tags && messageId) {
+            if (source === 'memo') {
+              const memo = (memos || []).find(row => row && row.id === messageId);
+              if (memo && Array.isArray(memo.imageTags)) tags = String(memo.imageTags[imageIndex] || '');
+            } else if (photo.directMediaUrl) {
+              const msg = (chatMessages || []).find(row => row && row.id === messageId);
+              if (msg) tags = String(getDirectMediaTagsForUrl(msg, photo.directMediaUrl) || '');
+            } else {
+              const msg = (chatMessages || []).find(row => row && row.id === messageId);
+              if (msg && Array.isArray(msg.imageTags)) tags = String(msg.imageTags[imageIndex] || '');
+            }
+          }
           return {
             ...photo,
             source,
             uploadSource: photo.uploadSource || (['chat', 'gallery', 'meeting', 'memo'].includes(source) ? source : photo.uploadSource),
             messageId: messageId || photo.messageId,
-            imageIndex
+            imageIndex,
+            tags
           };
         });
     }
@@ -1468,12 +1485,23 @@ export function ChatGalleryModal({
     );
   };
   const renderGalleryLoadMoreButton = props => /*#__PURE__*/React.createElement(GalleryLoadMoreButton, props);
+  // Mobile pagination has no arrows -- a horizontal drag pans the centered page window so more
+  // numbers can be revealed, then a tap (or drag-release past the threshold) selects a page.
+  const [paginationDragPage, setPaginationDragPage] = React.useState(null);
+  const paginationDragRef = React.useRef(null);
+  const paginationSuppressClickRef = React.useRef(false);
+  React.useEffect(() => {
+    setPaginationDragPage(null);
+    paginationDragRef.current = null;
+    paginationSuppressClickRef.current = false;
+  }, [indexedPhotoPage, indexedPhotoTotal]);
   const renderGalleryPagination = () => {
     if (!usingPhotoIndex || indexedPhotoComplete || typeof onIndexedPhotoPageChange !== 'function') return null;
     const pageCount = Math.max(1, Math.ceil(Number(indexedPhotoTotal || 0) / 100));
     if (pageCount <= 1) return null;
     const windowSize = isMobile ? 5 : 10;
-    const pages = getPaginationWindow(indexedPhotoPage, pageCount, windowSize);
+    const focusPage = paginationDragPage != null ? paginationDragPage : indexedPhotoPage;
+    const pages = getPaginationWindow(focusPage, pageCount, windowSize);
     const go = page => {
       if (indexedPhotoLoading || page < 1 || page > pageCount || page === indexedPhotoPage) return;
       void onIndexedPhotoPageChange(page);
@@ -1503,16 +1531,65 @@ export function ChatGalleryModal({
       key: label, type: "button", className: "gallery-pagination-button gallery-pagination-arrow",
       "aria-label": label, disabled: disabled || indexedPhotoLoading, onClick: () => go(page)
     }, glyph);
+    const endMobileDrag = () => {
+      const drag = paginationDragRef.current;
+      paginationDragRef.current = null;
+      if (!drag) return;
+      const target = Math.min(pageCount, Math.max(1, Number(drag.focusPage) || indexedPhotoPage));
+      setPaginationDragPage(null);
+      if (!drag.moved) return;
+      // Prevent the synthesized click on the button under the finger from also selecting a page.
+      paginationSuppressClickRef.current = true;
+      if (target !== indexedPhotoPage) go(target);
+    };
+    const mobileDragProps = isMobile ? {
+      onPointerDown: event => {
+        if (indexedPhotoLoading || event.button != null && event.button !== 0) return;
+        paginationDragRef.current = {
+          pointerId: event.pointerId,
+          startX: event.clientX,
+          originPage: focusPage,
+          focusPage,
+          moved: false
+        };
+        try { event.currentTarget.setPointerCapture(event.pointerId); } catch (_) { /* ignore */ }
+      },
+      onPointerMove: event => {
+        const drag = paginationDragRef.current;
+        if (!drag || drag.pointerId !== event.pointerId) return;
+        const delta = event.clientX - drag.startX;
+        if (Math.abs(delta) < 12 && !drag.moved) return;
+        // Drag left reveals higher page numbers (content moves with the finger).
+        const pageDelta = Math.round(-delta / 44);
+        const next = Math.min(pageCount, Math.max(1, drag.originPage + pageDelta));
+        drag.moved = true;
+        drag.focusPage = next;
+        if (paginationDragPage !== next) setPaginationDragPage(next);
+        event.preventDefault();
+      },
+      onPointerUp: endMobileDrag,
+      onPointerCancel: endMobileDrag
+    } : {};
     return /*#__PURE__*/React.createElement("nav", {
-      className: `gallery-pagination${isMobile ? ' is-mobile' : ''}`,
-      "aria-label": "갤러리 페이지"
+      className: `gallery-pagination${isMobile ? ' is-mobile is-swipeable' : ''}`,
+      "aria-label": "갤러리 페이지",
+      ...mobileDragProps
     },
       !isMobile && arrow('첫 페이지', 1, indexedPhotoPage <= 1, doubleChevron('left')),
       !isMobile && arrow('이전 페이지', indexedPhotoPage - 1, indexedPhotoPage <= 1, chevron('left')),
       pages.map(page => /*#__PURE__*/React.createElement("button", {
-        key: page, type: "button", className: `gallery-pagination-button${page === indexedPhotoPage ? ' is-active' : ''}`,
+        key: page, type: "button", className: `gallery-pagination-button${page === indexedPhotoPage ? ' is-active' : ''}${page === focusPage && page !== indexedPhotoPage ? ' is-focus' : ''}`,
         "aria-current": page === indexedPhotoPage ? 'page' : undefined,
-        disabled: indexedPhotoLoading, onClick: () => go(page)
+        disabled: indexedPhotoLoading,
+        onClick: event => {
+          if (paginationSuppressClickRef.current) {
+            paginationSuppressClickRef.current = false;
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          }
+          go(page);
+        }
       }, String(page))),
       !isMobile && arrow('다음 페이지', indexedPhotoPage + 1, indexedPhotoPage >= pageCount, chevron('right')),
       !isMobile && arrow('마지막 페이지', pageCount, indexedPhotoPage >= pageCount, doubleChevron('right'))
