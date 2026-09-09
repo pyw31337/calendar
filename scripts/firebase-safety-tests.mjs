@@ -237,6 +237,11 @@ const photoIndexSource = fs.readFileSync(new URL('../src/core/photo-index.js', i
 assert(dateModalSource.includes('getPhotoAssetKeys(photo)'), 'schedule albums must dedupe REST/index/live copies by original or thumbnail asset');
 assert(dateModalSource.includes('assetKeys.some(assetKey => directKeys.has(assetKey))'), 'tagged chat/memo photos must use the same asset identity as schedule albums');
 assert(photoIndexSource.includes('complete: true'), 'photo index must support complete hydration for cross-page search/date views');
+const appMainImageSource = fs.readFileSync(new URL('../src/core/app-main.js', import.meta.url), 'utf8');
+assert(appMainImageSource.includes('async function sniffImageFormat'), 'image attach must sniff real file bytes before trusting .png names');
+assert(appMainImageSource.includes('withCorrectedImageFile'), 'image attach must rewrite mismatched MIME/extension from sniffed bytes');
+assert(appMainImageSource.includes("sniffed?.kind === 'heic'"), 'HEIC bytes with a .png name must still take the HEIC convert path');
+
 assert(photoIndexSource.includes("sourceEquals: 'anniversary'"), 'gallery photo count must subtract anniversary/content posters');
 assert(photoIndexSource.includes('filterGalleryPhotoIndexItems'), 'gallery photo index pages must drop anniversary/content posters');
 assert(chatGallerySource.includes("source === 'anniversary'"), 'gallery 사진 tab must exclude anniversary/content posters');
