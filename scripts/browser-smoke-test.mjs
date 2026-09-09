@@ -280,7 +280,10 @@ async function checkLightboxZoomControls(browser, baseUrl) {
     const hasThumb = await thumb.count();
     if (!hasThumb) { console.log(`  (skip) ${label} -- 메인 갤러리에 사진이 없어 검사 생략`); await context.close(); return; }
     await thumb.click();
-    await page.locator('img[alt="원본 이미지"]').first().click();
+    // Swipe-enabled lightboxes keep prev/current/next images mounted. `.first()` can select the
+    // off-screen previous slide in WebKit, so target the current slide (or the non-carousel image)
+    // explicitly before checking zoom controls.
+    await page.locator('img[alt="원본 이미지"][data-slide="current"], img[alt="원본 이미지"]:not([data-slide])').first().click();
     await page.locator('button[title="확대"]').waitFor({ state: 'visible', timeout: 5000 });
     await page.locator('button[title="축소"]').waitFor({ state: 'visible', timeout: 5000 });
     pass(label);
