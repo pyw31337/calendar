@@ -2198,6 +2198,10 @@ function CalendarApp() {
   // 비워뒀으면(기본 상태) 행사 정보 자체를 메모 본문으로 등록한다. 새 메모 작성 흐름은
   // ui-memo-view.js의 handleAddMemo와 같은 컬렉션/활동로그 패턴을 따르되, 이미지/태그 등
   // 이 화면에 없는 입력은 다루지 않는다.
+  //
+  // Also mirrors the text onto the linked anniversary's `memo` field (and stamps
+  // cultureSourceId on the memo doc) so reopening the content backdrop can seed the same
+  // rounded field instead of always looking empty.
   const handleQuickSaveCultureMemo = async (item, customText = '') => {
     if (!activeCal?.id) return false;
     const trimmedCustom = String(customText || '').trim();
@@ -2205,30 +2209,57 @@ function CalendarApp() {
     if (!text) return false;
     const participantId = getCurrentChatParticipantId() || '';
     const stamp = Date.now();
-    const memoId = `memo_${stamp}_${Math.random().toString(36).slice(2, 8)}`;
+    const itemId = String(item?.id || '').trim();
+    const itemTitle = String(item?.title || '').trim();
+    const linkedAnn = (anniversaries || []).find(a => a && (
+      (itemId && (a.cultureSourceId === itemId || a.id === itemId))
+      || (itemTitle && String(a.title || '').trim() === itemTitle && ['festival', 'event', 'sports', 'movie'].includes(a.category))
+    )) || null;
+    const existingMemo = (memos || []).find(m => m && !isTombstone(m) && (
+      (itemId && String(m.cultureSourceId || '').trim() === itemId)
+      || (itemTitle && String(m.title || '').trim() === itemTitle && String(m.cultureSourceId || '').trim() === itemId)
+    )) || (itemTitle
+      ? (memos || [])
+          .filter(m => m && !isTombstone(m) && String(m.title || '').trim() === itemTitle)
+          .sort((a, b) => (Number(b.updatedAt) || Number(b.createdAt) || 0) - (Number(a.updatedAt) || Number(a.createdAt) || 0))[0]
+      : null);
+    const memoId = existingMemo?.id || `memo_${stamp}_${Math.random().toString(36).slice(2, 8)}`;
     const memoData = {
       id: memoId,
-      participantId,
-      title: item?.title || '',
+      participantId: existingMemo?.participantId || participantId,
+      title: itemTitle || existingMemo?.title || '',
       text,
-      imageUrls: [],
-      thumbUrls: [],
-      color: 'var(--bg-card)',
-      isPinned: false,
-      tags: [],
-      createdAt: stamp,
+      imageUrls: Array.isArray(existingMemo?.imageUrls) ? existingMemo.imageUrls : [],
+      thumbUrls: Array.isArray(existingMemo?.thumbUrls) ? existingMemo.thumbUrls : [],
+      color: existingMemo?.color || 'var(--bg-card)',
+      isPinned: !!existingMemo?.isPinned,
+      tags: Array.isArray(existingMemo?.tags) ? existingMemo.tags : [],
+      createdAt: existingMemo?.createdAt || stamp,
       updatedAt: stamp
     };
+    if (itemId) memoData.cultureSourceId = itemId;
     try {
       const saved = await writeCollectionDocumentWithFallback('memos', activeCal.id, memoId, sanitizeMemoForFirestore(memoData), 'set', '문화공연 메모 저장');
       if (!saved?.success) throw new Error('Culture event memo save failed');
-      const logNote = item?.title ? `제목: ${item.title}` : (text.slice(0, 30) + (text.length > 30 ? '...' : ''));
-      const activityLog = createMemoActivityLog(activeCal.id, 'memo_create', participantId, stamp, logNote);
-      if (activityLog) {
-        const nextCal = { ...activeCal, updatedAt: stamp, revision: (activeCal.revision || 0) + 1 };
-        await pushSingleCloudCalendar(nextCal, stamp, 4, null, 'settings', [activityLog]);
+      setMemos(prev => {
+        const list = Array.isArray(prev) ? prev.filter(m => m && m.id !== memoId) : [];
+        list.unshift(memoData);
+        return list;
+      });
+      if (linkedAnn?.id) {
+        const annPatch = { id: linkedAnn.id, memo: trimmedCustom || text, updatedAt: stamp };
+        const annSaved = await writeCollectionDocumentWithFallback('anniversaries', activeCal.id, linkedAnn.id, annPatch, 'update', '문화공연 연동 메모 저장');
+        if (annSaved?.success) handleAnniversarySaved({ ...linkedAnn, ...annPatch });
       }
-      showToast('메모에 등록되었습니다.', 'success');
+      if (!existingMemo) {
+        const logNote = itemTitle ? `제목: ${itemTitle}` : (text.slice(0, 30) + (text.length > 30 ? '...' : ''));
+        const activityLog = createMemoActivityLog(activeCal.id, 'memo_create', participantId, stamp, logNote);
+        if (activityLog) {
+          const nextCal = { ...activeCal, updatedAt: stamp, revision: (activeCal.revision || 0) + 1 };
+          await pushSingleCloudCalendar(nextCal, stamp, 4, null, 'settings', [activityLog]);
+        }
+      }
+      showToast(existingMemo ? '메모가 수정되었습니다.' : '메모에 등록되었습니다.', 'success');
       return true;
     } catch (err) {
       console.error('Failed to save culture event memo:', err);
@@ -7538,6 +7569,7 @@ function CalendarApp() {
         onBack: () => changeView('calendar'),
         onOpenAppSettings: () => setIsAppSettingsOpen(true),
         anniversaries: anniversaries,
+        memos: memos,
         onRegisterCultureEvent: handleRegisterCultureEvent,
         onUnregisterCultureEvent: handleUnregisterCultureEvent,
         onQuickSaveMemo: handleQuickSaveCultureMemo,
