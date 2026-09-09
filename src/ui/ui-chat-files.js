@@ -24,6 +24,79 @@ function isPdfAttachment() {
   return typeof f === "function" ? f.apply(null, args) : false;
 }
 
+
+function isHttpUrl(value) {
+  try {
+    var u = new URL(String(value || ""), typeof window !== "undefined" ? window.location.href : "https://local.invalid");
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch (_) {
+    return false;
+  }
+}
+
+/** iOS/WebKit often cannot inline-render cross-origin Firebase Storage PDFs in an iframe
+ *  (shows gray PDF icon + encoded storage path + 「열기」). Same-origin blob: URLs work. */
+function usePdfPreviewUrl(sourceUrl, enabled) {
+  var React = window.React;
+  var _state = React.useState({ status: enabled ? "idle" : "skip", url: null, error: null });
+  var state = _state[0];
+  var setState = _state[1];
+
+  React.useEffect(function() {
+    if (!enabled) {
+      setState({ status: "skip", url: null, error: null });
+      return undefined;
+    }
+    if (!sourceUrl || !isHttpUrl(sourceUrl)) {
+      setState({ status: "error", url: null, error: "invalid-url" });
+      return undefined;
+    }
+
+    var cancelled = false;
+    var objectUrl = null;
+    setState({ status: "loading", url: null, error: null });
+
+    fetch(sourceUrl, {
+      method: "GET",
+      mode: "cors",
+      credentials: "omit",
+      referrerPolicy: "no-referrer",
+      cache: "force-cache"
+    }).then(function(res) {
+      if (!res.ok) throw new Error("http-" + res.status);
+      return res.blob();
+    }).then(function(blob) {
+      if (cancelled) return;
+      var typed = blob && blob.type === "application/pdf"
+        ? blob
+        : new Blob([blob], { type: "application/pdf" });
+      objectUrl = URL.createObjectURL(typed);
+      setState({ status: "ready", url: objectUrl, error: null });
+    }).catch(function(err) {
+      if (cancelled) return;
+      var ua = typeof navigator !== "undefined" ? String(navigator.userAgent || "") : "";
+      var isAppleMobile = /iP(hone|od|ad)/.test(ua)
+        || (typeof navigator !== "undefined" && navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+      // Desktop browsers can often iframe the remote Storage URL; iOS/WebKit usually cannot,
+      // so prefer an explicit open fallback over the native gray-PDF + encoded-path + 「열기」 UI.
+      if (isAppleMobile) {
+        setState({ status: "error", url: null, error: err && err.message ? err.message : "fetch-failed" });
+      } else {
+        setState({ status: "remote", url: sourceUrl, error: err && err.message ? err.message : "fetch-failed" });
+      }
+    });
+
+    return function() {
+      cancelled = true;
+      if (objectUrl) {
+        try { URL.revokeObjectURL(objectUrl); } catch (_) {}
+      }
+    };
+  }, [sourceUrl, enabled]);
+
+  return state;
+}
+
 function FileTypeBadge(props) {
   var React = window.React;
   var label = (props && props.label) || "FILE";
@@ -193,11 +266,15 @@ export function DocumentLightbox(props) {
     return function() { window.removeEventListener("keydown", onKey); };
   }, [onClose, onNavigate, safeIndex, list.length]);
 
+  var pdfForPreview = current ? isPdfAttachment(current) : false;
+  var preview = usePdfPreviewUrl(current && current.url, !!pdfForPreview);
+
   if (!current) return null;
   var typeLabel = getChatFileTypeLabel(current);
   var sizeLabel = formatChatFileSize(current.size);
   var pdf = isPdfAttachment(current);
   var scale = zoomLevel / 100;
+  var previewSrc = preview.url || (pdf ? current.url : null);
 
   var handleZoomIn = function(e) {
     if (e) { e.preventDefault(); e.stopPropagation(); }
@@ -318,31 +395,109 @@ export function DocumentLightbox(props) {
           ? React.createElement("div", {
               style: {
                 width: "100%", minHeight: "70vh", overflow: "auto",
-                background: "#fff"
+                background: "#fff", position: "relative"
               }
             },
-              React.createElement("div", {
-                style: {
-                  transform: "scale(" + scale + ")",
-                  transformOrigin: "top left",
-                  width: (100 / scale) + "%",
-                  height: (100 / scale) + "%",
-                  minHeight: "70vh"
-                }
-              },
-                React.createElement("iframe", {
-                  title: current.name || "PDF",
-                  src: current.url,
-                  style: {
-                    width: "100%",
-                    minHeight: "70vh",
-                    height: "70vh",
-                    border: "none",
-                    background: "#fff",
-                    display: "block"
-                  }
-                })
-              )
+              preview.status === "loading" || preview.status === "idle"
+                ? React.createElement("div", {
+                    style: {
+                      minHeight: "70vh", display: "flex", alignItems: "center",
+                      justifyContent: "center", color: "var(--text-muted)", fontWeight: 700
+                    }
+                  }, "PDF 불러오는 중...")
+                : null,
+              preview.status === "error"
+                ? React.createElement("div", {
+                    style: {
+                      minHeight: "70vh", margin: "auto", display: "flex", flexDirection: "column",
+                      alignItems: "center", justifyContent: "center", gap: "12px",
+                      textAlign: "center", padding: "16px", color: "var(--text-main)"
+                    }
+                  },
+                    React.createElement(FileTypeBadge, { label: typeLabel, attachment: current }),
+                    React.createElement("div", { style: { fontWeight: 800 } }, "PDF를 미리볼 수 없습니다."),
+                    React.createElement("div", {
+                      style: { color: "var(--text-muted)", fontSize: "var(--font-size-md)", fontWeight: 600, overflowWrap: "anywhere" }
+                    }, current.name || ""),
+                    React.createElement("a", {
+                      href: current.url, target: "_blank", rel: "noopener noreferrer",
+                      style: {
+                        height: "40px", padding: "0 16px", borderRadius: "12px", background: "#57606F",
+                        color: "#fff", display: "inline-flex", alignItems: "center", fontWeight: 900,
+                        textDecoration: "none"
+                      }
+                    }, "열기")
+                  )
+                : (preview.status === "ready" || preview.status === "remote")
+                ? React.createElement("div", {
+                    style: {
+                      transform: "scale(" + scale + ")",
+                      transformOrigin: "top left",
+                      width: (100 / scale) + "%",
+                      height: (100 / scale) + "%",
+                      minHeight: "70vh"
+                    }
+                  },
+                    // Prefer same-origin blob URL (mobile Safari). object+embed covers WebKit
+                    // quirks where iframe alone still shows the native 「열기」 fallback.
+                    React.createElement("object", {
+                      data: previewSrc,
+                      type: "application/pdf",
+                      title: current.name || "PDF",
+                      style: {
+                        width: "100%",
+                        minHeight: "70vh",
+                        height: "70vh",
+                        border: "none",
+                        background: "#fff",
+                        display: "block"
+                      }
+                    },
+                      React.createElement("embed", {
+                        src: previewSrc,
+                        type: "application/pdf",
+                        title: current.name || "PDF",
+                        style: {
+                          width: "100%",
+                          minHeight: "70vh",
+                          height: "70vh",
+                          border: "none",
+                          background: "#fff",
+                          display: "block"
+                        }
+                      }),
+                      React.createElement("iframe", {
+                        title: current.name || "PDF",
+                        src: previewSrc,
+                        style: {
+                          width: "100%",
+                          minHeight: "70vh",
+                          height: "70vh",
+                          border: "none",
+                          background: "#fff",
+                          display: "block"
+                        }
+                      }),
+                      React.createElement("div", {
+                        style: {
+                          padding: "16px", display: "flex", flexDirection: "column",
+                          alignItems: "center", gap: "12px", textAlign: "center"
+                        }
+                      },
+                        React.createElement(FileTypeBadge, { label: typeLabel, attachment: current }),
+                        React.createElement("div", { style: { fontWeight: 800 } }, "이 기기에서 PDF 미리보기를 지원하지 않습니다."),
+                        React.createElement("a", {
+                          href: current.url, target: "_blank", rel: "noopener noreferrer",
+                          style: {
+                            height: "40px", padding: "0 16px", borderRadius: "12px", background: "#57606F",
+                            color: "#fff", display: "inline-flex", alignItems: "center", fontWeight: 900,
+                            textDecoration: "none"
+                          }
+                        }, "열기")
+                      )
+                    )
+                  )
+                : null
             )
           : React.createElement("div", {
               style: {

@@ -1781,10 +1781,14 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     style: {
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
       backgroundColor: 'rgba(15, 23, 42, 0.92)', WebkitBackdropFilter: 'blur(8px)', backdropFilter: 'blur(8px)', zIndex: 50000,
-      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: isDesktop ? 'center' : 'flex-start',
+      // Mobile used flex-start so the photo+comment stack clung to the top of the dimmed
+      // overlay (large empty band below). Treat image/map + comment thread (+ dots) as one
+      // chunk and vertically center that unit via margin:auto on the chunk; flex-start on the
+      // overlay keeps tall threads scrollable from the top instead of clipping both ends.
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start',
       width: '100%', maxWidth: '100%', overflowX: 'hidden', overflowY: isDesktop ? 'hidden' : 'auto',
       paddingTop: isDesktop ? 0 : 'max(52px, calc(env(safe-area-inset-top, 0px) + 44px))',
-      paddingBottom: isDesktop ? 0 : '8px', boxSizing: 'border-box',
+      paddingBottom: isDesktop ? 0 : 'max(8px, env(safe-area-inset-bottom, 0px))', boxSizing: 'border-box',
       userSelect: 'none'
     }
   }, /*#__PURE__*/React.createElement("input", {
@@ -1848,6 +1852,21 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     xmlns: "http://www.w3.org/2000/svg", width: "22", height: "22", viewBox: "0 0 24 24",
     fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
   }, /*#__PURE__*/React.createElement("path", { d: "M9 6l6 6l-6 6" }))),
+  /*#__PURE__*/React.createElement("div", {
+    className: "lightbox-content-chunk",
+    style: {
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      width: '100%',
+      maxWidth: '100%',
+      flexShrink: 0,
+      // Centers the photo/map + comment block as one unit when shorter than the overlay;
+      // collapses when the stack is taller so overflowY:auto can reach the top.
+      marginTop: 'auto',
+      marginBottom: 'auto'
+    }
+  },
   total > 1 ? /*#__PURE__*/React.createElement("div", {
     ref: imgAreaRef,
     onMouseDown: e => handleDragStart(e.clientX),
@@ -1952,7 +1971,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
         })
       )
     );
-  })(), imageUrlModalOpen && /*#__PURE__*/React.createElement(ImageUrlModal, {
+  })()), imageUrlModalOpen && /*#__PURE__*/React.createElement(ImageUrlModal, {
     imageUrl: currentUrl,
     tags: currentTags,
     onClose: () => setImageUrlModalOpen(false),
