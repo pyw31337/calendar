@@ -2,6 +2,8 @@
  * Summary list, photo gallery, category tabs (P4-11)
  */
 
+import { composeGalleryPhotos } from '../core/gallery-data.js';
+
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
@@ -109,115 +111,30 @@ function normalizePhotoUrl(value) {
 // Combines chat message images, memo images, and confirmed-meeting photos into one flat, deduped,
 // newest-first list -- shared by PhotoGallery (갤러리 페이지) and HistoryView's 인물/추억 tabs so
 // both browse exactly the same photo set instead of two independently-built ones drifting apart.
+// Delegates to composeGalleryPhotos so main-screen lightbox slides use the same durable identity
+// dedupe (message slot + asset/thumb URL) as the full gallery page.
 function buildCombinedPhotoEntries(chatMessages, memos, calendar, anniversaries = []) {
   const __deps = window.GATHER_UI_DEPS || {};
   const resolveMeetingPhotoDisplay = __deps.resolveMeetingPhotoDisplay;
-  const sorted = [...(chatMessages || [])].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-  const chatEntries = sorted.flatMap(msg => {
-    if (!msg || isTombstone(msg)) return [];
-    const directEntry = getMessageDirectMediaEntry(msg);
-    const entries = directEntry ? [...getMessageImageEntries(msg), directEntry] : getMessageImageEntries(msg);
-    return entries.map((entry) => ({ ...entry, source: entry.source || 'chat', timestamp: msg.timestamp }));
-  });
-  const memoEntries = (memos || []).flatMap(memo => {
-    if (!memo || isTombstone(memo)) return [];
-    const memoImageTags = Array.isArray(memo.imageTags) ? memo.imageTags : [];
-    const asMsg = {
-      id: memo.id, text: memo.text || memo.content || memo.body || '',
-      imageUrl: memo.imageUrl, imageUrls: memo.imageUrls, thumbUrl: memo.thumbUrl, thumbUrls: memo.thumbUrls,
-      imageTags: memoImageTags,
-      timestamp: memo.updatedAt || memo.createdAt || 0, participantId: memo.participantId || '',
-      uploadSource: 'memo'
-    };
-    const directEntry = getMessageDirectMediaEntry(asMsg);
-    const entries = directEntry ? [...getMessageImageEntries(asMsg), directEntry] : getMessageImageEntries(asMsg);
-    return entries.map((entry, idx) => ({
-      ...entry,
-      tags: String(entry.tags || memoImageTags[entry.imageIndex ?? idx] || ''),
-      source: 'memo',
-      timestamp: asMsg.timestamp
-    }));
-  });
-  const meetingEntries = [];
-  getConfirmedMeetings(calendar).forEach(meeting => {
-    const photos = Array.isArray(meeting?.photos) ? meeting.photos : [];
-    photos.forEach((photo, index) => {
-      if (!photo || isTombstone(photo)) return;
-      const resolved = resolveMeetingPhotoDisplay ? resolveMeetingPhotoDisplay(photo, chatMessages) : null;
-      const full = normalizePhotoUrl(resolved?.imageUrl || photo?.imageUrl || photo?.full || '');
-      const thumb = normalizePhotoUrl(resolved?.thumbUrl || photo?.thumbUrl || photo?.thumb || full);
-      if (!full && !thumb) return;
-      const mediaKey = resolved?.mediaKey
-        || photo?.mediaKey
-        || (photo?.sourceMessageId && Number.isInteger(photo?.sourceImageIndex)
-          ? `chat:${photo.sourceMessageId}:${photo.sourceImageIndex}`
-          : `meeting:${meeting.date || 'date'}:${photo?.id || index}`);
-      const refKey = resolved?.refKey || photo?.refKey || `meeting:${meeting.date || 'date'}:${photo?.id || index}`;
-      meetingEntries.push({
-        full: full || thumb,
-        thumb: thumb || full,
-        imageIndex: index,
-        messageId: null,
-        photoId: photo?.id || '',
-        sourceMessageId: photo?.sourceMessageId || '',
-        sourceImageIndex: Number.isInteger(photo?.sourceImageIndex) ? photo.sourceImageIndex : null,
-        timestamp: Number(photo?.createdAt || photo?.updatedAt || meeting?.confirmedAt || 0),
-        tags: String(resolved?.tags ?? photo?.tags ?? ''),
-        directMediaUrl: '',
-        source: 'meeting',
-        meetingDate: meeting.date || '',
-        mediaKey,
-        refKey
-      });
+  const getAllDirectMediaImageEntries = __deps.getAllDirectMediaImageEntries
+    || ((msg) => {
+      const direct = getMessageDirectMediaEntry(msg);
+      return direct ? [direct] : [];
     });
+  return composeGalleryPhotos({
+    chatMessages: chatMessages || [],
+    memos: memos || [],
+    calendar,
+    anniversaries: anniversaries || [],
+    isTombstone,
+    getMessageImageEntries,
+    getAllDirectMediaImageEntries,
+    getConfirmedMeetings,
+    resolveMeetingPhotoDisplay,
+    // Keep invalid/empty URLs out; broken-at-runtime filtering stays in PhotoGallery.
+    isBrokenPhotoValue: (value) => !normalizePhotoUrl(value),
+    getPhotoAssetCommentKey
   });
-  // Anniversary photos live on the anniversary document itself rather than in chat/memo or
-  // confirmed-meeting photo arrays. Keep them in the same flat source used by the History
-  // memories tab so a calendar event with an attached photo is always discoverable there.
-  const anniversaryEntries = [];
-  (Array.isArray(anniversaries) ? anniversaries : []).forEach(anniversary => {
-    const photos = Array.isArray(anniversary?.photos) ? anniversary.photos : [];
-    const anniversaryDate = String(anniversary?.date || anniversary?.startDate || anniversary?.endDate || '').slice(0, 10);
-    photos.forEach((photo, index) => {
-      const full = normalizePhotoUrl(photo?.imageUrl || photo?.url || photo?.full || photo?.src || '');
-      const thumb = normalizePhotoUrl(photo?.thumbUrl || photo?.thumbnailUrl || photo?.thumb || full);
-      if (!full && !thumb) return;
-      const mediaKey = photo?.mediaKey || `anniversary:${anniversary?.id || anniversaryDate || 'date'}:${photo?.id || index}`;
-      const refKey = photo?.refKey || mediaKey;
-      anniversaryEntries.push({
-        full: full || thumb,
-        thumb: thumb || full,
-        imageIndex: index,
-        messageId: null,
-        photoId: photo?.id || '',
-        sourceMessageId: '',
-        sourceImageIndex: null,
-        timestamp: Number(photo?.createdAt || photo?.updatedAt || anniversary?.updatedAt || 0),
-        tags: String(photo?.tags || ''),
-        directMediaUrl: '',
-        source: 'anniversary',
-        anniversaryId: anniversary?.id || '',
-        meetingDate: anniversaryDate,
-        mediaKey,
-        refKey
-      });
-    });
-  });
-  const byUrl = new Map();
-  const sourceRank = { chat: 0, memo: 1, meeting: 2, anniversary: 3 };
-  [...chatEntries, ...memoEntries, ...meetingEntries, ...anniversaryEntries].forEach(entry => {
-    const key = entry.mediaKey || entry.refKey || entry.full || entry.thumb;
-    if (!key) return;
-    const existing = byUrl.get(key);
-    if (!existing) {
-      byUrl.set(key, { ...entry });
-    } else if ((sourceRank[entry.source] ?? 9) < (sourceRank[existing.source] ?? 9)) {
-      byUrl.set(key, { ...entry, meetingDate: entry.meetingDate || existing.meetingDate || '' });
-    } else if (!existing.meetingDate && entry.meetingDate) {
-      existing.meetingDate = entry.meetingDate;
-    }
-  });
-  return Array.from(byUrl.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 }
 function copyTextToClipboard(...args) {
   const f = __gatherUiDeps().copyTextToClipboard || GATHER_APP_UTILS.copyTextToClipboard;
