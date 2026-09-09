@@ -910,8 +910,8 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
         // Ready threads size to their comment count + composer. A fixed minHeight here used to
         // keep a tall empty band under sparse threads; only loading/error keep a tap target floor.
         minHeight: commentStatus === 'ready' ? undefined : (isDesktop ? '64px' : '58px'),
-        maxHeight: isDesktop ? '55vh' : 'none',
-        overflowY: isDesktop ? 'auto' : 'visible', resize: isDesktop ? 'vertical' : 'none',
+        maxHeight: isDesktop ? '55vh' : '28dvh',
+        overflowY: 'auto', resize: isDesktop ? 'vertical' : 'none',
         marginTop: isDesktop ? '4px' : '0', padding: isDesktop ? '10px 14px' : '6px 10px',
         flexShrink: 0,
         backgroundColor: 'rgba(15, 23, 42, 0.72)', border: '1px solid rgba(255,255,255,0.12)',
@@ -1689,7 +1689,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   // sit directly under the photo and a short comment list no longer needs an inner/outer scroll
   // just to bridge empty stage space.
   const mobileImageMaxPx = !isDesktop && typeof window !== 'undefined'
-    ? Math.round((window.visualViewport?.height || window.innerHeight) * 0.56)
+    ? Math.max(160, Math.round((window.visualViewport?.height || window.innerHeight) * 0.42) - 8)
     : null;
   const mobileStageHeightPx = (() => {
     if (isDesktop || mobileImageMaxPx == null) return null;
@@ -1707,7 +1707,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     : {
         width: '92vw',
         height: `${mobileStageHeightPx}px`,
-        maxHeight: '56dvh',
+        maxHeight: '42dvh',
         overflow: 'hidden',
         flexShrink: 0
       };
@@ -1805,8 +1805,8 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
       // overlay keeps tall threads scrollable from the top instead of clipping both ends.
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start',
       width: '100%', maxWidth: '100%', overflowX: 'hidden', overflowY: isDesktop ? 'hidden' : 'auto',
-      paddingTop: isDesktop ? 0 : 'max(52px, calc(env(safe-area-inset-top, 0px) + 44px))',
-      paddingBottom: isDesktop ? 0 : 'max(52px, calc(env(safe-area-inset-bottom, 0px) + 44px))', boxSizing: 'border-box',
+      paddingTop: isDesktop ? 0 : 'max(44px, calc(env(safe-area-inset-top, 0px) + 36px))',
+      paddingBottom: isDesktop ? 0 : 'max(12px, calc(env(safe-area-inset-bottom, 0px) + 8px))', boxSizing: 'border-box',
       userSelect: 'none'
     }
   }, /*#__PURE__*/React.createElement("input", {
@@ -1878,11 +1878,11 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
       alignItems: 'center',
       width: '100%',
       maxWidth: '100%',
-      flexShrink: 0,
-      // Centers the photo/map + comment block as one unit when shorter than the overlay;
-      // collapses when the stack is taller so overflowY:auto can reach the top.
-      marginTop: 'auto',
-      marginBottom: 'auto'
+      flexShrink: 1,
+      minHeight: 0,
+      gap: '8px',
+      marginTop: 0,
+      marginBottom: 0
     }
   },
   total > 1 ? /*#__PURE__*/React.createElement("div", {
@@ -1907,7 +1907,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     }
   }, renderSlide(index > 0 ? displayUrls[index - 1] : null, 'prev'), renderSlide(currentUrl, 'current'), renderSlide(index < total - 1 ? displayUrls[index + 1] : null, 'next')))
     : /*#__PURE__*/React.createElement("div", {
-    style: { position: 'relative', display: 'inline-flex', maxWidth: '92vw', maxHeight: isDesktop ? '82vh' : '56dvh', touchAction: 'none' },
+    style: { position: 'relative', display: 'inline-flex', maxWidth: '92vw', maxHeight: isDesktop ? '82vh' : '42dvh', touchAction: 'none' },
     onTouchStart: handleTouchStart,
     onTouchMove: handleTouchMove,
     onTouchEnd: handleTouchEnd,
@@ -1923,7 +1923,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     onLoad: e => recordImageDimensions(currentUrl, e),
     onMouseDown: handleZoomedImageMouseDown,
     style: {
-      maxWidth: '92vw', maxHeight: isDesktop ? '82vh' : '56dvh', borderRadius: 'var(--radius-md)', objectFit: 'contain',
+      maxWidth: '92vw', maxHeight: isDesktop ? '82vh' : '42dvh', borderRadius: 'var(--radius-md)', objectFit: 'contain',
       display: 'block', ...zoomImageStyle
     }
   }), renderPhotoActions(),
