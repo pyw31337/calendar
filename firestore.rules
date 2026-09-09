@@ -113,6 +113,14 @@ service cloud.firestore {
             || (data.directMediaTags is map && data.directMediaTags.size() <= 50)
           ));
       }
+      // In-app chat document attachments (pdf/office/text). Kept separate from imageUrls so
+      // photo galleries/lightbox contracts stay unchanged (see chat-file-attachments.js).
+      function hasValidFileAttachments(data) {
+        return !('fileAttachments' in data) || (
+          data.fileAttachments is list
+          && data.fileAttachments.size() <= 20
+        );
+      }
       // Set at creation time (never patched afterward) to mark the message channel. `chat` is
       // explicit for new chat writes; gallery/meeting records stay out of chat queries.
       // the gallery/meeting-photo upload flows rather than typed into the chat composer (see
@@ -158,7 +166,7 @@ service cloud.firestore {
           // previously missing from this hasOnly() list, which made every single one of those
           // writes fail the security rules outright (Missing or insufficient permissions),
           // regardless of image count or size.
-          && request.resource.data.keys().hasOnly(['participantId', 'text', 'timestamp', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageTags', 'uploadSource', 'linkPreview', 'replyTo'])
+          && request.resource.data.keys().hasOnly(['participantId', 'text', 'timestamp', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageTags', 'uploadSource', 'linkPreview', 'replyTo', 'fileAttachments'])
           && request.resource.data.participantId is string
           && request.resource.data.participantId.size() <= 160
           && request.resource.data.timestamp is number
@@ -166,15 +174,17 @@ service cloud.firestore {
           && hasValidMessageImages(request.resource.data)
           && hasValidUploadSource(request.resource.data)
           && hasValidLinkPreview(request.resource.data)
-          && hasValidReplyTo(request.resource.data);
+          && hasValidReplyTo(request.resource.data)
+          && hasValidFileAttachments(request.resource.data);
         allow update: if isCalendarDoc(calendarDocId)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageShareUrls', 'imageTags', 'directMediaTags', 'participantId', 'linkPreview'])
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageShareUrls', 'imageTags', 'directMediaTags', 'participantId', 'linkPreview', 'fileAttachments'])
           && (
             hasValidMessageMediaMetadataPatch()
             || (
               hasValidMessageText(request.resource.data)
               && hasValidMessageImages(request.resource.data)
               && hasValidLinkPreview(request.resource.data)
+              && hasValidFileAttachments(request.resource.data)
               && (!('participantId' in request.resource.data) ||
                   (request.resource.data.participantId is string && request.resource.data.participantId.size() <= 160))
             )

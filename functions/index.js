@@ -531,7 +531,7 @@ exports.onMessageCreate = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).
     const sender = participants.find(p => p.id === senderId) || { name: '알수없음' };
     const senderName = sender.name;
     
-    const bodyText = message.text?.trim() || (message.imageUrls?.length || message.imageUrl ? '사진을 보냈습니다' : '새 메시지가 도착했습니다');
+    const bodyText = message.text?.trim() || (message.imageUrls?.length || message.imageUrl ? '사진을 보냈습니다' : (Array.isArray(message.fileAttachments) && message.fileAttachments.length ? '파일을 보냈습니다' : '새 메시지가 도착했습니다'));
     await broadcastCalendarPush(calendarDocId, {
       title: `${calendarTitle} · ${senderName}`,
       body: bodyText,

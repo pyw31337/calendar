@@ -105,6 +105,8 @@ export function ChatRoomView({
   chatTextareaRef,
   chatImage: chatImages,
   setChatImage: setChatImages,
+  chatFileAttachments = [],
+  setChatFileAttachments,
   chatReplyTarget = null,
   setChatReplyTarget,
   activeLightbox,
@@ -185,6 +187,11 @@ export function ChatRoomView({
   const getChatLastReadTimestamp = __deps.getChatLastReadTimestamp;
   const setChatLastReadTimestamp = __deps.setChatLastReadTimestamp;
   const appendChatImageFiles = __deps.appendChatImageFiles;
+  const classifyChatComposerFiles = __deps.classifyChatComposerFiles || (window.GATHER_CHAT_FILE_ATTACHMENTS && window.GATHER_CHAT_FILE_ATTACHMENTS.classifyChatComposerFiles);
+  const createPendingChatFileAttachment = __deps.createPendingChatFileAttachment || (window.GATHER_CHAT_FILE_ATTACHMENTS && window.GATHER_CHAT_FILE_ATTACHMENTS.createPendingChatFileAttachment);
+  const formatChatFileSize = __deps.formatChatFileSize || (window.GATHER_CHAT_FILE_ATTACHMENTS && window.GATHER_CHAT_FILE_ATTACHMENTS.formatChatFileSize);
+  const getChatFileTypeLabel = __deps.getChatFileTypeLabel || (window.GATHER_CHAT_FILE_ATTACHMENTS && window.GATHER_CHAT_FILE_ATTACHMENTS.getChatFileTypeLabel);
+  const DocumentLightbox = __comp.DocumentLightbox || __deps.DocumentLightbox;
   const confetti = __deps.confetti || window.confetti;
   const CONFETTI_Z_INDEX = __deps.CONFETTI_Z_INDEX;
   const meetingPhotoMessageIds = React.useMemo(() => {
@@ -374,7 +381,7 @@ export function ChatRoomView({
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  const canSendChatNow = () => !isChatSubmitting && (!!chatInput.trim() || chatImages.length > 0);
+  const canSendChatNow = () => !isChatSubmitting && (!!chatInput.trim() || chatImages.length > 0 || (chatFileAttachments && chatFileAttachments.length > 0));
   const triggerChatSend = useChatSendGuard(onSend, canSendChatNow);
   const handleSendPointerDown = (event) => {
     if (!canSendChatNow()) return;
@@ -390,14 +397,17 @@ export function ChatRoomView({
   // message to render the quote card (see renderReplyQuoteCard below) and to link back to it by
   // id -- not the live message object, so a later edit/delete of the original doesn't retroactively
   // change what the reply's quote shows (same behavior as KakaoTalk/Slack/Discord replies).
-  const handleStartReply = (msg, imageCount) => {
+  const handleStartReply = (msg, imageCount, fileCount = 0) => {
     if (typeof setChatReplyTarget !== 'function' || !msg) return;
-    const text = String(msg.text || '').trim();
+    let text = String(msg.text || '').trim();
+    const files = fileCount || (Array.isArray(msg.fileAttachments) ? msg.fileAttachments.length : 0);
+    if (!text && files > 0) text = files > 1 ? ('파일 ' + files + '개') : '파일';
     setChatReplyTarget({
       id: msg.id,
       participantId: msg.participantId,
       text: text.length > 200 ? text.slice(0, 200) : text,
-      imageCount: imageCount || 0
+      imageCount: imageCount || 0,
+      fileCount: files
     });
     if (onRevealChatInput) onRevealChatInput();
     requestAnimationFrame(() => chatTextareaRef.current && chatTextareaRef.current.focus());
@@ -408,6 +418,8 @@ export function ChatRoomView({
   const replyQuoteLabel = (replyTo) => {
     if (!replyTo) return '';
     if (replyTo.text) return replyTo.text;
+    const fileCount = Number(replyTo.fileCount) || 0;
+    if (fileCount > 0) return fileCount > 1 ? `파일 ${fileCount}개` : '파일';
     const count = Number(replyTo.imageCount) || 0;
     return count > 1 ? `사진 ${count}장` : '사진';
   };
@@ -523,7 +535,9 @@ export function ChatRoomView({
   }, [chatReplyTarget, chatInput, chatImages, isInputFocused, viewportBottom]);
 
   const fileInputRefChat = React.useRef(null);
+  const docFileInputRefChat = React.useRef(null);
   const [imageProcessingChat, setImageProcessingChat] = React.useState(null);
+  const [activeDocumentLightbox, setActiveDocumentLightbox] = React.useState(null);
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = React.useState(false);
   const insertEmojiIntoChatInput = (emoji) => {
     const textarea = chatTextareaRef.current;
@@ -557,6 +571,49 @@ export function ChatRoomView({
       setImageProcessingChat(null);
       e.target.value = '';
     }
+  };
+  const handleDocFileChangeChat = async (e) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    try {
+      const classified = typeof classifyChatComposerFiles === 'function'
+        ? classifyChatComposerFiles(files)
+        : { images: Array.from(files || []).filter(f => /^image\//i.test(f.type || '')), documents: [], rejected: [] };
+      if (classified.rejected && classified.rejected.length && showToast) {
+        const hasVideo = classified.rejected.some(r => r.reason === 'video');
+        const hasLarge = classified.rejected.some(r => r.reason === 'too-large');
+        if (hasVideo) showToast('동영상은 업로드할 수 없습니다.', 'error');
+        else if (hasLarge) showToast('파일이 너무 큽니다 (최대 20MB).', 'error');
+        else showToast('지원하지 않는 파일 형식입니다.', 'error');
+      }
+      if (classified.images && classified.images.length) {
+        await appendChatImageFiles({
+          files: classified.images,
+          currentCount: chatImages.length,
+          setImageProcessing: setImageProcessingChat,
+          setChatImages,
+          showToast
+        });
+      }
+      if (classified.documents && classified.documents.length && typeof setChatFileAttachments === 'function') {
+        const remaining = Math.max(0, 20 - (chatFileAttachments?.length || 0));
+        const docs = classified.documents.slice(0, remaining).map(file => createPendingChatFileAttachment(file));
+        if (classified.documents.length > remaining && showToast) showToast('파일은 최대 20개까지 첨부할 수 있습니다.', 'info');
+        if (docs.length) {
+          setChatFileAttachments(prev => [...(prev || []), ...docs]);
+          if (showToast) showToast(docs.length + '개 파일 첨부완료', 'success', 3000);
+        }
+      }
+    } catch (err) {
+      console.error('handleDocFileChangeChat unexpected error:', err);
+      if (showToast) showToast('파일 첨부 중 오류', 'error', 5000);
+    } finally {
+      setImageProcessingChat(null);
+      e.target.value = '';
+    }
+  };
+  const openDocumentLightbox = (list, index) => {
+    setActiveDocumentLightbox({ attachments: list, index: index || 0 });
   };
   const handlePasteImagesChat = async (e) => {
     const pastedFiles = getImageFilesFromClipboardEvent(e);
@@ -718,6 +775,8 @@ export function ChatRoomView({
     const isMe = msg.participantId === chatParticipantId;
     const timeStr = formatChatTime(msg.timestamp);
     const msgHasImages = !!(msg.imageUrl || (Array.isArray(msg.imageUrls) && msg.imageUrls.length > 0));
+    const msgHasFiles = Array.isArray(msg.fileAttachments) && msg.fileAttachments.length > 0;
+    const msgFileCount = msgHasFiles ? msg.fileAttachments.length : 0;
     const msgImageCount = Array.isArray(msg.imageUrls) && msg.imageUrls.length > 0 ? msg.imageUrls.length : (msg.imageUrl ? 1 : 0);
     const msgDirectMediaInfo = getDirectChatMediaInfo(extractFirstUrl(msg.text || ''));
     const isEmbedMessage = msgDirectMediaInfo?.type === 'embed';
@@ -732,7 +791,7 @@ export function ChatRoomView({
     const chatMediaStyle = isEmbedMessage
       ? { maxWidth: '760px', embedMaxWidth: '760px', portraitEmbedMaxWidth: '360px', maxHeight: '72vh', marginBottom: msg.text ? '10px' : '0' }
       : { maxWidth: '420px', maxHeight: '62vh', marginBottom: msg.text ? '10px' : '0' };
-    const isEmojiOnlyMessage = isEmojiOnlyChatText(msg.text) && !msgHasImages;
+    const isEmojiOnlyMessage = isEmojiOnlyChatText(msg.text) && !msgHasImages && !msgHasFiles;
     const rowId = msg.id || `msg-${idx}`;
     const isSearchMatch = searchQuery && msg.text && msg.text.toLowerCase().includes(searchQuery.toLowerCase());
     // Focused either by in-chat text search (isSearchMatch + arrow-key navigation) or by an
@@ -785,7 +844,7 @@ export function ChatRoomView({
         /*#__PURE__*/React.createElement("button", {
           type: "button",
           className: "msg-actions-group",
-          onClick: () => handleStartReply(msg, msgImageCount),
+          onClick: () => handleStartReply(msg, msgImageCount, msgFileCount),
           title: "답장",
           style: {
             width: '24px',
@@ -888,7 +947,7 @@ export function ChatRoomView({
         // identically across Chrome/Whale/Safari/Firefox, unlike relying purely on width math.
         overflow: 'hidden'
       }
-    }, renderReplyQuoteCard(msg.replyTo), renderChatMessageBody(msg, setActiveLightbox, chatMediaStyle, searchQuery, stickyVideoKey, onActivateVideo)), /*#__PURE__*/React.createElement("div", {
+    }, renderReplyQuoteCard(msg.replyTo), renderChatMessageBody(msg, setActiveLightbox, chatMediaStyle, searchQuery, stickyVideoKey, onActivateVideo, false, openDocumentLightbox)), /*#__PURE__*/React.createElement("div", {
       style: {
         position: 'absolute',
         right: '-7px',
@@ -946,7 +1005,7 @@ export function ChatRoomView({
         // identically across Chrome/Whale/Safari/Firefox, unlike relying purely on width math.
         overflow: 'hidden'
       }
-    }, renderReplyQuoteCard(msg.replyTo), renderChatMessageBody(msg, setActiveLightbox, chatMediaStyle, searchQuery, stickyVideoKey, onActivateVideo)), /*#__PURE__*/React.createElement("div", {
+    }, renderReplyQuoteCard(msg.replyTo), renderChatMessageBody(msg, setActiveLightbox, chatMediaStyle, searchQuery, stickyVideoKey, onActivateVideo, false, openDocumentLightbox)), /*#__PURE__*/React.createElement("div", {
       style: {
         position: 'absolute',
         left: '-7px',
@@ -996,7 +1055,7 @@ export function ChatRoomView({
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "msg-actions-group",
-        onClick: () => handleStartReply(msg, msgImageCount),
+        onClick: () => handleStartReply(msg, msgImageCount, msgFileCount),
         title: "답장",
         style: {
           width: '24px',
@@ -1061,7 +1120,7 @@ export function ChatRoomView({
       zIndex: 1020
     }
   }, /*#__PURE__*/React.createElement(BackArrowIcon, { size: 22 })),
-  !(isHeaderVisible || viewportBottom > 80 || isInputFocused || !!(chatInput && String(chatInput).trim()) || (chatImages && chatImages.length > 0) || !!chatReplyTarget) && /*#__PURE__*/React.createElement("button", {
+  !(isHeaderVisible || viewportBottom > 80 || isInputFocused || !!(chatInput && String(chatInput).trim()) || (chatImages && chatImages.length > 0) || (chatFileAttachments && chatFileAttachments.length > 0) || !!chatReplyTarget) && /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "chat-keyboard-reopen-btn",
     onClick: () => {
@@ -1383,9 +1442,9 @@ export function ChatRoomView({
       padding: '12px 16px',
       zIndex: isEmojiPickerOpen ? 13050 : 1012,
       flexShrink: 0,
-      transform: (isHeaderVisible || viewportBottom > 80 || isInputFocused || !!(chatInput && String(chatInput).trim()) || (chatImages && chatImages.length > 0) || !!chatReplyTarget) ? 'translateY(0)' : 'translateY(calc(100% + 12px))',
-      opacity: (isHeaderVisible || viewportBottom > 80 || isInputFocused || !!(chatInput && String(chatInput).trim()) || (chatImages && chatImages.length > 0) || !!chatReplyTarget) ? 1 : 0,
-      pointerEvents: (isHeaderVisible || viewportBottom > 80 || isInputFocused || !!(chatInput && String(chatInput).trim()) || (chatImages && chatImages.length > 0) || !!chatReplyTarget) ? 'auto' : 'none',
+      transform: (isHeaderVisible || viewportBottom > 80 || isInputFocused || !!(chatInput && String(chatInput).trim()) || (chatImages && chatImages.length > 0) || (chatFileAttachments && chatFileAttachments.length > 0) || !!chatReplyTarget) ? 'translateY(0)' : 'translateY(calc(100% + 12px))',
+      opacity: (isHeaderVisible || viewportBottom > 80 || isInputFocused || !!(chatInput && String(chatInput).trim()) || (chatImages && chatImages.length > 0) || (chatFileAttachments && chatFileAttachments.length > 0) || !!chatReplyTarget) ? 1 : 0,
+      pointerEvents: (isHeaderVisible || viewportBottom > 80 || isInputFocused || !!(chatInput && String(chatInput).trim()) || (chatImages && chatImages.length > 0) || (chatFileAttachments && chatFileAttachments.length > 0) || !!chatReplyTarget) ? 'auto' : 'none',
       transition: 'transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.18s ease, bottom 0.12s ease-out'
     }
   },
@@ -1470,7 +1529,7 @@ export function ChatRoomView({
               setIsInputFocused(true);
               return;
             }
-            if ((chatInput && String(chatInput).trim()) || (chatImages && chatImages.length > 0) || chatReplyTarget) {
+            if ((chatInput && String(chatInput).trim()) || (chatImages && chatImages.length > 0) || (chatFileAttachments && chatFileAttachments.length > 0) || chatReplyTarget) {
               setIsInputFocused(true);
               return;
             }
@@ -1524,6 +1583,32 @@ export function ChatRoomView({
         onClick: () => setChatImages(prev => prev.filter((_, idx) => idx !== index))
       })))) : null,
 
+      chatFileAttachments && chatFileAttachments.length > 0 ? /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px', width: '100%' }
+      }, chatFileAttachments.map((file, index) => /*#__PURE__*/React.createElement("div", {
+        key: file.id || index,
+        style: {
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
+          border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)',
+          padding: '8px 10px', backgroundColor: 'var(--bg-secondary)'
+        }
+      },
+        /*#__PURE__*/React.createElement("div", { style: { minWidth: 0, flex: 1 } },
+          /*#__PURE__*/React.createElement("div", {
+            style: { fontWeight: 800, fontSize: 'var(--font-size-md)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+          }, file.name || '파일'),
+          /*#__PURE__*/React.createElement("div", {
+            style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', fontWeight: 600 }
+          }, [typeof getChatFileTypeLabel === 'function' ? getChatFileTypeLabel(file) : '', typeof formatChatFileSize === 'function' ? formatChatFileSize(file.size) : ''].filter(Boolean).join(' · '))
+        ),
+        /*#__PURE__*/React.createElement("button", {
+          type: 'button',
+          onClick: () => typeof setChatFileAttachments === 'function' && setChatFileAttachments(prev => prev.filter((_, idx) => idx !== index)),
+          'aria-label': '파일 첨부 제거',
+          style: { border: 'none', background: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontWeight: 900, padding: '4px 6px' }
+        }, '×')
+      ))) : null,
+
       /* Hidden File Input */
       /*#__PURE__*/React.createElement("input", {
         ref: fileInputRefChat,
@@ -1532,6 +1617,14 @@ export function ChatRoomView({
         multiple: true,
         style: { position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 },
         onChange: handleFileChangeChat
+      }),
+      /*#__PURE__*/React.createElement("input", {
+        ref: docFileInputRefChat,
+        type: "file",
+        accept: ".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.csv,.rtf,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain,text/csv,application/rtf,image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif,image/*",
+        multiple: true,
+        style: { position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0,0,0,0)', border: 0 },
+        onChange: handleDocFileChangeChat
       }),
 
       /* Action Row (Select box, Camera, Send) at bottom */
@@ -1616,6 +1709,41 @@ export function ChatRoomView({
             /*#__PURE__*/React.createElement("path", { d: "M19 16v6" })
           )),
 
+          /* File upload button (documents + images; images route to photo pipeline) */
+          /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            onClick: () => docFileInputRefChat.current && docFileInputRefChat.current.click(),
+            title: "파일 업로드",
+            "aria-label": "파일 업로드",
+            style: {
+              width: '32px',
+              height: '32px',
+              borderRadius: '50%',
+              border: '1px solid var(--border-subtle)',
+              backgroundColor: 'var(--bg-card)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              padding: 0,
+              color: 'var(--text-muted)'
+            }
+          }, /*#__PURE__*/React.createElement("svg", {
+            xmlns: "http://www.w3.org/2000/svg",
+            width: "18",
+            height: "18",
+            viewBox: "0 0 24 24",
+            fill: "none",
+            stroke: "currentColor",
+            strokeWidth: "2",
+            strokeLinecap: "round",
+            strokeLinejoin: "round",
+            className: "lucide lucide-paperclip"
+          }, /*#__PURE__*/React.createElement("path", {
+            d: "m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551"
+          }))),
+
           /* Clipboard Paste Button (mobile has no Ctrl+V, so this reads the OS clipboard directly) */
           /*#__PURE__*/React.createElement("button", {
             type: "button",
@@ -1650,7 +1778,7 @@ export function ChatRoomView({
           /* Send Button */
           /*#__PURE__*/React.createElement("button", {
             type: "button",
-            disabled: isChatSubmitting || (!chatInput.trim() && chatImages.length === 0),
+            disabled: isChatSubmitting || (!chatInput.trim() && chatImages.length === 0 && !(chatFileAttachments && chatFileAttachments.length)),
             onPointerDown: handleSendPointerDown,
             onClick: handleSendClick,
             style: {
@@ -1664,7 +1792,7 @@ export function ChatRoomView({
               borderRadius: '16px',
               cursor: 'pointer',
               whiteSpace: 'nowrap',
-              opacity: (chatInput.trim() || chatImages.length > 0) && !isChatSubmitting ? 1 : 0.6
+              opacity: (chatInput.trim() || chatImages.length > 0 || (chatFileAttachments && chatFileAttachments.length > 0)) && !isChatSubmitting ? 1 : 0.6
             }
           }, isChatSubmitting ? '...' : '전송')
         )
@@ -1689,6 +1817,12 @@ export function ChatRoomView({
     onGetGalleryPhotoOrdinal,
     onRequestConfirm
   }) : null), imageProcessingChat && /*#__PURE__*/React.createElement(ImageProcessingOverlay, imageProcessingChat),
+  activeDocumentLightbox && DocumentLightbox ? /*#__PURE__*/React.createElement(DocumentLightbox, {
+    attachments: activeDocumentLightbox.attachments,
+    index: activeDocumentLightbox.index,
+    onClose: () => setActiveDocumentLightbox(null),
+    onNavigate: i => setActiveDocumentLightbox(prev => prev ? { ...prev, index: i } : prev)
+  }) : null,
   isEmojiPickerOpen && /*#__PURE__*/React.createElement(EmojiPickerSheet, {
     onSelect: insertEmojiIntoChatInput,
     onClose: () => setIsEmojiPickerOpen(false)

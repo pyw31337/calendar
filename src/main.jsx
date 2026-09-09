@@ -213,6 +213,7 @@ function loadChatUi() {
     chatUiLoadPromise = Promise.all([
       import('./ui/ui-chat-sheets.js'),
       import('./ui/ui-chat-gallery.js'),
+      import('./ui/ui-chat-files.js'),
       import('./ui/ui-chat-room.js')
     ]).catch(err => {
       chatUiLoadPromise = null;
@@ -260,6 +261,7 @@ async function boot() {
       import('./core/app-config.js'),
       import('./core/app-calendar-data.js'),
       import('./core/app-chat-data.js'),
+      import('./core/chat-file-attachments.js'),
       import('./core/app-utils.js'),
       import('./core/app-place-search.js'),
       import('./core/app-notifications.js'),
