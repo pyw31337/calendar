@@ -55,15 +55,33 @@ function getMessageImageEntriesForIndex(message) {
   })).filter(entry => entry.imageUrl || entry.thumbUrl);
 }
 
+function getDirectMediaTagKeyForIndex(url) {
+  const normalized = normalizePhotoAssetUrl(url);
+  let hash = 2166136261;
+  const source = String(normalized || url || '');
+  for (let index = 0; index < source.length; index += 1) {
+    hash ^= source.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `u_${(hash >>> 0).toString(36)}`;
+}
+
 function getDirectImageEntriesForIndex(message) {
   const text = String(message?.text || message?.content || message?.body || '');
   const urls = text.match(/https?:\/\/[^\s<>"']+/gi) || [];
   const imageExtensions = /\.(?:jpe?g|png|gif|webp|avif|bmp|svg|jfif|pjpeg|pjp|ico)(?:[?#].*)?$/i;
   const uploaded = new Set(getMessageImageEntriesForIndex(message)
     .flatMap(entry => [normalizePhotoAssetUrl(entry.imageUrl), normalizePhotoAssetUrl(entry.thumbUrl)]));
+  const directTags = message?.directMediaTags && typeof message.directMediaTags === 'object' && !Array.isArray(message.directMediaTags)
+    ? message.directMediaTags
+    : {};
   return Array.from(new Set(urls.map(url => url.replace(/[),.;!?]+$/, ''))))
     .filter(url => imageExtensions.test(url) && !uploaded.has(normalizePhotoAssetUrl(url)))
-    .map((url, index) => ({ index, imageUrl: url, thumbUrl: url, tags: '', directMediaUrl: url }));
+    .map((url, index) => {
+      const tagKey = getDirectMediaTagKeyForIndex(url);
+      const tags = String(directTags[tagKey] || directTags[url] || directTags[normalizePhotoAssetUrl(url)] || '');
+      return { index, imageUrl: url, thumbUrl: url, tags, directMediaUrl: url };
+    });
 }
 
 function normalizePhotoAssetUrl(value) {

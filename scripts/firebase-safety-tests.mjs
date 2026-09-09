@@ -241,6 +241,10 @@ assert(lightboxSource.includes('댓글 다시 불러오기'), 'failed lightbox c
 assert(!summaryGallerySource.includes('const fallbackDate = entryDateStr(entry)'), 'memories must not treat upload time as schedule membership');
 const dateModalSource = fs.readFileSync(new URL('../src/ui/ui-date-modal.js', import.meta.url), 'utf8');
 const photoIndexSource = fs.readFileSync(new URL('../src/core/photo-index.js', import.meta.url), 'utf8');
+assert(appMainSource.includes('rememberPhotoIndexTags'), 'tag saves must remember photoIndex tags across CF denorm lag');
+assert(photoIndexSource.includes('applyStickyPhotoIndexTags'), 'photoIndex loads must preserve session sticky tags over empty CF rows');
+assert(photoIndexSource.includes('mergePhotoIndexTags'), 'photoIndex force reload must not wipe locally patched tags');
+assert(/setTimeout\([\s\S]*?loadPage\([\s\S]*?force:\s*true/.test(appMainSource), 'tag saves must delay photoIndex force reload until CF can catch up');
 assert(dateModalSource.includes('getPhotoAssetKeys(photo)'), 'schedule albums must dedupe REST/index/live copies by original or thumbnail asset');
 assert(dateModalSource.includes('assetKeys.some(assetKey => directKeys.has(assetKey))'), 'tagged chat/memo photos must use the same asset identity as schedule albums');
 assert(photoIndexSource.includes('complete: true'), 'photo index must support complete hydration for cross-page search/date views');
