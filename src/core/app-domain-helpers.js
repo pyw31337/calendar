@@ -780,6 +780,15 @@ async function listServerAuditLogsRemote(password, options = {}) {
   return Array.isArray(result?.logs) ? result.logs : [];
 }
 
+async function rebuildPhotoIndexRemote(password, calendarId, options = {}) {
+  const result = await callAdminFunction('rebuildPhotoIndex', {
+    password,
+    calendarId,
+    apply: options.apply === true
+  });
+  return result || { ok: false };
+}
+
 async function listPushSubscriptionHealthRemote(password, calendarId) {
   const result = await callAdminFunction('listPushSubscriptionHealth', { password, calendarId });
   return result?.summary || null;
@@ -2611,6 +2620,7 @@ export {
   findCultureLinkedAnniversary,
   findCultureLinkedMemo,
   buildCultureLinkedMemoData,
+  rebuildPhotoIndexRemote,
   listPushSubscriptionHealthRemote,
   queueServerAuditEvent,
   getClientAuditContext,

@@ -172,6 +172,10 @@ function listServerAuditLogsRemote(...args) {
   const f = __gatherUiDeps().listServerAuditLogsRemote || GATHER_APP_UTILS.listServerAuditLogsRemote;
   return typeof f === 'function' ? f(...args) : [];
 }
+function rebuildPhotoIndexRemote(...args) {
+  const f = __gatherUiDeps().rebuildPhotoIndexRemote || GATHER_APP_UTILS.rebuildPhotoIndexRemote;
+  return typeof f === 'function' ? f(...args) : Promise.reject(new Error('rebuildPhotoIndexRemote unavailable'));
+}
 function listPushSubscriptionHealthRemote(...args) {
   const f = __gatherUiDeps().listPushSubscriptionHealthRemote || GATHER_APP_UTILS.listPushSubscriptionHealthRemote;
   return typeof f === 'function' ? f(...args) : Promise.resolve(null);
@@ -333,6 +337,8 @@ export function AdminDashboard({ initialCalendars }) {
   const [pushHealth, setPushHealth] = React.useState(null);
   const [auditLoading, setAuditLoading] = React.useState(false);
   const [auditQuery, setAuditQuery] = React.useState('');
+  const [photoIndexBusy, setPhotoIndexBusy] = React.useState(false);
+  const [photoIndexReport, setPhotoIndexReport] = React.useState(null);
 
   React.useEffect(() => {
     if (activeTab !== 'audit') return;
@@ -396,6 +402,40 @@ export function AdminDashboard({ initialCalendars }) {
     });
   };
   const closeConfirmDialog = () => setConfirmDialog(null);
+
+  const handleRebuildPhotoIndex = (apply) => {
+    const session = getAdminSession();
+    if (!session?.password || !selectedCalId) {
+      showAdminToast('관리자 세션 또는 선택된 캘린더가 없습니다.', 'error');
+      return;
+    }
+    const label = apply ? '적용(쓰기)' : '미리보기(dry-run)';
+    requestConfirm(
+      'photoIndex 재구축 (' + label + ')',
+      apply
+        ? '"' + selectedCalId + '" 캘린더의 photoIndex를 chat∪memo∪meeting 기준으로 재구축합니다. anniversary 포스터 행은 제거됩니다. 계속할까요?'
+        : '"' + selectedCalId + '" 캘린더 photoIndex를 읽기 전용으로 대조합니다. Firestore에는 쓰지 않습니다.',
+      async () => {
+        setPhotoIndexBusy(true);
+        try {
+          const report = await rebuildPhotoIndexRemote(session.password, selectedCalId, { apply: !!apply });
+          setPhotoIndexReport(report);
+          const gallery = report?.galleryIndexedPhotos ?? report?.indexedPhotos;
+          showAdminToast(
+            apply
+              ? 'photoIndex 적용 완료 — 갤러리 ' + gallery + '장 (stale ' + (report?.staleRows || 0) + ' 삭제)'
+              : 'dry-run — 갤러리 ' + gallery + '장 / 기존 ' + (report?.existingRows || 0) + ' / stale ' + (report?.staleRows || 0),
+            'success'
+          );
+        } catch (err) {
+          console.warn('photoIndex rebuild failed:', err);
+          showAdminToast('photoIndex 재구축 실패: ' + (err.message || '오류'), 'error');
+        } finally {
+          setPhotoIndexBusy(false);
+        }
+      }
+    );
+  };
 
   // New calendar creation modal (replaces window.prompt across this page)
   const [isCreateCalModalOpen, setIsCreateCalModalOpen] = React.useState(false);
@@ -2554,6 +2594,35 @@ export function AdminDashboard({ initialCalendars }) {
           )
         )
       ) : null,
+
+      /* photoIndex rebuild (admin password CF) — gallery totals = chat∪memo∪meeting */
+      /*#__PURE__*/React.createElement("section", { style: styles.card },
+        /*#__PURE__*/React.createElement("div", { className: "admin-section-header" },
+          /*#__PURE__*/React.createElement("div", { className: "summary-title" }, "갤러리 photoIndex 재구축"),
+          /*#__PURE__*/React.createElement("div", { className: "admin-backup-actions" },
+            /*#__PURE__*/React.createElement("button", {
+              className: "btn btn-secondary",
+              disabled: photoIndexBusy || !selectedCalId,
+              onClick: () => handleRebuildPhotoIndex(false)
+            }, photoIndexBusy ? "처리 중…" : ((selectedCalId || '—') + " dry-run")),
+            /*#__PURE__*/React.createElement("button", {
+              className: "btn btn-danger",
+              disabled: photoIndexBusy || !selectedCalId,
+              onClick: () => handleRebuildPhotoIndex(true)
+            }, photoIndexBusy ? "처리 중…" : "적용(쓰기)")
+          )
+        ),
+        /*#__PURE__*/React.createElement("p", { style: { margin: '0 0 10px', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', lineHeight: 1.45 } },
+          "선택된 캘린더의 photoIndex를 메시지·메모·확정모임 사진으로 재계산합니다. 컨텐츠/기념일 포스터는 갤러리 합계에서 제외됩니다. 배포 후 Cloud Function rebuildPhotoIndex가 필요합니다."
+        ),
+        photoIndexReport && /*#__PURE__*/React.createElement("pre", {
+          style: {
+            margin: 0, padding: '10px 12px', borderRadius: 'var(--radius-md)',
+            background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)',
+            fontSize: '11px', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word'
+          }
+        }, JSON.stringify(photoIndexReport, null, 2))
+      ),
 
       /* Original Backup card tools */
       /*#__PURE__*/React.createElement("section", { className: "recovery-backup-card", style: styles.card },

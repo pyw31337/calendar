@@ -247,11 +247,21 @@ async function rebuildPhotoIndexForCalendarAdmin(calendarId, apply = false) {
       await batch.commit();
     }
   }
+  const bySource = rows.reduce((acc, row) => {
+    const key = String(row?.source || 'unknown');
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+  // Anniversary/content posters are intentionally not re-indexed; any leftover anniversary
+  // rows are counted in staleRows and deleted on apply so gallery totals match chat∪memo∪meeting.
+  const galleryIndexedPhotos = rows.filter(row => String(row?.source || '') !== 'anniversary').length;
   return {
     calendarId,
     mode: apply ? 'applied' : 'dry-run',
     sourceDocuments: Object.fromEntries(collectionNames.slice(0, 5).map(name => [name, byName[name].size])),
     indexedPhotos: rows.length,
+    galleryIndexedPhotos,
+    bySource,
     commentsMatched: rows.filter(row => row.commentCount > 0).length,
     existingRows: byName.photoIndex.size,
     staleRows: staleRefs.length,
@@ -1794,9 +1804,34 @@ exports.pruneStaleRateLimitDocs = functions.pubsub.schedule('30 9 * * *').timeZo
   return null;
 });
 
-// Deliberately available only inside `firebase functions:shell`: this gives release operations
-// an Admin SDK path for an explicit, audited index rebuild without ever deploying a public
-// backfill endpoint or relaxing Firestore's server-only photoIndex rule.
+// Production admin path: same rebuild as the emulator helper, but gated by the admin password
+// (identical check to listAllCalendars / listServerAuditLogs). Dry-run by default; pass
+// apply:true to write. Never relaxes Firestore photoIndex write:false for clients.
+exports.rebuildPhotoIndex = functions.runWith({ timeoutSeconds: 300, memory: '1GB' }).https.onRequest(async (req, res) => {
+  setAdminCorsHeaders(res);
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  if (req.method !== 'POST') { res.status(405).json({ ok: false, message: 'Method not allowed' }); return; }
+  const password = req.body && req.body.password;
+  const calendarId = String(req.body?.calendarId || '');
+  const apply = req.body?.apply === true;
+  if (!password || typeof password !== 'string') { res.status(400).json({ ok: false, message: 'password is required' }); return; }
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(calendarId)) { res.status(400).json({ ok: false, message: 'calendarId is required' }); return; }
+  const rateState = await checkAdminAuthRateLimit(req.ip);
+  if (rateState.blocked) { res.status(429).json({ ok: false, message: '너무 많은 시도가 있었습니다. 잠시 후 다시 시도해 주세요.' }); return; }
+  const matches = sha256Hex(password.trim()) === await getStoredAdminPasswordHash();
+  await recordAdminAuthResult(rateState, matches);
+  if (!matches) { res.status(401).json({ ok: false, message: '비밀번호가 올바르지 않습니다.' }); return; }
+  try {
+    const report = await rebuildPhotoIndexForCalendarAdmin(calendarId, apply);
+    res.status(200).json({ ok: true, ...report });
+  } catch (error) {
+    console.error('rebuildPhotoIndex failed:', error);
+    res.status(500).json({ ok: false, message: String(error?.message || error) });
+  }
+});
+
+// Emulator-only unauthenticated twin for local shell/integration tests. Prefer rebuildPhotoIndex
+// in production (admin password required).
 if (process.env.FUNCTIONS_EMULATOR === 'true') {
   exports.photoIndexBackfillLocal = functions.https.onRequest(async (req, res) => {
     const calendarId = String(req.body?.calendarId || '');
