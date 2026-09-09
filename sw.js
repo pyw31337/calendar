@@ -12,7 +12,7 @@
 // assets resolve instantly/offline without touching the freshness of the app itself.
 // Replaced at build time by scripts/copy-static-to-dist.mjs. A commit-scoped cache
 // prevents an older PWA shell from surviving a deployment.
-const BUILD_SHA = '7d628ae7ac5c095e88dd20cdd0573b28689282d1';
+const BUILD_SHA = '914b83cebb02fd771783a5e56d13910786ffc729';
 const STATIC_CACHE = `moyeora-static-${BUILD_SHA}`;
 const STATIC_ASSETS = [
   'favicon.ico',
