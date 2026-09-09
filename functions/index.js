@@ -205,6 +205,28 @@ function selectPhotoIndexOwner(owners) {
     || Number(b.timestamp || 0) - Number(a.timestamp || 0))[0] || null;
 }
 
+function countPhotoIndexTagTokens(value) {
+  const tokens = Array.from(new Set(String(value || '').split(/[,\s#]+/).map(token => token.trim()).filter(Boolean)));
+  return tokens.length;
+}
+
+// Keep message/memo as the editable owner for identity fields, but never publish empty/partial
+// cached tags when another owner of the same asset (usually the meeting album copy) still holds
+// the fuller durable tag string saved before rebuild/denorm.
+function pickRichestPhotoIndexTags(owners, fallback = '') {
+  let best = String(fallback || '');
+  let bestCount = countPhotoIndexTagTokens(best);
+  (owners || []).forEach(owner => {
+    const tags = String(owner?.tags || '');
+    const count = countPhotoIndexTagTokens(tags);
+    if (count > bestCount) {
+      best = tags;
+      bestCount = count;
+    }
+  });
+  return best;
+}
+
 async function rebuildPhotoIndexForCalendarAdmin(calendarId, apply = false) {
   const db = admin.firestore();
   const root = db.collection('calendars').doc(`cal_${calendarId}`);
@@ -246,6 +268,7 @@ async function rebuildPhotoIndexForCalendarAdmin(calendarId, apply = false) {
       legacyKeys,
       owners,
       commentCount,
+      tags: pickRichestPhotoIndexTags(owners, selected.tags),
       tagCacheVersion: 2,
       tagSourceOwner: selected.sourceOwner,
       updatedAt: Date.now()
@@ -335,6 +358,7 @@ async function syncCanonicalPhotoIndex(change, context, sourceType, idParam) {
       legacyKeys,
       owners,
       commentCount: Math.max(0, Number(existing.commentCount || 0), existingComments),
+      tags: pickRichestPhotoIndexTags(owners, selected.tags),
       tagCacheVersion: 2,
       tagSourceOwner: selected.sourceOwner,
       updatedAt: Date.now()

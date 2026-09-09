@@ -368,6 +368,13 @@ assert(functionsIndexSource.includes('photoIndexOwnerRank'), 'CF photoIndex must
 assert(functionsIndexSource.includes("sourceOwner.startsWith('message:')"), 'meeting uploads must cache source-message tags ahead of album copies');
 assert(functionsIndexSource.includes('tagCacheVersion: 2'), 'photoIndex rows must expose the canonical tag cache contract version');
 assert(functionsIndexSource.includes('tagSourceOwner: selected.sourceOwner'), 'photoIndex rows must identify which source supplied cached tags');
+assert(functionsIndexSource.includes('pickRichestPhotoIndexTags'), 'rebuild/sync must publish the richest tags across message/memo/meeting owners');
+assert(photoIndexSource.includes('pickRicherPhotoTags'), 'lightbox tag resolve must prefer richer durable sources over empty/partial locals');
+assert(chatGallerySource.includes('Meeting album copies store durable tags'), 'gallery must consult confirmedMeetings photo.tags for meeting-sourced lightbox tags');
+assert(lightboxSource.includes('key: `tag-input-${tagTokens.length}`'), 'lightbox tag input must remount when token count changes so iOS refreshes (n/10)');
+const galleryDataSource = fs.readFileSync(new URL('../src/core/gallery-data.js', import.meta.url), 'utf8');
+assert(galleryDataSource.includes('otherTagCount > mergedTagCount'), 'gallery dedupe must keep the richer tag set across chat/meeting copies');
+assert(appMainSource.includes('entry.tags, photo?.tags'), 'meeting photo display must not blank album tags when message imageTags are empty');
 const photoCommentsSource = fs.readFileSync(new URL('../src/core/photo-comments.js', import.meta.url), 'utf8');
 assert(photoIndexSource.includes('patchItems'), 'gallery photo index must support local tag patches after save');
 assert(photoCommentsSource.includes('requirePersisted: true'), 'photo comment module must require durable writes');
@@ -1249,6 +1256,8 @@ console.log('Firebase-only calendar safety tests passed');
     hasStickyPhotoIndexTags,
     reconcilePhotoIndexTagItems,
     normalizePhotoIndexTagSet,
+    pickRicherPhotoTags,
+    countPhotoTagTokens,
     resolveGalleryLightboxTags
   } = await import('../src/core/photo-index.js');
   assert(
@@ -1326,4 +1335,21 @@ console.log('Firebase-only calendar safety tests passed');
     resolveGalleryLightboxTags(reopenCalId, reopenPhoto, { localTags: '아기 도연', indexTags: '아기 도연' }) === '',
     'trash-delete sticky empty must win over stale local/index tags'
   );
+
+  // No sticky: empty/partial message locals must not blank richer photoIndex / meeting tags.
+  const durableCalId = `tag-durable-${Date.now()}`;
+  const durablePhoto = { messageId: 'msg-meeting-twin', imageIndex: 0, assetKey: 'asset-meeting-twin', tags: '#식당 #데이트 #25.10.25 #야외' };
+  assert(
+    resolveGalleryLightboxTags(durableCalId, durablePhoto, { localTags: '', indexTags: '#식당 #데이트 #25.10.25 #야외' }) === '#식당 #데이트 #25.10.25 #야외',
+    'empty local message tags must fall through to richer photoIndex tags'
+  );
+  assert(
+    resolveGalleryLightboxTags(durableCalId, durablePhoto, { localTags: '25.10.25', indexTags: '#식당 #데이트 #25.10.25 #야외' }) === '#식당 #데이트 #25.10.25 #야외',
+    'partial local tags must lose to a fuller photoIndex/meeting tag set'
+  );
+  assert(
+    pickRicherPhotoTags('', '#a #b #c #d') === '#a #b #c #d',
+    'pickRicherPhotoTags must prefer non-empty candidates'
+  );
+  assert(countPhotoTagTokens('#a #b #c #d') === 4, 'countPhotoTagTokens must count unique tag tokens');
 }

@@ -53,7 +53,12 @@ export function dedupeGalleryPhotoEntries(list, getPhotoAssetCommentKey, sourceR
   const mergeIdentity = (preferred, other) => {
     const merged = { ...preferred };
     if (!merged.meetingDate && other.meetingDate) merged.meetingDate = other.meetingDate;
-    if (!merged.tags && other.tags) merged.tags = other.tags;
+    // Prefer the fuller tag string when chat/memo/meeting copies of the same asset disagree
+    // (empty message.imageTags must not blank a tagged meeting album copy).
+    const mergedTagCount = String(merged.tags || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean).length;
+    const otherTagCount = String(other.tags || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean).length;
+    if (otherTagCount > mergedTagCount) merged.tags = other.tags;
+    else if (!merged.tags && other.tags) merged.tags = other.tags;
     if (!merged.messageId && other.messageId) merged.messageId = other.messageId;
     if (coerceGalleryImageIndex(merged.imageIndex) == null && coerceGalleryImageIndex(other.imageIndex) != null) {
       merged.imageIndex = coerceGalleryImageIndex(other.imageIndex);
@@ -209,7 +214,13 @@ export function composeGalleryPhotos({
         sourceMessageId: photo?.sourceMessageId || '',
         sourceImageIndex,
         timestamp: Number(photo?.createdAt || photo?.updatedAt || meeting?.confirmedAt || 0),
-        tags: String(resolved?.tags ?? photo?.tags ?? ''),
+        tags: (() => {
+          const resolvedTags = resolved?.tags != null ? String(resolved.tags) : '';
+          const photoTags = String(photo?.tags ?? '');
+          const resolvedCount = resolvedTags.split(/[,\s#]+/).map(t => t.trim()).filter(Boolean).length;
+          const photoCount = photoTags.split(/[,\s#]+/).map(t => t.trim()).filter(Boolean).length;
+          return photoCount > resolvedCount ? photoTags : (resolvedTags || photoTags);
+        })(),
         directMediaUrl: '',
         text: `${meeting.date || ''} 일정 사진`,
         participantId: '',
