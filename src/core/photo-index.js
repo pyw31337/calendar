@@ -162,7 +162,7 @@ const stickyPhotoTagsByCalendar = new Map();
 
 // Tag token order / # prefixes vary between lightbox normalize, message writes, and CF denorm.
 // Compare as a sorted set so sticky clears only when the index actually caught up.
-function normalizePhotoIndexTagSet(value) {
+export function normalizePhotoIndexTagSet(value) {
   return Array.from(new Set(
     String(value || '').split(/[,\s#]+/).map(token => token.trim()).filter(Boolean)
   )).sort().join(' ');
@@ -228,10 +228,31 @@ export function schedulePhotoIndexTagReload(galleryPhotoIndex, calendarId, stick
 
 
 
-function applyStickyPhotoIndexTags(calendarId, items) {
+export function photoIndexTagTokenSet(value) {
+  const normalized = normalizePhotoIndexTagSet(value);
+  return normalized ? new Set(normalized.split(' ')) : new Set();
+}
+
+// Prefer the richer verified tag set. Partial CF denorm (e.g. only #260908) must not beat a
+// fuller previous patch / message save; intentional deletes rely on sticky until CF catches up.
+export function preferRicherPhotoIndexTags(previousTags, nextTags) {
+  const prev = String(previousTags || '');
+  const next = String(nextTags || '');
+  if (!next) return prev;
+  if (!prev) return next;
+  if (normalizePhotoIndexTagSet(prev) === normalizePhotoIndexTagSet(next)) return next;
+  const prevSet = photoIndexTagTokenSet(prev);
+  const nextSet = photoIndexTagTokenSet(next);
+  const nextSubsetOfPrev = nextSet.size < prevSet.size && [...nextSet].every(token => prevSet.has(token));
+  if (nextSubsetOfPrev) return prev;
+  return next;
+}
+
+function applyStickyPhotoIndexTags(calendarId, items, options = {}) {
   const list = Array.isArray(items) ? items : [];
   const sticky = stickyPhotoTagsByCalendar.get(calendarId);
   if (!sticky || sticky.size === 0) return list;
+  const clearOnMatch = options.clearOnMatch !== false;
   return list.map(photo => {
     const keys = photoIndexTagIdentityKeys(photo);
     let stickyTags = '';
@@ -243,11 +264,9 @@ function applyStickyPhotoIndexTags(calendarId, items) {
     }
     if (!stickyTags) return photo;
     const serverTags = String(photo?.tags || '');
-    // #502 only kept sticky over *empty* CF rows. A delayed force reload that still saw the
-    // previous non-empty denorm (e.g. only #260908) wiped sticky and reopened the lightbox with
-    // stale/partial tags even though message.imageTags already had the full save. Keep sticky
-    // until the index tag *set* matches the verified save.
-    if (normalizePhotoIndexTagSet(serverTags) === normalizePhotoIndexTagSet(stickyTags)) {
+    // Only clear sticky against RAW photoIndex/CF tags. Clearing after merge backfilled an empty
+    // CF row from a fuller previous patch made the next partial denorm stick permanently.
+    if (clearOnMatch && normalizePhotoIndexTagSet(serverTags) === normalizePhotoIndexTagSet(stickyTags)) {
       keys.forEach(key => sticky.delete(key));
       return serverTags ? photo : { ...photo, tags: stickyTags };
     }
@@ -267,12 +286,26 @@ function mergePhotoIndexTags(previousItems, nextItems) {
   });
   if (!byKey.size) return next;
   return next.map(photo => {
-    if (String(photo?.tags || '')) return photo;
+    let prevTags = '';
     for (const key of photoIndexTagIdentityKeys(photo)) {
-      if (byKey.has(key)) return { ...photo, tags: byKey.get(key) };
+      if (byKey.has(key)) {
+        prevTags = byKey.get(key);
+        break;
+      }
     }
-    return photo;
+    if (!prevTags) return photo;
+    const chosen = preferRicherPhotoIndexTags(prevTags, photo?.tags);
+    return chosen === String(photo?.tags || '') ? photo : { ...photo, tags: chosen };
   });
+}
+
+// Reconcile a force/page fetch with in-memory rows + session sticky.
+// Order matters: sticky may clear only when RAW CF tags match; merge then protects against
+// partial denorm overwriting a fuller previous patch after sticky was correctly cleared.
+export function reconcilePhotoIndexTagItems(calendarId, previousItems, fetchedItems) {
+  const fetched = Array.isArray(fetchedItems) ? fetchedItems : [];
+  const withStickyFromServer = applyStickyPhotoIndexTags(calendarId, fetched, { clearOnMatch: true });
+  return mergePhotoIndexTags(previousItems, withStickyFromServer);
 }
 
 export function useGalleryPhotoIndex({ React, calendarId, activeView, projectId, decodeDocument }) {
@@ -288,10 +321,7 @@ export function useGalleryPhotoIndex({ React, calendarId, activeView, projectId,
         fetchPhotoIndexCount({ calendarId, projectId })
       ]);
       setState(previous => {
-        const merged = applyStickyPhotoIndexTags(
-          calendarId,
-          mergePhotoIndexTags(previous.items, Array.isArray(items) ? items : [])
-        );
+        const merged = reconcilePhotoIndexTagItems(calendarId, previous.items, items);
         return {
           status: total > 0 ? 'ready' : 'fallback',
           items: merged,
@@ -330,9 +360,10 @@ export function useGalleryPhotoIndex({ React, calendarId, activeView, projectId,
       }
       setState(previous => ({
         status: 'ready',
-        items: applyStickyPhotoIndexTags(
+        items: reconcilePhotoIndexTagItems(
           calendarId,
-          mergePhotoIndexTags(previous.items, filterGalleryPhotoIndexItems(pages.flat()))
+          previous.items,
+          filterGalleryPhotoIndexItems(pages.flat())
         ),
         total,
         page: previous.page || 1,

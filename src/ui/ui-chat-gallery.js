@@ -599,22 +599,25 @@ export function ChatGalleryModal({
             const match = owner.match(/^memo:([^:]+):/);
             if (match) messageId = match[1];
           }
-          // Client cannot write photoIndex. When CF denorm lags, index rows reopen with empty
-          // tags even though messages/memos already hold the verified save. Prefer those local
-          // source tags whenever the index row is still empty.
-          let tags = String(photo.tags || '');
-          if (!tags && messageId) {
+          // Client cannot write photoIndex. CF denorm can lag empty OR partial (e.g. only
+          // #260908 while message.imageTags still has the full save). Prefer those local
+          // verified message/memo imageTags over photoIndex whenever the source doc is in memory
+          // (including intentional clears / trash-deleted tags). Index tags are only a fallback.
+          const indexTags = String(photo.tags || '');
+          let localTags = null;
+          if (messageId) {
             if (source === 'memo') {
               const memo = (memos || []).find(row => row && row.id === messageId);
-              if (memo && Array.isArray(memo.imageTags)) tags = String(memo.imageTags[imageIndex] || '');
+              if (memo && Array.isArray(memo.imageTags)) localTags = String(memo.imageTags[imageIndex] || '');
             } else if (photo.directMediaUrl) {
               const msg = (chatMessages || []).find(row => row && row.id === messageId);
-              if (msg) tags = String(getDirectMediaTagsForUrl(msg, photo.directMediaUrl) || '');
+              if (msg) localTags = String(getDirectMediaTagsForUrl(msg, photo.directMediaUrl) || '');
             } else {
               const msg = (chatMessages || []).find(row => row && row.id === messageId);
-              if (msg && Array.isArray(msg.imageTags)) tags = String(msg.imageTags[imageIndex] || '');
+              if (msg && Array.isArray(msg.imageTags)) localTags = String(msg.imageTags[imageIndex] || '');
             }
           }
+          let tags = localTags != null ? localTags : indexTags;
           return {
             ...photo,
             source,
