@@ -2585,6 +2585,31 @@ select.form-select {
   .gallery-pagination.is-mobile .gallery-pagination-arrow {
     display: none;
   }
+
+  /* Horizontal drag pans the centered page window; keep a single row so numbers slide as a strip. */
+  .gallery-pagination.is-mobile.is-swipeable {
+    flex-wrap: nowrap;
+    justify-content: center;
+    overflow: hidden;
+    touch-action: pan-y;
+    user-select: none;
+    -webkit-user-select: none;
+    cursor: grab;
+  }
+
+  .gallery-pagination.is-mobile.is-swipeable:active {
+    cursor: grabbing;
+  }
+
+  .gallery-pagination.is-mobile.is-swipeable .gallery-pagination-button {
+    flex: 0 0 auto;
+    touch-action: none;
+  }
+
+  .gallery-pagination-button.is-focus:not(.is-active) {
+    border-color: color-mix(in srgb, var(--accent-primary) 55%, var(--border-subtle));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-primary) 35%, transparent);
+  }
 }
 
 /* Gallery preview thumbnails: 3 columns (9 shown, see PhotoGallery's isMobile-gated slice)

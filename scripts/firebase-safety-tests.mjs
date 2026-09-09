@@ -243,8 +243,15 @@ const dateModalSource = fs.readFileSync(new URL('../src/ui/ui-date-modal.js', im
 const photoIndexSource = fs.readFileSync(new URL('../src/core/photo-index.js', import.meta.url), 'utf8');
 assert(appMainSource.includes('rememberPhotoIndexTags'), 'tag saves must remember photoIndex tags across CF denorm lag');
 assert(photoIndexSource.includes('applyStickyPhotoIndexTags'), 'photoIndex loads must preserve session sticky tags over empty CF rows');
+assert(photoIndexSource.includes('normalizePhotoIndexTagSet'), 'sticky tags must compare normalized tag sets, not merely non-empty CF rows');
+assert(photoIndexSource.includes('peekStickyPhotoIndexTags'), 'tag saves must poll until sticky photoIndex tags clear');
+assert(photoIndexSource.includes('schedulePhotoIndexTagReload'), 'photoIndex must own delayed reload polling after tag saves');
 assert(photoIndexSource.includes('mergePhotoIndexTags'), 'photoIndex force reload must not wipe locally patched tags');
-assert(/setTimeout\([\s\S]*?loadPage\([\s\S]*?force:\s*true/.test(appMainSource), 'tag saves must delay photoIndex force reload until CF can catch up');
+assert(appMainSource.includes('schedulePhotoIndexTagReload'), 'delayed photoIndex reload must stop once sticky tags match the server');
+assert(/setTimeout\([\s\S]*?loadPage\([\s\S]*?force:\s*true/.test(photoIndexSource), 'tag saves must delay photoIndex force reload until CF can catch up');
+assert(chatGallerySource.includes('Prefer those local'), 'gallery lightbox must fall back to message/memo tags when photoIndex tags are empty');
+assert(chatGallerySource.includes('paginationDragPage'), 'mobile gallery pagination must support horizontal drag to pan the page window');
+assert(chatGallerySource.includes('is-swipeable'), 'mobile gallery pagination must mark the swipeable strip');
 assert(dateModalSource.includes('getPhotoAssetKeys(photo)'), 'schedule albums must dedupe REST/index/live copies by original or thumbnail asset');
 assert(appMainSource.includes('taggedMessages') && appMainSource.includes('fetchMessagesByImageTag(activeCalId, tag)'), 'handleFetchMeetingAlbum must also date-tag scan chat (not view-window only)');
 assert(dateModalSource.includes('album.taggedMessages') && dateModalSource.includes('onLoadOlderChat'), 'DateModal must apply album taggedMessages and keep older-chat full-load path');

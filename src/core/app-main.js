@@ -144,7 +144,7 @@ import {
 } from './app-domain-helpers.js';
 import { fetchPhotoComments, savePhotoComments } from './photo-comments.js';
 import { createPhotoCommentStore } from './photo-comment-store.js';
-import { useGalleryPhotoIndex, invalidatePhotoIndexCache, rememberPhotoIndexTags } from './photo-index.js';
+import { useGalleryPhotoIndex, invalidatePhotoIndexCache, rememberPhotoIndexTags, schedulePhotoIndexTagReload } from './photo-index.js';
 import { useGalleryArchiveState } from './gallery-archive-state.js';
 import { cloneConfirmedMeetings, commitConfirmedMeetingChanges } from './confirmed-meeting-coordinator.js';
 import { getInitialAppView, buildAppViewUrl } from './app-routing-state.js';
@@ -4285,24 +4285,27 @@ function CalendarApp() {
         setMemos(prev => prev.map(m => m.id === memoId ? { ...m, imageTags: nextImageTags } : m));
         try {
           invalidatePhotoIndexCache(activeCalId);
-          const memoTagPatch = { messageId: memoId, imageIndex: resolvedIndex, tags: cleanTags };
+          const memoAsset = String(meta?.assetKey || meta?.mediaKey || meta?.refKey || '');
+          const memoTagPatch = {
+            messageId: memoId,
+            imageIndex: resolvedIndex,
+            assetKey: memoAsset,
+            mediaKey: memoAsset,
+            refKey: memoAsset,
+            tags: cleanTags
+          };
           rememberPhotoIndexTags(activeCalId, [memoTagPatch]);
           if (typeof galleryPhotoIndex?.patchItems === 'function') {
             galleryPhotoIndex.patchItems(items => (items || []).map(photo => {
-              if (photo.messageId === memoId && Number(photo.imageIndex) === Number(resolvedIndex)) {
+              const sameAsset = memoAsset && (photo.assetKey === memoAsset || photo.mediaKey === memoAsset || photo.refKey === memoAsset);
+              if (sameAsset || (photo.messageId === memoId && Number(photo.imageIndex) === Number(resolvedIndex))) {
                 return { ...photo, tags: cleanTags };
               }
               return photo;
             }));
           }
-          // Do not force-reload immediately: CF photoIndex denorm races this fetch and used to
-          // wipe the local patch with empty tags, so lightbox reopen lost the just-saved tags.
-          if (galleryPhotoIndex?.status === 'ready' && typeof galleryPhotoIndex.loadPage === 'function') {
-            const page = galleryPhotoIndex.page || 1;
-            window.setTimeout(() => {
-              void galleryPhotoIndex.loadPage(page, { force: true });
-            }, 1800);
-          }
+          // Do not force-reload immediately: CF denorm races; poll until sticky clears.
+          schedulePhotoIndexTagReload(galleryPhotoIndex, activeCalId, memoTagPatch);
         } catch (indexSyncErr) {
           console.warn('Gallery photoIndex memo-tag sync skipped:', indexSyncErr);
         }
@@ -4440,29 +4443,25 @@ function CalendarApp() {
     try {
       invalidatePhotoIndexCache(activeCalId);
       const asset = String(meta?.assetKey || meta?.mediaKey || meta?.refKey || '');
-      rememberPhotoIndexTags(activeCalId, [{
+      const stickyProbe = {
         messageId,
         imageIndex: isDirectMedia ? 0 : imageIndex,
         assetKey: asset,
         mediaKey: asset,
         refKey: asset,
         tags: cleanTags
-      }]);
+      };
+      rememberPhotoIndexTags(activeCalId, [stickyProbe]);
       if (typeof galleryPhotoIndex?.patchItems === 'function') {
         galleryPhotoIndex.patchItems(items => (items || []).map(photo => {
           const sameAsset = asset && (photo.assetKey === asset || photo.mediaKey === asset || photo.refKey === asset);
           const sameMessage = messageId && photo.messageId === messageId
-            && Number(photo.imageIndex) === Number(imageIndex);
+            && Number(photo.imageIndex) === Number(isDirectMedia ? 0 : imageIndex);
           if (sameAsset || sameMessage) return { ...photo, tags: cleanTags };
           return photo;
         }));
       }
-      if (galleryPhotoIndex?.status === 'ready' && typeof galleryPhotoIndex.loadPage === 'function') {
-        const page = galleryPhotoIndex.page || 1;
-        window.setTimeout(() => {
-          void galleryPhotoIndex.loadPage(page, { force: true });
-        }, 1800);
-      }
+      schedulePhotoIndexTagReload(galleryPhotoIndex, activeCalId, stickyProbe);
     } catch (indexSyncErr) {
       console.warn('Gallery photoIndex tag sync skipped:', indexSyncErr);
     }

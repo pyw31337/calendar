@@ -160,6 +160,14 @@ export function invalidatePhotoIndexCache(calendarId) {
 // message identity so local verified saves survive reload and gallery remount within the tab.
 const stickyPhotoTagsByCalendar = new Map();
 
+// Tag token order / # prefixes vary between lightbox normalize, message writes, and CF denorm.
+// Compare as a sorted set so sticky clears only when the index actually caught up.
+function normalizePhotoIndexTagSet(value) {
+  return Array.from(new Set(
+    String(value || '').split(/[,\s#]+/).map(token => token.trim()).filter(Boolean)
+  )).sort().join(' ');
+}
+
 function photoIndexTagIdentityKeys(photo = {}) {
   const keys = [];
   const asset = String(photo.assetKey || photo.mediaKey || photo.refKey || '').trim();
@@ -188,6 +196,38 @@ export function rememberPhotoIndexTags(calendarId, photos) {
   });
 }
 
+export function peekStickyPhotoIndexTags(calendarId, photo = {}) {
+  const sticky = stickyPhotoTagsByCalendar.get(calendarId);
+  if (!sticky || sticky.size === 0) return '';
+  for (const key of photoIndexTagIdentityKeys(photo)) {
+    if (sticky.has(key)) return String(sticky.get(key) || '');
+  }
+  return '';
+}
+
+// After a verified message/memo tag write, poll force-reload until sticky clears (CF denorm
+// caught up) or attempts are exhausted. Sticky overlay covers reopen during the wait.
+export function schedulePhotoIndexTagReload(galleryPhotoIndex, calendarId, stickyProbe, options = {}) {
+  if (!galleryPhotoIndex || galleryPhotoIndex.status !== 'ready') return;
+  if (typeof galleryPhotoIndex.loadPage !== 'function' || !calendarId) return;
+  const page = Math.max(1, Number(options.page || galleryPhotoIndex.page || 1) || 1);
+  const initialDelayMs = Number.isFinite(Number(options.initialDelayMs)) ? Number(options.initialDelayMs) : 1800;
+  const retryDelayMs = Number.isFinite(Number(options.retryDelayMs)) ? Number(options.retryDelayMs) : 1200;
+  const maxAttempts = Math.max(1, Number(options.maxAttempts) || 5);
+  let attempts = 0;
+  const poll = () => {
+    attempts += 1;
+    void Promise.resolve(galleryPhotoIndex.loadPage(page, { force: true })).finally(() => {
+      if (attempts >= maxAttempts) return;
+      if (!peekStickyPhotoIndexTags(calendarId, stickyProbe)) return;
+      window.setTimeout(poll, retryDelayMs);
+    });
+  };
+  window.setTimeout(poll, initialDelayMs);
+}
+
+
+
 function applyStickyPhotoIndexTags(calendarId, items) {
   const list = Array.isArray(items) ? items : [];
   const sticky = stickyPhotoTagsByCalendar.get(calendarId);
@@ -201,13 +241,17 @@ function applyStickyPhotoIndexTags(calendarId, items) {
         break;
       }
     }
-    const serverTags = String(photo?.tags || '');
     if (!stickyTags) return photo;
-    // Empty CF rows are the reopen-loss case (denorm lag / force-reload race). Non-empty server
-    // tags mean the index caught up (or another writer won) — drop sticky and trust the server.
-    if (!serverTags) return { ...photo, tags: stickyTags };
-    keys.forEach(key => sticky.delete(key));
-    return photo;
+    const serverTags = String(photo?.tags || '');
+    // #502 only kept sticky over *empty* CF rows. A delayed force reload that still saw the
+    // previous non-empty denorm (e.g. only #260908) wiped sticky and reopened the lightbox with
+    // stale/partial tags even though message.imageTags already had the full save. Keep sticky
+    // until the index tag *set* matches the verified save.
+    if (normalizePhotoIndexTagSet(serverTags) === normalizePhotoIndexTagSet(stickyTags)) {
+      keys.forEach(key => sticky.delete(key));
+      return serverTags ? photo : { ...photo, tags: stickyTags };
+    }
+    return { ...photo, tags: stickyTags };
   });
 }
 
