@@ -8618,6 +8618,56 @@ function loadHeic2any(timeoutMs = 15000) {
   return heic2anyLoadPromise;
 }
 
+async function sniffImageFormat(file) {
+  if (!file || typeof file.slice !== 'function') return null;
+  try {
+    const buf = await file.slice(0, 16).arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+      return { mime: 'image/jpeg', ext: 'jpg', kind: 'jpeg' };
+    }
+    if (bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) {
+      return { mime: 'image/png', ext: 'png', kind: 'png' };
+    }
+    if (bytes.length >= 6 && bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x38) {
+      return { mime: 'image/gif', ext: 'gif', kind: 'gif' };
+    }
+    if (bytes.length >= 12
+      && bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46
+      && bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) {
+      return { mime: 'image/webp', ext: 'webp', kind: 'webp' };
+    }
+    // ISO BMFF brands: HEIC/HEIF/AVIF often arrive from messengers with a .png/.jpg name.
+    if (bytes.length >= 12) {
+      const brand = String.fromCharCode(bytes[8], bytes[9], bytes[10], bytes[11]).toLowerCase();
+      if (brand === 'heic' || brand === 'heif' || brand === 'mif1' || brand === 'msf1') {
+        return { mime: 'image/heic', ext: 'heic', kind: 'heic' };
+      }
+      if (brand === 'avif' || brand === 'avis') {
+        return { mime: 'image/avif', ext: 'avif', kind: 'avif' };
+      }
+    }
+  } catch (_) { /* ignore sniff failures */ }
+  return null;
+}
+
+function withCorrectedImageFile(file, sniff) {
+  if (!file || !sniff?.mime) return file;
+  const currentType = String(file.type || '').toLowerCase();
+  if (currentType === sniff.mime) return file;
+  const rawName = String(file.name || 'image').trim() || 'image';
+  const base = rawName.includes('.') ? rawName.replace(/\.[^.]+$/, '') : rawName;
+  const nextName = `${base}.${sniff.ext}`;
+  try {
+    if (typeof File === 'function') {
+      return new File([file], nextName, { type: sniff.mime, lastModified: file.lastModified || Date.now() });
+    }
+  } catch (_) { /* fall through to Blob */ }
+  const blob = file.slice ? file.slice(0, file.size, sniff.mime) : new Blob([file], { type: sniff.mime });
+  try { blob.name = nextName; } catch (_) { /* Blob.name is read-only in some engines */ }
+  return blob;
+}
+
 function isHeicFile(file) {
   const type = (file.type || '').toLowerCase();
   if (type === 'image/heic' || type === 'image/heif' || type === 'image/heic-sequence' || type === 'image/heif-sequence') return true;
@@ -8656,11 +8706,16 @@ function loadImageElement(objectUrl, timeoutMs = 20000) {
 }
 
 async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_THUMB_BASE64_LENGTH } = {}) {
-  let sourceBlob = file;
-  const metadata = await extractPhotoMetadata(file).catch(() => null);
+  // Messengers often rewrite the bytes (JPEG/HEIC) while keeping a .png name or a wrong MIME.
+  // Sniff the header so decode/encode follow the real format instead of the filename.
+  const sniffed = await sniffImageFormat(file).catch(() => null);
+  const workingFile = withCorrectedImageFile(file, sniffed) || file;
+  let sourceBlob = workingFile;
+  const metadata = await extractPhotoMetadata(workingFile).catch(() => null);
   let img = null;
+  const treatAsHeic = isHeicFile(workingFile) || sniffed?.kind === 'heic';
 
-  if (isHeicFile(file)) {
+  if (treatAsHeic) {
     // Try every native decode path the platform might offer before falling back to a CDN
     // library. Different engines expose HEIC support through different APIs -- some Chrome
     // builds decode via createImageBitmap using the OS's own HEIF codec without supporting
@@ -8673,13 +8728,13 @@ async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_T
     // entirely on capable browsers.
     if (typeof createImageBitmap === 'function') {
       try {
-        img = await withTimeout(createImageBitmap(file), 6000, 'createImageBitmap timed out');
+        img = await withTimeout(createImageBitmap(workingFile), 6000, 'createImageBitmap timed out');
       } catch (err) {
         img = null;
       }
     }
     if (!img) {
-      const probeUrl = URL.createObjectURL(file);
+      const probeUrl = URL.createObjectURL(workingFile);
       try {
         img = await loadImageElement(probeUrl, 6000);
       } catch (err) {
@@ -8700,7 +8755,7 @@ async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_T
         try {
           const heicTo = await loadHeicTo();
           converted = await withTimeout(
-            heicTo({ blob: file, type: 'image/jpeg', quality: 0.85 }),
+            heicTo({ blob: workingFile, type: 'image/jpeg', quality: 0.85 }),
             45000,
             'HEIC conversion timed out'
           );
@@ -8722,7 +8777,7 @@ async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_T
             // must not be allowed to hang forever -- bound it generously (45s) rather than leave
             // the attach flow stuck with no way to recover.
             converted = await withTimeout(
-              heic2any({ blob: file, toType: 'image/jpeg', quality: 0.85 }),
+              heic2any({ blob: workingFile, toType: 'image/jpeg', quality: 0.85 }),
               45000,
               'HEIC conversion timed out'
             );
@@ -8735,12 +8790,23 @@ async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_T
       }
 
       if (!converted) {
-        throw Object.assign(new Error('HEIC 이미지를 변환하지 못했습니다.'), { code: 'HEIC_CONVERT_FAILED', fileName: file.name, cause: lastErr });
+        throw Object.assign(new Error('HEIC 이미지를 변환하지 못했습니다.'), { code: 'HEIC_CONVERT_FAILED', fileName: workingFile.name || file.name, cause: lastErr });
       }
       sourceBlob = Array.isArray(converted) ? converted[0] : converted;
     }
   }
 
+  if (!img) {
+    // Prefer createImageBitmap for ordinary images too -- some mobile WebViews decode JPEG/PNG
+    // via bitmap even when <img> onerror fires for a MIME/extension mismatch.
+    if (typeof createImageBitmap === 'function') {
+      try {
+        img = await withTimeout(createImageBitmap(sourceBlob), 8000, 'createImageBitmap timed out');
+      } catch (_) {
+        img = null;
+      }
+    }
+  }
   if (!img) {
     const objectUrl = URL.createObjectURL(sourceBlob);
     try {
@@ -8748,7 +8814,7 @@ async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_T
     } catch (err) {
       throw Object.assign(
         new Error('이미지를 불러오지 못했습니다. 지원하지 않는 형식이거나 손상된 파일일 수 있습니다.'),
-        { code: err.code || 'IMAGE_DECODE_FAILED', fileName: file.name }
+        { code: err.code || 'IMAGE_DECODE_FAILED', fileName: workingFile.name || file.name, sniffedKind: sniffed?.kind || null }
       );
     } finally {
       URL.revokeObjectURL(objectUrl);
@@ -8791,12 +8857,12 @@ async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_T
     // Storage uploads aren't bounded by Firestore's 1MiB doc limit the way inline base64 is.
     const maxDimHigh = 2000;
     const isOversized = img.width > maxDimHigh || img.height > maxDimHigh;
-    if (!isOversized && file.size <= 1.5 * 1024 * 1024) {
-      return Promise.resolve(file);
+    if (!isOversized && workingFile.size <= 1.5 * 1024 * 1024) {
+      return Promise.resolve(workingFile);
     }
     return new Promise(res => {
       let w = img.width, h = img.height;
-      const isPng = (file.type === 'image/png' || (file.name || '').toLowerCase().endsWith('.png'));
+      const isPng = sniffed?.kind === 'png' || (!sniffed && (workingFile.type === 'image/png' || (workingFile.name || file.name || '').toLowerCase().endsWith('.png')));
       if (isOversized) {
         if (w > h) { h = Math.round(h * maxDimHigh / w); w = maxDimHigh; }
         else { w = Math.round(w * maxDimHigh / h); h = maxDimHigh; }
@@ -8823,7 +8889,7 @@ async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_T
       canvas.width = w;
       canvas.height = h;
       canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      const isPng = (file.type === 'image/png' || (file.name || '').toLowerCase().endsWith('.png'));
+      const isPng = sniffed?.kind === 'png' || (!sniffed && (workingFile.type === 'image/png' || (workingFile.name || file.name || '').toLowerCase().endsWith('.png')));
       if (isPng) canvas.toBlob(blob => res(blob), 'image/png');
       else canvas.toBlob(blob => res(blob), 'image/jpeg', 0.82);
     });
@@ -9171,6 +9237,8 @@ function describeImageProcessingFailures(failed) {
     ? 'HEIC/HEIF 변환 실패'
     : first.error?.code === 'IMAGE_DECODE_TIMEOUT'
     ? '처리 시간 초과'
+    : first.error?.code === 'IMAGE_DECODE_FAILED'
+    ? '이미지 디코드 실패'
     : '지원하지 않는 형식';
   if (failed.length === 1) return `${first.fileName} 첨부 실패 (${reason})`;
   return `${failed.length}장 첨부 실패 (${reason} 등)`;
