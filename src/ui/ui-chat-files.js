@@ -3,6 +3,8 @@
  * PDF: browser iframe/object viewer. Office/text: download / open-in-new-tab.
  */
 
+import { resolveFileTypeIconUrl } from './file-type-icons.js';
+
 function __gatherUiDeps() { return window.GATHER_UI_DEPS || {}; }
 function __chatFiles() { return window.GATHER_CHAT_FILE_ATTACHMENTS || {}; }
 
@@ -24,15 +26,67 @@ function isPdfAttachment() {
 
 function FileTypeBadge(props) {
   var React = window.React;
-  var label = props && props.label;
+  var label = (props && props.label) || "FILE";
+  var attachment = props && props.attachment;
+  var iconSrc = resolveFileTypeIconUrl(attachment || label);
   return React.createElement("div", {
     style: {
       width: "48px", height: "48px", borderRadius: "10px",
       backgroundColor: "color-mix(in srgb, var(--primary) 12%, var(--bg-secondary))",
       color: "var(--primary)", display: "flex", alignItems: "center", justifyContent: "center",
-      fontSize: "0.72rem", fontWeight: 900, letterSpacing: "0.02em", flexShrink: 0
-    }
-  }, label || "FILE");
+      fontSize: "0.72rem", fontWeight: 900, letterSpacing: "0.02em", flexShrink: 0,
+      overflow: "hidden"
+    },
+    "aria-hidden": true
+  },
+    React.createElement("img", {
+      src: iconSrc,
+      alt: "",
+      width: 40,
+      height: 40,
+      decoding: "async",
+      style: { width: "40px", height: "40px", objectFit: "contain", display: "block" }
+    })
+  );
+}
+
+function DocZoomControls(props) {
+  var React = window.React;
+  var zoomLevel = props.zoomLevel;
+  var onZoomIn = props.onZoomIn;
+  var onZoomOut = props.onZoomOut;
+  var onZoomReset = props.onZoomReset;
+  var zoomMin = props.zoomMin;
+  var zoomMax = props.zoomMax;
+  var zoomDefault = props.zoomDefault;
+  var btnStyle = function(disabled) {
+    return {
+      height: "32px", minWidth: "32px", padding: "0 8px", borderRadius: "8px",
+      border: "1px solid var(--border-subtle)", background: "var(--bg-secondary)",
+      color: "var(--text-main)", cursor: disabled ? "default" : "pointer",
+      fontWeight: 800, fontSize: "var(--font-size-sm)", opacity: disabled ? 0.45 : 1,
+      display: "inline-flex", alignItems: "center", justifyContent: "center"
+    };
+  };
+  return React.createElement("div", {
+    style: { display: "inline-flex", alignItems: "center", gap: "6px", flexShrink: 0 }
+  },
+    React.createElement("button", {
+      type: "button", onClick: onZoomOut, disabled: zoomLevel <= zoomMin,
+      "aria-label": "축소", title: "축소", style: btnStyle(zoomLevel <= zoomMin)
+    }, "축소"),
+    React.createElement("button", {
+      type: "button", onClick: onZoomReset, disabled: zoomLevel === zoomDefault,
+      "aria-label": "맞춤", title: "맞춤 (100%)",
+      style: Object.assign({}, btnStyle(zoomLevel === zoomDefault), {
+        minWidth: "52px", fontVariantNumeric: "tabular-nums"
+      })
+    }, zoomLevel + "%"),
+    React.createElement("button", {
+      type: "button", onClick: onZoomIn, disabled: zoomLevel >= zoomMax,
+      "aria-label": "확대", title: "확대", style: btnStyle(zoomLevel >= zoomMax)
+    }, "확대")
+  );
 }
 
 export function FileAttachmentCard(props) {
@@ -55,7 +109,7 @@ export function FileAttachmentCard(props) {
     style: {
       display: "flex", alignItems: "center", gap: "10px",
       width: stretch ? "100%" : "fit-content",
-      maxWidth: stretch ? "100%" : "min(100%, 280px)",
+      maxWidth: stretch ? "100%" : "min(100%, 420px)",
       boxSizing: "border-box", textAlign: "left",
       border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)",
       backgroundColor: "var(--bg-card)", color: "inherit",
@@ -63,7 +117,7 @@ export function FileAttachmentCard(props) {
       cursor: "pointer", marginTop: compact ? 0 : "6px"
     }
   },
-    React.createElement(FileTypeBadge, { label: label }),
+    React.createElement(FileTypeBadge, { label: label, attachment: attachment }),
     React.createElement("div", { style: { minWidth: 0, flex: 1, display: "flex", flexDirection: "column", gap: "2px" } },
       React.createElement("div", {
         style: {
@@ -89,11 +143,30 @@ export function DocumentLightbox(props) {
   var safeIndex = Math.max(0, Math.min(list.length - 1, Number(index) || 0));
   var current = list[safeIndex] || attachment;
 
+  var ZOOM_MIN = 50;
+  var ZOOM_MAX = 300;
+  var ZOOM_STEP = 25;
+  var ZOOM_DEFAULT = 100;
+  var _zoom = React.useState(ZOOM_DEFAULT);
+  var zoomLevel = _zoom[0];
+  var setZoomLevel = _zoom[1];
+
+  React.useEffect(function() {
+    setZoomLevel(ZOOM_DEFAULT);
+  }, [safeIndex, current && current.url]);
+
   React.useEffect(function() {
     var onKey = function(e) {
       if (e.key === "Escape" && onClose) onClose();
       if (e.key === "ArrowLeft" && typeof onNavigate === "function" && safeIndex > 0) onNavigate(safeIndex - 1);
       if (e.key === "ArrowRight" && typeof onNavigate === "function" && safeIndex < list.length - 1) onNavigate(safeIndex + 1);
+      if (e.key === "+" || e.key === "=") {
+        setZoomLevel(function(prev) { return Math.min(ZOOM_MAX, prev + ZOOM_STEP); });
+      }
+      if (e.key === "-" || e.key === "_") {
+        setZoomLevel(function(prev) { return Math.max(ZOOM_MIN, prev - ZOOM_STEP); });
+      }
+      if (e.key === "0") setZoomLevel(ZOOM_DEFAULT);
     };
     window.addEventListener("keydown", onKey);
     return function() { window.removeEventListener("keydown", onKey); };
@@ -103,6 +176,20 @@ export function DocumentLightbox(props) {
   var typeLabel = getChatFileTypeLabel(current);
   var sizeLabel = formatChatFileSize(current.size);
   var pdf = isPdfAttachment(current);
+  var scale = zoomLevel / 100;
+
+  var handleZoomIn = function(e) {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    setZoomLevel(function(prev) { return Math.min(ZOOM_MAX, prev + ZOOM_STEP); });
+  };
+  var handleZoomOut = function(e) {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    setZoomLevel(function(prev) { return Math.max(ZOOM_MIN, prev - ZOOM_STEP); });
+  };
+  var handleZoomReset = function(e) {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    setZoomLevel(ZOOM_DEFAULT);
+  };
 
   return React.createElement("div", {
     role: "dialog", "aria-modal": "true", "aria-label": "파일 미리보기", onClick: onClose,
@@ -114,7 +201,7 @@ export function DocumentLightbox(props) {
     React.createElement("div", {
       onClick: function(e) { e.stopPropagation(); },
       style: {
-        width: "min(960px, 100%)", maxHeight: "92vh", backgroundColor: "var(--bg-card)",
+        width: "min(1100px, 96vw)", maxHeight: "92vh", backgroundColor: "var(--bg-card)",
         borderRadius: "16px", border: "1px solid var(--border-subtle)", display: "flex",
         flexDirection: "column", overflow: "hidden", boxShadow: "0 20px 50px rgba(0,0,0,0.35)"
       }
@@ -125,18 +212,31 @@ export function DocumentLightbox(props) {
           padding: "12px 14px", borderBottom: "1px solid var(--border-subtle)"
         }
       },
-        React.createElement("div", { style: { minWidth: 0 } },
+        React.createElement("div", { style: { minWidth: 0, flex: 1 } },
           React.createElement("div", {
             style: {
               fontWeight: 900, fontSize: "var(--font-size-base)", color: "var(--text-main)",
-              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"
+              overflow: "hidden", textOverflow: "ellipsis",
+              whiteSpace: "normal", display: "-webkit-box", WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical", wordBreak: "break-word"
             }
           }, current.name || "파일"),
           React.createElement("div", {
             style: { fontSize: "var(--font-size-sm)", color: "var(--text-muted)", fontWeight: 600 }
           }, [typeLabel, sizeLabel].filter(Boolean).join(" · "))
         ),
-        React.createElement("div", { style: { display: "flex", gap: "8px", flexShrink: 0 } },
+        React.createElement("div", {
+          style: { display: "flex", alignItems: "center", gap: "8px", flexShrink: 0, flexWrap: "wrap", justifyContent: "flex-end" }
+        },
+          pdf ? React.createElement(DocZoomControls, {
+            zoomLevel: zoomLevel,
+            zoomMin: ZOOM_MIN,
+            zoomMax: ZOOM_MAX,
+            zoomDefault: ZOOM_DEFAULT,
+            onZoomIn: handleZoomIn,
+            onZoomOut: handleZoomOut,
+            onZoomReset: handleZoomReset
+          }) : null,
           React.createElement("a", {
             href: current.url, target: "_blank", rel: "noopener noreferrer",
             download: current.name || undefined,
@@ -164,18 +264,42 @@ export function DocumentLightbox(props) {
         }
       },
         pdf
-          ? React.createElement("iframe", {
-              title: current.name || "PDF",
-              src: current.url,
-              style: { width: "100%", minHeight: "70vh", border: "none", background: "#fff" }
-            })
+          ? React.createElement("div", {
+              style: {
+                width: "100%", minHeight: "70vh", overflow: "auto",
+                background: "#fff"
+              }
+            },
+              React.createElement("div", {
+                style: {
+                  transform: "scale(" + scale + ")",
+                  transformOrigin: "top left",
+                  width: (100 / scale) + "%",
+                  height: (100 / scale) + "%",
+                  minHeight: "70vh"
+                }
+              },
+                React.createElement("iframe", {
+                  title: current.name || "PDF",
+                  src: current.url,
+                  style: {
+                    width: "100%",
+                    minHeight: "70vh",
+                    height: "70vh",
+                    border: "none",
+                    background: "#fff",
+                    display: "block"
+                  }
+                })
+              )
+            )
           : React.createElement("div", {
               style: {
                 margin: "auto", display: "flex", flexDirection: "column", alignItems: "center",
                 gap: "12px", textAlign: "center", maxWidth: "420px", color: "var(--text-main)"
               }
             },
-              React.createElement(FileTypeBadge, { label: typeLabel }),
+              React.createElement(FileTypeBadge, { label: typeLabel, attachment: current }),
               React.createElement("div", { style: { fontWeight: 800 } }, "이 형식은 앱 내 페이지 미리보기를 지원하지 않습니다."),
               React.createElement("div", {
                 style: { color: "var(--text-muted)", fontSize: "var(--font-size-md)", fontWeight: 600 }
