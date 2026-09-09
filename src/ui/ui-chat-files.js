@@ -123,7 +123,7 @@ export function FileAttachmentCard(props) {
       React.createElement("div", {
         style: {
           fontSize: "var(--font-size-md)", fontWeight: 800, color: "var(--text-main)",
-          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"
+          whiteSpace: "normal", overflowWrap: "anywhere", wordBreak: "break-word"
         }
       }, attachment.name || "파일"),
       React.createElement("div", {

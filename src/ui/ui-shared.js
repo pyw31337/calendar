@@ -258,6 +258,34 @@ export function ResizableModalContainer({ className, style, children, ...props }
   );
 }
 
+
+/** Keep mobile keyboard open after tag/comment save by restoring focus ASAP (incl. remounts). */
+export function refocusComposerField(inputRef) {
+  const resolve = () => {
+    if (!inputRef) return null;
+    if (typeof inputRef === 'object') return inputRef.current || null;
+    return null;
+  };
+  const focusNow = () => {
+    const el = resolve();
+    if (!el || typeof el.focus !== 'function') return false;
+    try { el.focus({ preventScroll: true }); } catch (_) {
+      try { el.focus(); } catch (__) { return false; }
+    }
+    return true;
+  };
+  focusNow();
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(() => {
+      focusNow();
+      requestAnimationFrame(focusNow);
+    });
+  } else if (typeof setTimeout === 'function') {
+    setTimeout(focusNow, 0);
+    setTimeout(focusNow, 50);
+  }
+}
+
 export function AutoGrowTextarea({
   maxHeight = 480,
   value,
@@ -1668,6 +1696,7 @@ export function ResizableListSection({
     ResizableModalContainer: ResizableModalContainer,
     ResizableListSection: ResizableListSection,
     AutoGrowTextarea: AutoGrowTextarea,
+    refocusComposerField: refocusComposerField,
     FormAddEditActionButtons: FormAddEditActionButtons,
     SegmentedToggle: SegmentedToggle,
     UnderlineTabs: UnderlineTabs,

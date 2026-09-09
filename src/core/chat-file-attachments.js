@@ -30,6 +30,14 @@ export const CHAT_IMAGE_EXTENSIONS = Object.freeze([
   'jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif', 'bmp', 'avif'
 ]);
 
+/** Single paperclip picker: images + documents (images route to photo pipeline). */
+export const CHAT_COMPOSER_ACCEPT = [
+  '.pdf', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx', '.txt', '.csv', '.rtf',
+  ...CHAT_DOCUMENT_MIME_TYPES,
+  'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif', 'image/*'
+].join(',');
+
+
 const EXT_MIME = Object.freeze({
   pdf: 'application/pdf',
   doc: 'application/msword',
@@ -310,6 +318,7 @@ if (typeof window !== 'undefined') {
   window.GATHER_CHAT_FILE_ATTACHMENTS = Object.assign({}, window.GATHER_CHAT_FILE_ATTACHMENTS || {}, {
     MAX_CHAT_FILE_BYTES,
     MAX_CHAT_FILE_ATTACHMENTS,
+    CHAT_COMPOSER_ACCEPT,
     classifyChatComposerFiles,
     formatChatFileSize,
     getChatFileTypeLabel,

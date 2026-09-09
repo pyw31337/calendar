@@ -3763,7 +3763,7 @@ function CalendarApp() {
     setEditingMessage({ ...msg, calId: activeCalId });
   };
 
-  const handleSaveEditMessage = async (newText, newImages, newParticipantId) => {
+  const handleSaveEditMessage = async (newText, newImages, newParticipantId, nextFileAttachments) => {
     if (!editingMessage) return false;
     const { id, calId } = editingMessage;
     const resolvedParticipantId = newParticipantId || editingMessage.participantId;
@@ -3817,6 +3817,14 @@ function CalendarApp() {
         return originalIdx >= 0 ? (originalTags[originalIdx] || '') : '';
       });
 
+      const incomingFiles = Array.isArray(nextFileAttachments) ? nextFileAttachments : (editingMessage.fileAttachments || []);
+      let uploadedFileAttachments = incomingFiles.filter(f => f && f.url && !f.file);
+      const pendingFiles = incomingFiles.filter(f => f && f.file);
+      if (pendingFiles.length && typeof uploadChatFileAttachments === 'function') {
+        const uploaded = await uploadChatFileAttachments(calId, pendingFiles, hasNewImages || pendingFiles.length ? setChatUploadProgress : null);
+        uploadedFileAttachments = uploadedFileAttachments.concat(uploaded || []);
+      }
+
       const data = {
         text: newText,
         imageUrl: firstChunk[0]?.imageUrl || '',
@@ -3824,7 +3832,8 @@ function CalendarApp() {
         imageUrls: firstChunk.map(r => r.imageUrl),
         thumbUrls: firstChunk.map(r => r.thumbUrl),
         imageTags: nextImageTags.slice(0, firstChunk.length),
-        linkPreview: linkPreview || null
+        linkPreview: linkPreview || null,
+        fileAttachments: uploadedFileAttachments
       };
       if (resolvedParticipantId !== editingMessage.participantId) data.participantId = resolvedParticipantId;
       let ok = false;
@@ -6038,6 +6047,13 @@ function CalendarApp() {
       // collapsing it down to just this save's raw note.
       ? (cleanVisitDate ? upsertPlaceMemoEntry(memoBasePlace ? memoBasePlace.memo : '', cleanVisitDate, cleanMemo) : (memoBasePlace ? memoBasePlace.memo : cleanMemo))
       : (mergeTargetPlace ? mergeTargetPlace.memo : cleanMemo);
+    const derivedVisitStatus = derivePlaceVisitStatus({ memo: nextMemo });
+    let nextVisitDate = placeData.visitDate !== undefined ? cleanVisitDate : mp('visitDate', '');
+    // 날짜 없는 후보지에 stale visitDate가 남아 일정 팝업 장소 탭에 뜨지 않도록 정리한다.
+    if (derivedVisitStatus === 'planned') {
+      const hasDatedMemo = parsePlaceMemoEntries(nextMemo).some(entry => normalizePlaceDateForSort(entry && entry.date));
+      if (!hasDatedMemo) nextVisitDate = '';
+    }
     const editedFields = {
       name: mp('name', cleanName),
       alias: mp('alias', cleanAlias),
@@ -6046,8 +6062,8 @@ function CalendarApp() {
       lng: mergeTargetPlace ? mergeTargetPlace.lng : placeData.lng,
       categoryId: mp('categoryId', cleanCategoryId),
       memo: nextMemo,
-      visitStatus: derivePlaceVisitStatus({ memo: nextMemo }),
-      visitDate: placeData.visitDate !== undefined ? cleanVisitDate : mp('visitDate', ''),
+      visitStatus: derivedVisitStatus,
+      visitDate: nextVisitDate,
       sourcePlaceId: mp('sourcePlaceId', sourcePlaceIdForSave || (isEditing && !mergeTargetPlace ? (existingPlaces.find(p => p.id === placeData.id) || {}).sourcePlaceId : '') || ''),
       updatedAt: now
     };
@@ -10467,19 +10483,11 @@ function DateModal(props) {
 
 
 function doesPlaceMatchDate(place, dateStr) {
-  if (place.visitDate === dateStr) return true;
-  const normalizedTarget = normalizePlaceDateForSort(dateStr);
-  if (!normalizedTarget) return false;
-  if (place.visitDate && normalizePlaceDateForSort(place.visitDate) === normalizedTarget) return true;
-  // 장소 페이지와 일정 팝업은 같은 장소 메모를 같은 날짜 기준으로 보여줘야 한다.
-  // 구형 parseVisitEntriesFromMemo는 날짜가 2개 이상일 때만 동작해 단일 날짜 메모나
-  // 일부 레거시 형식을 놓칠 수 있으므로, 장소 페이지가 사용하는 정규 파서를 단일 기준으로 쓴다.
-  const visitEntries = parsePlaceMemoEntries(place.memo);
-  for (const entry of visitEntries) {
-    if (normalizePlaceDateForSort(entry.date) === normalizedTarget) return true;
-  }
-  return false;
+  const f = (window.GATHER_APP_UTILS || {}).doesPlaceMatchDate;
+  return typeof f === 'function' ? f(place, dateStr) : false;
 }
+
+
 
 
 const rebuildCalendarToTimestamp = (calendar, T, logs = []) => {

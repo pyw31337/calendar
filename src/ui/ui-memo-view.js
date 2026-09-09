@@ -392,6 +392,8 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const [newIsPinned, setNewIsPinned] = React.useState(false);
   const [newTags, setNewTags] = React.useState([]); // array of strings (tag tokens)
   const [newTagInput, setNewTagInput] = React.useState('');
+  const newTagInputRef = React.useRef(null);
+  const editTagInputRef = React.useRef(null);
   const [newImages, setNewImages] = React.useState([]); // array of { original, thumbnail, originalBlob, thumbnailBlob } (same shape chat uses)
   const [imageProcessingNew, setImageProcessingNew] = React.useState(null); // compression phase, mirrors chat's imageProcessing
   const [newUploadProgress, setNewUploadProgress] = React.useState(null); // upload phase: { pct, remainingSec }
@@ -960,6 +962,9 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
     }
     setNewTags(prev => [...prev, cleanTag]);
     setNewTagInput('');
+    const refocus = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.refocusComposerField);
+    if (typeof refocus === 'function') refocus(newTagInputRef);
+    else if (newTagInputRef.current) { try { newTagInputRef.current.focus({ preventScroll: true }); } catch (_) { newTagInputRef.current.focus(); } }
   };
 
   const handleAddEditTag = async () => {
@@ -998,6 +1003,9 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
 
     setEditTags(nextTags);
     setEditTagInput('');
+    const refocus = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.refocusComposerField);
+    if (typeof refocus === 'function') refocus(editTagInputRef);
+    else if (editTagInputRef.current) { try { editTagInputRef.current.focus({ preventScroll: true }); } catch (_) { editTagInputRef.current.focus(); } }
   };
 
   const filteredMemos = (memos || []).filter(memo => {
@@ -1489,6 +1497,8 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
               }),
               /*#__PURE__*/React.createElement("input", {
                 type: "text",
+                ref: newTagInputRef,
+                enterKeyHint: "enter",
                 placeholder: newTags.length >= 10 ? "태그 최대 10개 도달" : `태그 입력 (${newTags.length}/10)`,
                 value: newTagInput,
                 onChange: e => setNewTagInput(e.target.value),

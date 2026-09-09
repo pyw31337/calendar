@@ -839,12 +839,33 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
     const entries = parsePlaceMemoEntries(memo);
     const entry = entries.find(e => normalizePlaceDateForSort(e.date) === targetNorm);
     if (entry) return entry.note;
-    // A place whose memo was never touched by the per-date system yet (a single freeform note
-    // with no date at all) still needs to show up regardless of which date it's viewed from --
-    // matches how a plain place.memo string always displayed before this per-date restructure.
-    if (entries.length === 1 && !entries[0].date) return entries[0].note;
+    // Undated freeform notes are 후보지/legacy text — they must NOT appear as if they belong to
+    // every day on DateModal's Place tab. Callers that need the raw undated note should read
+    // parsePlaceMemoEntries directly.
     return '';
   }
+
+
+  // DateModal Place tab: only places tied to this day (dated memo entry or visitDate).
+  // Undated 후보지/방문예정 must never appear just because a stale visitDate remains.
+  function doesPlaceMatchDate(place, dateStr) {
+    const normalizedTarget = normalizePlaceDateForSort(dateStr);
+    if (!normalizedTarget) return false;
+    const visitEntries = parsePlaceMemoEntries(place && place.memo);
+    for (const entry of visitEntries) {
+      if (normalizePlaceDateForSort(entry && entry.date) === normalizedTarget) return true;
+    }
+    const hasAnyDatedMemo = visitEntries.some(entry => normalizePlaceDateForSort(entry && entry.date));
+    const plannedUndated = !hasAnyDatedMemo && (
+      derivePlaceVisitStatus(place) === 'planned'
+      || (place && place.visitStatus === 'planned')
+    );
+    if (plannedUndated) return false;
+    if (place && place.visitDate === dateStr) return true;
+    if (place && place.visitDate && normalizePlaceDateForSort(place.visitDate) === normalizedTarget) return true;
+    return false;
+  }
+
 
 
   function trimLatLngOutliers(points) {
@@ -1103,6 +1124,7 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
     derivePlaceVisitStatus,
     countPlaceVisits,
     getPlaceMemoEntryForDate,
+    doesPlaceMatchDate,
     trimLatLngOutliers,
     parseSharePathFromLocation,
     getAppBaseUrl,
