@@ -1647,8 +1647,8 @@ export function ChatRoomView({
           /*#__PURE__*/React.createElement("button", {
             type: "button",
             onClick: () => docFileInputRefChat.current && docFileInputRefChat.current.click(),
-            title: "파일첨부",
-            "aria-label": "파일첨부",
+            title: "파일 업로드",
+            "aria-label": "파일 업로드",
             style: {
               width: '32px',
               height: '32px',
