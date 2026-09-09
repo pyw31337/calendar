@@ -1404,7 +1404,31 @@ export function CommentsSection({
     const badgeName = p?.name || '알수없음';
 
     /* === SHARED ELEMENTS === */
-    const bubbleContent = renderChatMessageBody(msg, setActiveLightbox, { maxWidth: '120px', maxHeight: '90px', isMiniChat: true }, '', null, null, true);
+    // linkPreviewOnly=true keeps OG cards compact on the dashboard. File cards still come from
+    // renderChatMessageBody once ui-chat-files has registered renderChatFileAttachments; the
+    // chip fallback below covers the brief window (or a failed chunk) where that helper is
+    // missing so a file-only message never renders as an empty bubble.
+    const bodyFromShared = renderChatMessageBody(msg, setActiveLightbox, { maxWidth: '120px', maxHeight: '90px', isMiniChat: true }, '', null, null, true);
+    const previewFiles = Array.isArray(msg.fileAttachments) ? msg.fileAttachments.filter(f => f && f.url) : [];
+    const hasSharedFileRenderer = !!(window.GATHER_UI_COMPONENTS && typeof window.GATHER_UI_COMPONENTS.renderChatFileAttachments === 'function');
+    const fallbackFileChips = (!hasSharedFileRenderer && previewFiles.length > 0)
+      ? /*#__PURE__*/React.createElement('div', {
+          style: { display: 'flex', flexDirection: 'column', gap: '6px', width: '100%' }
+        }, previewFiles.map((file, idx) => /*#__PURE__*/React.createElement('div', {
+          key: file.id || `${file.url}-${idx}`,
+          style: {
+            display: 'inline-flex', alignItems: 'center', gap: '6px',
+            padding: '6px 10px', borderRadius: 'var(--radius-md)',
+            border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)',
+            fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--text-main)',
+            maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+          },
+          title: file.name || '파일'
+        }, file.name || '파일')))
+      : null;
+    const bubbleContent = fallbackFileChips
+      ? /*#__PURE__*/React.createElement(React.Fragment, null, bodyFromShared, fallbackFileChips)
+      : bodyFromShared;
 
     const editSvg = PencilIcon
       ? /*#__PURE__*/React.createElement(PencilIcon, { size: 12 })

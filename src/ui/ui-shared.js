@@ -403,6 +403,10 @@ export function UnderlineTabs({ options = [], value, onChange, ariaLabel, classN
     const isActive = value === id;
     const label = typeof opt.label === 'function' ? opt.label(isActive) : opt.label;
     const badge = opt.badge;
+    // Content search (and similar) fades tabs with 0 hits so empty categories read as inactive
+    // without removing them from the bar -- mirrors the muted empty-state copy inside those tabs.
+    const isFaded = !!opt.faded;
+    const showBadge = badge != null && badge !== '' && !(isFaded && (badge === 0 || badge === '0'));
     return /*#__PURE__*/React.createElement('button', {
       key: String(id),
       type: 'button',
@@ -417,7 +421,8 @@ export function UnderlineTabs({ options = [], value, onChange, ariaLabel, classN
         cursor: 'pointer',
         fontSize: 'var(--font-size-md)',
         fontWeight: 800,
-        color: isActive ? activeColor : 'var(--text-muted)',
+        color: isFaded ? 'var(--text-light)' : (isActive ? activeColor : 'var(--text-muted)'),
+        opacity: isFaded ? 0.45 : 1,
         borderBottom: isActive ? `2px solid ${activeColor}` : '2px solid transparent',
         display: 'flex',
         alignItems: 'center',
@@ -428,7 +433,7 @@ export function UnderlineTabs({ options = [], value, onChange, ariaLabel, classN
       }
     },
       label,
-      badge != null && badge !== '' ? /*#__PURE__*/React.createElement('span', {
+      showBadge ? /*#__PURE__*/React.createElement('span', {
         style: {
           fontSize: 'var(--font-size-xs)',
           fontWeight: 800,
