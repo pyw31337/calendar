@@ -261,32 +261,41 @@ export function DocumentLightbox(props) {
         ),
         React.createElement("div", {
           style: {
-            display: "flex", alignItems: "center", gap: isMobile ? "4px" : "6px",
+            display: "flex", alignItems: "center",
+            justifyContent: "space-between", gap: isMobile ? "8px" : "12px",
             flexShrink: 1, flexWrap: "nowrap", minWidth: 0,
-            justifyContent: isMobile ? "flex-start" : "flex-end",
+            width: isMobile ? "100%" : "auto",
             overflow: "hidden"
           }
         },
-          pdf ? React.createElement(DocZoomControls, {
-            zoomLevel: zoomLevel,
-            zoomMin: ZOOM_MIN,
-            zoomMax: ZOOM_MAX,
-            zoomDefault: ZOOM_DEFAULT,
-            onZoomIn: handleZoomIn,
-            onZoomOut: handleZoomOut,
-            onZoomReset: handleZoomReset
-          }) : null,
-          React.createElement("a", {
-            href: current.url, target: "_blank", rel: "noopener noreferrer",
-            download: current.name || undefined,
+          // Left cluster: zoom + download. Close stays alone on the far right.
+          React.createElement("div", {
             style: {
-              height: "32px", padding: isMobile ? "0 8px" : "0 10px", borderRadius: "8px",
-              border: "1px solid #000", background: "#000",
-              color: "#fff", display: "inline-flex", alignItems: "center",
-              fontWeight: 800, fontSize: "var(--font-size-sm)", textDecoration: "none",
-              flexShrink: 0, whiteSpace: "nowrap", lineHeight: 1
+              display: "flex", alignItems: "center", gap: isMobile ? "4px" : "6px",
+              flexShrink: 1, minWidth: 0, overflow: "hidden"
             }
-          }, "다운로드"),
+          },
+            pdf ? React.createElement(DocZoomControls, {
+              zoomLevel: zoomLevel,
+              zoomMin: ZOOM_MIN,
+              zoomMax: ZOOM_MAX,
+              zoomDefault: ZOOM_DEFAULT,
+              onZoomIn: handleZoomIn,
+              onZoomOut: handleZoomOut,
+              onZoomReset: handleZoomReset
+            }) : null,
+            React.createElement("a", {
+              href: current.url, target: "_blank", rel: "noopener noreferrer",
+              download: current.name || undefined,
+              style: {
+                height: "32px", padding: isMobile ? "0 8px" : "0 10px", borderRadius: "8px",
+                border: "1px solid #000", background: "#000",
+                color: "#fff", display: "inline-flex", alignItems: "center",
+                fontWeight: 800, fontSize: "var(--font-size-sm)", textDecoration: "none",
+                flexShrink: 0, whiteSpace: "nowrap", lineHeight: 1
+              }
+            }, "다운로드")
+          ),
           React.createElement("button", {
             type: "button", onClick: onClose, "aria-label": "닫기",
             style: {
@@ -294,7 +303,7 @@ export function DocumentLightbox(props) {
               border: "1px solid var(--border-subtle)", background: "var(--bg-secondary)",
               color: "var(--text-main)", cursor: "pointer", fontWeight: 900,
               flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center",
-              lineHeight: 1, padding: 0
+              lineHeight: 1, padding: 0, marginLeft: "auto"
             }
           }, "×")
         )
