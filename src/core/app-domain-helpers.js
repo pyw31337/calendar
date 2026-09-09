@@ -699,6 +699,50 @@ function clearAdminSession() {
   }
 }
 
+
+function findCultureLinkedAnniversary(anniversaries, item) {
+  const itemId = String(item?.id || '').trim();
+  const itemTitle = String(item?.title || '').trim();
+  const cats = ['festival', 'event', 'sports', 'movie'];
+  return (anniversaries || []).find(a => a && (
+    (itemId && (a.cultureSourceId === itemId || a.id === itemId))
+    || (itemTitle && String(a.title || '').trim() === itemTitle && cats.includes(a.category))
+  )) || null;
+}
+
+function findCultureLinkedMemo(memos, item, isTombstoneFn) {
+  const itemId = String(item?.id || '').trim();
+  const itemTitle = String(item?.title || '').trim();
+  const live = (memos || []).filter(m => m && !(typeof isTombstoneFn === 'function' && isTombstoneFn(m)));
+  const bySource = itemId ? live.find(m => String(m.cultureSourceId || '').trim() === itemId) : null;
+  if (bySource) return bySource;
+  if (!itemTitle) return null;
+  return live
+    .filter(m => String(m.title || '').trim() === itemTitle)
+    .sort((a, b) => (Number(b.updatedAt) || Number(b.createdAt) || 0) - (Number(a.updatedAt) || Number(a.createdAt) || 0))[0] || null;
+}
+
+function buildCultureLinkedMemoData({ existingMemo, item, text, participantId, stamp }) {
+  const itemId = String(item?.id || '').trim();
+  const itemTitle = String(item?.title || '').trim();
+  const memoId = existingMemo?.id || ('memo_' + stamp + '_' + Math.random().toString(36).slice(2, 8));
+  const memoData = {
+    id: memoId,
+    participantId: existingMemo?.participantId || participantId || '',
+    title: itemTitle || existingMemo?.title || '',
+    text,
+    imageUrls: Array.isArray(existingMemo?.imageUrls) ? existingMemo.imageUrls : [],
+    thumbUrls: Array.isArray(existingMemo?.thumbUrls) ? existingMemo.thumbUrls : [],
+    color: existingMemo?.color || 'var(--bg-card)',
+    isPinned: !!existingMemo?.isPinned,
+    tags: Array.isArray(existingMemo?.tags) ? existingMemo.tags : [],
+    createdAt: existingMemo?.createdAt || stamp,
+    updatedAt: stamp
+  };
+  if (itemId) memoData.cultureSourceId = itemId;
+  return memoData;
+}
+
 async function callAdminFunction(name, body) {
   const res = await fetch(`https://us-central1-${window.__gatherFirebaseConfig.projectId}.cloudfunctions.net/${name}`, {
     method: 'POST',
@@ -2564,6 +2608,9 @@ export {
   verifyAdminPasswordRemote,
   listAllCalendarsRemote,
   listServerAuditLogsRemote,
+  findCultureLinkedAnniversary,
+  findCultureLinkedMemo,
+  buildCultureLinkedMemoData,
   listPushSubscriptionHealthRemote,
   queueServerAuditEvent,
   getClientAuditContext,

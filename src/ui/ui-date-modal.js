@@ -2044,7 +2044,7 @@ export function DateModal({
         const bannerKey = ann.id || aIdx;
         const isExpanded = expandedAnnBannerIds.has(bannerKey);
         const cultureLink = (ann.cultureSourceLink && String(ann.cultureSourceLink).trim()) || '';
-        const hasDetail = !!(hasRealAnnPlace(ann) || ann.description || getAnnBannerDateDisplay(ann) || cultureLink);
+        const hasDetail = !!(hasRealAnnPlace(ann) || ann.description || getAnnBannerDateDisplay(ann) || cultureLink || (ann.memo && String(ann.memo).trim()));
         const photos = getAnnBannerPhotos(ann);
         const listIdx = Array.isArray(anniversaries) ? anniversaries.findIndex(a => a && a.id === ann.id) : -1;
         const anniversaryIndex = listIdx >= 0 ? listIdx + 1 : (aIdx + 1);
@@ -2215,6 +2215,27 @@ export function DateModal({
                 : renderTextWithUrlBadge(cultureLink)) : null
             );
           })(),
+          // Culture-backdrop / 컨텐츠 "메모" saves onto anniversary.memo so the same note
+          // (e.g. "티켓 17,000원") stays visible here when the day card is opened.
+          !!(ann.memo && String(ann.memo).trim()) && /*#__PURE__*/React.createElement("div", {
+            style: {
+              backgroundColor: `color-mix(in srgb, ${displayColor} 12%, white)`,
+              color: 'var(--text-main)',
+              padding: '10px 12px',
+              fontWeight: 500,
+              fontSize: 'var(--font-size-sm)',
+              whiteSpace: 'pre-line'
+            }
+          },
+            /*#__PURE__*/React.createElement("div", {
+              style: {
+                display: 'inline-block', maxWidth: '100%', boxSizing: 'border-box',
+                padding: '8px 10px', borderRadius: 'var(--radius-md)',
+                backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)',
+                wordBreak: 'break-word'
+              }
+            }, renderTextWithUrlBadge(String(ann.memo).trim()))
+          ),
           // 첨부된 사진 전부를 카드 하단에 썸네일로 보여준다 -- 예전엔 titleRow 안에 photos[0]
           // 하나만 (폴딩 화살표 왼쪽에) 보여줘서 2장 이상 첨부해도 나머지는 확인할 방법이 없었음.
           photos.length > 0 && MediaThumb && /*#__PURE__*/React.createElement("div", {

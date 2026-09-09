@@ -2526,6 +2526,7 @@ export function ContentView({
   chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null,
   showSettlement = true, onOpenCreateSettlement,
   anniversaries = [], onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo = null,
+  memos = [],
   customCultureItems = [], onSaveCustomCultureItem = null, showToast = null
 }) {
   const React = window.React;
@@ -2881,7 +2882,7 @@ export function ContentView({
       items: regionFilterItems
     }),
     contentTab === 'culture' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
-      calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo, dataUrl: CULTURE_PERFORMANCES_URL,
+      calendar, anniversaries, memos, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo, dataUrl: CULTURE_PERFORMANCES_URL,
       emptyLabel: "상영중이거나 예정된 문화행사가 없습니다.", regionSelections, onItemsLoaded: setRegionFilterItems,
       anniversaryCategory: "event",
       extraItems: performanceExtraItems,
@@ -2889,7 +2890,7 @@ export function ContentView({
       gridCols, focusItemId, focusTitle, searchQuery, onEditContent: openContentEditor
     }),
     contentTab === 'festival' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
-      calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo, dataUrl: CULTURE_FESTIVALS_URL,
+      calendar, anniversaries, memos, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo, dataUrl: CULTURE_FESTIVALS_URL,
       emptyLabel: "진행중이거나 예정된 지역축제가 없습니다.", regionSelections, onItemsLoaded: setRegionFilterItems,
       anniversaryCategory: "festival",
       extraItems: festivalExtraItems,
@@ -2897,7 +2898,7 @@ export function ContentView({
       gridCols, focusItemId, focusTitle, searchQuery, onEditContent: openContentEditor
     }),
     contentTab === 'sports' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
-      calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo, dataUrl: CULTURE_SPORTS_URL,
+      calendar, anniversaries, memos, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo, dataUrl: CULTURE_SPORTS_URL,
       emptyLabel: "진행중이거나 예정된 스포츠 경기가 없습니다.", regionSelections, onItemsLoaded: setRegionFilterItems,
       anniversaryCategory: "sports",
       extraItems: sportsExtraItems,
@@ -2905,7 +2906,7 @@ export function ContentView({
       gridCols, focusItemId, focusTitle, searchQuery, onEditContent: openContentEditor
     }),
     contentTab === 'movies' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
-      calendar, anniversaries, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo, dataUrl: CULTURE_MOVIES_URL,
+      calendar, anniversaries, memos, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo, dataUrl: CULTURE_MOVIES_URL,
       emptyLabel: "등록된 영화가 없습니다.", regionSelections, onItemsLoaded: setRegionFilterItems,
       anniversaryCategory: "movie", extraItems: movieExtraItems,
       chipRowSlot, contentPaddingTop, onScroll: handleContentScroll,
@@ -3649,6 +3650,57 @@ function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind =
 // 상영중/예정 목록을 보여준다. Culture Flow(별개 프로젝트)의 실시간 JSON을 직접 fetch하지 않는
 // 이유는 그 프로젝트의 스키마가 바뀌거나 그날 수집이 실패해도 이 탭이 즉시 깨지지 않게 하기
 // 위함 -- 동기화 스크립트가 검증에 실패하면 최근 정상 스냅샷을 그대로 커밋해 유지한다.
+// Resolve already-saved memo text for a culture card so the detail backdrop can seed the
+// composer. Priority: linked anniversary.memo → memos collection (cultureSourceId / title) →
+// date-modal attendance notes on the linked anniversary's start date. Without this, reopening
+// a calendar-linked card always showed an empty memo dropdown even when DateModal already had
+// the note (e.g. "티켓 17,000원").
+function resolveExistingCultureMemoText(item, {
+  anniversaries = [],
+  memos = [],
+  calendar = null,
+  anniversaryCategory = 'event',
+  findRegisteredAnniversary = null
+} = {}) {
+  if (!item) return '';
+  const ann = typeof findRegisteredAnniversary === 'function'
+    ? findRegisteredAnniversary(item.id, item.title)
+    : (anniversaries || []).find(a => a && (a.cultureSourceId === item.id || a.id === item.id)) || null;
+  const fromAnn = String(ann?.memo || '').trim();
+  if (fromAnn) return fromAnn;
+
+  const itemId = String(item.id || '').trim();
+  const title = String(item.title || '').trim();
+  const liveMemos = (memos || []).filter(m => m && !isTombstone(m) && String(m.text || '').trim());
+  const bySource = itemId
+    ? liveMemos.find(m => String(m.cultureSourceId || '').trim() === itemId)
+    : null;
+  if (bySource) return String(bySource.text || '').trim();
+  if (title) {
+    const byTitle = liveMemos
+      .filter(m => String(m.title || '').trim() === title)
+      .sort((a, b) => (Number(b.updatedAt) || Number(b.createdAt) || 0) - (Number(a.updatedAt) || Number(a.createdAt) || 0));
+    if (byTitle[0]) return String(byTitle[0].text || '').trim();
+  }
+
+  // Last-resort: attendance notes the user left on the performance day in DateModal.
+  const getActiveAvailabilities = (__gatherUiDeps().getActiveAvailabilities)
+    || (window.GATHER_APP_UTILS || {}).getActiveAvailabilities;
+  const dateStr = String(ann?.startDate || ann?.date || item.startDate || item.date || '').slice(0, 10);
+  if (dateStr && typeof getActiveAvailabilities === 'function' && calendar) {
+    const notes = getActiveAvailabilities(calendar)
+      .filter(e => e && !isTombstone(e) && e.date === dateStr && String(e.note || '').trim())
+      .map(e => String(e.note || '').trim());
+    if (notes.length === 1) return notes[0];
+    // Prefer a short personal note over multi-line auto text when several exist.
+    const short = notes.find(n => n.length <= 80 && !n.includes('\n'));
+    if (short) return short;
+    if (notes[0]) return notes[0];
+  }
+  void anniversaryCategory;
+  return '';
+}
+
 // Preview-only mirror of app-main.js's buildCultureEventMemoText -- shown as the textarea's
 // placeholder so the user can see what gets saved if they leave the memo blank. The actual
 // save always goes through onQuickSaveMemo (app-main.js), which is the single source of truth
@@ -3663,7 +3715,7 @@ function buildQuickMemoPlaceholder(item) {
   return lines.join('\n') || '비워두면 행사 정보가 그대로 저장됩니다';
 }
 
-export function CulturePerformancesTab({ calendar, anniversaries = [], onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo = null, onEditContent = null, dataUrl = CULTURE_PERFORMANCES_URL, emptyLabel = "상영중이거나 예정된 문화공연이 없습니다.", regionSelections = [], onItemsLoaded, anniversaryCategory = 'event', extraItems = [], chipRowSlot = null, contentPaddingTop = 0, onScroll, gridCols = '2', focusItemId = null, focusTitle = '', searchQuery = '' }) {
+export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [], onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo = null, onEditContent = null, dataUrl = CULTURE_PERFORMANCES_URL, emptyLabel = "상영중이거나 예정된 문화공연이 없습니다.", regionSelections = [], onItemsLoaded, anniversaryCategory = 'event', extraItems = [], chipRowSlot = null, contentPaddingTop = 0, onScroll, gridCols = '2', focusItemId = null, focusTitle = '', searchQuery = '' }) {
   const React = window.React;
   const ReactDOM = window.ReactDOM;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -3698,19 +3750,60 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
   };
   const [memoDraft, setMemoDraft] = React.useState('');
   const [isSavingMemo, setIsSavingMemo] = React.useState(false);
-  // Reset the memo composer whenever a different card is opened (or the sheet is closed),
-  // rather than leaving a previous card's draft/expanded state bleeding into the next one.
+  const resolveSelectedMemoText = React.useCallback((item) => {
+    if (!item) return '';
+    const list = anniversaries || [];
+    const byId = list.find(a => a?.cultureSourceId === item.id || a?.id === item.id);
+    const title = String(item.title || '').trim();
+    const registered = byId || (title
+      ? list.find(a => a && a.category === anniversaryCategory && String(a.title || '').trim() === title) || null
+      : null);
+    return resolveExistingCultureMemoText(item, {
+      anniversaries,
+      memos,
+      calendar,
+      anniversaryCategory,
+      findRegisteredAnniversary: () => registered
+    });
+  }, [anniversaries, memos, calendar, anniversaryCategory]);
+  // Seed (and auto-expand) the memo composer from any already-linked memo when a card opens.
+  // Previously this always cleared + collapsed, so calendar-linked items that already had a
+  // memo (anniversary.memo / memos collection / DateModal attendance note) looked empty.
   React.useEffect(() => {
-    setIsMemoOpen(false);
-    setMemoDraft('');
     setIsSavingMemo(false);
+    if (!selected) {
+      setIsMemoOpen(false);
+      setMemoDraft('');
+      return;
+    }
+    const existing = resolveSelectedMemoText(selected);
+    setMemoDraft(existing || '');
+    setIsMemoOpen(!!existing);
   }, [selected?.id]);
+  // If memos/anniversaries hydrate after the sheet opened, fill an still-empty composer once
+  // without clobbering text the user has already started typing.
+  React.useEffect(() => {
+    if (!selected?.id) return;
+    const existing = resolveSelectedMemoText(selected);
+    if (!existing) return;
+    setMemoDraft(prev => {
+      if (String(prev || '').trim()) return prev;
+      setIsMemoOpen(true);
+      return existing;
+    });
+  }, [anniversaries, memos, resolveSelectedMemoText, selected?.id]);
   const handleSaveQuickMemo = async () => {
     if (!selected || isSavingMemo || typeof onQuickSaveMemo !== 'function') return;
     setIsSavingMemo(true);
     try {
+      const draft = String(memoDraft || '').trim();
       const ok = await onQuickSaveMemo(selected, memoDraft);
-      if (ok) { setIsMemoOpen(false); setMemoDraft(''); }
+      if (ok) {
+        // Keep the rounded memo field visible with the saved text (matches the expected
+        // calendar-linked backdrop screenshot) instead of collapsing to an empty composer.
+        if (draft) setMemoDraft(draft);
+        setIsMemoOpen(true);
+      }
     } finally {
       setIsSavingMemo(false);
     }
@@ -4332,7 +4425,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], onRegiste
               style: { transform: isMemoOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }
             }, /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" })))
           ),
-          isMemoOpen && /*#__PURE__*/React.createElement("div", {
+          (isMemoOpen || !!String(memoDraft || '').trim()) && /*#__PURE__*/React.createElement("div", {
             style: { display: 'flex', flexDirection: 'column', gap: '8px', flexShrink: 0 }
           },
             /*#__PURE__*/React.createElement("textarea", {
