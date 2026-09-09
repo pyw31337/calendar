@@ -53,6 +53,10 @@ function isValidDateString(...args) {
   const f = __gatherUiDeps().isValidDateString || GATHER_APP_UTILS.isValidDateString;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function highlightKeyword(...args) {
+  const f = __gatherUiDeps().highlightKeyword || GATHER_APP_UTILS.highlightKeyword;
+  return typeof f === 'function' ? f(...args) : args[0];
+}
 function removeFirstUrl(...args) {
   const f = __gatherUiDeps().removeFirstUrl || GATHER_APP_UTILS.removeFirstUrl;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -150,7 +154,7 @@ function useClipboardHasImage(active) {
 // card's local isVideoOpen state and tore down/rebuilt its DOM, which is what read as "the video
 // suddenly closes" and "the screen jumps" while scrolling with a video open. A stable module-level
 // function keeps each card's own state and DOM across ChatGalleryModal re-renders.
-function GalleryLinkCard({ item }) {
+function GalleryLinkCard({ item, searchQuery = '' }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -187,7 +191,7 @@ function GalleryLinkCard({ item }) {
         textOverflow: 'ellipsis',
         whiteSpace: 'nowrap'
       }
-    }, fallbackTitle),
+    }, highlightKeyword(fallbackTitle, searchQuery)),
 
     /* Primary Link Preview Card */
     /*#__PURE__*/React.createElement(LinkPreviewCard, {
@@ -825,7 +829,7 @@ export function ChatGalleryModal({
     // Date mode must group the full filtered list (visiblePhotos), not the flat-mode
     // render slice (renderedPhotos). Slicing left hasLocallyHiddenPhotos true for other
     // months and made auto load-more keep firing without growing the current month UI.
-    const sourceItems = activeTab === 'links' ? filteredLinks : visiblePhotos;
+    const sourceItems = activeTab === 'links' ? filteredLinks : (activeTab === 'files' ? filteredFiles : visiblePhotos);
     const groups = new Map();
     (sourceItems || []).forEach((item, idx) => {
       const key = getGalleryItemDateKey(item) || '__unknown__';
@@ -848,11 +852,11 @@ export function ChatGalleryModal({
           .sort((a, b) => (Number(b.item?.timestamp || 0) - Number(a.item?.timestamp || 0)) || (a.idx - b.idx))
           .map(entry => entry.item)
       }));
-  }, [galleryViewMode, activeTab, filteredLinks, visiblePhotos, galleryMonthKey]);
+  }, [galleryViewMode, activeTab, filteredLinks, filteredFiles, visiblePhotos, galleryMonthKey]);
 
   // Per-month photo count for the active galleryMonthKey (already-loaded visiblePhotos only).
   const monthVisiblePhotoCount = React.useMemo(() => {
-    if (galleryViewMode !== 'date' || activeTab === 'links') return 0;
+    if (galleryViewMode !== 'date' || activeTab !== 'photos') return 0;
     return (visiblePhotos || []).reduce((count, item) => {
       const key = getGalleryItemDateKey(item) || '';
       return key.startsWith(galleryMonthKey) ? count + 1 : count;
@@ -1489,9 +1493,25 @@ export function ChatGalleryModal({
   const renderGalleryLinkList = items => /*#__PURE__*/React.createElement(React.Fragment, null,
     (items || []).map(item => /*#__PURE__*/React.createElement(GalleryLinkCard, {
       key: item.messageId || item.url,
-      item: item
+      item: item,
+      searchQuery: searchQuery
     }))
   );
+  const renderGalleryFileList = items => /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', flexDirection: 'column', gap: '8px' }
+  }, (items || []).map((item, idx) => FileAttachmentCard ? /*#__PURE__*/React.createElement(FileAttachmentCard, {
+    key: (item.id || item.url) + '-' + idx,
+    attachment: item,
+    searchQuery: searchQuery,
+    stretch: true,
+    compact: true,
+    onOpen: () => setGalleryDocLightbox({ attachments: items, index: idx })
+  }) : null));
+  const renderFileListHeader = () => /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '8px' }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: { fontSize: 'var(--font-size-md)', fontWeight: 800, color: 'var(--text-muted)' }
+  }, `등록된 파일 (${filteredFiles.length}개)`));
   // "이전 사진/링크 더 보기": a real component (not a plain render-helper function) so it can use
   // its own IntersectionObserver to auto-fire onClick once the user scrolls near it, instead of
   // requiring an explicit tap. A sentinel div sits 300px above the visible button so the next
@@ -1857,13 +1877,14 @@ export function ChatGalleryModal({
     }
     if (galleryViewMode === 'date') {
       const isLinkMode = activeTab === 'links';
-      const monthExhausted = !isLinkMode && exhaustedGalleryMonthKey === galleryMonthKey;
+      const isFileMode = activeTab === 'files';
+      const monthExhausted = activeTab === 'photos' && exhaustedGalleryMonthKey === galleryMonthKey;
       // Date mode: do not gate on hasLocallyHiddenPhotos (flat slice). Photos already group from
       // visiblePhotos; only older-chat pagination (plus loading) matters. Hide when this month
       // was exhausted by a load that added zero month photos.
       const showLoadMore = isLinkMode
         ? (hasMoreOlderChat || hasMoreMemos)
-        : ((hasMoreOlderChat || loadingOlderChat) && !monthExhausted);
+        : (isFileMode ? hasMoreOlderChat : ((hasMoreOlderChat || loadingOlderChat) && !monthExhausted));
       const loadMoreNode = showLoadMore && !(searchQuery || '').trim() && (
         isLinkMode
           ? renderGalleryLoadMoreButton({
@@ -1876,8 +1897,8 @@ export function ChatGalleryModal({
               }
             })
           : renderGalleryLoadMoreButton({
-              label: `이전 사진 더 보기 (${visiblePhotos.length}장 불러옴)`,
-              loadingLabel: '이전 사진을 불러오는 중…',
+              label: isFileMode ? `이전 파일 더 보기 (${filteredFiles.length}개 불러옴)` : `이전 사진 더 보기 (${visiblePhotos.length}장 불러옴)`,
+              loadingLabel: isFileMode ? '이전 파일을 불러오는 중…' : '이전 사진을 불러오는 중…',
               disabled: !!loadingOlderChat,
               onClick: () => {
                 if (typeof onLoadOlderChat === 'function' && hasMoreOlderChat && !loadingOlderChat) onLoadOlderChat();
@@ -1886,7 +1907,7 @@ export function ChatGalleryModal({
       );
       return /*#__PURE__*/React.createElement(React.Fragment, null,
         // Keep 전체|일자 + 붙여넣기/추가 toolbar visible in date mode (same mobile header as flat).
-        isLinkMode ? renderLinkListHeader() : renderPhotoListHeader(),
+        isLinkMode ? renderLinkListHeader() : (isFileMode ? renderFileListHeader() : renderPhotoListHeader()),
         renderGalleryMonthNavigator(),
         groupedGallerySections.length === 0 ? /*#__PURE__*/React.createElement("div", {
           style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: 'var(--font-size-base)' }
@@ -1894,7 +1915,7 @@ export function ChatGalleryModal({
           ? "검색 결과가 없습니다."
           : (isLinkMode
             ? describeGalleryLinkEmptyState("이 달에 공유된 링크가 없습니다.")
-            : describeGalleryPhotoEmptyState("이 달에 등록된 사진이 없습니다.")))
+            : (isFileMode ? "이 달에 업로드된 파일이 없습니다." : describeGalleryPhotoEmptyState("이 달에 등록된 사진이 없습니다."))))
         // Same per-date section module the settlement page's 월별보기 tab uses for its daily
         // rows (icon + date label on the left, a pill badge + SectionToggleButton on the right),
         // re-skinned with a plain item count instead of a +/- amount.
@@ -1922,14 +1943,14 @@ export function ChatGalleryModal({
                 /*#__PURE__*/React.createElement(SectionToggleButton, {
                   collapsed: isCollapsed,
                   onToggle: () => toggleGalleryDate(section.dateKey),
-                  label: `${section.label} 사진`
+                  label: `${section.label} ${isLinkMode ? '링크' : (isFileMode ? '파일' : '사진')}`
                 })
               )
             ),
             !isCollapsed && /*#__PURE__*/React.createElement("div", {
               id: `gallery-date-items-${section.dateKey}`,
               style: { display: 'flex', flexDirection: 'column', gap: '8px' }
-            }, isLinkMode ? renderGalleryLinkList(section.items) : renderGalleryPhotoGrid(section.items, visiblePhotos))
+            }, isLinkMode ? renderGalleryLinkList(section.items) : (isFileMode ? renderGalleryFileList(section.items) : renderGalleryPhotoGrid(section.items, visiblePhotos)))
           );
         }),
         loadMoreNode
@@ -1938,24 +1959,10 @@ export function ChatGalleryModal({
     if (activeTab === 'files') {
       const sortedFiles = sortGalleryFlatItems(filteredFiles);
       return /*#__PURE__*/React.createElement(React.Fragment, null,
-        /*#__PURE__*/React.createElement("div", {
-          style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '8px' }
-        },
-          /*#__PURE__*/React.createElement("label", {
-            style: { fontSize: 'var(--font-size-md)', fontWeight: 800, color: 'var(--text-muted)' }
-          }, `등록된 파일 (${filteredFiles.length}개)`)
-        ),
+        renderFileListHeader(),
         sortedFiles.length === 0 ? /*#__PURE__*/React.createElement("div", {
           style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: 'var(--font-size-base)' }
-        }, searchQuery ? "검색 결과가 없습니다." : "업로드된 파일이 없습니다.") : /*#__PURE__*/React.createElement("div", {
-          style: { display: 'flex', flexDirection: 'column', gap: '8px' }
-        }, sortedFiles.map((item, idx) => FileAttachmentCard ? /*#__PURE__*/React.createElement(FileAttachmentCard, {
-          key: (item.id || item.url) + '-' + idx,
-          attachment: item,
-          stretch: true,
-          compact: true,
-          onOpen: () => setGalleryDocLightbox({ attachments: sortedFiles, index: idx })
-        }) : null)),
+        }, searchQuery ? "검색 결과가 없습니다." : "업로드된 파일이 없습니다.") : renderGalleryFileList(sortedFiles),
         (hasMoreOlderChat) && !(searchQuery || '').trim() && renderGalleryLoadMoreButton({
           label: `이전 파일 더 보기 (${filteredFiles.length}개 불러옴)`,
           loadingLabel: '이전 파일을 불러오는 중…',

@@ -23,6 +23,10 @@ function isPdfAttachment() {
   var f = __chatFiles().isPdfAttachment || __gatherUiDeps().isPdfAttachment;
   return typeof f === "function" ? f.apply(null, args) : false;
 }
+function highlightKeyword(value, keyword) {
+  var f = __gatherUiDeps().highlightKeyword;
+  return typeof f === "function" ? f(value, keyword) : value;
+}
 
 
 function isHttpUrl(value) {
@@ -169,6 +173,7 @@ export function FileAttachmentCard(props) {
   var onOpen = props && props.onOpen;
   var stretch = !!(props && props.stretch);
   var compact = !!(props && props.compact);
+  var searchQuery = (props && props.searchQuery) || "";
   if (!attachment || !attachment.url) return null;
   var label = getChatFileTypeLabel(attachment);
   var sizeLabel = formatChatFileSize(attachment.size);
@@ -198,7 +203,7 @@ export function FileAttachmentCard(props) {
           fontSize: "var(--font-size-md)", fontWeight: 800, color: "var(--text-main)",
           whiteSpace: "normal", overflowWrap: "anywhere", wordBreak: "break-word"
         }
-      }, attachment.name || "파일"),
+      }, highlightKeyword(attachment.name || "파일", searchQuery)),
       React.createElement("div", {
         style: { fontSize: "var(--font-size-sm)", color: "var(--text-muted)", fontWeight: 600 }
       }, [label, sizeLabel].filter(Boolean).join(" · "))
@@ -227,7 +232,7 @@ export function DocumentLightbox(props) {
   // Match ui-lightbox.js mobile breakpoint so document preview header adapts with resize/rotate.
   var _mobile = React.useState(function() {
     return typeof window !== "undefined" && window.matchMedia
-      && window.matchMedia("(max-width: 640px)").matches;
+      && window.matchMedia("(max-width: 1023px)").matches;
   });
   var isMobile = _mobile[0];
   var setIsMobile = _mobile[1];
@@ -238,7 +243,7 @@ export function DocumentLightbox(props) {
 
   React.useEffect(function() {
     if (typeof window === "undefined" || !window.matchMedia) return undefined;
-    var mq = window.matchMedia("(max-width: 640px)");
+    var mq = window.matchMedia("(max-width: 1023px)");
     var onChange = function() { setIsMobile(mq.matches); };
     onChange();
     if (mq.addEventListener) mq.addEventListener("change", onChange);
@@ -438,9 +443,16 @@ export function DocumentLightbox(props) {
                       minHeight: "70vh"
                     }
                   },
-                    // Prefer same-origin blob URL (mobile Safari). object+embed covers WebKit
-                    // quirks where iframe alone still shows the native 「열기」 fallback.
-                    React.createElement("object", {
+                    // Mobile WebKit is unreliable with nested object/embed PDF viewers. A
+                    // same-origin blob iframe avoids the external Storage navigation/error path.
+                    isMobile ? React.createElement("iframe", {
+                      title: current.name || "PDF",
+                      src: previewSrc,
+                      style: {
+                        width: "100%", minHeight: "70vh", height: "70vh",
+                        border: "none", background: "#fff", display: "block"
+                      }
+                    }) : React.createElement("object", {
                       data: previewSrc,
                       type: "application/pdf",
                       title: current.name || "PDF",

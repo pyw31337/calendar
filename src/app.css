@@ -2612,12 +2612,11 @@ select.form-select {
   }
 }
 
-/* Gallery preview thumbnails: 3 columns (9 shown, see PhotoGallery's isMobile-gated slice)
-   below the shared 640px breakpoint, 6 columns (18 shown) at/above it. */
+/* Phone and tablet previews stay 3x3. Six columns are reserved for real desktop widths. */
 .gallery-thumb-grid {
   grid-template-columns: repeat(3, 1fr);
 }
-@media (min-width: 640px) {
+@media (min-width: 1024px) {
   .gallery-thumb-grid {
     grid-template-columns: repeat(6, 1fr);
   }

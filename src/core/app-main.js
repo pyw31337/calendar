@@ -7485,6 +7485,9 @@ function CalendarApp() {
         onFetchPhotoComments: handleFetchPhotoComments,
         onSavePhotoComments: handleSavePhotoComments,
         onFetchMeetingPhotoIndex: handleFetchMeetingPhotoIndex,
+        indexedPhotos: galleryPhotoIndex.items,
+        indexedPhotoComplete: galleryPhotoIndex.complete,
+        onIndexedPhotoLoadAll: galleryPhotoIndex.loadAll,
         photoCommentCounts: photoCommentCounts,
         ...navMenuProps
       }),

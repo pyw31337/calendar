@@ -2278,7 +2278,11 @@ export function DateModal({
             const commentCount = photoCommentCounts[`anniversary:${photoIdForKey}`] || 0;
             return /*#__PURE__*/React.createElement("div", {
               key: p.id || `${bannerKey}_photo_${pIdx}`,
-              style: { position: 'relative', flexShrink: 0 }
+              className: commentCount > 0 ? 'gallery-comment-heartbeat' : undefined,
+              style: {
+                position: 'relative', flexShrink: 0,
+                animationDelay: commentCount > 0 ? `${(pIdx % 8) * 90}ms` : undefined
+              }
             },
               /*#__PURE__*/React.createElement(MediaThumb, {
                 src: p.thumbUrl || p.url,

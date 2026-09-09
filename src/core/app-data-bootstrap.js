@@ -300,11 +300,6 @@ export function subscribeAppResumeRefresh({
   const onVisible = () => {
     if (document.visibilityState === 'visible') setTimeout(refresh, 200);
   };
-  if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
-    navigator.serviceWorker.getRegistrations().then(registrations => {
-      registrations.forEach(registration => registration.update());
-    }).catch(() => {});
-  }
   document.addEventListener('visibilitychange', onVisible);
   window.addEventListener('focus', refresh);
   window.addEventListener('online', refresh);

@@ -1248,7 +1248,6 @@ function notifyRepeatScheduleReminder(calendar, ann, whenLabel, dateStr) {
 // itself, since this app deliberately serves its HTML as no-cache (see sw.js for why). Safe to
 // register unconditionally: browsers without service worker support simply skip this.
 if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
-  const hadServiceWorkerControllerAtStartup = Boolean(navigator.serviceWorker.controller);
   window.addEventListener('load', () => {
     const appBasePath = window.location.pathname.includes('/calendar/') ? '/calendar/' : '/';
     navigator.serviceWorker.register(`${appBasePath}sw.js`).then(reg => {
@@ -1266,15 +1265,11 @@ if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
     });
   }
 
-  let swRefreshing = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    // A first-ever install also emits controllerchange after clients.claim(). Reloading there
-    // destroys the freshly booted app in Firefox/WebKit. Reload only for a real SW update.
-    if (hadServiceWorkerControllerAtStartup && !swRefreshing) {
-      swRefreshing = true;
-      if (typeof window !== 'undefined' && window.location) {
-        window.location.reload();
-      }
+    // Never reload an active editing session automatically. UpdateAvailableToast compares the
+    // deployed build SHA and lets the user choose when to activate the new page safely.
+    if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+      window.dispatchEvent(new CustomEvent('moyeora:service-worker-updated'));
     }
   });
 }
