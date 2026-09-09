@@ -1202,7 +1202,7 @@ function CalendarApp() {
     React, calendarId: activeCalId, activeView,
     projectId: firebaseConfig.projectId, decodeDocument: firestoreDocumentToJs
   });
-  const { fullChatMessages, displayChatMessages, galleryChatMessages, galleryMemos } = useGalleryArchiveState({
+  const { fullChatMessages, displayChatMessages, galleryChatMessages, galleryMemos, patchGalleryArchiveMessage, patchGalleryArchiveMemo } = useGalleryArchiveState({
     React, activeCalId, activeView, isGlobalSearchOpen, firebaseDb, firebaseConnectionVersion,
     allChatMessages, galleryPreviewMessages, memos, fetchAllChatMessagesRest, fetchCalendarSearchIndex
   });
@@ -3116,6 +3116,10 @@ function CalendarApp() {
     setChatMessages(prev => prev.map(patchMessage));
     setOlderChatMessages(prev => prev.map(patchMessage));
     setGalleryPreviewMessages(prev => prev.map(patchMessage));
+    // Gallery archive (fullChatHistoryByCalendar) is a fourth snapshot used for lightbox tag reads.
+    // Without this, a verified tag save never reaches galleryChatMessages for photos outside the
+    // live chat window, so reopen fell back to stale/partial photoIndex tags.
+    if (typeof patchGalleryArchiveMessage === 'function') patchGalleryArchiveMessage(messageId, patch);
   };
   const upsertLocalChatMessage = message => {
     if (!message?.id) return;
@@ -4283,6 +4287,9 @@ function CalendarApp() {
         const ok = await writeCollectionDocumentWithFallback('memos', activeCalId, memoId, sanitizeMemoForFirestore({ imageTags: nextImageTags }), 'update', '메모 이미지 태그 저장', { requirePersisted: true });
         if (!ok?.success || ok?.queued) throw new Error('Memo image tags update failed');
         setMemos(prev => prev.map(m => m.id === memoId ? { ...m, imageTags: nextImageTags } : m));
+        if (typeof patchGalleryArchiveMemo === 'function') {
+          patchGalleryArchiveMemo(memoId, { imageTags: nextImageTags });
+        }
         try {
           invalidatePhotoIndexCache(activeCalId);
           const memoAsset = String(meta?.assetKey || meta?.mediaKey || meta?.refKey || '');

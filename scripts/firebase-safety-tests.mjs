@@ -247,9 +247,14 @@ assert(photoIndexSource.includes('normalizePhotoIndexTagSet'), 'sticky tags must
 assert(photoIndexSource.includes('peekStickyPhotoIndexTags'), 'tag saves must poll until sticky photoIndex tags clear');
 assert(photoIndexSource.includes('schedulePhotoIndexTagReload'), 'photoIndex must own delayed reload polling after tag saves');
 assert(photoIndexSource.includes('mergePhotoIndexTags'), 'photoIndex force reload must not wipe locally patched tags');
+assert(photoIndexSource.includes('reconcilePhotoIndexTagItems'), 'photoIndex must reconcile sticky against raw CF tags before merge');
+assert(photoIndexSource.includes('preferRicherPhotoIndexTags'), 'photoIndex merge must prefer richer previous tags over partial CF denorm');
 assert(appMainSource.includes('schedulePhotoIndexTagReload'), 'delayed photoIndex reload must stop once sticky tags match the server');
+assert(appMainSource.includes('patchGalleryArchiveMessage'), 'tag saves must patch the gallery full-chat archive snapshot');
+assert(appMainSource.includes('patchGalleryArchiveMemo'), 'memo tag saves must patch the gallery full-memo archive snapshot');
 assert(/setTimeout\([\s\S]*?loadPage\([\s\S]*?force:\s*true/.test(photoIndexSource), 'tag saves must delay photoIndex force reload until CF can catch up');
-assert(chatGallerySource.includes('Prefer those local'), 'gallery lightbox must fall back to message/memo tags when photoIndex tags are empty');
+assert(chatGallerySource.includes('Prefer those local'), 'gallery lightbox must prefer verified message/memo tags over photoIndex');
+assert(chatGallerySource.includes('localTags != null ? localTags : indexTags'), 'gallery must use in-memory message/memo imageTags whenever the source doc is present');
 assert(chatGallerySource.includes('paginationDragPage'), 'mobile gallery pagination must support horizontal drag to pan the page window');
 assert(chatGallerySource.includes('is-swipeable'), 'mobile gallery pagination must mark the swipeable strip');
 assert(dateModalSource.includes('getPhotoAssetKeys(photo)'), 'schedule albums must dedupe REST/index/live copies by original or thumbnail asset');
@@ -1128,3 +1133,62 @@ assert(commitBody.writes[0].update.fields.calendar.mapValue.fields.id.stringValu
 assert(commitBody.writes[0].update.fields.revision.integerValue === '2', 'REST fallback did not advance doc revision');
 
 console.log('Firebase-only calendar safety tests passed');
+
+{
+  const {
+    rememberPhotoIndexTags,
+    peekStickyPhotoIndexTags,
+    reconcilePhotoIndexTagItems,
+    preferRicherPhotoIndexTags,
+    normalizePhotoIndexTagSet
+  } = await import('../src/core/photo-index.js');
+
+  assert(
+    preferRicherPhotoIndexTags('260908 소고기고추볶음', '260908') === '260908 소고기고추볶음',
+    'partial CF denorm must not beat a fuller previous tag patch'
+  );
+  assert(
+    preferRicherPhotoIndexTags('260908', '260908 소고기고추볶음') === '260908 소고기고추볶음',
+    'richer CF catch-up must win over a smaller previous patch'
+  );
+  assert(
+    normalizePhotoIndexTagSet('#260908 #소고기고추볶음') === normalizePhotoIndexTagSet('소고기고추볶음 260908'),
+    'tag set normalize must ignore # and order'
+  );
+
+  const calId = `tag-reopen-${Date.now()}`;
+  const photo = { messageId: 'msg-reopen', imageIndex: 0, assetKey: 'asset-reopen' };
+  const fullTags = '260908 소고기고추볶음';
+  const previous = [{ ...photo, tags: fullTags }];
+  rememberPhotoIndexTags(calId, [{ ...photo, tags: fullTags }]);
+  assert(peekStickyPhotoIndexTags(calId, photo) === fullTags, 'sticky must remember verified gallery tag saves');
+
+  // Empty CF row + previous full patch must NOT clear sticky (raw server tags are empty).
+  const afterEmpty = reconcilePhotoIndexTagItems(calId, previous, [{ ...photo, tags: '' }]);
+  assert(String(afterEmpty[0]?.tags || '') === fullTags, 'empty CF reload must keep full sticky/previous tags');
+  assert(peekStickyPhotoIndexTags(calId, photo) === fullTags, 'empty CF reload must not clear sticky via merge backfill');
+
+  // Partial CF denorm after empty poll — the #506 reopen bug: sticky was already gone.
+  const afterPartial = reconcilePhotoIndexTagItems(calId, afterEmpty, [{ ...photo, tags: '260908' }]);
+  assert(
+    String(afterPartial[0]?.tags || '') === fullTags,
+    'partial CF denorm must not drop Korean/other tags after reopen reconcile'
+  );
+  assert(peekStickyPhotoIndexTags(calId, photo) === fullTags, 'partial CF denorm must leave sticky until full set matches');
+
+  // Full CF catch-up clears sticky.
+  const afterFull = reconcilePhotoIndexTagItems(calId, afterPartial, [{ ...photo, tags: '#260908 #소고기고추볶음' }]);
+  assert(normalizePhotoIndexTagSet(afterFull[0]?.tags) === normalizePhotoIndexTagSet(fullTags), 'full CF catch-up must keep full tag set');
+  assert(peekStickyPhotoIndexTags(calId, photo) === '', 'full CF catch-up must clear sticky once raw tags match');
+
+  // Intentional trash-delete: sticky holds reduced set while CF still has the old fuller denorm.
+  const reduced = '260908';
+  rememberPhotoIndexTags(calId, [{ ...photo, tags: reduced }]);
+  const afterReduce = reconcilePhotoIndexTagItems(
+    calId,
+    [{ ...photo, tags: reduced }],
+    [{ ...photo, tags: fullTags }]
+  );
+  assert(String(afterReduce[0]?.tags || '') === reduced, 'trash-deleted reduced tags must survive reopen while CF lags');
+}
+

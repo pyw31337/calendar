@@ -62,5 +62,45 @@ export function useGalleryArchiveState({
     return () => { cancelled = true; };
   }, [activeCalId, isGlobalSearchOpen, activeView, firebaseDb, firebaseConnectionVersion, fullChatHistoryByCalendar, fullGalleryMemosByCalendar, fetchAllChatMessagesRest, fetchCalendarSearchIndex]);
 
-  return { fullChatMessages, displayChatMessages, galleryChatMessages, galleryMemos };
+  const patchGalleryArchiveMessage = React.useCallback((messageId, patch) => {
+    if (!activeCalId || !messageId || !patch || typeof patch !== 'object') return;
+    setFullChatHistoryByCalendar(previous => {
+      const list = Array.isArray(previous[activeCalId]) ? previous[activeCalId] : null;
+      // No archive yet (still loading / not on gallery): nothing to patch; live windows cover it.
+      if (!list) return previous;
+      const idx = list.findIndex(message => message?.id === messageId);
+      if (idx >= 0) {
+        const next = list.slice();
+        next[idx] = { ...next[idx], ...patch, id: messageId };
+        return { ...previous, [activeCalId]: next };
+      }
+      // Verified tag save fetched a message that was absent from the search-index snapshot —
+      // upsert so gallery lightbox reopen can read imageTags without depending on photoIndex CF.
+      return { ...previous, [activeCalId]: [...list, { ...patch, id: messageId }] };
+    });
+  }, [activeCalId]);
+
+  const patchGalleryArchiveMemo = React.useCallback((memoId, patch) => {
+    if (!activeCalId || !memoId || !patch || typeof patch !== 'object') return;
+    setFullGalleryMemosByCalendar(previous => {
+      const list = Array.isArray(previous[activeCalId]) ? previous[activeCalId] : null;
+      if (!list) return previous;
+      const idx = list.findIndex(memo => memo?.id === memoId);
+      if (idx >= 0) {
+        const next = list.slice();
+        next[idx] = { ...next[idx], ...patch, id: memoId };
+        return { ...previous, [activeCalId]: next };
+      }
+      return { ...previous, [activeCalId]: [{ ...patch, id: memoId }, ...list] };
+    });
+  }, [activeCalId]);
+
+  return {
+    fullChatMessages,
+    displayChatMessages,
+    galleryChatMessages,
+    galleryMemos,
+    patchGalleryArchiveMessage,
+    patchGalleryArchiveMemo
+  };
 }
