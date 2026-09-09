@@ -3,6 +3,7 @@
  */
 
 import { composeGalleryPhotos } from '../core/gallery-data.js';
+import { resolveGalleryLightboxTags } from '../core/photo-index.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -535,7 +536,16 @@ export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalG
     if (changed) setBrokenPhotoRevision(prev => prev + 1);
   };
 
-  const photoEntries = React.useMemo(() => buildCombinedPhotoEntries(chatMessages, memos, calendar), [chatMessages, memos, calendar]);
+  const photoEntries = React.useMemo(() => {
+    const calendarId = calendar && calendar.id ? calendar.id : '';
+    return buildCombinedPhotoEntries(chatMessages, memos, calendar).map(entry => ({
+      ...entry,
+      tags: resolveGalleryLightboxTags(calendarId, entry, {
+        localTags: entry.tags != null ? String(entry.tags) : null,
+        indexTags: String(entry.tags || '')
+      })
+    }));
+  }, [chatMessages, memos, calendar]);
   const isKnownBrokenPhoto = entry => {
     const key = entry?.mediaKey || entry?.refKey || entry?.key;
     if (key && brokenPhotoKeysRef.current.has(key)) return true;
@@ -606,7 +616,7 @@ export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalG
             referrerPolicy: 'no-referrer',
             onClick: () => setLightbox({
               urls: displayedEntries.map(e => e.full),
-              meta: displayedEntries.map(e => ({ timestamp: e.timestamp, messageId: e.messageId, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, directMediaUrl: e.directMediaUrl, source: e.source, uploadSource: e.uploadSource, meetingDate: e.meetingDate, photoId: e.photoId, sourceMessageId: e.sourceMessageId, sourceImageIndex: e.sourceImageIndex, mediaKey: e.mediaKey, refKey: e.refKey, legacyKeys: e.legacyKeys })),
+              meta: displayedEntries.map(e => ({ timestamp: e.timestamp, messageId: e.messageId, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, directMediaUrl: e.directMediaUrl, source: e.source, uploadSource: e.uploadSource, meetingDate: e.meetingDate, photoId: e.photoId, sourceMessageId: e.sourceMessageId, sourceImageIndex: e.sourceImageIndex, assetKey: e.assetKey, mediaKey: e.mediaKey, refKey: e.refKey, legacyKeys: e.legacyKeys })),
               index: idx
             }),
             onBroken: (e, brokenInfo) => handleBrokenPhoto(entry, brokenInfo),
@@ -1444,7 +1454,16 @@ export function HistoryView({
 
   // 인물/추억 탭이 공유하는 사진 목록 -- 갤러리 페이지(PhotoGallery)와 동일한 소스(채팅/메모/모임
   // 사진)를 결합해, 태그(인물)나 날짜(추억)로 걸러 보여준다.
-  const baseHistoryPhotoEntries = React.useMemo(() => buildCombinedPhotoEntries(chatMessages, memos, calendar, anniversaries), [chatMessages, memos, calendar, anniversaries]);
+  const baseHistoryPhotoEntries = React.useMemo(() => {
+    const calendarId = calendar && calendar.id ? calendar.id : '';
+    return buildCombinedPhotoEntries(chatMessages, memos, calendar, anniversaries).map(entry => ({
+      ...entry,
+      tags: resolveGalleryLightboxTags(calendarId, entry, {
+        localTags: entry.tags != null ? String(entry.tags) : null,
+        indexTags: String(entry.tags || '')
+      })
+    }));
+  }, [chatMessages, memos, calendar, anniversaries]);
   // DateModal hydrates meetingPhotoIndex for the open date so album photos appear even when the
   // chat window is incomplete. Memories need the same for anniversary date ranges.
   const [indexedMeetingPhotoEntries, setIndexedMeetingPhotoEntries] = React.useState([]);
@@ -1691,7 +1710,7 @@ export function HistoryView({
       tags: p.tags, directMediaUrl: p.directMediaUrl, source: p.source, uploadSource: p.uploadSource,
       anniversaryId: p.anniversaryId,
       meetingDate: p.meetingDate, photoId: p.photoId, sourceMessageId: p.sourceMessageId,
-      sourceImageIndex: p.sourceImageIndex, mediaKey: p.mediaKey, refKey: p.refKey,
+      sourceImageIndex: p.sourceImageIndex, assetKey: p.assetKey, mediaKey: p.mediaKey, refKey: p.refKey,
       legacyKeys: p.legacyKeys
     }));
     setHistoryLightbox({ urls, index, meta, memoryId });

@@ -212,6 +212,20 @@ export function hasStickyPhotoIndexTags(calendarId, photo = {}) {
   return photoIndexTagIdentityKeys(photo).some(key => sticky.has(key));
 }
 
+// Lightbox reopen (save → close → open, no hard refresh): session sticky is the verified
+// in-tab write. Stale in-memory message snapshots (e.g. unpatched galleryLiveMessages) can
+// still expose empty imageTags[] and must not wipe sticky/index. Intentional clears stay in
+// sticky as '' until CF catches up.
+export function resolveGalleryLightboxTags(calendarId, photo = {}, { localTags = null, indexTags = '' } = {}) {
+  if (calendarId && hasStickyPhotoIndexTags(calendarId, photo)) {
+    return peekStickyPhotoIndexTags(calendarId, photo);
+  }
+  if (localTags != null) return String(localTags);
+  const fromIndex = indexTags != null ? String(indexTags) : '';
+  if (fromIndex) return fromIndex;
+  return String(photo?.tags || '');
+}
+
 // After a verified message/memo tag write, poll force-reload until sticky clears (CF denorm
 // caught up) or attempts are exhausted. Sticky overlay covers reopen during the wait.
 export function schedulePhotoIndexTagReload(galleryPhotoIndex, calendarId, stickyProbe, options = {}) {

@@ -341,8 +341,11 @@ assert(appMainSource.includes('schedulePhotoIndexTagReload'), 'delayed photoInde
 assert(appMainSource.includes('patchGalleryArchiveMessage'), 'tag saves must patch the gallery full-chat archive snapshot');
 assert(appMainSource.includes('patchGalleryArchiveMemo'), 'memo tag saves must patch the gallery full-memo archive snapshot');
 assert(/setTimeout\([\s\S]*?loadPage\([\s\S]*?force:\s*true/.test(photoIndexSource), 'tag saves must delay photoIndex force reload until CF can catch up');
-assert(chatGallerySource.includes('Prefer those local'), 'gallery lightbox must prefer verified message/memo tags over photoIndex');
-assert(chatGallerySource.includes('localTags != null ? localTags : indexTags'), 'gallery must use in-memory message/memo imageTags whenever the source doc is present');
+assert(chatGallerySource.includes('Session sticky'), 'gallery lightbox must document sticky-first tag preference on reopen');
+assert(chatGallerySource.includes('resolveGalleryLightboxTags'), 'gallery must resolve lightbox tags via sticky/local/index helper');
+assert(photoIndexSource.includes('resolveGalleryLightboxTags'), 'photo-index must export sticky-first lightbox tag resolver');
+assert(appMainSource.includes('setGalleryLiveMessages(prev => prev.map(patchMessage))'), 'tag saves must patch galleryLiveMessages (gallery uploads are not in chat listener)');
+assert(summaryGallerySource.includes('resolveGalleryLightboxTags'), 'main-screen PhotoGallery must apply sticky tags on reopen');
 assert(chatGallerySource.includes('paginationDragPage'), 'mobile gallery pagination must support horizontal drag to pan the page window');
 assert(chatGallerySource.includes('is-swipeable'), 'mobile gallery pagination must mark the swipeable strip');
 assert(dateModalSource.includes('getPhotoAssetKeys(photo)'), 'schedule albums must dedupe REST/index/live copies by original or thumbnail asset');
@@ -521,6 +524,7 @@ assert(!deletedPlaceProbe.places.some(place => place.id === 'place_delete'), 'ex
 const script = fs.readFileSync('assets/app-main.js', 'utf8');
 const sourceScript = fs.readFileSync('src/core/app-main.js', 'utf8');
 const galleryArchiveSource = fs.readFileSync('src/core/gallery-archive-state.js', 'utf8');
+assert(galleryArchiveSource.includes('pendingArchiveMessagePatchesRef'), 'tag saves before archive load must queue patches for merge');
 const memoScript = fs.readFileSync('src/ui/ui-memo-view.js', 'utf8');
 const eventModalScript = fs.readFileSync('src/ui/ui-event-modals.js', 'utf8');
 const weatherScript = fs.readFileSync('src/ui/ui-weather.js', 'utf8');
@@ -1244,7 +1248,8 @@ console.log('Firebase-only calendar safety tests passed');
     peekStickyPhotoIndexTags,
     hasStickyPhotoIndexTags,
     reconcilePhotoIndexTagItems,
-    normalizePhotoIndexTagSet
+    normalizePhotoIndexTagSet,
+    resolveGalleryLightboxTags
   } = await import('../src/core/photo-index.js');
   assert(
     normalizePhotoIndexTagSet('#260908 #소고기고추볶음') === normalizePhotoIndexTagSet('소고기고추볶음 260908'),
@@ -1302,4 +1307,23 @@ console.log('Firebase-only calendar safety tests passed');
   const afterDeleteAllSync = reconcilePhotoIndexTagItems(emptyCalId, afterDeleteAllLag, [{ ...photo, tags: '' }]);
   assert(String(afterDeleteAllSync[0]?.tags || '') === '', 'delete-all must stay empty after CF catches up');
   assert(!hasStickyPhotoIndexTags(emptyCalId, photo), 'delete-all sticky must clear only after raw CF catches up');
+
+  // Stale in-memory message imageTags (empty array slot) must not wipe session sticky on reopen.
+  const reopenCalId = `tag-reopen-resolve-${Date.now()}`;
+  const reopenPhoto = { messageId: 'msg-stale-live', imageIndex: 0, assetKey: 'asset-stale-live', mediaKey: 'asset-stale-live' };
+  rememberPhotoIndexTags(reopenCalId, [{ ...reopenPhoto, tags: '아기 도연' }]);
+  assert(
+    resolveGalleryLightboxTags(reopenCalId, reopenPhoto, { localTags: '', indexTags: '' }) === '아기 도연',
+    'sticky must beat stale empty local/index tags on lightbox reopen'
+  );
+  assert(
+    resolveGalleryLightboxTags(reopenCalId, reopenPhoto, { localTags: '부분', indexTags: '' }) === '아기 도연',
+    'sticky must beat partial stale local tags while CF denorm lags'
+  );
+  // Intentional clear stays empty even if index still has the old denorm.
+  rememberPhotoIndexTags(reopenCalId, [{ ...reopenPhoto, tags: '' }]);
+  assert(
+    resolveGalleryLightboxTags(reopenCalId, reopenPhoto, { localTags: '아기 도연', indexTags: '아기 도연' }) === '',
+    'trash-delete sticky empty must win over stale local/index tags'
+  );
 }

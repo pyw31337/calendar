@@ -3041,6 +3041,9 @@ function CalendarApp() {
     setChatMessages(prev => prev.map(patchMessage));
     setOlderChatMessages(prev => prev.map(patchMessage));
     setGalleryPreviewMessages(prev => prev.map(patchMessage));
+    // Gallery uploads live here (chat listener is uploadSource=='chat' only). Missing this
+    // left allChatMessages on a stale live snapshot whose empty imageTags overrode archive.
+    setGalleryLiveMessages(prev => prev.map(patchMessage));
     patchGalleryArchiveMessage(messageId, patch);
   };
   const upsertLocalChatMessage = message => {
