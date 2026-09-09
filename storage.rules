@@ -40,6 +40,24 @@ service firebase.storage {
       allow delete: if isCalendarId(calendarId);
     }
 
+    // Chat document attachments (pdf/office/text). Images still go through chatImages/.
+    // Size ceiling is higher than photos because PDFs/office decks are commonly multi-MB.
+    match /chatFiles/{calendarId}/{fileName} {
+      allow read: if isCalendarId(calendarId);
+      allow write: if isCalendarId(calendarId)
+        && request.resource.size <= 20 * 1024 * 1024
+        && (
+          request.resource.contentType.matches('image/.*')
+          || request.resource.contentType.matches('application/pdf')
+          || request.resource.contentType.matches('application/msword')
+          || request.resource.contentType.matches('application/vnd\\..*')
+          || request.resource.contentType.matches('application/rtf')
+          || request.resource.contentType.matches('text/.*')
+          || request.resource.contentType.matches('application/octet-stream')
+        );
+      allow delete: if isCalendarId(calendarId);
+    }
+
     match /{allPaths=**} {
       allow read, write: if false;
     }

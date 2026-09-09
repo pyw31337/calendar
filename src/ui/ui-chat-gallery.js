@@ -394,6 +394,9 @@ export function ChatGalleryModal({
   const WeatherBadge = __comp.WeatherBadge || __deps.WeatherBadge;
   const InlineSearchBar = __comp.InlineSearchBar || __deps.InlineSearchBar;
   const UnderlineTabs = __comp.UnderlineTabs || __deps.UnderlineTabs;
+  const FileAttachmentCard = __comp.FileAttachmentCard || __deps.FileAttachmentCard;
+  const DocumentLightbox = __comp.DocumentLightbox || __deps.DocumentLightbox;
+  const collectChatFileAttachmentsFromMessages = __deps.collectChatFileAttachmentsFromMessages || (window.GATHER_CHAT_FILE_ATTACHMENTS && window.GATHER_CHAT_FILE_ATTACHMENTS.collectChatFileAttachmentsFromMessages);
         const MenuIcon = __deps.MenuIcon || __comp.MenuIcon;
   const MediaThumb = __comp.MediaThumb || __deps.MediaThumb;
   const getMessageImageEntries = __deps.getMessageImageEntries;
@@ -402,7 +405,8 @@ export function ChatGalleryModal({
     const CalendarCheckIcon = __comp.CalendarCheckIcon || __deps.CalendarCheckIcon;
   const SectionToggleButton = __comp.SectionToggleButton || __deps.SectionToggleButton;
 
-  const [activeTab, setActiveTab] = React.useState('photos'); // 'photos' | 'links'
+  const [activeTab, setActiveTab] = React.useState('photos'); // 'photos' | 'links' | 'files'
+  const [galleryDocLightbox, setGalleryDocLightbox] = React.useState(null);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
@@ -648,6 +652,23 @@ export function ChatGalleryModal({
       return matchText || matchUrl || matchItemTitle || matchTitle || matchDesc;
     });
   }, [sharedLinks, searchQuery]);
+
+  const sharedFiles = React.useMemo(() => {
+    const collect = collectChatFileAttachmentsFromMessages;
+    if (typeof collect !== 'function') return [];
+    return collect(chatMessages || []);
+  }, [chatMessages]);
+
+  const filteredFiles = React.useMemo(() => {
+    if (!searchQuery.trim()) return sharedFiles;
+    const q = searchQuery.toLowerCase().trim();
+    return sharedFiles.filter(item => {
+      const name = String(item.name || '').toLowerCase();
+      const mime = String(item.mime || '').toLowerCase();
+      const ext = String(item.ext || '').toLowerCase();
+      return name.includes(q) || mime.includes(q) || ext.includes(q);
+    });
+  }, [sharedFiles, searchQuery]);
 
   const filteredPhotos = React.useMemo(() => {
     if (!searchQuery.trim()) return sharedPhotos;
@@ -1855,6 +1876,37 @@ export function ChatGalleryModal({
         loadMoreNode
       );
     }
+    if (activeTab === 'files') {
+      const sortedFiles = sortGalleryFlatItems(filteredFiles);
+      return /*#__PURE__*/React.createElement(React.Fragment, null,
+        /*#__PURE__*/React.createElement("div", {
+          style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '8px' }
+        },
+          /*#__PURE__*/React.createElement("label", {
+            style: { fontSize: 'var(--font-size-md)', fontWeight: 800, color: 'var(--text-muted)' }
+          }, `등록된 파일 (${filteredFiles.length}개)`)
+        ),
+        sortedFiles.length === 0 ? /*#__PURE__*/React.createElement("div", {
+          style: { textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0', fontSize: 'var(--font-size-base)' }
+        }, searchQuery ? "검색 결과가 없습니다." : "업로드된 파일이 없습니다.") : /*#__PURE__*/React.createElement("div", {
+          style: { display: 'flex', flexDirection: 'column', gap: '8px' }
+        }, sortedFiles.map((item, idx) => FileAttachmentCard ? /*#__PURE__*/React.createElement(FileAttachmentCard, {
+          key: (item.id || item.url) + '-' + idx,
+          attachment: item,
+          stretch: true,
+          compact: true,
+          onOpen: () => setGalleryDocLightbox({ attachments: sortedFiles, index: idx })
+        }) : null)),
+        (hasMoreOlderChat) && !(searchQuery || '').trim() && renderGalleryLoadMoreButton({
+          label: `이전 파일 더 보기 (${filteredFiles.length}개 불러옴)`,
+          loadingLabel: '이전 파일을 불러오는 중…',
+          disabled: !!loadingOlderChat,
+          onClick: () => {
+            if (typeof onLoadOlderChat === 'function' && hasMoreOlderChat && !loadingOlderChat) onLoadOlderChat();
+          }
+        })
+      );
+    }
     if (activeTab === 'links') {
       const sortedLinks = sortGalleryFlatItems(filteredLinks);
       return /*#__PURE__*/React.createElement(React.Fragment, null,
@@ -2049,7 +2101,7 @@ export function ChatGalleryModal({
         }, /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /*#__PURE__*/React.createElement("path", { d: "m21 21-4.3-4.3" }))),
         /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-copy" },
           /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-title" }, "갤러리 검색"),
-          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "사진·링크 통합 검색")
+          /*#__PURE__*/React.createElement("span", { className: "admin-side-menu-item-desc" }, "사진·링크·파일 통합 검색")
         )
       ),
       /*#__PURE__*/React.createElement("div", {
@@ -2110,7 +2162,7 @@ export function ChatGalleryModal({
     : null,
   isSearchOpen && /*#__PURE__*/React.createElement(InlineSearchBar, {
     value: searchQuery,
-    placeholder: "사진·링크 통합 검색 (태그, 텍스트, URL)",
+    placeholder: "사진·링크·파일 통합 검색 (태그, 텍스트, URL)",
     onChange: e => setSearchQuery(e.target.value),
     fixed: !!asPage,
     style: asPage ? {
@@ -2138,7 +2190,8 @@ export function ChatGalleryModal({
       style: { backgroundColor: 'var(--bg-card)', flex: 1, borderBottom: 'none' },
       options: [
         { value: 'photos', label: '사진' },
-        { value: 'links', label: '링크' }
+        { value: 'links', label: '링크' },
+        { value: 'files', label: '파일' }
       ]
     })
   ), asPage && isMobile && /*#__PURE__*/React.createElement("div", {
@@ -2159,7 +2212,8 @@ export function ChatGalleryModal({
       style: { backgroundColor: 'var(--bg-card)', flex: 1, borderBottom: 'none' },
       options: [
         { value: 'photos', label: '사진' },
-        { value: 'links', label: '링크' }
+        { value: 'links', label: '링크' },
+        { value: 'files', label: '파일' }
       ]
     })
   ), /*#__PURE__*/React.createElement("div", {
@@ -2250,7 +2304,13 @@ export function ChatGalleryModal({
     )),
     document.body
   );
-  return /*#__PURE__*/React.createElement(React.Fragment, null, galleryTree, pastePreviewModal, gatherPhotoPasteModal, gatherPhotosPasteModal, bulkShareResultModal, galleryYearMonthPickerSheet);
+  const galleryDocumentLightbox = galleryDocLightbox && DocumentLightbox ? /*#__PURE__*/React.createElement(DocumentLightbox, {
+    attachments: galleryDocLightbox.attachments,
+    index: galleryDocLightbox.index,
+    onClose: () => setGalleryDocLightbox(null),
+    onNavigate: i => setGalleryDocLightbox(prev => prev ? { ...prev, index: i } : prev)
+  }) : null;
+  return /*#__PURE__*/React.createElement(React.Fragment, null, galleryTree, pastePreviewModal, gatherPhotoPasteModal, gatherPhotosPasteModal, bulkShareResultModal, galleryYearMonthPickerSheet, galleryDocumentLightbox);
 }
 
   if (typeof window !== 'undefined') {

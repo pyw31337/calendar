@@ -483,6 +483,18 @@ assert(functionsSource.includes('setPublicCacheHeaders') && functionsSource.incl
 assert(/collection\('push_subscriptions'\)\.limit\(500\)/.test(functionsSource), 'push fan-out must have a bounded subscription query');
 assert(/new AbortController\(\)[\s\S]{0,220}api\.peekalink\.io/.test(functionsSource), 'paid link preview requests must have an upstream timeout');
 assert(firestoreRules.includes("data.uploadSource == 'chat'"), 'message rules must permit the explicit chat channel');
+assert(firestoreRules.includes('fileAttachments') && firestoreRules.includes('hasValidFileAttachments'), 'message rules must allow sanitized fileAttachments');
+assert(fs.existsSync('storage.rules') && fs.readFileSync('storage.rules', 'utf8').includes('chatFiles/{calendarId}/{fileName}'), 'storage rules must allow chatFiles uploads');
+const chatFileModule = fs.readFileSync('src/core/chat-file-attachments.js', 'utf8');
+assert(/fileAttachments/.test(chatFileModule) && /uploadChatFileAttachment/.test(chatFileModule), 'chat file attachment helper module must exist');
+assert(/classifyChatComposerFiles/.test(chatFileModule) && /isChatDocumentFile/.test(chatFileModule), 'composer must classify images vs documents');
+const chatRoomSource = fs.readFileSync('src/ui/ui-chat-room.js', 'utf8');
+assert(chatRoomSource.includes('파일 업로드') && chatRoomSource.includes('lucide-paperclip'), 'chat composer must expose a file upload paperclip control');
+assert(chatRoomSource.includes('handleDocFileChangeChat') && chatRoomSource.includes('classifyChatComposerFiles'), 'file button must classify and route images through the photo pipeline');
+assert(chatGallerySource.includes("value: 'files'") && chatGallerySource.includes('등록된 파일'), 'gallery must expose a 파일 tab');
+assert(domainHelpersScript.includes('fileAttachments'), 'message sanitizer must preserve fileAttachments');
+const chatFilesUi = fs.readFileSync('src/ui/ui-chat-files.js', 'utf8');
+assert(chatFilesUi.includes('DocumentLightbox') && chatFilesUi.includes('FileAttachmentCard'), 'document lightbox and attachment cards must ship');
 // Chat and media now have independent read paths: recent chat is server-scoped, while gallery
 // preview/full-history and the gallery live listener remain unscoped so no media disappears.
 assert(/async function fetchRecentChatMessages[\s\S]{0,2200}?where\('uploadSource', '==', 'chat'\)/.test(firebaseServicesScript), 'recent chat reads must be scoped before applying their bounded limit');

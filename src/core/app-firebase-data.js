@@ -1623,7 +1623,10 @@ async function sendChatMessageRest(calId, message) {
     if (Array.isArray(message.imageUrls) && message.imageUrls.length > 0) fields.imageUrls = jsToFirestoreValue(message.imageUrls);
     if (Array.isArray(message.thumbUrls) && message.thumbUrls.length > 0) fields.thumbUrls = jsToFirestoreValue(message.thumbUrls);
     if (Array.isArray(message.imageTags) && message.imageTags.length > 0) fields.imageTags = jsToFirestoreValue(message.imageTags);
+    if (Array.isArray(message.fileAttachments) && message.fileAttachments.length > 0) fields.fileAttachments = jsToFirestoreValue(message.fileAttachments);
     if (message.uploadSource) fields.uploadSource = jsToFirestoreValue(message.uploadSource);
+    if (message.linkPreview) fields.linkPreview = jsToFirestoreValue(message.linkPreview);
+    if (message.replyTo) fields.replyTo = jsToFirestoreValue(message.replyTo);
     const payload = { fields };
     const res = await fetchFirestoreRequest(url, {
       method: 'POST',

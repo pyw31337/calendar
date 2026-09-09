@@ -609,6 +609,34 @@ function sanitizeMessageForFirestore(messageData) {
     }).slice(0, 20);
     if (out.linkPreviews.length === 0) delete out.linkPreviews;
   }
+  if (Array.isArray(out.fileAttachments)) {
+    const sanitizeOne = (entry) => {
+      if (!entry || typeof entry !== 'object') return null;
+      const name = typeof entry.name === 'string' ? entry.name.trim().slice(0, 200) : '';
+      const url = typeof entry.url === 'string' ? entry.url.trim().slice(0, 2000) : '';
+      const storagePath = typeof entry.storagePath === 'string' ? entry.storagePath.trim().slice(0, 500) : '';
+      const mime = typeof entry.mime === 'string' ? entry.mime.trim().slice(0, 120) : '';
+      const ext = typeof entry.ext === 'string' ? entry.ext.trim().toLowerCase().slice(0, 16) : '';
+      const size = Number(entry.size);
+      const uploadedAt = Number(entry.uploadedAt);
+      const id = typeof entry.id === 'string' ? entry.id.trim().slice(0, 120) : '';
+      if (!name || !url || !storagePath) return null;
+      if (!Number.isFinite(size) || size < 0 || size > 20 * 1024 * 1024) return null;
+      if (!Number.isFinite(uploadedAt) || uploadedAt <= 0) return null;
+      return {
+        id: id || `file_${Math.round(uploadedAt)}`,
+        name,
+        mime: mime || 'application/octet-stream',
+        size: Math.round(size),
+        url,
+        storagePath,
+        uploadedAt: Math.round(uploadedAt),
+        ...(ext ? { ext } : {})
+      };
+    };
+    out.fileAttachments = out.fileAttachments.map(sanitizeOne).filter(Boolean).slice(0, 20);
+    if (out.fileAttachments.length === 0) delete out.fileAttachments;
+  }
   return omitUndefinedDeep(out);
 }
 function sanitizeMemoForFirestore(memoData) {
@@ -1160,7 +1188,7 @@ function notifyNewChatMessage(calendar, message, participantName) {
   if (!isNotificationSupported() || Notification.permission !== 'granted') return;
   if (!isChatNotifyEnabledForCalendar(calendar?.id)) return;
   try {
-    const body = message.text?.trim() || (message.imageUrls?.length || message.imageUrl ? '사진을 보냈습니다' : '');
+    const body = message.text?.trim() || (message.imageUrls?.length || message.imageUrl ? '사진을 보냈습니다' : (Array.isArray(message.fileAttachments) && message.fileAttachments.length ? '파일을 보냈습니다' : ''));
     new Notification(`${calendar?.title || '모여라 캘린더'} · ${participantName}`, {
       body,
       tag: `chat-${calendar?.id}`,

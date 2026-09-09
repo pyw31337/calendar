@@ -1,6 +1,15 @@
 /** P6 ESM adapter for app-main — live assets/app-main.js unchanged */
 import './../react-globals.js';
 import { uploadBlobWithWatchdog, retryMediaTask, getAdaptiveMediaUploadConcurrency } from './app-media-upload.js';
+import {
+  classifyChatComposerFiles,
+  createPendingChatFileAttachment,
+  uploadChatFileAttachments,
+  formatChatFileSize,
+  getChatFileTypeLabel,
+  isPdfAttachment,
+  collectChatFileAttachmentsFromMessages,
+} from './chat-file-attachments.js';
 import exifr from 'exifr';
 import {
   computeKoreanHolidaysForYear,
@@ -1075,6 +1084,7 @@ function CalendarApp() {
   const [chatUploadProgress, setChatUploadProgress] = React.useState(null);
   const chatTextareaRef = React.useRef(null);
   const [chatImages, setChatImages] = React.useState([]);
+  const [chatFileAttachments, setChatFileAttachments] = React.useState([]);
   // The message a reply-in-progress is quoting -- { id, participantId, text, imageCount } | null.
   // Snapshotted from the target message at the moment "답장" is tapped (see ChatRoomView), not
   // kept live, so editing/deleting the original afterward doesn't retroactively change what the
@@ -3224,7 +3234,7 @@ function CalendarApp() {
       active.closest &&
       (active.closest('.chat-composer') || active.closest('.chat-room-container'))
     );
-    const hasComposerDraft = !!(String(chatInput || '').trim() || (chatImages && chatImages.length > 0));
+    const hasComposerDraft = !!(String(chatInput || '').trim() || (chatImages && chatImages.length > 0) || (chatFileAttachments && chatFileAttachments.length > 0));
     const scrollTop = e.target.scrollTop;
     // Chat mounts by scrolling its list to the newest message. Do not treat that programmatic
     // scroll as the user's downward scroll and hide the fresh header.
@@ -3255,12 +3265,13 @@ function CalendarApp() {
   const handleSendChatMessage = async () => {
     const hasText = !!chatInput.trim();
     const imageCount = chatImages.length;
+    const fileCount = Array.isArray(chatFileAttachments) ? chatFileAttachments.length : 0;
     if (!chatParticipantId) {
       showToast('참여자를 선택해 주세요.', 'error');
       return;
     }
-    if (!hasText && imageCount === 0) {
-      showToast('메시지 내용 또는 사진을 입력해 주세요.', 'error');
+    if (!hasText && imageCount === 0 && fileCount === 0) {
+      showToast('메시지 내용, 사진 또는 파일을 입력해 주세요.', 'error');
       return;
     }
     const replyToPayload = chatReplyTarget ? {
@@ -3299,6 +3310,10 @@ function CalendarApp() {
       // the sender would have no way to know it isn't actually saved yet and might, per the
       // user's own worry, send it again believing the first attempt silently failed.
       let sendWasQueued = false;
+      if (fileCount > 0 && typeof navigator !== 'undefined' && navigator.onLine === false) {
+        showToast('오프라인에서는 파일 업로드를 할 수 없습니다. 연결 후 다시 시도해 주세요.', 'error', 5000);
+        return;
+      }
       if (imageCount > 0 && typeof navigator !== 'undefined' && navigator.onLine === false
         && chatImages.every(image => image?.originalBlob && image?.thumbnailBlob)) {
         const queued = await enqueueWriteOperation({
@@ -3317,9 +3332,15 @@ function CalendarApp() {
         if (!queued) throw new Error('사진 오프라인 저장 공간이 부족합니다.');
         setChatInput('');
         setChatImages([]);
+        setChatFileAttachments([]);
         setChatReplyTarget(null);
         showToast('오프라인입니다. 사진은 연결되면 자동 전송됩니다.', 'info', 5000);
         return;
+      }
+      let uploadedFileAttachments = [];
+      if (fileCount > 0) {
+        setChatUploadProgress({ pct: 8, remainingSec: null, label: '파일 업로드 중...', current: 1, total: fileCount });
+        uploadedFileAttachments = await uploadChatFileAttachments(activeCalId, chatFileAttachments, setChatUploadProgress);
       }
       if (imageCount === 0) {
         const messageOperationId = `chat_${activeCalId}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -3329,6 +3350,7 @@ function CalendarApp() {
           timestamp: Date.now(),
           uploadSource: 'chat'
         };
+        if (uploadedFileAttachments.length) messageData.fileAttachments = uploadedFileAttachments;
         if (linkPreview) messageData.linkPreview = linkPreview;
         if (replyToPayload) messageData.replyTo = replyToPayload;
         setChatUploadProgress({ pct: 90, remainingSec: 1, label: '채팅 저장 중...' });
@@ -3370,6 +3392,7 @@ function CalendarApp() {
             timestamp: baseTimestamp + i,
             uploadSource: 'chat'
           };
+          if (i === 0 && uploadedFileAttachments.length) messageData.fileAttachments = uploadedFileAttachments;
           if (i === 0 && linkPreview) messageData.linkPreview = linkPreview;
           if (i === 0 && replyToPayload) messageData.replyTo = replyToPayload;
           const sent = await writeCollectionDocumentWithFallback('messages', activeCalId, '', messageData, 'add', '채팅 저장', { documentId: messageOperationId });
@@ -3394,6 +3417,7 @@ function CalendarApp() {
         }
         setChatInput('');
         setChatImages([]);
+        setChatFileAttachments([]);
         setChatReplyTarget(null);
         if (chatTextareaRef.current) {
           chatTextareaRef.current.style.height = '34px';
@@ -3698,7 +3722,7 @@ function CalendarApp() {
         const finalizeStorage = () => { deleteAllChatImagesFromStorage(sourceSnapshot); };
         const restoreMessage = async () => {
           try {
-            const allowed = ['participantId', 'text', 'timestamp', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageTags', 'uploadSource', 'linkPreview'];
+            const allowed = ['participantId', 'text', 'timestamp', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageTags', 'uploadSource', 'linkPreview', 'fileAttachments', 'replyTo'];
             const createData = {};
             for (const key of allowed) {
               if (sourceSnapshot[key] !== undefined) createData[key] = sourceSnapshot[key];
@@ -5328,8 +5352,8 @@ function CalendarApp() {
     // and other local-only fields; writing those on undo caused permission-denied / restore fail.
     const pickMessageFieldsForWrite = (msg, { asCreate = false } = {}) => {
       const allowed = asCreate
-        ? ['participantId', 'text', 'timestamp', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageTags', 'uploadSource', 'linkPreview']
-        : ['text', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageShareUrls', 'imageTags', 'directMediaTags', 'participantId', 'linkPreview'];
+        ? ['participantId', 'text', 'timestamp', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageTags', 'uploadSource', 'linkPreview', 'fileAttachments', 'replyTo']
+        : ['text', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageShareUrls', 'imageTags', 'directMediaTags', 'participantId', 'linkPreview', 'fileAttachments'];
       const out = {};
       for (const key of allowed) {
         if (msg && msg[key] !== undefined) out[key] = msg[key];
@@ -7169,6 +7193,8 @@ function CalendarApp() {
       chatTextareaRef: chatTextareaRef,
       chatImage: chatImages,
       setChatImage: setChatImages,
+      chatFileAttachments: chatFileAttachments,
+      setChatFileAttachments: setChatFileAttachments,
       chatReplyTarget: chatReplyTarget,
       setChatReplyTarget: setChatReplyTarget,
       activeLightbox: null, // render via withStickyVideo shared Lightbox host
@@ -8050,6 +8076,8 @@ function CalendarApp() {
       chatTextareaRef: chatTextareaRef,
       chatImage: chatImages,
       setChatImage: setChatImages,
+      chatFileAttachments: chatFileAttachments,
+      setChatFileAttachments: setChatFileAttachments,
       activeLightbox: null, // render via withStickyVideo shared Lightbox host
       setActiveLightbox: setActiveLightbox,
       onSend: handleSendChatMessage,
@@ -8438,16 +8466,22 @@ function ImageUrlModal(props) {
   return typeof C === 'function' ? React.createElement(C, props) : null;
 }
 
-function renderChatMessageBody(msg, setActiveLightbox, singleImageStyle = {}, searchQuery = '', stickyVideoKey = null, onActivateVideo = null, linkPreviewOnly = false) {
+function renderChatMessageBody(msg, setActiveLightbox, singleImageStyle = {}, searchQuery = '', stickyVideoKey = null, onActivateVideo = null, linkPreviewOnly = false, onOpenFileAttachment = null) {
   const msgImages = renderChatMessageImages(msg, setActiveLightbox, singleImageStyle);
+  const renderFiles = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.renderChatFileAttachments;
+  const fileNodes = typeof renderFiles === 'function' && Array.isArray(msg.fileAttachments) && msg.fileAttachments.length
+    ? renderFiles(msg.fileAttachments, onOpenFileAttachment)
+    : null;
   // A fit-content chat bubble sizes itself to whichever of its children is widest. When there's
   // a multi-image grid above, cap the caption text below it to that same grid width -- otherwise
   // a long caption stretches the bubble past the grid, leaving a gap to the grid's right.
   const imageEntryCount = getMessageImageEntries(msg).length;
   const textMaxWidth = imageEntryCount >= 2 ? computeChatImageGridMaxWidth(imageEntryCount) : null;
+  const hasText = !!msg.text;
   return /*#__PURE__*/React.createElement(React.Fragment, null,
-    msgImages ? /*#__PURE__*/React.createElement('div', { style: { marginBottom: msg.text ? '8px' : '0' } }, msgImages) : null,
-    msg.text ? /*#__PURE__*/React.createElement(DirectChatMediaText, {
+    msgImages ? /*#__PURE__*/React.createElement('div', { style: { marginBottom: (hasText || fileNodes) ? '8px' : '0' } }, msgImages) : null,
+    fileNodes ? /*#__PURE__*/React.createElement('div', { style: { marginBottom: hasText ? '8px' : '0' } }, fileNodes) : null,
+    hasText ? /*#__PURE__*/React.createElement(DirectChatMediaText, {
       text: msg.text,
       searchQuery,
       setActiveLightbox: msgImages ? null : setActiveLightbox,
@@ -11904,6 +11938,12 @@ function bindGatherUiDeps() {
     useModalDirtyGuard: typeof useModalDirtyGuard === 'function' ? useModalDirtyGuard : null,
     writeCollectionDocumentWithFallback: typeof writeCollectionDocumentWithFallback === 'function' ? writeCollectionDocumentWithFallback : null,
     appendChatImageFiles: typeof appendChatImageFiles === 'function' ? appendChatImageFiles : null,
+    classifyChatComposerFiles: typeof classifyChatComposerFiles === 'function' ? classifyChatComposerFiles : null,
+    createPendingChatFileAttachment: typeof createPendingChatFileAttachment === 'function' ? createPendingChatFileAttachment : null,
+    formatChatFileSize: typeof formatChatFileSize === 'function' ? formatChatFileSize : null,
+    getChatFileTypeLabel: typeof getChatFileTypeLabel === 'function' ? getChatFileTypeLabel : null,
+    isPdfAttachment: typeof isPdfAttachment === 'function' ? isPdfAttachment : null,
+    collectChatFileAttachmentsFromMessages: typeof collectChatFileAttachmentsFromMessages === 'function' ? collectChatFileAttachmentsFromMessages : null,
     confetti: typeof confetti === 'function' ? confetti : (typeof window !== 'undefined' ? window.confetti : null),
     CONFETTI_Z_INDEX: typeof CONFETTI_Z_INDEX !== 'undefined' ? CONFETTI_Z_INDEX : 9999,
     AdminDashboard: typeof AdminDashboard === 'function' ? AdminDashboard : null,
