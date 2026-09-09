@@ -1,3 +1,28 @@
+function mergeArchiveDocsById(incoming, pendingById) {
+  const incomingList = Array.isArray(incoming) ? incoming : [];
+  const pending = pendingById && typeof pendingById === 'object' ? pendingById : null;
+  if (!pending || Object.keys(pending).length === 0) return incomingList;
+  const byId = new Map();
+  incomingList.forEach(doc => { if (doc?.id) byId.set(doc.id, doc); });
+  Object.keys(pending).forEach(id => {
+    const patch = pending[id];
+    if (!patch || typeof patch !== 'object') return;
+    const server = byId.get(id);
+    if (!server) {
+      byId.set(id, { ...patch, id });
+      return;
+    }
+    const merged = { ...server, ...patch, id };
+    // Verified patch imageTags (including intentional '') beat a stale search-index page.
+    if (Array.isArray(patch.imageTags)) merged.imageTags = patch.imageTags.slice();
+    if (patch.directMediaTags && typeof patch.directMediaTags === 'object') {
+      merged.directMediaTags = { ...(server.directMediaTags || {}), ...patch.directMediaTags };
+    }
+    byId.set(id, merged);
+  });
+  return Array.from(byId.values());
+}
+
 export function useGalleryArchiveState({
   React,
   activeCalId,
@@ -13,11 +38,41 @@ export function useGalleryArchiveState({
 }) {
   const [fullChatHistoryByCalendar, setFullChatHistoryByCalendar] = React.useState({});
   const [fullGalleryMemosByCalendar, setFullGalleryMemosByCalendar] = React.useState({});
+  // Verified tag saves that land before the search-index archive finishes loading. Applied when
+  // the snapshot arrives so reopen can read imageTags without waiting on photoIndex CF.
+  const pendingArchiveMessagePatchesRef = React.useRef({});
+  const pendingArchiveMemoPatchesRef = React.useRef({});
   const fullChatMessages = fullChatHistoryByCalendar[activeCalId] || null;
   const displayChatMessages = React.useMemo(() => {
     if (!Array.isArray(fullChatMessages)) return allChatMessages;
     const byId = new Map(fullChatMessages.filter(message => message?.id).map(message => [message.id, message]));
-    allChatMessages.forEach(message => { if (message?.id) byId.set(message.id, message); });
+    allChatMessages.forEach(message => {
+      if (!message?.id) return;
+      const previous = byId.get(message.id);
+      if (!previous) {
+        byId.set(message.id, message);
+        return;
+      }
+      // Live windows can briefly lag a verified tag write. Keep archive imageTags when the live
+      // slot is still empty so gallery lightbox reopen does not flash blank tags.
+      const merged = { ...previous, ...message };
+      if (Array.isArray(previous.imageTags)) {
+        if (!Array.isArray(message.imageTags)) {
+          merged.imageTags = previous.imageTags;
+        } else {
+          const len = Math.max(previous.imageTags.length, message.imageTags.length);
+          const next = [];
+          for (let i = 0; i < len; i += 1) {
+            const live = String(message.imageTags[i] || '');
+            const archived = String(previous.imageTags[i] || '');
+            next[i] = live || archived;
+          }
+          merged.imageTags = next;
+        }
+      }
+      if (previous.directMediaTags && !message.directMediaTags) merged.directMediaTags = previous.directMediaTags;
+      byId.set(message.id, merged);
+    });
     return Array.from(byId.values()).sort((a, b) => Number(a.timestamp || 0) - Number(b.timestamp || 0));
   }, [allChatMessages, fullChatMessages]);
   const galleryChatMessages = React.useMemo(() => {
@@ -45,8 +100,18 @@ export function useGalleryArchiveState({
     if (activeView === 'gallery') {
       fetchCalendarSearchIndex(activeCalId).then(index => {
         if (cancelled) return;
-        setFullChatHistoryByCalendar(previous => ({ ...previous, [activeCalId]: Array.isArray(index?.chatMessages) ? index.chatMessages : [] }));
-        setFullGalleryMemosByCalendar(previous => ({ ...previous, [activeCalId]: Array.isArray(index?.memos) ? index.memos : [] }));
+        const pendingMessages = pendingArchiveMessagePatchesRef.current[activeCalId] || {};
+        const pendingMemos = pendingArchiveMemoPatchesRef.current[activeCalId] || {};
+        setFullChatHistoryByCalendar(previous => ({
+          ...previous,
+          [activeCalId]: mergeArchiveDocsById(index?.chatMessages, pendingMessages)
+        }));
+        setFullGalleryMemosByCalendar(previous => ({
+          ...previous,
+          [activeCalId]: mergeArchiveDocsById(index?.memos, pendingMemos)
+        }));
+        pendingArchiveMessagePatchesRef.current = { ...pendingArchiveMessagePatchesRef.current, [activeCalId]: {} };
+        pendingArchiveMemoPatchesRef.current = { ...pendingArchiveMemoPatchesRef.current, [activeCalId]: {} };
       }).catch(error => {
         console.warn('full paged gallery archive load failed:', error);
         if (!cancelled) {
@@ -56,7 +121,14 @@ export function useGalleryArchiveState({
       });
     } else {
       fetchAllChatMessagesRest(activeCalId).then(list => {
-        if (!cancelled) setFullChatHistoryByCalendar(previous => ({ ...previous, [activeCalId]: Array.isArray(list) ? list : [] }));
+        if (!cancelled) {
+          const pendingMessages = pendingArchiveMessagePatchesRef.current[activeCalId] || {};
+          setFullChatHistoryByCalendar(previous => ({
+            ...previous,
+            [activeCalId]: mergeArchiveDocsById(list, pendingMessages)
+          }));
+          pendingArchiveMessagePatchesRef.current = { ...pendingArchiveMessagePatchesRef.current, [activeCalId]: {} };
+        }
       }).catch(error => console.warn('full paged chat history load failed:', error));
     }
     return () => { cancelled = true; };
@@ -66,8 +138,16 @@ export function useGalleryArchiveState({
     if (!activeCalId || !messageId || !patch || typeof patch !== 'object') return;
     setFullChatHistoryByCalendar(previous => {
       const list = Array.isArray(previous[activeCalId]) ? previous[activeCalId] : null;
-      // No archive yet (still loading / not on gallery): nothing to patch; live windows cover it.
-      if (!list) return previous;
+      // No archive yet (still loading / not on gallery): queue until search-index arrives.
+      if (!list) {
+        const bucket = { ...(pendingArchiveMessagePatchesRef.current[activeCalId] || {}) };
+        bucket[messageId] = { ...(bucket[messageId] || {}), ...patch, id: messageId };
+        pendingArchiveMessagePatchesRef.current = {
+          ...pendingArchiveMessagePatchesRef.current,
+          [activeCalId]: bucket
+        };
+        return previous;
+      }
       const idx = list.findIndex(message => message?.id === messageId);
       if (idx >= 0) {
         const next = list.slice();
@@ -84,7 +164,15 @@ export function useGalleryArchiveState({
     if (!activeCalId || !memoId || !patch || typeof patch !== 'object') return;
     setFullGalleryMemosByCalendar(previous => {
       const list = Array.isArray(previous[activeCalId]) ? previous[activeCalId] : null;
-      if (!list) return previous;
+      if (!list) {
+        const bucket = { ...(pendingArchiveMemoPatchesRef.current[activeCalId] || {}) };
+        bucket[memoId] = { ...(bucket[memoId] || {}), ...patch, id: memoId };
+        pendingArchiveMemoPatchesRef.current = {
+          ...pendingArchiveMemoPatchesRef.current,
+          [activeCalId]: bucket
+        };
+        return previous;
+      }
       const idx = list.findIndex(memo => memo?.id === memoId);
       if (idx >= 0) {
         const next = list.slice();

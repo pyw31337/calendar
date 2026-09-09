@@ -3,6 +3,7 @@
  */
 
 import { composeGalleryPhotos, getPaginationWindow } from '../core/gallery-data.js';
+import { resolveGalleryLightboxTags } from '../core/photo-index.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -604,9 +605,9 @@ export function ChatGalleryModal({
             if (match) messageId = match[1];
           }
           // Client cannot write photoIndex. CF denorm can lag empty OR partial (e.g. only
-          // #260908 while message.imageTags still has the full save). Prefer those local
-          // verified message/memo imageTags over photoIndex whenever the source doc is in memory
-          // (including intentional clears / trash-deleted tags). Index tags are only a fallback.
+          // #260908 while message.imageTags still has the full save). Session sticky (verified
+          // save this tab) wins over stale in-memory imageTags (unpatched galleryLive) and
+          // empty photoIndex; then local message/memo tags; index last.
           const indexTags = String(photo.tags || '');
           let localTags = null;
           if (messageId) {
@@ -621,7 +622,12 @@ export function ChatGalleryModal({
               if (msg && Array.isArray(msg.imageTags)) localTags = String(msg.imageTags[imageIndex] || '');
             }
           }
-          let tags = localTags != null ? localTags : indexTags;
+          const calendarId = calendar && calendar.id ? calendar.id : '';
+          let tags = resolveGalleryLightboxTags(calendarId, {
+            ...photo,
+            messageId: messageId || photo.messageId,
+            imageIndex
+          }, { localTags, indexTags });
           return {
             ...photo,
             source,
@@ -632,11 +638,19 @@ export function ChatGalleryModal({
           };
         });
     }
-    return composeGalleryPhotos({
+    const composed = composeGalleryPhotos({
       chatMessages, memos, calendar, isTombstone, getMessageImageEntries,
       getAllDirectMediaImageEntries, getConfirmedMeetings, resolveMeetingPhotoDisplay,
       isBrokenPhotoValue, getPhotoAssetCommentKey
     });
+    const calendarId = calendar && calendar.id ? calendar.id : '';
+    return composed.map(photo => ({
+      ...photo,
+      tags: resolveGalleryLightboxTags(calendarId, photo, {
+        localTags: photo.tags != null ? String(photo.tags) : null,
+        indexTags: String(photo.tags || '')
+      })
+    }));
   }, [chatMessages, memos, calendar, indexedPhotos]);
 
   const filteredLinks = React.useMemo(() => {
