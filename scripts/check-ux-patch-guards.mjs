@@ -60,10 +60,16 @@ assert.match(editModal, /title: "파일 업로드"/);
 
 const files = fs.readFileSync(path.join(root, "src/ui/ui-chat-files.js"), "utf8");
 assert.match(files, /overflowWrap: "anywhere"/);
+assert.match(files, /usePdfPreviewUrl/);
+assert.match(files, /createObjectURL/);
+assert.match(files, /revokeObjectURL/);
 
 const lightbox = fs.readFileSync(path.join(root, "src/ui/ui-lightbox.js"), "utf8");
 assert.match(lightbox, /keepTagFocusRef/);
 assert.match(lightbox, /refocusComposerField\(tagInputRef\)/);
 assert.match(lightbox, /refocusComposerField\(commentInputRef\)/);
+assert.match(lightbox, /lightbox-content-chunk/);
+assert.match(lightbox, /marginTop: 'auto'/);
+assert.match(lightbox, /marginBottom: 'auto'/);
 
 console.log("[ux-patch-guards] all checks passed");
