@@ -328,7 +328,8 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     const firebaseDb = getDb();
     if (firebaseDb) {
       try {
-        const docs = await fetchSdkDocsPaged(() => firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages'), 300);
+        // orderBy required so startAfter paging walks the full collection (not just the first page).
+        const docs = await fetchSdkDocsPaged(() => firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages').orderBy('timestamp', 'desc'), 300);
         const list = [];
         docs.forEach(function (doc) {
           const msg = slimMessage({ id: doc.id, ...doc.data() });
@@ -377,7 +378,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     const firebaseDb = getDb();
     if (firebaseDb) {
       try {
-        const docs = await fetchSdkDocsPaged(() => firebaseDb.collection('calendars').doc('cal_' + calId).collection('memos'), 300);
+        const docs = await fetchSdkDocsPaged(() => firebaseDb.collection('calendars').doc('cal_' + calId).collection('memos').orderBy('createdAt', 'desc'), 300);
         const list = [];
         docs.forEach(function (doc) {
           const memo = { id: doc.id, ...doc.data() };
