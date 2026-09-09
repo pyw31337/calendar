@@ -1509,9 +1509,11 @@ export function ChatGalleryModal({
   }) : null));
   const renderFileListHeader = () => /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '8px' }
-  }, /*#__PURE__*/React.createElement("label", {
-    style: { fontSize: 'var(--font-size-md)', fontWeight: 800, color: 'var(--text-muted)' }
-  }, `등록된 파일 (${filteredFiles.length}개)`));
+  }, isMobile
+    ? renderVisitFilterToggleMobile()
+    : /*#__PURE__*/React.createElement("label", {
+      style: { fontSize: 'var(--font-size-md)', fontWeight: 800, color: 'var(--text-muted)' }
+    }, `등록된 파일 (${filteredFiles.length}개)`));
   // "이전 사진/링크 더 보기": a real component (not a plain render-helper function) so it can use
   // its own IntersectionObserver to auto-fire onClick once the user scrolls near it, instead of
   // requiring an explicit tap. A sentinel div sits 300px above the visible button so the next

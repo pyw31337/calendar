@@ -365,6 +365,7 @@ assert(photoIndexSource.includes("activeView !== 'gallery' && activeView !== 'hi
   && photoIndexSource.includes("activeView === 'history') void loadAll()"),
   'memories and people must hydrate the complete canonical photo index');
 assert(chatGallerySource.includes("activeTab === 'files' ? filteredFiles"), 'gallery date-mode file tab must group files rather than photo rows');
+assert(/renderFileListHeader[\s\S]{0,300}isMobile[\s\S]{0,100}renderVisitFilterToggleMobile/.test(chatGallerySource), 'mobile file tab must retain the all/date switch');
 const appMainImageSource = fs.readFileSync(new URL('../src/core/app-main.js', import.meta.url), 'utf8');
 assert(appMainImageSource.includes('async function sniffImageFormat'), 'image attach must sniff real file bytes before trusting .png names');
 assert(appMainImageSource.includes('withCorrectedImageFile'), 'image attach must rewrite mismatched MIME/extension from sniffed bytes');
