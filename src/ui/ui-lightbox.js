@@ -848,7 +848,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
       Promise.resolve(photoCommentsFetchRef.current(key)),
       new Promise((_, reject) => setTimeout(() => reject(new Error('photo comments timeout')), 8000))
     ]);
-    const lookupKeys = [photoCommentKey, ...legacyPhotoCommentKeys].slice(0, 12);
+    const lookupKeys = [photoCommentKey];
     Promise.all(lookupKeys.map(key => fetchWithTimeout(key)
       .then(normalizeCommentsResult)
       .catch(() => ({ success: false, comments: [] })))).then(results => {
@@ -858,9 +858,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
         return;
       }
       const canonical = results[0];
-      const resolved = canonical?.comments?.length
-        ? canonical.comments
-        : (results.slice(1).find(result => result.success && result.comments.length > 0)?.comments || []);
+      const resolved = Array.isArray(canonical?.comments) ? canonical.comments : [];
       if (!cancelled && Array.isArray(resolved)) {
         completed = true;
         setPhotoCommentsByKey(prev => ({ ...prev, [photoCommentKey]: resolved }));

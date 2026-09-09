@@ -1952,7 +1952,7 @@ export function ChatGalleryModal({
             !isCollapsed && /*#__PURE__*/React.createElement("div", {
               id: `gallery-date-items-${section.dateKey}`,
               style: { display: 'flex', flexDirection: 'column', gap: '8px' }
-            }, isLinkMode ? renderGalleryLinkList(section.items) : (isFileMode ? renderGalleryFileList(section.items) : renderGalleryPhotoGrid(section.items, visiblePhotos)))
+            }, isLinkMode ? renderGalleryLinkList(section.items) : (isFileMode ? renderGalleryFileList(section.items) : renderGalleryPhotoGrid(section.items, section.items)))
           );
         }),
         loadMoreNode
