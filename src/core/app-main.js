@@ -2616,9 +2616,7 @@ function CalendarApp() {
     (tag) => fetchMemosByTag(activeCalId, tag),
     [activeCalId]
   );
-  // Full confirmed-meeting photo set for DateModal: never limited to whatever chat/memo
-  // window the current view already loaded. REST+SDK album + meetingPhotoIndex + date-tag
-  // scans run together so the 사진 tab is self-contained.
+  // DateModal full album: meeting + index + date-tag chat/memo (not view window).
   const handleFetchMeetingAlbum = React.useCallback(async (date) => {
     const tag = typeof dateStrToHashtag === 'function' ? dateStrToHashtag(date) : '';
     const [meetings, indexPhotos, taggedMessages, taggedMemos] = await Promise.all([
@@ -2628,11 +2626,7 @@ function CalendarApp() {
       tag ? fetchMemosByTag(activeCalId, tag).catch(() => []) : Promise.resolve([])
     ]);
     const meeting = (Array.isArray(meetings) ? meetings : []).find(m => m && m.date === date) || null;
-    if (meeting) {
-      setConfirmedMeetingsSubcollection(previous =>
-        mergeConfirmedMeetings(Array.isArray(previous) ? previous : [], [meeting])
-      );
-    }
+    if (meeting) setConfirmedMeetingsSubcollection(prev => mergeConfirmedMeetings(Array.isArray(prev) ? prev : [], [meeting]));
     return {
       photos: Array.isArray(meeting?.photos) ? meeting.photos : [],
       indexPhotos: Array.isArray(indexPhotos) ? indexPhotos : [],
