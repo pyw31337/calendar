@@ -150,10 +150,30 @@ export function DocumentLightbox(props) {
   var _zoom = React.useState(ZOOM_DEFAULT);
   var zoomLevel = _zoom[0];
   var setZoomLevel = _zoom[1];
+  // Match ui-lightbox.js mobile breakpoint so document preview header adapts with resize/rotate.
+  var _mobile = React.useState(function() {
+    return typeof window !== "undefined" && window.matchMedia
+      && window.matchMedia("(max-width: 640px)").matches;
+  });
+  var isMobile = _mobile[0];
+  var setIsMobile = _mobile[1];
 
   React.useEffect(function() {
     setZoomLevel(ZOOM_DEFAULT);
   }, [safeIndex, current && current.url]);
+
+  React.useEffect(function() {
+    if (typeof window === "undefined" || !window.matchMedia) return undefined;
+    var mq = window.matchMedia("(max-width: 640px)");
+    var onChange = function() { setIsMobile(mq.matches); };
+    onChange();
+    if (mq.addEventListener) mq.addEventListener("change", onChange);
+    else if (mq.addListener) mq.addListener(onChange);
+    return function() {
+      if (mq.removeEventListener) mq.removeEventListener("change", onChange);
+      else if (mq.removeListener) mq.removeListener(onChange);
+    };
+  }, []);
 
   React.useEffect(function() {
     var onKey = function(e) {
@@ -208,25 +228,41 @@ export function DocumentLightbox(props) {
     },
       React.createElement("div", {
         style: {
-          display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px",
+          display: "flex",
+          flexDirection: isMobile ? "column" : "row",
+          alignItems: isMobile ? "stretch" : "center",
+          justifyContent: "space-between",
+          gap: isMobile ? "10px" : "12px",
           padding: "12px 14px", borderBottom: "1px solid var(--border-subtle)"
         }
       },
-        React.createElement("div", { style: { minWidth: 0, flex: 1 } },
+        // Mirror FileAttachmentCard: type icon + filename + type·size meta.
+        React.createElement("div", {
+          style: {
+            display: "flex", alignItems: "center", gap: "10px",
+            minWidth: 0, flex: isMobile ? "0 0 auto" : 1
+          }
+        },
+          React.createElement(FileTypeBadge, { label: typeLabel, attachment: current }),
           React.createElement("div", {
-            style: {
-              fontWeight: 900, fontSize: "var(--font-size-base)", color: "var(--text-main)",
-              overflow: "hidden", textOverflow: "ellipsis",
-              whiteSpace: "normal", display: "-webkit-box", WebkitLineClamp: 2,
-              WebkitBoxOrient: "vertical", wordBreak: "break-word"
-            }
-          }, current.name || "파일"),
-          React.createElement("div", {
-            style: { fontSize: "var(--font-size-sm)", color: "var(--text-muted)", fontWeight: 600 }
-          }, [typeLabel, sizeLabel].filter(Boolean).join(" · "))
+            style: { minWidth: 0, flex: 1, display: "flex", flexDirection: "column", gap: "2px" }
+          },
+            React.createElement("div", {
+              style: {
+                fontWeight: 900, fontSize: "var(--font-size-base)", color: "var(--text-main)",
+                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"
+              }
+            }, current.name || "파일"),
+            React.createElement("div", {
+              style: { fontSize: "var(--font-size-sm)", color: "var(--text-muted)", fontWeight: 600 }
+            }, [typeLabel, sizeLabel].filter(Boolean).join(" · "))
+          )
         ),
         React.createElement("div", {
-          style: { display: "flex", alignItems: "center", gap: "8px", flexShrink: 0, flexWrap: "wrap", justifyContent: "flex-end" }
+          style: {
+            display: "flex", alignItems: "center", gap: "8px", flexShrink: 0, flexWrap: "wrap",
+            justifyContent: isMobile ? "flex-start" : "flex-end"
+          }
         },
           pdf ? React.createElement(DocZoomControls, {
             zoomLevel: zoomLevel,
