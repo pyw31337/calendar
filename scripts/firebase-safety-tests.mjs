@@ -10,7 +10,9 @@ import { getInitialAppView, buildAppViewUrl } from '../src/core/app-routing-stat
 import { getInitialDataLoadingState, subscribeCalendarBootstrap } from '../src/core/app-data-bootstrap.js';
 
 globalThis.window ||= {};
+window.GATHER_APP_UTILS ||= GATHER_APP_UTILS;
 const { getMediaIdentityKeys } = await import('../src/core/app-domain-helpers.js');
+const { buildMainCalendarScreenState } = await import('../src/core/app-calendar-screen-state.js');
 const require = createRequire(import.meta.url);
 const { pickCanonicalPhotoIndexTagState } = require('../functions/photo-index-tag-contract.js');
 
@@ -26,6 +28,30 @@ assert(getInitialAppView({ pathname: '/', search: '?view=gallery' }, () => null)
 assert(buildAppViewUrl({ pathname: '/calendar/', search: '?id=cw&date=2026-09-08&msg=x' }, 'gallery', new Date(2026, 8, 1)) === '/calendar/?id=cw&year=2026&month=09&view=gallery', 'route changes must retain calendar/month and clear stale deep-link state');
 assert(getInitialDataLoadingState({ firebaseDb: {}, activeCalId: 'cached', loadLocalCache: () => [{ id: 'cached', title: 'ready' }], isUsableCalendarRecord: row => row?.title === 'ready' }) === false, 'cached usable calendar must render without a loading shell');
 assert(getInitialDataLoadingState({ firebaseDb: {}, activeCalId: 'missing', loadLocalCache: () => [], isUsableCalendarRecord: () => false }) === true, 'missing calendar must retain its initial loading state');
+
+{
+  const state = buildMainCalendarScreenState({
+    calendar: {
+      polls: [{ id: 'poll_open', createdAt: 1000 }],
+      places: [{ id: 'place_live', lat: 37.5, lng: 126.8 }],
+      confirmedMeeting: [
+        { id: 'past', date: '2026-09-09' },
+        { id: 'future', date: '2026-09-11' }
+      ]
+    },
+    calendarId: 'screen-state',
+    visibleTotalChatCount: 12,
+    visibleChatMessages: [],
+    totalMemoCount: 7,
+    memos: [],
+    localGalleryCount: 9,
+    totalGalleryCount: 30,
+    now: new Date(2026, 8, 10, 12, 0, 0)
+  });
+  assert(state.hasVisiblePolls && state.mainMenuChatCount === 12 && state.mainMenuMemoCount === 7, 'main calendar screen counts must preserve server totals');
+  assert(state.mainMenuGalleryCount === 9 && state.mainMenuPlaceCount === 1, 'main calendar gallery/place counts changed during coordinator split');
+  assert(state.visibleConfirmedMeetings.length === 1 && state.visibleConfirmedMeetings[0].id === 'future', 'main calendar banners must keep only today/future confirmed meetings');
+}
 
 {
   let applied = null;

@@ -159,6 +159,13 @@ import { cloneConfirmedMeetings, commitConfirmedMeetingChanges } from './confirm
 import { getInitialAppView, buildAppViewUrl } from './app-routing-state.js';
 import { useNotificationPwaState } from './notification-pwa-state.js';
 import { useDisplayPreferences, useMainHeaderState } from './app-shell-state.js';
+import { useBrowserUiCompatibility } from './app-browser-ui-state.js';
+import {
+  buildMainCalendarScreenState,
+  getLocalStorage,
+  getChatLastReadTimestamp,
+  setChatLastReadTimestamp
+} from './app-calendar-screen-state.js';
 import {
   getInitialDataLoadingState,
   subscribeBrowserConnectivity,
@@ -1196,109 +1203,7 @@ function CalendarApp() {
     }
   }, []);
 
-  // JS fallback for three app.css rules that rely on :has() -- background-scroll lock while any
-  // modal/bottom sheet is mounted, the admin screen's forced light-mode override, and its
-  // padding reset. :has() is supported by every evergreen browser (Safari 15.4+/Chrome 105+/
-  // Firefox 121+) but some outdated embedded webviews still lack it (e.g. an old Android OEM
-  // WebView inside KakaoTalk/Naver's in-app browser, both realistic sources of traffic for a
-  // Korean link-shared app) -- there, the CSS rules silently do nothing and background scroll
-  // stays unlocked / the admin screen stays in dark colors it isn't designed for. A
-  // MutationObserver (rather than threading each overlay's own open/close state into this one
-  // effect) mirrors the exact same rules for every current and future modal without extra
-  // wiring, and only ever touches the DOM when :has() isn't supported at all -- on every modern
-  // engine this effect is a no-op and the native CSS rules do all the work, unchanged.
-  React.useEffect(() => {
-    if (typeof MutationObserver === 'undefined') return undefined;
-    if (typeof CSS !== 'undefined' && typeof CSS.supports === 'function' && CSS.supports('selector(:has(*))')) return undefined;
-
-    let overlayLocked = false;
-    let savedOverflow = '';
-    let adminScopeActive = false;
-    let savedBackgroundColor = '';
-    let savedBackgroundImage = '';
-    let savedColorScheme = '';
-    let bodyPaddingReset = false;
-    let savedPadding = '';
-
-    const sync = () => {
-      // Mirrors: body:has(.modal-overlay, .bottom-sheet-overlay) { overflow: hidden; }
-      const hasOverlay = !!document.body.querySelector('.modal-overlay, .bottom-sheet-overlay');
-      if (hasOverlay !== overlayLocked) {
-        overlayLocked = hasOverlay;
-        if (overlayLocked) {
-          savedOverflow = document.body.style.overflow;
-          document.body.style.overflow = 'hidden';
-        } else {
-          document.body.style.overflow = savedOverflow;
-        }
-      }
-
-      const hasAdminScope = !!document.body.querySelector('.admin-scope');
-      const hasLoginGate = !!document.body.querySelector('.admin-login-gate');
-
-      // Mirrors: body:has(.admin-scope), body:has(.admin-login-gate) { padding: 0; }
-      const shouldResetPadding = hasAdminScope || hasLoginGate;
-      if (shouldResetPadding !== bodyPaddingReset) {
-        bodyPaddingReset = shouldResetPadding;
-        if (bodyPaddingReset) {
-          savedPadding = document.body.style.padding;
-          document.body.style.padding = '0';
-        } else {
-          document.body.style.padding = savedPadding;
-        }
-      }
-
-      // Mirrors: :root[data-theme="dark"] body:has(.admin-scope) { background-color/-image }
-      // and :root[data-theme="dark"]:has(.admin-scope) { color-scheme: light }
-      const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-      const shouldForceLight = isDark && hasAdminScope;
-      if (shouldForceLight !== adminScopeActive) {
-        adminScopeActive = shouldForceLight;
-        if (adminScopeActive) {
-          savedBackgroundColor = document.body.style.backgroundColor;
-          savedBackgroundImage = document.body.style.backgroundImage;
-          savedColorScheme = document.documentElement.style.colorScheme;
-          document.body.style.backgroundColor = '#F8FAFC';
-          document.body.style.backgroundImage = 'none';
-          document.documentElement.style.colorScheme = 'light';
-        } else {
-          document.body.style.backgroundColor = savedBackgroundColor;
-          document.body.style.backgroundImage = savedBackgroundImage;
-          document.documentElement.style.colorScheme = savedColorScheme;
-        }
-      }
-    };
-
-    sync();
-    const bodyObserver = new MutationObserver(sync);
-    // attributes+attributeFilter:['class'] on top of childList/subtree catches the rarer case of
-    // a persistently-mounted element's className toggling (e.g. via a class-list update rather
-    // than mount/unmount) in addition to the more common case of the overlay/admin element itself
-    // being mounted or removed.
-    bodyObserver.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
-    const themeObserver = new MutationObserver(sync);
-    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-    return () => {
-      bodyObserver.disconnect();
-      themeObserver.disconnect();
-    };
-  }, []);
-
-  // Global visual viewport resize handler to scroll active inputs into view (e.g. CommentsSection)
-  React.useEffect(() => {
-    if (!window.visualViewport) return;
-    const handleResize = () => {
-      const active = document.activeElement;
-      if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
-        if (active.closest('.chat-room-container')) return; // ChatRoom handles its own viewport height
-        setTimeout(() => {
-          active.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }, 150);
-      }
-    };
-    window.visualViewport.addEventListener('resize', handleResize);
-    return () => window.visualViewport.removeEventListener('resize', handleResize);
-  }, []);
+  useBrowserUiCompatibility(React);
 
   const changeView = (view) => {
     if (view === 'settlement'
@@ -7521,47 +7426,20 @@ function CalendarApp() {
     ));
   }
 
-  // Whether the 진행중 투표 section has anything to render at all -- mirrors PollList's own
-  // "polls" filter (ui-calendar-core.js), which keeps closed-but-not-hidden polls visible there
-  // (shown dimmed with a winning-option badge). Used both to decide whether to render that
-  // section and whether the header 투표 메뉴 click should scroll to it or show a "없습니다" alert.
-  const hasVisiblePolls = getCalendarPolls(activeCal).some(poll => !poll.hidden);
-  const mainMenuChatCount = (typeof visibleTotalChatCount === 'number' && visibleTotalChatCount >= 0)
-    ? visibleTotalChatCount
-    : visibleChatMessages.length;
-  const mainMenuChatLatestTimestamp = visibleChatMessages.length > 0 ? visibleChatMessages[visibleChatMessages.length - 1].timestamp : 0;
-  const mainMenuChatHasUnread = mainMenuChatLatestTimestamp > getChatLastReadTimestamp(activeCalId);
-
-  // No per-user "last read" tracking exists for polls/memos the way chat has
-  // getChatLastReadTimestamp, so their main-menu dot falls back to "created within the last 6
-  // hours" as a reasonable proxy for "new" -- see NEW_CONTENT_DOT_WINDOW_MS.
-  const NEW_CONTENT_DOT_WINDOW_MS = 6 * 60 * 60 * 1000;
-  const mainMenuPollLatestTimestamp = getCalendarPolls(activeCal)
-    .filter(poll => !poll.hidden)
-    .reduce((max, poll) => Math.max(max, Number(poll.createdAt) || 0), 0);
-  const mainMenuPollHasNew = mainMenuPollLatestTimestamp > 0
-    && (Date.now() - mainMenuPollLatestTimestamp) < NEW_CONTENT_DOT_WINDOW_MS;
-
-  const mainMenuMemoCount = (typeof totalMemoCount === 'number' && totalMemoCount >= 0)
-    ? totalMemoCount
-    : (memos || []).length;
-  const mainMenuMemoLatestTimestamp = (memos || []).reduce((max, memo) => Math.max(max, Number(memo && memo.createdAt) || 0), 0);
-  const mainMenuMemoHasNew = mainMenuMemoLatestTimestamp > 0
-    && (Date.now() - mainMenuMemoLatestTimestamp) < NEW_CONTENT_DOT_WINDOW_MS;
-  const mainMenuGalleryCount = (localGalleryCount > 0)
-    ? localGalleryCount
-    : ((typeof totalGalleryCount === 'number' && totalGalleryCount >= 0) ? totalGalleryCount : localGalleryCount);
-  const mainMenuPlaceCount = getCalendarPlaces(activeCal).length;
-
-  // Each confirmed meeting gets its own banner bubble on the calendar, and stays up through
-  // the day of the meeting itself -- only today-or-future confirmations show.
-  const todayDateStrForBanner = (() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  })();
-  const visibleConfirmedMeetings = getTrulyConfirmedMeetings(activeCal)
-    .filter(m => isValidDateString(m?.date) && m.date >= todayDateStrForBanner)
-    .sort((a, b) => a.date.localeCompare(b.date));
+  const {
+    hasVisiblePolls,
+    mainMenuChatCount,
+    mainMenuChatHasUnread,
+    mainMenuPollHasNew,
+    mainMenuMemoCount,
+    mainMenuMemoHasNew,
+    mainMenuGalleryCount,
+    mainMenuPlaceCount,
+    visibleConfirmedMeetings
+  } = buildMainCalendarScreenState({
+    calendar: activeCal, calendarId: activeCalId, visibleTotalChatCount, visibleChatMessages,
+    totalMemoCount, memos, localGalleryCount, totalGalleryCount
+  });
 
   const toggleConfirmedDateExpand = (dateStr) => {
     const isCurrentlyExpanded = !!expandedConfirmedDates[dateStr];
@@ -8207,31 +8085,6 @@ function GlobalSearchModal(props) {
 function EditMessageModal(props) {
   const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.EditMessageModal;
   return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-
-// Comments / Chat Icons & Utilities
-const getLocalStorage = () => {
-  return window['local' + 'Storage'];
-};
-
-// Per-calendar "last read" chat timestamp, stored locally per browser/device (no server
-// concept of read state). Used to color the chat count badge gray (all read) vs red
-// (unread messages newer than the last time this section was expanded).
-const CHAT_LAST_READ_KEY_PREFIX = 'gather_chat_last_read_v1_';
-function getChatLastReadTimestamp(calendarId) {
-  try {
-    const raw = getLocalStorage().getItem(CHAT_LAST_READ_KEY_PREFIX + calendarId);
-    return raw ? Number(raw) || 0 : 0;
-  } catch (e) {
-    return 0;
-  }
-}
-function setChatLastReadTimestamp(calendarId, timestamp) {
-  try {
-    getLocalStorage().setItem(CHAT_LAST_READ_KEY_PREFIX + calendarId, String(timestamp));
-  } catch (e) {
-    // ignore (private browsing / storage disabled)
-  }
 }
 
 // Link preview (OpenGraph via peekalink.io's API), fetched through the peekalinkProxy Cloud
