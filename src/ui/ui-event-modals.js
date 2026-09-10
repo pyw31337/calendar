@@ -2998,6 +2998,19 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   const SharedSideMenuFooter = __comp.SharedSideMenuFooter || __deps.SharedSideMenuFooter || (function Shell(p) { return React.createElement('div', p, p.children); });
   const SharedAppNavBlock = __comp.SharedAppNavBlock || __deps.SharedAppNavBlock || (function Shell(p) { return React.createElement('div', p, p.children); });
   const ThreeLinesIcon = __comp.ThreeLinesIcon || __deps.ThreeLinesIcon || (function () { return '☰'; });
+  const PAGE_HEADER_ICON_BTN_STYLE = __comp.PAGE_HEADER_ICON_BTN_STYLE || __deps.PAGE_HEADER_ICON_BTN_STYLE || {
+    background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
+    color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+  };
+  const PAGE_HEADER_ACTIONS_WRAP_STYLE = __comp.PAGE_HEADER_ACTIONS_WRAP_STYLE || __deps.PAGE_HEADER_ACTIONS_WRAP_STYLE || {
+    display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0
+  };
+  const PAGE_HEADER_TITLE_STYLE = __comp.PAGE_HEADER_TITLE_STYLE || __deps.PAGE_HEADER_TITLE_STYLE || {
+    position: 'absolute', left: '50%', transform: 'translateX(-50%)',
+    display: 'flex', alignItems: 'center', fontWeight: 800, fontSize: '0.95rem',
+    color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+    maxWidth: 'calc(100vw - 120px)', pointerEvents: 'none'
+  };
   const WeatherBadge = __comp.WeatherBadge || __deps.WeatherBadge || (function () { return null; });
   const InlineSearchBar = __comp.InlineSearchBar || __deps.InlineSearchBar || (({ value, onChange, placeholder, trailing }) => /*#__PURE__*/React.createElement("div", { className: "inline-search-bar", style: { position: 'fixed', top: 'calc(56px + env(safe-area-inset-top, 0px))', left: 0, right: 0, zIndex: 1008, minHeight: '48px', display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)' } }, /*#__PURE__*/React.createElement("input", { autoFocus: true, type: "text", value: value, onChange: onChange, placeholder: placeholder, style: { flex: 1, height: '36px', border: 'none', outline: 'none', borderRadius: 'var(--radius-full)', padding: '0 12px', background: 'var(--bg-primary)', color: 'var(--text-main)' } }), trailing));
   const SearchIcon = ({ size = 20 }) => /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true }, /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /*#__PURE__*/React.createElement("path", { d: "m21 21-4.3-4.3" }));
@@ -3425,22 +3438,19 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
       zIndex: 1010, transition: 'transform 0.3s ease',
       transform: isHeaderVisible ? 'translateY(0)' : 'translateY(-100%)'
     }
-  }, /*#__PURE__*/React.createElement("div", { style: { width: '32px', flexShrink: 0 } }), /*#__PURE__*/React.createElement("h3", {
-    style: {
-      fontSize: '1.05rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '8px', margin: 0, color: 'var(--text-main)',
-      position: 'absolute', left: '50%', transform: 'translateX(-50%)', pointerEvents: 'none'
-    }
-  }, formatChatHeaderTitle(calendar?.title), " 정산"), /*#__PURE__*/React.createElement("div", { style: { marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '4px' } },
+  }, /*#__PURE__*/React.createElement("div", { style: { width: '32px', flexShrink: 0 } }), /*#__PURE__*/React.createElement("div", {
+    style: PAGE_HEADER_TITLE_STYLE
+  }, formatChatHeaderTitle(calendar?.title), " 정산"), /*#__PURE__*/React.createElement("div", { style: PAGE_HEADER_ACTIONS_WRAP_STYLE },
     /*#__PURE__*/React.createElement("button", {
       type: "button", onClick: () => setIsSettlementSearchOpen(value => !value),
       title: "정산 검색", "aria-label": "정산 검색",
-      style: { width: '32px', height: '32px', borderRadius: '50%', border: 'none', backgroundColor: isSettlementSearchOpen ? 'var(--bg-primary)' : 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', padding: 0 }
-    }, /*#__PURE__*/React.createElement(SearchIcon, { size: 19 })),
+      style: { ...PAGE_HEADER_ICON_BTN_STYLE, backgroundColor: isSettlementSearchOpen ? 'var(--bg-primary)' : undefined, borderRadius: 'var(--radius-md)' }
+    }, /*#__PURE__*/React.createElement(SearchIcon, { size: 20 })),
     /*#__PURE__*/React.createElement("button", {
       type: "button", onClick: () => setIsSettlementMenuOpen(true),
       title: "메뉴", "aria-label": "메뉴",
-      style: { width: '32px', height: '32px', borderRadius: '50%', border: 'none', backgroundColor: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', padding: 0 }
-    }, ThreeLinesIcon ? /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 20 }) : /*#__PURE__*/React.createElement(ShareIcon, { size: 16 }))
+      style: PAGE_HEADER_ICON_BTN_STYLE
+    }, ThreeLinesIcon ? /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 22 }) : /*#__PURE__*/React.createElement(ShareIcon, { size: 16 }))
   )),
 
   isSettlementSearchOpen && InlineSearchBar && /*#__PURE__*/React.createElement(InlineSearchBar, {

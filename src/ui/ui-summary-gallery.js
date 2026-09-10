@@ -1222,6 +1222,43 @@ export function HistoryView({
   const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
   const PlusIcon = __comp.PlusIcon || __deps.PlusIcon;
   const CalendarCheckIcon = __comp.CalendarCheckIcon || __deps.CalendarCheckIcon;
+  const EditSelectCheckbox = __comp.EditSelectCheckbox || __deps.EditSelectCheckbox;
+  const getListEditActionWrapStyle = __comp.getListEditActionWrapStyle || __deps.getListEditActionWrapStyle;
+  const getListEditTextBtnStyle = __comp.getListEditTextBtnStyle || __deps.getListEditTextBtnStyle;
+  const LIST_TOOLBAR_ROW_STYLE = __comp.LIST_TOOLBAR_ROW_STYLE || __deps.LIST_TOOLBAR_ROW_STYLE || {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    gap: '8px', padding: '12px 0 4px', minWidth: 0, flexWrap: 'nowrap', flexShrink: 0
+  };
+  const PAGE_HEADER_ICON_BTN_STYLE = __comp.PAGE_HEADER_ICON_BTN_STYLE || __deps.PAGE_HEADER_ICON_BTN_STYLE || {
+    background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
+    color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+  };
+  const PAGE_HEADER_BACK_BTN_STYLE = __comp.PAGE_HEADER_BACK_BTN_STYLE || __deps.PAGE_HEADER_BACK_BTN_STYLE || {
+    width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'transparent', border: 'none',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)', flexShrink: 0
+  };
+  const PAGE_HEADER_ACTIONS_WRAP_STYLE = __comp.PAGE_HEADER_ACTIONS_WRAP_STYLE || __deps.PAGE_HEADER_ACTIONS_WRAP_STYLE || {
+    display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0
+  };
+  const PAGE_HEADER_TITLE_STYLE = __comp.PAGE_HEADER_TITLE_STYLE || __deps.PAGE_HEADER_TITLE_STYLE || {
+    position: 'absolute', left: '50%', transform: 'translateX(-50%)',
+    display: 'flex', alignItems: 'center', fontWeight: 800, fontSize: '0.95rem',
+    color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+    maxWidth: 'calc(100vw - 120px)', pointerEvents: 'none'
+  };
+  const [isMobile, setIsMobile] = React.useState(() => typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 720px)').matches);
+  React.useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return undefined;
+    const mq = window.matchMedia('(max-width: 720px)');
+    const handleChange = () => setIsMobile(mq.matches);
+    handleChange();
+    if (mq.addEventListener) mq.addEventListener('change', handleChange);
+    else if (mq.addListener) mq.addListener(handleChange);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener('change', handleChange);
+      else if (mq.removeListener) mq.removeListener(handleChange);
+    };
+  }, []);
   const PhotoCommentCountBadge = __comp.PhotoCommentCountBadge || __deps.PhotoCommentCountBadge || function InlinePhotoCommentCountBadge({ count = 0 } = {}) {
     if (!count) return null;
     return /*#__PURE__*/React.createElement('span', {
@@ -1418,7 +1455,7 @@ export function HistoryView({
     };
   }, []);
   const headerStackRef = React.useRef(null);
-  const [, setHeaderStackHeight] = React.useState(0);
+  const [headerStackHeight, setHeaderStackHeight] = React.useState(104);
   React.useLayoutEffect(() => {
     const el = headerStackRef.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
@@ -1429,11 +1466,14 @@ export function HistoryView({
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  // Content sits below the now-fixed header stack; padding-top reserves exactly its measured
-  // height, and drops to a small constant while hidden so the first scroll-up gesture actually
-  // moves content instead of only eating reserved empty space (same trick the 갤러리 페이지 uses).
-  // Both branches add env(safe-area-inset-top) too, since the header stack itself now starts
-  // that far down (see its `top` above) rather than at the very top of the screen.
+  // +16px 여유를 더해 탭 밑줄에 콘텐츠가 바로 붙지 않도록 한다(측정값 그대로 쓰면 딱 붙어 보임).
+  const historyScrollPadTop = isHeaderVisible
+    ? `calc(${Math.max(headerStackHeight, 56)}px + 16px + env(safe-area-inset-top, 0px))`
+    : 'calc(12px + env(safe-area-inset-top, 0px))';
+  const historyScrollStyle = {
+    flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain',
+    WebkitOverflowScrolling: 'touch', padding: `${historyScrollPadTop} 16px 16px`
+  };
     const activeParticipants = getActiveParticipants(calendar);
   const participantsMap = activeParticipants.reduce((acc, p) => { acc[p.id] = p; return acc; }, {});
   const availabilities = getActiveAvailabilities(calendar);
@@ -1806,11 +1846,13 @@ export function HistoryView({
     borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center',
     cursor: 'pointer', flexShrink: 0, boxSizing: 'border-box', aspectRatio: '1 / 1'
   };
-  const memoryTextBtn = {
-    height: '44px', minHeight: '44px', minWidth: '44px', padding: '0 16px', borderRadius: 'var(--radius-md)',
-    fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: 'pointer', flex: 1, flexShrink: 0, whiteSpace: 'nowrap',
-    boxSizing: 'border-box'
-  };
+  const memoryTextBtn = typeof getListEditTextBtnStyle === 'function'
+    ? getListEditTextBtnStyle(isMobile, true)
+    : {
+        height: '44px', minHeight: '44px', minWidth: '44px', padding: isMobile ? '0 8px' : '0 14px', borderRadius: 'var(--radius-md)',
+        fontSize: isMobile ? 'var(--font-size-sm)' : 'var(--font-size-md)', fontWeight: 900, cursor: 'pointer',
+        flex: isMobile ? 1 : '0 0 auto', flexShrink: 0, whiteSpace: 'nowrap', boxSizing: 'border-box'
+      };
   const renderMemoryAllDateToggle = () => /*#__PURE__*/React.createElement("div", {
     className: "visit-filter-toggle-mobile",
     style: {
@@ -1918,19 +1960,21 @@ export function HistoryView({
         /*#__PURE__*/React.createElement("span", { style: { color: '#fff', fontWeight: 800, fontSize: 'var(--font-size-sm)' } }, group.title),
         /*#__PURE__*/React.createElement("span", { style: { color: 'rgba(255,255,255,0.85)', fontSize: 'var(--font-size-2xs)' } }, formatHistoryDate(group.startDate))
       ),
-      isMemoryListEditMode && /*#__PURE__*/React.createElement("span", {
+      isMemoryListEditMode && (EditSelectCheckbox
+        ? /*#__PURE__*/React.createElement(EditSelectCheckbox, { checked: isChecked, variant: "onMedia" })
+        : /*#__PURE__*/React.createElement("span", {
         "aria-hidden": true,
         style: {
-          position: 'absolute', top: '6px', left: '6px', zIndex: 4, width: '22px', height: '22px', borderRadius: '6px',
-          border: isChecked ? 'none' : '2px solid rgba(255,255,255,0.9)',
+          position: 'absolute', top: '8px', left: '8px', zIndex: 4, width: '20px', height: '20px', borderRadius: '5px',
+          border: isChecked ? 'none' : '2px solid rgba(255,255,255,0.95)',
           backgroundColor: isChecked ? 'var(--accent-primary)' : 'rgba(0,0,0,0.35)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.4)'
+          boxShadow: '0 1px 3px rgba(0,0,0,0.35)'
         }
       }, isChecked && /*#__PURE__*/React.createElement("svg", {
         xmlns: "http://www.w3.org/2000/svg", width: "14", height: "14", viewBox: "0 0 24 24",
         fill: "none", stroke: "#fff", strokeWidth: "3", strokeLinecap: "round", strokeLinejoin: "round"
-      }, /*#__PURE__*/React.createElement("path", { d: "M20 6 9 17l-5-5" })))
+      }, /*#__PURE__*/React.createElement("path", { d: "M20 6 9 17l-5-5" }))))
     );
   };
   const renderMemoryGroupGrid = groups => /*#__PURE__*/React.createElement("div", {
@@ -2003,19 +2047,21 @@ export function HistoryView({
           style: { width: '100%', height: '100%', objectFit: 'cover' }
         }),
         PhotoCommentCountBadge && /*#__PURE__*/React.createElement(PhotoCommentCountBadge, { count: commentCount }),
-        checkable && /*#__PURE__*/React.createElement("span", {
+        checkable && (EditSelectCheckbox
+          ? /*#__PURE__*/React.createElement(EditSelectCheckbox, { checked: isChecked, variant: "onMedia" })
+          : /*#__PURE__*/React.createElement("span", {
           "aria-hidden": true,
           style: {
-            position: 'absolute', top: '4px', left: '4px', width: '20px', height: '20px', borderRadius: '5px',
-            border: isChecked ? 'none' : '2px solid rgba(255,255,255,0.9)',
+            position: 'absolute', top: '8px', left: '8px', width: '20px', height: '20px', borderRadius: '5px',
+            border: isChecked ? 'none' : '2px solid rgba(255,255,255,0.95)',
             backgroundColor: isChecked ? 'var(--accent-primary)' : 'rgba(0,0,0,0.35)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.4)'
+            boxShadow: '0 1px 3px rgba(0,0,0,0.35)'
           }
         }, isChecked && /*#__PURE__*/React.createElement("svg", {
           xmlns: "http://www.w3.org/2000/svg", width: "14", height: "14", viewBox: "0 0 24 24",
           fill: "none", stroke: "#fff", strokeWidth: "3", strokeLinecap: "round", strokeLinejoin: "round"
-        }, /*#__PURE__*/React.createElement("path", { d: "M20 6 9 17l-5-5" })))
+        }, /*#__PURE__*/React.createElement("path", { d: "M20 6 9 17l-5-5" }))))
       );
     }))
   );
@@ -2053,26 +2099,19 @@ export function HistoryView({
     },
       /*#__PURE__*/React.createElement("button", {
         type: "button", onClick: onBack, "aria-label": "뒤로가기",
-        style: {
-          width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'transparent', border: 'none',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)'
-        }
+        style: PAGE_HEADER_BACK_BTN_STYLE
       }, BackArrowIcon ? /*#__PURE__*/React.createElement(BackArrowIcon, { size: 22 }) : "←"),
       /*#__PURE__*/React.createElement("div", {
-        style: {
-          position: 'absolute', left: '50%', transform: 'translateX(-50%)',
-          display: 'flex', alignItems: 'center', fontWeight: 800, fontSize: '0.95rem',
-          color: 'var(--text-main)', whiteSpace: 'nowrap', pointerEvents: 'none'
-        }
+        style: PAGE_HEADER_TITLE_STYLE
       }, calendar.title, " 보관함"),
-      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+      /*#__PURE__*/React.createElement("div", { style: PAGE_HEADER_ACTIONS_WRAP_STYLE },
         /*#__PURE__*/React.createElement("button", {
           type: "button", onClick: () => setIsSearchOpen(v => !v), title: "보관함 검색", "aria-label": "보관함 검색",
-          style: { background: 'none', border: 'none', cursor: 'pointer', padding: '6px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }
-        }, SearchIcon ? /*#__PURE__*/React.createElement(SearchIcon, null) : "🔍"),
+          style: PAGE_HEADER_ICON_BTN_STYLE
+        }, SearchIcon ? /*#__PURE__*/React.createElement(SearchIcon, { size: 20 }) : "🔍"),
         /*#__PURE__*/React.createElement("button", {
           type: "button", onClick: () => setIsMenuOpen(true), title: "메뉴", "aria-label": "메뉴 열기",
-          style: { background: 'none', border: 'none', cursor: 'pointer', padding: '6px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }
+          style: PAGE_HEADER_ICON_BTN_STYLE
         }, ThreeLinesIcon ? /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 22 }) : "≡")
       )
     ),
@@ -2087,9 +2126,9 @@ export function HistoryView({
       value: historyTab,
       onChange: changeHistoryTab,
       options: [
-        { value: 'memories', label: '추억' },
-        { value: 'people', label: '인물' },
-        { value: 'meetings', label: '지난모임' }
+        { value: 'memories', label: '추억', badge: travelMemoryGroups.length },
+        { value: 'people', label: '인물', badge: personTagChips.length },
+        { value: 'meetings', label: '지난모임', badge: confirmedDates.length }
       ]
     })
     ), // end history-header-stack
@@ -2097,7 +2136,7 @@ export function HistoryView({
       className: "history-meetings-grid history-page-scroll",
       onScroll: handleHistoryScroll,
       style: Object.assign(
-        { flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: '134px 16px 16px' },
+        { ...historyScrollStyle },
         confirmedDates.length === 0 ? { display: 'flex', alignItems: 'center', justifyContent: 'center' } : {}
       )
     },
@@ -2186,14 +2225,16 @@ export function HistoryView({
     historyTab === 'memories' && !selectedMemoryGroupId && /*#__PURE__*/React.createElement("div", {
       className: "history-page-scroll",
       onScroll: handleHistoryScroll,
-      style: { flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: '134px 16px 16px' }
+      style: historyScrollStyle
     }, /*#__PURE__*/React.createElement(React.Fragment, null,
       /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '10px', minWidth: 0 }
+        style: { ...LIST_TOOLBAR_ROW_STYLE, gap: '8px' }
       },
-        !isMemoryListEditMode && renderMemoryAllDateToggle(),
+        (!isMemoryListEditMode || !isMobile) && renderMemoryAllDateToggle(),
         /*#__PURE__*/React.createElement("div", {
-          style: { display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: isMemoryListEditMode ? 0 : 'auto', flex: isMemoryListEditMode ? 1 : undefined, width: isMemoryListEditMode ? '100%' : undefined }
+          style: typeof getListEditActionWrapStyle === 'function'
+            ? getListEditActionWrapStyle(isMemoryListEditMode, isMobile)
+            : { display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: 'auto', width: isMemoryListEditMode && isMobile ? '100%' : 'auto' }
         },
           isMemoryListEditMode
             ? /*#__PURE__*/React.createElement(React.Fragment, null,
@@ -2217,13 +2258,23 @@ export function HistoryView({
         /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-body" },
           availableMemoryGroups.length === 0
             ? /*#__PURE__*/React.createElement("p", { style: { color: 'var(--text-muted)', textAlign: 'center', padding: '24px 0' } }, "추가할 미등록 기념일이 없습니다.")
-            : availableMemoryGroups.map(item => /*#__PURE__*/React.createElement("button", {
-                key: item.id, type: "button", disabled: isChangingMemoryGroups, onClick: () => handleRestoreMemoryGroup(item.id),
-                style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '12px', marginBottom: '8px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', background: 'var(--bg-primary)', color: 'var(--text-main)', textAlign: 'left', cursor: 'pointer' }
-              }, /*#__PURE__*/React.createElement("span", null,
-                /*#__PURE__*/React.createElement("strong", { style: { display: 'block' } }, item.title),
-                /*#__PURE__*/React.createElement("small", { style: { color: 'var(--text-muted)' } }, formatHistoryDateRange(item.startDate, item.endDate))
-              ), /*#__PURE__*/React.createElement("span", { style: { color: 'var(--accent-primary)', fontWeight: 800 } }, "+")))
+            : /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
+                availableMemoryGroups.map(item => /*#__PURE__*/React.createElement("div", {
+                  key: item.id,
+                  style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '10px 12px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', background: 'var(--bg-primary)', color: 'var(--text-main)' }
+                }, /*#__PURE__*/React.createElement("span", { style: { minWidth: 0, flex: 1 } },
+                  /*#__PURE__*/React.createElement("strong", { style: { display: 'block' } }, item.title),
+                  /*#__PURE__*/React.createElement("small", { style: { color: 'var(--text-muted)' } }, formatHistoryDateRange(item.startDate, item.endDate))
+                ), /*#__PURE__*/React.createElement("button", {
+                  type: "button",
+                  className: "btn btn-action btn-action-dark",
+                  disabled: isChangingMemoryGroups,
+                  onClick: () => handleRestoreMemoryGroup(item.id),
+                  title: "추억에 추가",
+                  "aria-label": `${item.title} 추억에 추가`,
+                  style: memoryIconBtn
+                }, PlusIcon ? /*#__PURE__*/React.createElement(PlusIcon, { size: 16 }) : "+")))
+              )
         )
       ))
     )),
@@ -2235,7 +2286,7 @@ export function HistoryView({
       return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
         className: "history-page-scroll",
         onScroll: handleHistoryScroll,
-        style: { flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: '134px 16px 16px' }
+        style: historyScrollStyle
       }, /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
         /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
           /*#__PURE__*/React.createElement("button", {
@@ -2252,7 +2303,9 @@ export function HistoryView({
             )
           ),
           /*#__PURE__*/React.createElement("div", {
-            style: { display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: 'auto' }
+            style: typeof getListEditActionWrapStyle === 'function'
+              ? getListEditActionWrapStyle(isMemoryEditMode, isMobile)
+              : { display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: 'auto', width: isMemoryEditMode && isMobile ? '100%' : 'auto' }
           },
             isMemoryEditMode
               ? /*#__PURE__*/React.createElement(React.Fragment, null,
@@ -2321,7 +2374,7 @@ export function HistoryView({
     historyTab === 'people' && !selectedPersonTag && /*#__PURE__*/React.createElement("div", {
       className: "history-page-scroll",
       onScroll: handleHistoryScroll,
-      style: { flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: '134px 16px 16px' }
+      style: historyScrollStyle
     }, /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '16px' } },
       // 새 인물 태그 추가 -- 벤또 그리드 위로 이동(추가 즉시 그리드에 반영되는 걸 바로 보기
       // 쉽도록). 기존 .form-input/.btn-primary만으로는 패딩/높이/모서리가 다른 입력·버튼과
@@ -2404,7 +2457,7 @@ export function HistoryView({
     historyTab === 'people' && !!selectedPersonTag && /*#__PURE__*/React.createElement("div", {
       className: "history-page-scroll",
       onScroll: handleHistoryScroll,
-      style: { flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: '134px 16px 16px' }
+      style: historyScrollStyle
     }, /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
         /*#__PURE__*/React.createElement("button", {
@@ -2584,6 +2637,23 @@ export function ContentView({
   const InlineSearchBar = __comp.InlineSearchBar || __deps.InlineSearchBar;
   const LocateFixedIcon = __comp.LocateFixedIcon || __deps.LocateFixedIcon;
   const UnderlineTabs = __comp.UnderlineTabs || __deps.UnderlineTabs;
+  const PAGE_HEADER_ICON_BTN_STYLE = __comp.PAGE_HEADER_ICON_BTN_STYLE || __deps.PAGE_HEADER_ICON_BTN_STYLE || {
+    background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
+    color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+  };
+  const PAGE_HEADER_BACK_BTN_STYLE = __comp.PAGE_HEADER_BACK_BTN_STYLE || __deps.PAGE_HEADER_BACK_BTN_STYLE || {
+    width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'transparent', border: 'none',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)', flexShrink: 0
+  };
+  const PAGE_HEADER_ACTIONS_WRAP_STYLE = __comp.PAGE_HEADER_ACTIONS_WRAP_STYLE || __deps.PAGE_HEADER_ACTIONS_WRAP_STYLE || {
+    display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0
+  };
+  const PAGE_HEADER_TITLE_STYLE = __comp.PAGE_HEADER_TITLE_STYLE || __deps.PAGE_HEADER_TITLE_STYLE || {
+    position: 'absolute', left: '50%', transform: 'translateX(-50%)',
+    display: 'flex', alignItems: 'center', fontWeight: 800, fontSize: '0.95rem',
+    color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+    maxWidth: 'calc(100vw - 120px)', pointerEvents: 'none'
+  };
 
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
@@ -2891,26 +2961,19 @@ export function ContentView({
     },
       /*#__PURE__*/React.createElement("button", {
         type: "button", onClick: onBack, "aria-label": "뒤로가기",
-        style: {
-          width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'transparent', border: 'none',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)'
-        }
+        style: PAGE_HEADER_BACK_BTN_STYLE
       }, BackArrowIcon ? /*#__PURE__*/React.createElement(BackArrowIcon, { size: 22 }) : "←"),
       /*#__PURE__*/React.createElement("div", {
-        style: {
-          position: 'absolute', left: '50%', transform: 'translateX(-50%)',
-          display: 'flex', alignItems: 'center', fontWeight: 800, fontSize: '0.95rem',
-          color: 'var(--text-main)', whiteSpace: 'nowrap', pointerEvents: 'none'
-        }
+        style: PAGE_HEADER_TITLE_STYLE
       }, calendar.title, " 컨텐츠"),
-      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+      /*#__PURE__*/React.createElement("div", { style: PAGE_HEADER_ACTIONS_WRAP_STYLE },
         /*#__PURE__*/React.createElement("button", {
           type: "button", onClick: () => setIsSearchOpen(v => !v), title: "컨텐츠 검색", "aria-label": "컨텐츠 검색",
-          style: { background: 'none', border: 'none', cursor: 'pointer', padding: '6px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }
-        }, SearchIcon ? /*#__PURE__*/React.createElement(SearchIcon, null) : "🔍"),
+          style: PAGE_HEADER_ICON_BTN_STYLE
+        }, SearchIcon ? /*#__PURE__*/React.createElement(SearchIcon, { size: 20 }) : "🔍"),
         /*#__PURE__*/React.createElement("button", {
           type: "button", onClick: () => setIsMenuOpen(true), title: "메뉴", "aria-label": "메뉴 열기",
-          style: { background: 'none', border: 'none', cursor: 'pointer', padding: '6px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }
+          style: PAGE_HEADER_ICON_BTN_STYLE
         }, ThreeLinesIcon ? /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 22 }) : "≡")
       )
     ),

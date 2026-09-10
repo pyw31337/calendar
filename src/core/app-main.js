@@ -163,6 +163,12 @@ import { createPhotoCommentStore } from './photo-comment-store.js';
 import { useGalleryPhotoIndex, invalidatePhotoIndexCache, rememberPhotoIndexTags, schedulePhotoIndexTagReload } from './photo-index.js';
 import { useGalleryArchiveState } from './gallery-archive-state.js';
 import { cloneConfirmedMeetings, commitConfirmedMeetingChanges } from './confirmed-meeting-coordinator.js';
+import {
+  buildMetadataTags as buildPhotoMetadataTags,
+  parseNominatimLocation,
+  todayUploadTagOptions,
+  withUploadDateTag
+} from './photo-metadata-tags.js';
 import { getInitialAppView, buildAppViewUrl } from './app-routing-state.js';
 import { useNotificationPwaState } from './notification-pwa-state.js';
 import { useDisplayPreferences, useMainHeaderState } from './app-shell-state.js';
@@ -3245,7 +3251,7 @@ function CalendarApp() {
             text: chatInput.trim(),
             timestamp: Date.now(),
             uploadSource: 'chat',
-            images: chatImages.map(image => ({ originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob })),
+            images: chatImages.map(image => ({ originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob, metadata: image.metadata || null })),
             ...(replyToPayload ? { replyTo: replyToPayload } : {})
           }
         });
@@ -3261,6 +3267,7 @@ function CalendarApp() {
       if (fileCount > 0) {
         setChatUploadProgress({ pct: 8, remainingSec: null, label: '파일 업로드 중...', current: 1, total: fileCount });
         uploadedFileAttachments = await uploadChatFileAttachments(activeCalId, chatFileAttachments, setChatUploadProgress);
+        uploadedFileAttachments = uploadedFileAttachments.map(item => item ? { ...item, tags: withUploadDateTag(item.tags) } : item);
       }
       if (imageCount === 0) {
         const messageOperationId = `chat_${activeCalId}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -3308,7 +3315,7 @@ function CalendarApp() {
             thumbUrl: chunkImages[0].thumbUrl,
             imageUrls: chunkImages.map(r => r.imageUrl),
             thumbUrls: chunkImages.map(r => r.thumbUrl),
-            imageTags: chunkImages.map(r => buildMetadataTags(r.metadata)),
+            imageTags: chunkImages.map(r => buildMetadataTags(r.metadata, todayUploadTagOptions())),
             timestamp: baseTimestamp + i,
             uploadSource: 'chat'
           };
@@ -3407,7 +3414,7 @@ function CalendarApp() {
           payload: {
             participantId: fallbackParticipantId,
             text: '갤러리 사진', timestamp: Date.now(), uploadSource: 'gallery',
-            images: compressed.map(image => ({ originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob }))
+            images: compressed.map(image => ({ originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob, metadata: image.metadata || null }))
           }
         });
         if (!queued) throw new Error('갤러리 사진 오프라인 저장 공간이 부족합니다.');
@@ -3441,7 +3448,7 @@ function CalendarApp() {
           thumbUrl: chunkImages[0].thumbUrl,
           imageUrls: chunkImages.map(r => r.imageUrl),
           thumbUrls: chunkImages.map(r => r.thumbUrl),
-          imageTags: chunkImages.map(r => buildMetadataTags(r.metadata)),
+          imageTags: chunkImages.map(r => buildMetadataTags(r.metadata, todayUploadTagOptions())),
           timestamp: now + i,
           // Marks this message as gallery-uploaded (vs typed into the chat composer) so the
           // Lightbox info panel can show "갤러리에서 업로드됨" instead of "채팅방에서 업로드됨".
@@ -3530,8 +3537,12 @@ function CalendarApp() {
       storagePath: String(item?.storagePath || '').trim(),
       uploadedAt: Number(item?.uploadedAt) || Date.now(),
       id: String(item?.id || '').trim(),
-      ext: String(item?.ext || '').trim()
+      ext: String(item?.ext || '').trim(),
+      tags: String(item?.tags || '').trim()
     })).filter(Boolean);
+    files.forEach((item, index) => {
+      files[index] = { ...item, tags: withUploadDateTag(item.tags) };
+    });
     if (!files.length) {
       showToast('공유 파일 정보가 불완전합니다. 모아엘가에서 파일을 다시 일괄공유한 뒤 붙여넣어 주세요.', 'error');
       return false;
@@ -3802,7 +3813,7 @@ function CalendarApp() {
       const pendingFiles = incomingFiles.filter(f => f && f.file);
       if (pendingFiles.length && typeof uploadChatFileAttachments === 'function') {
         const uploaded = await uploadChatFileAttachments(calId, pendingFiles, hasNewImages || pendingFiles.length ? setChatUploadProgress : null);
-        uploadedFileAttachments = uploadedFileAttachments.concat(uploaded || []);
+        uploadedFileAttachments = uploadedFileAttachments.concat((uploaded || []).map(item => item ? { ...item, tags: withUploadDateTag(item.tags) } : item));
       }
 
       const data = {
@@ -6130,7 +6141,7 @@ function CalendarApp() {
       { places: nextPlaces, settingsFields: ['places'] }
     );
   };
-  const handleDeletePlace = async (placeId) => {
+  const handleDeletePlace = async (placeId, options) => {
     if (!activeCal || !placeId) return false;
     const existingPlaces = getCalendarPlaces(activeCal);
     const deletedPlace = existingPlaces.find(p => p.id === placeId);
@@ -6158,7 +6169,7 @@ function CalendarApp() {
       settingsFields: ['places'],
       deletedPlaceIds: [placeId]
     });
-    if (ok) {
+    if (ok && !(options && options.silent)) {
       showUndoableDeleteToast('장소가 삭제되었습니다.', async () => {
         try {
           const restoreNow = Date.now();
@@ -8925,21 +8936,31 @@ async function extractPhotoMetadata(file) {
   const lat = Number(exif.latitude), lon = Number(exif.longitude);
   if (Number.isFinite(lat) && Number.isFinite(lon)) {
     result.latitude = Number(lat.toFixed(6)); result.longitude = Number(lon.toFixed(6));
-    const key = `${lat.toFixed(3)},${lon.toFixed(3)}`;
-    if (photoLocationCache.has(key)) result.location = photoLocationCache.get(key);
-    else {
+    const key = `${lat.toFixed(4)},${lon.toFixed(4)}`;
+    if (photoLocationCache.has(key)) {
+      const cached = photoLocationCache.get(key);
+      if (cached && typeof cached === 'object') {
+        if (cached.location) result.location = cached.location;
+        if (Array.isArray(cached.locationTags) && cached.locationTags.length) result.locationTags = cached.locationTags.slice();
+      } else if (cached) {
+        result.location = cached;
+      }
+    } else {
       try {
         const waitMs = Math.max(0, 1100 - (Date.now() - photoLocationRequestAt));
         if (waitMs) await new Promise(resolve => setTimeout(resolve, waitMs));
         photoLocationRequestAt = Date.now();
-        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=jsonv2&accept-language=ko&zoom=10`, { headers: { 'Accept': 'application/json' } });
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=jsonv2&addressdetails=1&accept-language=ko&zoom=18`,
+          { headers: { Accept: 'application/json', 'User-Agent': 'GatherCalendar/1.0 (https://github.com/pyw31337/calendar)' } }
+        );
         if (response.ok) {
-          const address = await response.json();
-          const a = address?.address || {};
-          const country = String(a.country || '').trim();
-          const location = [(country === '대한민국' || country.toLowerCase() === 'south korea') ? '' : country, a.province || a.state || a.city, a.city || a.county || a.municipality]
-            .filter(Boolean).filter((v, i, arr) => arr.indexOf(v) === i).join(' ').replace(/\s+/g, ' ').trim().slice(0, 80);
-          if (location) { photoLocationCache.set(key, location); result.location = location; }
+          const parsed = parseNominatimLocation(await response.json());
+          if (parsed.location || (parsed.locationTags && parsed.locationTags.length)) {
+            photoLocationCache.set(key, parsed);
+            if (parsed.location) result.location = parsed.location;
+            if (parsed.locationTags.length) result.locationTags = parsed.locationTags;
+          }
         }
       } catch (_) {}
     }
@@ -8947,54 +8968,8 @@ async function extractPhotoMetadata(file) {
   return result;
 }
 
-function buildMetadataTags(metadata, scheduledDate = '') {
-  const tags = [];
-  const add = value => {
-    let t = String(value || '').trim().replace(/\s+/g, ' ');
-    if (!t) return;
-    if (!t.startsWith('#')) t = `#${t.replace(/^#+/, '')}`;
-    if (!tags.includes(t)) tags.push(t);
-  };
-  if (scheduledDate && /^\d{4}-\d{2}-\d{2}$/.test(scheduledDate)) add(dateStrToHashtag(scheduledDate));
-  const captured = String(metadata?.capturedAt || '').slice(0, 10);
-  if (/^\d{4}-\d{2}-\d{2}$/.test(captured)) add(dateStrToHashtag(captured));
-  if (metadata?.location) add(metadata.location);
-  if (metadata?.device) {
-    const raw = String(metadata.device).replace(/\s+/g, ' ').trim();
-    const lower = raw.toLowerCase();
-    let deviceTag = '';
-    if (lower.includes('iphone')) {
-      const model = raw.match(/iphone\s*([0-9]+(?:\s*pro(?:\s*max)?|\s*plus|\s*mini)?)/i);
-      deviceTag = model ? `아이폰${model[1].replace(/\s+/g, '').replace(/pro/i, '프로').replace(/max/i, '맥스').replace(/plus/i, '플러스').replace(/mini/i, '미니')}` : '아이폰';
-    } else if (lower.includes('galaxy') || /^sm[- ]/i.test(raw)) {
-      // Samsung EXIF stores opaque codes (for example SM-F916N). Never expose those
-      // codes, nor the generic manufacturer name, as user-facing hashtags. Only emit a
-      // Korean product name when the code is in this verified map.
-      const samsungModels = [
-        [/SM-F916[A-Z0-9]*/i, '갤럭시Z폴드2'],
-        [/SM-F926[A-Z0-9]*/i, '갤럭시Z폴드3'],
-        [/SM-F936[A-Z0-9]*/i, '갤럭시Z폴드4'],
-        [/SM-F946[A-Z0-9]*/i, '갤럭시Z폴드5'],
-        [/SM-F956[A-Z0-9]*/i, '갤럭시Z폴드6'],
-        [/SM-F700[A-Z0-9]*/i, '갤럭시Z플립'],
-        [/SM-F711[A-Z0-9]*/i, '갤럭시Z플립3'],
-        [/SM-F721[A-Z0-9]*/i, '갤럭시Z플립4'],
-        [/SM-F731[A-Z0-9]*/i, '갤럭시Z플립5'],
-        [/SM-F741[A-Z0-9]*/i, '갤럭시Z플립6'],
-        [/SM-S911[A-Z0-9]*/i, '갤럭시S23'],
-        [/SM-S921[A-Z0-9]*/i, '갤럭시S24'],
-        [/SM-S931[A-Z0-9]*/i, '갤럭시S25']
-      ];
-      const mapped = samsungModels.find(([pattern]) => pattern.test(raw));
-      if (mapped) deviceTag = mapped[1];
-      else {
-        const model = raw.match(/(?:galaxy\s*)?(z\s*(?:fold|flip)\s*\d+|s\s*\d+|note\s*\d+)/i);
-        if (model) deviceTag = `갤럭시${model[1].replace(/\s+/g, '').replace(/fold/i, '폴드').replace(/flip/i, '플립').replace(/note/i, '노트')}`;
-      }
-    }
-    if (deviceTag) add(deviceTag);
-  }
-  return tags.join(' ');
+function buildMetadataTags(metadata, scheduledDateOrOptions = '') {
+  return buildPhotoMetadataTags(metadata, scheduledDateOrOptions);
 }
 
 async function buildBase64FallbackFromCompressed(compressed) {
@@ -11595,12 +11570,23 @@ function loadMapLibreLeaflet() {
   if (mapLibreLeafletLoadPromise) return mapLibreLeafletLoadPromise;
   mapLibreLeafletLoadPromise = (async () => {
     const L = await loadLeaflet();
-    const [mapLibreModule] = await Promise.all([
+    // MapLibre GL JS 6 is ESM-only. 6.4.1+ patches GHSA-jrc7-96c5-q579 (CVE-2026-85061).
+    // The Leaflet bridge ESM build imports maplibre-gl itself and assigns L.maplibreGL.
+    const [mapLibreModule, , leafletBridge] = await Promise.all([
       import('maplibre-gl'),
-      import('maplibre-gl/dist/maplibre-gl.css')
+      import('maplibre-gl/dist/maplibre-gl.css'),
+      import('@maplibre/maplibre-gl-leaflet')
     ]);
-    window.maplibregl = mapLibreModule.default || mapLibreModule;
-    await import('@maplibre/maplibre-gl-leaflet');
+    if (typeof mapLibreModule.setWorkerUrl === 'function') {
+      try {
+        const workerUrlMod = await import('maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url');
+        if (workerUrlMod?.default) mapLibreModule.setWorkerUrl(workerUrlMod.default);
+      } catch (_) { /* Vite can still resolve the worker via import.meta.url */ }
+    }
+    window.maplibregl = mapLibreModule;
+    const maplibreGL = leafletBridge.maplibreGL || leafletBridge.default;
+    if (!L.maplibreGL && typeof maplibreGL === 'function') L.maplibreGL = maplibreGL;
+    if (leafletBridge.MaplibreGL && !L.MaplibreGL) L.MaplibreGL = leafletBridge.MaplibreGL;
     if (!L.maplibreGL) throw new Error('MapLibre Leaflet bridge loaded without maplibreGL');
     return L;
   })().catch(err => {

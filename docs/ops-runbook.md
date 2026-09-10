@@ -5,9 +5,13 @@
 ## 1. 배포
 1. 로컬 검증: `npm run check:all`, `npm run safety:test`, `npm run build`
 2. main push → `Deploy Vite Pages` + `Verify Calendar`
-3. 배포 후: `npm run smoke:live`
-4. Firebase Functions 변경이 포함된 경우 GitHub Pages 배포와 별도로 functions 배포 여부를 확인
+3. 배포 후: `npm run smoke:live` (HTTPS Cloud Functions `rebuildPhotoIndex` / `kakaoLocalSearchProxy` / `listPublicCalendarSummaries` / `onMessagePhotoIndexWrite` 존재 여부도 같이 확인)
+4. Firebase Functions 코드가 바뀐 경우에만 `firebase deploy --only functions`를 수동 실행한다. GitHub Actions는 Functions를 배포하지 않는다. 2026-09-10 기준 `rebuildPhotoIndex`와 photoIndex Firestore 트리거는 프로덕션에 이미 올라가 있다.
 5. 운영 데이터 점검: `npm run ops:audit`, `npm run ops:media-audit`
+
+### 지도 보안 (MapLibre)
+- `maplibre-gl`은 **6.9.0+** (GHSA-jrc7-96c5-q579 / CVE-2026-85061, attribution XSS). 5.x는 패치가 없고, `npm audit --force`로 6.9.0만 올리면 Leaflet 브릿지 0.1.3이 깨진다.
+- 장소 지도는 `@maplibre/maplibre-gl-leaflet` **0.1.4** ESM 브릿지 + Vite worker URL(`setWorkerUrl`)을 쓴다. 5.x로 되돌리지 말 것.
 
 ## 2. 안전 태그
 현재 주요 태그:

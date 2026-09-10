@@ -868,6 +868,78 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
 
 
 
+  const GATHER_PLACES_FRAGMENT_PREFIX = '#gatherPlaces=';
+  const GATHER_PLACES_MAX_SHARE = 50;
+
+  // Local calendar ids look like `place_${calId}_${now}_…`. Pasting those back as
+  // sourcePlaceId would make handleSavePlace merge into an existing record instead
+  // of cloning. Only keep ids that came from an external search (Kakao/Google/Nominatim).
+  function isExternalPlaceSourceId(value) {
+    const id = String(value || '').trim();
+    if (!id || id.length > 120) return false;
+    if (/^place_/i.test(id)) return false;
+    return true;
+  }
+
+  function isValidGatherPlaceLatLng(lat, lng) {
+    const la = Number(lat);
+    const ln = Number(lng);
+    return Number.isFinite(la) && Number.isFinite(ln) && la >= -90 && la <= 90 && ln >= -180 && ln <= 180;
+  }
+
+  function sanitizePlaceForGatherShare(place) {
+    if (!place || typeof place !== 'object') return null;
+    const name = String(place.name || '').trim().slice(0, 80);
+    const lat = Number(place.lat);
+    const lng = Number(place.lng);
+    if (!name || !isValidGatherPlaceLatLng(lat, lng)) return null;
+    const visitDate = /^\d{4}-\d{2}-\d{2}$/.test(String(place.visitDate || '')) ? String(place.visitDate) : '';
+    const categoryId = String(place.categoryId || 'etc').trim().slice(0, 40) || 'etc';
+    return {
+      name,
+      alias: String(place.alias || '').trim().slice(0, 80),
+      address: String(place.address || '').trim().slice(0, 240),
+      lat,
+      lng,
+      categoryId,
+      memo: String(place.memo || '').slice(0, 2000),
+      visitStatus: place.visitStatus === 'planned' ? 'planned' : 'visited',
+      visitDate,
+      sourcePlaceId: isExternalPlaceSourceId(place.sourcePlaceId) ? String(place.sourcePlaceId).trim().slice(0, 120) : ''
+    };
+  }
+
+  function encodeGatherPlacesFragment(places) {
+    try {
+      const cleaned = (places || []).map(sanitizePlaceForGatherShare).filter(Boolean).slice(0, GATHER_PLACES_MAX_SHARE);
+      if (!cleaned.length) return '';
+      const payload = { v: 1, kind: 'gather-places', places: cleaned };
+      const json = JSON.stringify(payload);
+      const b64 = typeof btoa === 'function' ? btoa(unescape(encodeURIComponent(json))) : '';
+      return b64 ? GATHER_PLACES_FRAGMENT_PREFIX + b64 : '';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function parseGatherPlacesClipboardText(text) {
+    const raw = String(text || '').trim();
+    if (!/^https?:\/\//i.test(raw)) return null;
+    const markerIndex = raw.indexOf(GATHER_PLACES_FRAGMENT_PREFIX);
+    if (markerIndex === -1) return null;
+    const b64 = raw.slice(markerIndex + GATHER_PLACES_FRAGMENT_PREFIX.length);
+    try {
+      const json = decodeURIComponent(escape(atob(b64)));
+      const payload = JSON.parse(json);
+      if (!payload || payload.kind !== 'gather-places' || payload.v !== 1 || !Array.isArray(payload.places)) return null;
+      const places = payload.places.map(sanitizePlaceForGatherShare).filter(Boolean).slice(0, GATHER_PLACES_MAX_SHARE);
+      return places.length ? places : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+
   function trimLatLngOutliers(points) {
     if (!Array.isArray(points) || points.length <= 5) return points || [];
     const lats = points.map(p => p[0]).slice().sort((a, b) => a - b);
@@ -1125,6 +1197,13 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
     countPlaceVisits,
     getPlaceMemoEntryForDate,
     doesPlaceMatchDate,
+    GATHER_PLACES_FRAGMENT_PREFIX,
+    GATHER_PLACES_MAX_SHARE,
+    isExternalPlaceSourceId,
+    isValidGatherPlaceLatLng,
+    sanitizePlaceForGatherShare,
+    encodeGatherPlacesFragment,
+    parseGatherPlacesClipboardText,
     trimLatLngOutliers,
     parseSharePathFromLocation,
     getAppBaseUrl,

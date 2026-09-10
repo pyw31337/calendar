@@ -1311,7 +1311,7 @@ export function MemoSectionIcon({ size = 20 } = {}) {
   );
 }
 
-export function ThreeLinesIcon({ size = 18 } = {}) {
+export function ThreeLinesIcon({ size = 22 } = {}) {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("svg", {

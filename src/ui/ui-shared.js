@@ -452,6 +452,131 @@ export function UnderlineTabs({ options = [], value, onChange, ariaLabel, classN
   }));
 }
 
+// Edit-mode selection checkbox. Spec taken from gallery 링크/파일 cards:
+// 8px inset, 20×20, radius 5. `onMedia` is the dark chip on photos/thumbnails;
+// `onCard` is the light chip on white list cards (장소).
+export function EditSelectCheckbox({ checked = false, variant = 'onMedia' } = {}) {
+  const React = window.React;
+  const onMedia = variant !== 'onCard';
+  return React.createElement('span', {
+    'aria-hidden': true,
+    className: 'edit-select-checkbox',
+    style: {
+      position: 'absolute',
+      top: '8px',
+      left: '8px',
+      width: '20px',
+      height: '20px',
+      borderRadius: '5px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      pointerEvents: 'none',
+      zIndex: 4,
+      boxShadow: onMedia ? '0 1px 3px rgba(0,0,0,0.35)' : '0 1px 3px rgba(0,0,0,0.15)',
+      border: checked ? 'none' : (onMedia ? '2px solid rgba(255,255,255,0.95)' : '2px solid var(--border-strong, #94A3B8)'),
+      backgroundColor: checked ? 'var(--accent-primary)' : (onMedia ? 'rgba(0,0,0,0.35)' : 'var(--bg-card)')
+    }
+  }, checked ? React.createElement('svg', {
+    xmlns: 'http://www.w3.org/2000/svg', width: '14', height: '14', viewBox: '0 0 24 24',
+    fill: 'none', stroke: '#fff', strokeWidth: '3', strokeLinecap: 'round', strokeLinejoin: 'round'
+  }, React.createElement('path', { d: 'M20 6 9 17l-5-5' })) : null);
+}
+
+// Idle: 추가/편집 sit on the right. Edit: 제거/붙여넣기/일괄공유/취소.
+// Mobile edit fills the row because 전체|일자 is hidden. Desktop stays content-sized
+// so the four actions read as buttons, not a stretched bar.
+export function getListEditActionWrapStyle(isEdit, isMobile) {
+  return {
+    display: 'flex',
+    alignItems: 'center',
+    gap: isMobile ? '4px' : '6px',
+    flexShrink: 0,
+    minWidth: 0,
+    flexWrap: 'nowrap',
+    justifyContent: 'flex-end',
+    marginLeft: 'auto',
+    width: isEdit && isMobile ? '100%' : 'auto'
+  };
+}
+
+export function getListEditTextBtnStyle(isMobile, isEdit) {
+  return {
+    height: '44px',
+    minHeight: '44px',
+    minWidth: '44px',
+    padding: isMobile ? '0 8px' : '0 14px',
+    borderRadius: 'var(--radius-md)',
+    fontSize: isMobile ? 'var(--font-size-sm)' : 'var(--font-size-md)',
+    fontWeight: 900,
+    cursor: 'pointer',
+    flex: isEdit && isMobile ? 1 : '0 0 auto',
+    flexShrink: 0,
+    whiteSpace: 'nowrap',
+    boxSizing: 'border-box'
+  };
+}
+
+export const LIST_TOOLBAR_ROW_STYLE = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: '8px',
+  padding: '12px 0 4px',
+  minWidth: 0,
+  flexWrap: 'nowrap',
+  flexShrink: 0
+};
+
+export const PAGE_HEADER_ICON_BTN_STYLE = {
+  background: 'none',
+  border: 'none',
+  cursor: 'pointer',
+  padding: '6px',
+  color: 'var(--text-muted)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  flexShrink: 0
+};
+
+export const PAGE_HEADER_BACK_BTN_STYLE = {
+  width: '36px',
+  height: '36px',
+  borderRadius: '50%',
+  backgroundColor: 'transparent',
+  border: 'none',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  cursor: 'pointer',
+  color: 'var(--text-muted)',
+  flexShrink: 0
+};
+
+export const PAGE_HEADER_ACTIONS_WRAP_STYLE = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '8px',
+  flexShrink: 0
+};
+
+export const PAGE_HEADER_TITLE_STYLE = {
+  position: 'absolute',
+  left: '50%',
+  transform: 'translateX(-50%)',
+  display: 'flex',
+  alignItems: 'center',
+  fontWeight: 800,
+  fontSize: '0.95rem',
+  color: 'var(--text-main)',
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  maxWidth: 'calc(100vw - 120px)',
+  pointerEvents: 'none'
+};
+
 export function SegmentedToggle({ options, value, onChange, disabled, style, ariaLabel }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -1708,6 +1833,14 @@ export function ResizableListSection({
     FormAddEditActionButtons: FormAddEditActionButtons,
     SegmentedToggle: SegmentedToggle,
     UnderlineTabs: UnderlineTabs,
+    EditSelectCheckbox: EditSelectCheckbox,
+    getListEditActionWrapStyle: getListEditActionWrapStyle,
+    getListEditTextBtnStyle: getListEditTextBtnStyle,
+    LIST_TOOLBAR_ROW_STYLE: LIST_TOOLBAR_ROW_STYLE,
+    PAGE_HEADER_ICON_BTN_STYLE: PAGE_HEADER_ICON_BTN_STYLE,
+    PAGE_HEADER_BACK_BTN_STYLE: PAGE_HEADER_BACK_BTN_STYLE,
+    PAGE_HEADER_ACTIONS_WRAP_STYLE: PAGE_HEADER_ACTIONS_WRAP_STYLE,
+    PAGE_HEADER_TITLE_STYLE: PAGE_HEADER_TITLE_STYLE,
     ItemEditDeleteActions: ItemEditDeleteActions,
     GamifiedConfirmButtonContent: GamifiedConfirmButtonContent,
     SyncStatusChip: SyncStatusChip,

@@ -1,12 +1,21 @@
 /* Replay helpers for media messages kept in the durable write queue. Firebase-specific work is
  * injected by app-main so this module remains small and independently testable. */
 
+import { buildMetadataTags, todayUploadTagOptions } from './photo-metadata-tags.js';
+
 export async function replayQueuedMediaMessage(operation, { resolveImages, chunkImages, writeMessage } = {}) {
   const payload = operation?.payload;
   if (!payload || typeof resolveImages !== 'function' || typeof chunkImages !== 'function' || typeof writeMessage !== 'function') return false;
-  const compressed = (Array.isArray(payload.images) ? payload.images : []).map(image => ({ original: '', thumbnail: '', originalBlob: image.originalBlob, thumbnailBlob: image.thumbnailBlob }));
+  const compressed = (Array.isArray(payload.images) ? payload.images : []).map(image => ({
+    original: '',
+    thumbnail: '',
+    originalBlob: image.originalBlob,
+    thumbnailBlob: image.thumbnailBlob,
+    metadata: image.metadata || null
+  }));
   if (compressed.length === 0) return false;
   const chunks = chunkImages(await resolveImages(operation.calendarId, compressed));
+  const tagOptions = todayUploadTagOptions(new Date(Number(payload.timestamp) || Date.now()));
   for (let i = 0; i < chunks.length; i += 1) {
     const images = chunks[i];
     const result = await writeMessage(operation.calendarId, {
@@ -16,6 +25,7 @@ export async function replayQueuedMediaMessage(operation, { resolveImages, chunk
       thumbUrl: images[0].thumbUrl,
       imageUrls: images.map(image => image.imageUrl),
       thumbUrls: images.map(image => image.thumbUrl),
+      imageTags: images.map(image => buildMetadataTags(image.metadata, tagOptions)),
       timestamp: (Number(payload.timestamp) || Date.now()) + i,
       ...(payload.uploadSource ? { uploadSource: payload.uploadSource } : {}),
       ...(i === 0 && payload.replyTo ? { replyTo: payload.replyTo } : {})

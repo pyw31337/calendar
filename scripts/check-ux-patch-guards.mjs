@@ -43,6 +43,24 @@ assert.equal(utils.derivePlaceVisitStatus({ memo: "그냥 메모" }), "planned")
 assert.equal(utils.getPlaceMemoEntryForDate("그냥 메모", "2026-09-09"), "");
 assert.equal(utils.getPlaceMemoEntryForDate("26.09.09 점심", "2026-09-09"), "점심");
 
+assert.equal(typeof utils.encodeGatherPlacesFragment, "function", "encodeGatherPlacesFragment exported");
+assert.equal(utils.isExternalPlaceSourceId("kakao:1"), true);
+assert.equal(utils.isExternalPlaceSourceId("place_cw_1_x"), false);
+{
+  const fragment = utils.encodeGatherPlacesFragment([{
+    id: "place_cw_1_x",
+    name: "테스트 장소",
+    lat: 37.5,
+    lng: 126.9,
+    sourcePlaceId: "place_cw_1_x"
+  }]);
+  const parsed = utils.parseGatherPlacesClipboardText(`https://example.test/${fragment}`);
+  assert.equal(parsed.length, 1);
+  assert.equal(parsed[0].name, "테스트 장소");
+  assert.equal(parsed[0].sourcePlaceId, "");
+  assert.equal("id" in parsed[0], false);
+}
+
 const gallery = fs.readFileSync(path.join(root, "src/ui/ui-summary-gallery.js"), "utf8");
 assert.match(gallery, /category === \x27movie\x27/);
 assert.match(gallery, /isNowShowing/);

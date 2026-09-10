@@ -480,6 +480,32 @@ export function ChatGalleryModal({
   const PlusIcon = __comp.PlusIcon || __deps.PlusIcon;
   const PencilIcon = __comp.PencilIcon || __deps.PencilIcon;
   const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
+  const SearchIcon = __comp.SearchIcon || __deps.SearchIcon;
+  const ThreeLinesIcon = __comp.ThreeLinesIcon || __deps.ThreeLinesIcon;
+  const EditSelectCheckbox = __comp.EditSelectCheckbox || __deps.EditSelectCheckbox;
+  const getListEditActionWrapStyle = __comp.getListEditActionWrapStyle || __deps.getListEditActionWrapStyle;
+  const getListEditTextBtnStyle = __comp.getListEditTextBtnStyle || __deps.getListEditTextBtnStyle;
+  const LIST_TOOLBAR_ROW_STYLE = __comp.LIST_TOOLBAR_ROW_STYLE || __deps.LIST_TOOLBAR_ROW_STYLE || {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    gap: '8px', padding: '12px 0 4px', minWidth: 0, flexWrap: 'nowrap', flexShrink: 0
+  };
+  const PAGE_HEADER_ICON_BTN_STYLE = __comp.PAGE_HEADER_ICON_BTN_STYLE || __deps.PAGE_HEADER_ICON_BTN_STYLE || {
+    background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
+    color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+  };
+  const PAGE_HEADER_BACK_BTN_STYLE = __comp.PAGE_HEADER_BACK_BTN_STYLE || __deps.PAGE_HEADER_BACK_BTN_STYLE || {
+    width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'transparent', border: 'none',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)', flexShrink: 0
+  };
+  const PAGE_HEADER_ACTIONS_WRAP_STYLE = __comp.PAGE_HEADER_ACTIONS_WRAP_STYLE || __deps.PAGE_HEADER_ACTIONS_WRAP_STYLE || {
+    display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0
+  };
+  const PAGE_HEADER_TITLE_STYLE = __comp.PAGE_HEADER_TITLE_STYLE || __deps.PAGE_HEADER_TITLE_STYLE || {
+    position: 'absolute', left: '50%', transform: 'translateX(-50%)',
+    display: 'flex', alignItems: 'center', fontWeight: 800, fontSize: '0.95rem',
+    color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+    maxWidth: 'calc(100vw - 120px)', pointerEvents: 'none'
+  };
   const PhotoCommentCountBadge = __comp.PhotoCommentCountBadge || __deps.PhotoCommentCountBadge || function InlinePhotoCommentCountBadge({ count = 0 } = {}) {
     if (!count) return null;
     return React.createElement('span', {
@@ -808,11 +834,14 @@ export function ChatGalleryModal({
   const filteredFiles = React.useMemo(() => {
     if (!searchQuery.trim()) return sharedFiles;
     const q = searchQuery.toLowerCase().trim();
+    const qNoHash = q.replace(/^#/, '');
     return sharedFiles.filter(item => {
       const name = String(item.name || '').toLowerCase();
       const mime = String(item.mime || '').toLowerCase();
       const ext = String(item.ext || '').toLowerCase();
-      return name.includes(q) || mime.includes(q) || ext.includes(q);
+      const tags = String(item.tags || '').toLowerCase();
+      return name.includes(q) || mime.includes(q) || ext.includes(q)
+        || tags.includes(q) || tags.includes(qNoHash) || tags.replace(/#/g, '').includes(qNoHash);
     });
   }, [sharedFiles, searchQuery]);
 
@@ -1262,11 +1291,13 @@ export function ChatGalleryModal({
       borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center',
       cursor: 'pointer', flexShrink: 0, boxSizing: 'border-box', aspectRatio: '1 / 1'
     };
-    const textBtn = {
-      height: '44px', minHeight: '44px', minWidth: '44px', padding: '0 16px',
-      borderRadius: 'var(--radius-md)', fontSize: isMobile ? 'var(--font-size-sm)' : 'var(--font-size-md)', fontWeight: 900,
-      cursor: 'pointer', flex: 1, flexShrink: 0, whiteSpace: 'nowrap', boxSizing: 'border-box'
-    };
+    const textBtn = typeof getListEditTextBtnStyle === 'function'
+      ? getListEditTextBtnStyle(isMobile, isBulkShareMode)
+      : {
+          height: '44px', minHeight: '44px', minWidth: '44px', padding: isMobile ? '0 8px' : '0 14px',
+          borderRadius: 'var(--radius-md)', fontSize: isMobile ? 'var(--font-size-sm)' : 'var(--font-size-md)', fontWeight: 900,
+          cursor: 'pointer', flex: isBulkShareMode && isMobile ? 1 : '0 0 auto', flexShrink: 0, whiteSpace: 'nowrap', boxSizing: 'border-box'
+        };
     if (!isBulkShareMode) {
       return /*#__PURE__*/React.createElement(React.Fragment, null,
         onAdd ? /*#__PURE__*/React.createElement("button", {
@@ -1818,19 +1849,21 @@ export function ChatGalleryModal({
       style: { position: 'relative', animationDelay: `${(idx % 7) * 0.9}s` }
     },
       thumb,
-      isBulkShareMode && /*#__PURE__*/React.createElement("span", {
+      isBulkShareMode && (EditSelectCheckbox
+        ? /*#__PURE__*/React.createElement(EditSelectCheckbox, { checked: isChecked, variant: "onMedia" })
+        : /*#__PURE__*/React.createElement("span", {
         "aria-hidden": true,
         style: {
-          position: 'absolute', top: '4px', left: '4px', width: '20px', height: '20px', borderRadius: '5px',
-          border: isChecked ? 'none' : '2px solid rgba(255,255,255,0.9)',
+          position: 'absolute', top: '8px', left: '8px', width: '20px', height: '20px', borderRadius: '5px',
+          border: isChecked ? 'none' : '2px solid rgba(255,255,255,0.95)',
           backgroundColor: isChecked ? 'var(--accent-primary)' : 'rgba(0,0,0,0.35)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.4)', pointerEvents: 'none'
+          boxShadow: '0 1px 3px rgba(0,0,0,0.35)', pointerEvents: 'none'
         }
       }, isChecked && /*#__PURE__*/React.createElement("svg", {
         xmlns: "http://www.w3.org/2000/svg", width: "14", height: "14", viewBox: "0 0 24 24",
         fill: "none", stroke: "#fff", strokeWidth: "3", strokeLinecap: "round", strokeLinejoin: "round"
-      }, /*#__PURE__*/React.createElement("path", { d: "M20 6 9 17l-5-5" }))),
+      }, /*#__PURE__*/React.createElement("path", { d: "M20 6 9 17l-5-5" })))),
       commentBadge
     );
   }));
@@ -1850,7 +1883,9 @@ export function ChatGalleryModal({
         style: { position: 'relative', width: '100%', cursor: 'pointer', outline: isChecked ? '2px solid var(--accent-primary)' : 'none', borderRadius: 'var(--radius-md)' }
       },
         card,
-        /*#__PURE__*/React.createElement("span", {
+        EditSelectCheckbox
+          ? /*#__PURE__*/React.createElement(EditSelectCheckbox, { checked: isChecked, variant: "onMedia" })
+          : /*#__PURE__*/React.createElement("span", {
           "aria-hidden": true,
           style: {
             position: 'absolute', top: '8px', left: '8px', width: '20px', height: '20px', borderRadius: '5px',
@@ -1887,7 +1922,9 @@ export function ChatGalleryModal({
       style: { position: 'relative', width: '100%', maxWidth: '100%', boxSizing: 'border-box', cursor: isBulkShareMode ? 'pointer' : 'default', outline: isChecked ? '2px solid var(--accent-primary)' : 'none', borderRadius: 'var(--radius-md)' }
     },
       card,
-      isBulkShareMode && /*#__PURE__*/React.createElement("span", {
+      isBulkShareMode && (EditSelectCheckbox
+        ? /*#__PURE__*/React.createElement(EditSelectCheckbox, { checked: isChecked, variant: "onMedia" })
+        : /*#__PURE__*/React.createElement("span", {
         "aria-hidden": true,
         style: {
           position: 'absolute', top: '8px', left: '8px', width: '20px', height: '20px', borderRadius: '5px',
@@ -1899,15 +1936,15 @@ export function ChatGalleryModal({
       }, isChecked && /*#__PURE__*/React.createElement("svg", {
         xmlns: "http://www.w3.org/2000/svg", width: "14", height: "14", viewBox: "0 0 24 24",
         fill: "none", stroke: "#fff", strokeWidth: "3", strokeLinecap: "round", strokeLinejoin: "round"
-      }, /*#__PURE__*/React.createElement("path", { d: "M20 6 9 17l-5-5" })))
+      }, /*#__PURE__*/React.createElement("path", { d: "M20 6 9 17l-5-5" }))))
     );
   }));
   const renderFileListHeader = () => /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: isMobile ? '6px' : '8px', marginBottom: '4px', minWidth: 0, flexWrap: 'nowrap' }
+    style: { ...LIST_TOOLBAR_ROW_STYLE, gap: isMobile ? '6px' : '8px' }
   },
-    !isBulkShareMode && renderVisitFilterToggleMobile(),
+    (!isBulkShareMode || !isMobile) && renderVisitFilterToggleMobile(),
     /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '6px', flexShrink: 0, flexWrap: 'nowrap', justifyContent: isBulkShareMode ? 'stretch' : 'flex-end', marginLeft: isBulkShareMode ? 0 : 'auto', flex: isBulkShareMode ? 1 : undefined, width: isBulkShareMode ? '100%' : undefined }
+      style: typeof getListEditActionWrapStyle === 'function' ? getListEditActionWrapStyle(isBulkShareMode, isMobile) : { display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '6px', flexShrink: 0, flexWrap: 'nowrap', justifyContent: isBulkShareMode ? 'stretch' : 'flex-end', marginLeft: isBulkShareMode ? 0 : 'auto', flex: isBulkShareMode ? 1 : undefined, width: isBulkShareMode && isMobile ? '100%' : 'auto' }
     },
       renderGalleryActionButtons({ onAdd: handleUploadClick, onPaste: handlePasteGalleryUpload })
     )
@@ -2127,30 +2164,24 @@ export function ChatGalleryModal({
     }, tab.label))
   );
   const renderPhotoListHeader = () => /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      gap: isMobile ? '6px' : '8px', marginBottom: '4px', minWidth: 0,
-      flexWrap: 'nowrap'
-    }
+    style: { ...LIST_TOOLBAR_ROW_STYLE, gap: isMobile ? '6px' : '8px' }
   },
-    !isBulkShareMode && renderVisitFilterToggleMobile(),
+    (!isBulkShareMode || !isMobile) && renderVisitFilterToggleMobile(),
     /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '6px', flexShrink: 0, minWidth: 0, flexWrap: 'nowrap', justifyContent: isBulkShareMode ? 'stretch' : 'flex-end', marginLeft: isBulkShareMode ? 0 : 'auto', flex: isBulkShareMode ? 1 : undefined, width: isBulkShareMode ? '100%' : undefined }
+      style: typeof getListEditActionWrapStyle === 'function' ? getListEditActionWrapStyle(isBulkShareMode, isMobile) : { display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '6px', flexShrink: 0, minWidth: 0, flexWrap: 'nowrap', justifyContent: isBulkShareMode ? 'stretch' : 'flex-end', marginLeft: isBulkShareMode ? 0 : 'auto', flex: isBulkShareMode ? 1 : undefined, width: isBulkShareMode && isMobile ? '100%' : 'auto' }
     },
       renderGalleryActionButtons({ onAdd: handleUploadClick, onPaste: handlePasteGalleryUpload })
     )
   );
   const renderLinkListHeader = () => /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '4px'
-    }
+    style: { display: 'flex', flexDirection: 'column', gap: '8px' }
   },
     /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: isMobile ? '6px' : '8px', minWidth: 0, flexWrap: 'nowrap' }
+      style: { ...LIST_TOOLBAR_ROW_STYLE, gap: isMobile ? '6px' : '8px' }
     },
-      !isBulkShareMode && renderVisitFilterToggleMobile(),
+      (!isBulkShareMode || !isMobile) && renderVisitFilterToggleMobile(),
       /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '6px', flexShrink: 0, flexWrap: 'nowrap', justifyContent: isBulkShareMode ? 'stretch' : 'flex-end', marginLeft: isBulkShareMode ? 0 : 'auto', flex: isBulkShareMode ? 1 : undefined, width: isBulkShareMode ? '100%' : undefined }
+        style: typeof getListEditActionWrapStyle === 'function' ? getListEditActionWrapStyle(isBulkShareMode, isMobile) : { display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '6px', flexShrink: 0, flexWrap: 'nowrap', justifyContent: isBulkShareMode ? 'stretch' : 'flex-end', marginLeft: isBulkShareMode ? 0 : 'auto', flex: isBulkShareMode ? 1 : undefined, width: isBulkShareMode && isMobile ? '100%' : 'auto' }
       },
         renderGalleryActionButtons({ onAdd: handleToggleAddLink, onPaste: handlePasteLinkFromClipboard, addDisabled: isSavingLink, pasteDisabled: isSavingLink })
       )
@@ -2349,42 +2380,26 @@ export function ChatGalleryModal({
       ? /*#__PURE__*/React.createElement(React.Fragment, null,
           /*#__PURE__*/React.createElement("button", {
             type: "button", onClick: onClose, "aria-label": "뒤로가기",
-            style: {
-              width: '36px', height: '36px', borderRadius: '50%', background: 'transparent', border: 'none',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)', flexShrink: 0
-            }
+            style: PAGE_HEADER_BACK_BTN_STYLE
           }, /*#__PURE__*/React.createElement(BackArrowIcon, { size: 22 })),
           /*#__PURE__*/React.createElement("div", {
-            style: {
-              position: 'absolute', left: '50%', transform: 'translateX(-50%)',
-              display: 'flex', alignItems: 'center', fontWeight: 800, fontSize: '0.95rem',
-              color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden',
-              textOverflow: 'ellipsis', maxWidth: 'calc(100vw - 120px)', pointerEvents: 'none'
-            }
+            style: PAGE_HEADER_TITLE_STYLE
           }, formatChatHeaderTitle(calendar?.title) ? formatChatHeaderTitle(calendar?.title) + " 갤러리" : "갤러리"),
           /*#__PURE__*/React.createElement("div", {
-            style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }
+            style: PAGE_HEADER_ACTIONS_WRAP_STYLE
           },
             /*#__PURE__*/React.createElement("button", {
               type: "button",
               onClick: () => setIsSearchOpen(prev => { if (prev) setSearchQuery(''); return !prev; }),
               title: "갤러리 검색", "aria-label": "갤러리 검색",
-              style: {
-                background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
-                color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-              }
-            }, /*#__PURE__*/React.createElement("svg", {
-              xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true
-            }, /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /*#__PURE__*/React.createElement("path", { d: "m21 21-4.3-4.3" }))),
+              style: PAGE_HEADER_ICON_BTN_STYLE
+            }, SearchIcon ? /*#__PURE__*/React.createElement(SearchIcon, { size: 20 }) : "🔍"),
             /*#__PURE__*/React.createElement("button", {
               type: "button",
               onClick: () => setIsMenuOpen(true),
               title: "갤러리 메뉴", "aria-label": "갤러리 메뉴 열기",
-              style: {
-                background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
-                color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-              }
-            }, renderMenuIcon())
+              style: PAGE_HEADER_ICON_BTN_STYLE
+            }, ThreeLinesIcon ? /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 22 }) : renderMenuIcon())
           )
         )
       : /*#__PURE__*/React.createElement(React.Fragment, null,
@@ -2595,9 +2610,9 @@ export function ChatGalleryModal({
             `calc(${(!isHeaderVisible
               ? '12px'
               : (isSearchOpen ? '156px' : '108px'))} + env(safe-area-inset-top, 0px))`
-            + ' 20px 16px 20px'
+            + ' 16px 16px 16px'
           )
-        : '16px 20px',
+        : '16px',
       display: 'flex', flexDirection: 'column', gap: '12px', boxSizing: 'border-box',
       minWidth: 0
     }

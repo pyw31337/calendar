@@ -19,7 +19,7 @@ const BUDGETS = [
 
 // Chunks matching these patterns are loaded lazily/on-demand only -- never part of the
 // initial page load. vendor-map bundles maplibre-gl + leaflet + leaflet.markercluster +
-// the maplibre/leaflet bridge (together ~1.1MB), pulled in only via dynamic import() when
+// the maplibre/leaflet bridge (together ~1.2MB plus a ~670KB MapLibre worker chunk), pulled in only via dynamic import() when
 // a user actually opens the 장소(지도) picker (verified: no static "import ... from
 // 'leaflet'|'maplibre-gl'" anywhere in src -- app-main.js and ui-places.js only reach them
 // through `await import(...)`). Counting an on-demand-only vendor bundle against the same
@@ -28,6 +28,7 @@ const BUDGETS = [
 // visibility, but excluded from TOTAL_JS_MAX_BYTES.
 const LAZY_CHUNK_PATTERNS = [
   /^vendor-map-.*\.js$/,
+  /^maplibre-gl-worker-.*\.js$/,
   /^ui-admin-.*\.js$/,
   /^ui-user-manual-.*\.js$/,
   /^ui-chat-room-.*\.js$/,
