@@ -16,6 +16,7 @@ import {
   deleteGalleryLinkItems,
   filterDeletedPhotoFromIndexItems
 } from './gallery-bulk-delete.js';
+import { filterOutMemoryExclusionKeys } from './gallery-data.js';
 import exifr from 'exifr';
 import {
   computeKoreanHolidaysForYear,
@@ -2159,7 +2160,7 @@ function CalendarApp() {
   // 위 handleRemovePhotoFromTravelMemory의 일괄(여러 장) 버전 -- 추억 상세 페이지의 편집 모드에서
   // 체크박스로 여러 장을 골라 한 번에 제외할 때 쓴다. 장 수만큼 반복 호출하는 대신 병합된 제외
   // 목록 하나로 한 번만 쓴다.
-  const handleRemovePhotosFromTravelMemory = async (anniversaryId, photoKeys) => {
+  const handleRemovePhotosFromTravelMemory = async (anniversaryId, photoKeys, photoCount) => {
     if (!activeCal?.id || !anniversaryId || !Array.isArray(photoKeys) || photoKeys.length === 0) return false;
     const ann = (anniversaries || []).find(a => a.id === anniversaryId);
     const existing = Array.isArray(ann?.excludedMemoryPhotoKeys) ? ann.excludedMemoryPhotoKeys : [];
@@ -2169,7 +2170,8 @@ function CalendarApp() {
       const saved = await writeCollectionDocumentWithFallback('anniversaries', activeCal.id, anniversaryId, { excludedMemoryPhotoKeys: next }, 'update', '추억에서 사진 일괄 제외');
       if (!saved?.success) throw new Error('remove photos from travel memory failed');
       handleAnniversarySaved({ id: anniversaryId, excludedMemoryPhotoKeys: next });
-      showToast(`사진 ${photoKeys.length}장을 추억에서 제외했습니다.`, 'success');
+      const shown = Number.isFinite(photoCount) && photoCount > 0 ? photoCount : null;
+      showToast(shown ? `사진 ${shown}장을 추억에서 제외했습니다.` : '선택한 사진을 추억에서 제외했습니다.', 'success');
       return true;
     } catch (err) {
       console.error('Failed to bulk-remove photos from travel memory:', err);
@@ -2214,18 +2216,18 @@ function CalendarApp() {
 
   // 추억 탭의 "추가" -- handleRemovePhotosFromTravelMemory로 제외했던 사진을 다시 이 추억에
   // 넣을 수 있게, excludedMemoryPhotoKeys에서 골라낸 키들만 제거한다.
-  const handleAddPhotosBackToTravelMemory = async (anniversaryId, photoKeys) => {
+  const handleAddPhotosBackToTravelMemory = async (anniversaryId, photoKeys, photoCount) => {
     if (!activeCal?.id || !anniversaryId || !Array.isArray(photoKeys) || photoKeys.length === 0) return false;
     const ann = (anniversaries || []).find(a => a.id === anniversaryId);
     const existing = Array.isArray(ann?.excludedMemoryPhotoKeys) ? ann.excludedMemoryPhotoKeys : [];
-    const remove = new Set(photoKeys);
-    const next = existing.filter(k => !remove.has(k));
+    const next = filterOutMemoryExclusionKeys(existing, photoKeys);
     if (next.length === existing.length) return true;
     try {
       const saved = await writeCollectionDocumentWithFallback('anniversaries', activeCal.id, anniversaryId, { excludedMemoryPhotoKeys: next }, 'update', '추억에 사진 다시 추가');
       if (!saved?.success) throw new Error('add photos back to travel memory failed');
       handleAnniversarySaved({ id: anniversaryId, excludedMemoryPhotoKeys: next });
-      showToast(`사진 ${photoKeys.length}장을 추억에 다시 추가했습니다.`, 'success');
+      const shown = Number.isFinite(photoCount) && photoCount > 0 ? photoCount : null;
+      showToast(shown ? `사진 ${shown}장을 추억에 다시 추가했습니다.` : '선택한 사진을 추억에 다시 추가했습니다.', 'success');
       return true;
     } catch (err) {
       console.error('Failed to add photos back to travel memory:', err);

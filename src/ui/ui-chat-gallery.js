@@ -1283,16 +1283,13 @@ export function ChatGalleryModal({
     }
     return /*#__PURE__*/React.createElement(React.Fragment, null,
       /*#__PURE__*/React.createElement("button", {
-        type: "button", className: "btn btn-action btn-action-outline",
+        type: "button", className: "btn btn-action btn-action-danger",
         onClick: handleClickBulkDelete,
         disabled: selectedBulkShareKeys.size === 0 || isBulkDeleting,
         title: "삭제",
         "aria-label": "삭제",
         style: {
           ...iconBtn,
-          color: 'rgb(239, 68, 68)',
-          borderColor: 'rgb(239, 68, 68)',
-          backgroundColor: 'var(--bg-primary)',
           cursor: (selectedBulkShareKeys.size === 0 || isBulkDeleting) ? 'default' : 'pointer',
           opacity: (selectedBulkShareKeys.size === 0 || isBulkDeleting) ? 0.5 : 1
         }

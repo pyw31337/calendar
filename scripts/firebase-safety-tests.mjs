@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import { GATHER_APP_UTILS, omitUndefinedDeep } from '../src/core/app-utils.js';
 import { calculateSettlementRows } from '../src/core/settlement-calculator.js';
 import { fetchPhotoComments, savePhotoComments } from '../src/core/photo-comments.js';
-import { composeGalleryPhotos, paginateGalleryItems, getPaginationWindow, dedupeGalleryPhotoEntries, getGalleryPhotoDedupeKeys, coerceGalleryImageIndex } from '../src/core/gallery-data.js';
+import { composeGalleryPhotos, paginateGalleryItems, getPaginationWindow, dedupeGalleryPhotoEntries, getGalleryPhotoDedupeKeys, coerceGalleryImageIndex, collectMemoryPhotoIdentityKeys, isMemoryPhotoExcluded, expandMemoryPhotoExclusionKeys, filterOutMemoryExclusionKeys, dedupeMemoryPhotoEntries } from '../src/core/gallery-data.js';
 import { filterDeletedPhotoFromIndexItems, deleteOwnedChatFileFromStorage } from '../src/core/gallery-bulk-delete.js';
 import { cloneConfirmedMeetings, commitConfirmedMeetingChanges } from '../src/core/confirmed-meeting-coordinator.js';
 import { getInitialAppView, buildAppViewUrl } from '../src/core/app-routing-state.js';
@@ -320,6 +320,38 @@ const writeQueueSource = fs.readFileSync(new URL('../src/core/app-write-queue.js
   assert(getPaginationWindow(12, 12, 5).join(',') === '8,9,10,11,12', 'last-page window stays right-aligned');
   assert(getPaginationWindow(6, 12, 5).join(',') === '4,5,6,7,8', 'odd window keeps the active page in the middle');
 }
+
+{
+  const storageUrlA = 'https://firebasestorage.googleapis.com/v0/b/ex/o/chatFiles%2Fcw%2Fphoto.jpg?alt=media&token=aaa';
+  const storageUrlB = 'https://firebasestorage.googleapis.com/v0/b/ex/o/chatFiles%2Fcw%2Fphoto.jpg?alt=media&token=bbb';
+  const chatCopy = {
+    source: 'chat', messageId: 'msg-1', imageIndex: 0, full: storageUrlA, thumb: storageUrlA, mediaKey: 'gallery:msg-1:0'
+  };
+  const meetingCopy = {
+    source: 'meeting', sourceMessageId: 'msg-1', sourceImageIndex: 0, full: storageUrlB, thumb: storageUrlB,
+    mediaKey: 'meeting-index:2026-09-05:p1', photoId: 'p1', meetingDate: '2026-09-05'
+  };
+  const otherPhoto = {
+    source: 'chat', messageId: 'msg-2', imageIndex: 0, full: 'https://example.com/other.jpg', mediaKey: 'gallery:msg-2:0'
+  };
+  const expanded = expandMemoryPhotoExclusionKeys([chatCopy], ['slot:msg-1:0'], getPhotoAssetCommentKey);
+  assert(expanded.matchedCount === 1, 'excluding one memory photo must count 1 photo, not N identity keys');
+  assert(expanded.keys.includes('gallery:msg-1:0'), 'exclusion must persist gallery mediaKey aliases');
+  assert(isMemoryPhotoExcluded(meetingCopy, expanded.keys, getPhotoAssetCommentKey), 'same photo with rotated token/mediaKey must stay excluded from that memory');
+  assert(isMemoryPhotoExcluded(meetingCopy, ['gallery:msg-1:0'], getPhotoAssetCommentKey), 'legacy gallery:msg:idx exclusion must still match after reindex');
+  assert(!isMemoryPhotoExcluded(otherPhoto, expanded.keys, getPhotoAssetCommentKey), 'unrelated photos must not inherit another memory exclusion');
+  assert(!isMemoryPhotoExcluded(chatCopy, ['unrelated-key'], getPhotoAssetCommentKey), 'same-day sibling anniversary without the key must still show the shared schedule photo');
+  const leftover = filterOutMemoryExclusionKeys(
+    [...expanded.keys, storageUrlA],
+    collectMemoryPhotoIdentityKeys(meetingCopy, getPhotoAssetCommentKey)
+  );
+  assert(leftover.length === 0, 'add-back must drop every alias including leftover token URLs');
+  const deduped = dedupeMemoryPhotoEntries([chatCopy, meetingCopy], getPhotoAssetCommentKey);
+  assert(deduped.length === 1, 'chat+meeting copies of one memory photo must collapse');
+  const mergedIds = collectMemoryPhotoIdentityKeys(deduped[0], getPhotoAssetCommentKey);
+  assert(mergedIds.includes('gallery:msg-1:0') && mergedIds.includes('slot:msg-1:0'), 'merged memory photo must keep chat and meeting identities');
+}
+
 assert(writeQueueSource.includes('nextAttemptAt: Number(operation.nextAttemptAt) || 0'), 'queued operations must persist retry backoff metadata');
 assert(writeQueueSource.includes("await deferOperation(operation, new Error('대기 저장이 완료되지 않았습니다.'))"), 'false queue handler results must be deferred with backoff');
 const appMainSource = fs.readFileSync(new URL('../src/core/app-main.js', import.meta.url), 'utf8');
@@ -332,6 +364,12 @@ assert(lightboxSource.includes('태그를 입력해 주세요'), 'empty lightbox
 assert(appMainSource.includes('coerceTagImageIndex'), 'image tag persistence must coerce non-integer imageIndex values');
 assert(chatGallerySource.includes("source === 'memo'"), 'indexed memo photos must recover messageId for tag save');
 assert(summaryGallerySource.includes('composeGalleryPhotos'), 'main-screen PhotoGallery must compose via shared gallery dedupe');
+assert(summaryGallerySource.includes('renderMemoryAllDateToggle'), 'memories tab must reuse the gallery 전체|일자 toggle');
+assert(summaryGallerySource.includes('renderMemoryTrashButton'), 'memories edit mode must show a red trash action instead of 제외 text');
+assert(summaryGallerySource.includes('isMemoryPhotoExcluded'), 'memory groups must filter excluded photos by durable identity keys');
+assert(summaryGallerySource.includes('expandMemoryPhotoExclusionKeys'), 'memory exclude/add-back must expand every identity alias before write');
+assert(appMainSource.includes('filterOutMemoryExclusionKeys'), 'adding a photo back to a memory must drop leftover identity aliases');
+assert(chatGallerySource.includes('btn-action-danger'), 'gallery bulk delete must use the red danger outline, not the black outline override');
 assert(appMainSource.includes('coerceIndex') && appMainSource.includes('resolveMeetingPhotoDisplay'), 'meeting photo display must coerce sourceImageIndex for gallery identity');
 
 

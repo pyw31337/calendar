@@ -279,6 +279,7 @@ export function DateModal({
   const MediaThumb = __comp.MediaThumb || __deps.MediaThumb;
   const PhotoCommentCountBadge = __comp.PhotoCommentCountBadge || __deps.PhotoCommentCountBadge;
   const PencilIcon = __comp.PencilIcon || __deps.PencilIcon;
+  const PlusIcon = __comp.PlusIcon || __deps.PlusIcon;
   const CakeIcon = __comp.CakeIcon || __deps.CakeIcon;
   const BalloonIcon = __comp.BalloonIcon || __deps.BalloonIcon;
   const ConfettiIcon = __comp.ConfettiIcon || __deps.ConfettiIcon;
@@ -3242,7 +3243,8 @@ export function DateModal({
             onClick: handlePasteMeetingPhotos,
             title: hasClipboardImage ? undefined : '클립보드에 붙여넣을 이미지가 없습니다.',
             style: {
-              height: '36px',
+              height: '44px',
+              minHeight: '44px',
               padding: '0 12px',
               borderRadius: 'var(--radius-md)',
               fontSize: 'var(--font-size-md)',
@@ -3255,15 +3257,14 @@ export function DateModal({
             className: "btn btn-action btn-action-dark",
             disabled: isSavingMeetingPhotos,
             onClick: () => meetingPhotoInputRef.current && meetingPhotoInputRef.current.click(),
+            title: "추가",
+            "aria-label": "추가",
             style: {
-              height: '36px',
-              padding: '0 12px',
-              borderRadius: 'var(--radius-md)',
-              fontSize: 'var(--font-size-md)',
-              fontWeight: 900,
-              cursor: isSavingMeetingPhotos ? 'wait' : 'pointer'
+              height: '44px', minHeight: '44px', width: '44px', minWidth: '44px', maxWidth: '44px', padding: 0,
+              borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: isSavingMeetingPhotos ? 'wait' : 'pointer', flexShrink: 0, boxSizing: 'border-box', aspectRatio: '1 / 1'
             }
-          }, isSavingMeetingPhotos ? "업로드 중..." : "추가")
+          }, isSavingMeetingPhotos ? "..." : (PlusIcon ? /*#__PURE__*/React.createElement(PlusIcon, { size: 16 }) : "+"))
         )
       ),
       /* Empty State or Photo Grid */

@@ -40,6 +40,157 @@ export function getGalleryPhotoDedupeKeys(entry, getPhotoAssetCommentKey) {
   return keys;
 }
 
+function pushNormalizedMemoryIdentityKey(keys, key) {
+  const value = typeof key === 'string' ? key.trim() : '';
+  if (!value || keys.includes(value)) return;
+  keys.push(value);
+  if (!/^https?:\/\//i.test(value) && value.indexOf('/o/') < 0) return;
+  const stripped = value.split('?')[0];
+  if (stripped && !keys.includes(stripped)) keys.push(stripped);
+  try {
+    const decoded = decodeURIComponent(stripped || value);
+    const marker = '/o/';
+    const idx = decoded.indexOf(marker);
+    if (idx >= 0) {
+      const path = decoded.slice(idx + marker.length).split('?')[0];
+      if (path && !keys.includes(path)) keys.push(path);
+    }
+  } catch (_err) { /* ignore malformed URI */ }
+}
+
+function expandStoredMemoryIdentityKey(key) {
+  const keys = [];
+  pushNormalizedMemoryIdentityKey(keys, key);
+  return keys;
+}
+
+export function collectMemoryPhotoIdentityKeys(entry, getPhotoAssetCommentKey) {
+  const keys = [];
+  const push = (key) => pushNormalizedMemoryIdentityKey(keys, key);
+  getGalleryPhotoDedupeKeys(entry, getPhotoAssetCommentKey).forEach(push);
+  push(entry?.assetKey);
+  push(entry?.photoId);
+  push(entry?.id);
+  push(entry?.imageUrl);
+  push(entry?.storagePath);
+  const sourceIdx = coerceGalleryImageIndex(entry?.sourceImageIndex);
+  const idx = coerceGalleryImageIndex(entry?.imageIndex);
+  if (entry?.sourceMessageId && sourceIdx != null) {
+    push(`chat:${entry.sourceMessageId}:${sourceIdx}`);
+    push(`gallery:${entry.sourceMessageId}:${sourceIdx}`);
+    push(`meeting-index:${entry.sourceMessageId}:${sourceIdx}`);
+  }
+  if (entry?.messageId && idx != null) {
+    push(`chat:${entry.messageId}:${idx}`);
+    push(`gallery:${entry.messageId}:${idx}`);
+  }
+  if (entry?.photoId) push(`meeting-index:${entry.photoId}`);
+  (Array.isArray(entry?.legacyKeys) ? entry.legacyKeys : []).forEach(push);
+  return keys;
+}
+
+export function isMemoryPhotoExcluded(entry, excludedKeys, getPhotoAssetCommentKey) {
+  const excluded = excludedKeys instanceof Set ? excludedKeys : new Set(Array.isArray(excludedKeys) ? excludedKeys : []);
+  if (!excluded.size) return false;
+  const excludedAll = new Set();
+  excluded.forEach((key) => expandStoredMemoryIdentityKey(key).forEach((item) => excludedAll.add(item)));
+  return collectMemoryPhotoIdentityKeys(entry, getPhotoAssetCommentKey).some(key => excludedAll.has(key));
+}
+
+export function expandMemoryPhotoExclusionKeys(photos, selectedKeys, getPhotoAssetCommentKey) {
+  const selected = selectedKeys instanceof Set ? selectedKeys : new Set(Array.isArray(selectedKeys) ? selectedKeys : []);
+  const out = [];
+  const push = (key) => pushNormalizedMemoryIdentityKey(out, key);
+  let matchedCount = 0;
+  (Array.isArray(photos) ? photos : []).forEach((photo, idx) => {
+    const ids = collectMemoryPhotoIdentityKeys(photo, getPhotoAssetCommentKey);
+    const uiKey = ids[0] || `${photo?.mediaKey || photo?.refKey || 'idx'}:${idx}`;
+    const matched = selected.has(uiKey) || ids.some(key => selected.has(key));
+    if (!matched) return;
+    matchedCount += 1;
+    ids.forEach(push);
+    push(uiKey);
+  });
+  return { keys: out, matchedCount };
+}
+
+export function filterOutMemoryExclusionKeys(existingKeys, identityKeys) {
+  const existing = Array.isArray(existingKeys) ? existingKeys : [];
+  const identity = new Set();
+  (identityKeys instanceof Set ? Array.from(identityKeys) : (Array.isArray(identityKeys) ? identityKeys : [])).forEach((key) => {
+    expandStoredMemoryIdentityKey(key).forEach((item) => identity.add(item));
+  });
+  if (!identity.size) return existing.slice();
+  return existing.filter((key) => !expandStoredMemoryIdentityKey(key).some((item) => identity.has(item)));
+}
+
+export function mergeMemoryPhotoIdentity(preferred, other, getPhotoAssetCommentKey) {
+  const merged = { ...(preferred || {}) };
+  const donor = other || {};
+  if (!merged.meetingDate && donor.meetingDate) merged.meetingDate = donor.meetingDate;
+  if (!merged.messageId && donor.messageId) merged.messageId = donor.messageId;
+  if (!merged.sourceMessageId && donor.sourceMessageId) merged.sourceMessageId = donor.sourceMessageId;
+  if (coerceGalleryImageIndex(merged.imageIndex) == null && coerceGalleryImageIndex(donor.imageIndex) != null) {
+    merged.imageIndex = coerceGalleryImageIndex(donor.imageIndex);
+  }
+  if (coerceGalleryImageIndex(merged.sourceImageIndex) == null && coerceGalleryImageIndex(donor.sourceImageIndex) != null) {
+    merged.sourceImageIndex = coerceGalleryImageIndex(donor.sourceImageIndex);
+  }
+  if (!merged.photoId && donor.photoId) merged.photoId = donor.photoId;
+  if (!merged.id && donor.id) merged.id = donor.id;
+  if (!merged.mediaKey && donor.mediaKey) merged.mediaKey = donor.mediaKey;
+  if (!merged.refKey && donor.refKey) merged.refKey = donor.refKey;
+  if (!merged.assetKey && donor.assetKey) merged.assetKey = donor.assetKey;
+  if (!merged.imageUrl && donor.imageUrl) merged.imageUrl = donor.imageUrl;
+  if (!merged.storagePath && donor.storagePath) merged.storagePath = donor.storagePath;
+  if (donor.full && (!merged.full || (merged.thumb && merged.full === merged.thumb && donor.full !== donor.thumb))) {
+    merged.full = donor.full;
+  }
+  if (donor.thumb && !merged.thumb) merged.thumb = donor.thumb;
+  const union = [];
+  collectMemoryPhotoIdentityKeys(merged, getPhotoAssetCommentKey).forEach((key) => pushNormalizedMemoryIdentityKey(union, key));
+  collectMemoryPhotoIdentityKeys(donor, getPhotoAssetCommentKey).forEach((key) => pushNormalizedMemoryIdentityKey(union, key));
+  merged.legacyKeys = union;
+  return merged;
+}
+
+export function dedupeMemoryPhotoEntries(list, getPhotoAssetCommentKey, sourceRankFn) {
+  const sourceRank = typeof sourceRankFn === 'function'
+    ? sourceRankFn
+    : (entry) => {
+      const rank = { chat: 0, gallery: 0, memo: 1, meeting: 2, anniversary: 3 };
+      return rank[entry?.source] ?? 9;
+    };
+  const byCanonical = new Map();
+  const alias = new Map();
+  (Array.isArray(list) ? list : []).forEach((entry) => {
+    if (!entry) return;
+    const keys = collectMemoryPhotoIdentityKeys(entry, getPhotoAssetCommentKey);
+    if (!keys.length) return;
+    let canonical = null;
+    for (const key of keys) {
+      if (alias.has(key)) {
+        canonical = alias.get(key);
+        break;
+      }
+    }
+    if (canonical == null) {
+      canonical = keys[0];
+      byCanonical.set(canonical, mergeMemoryPhotoIdentity(entry, {}, getPhotoAssetCommentKey));
+      keys.forEach((key) => alias.set(key, canonical));
+      return;
+    }
+    const existing = byCanonical.get(canonical) || entry;
+    const preferNew = sourceRank(entry) < sourceRank(existing);
+    const merged = preferNew
+      ? mergeMemoryPhotoIdentity(entry, existing, getPhotoAssetCommentKey)
+      : mergeMemoryPhotoIdentity(existing, entry, getPhotoAssetCommentKey);
+    byCanonical.set(canonical, merged);
+    collectMemoryPhotoIdentityKeys(merged, getPhotoAssetCommentKey).forEach((key) => alias.set(key, canonical));
+  });
+  return Array.from(byCanonical.values());
+}
+
 export function dedupeGalleryPhotoEntries(list, getPhotoAssetCommentKey, sourceRankFn) {
   const sourceRank = typeof sourceRankFn === 'function'
     ? sourceRankFn
