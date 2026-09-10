@@ -1,0 +1,35 @@
+name: Apply upload-tags toolbar patch
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Apply gzip+hex patch
+        run: python3 patches/apply-upload-tags.py
+      - name: Verify guards
+        run: |
+          node scripts/check-design-system.mjs
+          node scripts/check-required-symbols.mjs
+          node scripts/firebase-safety-tests.mjs
+      - name: Commit and push
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git status --short
+          git commit -m "$(cat <<'EOF'
+          feat: stamp chat/gallery uploads with date and richer EXIF tags
+
+          Keep 전체|일자 on desktop edit, drop the 50% PC action bar, and
+          auto-tag chat/gallery photos and files with today's YYMMDD plus
+          Korean place/device hashtags from EXIF.
+          EOF
+          )"
+          git push origin HEAD:main
