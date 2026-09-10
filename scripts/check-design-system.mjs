@@ -29,6 +29,13 @@ requireText(chatGallery, /minWidth: '44px', padding: '0 16px'/, 'gallery text ac
 if (/padding: isMobile \? '0 6px'/.test(chatGallery)) failures.push('gallery text actions must not use 6px mobile padding that makes 취소 taller than wide');
 requireText(picker, /!isMemoryListEditMode && renderMemoryAllDateToggle\(\)/, 'memories edit mode must hide 전체|일자 like gallery');
 requireText(picker, /minWidth: '44px', padding: '0 16px'/, 'memories 취소 must stay at least 1:1');
+const placesView = read('src/ui/ui-places.js');
+requireText(placesView, /places-list-toolbar/, 'places list toolbar (전체|방문|예정 + 추가/편집) missing');
+requireText(placesView, /!isBulkShareMode && renderPlacesVisitFilter\(\)/, 'places edit mode must hide 전체|방문|예정 so expanded actions fit');
+requireText(placesView, /minWidth: '44px', padding: '0 16px'/, 'places 취소/붙여넣기/일괄공유 must not be taller than wide');
+if (/visit-filter-toggle-desktop/.test(placesView)) failures.push('places visit filter must not stay in the header');
+requireText(picker, /btn btn-action btn-action-dark[\s\S]{0,400}추억에 추가/, 'memory-add backdrop must use the black plus icon button');
+requireText(picker, /flexDirection: 'column', gap: '6px'/, 'memory-add backdrop list spacing must stay compact');
 const chatFiles = read('src/ui/ui-chat-files.js');
 if (/minWidth: ["']28px["']/.test(chatFiles)) failures.push('PDF zoom controls must not be narrower than their height');
 requireText(chatFiles, /minWidth: "32px", padding: "0 8px"/, 'PDF zoom +/- buttons must be at least square');

@@ -6130,7 +6130,7 @@ function CalendarApp() {
       { places: nextPlaces, settingsFields: ['places'] }
     );
   };
-  const handleDeletePlace = async (placeId) => {
+  const handleDeletePlace = async (placeId, options) => {
     if (!activeCal || !placeId) return false;
     const existingPlaces = getCalendarPlaces(activeCal);
     const deletedPlace = existingPlaces.find(p => p.id === placeId);
@@ -6158,7 +6158,7 @@ function CalendarApp() {
       settingsFields: ['places'],
       deletedPlaceIds: [placeId]
     });
-    if (ok) {
+    if (ok && !(options && options.silent)) {
       showUndoableDeleteToast('장소가 삭제되었습니다.', async () => {
         try {
           const restoreNow = Date.now();

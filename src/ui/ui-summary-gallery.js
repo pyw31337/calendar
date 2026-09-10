@@ -2216,13 +2216,23 @@ export function HistoryView({
         /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-body" },
           availableMemoryGroups.length === 0
             ? /*#__PURE__*/React.createElement("p", { style: { color: 'var(--text-muted)', textAlign: 'center', padding: '24px 0' } }, "추가할 미등록 기념일이 없습니다.")
-            : availableMemoryGroups.map(item => /*#__PURE__*/React.createElement("button", {
-                key: item.id, type: "button", disabled: isChangingMemoryGroups, onClick: () => handleRestoreMemoryGroup(item.id),
-                style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '12px', marginBottom: '8px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', background: 'var(--bg-primary)', color: 'var(--text-main)', textAlign: 'left', cursor: 'pointer' }
-              }, /*#__PURE__*/React.createElement("span", null,
-                /*#__PURE__*/React.createElement("strong", { style: { display: 'block' } }, item.title),
-                /*#__PURE__*/React.createElement("small", { style: { color: 'var(--text-muted)' } }, formatHistoryDateRange(item.startDate, item.endDate))
-              ), /*#__PURE__*/React.createElement("span", { style: { color: 'var(--accent-primary)', fontWeight: 800 } }, "+")))
+            : /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
+                availableMemoryGroups.map(item => /*#__PURE__*/React.createElement("div", {
+                  key: item.id,
+                  style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '10px 12px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', background: 'var(--bg-primary)', color: 'var(--text-main)' }
+                }, /*#__PURE__*/React.createElement("span", { style: { minWidth: 0, flex: 1 } },
+                  /*#__PURE__*/React.createElement("strong", { style: { display: 'block' } }, item.title),
+                  /*#__PURE__*/React.createElement("small", { style: { color: 'var(--text-muted)' } }, formatHistoryDateRange(item.startDate, item.endDate))
+                ), /*#__PURE__*/React.createElement("button", {
+                  type: "button",
+                  className: "btn btn-action btn-action-dark",
+                  disabled: isChangingMemoryGroups,
+                  onClick: () => handleRestoreMemoryGroup(item.id),
+                  title: "추억에 추가",
+                  "aria-label": `${item.title} 추억에 추가`,
+                  style: memoryIconBtn
+                }, PlusIcon ? /*#__PURE__*/React.createElement(PlusIcon, { size: 16 }) : "+")))
+              )
         )
       ))
     )),

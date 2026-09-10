@@ -45,6 +45,7 @@ const requiredInUtils = [
   'normalizePlaceCategories',
   'reformatMemoIntoDateLines',
   'trimLatLngOutliers',
+  'encodeGatherPlacesFragment',
   'GATHER_APP_UTILS'
 ];
 

@@ -47,6 +47,25 @@ function renderTextWithUrlBadge(...args) {
   const f = __gatherUiDeps().renderTextWithUrlBadge || GATHER_APP_UTILS.renderTextWithUrlBadge;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function copyTextToClipboard(...args) {
+  const utils = (typeof window !== 'undefined' && window.GATHER_APP_UTILS) || GATHER_APP_UTILS || {};
+  const f = __gatherUiDeps().copyTextToClipboard || utils.copyTextToClipboard;
+  return typeof f === 'function' ? f(...args) : Promise.resolve(false);
+}
+function encodeGatherPlacesFragment(...args) {
+  const utils = (typeof window !== 'undefined' && window.GATHER_APP_UTILS) || GATHER_APP_UTILS || {};
+  const f = __gatherUiDeps().encodeGatherPlacesFragment || utils.encodeGatherPlacesFragment;
+  return typeof f === 'function' ? f(...args) : '';
+}
+function parseGatherPlacesClipboardText(...args) {
+  const utils = (typeof window !== 'undefined' && window.GATHER_APP_UTILS) || GATHER_APP_UTILS || {};
+  const f = __gatherUiDeps().parseGatherPlacesClipboardText || utils.parseGatherPlacesClipboardText;
+  return typeof f === 'function' ? f(...args) : null;
+}
+function getGatherPlacesMaxShare() {
+  const utils = (typeof window !== 'undefined' && window.GATHER_APP_UTILS) || GATHER_APP_UTILS || {};
+  return Number(utils.GATHER_PLACES_MAX_SHARE) || 50;
+}
 // A deliberately quiet basemap: enough coastline, water, major roads and broad place names to
 // orient the user, but no POIs, buildings, shops, transit labels or neighbourhood-level noise.
 // The source is isolated behind a normal MapLibre style object so moving it to our own PMTiles
@@ -796,6 +815,7 @@ export function PlacesView({
       const BackArrowIcon = __deps.BackArrowIcon;
   const BuildingIcon = __deps.BuildingIcon;
   const PencilIcon = __deps.PencilIcon;
+  const PlusIcon = __comp.PlusIcon || __deps.PlusIcon;
   const SearchIcon = __deps.SearchIcon;
   const SmallXIcon = __deps.SmallXIcon;
   const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
@@ -852,6 +872,13 @@ export function PlacesView({
   // only one entry across all place cards is in edit mode at a time.
   const [editingMemoEntryKey, setEditingMemoEntryKey] = React.useState(null);
   const [editingMemoEntryText, setEditingMemoEntryText] = React.useState('');
+  const [isBulkShareMode, setIsBulkShareMode] = React.useState(false);
+  const [selectedBulkShareKeys, setSelectedBulkShareKeys] = React.useState(() => new Set());
+  const [isGeneratingBulkShareUrl, setIsGeneratingBulkShareUrl] = React.useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = React.useState(false);
+  const [isSavingGatherPlacesPaste, setIsSavingGatherPlacesPaste] = React.useState(false);
+  const [gatherPlacesPastePreview, setGatherPlacesPastePreview] = React.useState(null);
+  const [bulkShareResultUrl, setBulkShareResultUrl] = React.useState('');
   const listScrollAnimRef = React.useRef(0);
 
   React.useEffect(() => {
@@ -922,6 +949,234 @@ export function PlacesView({
   const handleEditPlace = place => {
     setEditingPlace(place);
     setIsRegisterOpen(true);
+  };
+  const toggleBulkShareSelected = key => {
+    if (!key) return;
+    setSelectedBulkShareKeys(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+  const handleToggleBulkShareMode = () => {
+    setIsBulkShareMode(v => !v);
+    setSelectedBulkShareKeys(new Set());
+  };
+  const handleClickBulkDelete = () => {
+    const keys = Array.from(selectedBulkShareKeys);
+    if (!keys.length || isBulkDeleting || typeof onDeletePlace !== 'function') return;
+    const keySet = new Set(keys);
+    const selected = (places || []).filter(place => keySet.has(place.id));
+    const count = selected.length;
+    if (!count) return;
+    const run = async () => {
+      setIsBulkDeleting(true);
+      try {
+        let deleted = 0;
+        for (const place of selected) {
+          const ok = await Promise.resolve(onDeletePlace(place.id, { silent: true }));
+          if (ok !== false) deleted += 1;
+        }
+        if (showToast) showToast(deleted ? `장소 ${deleted}개를 삭제했습니다.` : '삭제할 장소를 처리하지 못했습니다.', deleted ? 'success' : 'error');
+        setSelectedBulkShareKeys(new Set());
+        if (deleted) setIsBulkShareMode(false);
+      } finally {
+        setIsBulkDeleting(false);
+      }
+    };
+    const message = `선택한 장소 ${count}개를 이 캘린더에서 삭제하시겠습니까? 다른 캘린더 원본은 그대로 둡니다.`;
+    if (typeof onRequestConfirm === 'function') onRequestConfirm('삭제', message, run);
+    else void run();
+  };
+  const handleClickBulkShare = async () => {
+    const keys = Array.from(selectedBulkShareKeys);
+    if (!keys.length || isGeneratingBulkShareUrl) return;
+    if (keys.length > getGatherPlacesMaxShare()) {
+      if (showToast) showToast(`한 번에 ${getGatherPlacesMaxShare()}개까지 공유할 수 있습니다.`, 'error');
+      return;
+    }
+    const keySet = new Set(keys);
+    const selected = (places || []).filter(place => keySet.has(place.id));
+    if (!selected.length) {
+      if (showToast) showToast('공유할 장소를 선택해 주세요.', 'error');
+      return;
+    }
+    setIsGeneratingBulkShareUrl(true);
+    try {
+      const fragment = encodeGatherPlacesFragment(selected);
+      if (!fragment) {
+        if (showToast) showToast('공유 URL 생성 실패', 'error');
+        return;
+      }
+      const shareUrl = `${window.location.origin}${window.location.pathname}${fragment}`;
+      const ok = await copyTextToClipboard(shareUrl);
+      setBulkShareResultUrl(shareUrl);
+      setIsBulkShareMode(false);
+      setSelectedBulkShareKeys(new Set());
+      if (showToast) showToast(ok ? `장소 ${selected.length}개 공유 URL이 복사되었습니다.` : 'URL 생성은 됐지만 복사에 실패했습니다.', ok ? 'success' : 'error');
+    } finally {
+      setIsGeneratingBulkShareUrl(false);
+    }
+  };
+  const offerGatherPlacesPaste = (incoming) => {
+    const placesToPaste = Array.isArray(incoming) ? incoming : null;
+    if (!placesToPaste || !placesToPaste.length) return false;
+    setGatherPlacesPastePreview(placesToPaste);
+    return true;
+  };
+  const handlePastePlacesFromClipboard = async (e) => {
+    if (e) e.stopPropagation();
+    if (isSavingGatherPlacesPaste) return;
+    let clipboardText = '';
+    try { clipboardText = await navigator.clipboard.readText(); } catch (_) { /* not granted/available */ }
+    const parsed = parseGatherPlacesClipboardText(clipboardText);
+    if (!parsed) {
+      if (showToast) showToast('클립보드에 장소 공유 URL이 없습니다.', 'error');
+      return;
+    }
+    offerGatherPlacesPaste(parsed);
+  };
+  const handleConfirmGatherPlacesPaste = async () => {
+    if (!gatherPlacesPastePreview || typeof onSavePlace !== 'function' || isSavingGatherPlacesPaste) return;
+    setIsSavingGatherPlacesPaste(true);
+    try {
+      let added = 0;
+      for (const place of gatherPlacesPastePreview) {
+        const ok = await Promise.resolve(onSavePlace({
+          name: place.name,
+          alias: place.alias || '',
+          address: place.address || '',
+          lat: place.lat,
+          lng: place.lng,
+          categoryId: place.categoryId || 'etc',
+          memo: place.memo || '',
+          visitStatus: place.visitStatus === 'planned' ? 'planned' : 'visited',
+          visitDate: place.visitDate || '',
+          sourcePlaceId: place.sourcePlaceId || ''
+        }));
+        if (ok !== false) added += 1;
+      }
+      if (showToast) showToast(added ? `장소 ${added}개를 붙여넣었습니다.` : '장소 붙여넣기에 실패했습니다.', added ? 'success' : 'error');
+      if (added) setGatherPlacesPastePreview(null);
+    } finally {
+      setIsSavingGatherPlacesPaste(false);
+    }
+  };
+  React.useEffect(() => {
+    const handlePaste = e => {
+      const target = e.target;
+      if (target && ((target.closest && target.closest('input, textarea, select, [contenteditable="true"]')) || target.isContentEditable)) return;
+      const text = e.clipboardData ? e.clipboardData.getData('text/plain') : '';
+      const parsed = parseGatherPlacesClipboardText(text);
+      if (!parsed) return;
+      e.preventDefault();
+      setIsPlacesMenuOpen(false);
+      offerGatherPlacesPaste(parsed);
+    };
+    document.addEventListener('paste', handlePaste);
+    return () => document.removeEventListener('paste', handlePaste);
+  }, []);
+  React.useEffect(() => {
+    const onKey = e => {
+      if (e.key !== 'Escape') return;
+      const target = e.target;
+      if (target && ((target.closest && target.closest('input, textarea, select, [contenteditable="true"]')) || target.isContentEditable)) return;
+      if (isRegisterOpen) return;
+      if (gatherPlacesPastePreview) { setGatherPlacesPastePreview(null); e.preventDefault(); return; }
+      if (bulkShareResultUrl) { setBulkShareResultUrl(''); e.preventDefault(); return; }
+      if (isBulkShareMode) {
+        setIsBulkShareMode(false);
+        setSelectedBulkShareKeys(new Set());
+        e.preventDefault();
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [isRegisterOpen, gatherPlacesPastePreview, bulkShareResultUrl, isBulkShareMode]);
+  const renderPlacesVisitFilter = () => /*#__PURE__*/React.createElement("div", {
+    className: "visit-filter-toggle-mobile",
+    style: {
+      display: 'inline-flex', alignItems: 'center', height: '44px', boxSizing: 'border-box',
+      padding: '3px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)',
+      backgroundColor: 'var(--bg-card)', flexShrink: 0, overflow: 'hidden'
+    }
+  },
+    [
+      { key: 'all', label: '전체' },
+      { key: 'visited', label: '방문' },
+      { key: 'planned', label: '예정' }
+    ].map(tab => /*#__PURE__*/React.createElement("button", {
+      key: tab.key,
+      type: "button",
+      onClick: () => setVisitFilter(tab.key),
+      style: {
+        height: '100%', boxSizing: 'border-box', padding: '0 12px', fontSize: 'var(--font-size-md)', fontWeight: 900,
+        borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer',
+        backgroundColor: visitFilter === tab.key ? '#4F46E5' : 'transparent',
+        color: visitFilter === tab.key ? '#FFFFFF' : 'var(--text-muted)'
+      }
+    }, tab.label))
+  );
+  const renderPlacesActionButtons = () => {
+    const iconBtn = {
+      height: '44px', minHeight: '44px', width: '44px', minWidth: '44px', maxWidth: '44px', padding: 0,
+      borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      cursor: 'pointer', flexShrink: 0, boxSizing: 'border-box', aspectRatio: '1 / 1'
+    };
+    const textBtn = {
+      height: '44px', minHeight: '44px', minWidth: '44px', padding: '0 16px',
+      borderRadius: 'var(--radius-md)', fontSize: isMobile ? 'var(--font-size-sm)' : 'var(--font-size-md)', fontWeight: 900,
+      cursor: 'pointer', flex: 1, flexShrink: 0, whiteSpace: 'nowrap', boxSizing: 'border-box'
+    };
+    if (!isBulkShareMode) {
+      return /*#__PURE__*/React.createElement(React.Fragment, null,
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", className: "btn btn-action btn-action-dark",
+          onClick: handleOpenRegister, title: "추가", "aria-label": "장소 추가",
+          style: iconBtn
+        }, PlusIcon ? /*#__PURE__*/React.createElement(PlusIcon, { size: 16 }) : "+"),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", className: "btn btn-action btn-action-outline",
+          onClick: handleToggleBulkShareMode, title: "편집", "aria-label": "편집",
+          style: iconBtn
+        }, PencilIcon ? /*#__PURE__*/React.createElement(PencilIcon, { size: 15 }) : "편집")
+      );
+    }
+    return /*#__PURE__*/React.createElement(React.Fragment, null,
+      /*#__PURE__*/React.createElement("button", {
+        type: "button", className: "btn btn-action btn-action-danger",
+        onClick: handleClickBulkDelete,
+        disabled: selectedBulkShareKeys.size === 0 || isBulkDeleting,
+        title: "삭제",
+        "aria-label": "삭제",
+        style: {
+          ...iconBtn,
+          cursor: (selectedBulkShareKeys.size === 0 || isBulkDeleting) ? 'default' : 'pointer',
+          opacity: (selectedBulkShareKeys.size === 0 || isBulkDeleting) ? 0.5 : 1
+        }
+      }, TrashIcon ? /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }) : (isBulkDeleting ? "..." : "삭제")),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button", className: "btn btn-action btn-action-outline",
+        onClick: handlePastePlacesFromClipboard, disabled: isSavingGatherPlacesPaste || isBulkDeleting,
+        style: { ...textBtn, cursor: (isSavingGatherPlacesPaste || isBulkDeleting) ? 'wait' : 'pointer' }
+      }, "붙여넣기"),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button", className: "btn btn-action btn-action-dark",
+        onClick: handleClickBulkShare,
+        disabled: selectedBulkShareKeys.size === 0 || isGeneratingBulkShareUrl || isBulkDeleting,
+        style: {
+          ...textBtn,
+          cursor: (selectedBulkShareKeys.size === 0 || isGeneratingBulkShareUrl || isBulkDeleting) ? 'default' : 'pointer',
+          opacity: (selectedBulkShareKeys.size === 0 || isGeneratingBulkShareUrl || isBulkDeleting) ? 0.5 : 1
+        }
+      }, isGeneratingBulkShareUrl ? "생성 중..." : `일괄공유${selectedBulkShareKeys.size > 0 ? ` (${selectedBulkShareKeys.size})` : ''}`),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button", className: "btn btn-action btn-action-outline",
+        onClick: handleToggleBulkShareMode,
+        disabled: isGeneratingBulkShareUrl || isBulkDeleting,
+        style: textBtn
+      }, "취소")
+    );
   };
 
   // Per-date memo entry edit/delete -- mirrors MemoCard's comment edit/delete (ui-calendar-core.js)
@@ -1192,45 +1447,8 @@ export function PlacesView({
         }
       }, calendar.title, " 장소"),
       
-      /* Right Controls: Desktop Visit Filter Toggle + 3-line menu */
+      /* Right Controls: search + 3-line menu */
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
-        /* Desktop Visit Filter Toggle: 전체 | 방문 | 예정 (Only on PC) */
-        !isMobile && /*#__PURE__*/React.createElement("div", {
-          className: "visit-filter-toggle-desktop",
-          style: {
-            display: 'flex', alignItems: 'center', gap: '2px',
-            backgroundColor: 'var(--bg-primary)', padding: '3px', borderRadius: 'var(--radius-md)',
-            border: '1px solid var(--border-subtle)'
-          }
-        },
-          /*#__PURE__*/React.createElement("button", {
-            type: "button",
-            onClick: () => setVisitFilter('all'),
-            style: {
-              padding: '4px 10px', fontSize: 'var(--font-size-sm)', fontWeight: 800, borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer',
-              backgroundColor: visitFilter === 'all' ? '#4F46E5' : 'transparent',
-              color: visitFilter === 'all' ? '#FFFFFF' : 'var(--text-muted)'
-            }
-          }, "전체"),
-          /*#__PURE__*/React.createElement("button", {
-            type: "button",
-            onClick: () => setVisitFilter('visited'),
-            style: {
-              padding: '4px 10px', fontSize: 'var(--font-size-sm)', fontWeight: 800, borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer',
-              backgroundColor: visitFilter === 'visited' ? '#4F46E5' : 'transparent',
-              color: visitFilter === 'visited' ? '#FFFFFF' : 'var(--text-muted)'
-            }
-          }, "방문"),
-          /*#__PURE__*/React.createElement("button", {
-            type: "button",
-            onClick: () => setVisitFilter('planned'),
-            style: {
-              padding: '4px 10px', fontSize: 'var(--font-size-sm)', fontWeight: 800, borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer',
-              backgroundColor: visitFilter === 'planned' ? '#4F46E5' : 'transparent',
-              color: visitFilter === 'planned' ? '#FFFFFF' : 'var(--text-muted)'
-            }
-          }, "예정")
-        ),
         /* Search + 3-line menu */
         /*#__PURE__*/React.createElement("button", {
           type: "button",
@@ -1399,10 +1617,10 @@ export function PlacesView({
           countBadgeClassName: "section-count-badge"
         })
       ),
-      /* Mobile Category Select Box + Visit/Planned Switching Tab (Only on Mobile) */
+      /* Mobile Category Select Box (visit filter lives on the list toolbar below) */
       isMobile && /*#__PURE__*/React.createElement("div", {
         className: "place-category-select-mobile-only",
-        style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '6px 12px' }
+        style: { display: 'flex', alignItems: 'center', padding: '6px 12px' }
       },
         /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
           title: "카테고리 선택",
@@ -1440,59 +1658,29 @@ export function PlacesView({
             })
           ],
           onSelect: setCategoryFilter
-        }),
-        /* Mobile Switching Tab: 방문 | 예정 -- height matches the 카테고리 select box next to it
-           (.form-select's 44px, see app.css) so the two controls line up edge-to-edge. */
-        /*#__PURE__*/React.createElement("div", {
-          className: "visit-filter-toggle-mobile",
-          style: {
-            display: 'inline-flex',
-            alignItems: 'center',
-            height: '44px',
-            boxSizing: 'border-box',
-            padding: '3px',
-            borderRadius: 'var(--radius-md)',
-            border: '1px solid var(--border-subtle)',
-            backgroundColor: 'var(--bg-card)',
-            flexShrink: 0,
-            overflow: 'hidden'
-          }
-        },
-          /*#__PURE__*/React.createElement("button", {
-            type: "button",
-            onClick: () => setVisitFilter(prev => prev === 'visited' ? 'all' : 'visited'),
-            style: {
-              height: '100%',
-              boxSizing: 'border-box',
-              padding: '0 12px',
-              fontSize: 'var(--font-size-md)',
-              fontWeight: 900,
-              borderRadius: 'var(--radius-sm)',
-              border: 'none',
-              cursor: 'pointer',
-              backgroundColor: visitFilter === 'visited' ? '#4F46E5' : 'transparent',
-              color: visitFilter === 'visited' ? '#FFFFFF' : 'var(--text-muted)'
-            }
-          }, "방문"),
-          /*#__PURE__*/React.createElement("div", { style: { width: '1px', height: '14px', backgroundColor: 'var(--border-subtle)', margin: '0 2px' } }),
-          /*#__PURE__*/React.createElement("button", {
-            type: "button",
-            onClick: () => setVisitFilter(prev => prev === 'planned' ? 'all' : 'planned'),
-            style: {
-              height: '100%',
-              boxSizing: 'border-box',
-              padding: '0 12px',
-              fontSize: 'var(--font-size-md)',
-              fontWeight: 900,
-              borderRadius: 'var(--radius-sm)',
-              border: 'none',
-              cursor: 'pointer',
-              backgroundColor: visitFilter === 'planned' ? '#4F46E5' : 'transparent',
-              color: visitFilter === 'planned' ? '#FFFFFF' : 'var(--text-muted)'
-            }
-          }, "예정")
-        )
+        })
       )
+    ),
+
+    /* List toolbar: 전체|방문|예정 + 추가/편집 (gallery module). Hidden while map is expanded. */
+    !mapExpanded && /*#__PURE__*/React.createElement("div", {
+      className: "places-list-toolbar",
+      style: {
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        gap: isMobile ? '6px' : '8px', padding: '8px 16px 4px', minWidth: 0,
+        flexWrap: 'nowrap', flexShrink: 0, backgroundColor: 'var(--bg-primary)'
+      }
+    },
+      !isBulkShareMode && renderPlacesVisitFilter(),
+      /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '6px', flexShrink: 0, minWidth: 0, flexWrap: 'nowrap',
+          justifyContent: isBulkShareMode ? 'stretch' : 'flex-end',
+          marginLeft: isBulkShareMode ? 0 : 'auto',
+          flex: isBulkShareMode ? 1 : undefined,
+          width: isBulkShareMode ? '100%' : undefined
+        }
+      }, renderPlacesActionButtons())
     ),
 
     /* Scrollable Cards List Container (Scrolling independently) */
@@ -1510,43 +1698,68 @@ export function PlacesView({
       },
         filteredPlaces.length === 0 ? /*#__PURE__*/React.createElement("div", {
           style: { padding: '30px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-base)' }
-        }, places.length === 0 ? "등록된 장소가 없습니다. 우측 상단 아이콘을 눌러 추가해 보세요." : "검색 조건에 맞는 장소가 없습니다.") :
+        }, places.length === 0 ? "등록된 장소가 없습니다. 추가 버튼을 눌러 등록해 보세요." : "검색 조건에 맞는 장소가 없습니다.") :
         filteredPlaces.map(place => {
           const category = categoryMap[place.categoryId] || categoryMap.etc;
           const memoEntries = parsePlaceMemoEntries(place.memo);
           const displayVisitEntries = sortVisitEntriesRecentFirst(memoEntries.filter(e => e.date));
           const memoWithoutDate = memoEntries.filter(e => !e.date).map(e => e.note).join('\n');
           const isPlaceFocused = !!(focusPlace && focusPlace.id === place.id);
+          const isChecked = isBulkShareMode && selectedBulkShareKeys.has(place.id);
           return /*#__PURE__*/React.createElement("div", {
             key: place.id,
             // Same purple-border + up/down-shake "you were just brought here" treatment used
             // everywhere else in the app (see chat-search-focused-bubble/chat-search-shake).
-            className: "place-card-row" + (isPlaceFocused ? " is-focused chat-search-focused-bubble" : ""),
+            className: "place-card-row" + (isPlaceFocused && !isBulkShareMode ? " is-focused chat-search-focused-bubble" : ""),
             "data-place-id": place.id,
             "data-no-press-feedback": true,
-            role: "button",
+            role: isBulkShareMode ? "checkbox" : "button",
+            "aria-checked": isBulkShareMode ? !!isChecked : undefined,
             tabIndex: 0,
             onClickCapture: e => {
+              if (isBulkShareMode) {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleBulkShareSelected(place.id);
+                return;
+              }
               if (e.target && typeof e.target.closest === 'function' && e.target.closest('button, input, textarea, select')) return;
               handleSelectPlaceOnMap(place);
             },
             onKeyDown: (e) => {
               if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'BUTTON')) return;
-              if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSelectPlaceOnMap(place); }
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                if (isBulkShareMode) toggleBulkShareSelected(place.id);
+                else handleSelectPlaceOnMap(place);
+              }
             },
             style: {
               display: 'flex', flexDirection: 'column', gap: '4px',
-              padding: '10px 12px', position: 'relative',
-              border: isPlaceFocused ? '1px solid #8B5CF6' : '1px solid var(--border-subtle)',
+              padding: isBulkShareMode ? '10px 12px 10px 36px' : '10px 12px', position: 'relative',
+              border: isChecked ? '2px solid var(--accent-primary)' : (isPlaceFocused ? '1px solid #8B5CF6' : '1px solid var(--border-subtle)'),
               boxShadow: 'none',
               borderRadius: 'var(--radius-md)',
               cursor: 'pointer',
-              backgroundColor: isPlaceFocused ? 'rgba(139, 92, 246, 0.08)' : 'var(--bg-card)',
+              backgroundColor: isChecked ? 'rgba(79, 70, 229, 0.08)' : (isPlaceFocused ? 'rgba(139, 92, 246, 0.08)' : 'var(--bg-card)'),
               transition: 'border-color 0.15s ease, background-color 0.15s ease'
             }
           },
+            isBulkShareMode && /*#__PURE__*/React.createElement("span", {
+              "aria-hidden": true,
+              style: {
+                position: 'absolute', top: '12px', left: '10px', width: '20px', height: '20px', borderRadius: '5px',
+                border: isChecked ? 'none' : '2px solid var(--border-strong, #94A3B8)',
+                backgroundColor: isChecked ? 'var(--accent-primary)' : 'var(--bg-card)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.15)', pointerEvents: 'none'
+              }
+            }, isChecked && /*#__PURE__*/React.createElement("svg", {
+              xmlns: "http://www.w3.org/2000/svg", width: "14", height: "14", viewBox: "0 0 24 24",
+              fill: "none", stroke: "#fff", strokeWidth: "3", strokeLinecap: "round", strokeLinejoin: "round"
+            }, /*#__PURE__*/React.createElement("path", { d: "M20 6 9 17l-5-5" }))),
             /* Top-right absolute action buttons */
-            /*#__PURE__*/React.createElement("div", {
+            !isBulkShareMode && /*#__PURE__*/React.createElement("div", {
               style: { position: 'absolute', top: '8px', right: '8px', display: 'flex', alignItems: 'center', gap: '4px', zIndex: 10 },
               onClick: e => { e.preventDefault(); e.stopPropagation(); },
               onMouseDown: e => e.stopPropagation(),
@@ -1835,7 +2048,86 @@ export function PlacesView({
         showToast,
         onRequestConfirm
       }) : null;
-    })()
+    })(),
+    gatherPlacesPastePreview && /*#__PURE__*/React.createElement("div", {
+      className: "modal-overlay",
+      style: { zIndex: 30000 },
+      onClick: () => { if (!isSavingGatherPlacesPaste) setGatherPlacesPastePreview(null); }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "modal-container confirm-dialog-modal",
+      onClick: e => e.stopPropagation(),
+      style: { maxWidth: '400px', borderRadius: 'var(--radius-md)' }
+    },
+      /*#__PURE__*/React.createElement("h3", {
+        style: { fontSize: '1.05rem', fontWeight: 800, marginBottom: '12px', color: 'var(--text-main)', textAlign: 'center' }
+      }, `장소 ${gatherPlacesPastePreview.length}개를 붙여넣을까요?`),
+      /*#__PURE__*/React.createElement("div", {
+        style: { maxHeight: '40vh', overflowY: 'auto', marginBottom: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }
+      }, gatherPlacesPastePreview.map((place, idx) => /*#__PURE__*/React.createElement("div", {
+        key: `${place.name}-${idx}`,
+        style: { padding: '8px 10px', borderRadius: 'var(--radius-md)', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)' }
+      },
+        /*#__PURE__*/React.createElement("strong", { style: { display: 'block', color: 'var(--text-main)' } }, place.alias || place.name),
+        place.alias && place.name ? /*#__PURE__*/React.createElement("small", { style: { color: 'var(--text-muted)' } }, place.name) : null,
+        place.address ? /*#__PURE__*/React.createElement("small", { style: { display: 'block', color: 'var(--text-muted)' } }, place.address) : null
+      ))),
+      /*#__PURE__*/React.createElement("div", {
+        style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', textAlign: 'center', marginBottom: '16px' }
+      }, "복사 시점의 장소 정보가 이 캘린더에 새로 등록됩니다. 같은 외부 장소는 기존 기록에 합쳐질 수 있습니다."),
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '10px', justifyContent: 'center' } },
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          className: "btn btn-secondary",
+          disabled: isSavingGatherPlacesPaste,
+          onClick: () => setGatherPlacesPastePreview(null),
+          style: { flex: 1, height: '44px', minWidth: '44px', padding: '0 16px', fontSize: 'var(--font-size-base)' }
+        }, "취소"),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          className: "btn btn-action-dark",
+          disabled: isSavingGatherPlacesPaste,
+          onClick: handleConfirmGatherPlacesPaste,
+          style: { flex: 1, height: '44px', minWidth: '44px', padding: '0 16px', fontSize: 'var(--font-size-base)' }
+        }, isSavingGatherPlacesPaste ? "붙여넣는 중..." : "붙여넣기")
+      )
+    )),
+    bulkShareResultUrl && /*#__PURE__*/React.createElement("div", {
+      className: "modal-overlay",
+      style: { zIndex: 30000 },
+      onClick: () => setBulkShareResultUrl('')
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "modal-container confirm-dialog-modal",
+      onClick: e => e.stopPropagation(),
+      style: { maxWidth: '400px', borderRadius: 'var(--radius-md)' }
+    },
+      /*#__PURE__*/React.createElement("h3", {
+        style: { fontSize: '1.05rem', fontWeight: 800, marginBottom: '12px', color: 'var(--text-main)', textAlign: 'center' }
+      }, "공유 URL"),
+      /*#__PURE__*/React.createElement("input", {
+        type: "text", className: "form-input", readOnly: true, value: bulkShareResultUrl,
+        style: { width: '100%', marginBottom: '12px' }
+      }),
+      /*#__PURE__*/React.createElement("div", {
+        style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', textAlign: 'center', marginBottom: '16px' }
+      }, "이 URL을 다른 캘린더 장소의 '붙여넣기' 버튼이나 Ctrl+V로 붙여넣으면 선택한 장소가 그대로 등록됩니다."),
+      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '10px', justifyContent: 'center' } },
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          className: "btn btn-secondary",
+          onClick: () => setBulkShareResultUrl(''),
+          style: { flex: 1, height: '44px', minWidth: '44px', padding: '0 16px', fontSize: 'var(--font-size-base)' }
+        }, "닫기"),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          className: "btn btn-action-dark",
+          onClick: async () => {
+            const ok = await copyTextToClipboard(bulkShareResultUrl);
+            if (showToast) showToast(ok ? 'URL이 복사되었습니다.' : '복사에 실패했습니다. URL을 직접 선택해 복사해 주세요.', ok ? 'success' : 'error');
+          },
+          style: { flex: 1, height: '44px', minWidth: '44px', padding: '0 16px', fontSize: 'var(--font-size-base)' }
+        }, "다시 복사")
+      )
+    ))
   );
 }
 

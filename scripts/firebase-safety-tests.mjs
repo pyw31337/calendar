@@ -741,6 +741,80 @@ assert(!chatGallerySource.includes("padding: isMobile ? '0 6px'"), 'gallery text
 assert(summaryGallerySource.includes('!isMemoryListEditMode && renderMemoryAllDateToggle()'), 'memories edit mode must hide 전체|일자 like gallery');
 assert(chatGallerySource.includes('handleToggleBulkShareMode, title: "편집"'), 'gallery default toolbar must keep the edit pencil');
 assert(chatGallerySource.includes('input, textarea, select, [contenteditable="true"]'), 'Ctrl+V must not steal paste from search inputs');
+const placesViewSource = fs.readFileSync(new URL('../src/ui/ui-places.js', import.meta.url), 'utf8');
+assert(!placesViewSource.includes('visit-filter-toggle-desktop'), 'places visit filter must leave the header');
+assert(placesViewSource.includes('places-list-toolbar'), 'places list must expose the gallery-style toolbar');
+assert(placesViewSource.includes('!isBulkShareMode && renderPlacesVisitFilter()'), 'places edit mode must hide 전체|방문|예정 so expanded actions fit');
+assert(placesViewSource.includes('handleOpenRegister, title: "추가"'), 'places plus button must open the register modal');
+assert(placesViewSource.includes('handleToggleBulkShareMode, title: "편집"'), 'places default toolbar must keep the edit pencil');
+assert(placesViewSource.includes('"붙여넣기"') && placesViewSource.includes('일괄공유'), 'places edit mode must reuse 붙여넣기/일괄공유');
+assert(placesViewSource.includes("minWidth: '44px', padding: '0 16px'"), 'places 취소/붙여넣기/일괄공유 must stay at least 1:1');
+assert(placesViewSource.includes('input, textarea, select, [contenteditable="true"]'), 'places Ctrl+V must not steal paste from search/memo inputs');
+assert(placesViewSource.includes("e.key !== 'Escape'"), 'places Escape must cancel edit/paste without stealing from inputs');
+assert(placesViewSource.includes("role: isBulkShareMode ? \"checkbox\""), 'places bulk share must use checkboxes');
+assert(placesViewSource.includes('kind: \'gather-places\'') || placesViewSource.includes('parseGatherPlacesClipboardText'), 'places bulk share must use the gatherPlaces fragment');
+assert(placesViewSource.includes('onDeletePlace(place.id, { silent: true })'), 'places bulk delete must reuse handleDeletePlace without stacking undo toasts');
+assert(appMainSource.includes('ok && !(options && options.silent)'), 'bulk place delete must be able to skip the per-item undo toast');
+assert(!/handleConfirmGatherPlacesPaste[\s\S]{0,700}id: place\.id/.test(placesViewSource), 'pasted places must not reuse the source calendar id');
+assert(summaryGallerySource.includes("className: \"btn btn-action btn-action-dark\""), 'memory-add backdrop must use the black plus action button');
+assert(summaryGallerySource.includes("gap: '6px'") && summaryGallerySource.includes('추억에 추가할 기념일'), 'memory-add backdrop list spacing must stay compact');
+assert(!summaryGallerySource.includes("color: 'var(--accent-primary)', fontWeight: 800 } }, \"+\""), 'memory-add backdrop must not use a trailing text plus');
+{
+  const {
+    encodeGatherPlacesFragment,
+    parseGatherPlacesClipboardText,
+    sanitizePlaceForGatherShare,
+    isExternalPlaceSourceId,
+    GATHER_PLACES_MAX_SHARE
+  } = GATHER_APP_UTILS;
+  assert(typeof encodeGatherPlacesFragment === 'function', 'encodeGatherPlacesFragment must export');
+  assert(GATHER_PLACES_MAX_SHARE === 50, 'place bulk share cap must stay at 50');
+  assert(isExternalPlaceSourceId('kakao:12345') === true, 'kakao/google source ids must survive share');
+  assert(isExternalPlaceSourceId('place_cw_123_abc') === false, 'local place_* ids must not be copied as sourcePlaceId');
+  assert(isExternalPlaceSourceId('') === false, 'empty sourcePlaceId must drop');
+  const sample = {
+    id: 'place_cw_1_aaaaa',
+    name: '인천공항 본관엔비빔밥',
+    alias: '비빔밥',
+    address: '인천 중구',
+    lat: 37.4602,
+    lng: 126.4407,
+    categoryId: 'food',
+    memo: '26.09.05 점심',
+    visitStatus: 'visited',
+    visitDate: '2026-09-05',
+    sourcePlaceId: 'place_cw_1_aaaaa',
+    createdAt: 1,
+    updatedAt: 2
+  };
+  const sanitized = sanitizePlaceForGatherShare(sample);
+  assert(sanitized && sanitized.name === sample.name, 'share snapshot must keep the display name');
+  assert(!('id' in sanitized), 'share snapshot must omit local id');
+  assert(sanitized.sourcePlaceId === '', 'local place_* sourcePlaceId must be stripped so paste does not merge');
+  const kakaoPlace = sanitizePlaceForGatherShare({ ...sample, sourcePlaceId: 'kakao:998877' });
+  assert(kakaoPlace.sourcePlaceId === 'kakao:998877', 'external sourcePlaceId must round-trip for merge-on-paste');
+  assert(sanitizePlaceForGatherShare({ ...sample, name: '  ' }) === null, 'nameless places must not be shareable');
+  assert(sanitizePlaceForGatherShare({ ...sample, lat: 'x', lng: 126 }) === null, 'invalid coordinates must not be shareable');
+  assert(sanitizePlaceForGatherShare({ ...sample, lat: 91, lng: 126 }) === null, 'out-of-range lat must not be shareable');
+  const fragment = encodeGatherPlacesFragment([sample, { ...sample, name: '카페', sourcePlaceId: 'kakao:1' }]);
+  assert(fragment.startsWith('#gatherPlaces='), 'encoder must emit the gatherPlaces fragment');
+  const parsed = parseGatherPlacesClipboardText(`https://example.com/calendar/${fragment}`);
+  assert(Array.isArray(parsed) && parsed.length === 2, 'parser must round-trip valid places');
+  assert(!parsed.some(item => item.id), 'parsed places must not carry local ids');
+  assert(parsed[0].sourcePlaceId === '' && parsed[1].sourcePlaceId === 'kakao:1', 'parser must keep only external sourcePlaceId');
+  assert(parsed[0].name === '인천공항 본관엔비빔밥', 'unicode names must survive encode/parse');
+  assert(parseGatherPlacesClipboardText('#gatherPlaces=abc') === null, 'clipboard without https must be ignored');
+  assert(parseGatherPlacesClipboardText('https://x.test/#gatherPhotos=abc') === null, 'other gather fragments must not parse as places');
+  assert(parseGatherPlacesClipboardText('https://x.test/#gatherPlaces=%%%') === null, 'malformed payload must be ignored');
+  const oversized = Array.from({ length: GATHER_PLACES_MAX_SHARE + 10 }, (_, i) => ({
+    name: `장소 ${i + 1}`, lat: 37.5, lng: 126.9
+  }));
+  const capped = parseGatherPlacesClipboardText(`https://x.test/${encodeGatherPlacesFragment(oversized)}`);
+  assert(capped && capped.length === GATHER_PLACES_MAX_SHARE, 'share/paste must cap at 50 places');
+  const badKindPayload = { v: 1, kind: 'gather-photos', places: [sample] };
+  const badKindB64 = btoa(unescape(encodeURIComponent(JSON.stringify(badKindPayload))));
+  assert(parseGatherPlacesClipboardText(`https://x.test/#gatherPlaces=${badKindB64}`) === null, 'wrong kind must be rejected even under the places prefix');
+}
 assert(appMainSource.includes('handleDeleteGalleryFiles') && appMainSource.includes('handleDeleteGalleryLinks'), 'gallery bulk delete must persist file and gallery-link removals');
 assert(appMainSource.includes('remainingFiles'), 'photo delete must keep leftover fileAttachments on the same message');
 assert(appMainSource.includes('removeGalleryArchiveMessage'), 'deleting a gallery message must drop it from the in-memory archive');
