@@ -910,7 +910,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
         // Ready threads size to their comment count + composer. A fixed minHeight here used to
         // keep a tall empty band under sparse threads; only loading/error keep a tap target floor.
         minHeight: commentStatus === 'ready' ? undefined : (isDesktop ? '64px' : '58px'),
-        maxHeight: isDesktop ? '55vh' : '28dvh',
+        maxHeight: isDesktop ? '55vh' : '36dvh',
         overflowY: isDesktop ? 'auto' : 'visible', resize: isDesktop ? 'vertical' : 'none',
         marginTop: isDesktop ? '4px' : '0', padding: isDesktop ? '10px 14px' : '6px 10px',
         flexShrink: 0,
@@ -1689,7 +1689,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   // sit directly under the photo and a short comment list no longer needs an inner/outer scroll
   // just to bridge empty stage space.
   const mobileImageMaxPx = !isDesktop && typeof window !== 'undefined'
-    ? Math.max(160, Math.round((window.visualViewport?.height || window.innerHeight) * 0.42) - 8)
+    ? Math.max(160, Math.round((window.visualViewport?.height || window.innerHeight) * 0.56) - 8)
     : null;
   const mobileStageHeightPx = (() => {
     if (isDesktop || mobileImageMaxPx == null) return null;
@@ -1707,7 +1707,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     : {
         width: '92vw',
         height: `${mobileStageHeightPx}px`,
-        maxHeight: '42dvh',
+        maxHeight: '56dvh',
         overflow: 'hidden',
         flexShrink: 0
       };
@@ -1803,10 +1803,10 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
       // overlay (large empty band below). Treat image/map + comment thread (+ dots) as one
       // chunk and vertically center that unit via margin:auto on the chunk; flex-start on the
       // overlay keeps tall threads scrollable from the top instead of clipping both ends.
-      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
       width: '100%', maxWidth: '100%', overflowX: 'hidden', overflowY: isDesktop ? 'hidden' : 'auto',
-      paddingTop: isDesktop ? 0 : 'max(44px, calc(env(safe-area-inset-top, 0px) + 36px))',
-      paddingBottom: isDesktop ? 0 : 'max(12px, calc(env(safe-area-inset-bottom, 0px) + 8px))', boxSizing: 'border-box',
+      paddingTop: isDesktop ? 0 : 'max(12px, calc(env(safe-area-inset-top, 0px) + 8px))',
+      paddingBottom: isDesktop ? 0 : 'max(16px, calc(env(safe-area-inset-bottom, 0px) + 12px))', boxSizing: 'border-box',
       userSelect: 'none'
     }
   }, /*#__PURE__*/React.createElement("input", {
@@ -1907,7 +1907,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     }
   }, renderSlide(index > 0 ? displayUrls[index - 1] : null, 'prev'), renderSlide(currentUrl, 'current'), renderSlide(index < total - 1 ? displayUrls[index + 1] : null, 'next')))
     : /*#__PURE__*/React.createElement("div", {
-    style: { position: 'relative', display: 'inline-flex', maxWidth: '92vw', maxHeight: isDesktop ? '82vh' : '42dvh', touchAction: 'none' },
+    style: { position: 'relative', display: 'inline-flex', maxWidth: '92vw', maxHeight: isDesktop ? '82vh' : '56dvh', touchAction: 'none' },
     onTouchStart: handleTouchStart,
     onTouchMove: handleTouchMove,
     onTouchEnd: handleTouchEnd,
@@ -1923,7 +1923,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     onLoad: e => recordImageDimensions(currentUrl, e),
     onMouseDown: handleZoomedImageMouseDown,
     style: {
-      maxWidth: '92vw', maxHeight: isDesktop ? '82vh' : '42dvh', borderRadius: 'var(--radius-md)', objectFit: 'contain',
+      maxWidth: '92vw', maxHeight: isDesktop ? '82vh' : '56dvh', borderRadius: 'var(--radius-md)', objectFit: 'contain',
       display: 'block', ...zoomImageStyle
     }
   }), renderPhotoActions(),

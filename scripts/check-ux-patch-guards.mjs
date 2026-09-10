@@ -70,6 +70,6 @@ assert.match(lightbox, /refocusComposerField\(tagInputRef\)/);
 assert.match(lightbox, /refocusComposerField\(commentInputRef\)/);
 assert.match(lightbox, /lightbox-content-chunk/);
 assert.match(lightbox, /gap: '8px'/);
-assert.match(lightbox, /42dvh/);
+assert.match(lightbox, /56dvh/);
 
 console.log("[ux-patch-guards] all checks passed");
