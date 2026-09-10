@@ -82,11 +82,7 @@ function usePdfPreviewUrl(sourceUrl, enabled) {
       var isMobileUa = /Android|iP(hone|od|ad)|Mobile/i.test(ua)
         || (typeof navigator !== "undefined" && navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
       if (isMobileUa) {
-        setState({
-          status: "gview",
-          url: "https://docs.google.com/gview?embedded=1&url=" + encodeURIComponent(sourceUrl),
-          error: err && err.message ? err.message : "fetch-failed"
-        });
+        setState({ status: "error", url: null, error: err && err.message ? err.message : "fetch-failed" });
       } else {
         setState({ status: "remote", url: sourceUrl, error: err && err.message ? err.message : "fetch-failed" });
       }
@@ -429,7 +425,7 @@ export function DocumentLightbox(props) {
                     }
                   },
                     React.createElement(FileTypeBadge, { label: typeLabel, attachment: current }),
-                    React.createElement("div", { style: { fontWeight: 800 } }, "PDF를 미리볼 수 없습니다."),
+                    React.createElement("div", { style: { fontWeight: 800 } }, "이 브라우저에서는 PDF 미리보기를 열 수 없습니다."),
                     React.createElement("div", {
                       style: { color: "var(--text-muted)", fontSize: "var(--font-size-md)", fontWeight: 600, overflowWrap: "anywhere" }
                     }, current.name || ""),
@@ -440,9 +436,9 @@ export function DocumentLightbox(props) {
                         color: "#fff", display: "inline-flex", alignItems: "center", fontWeight: 900,
                         textDecoration: "none"
                       }
-                    }, "열기")
+                    }, "새 탭에서 열기")
                   )
-                : (preview.status === "ready" || preview.status === "remote" || preview.status === "gview")
+                : (preview.status === "ready" || preview.status === "remote")
                 ? React.createElement("div", {
                     style: {
                       transform: "scale(" + scale + ")",
