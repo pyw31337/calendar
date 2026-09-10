@@ -2482,7 +2482,7 @@ export function ChatGalleryModal({
     UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
       ariaLabel: "갤러리 탭",
       value: activeTab,
-      onChange: v => setActiveTab(v),
+      onChange: v => setGalleryTab(v),
       style: { backgroundColor: 'var(--bg-card)', flex: 1, borderBottom: 'none' },
       options: [
         { value: 'photos', label: '사진', badge: displayPhotoTabCount },
@@ -2504,7 +2504,7 @@ export function ChatGalleryModal({
     UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
       ariaLabel: "갤러리 탭",
       value: activeTab,
-      onChange: v => setActiveTab(v),
+      onChange: v => setGalleryTab(v),
       style: { backgroundColor: 'var(--bg-card)', flex: 1, borderBottom: 'none' },
       options: [
         { value: 'photos', label: '사진', badge: displayPhotoTabCount },
