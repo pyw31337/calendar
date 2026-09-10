@@ -1080,7 +1080,7 @@ export function ChatGalleryModal({
       const photos = visiblePhotos
         .filter(photo => keySet.has(getPhotoKey(photo)))
         .map(photo => ({ url: photo.full || photo.thumb, tags: photo.tags || '' }));
-      const fragment = encodeGatherPhotosFragment(photos);
+      fragment = encodeGatherPhotosFragment(photos);
       if (!fragment) {
         if (showToast) showToast('공유 URL 생성 실패', 'error');
         return;
