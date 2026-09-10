@@ -185,8 +185,9 @@ export function FileAttachmentCard(props) {
     title: attachment.name || "파일",
     style: {
       display: "flex", alignItems: "center", gap: "10px",
-      width: stretch ? "100%" : "fit-content",
-      maxWidth: stretch ? "100%" : "min(100%, 420px)",
+      width: "100%",
+      maxWidth: "100%",
+      boxSizing: "border-box",
       boxSizing: "border-box", textAlign: "left",
       border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-md)",
       backgroundColor: "var(--bg-card)", color: "inherit",

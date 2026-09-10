@@ -1054,6 +1054,29 @@ export function ChatGalleryModal({
     setIsGeneratingBulkShareUrl(true);
     try {
       const keySet = new Set(keys);
+      let fragment = '';
+      if (activeTab === 'links') {
+        const links = (filteredLinks || []).filter(item => keySet.has(item.messageId || item.url));
+        const text = links.map(item => item.url).filter(Boolean).join('\n');
+        if (!text) { if (showToast) showToast('공유할 링크를 선택해 주세요.', 'error'); return; }
+        const ok = await copyTextToClipboard(text);
+        setBulkShareResultUrl(text.split('\n')[0] || '');
+        setIsBulkShareMode(false);
+        setSelectedBulkShareKeys(new Set());
+        if (showToast) showToast(ok ? `링크 ${links.length}개 URL을 복사했습니다.` : '복사에 실패했습니다.', ok ? 'success' : 'error');
+        return;
+      }
+      if (activeTab === 'files') {
+        const files = (filteredFiles || []).filter(item => keySet.has((item.id || item.url) + ''));
+        const text = files.map(item => item.url).filter(Boolean).join('\n');
+        if (!text) { if (showToast) showToast('공유할 파일을 선택해 주세요.', 'error'); return; }
+        const ok = await copyTextToClipboard(text);
+        setBulkShareResultUrl(text.split('\n')[0] || '');
+        setIsBulkShareMode(false);
+        setSelectedBulkShareKeys(new Set());
+        if (showToast) showToast(ok ? `파일 ${files.length}개 URL을 복사했습니다.` : '복사에 실패했습니다.', ok ? 'success' : 'error');
+        return;
+      }
       const photos = visiblePhotos
         .filter(photo => keySet.has(getPhotoKey(photo)))
         .map(photo => ({ url: photo.full || photo.thumb, tags: photo.tags || '' }));
@@ -1491,22 +1514,42 @@ export function ChatGalleryModal({
     );
   }));
   const renderGalleryLinkList = items => /*#__PURE__*/React.createElement(React.Fragment, null,
-    (items || []).map(item => /*#__PURE__*/React.createElement(GalleryLinkCard, {
-      key: item.messageId || item.url,
-      item: item,
-      searchQuery: searchQuery
-    }))
+    (items || []).map(item => {
+      const itemKey = item.messageId || item.url;
+      const isChecked = selectedBulkShareKeys.has(itemKey);
+      const card = /*#__PURE__*/React.createElement(GalleryLinkCard, {
+        key: itemKey,
+        item: item,
+        searchQuery: searchQuery
+      });
+      if (!isBulkShareMode) return card;
+      return /*#__PURE__*/React.createElement("div", {
+        key: itemKey,
+        onClick: ev => { ev.preventDefault(); ev.stopPropagation(); toggleBulkShareSelected(itemKey); },
+        style: { position: 'relative', width: '100%', cursor: 'pointer', outline: isChecked ? '2px solid var(--accent-primary)' : 'none', borderRadius: 'var(--radius-md)' }
+      }, card);
+    })
   );
   const renderGalleryFileList = items => /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', flexDirection: 'column', gap: '8px' }
-  }, (items || []).map((item, idx) => FileAttachmentCard ? /*#__PURE__*/React.createElement(FileAttachmentCard, {
-    key: (item.id || item.url) + '-' + idx,
-    attachment: item,
-    searchQuery: searchQuery,
-    stretch: true,
-    compact: true,
-    onOpen: () => setGalleryDocLightbox({ attachments: items, index: idx })
-  }) : null));
+    style: { display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }
+  }, (items || []).map((item, idx) => {
+    const itemKey = String(item.id || item.url || idx);
+    const isChecked = selectedBulkShareKeys.has(itemKey);
+    const card = FileAttachmentCard ? /*#__PURE__*/React.createElement(FileAttachmentCard, {
+      key: itemKey,
+      attachment: item,
+      searchQuery: searchQuery,
+      stretch: true,
+      compact: true,
+      onOpen: isBulkShareMode ? undefined : () => setGalleryDocLightbox({ attachments: items, index: idx })
+    }) : null;
+    if (!card) return null;
+    return /*#__PURE__*/React.createElement("div", {
+      key: itemKey,
+      onClick: isBulkShareMode ? ev => { ev.preventDefault(); ev.stopPropagation(); toggleBulkShareSelected(itemKey); } : undefined,
+      style: { width: '100%', maxWidth: '100%', boxSizing: 'border-box', cursor: isBulkShareMode ? 'pointer' : 'default', outline: isChecked ? '2px solid var(--accent-primary)' : 'none', borderRadius: 'var(--radius-md)' }
+    }, card);
+  }));
   const renderFileListHeader = () => /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: isMobile ? '6px' : '8px', marginBottom: '4px', minWidth: 0 }
   },
@@ -1514,6 +1557,21 @@ export function ChatGalleryModal({
     /*#__PURE__*/React.createElement("div", {
       style: { display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '6px', flexShrink: 0 }
     },
+      isBulkShareMode
+        ? /*#__PURE__*/React.createElement(React.Fragment, null,
+            /*#__PURE__*/React.createElement("button", {
+              type: "button", className: "btn btn-action btn-action-outline",
+              onClick: handleToggleBulkShareMode,
+              style: { height: '44px', minHeight: '44px', padding: '0 14px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: 'pointer' }
+            }, "취소"),
+            /*#__PURE__*/React.createElement("button", {
+              type: "button", className: "btn btn-action btn-action-dark",
+              onClick: handleClickBulkShare,
+              disabled: selectedBulkShareKeys.size === 0 || isGeneratingBulkShareUrl,
+              style: { height: '44px', minHeight: '44px', padding: '0 14px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: selectedBulkShareKeys.size === 0 ? 'default' : 'pointer', opacity: selectedBulkShareKeys.size === 0 ? 0.5 : 1 }
+            }, isGeneratingBulkShareUrl ? "생성 중..." : `일괄공유${selectedBulkShareKeys.size > 0 ? ` (${selectedBulkShareKeys.size})` : ''}`)
+          )
+        : /*#__PURE__*/React.createElement(React.Fragment, null,
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "btn btn-action btn-action-outline",
@@ -1536,6 +1594,7 @@ export function ChatGalleryModal({
         "aria-label": "편집",
         style: { height: '44px', minHeight: '44px', width: '44px', minWidth: '44px', maxWidth: '44px', padding: 0, borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }
       }, PencilIcon ? /*#__PURE__*/React.createElement(PencilIcon, { size: 15 }) : "편집")
+          )
     )
   );
   // "이전 사진/링크 더 보기": a real component (not a plain render-helper function) so it can use
@@ -1828,15 +1887,32 @@ export function ChatGalleryModal({
     )
   );
   const renderLinkListHeader = () => /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '4px' }
+    style: {
+      display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '4px'
+    }
   },
     /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }
+      style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: isMobile ? '6px' : '8px', minWidth: 0 }
     },
       renderVisitFilterToggleMobile(),
       /*#__PURE__*/React.createElement("div", {
         style: { display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '6px', flexShrink: 0 }
       },
+        isBulkShareMode
+          ? /*#__PURE__*/React.createElement(React.Fragment, null,
+              /*#__PURE__*/React.createElement("button", {
+                type: "button", className: "btn btn-action btn-action-outline",
+                onClick: handleToggleBulkShareMode,
+                style: { height: '44px', minHeight: '44px', padding: '0 14px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: 'pointer' }
+              }, "취소"),
+              /*#__PURE__*/React.createElement("button", {
+                type: "button", className: "btn btn-action btn-action-dark",
+                onClick: handleClickBulkShare,
+                disabled: selectedBulkShareKeys.size === 0 || isGeneratingBulkShareUrl,
+                style: { height: '44px', minHeight: '44px', padding: '0 14px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: selectedBulkShareKeys.size === 0 ? 'default' : 'pointer', opacity: selectedBulkShareKeys.size === 0 ? 0.5 : 1 }
+              }, isGeneratingBulkShareUrl ? "생성 중..." : `일괄공유${selectedBulkShareKeys.size > 0 ? ` (${selectedBulkShareKeys.size})` : ''}`)
+            )
+          : /*#__PURE__*/React.createElement(React.Fragment, null,
         /*#__PURE__*/React.createElement("button", {
           type: "button",
           className: "btn btn-action btn-action-outline",
@@ -1861,6 +1937,7 @@ export function ChatGalleryModal({
           onClick: handleToggleBulkShareMode,
           style: { height: '44px', minHeight: '44px', width: '44px', minWidth: '44px', maxWidth: '44px', padding: 0, borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }
         }, PencilIcon ? /*#__PURE__*/React.createElement(PencilIcon, { size: 15 }) : "편집")
+            )
       )
     ),
     isAddingLink && /*#__PURE__*/React.createElement("div", {
@@ -2306,7 +2383,7 @@ export function ChatGalleryModal({
             + ' 20px 16px 20px'
           )
         : '16px 20px',
-      display: 'flex', flexDirection: 'column', gap: activeTab === 'links' ? '8px' : '12px', boxSizing: 'border-box',
+      display: 'flex', flexDirection: 'column', gap: '12px', boxSizing: 'border-box',
       minWidth: 0
     }
   }, renderGalleryContent())));
