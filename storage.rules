@@ -58,6 +58,18 @@ service firebase.storage {
       allow delete: if isCalendarId(calendarId);
     }
 
+    // 밈 키보드 이미지 풀. calendarId로 나뉘지 않는 전역 공유 경로다 -- 모든 캘린더가 같은
+    // 해시태그 인덱스를 읽는다. Firestore 쪽 문서(memePool/{memeId})는 admin-gated Cloud
+    // Function으로만 쓸 수 있지만, 이 프로젝트에 실사용자 인증이 없어 Storage 쪽에서 "관리자만"을
+    // 강제할 방법은 없다(다른 모든 업로드 경로와 동일한 신뢰 모델). 문서가 없는 고아 파일은
+    // 아무도 읽지 않아 무해하다.
+    match /memePool/{fileName} {
+      allow get: if true;
+      allow write: if request.resource.size <= 15 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if true;
+    }
+
     match /{allPaths=**} {
       allow read, write: if false;
     }

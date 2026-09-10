@@ -129,7 +129,7 @@ service cloud.firestore {
       function hasValidUploadSource(data) {
         return !('uploadSource' in data) || (
           data.uploadSource is string
-          && (data.uploadSource == 'chat' || data.uploadSource == 'gallery' || data.uploadSource == 'meeting')
+          && (data.uploadSource == 'chat' || data.uploadSource == 'gallery' || data.uploadSource == 'meeting' || data.uploadSource == 'meme')
         );
       }
       // Kakao-style reply quote: set only at creation time (never patched), a small snapshot of
@@ -166,10 +166,11 @@ service cloud.firestore {
           // previously missing from this hasOnly() list, which made every single one of those
           // writes fail the security rules outright (Missing or insufficient permissions),
           // regardless of image count or size.
-          && request.resource.data.keys().hasOnly(['participantId', 'text', 'timestamp', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageTags', 'uploadSource', 'linkPreview', 'replyTo', 'fileAttachments'])
+          && request.resource.data.keys().hasOnly(['participantId', 'text', 'timestamp', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageTags', 'uploadSource', 'linkPreview', 'replyTo', 'fileAttachments', 'deviceType'])
           && request.resource.data.participantId is string
           && request.resource.data.participantId.size() <= 160
           && request.resource.data.timestamp is number
+          && (!('deviceType' in request.resource.data) || request.resource.data.deviceType in ['mobile', 'desktop', ''])
           && hasValidMessageText(request.resource.data)
           && hasValidMessageImages(request.resource.data)
           && hasValidUploadSource(request.resource.data)
@@ -538,6 +539,16 @@ service cloud.firestore {
       allow get: if true;
       allow list: if false;
       allow create, update, delete: if false;
+    }
+
+    // Global cross-calendar 밈 이미지 pool (밈 키보드). Not scoped under any one calendar's
+    // document since every calendar's chat searches the same shared hashtag index. Every
+    // calendar's client reads the full list directly (list must stay open for that), but only
+    // the admin-gated memePoolUpsert/memePoolDelete Cloud Functions may write -- see their
+    // comment in functions/index.js for why client writes aren't allowed here.
+    match /memePool/{memeId} {
+      allow get, list: if true;
+      allow write: if false;
     }
 
     match /{document=**} {

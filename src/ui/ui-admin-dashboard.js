@@ -2,6 +2,8 @@
  * Admin dashboard (P4-17)
  */
 
+import { MemeAdminPanel } from './ui-meme-admin.js';
+
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_CHAT_DATA = window.GATHER_APP_CHAT_DATA || {};
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -171,6 +173,10 @@ function listAllCalendarsRemote(...args) {
 function listServerAuditLogsRemote(...args) {
   const f = __gatherUiDeps().listServerAuditLogsRemote || GATHER_APP_UTILS.listServerAuditLogsRemote;
   return typeof f === 'function' ? f(...args) : [];
+}
+function fetchMemePoolRest(...args) {
+  const f = __gatherUiDeps().fetchMemePoolRest || GATHER_APP_UTILS.fetchMemePoolRest;
+  return typeof f === 'function' ? f(...args) : Promise.resolve([]);
 }
 function rebuildPhotoIndexRemote(...args) {
   const f = __gatherUiDeps().rebuildPhotoIndexRemote || GATHER_APP_UTILS.rebuildPhotoIndexRemote;
@@ -356,6 +362,15 @@ export function AdminDashboard({ initialCalendars }) {
     return () => { cancelled = true; };
   }, [activeTab, selectedCalId]);
 
+  // 밈 이미지 풀은 calendarId로 나뉘지 않는 전역 컬렉션이라, 탭을 처음 열 때 한 번만 불러온다.
+  const [memePoolAdmin, setMemePoolAdmin] = React.useState([]);
+  const memePoolFetchedRef = React.useRef(false);
+  React.useEffect(() => {
+    if (activeTab !== 'meme' || memePoolFetchedRef.current) return;
+    memePoolFetchedRef.current = true;
+    fetchMemePoolRest().then(list => setMemePoolAdmin(list)).catch(() => {});
+  }, [activeTab]);
+
   // Timeline filters and pagination for Tab 4 (Recovery logs)
   const [timelineSearchQuery, setTimelineSearchQuery] = React.useState('');
   const [timelineTypeFilter, setTimelineTypeFilter] = React.useState('all');
@@ -424,11 +439,12 @@ export function AdminDashboard({ initialCalendars }) {
         ['업로드 출처', msg.uploadSource || ''],
         ['이미지 개수', images.length ? String(images.length) : '0'],
         ['링크 미리보기', msg.linkPreview ? (msg.linkPreview.title || msg.linkPreview.url || '있음') : ''],
-        // 현재 채팅 메시지에는 발신자 IP/기기(User-Agent) 정보가 전혀 기록되지 않는다 -- 이걸
-        // 보여주려면 메시지 전송 시점에 서버(Cloud Function)로 별도 비콘을 보내 IP를 받아
-        // 기록하는 새 파이프라인이 필요해서(서버 감사 로그와 동일한 방식), 이번 변경 범위에서는
-        // 넣지 않았다.
-        ['IP / 기기 정보', '(수집되지 않음 -- 별도 개발 필요)']
+        // 기기 종류(모바일/PC)는 전송 시점에 message.deviceType으로 함께 저장된다(app-firebase-
+        // data.js의 detectMessageDeviceType). IP나 정확한 브라우저/OS 버전까지는 아직 기록하지
+        // 않는다 -- 메시지 전송마다 서버(Cloud Function)로 별도 신호를 보내 IP를 받아 기록하는
+        // 새 파이프라인과, 개인정보 수집 범위에 대한 별도 결정이 필요하다.
+        ['기기 종류', msg.deviceType === 'mobile' ? '모바일' : (msg.deviceType === 'desktop' ? 'PC' : '(이 필드 추가 전 메시지)')],
+        ['IP / 상세 기기정보', '(수집되지 않음 -- 별도 개발 필요)']
       ].filter(([, v]) => v !== '' && v != null)
     });
   };
@@ -1863,8 +1879,21 @@ export function AdminDashboard({ initialCalendars }) {
         /*#__PURE__*/React.createElement("button", {
           type: "button", className: "admin-tab-button", onClick: () => setActiveTab('recovery'),
           style: styles.tabButton(activeTab === 'recovery')
-        }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(HourglassIcon, null)), "복구")
+        }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(HourglassIcon, null)), "복구"),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", className: "admin-tab-button", onClick: () => setActiveTab('meme'),
+          style: styles.tabButton(activeTab === 'meme')
+        }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(ChatSectionIcon, null)), "밈 이미지")
       )
+    ),
+
+    activeTab === 'meme' && /*#__PURE__*/React.createElement("section", { style: styles.card },
+      /*#__PURE__*/React.createElement(MemeAdminPanel, {
+        pool: memePoolAdmin,
+        onPoolChange: setMemePoolAdmin,
+        password: getAdminSession()?.password,
+        showToast: showAdminToast
+      })
     ),
 
     activeTab === 'audit' && /*#__PURE__*/React.createElement("section", { style: styles.card },

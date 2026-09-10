@@ -2,6 +2,8 @@
  * Chat room view (P4-16)
  */
 
+import { matchMemePoolByKeyword } from '../core/meme-pool.js';
+
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 function __gatherUiDeps() { return window.GATHER_UI_DEPS || {}; }
@@ -91,6 +93,8 @@ function getDirectChatMediaInfo(...args) {
 }
 export function ChatRoomView({
   calendar,
+  memePool = [],
+  onSendMemeImage,
   chatMessages,
   loadingOlderChat,
   hasMoreOlderChat,
@@ -230,6 +234,14 @@ export function ChatRoomView({
   const [composerHeight, setComposerHeight] = React.useState(0);
   const chatComposerRef = React.useRef(null);
   const [isInputFocused, setIsInputFocused] = React.useState(false);
+  // 밈 키보드: 입력 중인 텍스트가 memePool의 해시태그와 겹치면 "#태그 (n)" 칩을 보여주고,
+  // 누르면 그 태그의 썸네일을 펼친다. 한 번에 하나의 태그만 펼쳐둔다(여러 개를 동시에 펼치면
+  // 좁은 화면에서 입력창을 다 가림).
+  const memeMatches = React.useMemo(() => matchMemePoolByKeyword(memePool, chatInput), [memePool, chatInput]);
+  const [expandedMemeTag, setExpandedMemeTag] = React.useState(null);
+  React.useEffect(() => {
+    if (!memeMatches.some(m => m.tag === expandedMemeTag)) setExpandedMemeTag(null);
+  }, [memeMatches, expandedMemeTag]);
   // 'closed' (default -- nothing shown) | 'list' (existing notices + 공지 추가) | 'add' (textarea)
   const [noticePanelMode, setNoticePanelMode] = React.useState('closed');
   const [noticeInput, setNoticeInput] = React.useState('');
@@ -1433,6 +1445,47 @@ export function ChatRoomView({
         width: '100%'
       }
     },
+      /* 밈 키보드: 입력창 바로 위, 이모지 피커와 같은 자리 개념. 매칭된 해시태그가 있을 때만
+         보인다 -- 평소엔 아무 자리도 차지하지 않는다. */
+      memeMatches.length > 0 && /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', flexDirection: 'column', gap: '8px' }
+      },
+        /*#__PURE__*/React.createElement("div", {
+          style: { display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '2px' }
+        }, memeMatches.map(({ tag, items }) => /*#__PURE__*/React.createElement("button", {
+          key: tag,
+          type: "button",
+          onClick: () => setExpandedMemeTag(prev => prev === tag ? null : tag),
+          style: {
+            flexShrink: 0, display: 'flex', alignItems: 'center', gap: '4px',
+            padding: '6px 10px', borderRadius: 'var(--radius-full)',
+            border: `1px solid ${expandedMemeTag === tag ? 'var(--accent-primary)' : 'var(--border-subtle)'}`,
+            backgroundColor: expandedMemeTag === tag ? 'var(--accent-primary)' : 'var(--bg-primary)',
+            color: expandedMemeTag === tag ? '#fff' : 'var(--text-main)',
+            fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap'
+          }
+        }, `#${tag} (${items.length})`,
+          /*#__PURE__*/React.createElement("svg", {
+            xmlns: "http://www.w3.org/2000/svg", width: "12", height: "12", viewBox: "0 0 24 24",
+            fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round",
+            style: { transform: expandedMemeTag === tag ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }
+          }, /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" }))
+        ))),
+        expandedMemeTag && /*#__PURE__*/React.createElement("div", {
+          style: { display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '2px' }
+        }, (memeMatches.find(m => m.tag === expandedMemeTag)?.items || []).map(item => /*#__PURE__*/React.createElement("button", {
+          key: item.id,
+          type: "button",
+          onClick: () => { if (typeof onSendMemeImage === 'function') onSendMemeImage(item); },
+          style: {
+            flexShrink: 0, width: '64px', height: '64px', padding: 0, borderRadius: 'var(--radius-md)',
+            border: '1px solid var(--border-subtle)', overflow: 'hidden', cursor: 'pointer', backgroundColor: 'var(--bg-primary)'
+          }
+        }, /*#__PURE__*/React.createElement("img", {
+          src: item.thumbUrl || item.fullUrl, alt: `#${expandedMemeTag}`, loading: "lazy",
+          style: { width: '100%', height: '100%', objectFit: 'cover' }
+        }))))
+      ),
       /* Reply preview: shown above the textarea while replying to a specific bubble. The
          snippet mirrors renderReplyQuoteCard's label so what you see here is exactly what
          lands on the sent message's own quote card. */

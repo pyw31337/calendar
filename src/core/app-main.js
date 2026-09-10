@@ -80,6 +80,8 @@ import {
   verifyAdminPasswordRemote,
   listAllCalendarsRemote,
   listServerAuditLogsRemote,
+  memePoolUpsertRemote,
+  memePoolDeleteRemote,
   findCultureLinkedAnniversary,
   findCultureLinkedMemo,
   buildCultureLinkedMemoData,
@@ -437,6 +439,7 @@ import {
   fetchAnniversariesRest,
   fetchPhotoCommentCountsRest,
   fetchCustomCultureItemsRest,
+  fetchMemePoolRest,
   writeCollectionDocumentWithFallback,
   writeRootCollectionDocumentWithFallback,
   deleteMessageRest,
@@ -1032,6 +1035,14 @@ function CalendarApp() {
   }, [activeCalId, firebaseDb, firebaseConnectionVersion]);
   const [anniversaries, setAnniversaries] = React.useState([]);
   const [customCultureItems, setCustomCultureItems] = React.useState([]);
+  // 밈 키보드용 이미지 풀. calendarId로 나뉘지 않는 전역 컬렉션이라(모든 캘린더가 같은 해시태그
+  // 인덱스를 검색) 활성 캘린더가 바뀌어도 다시 불러올 필요 없이 앱 세션당 한 번만 가져온다.
+  const [memePool, setMemePool] = React.useState([]);
+  React.useEffect(() => {
+    let cancelled = false;
+    fetchMemePoolRest().then(list => { if (!cancelled) setMemePool(list); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
   // id -> poster URL from crawled culture JSON (festivals + performances). Used to enrich
   // already-registered culture anniversaries that were saved before posters were copied.
   const [culturePosterById, setCulturePosterById] = React.useState(() => new Map());
@@ -3374,6 +3385,29 @@ function CalendarApp() {
       setIsChatSubmitting(false);
       setChatUploadProgress(null);
     }
+  };
+
+  // 밈 키보드에서 썸네일을 탭했을 때: 이미 Storage에 올라가 있는 이미지라 handleSendChatMessage의
+  // 업로드/오프라인 큐잉 로직이 전혀 필요 없다 -- 그 URL만 그대로 참조하는 메시지 한 건을 쓴다.
+  const handleSendMemeImage = async (meme) => {
+    if (!meme || (!meme.fullUrl && !meme.thumbUrl)) return;
+    if (!chatParticipantId) { showToast('참여자를 선택해 주세요.', 'error'); return; }
+    const url = meme.fullUrl || meme.thumbUrl;
+    const thumb = meme.thumbUrl || meme.fullUrl;
+    const messageOperationId = `chat_${activeCalId}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const messageData = {
+      participantId: chatParticipantId,
+      text: '',
+      imageUrl: url,
+      thumbUrl: thumb,
+      imageUrls: [url],
+      thumbUrls: [thumb],
+      timestamp: Date.now(),
+      uploadSource: 'meme'
+    };
+    const sent = await writeCollectionDocumentWithFallback('messages', activeCalId, '', messageData, 'add', '밈 전송', { documentId: messageOperationId });
+    if (sent?.id) upsertLocalChatMessage({ ...messageData, id: sent.id });
+    else showToast('밈 전송에 실패했습니다.', 'error');
   };
 
   const prepareGalleryImageUploads = async (files, title = '사진 업로드 준비 중...') => {
@@ -7220,6 +7254,8 @@ function CalendarApp() {
   if (activeView === 'chat') {
     return withStickyVideo(/*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", { className: "chat-view-container" }, /*#__PURE__*/React.createElement(ChatRoomView, {
       calendar: activeCal,
+      memePool: memePool,
+      onSendMemeImage: handleSendMemeImage,
       chatMessages: displayChatMessages,
       loadingOlderChat: loadingOlderChat,
       hasMoreOlderChat: hasMoreOlderChat,
@@ -11889,6 +11925,9 @@ function bindGatherUiDeps() {
     isAdminRestoreRoute: typeof isAdminRestoreRoute === 'function' ? isAdminRestoreRoute : null,
     listAllCalendarsRemote: typeof listAllCalendarsRemote === 'function' ? listAllCalendarsRemote : null,
     listServerAuditLogsRemote: typeof listServerAuditLogsRemote === 'function' ? listServerAuditLogsRemote : null,
+    memePoolUpsertRemote: typeof memePoolUpsertRemote === 'function' ? memePoolUpsertRemote : null,
+    memePoolDeleteRemote: typeof memePoolDeleteRemote === 'function' ? memePoolDeleteRemote : null,
+    fetchMemePoolRest: typeof fetchMemePoolRest === 'function' ? fetchMemePoolRest : null,
     rebuildPhotoIndexRemote: typeof rebuildPhotoIndexRemote === 'function' ? rebuildPhotoIndexRemote : null,
     mergeCalendarCollections: typeof mergeCalendarCollections === 'function' ? mergeCalendarCollections : null,
     mergePollRecord: typeof mergePollRecord === 'function' ? mergePollRecord : null,

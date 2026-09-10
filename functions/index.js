@@ -1777,6 +1777,79 @@ exports.listServerAuditLogs = functions.https.onRequest(async (req, res) => {
   }
 });
 
+// Global cross-calendar meme/sticker image pool (밈 키보드). Any calendar's chat can search
+// these by hashtag and send one straight into the chat, like an attachment. Writable only via
+// this admin-gated function -- if any calendar's own client could write directly, a
+// compromised or malicious calendar could inject arbitrary images/hashtags into a pool every
+// OTHER calendar sees, a materially bigger blast radius than that calendar's own data (same
+// reasoning as the photoIndex collection). Reads stay open in firestore.rules since every
+// calendar needs the full hashtag index to search locally.
+const MEME_POOL_ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
+exports.memePoolUpsert = functions.https.onRequest(async (req, res) => {
+  setAdminCorsHeaders(res);
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  if (req.method !== 'POST') { res.status(405).json({ ok: false }); return; }
+  const { password, id, thumbUrl, fullUrl, hashtags, fileName, width, height } = req.body || {};
+  if (typeof password !== 'string' || !password.trim()) { res.status(400).json({ ok: false }); return; }
+  if (typeof id !== 'string' || !MEME_POOL_ID_RE.test(id)) { res.status(400).json({ ok: false, message: 'invalid id' }); return; }
+  const rateState = await checkAdminAuthRateLimit(req.ip);
+  if (rateState.blocked) { res.status(429).json({ ok: false }); return; }
+  const matches = sha256Hex(password.trim()) === await getStoredAdminPasswordHash();
+  await recordAdminAuthResult(rateState, matches);
+  if (!matches) { res.status(401).json({ ok: false }); return; }
+  try {
+    const ref = admin.firestore().collection('memePool').doc(id);
+    const existingSnap = await ref.get();
+    const existing = existingSnap.exists ? existingSnap.data() : null;
+    // hashtags is the only field a second call (the lightbox tagging step, after the bulk
+    // upload already registered thumbUrl/fullUrl) is expected to change -- omit it to leave
+    // existing tags alone rather than wiping them back to [].
+    const cleanHashtags = Array.isArray(hashtags)
+      ? Array.from(new Set(
+          hashtags.map(t => String(t || '').trim().replace(/^#/, '').toLowerCase()).filter(Boolean)
+        )).slice(0, 30)
+      : (existing?.hashtags || []);
+    const now = Date.now();
+    const doc = {
+      thumbUrl: typeof thumbUrl === 'string' && thumbUrl ? thumbUrl : (existing?.thumbUrl || ''),
+      fullUrl: typeof fullUrl === 'string' && fullUrl ? fullUrl : (existing?.fullUrl || ''),
+      fileName: typeof fileName === 'string' ? fileName.slice(0, 200) : (existing?.fileName || ''),
+      hashtags: cleanHashtags,
+      width: Number.isFinite(Number(width)) ? Number(width) : (existing?.width ?? null),
+      height: Number.isFinite(Number(height)) ? Number(height) : (existing?.height ?? null),
+      createdAt: existing?.createdAt || now,
+      updatedAt: now
+    };
+    if (!doc.thumbUrl && !doc.fullUrl) { res.status(400).json({ ok: false, message: 'thumbUrl or fullUrl required' }); return; }
+    await ref.set(doc);
+    res.status(200).json({ ok: true, id });
+  } catch (err) {
+    console.error('memePoolUpsert failed:', err);
+    res.status(500).json({ ok: false });
+  }
+});
+
+exports.memePoolDelete = functions.https.onRequest(async (req, res) => {
+  setAdminCorsHeaders(res);
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  if (req.method !== 'POST') { res.status(405).json({ ok: false }); return; }
+  const { password, id } = req.body || {};
+  if (typeof password !== 'string' || !password.trim()) { res.status(400).json({ ok: false }); return; }
+  if (typeof id !== 'string' || !MEME_POOL_ID_RE.test(id)) { res.status(400).json({ ok: false }); return; }
+  const rateState = await checkAdminAuthRateLimit(req.ip);
+  if (rateState.blocked) { res.status(429).json({ ok: false }); return; }
+  const matches = sha256Hex(password.trim()) === await getStoredAdminPasswordHash();
+  await recordAdminAuthResult(rateState, matches);
+  if (!matches) { res.status(401).json({ ok: false }); return; }
+  try {
+    await admin.firestore().collection('memePool').doc(id).delete();
+    res.status(200).json({ ok: true });
+  } catch (err) {
+    console.error('memePoolDelete failed:', err);
+    res.status(500).json({ ok: false });
+  }
+});
+
 // Admin-only aggregate health view for Web Push subscriptions. Endpoints and encryption keys
 // are never returned; this is intentionally a diagnostic summary to explain missed pushes and
 // bound fan-out costs without exposing credentials.
