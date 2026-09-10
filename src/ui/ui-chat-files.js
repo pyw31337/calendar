@@ -292,6 +292,10 @@ export function DocumentLightbox(props) {
     setZoomLevel(ZOOM_DEFAULT);
   };
 
+  var ModalBox = (!isMobile && window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer)
+    ? window.GATHER_UI_COMPONENTS.ResizableModalContainer
+    : "div";
+
   return React.createElement("div", {
     role: "dialog", "aria-modal": "true", "aria-label": "파일 미리보기", onClick: onClose,
     style: {
@@ -301,11 +305,12 @@ export function DocumentLightbox(props) {
       height: "100dvh", maxHeight: "100dvh", boxSizing: "border-box", overflow: "hidden"
     }
   },
-    React.createElement("div", {
+    React.createElement(ModalBox, {
+      className: "modal-container document-lightbox-modal",
       onClick: function(e) { e.stopPropagation(); },
       style: {
         width: isMobile ? "100%" : "min(1100px, 96vw)",
-        height: isMobile ? "100dvh" : "auto",
+        height: isMobile ? "100dvh" : "min(860px, 86vh)",
         maxHeight: isMobile ? "100dvh" : "92vh",
         backgroundColor: "var(--bg-card)",
         borderRadius: isMobile ? "0" : "16px", border: "1px solid var(--border-subtle)", display: "flex",
