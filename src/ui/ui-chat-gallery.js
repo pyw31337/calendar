@@ -1508,12 +1508,36 @@ export function ChatGalleryModal({
     onOpen: () => setGalleryDocLightbox({ attachments: items, index: idx })
   }) : null));
   const renderFileListHeader = () => /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '8px' }
-  }, isMobile
-    ? renderVisitFilterToggleMobile()
-    : /*#__PURE__*/React.createElement("label", {
-      style: { fontSize: 'var(--font-size-md)', fontWeight: 800, color: 'var(--text-muted)' }
-    }, `등록된 파일 (${filteredFiles.length}개)`));
+    style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: isMobile ? '6px' : '8px', marginBottom: '4px', minWidth: 0 }
+  },
+    renderVisitFilterToggleMobile(),
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '6px', flexShrink: 0 }
+    },
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "btn btn-action btn-action-outline",
+        onClick: handlePasteGalleryUpload,
+        style: { height: '44px', minHeight: '44px', padding: isMobile ? '0 8px' : '0 12px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: 'pointer', flexShrink: 0 }
+      }, "붙여넣기"),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "btn btn-action btn-action-dark",
+        onClick: handleUploadClick,
+        title: "추가",
+        "aria-label": "추가",
+        style: { height: '44px', minHeight: '44px', width: '44px', minWidth: '44px', maxWidth: '44px', padding: 0, borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }
+      }, PlusIcon ? /*#__PURE__*/React.createElement(PlusIcon, { size: 16 }) : "+"),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "btn btn-action btn-action-outline",
+        onClick: handleToggleBulkShareMode,
+        title: "편집",
+        "aria-label": "편집",
+        style: { height: '44px', minHeight: '44px', width: '44px', minWidth: '44px', maxWidth: '44px', padding: 0, borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }
+      }, PencilIcon ? /*#__PURE__*/React.createElement(PencilIcon, { size: 15 }) : "편집")
+    )
+  );
   // "이전 사진/링크 더 보기": a real component (not a plain render-helper function) so it can use
   // its own IntersectionObserver to auto-fire onClick once the user scrolls near it, instead of
   // requiring an explicit tap. A sentinel div sits 300px above the visible button so the next
@@ -1721,7 +1745,7 @@ export function ChatGalleryModal({
       type: "button",
       onClick: () => setGalleryViewMode(tab.key),
       style: {
-        height: '100%', boxSizing: 'border-box', padding: isMobile ? '0 10px' : '0 14px', fontSize: 'var(--font-size-md)', fontWeight: 900,
+        height: '100%', boxSizing: 'border-box', padding: '0 12px', fontSize: 'var(--font-size-md)', fontWeight: 900,
         borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer',
         backgroundColor: galleryViewMode === tab.key ? '#4F46E5' : 'transparent',
         color: galleryViewMode === tab.key ? '#FFFFFF' : 'var(--text-muted)'
@@ -1734,11 +1758,7 @@ export function ChatGalleryModal({
       gap: isMobile ? '6px' : '8px', marginBottom: '4px', minWidth: 0
     }
   },
-    isMobile
-      ? renderVisitFilterToggleMobile()
-      : /*#__PURE__*/React.createElement("label", {
-          style: { fontSize: 'var(--font-size-md)', fontWeight: 800, color: 'var(--text-muted)' }
-        }, `등록된 사진 (${displayPhotoTabCount}장)`),
+    renderVisitFilterToggleMobile(),
     /*#__PURE__*/React.createElement("div", {
       style: { display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '6px', flexShrink: 0, minWidth: 0 }
     },
@@ -1813,28 +1833,34 @@ export function ChatGalleryModal({
     /*#__PURE__*/React.createElement("div", {
       style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }
     },
-      isMobile
-        ? renderVisitFilterToggleMobile()
-        : /*#__PURE__*/React.createElement("label", {
-            style: { fontSize: 'var(--font-size-md)', fontWeight: 800, color: 'var(--text-muted)' }
-          }, `등록된 링크 (${filteredLinks.length}개)`),
+      renderVisitFilterToggleMobile(),
       /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }
+        style: { display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '6px', flexShrink: 0 }
       },
         /*#__PURE__*/React.createElement("button", {
           type: "button",
           className: "btn btn-action btn-action-outline",
           disabled: isSavingLink,
           onClick: handlePasteLinkFromClipboard,
-          style: { height: '44px', minHeight: '44px', padding: '0 14px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: isSavingLink ? 'wait' : 'pointer' }
+          style: { height: '44px', minHeight: '44px', padding: isMobile ? '0 8px' : '0 12px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: isSavingLink ? 'wait' : 'pointer', flexShrink: 0 }
         }, "붙여넣기"),
         /*#__PURE__*/React.createElement("button", {
           type: "button",
           className: "btn btn-action btn-action-dark",
           disabled: isSavingLink,
           onClick: handleToggleAddLink,
-          style: { height: '44px', minHeight: '44px', padding: '0 14px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: isSavingLink ? 'wait' : 'pointer' }
-        }, isSavingLink ? "저장 중..." : (isAddingLink ? "취소" : "추가"))
+          title: "추가",
+          "aria-label": "추가",
+          style: { height: '44px', minHeight: '44px', width: '44px', minWidth: '44px', maxWidth: '44px', padding: 0, borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: isSavingLink ? 'wait' : 'pointer', flexShrink: 0 }
+        }, PlusIcon ? /*#__PURE__*/React.createElement(PlusIcon, { size: 16 }) : "+"),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          className: "btn btn-action btn-action-outline",
+          title: "편집",
+          "aria-label": "편집",
+          onClick: handleToggleBulkShareMode,
+          style: { height: '44px', minHeight: '44px', width: '44px', minWidth: '44px', maxWidth: '44px', padding: 0, borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }
+        }, PencilIcon ? /*#__PURE__*/React.createElement(PencilIcon, { size: 15 }) : "편집")
       )
     ),
     isAddingLink && /*#__PURE__*/React.createElement("div", {
@@ -2047,30 +2073,6 @@ export function ChatGalleryModal({
           /*#__PURE__*/React.createElement("div", {
             style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }
           },
-            /* Desktop view-mode filter: 전체 | 일자 (Only on PC -- mobile gets its own row
-               below the header, matching the places page's desktop-vs-mobile filter split). */
-            !isMobile && /*#__PURE__*/React.createElement("div", {
-              className: "visit-filter-toggle-desktop",
-              style: {
-                display: 'flex', alignItems: 'center', gap: '2px',
-                backgroundColor: 'var(--bg-primary)', padding: '3px', borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--border-subtle)'
-              }
-            },
-              [
-                { key: 'all', label: '전체' },
-                { key: 'date', label: '일자' }
-              ].map(tab => /*#__PURE__*/React.createElement("button", {
-                key: tab.key,
-                type: "button",
-                onClick: () => setGalleryViewMode(tab.key),
-                style: {
-                  padding: '4px 10px', fontSize: 'var(--font-size-sm)', fontWeight: 800, borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer',
-                  backgroundColor: galleryViewMode === tab.key ? '#4F46E5' : 'transparent',
-                  color: galleryViewMode === tab.key ? '#FFFFFF' : 'var(--text-muted)'
-                }
-              }, tab.label))
-            ),
             /*#__PURE__*/React.createElement("button", {
               type: "button",
               onClick: () => setIsSearchOpen(prev => { if (prev) setSearchQuery(''); return !prev; }),
@@ -2257,9 +2259,9 @@ export function ChatGalleryModal({
       onChange: v => setActiveTab(v),
       style: { backgroundColor: 'var(--bg-card)', flex: 1, borderBottom: 'none' },
       options: [
-        { value: 'photos', label: '사진' },
-        { value: 'links', label: '링크' },
-        { value: 'files', label: '파일' }
+        { value: 'photos', label: '사진', badge: displayPhotoTabCount },
+        { value: 'links', label: '링크', badge: filteredLinks.length },
+        { value: 'files', label: '파일', badge: filteredFiles.length }
       ]
     })
   ), asPage && isMobile && /*#__PURE__*/React.createElement("div", {
@@ -2279,9 +2281,9 @@ export function ChatGalleryModal({
       onChange: v => setActiveTab(v),
       style: { backgroundColor: 'var(--bg-card)', flex: 1, borderBottom: 'none' },
       options: [
-        { value: 'photos', label: '사진' },
-        { value: 'links', label: '링크' },
-        { value: 'files', label: '파일' }
+        { value: 'photos', label: '사진', badge: displayPhotoTabCount },
+        { value: 'links', label: '링크', badge: filteredLinks.length },
+        { value: 'files', label: '파일', badge: filteredFiles.length }
       ]
     })
   ), /*#__PURE__*/React.createElement("div", {
