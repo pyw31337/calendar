@@ -1618,8 +1618,7 @@ console.log('Firebase-only calendar safety tests passed');
     buildLocationHashtags,
     parseNominatimLocation,
     dateStrToCompactHashtag,
-    withUploadDateTag,
-    localDateStr
+    withUploadDateTag
   } = await import('../src/core/photo-metadata-tags.js');
   assert(dateStrToCompactHashtag('2026-09-10') === '260910', 'upload date tag must use YYMMDD');
   assert(formatDeviceHashtag('samsung SM-F916N') === '갤럭시Z폴드2', 'Samsung EXIF codes must map to Korean product names');

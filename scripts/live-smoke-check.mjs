@@ -209,4 +209,27 @@ if (mode === 'vite') {
   }
 }
 
+const FUNCTIONS_BASE = 'https://us-central1-metro-live-2918e.cloudfunctions.net';
+const functionProbes = [
+  ['rebuildPhotoIndex', [405], 'Method not allowed'],
+  ['listPublicCalendarSummaries', [200], '"ok":true'],
+  ['kakaoLocalSearchProxy', [400], 'query is required']
+];
+for (const [name, okCodes, needle] of functionProbes) {
+  const url = `${FUNCTIONS_BASE}/${name}`;
+  const response = await fetch(url, { redirect: 'follow' });
+  const text = await response.text();
+  if (response.status === 404) throw new Error(`Cloud Function missing (not deployed): ${name}`);
+  if (!okCodes.includes(response.status)) {
+    throw new Error(`Cloud Function ${name} unexpected ${response.status}`);
+  }
+  if (needle && !text.includes(needle)) throw new Error(`Cloud Function ${name} body mismatch`);
+  console.log(`[live-smoke] function ok ${name} ${response.status}`);
+}
+const photoIndexTrigger = await fetch(`${FUNCTIONS_BASE}/onMessagePhotoIndexWrite`, { redirect: 'follow' });
+if (photoIndexTrigger.status === 404) {
+  throw new Error('Cloud Function missing (not deployed): onMessagePhotoIndexWrite');
+}
+console.log(`[live-smoke] function trigger onMessagePhotoIndexWrite ${photoIndexTrigger.status}`);
+
 console.log('Live smoke check passed.');

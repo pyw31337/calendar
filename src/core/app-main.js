@@ -11570,12 +11570,23 @@ function loadMapLibreLeaflet() {
   if (mapLibreLeafletLoadPromise) return mapLibreLeafletLoadPromise;
   mapLibreLeafletLoadPromise = (async () => {
     const L = await loadLeaflet();
-    const [mapLibreModule] = await Promise.all([
+    // MapLibre GL JS 6 is ESM-only. 6.4.1+ patches GHSA-jrc7-96c5-q579 (CVE-2026-85061).
+    // The Leaflet bridge ESM build imports maplibre-gl itself and assigns L.maplibreGL.
+    const [mapLibreModule, , leafletBridge] = await Promise.all([
       import('maplibre-gl'),
-      import('maplibre-gl/dist/maplibre-gl.css')
+      import('maplibre-gl/dist/maplibre-gl.css'),
+      import('@maplibre/maplibre-gl-leaflet')
     ]);
-    window.maplibregl = mapLibreModule.default || mapLibreModule;
-    await import('@maplibre/maplibre-gl-leaflet');
+    if (typeof mapLibreModule.setWorkerUrl === 'function') {
+      try {
+        const workerUrlMod = await import('maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url');
+        if (workerUrlMod?.default) mapLibreModule.setWorkerUrl(workerUrlMod.default);
+      } catch (_) { /* Vite can still resolve the worker via import.meta.url */ }
+    }
+    window.maplibregl = mapLibreModule;
+    const maplibreGL = leafletBridge.maplibreGL || leafletBridge.default;
+    if (!L.maplibreGL && typeof maplibreGL === 'function') L.maplibreGL = maplibreGL;
+    if (leafletBridge.MaplibreGL && !L.MaplibreGL) L.MaplibreGL = leafletBridge.MaplibreGL;
     if (!L.maplibreGL) throw new Error('MapLibre Leaflet bridge loaded without maplibreGL');
     return L;
   })().catch(err => {

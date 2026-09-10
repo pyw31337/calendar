@@ -91,6 +91,19 @@ if (/top:\s*['"]12px['"]\s*,\s*left:\s*['"]10px['"]/.test(placesView)) {
   failures.push('places edit checkbox must use 8px inset, not 12/10');
 }
 
+const pkg = JSON.parse(read('package.json'));
+const maplibreRange = String(pkg.dependencies?.['maplibre-gl'] || '');
+const leafletBridgeRange = String(pkg.dependencies?.['@maplibre/maplibre-gl-leaflet'] || '');
+if (!/^[\^~]?6\.(?:[4-9]\.|[1-9]\d)/.test(maplibreRange)) {
+  failures.push('maplibre-gl must be 6.4.1+ (GHSA-jrc7-96c5-q579 / CVE-2026-85061); got ' + maplibreRange);
+}
+if (!/^[\^~]?0\.1\.(?:[4-9]|\d{2,})/.test(leafletBridgeRange)) {
+  failures.push('@maplibre/maplibre-gl-leaflet must be 0.1.4+ for MapLibre 6; got ' + leafletBridgeRange);
+}
+const appMain = read('src/core/app-main.js');
+requireText(appMain, /import\('@maplibre\/maplibre-gl-leaflet'\)/, 'places map must load the MapLibre Leaflet ESM bridge');
+requireText(appMain, /setWorkerUrl/, 'MapLibre 6 worker URL must be wired for Vite');
+
 if (failures.length) {
   failures.forEach(message => console.error('[check-design-system]', message));
   process.exit(1);
