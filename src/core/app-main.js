@@ -2604,7 +2604,10 @@ function CalendarApp() {
       setMemos(Array.from(byId.values()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)));
     };
 
-    const unsubscribePinned = needsMemoCollection ? subscribeMemos(activeCalId, { where: ['isPinned', '==', true] }, snapshot => {
+    // 고정 메모는 원래도 적은 수라 문제된 적 없지만, 수년간 쓰는 가족 캘린더가 계속 늘려온
+    // 다른 컬렉션(anniversaries)에서 이미 겪은 "무제한 재읽기" 패턴을 여기도 예방적으로 막아둔다.
+    // where()에 대한 등호(==) 필터 + limit()만 쓰면(orderBy 없이) 복합 인덱스가 필요 없다.
+    const unsubscribePinned = needsMemoCollection ? subscribeMemos(activeCalId, { where: ['isPinned', '==', true], limit: 100 }, snapshot => {
         if (!isMounted) return;
         pinnedList = [];
         snapshot.forEach(doc => pinnedList.push({ id: doc.id, ...doc.data() }));
