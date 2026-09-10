@@ -1486,6 +1486,27 @@ button, input, textarea, select {
   transform: translateY(-1px);
 }
 
+.btn-action-danger,
+.btn.btn-action-danger {
+  background: var(--bg-primary, #ffffff) !important;
+  border: 1.5px solid rgb(239, 68, 68) !important;
+  color: rgb(239, 68, 68) !important;
+  box-shadow: none;
+}
+.btn-action-danger:hover,
+.btn.btn-action-danger:hover {
+  background: rgba(239, 68, 68, 0.06) !important;
+  border-color: rgb(220, 38, 38) !important;
+  color: rgb(220, 38, 38) !important;
+}
+.btn-action-danger:disabled,
+.btn.btn-action-danger:disabled {
+  background: var(--bg-primary, #ffffff) !important;
+  border-color: rgb(239, 68, 68) !important;
+  color: rgb(239, 68, 68) !important;
+}
+
+
 
 .btn-secondary { background: #F1F5F9; border-color: var(--border-subtle); color: var(--text-main); }
 .btn-secondary:hover { background: #E2E8F0; border-color: var(--border-hover); }
