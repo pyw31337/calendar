@@ -4,6 +4,7 @@ import fs from 'node:fs';
 // now lives in photo-comments.js and UI compatibility wrappers are local to their actual chunk.
 const targets = [
   { file: 'src/core/app-main.js', maxLines: 12250, label: 'app-main.js' },
+  { file: 'src/core/app-anniversary-dates.js', maxLines: 360, label: 'app-anniversary-dates.js' },
   { file: 'src/core/app-firebase-data.js', maxLines: 4500, label: 'app-firebase-data.js' },
   { file: 'src/core/notification-pwa-state.js', maxLines: 240, label: 'notification-pwa-state.js' },
   { file: 'src/core/app-data-bootstrap.js', maxLines: 360, label: 'app-data-bootstrap.js' },
