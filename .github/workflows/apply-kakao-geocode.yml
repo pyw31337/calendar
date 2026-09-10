@@ -1,0 +1,43 @@
+name: Apply Kakao reverse-geocode tags
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - name: Apply Kakao reverse-geocode patch
+        run: python3 patches/apply-kakao-geocode.py
+      - name: Verify guards
+        run: |
+          node scripts/firebase-safety-tests.mjs
+          node scripts/check-architecture-budget.mjs
+          node scripts/check-required-symbols.mjs
+      - name: Commit and push
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add src/core/photo-metadata-tags.js src/core/app-place-search.js src/core/app-main.js functions/index.js scripts/firebase-safety-tests.mjs
+          git status --short
+          if git diff --cached --quiet; then
+            echo 'No source changes to commit'
+            exit 0
+          fi
+          git commit -m "$(cat <<'MSG'
+          feat: reverse-geocode photo GPS with Kakao building names
+
+          Keep UI files untouched. Chat/gallery uploads now prefer Kakao
+          coord2address for Korean POI/admin tags (#모아엘가 #경기도부천시)
+          and still fall back to Nominatim zoom=18 when Kakao is empty.
+          MSG
+          )"
+          git push origin HEAD:main
