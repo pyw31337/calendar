@@ -982,16 +982,12 @@ function setPublicCacheHeaders(res, maxAge = 300) {
 }
 
 const PUBLIC_PROXY_RUNTIME = { timeoutSeconds: 15, memory: '256MB', maxInstances: 20 };
-// Place search (Kakao/Google) was the specific "느리고 답답하다" complaint -- these two scale to
-// zero like every other function here, so an idle gap of even a few minutes forces the next
-// search to pay a full cold start (function container boot + Node runtime init), often 1-3s+ on
-// top of the actual API call. minInstances keeps one instance warm so a search only ever pays
-// the real network round-trip. Cost is a small idle-instance fee (~256MB, 1 warm instance,
-// us-central1/Tier-1 pricing) on top of normal pay-per-use billing -- roughly $2.70/month per
-// warm instance (~3,600-4,000원), not a per-request charge. peekalinkProxy/tourApiSearchProxy
-// are left at the default (scale-to-zero) since they weren't the reported problem and don't
-// justify the extra always-on cost.
-const PLACE_SEARCH_PROXY_RUNTIME = { ...PUBLIC_PROXY_RUNTIME, minInstances: 1 };
+// kakaoLocalSearchProxy/googlePlacesSearchProxy briefly ran with minInstances: 1 (a warm instance,
+// ~$2.31/month minimum bill) to remove cold-start latency. Reverted: the actual bottleneck the
+// user felt was a fixed-duration *simulated* progress bar in the date-modal place search UI (see
+// ui-date-modal.js), not real cold starts, and paid-idle-instance cost isn't worth it for a
+// feature this infrequently used relative to chat/gallery.
+const PLACE_SEARCH_PROXY_RUNTIME = PUBLIC_PROXY_RUNTIME;
 
 // Generic per-IP, per-endpoint sliding-window throttle for the public proxy functions below
 // (peekalinkProxy, kakaoLocalSearchProxy). Both proxies are unauthenticated by design (any

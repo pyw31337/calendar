@@ -465,30 +465,6 @@ export function DateModal({
   const [placeSearchStage, setPlaceSearchStage] = React.useState(null);
   const [isSavingPlace, setIsSavingPlace] = React.useState(false);
 
-  // Search progress simulation states
-  const [searchProgress, setSearchProgress] = React.useState(0);
-  const [estRemainingSeconds, setEstRemainingSeconds] = React.useState(5);
-
-  React.useEffect(() => {
-    if (!isPlaceLoading) {
-      setSearchProgress(0);
-      setEstRemainingSeconds(5);
-      return;
-    }
-    setSearchProgress(5);
-    setEstRemainingSeconds(5);
-    const startTime = Date.now();
-    const targetDuration = 5000;
-    const interval = setInterval(() => {
-      const elapsed = Date.now() - startTime;
-      const progressValue = Math.min(Math.round(98 * (1 - Math.exp(-elapsed / 2200))), 98);
-      const remaining = Math.max(1, Math.round((targetDuration - elapsed) / 1000));
-      setSearchProgress(progressValue);
-      setEstRemainingSeconds(remaining);
-    }, 100);
-    return () => clearInterval(interval);
-  }, [isPlaceLoading]);
-
   const searchPlacesWithProviders = async (cleanQuery, options = {}) => {
     const api = window.GATHER_APP_PLACE_SEARCH;
     if (!api || typeof api.searchPlaces !== 'function') return { provider: null, results: [] };
@@ -2602,23 +2578,18 @@ export function DateModal({
           )
         ),
 
-        /* Search progress overlay */
+        /* Search progress -- a real spinner tied to the actual request, not a simulated
+           countdown. A fixed-duration fake progress bar (the previous implementation) makes a
+           search that resolves in under a second look and feel exactly as slow as a 5-second
+           worst case every single time, which is worse than just not showing a duration at all. */
         isPlaceLoading && /*#__PURE__*/React.createElement("div", {
-          style: {
-            padding: '12px 14px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)',
-            backgroundColor: 'var(--bg-primary)', display: 'flex', flexDirection: 'column', gap: '6px'
-          }
+          style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', borderRadius: 'var(--radius-md)', backgroundColor: 'rgba(59, 130, 246, 0.06)' }
         },
-          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', fontSize: 'var(--font-size-sm)', fontWeight: 700 } },
-            /*#__PURE__*/React.createElement("span", { style: { color: 'var(--text-muted)' } },
-              placeSearchStage === 'kakao' ? "카카오 로컬 정보 분석 중..." :
-              placeSearchStage === 'google' ? "구글 장소 분석 중..." :
-              placeSearchStage === 'nominatim' ? "지도 매핑 분석 중..." : "주변 정보 수집 중..."
-            ),
-            /*#__PURE__*/React.createElement("span", { style: { color: 'var(--accent-primary)' } }, `${searchProgress}% (${estRemainingSeconds}초 남음)`)
-          ),
-          /*#__PURE__*/React.createElement("div", { style: { width: '100%', height: '6px', backgroundColor: 'var(--border-subtle)', borderRadius: 'var(--radius-full)', overflow: 'hidden' } },
-            /*#__PURE__*/React.createElement("div", { style: { width: `${searchProgress}%`, height: '100%', backgroundColor: 'var(--accent-primary)', transition: 'width 0.1s linear' } })
+          /*#__PURE__*/React.createElement("span", { className: "calendar-spinner", style: { flexShrink: 0 } }),
+          /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-md)', color: 'var(--text-muted)' } },
+            placeSearchStage === 'kakao' ? "카카오에서 검색 중..." :
+            placeSearchStage === 'google' ? "해외 장소 데이터베이스 확인 중..." :
+            placeSearchStage === 'nominatim' ? "지도 데이터에서 주소 확인 중..." : "검색 중..."
           )
         ),
 
