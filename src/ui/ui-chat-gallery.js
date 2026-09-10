@@ -1180,11 +1180,31 @@ export function ChatGalleryModal({
     if (!keys.length || isBulkDeleting) return;
     const keySet = new Set(keys);
     const count = keys.length;
+    const selectedPhotos = activeTab === 'photos'
+      ? (visiblePhotos || []).filter(photo => keySet.has(getPhotoKey(photo)))
+      : [];
+    const selectedFiles = activeTab === 'files'
+      ? (filteredFiles || []).filter(item => keySet.has(String(item.id || item.url || '')))
+      : [];
+    const photoPlaces = (() => {
+      const labels = new Set(['갤러리']);
+      selectedPhotos.forEach(photo => {
+        const s = String(photo.source || photo.uploadSource || '').toLowerCase();
+        if (s === 'chat' || s === 'chat-tag') labels.add('채팅');
+        if (s === 'meeting') labels.add('일정');
+        if (s === 'memo') labels.add('메모');
+      });
+      return Array.from(labels).join('·');
+    })();
+    const filePlaces = selectedFiles.some(item => {
+      const s = String(item.uploadSource || '').toLowerCase();
+      return s && s !== 'gallery' && s !== 'meeting';
+    }) ? '채팅과 갤러리' : '갤러리';
     const message = activeTab === 'photos'
-      ? `선택한 사진 ${count}장을 삭제하시겠습니까? 채팅·일정·갤러리에서 함께 사라집니다.`
+      ? `선택한 사진 ${count}장을 이 캘린더 ${photoPlaces}에서 삭제하시겠습니까? 다른 캘린더 원본은 그대로 둡니다.`
       : (activeTab === 'files'
-        ? `선택한 파일 ${count}개를 삭제하시겠습니까? 채팅과 갤러리에서 함께 사라집니다.`
-        : `선택한 링크 ${count}개를 삭제하시겠습니까? 갤러리에 따로 등록된 링크만 삭제되고, 메모/일정 본문 링크는 건너뜁니다.`);
+        ? `선택한 파일 ${count}개를 이 캘린더 ${filePlaces}에서 삭제하시겠습니까? 다른 캘린더 원본은 그대로 둡니다.`
+        : `선택한 링크 ${count}개를 이 캘린더 갤러리에서 삭제하시겠습니까? 메모/일정 본문과 다른 캘린더 원본은 그대로 둡니다.`);
     const run = async () => {
       setIsBulkDeleting(true);
       try {

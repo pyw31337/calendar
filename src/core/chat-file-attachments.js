@@ -306,6 +306,7 @@ export function collectChatFileAttachmentsFromMessages(messages) {
         participantId: msg.participantId || '',
         timestamp: Number(msg.timestamp) || clean.uploadedAt || 0,
         source: 'chat',
+        uploadSource: msg.uploadSource || 'chat',
         attachmentIndex: index
       });
     });
