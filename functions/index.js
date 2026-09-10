@@ -982,6 +982,16 @@ function setPublicCacheHeaders(res, maxAge = 300) {
 }
 
 const PUBLIC_PROXY_RUNTIME = { timeoutSeconds: 15, memory: '256MB', maxInstances: 20 };
+// Place search (Kakao/Google) was the specific "느리고 답답하다" complaint -- these two scale to
+// zero like every other function here, so an idle gap of even a few minutes forces the next
+// search to pay a full cold start (function container boot + Node runtime init), often 1-3s+ on
+// top of the actual API call. minInstances keeps one instance warm so a search only ever pays
+// the real network round-trip. Cost is a small idle-instance fee (~256MB, 1 warm instance,
+// us-central1/Tier-1 pricing) on top of normal pay-per-use billing -- roughly $2.70/month per
+// warm instance (~3,600-4,000원), not a per-request charge. peekalinkProxy/tourApiSearchProxy
+// are left at the default (scale-to-zero) since they weren't the reported problem and don't
+// justify the extra always-on cost.
+const PLACE_SEARCH_PROXY_RUNTIME = { ...PUBLIC_PROXY_RUNTIME, minInstances: 1 };
 
 // Generic per-IP, per-endpoint sliding-window throttle for the public proxy functions below
 // (peekalinkProxy, kakaoLocalSearchProxy). Both proxies are unauthenticated by design (any
@@ -1275,7 +1285,7 @@ async function writeExternalCache(provider, key, payload, ttlMs) {
   } catch (err) { console.warn(`external cache write failed (${provider}):`, err); }
 }
 
-exports.kakaoLocalSearchProxy = functions.runWith({ ...PUBLIC_PROXY_RUNTIME, secrets: ['KAKAO_REST_API_KEY'] }).https.onRequest(async (req, res) => {
+exports.kakaoLocalSearchProxy = functions.runWith({ ...PLACE_SEARCH_PROXY_RUNTIME, secrets: ['KAKAO_REST_API_KEY'] }).https.onRequest(async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') { setPublicCacheHeaders(res, 86400); res.status(204).send(''); return; }
@@ -1354,7 +1364,7 @@ async function incrementGooglePlacesSearchStat() {
   }
 }
 
-exports.googlePlacesSearchProxy = functions.runWith({ ...PUBLIC_PROXY_RUNTIME, secrets: ['GOOGLE_PLACES_API_KEY'] }).https.onRequest(async (req, res) => {
+exports.googlePlacesSearchProxy = functions.runWith({ ...PLACE_SEARCH_PROXY_RUNTIME, secrets: ['GOOGLE_PLACES_API_KEY'] }).https.onRequest(async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') { setPublicCacheHeaders(res, 86400); res.status(204).send(''); return; }

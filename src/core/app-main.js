@@ -891,7 +891,17 @@ function CalendarApp() {
       }
       const pendingPlaces = pendingRemotePlacesRef.current;
       pendingRemotePlacesRef.current = null;
-      if (Array.isArray(pendingPlaces)) setPlacesSubcollection(pendingPlaces);
+      // pendingPlaces is now only the bounded recent-updates window (see subscribePlaces above),
+      // not the full collection, so merge it in by id instead of replacing -- a plain replace
+      // here would silently drop every older place not touched during this save.
+      if (Array.isArray(pendingPlaces)) {
+        setPlacesSubcollection(prev => {
+          const byId = new Map();
+          (Array.isArray(prev) ? prev : []).forEach(p => { if (p?.id) byId.set(p.id, p); });
+          pendingPlaces.forEach(p => { if (p?.id) byId.set(p.id, p); });
+          return Array.from(byId.values());
+        });
+      }
       const pendingMeetings = pendingRemoteMeetingsRef.current;
       pendingRemoteMeetingsRef.current = null;
       if (Array.isArray(pendingMeetings)) {
@@ -1473,6 +1483,34 @@ function CalendarApp() {
   // itself changes. Mirrors the chatParticipantIdRef pattern used the same way above.
   const activeCalRef = React.useRef(activeCal);
   React.useEffect(() => { activeCalRef.current = activeCal; }, [activeCal]);
+
+  // Lightweight client-side error monitoring: without this, a bug that fails silently in
+  // someone's browser is invisible to us unless they think to report it. Reuses the existing
+  // serverAuditLogs pipeline (queueServerAuditEvent -> auditEvent Cloud Function, already
+  // rate-limited server-side) instead of adding a new third-party service/account -- these
+  // show up in the admin 감사 로그 tab as action "client_error", same place as every other
+  // audit event. Registered once for the page's lifetime, not per calendar.
+  React.useEffect(() => {
+    const reportClientError = (message, extra) => {
+      const calId = activeCalRef.current?.id || 'unknown';
+      const note = sanitizeText(`${message || '알 수 없는 오류'} ${extra || ''}`.trim(), 200);
+      queueServerAuditEvent(calId, 'client_error', note, getClientAuditContext());
+    };
+    const onError = (event) => {
+      reportClientError(event?.message, event?.filename ? `@${event.filename}:${event.lineno || ''}` : '');
+    };
+    const onRejection = (event) => {
+      const reason = event?.reason;
+      reportClientError(reason?.message || String(reason || '').slice(0, 160));
+    };
+    window.addEventListener('error', onError);
+    window.addEventListener('unhandledrejection', onRejection);
+    return () => {
+      window.removeEventListener('error', onError);
+      window.removeEventListener('unhandledrejection', onRejection);
+    };
+  }, []);
+
   React.useEffect(() => {
     if (activeCal) {
       const calTitle = `${activeCal.title} 캘린더`;
@@ -2402,7 +2440,26 @@ function CalendarApp() {
       return () => { isMounted = false; clearInterval(refreshTimer); };
     }
 
-    const unsubPlaces = subscribePlaces(activeCalId, snapshot => {
+    // A years-old family calendar's places subcollection only ever grows, and a plain
+    // unbounded onSnapshot() re-reads every single place from scratch on every reconnect.
+    // Same fix as anniversaries/customCultureItems: hydrate the full list once via REST, then
+    // attach a listener bounded to the most-recently-updated places to catch live add/edit/
+    // (soft-)delete, merging by id into local state so older places hydrated via REST are never
+    // dropped. Deletes are safe to catch this way because they're soft-deletes (deletedAt set on
+    // the doc, which bumps updatedAt) rather than real document removal, so a delete always shows
+    // up in the "most recently updated" window like any other edit.
+    const mergePlacesById = (prevList, incomingList) => {
+      const byId = new Map();
+      (Array.isArray(prevList) ? prevList : []).forEach(p => { if (p?.id) byId.set(p.id, p); });
+      (Array.isArray(incomingList) ? incomingList : []).forEach(p => { if (p?.id) byId.set(p.id, p); });
+      return Array.from(byId.values());
+    };
+    fetchPlacesFromFirestore(activeCalId).then(list => {
+      if (isMounted && Array.isArray(list) && list.length > 0) {
+        setPlacesSubcollection(prev => mergePlacesById(prev, list));
+      }
+    }).catch(err => console.warn('Places archive hydration failed:', err));
+    const unsubPlaces = subscribePlaces(activeCalId, { orderBy: 'updatedAt', direction: 'desc', limit: 200 }, snapshot => {
         if (!isMounted) return;
         const list = [];
         snapshot.forEach(doc => list.push(doc.data()));
@@ -2410,7 +2467,7 @@ function CalendarApp() {
           if (!snapshot.metadata?.fromCache && !snapshot.metadata?.hasPendingWrites) pendingRemotePlacesRef.current = list;
           return;
         }
-        setPlacesSubcollection(list);
+        setPlacesSubcollection(prev => mergePlacesById(prev, list));
       }, err => {
         console.warn(`Firestore places subscription error:`, err);
         queueServerAuditEvent(activeCalId, 'realtime_fallback', `places:${String(err?.code || 'unknown')}`, getClientAuditContext());

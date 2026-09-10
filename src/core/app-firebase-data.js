@@ -968,14 +968,16 @@ function subscribeMessages(calId, options, onSnapshot, onError) {
   if (options && options.limit) q = q.limit(options.limit);
   return q.onSnapshot(onSnapshot, onError || function () {});
 }
-function subscribePlaces(calId, onSnapshot, onError) {
+function subscribePlaces(calId, options, onSnapshot, onError) {
   const svc = window.GATHER_FIREBASE_SERVICES;
   if (svc && typeof svc.subscribePlaces === 'function' && !svc.isScaffold) {
-    return svc.subscribePlaces(calId, onSnapshot, onError);
+    return svc.subscribePlaces(calId, options, onSnapshot, onError);
   }
   if (!firebaseDb || !calId) return function () {};
-  return firebaseDb.collection('calendars').doc('cal_' + calId).collection('places')
-    .onSnapshot(onSnapshot, onError || function () {});
+  let q = firebaseDb.collection('calendars').doc('cal_' + calId).collection('places');
+  if (options && options.orderBy) q = q.orderBy(options.orderBy, options.direction || 'desc');
+  if (options && options.limit) q = q.limit(options.limit);
+  return q.onSnapshot(onSnapshot, onError || function () {});
 }
 function subscribeMemos(calId, options, onSnapshot, onError) {
   const svc = window.GATHER_FIREBASE_SERVICES;

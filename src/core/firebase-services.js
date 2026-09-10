@@ -998,8 +998,15 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     };
   }
 
-  function subscribePlaces(calId, onSnapshot, onError) {
-    return subscribeCalSubcollection(calId, 'places', {}, onSnapshot, onError);
+  function subscribePlaces(calId, options, onSnapshot, onError) {
+    options = options || {};
+    const spec = {};
+    if (options.orderBy) {
+      spec.orderBy = options.orderBy;
+      spec.direction = options.direction || 'desc';
+    }
+    if (options.limit != null) spec.limit = options.limit;
+    return subscribeCalSubcollection(calId, 'places', spec, onSnapshot, onError);
   }
 
   function subscribeMemos(calId, options, onSnapshot, onError) {
