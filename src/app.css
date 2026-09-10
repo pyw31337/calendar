@@ -5934,3 +5934,11 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
 }
+
+/* 인물/추억 탭의 벤또 그리드(태그·여행 칸). 좁은 화면에서는 auto-fill의 140px 최소폭 때문에
+   한 줄에 1칸만 들어가는 경우가 있어, 모바일 폭에서는 무조건 2열로 고정해 썸네일을 줄인다. */
+@media (max-width: 480px) {
+  .history-bento-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}

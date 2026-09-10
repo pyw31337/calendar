@@ -1934,6 +1934,7 @@ export function HistoryView({
     );
   };
   const renderMemoryGroupGrid = groups => /*#__PURE__*/React.createElement("div", {
+    className: "history-bento-grid",
     style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px' }
   }, groups.map(renderMemoryGroupCard));
   const renderMemoryGroups = () => {
@@ -2096,7 +2097,7 @@ export function HistoryView({
       className: "history-meetings-grid history-page-scroll",
       onScroll: handleHistoryScroll,
       style: Object.assign(
-        { flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: '118px 16px 16px' },
+        { flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: '134px 16px 16px' },
         confirmedDates.length === 0 ? { display: 'flex', alignItems: 'center', justifyContent: 'center' } : {}
       )
     },
@@ -2185,7 +2186,7 @@ export function HistoryView({
     historyTab === 'memories' && !selectedMemoryGroupId && /*#__PURE__*/React.createElement("div", {
       className: "history-page-scroll",
       onScroll: handleHistoryScroll,
-      style: { flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: '118px 16px 16px' }
+      style: { flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: '134px 16px 16px' }
     }, /*#__PURE__*/React.createElement(React.Fragment, null,
       /*#__PURE__*/React.createElement("div", {
         style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '10px', minWidth: 0 }
@@ -2234,7 +2235,7 @@ export function HistoryView({
       return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
         className: "history-page-scroll",
         onScroll: handleHistoryScroll,
-        style: { flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: '118px 16px 16px' }
+        style: { flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: '134px 16px 16px' }
       }, /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
         /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
           /*#__PURE__*/React.createElement("button", {
@@ -2320,7 +2321,7 @@ export function HistoryView({
     historyTab === 'people' && !selectedPersonTag && /*#__PURE__*/React.createElement("div", {
       className: "history-page-scroll",
       onScroll: handleHistoryScroll,
-      style: { flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: '118px 16px 16px' }
+      style: { flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: '134px 16px 16px' }
     }, /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '16px' } },
       // 새 인물 태그 추가 -- 벤또 그리드 위로 이동(추가 즉시 그리드에 반영되는 걸 바로 보기
       // 쉽도록). 기존 .form-input/.btn-primary만으로는 패딩/높이/모서리가 다른 입력·버튼과
@@ -2335,7 +2336,10 @@ export function HistoryView({
           onChange: e => setNewPersonTag(e.target.value),
           onKeyDown: e => { if (e.key === 'Enter') { e.preventDefault(); handleAddPersonTagClick(); } },
           style: {
-            flex: 1, height: '40px', padding: '0 14px', borderRadius: 'var(--radius-md)',
+            // minWidth: 0 없으면 flex item 기본값(auto)이 placeholder 텍스트 길이만큼의
+            // 고유 너비를 최소폭으로 강제해서, 좁은 화면에서 옆 버튼이 화면 우측 밖으로
+            // 밀려나갔었다.
+            flex: 1, minWidth: 0, height: '40px', padding: '0 14px', borderRadius: 'var(--radius-md)',
             border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)',
             color: 'var(--text-main)', fontSize: 'var(--font-size-sm)'
           }
@@ -2357,7 +2361,7 @@ export function HistoryView({
       ),
       personTagChips.length === 0
         ? /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' } }, "태그가 없습니다. 위에서 인물 태그를 추가해 보세요.")
-        : /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px' } },
+        : /*#__PURE__*/React.createElement("div", { className: "history-bento-grid", style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px' } },
             personTagChips.map(tag => {
               const tagPhotos = getPhotosForTagLabel(tag.label);
               const cover = tagPhotos[0];
@@ -2400,7 +2404,7 @@ export function HistoryView({
     historyTab === 'people' && !!selectedPersonTag && /*#__PURE__*/React.createElement("div", {
       className: "history-page-scroll",
       onScroll: handleHistoryScroll,
-      style: { flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: '118px 16px 16px' }
+      style: { flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', padding: '134px 16px 16px' }
     }, /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
         /*#__PURE__*/React.createElement("button", {
