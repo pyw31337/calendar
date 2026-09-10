@@ -11,6 +11,14 @@ function getPhotoAssetCommentKey(...args) {
   const f = __gatherUiDeps().getPhotoAssetCommentKey || GATHER_APP_UTILS.getPhotoAssetCommentKey;
   return typeof f === 'function' ? f(...args) : '';
 }
+function getPhotoCommentIdentity(...args) {
+  const f = __gatherUiDeps().getPhotoCommentIdentity || GATHER_APP_UTILS.getPhotoCommentIdentity;
+  return typeof f === 'function' ? f(...args) : {};
+}
+function getPhotoCommentCount(...args) {
+  const f = __gatherUiDeps().getPhotoCommentCount || GATHER_APP_UTILS.getPhotoCommentCount;
+  return typeof f === 'function' ? f(...args) : 0;
+}
 function getPhotoAssetKeys(photo = {}) {
   return Array.from(new Set([
     getPhotoAssetCommentKey({ full: photo.imageUrl || photo.full || '' }),
@@ -3279,9 +3287,13 @@ export function DateModal({
           gridTemplateColumns: 'repeat(auto-fill, minmax(76px, 1fr))',
           gap: '8px'
         }
-      }, visibleMeetingImages.map((photo, index) => /*#__PURE__*/React.createElement("div", {
+      }, visibleMeetingImages.map((photo, index) => {
+        const commentIdentity = getPhotoCommentIdentity(photo, visibleMeetingImages, { source: photo.source || 'meeting', meetingDate: dateStr }) || {};
+        const commentCount = getPhotoCommentCount(commentIdentity, photoCommentCounts) || Math.max(0, Number(photo.commentCount || 0));
+        return /*#__PURE__*/React.createElement("div", {
         key: photo.id || `${photo.imageUrl}_${index}`,
-        style: { position: 'relative', minWidth: 0 }
+        className: commentCount ? 'gallery-comment-heartbeat' : '',
+        style: { position: 'relative', minWidth: 0, animationDelay: `${(index % 7) * 0.9}s` }
       },
         /*#__PURE__*/React.createElement(MediaThumb, {
           src: photo.thumbUrl || photo.imageUrl,
@@ -3336,7 +3348,9 @@ export function DateModal({
             cursor: 'pointer'
           }
         }),
-      ))),
+        PhotoCommentCountBadge && /*#__PURE__*/React.createElement(PhotoCommentCountBadge, { count: commentCount })
+        );
+      })),
         visibleMeetingVideos.length > 0 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '14px' } },
           visibleMeetingVideos.map(video => /*#__PURE__*/React.createElement(DateModalVideoCard, { key: video.id, video }))
         )

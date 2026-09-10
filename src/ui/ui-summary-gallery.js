@@ -1466,8 +1466,9 @@ export function HistoryView({
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+  // +16px 여유를 더해 탭 밑줄에 콘텐츠가 바로 붙지 않도록 한다(측정값 그대로 쓰면 딱 붙어 보임).
   const historyScrollPadTop = isHeaderVisible
-    ? `calc(${Math.max(headerStackHeight, 56)}px + env(safe-area-inset-top, 0px))`
+    ? `calc(${Math.max(headerStackHeight, 56)}px + 16px + env(safe-area-inset-top, 0px))`
     : 'calc(12px + env(safe-area-inset-top, 0px))';
   const historyScrollStyle = {
     flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain',
@@ -1977,6 +1978,7 @@ export function HistoryView({
     );
   };
   const renderMemoryGroupGrid = groups => /*#__PURE__*/React.createElement("div", {
+    className: "history-bento-grid",
     style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px' }
   }, groups.map(renderMemoryGroupCard));
   const renderMemoryGroups = () => {
@@ -2387,7 +2389,10 @@ export function HistoryView({
           onChange: e => setNewPersonTag(e.target.value),
           onKeyDown: e => { if (e.key === 'Enter') { e.preventDefault(); handleAddPersonTagClick(); } },
           style: {
-            flex: 1, height: '40px', padding: '0 14px', borderRadius: 'var(--radius-md)',
+            // minWidth: 0 없으면 flex item 기본값(auto)이 placeholder 텍스트 길이만큼의
+            // 고유 너비를 최소폭으로 강제해서, 좁은 화면에서 옆 버튼이 화면 우측 밖으로
+            // 밀려나갔었다.
+            flex: 1, minWidth: 0, height: '40px', padding: '0 14px', borderRadius: 'var(--radius-md)',
             border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)',
             color: 'var(--text-main)', fontSize: 'var(--font-size-sm)'
           }
@@ -2409,7 +2414,7 @@ export function HistoryView({
       ),
       personTagChips.length === 0
         ? /*#__PURE__*/React.createElement("div", { style: { color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' } }, "태그가 없습니다. 위에서 인물 태그를 추가해 보세요.")
-        : /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px' } },
+        : /*#__PURE__*/React.createElement("div", { className: "history-bento-grid", style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px' } },
             personTagChips.map(tag => {
               const tagPhotos = getPhotosForTagLabel(tag.label);
               const cover = tagPhotos[0];
