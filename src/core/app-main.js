@@ -3508,6 +3508,39 @@ function CalendarApp() {
     }
   };
 
+  const handleAddGalleryFiles = async attachments => {
+    if (!guardLoadedCalendar()) return false;
+    const files = (attachments || []).map(item => ({
+      url: String(item?.url || '').trim(),
+      name: String(item?.name || '파일').trim(),
+      mime: String(item?.mime || item?.contentType || '').trim(),
+      size: Number(item?.size) || 0
+    })).filter(item => /^https?:\/\//i.test(item.url));
+    if (!files.length) {
+      showToast('붙여넣을 파일이 없습니다.', 'error');
+      return false;
+    }
+    const fallbackParticipantId = chatParticipantId || getActiveParticipants(activeCal)[0]?.id || '';
+    const messageOperationId = `gallery_files_${activeCal.id}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const messageData = {
+      participantId: fallbackParticipantId,
+      text: files.map(item => item.name).filter(Boolean).join('\n'),
+      timestamp: Date.now(),
+      uploadSource: 'gallery',
+      fileAttachments: files
+    };
+    try {
+      const sent = await writeCollectionDocumentWithFallback('messages', activeCal.id, '', messageData, 'add', '갤러리 파일 저장', { documentId: messageOperationId });
+      if (!sent) throw new Error('Gallery file save failed');
+      if (sent.id) upsertLocalChatMessage({ ...messageData, id: sent.id });
+      return sent.queued ? 'queued' : true;
+    } catch (err) {
+      console.error('handleAddGalleryFiles failed:', err);
+      showToast('파일 저장 실패', 'error');
+      return false;
+    }
+  };
+
   // 다른 캘린더의 라이트박스에서 "URL 복사하기"로 복사한 사진을 이 갤러리에 붙여넣는다
   // (ui-chat-gallery.js의 onPasteGatherPhoto). URL은 그대로 재사용한다 -- 사진 삭제는 어느
   // 캘린더에서든 이 메시지 문서(참조)만 지울 뿐 Storage 원본 파일은 건드리지 않으므로(기존
@@ -7252,6 +7285,7 @@ function CalendarApp() {
         onClose: () => changeView('calendar'),
         onUploadImages: handleUploadGalleryImages,
         onAddLink: handleAddGalleryLink,
+        onAddFiles: handleAddGalleryFiles,
         onPasteGatherPhoto: handlePasteGatherPhoto,
         onPasteGatherPhotos: handlePasteGatherPhotos,
         onOpenShare: () => {
@@ -7683,6 +7717,7 @@ function CalendarApp() {
     onClose: () => setIsGalleryOpen(false),
     onUploadImages: handleUploadGalleryImages,
     onAddLink: handleAddGalleryLink,
+    onAddFiles: handleAddGalleryFiles,
     onPasteGatherPhoto: handlePasteGatherPhoto,
     onPasteGatherPhotos: handlePasteGatherPhotos,
     onOpenShare: () => {

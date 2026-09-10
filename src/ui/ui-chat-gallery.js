@@ -291,6 +291,88 @@ function encodeGatherPhotosFragment(photos) {
     return '';
   }
 }
+const GATHER_LINKS_FRAGMENT_PREFIX = '#gatherLinks=';
+function encodeGatherLinksFragment(links) {
+  try {
+    const payload = {
+      v: 1,
+      kind: 'gather-links',
+      links: (links || []).map(item => ({
+        url: String(item?.url || '').trim(),
+        title: String(item?.title || item?.text || '').trim()
+      })).filter(item => /^https?:\/\//i.test(item.url))
+    };
+    if (!payload.links.length) return '';
+    const json = JSON.stringify(payload);
+    const b64 = typeof btoa === 'function' ? btoa(unescape(encodeURIComponent(json))) : '';
+    return b64 ? GATHER_LINKS_FRAGMENT_PREFIX + b64 : '';
+  } catch (_) {
+    return '';
+  }
+}
+function parseGatherLinksClipboardText(text) {
+  const raw = String(text || '').trim();
+  if (!/^https?:\/\//i.test(raw)) return null;
+  const markerIndex = raw.indexOf(GATHER_LINKS_FRAGMENT_PREFIX);
+  if (markerIndex === -1) return null;
+  const b64 = raw.slice(markerIndex + GATHER_LINKS_FRAGMENT_PREFIX.length);
+  try {
+    const json = decodeURIComponent(escape(atob(b64)));
+    const payload = JSON.parse(json);
+    if (!payload || payload.kind !== 'gather-links' || !Array.isArray(payload.links)) return null;
+    const links = payload.links
+      .map(item => ({ url: String(item?.url || '').trim(), title: String(item?.title || '').trim() }))
+      .filter(item => /^https?:\/\//i.test(item.url));
+    return links.length ? links : null;
+  } catch (_) {
+    return null;
+  }
+}
+const GATHER_FILES_FRAGMENT_PREFIX = '#gatherFiles=';
+function encodeGatherFilesFragment(files) {
+  try {
+    const payload = {
+      v: 1,
+      kind: 'gather-files',
+      files: (files || []).map(item => ({
+        url: String(item?.url || '').trim(),
+        name: String(item?.name || '파일').trim(),
+        mime: String(item?.mime || item?.contentType || '').trim(),
+        size: Number(item?.size) || 0
+      })).filter(item => /^https?:\/\//i.test(item.url))
+    };
+    if (!payload.files.length) return '';
+    const json = JSON.stringify(payload);
+    const b64 = typeof btoa === 'function' ? btoa(unescape(encodeURIComponent(json))) : '';
+    return b64 ? GATHER_FILES_FRAGMENT_PREFIX + b64 : '';
+  } catch (_) {
+    return '';
+  }
+}
+function parseGatherFilesClipboardText(text) {
+  const raw = String(text || '').trim();
+  if (!/^https?:\/\//i.test(raw)) return null;
+  const markerIndex = raw.indexOf(GATHER_FILES_FRAGMENT_PREFIX);
+  if (markerIndex === -1) return null;
+  const b64 = raw.slice(markerIndex + GATHER_FILES_FRAGMENT_PREFIX.length);
+  try {
+    const json = decodeURIComponent(escape(atob(b64)));
+    const payload = JSON.parse(json);
+    if (!payload || payload.kind !== 'gather-files' || !Array.isArray(payload.files)) return null;
+    const files = payload.files
+      .map(item => ({
+        url: String(item?.url || '').trim(),
+        name: String(item?.name || '파일').trim(),
+        mime: String(item?.mime || item?.contentType || '').trim(),
+        size: Number(item?.size) || 0
+      }))
+      .filter(item => /^https?:\/\//i.test(item.url));
+    return files.length ? files : null;
+  } catch (_) {
+    return null;
+  }
+}
+
 function parseGatherPhotosClipboardText(text) {
   const raw = String(text || '').trim();
   if (!/^https?:\/\//i.test(raw)) return null;
@@ -318,6 +400,7 @@ export function ChatGalleryModal({
   onClose,
   onUploadImages = null,
   onAddLink = null,
+  onAddFiles = null,
   onOpenShare = null,
   setActiveLightbox,
   hasMoreOlderChat = false,
@@ -989,6 +1072,19 @@ export function ChatGalleryModal({
       setGatherPhotosPastePreview(gatherPhotos);
       return;
     }
+    const gatherFiles = parseGatherFilesClipboardText(clipboardText);
+    if (gatherFiles && typeof onAddFiles === 'function') {
+      setIsMenuOpen(false);
+      setIsSavingLink(true);
+      try {
+        const ok = await onAddFiles(gatherFiles);
+        if (showToast) showToast(ok !== false ? `파일 ${gatherFiles.length}개를 붙여넣었습니다.` : '파일 붙여넣기에 실패했습니다.', ok !== false ? 'success' : 'error');
+        if (ok !== false) setActiveTab('files');
+      } finally {
+        setIsSavingLink(false);
+      }
+      return;
+    }
     const files = await readClipboardImageFiles(showToast);
     if (files && files.length > 0) {
       // Show what will be uploaded and let the user confirm instead of uploading immediately --
@@ -1057,24 +1153,26 @@ export function ChatGalleryModal({
       let fragment = '';
       if (activeTab === 'links') {
         const links = (filteredLinks || []).filter(item => keySet.has(item.messageId || item.url));
-        const text = links.map(item => item.url).filter(Boolean).join('\n');
-        if (!text) { if (showToast) showToast('공유할 링크를 선택해 주세요.', 'error'); return; }
-        const ok = await copyTextToClipboard(text);
-        setBulkShareResultUrl(text.split('\n')[0] || '');
+        fragment = encodeGatherLinksFragment(links);
+        if (!fragment) { if (showToast) showToast('공유할 링크를 선택해 주세요.', 'error'); return; }
+        const shareUrl = `${window.location.origin}${window.location.pathname}${fragment}`;
+        const ok = await copyTextToClipboard(shareUrl);
+        setBulkShareResultUrl(shareUrl);
         setIsBulkShareMode(false);
         setSelectedBulkShareKeys(new Set());
-        if (showToast) showToast(ok ? `링크 ${links.length}개 URL을 복사했습니다.` : '복사에 실패했습니다.', ok ? 'success' : 'error');
+        if (showToast) showToast(ok ? `링크 ${links.length}개 공유 URL이 복사되었습니다.` : 'URL 생성은 됐지만 복사에 실패했습니다.', ok ? 'success' : 'error');
         return;
       }
       if (activeTab === 'files') {
-        const files = (filteredFiles || []).filter(item => keySet.has((item.id || item.url) + ''));
-        const text = files.map(item => item.url).filter(Boolean).join('\n');
-        if (!text) { if (showToast) showToast('공유할 파일을 선택해 주세요.', 'error'); return; }
-        const ok = await copyTextToClipboard(text);
-        setBulkShareResultUrl(text.split('\n')[0] || '');
+        const files = (filteredFiles || []).filter(item => keySet.has(String(item.id || item.url || '')));
+        fragment = encodeGatherFilesFragment(files);
+        if (!fragment) { if (showToast) showToast('공유할 파일을 선택해 주세요.', 'error'); return; }
+        const shareUrl = `${window.location.origin}${window.location.pathname}${fragment}`;
+        const ok = await copyTextToClipboard(shareUrl);
+        setBulkShareResultUrl(shareUrl);
         setIsBulkShareMode(false);
         setSelectedBulkShareKeys(new Set());
-        if (showToast) showToast(ok ? `파일 ${files.length}개 URL을 복사했습니다.` : '복사에 실패했습니다.', ok ? 'success' : 'error');
+        if (showToast) showToast(ok ? `파일 ${files.length}개 공유 URL이 복사되었습니다.` : 'URL 생성은 됐지만 복사에 실패했습니다.', ok ? 'success' : 'error');
         return;
       }
       const photos = visiblePhotos
@@ -1152,6 +1250,22 @@ export function ChatGalleryModal({
       text = await navigator.clipboard.readText();
     } catch (err) {
       if (showToast) showToast('클립보드를 읽을 수 없습니다. 브라우저 권한을 확인해 주세요.', 'error');
+      return;
+    }
+    const gatherLinks = parseGatherLinksClipboardText(text);
+    if (gatherLinks && gatherLinks.length) {
+      setIsSavingLink(true);
+      try {
+        let added = 0;
+        for (const item of gatherLinks) {
+          const ok = await onAddLink(item.url);
+          if (ok !== false) added += 1;
+        }
+        if (showToast) showToast(added ? `링크 ${added}개를 붙여넣었습니다.` : '링크 붙여넣기에 실패했습니다.', added ? 'success' : 'error');
+        if (added) setActiveTab('links');
+      } finally {
+        setIsSavingLink(false);
+      }
       return;
     }
     const url = extractFirstUrl(text);
@@ -1527,7 +1641,22 @@ export function ChatGalleryModal({
         key: itemKey,
         onClick: ev => { ev.preventDefault(); ev.stopPropagation(); toggleBulkShareSelected(itemKey); },
         style: { position: 'relative', width: '100%', cursor: 'pointer', outline: isChecked ? '2px solid var(--accent-primary)' : 'none', borderRadius: 'var(--radius-md)' }
-      }, card);
+      },
+        card,
+        /*#__PURE__*/React.createElement("span", {
+          "aria-hidden": true,
+          style: {
+            position: 'absolute', top: '8px', left: '8px', width: '20px', height: '20px', borderRadius: '5px',
+            border: isChecked ? 'none' : '2px solid rgba(255,255,255,0.95)',
+            backgroundColor: isChecked ? 'var(--accent-primary)' : 'rgba(0,0,0,0.35)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.35)', pointerEvents: 'none', zIndex: 2
+          }
+        }, isChecked && /*#__PURE__*/React.createElement("svg", {
+          xmlns: "http://www.w3.org/2000/svg", width: "14", height: "14", viewBox: "0 0 24 24",
+          fill: "none", stroke: "#fff", strokeWidth: "3", strokeLinecap: "round", strokeLinejoin: "round"
+        }, /*#__PURE__*/React.createElement("path", { d: "M20 6 9 17l-5-5" })))
+      );
     })
   );
   const renderGalleryFileList = items => /*#__PURE__*/React.createElement("div", {
@@ -1547,8 +1676,23 @@ export function ChatGalleryModal({
     return /*#__PURE__*/React.createElement("div", {
       key: itemKey,
       onClick: isBulkShareMode ? ev => { ev.preventDefault(); ev.stopPropagation(); toggleBulkShareSelected(itemKey); } : undefined,
-      style: { width: '100%', maxWidth: '100%', boxSizing: 'border-box', cursor: isBulkShareMode ? 'pointer' : 'default', outline: isChecked ? '2px solid var(--accent-primary)' : 'none', borderRadius: 'var(--radius-md)' }
-    }, card);
+      style: { position: 'relative', width: '100%', maxWidth: '100%', boxSizing: 'border-box', cursor: isBulkShareMode ? 'pointer' : 'default', outline: isChecked ? '2px solid var(--accent-primary)' : 'none', borderRadius: 'var(--radius-md)' }
+    },
+      card,
+      isBulkShareMode && /*#__PURE__*/React.createElement("span", {
+        "aria-hidden": true,
+        style: {
+          position: 'absolute', top: '8px', left: '8px', width: '20px', height: '20px', borderRadius: '5px',
+          border: isChecked ? 'none' : '2px solid rgba(255,255,255,0.95)',
+          backgroundColor: isChecked ? 'var(--accent-primary)' : 'rgba(0,0,0,0.35)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.35)', pointerEvents: 'none', zIndex: 2
+        }
+      }, isChecked && /*#__PURE__*/React.createElement("svg", {
+        xmlns: "http://www.w3.org/2000/svg", width: "14", height: "14", viewBox: "0 0 24 24",
+        fill: "none", stroke: "#fff", strokeWidth: "3", strokeLinecap: "round", strokeLinejoin: "round"
+      }, /*#__PURE__*/React.createElement("path", { d: "M20 6 9 17l-5-5" })))
+    );
   }));
   const renderFileListHeader = () => /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: isMobile ? '6px' : '8px', marginBottom: '4px', minWidth: 0 }
