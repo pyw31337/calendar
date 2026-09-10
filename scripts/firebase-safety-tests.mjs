@@ -1659,3 +1659,41 @@ console.log('Firebase-only calendar safety tests passed');
   assert(withUploadDateTag('#hello', new Date('2026-09-10T12:00:00+09:00')) === '#260910 #hello', 'upload-date tag prepends existing file tags');
 }
 
+{
+  const {
+    parseKakaoAddress,
+    mergeLocationResults,
+    normalizeKoreaSido,
+    normalizeKoreaSigungu,
+    formatDeviceHashtag
+  } = await import('../src/core/photo-metadata-tags.js');
+  assert(normalizeKoreaSido('경기') === '경기도', 'Kakao short sido 경기 must expand to 경기도');
+  assert(normalizeKoreaSigungu('부천시 원미구') === '부천시', 'Kakao 시+구 must keep the city');
+  assert(formatDeviceHashtag('samsung SM-X910') === '갤럭시탭S9울트라', 'tablet EXIF codes must map too');
+  const kakaoApt = parseKakaoAddress({
+    road_address: {
+      region_1depth_name: '경기',
+      region_2depth_name: '부천시 원미구',
+      building_name: '모아엘가 더 스카이'
+    },
+    address: {
+      region_1depth_name: '경기',
+      region_2depth_name: '부천시 원미구',
+      region_3depth_name: '춘의동'
+    }
+  });
+  assert(kakaoApt.locationTags.includes('#모아엘가'), 'Kakao building_name must become a POI tag');
+  assert(kakaoApt.locationTags.includes('#경기도부천시'), 'Kakao 경기+부천시 must compact to #경기도부천시');
+  const kakaoSchool = parseKakaoAddress({
+    place_name: '오류남초등학교',
+    address_name: '경기 부천시 원미구 오류동 123-4',
+    category_name: '교육,학문 > 학교 > 초등학교'
+  });
+  assert(kakaoSchool.locationTags.includes('#오류남초등학교'), 'Kakao keyword school must become a POI tag');
+  const merged = mergeLocationResults(
+    kakaoApt,
+    { poi: '', station: '천왕역', sido: '경기도', sigungu: '부천시', locationTags: ['#천왕역'] }
+  );
+  assert(merged.locationTags.some(tag => tag.includes('천왕역') && tag.includes('모아엘가')), 'Kakao building + Nominatim station must combine');
+}
+

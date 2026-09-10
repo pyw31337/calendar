@@ -4,7 +4,16 @@
  * The UI must not know which geocoder is active.  Keeping the provider order,
  * timeout, cache and Nominatim throttle here lets us switch providers without
  * editing every modal that offers place search.
+ *
+ * reverseGeocodeCoords is the photo-upload path: Kakao coord2address first
+ * (Korean building/admin names), Nominatim zoom=18 as supplement/fallback.
  */
+
+import {
+  parseKakaoAddress,
+  parseNominatimLocation,
+  mergeLocationResults
+} from './photo-metadata-tags.js';
 
 const PLACE_SEARCH_PROVIDER_KEY = 'gather_place_search_provider_v1';
 const NOMINATIM_ENDPOINT_KEY = 'gather_nominatim_endpoint_v1';
@@ -231,6 +240,68 @@ function groupTourItemsByType(items = []) {
   return Array.from(groups.values());
 }
 
+function isSchoolPoi(parsed) {
+  return /학교|유치원|대학교|어린이집/.test(String(parsed?.poi || ''));
+}
+
+async function reverseGeocodeNominatim(lat, lng) {
+  await waitForNominatimSlot();
+  const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=jsonv2&addressdetails=1&namedetails=1&accept-language=ko&zoom=18`;
+  const response = await fetchWithTimeout(url, {
+    headers: { Accept: 'application/json', 'User-Agent': 'GatherCalendar/1.0 (https://github.com/pyw31337/calendar)' }
+  });
+  if (!response.ok) return null;
+  return parseNominatimLocation(await response.json());
+}
+
+async function reverseGeocodeKakao(lat, lng, firebaseConfig) {
+  const projectId = firebaseConfig?.projectId;
+  if (!projectId) return null;
+  const base = `https://us-central1-${projectId}.cloudfunctions.net/kakaoLocalSearchProxy`;
+  const response = await fetchWithTimeout(`${base}?x=${encodeURIComponent(String(lng))}&y=${encodeURIComponent(String(lat))}`);
+  const json = response.ok ? await response.json() : null;
+  if (!json?.ok || !Array.isArray(json.documents) || !json.documents[0]) return null;
+  return parseKakaoAddress(json.documents[0]);
+}
+
+async function reverseGeocodeCoords(lat, lng, options = {}) {
+  const latN = Number(lat);
+  const lngN = Number(lng);
+  if (!Number.isFinite(latN) || !Number.isFinite(lngN)) {
+    return { location: '', locationTags: [] };
+  }
+  const key = `rev:${latN.toFixed(4)},${lngN.toFixed(4)}`;
+  const hit = cached(key);
+  if (hit) return hit;
+  const existing = inFlightSearches.get(key);
+  if (existing) return existing;
+
+  const pending = (async () => {
+    let kakaoParsed = null;
+    try {
+      kakaoParsed = await reverseGeocodeKakao(latN, lngN, options.firebaseConfig || {});
+    } catch (_) { kakaoParsed = null; }
+
+    let nominatimParsed = null;
+    const skipNominatim = isSchoolPoi(kakaoParsed) && kakaoParsed?.sido;
+    if (!skipNominatim) {
+      try {
+        nominatimParsed = await reverseGeocodeNominatim(latN, lngN);
+      } catch (_) { nominatimParsed = null; }
+    }
+
+    const merged = mergeLocationResults(kakaoParsed, nominatimParsed);
+    return cache(key, merged);
+  })();
+
+  inFlightSearches.set(key, pending);
+  try {
+    return await pending;
+  } finally {
+    if (inFlightSearches.get(key) === pending) inFlightSearches.delete(key);
+  }
+}
+
 const api = {
   getPlaceSearchSettings,
   setPlaceSearchProvider,
@@ -238,8 +309,18 @@ const api = {
   searchPlaces,
   searchTourInfo,
   groupTourItemsByType,
-  getTourApiUrl
+  getTourApiUrl,
+  reverseGeocodeCoords
 };
 
 if (typeof window !== 'undefined') window.GATHER_APP_PLACE_SEARCH = api;
-export { getPlaceSearchSettings, setPlaceSearchProvider, setNominatimEndpoint, searchPlaces, searchTourInfo, groupTourItemsByType, getTourApiUrl };
+export {
+  getPlaceSearchSettings,
+  setPlaceSearchProvider,
+  setNominatimEndpoint,
+  searchPlaces,
+  searchTourInfo,
+  groupTourItemsByType,
+  getTourApiUrl,
+  reverseGeocodeCoords
+};

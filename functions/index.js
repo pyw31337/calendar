@@ -1281,7 +1281,12 @@ exports.kakaoLocalSearchProxy = functions.runWith({ ...PUBLIC_PROXY_RUNTIME, sec
   if (req.method === 'OPTIONS') { setPublicCacheHeaders(res, 86400); res.status(204).send(''); return; }
   if (req.method !== 'GET') { res.status(405).json({ ok: false, message: 'Method not allowed' }); return; }
   const query = String(req.query.query || '').trim().slice(0, 200);
-  if (!query) { res.status(400).json({ ok: false, message: 'query is required' }); return; }
+  const xRaw = String(req.query.x || '').trim();
+  const yRaw = String(req.query.y || '').trim();
+  const xN = Number(xRaw);
+  const yN = Number(yRaw);
+  const isCoord = !query && Number.isFinite(xN) && Number.isFinite(yN) && Math.abs(xN) <= 180 && Math.abs(yN) <= 90;
+  if (!query && !isCoord) { res.status(400).json({ ok: false, message: 'query is required' }); return; }
   setPublicCacheHeaders(res, 300);
   // 30/minute per IP -- generous for a real person typing/refining a place search, but stops a
   // scripted caller from burning through the free daily quota this whole app shares.
@@ -1289,27 +1294,31 @@ exports.kakaoLocalSearchProxy = functions.runWith({ ...PUBLIC_PROXY_RUNTIME, sec
     res.status(429).json({ ok: false, message: 'Too many requests' });
     return;
   }
-  const cacheKey = query.toLocaleLowerCase('ko-KR');
-  const cached = await readExternalCache('kakaoSearch', cacheKey);
+  const cacheKey = isCoord ? `coord:${xN.toFixed(4)},${yN.toFixed(4)}` : query.toLocaleLowerCase('ko-KR');
+  const cacheProvider = isCoord ? 'kakaoCoord' : 'kakaoSearch';
+  const cached = await readExternalCache(cacheProvider, cacheKey);
   if (cached) { res.status(200).json(cached); return; }
   try {
-    const kakaoRes = await fetch(`https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(query)}&size=10`, {
+    const kakaoUrl = isCoord
+      ? `https://dapi.kakao.com/v2/local/geo/coord2address.json?x=${encodeURIComponent(String(xN))}&y=${encodeURIComponent(String(yN))}`
+      : `https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(query)}&size=10`;
+    const kakaoRes = await fetch(kakaoUrl, {
       headers: { Authorization: `KakaoAK ${KAKAO_REST_API_KEY}` }
     });
     // Awaited (rather than fire-and-forget) so the write reliably completes before this HTTP
     // function's instance is frozen once the response below is sent.
     await incrementKakaoLocalSearchStat();
     if (!kakaoRes.ok) {
-      res.status(kakaoRes.status).json({ ok: false, message: 'Kakao local search failed' });
+      res.status(kakaoRes.status).json({ ok: false, message: isCoord ? 'Kakao coord2address failed' : 'Kakao local search failed' });
       return;
     }
     const json = await kakaoRes.json();
-    const result = { ok: true, documents: json.documents || [] };
-    await writeExternalCache('kakaoSearch', cacheKey, result, 24 * 60 * 60 * 1000);
+    const result = { ok: true, mode: isCoord ? 'coord' : 'keyword', documents: json.documents || [] };
+    await writeExternalCache(cacheProvider, cacheKey, result, 24 * 60 * 60 * 1000);
     res.status(200).json(result);
   } catch (err) {
     console.error('kakaoLocalSearchProxy failed:', err);
-    res.status(502).json({ ok: false, message: 'Kakao local search request failed' });
+    res.status(502).json({ ok: false, message: isCoord ? 'Kakao coord2address request failed' : 'Kakao local search request failed' });
   }
 });
 

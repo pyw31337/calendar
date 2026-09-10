@@ -174,6 +174,7 @@ import {
   todayUploadTagOptions,
   withUploadDateTag
 } from './photo-metadata-tags.js';
+import { reverseGeocodeCoords } from './app-place-search.js';
 import { getInitialAppView, buildAppViewUrl } from './app-routing-state.js';
 import { useNotificationPwaState } from './notification-pwa-state.js';
 import { useDisplayPreferences, useMainHeaderState } from './app-shell-state.js';
@@ -8952,20 +8953,25 @@ async function extractPhotoMetadata(file) {
       }
     } else {
       try {
-        const waitMs = Math.max(0, 1100 - (Date.now() - photoLocationRequestAt));
-        if (waitMs) await new Promise(resolve => setTimeout(resolve, waitMs));
-        photoLocationRequestAt = Date.now();
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=jsonv2&addressdetails=1&accept-language=ko&zoom=18`,
-          { headers: { Accept: 'application/json', 'User-Agent': 'GatherCalendar/1.0 (https://github.com/pyw31337/calendar)' } }
-        );
-        if (response.ok) {
-          const parsed = parseNominatimLocation(await response.json());
-          if (parsed.location || (parsed.locationTags && parsed.locationTags.length)) {
-            photoLocationCache.set(key, parsed);
-            if (parsed.location) result.location = parsed.location;
-            if (parsed.locationTags.length) result.locationTags = parsed.locationTags;
-          }
+        let parsed = null;
+        if (typeof reverseGeocodeCoords === 'function') {
+          parsed = await reverseGeocodeCoords(lat, lon, {
+            firebaseConfig: typeof firebaseConfig !== 'undefined' ? firebaseConfig : {}
+          });
+        } else {
+          const waitMs = Math.max(0, 1100 - (Date.now() - photoLocationRequestAt));
+          if (waitMs) await new Promise(resolve => setTimeout(resolve, waitMs));
+          photoLocationRequestAt = Date.now();
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=jsonv2&addressdetails=1&accept-language=ko&zoom=18`,
+            { headers: { Accept: 'application/json', 'User-Agent': 'GatherCalendar/1.0 (https://github.com/pyw31337/calendar)' } }
+          );
+          if (response.ok) parsed = parseNominatimLocation(await response.json());
+        }
+        if (parsed && (parsed.location || (parsed.locationTags && parsed.locationTags.length))) {
+          photoLocationCache.set(key, parsed);
+          if (parsed.location) result.location = parsed.location;
+          if (parsed.locationTags.length) result.locationTags = parsed.locationTags;
         }
       } catch (_) {}
     }
