@@ -2,7 +2,7 @@
  * Summary list, photo gallery, category tabs (P4-11)
  */
 
-import { composeGalleryPhotos, collectMemoryPhotoIdentityKeys, isMemoryPhotoExcluded, expandMemoryPhotoExclusionKeys, dedupeMemoryPhotoEntries } from '../core/gallery-data.js';
+import { composeGalleryPhotos, collectMemoryPhotoIdentityKeys, isMemoryPhotoExcluded, expandMemoryPhotoExclusionKeys, dedupeMemoryPhotoEntries, photoBelongsToMemory } from '../core/gallery-data.js';
 import { resolveGalleryLightboxTags } from '../core/photo-index.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
@@ -1733,19 +1733,8 @@ export function HistoryView({
   // 260904, etc.) rather than by a meeting-photo reference. Treat those explicit dates as the
   // source of truth before falling back to the upload timestamp; otherwise photos uploaded later
   // than the trip disappear from its memories group even though the date modal shows them.
-  const entryTaggedDates = entry => parseHistoryDateTokens(entry?.tags || '');
-  const entryMatchesDateRange = (entry, start, end) => {
-    if (!entry || !start || !end) return false;
-    if (entry.meetingDate) {
-      const meetingDate = String(entry.meetingDate).slice(0, 10);
-      if (meetingDate >= start && meetingDate <= end) return true;
-    }
-    if (entryTaggedDates(entry).some(date => date >= start && date <= end)) return true;
-    if (entry.source === 'anniversary') {
-      const anniversaryDate = String(entry.meetingDate || '').slice(0, 10);
-      return !!anniversaryDate && anniversaryDate >= start && anniversaryDate <= end;
-    }
-    return false;
+  const entryMatchesDateRange = (entry, start, end, memoryId = '') => {
+    return photoBelongsToMemory(entry, { id: memoryId, startDate: start, endDate: end }, { parseDateTokens: parseHistoryDateTokens });
   };
   const travelMemoryGroups = React.useMemo(() => {
     // range 타입(dayMode==='range')이 아닌 once/yearly 타입(하루짜리) 여행 기념일은
@@ -1759,9 +1748,11 @@ export function HistoryView({
         const end = a.endDate || a.startDate || a.date;
         // 날짜 구간으로 자동 수집되다 보니 그 기념일과 상관없는 사진이 섞여 들어올 수 있어,
         // 라이트박스의 '이 추억에서 제거' 버튼으로 뺀 사진(excludedMemoryPhotoKeys)은 제외한다.
+        // 제외 목록은 기념일 문서 set()에도 살아남아야 한다 -- 같은 날 다른 일정의 사진이
+        // 다시 들어오는 건 한 번 고친 작업을 반복하게 만든다.
         const excluded = new Set(Array.isArray(a.excludedMemoryPhotoKeys) ? a.excludedMemoryPhotoKeys : []);
         const photosInRange = historyPhotoEntries.filter(entry => {
-          return entryMatchesDateRange(entry, start, end);
+          return entryMatchesDateRange(entry, start, end, a.id);
         });
         const photos = photosInRange.filter(entry => !isMemoryPhotoExcluded(entry, excluded, getPhotoAssetCommentKey));
         const excludedPhotos = photosInRange.filter(entry => isMemoryPhotoExcluded(entry, excluded, getPhotoAssetCommentKey));
@@ -1796,7 +1787,7 @@ export function HistoryView({
     const start = a.startDate || a.date;
     const end = a.endDate || a.startDate || a.date;
     if (!start || !end) return false;
-    return historyPhotoEntries.some(entry => entryMatchesDateRange(entry, start, end));
+    return historyPhotoEntries.some(entry => entryMatchesDateRange(entry, start, end, a.id));
   }).map(a => ({ id: a.id, title: a.title || '기록', startDate: a.startDate || a.date, endDate: a.endDate || a.startDate || a.date, hidden: !!a.hiddenFromMemories }))
     .sort((a, b) => (b.startDate || '').localeCompare(a.startDate || '')), [anniversaries, historyPhotoEntries, travelMemoryGroups]);
   const handleRestoreMemoryGroup = async id => {

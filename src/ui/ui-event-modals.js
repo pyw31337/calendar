@@ -3,6 +3,7 @@
  */
 
 import { calculateSettlementRows } from '../core/settlement-calculator.js';
+import { preserveAnniversaryCurationFields } from '../core/gallery-data.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -549,6 +550,8 @@ export function AnniversaryModal({
         annData.isLunar = isLunar;
         annData.isLeap = isLunar ? isLeap : false;
       }
+
+      annData = preserveAnniversaryCurationFields(oldAnn, annData);
 
       const saved = await writeSharedCollection('anniversaries', calendarId, anniversaryId, annData, 'set', '기념일 저장');
       if (!saved?.success) throw new Error('Anniversary save failed');

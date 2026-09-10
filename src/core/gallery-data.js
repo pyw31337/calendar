@@ -67,6 +67,34 @@ function expandStoredMemoryIdentityKey(key) {
 export function collectMemoryPhotoIdentityKeys(entry, getPhotoAssetCommentKey) {
   const keys = [];
   const push = (key) => pushNormalizedMemoryIdentityKey(keys, key);
+  const pushSlotAliases = (messageId, imageIndex) => {
+    if (!messageId || imageIndex == null) return;
+    push(`slot:${messageId}:${imageIndex}`);
+    push(`chat:${messageId}:${imageIndex}`);
+    push(`gallery:${messageId}:${imageIndex}`);
+    push(`meeting-index:${messageId}:${imageIndex}`);
+  };
+  const pushOwnerAliases = (owner) => {
+    if (!owner || typeof owner !== 'object') return;
+    push(owner.assetKey);
+    push(owner.mediaKey);
+    push(owner.refKey);
+    push(owner.full);
+    push(owner.thumb);
+    push(owner.imageUrl);
+    push(owner.storagePath);
+    (Array.isArray(owner.legacyKeys) ? owner.legacyKeys : []).forEach(push);
+    pushSlotAliases(owner.sourceMessageId, coerceGalleryImageIndex(owner.sourceImageIndex));
+    pushSlotAliases(owner.messageId, coerceGalleryImageIndex(owner.imageIndex));
+    if (owner.photoId) {
+      push(owner.photoId);
+      push(`meeting-index:${owner.photoId}`);
+    }
+    if (owner.meetingDate && owner.photoId) {
+      push(`meeting:${owner.meetingDate}:${owner.photoId}`);
+      push(`meeting-index:${owner.meetingDate}:${owner.photoId}`);
+    }
+  };
   getGalleryPhotoDedupeKeys(entry, getPhotoAssetCommentKey).forEach(push);
   push(entry?.assetKey);
   push(entry?.photoId);
@@ -75,17 +103,15 @@ export function collectMemoryPhotoIdentityKeys(entry, getPhotoAssetCommentKey) {
   push(entry?.storagePath);
   const sourceIdx = coerceGalleryImageIndex(entry?.sourceImageIndex);
   const idx = coerceGalleryImageIndex(entry?.imageIndex);
-  if (entry?.sourceMessageId && sourceIdx != null) {
-    push(`chat:${entry.sourceMessageId}:${sourceIdx}`);
-    push(`gallery:${entry.sourceMessageId}:${sourceIdx}`);
-    push(`meeting-index:${entry.sourceMessageId}:${sourceIdx}`);
-  }
-  if (entry?.messageId && idx != null) {
-    push(`chat:${entry.messageId}:${idx}`);
-    push(`gallery:${entry.messageId}:${idx}`);
-  }
+  pushSlotAliases(entry?.sourceMessageId, sourceIdx);
+  pushSlotAliases(entry?.messageId, idx);
   if (entry?.photoId) push(`meeting-index:${entry.photoId}`);
+  if (entry?.meetingDate && entry?.photoId) {
+    push(`meeting:${entry.meetingDate}:${entry.photoId}`);
+    push(`meeting-index:${entry.meetingDate}:${entry.photoId}`);
+  }
   (Array.isArray(entry?.legacyKeys) ? entry.legacyKeys : []).forEach(push);
+  (Array.isArray(entry?.owners) ? entry.owners : []).forEach(pushOwnerAliases);
   return keys;
 }
 
@@ -124,10 +150,98 @@ export function filterOutMemoryExclusionKeys(existingKeys, identityKeys) {
   return existing.filter((key) => !expandStoredMemoryIdentityKey(key).some((item) => identity.has(item)));
 }
 
+// Anniversary form/tag/culture saves historically used Firestore set() with a partial payload.
+// That replaces the whole document, so excludedMemoryPhotoKeys and hiddenFromMemories vanished
+// and previously curated memories filled back up with the same mixed photos. Merge those
+// user-curation fields (and culture linkage the form does not edit) whenever a write would
+// otherwise drop them.
+export function preserveAnniversaryCurationFields(existing, payload) {
+  const prev = existing && typeof existing === 'object' ? existing : {};
+  const next = { ...(payload || {}) };
+  if (!Array.isArray(next.excludedMemoryPhotoKeys) && Array.isArray(prev.excludedMemoryPhotoKeys)) {
+    next.excludedMemoryPhotoKeys = prev.excludedMemoryPhotoKeys.slice();
+  }
+  if (next.hiddenFromMemories == null && prev.hiddenFromMemories) {
+    next.hiddenFromMemories = true;
+  }
+  ['cultureSourceId', 'cultureSnapshot', 'cultureSourceLink', 'memo', 'genre', 'movieMeta'].forEach((field) => {
+    if (next[field] == null && prev[field] != null) next[field] = prev[field];
+  });
+  return next;
+}
+
+export function parseMemoryDateTokens(text) {
+  const source = String(text || '').replace(/[()[\]{}'"“”‘’]/g, ' ');
+  const dates = new Set();
+  const pushDate = (yearRaw, monthRaw, dayRaw) => {
+    let year = Number(yearRaw);
+    const month = Number(monthRaw);
+    const day = Number(dayRaw);
+    if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return;
+    if (year < 100) year += 2000;
+    if (year < 2000 || year > 2099 || month < 1 || month > 12 || day < 1 || day > 31) return;
+    const check = new Date(year, month - 1, day);
+    if (check.getFullYear() !== year || check.getMonth() !== month - 1 || check.getDate() !== day) return;
+    dates.add(`${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`);
+  };
+  source.replace(/(?:^|[^\d])(\d{2,4})\s*[.\-/]\s*(\d{1,2})\s*[.\-/]\s*(\d{1,2})(?=$|[^\d])/g, (match, y, m, d) => {
+    pushDate(y, m, d);
+    return match;
+  });
+  source.replace(/(?:^|[^\d])(\d{2,4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일?/g, (match, y, m, d) => {
+    pushDate(y, m, d);
+    return match;
+  });
+  source.replace(/(?:^|[^\d])(\d{4})(\d{2})(\d{2})(?=$|[^\d])/g, (match, y, m, d) => {
+    pushDate(y, m, d);
+    return match;
+  });
+  source.replace(/(?:^|[^\d])(\d{2})(\d{2})(\d{2})(?=$|[^\d])/g, (match, y, m, d) => {
+    pushDate(y, m, d);
+    return match;
+  });
+  return Array.from(dates);
+}
+
+function isIsoDate(value) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(value || ''));
+}
+
+// A memory is not "everything uploaded that day". Explicit date tags are the source of truth;
+// a beach photo tagged 9/1 must not re-enter a 9/5 fireworks memory just because it was later
+// copied onto that day's meeting album. Anniversary-owned photos stay on their own anniversary
+// even when another event overlaps the same date.
+export function photoBelongsToMemory(entry, memory, options = {}) {
+  if (!entry || !memory) return false;
+  const start = String(memory.startDate || memory.date || '').slice(0, 10);
+  const end = String(memory.endDate || memory.startDate || memory.date || '').slice(0, 10);
+  if (!isIsoDate(start) || !isIsoDate(end)) return false;
+  const memoryId = String(memory.id || '').trim();
+  const anniversaryId = String(entry.anniversaryId || '').trim();
+  if (anniversaryId && memoryId && anniversaryId === memoryId) return true;
+  if (anniversaryId && memoryId && anniversaryId !== memoryId) return false;
+
+  const parseDateTokens = typeof options.parseDateTokens === 'function' ? options.parseDateTokens : parseMemoryDateTokens;
+  const taggedDates = (parseDateTokens(entry.tags || '') || []).map(date => String(date).slice(0, 10)).filter(isIsoDate);
+  if (taggedDates.length) return taggedDates.some(date => date >= start && date <= end);
+
+  const meetingDate = String(entry.meetingDate || '').slice(0, 10);
+  if (isIsoDate(meetingDate) && meetingDate >= start && meetingDate <= end) return true;
+  if (entry.source === 'anniversary') {
+    const anniversaryDate = String(entry.meetingDate || '').slice(0, 10);
+    return isIsoDate(anniversaryDate) && anniversaryDate >= start && anniversaryDate <= end;
+  }
+  return false;
+}
+
 export function mergeMemoryPhotoIdentity(preferred, other, getPhotoAssetCommentKey) {
   const merged = { ...(preferred || {}) };
   const donor = other || {};
   if (!merged.meetingDate && donor.meetingDate) merged.meetingDate = donor.meetingDate;
+  const mergedTagCount = String(merged.tags || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean).length;
+  const donorTagCount = String(donor.tags || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean).length;
+  if (donorTagCount > mergedTagCount) merged.tags = donor.tags;
+  else if (!merged.tags && donor.tags) merged.tags = donor.tags;
   if (!merged.messageId && donor.messageId) merged.messageId = donor.messageId;
   if (!merged.sourceMessageId && donor.sourceMessageId) merged.sourceMessageId = donor.sourceMessageId;
   if (coerceGalleryImageIndex(merged.imageIndex) == null && coerceGalleryImageIndex(donor.imageIndex) != null) {
@@ -138,6 +252,8 @@ export function mergeMemoryPhotoIdentity(preferred, other, getPhotoAssetCommentK
   }
   if (!merged.photoId && donor.photoId) merged.photoId = donor.photoId;
   if (!merged.id && donor.id) merged.id = donor.id;
+  if (!merged.anniversaryId && donor.anniversaryId) merged.anniversaryId = donor.anniversaryId;
+  if (!Array.isArray(merged.owners) && Array.isArray(donor.owners)) merged.owners = donor.owners.slice();
   if (!merged.mediaKey && donor.mediaKey) merged.mediaKey = donor.mediaKey;
   if (!merged.refKey && donor.refKey) merged.refKey = donor.refKey;
   if (!merged.assetKey && donor.assetKey) merged.assetKey = donor.assetKey;

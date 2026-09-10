@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import { GATHER_APP_UTILS, omitUndefinedDeep } from '../src/core/app-utils.js';
 import { calculateSettlementRows } from '../src/core/settlement-calculator.js';
 import { fetchPhotoComments, savePhotoComments } from '../src/core/photo-comments.js';
-import { composeGalleryPhotos, paginateGalleryItems, getPaginationWindow, dedupeGalleryPhotoEntries, getGalleryPhotoDedupeKeys, coerceGalleryImageIndex, collectMemoryPhotoIdentityKeys, isMemoryPhotoExcluded, expandMemoryPhotoExclusionKeys, filterOutMemoryExclusionKeys, dedupeMemoryPhotoEntries } from '../src/core/gallery-data.js';
+import { composeGalleryPhotos, paginateGalleryItems, getPaginationWindow, dedupeGalleryPhotoEntries, getGalleryPhotoDedupeKeys, coerceGalleryImageIndex, collectMemoryPhotoIdentityKeys, isMemoryPhotoExcluded, expandMemoryPhotoExclusionKeys, filterOutMemoryExclusionKeys, dedupeMemoryPhotoEntries, preserveAnniversaryCurationFields, photoBelongsToMemory } from '../src/core/gallery-data.js';
 import { filterDeletedPhotoFromIndexItems, deleteOwnedChatFileFromStorage } from '../src/core/gallery-bulk-delete.js';
 import { cloneConfirmedMeetings, commitConfirmedMeetingChanges } from '../src/core/confirmed-meeting-coordinator.js';
 import { getInitialAppView, buildAppViewUrl } from '../src/core/app-routing-state.js';
@@ -350,6 +350,45 @@ const writeQueueSource = fs.readFileSync(new URL('../src/core/app-write-queue.js
   assert(deduped.length === 1, 'chat+meeting copies of one memory photo must collapse');
   const mergedIds = collectMemoryPhotoIdentityKeys(deduped[0], getPhotoAssetCommentKey);
   assert(mergedIds.includes('gallery:msg-1:0') && mergedIds.includes('slot:msg-1:0'), 'merged memory photo must keep chat and meeting identities');
+
+  const indexedRebuilt = {
+    source: 'meeting',
+    mediaKey: 'asset:v1:rebuilt',
+    photoId: 'p-new',
+    meetingDate: '2026-09-05',
+    full: storageUrlB,
+    owners: [{
+      sourceOwner: 'message:msg-1:0',
+      messageId: 'msg-1',
+      imageIndex: 0,
+      legacyKeys: ['gallery:msg-1:0', 'chat:msg-1:0']
+    }]
+  };
+  assert(isMemoryPhotoExcluded(indexedRebuilt, ['gallery:msg-1:0'], getPhotoAssetCommentKey), 'photoIndex rebuild must still honor the original gallery exclusion via owner aliases');
+
+  const fireworks = { id: 'ann-fireworks', startDate: '2026-09-05', endDate: '2026-09-05' };
+  const trip = { id: 'ann-trip', startDate: '2026-09-01', endDate: '2026-09-07' };
+  const beachTaggedOtherDay = { source: 'meeting', meetingDate: '2026-09-05', tags: '#바다 26.09.01' };
+  const fireworksMeetingPhoto = { source: 'meeting', meetingDate: '2026-09-05', tags: '' };
+  const otherAnniversaryPoster = { source: 'anniversary', anniversaryId: 'ann-trip', meetingDate: '2026-09-05' };
+  assert(!photoBelongsToMemory(beachTaggedOtherDay, fireworks), 'a photo tagged for another day must not mix into a same-day event memory just because it sat on that meeting album');
+  assert(photoBelongsToMemory(beachTaggedOtherDay, trip), 'a photo tagged 9/1 still belongs to the trip that covers 9/1');
+  assert(photoBelongsToMemory(fireworksMeetingPhoto, fireworks), 'untagged meeting photos on the event date still seed that event memory');
+  assert(!photoBelongsToMemory(otherAnniversaryPoster, fireworks), 'another anniversary\'s own photos must not leak into an overlapping event memory');
+  assert(photoBelongsToMemory(otherAnniversaryPoster, trip), 'anniversary-owned photos stay on their own memory');
+
+  const wipedSave = preserveAnniversaryCurationFields(
+    { id: 'ann-fireworks', excludedMemoryPhotoKeys: expanded.keys, hiddenFromMemories: true, cultureSourceId: 'fest-1' },
+    { id: 'ann-fireworks', title: '2026 서울세계불꽃축제', startDate: '2026-09-05' }
+  );
+  assert(Array.isArray(wipedSave.excludedMemoryPhotoKeys) && wipedSave.excludedMemoryPhotoKeys.includes('gallery:msg-1:0'), 'anniversary set() must keep excluded photo keys so curated memories do not refill');
+  assert(wipedSave.hiddenFromMemories === true, 'anniversary set() must keep hiddenFromMemories');
+  assert(wipedSave.cultureSourceId === 'fest-1', 'anniversary set() must keep culture linkage the form does not edit');
+  const addBackSave = preserveAnniversaryCurationFields(
+    { excludedMemoryPhotoKeys: expanded.keys },
+    { excludedMemoryPhotoKeys: [] }
+  );
+  assert(Array.isArray(addBackSave.excludedMemoryPhotoKeys) && addBackSave.excludedMemoryPhotoKeys.length === 0, 'explicit empty exclusion list must win so add-back can restore photos');
 }
 
 assert(writeQueueSource.includes('nextAttemptAt: Number(operation.nextAttemptAt) || 0'), 'queued operations must persist retry backoff metadata');
@@ -366,9 +405,12 @@ assert(chatGallerySource.includes("source === 'memo'"), 'indexed memo photos mus
 assert(summaryGallerySource.includes('composeGalleryPhotos'), 'main-screen PhotoGallery must compose via shared gallery dedupe');
 assert(summaryGallerySource.includes('renderMemoryAllDateToggle'), 'memories tab must reuse the gallery 전체|일자 toggle');
 assert(summaryGallerySource.includes('renderMemoryTrashButton'), 'memories edit mode must show a red trash action instead of 제외 text');
+assert(summaryGallerySource.includes('photoBelongsToMemory'), 'memory groups must use explicit date tags over same-day meeting membership');
 assert(summaryGallerySource.includes('isMemoryPhotoExcluded'), 'memory groups must filter excluded photos by durable identity keys');
 assert(summaryGallerySource.includes('expandMemoryPhotoExclusionKeys'), 'memory exclude/add-back must expand every identity alias before write');
 assert(appMainSource.includes('filterOutMemoryExclusionKeys'), 'adding a photo back to a memory must drop leftover identity aliases');
+assert(appMainSource.includes('preserveAnniversaryCurationFields'), 'anniversary snapshots/saves must keep memory exclusion keys');
+assert(fs.readFileSync(new URL('../src/ui/ui-event-modals.js', import.meta.url), 'utf8').includes('preserveAnniversaryCurationFields'), 'anniversary modal set() must keep excludedMemoryPhotoKeys');
 assert(chatGallerySource.includes('btn-action-danger'), 'gallery bulk delete must use the red danger outline, not the black outline override');
 assert(appMainSource.includes('coerceIndex') && appMainSource.includes('resolveMeetingPhotoDisplay'), 'meeting photo display must coerce sourceImageIndex for gallery identity');
 
