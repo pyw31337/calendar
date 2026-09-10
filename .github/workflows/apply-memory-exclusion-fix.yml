@@ -1,0 +1,43 @@
+name: Apply memory exclusion fix
+
+on:
+  push:
+    branches: [fix/memories-exclusion-persist]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+concurrency:
+  group: apply-memory-exclusion-fix
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Apply patch, open PR, merge if possible
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git config user.name "pyw31337"
+          git config user.email "pyw31337@users.noreply.github.com"
+          python3 -c 'import base64,gzip,pathlib; p=pathlib.Path("patches/memory-exclusion-fix.b64"); pathlib.Path("memory-exclusion-fix.patch").write_bytes(gzip.decompress(base64.b64decode(p.read_text().strip())))'
+          git apply --check memory-exclusion-fix.patch
+          git apply memory-exclusion-fix.patch
+          git add src/core/gallery-data.js src/core/app-main.js src/ui/ui-event-modals.js src/ui/ui-summary-gallery.js scripts/firebase-safety-tests.mjs
+          rm -f memory-exclusion-fix.patch
+          git rm -f patches/memory-exclusion-fix.b64
+          git rm -f .github/workflows/apply-memory-exclusion-fix.yml
+          git status --short
+          git commit -m "fix(memories): keep exclusions across anniversary saves and stop date mixing"
+          git push origin HEAD:fix/memories-exclusion-persist
+          gh pr create --base main --head fix/memories-exclusion-persist --title "fix(memories): keep exclusions and stop date mixing" --body "추억에서 제외한 사진이 기념일 저장 후 다시 섞여 들어오던 문제를 고칩니다. 날짜 태그가 있는 사진은 같은 날 일정에 있어도 그 추억으로 들어가지 않습니다." || true
+          gh pr merge --squash --delete-branch || true
+          gh workflow run deploy-vite-pages.yml --ref main || true
