@@ -157,7 +157,7 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
     selected && /*#__PURE__*/React.createElement("div", {
       onClick: closeLightbox,
       style: {
-        position: 'fixed', inset: 0, zIndex: 20700, backgroundColor: 'rgba(15,23,42,0.7)',
+        position: 'fixed', inset: 0, zIndex: 20700, backgroundColor: 'rgba(0,0,0,0.55)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px'
       }
     },
