@@ -968,14 +968,16 @@ function subscribeMessages(calId, options, onSnapshot, onError) {
   if (options && options.limit) q = q.limit(options.limit);
   return q.onSnapshot(onSnapshot, onError || function () {});
 }
-function subscribePlaces(calId, onSnapshot, onError) {
+function subscribePlaces(calId, options, onSnapshot, onError) {
   const svc = window.GATHER_FIREBASE_SERVICES;
   if (svc && typeof svc.subscribePlaces === 'function' && !svc.isScaffold) {
-    return svc.subscribePlaces(calId, onSnapshot, onError);
+    return svc.subscribePlaces(calId, options, onSnapshot, onError);
   }
   if (!firebaseDb || !calId) return function () {};
-  return firebaseDb.collection('calendars').doc('cal_' + calId).collection('places')
-    .onSnapshot(onSnapshot, onError || function () {});
+  let q = firebaseDb.collection('calendars').doc('cal_' + calId).collection('places');
+  if (options && options.orderBy) q = q.orderBy(options.orderBy, options.direction || 'desc');
+  if (options && options.limit) q = q.limit(options.limit);
+  return q.onSnapshot(onSnapshot, onError || function () {});
 }
 function subscribeMemos(calId, options, onSnapshot, onError) {
   const svc = window.GATHER_FIREBASE_SERVICES;
@@ -1610,13 +1612,55 @@ async function fetchCustomCultureItemsRest(calId) {
   }
 }
 
+// 밈 키보드 이미지 풀(memePool) 전체 목록. 캘린더별 서브컬렉션이 아니라 최상위 컬렉션이다 --
+// 모든 캘린더의 채팅이 같은 해시태그 인덱스를 검색해야 하기 때문(firestore.rules에서 read는
+// 전체 공개, write는 admin-gated Cloud Function으로만 허용). 몇백~몇천 장이어도 REST list는
+// 메타데이터(문서)만 가져오고 실제 이미지 바이트는 각 썸네일 <img>가 필요할 때 따로 받으므로,
+// customCultureItems와 같은 전체 REST-hydrate-once 패턴을 그대로 쓴다.
+async function fetchMemePoolRest() {
+  try {
+    const baseUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/memePool`;
+    const list = [];
+    let pageToken = '';
+    do {
+      const query = new URLSearchParams({ pageSize: '300' });
+      if (pageToken) query.set('pageToken', pageToken);
+      const res = await fetchFirestoreRequest(`${baseUrl}?${query.toString()}`);
+      if (!res.ok) return list;
+      const data = await res.json();
+      (data.documents || []).forEach(doc => list.push({
+        id: doc.name.split('/').pop(),
+        ...firestoreDocumentToJs(doc)
+      }));
+      pageToken = data.nextPageToken || '';
+    } while (pageToken);
+    return list;
+  } catch (err) {
+    console.warn('fetchMemePoolRest error:', err);
+    return [];
+  }
+}
+
+// 어드민 채팅 로그 상세팝업에서 "누가/언제"에 이어 "어떤 기기로"까지 보여주기 위한 최소 정보.
+// IP나 정확한 OS/브라우저 버전까지 저장하려면 메시지 전송마다 서버(Cloud Function)로 별도
+// 신호를 보내는 새 파이프라인과 개인정보 수집 범위에 대한 별도 결정이 필요해서, 우선 지금
+// 클라이언트에서 이미 아는 정보(모바일/PC 여부)만 가볍게 같이 저장한다.
+function detectMessageDeviceType() {
+  if (typeof navigator === 'undefined') return '';
+  const uaData = navigator.userAgentData;
+  if (uaData && typeof uaData.mobile === 'boolean') return uaData.mobile ? 'mobile' : 'desktop';
+  const ua = String(navigator.userAgent || '');
+  return /Mobi|Android|iPhone|iPad|iPod/i.test(ua) ? 'mobile' : 'desktop';
+}
+
 async function sendChatMessageRest(calId, message) {
   try {
     const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${calId}/messages`;
     const fields = {
       participantId: jsToFirestoreValue(message.participantId),
       text: jsToFirestoreValue(message.text),
-      timestamp: jsToFirestoreValue(message.timestamp)
+      timestamp: jsToFirestoreValue(message.timestamp),
+      deviceType: jsToFirestoreValue(message.deviceType || detectMessageDeviceType())
     };
     if (message.imageUrl) fields.imageUrl = jsToFirestoreValue(message.imageUrl);
     if (message.thumbUrl) fields.thumbUrl = jsToFirestoreValue(message.thumbUrl);
@@ -3884,6 +3928,7 @@ export {
   fetchAnniversariesRest,
   fetchPhotoCommentCountsRest,
   fetchCustomCultureItemsRest,
+  fetchMemePoolRest,
   sendChatMessageRest,
   writeCollectionDocumentWithFallback,
   writeRootCollectionDocumentWithFallback,

@@ -80,6 +80,8 @@ import {
   verifyAdminPasswordRemote,
   listAllCalendarsRemote,
   listServerAuditLogsRemote,
+  memePoolUpsertRemote,
+  memePoolDeleteRemote,
   findCultureLinkedAnniversary,
   findCultureLinkedMemo,
   buildCultureLinkedMemoData,
@@ -437,6 +439,7 @@ import {
   fetchAnniversariesRest,
   fetchPhotoCommentCountsRest,
   fetchCustomCultureItemsRest,
+  fetchMemePoolRest,
   writeCollectionDocumentWithFallback,
   writeRootCollectionDocumentWithFallback,
   deleteMessageRest,
@@ -899,7 +902,17 @@ function CalendarApp() {
       }
       const pendingPlaces = pendingRemotePlacesRef.current;
       pendingRemotePlacesRef.current = null;
-      if (Array.isArray(pendingPlaces)) setPlacesSubcollection(pendingPlaces);
+      // pendingPlaces is now only the bounded recent-updates window (see subscribePlaces above),
+      // not the full collection, so merge it in by id instead of replacing -- a plain replace
+      // here would silently drop every older place not touched during this save.
+      if (Array.isArray(pendingPlaces)) {
+        setPlacesSubcollection(prev => {
+          const byId = new Map();
+          (Array.isArray(prev) ? prev : []).forEach(p => { if (p?.id) byId.set(p.id, p); });
+          pendingPlaces.forEach(p => { if (p?.id) byId.set(p.id, p); });
+          return Array.from(byId.values());
+        });
+      }
       const pendingMeetings = pendingRemoteMeetingsRef.current;
       pendingRemoteMeetingsRef.current = null;
       if (Array.isArray(pendingMeetings)) {
@@ -1043,6 +1056,14 @@ function CalendarApp() {
   }, [activeCalId, firebaseDb, firebaseConnectionVersion]);
   const [anniversaries, setAnniversaries] = React.useState([]);
   const [customCultureItems, setCustomCultureItems] = React.useState([]);
+  // 밈 키보드용 이미지 풀. calendarId로 나뉘지 않는 전역 컬렉션이라(모든 캘린더가 같은 해시태그
+  // 인덱스를 검색) 활성 캘린더가 바뀌어도 다시 불러올 필요 없이 앱 세션당 한 번만 가져온다.
+  const [memePool, setMemePool] = React.useState([]);
+  React.useEffect(() => {
+    let cancelled = false;
+    fetchMemePoolRest().then(list => { if (!cancelled) setMemePool(list); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
   // id -> poster URL from crawled culture JSON (festivals + performances). Used to enrich
   // already-registered culture anniversaries that were saved before posters were copied.
   const [culturePosterById, setCulturePosterById] = React.useState(() => new Map());
@@ -1473,6 +1494,34 @@ function CalendarApp() {
   // itself changes. Mirrors the chatParticipantIdRef pattern used the same way above.
   const activeCalRef = React.useRef(activeCal);
   React.useEffect(() => { activeCalRef.current = activeCal; }, [activeCal]);
+
+  // Lightweight client-side error monitoring: without this, a bug that fails silently in
+  // someone's browser is invisible to us unless they think to report it. Reuses the existing
+  // serverAuditLogs pipeline (queueServerAuditEvent -> auditEvent Cloud Function, already
+  // rate-limited server-side) instead of adding a new third-party service/account -- these
+  // show up in the admin 감사 로그 tab as action "client_error", same place as every other
+  // audit event. Registered once for the page's lifetime, not per calendar.
+  React.useEffect(() => {
+    const reportClientError = (message, extra) => {
+      const calId = activeCalRef.current?.id || 'unknown';
+      const note = sanitizeText(`${message || '알 수 없는 오류'} ${extra || ''}`.trim(), 200);
+      queueServerAuditEvent(calId, 'client_error', note, getClientAuditContext());
+    };
+    const onError = (event) => {
+      reportClientError(event?.message, event?.filename ? `@${event.filename}:${event.lineno || ''}` : '');
+    };
+    const onRejection = (event) => {
+      const reason = event?.reason;
+      reportClientError(reason?.message || String(reason || '').slice(0, 160));
+    };
+    window.addEventListener('error', onError);
+    window.addEventListener('unhandledrejection', onRejection);
+    return () => {
+      window.removeEventListener('error', onError);
+      window.removeEventListener('unhandledrejection', onRejection);
+    };
+  }, []);
+
   React.useEffect(() => {
     if (activeCal) {
       const calTitle = `${activeCal.title} 캘린더`;
@@ -2402,7 +2451,26 @@ function CalendarApp() {
       return () => { isMounted = false; clearInterval(refreshTimer); };
     }
 
-    const unsubPlaces = subscribePlaces(activeCalId, snapshot => {
+    // A years-old family calendar's places subcollection only ever grows, and a plain
+    // unbounded onSnapshot() re-reads every single place from scratch on every reconnect.
+    // Same fix as anniversaries/customCultureItems: hydrate the full list once via REST, then
+    // attach a listener bounded to the most-recently-updated places to catch live add/edit/
+    // (soft-)delete, merging by id into local state so older places hydrated via REST are never
+    // dropped. Deletes are safe to catch this way because they're soft-deletes (deletedAt set on
+    // the doc, which bumps updatedAt) rather than real document removal, so a delete always shows
+    // up in the "most recently updated" window like any other edit.
+    const mergePlacesById = (prevList, incomingList) => {
+      const byId = new Map();
+      (Array.isArray(prevList) ? prevList : []).forEach(p => { if (p?.id) byId.set(p.id, p); });
+      (Array.isArray(incomingList) ? incomingList : []).forEach(p => { if (p?.id) byId.set(p.id, p); });
+      return Array.from(byId.values());
+    };
+    fetchPlacesFromFirestore(activeCalId).then(list => {
+      if (isMounted && Array.isArray(list) && list.length > 0) {
+        setPlacesSubcollection(prev => mergePlacesById(prev, list));
+      }
+    }).catch(err => console.warn('Places archive hydration failed:', err));
+    const unsubPlaces = subscribePlaces(activeCalId, { orderBy: 'updatedAt', direction: 'desc', limit: 200 }, snapshot => {
         if (!isMounted) return;
         const list = [];
         snapshot.forEach(doc => list.push(doc.data()));
@@ -2410,7 +2478,7 @@ function CalendarApp() {
           if (!snapshot.metadata?.fromCache && !snapshot.metadata?.hasPendingWrites) pendingRemotePlacesRef.current = list;
           return;
         }
-        setPlacesSubcollection(list);
+        setPlacesSubcollection(prev => mergePlacesById(prev, list));
       }, err => {
         console.warn(`Firestore places subscription error:`, err);
         queueServerAuditEvent(activeCalId, 'realtime_fallback', `places:${String(err?.code || 'unknown')}`, getClientAuditContext());
@@ -2604,7 +2672,10 @@ function CalendarApp() {
       setMemos(Array.from(byId.values()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)));
     };
 
-    const unsubscribePinned = needsMemoCollection ? subscribeMemos(activeCalId, { where: ['isPinned', '==', true] }, snapshot => {
+    // 고정 메모는 원래도 적은 수라 문제된 적 없지만, 수년간 쓰는 가족 캘린더가 계속 늘려온
+    // 다른 컬렉션(anniversaries)에서 이미 겪은 "무제한 재읽기" 패턴을 여기도 예방적으로 막아둔다.
+    // where()에 대한 등호(==) 필터 + limit()만 쓰면(orderBy 없이) 복합 인덱스가 필요 없다.
+    const unsubscribePinned = needsMemoCollection ? subscribeMemos(activeCalId, { where: ['isPinned', '==', true], limit: 100 }, snapshot => {
         if (!isMounted) return;
         pinnedList = [];
         snapshot.forEach(doc => pinnedList.push({ id: doc.id, ...doc.data() }));
@@ -3014,6 +3085,11 @@ function CalendarApp() {
   const patchLocalMemo = (memoId, patch) => {
     if (!memoId || !patch) return;
     setMemos(prev => (Array.isArray(prev) ? prev.map(m => m.id === memoId ? { ...m, ...patch } : m) : []));
+    // patchLocalChatMessage's chat equivalent also patches the gallery archive copy -- this
+    // didn't, so a pin toggle or a new comment on a memo already loaded into the Gallery/History
+    // archive stayed stale there (only the live `memos` array saw it) until the archive's own
+    // one-shot fetch happened to re-run.
+    if (typeof patchGalleryArchiveMemo === 'function') patchGalleryArchiveMemo(memoId, patch);
   };
   const upsertLocalMemo = memo => {
     if (!memo?.id) return;
@@ -3385,6 +3461,29 @@ function CalendarApp() {
       setIsChatSubmitting(false);
       setChatUploadProgress(null);
     }
+  };
+
+  // 밈 키보드에서 썸네일을 탭했을 때: 이미 Storage에 올라가 있는 이미지라 handleSendChatMessage의
+  // 업로드/오프라인 큐잉 로직이 전혀 필요 없다 -- 그 URL만 그대로 참조하는 메시지 한 건을 쓴다.
+  const handleSendMemeImage = async (meme) => {
+    if (!meme || (!meme.fullUrl && !meme.thumbUrl)) return;
+    if (!chatParticipantId) { showToast('참여자를 선택해 주세요.', 'error'); return; }
+    const url = meme.fullUrl || meme.thumbUrl;
+    const thumb = meme.thumbUrl || meme.fullUrl;
+    const messageOperationId = `chat_${activeCalId}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const messageData = {
+      participantId: chatParticipantId,
+      text: '',
+      imageUrl: url,
+      thumbUrl: thumb,
+      imageUrls: [url],
+      thumbUrls: [thumb],
+      timestamp: Date.now(),
+      uploadSource: 'meme'
+    };
+    const sent = await writeCollectionDocumentWithFallback('messages', activeCalId, '', messageData, 'add', '밈 전송', { documentId: messageOperationId });
+    if (sent?.id) upsertLocalChatMessage({ ...messageData, id: sent.id });
+    else showToast('밈 전송에 실패했습니다.', 'error');
   };
 
   const prepareGalleryImageUploads = async (files, title = '사진 업로드 준비 중...') => {
@@ -7231,6 +7330,8 @@ function CalendarApp() {
   if (activeView === 'chat') {
     return withStickyVideo(/*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", { className: "chat-view-container" }, /*#__PURE__*/React.createElement(ChatRoomView, {
       calendar: activeCal,
+      memePool: memePool,
+      onSendMemeImage: handleSendMemeImage,
       chatMessages: displayChatMessages,
       loadingOlderChat: loadingOlderChat,
       hasMoreOlderChat: hasMoreOlderChat,
@@ -7811,7 +7912,13 @@ function CalendarApp() {
     syncStatus: syncStatus
   }), isGalleryOpen && /*#__PURE__*/React.createElement(ChatGalleryModal, {
     calendar: activeCal,
-    chatMessages: chatMessages,
+    // 채팅창 안에서 여는 이 갤러리 인스턴스만 좁은 live-window `chatMessages`를 받고 있었다 --
+    // 스크롤로 올라간 옛 사진을 열어 태그를 저장해도 patchLocalChatMessage가 patch하는 다른
+    // 4개 버킷(olderChatMessages/galleryLiveMessages/갤러리 아카이브)에는 반영되지만 이 좁은
+    // 배열엔 반영 안 돼서, 같은 사진을 다시 열면 저장 전 상태로 보였다(새로고침해야 갱신).
+    // 갤러리 페이지/히스토리 뷰가 이미 쓰는 병합된 galleryChatMessages/galleryMemos로 맞춘다.
+    chatMessages: galleryChatMessages,
+    memos: galleryMemos,
     onClose: () => setIsGalleryOpen(false),
     onUploadImages: handleUploadGalleryImages,
     onAddLink: handleAddGalleryLink,
@@ -11900,6 +12007,9 @@ function bindGatherUiDeps() {
     isAdminRestoreRoute: typeof isAdminRestoreRoute === 'function' ? isAdminRestoreRoute : null,
     listAllCalendarsRemote: typeof listAllCalendarsRemote === 'function' ? listAllCalendarsRemote : null,
     listServerAuditLogsRemote: typeof listServerAuditLogsRemote === 'function' ? listServerAuditLogsRemote : null,
+    memePoolUpsertRemote: typeof memePoolUpsertRemote === 'function' ? memePoolUpsertRemote : null,
+    memePoolDeleteRemote: typeof memePoolDeleteRemote === 'function' ? memePoolDeleteRemote : null,
+    fetchMemePoolRest: typeof fetchMemePoolRest === 'function' ? fetchMemePoolRest : null,
     rebuildPhotoIndexRemote: typeof rebuildPhotoIndexRemote === 'function' ? rebuildPhotoIndexRemote : null,
     mergeCalendarCollections: typeof mergeCalendarCollections === 'function' ? mergeCalendarCollections : null,
     mergePollRecord: typeof mergePollRecord === 'function' ? mergePollRecord : null,

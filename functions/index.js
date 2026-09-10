@@ -982,6 +982,16 @@ function setPublicCacheHeaders(res, maxAge = 300) {
 }
 
 const PUBLIC_PROXY_RUNTIME = { timeoutSeconds: 15, memory: '256MB', maxInstances: 20 };
+// Place search (Kakao/Google) was the specific "느리고 답답하다" complaint -- these two scale to
+// zero like every other function here, so an idle gap of even a few minutes forces the next
+// search to pay a full cold start (function container boot + Node runtime init), often 1-3s+ on
+// top of the actual API call. minInstances keeps one instance warm so a search only ever pays
+// the real network round-trip. Cost is a small idle-instance fee (~256MB, 1 warm instance,
+// us-central1/Tier-1 pricing) on top of normal pay-per-use billing -- roughly $2.70/month per
+// warm instance (~3,600-4,000원), not a per-request charge. peekalinkProxy/tourApiSearchProxy
+// are left at the default (scale-to-zero) since they weren't the reported problem and don't
+// justify the extra always-on cost.
+const PLACE_SEARCH_PROXY_RUNTIME = { ...PUBLIC_PROXY_RUNTIME, minInstances: 1 };
 
 // Generic per-IP, per-endpoint sliding-window throttle for the public proxy functions below
 // (peekalinkProxy, kakaoLocalSearchProxy). Both proxies are unauthenticated by design (any
@@ -1275,7 +1285,7 @@ async function writeExternalCache(provider, key, payload, ttlMs) {
   } catch (err) { console.warn(`external cache write failed (${provider}):`, err); }
 }
 
-exports.kakaoLocalSearchProxy = functions.runWith({ ...PUBLIC_PROXY_RUNTIME, secrets: ['KAKAO_REST_API_KEY'] }).https.onRequest(async (req, res) => {
+exports.kakaoLocalSearchProxy = functions.runWith({ ...PLACE_SEARCH_PROXY_RUNTIME, secrets: ['KAKAO_REST_API_KEY'] }).https.onRequest(async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') { setPublicCacheHeaders(res, 86400); res.status(204).send(''); return; }
@@ -1354,7 +1364,7 @@ async function incrementGooglePlacesSearchStat() {
   }
 }
 
-exports.googlePlacesSearchProxy = functions.runWith({ ...PUBLIC_PROXY_RUNTIME, secrets: ['GOOGLE_PLACES_API_KEY'] }).https.onRequest(async (req, res) => {
+exports.googlePlacesSearchProxy = functions.runWith({ ...PLACE_SEARCH_PROXY_RUNTIME, secrets: ['GOOGLE_PLACES_API_KEY'] }).https.onRequest(async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') { setPublicCacheHeaders(res, 86400); res.status(204).send(''); return; }
@@ -1751,13 +1761,101 @@ exports.listServerAuditLogs = functions.https.onRequest(async (req, res) => {
   if (!matches) { res.status(401).json({ ok: false }); return; }
   try {
     const max = Math.min(Math.max(Number(limit) || 300, 1), 1000);
-    let query = admin.firestore().collection('serverAuditLogs').orderBy('receivedAt', 'desc').limit(max);
-    if (calendarId) query = query.where('calendarId', '==', String(calendarId));
-    const snap = await query.get();
-    const logs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    let logs;
+    if (calendarId) {
+      // where('calendarId') + orderBy('receivedAt') needs a composite index that was never
+      // deployed (this project has no automated firestore:indexes deploy step), so every
+      // calendar-scoped fetch failed with FAILED_PRECONDITION and the admin 감사 로그 탭 always
+      // showed "조회 실패". An equality-only where() never needs a composite index, so fetch
+      // this calendar's rows unordered up to a generous cap and sort/trim in JS instead --
+      // audit log volume per calendar stays small enough that this is cheap.
+      const snap = await admin.firestore().collection('serverAuditLogs')
+        .where('calendarId', '==', String(calendarId))
+        .limit(5000)
+        .get();
+      logs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+        .sort((a, b) => (Number(b.receivedAt) || 0) - (Number(a.receivedAt) || 0))
+        .slice(0, max);
+    } else {
+      const snap = await admin.firestore().collection('serverAuditLogs').orderBy('receivedAt', 'desc').limit(max).get();
+      logs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    }
     res.status(200).json({ ok: true, logs });
   } catch (err) {
     console.error('listServerAuditLogs failed:', err);
+    res.status(500).json({ ok: false });
+  }
+});
+
+// Global cross-calendar meme/sticker image pool (밈 키보드). Any calendar's chat can search
+// these by hashtag and send one straight into the chat, like an attachment. Writable only via
+// this admin-gated function -- if any calendar's own client could write directly, a
+// compromised or malicious calendar could inject arbitrary images/hashtags into a pool every
+// OTHER calendar sees, a materially bigger blast radius than that calendar's own data (same
+// reasoning as the photoIndex collection). Reads stay open in firestore.rules since every
+// calendar needs the full hashtag index to search locally.
+const MEME_POOL_ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
+exports.memePoolUpsert = functions.https.onRequest(async (req, res) => {
+  setAdminCorsHeaders(res);
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  if (req.method !== 'POST') { res.status(405).json({ ok: false }); return; }
+  const { password, id, thumbUrl, fullUrl, hashtags, fileName, width, height } = req.body || {};
+  if (typeof password !== 'string' || !password.trim()) { res.status(400).json({ ok: false }); return; }
+  if (typeof id !== 'string' || !MEME_POOL_ID_RE.test(id)) { res.status(400).json({ ok: false, message: 'invalid id' }); return; }
+  const rateState = await checkAdminAuthRateLimit(req.ip);
+  if (rateState.blocked) { res.status(429).json({ ok: false }); return; }
+  const matches = sha256Hex(password.trim()) === await getStoredAdminPasswordHash();
+  await recordAdminAuthResult(rateState, matches);
+  if (!matches) { res.status(401).json({ ok: false }); return; }
+  try {
+    const ref = admin.firestore().collection('memePool').doc(id);
+    const existingSnap = await ref.get();
+    const existing = existingSnap.exists ? existingSnap.data() : null;
+    // hashtags is the only field a second call (the lightbox tagging step, after the bulk
+    // upload already registered thumbUrl/fullUrl) is expected to change -- omit it to leave
+    // existing tags alone rather than wiping them back to [].
+    const cleanHashtags = Array.isArray(hashtags)
+      ? Array.from(new Set(
+          hashtags.map(t => String(t || '').trim().replace(/^#/, '').toLowerCase()).filter(Boolean)
+        )).slice(0, 30)
+      : (existing?.hashtags || []);
+    const now = Date.now();
+    const doc = {
+      thumbUrl: typeof thumbUrl === 'string' && thumbUrl ? thumbUrl : (existing?.thumbUrl || ''),
+      fullUrl: typeof fullUrl === 'string' && fullUrl ? fullUrl : (existing?.fullUrl || ''),
+      fileName: typeof fileName === 'string' ? fileName.slice(0, 200) : (existing?.fileName || ''),
+      hashtags: cleanHashtags,
+      width: Number.isFinite(Number(width)) ? Number(width) : (existing?.width ?? null),
+      height: Number.isFinite(Number(height)) ? Number(height) : (existing?.height ?? null),
+      createdAt: existing?.createdAt || now,
+      updatedAt: now
+    };
+    if (!doc.thumbUrl && !doc.fullUrl) { res.status(400).json({ ok: false, message: 'thumbUrl or fullUrl required' }); return; }
+    await ref.set(doc);
+    res.status(200).json({ ok: true, id });
+  } catch (err) {
+    console.error('memePoolUpsert failed:', err);
+    res.status(500).json({ ok: false });
+  }
+});
+
+exports.memePoolDelete = functions.https.onRequest(async (req, res) => {
+  setAdminCorsHeaders(res);
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  if (req.method !== 'POST') { res.status(405).json({ ok: false }); return; }
+  const { password, id } = req.body || {};
+  if (typeof password !== 'string' || !password.trim()) { res.status(400).json({ ok: false }); return; }
+  if (typeof id !== 'string' || !MEME_POOL_ID_RE.test(id)) { res.status(400).json({ ok: false }); return; }
+  const rateState = await checkAdminAuthRateLimit(req.ip);
+  if (rateState.blocked) { res.status(429).json({ ok: false }); return; }
+  const matches = sha256Hex(password.trim()) === await getStoredAdminPasswordHash();
+  await recordAdminAuthResult(rateState, matches);
+  if (!matches) { res.status(401).json({ ok: false }); return; }
+  try {
+    await admin.firestore().collection('memePool').doc(id).delete();
+    res.status(200).json({ ok: true });
+  } catch (err) {
+    console.error('memePoolDelete failed:', err);
     res.status(500).json({ ok: false });
   }
 });

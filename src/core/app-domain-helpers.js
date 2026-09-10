@@ -819,6 +819,19 @@ async function rebuildPhotoIndexRemote(password, calendarId, options = {}) {
   return result || { ok: false };
 }
 
+// 밈 키보드 이미지 풀 메타데이터(해시태그 등)는 어드민 비밀번호로 게이트된 이 두 함수로만
+// 쓸 수 있다 -- 실제 이미지 바이트 업로드는 uploadMemePoolAssets(meme-pool.js)가 Storage에
+// 직접 올리고, 그 다운로드 URL을 여기로 등록만 한다.
+async function memePoolUpsertRemote(password, payload = {}) {
+  const result = await callAdminFunction('memePoolUpsert', { password, ...payload });
+  return !!result?.ok;
+}
+
+async function memePoolDeleteRemote(password, id) {
+  const result = await callAdminFunction('memePoolDelete', { password, id });
+  return !!result?.ok;
+}
+
 async function listPushSubscriptionHealthRemote(password, calendarId) {
   const result = await callAdminFunction('listPushSubscriptionHealth', { password, calendarId });
   return result?.summary || null;
@@ -2642,6 +2655,8 @@ export {
   verifyAdminPasswordRemote,
   listAllCalendarsRemote,
   listServerAuditLogsRemote,
+  memePoolUpsertRemote,
+  memePoolDeleteRemote,
   findCultureLinkedAnniversary,
   findCultureLinkedMemo,
   buildCultureLinkedMemoData,

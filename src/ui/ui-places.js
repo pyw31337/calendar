@@ -5,6 +5,10 @@
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 function __gatherUiDeps() { return window.GATHER_UI_DEPS || {}; }
+function highlightKeyword(...args) {
+  const f = __gatherUiDeps().highlightKeyword || GATHER_APP_UTILS.highlightKeyword;
+  return typeof f === 'function' ? f(...args) : args[0];
+}
 /* __fb() bridge */
 function __fb() {
   const deps = __gatherUiDeps();
@@ -1849,9 +1853,9 @@ export function PlacesView({
             
             /* Name & Address -- alias is the list display name when set; official name shown underneath */
             /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 } },
-              /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: 'var(--font-size-base)', color: 'var(--text-main)' } }, (place.alias || place.name || '이름 없음')),
-              place.alias && place.name && /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } }, place.name),
-              place.address && /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } }, getDisplayPlaceAddress(place))
+              /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: 'var(--font-size-base)', color: 'var(--text-main)' } }, highlightKeyword(place.alias || place.name || '이름 없음', listSearchQuery)),
+              place.alias && place.name && /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } }, highlightKeyword(place.name, listSearchQuery)),
+              place.address && /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } }, highlightKeyword(getDisplayPlaceAddress(place), listSearchQuery))
             ),
             
             /* Visits history log (one row per date, newest first) or plain dateless memo --

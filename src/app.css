@@ -1578,7 +1578,9 @@ input[type="date"].form-input {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md) !important;
   color: var(--text-main);
-  font-size: 0.9rem;
+  /* 16px 이상 유지 -- 이보다 작으면 iOS Safari가 이 필드를 탭할 때 페이지를 자동으로
+     확대해버린다(디자인시스템 문서 규칙). 모바일 미디어쿼리에서 이보다 더 줄이지 않는다. */
+  font-size: 1rem;
   font-family: inherit;
   outline: none;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
@@ -1610,9 +1612,8 @@ button.form-select {
 }
 
 .form-select:focus, .form-input:focus { border-color: var(--accent-primary); box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15); }
-@media (max-width: 639px) {
-  .form-select, .form-input { font-size: 0.8rem; }
-}
+/* 예전엔 여기서 0.8rem(12.8px)까지 줄였다 -- 정작 확대를 막아야 할 좁은 화면에서 16px
+   미만이 되어 오히려 iOS 자동 확대를 유발했다. 모바일에서도 16px를 유지한다. */
 
 /* Native <select> elements: replace the browser's default OS-styled dropdown arrow with the
    same chevron-down icon used everywhere else in the app (e.g. the admin header's calendar
@@ -2553,7 +2554,9 @@ select.form-select {
   flex-wrap: wrap;
   gap: 6px;
   width: 100%;
-  padding: 18px 0 8px;
+  /* 모바일 브라우저 하단 주소창/제스처 바에 페이지 번호가 가려지지 않도록 safe-area 만큼
+     여백을 더한다 -- 스크롤 컨테이너 자체의 고정 16px padding-bottom만으로는 부족했다. */
+  padding: 18px 0 calc(8px + env(safe-area-inset-bottom, 0px));
 }
 
 .gallery-pagination-button {
