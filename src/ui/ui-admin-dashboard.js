@@ -403,6 +403,70 @@ export function AdminDashboard({ initialCalendars }) {
   };
   const closeConfirmDialog = () => setConfirmDialog(null);
 
+  // 채팅 로그/복구 타임라인의 행을 눌렀을 때 여는 상세정보 레이어팝업. 두 탭이 서로 다른 모양의
+  // 레코드(chat message vs activity log)를 다루므로, rows(라벨/값 쌍 배열)만 계산해 넘기고
+  // 렌더링은 하나의 공용 모달이 담당한다.
+  const [logDetail, setLogDetail] = React.useState(null);
+  const closeLogDetail = () => setLogDetail(null);
+  const openChatLogDetail = (msg, cal) => {
+    const pMap = (cal?.participants || []).reduce((acc, p) => { acc[p.id] = p; return acc; }, {});
+    const p = pMap[msg.participantId] || null;
+    const images = Array.isArray(msg.imageUrls) ? msg.imageUrls : (msg.imageUrl ? [msg.imageUrl] : []);
+    setLogDetail({
+      title: '채팅 메시지 상세',
+      images,
+      rows: [
+        ['캘린더', cal ? `${cal.title} (${cal.id})` : msg.calId],
+        ['보낸 사람', p ? p.name : (msg.participantId || '알수없음')],
+        ['전송 시각', new Date(msg.timestamp).toLocaleString('ko-KR')],
+        ['메시지 ID', msg.id],
+        ['내용', msg.text || '(텍스트 없음)'],
+        ['업로드 출처', msg.uploadSource || ''],
+        ['이미지 개수', images.length ? String(images.length) : '0'],
+        ['링크 미리보기', msg.linkPreview ? (msg.linkPreview.title || msg.linkPreview.url || '있음') : ''],
+        // 현재 채팅 메시지에는 발신자 IP/기기(User-Agent) 정보가 전혀 기록되지 않는다 -- 이걸
+        // 보여주려면 메시지 전송 시점에 서버(Cloud Function)로 별도 비콘을 보내 IP를 받아
+        // 기록하는 새 파이프라인이 필요해서(서버 감사 로그와 동일한 방식), 이번 변경 범위에서는
+        // 넣지 않았다.
+        ['IP / 기기 정보', '(수집되지 않음 -- 별도 개발 필요)']
+      ].filter(([, v]) => v !== '' && v != null)
+    });
+  };
+  const openRecoveryLogDetail = (log, cal) => {
+    const pMap = (cal?.participants || []).reduce((acc, p) => { acc[p.id] = p; return acc; }, {});
+    const resolveParticipant = __deps.resolveLogParticipant || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.resolveLogParticipant) || ((l, map) => (map && map[l.participantId]) || { name: '시스템', color: '#94A3B8' });
+    const formatNote = __deps.formatDetailedLogNote || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.formatDetailedLogNote) || (l => l.note || '');
+    const p = resolveParticipant(log, pMap);
+    const resource = log.resource && typeof log.resource === 'object' ? log.resource : null;
+    // resource.resourceId는 tag_add/tag_remove 등 사진 관련 로그에서 그 사진이 올라온 채팅
+    // 메시지의 id다. 같은 캘린더의 로드된 메시지 중에서 찾아 실제 이미지를 함께 보여준다 --
+    // 못 찾으면(오래돼 이미 로컬에 없거나 삭제됨) 이미지 없이 나머지 정보만 보여준다.
+    let images = [];
+    if (resource?.resourceId) {
+      const srcMsg = (messagesMap[selectedCalId] || []).find(m => m.id === resource.resourceId);
+      const srcImages = srcMsg && Array.isArray(srcMsg.imageUrls) ? srcMsg.imageUrls : [];
+      if (Number.isInteger(resource.imageIndex) && srcImages[resource.imageIndex]) images = [srcImages[resource.imageIndex]];
+      else if (srcImages.length) images = srcImages;
+    }
+    setLogDetail({
+      title: '복구 로그 상세',
+      images,
+      rows: [
+        ['캘린더', cal ? `${cal.title} (${cal.id})` : selectedCalId],
+        ['종류', log.type || ''],
+        ['동작(action)', log.action || ''],
+        ['담당자', p ? p.name : (log.participantId || '')],
+        ['일정 날짜', log.date || ''],
+        ['기록 시각', new Date(log.timestamp).toLocaleString('ko-KR')],
+        ['내용', formatNote(log) || ''],
+        ['원본 리소스 ID', resource?.resourceId || ''],
+        ['리소스 출처', resource?.source || ''],
+        ['이미지 인덱스', Number.isInteger(resource?.imageIndex) ? String(resource.imageIndex) : ''],
+        ['로그 ID', log.id || '']
+      ].filter(([, v]) => v !== '' && v != null)
+    });
+  };
+
   const handleRebuildPhotoIndex = (apply) => {
     const session = getAdminSession();
     if (!session?.password || !selectedCalId) {
@@ -2543,7 +2607,9 @@ export function AdminDashboard({ initialCalendars }) {
 
                 return /*#__PURE__*/React.createElement("div", {
                   key: log.id,
-                  className: "admin-chat-row"
+                  className: "admin-chat-row",
+                  onClick: () => openRecoveryLogDetail(log, selectedCal),
+                  style: { cursor: 'pointer' }
                 },
                   /* Left: action + participant badges + date */
                   /*#__PURE__*/React.createElement("div", { className: "admin-chat-header", style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' } },
@@ -2567,7 +2633,7 @@ export function AdminDashboard({ initialCalendars }) {
                     /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', fontWeight: '500', whiteSpace: 'nowrap' } }, formatRegisteredAt(log.timestamp)),
                     /*#__PURE__*/React.createElement("button", {
                       type: "button", className: "btn btn-secondary recovery-restore-btn", style: { fontSize: 'var(--font-size-sm)', padding: '4px 10px', whiteSpace: 'nowrap' },
-                      onClick: () => handleRestoreToLogTimestamp(selectedCalId, log)
+                      onClick: e => { e.stopPropagation(); handleRestoreToLogTimestamp(selectedCalId, log); }
                     }, "이 시점으로 복구")
                   )
                 );
@@ -2699,7 +2765,9 @@ export function AdminDashboard({ initialCalendars }) {
 
             return /*#__PURE__*/React.createElement("div", {
               key: msg.id,
-              className: 'admin-chat-row'
+              className: 'admin-chat-row',
+              onClick: () => openChatLogDetail(msg, cal),
+              style: { cursor: 'pointer' }
             },
               /* Line 1: participant badge (calendar is now implied by the header's calendar select) */
               /*#__PURE__*/React.createElement("div", { className: "admin-chat-header" },
@@ -2716,7 +2784,7 @@ export function AdminDashboard({ initialCalendars }) {
                 /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } }, timeStr),
                 /*#__PURE__*/React.createElement("button", {
                   type: "button", className: "btn btn-danger", title: "삭제",
-                  onClick: () => handleDeleteMessageDirect(msg.calId, msg),
+                  onClick: e => { e.stopPropagation(); handleDeleteMessageDirect(msg.calId, msg); },
                   style: { width: '26px', height: '26px', padding: 0, flexShrink: 0 }
                 }, /*#__PURE__*/React.createElement(TrashIcon, { size: 14 }))
               )
@@ -2809,6 +2877,46 @@ export function AdminDashboard({ initialCalendars }) {
       onCancel: closeConfirmDialog,
       showPasswordInput: confirmDialog.showPasswordInput
     }),
+
+    /* 채팅 로그 / 복구 타임라인 행을 눌렀을 때 뜨는 상세정보 레이어팝업 */
+    logDetail && /*#__PURE__*/React.createElement("div", {
+      onClick: closeLogDetail,
+      style: {
+        position: 'fixed', inset: 0, zIndex: 20600, backgroundColor: 'rgba(15,23,42,0.55)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px'
+      }
+    },
+      /*#__PURE__*/React.createElement("div", {
+        onClick: e => e.stopPropagation(),
+        style: {
+          width: '100%', maxWidth: '480px', maxHeight: '85vh', overflowY: 'auto',
+          backgroundColor: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '20px',
+          display: 'flex', flexDirection: 'column', gap: '12px', boxShadow: '0 10px 40px rgba(0,0,0,0.3)'
+        }
+      },
+        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+          /*#__PURE__*/React.createElement("h4", { style: { margin: 0, fontSize: '1.05rem', fontWeight: 900 } }, logDetail.title),
+          /*#__PURE__*/React.createElement("button", {
+            type: "button", onClick: closeLogDetail, "aria-label": "닫기",
+            style: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer' }
+          }, "✕")
+        ),
+        logDetail.images && logDetail.images.length > 0 && /*#__PURE__*/React.createElement("div", {
+          style: { display: 'flex', gap: '8px', flexWrap: 'wrap' }
+        }, logDetail.images.map((url, idx) => /*#__PURE__*/React.createElement("img", {
+          key: idx, src: url, alt: "첨부 이미지",
+          style: { width: '96px', height: '96px', objectFit: 'cover', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }
+        }))),
+        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
+          logDetail.rows.map(([label, value], idx) => /*#__PURE__*/React.createElement("div", {
+            key: idx, style: { display: 'flex', gap: '10px', fontSize: 'var(--font-size-sm)', alignItems: 'flex-start' }
+          },
+            /*#__PURE__*/React.createElement("span", { style: { flexShrink: 0, width: '92px', color: 'var(--text-muted)', fontWeight: 700 } }, label),
+            /*#__PURE__*/React.createElement("span", { style: { color: 'var(--text-main)', wordBreak: 'break-word', whiteSpace: 'pre-wrap' } }, String(value))
+          ))
+        )
+      )
+    ),
 
     /* New calendar creation modal (replaces window.prompt) */
     isCreateCalModalOpen && /*#__PURE__*/React.createElement(AdminCreateCalendarModal, {

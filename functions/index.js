@@ -1751,10 +1751,25 @@ exports.listServerAuditLogs = functions.https.onRequest(async (req, res) => {
   if (!matches) { res.status(401).json({ ok: false }); return; }
   try {
     const max = Math.min(Math.max(Number(limit) || 300, 1), 1000);
-    let query = admin.firestore().collection('serverAuditLogs').orderBy('receivedAt', 'desc').limit(max);
-    if (calendarId) query = query.where('calendarId', '==', String(calendarId));
-    const snap = await query.get();
-    const logs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    let logs;
+    if (calendarId) {
+      // where('calendarId') + orderBy('receivedAt') needs a composite index that was never
+      // deployed (this project has no automated firestore:indexes deploy step), so every
+      // calendar-scoped fetch failed with FAILED_PRECONDITION and the admin 감사 로그 탭 always
+      // showed "조회 실패". An equality-only where() never needs a composite index, so fetch
+      // this calendar's rows unordered up to a generous cap and sort/trim in JS instead --
+      // audit log volume per calendar stays small enough that this is cheap.
+      const snap = await admin.firestore().collection('serverAuditLogs')
+        .where('calendarId', '==', String(calendarId))
+        .limit(5000)
+        .get();
+      logs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+        .sort((a, b) => (Number(b.receivedAt) || 0) - (Number(a.receivedAt) || 0))
+        .slice(0, max);
+    } else {
+      const snap = await admin.firestore().collection('serverAuditLogs').orderBy('receivedAt', 'desc').limit(max).get();
+      logs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    }
     res.status(200).json({ ok: true, logs });
   } catch (err) {
     console.error('listServerAuditLogs failed:', err);
