@@ -5,6 +5,7 @@ import { GATHER_APP_UTILS, omitUndefinedDeep } from '../src/core/app-utils.js';
 import { calculateSettlementRows } from '../src/core/settlement-calculator.js';
 import { fetchPhotoComments, savePhotoComments } from '../src/core/photo-comments.js';
 import { composeGalleryPhotos, paginateGalleryItems, getPaginationWindow, dedupeGalleryPhotoEntries, getGalleryPhotoDedupeKeys, coerceGalleryImageIndex } from '../src/core/gallery-data.js';
+import { filterDeletedPhotoFromIndexItems, deleteOwnedChatFileFromStorage } from '../src/core/gallery-bulk-delete.js';
 import { cloneConfirmedMeetings, commitConfirmedMeetingChanges } from '../src/core/confirmed-meeting-coordinator.js';
 import { getInitialAppView, buildAppViewUrl } from '../src/core/app-routing-state.js';
 import { getInitialDataLoadingState, subscribeCalendarBootstrap } from '../src/core/app-data-bootstrap.js';
@@ -652,6 +653,43 @@ assert(chatRoomSource.includes('handleDocFileChangeChat') && chatRoomSource.incl
 assert(chatGallerySource.includes("value: 'files'") && chatGallerySource.includes("label: '파일'") && chatGallerySource.includes('renderFileListHeader'), 'gallery must expose a 파일 tab');
 assert(chatGallerySource.includes("kind: 'gather-files'") && chatGallerySource.includes('storagePath'), 'file bulk-share payload must keep storagePath so sanitizer does not drop attachments');
 assert(appMainSource.includes('handleAddGalleryFiles') && appMainSource.includes('sanitizeFileAttachment'), 'pasted gallery files must keep sanitized storagePath before write');
+assert(chatGallerySource.includes('handleClickBulkDelete'), 'gallery edit mode must offer bulk delete');
+assert(chatGallerySource.includes('if (!isBulkShareMode)'), 'gallery default toolbar must hide paste until edit mode');
+assert(chatGallerySource.includes('handleToggleBulkShareMode, title: "편집"'), 'gallery default toolbar must keep the edit pencil');
+assert(chatGallerySource.includes('input, textarea, select, [contenteditable="true"]'), 'Ctrl+V must not steal paste from search inputs');
+assert(appMainSource.includes('handleDeleteGalleryFiles') && appMainSource.includes('handleDeleteGalleryLinks'), 'gallery bulk delete must persist file and gallery-link removals');
+assert(appMainSource.includes('remainingFiles'), 'photo delete must keep leftover fileAttachments on the same message');
+assert(appMainSource.includes('removeGalleryArchiveMessage'), 'deleting a gallery message must drop it from the in-memory archive');
+assert(appMainSource.includes('dropPhotoFromGalleryIndex'), 'gallery photo delete must hide the row before photoIndex CF catches up');
+const galleryBulkDeleteSource = fs.readFileSync(new URL('../src/core/gallery-bulk-delete.js', import.meta.url), 'utf8');
+assert(galleryBulkDeleteSource.includes("path.indexOf('chatFiles/' + activeCalId + '/') !== 0"), 'file storage delete must stay inside the active calendar prefix');
+assert(galleryBulkDeleteSource.includes("sourceMessage.uploadSource !== 'gallery'"), 'gallery link delete must not strip chat/memo/meeting body URLs');
+assert(galleryBulkDeleteSource.includes('filterDeletedPhotoFromIndexItems'), 'photo index rows must shift after a same-message delete');
+{
+  const after = filterDeletedPhotoFromIndexItems([
+    { messageId: 'm1', imageIndex: 0, full: 'a.jpg' },
+    { messageId: 'm1', imageIndex: 1, full: 'b.jpg' },
+    { messageId: 'm1', imageIndex: 2, full: 'c.jpg' },
+    { messageId: 'm2', imageIndex: 0, full: 'd.jpg' }
+  ], { messageId: 'm1', imageIndex: 1, full: 'b.jpg' });
+  assert(after.length === 3, 'deleted gallery photo must leave sibling index rows');
+  assert(after.find(photo => photo.full === 'c.jpg')?.imageIndex === 1, 'later photos on the same message must shift down');
+  assert(after.find(photo => photo.full === 'd.jpg')?.imageIndex === 0, 'photos on other messages must keep their index');
+}
+{
+  let deleted = false;
+  const fakeStorage = { ref: () => ({ delete: async () => { deleted = true; } }) };
+  await deleteOwnedChatFileFromStorage({ storagePath: 'chatFiles/cw/file.pdf' }, {
+    activeCalId: 'kkot',
+    getStorage: () => fakeStorage
+  });
+  assert(!deleted, 'pasted files from another calendar must not delete the source Storage object');
+  await deleteOwnedChatFileFromStorage({ storagePath: 'chatFiles/kkot/file.pdf' }, {
+    activeCalId: 'kkot',
+    getStorage: () => fakeStorage
+  });
+  assert(deleted, 'files owned by the active calendar must be removable from Storage');
+}
 assert(domainHelpersScript.includes('fileAttachments'), 'message sanitizer must preserve fileAttachments');
 const chatFilesUi = fs.readFileSync('src/ui/ui-chat-files.js', 'utf8');
 assert(chatFilesUi.includes('DocumentLightbox') && chatFilesUi.includes('FileAttachmentCard'), 'document lightbox and attachment cards must ship');

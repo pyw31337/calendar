@@ -11,6 +11,11 @@ import {
   collectChatFileAttachmentsFromMessages,
   sanitizeFileAttachment,
 } from './chat-file-attachments.js';
+import {
+  deleteGalleryFileAttachments,
+  deleteGalleryLinkItems,
+  filterDeletedPhotoFromIndexItems
+} from './gallery-bulk-delete.js';
 import exifr from 'exifr';
 import {
   computeKoreanHolidaysForYear,
@@ -1144,7 +1149,7 @@ function CalendarApp() {
     React, calendarId: activeCalId, activeView,
     projectId: firebaseConfig.projectId, decodeDocument: firestoreDocumentToJs
   });
-  const { fullChatMessages, displayChatMessages, galleryChatMessages, galleryMemos, patchGalleryArchiveMessage, patchGalleryArchiveMemo } = useGalleryArchiveState({
+  const { fullChatMessages, displayChatMessages, galleryChatMessages, galleryMemos, patchGalleryArchiveMessage, removeGalleryArchiveMessage, patchGalleryArchiveMemo } = useGalleryArchiveState({
     React, activeCalId, activeView, isGlobalSearchOpen, firebaseDb, firebaseConnectionVersion,
     allChatMessages, galleryPreviewMessages, memos, fetchAllChatMessagesRest, fetchCalendarSearchIndex
   });
@@ -2975,6 +2980,8 @@ function CalendarApp() {
     setChatMessages(dropMessage);
     setOlderChatMessages(dropMessage);
     setGalleryPreviewMessages(dropMessage);
+    setGalleryLiveMessages(dropMessage);
+    if (typeof removeGalleryArchiveMessage === 'function') removeGalleryArchiveMessage(messageId);
     invalidateGalleryItemCount(activeCalId);
   };
   const patchLocalMemo = (memoId, patch) => {
@@ -3548,6 +3555,29 @@ function CalendarApp() {
       return false;
     }
   };
+
+  const handleDeleteGalleryFiles = items => deleteGalleryFileAttachments(items, {
+    activeCal,
+    activeCalId,
+    guardLoadedCalendar,
+    findChatMessageById,
+    getMessageImageEntries,
+    writeCollectionDocumentWithFallback,
+    removeLocalChatMessage,
+    patchLocalChatMessage,
+    getLiveFirebaseStorage,
+    ensureFirebaseStorageReady
+  });
+
+  const handleDeleteGalleryLinks = items => deleteGalleryLinkItems(items, {
+    activeCal,
+    guardLoadedCalendar,
+    findChatMessageById,
+    getMessageImageEntries,
+    writeCollectionDocumentWithFallback,
+    removeLocalChatMessage,
+    patchLocalChatMessage
+  });
 
   // 다른 캘린더의 라이트박스에서 "URL 복사하기"로 복사한 사진을 이 갤러리에 붙여넣는다
   // (ui-chat-gallery.js의 onPasteGatherPhoto). URL은 그대로 재사용한다 -- 사진 삭제는 어느
@@ -5154,6 +5184,10 @@ function CalendarApp() {
     };
     return ok.then(result => {
       if (!result) return false;
+      if (options.silent) {
+        if (shouldDeleteStorage) finalizeStorageDeletion();
+        return true;
+      }
       const onExpire = shouldDeleteStorage ? async () => {
         finalizeStorageDeletion();
       } : null;
@@ -5218,9 +5252,14 @@ function CalendarApp() {
   // Stable findChatMessageById for DateModal source-message effect.
   const chatMessagesRef = React.useRef(chatMessages);
   chatMessagesRef.current = chatMessages;
+  const galleryChatMessagesRef = React.useRef(galleryChatMessages);
+  galleryChatMessagesRef.current = galleryChatMessages;
   const findChatMessageById = React.useCallback(async messageId => {
-    const local = (chatMessagesRef.current || []).find(msg => msg.id === messageId);
-    if (local) return local;
+    const pools = [chatMessagesRef.current, galleryChatMessagesRef.current];
+    for (let i = 0; i < pools.length; i += 1) {
+      const local = (pools[i] || []).find(msg => msg && msg.id === messageId);
+      if (local) return local;
+    }
     try {
       if (firebaseDb) {
         const snap = await withTimeout(firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').doc(messageId).get(), 9000, 'photo edit source message read');
@@ -5284,7 +5323,8 @@ function CalendarApp() {
     return true;
   };
 
-  const handleDeleteChatMessagePhoto = async (messageId, imageIndex) => {
+  const handleDeleteChatMessagePhoto = async (messageId, imageIndex, options) => {
+    const silent = !!(options && options.silent);
     if (!messageId || !Number.isInteger(imageIndex)) return false;
     const sourceMessage = await findChatMessageById(messageId);
     if (!sourceMessage) {
@@ -5297,6 +5337,7 @@ function CalendarApp() {
     const nextThumbs = entries.filter((_, i) => i !== imageIndex).map(e => e.thumb);
     const nextTags = entries.filter((_, i) => i !== imageIndex).map(e => e.tags || '');
     const remainingText = String(sourceMessage.text || '').trim();
+    const remainingFiles = Array.isArray(sourceMessage.fileAttachments) ? sourceMessage.fileAttachments.filter(Boolean) : [];
     const previousMeetings = cloneConfirmedMeetings(getConfirmedMeetings(activeCal));
     const sourceSnapshot = JSON.parse(JSON.stringify(sourceMessage));
     const deletedPhotoIdentity = {
@@ -5336,7 +5377,8 @@ function CalendarApp() {
     // fixing. Surface the truth instead so the user knows to wait rather than repeat the action.
     let wasQueued;
     try {
-      if (nextUrls.length === 0 && !remainingText) {
+      const isWholeDelete = nextUrls.length === 0 && !remainingText && remainingFiles.length === 0;
+      if (isWholeDelete) {
         const deleted = await writeCollectionDocumentWithFallback('messages', activeCalId, messageId, null, 'delete', '메시지 삭제');
         if (!deleted) throw new Error('Message delete failed');
         wasQueued = Boolean(deleted?.queued);
@@ -5367,7 +5409,6 @@ function CalendarApp() {
         meetingCleanupOk = false;
         console.warn('handleDeleteChatMessagePhoto meeting cleanup deferred:', cleanupErr);
       }
-      const isWholeDelete = nextUrls.length === 0 && !remainingText;
       const canUndo = firebaseDb || !isWholeDelete;
       const restoreDeletedPhoto = async () => {
         try {
@@ -5420,7 +5461,9 @@ function CalendarApp() {
         finalizeStorageDeletion();
       };
       if (wasQueued) {
-        showToast('네트워크가 불안정하여 삭제를 대기열에 저장했습니다. 연결되면 자동으로 반영됩니다.', 'info', 6000);
+        if (!silent) showToast('네트워크가 불안정하여 삭제를 대기열에 저장했습니다. 연결되면 자동으로 반영됩니다.', 'info', 6000);
+      } else if (silent) {
+        await expireStorageDeletion();
       } else if (canUndo) {
         showUndoableDeleteToast('사진이 삭제되었습니다.', restoreDeletedPhoto, expireStorageDeletion, 5000);
       } else {
@@ -5429,7 +5472,7 @@ function CalendarApp() {
       return true;
     } catch (err) {
       console.error('handleDeleteChatMessagePhoto failed:', err);
-      showToast('사진 삭제 실패', 'error', 4000);
+      if (!silent) showToast('사진 삭제 실패', 'error', 4000);
       return false;
     }
   };
@@ -5539,7 +5582,8 @@ function CalendarApp() {
     }
   };
 
-  const handleDeleteMemoPhoto = async (memoId, imageIndex) => {
+  const handleDeleteMemoPhoto = async (memoId, imageIndex, options) => {
+    const silent = !!(options && options.silent);
     if (!memoId || !Number.isInteger(imageIndex)) return false;
     const memo = await findMemoById(memoId);
     if (!memo) {
@@ -5564,11 +5608,17 @@ function CalendarApp() {
       const updated = await writeCollectionDocumentWithFallback('memos', activeCalId, memoId, data, 'update', '메모 사진 삭제', { deletePaths });
       if (!updated) throw new Error('Memo photo delete failed');
       setMemos(prev => prev.map(m => m.id === memoId ? { ...m, ...data } : m));
+      if (typeof patchGalleryArchiveMemo === 'function') patchGalleryArchiveMemo(memoId, data);
+      if (silent) {
+        finalizeStorageDeletion();
+        return true;
+      }
       showUndoableDeleteToast('사진이 삭제되었습니다.', async () => {
         try {
           const restored = await writeCollectionDocumentWithFallback('memos', activeCalId, memoId, sanitizeMemoForFirestore(memoSnapshot), 'set', '메모 사진 복원');
           if (!restored) throw new Error('Memo photo restore failed');
           setMemos(prev => prev.map(m => m.id === memoId ? { ...m, ...memoSnapshot } : m));
+          if (typeof patchGalleryArchiveMemo === 'function') patchGalleryArchiveMemo(memoId, memoSnapshot);
           showToast('사진 삭제를 되돌렸습니다.', 'success', 3000);
         } catch (err) {
           console.error('handleDeleteMemoPhoto undo failed:', err);
@@ -5578,7 +5628,7 @@ function CalendarApp() {
       return true;
     } catch (err) {
       console.error('handleDeleteMemoPhoto failed:', err);
-      showToast('사진 삭제 실패', 'error', 4000);
+      if (!silent) showToast('사진 삭제 실패', 'error', 4000);
       return false;
     }
   };
@@ -5711,8 +5761,14 @@ function CalendarApp() {
     return true;
   };
 
+  const dropPhotoFromGalleryIndex = meta => {
+    if (!meta || typeof galleryPhotoIndex?.patchItems !== 'function') return;
+    galleryPhotoIndex.patchItems(items => filterDeletedPhotoFromIndexItems(items, meta));
+  };
+
   const handleDeletePhoto = async meta => {
     if (!meta || meta.directMediaUrl) return false;
+    const silent = !!meta.silent;
     const imageUrl = meta.imageUrl || meta.full || meta.thumb;
     const msgId = meta.messageId || meta.sourceMessageId;
     const imgIdx = Number.isInteger(meta.imageIndex) ? meta.imageIndex : (Number.isInteger(meta.sourceImageIndex) ? meta.sourceImageIndex : 0);
@@ -5723,10 +5779,23 @@ function CalendarApp() {
     const isMeetingPhotoMeta = meta.source === 'meeting' || meta.uploadSource === 'meeting' || dateStr || photoId;
     const originalTags = typeof meta.tags === 'string' ? meta.tags : '';
     const preferredIdentity = { photoId, mediaKey, refKey, assetKey: meta.assetKey || '', imageUrl, thumbUrl: meta.thumbUrl || meta.thumb || imageUrl, imageIndex: imgIdx, sourceImageIndex: meta.sourceImageIndex };
+    const silentOpt = silent ? { silent: true } : undefined;
+    const finish = (ok, patch) => {
+      if (!ok) return false;
+      dropPhotoFromGalleryIndex(patch || meta);
+      return true;
+    };
+    const meetingOpts = extra => ({
+      restoreSourceMessageId: extra.sourceMessageId,
+      restoreSourceImageIndex: extra.sourceImageIndex,
+      restoreSourceTags: originalTags,
+      mediaKey: extra.mediaKey || mediaKey,
+      refKey: extra.refKey || refKey,
+      silent
+    });
 
     if (meta.source === 'memo' && msgId) {
-      const ok = await handleDeleteMemoPhoto(msgId, imgIdx);
-      if (ok) return true;
+      if (finish(await handleDeleteMemoPhoto(msgId, imgIdx, silentOpt))) return true;
     }
 
     if (meta.sourceMessageId) {
@@ -5737,61 +5806,47 @@ function CalendarApp() {
         // Meeting-tab photos are a view onto the shared image asset, not a separate owner.
         // Delete the canonical asset first so the photo disappears from chat, gallery, and
         // every linked meeting in one step.
-        const okChat = await handleDeleteChatMessagePhoto(meta.sourceMessageId, resolvedIndex);
-        if (okChat) return true;
+        if (finish(
+          await handleDeleteChatMessagePhoto(meta.sourceMessageId, resolvedIndex, silentOpt),
+          { ...meta, imageIndex: resolvedIndex, messageId: meta.sourceMessageId }
+        )) return true;
       }
     }
 
     const target = await findPhotoTargetByUrl(imageUrl, msgId, dateStr, photoId, preferredIdentity);
     if (target) {
       if (target.type === 'chat') {
-        const ok = await handleDeleteChatMessagePhoto(target.messageId, target.imageIndex);
-        if (ok) return true;
+        if (finish(
+          await handleDeleteChatMessagePhoto(target.messageId, target.imageIndex, silentOpt),
+          { ...meta, messageId: target.messageId, imageIndex: target.imageIndex }
+        )) return true;
       } else if (target.type === 'memo') {
-        const ok = await handleDeleteMemoPhoto(target.memoId, target.imageIndex);
-        if (ok) return true;
+        if (finish(
+          await handleDeleteMemoPhoto(target.memoId, target.imageIndex, silentOpt),
+          { ...meta, messageId: target.memoId, imageIndex: target.imageIndex }
+        )) return true;
       } else if (target.type === 'meeting') {
-        const ok = await handleDeleteMeetingPhoto(target.dateStr, target.photoId, imageUrl, {
-          restoreSourceMessageId: target.sourceMessageId,
-          restoreSourceImageIndex: target.sourceImageIndex,
-          restoreSourceTags: originalTags,
-          mediaKey: target.mediaKey,
-          refKey: target.refKey
-        });
-        if (ok) return true;
+        if (finish(await handleDeleteMeetingPhoto(target.dateStr, target.photoId, imageUrl, meetingOpts(target)))) return true;
       }
     }
 
     if (msgId) {
-      const okChat = await handleDeleteChatMessagePhoto(msgId, imgIdx);
-      if (okChat) return true;
+      if (finish(
+        await handleDeleteChatMessagePhoto(msgId, imgIdx, silentOpt),
+        { ...meta, messageId: msgId, imageIndex: imgIdx }
+      )) return true;
     }
 
     if (isMeetingPhotoMeta) {
       // Legacy fallback for meeting-only entries that do not have a canonical source asset
       // pointer. New uploads should almost always route through the shared chat/message asset
       // path above so one delete removes the photo everywhere.
-      const okMeeting = await handleDeleteMeetingPhoto(dateStr, photoId, imageUrl, {
-        restoreSourceMessageId: meta.sourceMessageId,
-        restoreSourceImageIndex: meta.sourceImageIndex,
-        restoreSourceTags: originalTags,
-        mediaKey,
-        refKey
-      });
-      if (okMeeting) return true;
+      if (finish(await handleDeleteMeetingPhoto(dateStr, photoId, imageUrl, meetingOpts(meta)))) return true;
       return false;
     }
 
-    const okMeetingFallback = await handleDeleteMeetingPhoto(dateStr, photoId, imageUrl, {
-      restoreSourceMessageId: meta.sourceMessageId,
-      restoreSourceImageIndex: meta.sourceImageIndex,
-      restoreSourceTags: originalTags,
-      mediaKey,
-      refKey
-    });
-    if (okMeetingFallback) return true;
-
-    showToast('삭제 대상 사진을 찾지 못했습니다.', 'error', 4000);
+    if (finish(await handleDeleteMeetingPhoto(dateStr, photoId, imageUrl, meetingOpts(meta)))) return true;
+    if (!silent) showToast('삭제 대상 사진을 찾지 못했습니다.', 'error', 4000);
     return false;
   };
 
@@ -7294,6 +7349,9 @@ function CalendarApp() {
         onUploadImages: handleUploadGalleryImages,
         onAddLink: handleAddGalleryLink,
         onAddFiles: handleAddGalleryFiles,
+        onDeleteFiles: handleDeleteGalleryFiles,
+        onDeleteGalleryLinks: handleDeleteGalleryLinks,
+        onRequestConfirm: showConfirmDialog,
         onPasteGatherPhoto: handlePasteGatherPhoto,
         onPasteGatherPhotos: handlePasteGatherPhotos,
         onOpenShare: () => {
@@ -7726,6 +7784,9 @@ function CalendarApp() {
     onUploadImages: handleUploadGalleryImages,
     onAddLink: handleAddGalleryLink,
     onAddFiles: handleAddGalleryFiles,
+    onDeleteFiles: handleDeleteGalleryFiles,
+    onDeleteGalleryLinks: handleDeleteGalleryLinks,
+    onRequestConfirm: showConfirmDialog,
     onPasteGatherPhoto: handlePasteGatherPhoto,
     onPasteGatherPhotos: handlePasteGatherPhotos,
     onOpenShare: () => {

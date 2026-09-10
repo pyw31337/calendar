@@ -160,6 +160,23 @@ export function useGalleryArchiveState({
     });
   }, [activeCalId]);
 
+  const removeGalleryArchiveMessage = React.useCallback((messageId) => {
+    if (!activeCalId || !messageId) return;
+    setFullChatHistoryByCalendar(previous => {
+      const list = Array.isArray(previous[activeCalId]) ? previous[activeCalId] : null;
+      if (!list) {
+        const bucket = { ...(pendingArchiveMessagePatchesRef.current[activeCalId] || {}) };
+        delete bucket[messageId];
+        pendingArchiveMessagePatchesRef.current = {
+          ...pendingArchiveMessagePatchesRef.current,
+          [activeCalId]: bucket
+        };
+        return previous;
+      }
+      return { ...previous, [activeCalId]: list.filter(message => message?.id !== messageId) };
+    });
+  }, [activeCalId]);
+
   const patchGalleryArchiveMemo = React.useCallback((memoId, patch) => {
     if (!activeCalId || !memoId || !patch || typeof patch !== 'object') return;
     setFullGalleryMemosByCalendar(previous => {
@@ -189,6 +206,7 @@ export function useGalleryArchiveState({
     galleryChatMessages,
     galleryMemos,
     patchGalleryArchiveMessage,
+    removeGalleryArchiveMessage,
     patchGalleryArchiveMemo
   };
 }

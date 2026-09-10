@@ -409,6 +409,9 @@ export function ChatGalleryModal({
   onUploadImages = null,
   onAddLink = null,
   onAddFiles = null,
+  onDeleteFiles = null,
+  onDeleteGalleryLinks = null,
+  onRequestConfirm = null,
   onOpenShare = null,
   setActiveLightbox,
   hasMoreOlderChat = false,
@@ -537,6 +540,7 @@ export function ChatGalleryModal({
   // "편집" -> 일괄공유 모드: 사진 탭 썸네일마다 체크박스를 켜고, 고른 사진들을 태그와 함께
   // 하나의 URL로 묶어 다른 캘린더 갤러리에 붙여넣을 수 있게 한다(위 gather-photos 프래그먼트).
   const [isBulkShareMode, setIsBulkShareMode] = React.useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = React.useState(false);
   const [selectedBulkShareKeys, setSelectedBulkShareKeys] = React.useState(() => new Set());
   const [isGeneratingBulkShareUrl, setIsGeneratingBulkShareUrl] = React.useState(false);
   const [bulkShareResultUrl, setBulkShareResultUrl] = React.useState('');
@@ -1097,6 +1101,23 @@ export function ChatGalleryModal({
       }
       return;
     }
+    const gatherLinks = parseGatherLinksClipboardText(clipboardText);
+    if (gatherLinks && typeof onAddLink === 'function') {
+      setIsMenuOpen(false);
+      setIsSavingLink(true);
+      try {
+        let added = 0;
+        for (const item of gatherLinks) {
+          const ok = await onAddLink(item.url);
+          if (ok !== false) added += 1;
+        }
+        if (showToast) showToast(added ? `링크 ${added}개를 붙여넣었습니다.` : '링크 붙여넣기에 실패했습니다.', added ? 'success' : 'error');
+        if (added) setActiveTab('links');
+      } finally {
+        setIsSavingLink(false);
+      }
+      return;
+    }
     const files = await readClipboardImageFiles(showToast);
     if (files && files.length > 0) {
       // Show what will be uploaded and let the user confirm instead of uploading immediately --
@@ -1152,6 +1173,128 @@ export function ChatGalleryModal({
   const handleToggleBulkShareMode = () => {
     setIsBulkShareMode(v => !v);
     setSelectedBulkShareKeys(new Set());
+  };
+  const handleClickBulkDelete = () => {
+    const keys = Array.from(selectedBulkShareKeys);
+    if (!keys.length || isBulkDeleting) return;
+    const keySet = new Set(keys);
+    const count = keys.length;
+    const message = activeTab === 'photos'
+      ? `선택한 사진 ${count}장을 삭제하시겠습니까? 채팅·일정·갤러리에서 함께 사라집니다.`
+      : (activeTab === 'files'
+        ? `선택한 파일 ${count}개를 삭제하시겠습니까? 채팅과 갤러리에서 함께 사라집니다.`
+        : `선택한 링크 ${count}개를 삭제하시겠습니까? 갤러리에 따로 등록된 링크만 삭제되고, 메모/일정 본문 링크는 건너뜁니다.`);
+    const run = async () => {
+      setIsBulkDeleting(true);
+      try {
+        if (activeTab === 'photos') {
+          if (typeof onDeletePhoto !== 'function') return;
+          const photos = (visiblePhotos || []).filter(photo => keySet.has(getPhotoKey(photo)));
+          photos.sort((a, b) => {
+            const idA = String(a.sourceMessageId || a.messageId || '');
+            const idB = String(b.sourceMessageId || b.messageId || '');
+            if (idA !== idB) return idA.localeCompare(idB);
+            const idxA = Number.isInteger(a.imageIndex) ? a.imageIndex : (Number(a.sourceImageIndex) || 0);
+            const idxB = Number.isInteger(b.imageIndex) ? b.imageIndex : (Number(b.sourceImageIndex) || 0);
+            return idxB - idxA;
+          });
+          let okCount = 0;
+          for (const photo of photos) {
+            const ok = await onDeletePhoto({
+              ...photo,
+              imageUrl: photo.full || photo.thumb,
+              silent: true
+            });
+            if (ok) okCount += 1;
+          }
+          if (showToast) showToast(okCount ? `사진 ${okCount}장을 삭제했습니다.` : '삭제할 사진을 처리하지 못했습니다.', okCount ? 'success' : 'error');
+        } else if (activeTab === 'files') {
+          if (typeof onDeleteFiles !== 'function') return;
+          const files = (filteredFiles || []).filter(item => keySet.has(String(item.id || item.url || '')));
+          const deleted = await onDeleteFiles(files);
+          if (showToast) showToast(deleted ? `파일 ${deleted}개를 삭제했습니다.` : '삭제할 파일을 처리하지 못했습니다.', deleted ? 'success' : 'error');
+        } else {
+          if (typeof onDeleteGalleryLinks !== 'function') return;
+          const links = (filteredLinks || []).filter(item => keySet.has(item.messageId || item.url));
+          const result = await onDeleteGalleryLinks(links) || { deleted: 0, skipped: 0 };
+          if (showToast) {
+            if (result.deleted && result.skipped) showToast(`링크 ${result.deleted}개 삭제, ${result.skipped}개는 본문에 있어 건너뛰었습니다.`, 'info');
+            else if (result.deleted) showToast(`링크 ${result.deleted}개를 삭제했습니다.`, 'success');
+            else showToast('채팅/메모/일정 본문에 있는 링크는 해당 화면에서 수정해 주세요.', 'error');
+          }
+        }
+        setSelectedBulkShareKeys(new Set());
+      } finally {
+        setIsBulkDeleting(false);
+      }
+    };
+    if (typeof onRequestConfirm === 'function') onRequestConfirm('삭제', message, run);
+    else void run();
+  };
+  const renderGalleryActionButtons = (actions) => {
+    const onAdd = actions && actions.onAdd;
+    const onPaste = actions && actions.onPaste;
+    const addDisabled = !!(actions && actions.addDisabled);
+    const pasteDisabled = !!(actions && actions.pasteDisabled);
+    const iconBtn = {
+      height: '44px', minHeight: '44px', width: '44px', minWidth: '44px', maxWidth: '44px', padding: 0,
+      borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      cursor: 'pointer', flexShrink: 0, boxSizing: 'border-box', aspectRatio: '1 / 1'
+    };
+    const textBtn = {
+      height: '44px', minHeight: '44px', padding: isMobile ? '0 6px' : '0 12px',
+      borderRadius: 'var(--radius-md)', fontSize: isMobile ? 'var(--font-size-sm)' : 'var(--font-size-md)', fontWeight: 900,
+      cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap'
+    };
+    if (!isBulkShareMode) {
+      return /*#__PURE__*/React.createElement(React.Fragment, null,
+        onAdd ? /*#__PURE__*/React.createElement("button", {
+          type: "button", className: "btn btn-action btn-action-dark",
+          onClick: onAdd, disabled: addDisabled, title: "추가", "aria-label": "추가",
+          style: { ...iconBtn, cursor: addDisabled ? 'wait' : 'pointer' }
+        }, PlusIcon ? /*#__PURE__*/React.createElement(PlusIcon, { size: 16 }) : "+") : null,
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", className: "btn btn-action btn-action-outline",
+          onClick: handleToggleBulkShareMode, title: "편집", "aria-label": "편집",
+          style: iconBtn
+        }, PencilIcon ? /*#__PURE__*/React.createElement(PencilIcon, { size: 15 }) : "편집")
+      );
+    }
+    return /*#__PURE__*/React.createElement(React.Fragment, null,
+      /*#__PURE__*/React.createElement("button", {
+        type: "button", className: "btn btn-action btn-action-outline",
+        onClick: handleClickBulkDelete,
+        disabled: selectedBulkShareKeys.size === 0 || isBulkDeleting,
+        style: {
+          ...textBtn,
+          color: 'rgb(239, 68, 68)',
+          borderColor: 'rgb(239, 68, 68)',
+          cursor: (selectedBulkShareKeys.size === 0 || isBulkDeleting) ? 'default' : 'pointer',
+          opacity: (selectedBulkShareKeys.size === 0 || isBulkDeleting) ? 0.5 : 1
+        }
+      }, isBulkDeleting ? "삭제 중..." : "삭제"),
+      onPaste ? /*#__PURE__*/React.createElement("button", {
+        type: "button", className: "btn btn-action btn-action-outline",
+        onClick: onPaste, disabled: pasteDisabled || isBulkDeleting,
+        style: { ...textBtn, cursor: (pasteDisabled || isBulkDeleting) ? 'wait' : 'pointer' }
+      }, "붙여넣기") : null,
+      /*#__PURE__*/React.createElement("button", {
+        type: "button", className: "btn btn-action btn-action-dark",
+        onClick: handleClickBulkShare,
+        disabled: selectedBulkShareKeys.size === 0 || isGeneratingBulkShareUrl || isBulkDeleting,
+        style: {
+          ...textBtn,
+          cursor: (selectedBulkShareKeys.size === 0 || isGeneratingBulkShareUrl || isBulkDeleting) ? 'default' : 'pointer',
+          opacity: (selectedBulkShareKeys.size === 0 || isGeneratingBulkShareUrl || isBulkDeleting) ? 0.5 : 1
+        }
+      }, isGeneratingBulkShareUrl ? "생성 중..." : `일괄공유${selectedBulkShareKeys.size > 0 ? ` (${selectedBulkShareKeys.size})` : ''}`),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button", className: "btn btn-action btn-action-outline",
+        onClick: handleToggleBulkShareMode,
+        disabled: isGeneratingBulkShareUrl || isBulkDeleting,
+        style: textBtn
+      }, "취소")
+    );
   };
   // 선택한 사진들을 하나의 URL로 묶어 공유("일괄공유") -- 복사 시점의 사진 URL과 태그를 그대로
   // 실어 보내고(encodeGatherPhotosFragment), 이후 원본/사본 어느 쪽에서 태그를 바꾸거나 사진을
@@ -1308,6 +1451,8 @@ export function ChatGalleryModal({
   React.useEffect(() => {
     if (typeof onUploadImages !== 'function' && typeof onPasteGatherPhoto !== 'function' && typeof onPasteGatherPhotos !== 'function') return;
     const handlePaste = e => {
+      const target = e.target;
+      if (target && ((target.closest && target.closest('input, textarea, select, [contenteditable="true"]')) || target.isContentEditable)) return;
       // 다른 캘린더 사진(gather-photo URL)이 먼저 -- clipboardData는 이 이벤트에서만 동기적으로
       // 읽을 수 있어(navigator.clipboard 비동기 API와 달리 권한 프롬프트 없이) Ctrl+V 쪽은
       // 이 경로로 확인한다.
@@ -1737,50 +1882,13 @@ export function ChatGalleryModal({
     );
   }));
   const renderFileListHeader = () => /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: isMobile ? '6px' : '8px', marginBottom: '4px', minWidth: 0 }
+    style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: isMobile ? '6px' : '8px', marginBottom: '4px', minWidth: 0, flexWrap: isBulkShareMode ? 'wrap' : 'nowrap' }
   },
     renderVisitFilterToggleMobile(),
     /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '6px', flexShrink: 0 }
+      style: { display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '6px', flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end', marginLeft: 'auto' }
     },
-      isBulkShareMode
-        ? /*#__PURE__*/React.createElement(React.Fragment, null,
-            /*#__PURE__*/React.createElement("button", {
-              type: "button", className: "btn btn-action btn-action-outline",
-              onClick: handleToggleBulkShareMode,
-              style: { height: '44px', minHeight: '44px', padding: '0 14px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: 'pointer' }
-            }, "취소"),
-            /*#__PURE__*/React.createElement("button", {
-              type: "button", className: "btn btn-action btn-action-dark",
-              onClick: handleClickBulkShare,
-              disabled: selectedBulkShareKeys.size === 0 || isGeneratingBulkShareUrl,
-              style: { height: '44px', minHeight: '44px', padding: '0 14px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: selectedBulkShareKeys.size === 0 ? 'default' : 'pointer', opacity: selectedBulkShareKeys.size === 0 ? 0.5 : 1 }
-            }, isGeneratingBulkShareUrl ? "생성 중..." : `일괄공유${selectedBulkShareKeys.size > 0 ? ` (${selectedBulkShareKeys.size})` : ''}`)
-          )
-        : /*#__PURE__*/React.createElement(React.Fragment, null,
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "btn btn-action btn-action-outline",
-        onClick: handlePasteGalleryUpload,
-        style: { height: '44px', minHeight: '44px', padding: isMobile ? '0 8px' : '0 12px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: 'pointer', flexShrink: 0 }
-      }, "붙여넣기"),
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "btn btn-action btn-action-dark",
-        onClick: handleUploadClick,
-        title: "추가",
-        "aria-label": "추가",
-        style: { height: '44px', minHeight: '44px', width: '44px', minWidth: '44px', maxWidth: '44px', padding: 0, borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }
-      }, PlusIcon ? /*#__PURE__*/React.createElement(PlusIcon, { size: 16 }) : "+"),
-      /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        className: "btn btn-action btn-action-outline",
-        onClick: handleToggleBulkShareMode,
-        title: "편집",
-        "aria-label": "편집",
-        style: { height: '44px', minHeight: '44px', width: '44px', minWidth: '44px', maxWidth: '44px', padding: 0, borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }
-      }, PencilIcon ? /*#__PURE__*/React.createElement(PencilIcon, { size: 15 }) : "편집")
-          )
+      renderGalleryActionButtons({ onAdd: handleUploadClick, onPaste: handlePasteGalleryUpload })
     )
   );
   // "이전 사진/링크 더 보기": a real component (not a plain render-helper function) so it can use
@@ -2000,76 +2108,15 @@ export function ChatGalleryModal({
   const renderPhotoListHeader = () => /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      gap: isMobile ? '6px' : '8px', marginBottom: '4px', minWidth: 0
+      gap: isMobile ? '6px' : '8px', marginBottom: '4px', minWidth: 0,
+      flexWrap: isBulkShareMode ? 'wrap' : 'nowrap'
     }
   },
     renderVisitFilterToggleMobile(),
     /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '6px', flexShrink: 0, minWidth: 0 }
+      style: { display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '6px', flexShrink: 0, minWidth: 0, flexWrap: 'wrap', justifyContent: 'flex-end', marginLeft: 'auto' }
     },
-      isBulkShareMode
-        ? /*#__PURE__*/React.createElement(React.Fragment, null,
-            /*#__PURE__*/React.createElement("button", {
-              type: "button",
-              className: "btn btn-action btn-action-outline",
-              onClick: handleToggleBulkShareMode,
-              disabled: isGeneratingBulkShareUrl,
-              style: { height: '44px', minHeight: '44px', padding: '0 14px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: 'pointer' }
-            }, "취소"),
-            /*#__PURE__*/React.createElement("button", {
-              type: "button",
-              className: "btn btn-action btn-action-dark",
-              onClick: handleClickBulkShare,
-              disabled: selectedBulkShareKeys.size === 0 || isGeneratingBulkShareUrl,
-              style: {
-                height: '44px', minHeight: '44px', padding: '0 14px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900,
-                cursor: (selectedBulkShareKeys.size === 0 || isGeneratingBulkShareUrl) ? 'default' : 'pointer',
-                opacity: (selectedBulkShareKeys.size === 0 || isGeneratingBulkShareUrl) ? 0.5 : 1
-              }
-            }, isGeneratingBulkShareUrl ? "생성 중..." : `일괄공유${selectedBulkShareKeys.size > 0 ? ` (${selectedBulkShareKeys.size})` : ''}`)
-          )
-        : /*#__PURE__*/React.createElement(React.Fragment, null,
-            // 배경 없이 텍스트만 -- 이 헤더의 나머지 두 버튼(추가/편집)은 아이콘 전용이라
-            // 시각적 무게가 가벼워졌으므로, 가장 덜 쓰이는 이 버튼까지 배경을 남겨두면 상대적으로
-            // 튀어 보인다.
-            /*#__PURE__*/React.createElement("button", {
-              type: "button",
-              className: "btn btn-action btn-action-outline",
-              onClick: handlePasteGalleryUpload,
-              style: {
-                height: '44px', minHeight: '44px',
-                padding: isMobile ? '0 8px' : '0 12px',
-                borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: 'pointer',
-                flexShrink: 0
-              }
-            }, "붙여넣기"),
-            /*#__PURE__*/React.createElement("button", {
-              type: "button",
-              className: "btn btn-action btn-action-dark",
-              onClick: handleUploadClick,
-              title: "추가",
-              "aria-label": "추가",
-              style: {
-                height: '44px', minHeight: '44px', width: '44px', minWidth: '44px', maxWidth: '44px',
-                padding: 0, borderRadius: 'var(--radius-md)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-                flexShrink: 0, aspectRatio: '1 / 1', boxSizing: 'border-box'
-              }
-            }, PlusIcon ? /*#__PURE__*/React.createElement(PlusIcon, { size: 16 }) : "+"),
-            /*#__PURE__*/React.createElement("button", {
-              type: "button",
-              className: "btn btn-action btn-action-outline",
-              onClick: handleToggleBulkShareMode,
-              title: "편집",
-              "aria-label": "편집",
-              style: {
-                height: '44px', minHeight: '44px', width: '44px', minWidth: '44px', maxWidth: '44px',
-                padding: 0, borderRadius: 'var(--radius-md)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-                flexShrink: 0, aspectRatio: '1 / 1', boxSizing: 'border-box'
-              }
-            }, PencilIcon ? /*#__PURE__*/React.createElement(PencilIcon, { size: 15 }) : "편집")
-          )
+      renderGalleryActionButtons({ onAdd: handleUploadClick, onPaste: handlePasteGalleryUpload })
     )
   );
   const renderLinkListHeader = () => /*#__PURE__*/React.createElement("div", {
@@ -2078,52 +2125,13 @@ export function ChatGalleryModal({
     }
   },
     /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: isMobile ? '6px' : '8px', minWidth: 0 }
+      style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: isMobile ? '6px' : '8px', minWidth: 0, flexWrap: isBulkShareMode ? 'wrap' : 'nowrap' }
     },
       renderVisitFilterToggleMobile(),
       /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '6px', flexShrink: 0 }
+        style: { display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '6px', flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end', marginLeft: 'auto' }
       },
-        isBulkShareMode
-          ? /*#__PURE__*/React.createElement(React.Fragment, null,
-              /*#__PURE__*/React.createElement("button", {
-                type: "button", className: "btn btn-action btn-action-outline",
-                onClick: handleToggleBulkShareMode,
-                style: { height: '44px', minHeight: '44px', padding: '0 14px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: 'pointer' }
-              }, "취소"),
-              /*#__PURE__*/React.createElement("button", {
-                type: "button", className: "btn btn-action btn-action-dark",
-                onClick: handleClickBulkShare,
-                disabled: selectedBulkShareKeys.size === 0 || isGeneratingBulkShareUrl,
-                style: { height: '44px', minHeight: '44px', padding: '0 14px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: selectedBulkShareKeys.size === 0 ? 'default' : 'pointer', opacity: selectedBulkShareKeys.size === 0 ? 0.5 : 1 }
-              }, isGeneratingBulkShareUrl ? "생성 중..." : `일괄공유${selectedBulkShareKeys.size > 0 ? ` (${selectedBulkShareKeys.size})` : ''}`)
-            )
-          : /*#__PURE__*/React.createElement(React.Fragment, null,
-        /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          className: "btn btn-action btn-action-outline",
-          disabled: isSavingLink,
-          onClick: handlePasteLinkFromClipboard,
-          style: { height: '44px', minHeight: '44px', padding: isMobile ? '0 8px' : '0 12px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: isSavingLink ? 'wait' : 'pointer', flexShrink: 0 }
-        }, "붙여넣기"),
-        /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          className: "btn btn-action btn-action-dark",
-          disabled: isSavingLink,
-          onClick: handleToggleAddLink,
-          title: "추가",
-          "aria-label": "추가",
-          style: { height: '44px', minHeight: '44px', width: '44px', minWidth: '44px', maxWidth: '44px', padding: 0, borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: isSavingLink ? 'wait' : 'pointer', flexShrink: 0 }
-        }, PlusIcon ? /*#__PURE__*/React.createElement(PlusIcon, { size: 16 }) : "+"),
-        /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          className: "btn btn-action btn-action-outline",
-          title: "편집",
-          "aria-label": "편집",
-          onClick: handleToggleBulkShareMode,
-          style: { height: '44px', minHeight: '44px', width: '44px', minWidth: '44px', maxWidth: '44px', padding: 0, borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }
-        }, PencilIcon ? /*#__PURE__*/React.createElement(PencilIcon, { size: 15 }) : "편집")
-            )
+        renderGalleryActionButtons({ onAdd: handleToggleAddLink, onPaste: handlePasteLinkFromClipboard, addDisabled: isSavingLink, pasteDisabled: isSavingLink })
       )
     ),
     isAddingLink && /*#__PURE__*/React.createElement("div", {
