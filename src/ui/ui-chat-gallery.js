@@ -479,6 +479,7 @@ export function ChatGalleryModal({
   const BackArrowIcon = __deps.BackArrowIcon;
   const PlusIcon = __comp.PlusIcon || __deps.PlusIcon;
   const PencilIcon = __comp.PencilIcon || __deps.PencilIcon;
+  const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
   const PhotoCommentCountBadge = __comp.PhotoCommentCountBadge || __deps.PhotoCommentCountBadge || function InlinePhotoCommentCountBadge({ count = 0 } = {}) {
     if (!count) return null;
     return React.createElement('span', {
@@ -1265,14 +1266,17 @@ export function ChatGalleryModal({
         type: "button", className: "btn btn-action btn-action-outline",
         onClick: handleClickBulkDelete,
         disabled: selectedBulkShareKeys.size === 0 || isBulkDeleting,
+        title: "삭제",
+        "aria-label": "삭제",
         style: {
-          ...textBtn,
+          ...iconBtn,
           color: 'rgb(239, 68, 68)',
           borderColor: 'rgb(239, 68, 68)',
+          backgroundColor: 'var(--bg-primary)',
           cursor: (selectedBulkShareKeys.size === 0 || isBulkDeleting) ? 'default' : 'pointer',
           opacity: (selectedBulkShareKeys.size === 0 || isBulkDeleting) ? 0.5 : 1
         }
-      }, isBulkDeleting ? "삭제 중..." : "삭제"),
+      }, TrashIcon ? /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }) : (isBulkDeleting ? "..." : "삭제")),
       onPaste ? /*#__PURE__*/React.createElement("button", {
         type: "button", className: "btn btn-action btn-action-outline",
         onClick: onPaste, disabled: pasteDisabled || isBulkDeleting,
