@@ -1448,12 +1448,14 @@ button, input, textarea, select {
   transform: translateY(-1px);
 }
 
-/* 버튼 규칙: 검색/추가/수정/저장 = Rounded 사각형(캡슐 X), 높이 44px */
+/* 버튼 규칙: 검색/추가/수정/저장 = Rounded 사각형(캡슐 X), 높이 44px.
+   가로는 세로 이상(최소 1:1). 아이콘 버튼은 정사각, 텍스트 액션은 더 넓다. */
 .btn-action,
 .btn-poll-create {
   border-radius: var(--radius-md) !important;
   height: 44px;
   min-height: 44px;
+  min-width: 44px;
   padding: 0 16px;
   font-weight: 800;
   white-space: nowrap;
@@ -1820,7 +1822,8 @@ select.form-select {
   .modal-header h3 { font-size: 0.95rem !important; }
   .modal-header .holiday-label { font-size: 0.82rem !important; }
   .modal-header .status-badge { font-size: 0.7rem !important; padding: 2px 4px !important; }
-  .modal-header .btn { padding: 4px 6px !important; font-size: 0.72rem !important; }
+  .modal-header .btn { padding: 4px 8px !important; font-size: 0.72rem !important; min-width: 32px; box-sizing: border-box; }
+  .modal-header .btn-action { padding: 0 16px !important; min-width: 44px; font-size: var(--font-size-sm) !important; }
 }
 
 .day-cell {

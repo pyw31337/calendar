@@ -735,6 +735,10 @@ assert(chatGallerySource.includes("kind: 'gather-files'") && chatGallerySource.i
 assert(appMainSource.includes('handleAddGalleryFiles') && appMainSource.includes('sanitizeFileAttachment'), 'pasted gallery files must keep sanitized storagePath before write');
 assert(chatGallerySource.includes('handleClickBulkDelete'), 'gallery edit mode must offer bulk delete');
 assert(chatGallerySource.includes('if (!isBulkShareMode)'), 'gallery default toolbar must hide paste until edit mode');
+assert(chatGallerySource.includes('!isBulkShareMode && renderVisitFilterToggleMobile()'), 'gallery edit mode must hide 전체|일자 while delete/paste/share/cancel are expanded');
+assert(chatGallerySource.includes("minWidth: '44px', padding: '0 16px'"), 'gallery 취소/붙여넣기/일괄공유 must stay at least as wide as they are tall');
+assert(!chatGallerySource.includes("padding: isMobile ? '0 6px'"), 'gallery text actions must not crush to 6px padding on mobile');
+assert(summaryGallerySource.includes('!isMemoryListEditMode && renderMemoryAllDateToggle()'), 'memories edit mode must hide 전체|일자 like gallery');
 assert(chatGallerySource.includes('handleToggleBulkShareMode, title: "편집"'), 'gallery default toolbar must keep the edit pencil');
 assert(chatGallerySource.includes('input, textarea, select, [contenteditable="true"]'), 'Ctrl+V must not steal paste from search inputs');
 assert(appMainSource.includes('handleDeleteGalleryFiles') && appMainSource.includes('handleDeleteGalleryLinks'), 'gallery bulk delete must persist file and gallery-link removals');

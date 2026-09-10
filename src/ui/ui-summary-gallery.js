@@ -1807,8 +1807,9 @@ export function HistoryView({
     cursor: 'pointer', flexShrink: 0, boxSizing: 'border-box', aspectRatio: '1 / 1'
   };
   const memoryTextBtn = {
-    height: '44px', minHeight: '44px', padding: '0 12px', borderRadius: 'var(--radius-md)',
-    fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap'
+    height: '44px', minHeight: '44px', minWidth: '44px', padding: '0 16px', borderRadius: 'var(--radius-md)',
+    fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: 'pointer', flex: 1, flexShrink: 0, whiteSpace: 'nowrap',
+    boxSizing: 'border-box'
   };
   const renderMemoryAllDateToggle = () => /*#__PURE__*/React.createElement("div", {
     className: "visit-filter-toggle-mobile",
@@ -2189,9 +2190,9 @@ export function HistoryView({
       /*#__PURE__*/React.createElement("div", {
         style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '10px', minWidth: 0 }
       },
-        renderMemoryAllDateToggle(),
+        !isMemoryListEditMode && renderMemoryAllDateToggle(),
         /*#__PURE__*/React.createElement("div", {
-          style: { display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: 'auto' }
+          style: { display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: isMemoryListEditMode ? 0 : 'auto', flex: isMemoryListEditMode ? 1 : undefined, width: isMemoryListEditMode ? '100%' : undefined }
         },
           isMemoryListEditMode
             ? /*#__PURE__*/React.createElement(React.Fragment, null,

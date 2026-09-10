@@ -2238,7 +2238,7 @@ export function AdminDashboard({ initialCalendars }) {
                 }),
                 /* Remove trigger */
                 /*#__PURE__*/React.createElement("button", {
-                  type: "button", className: "btn btn-danger", style: { padding: '4px 10px', height: '44px', display: 'flex', alignItems: 'center' },
+                  type: "button", className: "btn btn-danger", style: { width: '44px', minWidth: '44px', height: '44px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxSizing: 'border-box' },
                   onClick: () => requestConfirm('참여자 삭제', `"${p.name}" 참여자를 삭제하시겠습니까?`, () => handleUpdatePart(p.id, { removedAt: Date.now() }))
                 }, /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }))
               ))
@@ -2293,7 +2293,7 @@ export function AdminDashboard({ initialCalendars }) {
 	                /*#__PURE__*/React.createElement("button", {
 	                  type: "button",
 	                  className: "btn btn-danger",
-	                  style: { padding: '4px 10px', height: '44px', display: 'flex', alignItems: 'center' },
+	                  style: { width: '44px', minWidth: '44px', height: '44px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxSizing: 'border-box' },
 	                  onClick: () => handleRemoveExpenseCategory(category.id)
                 }, /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }))
 	              ))
@@ -2348,7 +2348,7 @@ export function AdminDashboard({ initialCalendars }) {
 	                /*#__PURE__*/React.createElement("button", {
 	                  type: "button",
 	                  className: "btn btn-danger",
-	                  style: { padding: '4px 10px', height: '44px', display: 'flex', alignItems: 'center' },
+	                  style: { width: '44px', minWidth: '44px', height: '44px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxSizing: 'border-box' },
 	                  onClick: () => handleRemovePlaceCategory(category.id)
                 }, /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }))
 	              ))

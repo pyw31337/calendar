@@ -343,6 +343,9 @@ export function FormAddEditActionButtons({ isEditing, isSaving, onCancel, onSubm
     flexShrink: flexGrow ? 1 : 0,
     height: '44px',
     minHeight: '44px',
+    minWidth: '44px',
+    padding: '0 16px',
+    boxSizing: 'border-box',
     whiteSpace: 'nowrap',
     justifyContent: 'center'
   };

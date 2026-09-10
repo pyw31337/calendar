@@ -136,7 +136,7 @@ function DocZoomControls(props) {
   var zoomDefault = props.zoomDefault;
   var btnStyle = function(disabled) {
     return {
-      height: "32px", minWidth: "28px", padding: "0 6px", borderRadius: "8px",
+      height: "32px", minWidth: "32px", padding: "0 8px", borderRadius: "8px",
       border: "1px solid var(--border-subtle)", background: "var(--bg-secondary)",
       color: "var(--text-main)", cursor: disabled ? "default" : "pointer",
       fontWeight: 800, fontSize: "var(--font-size-sm)", opacity: disabled ? 0.45 : 1,

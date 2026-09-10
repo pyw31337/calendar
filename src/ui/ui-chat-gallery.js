@@ -1263,9 +1263,9 @@ export function ChatGalleryModal({
       cursor: 'pointer', flexShrink: 0, boxSizing: 'border-box', aspectRatio: '1 / 1'
     };
     const textBtn = {
-      height: '44px', minHeight: '44px', padding: isMobile ? '0 6px' : '0 12px',
+      height: '44px', minHeight: '44px', minWidth: '44px', padding: '0 16px',
       borderRadius: 'var(--radius-md)', fontSize: isMobile ? 'var(--font-size-sm)' : 'var(--font-size-md)', fontWeight: 900,
-      cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap'
+      cursor: 'pointer', flex: 1, flexShrink: 0, whiteSpace: 'nowrap', boxSizing: 'border-box'
     };
     if (!isBulkShareMode) {
       return /*#__PURE__*/React.createElement(React.Fragment, null,
@@ -1903,11 +1903,11 @@ export function ChatGalleryModal({
     );
   }));
   const renderFileListHeader = () => /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: isMobile ? '6px' : '8px', marginBottom: '4px', minWidth: 0, flexWrap: isBulkShareMode ? 'wrap' : 'nowrap' }
+    style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: isMobile ? '6px' : '8px', marginBottom: '4px', minWidth: 0, flexWrap: 'nowrap' }
   },
-    renderVisitFilterToggleMobile(),
+    !isBulkShareMode && renderVisitFilterToggleMobile(),
     /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '6px', flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end', marginLeft: 'auto' }
+      style: { display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '6px', flexShrink: 0, flexWrap: 'nowrap', justifyContent: isBulkShareMode ? 'stretch' : 'flex-end', marginLeft: isBulkShareMode ? 0 : 'auto', flex: isBulkShareMode ? 1 : undefined, width: isBulkShareMode ? '100%' : undefined }
     },
       renderGalleryActionButtons({ onAdd: handleUploadClick, onPaste: handlePasteGalleryUpload })
     )
@@ -2130,12 +2130,12 @@ export function ChatGalleryModal({
     style: {
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       gap: isMobile ? '6px' : '8px', marginBottom: '4px', minWidth: 0,
-      flexWrap: isBulkShareMode ? 'wrap' : 'nowrap'
+      flexWrap: 'nowrap'
     }
   },
-    renderVisitFilterToggleMobile(),
+    !isBulkShareMode && renderVisitFilterToggleMobile(),
     /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '6px', flexShrink: 0, minWidth: 0, flexWrap: 'wrap', justifyContent: 'flex-end', marginLeft: 'auto' }
+      style: { display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '6px', flexShrink: 0, minWidth: 0, flexWrap: 'nowrap', justifyContent: isBulkShareMode ? 'stretch' : 'flex-end', marginLeft: isBulkShareMode ? 0 : 'auto', flex: isBulkShareMode ? 1 : undefined, width: isBulkShareMode ? '100%' : undefined }
     },
       renderGalleryActionButtons({ onAdd: handleUploadClick, onPaste: handlePasteGalleryUpload })
     )
@@ -2146,11 +2146,11 @@ export function ChatGalleryModal({
     }
   },
     /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: isMobile ? '6px' : '8px', minWidth: 0, flexWrap: isBulkShareMode ? 'wrap' : 'nowrap' }
+      style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: isMobile ? '6px' : '8px', minWidth: 0, flexWrap: 'nowrap' }
     },
-      renderVisitFilterToggleMobile(),
+      !isBulkShareMode && renderVisitFilterToggleMobile(),
       /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '6px', flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end', marginLeft: 'auto' }
+        style: { display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '6px', flexShrink: 0, flexWrap: 'nowrap', justifyContent: isBulkShareMode ? 'stretch' : 'flex-end', marginLeft: isBulkShareMode ? 0 : 'auto', flex: isBulkShareMode ? 1 : undefined, width: isBulkShareMode ? '100%' : undefined }
       },
         renderGalleryActionButtons({ onAdd: handleToggleAddLink, onPaste: handlePasteLinkFromClipboard, addDisabled: isSavingLink, pasteDisabled: isSavingLink })
       )

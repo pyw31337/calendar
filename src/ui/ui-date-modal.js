@@ -3245,11 +3245,13 @@ export function DateModal({
             style: {
               height: '44px',
               minHeight: '44px',
-              padding: '0 12px',
+              minWidth: '44px',
+              padding: '0 16px',
               borderRadius: 'var(--radius-md)',
               fontSize: 'var(--font-size-md)',
               fontWeight: 900,
-              cursor: isSavingMeetingPhotos ? 'wait' : 'pointer'
+              cursor: isSavingMeetingPhotos ? 'wait' : 'pointer',
+              boxSizing: 'border-box'
             }
           }, "붙여넣기"),
           /*#__PURE__*/React.createElement("button", {
