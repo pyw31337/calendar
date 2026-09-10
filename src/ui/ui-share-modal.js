@@ -171,7 +171,7 @@ function getDeps() { return window.GATHER_UI_DEPS || {}; }
             });
           },
           style: {
-            flex: '1 1 100%', height: '38px', borderRadius: '8px',
+            flex: '1 1 100%', height: '44px', borderRadius: 'var(--radius-md)',
             backgroundColor: '#FEE500', color: '#191919', border: 'none',
             fontSize: 'var(--font-size-md)', fontWeight: 800, cursor: 'pointer',
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
@@ -188,7 +188,7 @@ function getDeps() { return window.GATHER_UI_DEPS || {}; }
             if (showToast) showToast(ok ? '초대 문구가 복사되었습니다! 카카오톡에 붙여넣어 공유하세요.' : '복사 실패', ok ? 'success' : 'error');
           },
           style: {
-            flex: '1 1 100%', height: '36px', borderRadius: '8px',
+            flex: '1 1 100%', height: '44px', borderRadius: 'var(--radius-md)',
             backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)', border: '1px solid var(--border-subtle)',
             fontSize: 'var(--font-size-md)', fontWeight: 700, cursor: 'pointer',
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px'

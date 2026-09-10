@@ -2502,7 +2502,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
         React.createElement('input', {
           type: 'text', className: 'form-input', value: title,
           onChange: e => setTitle(e.target.value), placeholder: '예: 1/N 간편 송금',
-          style: { width: '100%', borderRadius: '8px' }
+          style: { width: '100%', borderRadius: 'var(--radius-md)' }
         })
       ),
       React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } },
@@ -2514,7 +2514,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
           options: participantPickerOptionsWithSelectionState,
           onSelect: setParticipantToAdd,
           disabled: availableParticipantPickerOptions.length === 0 && !editingParticipantRowId,
-          style: { width: '100%', height: '44px', borderRadius: '8px', fontSize: 'var(--font-size-base)' }
+          style: { width: '100%', height: '44px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-base)' }
         }),
           React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
             React.createElement('label', { style: settlementSectionLabelStyle }, '메모 입력 (선택)'),
@@ -2523,33 +2523,33 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
               type: 'text', className: 'form-input', value: participantMemoInput,
               maxLength: 500, onChange: e => setParticipantMemoInput(e.target.value),
               placeholder: '일정 메모를 남길 수 있습니다 (최대 500자)',
-              style: { width: '100%', height: '44px', borderRadius: '8px', fontSize: 'var(--font-size-md)' }
+              style: { width: '100%', height: '44px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)' }
             }),
             editingParticipantRowId
               ? React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', width: '100%' } },
                 React.createElement('button', {
                   type: 'button', className: 'btn btn-secondary', onClick: () => {
                     setParticipantToAdd(''); setParticipantMemoInput(''); setEditingParticipantRowId(null);
-                  }, style: { width: '100%', height: '44px', borderRadius: '8px', fontSize: 'var(--font-size-md)', fontWeight: 800 }
+                  }, style: { width: '100%', height: '44px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 800 }
                 }, '취소'),
                 React.createElement('button', {
                   type: 'button', className: 'btn btn-secondary', onClick: handleAddParticipantRow,
                   disabled: !participantToAdd,
-                  style: { width: '100%', height: '44px', borderRadius: '8px', fontSize: 'var(--font-size-md)', fontWeight: 800, color: 'var(--text-main)', cursor: participantToAdd ? 'pointer' : 'not-allowed', border: '1px solid #CBD5E1', backgroundColor: '#F1F5F9' }
+                  style: { width: '100%', height: '44px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 800, color: 'var(--text-main)', cursor: participantToAdd ? 'pointer' : 'not-allowed', border: '1px solid #CBD5E1', backgroundColor: '#F1F5F9' }
                 }, '수정')
               )
               : React.createElement('button', {
                 type: 'button', className: 'btn btn-secondary', onClick: handleAddParticipantRow,
                 disabled: !participantToAdd,
-                style: { width: '60px', height: '44px', flexShrink: 0, borderRadius: '8px', fontSize: 'var(--font-size-md)', fontWeight: 800, color: 'var(--text-main)', cursor: participantToAdd ? 'pointer' : 'not-allowed', border: '1px solid #CBD5E1', backgroundColor: '#F1F5F9' }
+                style: { width: '60px', height: '44px', flexShrink: 0, borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 800, color: 'var(--text-main)', cursor: participantToAdd ? 'pointer' : 'not-allowed', border: '1px solid #CBD5E1', backgroundColor: '#F1F5F9' }
               }, '추가')
           )
         ),
         participantRows.length > 0 && React.createElement('div', {
-          style: { display: 'flex', flexDirection: 'column', gap: '6px', padding: '8px', backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', borderRadius: '8px' }
+          style: { display: 'flex', flexDirection: 'column', gap: '6px', padding: '8px', backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)' }
         }, participantRows.map(row => React.createElement('div', {
           key: row.id,
-          style: { display: 'flex', flexDirection: 'column', gap: '4px', minHeight: '44px', padding: '7px 10px', border: '1px solid var(--border-subtle)', borderRadius: '8px', backgroundColor: 'var(--bg-card)' }
+          style: { display: 'flex', flexDirection: 'column', gap: '4px', minHeight: '44px', padding: '7px 10px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-card)' }
         },
           React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', width: '100%', minWidth: 0 } },
             React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '9px', minWidth: 0, overflow: 'hidden', cursor: 'pointer' }, onClick: () => handleEditParticipantRow(row) },
@@ -2586,15 +2586,15 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
             value: bankName,
             options: bankPickerOptions,
             onSelect: (val) => handleBankNameChange(val),
-            style: { width: '100%', height: '44px', borderRadius: '8px', fontSize: 'var(--font-size-md)' }
+            style: { width: '100%', height: '44px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)' }
           }) : React.createElement('select', {
             className: 'form-select', value: bankName, onChange: e => handleBankNameChange(e.target.value),
-            style: { width: '100%', height: '44px', borderRadius: '8px', fontSize: 'var(--font-size-md)' }
+            style: { width: '100%', height: '44px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)' }
           }, BANK_OPTIONS.map(b => React.createElement('option', { key: b, value: b }, b))),
           bankName === '기타' && React.createElement('input', {
             type: 'text', className: 'form-input', value: otherBankName,
             onChange: e => setOtherBankName(e.target.value), placeholder: '은행 이름 입력', maxLength: 40,
-            style: { width: '100%', height: '44px', borderRadius: '8px', fontSize: 'var(--font-size-md)' }
+            style: { width: '100%', height: '44px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)' }
           })
         ),
         React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
@@ -2602,7 +2602,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
           React.createElement('input', {
             type: 'text', className: 'form-input', value: depositorName,
             onChange: e => setDepositorName(e.target.value), placeholder: '예금주 입력',
-            style: { width: '100%', height: '44px', borderRadius: '8px', fontSize: 'var(--font-size-md)' }
+            style: { width: '100%', height: '44px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)' }
           })
         )
       ),
@@ -2615,7 +2615,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
               value: isAccountNumberHidden ? maskSettlementAccountNumber(accountNumber) : accountNumber,
               readOnly: isAccountNumberHidden,
               onChange: handleAccountNumberChange, placeholder: bankName === '기타' ? '계좌번호 입력 (숫자와 - 직접 입력)' : '계좌번호 입력 (숫자만 입력 시 하이픈 자동생성)',
-              style: { width: '100%', height: '44px', borderRadius: '8px', fontSize: 'var(--font-size-md)', paddingRight: !isAccountNumberHidden && bankName !== '기타' && isAccountValid ? '36px' : '12px' }
+              style: { width: '100%', height: '44px', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', paddingRight: !isAccountNumberHidden && bankName !== '기타' && isAccountValid ? '36px' : '12px' }
             }),
             !isAccountNumberHidden && bankName !== '기타' && isAccountValid && React.createElement('div', {
               style: {
@@ -2733,10 +2733,10 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
             )
           ),
           autoPersonalItems.length > 0 && React.createElement('div', {
-            style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '8px', padding: '6px 10px' }
+            style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 'var(--radius-md)', padding: '6px 10px' }
           }, `일정의 정산 탭에서 지출자를 지정한 ${autoPersonalItems.length}건이 자동으로 반영되었습니다.`),
           unresolvedAutoPayers.length > 0 && React.createElement('div', {
-            style: { fontSize: 'var(--font-size-sm)', color: '#DC2626', backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: '8px', padding: '6px 10px' }
+            style: { fontSize: 'var(--font-size-sm)', color: '#DC2626', backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: 'var(--radius-md)', padding: '6px 10px' }
           }, `${unresolvedAutoPayers.join(', ')}이(가) 이 정산 카드의 참여자 목록(일반 탭)에 없어 정산 금액에 반영되지 않았습니다. 참여자로 추가해 주세요.`),
 
           React.createElement('div', {
@@ -2840,7 +2840,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
               setIsSavingSettlementCard(false);
             }
           },
-          style: { borderRadius: '8px', fontSize: 'var(--font-size-md)', fontWeight: 800 }
+          style: { borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 800 }
         }, '삭제'),
         isEditing && React.createElement('button', {
           type: 'button', className: 'btn btn-secondary',
@@ -2855,13 +2855,13 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
               setIsSavingSettlementCard(false);
             }
           },
-          style: { borderRadius: '8px', fontSize: 'var(--font-size-md)', fontWeight: 800 }
+          style: { borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', fontWeight: 800 }
         }, cardToEdit?.status === 'closed' ? '마감 해제' : '마감')
       ),
       /* Right footer actions: Cancel & Save (Black background, white text) */
       React.createElement('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
         React.createElement('button', {
-          type: 'button', className: 'btn btn-secondary', onClick: onClose, style: { borderRadius: '8px', fontSize: 'var(--font-size-md)', background: 'none', border: 0 }
+          type: 'button', className: 'btn btn-secondary', onClick: onClose, style: { borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-md)', background: 'none', border: 0 }
         }, '취소'),
         React.createElement('button', {
           type: 'button',
@@ -2869,7 +2869,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
           onClick: handleSave,
           disabled: isSavingSettlementCard,
           style: {
-            borderRadius: '8px', fontWeight: 800, fontSize: 'var(--font-size-base)',
+            borderRadius: 'var(--radius-md)', fontWeight: 800, fontSize: 'var(--font-size-base)',
             backgroundColor: '#0F172A', color: '#FFFFFF', border: 'none', padding: '8px 20px',
             cursor: isSavingSettlementCard ? 'wait' : 'pointer', opacity: isSavingSettlementCard ? 0.7 : 1
           }
@@ -3608,7 +3608,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
               isMenuOpen && React.createElement("div", {
                   style: {
                     position: 'absolute', right: 0, top: '34px', backgroundColor: 'var(--bg-card)',
-                    border: '1px solid var(--border-subtle)', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                    border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                     zIndex: 100, display: 'flex', flexDirection: 'column', minWidth: '110px', overflow: 'hidden'
                   }
                 },

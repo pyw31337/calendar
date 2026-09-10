@@ -1129,7 +1129,7 @@ export function AdminDashboard({ initialCalendars }) {
 	    setCalExpenseCategories(prev => [...prev, {
 	      id,
 	      name: trimmed,
-	      color: normalizeColorValue(PRESET_COLORS[prev.length % PRESET_COLORS.length], '#64748B')
+	      color: normalizeColorValue(PRESET_COLORS[prev.length % PRESET_COLORS.length], 'var(--text-muted)')
 	    }]);
 	    setNewExpenseCategoryName('');
 	  };
@@ -1165,7 +1165,7 @@ export function AdminDashboard({ initialCalendars }) {
 	    setCalPlaceCategories(prev => [...prev, {
 	      id,
 	      name: trimmed,
-	      color: normalizeColorValue(PRESET_COLORS[prev.length % PRESET_COLORS.length], '#64748B')
+	      color: normalizeColorValue(PRESET_COLORS[prev.length % PRESET_COLORS.length], 'var(--text-muted)')
 	    }]);
 	    setNewPlaceCategoryName('');
 	  };
@@ -1609,7 +1609,7 @@ export function AdminDashboard({ initialCalendars }) {
       width: '100%',
       border: 'none',
       background: 'none',
-      color: isActive ? 'var(--status-green)' : '#64748B',
+      color: isActive ? 'var(--status-green)' : 'var(--text-muted)',
       borderBottom: isActive ? '3px solid var(--status-green)' : '3px solid transparent',
       backgroundColor: isActive ? '#ECFDF5' : 'transparent',
       borderRadius: 'var(--radius-md) var(--radius-md) 0 0',
@@ -1776,7 +1776,7 @@ export function AdminDashboard({ initialCalendars }) {
             /*#__PURE__*/React.createElement("span", {
               style: {
                 fontSize: 'var(--font-size-xs)', fontWeight: 800, padding: '3px 10px', borderRadius: 'var(--radius-full)',
-                backgroundColor: '#0F172A', color: '#FFFFFF', letterSpacing: '0.02em'
+                backgroundColor: 'var(--text-main)', color: '#FFFFFF', letterSpacing: '0.02em'
               }
             }, "Admin")
           )
@@ -2220,7 +2220,7 @@ export function AdminDashboard({ initialCalendars }) {
                     )
                   ),
                   /*#__PURE__*/React.createElement("div", { style: { width: '100%', height: '5px', borderRadius: 'var(--radius-full)', background: '#E2E8F0', overflow: 'hidden', marginTop: '2px', border: '1px solid var(--border-subtle)' } },
-                    /*#__PURE__*/React.createElement("div", { style: { width: pct, height: '100%', background: participant.color || '#64748B' } })
+                    /*#__PURE__*/React.createElement("div", { style: { width: pct, height: '100%', background: participant.color || 'var(--text-muted)' } })
                   )
                 );
               })
@@ -2270,7 +2270,7 @@ export function AdminDashboard({ initialCalendars }) {
             /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "캘린더 제목"),
             /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
               /*#__PURE__*/React.createElement(ColorSwatchPicker, {
-                value: calAccentColor || '#64748B',
+                value: calAccentColor || 'var(--text-muted)',
                 onChange: setCalAccentColor,
                 title: "캘린더 색상"
               }),
@@ -2542,7 +2542,6 @@ export function AdminDashboard({ initialCalendars }) {
                 placeholder: "검색어 입력...",
                 value: timelineSearchQuery,
                 onChange: e => { setTimelineSearchQuery(e.target.value); setTimelineLimit(100); },
-                style: { fontSize: 'var(--font-size-md)', padding: '6px 10px', height: '34px', minHeight: '34px' }
               })
             ),
             /* Type Filter (All / Activity / Chat) */
@@ -2552,7 +2551,6 @@ export function AdminDashboard({ initialCalendars }) {
                 className: "form-select",
                 value: timelineTypeFilter,
                 onChange: e => { setTimelineTypeFilter(e.target.value); setTimelineLimit(100); },
-                style: { fontSize: 'var(--font-size-md)', padding: '6px 10px', height: '34px', minHeight: '34px' }
               },
                 /*#__PURE__*/React.createElement("option", { value: "all" }, "전체 로그"),
                 /*#__PURE__*/React.createElement("option", { value: "activity" }, "활동 로그만"),
@@ -2567,7 +2565,6 @@ export function AdminDashboard({ initialCalendars }) {
                 className: "form-input",
                 value: timelineStartDate,
                 onChange: e => { setTimelineStartDate(e.target.value); setTimelineLimit(100); },
-                style: { fontSize: 'var(--font-size-md)', padding: '6px 10px', height: '34px', minHeight: '34px' }
               })
             ),
             /* Date range (End Date) */
@@ -2578,7 +2575,6 @@ export function AdminDashboard({ initialCalendars }) {
                 className: "form-input",
                 value: timelineEndDate,
                 onChange: e => { setTimelineEndDate(e.target.value); setTimelineLimit(100); },
-                style: { fontSize: 'var(--font-size-md)', padding: '6px 10px', height: '34px', minHeight: '34px' }
               })
             )
           ),
@@ -2632,7 +2628,7 @@ export function AdminDashboard({ initialCalendars }) {
                                      meeting_confirm: '#7E22CE', meeting_cancel: '#B91C1C',
                                      memo_create: '#4338CA', memo_update: '#B45309', memo_delete: '#B91C1C',
                                      place_create: 'var(--status-green)', place_update: '#1D4ED8', place_delete: '#B91C1C'
-                                   }[log.action] || '#64748B';
+                                   }[log.action] || 'var(--text-muted)';
 
                 return /*#__PURE__*/React.createElement("div", {
                   key: log.id,

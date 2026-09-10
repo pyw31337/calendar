@@ -3014,6 +3014,11 @@ function CalendarApp() {
   const patchLocalMemo = (memoId, patch) => {
     if (!memoId || !patch) return;
     setMemos(prev => (Array.isArray(prev) ? prev.map(m => m.id === memoId ? { ...m, ...patch } : m) : []));
+    // patchLocalChatMessage's chat equivalent also patches the gallery archive copy -- this
+    // didn't, so a pin toggle or a new comment on a memo already loaded into the Gallery/History
+    // archive stayed stale there (only the live `memos` array saw it) until the archive's own
+    // one-shot fetch happened to re-run.
+    if (typeof patchGalleryArchiveMemo === 'function') patchGalleryArchiveMemo(memoId, patch);
   };
   const upsertLocalMemo = memo => {
     if (!memo?.id) return;
@@ -7836,7 +7841,13 @@ function CalendarApp() {
     syncStatus: syncStatus
   }), isGalleryOpen && /*#__PURE__*/React.createElement(ChatGalleryModal, {
     calendar: activeCal,
-    chatMessages: chatMessages,
+    // 채팅창 안에서 여는 이 갤러리 인스턴스만 좁은 live-window `chatMessages`를 받고 있었다 --
+    // 스크롤로 올라간 옛 사진을 열어 태그를 저장해도 patchLocalChatMessage가 patch하는 다른
+    // 4개 버킷(olderChatMessages/galleryLiveMessages/갤러리 아카이브)에는 반영되지만 이 좁은
+    // 배열엔 반영 안 돼서, 같은 사진을 다시 열면 저장 전 상태로 보였다(새로고침해야 갱신).
+    // 갤러리 페이지/히스토리 뷰가 이미 쓰는 병합된 galleryChatMessages/galleryMemos로 맞춘다.
+    chatMessages: galleryChatMessages,
+    memos: galleryMemos,
     onClose: () => setIsGalleryOpen(false),
     onUploadImages: handleUploadGalleryImages,
     onAddLink: handleAddGalleryLink,

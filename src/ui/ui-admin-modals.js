@@ -532,7 +532,7 @@ export function AdminModal({
         onClick: () => setActiveTab('settings'),
         style: {
           padding: '12px 8px', fontSize: 'var(--font-size-base)', fontWeight: 'bold', whiteSpace: 'nowrap',
-          color: activeTab === 'settings' ? '#2563EB' : '#64748B',
+          color: activeTab === 'settings' ? '#2563EB' : 'var(--text-muted)',
           border: 'none', background: 'none',
           borderBottom: activeTab === 'settings' ? '3px solid #2563EB' : '3px solid transparent',
           cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
@@ -544,7 +544,7 @@ export function AdminModal({
         onClick: () => setActiveTab('polls'),
         style: {
           padding: '12px 8px', fontSize: 'var(--font-size-base)', fontWeight: 'bold', whiteSpace: 'nowrap',
-          color: activeTab === 'polls' ? '#2563EB' : '#64748B',
+          color: activeTab === 'polls' ? '#2563EB' : 'var(--text-muted)',
           border: 'none', background: 'none',
           borderBottom: activeTab === 'polls' ? '3px solid #2563EB' : '3px solid transparent',
           cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
@@ -556,7 +556,7 @@ export function AdminModal({
         onClick: () => setActiveTab('recovery'),
         style: {
           padding: '12px 8px', fontSize: 'var(--font-size-base)', fontWeight: 'bold', whiteSpace: 'nowrap',
-          color: activeTab === 'recovery' ? '#2563EB' : '#64748B',
+          color: activeTab === 'recovery' ? '#2563EB' : 'var(--text-muted)',
           border: 'none', background: 'none',
           borderBottom: activeTab === 'recovery' ? '3px solid #2563EB' : '3px solid transparent',
           cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
@@ -568,7 +568,7 @@ export function AdminModal({
         onClick: () => setActiveTab('logs'),
         style: {
           padding: '12px 8px', fontSize: 'var(--font-size-base)', fontWeight: 'bold', whiteSpace: 'nowrap',
-          color: activeTab === 'logs' ? '#2563EB' : '#64748B',
+          color: activeTab === 'logs' ? '#2563EB' : 'var(--text-muted)',
           border: 'none', background: 'none',
           borderBottom: activeTab === 'logs' ? '3px solid #2563EB' : '3px solid transparent',
           cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
@@ -663,7 +663,7 @@ export function AdminModal({
                   }),
                   /* Name input */
                   /*#__PURE__*/React.createElement("input", {
-                    type: "text", className: "form-input", style: { flex: 1, minWidth: 0, height: '30px', fontSize: 'var(--font-size-md)' },
+                    type: "text", className: "form-input", style: { flex: 1, minWidth: 0, height: '44px' },
                     value: p.name, disabled: isSubmitting, maxLength: 40,
                     onInput: e => updateParticipant(p.id, { name: e.target.value }),
                     onChange: e => updateParticipant(p.id, { name: e.target.value })
@@ -671,7 +671,7 @@ export function AdminModal({
                   /* Remove button */
                   /*#__PURE__*/React.createElement("button", {
                     type: "button", className: "btn btn-danger", disabled: isSubmitting, title: "삭제",
-                    style: { width: '30px', height: '30px', padding: 0, flexShrink: 0 },
+                    style: { width: '44px', height: '44px', minWidth: '44px', padding: 0, flexShrink: 0 },
                     onClick: () => onRequestConfirm('참여자 삭제', `"${p.name}" 참여자를 삭제하시겠습니까?`, () => updateParticipant(p.id, { removedAt: Date.now() }))
                   }, /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }))
                 ))
@@ -845,7 +845,7 @@ export function AdminModal({
                 meeting_confirm: '#8B5CF6', meeting_cancel: '#EF4444',
                 memo_create: '#6366F1', memo_update: '#F59E0B', memo_delete: '#EF4444',
                 place_create: 'var(--status-green)', place_update: '#2563EB', place_delete: '#EF4444'
-              }[log.action] || '#64748B';
+              }[log.action] || 'var(--text-muted)';
               const actionBadgeBg = `${actionBadgeColor}1F`;
 
               return /*#__PURE__*/React.createElement("div", {
@@ -922,8 +922,8 @@ export function AdminModal({
             onClick: () => setLogCategoryFilter(chip.id),
             style: {
               padding: '5px 12px', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap',
-              border: logCategoryFilter === chip.id ? '1px solid #0F172A' : '1px solid var(--border-subtle)',
-              backgroundColor: logCategoryFilter === chip.id ? '#0F172A' : 'var(--bg-card)',
+              border: logCategoryFilter === chip.id ? '1px solid var(--text-main)' : '1px solid var(--border-subtle)',
+              backgroundColor: logCategoryFilter === chip.id ? 'var(--text-main)' : 'var(--bg-card)',
               color: logCategoryFilter === chip.id ? '#FFFFFF' : 'var(--text-muted)'
             }
           }, chip.label))
@@ -951,7 +951,7 @@ export function AdminModal({
           };
           const actionColors = {
             create: '#2563EB', update: '#7C3AED', delete: '#DC2626',
-            poll_create: '#0F172A', poll_vote: '#2563EB', poll_cancel: '#DC2626',
+            poll_create: 'var(--text-main)', poll_vote: '#2563EB', poll_cancel: '#DC2626',
             expense_create: '#B45309', expense_update: '#B45309', expense_delete: '#C2410C',
             tag_add: '#4338CA', tag_remove: '#B91C1C',
             meeting_confirm: '#7E22CE', meeting_cancel: '#B91C1C',
@@ -995,7 +995,7 @@ export function AdminModal({
             const formatNote = __deps.formatDetailedLogNote || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.formatDetailedLogNote) || (l => l.note || '');
             const participant = resolveParticipant(log, participantsMap);
             const actionLabel = actionLabels[log.action] || '기록';
-            const actionColor = actionColors[log.action] || '#64748B';
+            const actionColor = actionColors[log.action] || 'var(--text-muted)';
             const noteText = sanitizeText(formatNote(log) || '', 160);
             const logDateText = log.date ? formatShortDateWithDayName(log.date) : '';
             const logTitleText = [participant.name, `[${actionLabel}]`, logDateText].filter(Boolean).join(' ');
@@ -1069,6 +1069,14 @@ export function AdminUnifiedSearchResultsView({
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const BackArrowIcon = __comp.BackArrowIcon || __deps.BackArrowIcon;
   const CalendarSearchIcon = __comp.CalendarSearchIcon || __deps.CalendarSearchIcon;
+  const PAGE_HEADER_BACK_BTN_STYLE = __comp.PAGE_HEADER_BACK_BTN_STYLE || __deps.PAGE_HEADER_BACK_BTN_STYLE || {
+    width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'transparent', border: 'none',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)', flexShrink: 0
+  };
+  const PAGE_HEADER_ICON_BTN_STYLE = __comp.PAGE_HEADER_ICON_BTN_STYLE || __deps.PAGE_HEADER_ICON_BTN_STYLE || {
+    background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
+    color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+  };
   const DeadlineDateTimePicker = __comp.DeadlineDateTimePicker || __deps.DeadlineDateTimePicker;
   const SearchCategoryTabs = __comp.SearchCategoryTabs || __deps.SearchCategoryTabs;
   const SearchResultLogRow = __comp.SearchResultLogRow || __deps.SearchResultLogRow;
@@ -1177,7 +1185,7 @@ export function AdminUnifiedSearchResultsView({
     },
       /*#__PURE__*/React.createElement("button", {
         type: "button", onClick: onBack, "aria-label": "뒤로가기",
-        style: { background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', color: 'var(--text-main)', padding: 0, flexShrink: 0 }
+        style: PAGE_HEADER_BACK_BTN_STYLE
       }, /*#__PURE__*/React.createElement(BackArrowIcon, { size: 22 })),
       /*#__PURE__*/React.createElement("div", {
         style: { position: 'absolute', left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'baseline', whiteSpace: 'nowrap' }
@@ -1191,8 +1199,8 @@ export function AdminUnifiedSearchResultsView({
         type: "button", onClick: () => setIsFilterPanelOpen(prev => !prev),
         "aria-label": "검색 기간/캘린더 필터", title: "검색 기간/캘린더 필터",
         style: {
-          background: 'none', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          width: '32px', height: '32px', padding: 0, color: (calFilter !== 'all' || dateStart || dateEnd) ? '#2563EB' : '#64748B', flexShrink: 0
+          ...PAGE_HEADER_ICON_BTN_STYLE,
+          color: (calFilter !== 'all' || dateStart || dateEnd) ? '#2563EB' : 'var(--text-muted)'
         }
       }, /*#__PURE__*/React.createElement(CalendarSearchIcon, { size: 22 }))
     ),
