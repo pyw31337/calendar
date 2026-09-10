@@ -160,9 +160,15 @@ function useScrollHideHeader() {
     const maxScroll = el ? Math.max(0, (el.scrollHeight || 0) - (el.clientHeight || 0)) : 0;
     // Near the bottom, never re-show from tiny upward deltas (padding oscillation)
     const nearBottom = maxScroll > 0 && (maxScroll - scrollTop) < 64;
+    // Hiding the header shrinks this container's own padding-top by ~header height, which
+    // shrinks maxScroll by the same amount. On short lists (few 인물 tags, a small trip) that
+    // can push maxScroll below the current scrollTop, forcing the browser to clamp scrollTop
+    // straight back toward 0 -- felt as "scroll won't go down / keeps snapping back up". Only
+    // allow the hide once there is enough scrollable room left that shrinking won't collapse it.
+    const hasRoomToHide = maxScroll > 200;
     if (scrollTop < 10) {
       setIsHeaderVisible(true);
-    } else if (delta > 0 && scrollTop > 56) {
+    } else if (delta > 0 && scrollTop > 56 && hasRoomToHide) {
       setIsHeaderVisible(false);
     } else if (delta < 0 && !nearBottom) {
       setIsHeaderVisible(true);
@@ -1466,9 +1472,10 @@ export function HistoryView({
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  // +16px 여유를 더해 탭 밑줄에 콘텐츠가 바로 붙지 않도록 한다(측정값 그대로 쓰면 딱 붙어 보임).
+  // 갤러리 페이지(ContentView/PhotoGallery)와 동일하게 헤더 실측 높이만 예약한다 -- 여기만 별도
+  // 여유를 더하면 탭 페이지마다 헤더 아래 여백이 달라 보인다(문제로 지적됨).
   const historyScrollPadTop = isHeaderVisible
-    ? `calc(${Math.max(headerStackHeight, 56)}px + 16px + env(safe-area-inset-top, 0px))`
+    ? `calc(${Math.max(headerStackHeight, 56)}px + env(safe-area-inset-top, 0px))`
     : 'calc(12px + env(safe-area-inset-top, 0px))';
   const historyScrollStyle = {
     flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain',
@@ -2178,7 +2185,7 @@ export function HistoryView({
                   ? { backgroundColor: 'transparent', background: 'transparent', color: p.color, border: `1px solid ${p.color}`, boxShadow: 'none' }
                   : { backgroundColor: p.color, color: getContrastTextColor(p.color) },
                 title: `${p.name}: ${memoText}`
-              }, memoText);
+              }, highlightKeyword(memoText, searchQuery));
             })
           ),
           datePlaces.length > 0 && /*#__PURE__*/React.createElement("div", {
@@ -2209,9 +2216,9 @@ export function HistoryView({
                         href: mapUrl, target: "_blank", rel: "noreferrer",
                         onClick: e => e.stopPropagation(),
                         style: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: isPast ? 'var(--text-main)' : '#fff', textDecoration: 'none', wordBreak: 'break-word' }
-                      }, placeName)
-                    : /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: isPast ? 'var(--text-main)' : '#fff', wordBreak: 'break-word' } }, placeName),
-                  address && /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-xs)', color: isPast ? 'var(--text-muted)' : '#fff', wordBreak: 'break-word' } }, address)
+                      }, highlightKeyword(placeName, searchQuery))
+                    : /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: isPast ? 'var(--text-main)' : '#fff', wordBreak: 'break-word' } }, highlightKeyword(placeName, searchQuery)),
+                  address && /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-xs)', color: isPast ? 'var(--text-muted)' : '#fff', wordBreak: 'break-word' } }, highlightKeyword(address, searchQuery))
                 )
               );
             })
@@ -2228,7 +2235,7 @@ export function HistoryView({
       style: historyScrollStyle
     }, /*#__PURE__*/React.createElement(React.Fragment, null,
       /*#__PURE__*/React.createElement("div", {
-        style: { ...LIST_TOOLBAR_ROW_STYLE, gap: '8px' }
+        style: { ...LIST_TOOLBAR_ROW_STYLE, gap: isMobile ? '6px' : '8px' }
       },
         (!isMemoryListEditMode || !isMobile) && renderMemoryAllDateToggle(),
         /*#__PURE__*/React.createElement("div", {
@@ -3479,7 +3486,12 @@ function cultureItemMatchesSearch(item, needle) {
   return haystack.includes(needle);
 }
 
-function filterCultureItemsByRegion(items, regionSelections) {
+function filterCultureItemsByRegion(items, regionSelections, category) {
+  // 영화는 상영관(장소)이라는 개념이 없어 크롤링 원본이 항상 sentinel region:'etc'를 넣는다
+  // (culture-movies.json). 다른 탭에서 지역을 골라둔 채로 영화 탭에 들어오면 모든 항목이
+  // region 불일치로 걸러져 "선택한 지역에 해당하는 항목이 없습니다"가 항상 뜨던 버그가 있었음 --
+  // 영화는 지역 필터와 무관하니 항상 통과시킨다.
+  if (category === 'movie') return items || [];
   if (!regionSelections || regionSelections.length === 0) return items || [];
   return (items || []).filter(item => regionSelections.some(sel => {
     if (sel.sido && item.region !== sel.sido) return false;
@@ -3506,7 +3518,7 @@ function countCultureSearchMatches(crawledItems, extraItems, anniversaryCategory
   if (!needle) return 0;
   const merged = mergeCultureCrawledWithExtras(crawledItems, extraItems);
   const lifecycle = filterAndSortCultureItems(merged, anniversaryCategory);
-  const regionFiltered = filterCultureItemsByRegion(lifecycle, regionSelections);
+  const regionFiltered = filterCultureItemsByRegion(lifecycle, regionSelections, anniversaryCategory);
   return regionFiltered.filter(item => cultureItemMatchesSearch(item, needle)).length;
 }
 
@@ -4239,7 +4251,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
   // Multi-select OR: with no selections at all, every item passes (전국); with one or more,
   // an item matches if it satisfies ANY saved { sido, gugun } pair (gugun '' means that 시/도 전체).
   const lifecycleItems = filterAndSortCultureItems(mergedItems, anniversaryCategory);
-  const regionFilteredItems = filterCultureItemsByRegion(lifecycleItems, regionSelections);
+  const regionFilteredItems = filterCultureItemsByRegion(lifecycleItems, regionSelections, anniversaryCategory);
 
   if (regionFilteredItems.length === 0) {
     return /*#__PURE__*/React.createElement("div", {

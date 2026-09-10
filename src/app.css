@@ -2553,7 +2553,9 @@ select.form-select {
   flex-wrap: wrap;
   gap: 6px;
   width: 100%;
-  padding: 18px 0 8px;
+  /* 모바일 브라우저 하단 주소창/제스처 바에 페이지 번호가 가려지지 않도록 safe-area 만큼
+     여백을 더한다 -- 스크롤 컨테이너 자체의 고정 16px padding-bottom만으로는 부족했다. */
+  padding: 18px 0 calc(8px + env(safe-area-inset-bottom, 0px));
 }
 
 .gallery-pagination-button {

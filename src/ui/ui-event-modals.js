@@ -179,9 +179,15 @@ function useScrollHideHeader() {
     const maxScroll = el ? Math.max(0, (el.scrollHeight || 0) - (el.clientHeight || 0)) : 0;
     // Near the bottom, never re-show from tiny upward deltas (padding oscillation)
     const nearBottom = maxScroll > 0 && (maxScroll - scrollTop) < 64;
+    // Hiding the header shrinks this container's own padding-top by ~header height, which
+    // shrinks maxScroll by the same amount. On a short list that can push maxScroll below the
+    // current scrollTop, forcing the browser to clamp scrollTop straight back toward 0 -- felt
+    // as "scroll won't go down / keeps snapping back up". Only hide once there is enough
+    // scrollable room left that shrinking won't collapse it.
+    const hasRoomToHide = maxScroll > 200;
     if (scrollTop < 10) {
       setIsHeaderVisible(true);
-    } else if (delta > 0 && scrollTop > 56) {
+    } else if (delta > 0 && scrollTop > 56 && hasRoomToHide) {
       setIsHeaderVisible(false);
     } else if (delta < 0 && !nearBottom) {
       setIsHeaderVisible(true);
