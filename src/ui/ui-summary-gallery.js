@@ -3929,6 +3929,16 @@ function resolveExistingCultureMemoText(item, {
     : (anniversaries || []).find(a => a && (a.cultureSourceId === item.id || a.id === item.id)) || null;
   const fromAnn = String(ann?.memo || '').trim();
   if (fromAnn) return fromAnn;
+  // findRegisteredAnniversary only matches within this tab's own category (festival/sports/
+  // movie/event) so an unrelated same-titled card can't false-match for the register checkbox.
+  // But that same scoping meant a memo written while the item was linked under a different
+  // category (or before a category re-classification) silently failed to show here even though
+  // the memo genuinely belongs to this title -- read-only fallback: title match, any category.
+  const titleAny = String(item.title || '').trim();
+  if (titleAny) {
+    const byTitleAnyCategory = (anniversaries || []).find(a => a && String(a.title || '').trim() === titleAny && String(a?.memo || '').trim());
+    if (byTitleAnyCategory) return String(byTitleAnyCategory.memo || '').trim();
+  }
 
   const itemId = String(item.id || '').trim();
   const title = String(item.title || '').trim();
@@ -4356,8 +4366,18 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
   // 보여주는 자유 텍스트라, 공식 홈페이지처럼 별도 구조화된 필드 없이 URL이 그냥 문장 중간에
   // 섞여 들어오는 경우가 있다(예: 운영시간 뒤에 홈페이지 주소가 이어지는 식) -- 그런 URL도
   // 클릭해서 새 창으로 열 수 있도록 설명 텍스트 안의 http(s) 링크만 찾아 <a>로 바꿔준다.
+  // 크롤링 원본 설명은 줄바꿈 없이 문장이 쭉 이어 붙은 한 덩어리 텍스트로 오는 경우가 많아
+  // (예: "...열리는 특별한 뮤지컬 공연/행사입니다. 진행 일정은... 기간입니다. 위치는...")
+  // 모바일에서 벽처럼 읽기 힘들었다. 원본에 이미 줄바꿈이 있으면 그대로 존중하고, 없을 때만
+  // 문장 끝(.!?) 뒤 공백을 줄바꿈으로 바꿔 문장 단위로 나눠 보여준다. "2026.09.11"처럼 공백 없이
+  // 붙은 숫자 점(.)은 뒤에 공백이 없어 매치되지 않는다.
+  const insertReadableLineBreaks = text => {
+    const t = String(text || '');
+    if (!t || /\n/.test(t)) return t;
+    return t.replace(/([.!?])\s+/g, '$1\n');
+  };
   const renderDescriptionWithLinks = text => {
-    const raw = String(text || '').replace(/\\r\\n|\\n|\\r/g, '\n').replace(/\r\n?/g, '\n');
+    const raw = insertReadableLineBreaks(text).replace(/\\r\\n|\\n|\\r/g, '\n').replace(/\r\n?/g, '\n');
     return raw.split(/(https?:\/\/[^\s]+)/g).map((part, i) => {
       if (!/^https?:\/\//.test(part)) return part;
       const trailingMatch = part.match(/[).,!?"'”’]+$/);
@@ -4632,67 +4652,90 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
               style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-main)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }
             }, renderDescriptionWithLinks(selected.description))
           ),
-          /*#__PURE__*/React.createElement("div", {
-            style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }
+          /*#__PURE__*/React.createElement("label", {
+            style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, padding: '10px', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)', cursor: pendingId ? 'wait' : 'pointer', fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-main)' }
           },
-            /*#__PURE__*/React.createElement("label", {
-              style: { display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0, padding: '10px', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)', cursor: pendingId ? 'wait' : 'pointer', fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-main)' }
+            /*#__PURE__*/React.createElement("input", {
+              type: "checkbox",
+              checked: !!findRegisteredAnniversary(selected.id, selected.title),
+              disabled: !!pendingId,
+              onChange: () => handleToggleRegister(selected)
+            }),
+            /*#__PURE__*/React.createElement("span", {
+              style: { display: 'inline-flex', alignItems: 'center', gap: '4px', minWidth: 0 }
             },
-              /*#__PURE__*/React.createElement("input", {
-                type: "checkbox",
-                checked: !!findRegisteredAnniversary(selected.id, selected.title),
-                disabled: !!pendingId,
-                onChange: () => handleToggleRegister(selected)
-              }),
-              /*#__PURE__*/React.createElement("span", {
-                style: { display: 'inline-flex', alignItems: 'center', gap: '4px', minWidth: 0 }
-              },
-                "캘린더와 연동",
-                CalendarUpIcon ? /*#__PURE__*/React.createElement(CalendarUpIcon, { size: 13 }) : null
-              )
-            ),
-            typeof onQuickSaveMemo === 'function' && /*#__PURE__*/React.createElement("button", {
-              type: "button",
-              onClick: () => setIsMemoOpen(prev => !prev),
-              "aria-expanded": isMemoOpen,
-              "aria-label": "메모로 등록",
-              style: {
-                display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0,
-                padding: '10px 12px', borderRadius: 'var(--radius-md)', border: 'none',
-                backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)',
-                fontSize: 'var(--font-size-md)', fontWeight: 700, cursor: 'pointer'
-              }
-            }, "메모", /*#__PURE__*/React.createElement("svg", {
-              xmlns: "http://www.w3.org/2000/svg", width: "16", height: "16", viewBox: "0 0 24 24",
-              fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round",
-              style: { transform: isMemoOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }
-            }, /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" })))
+              "캘린더와 연동",
+              CalendarUpIcon ? /*#__PURE__*/React.createElement(CalendarUpIcon, { size: 13 }) : null
+            )
           ),
-          (isMemoOpen || !!String(memoDraft || '').trim()) && /*#__PURE__*/React.createElement("div", {
+          // 캘린더연동 메모: 예전엔 "메모" 토글 버튼을 눌러야만 열리는 작성창이라, 이미 저장된
+          // 메모(예: 기념일에 남긴 "티켓 17,000원")가 있어도 안 눌러보면 안 보였다. 이제 저장된
+          // 내용을 이 줄에 항상 텍스트로 보여주고, 우측 연필 버튼으로만 편집 모드(입력창+저장)로
+          // 전환한다 -- 인물 태그 이름수정과 같은 읽기/편집 전환 패턴.
+          typeof onQuickSaveMemo === 'function' && /*#__PURE__*/React.createElement("div", {
             style: { display: 'flex', flexDirection: 'column', gap: '8px', flexShrink: 0 }
           },
-            /*#__PURE__*/React.createElement("textarea", {
-              value: memoDraft,
-              onChange: e => setMemoDraft(e.target.value),
-              placeholder: buildQuickMemoPlaceholder(selected),
-              rows: 4,
-              style: {
-                width: '100%', boxSizing: 'border-box', padding: '10px', borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)', color: 'var(--text-main)',
-                fontSize: 'var(--font-size-sm)', fontFamily: 'inherit', resize: 'vertical'
-              }
-            }),
-            /*#__PURE__*/React.createElement("button", {
-              type: "button",
-              onClick: handleSaveQuickMemo,
-              disabled: isSavingMemo,
-              style: {
-                padding: '10px', borderRadius: 'var(--radius-md)', border: 'none',
-                backgroundColor: 'var(--accent-primary)', color: '#fff', fontWeight: 800,
-                fontSize: 'var(--font-size-md)', cursor: isSavingMemo ? 'wait' : 'pointer',
-                opacity: isSavingMemo ? 0.6 : 1
-              }
-            }, "메모 저장")
+            isMemoOpen
+              ? /*#__PURE__*/React.createElement(React.Fragment, null,
+                  /*#__PURE__*/React.createElement("textarea", {
+                    value: memoDraft,
+                    onChange: e => setMemoDraft(e.target.value),
+                    placeholder: buildQuickMemoPlaceholder(selected),
+                    rows: 4,
+                    autoFocus: true,
+                    style: {
+                      width: '100%', boxSizing: 'border-box', padding: '10px', borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)', color: 'var(--text-main)',
+                      fontSize: 'var(--font-size-sm)', fontFamily: 'inherit', resize: 'vertical'
+                    }
+                  }),
+                  /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
+                    /*#__PURE__*/React.createElement("button", {
+                      type: "button",
+                      onClick: async () => { await handleSaveQuickMemo(); setIsMemoOpen(false); },
+                      disabled: isSavingMemo,
+                      style: {
+                        flex: 1, padding: '10px', borderRadius: 'var(--radius-md)', border: 'none',
+                        backgroundColor: 'var(--accent-primary)', color: '#fff', fontWeight: 800,
+                        fontSize: 'var(--font-size-md)', cursor: isSavingMemo ? 'wait' : 'pointer',
+                        opacity: isSavingMemo ? 0.6 : 1
+                      }
+                    }, "메모 저장"),
+                    /*#__PURE__*/React.createElement("button", {
+                      type: "button",
+                      onClick: () => setIsMemoOpen(false),
+                      disabled: isSavingMemo,
+                      style: {
+                        padding: '10px 16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)',
+                        backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)', fontWeight: 700,
+                        fontSize: 'var(--font-size-md)', cursor: isSavingMemo ? 'wait' : 'pointer'
+                      }
+                    }, "취소")
+                  )
+                )
+              : /*#__PURE__*/React.createElement("div", {
+                  style: {
+                    display: 'flex', alignItems: 'center', gap: '8px', padding: '10px',
+                    borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)'
+                  }
+                },
+                  /*#__PURE__*/React.createElement("span", {
+                    style: {
+                      flex: 1, minWidth: 0, fontSize: 'var(--font-size-sm)', color: memoDraft ? 'var(--text-main)' : 'var(--text-muted)',
+                      whiteSpace: 'pre-wrap', wordBreak: 'break-word'
+                    }
+                  }, memoDraft || '메모가 없습니다.'),
+                  /*#__PURE__*/React.createElement("button", {
+                    type: "button",
+                    onClick: () => setIsMemoOpen(true),
+                    "aria-label": memoDraft ? "메모 편집" : "메모 추가",
+                    style: {
+                      flexShrink: 0, width: '32px', height: '32px', padding: 0, borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)', color: 'var(--text-main)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
+                    }
+                  }, PencilIcon ? /*#__PURE__*/React.createElement(PencilIcon, { size: 15 }) : "✎")
+                )
           ),
           (() => {
             // 자세히보기 URL이 없으면 공유만 남는데, 44px 아이콘만 두면 로드 깨진 것처럼 보인다.

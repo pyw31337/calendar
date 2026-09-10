@@ -2226,7 +2226,11 @@ export function DateModal({
             placeBlock
           ),
           (() => {
-            const descText = (ann.description && String(ann.description)) || '';
+            // 원본 설명이 줄바꿈 없이 문장이 죽 이어 붙어 오는 경우가 많아, 이미 줄바꿈이 있으면
+            // 그대로 두고 없을 때만 문장 끝(.!?) 뒤 공백을 줄바꿈으로 바꿔 가독성을 높인다.
+            // "2026.09.11"처럼 공백 없이 붙은 숫자 점은 매치되지 않는다.
+            const rawDescText = (ann.description && String(ann.description)) || '';
+            const descText = rawDescText && !/\n/.test(rawDescText) ? rawDescText.replace(/([.!?])\s+/g, '$1\n') : rawDescText;
             const linkAlreadyInDesc = !!(cultureLink && descText.includes(cultureLink));
             const showLink = !!(cultureLink && !linkAlreadyInDesc);
             if (!descText && !showLink) return null;
