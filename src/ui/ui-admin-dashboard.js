@@ -1594,17 +1594,19 @@ export function AdminDashboard({ initialCalendars }) {
     },
     tabBar: {
       display: 'grid',
-      gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+      gridTemplateColumns: 'repeat(6, minmax(0, 1fr))',
       gap: 0,
       borderTop: '1px solid var(--border-subtle)',
-      padding: '6px 12px 0 12px',
+      padding: '6px 4px 0 4px',
       minWidth: 0
     },
     tabButton: (isActive) => ({
-      padding: '12px 16px',
-      fontSize: 'var(--font-size-base)',
+      padding: '12px 4px',
+      fontSize: 'var(--font-size-sm)',
       fontWeight: 'bold',
       whiteSpace: 'nowrap',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
       minWidth: 0,
       width: '100%',
       border: 'none',
@@ -1619,7 +1621,7 @@ export function AdminDashboard({ initialCalendars }) {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: '8px'
+      gap: '4px'
     }),
     card: {
       backgroundColor: '#FFFFFF',
@@ -1874,7 +1876,7 @@ export function AdminDashboard({ initialCalendars }) {
         /*#__PURE__*/React.createElement("button", {
           type: "button", className: "admin-tab-button", onClick: () => setActiveTab('audit'),
           style: styles.tabButton(activeTab === 'audit')
-        }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(ShieldCheckIcon, null)), "감사 로그"),
+        }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(ShieldCheckIcon, null)), "로그"),
         /* Tab 4 button */
         /*#__PURE__*/React.createElement("button", {
           type: "button", className: "admin-tab-button", onClick: () => setActiveTab('recovery'),
@@ -1883,7 +1885,7 @@ export function AdminDashboard({ initialCalendars }) {
         /*#__PURE__*/React.createElement("button", {
           type: "button", className: "admin-tab-button", onClick: () => setActiveTab('meme'),
           style: styles.tabButton(activeTab === 'meme')
-        }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(ChatSectionIcon, null)), "밈 이미지")
+        }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(ChatSectionIcon, null)), "밈키보드")
       )
     ),
 

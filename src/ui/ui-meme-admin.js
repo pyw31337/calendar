@@ -69,6 +69,8 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
     if (uploaded.length > 0 && typeof onPoolChange === 'function') onPoolChange(prev => [...uploaded, ...prev]);
     const failCount = files.length - uploaded.length;
     notify(failCount > 0 ? `${uploaded.length}장 업로드 완료, ${failCount}장 실패` : `${uploaded.length}장 업로드 완료`, failCount > 0 ? 'error' : 'success');
+    // 업로드가 끝나면 바로 태깅을 시작할 수 있도록 방금 올린 첫 사진의 라이트박스를 자동으로 연다.
+    if (uploaded.length > 0) openLightbox(uploaded[0]);
   };
 
   const openLightbox = (item) => { setSelected(item); setTagDraft((item.hashtags || []).map(t => `#${t}`).join(' ')); };
