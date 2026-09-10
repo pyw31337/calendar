@@ -338,8 +338,12 @@ function encodeGatherFilesFragment(files) {
         url: String(item?.url || '').trim(),
         name: String(item?.name || '파일').trim(),
         mime: String(item?.mime || item?.contentType || '').trim(),
-        size: Number(item?.size) || 0
-      })).filter(item => /^https?:\/\//i.test(item.url))
+        size: Number(item?.size) || 0,
+        storagePath: String(item?.storagePath || '').trim(),
+        uploadedAt: Number(item?.uploadedAt) || Number(item?.timestamp) || 0,
+        id: String(item?.id || '').trim(),
+        ext: String(item?.ext || '').trim()
+      })).filter(item => /^https?:\/\//i.test(item.url) && item.storagePath)
     };
     if (!payload.files.length) return '';
     const json = JSON.stringify(payload);
@@ -364,9 +368,13 @@ function parseGatherFilesClipboardText(text) {
         url: String(item?.url || '').trim(),
         name: String(item?.name || '파일').trim(),
         mime: String(item?.mime || item?.contentType || '').trim(),
-        size: Number(item?.size) || 0
+        size: Number(item?.size) || 0,
+        storagePath: String(item?.storagePath || '').trim(),
+        uploadedAt: Number(item?.uploadedAt) || 0,
+        id: String(item?.id || '').trim(),
+        ext: String(item?.ext || '').trim()
       }))
-      .filter(item => /^https?:\/\//i.test(item.url));
+      .filter(item => /^https?:\/\//i.test(item.url) && item.storagePath);
     return files.length ? files : null;
   } catch (_) {
     return null;
@@ -1323,6 +1331,35 @@ export function ChatGalleryModal({
           return;
         }
       }
+      {
+        const text = e.clipboardData ? e.clipboardData.getData('text/plain') : '';
+        const gatherFiles = parseGatherFilesClipboardText(text);
+        if (gatherFiles && typeof onAddFiles === 'function') {
+          e.preventDefault();
+          setIsMenuOpen(false);
+          void (async () => {
+            const ok = await onAddFiles(gatherFiles);
+            if (showToast) showToast(ok !== false ? `파일 ${gatherFiles.length}개를 붙여넣었습니다.` : '파일 붙여넣기에 실패했습니다.', ok !== false ? 'success' : 'error');
+            if (ok !== false) setActiveTab('files');
+          })();
+          return;
+        }
+        const gatherLinks = parseGatherLinksClipboardText(text);
+        if (gatherLinks && typeof onAddLink === 'function') {
+          e.preventDefault();
+          setIsMenuOpen(false);
+          void (async () => {
+            let added = 0;
+            for (const item of gatherLinks) {
+              const ok = await onAddLink(item.url);
+              if (ok !== false) added += 1;
+            }
+            if (showToast) showToast(added ? `링크 ${added}개를 붙여넣었습니다.` : '링크 붙여넣기에 실패했습니다.', added ? 'success' : 'error');
+            if (added) setActiveTab('links');
+          })();
+          return;
+        }
+      }
       if (typeof onUploadImages !== 'function') return;
       const files = getImageFilesFromClipboardEvent(e);
       if (!files.length) return;
@@ -1332,7 +1369,7 @@ export function ChatGalleryModal({
     };
     document.addEventListener('paste', handlePaste);
     return () => document.removeEventListener('paste', handlePaste);
-  }, [onUploadImages, onPasteGatherPhoto, onPasteGatherPhotos]);
+  }, [onUploadImages, onPasteGatherPhoto, onPasteGatherPhotos, onAddFiles, onAddLink, showToast]);
   const renderMenuIcon = () => MenuIcon
     ? /*#__PURE__*/React.createElement(MenuIcon, { paths: ["M4 6h16", "M4 12h16", "M4 18h16"] })
     : /*#__PURE__*/React.createElement("svg", {

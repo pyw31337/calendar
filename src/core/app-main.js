@@ -9,6 +9,7 @@ import {
   getChatFileTypeLabel,
   isPdfAttachment,
   collectChatFileAttachmentsFromMessages,
+  sanitizeFileAttachment,
 } from './chat-file-attachments.js';
 import exifr from 'exifr';
 import {
@@ -3510,14 +3511,18 @@ function CalendarApp() {
 
   const handleAddGalleryFiles = async attachments => {
     if (!guardLoadedCalendar()) return false;
-    const files = (attachments || []).map(item => ({
+    const files = (attachments || []).map(item => sanitizeFileAttachment({
       url: String(item?.url || '').trim(),
       name: String(item?.name || '파일').trim(),
       mime: String(item?.mime || item?.contentType || '').trim(),
-      size: Number(item?.size) || 0
-    })).filter(item => /^https?:\/\//i.test(item.url));
+      size: Number(item?.size) || 0,
+      storagePath: String(item?.storagePath || '').trim(),
+      uploadedAt: Number(item?.uploadedAt) || Date.now(),
+      id: String(item?.id || '').trim(),
+      ext: String(item?.ext || '').trim()
+    })).filter(Boolean);
     if (!files.length) {
-      showToast('붙여넣을 파일이 없습니다.', 'error');
+      showToast('공유 파일 정보가 불완전합니다. 모아엘가에서 파일을 다시 일괄공유한 뒤 붙여넣어 주세요.', 'error');
       return false;
     }
     const fallbackParticipantId = chatParticipantId || getActiveParticipants(activeCal)[0]?.id || '';
@@ -3532,7 +3537,10 @@ function CalendarApp() {
     try {
       const sent = await writeCollectionDocumentWithFallback('messages', activeCal.id, '', messageData, 'add', '갤러리 파일 저장', { documentId: messageOperationId });
       if (!sent) throw new Error('Gallery file save failed');
-      if (sent.id) upsertLocalChatMessage({ ...messageData, id: sent.id });
+      if (sent.id) {
+        upsertLocalChatMessage({ ...messageData, id: sent.id });
+        if (typeof patchGalleryArchiveMessage === 'function') patchGalleryArchiveMessage(sent.id, { ...messageData, id: sent.id });
+      }
       return sent.queued ? 'queued' : true;
     } catch (err) {
       console.error('handleAddGalleryFiles failed:', err);
