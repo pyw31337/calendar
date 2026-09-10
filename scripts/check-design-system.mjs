@@ -10,6 +10,10 @@ const shared = read('src/ui/ui-shared.js');
 const picker = read('src/ui/ui-summary-gallery.js');
 const confirm = read('src/ui/ui-confirm-dialog.js');
 const sideMenu = read('src/ui/ui-side-menu.js');
+const icons = read('src/ui/ui-icons.js');
+const memoView = read('src/ui/ui-memo-view.js');
+const chatRoom = read('src/ui/ui-chat-room.js');
+const eventModals = read('src/ui/ui-event-modals.js');
 const uiSources = ['ui-calendar-core.js', 'ui-misc.js', 'ui-remaining.js', 'ui-admin-modals.js', 'ui-share-modal.js', 'ui-event-modals.js']
   .map(file => read(`src/ui/${file}`)).join('\n');
 const allUiSources = readdirSync(resolve(root, 'src/ui')).filter(file => file.endsWith('.js'))
@@ -46,6 +50,43 @@ requireText(confirm, /height: '44px'[\s\S]*minHeight: '44px'/, 'confirm actions 
 if (/window\.confirm\s*\(/.test(sideMenu)) failures.push('settings must not use native window.confirm');
 if (/\balert\s*\(/.test(uiSources)) failures.push('shared UI flows must use toast/dialog primitives instead of native alert');
 if (/"stroke-(?:width|linecap|linejoin)"\s*:/.test(allUiSources)) failures.push('React SVG props must use strokeWidth/strokeLinecap/strokeLinejoin');
+
+requireText(shared, /export function EditSelectCheckbox/, 'shared edit checkbox module missing');
+requireText(shared, /top: '8px',\s*left: '8px',\s*width: '20px',\s*height: '20px',\s*borderRadius: '5px'/, 'edit checkbox spec must be 8px inset, 20×20, radius 5');
+requireText(shared, /export function getListEditActionWrapStyle/, 'shared list edit action wrap missing');
+requireText(shared, /width: isEdit \? \(isMobile \? '100%' : '50%'\)/, 'PC edit actions must cap at 50% width');
+requireText(shared, /marginLeft: isEdit && isMobile \? 0 : 'auto'/, 'PC edit actions must stay right-aligned at 50%');
+requireText(shared, /export const LIST_TOOLBAR_ROW_STYLE/, 'shared list toolbar style missing');
+requireText(shared, /padding: '12px 0 4px'/, 'list toolbar padding must be 12px 0 4px');
+requireText(shared, /export const PAGE_HEADER_ICON_BTN_STYLE/, 'page header icon button token missing');
+requireText(shared, /export const PAGE_HEADER_BACK_BTN_STYLE/, 'page header back button token missing');
+requireText(shared, /export const PAGE_HEADER_ACTIONS_WRAP_STYLE/, 'page header actions wrap token missing');
+requireText(shared, /export const PAGE_HEADER_TITLE_STYLE/, 'page header title token missing');
+requireText(icons, /function ThreeLinesIcon\(\{ size = 22 \}/, 'ThreeLinesIcon default size must be 22 to match 보관함');
+requireText(picker, /value: 'memories', label: '추억', badge: travelMemoryGroups\.length/, 'history 추억 tab must show a count badge');
+requireText(picker, /value: 'people', label: '인물', badge: personTagChips\.length/, 'history 인물 tab must show a count badge');
+requireText(picker, /value: 'meetings', label: '지난모임', badge: confirmedDates\.length/, 'history 지난모임 tab must show a count badge');
+requireText(picker, /historyScrollPadTop/, 'memories scroll must use measured header height like gallery');
+requireText(placesView, /padding: '12px 16px 4px'/, 'places toolbar must widen top and tighten bottom (12/16/4)');
+requireText(placesView, /padding: '8px 16px 16px'/, 'places list body padding must stay compact under the toolbar');
+requireText(chatGallery, /PAGE_HEADER_ACTIONS_WRAP_STYLE/, 'gallery page header must use shared header actions wrap');
+requireText(placesView, /PAGE_HEADER_BACK_BTN_STYLE/, 'places header must use shared back button');
+requireText(picker, /PAGE_HEADER_TITLE_STYLE/, '보관함/컨텐츠 header must use shared title token');
+requireText(memoView, /PAGE_HEADER_ACTIONS_WRAP_STYLE/, 'memo header must use shared header actions wrap');
+requireText(memoView, /ThreeLinesIcon, \{ size: 22 \}/, 'memo menu icon must be size 22');
+requireText(chatRoom, /PAGE_HEADER_ACTIONS_WRAP_STYLE/, 'chat header must use shared header actions wrap');
+requireText(eventModals, /PAGE_HEADER_ICON_BTN_STYLE/, 'settlement header must use shared icon button token');
+requireText(eventModals, /ThreeLinesIcon, \{ size: 22 \}/, 'settlement menu icon must be size 22');
+if (/SearchIcon, \{ size: 19 \}/.test(eventModals)) failures.push('settlement search icon must be size 20, not 19');
+if (/top:\s*['"]4px['"]\s*,\s*left:\s*['"]4px['"]\s*,\s*width:\s*['"]20px['"]/.test(allUiSources)) {
+  failures.push('edit checkboxes must be 8px inset, not 4px');
+}
+if (/top:\s*['"]6px['"]\s*,\s*left:\s*['"]6px['"][\s\S]{0,120}width:\s*['"]22px['"]/.test(allUiSources)) {
+  failures.push('memory group checkboxes must use 8px/20px, not 6px/22px');
+}
+if (/top:\s*['"]12px['"]\s*,\s*left:\s*['"]10px['"]/.test(placesView)) {
+  failures.push('places edit checkbox must use 8px inset, not 12/10');
+}
 
 if (failures.length) {
   failures.forEach(message => console.error('[check-design-system]', message));

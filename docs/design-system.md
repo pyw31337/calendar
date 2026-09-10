@@ -1,6 +1,6 @@
 # 모여라 캘린더 UI 디자인 시스템
 
-작성 기준: 2026-08-28  
+작성 기준: 2026-09-10  
 적용 범위: 사용자용 캘린더, 일정·참여자·장소·메모·갤러리·정산 화면과 공통 레이어팝업
 
 이 문서는 지금까지 요청된 디자인 원칙을 구현 가능한 규칙으로 고정한다. 새 화면은 먼저 공통 모듈을 찾고, 모듈의 props만으로 해결되지 않을 때만 같은 모듈을 베이스로 확장한다.
@@ -21,6 +21,10 @@
 | 추가/수정 액션 | `FormAddEditActionButtons` | 추가·수정·취소의 라벨과 44px 높이를 공통 처리 |
 | 확인 | `ConfirmDialog` / `onRequestConfirm` | 삭제·수정·저장·복구 등 상태 변경 전 레이어 1회 확인. `window.confirm`, `alert`, `prompt` 금지 |
 | 긴 입력 | `AutoGrowTextarea` | 내용량에 따라 자동 확장. 모바일에서 한 줄 고정으로 내용을 압축하지 않음 |
+| 편집 선택 체크박스 | `EditSelectCheckbox` | 갤러리 링크/파일 카드 기준. 8px inset, 20×20, radius 5. 사진·썸네일은 `onMedia`, 흰 카드(장소)는 `onCard` |
+| 페이지 헤더 | `PAGE_HEADER_*` | 보관함 헤더가 스펙. 뒤로 36×36 + `BackArrowIcon` 22, 검색 `SearchIcon` 20, 메뉴 `ThreeLinesIcon` 22, 색 `var(--text-muted)`, 아이콘 패딩 6px, 액션 gap 8px, 제목 0.95rem/800 |
+| 목록 툴바 | `LIST_TOOLBAR_ROW_STYLE` | `전체\|일자` + 추가/편집 한 줄. padding `12px 0 4px`. 장소처럼 스크롤 밖이면 가로 16px를 덮어쓴다 (`12px 16px 4px`) |
+| 편집 액션 줄 | `getListEditActionWrapStyle` | 모바일 편집은 가로 100%. PC 편집은 가로 50% + 오른쪽 정렬. 버튼이 한 줄을 통째로 채우지 않는다 |
 
 공통 모듈을 직접 쓰기 어려운 화면은 동일한 class/token/높이/간격을 유지한 얇은 래퍼만 허용한다. 화면별 임의 셀렉트, 참여자 pill, 임의 확인창을 새로 만들지 않는다.
 
@@ -60,10 +64,37 @@
 - 개인지출은 기존 일정 정산내역과 같은 카드형 목록으로 보여주고, 일반 탭 참여자는 개인지출 등록 아래에 한 줄 가로 목록으로 보여주며 개인별 합계를 표시한다.
 - 정산 목록은 진행 중인 최신 카드가 위, 마감된 과거 카드는 목록 레이어에서 확인한다.
 
-## 8. 검토 체크리스트
+## 8. 페이지 헤더
+
+보관함 상단이 기준이다. 갤러리·장소·컨텐츠·메모·채팅·정산도 같은 모듈을 쓴다.
+
+- 뒤로: `PAGE_HEADER_BACK_BTN_STYLE` (36×36 원, `BackArrowIcon` 22, `var(--text-muted)`). 채팅·메모·정산은 헤더가 숨어도 남는 플로팅 뒤로를 유지한다.
+- 제목: `PAGE_HEADER_TITLE_STYLE` (0.95rem, fontWeight 800, 가운데 절대 배치).
+- 검색/메뉴: `PAGE_HEADER_ICON_BTN_STYLE` (padding 6px, `var(--text-muted)`). 검색 아이콘 20, 메뉴 `ThreeLinesIcon` 기본 22. 페이지마다 다른 햄버거 path나 32px 원형 버튼을 만들지 않는다.
+- 액션 묶음: `PAGE_HEADER_ACTIONS_WRAP_STYLE` (gap 8px). gap 2px/4px로 조밀하게 붙이지 않는다.
+
+## 9. 편집 체크박스
+
+모든 편집 모드 선택 체크박스는 갤러리 링크/파일 카드와 같다.
+
+- 위치 `top/left: 8px`, 크기 20×20, `borderRadius: 5px`.
+- 사진·썸네일·링크·파일·추억 칸: `EditSelectCheckbox variant="onMedia"` (어두운 칩 + 흰 테두리).
+- 장소처럼 흰 리스트 카드: `variant="onCard"` (카드 배경 + 회색 테두리).
+- 4px/6px inset, 22×22, 12/10 등 화면별 임의 좌표를 새로 두지 않는다.
+
+## 10. 목록 툴바와 본문 패딩
+
+- 툴바 한 줄(`전체|일자` 또는 `전체|방문|예정` + 추가/편집)은 `LIST_TOOLBAR_ROW_STYLE` — padding `12px 0 4px` (위는 넓고 아래는 얇다).
+- 보관함·추억 본문 스크롤은 헤더 스택 실측 높이 + safe-area를 padding-top으로 쓴다. 하드코딩 118px를 쓰지 않는다.
+- 장소 툴바는 스크롤 밖이므로 `12px 16px 4px`, 리스트 본문은 `8px 16px 16px`.
+- 탭 숫자 뱃지는 `UnderlineTabs`의 `opt.badge`를 쓴다. 갤러리(사진/링크/파일)와 보관함(추억/인물/지난모임) 모두 텍스트 오른쪽에 같은 뱃지를 둔다.
+
+## 11. 검토 체크리스트
 
 - 같은 개념의 버튼/셀렉트/참여자 표시가 공통 모듈을 사용하는가?
 - 44px 액션 높이와 16px 모바일 입력 기준을 지키는가?
 - 모바일에서 가로 폭 때문에 필드와 텍스트가 불필요하게 압축되지 않는가?
 - 상태 변경 액션에 레이어 확인이 있고 시스템 UI가 남아 있지 않은가?
+- 페이지 헤더·편집 체크박스·목록 툴바가 위 공통 토큰을 쓰는가?
+- PC 편집 액션(삭제/붙여넣기/일괄공유/취소)이 가로 100%가 아니라 약 50%인가?
 - `npm run check:design-system`, `npm run check:design-rules`, `npm run build`, 기능 smoke를 통과하는가?

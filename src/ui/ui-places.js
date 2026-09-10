@@ -820,6 +820,29 @@ export function PlacesView({
   const SmallXIcon = __deps.SmallXIcon;
   const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
   const ThreeLinesIcon = __deps.ThreeLinesIcon;
+  const EditSelectCheckbox = __comp.EditSelectCheckbox || __deps.EditSelectCheckbox;
+  const getListEditActionWrapStyle = __comp.getListEditActionWrapStyle || __deps.getListEditActionWrapStyle;
+  const LIST_TOOLBAR_ROW_STYLE = __comp.LIST_TOOLBAR_ROW_STYLE || __deps.LIST_TOOLBAR_ROW_STYLE || {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    gap: '8px', padding: '12px 0 4px', minWidth: 0, flexWrap: 'nowrap', flexShrink: 0
+  };
+  const PAGE_HEADER_ICON_BTN_STYLE = __comp.PAGE_HEADER_ICON_BTN_STYLE || __deps.PAGE_HEADER_ICON_BTN_STYLE || {
+    background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
+    color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+  };
+  const PAGE_HEADER_BACK_BTN_STYLE = __comp.PAGE_HEADER_BACK_BTN_STYLE || __deps.PAGE_HEADER_BACK_BTN_STYLE || {
+    width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'transparent', border: 'none',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)', flexShrink: 0
+  };
+  const PAGE_HEADER_ACTIONS_WRAP_STYLE = __comp.PAGE_HEADER_ACTIONS_WRAP_STYLE || __deps.PAGE_HEADER_ACTIONS_WRAP_STYLE || {
+    display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0
+  };
+  const PAGE_HEADER_TITLE_STYLE = __comp.PAGE_HEADER_TITLE_STYLE || __deps.PAGE_HEADER_TITLE_STYLE || {
+    position: 'absolute', left: '50%', transform: 'translateX(-50%)',
+    display: 'flex', alignItems: 'center', fontWeight: 800, fontSize: '0.95rem',
+    color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+    maxWidth: 'calc(100vw - 120px)', pointerEvents: 'none'
+  };
   const getCalendarPlaces = __deps.getCalendarPlaces;
   const getPlaceCategories = __deps.getPlaceCategories;
   const parsePlaceMemoEntries = __deps.parsePlaceMemoEntries;
@@ -1430,45 +1453,30 @@ export function PlacesView({
         type: "button",
         onClick: onBack,
         "aria-label": "뒤로가기",
-        style: {
-          width: '36px', height: '36px',
-          borderRadius: '50%', backgroundColor: 'transparent', border: 'none',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          cursor: 'pointer', color: 'var(--text-muted)'
-        }
+        style: PAGE_HEADER_BACK_BTN_STYLE
       }, /*#__PURE__*/React.createElement(BackArrowIcon, { size: 22 })),
       
       /* Title */
       /*#__PURE__*/React.createElement("div", {
-        style: {
-          position: 'absolute', left: '50%', transform: 'translateX(-50%)',
-          display: 'flex', alignItems: 'center', fontWeight: 800, fontSize: '0.95rem',
-          color: 'var(--text-main)', whiteSpace: 'nowrap', pointerEvents: 'none'
-        }
+        style: PAGE_HEADER_TITLE_STYLE
       }, calendar.title, " 장소"),
       
       /* Right Controls: search + 3-line menu */
-      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+      /*#__PURE__*/React.createElement("div", { style: PAGE_HEADER_ACTIONS_WRAP_STYLE },
         /* Search + 3-line menu */
         /*#__PURE__*/React.createElement("button", {
           type: "button",
           onClick: () => setIsSearchOpen(prev => { if (prev) setListSearchQuery(''); return !prev; }),
           title: "장소 검색",
           "aria-label": "장소 검색",
-          style: {
-            background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
-            color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }
-        }, SearchIcon ? /*#__PURE__*/React.createElement(SearchIcon, null) : "🔍"),
+          style: PAGE_HEADER_ICON_BTN_STYLE
+        }, SearchIcon ? /*#__PURE__*/React.createElement(SearchIcon, { size: 20 }) : "🔍"),
         /*#__PURE__*/React.createElement("button", {
           type: "button",
           onClick: () => setIsPlacesMenuOpen(true),
           title: "장소 메뉴",
           "aria-label": "장소 메뉴 열기",
-          style: {
-            background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
-            color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }
+          style: PAGE_HEADER_ICON_BTN_STYLE
         }, /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 22 }))
       )
     ),
@@ -1666,27 +1674,30 @@ export function PlacesView({
     !mapExpanded && /*#__PURE__*/React.createElement("div", {
       className: "places-list-toolbar",
       style: {
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        gap: isMobile ? '6px' : '8px', padding: '8px 16px 4px', minWidth: 0,
-        flexWrap: 'nowrap', flexShrink: 0, backgroundColor: 'var(--bg-primary)'
+        ...LIST_TOOLBAR_ROW_STYLE,
+        padding: '12px 16px 4px',
+        gap: isMobile ? '6px' : '8px',
+        backgroundColor: 'var(--bg-primary)'
       }
     },
       !isBulkShareMode && renderPlacesVisitFilter(),
       /*#__PURE__*/React.createElement("div", {
-        style: {
-          display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '6px', flexShrink: 0, minWidth: 0, flexWrap: 'nowrap',
-          justifyContent: isBulkShareMode ? 'stretch' : 'flex-end',
-          marginLeft: isBulkShareMode ? 0 : 'auto',
-          flex: isBulkShareMode ? 1 : undefined,
-          width: isBulkShareMode ? '100%' : undefined
-        }
+        style: typeof getListEditActionWrapStyle === 'function'
+          ? getListEditActionWrapStyle(isBulkShareMode, isMobile)
+          : {
+              display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '6px', flexShrink: 0, minWidth: 0, flexWrap: 'nowrap',
+              justifyContent: isBulkShareMode ? 'stretch' : 'flex-end',
+              marginLeft: isBulkShareMode ? 0 : 'auto',
+              flex: isBulkShareMode ? 1 : undefined,
+              width: isBulkShareMode ? (isMobile ? '100%' : '50%') : undefined
+            }
       }, renderPlacesActionButtons())
     ),
 
     /* Scrollable Cards List Container (Scrolling independently) */
     !mapExpanded && /*#__PURE__*/React.createElement("div", {
       ref: scrollBodyRef,
-      style: { flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }
+      style: { flex: 1, overflowY: 'auto', padding: '8px 16px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }
     },
       /* Place cards list layout */
       /*#__PURE__*/React.createElement("div", {
@@ -1745,10 +1756,12 @@ export function PlacesView({
               transition: 'border-color 0.15s ease, background-color 0.15s ease'
             }
           },
-            isBulkShareMode && /*#__PURE__*/React.createElement("span", {
+            isBulkShareMode && (EditSelectCheckbox
+              ? /*#__PURE__*/React.createElement(EditSelectCheckbox, { checked: isChecked, variant: "onCard" })
+              : /*#__PURE__*/React.createElement("span", {
               "aria-hidden": true,
               style: {
-                position: 'absolute', top: '12px', left: '10px', width: '20px', height: '20px', borderRadius: '5px',
+                position: 'absolute', top: '8px', left: '8px', width: '20px', height: '20px', borderRadius: '5px',
                 border: isChecked ? 'none' : '2px solid var(--border-strong, #94A3B8)',
                 backgroundColor: isChecked ? 'var(--accent-primary)' : 'var(--bg-card)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1757,7 +1770,7 @@ export function PlacesView({
             }, isChecked && /*#__PURE__*/React.createElement("svg", {
               xmlns: "http://www.w3.org/2000/svg", width: "14", height: "14", viewBox: "0 0 24 24",
               fill: "none", stroke: "#fff", strokeWidth: "3", strokeLinecap: "round", strokeLinejoin: "round"
-            }, /*#__PURE__*/React.createElement("path", { d: "M20 6 9 17l-5-5" }))),
+            }, /*#__PURE__*/React.createElement("path", { d: "M20 6 9 17l-5-5" })))),
             /* Top-right absolute action buttons */
             !isBulkShareMode && /*#__PURE__*/React.createElement("div", {
               style: { position: 'absolute', top: '8px', right: '8px', display: 'flex', alignItems: 'center', gap: '4px', zIndex: 10 },

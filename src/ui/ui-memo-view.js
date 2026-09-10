@@ -372,6 +372,19 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
     const SharedSideMenuFooter = (__comp && __comp.SharedSideMenuFooter) || (window.GATHER_UI_DEPS || {}).SharedSideMenuFooter;
   const SharedAppNavBlock = (__comp && __comp.SharedAppNavBlock) || (window.GATHER_UI_DEPS || {}).SharedAppNavBlock;
   const ThreeLinesIcon = (__comp && __comp.ThreeLinesIcon) || (window.GATHER_UI_DEPS || {}).ThreeLinesIcon;
+  const PAGE_HEADER_ICON_BTN_STYLE = (__comp && __comp.PAGE_HEADER_ICON_BTN_STYLE) || (window.GATHER_UI_DEPS || {}).PAGE_HEADER_ICON_BTN_STYLE || {
+    background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
+    color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+  };
+  const PAGE_HEADER_ACTIONS_WRAP_STYLE = (__comp && __comp.PAGE_HEADER_ACTIONS_WRAP_STYLE) || (window.GATHER_UI_DEPS || {}).PAGE_HEADER_ACTIONS_WRAP_STYLE || {
+    display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0
+  };
+  const PAGE_HEADER_TITLE_STYLE = (__comp && __comp.PAGE_HEADER_TITLE_STYLE) || (window.GATHER_UI_DEPS || {}).PAGE_HEADER_TITLE_STYLE || {
+    position: 'absolute', left: '50%', transform: 'translateX(-50%)',
+    display: 'flex', alignItems: 'center', fontWeight: 800, fontSize: '0.95rem',
+    color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+    maxWidth: 'calc(100vw - 120px)', pointerEvents: 'none'
+  };
   const WeatherBadge = (__comp && __comp.WeatherBadge) || (window.GATHER_UI_DEPS || {}).WeatherBadge;
   const [isMemoMenuOpen, setIsMemoMenuOpen] = React.useState(false);
 const [isSearchOpen, setIsSearchOpen] = React.useState(false);
@@ -1113,38 +1126,23 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
     },
       /*#__PURE__*/React.createElement("div", { style: { width: '32px', flexShrink: 0 } }),
       /*#__PURE__*/React.createElement("div", {
-        style: {
-          position: 'absolute', left: '50%', transform: 'translateX(-50%)',
-          display: 'flex', alignItems: 'center', fontWeight: 800, fontSize: '0.95rem',
-          color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden',
-          textOverflow: 'ellipsis', maxWidth: 'calc(100vw - 160px)', pointerEvents: 'none'
-        }
+        style: PAGE_HEADER_TITLE_STYLE
       }, calendar.title, " 메모"),
-      /*#__PURE__*/React.createElement("div", {
-        style: { display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }
-      },
+      /*#__PURE__*/React.createElement("div", { style: PAGE_HEADER_ACTIONS_WRAP_STYLE },
         /*#__PURE__*/React.createElement("button", {
           type: "button",
           onClick: () => setIsSearchOpen(value => !value),
           title: "메모 검색",
           "aria-label": "메모 검색",
-          style: {
-            background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
-            color: 'var(--text-muted)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--radius-md)'
-          }
+          style: PAGE_HEADER_ICON_BTN_STYLE
         }, /*#__PURE__*/React.createElement(SearchIcon, { size: 20 })),
         /*#__PURE__*/React.createElement("button", {
           type: "button",
           onClick: () => setIsMemoMenuOpen(true),
           title: "메모 메뉴",
           "aria-label": "메모 메뉴 열기",
-          style: {
-            background: 'none', border: 'none', cursor: 'pointer', padding: '6px',
-            color: 'var(--text-muted)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--radius-md)'
-          }
-        }, ThreeLinesIcon ? /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 20 }) : /*#__PURE__*/React.createElement("svg", {
+          style: PAGE_HEADER_ICON_BTN_STYLE
+        }, ThreeLinesIcon ? /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 22 }) : /*#__PURE__*/React.createElement("svg", {
           xmlns: "http://www.w3.org/2000/svg", width: "22", height: "22", viewBox: "0 0 24 24",
           fill: "none", stroke: "currentColor", strokeWidth: "2"
         }, /*#__PURE__*/React.createElement("path", { d: "M4 6h16" }), /*#__PURE__*/React.createElement("path", { d: "M4 12h16" }), /*#__PURE__*/React.createElement("path", { d: "M4 18h16" })))
