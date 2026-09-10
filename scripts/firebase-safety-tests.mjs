@@ -649,7 +649,7 @@ assert(/classifyChatComposerFiles/.test(chatFileModule) && /isChatDocumentFile/.
 const chatRoomSource = fs.readFileSync('src/ui/ui-chat-room.js', 'utf8');
 assert(chatRoomSource.includes('파일 업로드') && chatRoomSource.includes('lucide-paperclip'), 'chat composer must expose a file upload paperclip control');
 assert(chatRoomSource.includes('handleDocFileChangeChat') && chatRoomSource.includes('classifyChatComposerFiles'), 'file button must classify and route images through the photo pipeline');
-assert(chatGallerySource.includes("value: 'files'") && chatGallerySource.includes('등록된 파일'), 'gallery must expose a 파일 tab');
+assert(chatGallerySource.includes("value: 'files'") && chatGallerySource.includes("label: '파일'") && chatGallerySource.includes('renderFileListHeader'), 'gallery must expose a 파일 tab');
 assert(domainHelpersScript.includes('fileAttachments'), 'message sanitizer must preserve fileAttachments');
 const chatFilesUi = fs.readFileSync('src/ui/ui-chat-files.js', 'utf8');
 assert(chatFilesUi.includes('DocumentLightbox') && chatFilesUi.includes('FileAttachmentCard'), 'document lightbox and attachment cards must ship');
