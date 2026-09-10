@@ -277,7 +277,7 @@ async function reverseGeocodeCoords(lat, lng, options = {}) {
   if (existing) return existing;
 
   const pending = (async () => {
-    let kakaoParsed = null;
+    let kakaoParsed;
     try {
       kakaoParsed = await reverseGeocodeKakao(latN, lngN, options.firebaseConfig || {});
     } catch (_) { kakaoParsed = null; }
