@@ -494,7 +494,11 @@ export function ChatGalleryModal({
     const CalendarCheckIcon = __comp.CalendarCheckIcon || __deps.CalendarCheckIcon;
   const SectionToggleButton = __comp.SectionToggleButton || __deps.SectionToggleButton;
 
-  const [activeTab, setActiveTab] = React.useState('photos'); // 'photos' | 'links' | 'files'
+  const [activeTab, setActiveTab] = React.useState('photos');
+  const setGalleryTab = next => {
+    setActiveTab(next);
+    setSelectedBulkShareKeys(new Set());
+  }; // 'photos' | 'links' | 'files'
   const [galleryDocLightbox, setGalleryDocLightbox] = React.useState(null);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
@@ -1670,6 +1674,7 @@ export function ChatGalleryModal({
       searchQuery: searchQuery,
       stretch: true,
       compact: true,
+      onToggleSelect: isBulkShareMode ? () => toggleBulkShareSelected(itemKey) : undefined,
       onOpen: isBulkShareMode ? undefined : () => setGalleryDocLightbox({ attachments: items, index: idx })
     }) : null;
     if (!card) return null;

@@ -169,6 +169,7 @@ export function FileAttachmentCard(props) {
   var React = window.React;
   var attachment = props && props.attachment;
   var onOpen = props && props.onOpen;
+  var onToggleSelect = props && props.onToggleSelect;
   var compact = !!(props && props.compact);
   var searchQuery = (props && props.searchQuery) || "";
   if (!attachment || !attachment.url) return null;
@@ -179,6 +180,10 @@ export function FileAttachmentCard(props) {
     className: "chat-file-attachment-card",
     onClick: function(e) {
       if (e) { e.preventDefault(); e.stopPropagation(); }
+      if (typeof onToggleSelect === "function") {
+        onToggleSelect();
+        return;
+      }
       if (typeof onOpen === "function") onOpen(attachment);
     },
     title: attachment.name || "파일",
