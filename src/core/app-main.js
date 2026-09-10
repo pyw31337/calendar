@@ -682,7 +682,18 @@ function CalendarApp() {
       const savedId = window.localStorage?.getItem('gather_last_active_cal_id');
       if (savedId && isAllowedCalendarId(savedId)) return savedId;
     } catch (_) {}
-    return 'cw';
+    // This app has no real per-user login -- a calendar id IS the access secret (see
+    // firestore.rules' isCalendarDoc checks). The bare app URL used to default straight into
+    // a real, hardcoded family calendar id for anyone with neither a share link nor a saved
+    // browser (a brand new device/browser, private mode, or cleared storage) -- meaning that
+    // literal id, sitting in this public repo's source, doubled as a live, unauthenticated
+    // door into that calendar's chat/photos/locations for anyone who read the code. A visitor
+    // with no real link now sees the generic "불러오는 중..." loading shell (createLoading-
+    // CalendarShell/isUsableCalendarRecord already handle an id no calendar document matches)
+    // instead of silently landing on someone's actual data. Real access still only ever works
+    // via an explicit share link (?cal=.../ /share/.../) or this device's own saved last-used
+    // calendar, exactly as before -- nothing changes for anyone who already has a real link.
+    return 'no-calendar-selected';
   });
   normalizeCalendarUrlParams(activeCalId);
   React.useEffect(() => {
