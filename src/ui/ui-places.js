@@ -822,6 +822,7 @@ export function PlacesView({
   const ThreeLinesIcon = __deps.ThreeLinesIcon;
   const EditSelectCheckbox = __comp.EditSelectCheckbox || __deps.EditSelectCheckbox;
   const getListEditActionWrapStyle = __comp.getListEditActionWrapStyle || __deps.getListEditActionWrapStyle;
+  const getListEditTextBtnStyle = __comp.getListEditTextBtnStyle || __deps.getListEditTextBtnStyle;
   const LIST_TOOLBAR_ROW_STYLE = __comp.LIST_TOOLBAR_ROW_STYLE || __deps.LIST_TOOLBAR_ROW_STYLE || {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
     gap: '8px', padding: '12px 0 4px', minWidth: 0, flexWrap: 'nowrap', flexShrink: 0
@@ -1146,11 +1147,13 @@ export function PlacesView({
       borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center',
       cursor: 'pointer', flexShrink: 0, boxSizing: 'border-box', aspectRatio: '1 / 1'
     };
-    const textBtn = {
-      height: '44px', minHeight: '44px', minWidth: '44px', padding: '0 16px',
-      borderRadius: 'var(--radius-md)', fontSize: isMobile ? 'var(--font-size-sm)' : 'var(--font-size-md)', fontWeight: 900,
-      cursor: 'pointer', flex: 1, flexShrink: 0, whiteSpace: 'nowrap', boxSizing: 'border-box'
-    };
+    const textBtn = typeof getListEditTextBtnStyle === 'function'
+      ? getListEditTextBtnStyle(isMobile, isBulkShareMode)
+      : {
+          height: '44px', minHeight: '44px', minWidth: '44px', padding: isMobile ? '0 8px' : '0 14px',
+          borderRadius: 'var(--radius-md)', fontSize: isMobile ? 'var(--font-size-sm)' : 'var(--font-size-md)', fontWeight: 900,
+          cursor: 'pointer', flex: isBulkShareMode && isMobile ? 1 : '0 0 auto', flexShrink: 0, whiteSpace: 'nowrap', boxSizing: 'border-box'
+        };
     if (!isBulkShareMode) {
       return /*#__PURE__*/React.createElement(React.Fragment, null,
         /*#__PURE__*/React.createElement("button", {
@@ -1680,7 +1683,7 @@ export function PlacesView({
         backgroundColor: 'var(--bg-primary)'
       }
     },
-      !isBulkShareMode && renderPlacesVisitFilter(),
+      (!isBulkShareMode || !isMobile) && renderPlacesVisitFilter(),
       /*#__PURE__*/React.createElement("div", {
         style: typeof getListEditActionWrapStyle === 'function'
           ? getListEditActionWrapStyle(isBulkShareMode, isMobile)
@@ -1689,7 +1692,7 @@ export function PlacesView({
               justifyContent: isBulkShareMode ? 'stretch' : 'flex-end',
               marginLeft: isBulkShareMode ? 0 : 'auto',
               flex: isBulkShareMode ? 1 : undefined,
-              width: isBulkShareMode ? (isMobile ? '100%' : '50%') : undefined
+              width: isBulkShareMode && isMobile ? '100%' : 'auto'
             }
       }, renderPlacesActionButtons())
     ),

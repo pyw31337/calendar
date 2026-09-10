@@ -735,20 +735,20 @@ assert(chatGallerySource.includes("kind: 'gather-files'") && chatGallerySource.i
 assert(appMainSource.includes('handleAddGalleryFiles') && appMainSource.includes('sanitizeFileAttachment'), 'pasted gallery files must keep sanitized storagePath before write');
 assert(chatGallerySource.includes('handleClickBulkDelete'), 'gallery edit mode must offer bulk delete');
 assert(chatGallerySource.includes('if (!isBulkShareMode)'), 'gallery default toolbar must hide paste until edit mode');
-assert(chatGallerySource.includes('!isBulkShareMode && renderVisitFilterToggleMobile()'), 'gallery edit mode must hide 전체|일자 while delete/paste/share/cancel are expanded');
-assert(chatGallerySource.includes("minWidth: '44px', padding: '0 16px'"), 'gallery 취소/붙여넣기/일괄공유 must stay at least as wide as they are tall');
+assert(chatGallerySource.includes('(!isBulkShareMode || !isMobile) && renderVisitFilterToggleMobile()'), 'gallery must hide 전체|일자 only on mobile edit');
+assert(chatGallerySource.includes('getListEditTextBtnStyle'), 'gallery 취소/붙여넣기/일괄공유 must use compact shared padding');
 assert(!chatGallerySource.includes("padding: isMobile ? '0 6px'"), 'gallery text actions must not crush to 6px padding on mobile');
-assert(summaryGallerySource.includes('!isMemoryListEditMode && renderMemoryAllDateToggle()'), 'memories edit mode must hide 전체|일자 like gallery');
+assert(summaryGallerySource.includes('(!isMemoryListEditMode || !isMobile) && renderMemoryAllDateToggle()'), 'memories must hide 전체|일자 only on mobile edit');
 assert(chatGallerySource.includes('handleToggleBulkShareMode, title: "편집"'), 'gallery default toolbar must keep the edit pencil');
 assert(chatGallerySource.includes('input, textarea, select, [contenteditable="true"]'), 'Ctrl+V must not steal paste from search inputs');
 const placesViewSource = fs.readFileSync(new URL('../src/ui/ui-places.js', import.meta.url), 'utf8');
 assert(!placesViewSource.includes('visit-filter-toggle-desktop'), 'places visit filter must leave the header');
 assert(placesViewSource.includes('places-list-toolbar'), 'places list must expose the gallery-style toolbar');
-assert(placesViewSource.includes('!isBulkShareMode && renderPlacesVisitFilter()'), 'places edit mode must hide 전체|방문|예정 so expanded actions fit');
+assert(placesViewSource.includes('(!isBulkShareMode || !isMobile) && renderPlacesVisitFilter()'), 'places must hide 전체|방문|예정 only on mobile edit');
 assert(placesViewSource.includes('handleOpenRegister, title: "추가"'), 'places plus button must open the register modal');
 assert(placesViewSource.includes('handleToggleBulkShareMode, title: "편집"'), 'places default toolbar must keep the edit pencil');
 assert(placesViewSource.includes('"붙여넣기"') && placesViewSource.includes('일괄공유'), 'places edit mode must reuse 붙여넣기/일괄공유');
-assert(placesViewSource.includes("minWidth: '44px', padding: '0 16px'"), 'places 취소/붙여넣기/일괄공유 must stay at least 1:1');
+assert(placesViewSource.includes('getListEditTextBtnStyle'), 'places 취소/붙여넣기/일괄공유 must use compact shared padding');
 assert(placesViewSource.includes('input, textarea, select, [contenteditable="true"]'), 'places Ctrl+V must not steal paste from search/memo inputs');
 assert(placesViewSource.includes("e.key !== 'Escape'"), 'places Escape must cancel edit/paste without stealing from inputs');
 assert(placesViewSource.includes("role: isBulkShareMode ? \"checkbox\""), 'places bulk share must use checkboxes');
@@ -1610,3 +1610,53 @@ console.log('Firebase-only calendar safety tests passed');
   );
   assert(countPhotoTagTokens('#a #b #c #d') === 4, 'countPhotoTagTokens must count unique tag tokens');
 }
+
+{
+  const {
+    buildMetadataTags,
+    formatDeviceHashtag,
+    buildLocationHashtags,
+    parseNominatimLocation,
+    dateStrToCompactHashtag,
+    withUploadDateTag,
+    localDateStr
+  } = await import('../src/core/photo-metadata-tags.js');
+  assert(dateStrToCompactHashtag('2026-09-10') === '260910', 'upload date tag must use YYMMDD');
+  assert(formatDeviceHashtag('samsung SM-F916N') === '갤럭시Z폴드2', 'Samsung EXIF codes must map to Korean product names');
+  assert(formatDeviceHashtag('SM-F966B') === '갤럭시Z폴드7', 'newer Fold codes must stay mapped');
+  assert(formatDeviceHashtag('samsung SM-XXXX') === '', 'unknown SM- codes must not become hashtags');
+  assert(formatDeviceHashtag('Apple iPhone 15 Pro Max') === '아이폰15프로맥스', 'iPhone marketing names stay Korean');
+  const loc = buildLocationHashtags({
+    country: '대한민국',
+    province: '경기도',
+    city: '부천시',
+    suburb: '오류동',
+    school: '오류남초등학교'
+  }, '오류남초등학교');
+  assert(loc.includes('#오류남초등학교'), 'school POI must become a hashtag');
+  assert(loc.includes('#경기도부천시'), 'admin region must be compact 시도+시군구');
+  const apt = buildLocationHashtags({
+    country: '대한민국',
+    province: '경기도',
+    city: '부천시',
+    railway: '천왕역',
+    building: '모아엘가 더 스카이'
+  }, '모아엘가 더 스카이');
+  assert(apt.some(tag => tag.includes('천왕역') && tag.includes('모아엘가')), 'station+apartment should combine when both exist');
+  const nominatim = parseNominatimLocation({
+    name: '오류남초등학교',
+    address: { country: '대한민국', province: '경기도', city: '부천시', suburb: '오류동', amenity: '오류남초등학교' }
+  });
+  assert(nominatim.locationTags.includes('#오류남초등학교'), 'Nominatim zoom-18 payload must expose the POI tag');
+  const tagged = buildMetadataTags(
+    { capturedAt: '2026-09-01T03:00:00.000Z', device: 'samsung SM-F916N', locationTags: nominatim.locationTags },
+    { uploadDate: '2026-09-10' }
+  );
+  assert(tagged.includes('#260910'), 'chat/gallery upload must stamp today YYMMDD');
+  assert(tagged.includes('#260901'), 'EXIF capture date stays when it differs from upload day');
+  assert(tagged.includes('#갤럭시Z폴드2'), 'device tag must use the Korean product name');
+  assert(!tagged.includes('SM-F916'), 'opaque product numbers must not leak into tags');
+  assert(withUploadDateTag('', new Date('2026-09-10T12:00:00+09:00')) === '#260910', 'files get a default upload-date tag');
+  assert(withUploadDateTag('#hello', new Date('2026-09-10T12:00:00+09:00')) === '#260910 #hello', 'upload-date tag prepends existing file tags');
+}
+

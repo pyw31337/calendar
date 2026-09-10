@@ -484,7 +484,8 @@ export function EditSelectCheckbox({ checked = false, variant = 'onMedia' } = {}
 }
 
 // Idle: 추가/편집 sit on the right. Edit: 제거/붙여넣기/일괄공유/취소.
-// Mobile fills the row; desktop caps at 50% so the four actions still read as buttons.
+// Mobile edit fills the row because 전체|일자 is hidden. Desktop stays content-sized
+// so the four actions read as buttons, not a stretched bar.
 export function getListEditActionWrapStyle(isEdit, isMobile) {
   return {
     display: 'flex',
@@ -493,10 +494,26 @@ export function getListEditActionWrapStyle(isEdit, isMobile) {
     flexShrink: 0,
     minWidth: 0,
     flexWrap: 'nowrap',
-    justifyContent: isEdit ? 'stretch' : 'flex-end',
-    marginLeft: isEdit && isMobile ? 0 : 'auto',
-    flex: isEdit && isMobile ? 1 : undefined,
-    width: isEdit ? (isMobile ? '100%' : '50%') : undefined
+    justifyContent: 'flex-end',
+    marginLeft: 'auto',
+    width: isEdit && isMobile ? '100%' : 'auto'
+  };
+}
+
+export function getListEditTextBtnStyle(isMobile, isEdit) {
+  return {
+    height: '44px',
+    minHeight: '44px',
+    minWidth: '44px',
+    padding: isMobile ? '0 8px' : '0 14px',
+    borderRadius: 'var(--radius-md)',
+    fontSize: isMobile ? 'var(--font-size-sm)' : 'var(--font-size-md)',
+    fontWeight: 900,
+    cursor: 'pointer',
+    flex: isEdit && isMobile ? 1 : '0 0 auto',
+    flexShrink: 0,
+    whiteSpace: 'nowrap',
+    boxSizing: 'border-box'
   };
 }
 
@@ -1818,6 +1835,7 @@ export function ResizableListSection({
     UnderlineTabs: UnderlineTabs,
     EditSelectCheckbox: EditSelectCheckbox,
     getListEditActionWrapStyle: getListEditActionWrapStyle,
+    getListEditTextBtnStyle: getListEditTextBtnStyle,
     LIST_TOOLBAR_ROW_STYLE: LIST_TOOLBAR_ROW_STYLE,
     PAGE_HEADER_ICON_BTN_STYLE: PAGE_HEADER_ICON_BTN_STYLE,
     PAGE_HEADER_BACK_BTN_STYLE: PAGE_HEADER_BACK_BTN_STYLE,

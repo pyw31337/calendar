@@ -61,7 +61,7 @@ const EXT_MIME = Object.freeze({
 });
 
 const FILE_ATTACHMENT_KEYS = Object.freeze([
-  'id', 'name', 'mime', 'size', 'url', 'storagePath', 'uploadedAt', 'ext'
+  'id', 'name', 'mime', 'size', 'url', 'storagePath', 'uploadedAt', 'ext', 'tags'
 ]);
 
 export function getFileExtension(nameOrPath = '') {
@@ -192,6 +192,7 @@ export function sanitizeFileAttachment(entry) {
   const size = Number(entry.size);
   const uploadedAt = Number(entry.uploadedAt);
   const id = typeof entry.id === 'string' ? entry.id.trim().slice(0, 120) : '';
+  const tags = typeof entry.tags === 'string' ? entry.tags.trim().slice(0, 160) : '';
   if (!name || !url || !storagePath) return null;
   if (!Number.isFinite(size) || size < 0 || size > MAX_CHAT_FILE_BYTES) return null;
   if (!Number.isFinite(uploadedAt) || uploadedAt <= 0) return null;
@@ -203,7 +204,8 @@ export function sanitizeFileAttachment(entry) {
     url,
     storagePath,
     uploadedAt: Math.round(uploadedAt),
-    ext
+    ext,
+    ...(tags ? { tags } : {})
   };
   // Drop unknown keys so Firestore hasOnly stays stable.
   Object.keys(out).forEach(key => {

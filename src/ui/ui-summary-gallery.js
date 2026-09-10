@@ -1224,6 +1224,7 @@ export function HistoryView({
   const CalendarCheckIcon = __comp.CalendarCheckIcon || __deps.CalendarCheckIcon;
   const EditSelectCheckbox = __comp.EditSelectCheckbox || __deps.EditSelectCheckbox;
   const getListEditActionWrapStyle = __comp.getListEditActionWrapStyle || __deps.getListEditActionWrapStyle;
+  const getListEditTextBtnStyle = __comp.getListEditTextBtnStyle || __deps.getListEditTextBtnStyle;
   const LIST_TOOLBAR_ROW_STYLE = __comp.LIST_TOOLBAR_ROW_STYLE || __deps.LIST_TOOLBAR_ROW_STYLE || {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
     gap: '8px', padding: '12px 0 4px', minWidth: 0, flexWrap: 'nowrap', flexShrink: 0
@@ -1844,11 +1845,13 @@ export function HistoryView({
     borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center',
     cursor: 'pointer', flexShrink: 0, boxSizing: 'border-box', aspectRatio: '1 / 1'
   };
-  const memoryTextBtn = {
-    height: '44px', minHeight: '44px', minWidth: '44px', padding: '0 16px', borderRadius: 'var(--radius-md)',
-    fontSize: 'var(--font-size-md)', fontWeight: 900, cursor: 'pointer', flex: 1, flexShrink: 0, whiteSpace: 'nowrap',
-    boxSizing: 'border-box'
-  };
+  const memoryTextBtn = typeof getListEditTextBtnStyle === 'function'
+    ? getListEditTextBtnStyle(isMobile, true)
+    : {
+        height: '44px', minHeight: '44px', minWidth: '44px', padding: isMobile ? '0 8px' : '0 14px', borderRadius: 'var(--radius-md)',
+        fontSize: isMobile ? 'var(--font-size-sm)' : 'var(--font-size-md)', fontWeight: 900, cursor: 'pointer',
+        flex: isMobile ? 1 : '0 0 auto', flexShrink: 0, whiteSpace: 'nowrap', boxSizing: 'border-box'
+      };
   const renderMemoryAllDateToggle = () => /*#__PURE__*/React.createElement("div", {
     className: "visit-filter-toggle-mobile",
     style: {
@@ -2225,11 +2228,11 @@ export function HistoryView({
       /*#__PURE__*/React.createElement("div", {
         style: { ...LIST_TOOLBAR_ROW_STYLE, gap: '8px' }
       },
-        !isMemoryListEditMode && renderMemoryAllDateToggle(),
+        (!isMemoryListEditMode || !isMobile) && renderMemoryAllDateToggle(),
         /*#__PURE__*/React.createElement("div", {
           style: typeof getListEditActionWrapStyle === 'function'
             ? getListEditActionWrapStyle(isMemoryListEditMode, isMobile)
-            : { display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: isMemoryListEditMode ? 0 : 'auto', flex: isMemoryListEditMode ? 1 : undefined, width: isMemoryListEditMode ? (isMobile ? '100%' : '50%') : undefined }
+            : { display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: 'auto', width: isMemoryListEditMode && isMobile ? '100%' : 'auto' }
         },
           isMemoryListEditMode
             ? /*#__PURE__*/React.createElement(React.Fragment, null,
@@ -2300,7 +2303,7 @@ export function HistoryView({
           /*#__PURE__*/React.createElement("div", {
             style: typeof getListEditActionWrapStyle === 'function'
               ? getListEditActionWrapStyle(isMemoryEditMode, isMobile)
-              : { display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: 'auto', width: isMemoryEditMode && !isMobile ? '50%' : undefined }
+              : { display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: 'auto', width: isMemoryEditMode && isMobile ? '100%' : 'auto' }
           },
             isMemoryEditMode
               ? /*#__PURE__*/React.createElement(React.Fragment, null,

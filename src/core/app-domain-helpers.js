@@ -620,6 +620,7 @@ function sanitizeMessageForFirestore(messageData) {
       const size = Number(entry.size);
       const uploadedAt = Number(entry.uploadedAt);
       const id = typeof entry.id === 'string' ? entry.id.trim().slice(0, 120) : '';
+      const tags = typeof entry.tags === 'string' ? entry.tags.trim().slice(0, 160) : '';
       if (!name || !url || !storagePath) return null;
       if (!Number.isFinite(size) || size < 0 || size > 20 * 1024 * 1024) return null;
       if (!Number.isFinite(uploadedAt) || uploadedAt <= 0) return null;
@@ -631,7 +632,8 @@ function sanitizeMessageForFirestore(messageData) {
         url,
         storagePath,
         uploadedAt: Math.round(uploadedAt),
-        ...(ext ? { ext } : {})
+        ...(ext ? { ext } : {}),
+        ...(tags ? { tags } : {})
       };
     };
     out.fileAttachments = out.fileAttachments.map(sanitizeOne).filter(Boolean).slice(0, 20);
