@@ -16,7 +16,7 @@ import {
   deleteGalleryLinkItems,
   filterDeletedPhotoFromIndexItems
 } from './gallery-bulk-delete.js';
-import { filterOutMemoryExclusionKeys } from './gallery-data.js';
+import { filterOutMemoryExclusionKeys, preserveAnniversaryCurationFields } from './gallery-data.js';
 import exifr from 'exifr';
 import {
   computeKoreanHolidaysForYear,
@@ -1755,11 +1755,13 @@ function CalendarApp() {
       if (!isMounted) return;
       const arr = Array.isArray(list) ? list : [];
       setAnniversaries(prev => {
-        let merged = arr;
+        const prevById = new Map((Array.isArray(prev) ? prev : []).filter(item => item?.id).map(item => [item.id, item]));
+        const hydrated = arr.map(item => preserveAnniversaryCurationFields(prevById.get(item?.id), item));
+        let merged = hydrated;
         if (preserveExisting) {
-          const seen = new Set(arr.map(item => item?.id).filter(Boolean));
+          const seen = new Set(hydrated.map(item => item?.id).filter(Boolean));
           const existing = Array.isArray(prev) ? prev.filter(item => item?.id && !seen.has(item.id)) : [];
-          merged = [...arr, ...existing];
+          merged = [...hydrated, ...existing];
         }
         return sortAnns(merged);
       });
@@ -1810,7 +1812,7 @@ function CalendarApp() {
     setAnniversaries(prev => {
       const list = Array.isArray(prev) ? prev.slice() : [];
       const idx = list.findIndex(a => a.id === annData.id);
-      if (idx >= 0) list[idx] = { ...list[idx], ...annData };
+      if (idx >= 0) list[idx] = preserveAnniversaryCurationFields(list[idx], { ...list[idx], ...annData });
       else list.unshift(annData);
       list.sort((a, b) => (Number(b.createdAt) || Number(b.updatedAt) || 0) - (Number(a.createdAt) || Number(a.updatedAt) || 0));
       return list;
@@ -4147,7 +4149,7 @@ function CalendarApp() {
     )).slice(0, 10);
     const cleanTags = sanitizeText(parseTagTokens(tagsText).join(' '), 100);
     const nextPhotos = photos.map((p, i) => i === imageIndex ? { ...p, tags: cleanTags } : p);
-    const annData = { ...ann, photos: nextPhotos, updatedAt: Date.now() };
+    const annData = preserveAnniversaryCurationFields(ann, { ...ann, photos: nextPhotos, updatedAt: Date.now() });
     try {
       const saved = await writeCollectionDocumentWithFallback('anniversaries', activeCal.id, anniversaryId, annData, 'set', '기념일 사진 태그 저장');
       if (!saved?.success) throw new Error('Anniversary photo tags update failed');
