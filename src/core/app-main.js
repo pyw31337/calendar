@@ -10203,8 +10203,13 @@ function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) 
   const displayUrls = entries.map(e => e.full);
   const meta = entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, source: e.source, uploadSource: e.uploadSource, assetKey: e.assetKey, mediaKey: e.mediaKey, refKey: e.refKey }));
   if (thumbs.length === 1) {
+    // The bubble caps display to maxWidth 420px/60vh (singleImageStyle below), so the small
+    // thumb (640px cap) is already higher resolution than this ever needs to render at -- using
+    // the full/original asset here (up to a 2000px-capped JPEG, or an untouched original up to
+    // 1.5MB) downloads and decodes several times more data than the bubble can even show. The
+    // lightbox onClick below still opens `displayUrls` (the full asset) when the user taps in.
     return /*#__PURE__*/React.createElement('img', {
-      src: displayUrls[0] || thumbs[0],
+      src: thumbs[0] || displayUrls[0],
       alt: '첨부이미지',
       loading: 'lazy',
       decoding: 'async',
