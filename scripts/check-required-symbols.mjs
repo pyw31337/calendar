@@ -22,7 +22,6 @@ const requiredInMain = [
   'extractLeadingMemoDate',
   'normalizePlaceAddressForSave',
   'getPlaceExternalMapUrl',
-  'isExpenseIncomeEntry',
   'getPlaceCategories',
   'AdminLoginGate',
   'PlacesView',
