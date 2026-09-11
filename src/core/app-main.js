@@ -197,6 +197,7 @@ import {
   getChatLastReadTimestamp,
   setChatLastReadTimestamp
 } from './app-calendar-screen-state.js';
+import { KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY, fetchWithTimeout } from './app-place-search.js';
 import {
   getInitialDataLoadingState,
   subscribeBrowserConnectivity,
@@ -8853,32 +8854,6 @@ const { PlaceMapView, PlacesView, HistoryView, ContentView } = uiWrapperAliases;
 // fallback -- chosen as the PRIMARY geocoder here since it supports POI/business search, unlike
 // Open-Meteo's city-only geocoder) + memo + category select, used for both creating a new place
 // and editing an existing one (editingPlace present).
-// Kakao's category_group_code covers 15 fixed groups; only these have an obvious match to this
-// app's six place categories (식당/카페/놀이/숙박/쇼핑/기타) -- everything else (학교, 주차장, 지하철역
-// 등) falls back to 기타 rather than guessing.
-const KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY = {
-  FD6: 'restaurant', // 음식점
-  CE7: 'cafe',        // 카페
-  AD5: 'lodging',      // 숙박
-  AT4: 'play',         // 관광명소
-  MT1: 'shopping'      // 대형마트
-};
-
-// Caps how long any single search tier (Kakao/Google Places/Nominatim) is allowed to hang before
-// PlaceRegisterModal.handleSearch gives up on it and moves to the next fallback -- googlePlacesSearchProxy
-// in particular is a 1st-gen Cloud Function that's called rarely (only when Kakao comes up empty),
-// so a cold start there can otherwise stall the whole 3-tier chain far longer than any one search
-// step should reasonably take.
-async function fetchWithTimeout(url, timeoutMs) {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(url, { signal: controller.signal });
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
-
 const { PlaceRegisterModal } = uiWrapperAliases;
 
 
