@@ -8883,14 +8883,14 @@ async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_T
     if (isStorageDisabled) return Promise.resolve(null);
     return new Promise(res => {
       let w = img.width, h = img.height;
-      // 480px: this thumb is shared by the gallery grid (~122px cells) and the single-image
+      // 640px: this thumb is shared by the gallery grid (~122px cells) and the single-image
       // chat bubble (renderChatMessageImages caps that display at maxWidth 420px/60vh and
-      // intentionally reuses this thumb instead of the full asset) -- 480px stays comfortably
-      // above the bubble's largest real render size while still cutting per-photo bytes well
-      // below the previous 640px cap for grid-heavy screens (gallery/summary) that load many
-      // of these at once. A grid-only tier smaller than this would need its own field/upload
-      // step since going lower here would visibly soften that single-image bubble case.
-      const maxDimThumb = 480;
+      // intentionally reuses this thumb instead of the full asset). A 480px cap (tried in
+      // #556) visibly softened the chat bubble on retina/high-DPI screens -- a 420 CSS px
+      // bubble on a 2x+ display needs 840px+ of real pixels to look sharp, and 480px fell far
+      // short. Reverted back to 640px; the gallery grid can live with the larger per-photo
+      // bytes since 640px is still well under the un-thumbed full asset.
+      const maxDimThumb = 640;
       if (w > maxDimThumb || h > maxDimThumb) {
         if (w > h) { h = Math.round(h * maxDimThumb / w); w = maxDimThumb; }
         else { w = Math.round(w * maxDimThumb / h); h = maxDimThumb; }
