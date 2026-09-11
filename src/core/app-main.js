@@ -3413,7 +3413,11 @@ function CalendarApp() {
       imageUrls: [url],
       thumbUrls: [thumb],
       timestamp: Date.now(),
-      uploadSource: 'chat'
+      // Deliberately distinct from 'chat' (getMessageImageEntries's sourceHint list doesn't
+      // recognize 'meme' and falls back to 'chat' for it internally, so this doesn't change
+      // asset-key behavior) -- composeGalleryPhotos below filters on this exact value to keep
+      // meme stickers out of the gallery/memories screens; they're meant to live in chat only.
+      uploadSource: 'meme'
     };
     // Tapping the meme thumbnail (a <button>, not the textarea) blurs the composer on mobile
     // Safari and can dismiss the on-screen keyboard mid-send; without this the scroll-driven
