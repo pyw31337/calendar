@@ -96,7 +96,7 @@ async function ensureMemeStorage() {
   if (storage) return storage;
   if (typeof window !== 'undefined' && typeof window.__gatherLoadFirebaseStorageSdk === 'function') {
     try { await window.__gatherLoadFirebaseStorageSdk(); } catch (err) {
-      throw new Error(`스토리지 SDK 로드 실패: ${err?.message || err}`);
+      throw new Error(`스토리지 SDK 로드 실패: ${err?.message || err}`, { cause: err });
     }
   }
   storage = getMemeStorage();
@@ -120,11 +120,11 @@ function describeMemeUploadError(err) {
   if (code === 'storage/canceled' || /canceled/i.test(raw)) return '업로드가 취소되었습니다.';
   if (code === 'storage/retry-limit-exceeded') return '네트워크가 불안정합니다. 잠시 후 다시 시도해 주세요.';
   if (/스토리지 SDK|스토리지를 시작/i.test(raw)) return raw;
-  if (/hei[cf]/i.test(raw) || /HEIC/i.test(raw)) return raw;
+  if (/hei[cf]/i.test(raw)) return raw;
   if (/이미지를 변환|로드하지/i.test(raw)) return raw;
-  if (/요청이 실패했습니다 \(401\)/) return '관리자 비밀번호가 맞지 않습니다. 다시 로그인해 주세요.';
-  if (/요청이 실패했습니다 \(429\)/) return '잠시 후 다시 시도해 주세요.';
-  if (/요청이 실패했습니다/) return `등록 함수 오류: ${raw}`;
+  if (/요청이 실패했습니다 \(401\)/.test(raw)) return '관리자 비밀번호가 맞지 않습니다. 다시 로그인해 주세요.';
+  if (/요청이 실패했습니다 \(429\)/.test(raw)) return '잠시 후 다시 시도해 주세요.';
+  if (/요청이 실패했습니다/.test(raw)) return `등록 함수 오류: ${raw}`;
   return raw.slice(0, 180) || '알 수 없는 오류';
 }
 
