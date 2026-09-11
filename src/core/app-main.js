@@ -201,6 +201,7 @@ import {
   getChatLastReadTimestamp,
   setChatLastReadTimestamp
 } from './app-calendar-screen-state.js';
+import { twemojiImageUrl, getRecentEmojis, addRecentEmoji } from './app-chat-data.js';
 import { KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY, fetchWithTimeout } from './app-place-search.js';
 import {
   getInitialDataLoadingState,
@@ -8160,8 +8161,6 @@ function extractDirectImageUrls(text) {
 
 const { DirectChatMediaText, DeadlineDateTimePicker, PlacesSection, ImageUrlModal } = uiWrapperAliases;
 
-const GATHER_APP_CHAT_DATA = window.GATHER_APP_CHAT_DATA || {};
-
 const { ImageUploadOverlay, ImageProcessingOverlay, EmojiPickerSheet } = uiWrapperAliases;
 
 
@@ -8207,44 +8206,6 @@ const { Lightbox } = uiWrapperAliases;
 
 const { ChatRoomView } = uiWrapperAliases;
 
-
-// A curated, cross-platform-consistent emoji set (Twemoji, the same flat-design set used by
-// Twitter/X, Discord, and Slack) rendered as small <img> tags -- not native OS emoji fonts.
-// Native emoji rendering looks different on every OS (Apple/Segoe/Noto/etc.), which is exactly
-// what a shared group chat wants to avoid: everyone sees the identical glyph regardless of
-// device or browser (Safari/Chrome/Edge/Firefox, desktop or mobile).
-const TWEMOJI_CDN_BASE = typeof GATHER_APP_CHAT_DATA.TWEMOJI_CDN_BASE === 'string' ? GATHER_APP_CHAT_DATA.TWEMOJI_CDN_BASE : 'https://cdn.jsdelivr.net/gh/jdecked/twemoji@17.0.3/assets/svg/';
-function twemojiCodepoint(emoji) {
-  const hasZwj = emoji.indexOf('\u200D') !== -1;
-  const codepoints = [];
-  for (const ch of emoji) {
-    const cp = ch.codePointAt(0);
-    if (cp === 0xFE0F && !hasZwj) continue; // strip the variation selector unless a ZWJ sequence needs it, matching Twemoji's own asset naming
-    codepoints.push(cp.toString(16));
-  }
-  return codepoints.join('-');
-}
-function twemojiImageUrl(emoji) {
-  return `${TWEMOJI_CDN_BASE}${twemojiCodepoint(emoji)}.svg`;
-}
-
-const RECENT_EMOJI_STORAGE_KEY = typeof GATHER_APP_CHAT_DATA.RECENT_EMOJI_STORAGE_KEY === 'string' ? GATHER_APP_CHAT_DATA.RECENT_EMOJI_STORAGE_KEY : 'gather_recent_emojis_v1';
-function getRecentEmojis() {
-  try {
-    const arr = JSON.parse(getLocalStorage().getItem(RECENT_EMOJI_STORAGE_KEY) || '[]');
-    return Array.isArray(arr) ? arr.slice(0, 24) : [];
-  } catch (e) {
-    return [];
-  }
-}
-function addRecentEmoji(emoji) {
-  try {
-    const next = [emoji, ...getRecentEmojis().filter(e => e !== emoji)].slice(0, 24);
-    getLocalStorage().setItem(RECENT_EMOJI_STORAGE_KEY, JSON.stringify(next));
-  } catch (e) {
-    // storage unavailable (private browsing etc.) -- recents just won't persist
-  }
-}
 
 // A single emoji cell: renders the shared Twemoji image, falling back to the native character
 // (via the system font) if the CDN image fails to load, so a network hiccup never blocks
