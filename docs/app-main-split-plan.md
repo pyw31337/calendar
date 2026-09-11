@@ -12,7 +12,7 @@
 
 ---
 
-## 1. 왜 다시 쓴개야 하는가
+## 1. 왜 다시 써야 하는가
 
 지금까지 분리는 “예산 상한에 닫려서 급하게 조각 뼈는” 식이었다. `CalendarApp` 클로저를 자르면 라이브가 깨진다.
 
@@ -26,7 +26,7 @@
 | 예산 압박 | 여유 167줄. 기능 PR이 분리를 강제하고, 분리가 다시 기능을 깨뜨림 |
 | hex 패치 | 대형 파일을 기계적으로 잘라 컨텍스트 소실 |
 
-**해결:** `CalendarApp`은 책터 8 이전 동결. 드는 그 **밖**의 WRAPPER / 순수 헬퍼만, 한 책터 = 한 PR.
+**해결:** `CalendarApp`은 책터 8 이전 동결. 그 **밖**의 WRAPPER / 순수 헬퍼만, 한 책터 = 한 PR.
 
 ---
 
@@ -84,7 +84,7 @@
 
 ### 병렬 작업 레인
 
-분리 책터 진행 중 다른 에이전트는 **`src/ui/*`와 CSS만**. app-main 동시 편집 금지. 반대로, 기능/우이 작업 중에는 분리 책터를 시작하지 말 것.
+분리 책터 진행 중 다른 에이전트는 **`src/ui/*`와 CSS만**. app-main 동시 편집 금지. 반대로, 기능/UI 작업 중에는 분리 책터를 시작하지 말 것.
 
 ### 에이전트에게 주는 한 장
 
@@ -273,7 +273,7 @@ CalendarApp을 뷰 컴포넌트로 조개서 쌔개지 말 것. 먼저 **커스�
 
 ```
 app-main.js                 coordinator (상태, 구독, 뷰 스위치)
-app-ui-wrappers.js          GATHER_UI_COMPONENTS 알리어스
+app-ui-wrappers.js          GATHER_UI_COMPONENTS 별칭
 app-ui-deps.js              bindGatherUiDeps 카탈로그
 app-image-pipeline.js       HEIC/압축/메타데이터/업로드
 app-link-preview.js
@@ -283,7 +283,7 @@ app-search.js
 (+ 기존 app-anniversary-dates, photo-metadata-tags, gallery-*, firebase-services 등)
 ```
 
-`src/ui/*.js`는 계속 뷰 본체. 분리 책터가 UI 파일을 검드리지 않는다.
+`src/ui/*.js`는 계속 뷰 본체. 분리 책터가 UI 파일을 건드리지 않는다.
 
 ---
 
@@ -295,7 +295,7 @@ app-search.js
 - [ ] 갤러리: 라이트박스 태그 저장 후 재오픈, 댓글 뱃지
 - [ ] 장소: 지도 핀/클러스터/팝업, 검색
 - [ ] 메모: 핀, 검색 하이라이트
-- [ ] 정산: 실행 장소 장소 탭이 있는 캘린더만
+- [ ] 정산: 정산 기능이 켜 있는 캘린더만
 - [ ] 관리자: 로그인 게이트, 탭 하나
 - [ ] 폭: 390 / 768 / 1440
 
