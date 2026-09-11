@@ -100,9 +100,10 @@ if (!/^[\^~]?6\.(?:[4-9]\.|[1-9]\d)/.test(maplibreRange)) {
 if (!/^[\^~]?0\.1\.(?:[4-9]|\d{2,})/.test(leafletBridgeRange)) {
   failures.push('@maplibre/maplibre-gl-leaflet must be 0.1.4+ for MapLibre 6; got ' + leafletBridgeRange);
 }
-const appMain = read('src/core/app-main.js');
-requireText(appMain, /import\('@maplibre\/maplibre-gl-leaflet'\)/, 'places map must load the MapLibre Leaflet ESM bridge');
-requireText(appMain, /setWorkerUrl/, 'MapLibre 6 worker URL must be wired for Vite');
+// Map loader helpers moved to app-place-map.js in U6 (split-units).
+const placeMap = read('src/core/app-place-map.js');
+requireText(placeMap, /import\('@maplibre\/maplibre-gl-leaflet'\)/, 'places map must load the MapLibre Leaflet ESM bridge');
+requireText(placeMap, /setWorkerUrl/, 'MapLibre 6 worker URL must be wired for Vite');
 
 if (failures.length) {
   failures.forEach(message => console.error('[check-design-system]', message));
