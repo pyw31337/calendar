@@ -58,6 +58,26 @@ service firebase.storage {
       allow delete: if isCalendarId(calendarId);
     }
 
+    // Cross-calendar shared file pool (see sharedFiles/{fileHash} in firestore.rules). Not
+    // scoped by calendarId, same reasoning as memePool/ below -- the whole point is that the
+    // same PDF/doc uploaded from any calendar lands in one place and gets reused instead of
+    // duplicated. Orphaned files (no calendar's messages reference them anymore) are harmless,
+    // same as memePool's orphan-file note.
+    match /sharedFiles/{fileName} {
+      allow get: if true;
+      allow write: if request.resource.size <= 20 * 1024 * 1024
+        && (
+          request.resource.contentType.matches('image/.*')
+          || request.resource.contentType.matches('application/pdf')
+          || request.resource.contentType.matches('application/msword')
+          || request.resource.contentType.matches('application/vnd\\..*')
+          || request.resource.contentType.matches('application/rtf')
+          || request.resource.contentType.matches('text/.*')
+          || request.resource.contentType.matches('application/octet-stream')
+        );
+      allow delete: if false;
+    }
+
     // 밈 키보드 이미지 풀. calendarId로 나뉘지 않는 전역 공유 경로다 -- 모든 캘린더가 같은
     // 해시태그 인덱스를 읽는다. Firestore 쪽 문서(memePool/{memeId})는 admin-gated Cloud
     // Function으로만 쓸 수 있지만, 이 프로젝트에 실사용자 인증이 없어 Storage 쪽에서 "관리자만"을

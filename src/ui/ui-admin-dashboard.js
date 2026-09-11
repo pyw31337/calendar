@@ -186,6 +186,14 @@ function listPushSubscriptionHealthRemote(...args) {
   const f = __gatherUiDeps().listPushSubscriptionHealthRemote || GATHER_APP_UTILS.listPushSubscriptionHealthRemote;
   return typeof f === 'function' ? f(...args) : Promise.resolve(null);
 }
+function listUntaggedPhotoIndexEntriesRemote(...args) {
+  const f = __gatherUiDeps().listUntaggedPhotoIndexEntriesRemote || GATHER_APP_UTILS.listUntaggedPhotoIndexEntriesRemote;
+  return typeof f === 'function' ? f(...args) : Promise.resolve({ items: [], nextCursor: null });
+}
+function adminBulkTagPhotosRemote(...args) {
+  const f = __gatherUiDeps().adminBulkTagPhotosRemote || GATHER_APP_UTILS.adminBulkTagPhotosRemote;
+  return typeof f === 'function' ? f(...args) : Promise.resolve([]);
+}
 function mergeCalendarCollections(...args) {
   const f = __gatherUiDeps().mergeCalendarCollections || GATHER_APP_UTILS.mergeCalendarCollections;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -379,6 +387,60 @@ export function AdminDashboard({ initialCalendars }) {
     memePoolFetchedRef.current = true;
     fetchMemePoolRest().then(list => setMemePoolAdmin(list)).catch(() => {});
   }, [activeTab]);
+
+  // 각 캘린더 갤러리/채팅 사진의 미태그 항목을 한 번에 훑어 밀린 태그 작업을 처리하는 섹션.
+  // memePool과 달리 이건 캘린더별 photoIndex 서브컬렉션이라 admin-gated Cloud Function으로
+  // collectionGroup 조회를 해야 한다 (functions/index.js의 listUntaggedPhotoIndexEntries).
+  const [untaggedPhotos, setUntaggedPhotos] = React.useState([]);
+  const [untaggedPhotosCursor, setUntaggedPhotosCursor] = React.useState(null);
+  const [untaggedPhotosLoading, setUntaggedPhotosLoading] = React.useState(false);
+  const [untaggedPhotosFetched, setUntaggedPhotosFetched] = React.useState(false);
+  const [selectedUntaggedKeys, setSelectedUntaggedKeys] = React.useState([]);
+  const [bulkTagInput, setBulkTagInput] = React.useState('');
+  const [bulkTagSaving, setBulkTagSaving] = React.useState(false);
+  const untaggedPhotoEntryKey = item => `${item.calendarId}::${item.assetKey}`;
+  const loadUntaggedPhotos = React.useCallback((cursor = null) => {
+    const session = getAdminSession();
+    if (!session?.password) return;
+    setUntaggedPhotosLoading(true);
+    listUntaggedPhotoIndexEntriesRemote(session.password, { cursor, limit: 60 })
+      .then(({ items, nextCursor }) => {
+        setUntaggedPhotos(prev => cursor ? [...prev, ...items] : items);
+        setUntaggedPhotosCursor(nextCursor);
+        setUntaggedPhotosFetched(true);
+      })
+      .catch(err => showAdminToast(`미태그 사진 조회 실패: ${err.message || '오류'}`, 'error'))
+      .finally(() => setUntaggedPhotosLoading(false));
+  }, []);
+  const toggleUntaggedSelection = key => {
+    setSelectedUntaggedKeys(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
+  };
+  const handleBulkTagSave = async () => {
+    const tag = bulkTagInput.trim();
+    if (!tag || selectedUntaggedKeys.length === 0 || bulkTagSaving) return;
+    const session = getAdminSession();
+    if (!session?.password) return;
+    setBulkTagSaving(true);
+    try {
+      const entries = selectedUntaggedKeys.map(key => {
+        const [calendarId, assetKey] = key.split('::');
+        return { calendarId, assetKey, tags: tag };
+      });
+      const results = await adminBulkTagPhotosRemote(session.password, entries);
+      const okKeys = new Set(results.filter(r => r.ok).map(r => `${r.calendarId}::${r.assetKey}`));
+      setUntaggedPhotos(prev => prev.filter(item => !okKeys.has(untaggedPhotoEntryKey(item))));
+      setSelectedUntaggedKeys(prev => prev.filter(key => !okKeys.has(key)));
+      if (okKeys.size > 0) {
+        setBulkTagInput('');
+        showAdminToast(`${okKeys.size}장에 태그를 적용했습니다.`, 'success');
+      }
+      if (okKeys.size < entries.length) showAdminToast(`${entries.length - okKeys.size}장은 적용하지 못했습니다.`, 'error');
+    } catch (err) {
+      showAdminToast(`일괄 태그 적용 실패: ${err.message || '오류'}`, 'error');
+    } finally {
+      setBulkTagSaving(false);
+    }
+  };
 
   // 데이터풀 탭의 카테고리 선택 (사진/파일/링크/기타) + "미태그만 보기" -- 태그 기반으로 관리하는
   // 공유 데이터 어디서나 재사용할 수 있도록 category-agnostic 하게 둔다.
@@ -2003,7 +2065,75 @@ export function AdminDashboard({ initialCalendars }) {
                     style: { position: 'absolute', top: '4px', left: '4px', padding: '1px 6px', borderRadius: 'var(--radius-full)', backgroundColor: 'rgba(220,38,38,0.9)', color: '#fff', fontSize: 'var(--font-size-2xs)', fontWeight: 800 }
                   }, "미태그")
                 ))
-              )
+              ),
+          /*#__PURE__*/React.createElement("div", { style: { marginTop: '24px', paddingTop: '20px', borderTop: '1px solid var(--border-subtle)' } },
+            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '10px' } },
+              /*#__PURE__*/React.createElement("div", null,
+                /*#__PURE__*/React.createElement("p", { style: { margin: 0, fontWeight: 800, fontSize: 'var(--font-size-md)' } }, "전체 캘린더 미태그 사진 일괄 처리"),
+                /*#__PURE__*/React.createElement("p", { style: { margin: '2px 0 0', fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } }, "모든 캘린더의 채팅/갤러리 사진 중 태그가 비어 있는 항목을 모아 한 번에 태그를 붙입니다.")
+              ),
+              /*#__PURE__*/React.createElement("button", {
+                type: "button", className: "btn btn-secondary",
+                onClick: () => loadUntaggedPhotos(null),
+                disabled: untaggedPhotosLoading,
+                style: { height: '36px', padding: '0 12px', fontWeight: 800, fontSize: 'var(--font-size-sm)' }
+              }, untaggedPhotosLoading ? "불러오는 중..." : (untaggedPhotosFetched ? "새로고침" : "불러오기"))
+            ),
+            !untaggedPhotosFetched
+              ? /*#__PURE__*/React.createElement("div", { style: { padding: '20px', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', textAlign: 'center' } }, "\"불러오기\"를 눌러 미태그 사진을 조회하세요.")
+              : untaggedPhotos.length === 0
+                ? /*#__PURE__*/React.createElement("div", { style: { padding: '20px', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', textAlign: 'center' } }, "미태그 사진이 없습니다.")
+                : /*#__PURE__*/React.createElement(React.Fragment, null,
+                    /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(84px, 1fr))', gap: '6px', marginBottom: '12px' } },
+                      untaggedPhotos.map(item => {
+                        const key = untaggedPhotoEntryKey(item);
+                        const isSelected = selectedUntaggedKeys.includes(key);
+                        return /*#__PURE__*/React.createElement("button", {
+                          key, type: "button",
+                          onClick: () => toggleUntaggedSelection(key),
+                          title: item.calendarId,
+                          style: {
+                            position: 'relative', borderRadius: 'var(--radius-sm)', overflow: 'hidden', aspectRatio: '1 / 1',
+                            backgroundColor: 'var(--bg-primary)', padding: 0, cursor: 'pointer',
+                            border: isSelected ? '3px solid var(--status-green)' : '1px solid var(--border-subtle)'
+                          }
+                        },
+                          /*#__PURE__*/React.createElement("img", {
+                            src: item.thumb || item.full, alt: "", loading: "lazy",
+                            style: { width: '100%', height: '100%', objectFit: 'cover' }
+                          }),
+                          isSelected && /*#__PURE__*/React.createElement("span", {
+                            "aria-hidden": true,
+                            style: {
+                              position: 'absolute', top: '4px', right: '4px', width: '18px', height: '18px', borderRadius: '50%',
+                              backgroundColor: 'var(--status-green)', color: '#fff', fontSize: 'var(--font-size-2xs)', fontWeight: 800,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center'
+                            }
+                          }, "✓")
+                        );
+                      })
+                    ),
+                    untaggedPhotosCursor && /*#__PURE__*/React.createElement("button", {
+                      type: "button", className: "btn btn-secondary",
+                      onClick: () => loadUntaggedPhotos(untaggedPhotosCursor),
+                      disabled: untaggedPhotosLoading,
+                      style: { width: '100%', height: '36px', fontWeight: 800, fontSize: 'var(--font-size-sm)', marginBottom: '12px' }
+                    }, untaggedPhotosLoading ? "불러오는 중..." : "더 보기"),
+                    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
+                      /*#__PURE__*/React.createElement("input", {
+                        type: "text", className: "form-input", placeholder: `선택한 ${selectedUntaggedKeys.length}장에 붙일 태그 (예: 눈물, 화남)`,
+                        value: bulkTagInput, onChange: e => setBulkTagInput(e.target.value),
+                        style: { flex: 1 }
+                      }),
+                      /*#__PURE__*/React.createElement("button", {
+                        type: "button", className: "btn btn-primary",
+                        onClick: handleBulkTagSave,
+                        disabled: bulkTagSaving || !bulkTagInput.trim() || selectedUntaggedKeys.length === 0,
+                        style: { height: '40px', padding: '0 16px', fontWeight: 800, fontSize: 'var(--font-size-sm)' }
+                      }, bulkTagSaving ? "적용 중..." : "일괄 태그 적용")
+                    )
+                  )
+          )
         ) : /*#__PURE__*/React.createElement("div", { style: { padding: '40px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)' } },
           categories.find(c => c.id === dataPoolCategory)?.label, " 종류의 캘린더 간 공유 데이터는 아직 없습니다.",
           /*#__PURE__*/React.createElement("br"),

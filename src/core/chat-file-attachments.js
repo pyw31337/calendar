@@ -230,9 +230,71 @@ function getLiveFirebaseStorage() {
   return null;
 }
 
+function getLiveFirestore() {
+  try {
+    if (typeof window !== 'undefined' && window.GATHER_APP_FIREBASE_DATA && window.GATHER_APP_FIREBASE_DATA.firebaseDb) {
+      return window.GATHER_APP_FIREBASE_DATA.firebaseDb;
+    }
+  } catch (_) {}
+  return null;
+}
+
 function safeStorageFileName(name) {
   const base = String(name || 'file').replace(/[^\w.\-()+ ]+/g, '_').replace(/\s+/g, '_');
   return base.slice(0, 120) || 'file';
+}
+
+// SHA-256 of the file's bytes -- the dedup key for the cross-calendar shared-file pool below.
+// Every browser this app supports has SubtleCrypto; if it's ever unavailable (very old browser,
+// non-HTTPS context) callers just skip dedup and upload like before rather than failing outright.
+async function sha256HexOfFile(file) {
+  try {
+    if (!(typeof crypto !== 'undefined' && crypto.subtle && typeof crypto.subtle.digest === 'function')) return '';
+    const buffer = await file.arrayBuffer();
+    const digest = await crypto.subtle.digest('SHA-256', buffer);
+    return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+  } catch (_) {
+    return '';
+  }
+}
+
+// Same file (identical bytes) commonly gets sent to several calendars, or resent in the same
+// one -- a shared trip flyer, a group PDF, a ticket. Before this, every send re-uploaded the
+// full bytes to a fresh per-calendar Storage path, unlike link previews (which already share one
+// Peekalink fetch per URL across every calendar via the `linkPreviews` collection). Look up a
+// content-hash keyed `sharedFiles/{hash}` doc first and reuse its URL/path when the bytes match;
+// only fall through to a real upload on a genuine miss.
+async function findSharedFileByHash(hash) {
+  const db = getLiveFirestore();
+  if (!db || !hash) return null;
+  try {
+    const snap = await db.collection('sharedFiles').doc(hash).get();
+    if (!snap.exists) return null;
+    const data = snap.data() || {};
+    if (!data.url || !data.storagePath) return null;
+    return data;
+  } catch (_) {
+    return null;
+  }
+}
+
+async function registerSharedFile(hash, entry) {
+  const db = getLiveFirestore();
+  if (!db || !hash) return;
+  try {
+    await db.collection('sharedFiles').doc(hash).set({
+      url: entry.url,
+      storagePath: entry.storagePath,
+      name: entry.name,
+      mime: entry.mime,
+      size: entry.size,
+      ext: entry.ext,
+      createdAt: Date.now()
+    }, { merge: true });
+  } catch (_) {
+    // Non-fatal -- the file itself already uploaded fine; a dedup registration miss just means
+    // the next identical upload re-uploads instead of reusing, not a broken attachment now.
+  }
 }
 
 export async function uploadChatFileAttachment(calendarId, file, onBytes, timeoutMs = 60000) {
@@ -244,9 +306,33 @@ export async function uploadChatFileAttachment(calendarId, file, onBytes, timeou
   if (!storage || !file || !calendarId) return null;
   const ext = getFileExtension(file.name);
   const mime = guessMimeForFile(file);
+  const size = Number(file.size) || 0;
   const stamp = Date.now();
   const rand = Math.random().toString(36).slice(2, 8);
-  const storagePath = `chatFiles/${calendarId}/${stamp}_${rand}_${safeStorageFileName(file.name)}`;
+  const name = String(file.name || `file.${ext || 'bin'}`).slice(0, 200);
+
+  const hash = await sha256HexOfFile(file);
+  if (hash) {
+    const shared = await findSharedFileByHash(hash);
+    // Guard on size too -- an extremely unlikely SHA-256 collision would otherwise hand back
+    // someone else's file under this name.
+    if (shared && Number(shared.size) === size) {
+      return sanitizeFileAttachment({
+        id: `file_${stamp}_${rand}`,
+        name,
+        mime: shared.mime || mime,
+        size,
+        url: shared.url,
+        storagePath: shared.storagePath,
+        uploadedAt: stamp,
+        ext
+      });
+    }
+  }
+
+  const storagePath = hash
+    ? `sharedFiles/${hash}_${size}.${ext || 'bin'}`
+    : `chatFiles/${calendarId}/${stamp}_${rand}_${safeStorageFileName(file.name)}`;
   const ref = storage.ref(storagePath);
   const url = await uploadBlobWithWatchdog({
     ref,
@@ -261,16 +347,18 @@ export async function uploadChatFileAttachment(calendarId, file, onBytes, timeou
     try { await ref.delete(); } catch (_) {}
     return null;
   }
-  return sanitizeFileAttachment({
+  const attachment = sanitizeFileAttachment({
     id: `file_${stamp}_${rand}`,
-    name: String(file.name || `file.${ext || 'bin'}`).slice(0, 200),
+    name,
     mime,
-    size: Number(file.size) || 0,
+    size,
     url,
     storagePath,
     uploadedAt: stamp,
     ext
   });
+  if (hash && attachment) registerSharedFile(hash, attachment);
+  return attachment;
 }
 
 export async function uploadChatFileAttachments(calendarId, pendingList, onProgress) {

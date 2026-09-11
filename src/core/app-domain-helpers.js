@@ -832,6 +832,24 @@ async function memePoolDeleteRemote(password, id) {
   return !!result?.ok;
 }
 
+// Admin 데이터풀 > 사진 "미태그만 보기" 일괄 처리 -- lists untagged photos across every
+// calendar (photoIndex is per-calendar and client writes are denied, so this always goes
+// through the admin-gated Cloud Function; see its comment in functions/index.js) and applies
+// one tag string to a batch of them at once.
+async function listUntaggedPhotoIndexEntriesRemote(password, options = {}) {
+  const result = await callAdminFunction('listUntaggedPhotoIndexEntries', {
+    password,
+    cursor: options.cursor ?? undefined,
+    limit: options.limit || 60
+  });
+  return { items: Array.isArray(result?.items) ? result.items : [], nextCursor: result?.nextCursor ?? null };
+}
+
+async function adminBulkTagPhotosRemote(password, entries) {
+  const result = await callAdminFunction('adminBulkTagPhotos', { password, entries });
+  return Array.isArray(result?.results) ? result.results : [];
+}
+
 async function listPushSubscriptionHealthRemote(password, calendarId) {
   const result = await callAdminFunction('listPushSubscriptionHealth', { password, calendarId });
   return result?.summary || null;
@@ -2657,6 +2675,8 @@ export {
   listServerAuditLogsRemote,
   memePoolUpsertRemote,
   memePoolDeleteRemote,
+  listUntaggedPhotoIndexEntriesRemote,
+  adminBulkTagPhotosRemote,
   findCultureLinkedAnniversary,
   findCultureLinkedMemo,
   buildCultureLinkedMemoData,

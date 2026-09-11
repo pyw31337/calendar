@@ -481,6 +481,27 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Shared, cross-calendar chat-file dedup index. Keyed by the SHA-256 hex of the file's bytes
+    // (see sha256HexOfFile in chat-file-attachments.js) so the same PDF/doc sent to two different
+    // calendars, or resent in the same one, uploads to Storage once and every later sender just
+    // reuses this doc's url/storagePath -- same "hash the content, share the one copy" model as
+    // linkPreviews above, applied to file bytes instead of URL metadata. No 'list' access for the
+    // same reason: a hash is only useful to someone who already has the matching file.
+    match /sharedFiles/{fileHash} {
+      allow get: if fileHash is string && fileHash.size() <= 80;
+      allow list: if false;
+      allow create, update: if fileHash is string && fileHash.size() <= 80
+        && request.resource.data.keys().hasOnly(['url', 'storagePath', 'name', 'mime', 'size', 'ext', 'createdAt'])
+        && request.resource.data.url is string && request.resource.data.url.size() <= 2000
+        && request.resource.data.storagePath is string && request.resource.data.storagePath.size() <= 500
+        && request.resource.data.name is string && request.resource.data.name.size() <= 200
+        && request.resource.data.mime is string && request.resource.data.mime.size() <= 120
+        && request.resource.data.size is number && request.resource.data.size >= 0 && request.resource.data.size <= 20 * 1024 * 1024
+        && request.resource.data.ext is string && request.resource.data.ext.size() <= 16
+        && request.resource.data.createdAt is number;
+      allow delete: if false;
+    }
+
     // Aggregate counter for the linkPreviews cache above, read by the admin dashboard's
     // "외부 서비스 연동 현황" panel so it can show cache size without a costly full-collection
     // read (list access on linkPreviews itself is intentionally disabled).
