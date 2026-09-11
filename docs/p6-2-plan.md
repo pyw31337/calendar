@@ -1,3 +1,5 @@
+> **STALE (2026-09-11).** P6-2는 “복사만 하고 원본 유지” 단계었고 Vite 전환(P6-3)은 완료되었다. 이후 `app-main.js` 분할은 [docs/app-main-split-plan.md](./app-main-split-plan.md)만 따른다.
+
 # P6-2 계획: App 분리 + dynamic import 준비
 
 작성일: 2026-08-20

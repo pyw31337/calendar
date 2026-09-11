@@ -1,3 +1,5 @@
+> **STALE (2026-09-11).** 2026-08-20 구역 지도. 현재 줄 번호·WRAPPER/REAL 분류·책터 계획은 [docs/app-main-split-plan.md](./app-main-split-plan.md)를 보라. 이 파일의 `구조 파일로 조개는 후보`를 그대로 실행하지 말 것.
+
 # P6-2 app-main.js 구역 지도
 
 작성일: 2026-08-20
@@ -33,7 +35,7 @@
    - 뷰 분기: chat / memo / places / gallery / settlement / calendar / admin
    - 공통 오버레이: ConfirmDialog, ShareModal, Lightbox, toast, sticky video
 
-## P6-2에서 나중에 쪼갤 파일 후보
+## P6-2에서 나중에 조갤 파일 후보
 
 - src/core/app-shell.js      (App 상태 + changeView)
 - src/core/firebase-io.js    (구독/REST, 이미 firebase-services.js와 겹침)
@@ -43,4 +45,4 @@
 - src/views/places-view.js
 - src/views/admin-view.js
 
-지금은 파일로 쪼개지 않는다. 다음 커밋에서 src/core/app-main.js 에 구역 주석만 넣는다.
+지금은 파일로 조개지 않는다. 다음 커밋에서 src/core/app-main.js 에 구역 주석만 넣는다.

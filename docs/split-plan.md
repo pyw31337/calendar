@@ -1,3 +1,5 @@
+> **STALE (2026-09-11).** Vite 이전(`assets/`, 인라인 `index.html`) 기록이다. 이후 `app-main.js` 분할은 [docs/app-main-split-plan.md](./app-main-split-plan.md)만 따른다. 이 파일은 역사 기록으로만 남긴다.
+
 # 모여라 캘린더 코드 분리 설계
 
 ## 운영 원칙
