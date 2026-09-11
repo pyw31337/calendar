@@ -1045,6 +1045,35 @@ function __setFirebaseDb(v){
   notifyFirebaseStateChange();
 }
 
+// Same live-getter pattern as chat-file-attachments.js/app-image-pipeline.js's own
+// getLiveFirebaseStorage -- reads window.__gatherFirebaseStorage fresh on every call instead of
+// a module-scope snapshot, falling back to firebase.storage() directly when the SDK connected but
+// __setFirebaseDb-adjacent wiring hasn't mirrored it onto window yet.
+function getLiveFirebaseStorage() {
+  try {
+    if (typeof window !== 'undefined' && window.__gatherFirebaseStorage) return window.__gatherFirebaseStorage;
+  } catch (_) {}
+  try {
+    if (typeof firebase !== 'undefined' && typeof firebase.storage === 'function') return firebase.storage();
+  } catch (_) {}
+  return null;
+}
+
+// window.__GATHER_FIREBASE_STATE_VERSION is bumped by notifyFirebaseStateChange above on every
+// connection-state change; exposed as a version number (not the raw event) so callers can use it
+// with React.useSyncExternalStore's getSnapshot contract.
+function getFirebaseStateVersion() {
+  if (typeof window === 'undefined') return 0;
+  return Number(window.__GATHER_FIREBASE_STATE_VERSION || 0) || 0;
+}
+
+function subscribeFirebaseStateChange(onStoreChange) {
+  if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return () => {};
+  const handler = () => onStoreChange();
+  window.addEventListener('gather-firebase-state-change', handler);
+  return () => window.removeEventListener('gather-firebase-state-change', handler);
+}
+
 let firebaseStorage = null;
 
 // Set whenever attemptFirebaseInit() ends up NOT producing a usable firebaseDb, with enough
@@ -3897,6 +3926,9 @@ export {
   firebaseConfig,
   firebaseDb,
   __setFirebaseDb,
+  getLiveFirebaseStorage,
+  getFirebaseStateVersion,
+  subscribeFirebaseStateChange,
   firebaseInitError,
   firebaseRetryExhausted,
   firebaseStorage,
