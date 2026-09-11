@@ -54,6 +54,22 @@ function getMemeStorage() {
   return (typeof window !== 'undefined' && window.__gatherFirebaseStorage) || null;
 }
 
+// Storage is loaded lazily (see main.jsx's loadFirebaseStorageSdk) so a read-only visitor never
+// pays for its script on the critical path -- the SDK only actually loads once something tries
+// to upload. Every other upload path (chat images/files) awaits window.__gatherLoadFirebaseStorageSdk()
+// before checking for storage; this one didn't, so on any admin session where nothing else had
+// already triggered an upload first (the common case -- 밈키보드 is often the first thing opened),
+// window.__gatherFirebaseStorage was still unset and every meme upload failed immediately with no
+// visible reason beyond "실패".
+async function ensureMemeStorage() {
+  let storage = getMemeStorage();
+  if (storage) return storage;
+  if (typeof window !== 'undefined' && typeof window.__gatherLoadFirebaseStorageSdk === 'function') {
+    try { await window.__gatherLoadFirebaseStorageSdk(); } catch (_) {}
+  }
+  return getMemeStorage();
+}
+
 async function uploadBlobToMemePool(storage, path, blob, contentType) {
   const ref = storage.ref(path);
   await ref.put(blob, { contentType });
@@ -64,7 +80,7 @@ async function uploadBlobToMemePool(storage, path, blob, contentType) {
 // returning the pair of download URLs (plus the full image's pixel size) or null on failure.
 // Does NOT touch Firestore -- call memePoolUpsertRemote afterward to register the metadata.
 async function uploadMemePoolAssets(id, file) {
-  const storage = getMemeStorage();
+  const storage = await ensureMemeStorage();
   if (!storage || !file) return null;
   try {
     if (isGif(file)) {
