@@ -232,8 +232,12 @@ function getLiveFirebaseStorage() {
 
 function getLiveFirestore() {
   try {
-    if (typeof window !== 'undefined' && window.GATHER_APP_FIREBASE_DATA && window.GATHER_APP_FIREBASE_DATA.firebaseDb) {
-      return window.GATHER_APP_FIREBASE_DATA.firebaseDb;
+    // window.GATHER_APP_FIREBASE_DATA is never assigned anywhere in this codebase -- this always
+    // returned null. window.__gatherFirebaseDb is the real, live-updated global (set by
+    // __setFirebaseDb in app-firebase-data.js), same one getLiveFirebaseStorage above already
+    // uses for Storage.
+    if (typeof window !== 'undefined' && window.__gatherFirebaseDb) {
+      return window.__gatherFirebaseDb;
     }
   } catch (_) {}
   return null;
