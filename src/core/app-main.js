@@ -20,7 +20,7 @@ import { bindUiComponentAliases } from './app-ui-wrappers.js';
 import { useTapRevealedMsgId, useModalDirtyGuard, useChatSendGuard } from './app-ui-hooks.js';
 import { highlightTextWithYellowMarker, highlightKeyword, formatLogTimestamp, computeCalendarSearchMatches, getAdminSearchResultTargetUrl } from './app-search.js';
 import { fetchLinkPreview, useLinkPreview, shouldFetchLinkPreviewForChatUrl } from './app-link-preview.js';
-import { renderChatMessageBody, parseTextWithLinks, isEmojiOnlyChatText, resolveMeetingPhotoDisplay, buildLightboxImageInfo } from './app-chat-render.js';
+import { renderChatMessageBody, parseTextWithLinks, isEmojiOnlyChatText, resolveMeetingPhotoDisplay, buildLightboxImageInfo, renderTextWithUrlBadge } from './app-chat-render.js';
 import { loadLeaflet, loadLeafletMarkerCluster, loadMapLibreLeaflet, getPlaceCategoryMarkerContent, buildPlaceMarkerHtml, panMapToFitMarkerPopup, centerMapOnMarkerAndPopup } from './app-place-map.js';
 import {
   isHeicFile,
@@ -221,96 +221,6 @@ const {
   CapsuleTextBadge
 } = uiWrapperAliases;
 
-// 입력필드 표시 규칙: 일반 텍스트 / YY.MM.DD 날짜 / URL 분리
-function tokenizeRichFieldText(text) {
-  const source = String(text || '');
-  if (!source.trim()) return [];
-  const urlRe = /https?:\/\/[^\s<>"'\]]+/gi;
-  const chunks = [];
-  let last = 0;
-  let match;
-  while ((match = urlRe.exec(source)) !== null) {
-    if (match.index > last) chunks.push({ type: 'raw', value: source.slice(last, match.index) });
-    let href = match[0].replace(/[.,);\]}]+$/g, '');
-    chunks.push({ type: 'url', value: href });
-    last = match.index + match[0].length;
-  }
-  if (last < source.length) chunks.push({ type: 'raw', value: source.slice(last) });
-  if (chunks.length === 0) chunks.push({ type: 'raw', value: source });
-
-  const tokens = [];
-  chunks.forEach(chunk => {
-    if (chunk.type === 'url') { tokens.push(chunk); return; }
-    const s = chunk.value;
-    const dateRe = /(\d{2,4}[./-]\d{1,2}[./-]\d{1,2})/g;
-    let dLast = 0, dm;
-    while ((dm = dateRe.exec(s)) !== null) {
-      if (dm.index > dLast) {
-        const piece = s.slice(dLast, dm.index);
-        if (piece) tokens.push({ type: 'text', value: piece });
-      }
-      tokens.push({ type: 'date', value: dm[1] || dm[0] });
-      dLast = dm.index + dm[0].length;
-    }
-    if (dLast < s.length) {
-      const piece = s.slice(dLast);
-      if (piece) tokens.push({ type: 'text', value: piece });
-    }
-  });
-  return tokens;
-}
-
-function renderTextWithUrlBadge(text, options = null) {
-  const tokens = tokenizeRichFieldText(text);
-  if (tokens.length === 0) return null;
-  const stackUrl = !options || options.stackUrl !== false;
-  const textRow = [];
-  const urlRow = [];
-  tokens.forEach((tok, idx) => {
-    if (tok.type === 'url') {
-      urlRow.push(/*#__PURE__*/React.createElement(UrlCapsuleBadge, {
-        key: `u-${idx}-${tok.value}`,
-        url: tok.value,
-        style: stackUrl ? { alignSelf: 'flex-start' } : { marginLeft: '4px' }
-      }));
-    } else if (tok.type === 'date') {
-      textRow.push(/*#__PURE__*/React.createElement(DateCapsuleBadge, {
-        key: `d-${idx}-${tok.value}`,
-        date: tok.value,
-        style: { marginRight: '4px' }
-      }));
-    } else {
-      const v = tok.value;
-      if (!v || !String(v).trim()) return;
-      textRow.push(/*#__PURE__*/React.createElement("span", {
-        key: `t-${idx}`,
-        style: { wordBreak: 'break-word' }
-      }, v));
-    }
-  });
-  if (!stackUrl) {
-    return /*#__PURE__*/React.createElement("span", {
-      style: { display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' }
-    }, textRow, urlRow);
-  }
-  if (urlRow.length === 0) {
-    if (textRow.length === 0) return null;
-    if (textRow.length === 1 && tokens.every(t => t.type === 'text')) return textRow[0];
-    return /*#__PURE__*/React.createElement("span", {
-      style: { display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' }
-    }, textRow);
-  }
-  return /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px', minWidth: 0 }
-  },
-    textRow.length > 0 && /*#__PURE__*/React.createElement("span", {
-      style: { display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center', gap: '2px', wordBreak: 'break-word' }
-    }, textRow),
-    /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', flexDirection: 'column', gap: '4px', maxWidth: '100%' }
-    }, urlRow)
-  );
-}
 
 // Shared add/edit action row: 추가 | (edit) 취소 + 수정 — DateModal 참여자/장소/정산 공통 모듈
 
