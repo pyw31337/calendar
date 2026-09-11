@@ -335,7 +335,9 @@ async function ensureMemeStorage() {
 async function uploadBlobToMemePool(storage, path, blob, contentType) {
   if (!blob) throw new Error('업로드할 이미지가 비어 있습니다');
   const ref = storage.ref(path);
-  await ref.put(blob, { contentType });
+  // Meme pool assets are never overwritten in place (a re-tag only touches Firestore, not
+  // Storage) -- safe to cache forever, so repeat keyboard opens don't re-fetch every thumbnail.
+  await ref.put(blob, { contentType, cacheControl: 'public, max-age=31536000, immutable' });
   return ref.getDownloadURL();
 }
 

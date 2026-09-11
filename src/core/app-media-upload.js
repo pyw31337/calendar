@@ -91,7 +91,12 @@ export function uploadBlobWithWatchdog({
     const handleOffline = () => pauseForLifecycle();
     const handleOnline = () => resumeFromLifecycle();
     timeoutId = setTimeout(cancelAndFail, timeoutMs);
-    task = ref.put(blob, { contentType });
+    // Chat/gallery images are content-addressed by upload (a re-edit always writes a new
+    // path/id, never overwrites one in place), so every asset this app ever serves is safe to
+    // cache forever. Firebase Storage defaults new objects to no explicit Cache-Control, which
+    // makes browsers revalidate every repeat view instead of serving straight from disk cache --
+    // the single biggest lever for "여러 썸네일이 느리게 뜬다" on repeat gallery/chat visits.
+    task = ref.put(blob, { contentType, cacheControl: 'public, max-age=31536000, immutable' });
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', handleVisibilityChange);
       if (document.visibilityState === 'hidden') pauseForLifecycle();

@@ -1795,7 +1795,7 @@ exports.memePoolUpsert = functions.https.onRequest(async (req, res) => {
   setAdminCorsHeaders(res);
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
   if (req.method !== 'POST') { res.status(405).json({ ok: false }); return; }
-  const { password, id, thumbUrl, fullUrl, hashtags, fileName, width, height } = req.body || {};
+  const { password, id, thumbUrl, fullUrl, hashtags, fileName, fileSize, width, height } = req.body || {};
   if (typeof password !== 'string' || !password.trim()) { res.status(400).json({ ok: false }); return; }
   if (typeof id !== 'string' || !MEME_POOL_ID_RE.test(id)) { res.status(400).json({ ok: false, message: 'invalid id' }); return; }
   const rateState = await checkAdminAuthRateLimit(req.ip);
@@ -1820,6 +1820,7 @@ exports.memePoolUpsert = functions.https.onRequest(async (req, res) => {
       thumbUrl: typeof thumbUrl === 'string' && thumbUrl ? thumbUrl : (existing?.thumbUrl || ''),
       fullUrl: typeof fullUrl === 'string' && fullUrl ? fullUrl : (existing?.fullUrl || ''),
       fileName: typeof fileName === 'string' ? fileName.slice(0, 200) : (existing?.fileName || ''),
+      fileSize: Number.isFinite(Number(fileSize)) ? Number(fileSize) : (existing?.fileSize ?? null),
       hashtags: cleanHashtags,
       width: Number.isFinite(Number(width)) ? Number(width) : (existing?.width ?? null),
       height: Number.isFinite(Number(height)) ? Number(height) : (existing?.height ?? null),
