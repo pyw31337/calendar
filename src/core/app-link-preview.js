@@ -3,10 +3,19 @@ import { sanitizeText, withTimeout, getDirectChatMediaInfo } from './app-domain-
 
 const React = window.React;
 const GATHER_APP_CHAT_DATA = window.GATHER_APP_CHAT_DATA || {};
-// Same one-time snapshot app-main.js itself takes (see its own firebaseDb declaration) -- not a
-// live getter, so this only reflects whatever window.GATHER_APP_FIREBASE_DATA.firebaseDb held at
-// this module's own evaluation time. Preserved as-is when moving this code out of app-main.js.
-var firebaseDb = (typeof window !== 'undefined' && window.GATHER_APP_FIREBASE_DATA && window.GATHER_APP_FIREBASE_DATA.firebaseDb) || null;
+// window.GATHER_APP_FIREBASE_DATA is never assigned anywhere in this codebase, so this was a
+// permanently-null dead snapshot -- the shared linkPreviews cache silently never read/wrote to
+// Firestore at all, on every client, for this file's entire life. The real, live-updated global
+// is window.__gatherFirebaseDb (set by __setFirebaseDb in app-firebase-data.js and already used
+// correctly by every ui-*.js file); kept in sync via the same 'gather-firebase-state-change'
+// event app-firebase-data.js dispatches on every connection-state change (see app-main.js's own
+// firebaseDb declaration for the matching fix).
+var firebaseDb = (typeof window !== 'undefined' && window.__gatherFirebaseDb) || null;
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  window.addEventListener('gather-firebase-state-change', () => {
+    if (window.__gatherFirebaseDb) firebaseDb = window.__gatherFirebaseDb;
+  });
+}
 
 // Link preview (OpenGraph via peekalink.io's API), fetched through the peekalinkProxy Cloud
 // Function (functions/index.js) instead of calling api.peekalink.io directly from the browser.

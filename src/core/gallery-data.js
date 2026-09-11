@@ -404,6 +404,23 @@ function collectMessagePhotoEntries(msg, {
   ));
 }
 
+// Meme keyboard stickers upload to Firebase Storage's shared `memePool/` path (see
+// uploadMemePoolAssets in meme-pool.js), so every meme-sent message's image URL contains this
+// segment (URL-encoded as memePool%2F in a getDownloadURL result) regardless of when it was sent.
+// uploadSource === 'meme' alone only catches messages sent after that tag was introduced --
+// this URL check also catches meme messages already stored before it existed.
+function isMemePoolAssetUrl(url) {
+  return typeof url === 'string' && /\/memePool(?:%2F|\/)/i.test(url);
+}
+function isMemeKeyboardMessage(msg) {
+  if (!msg) return false;
+  if (msg.uploadSource === 'meme') return true;
+  if (isMemePoolAssetUrl(msg.imageUrl) || isMemePoolAssetUrl(msg.thumbUrl)) return true;
+  if (Array.isArray(msg.imageUrls) && msg.imageUrls.some(isMemePoolAssetUrl)) return true;
+  if (Array.isArray(msg.thumbUrls) && msg.thumbUrls.some(isMemePoolAssetUrl)) return true;
+  return false;
+}
+
 export function composeGalleryPhotos({
   chatMessages = [], memos = [], calendar = null, anniversaries = [],
   isTombstone, getMessageImageEntries, getAllDirectMediaImageEntries,
@@ -417,7 +434,7 @@ export function composeGalleryPhotos({
     // Meme keyboard stickers are meant to live only in chat, not leak into the gallery/memories
     // screens alongside real photos -- they're reused emoji-like assets from a shared pool, not
     // memories worth keeping.
-    if (msg.uploadSource === 'meme') return;
+    if (isMemeKeyboardMessage(msg)) return;
     collectMessagePhotoEntries(msg, {
       getMessageImageEntries,
       getAllDirectMediaImageEntries,

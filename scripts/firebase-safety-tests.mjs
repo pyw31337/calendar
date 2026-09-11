@@ -248,6 +248,26 @@ const writeQueueSource = fs.readFileSync(new URL('../src/core/app-write-queue.js
   });
   assert(galleryWithMeme.length === 1 && galleryWithMeme[0].full === 'https://example.com/real.jpg', 'meme keyboard stickers must not appear in the gallery/memories screens');
 
+  // Meme messages sent before uploadSource:'meme' existed (or mistagged 'chat') have no reliable
+  // tag -- they must still be filtered out via their memePool Storage URL, so historical meme
+  // sends don't leak into the gallery either.
+  const galleryWithUntaggedMeme = composeGalleryPhotos({
+    chatMessages: [
+      { id: 'chat-real-2', imageUrl: 'https://example.com/real2.jpg', timestamp: 10 },
+      { id: 'chat-legacy-meme', uploadSource: 'chat', imageUrl: 'https://firebasestorage.googleapis.com/v0/b/x/o/memePool%2Fabc_full.png?alt=media', timestamp: 20 }
+    ],
+    memos: [],
+    calendar: {},
+    isTombstone: () => false,
+    getMessageImageEntries,
+    getAllDirectMediaImageEntries: () => [],
+    getConfirmedMeetings: () => [],
+    resolveMeetingPhotoDisplay: photo => photo,
+    isBrokenPhotoValue: () => false,
+    getPhotoAssetCommentKey
+  });
+  assert(galleryWithUntaggedMeme.length === 1 && galleryWithUntaggedMeme[0].full === 'https://example.com/real2.jpg', 'meme messages sent before/without the meme upload tag must still be filtered via their memePool URL');
+
   // Main-screen lightbox regression: chat attachment + auto-linked meeting copy (possibly
   // thumb-only / string sourceImageIndex / mismatched mediaKey prefix) must yield one slide.
   const mainGalleryDupes = composeGalleryPhotos({

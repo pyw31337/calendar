@@ -408,8 +408,26 @@ import {
 import { enqueueWriteOperation, flushWriteQueue } from './app-write-queue.js';
 import { replayQueuedMediaMessage, replayQueuedMemoSave, replayQueuedRootCollectionWrite } from './app-media-outbox.js';
 import { useAppFeedbackState } from './app-feedback-state.js';
-var firebaseDb = (typeof window !== 'undefined' && window.GATHER_APP_FIREBASE_DATA && window.GATHER_APP_FIREBASE_DATA.firebaseDb) || null;
-var firebaseStorage = (typeof window !== 'undefined' && window.GATHER_APP_FIREBASE_DATA && window.GATHER_APP_FIREBASE_DATA.firebaseStorage) || null;
+// window.GATHER_APP_FIREBASE_DATA was never assigned anywhere in this codebase -- these two
+// vars were a permanently-null dead snapshot from module-eval time onward, which meant every
+// `if (!firebaseDb)` check below saw the SDK as "unavailable" forever and fell back to its
+// REST-polling path (setInterval(..., 6000)) for the entire life of every page load, on every
+// client, regardless of whether the Firebase SDK actually connected successfully. The real,
+// live-updated globals are window.__gatherFirebaseDb / window.__gatherFirebaseStorage (set by
+// __setFirebaseDb in app-firebase-data.js and already used correctly by every ui-*.js file and
+// by getLiveFirebaseStorage below) -- read those now, and keep these vars in sync going forward
+// via the same 'gather-firebase-state-change' event app-firebase-data.js already dispatches on
+// every connection-state change (see firebaseConnectionVersion's useSyncExternalStore below,
+// which already re-runs the affected effects on this same event -- they just need firebaseDb
+// itself to stop being stuck at its initial null).
+var firebaseDb = (typeof window !== 'undefined' && window.__gatherFirebaseDb) || null;
+var firebaseStorage = (typeof window !== 'undefined' && window.__gatherFirebaseStorage) || null;
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  window.addEventListener('gather-firebase-state-change', () => {
+    if (window.__gatherFirebaseDb) firebaseDb = window.__gatherFirebaseDb;
+    if (window.__gatherFirebaseStorage) firebaseStorage = window.__gatherFirebaseStorage;
+  });
+}
 function getLiveFirebaseStorage() {
   return (typeof window !== 'undefined' && window.__gatherFirebaseStorage) || firebaseStorage;
 }
