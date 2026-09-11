@@ -47,7 +47,14 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
   const notify = (msg, kind) => { if (typeof showToast === 'function') showToast(msg, kind); };
 
   const handleFilesSelected = async (fileList) => {
-    const files = Array.from(fileList || []).filter(f => /^image\//i.test(f.type || '') || /\.(gif|jpg|jpeg|png|webp|heic|heif)$/i.test(f.name || ''));
+    const files = Array.from(fileList || []).filter(f => {
+      const type = f.type || '';
+      const name = f.name || '';
+      if (/^image\//i.test(type)) return true;
+      if (/\.(gif|jpg|jpeg|png|webp|heic|heif)$/i.test(name)) return true;
+      // iOS Files 등이 MIME/확장자를 비우는 경우가 있어 바이트 스니프에 맡긴다.
+      return !type;
+    });
     if (files.length === 0) return;
     if (!password) {
       notify('관리자 세션이 없습니다. 다시 로그인해 주세요.', 'error');
@@ -155,7 +162,7 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
         }, uploadProgress ? `업로드 중 ${uploadProgress.done}/${uploadProgress.total}` : "+ 일괄 업로드")
       ),
       /*#__PURE__*/React.createElement("input", {
-        ref: fileInputRef, type: "file", accept: "image/*,image/gif", multiple: true, style: { display: 'none' },
+        ref: fileInputRef, type: "file", accept: "image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif,image/*", multiple: true, style: { display: 'none' },
         onChange: e => handleFilesSelected(e.target.files)
       })
     ),
