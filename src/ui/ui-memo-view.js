@@ -288,7 +288,7 @@ export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoad
     if (!urls.length) return;
     void Promise.all(urls.map(async url => {
       try {
-        const result = await fetchLinkPreview(url);
+        const result = await fetchLinkPreview(url, calendarId);
         if (result?.status === 'success' && result.data) return { ...result.data, url: result.data.url || url };
       } catch (_) {}
       return null;

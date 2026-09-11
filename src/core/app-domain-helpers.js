@@ -866,6 +866,20 @@ async function adminBulkTagPhotosRemote(password, entries) {
   return Array.isArray(result?.results) ? result.results : [];
 }
 
+// Admin 데이터풀 > 파일/링크 -- lists sharedFiles/linkPreviews docs used by 2+ calendars (see
+// onSharedFileWrite/onLinkPreviewWrite + listSharedDataPool in functions/index.js). Both
+// collections deny client `list` access in firestore.rules, so this always goes through the
+// admin-gated Cloud Function, same trust model as listUntaggedPhotoIndexEntriesRemote above.
+async function listSharedDataPoolRemote(password, kind, options = {}) {
+  const result = await callAdminFunction('listSharedDataPool', {
+    password,
+    kind,
+    cursor: options.cursor ?? undefined,
+    limit: options.limit || 100
+  });
+  return { items: Array.isArray(result?.items) ? result.items : [], nextCursor: result?.nextCursor ?? null };
+}
+
 async function listPushSubscriptionHealthRemote(password, calendarId) {
   const result = await callAdminFunction('listPushSubscriptionHealth', { password, calendarId });
   return result?.summary || null;
@@ -2693,6 +2707,7 @@ export {
   memePoolDeleteRemote,
   listUntaggedPhotoIndexEntriesRemote,
   adminBulkTagPhotosRemote,
+  listSharedDataPoolRemote,
   findCultureLinkedAnniversary,
   findCultureLinkedMemo,
   buildCultureLinkedMemoData,

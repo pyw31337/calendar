@@ -282,11 +282,11 @@ async function findSharedFileByHash(hash) {
   }
 }
 
-async function registerSharedFile(hash, entry) {
+async function registerSharedFile(hash, entry, calendarId) {
   const db = getLiveFirestore();
   if (!db || !hash) return;
   try {
-    await db.collection('sharedFiles').doc(hash).set({
+    const data = {
       url: entry.url,
       storagePath: entry.storagePath,
       name: entry.name,
@@ -294,11 +294,32 @@ async function registerSharedFile(hash, entry) {
       size: entry.size,
       ext: entry.ext,
       createdAt: Date.now()
-    }, { merge: true });
+    };
+    // calendarId (when known) records this file as used by that calendar via arrayUnion -- a
+    // server-side trigger (onSharedFileWrite in functions/index.js) keeps `calendarCount` in
+    // sync so the admin dashboard's 데이터풀 tab can surface files used by 2+ calendars without a
+    // client-side `list` query (disallowed by firestore.rules).
+    if (calendarId && typeof firebase !== 'undefined' && firebase.firestore && firebase.firestore.FieldValue) {
+      data.calendarIds = firebase.firestore.FieldValue.arrayUnion(calendarId);
+    }
+    await db.collection('sharedFiles').doc(hash).set(data, { merge: true });
   } catch (_) {
     // Non-fatal -- the file itself already uploaded fine; a dedup registration miss just means
     // the next identical upload re-uploads instead of reusing, not a broken attachment now.
   }
+}
+
+// Records that an existing shared file (a dedup cache hit -- the bytes were already uploaded by
+// some earlier send, possibly from a different calendar) is also used by this calendar. Same
+// best-effort arrayUnion as registerSharedFile above, split out since a cache hit only needs the
+// one field touched, not a full re-write of the dedup metadata.
+function markSharedFileUsedByCalendar(hash, calendarId) {
+  const db = getLiveFirestore();
+  if (!db || !hash || !calendarId) return;
+  if (!(typeof firebase !== 'undefined' && firebase.firestore && firebase.firestore.FieldValue)) return;
+  db.collection('sharedFiles').doc(hash).set({
+    calendarIds: firebase.firestore.FieldValue.arrayUnion(calendarId)
+  }, { merge: true }).catch(() => {});
 }
 
 export async function uploadChatFileAttachment(calendarId, file, onBytes, timeoutMs = 60000) {
@@ -321,6 +342,7 @@ export async function uploadChatFileAttachment(calendarId, file, onBytes, timeou
     // Guard on size too -- an extremely unlikely SHA-256 collision would otherwise hand back
     // someone else's file under this name.
     if (shared && Number(shared.size) === size) {
+      markSharedFileUsedByCalendar(hash, calendarId);
       return sanitizeFileAttachment({
         id: `file_${stamp}_${rand}`,
         name,
@@ -361,7 +383,7 @@ export async function uploadChatFileAttachment(calendarId, file, onBytes, timeou
     uploadedAt: stamp,
     ext
   });
-  if (hash && attachment) registerSharedFile(hash, attachment);
+  if (hash && attachment) registerSharedFile(hash, attachment, calendarId);
   return attachment;
 }
 

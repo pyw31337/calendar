@@ -92,6 +92,7 @@ import {
   memePoolDeleteRemote,
   listUntaggedPhotoIndexEntriesRemote,
   adminBulkTagPhotosRemote,
+  listSharedDataPoolRemote,
   findCultureLinkedAnniversary,
   findCultureLinkedMemo,
   buildCultureLinkedMemoData,
@@ -3379,7 +3380,7 @@ function CalendarApp() {
       if (ok) {
         sentMessagesForOptimisticInsert.forEach(msg => upsertLocalChatMessage(msg));
         if (firstSentMessageId && chatLinkUrl && shouldFetchLinkPreviewForChatUrl(chatLinkUrl)) {
-          void fetchLinkPreview(chatLinkUrl).then(async result => {
+          void fetchLinkPreview(chatLinkUrl, activeCalId).then(async result => {
             if (result?.status !== 'success') return;
             await writeCollectionDocumentWithFallback('messages', activeCalId, firstSentMessageId, {
               linkPreview: result.data
@@ -3593,7 +3594,7 @@ function CalendarApp() {
       if (sent.id) upsertLocalChatMessage({ ...messageData, id: sent.id });
       if (shouldFetchLinkPreviewForChatUrl(cleanUrl)) {
         const sentId = sent.id || messageOperationId;
-        void fetchLinkPreview(cleanUrl).then(async result => {
+        void fetchLinkPreview(cleanUrl, activeCal.id).then(async result => {
           if (result?.status !== 'success') return;
           await writeCollectionDocumentWithFallback('messages', activeCal.id, sentId, { linkPreview: result.data }, 'update', '갤러리 링크 미리보기 후처리');
         }).catch(error => console.warn('Background gallery link preview failed:', error));
@@ -3852,7 +3853,7 @@ function CalendarApp() {
           linkPreview = editingMessage.linkPreview;
         } else {
           try {
-            const res = await fetchLinkPreview(url);
+            const res = await fetchLinkPreview(url, calId);
             if (res && res.status === 'success') {
               linkPreview = res.data;
             }
@@ -10018,6 +10019,7 @@ function bindGatherUiDeps() {
     memePoolDeleteRemote: typeof memePoolDeleteRemote === 'function' ? memePoolDeleteRemote : null,
     listUntaggedPhotoIndexEntriesRemote: typeof listUntaggedPhotoIndexEntriesRemote === 'function' ? listUntaggedPhotoIndexEntriesRemote : null,
     adminBulkTagPhotosRemote: typeof adminBulkTagPhotosRemote === 'function' ? adminBulkTagPhotosRemote : null,
+    listSharedDataPoolRemote: typeof listSharedDataPoolRemote === 'function' ? listSharedDataPoolRemote : null,
     fetchMemePoolRest: typeof fetchMemePoolRest === 'function' ? fetchMemePoolRest : null,
     rebuildPhotoIndexRemote: typeof rebuildPhotoIndexRemote === 'function' ? rebuildPhotoIndexRemote : null,
     mergeCalendarCollections: typeof mergeCalendarCollections === 'function' ? mergeCalendarCollections : null,

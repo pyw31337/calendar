@@ -471,13 +471,21 @@ service cloud.firestore {
       allow get: if urlHash is string && urlHash.matches('^[a-f0-9]{1,16}$');
       allow list: if false;
       allow create, update: if urlHash is string && urlHash.matches('^[a-f0-9]{1,16}$')
-        && request.resource.data.keys().hasOnly(['url', 'title', 'description', 'image', 'siteName', 'fetchedAt'])
+        // calendarIds: which calendars have used this URL (client arrayUnion's its own calendarId
+        // in -- see markLinkPreviewUsedByCalendar in app-link-preview.js). calendarCount is a
+        // denormalized count of calendarIds kept in sync by a server-side trigger (onLinkPreviewWrite
+        // in functions/index.js) so the admin dashboard can query it without a client-side `list`;
+        // clients never set it directly, but it must be allowed here since it's already present on
+        // the underlying doc by the time a client does its next merge write.
+        && request.resource.data.keys().hasOnly(['url', 'title', 'description', 'image', 'siteName', 'fetchedAt', 'calendarIds', 'calendarCount'])
         && request.resource.data.url is string && request.resource.data.url.size() <= 2000
         && request.resource.data.title is string && request.resource.data.title.size() <= 300
         && request.resource.data.description is string && request.resource.data.description.size() <= 500
         && request.resource.data.image is string && request.resource.data.image.size() <= 2000
         && request.resource.data.siteName is string && request.resource.data.siteName.size() <= 200
-        && request.resource.data.fetchedAt is number;
+        && request.resource.data.fetchedAt is number
+        && (!('calendarIds' in request.resource.data) || (request.resource.data.calendarIds is list && request.resource.data.calendarIds.size() <= 500))
+        && (!('calendarCount' in request.resource.data) || (request.resource.data.calendarCount is number && request.resource.data.calendarCount >= 0));
       allow delete: if false;
     }
 
@@ -491,14 +499,19 @@ service cloud.firestore {
       allow get: if fileHash is string && fileHash.size() <= 80;
       allow list: if false;
       allow create, update: if fileHash is string && fileHash.size() <= 80
-        && request.resource.data.keys().hasOnly(['url', 'storagePath', 'name', 'mime', 'size', 'ext', 'createdAt'])
+        // calendarIds/calendarCount: same cross-calendar usage tracking as linkPreviews above
+        // (see markSharedFileUsedByCalendar / registerSharedFile in chat-file-attachments.js and
+        // onSharedFileWrite in functions/index.js).
+        && request.resource.data.keys().hasOnly(['url', 'storagePath', 'name', 'mime', 'size', 'ext', 'createdAt', 'calendarIds', 'calendarCount'])
         && request.resource.data.url is string && request.resource.data.url.size() <= 2000
         && request.resource.data.storagePath is string && request.resource.data.storagePath.size() <= 500
         && request.resource.data.name is string && request.resource.data.name.size() <= 200
         && request.resource.data.mime is string && request.resource.data.mime.size() <= 120
         && request.resource.data.size is number && request.resource.data.size >= 0 && request.resource.data.size <= 20 * 1024 * 1024
         && request.resource.data.ext is string && request.resource.data.ext.size() <= 16
-        && request.resource.data.createdAt is number;
+        && request.resource.data.createdAt is number
+        && (!('calendarIds' in request.resource.data) || (request.resource.data.calendarIds is list && request.resource.data.calendarIds.size() <= 500))
+        && (!('calendarCount' in request.resource.data) || (request.resource.data.calendarCount is number && request.resource.data.calendarCount >= 0));
       allow delete: if false;
     }
 
