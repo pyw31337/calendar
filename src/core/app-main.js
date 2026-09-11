@@ -341,6 +341,9 @@ import {
   firebaseInitError,
   firebaseRetryExhausted,
   ensureFirebaseStorageReady,
+  getLiveFirebaseStorage,
+  getFirebaseStateVersion,
+  subscribeFirebaseStateChange,
   checkFirebaseStorageHealth,
   fetchSingleCalendarWithRest,
   fetchRecentMessagesRest,
@@ -424,15 +427,10 @@ import { useAppFeedbackState } from './app-feedback-state.js';
 // which already re-runs the affected effects on this same event -- they just need firebaseDb
 // itself to stop being stuck at its initial null).
 var firebaseDb = (typeof window !== 'undefined' && window.__gatherFirebaseDb) || null;
-var firebaseStorage = (typeof window !== 'undefined' && window.__gatherFirebaseStorage) || null;
 if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
   window.addEventListener('gather-firebase-state-change', () => {
     if (window.__gatherFirebaseDb) firebaseDb = window.__gatherFirebaseDb;
-    if (window.__gatherFirebaseStorage) firebaseStorage = window.__gatherFirebaseStorage;
   });
-}
-function getLiveFirebaseStorage() {
-  return (typeof window !== 'undefined' && window.__gatherFirebaseStorage) || firebaseStorage;
 }
 function shouldQueueCalendarWriteFailure(error) {
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return true;
@@ -494,17 +492,6 @@ const {
 function getAllDirectMediaImageEntries(message) {
   const direct = getMessageDirectMediaEntry(message);
   return direct ? [direct] : [];
-}
-function getFirebaseStateVersion() {
-  if (typeof window === 'undefined') return 0;
-  return Number(window.__GATHER_FIREBASE_STATE_VERSION || 0) || 0;
-}
-
-function subscribeFirebaseStateChange(onStoreChange) {
-  if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return () => {};
-  const handler = () => onStoreChange();
-  window.addEventListener('gather-firebase-state-change', handler);
-  return () => window.removeEventListener('gather-firebase-state-change', handler);
 }
 const NON_CHAT_UPLOAD_SOURCES = new Set(['meeting', 'gallery']);
 function isNonChatUploadSource(uploadSource) {
