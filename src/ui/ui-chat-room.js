@@ -1141,7 +1141,11 @@ export function ChatRoomView({
     style: {
       position: 'fixed',
       left: '10px',
-      bottom: `calc(${viewportBottom}px + 16px)`,
+      // While the composer is showing, it sits directly on top of viewportBottom (the keyboard,
+      // when open) at composerHeight px tall -- placing this button at the same +16px offset used
+      // when the composer is hidden made it float on top of the composer/meme-keyboard strip
+      // instead of above it. Only add composerHeight to the offset while visible.
+      bottom: `calc(${viewportBottom}px + ${isHeaderVisible ? composerHeight + 16 : 16}px)`,
       width: '36px',
       height: '36px',
       borderRadius: '50%',

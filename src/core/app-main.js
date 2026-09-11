@@ -3520,11 +3520,22 @@ function CalendarApp() {
       imageUrls: [url],
       thumbUrls: [thumb],
       timestamp: Date.now(),
-      uploadSource: 'meme'
+      uploadSource: 'chat'
     };
-    const sent = await writeCollectionDocumentWithFallback('messages', activeCalId, '', messageData, 'add', '밈 전송', { documentId: messageOperationId });
-    if (sent?.id) upsertLocalChatMessage({ ...messageData, id: sent.id });
-    else showToast('밈 전송에 실패했습니다.', 'error');
+    // Tapping the meme thumbnail (a <button>, not the textarea) blurs the composer on mobile
+    // Safari and can dismiss the on-screen keyboard mid-send; without this the scroll-driven
+    // auto-hide (handleChatScroll) can collapse the composer/meme strip right as the write is
+    // still in flight, making the whole thing look like it "disappeared".
+    chatHeaderRevealUntilRef.current = Date.now() + 1000;
+    setIsHeaderVisible(true);
+    try {
+      const sent = await writeCollectionDocumentWithFallback('messages', activeCalId, '', messageData, 'add', '밈 전송', { documentId: messageOperationId });
+      if (sent?.id) upsertLocalChatMessage({ ...messageData, id: sent.id });
+      else showToast('밈 전송에 실패했습니다.', 'error');
+    } catch (err) {
+      console.error('밈 전송 실패:', err);
+      showToast('밈 전송에 실패했습니다.', 'error');
+    }
   };
 
   const prepareGalleryImageUploads = async (files, title = '사진 업로드 준비 중...') => {
