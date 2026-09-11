@@ -531,9 +531,11 @@ assert(firebaseDataSource.includes('function normalizeConfirmedMeetingPhotoUrl')
 assert(!/sanitizeText\(photo\.imageUrl \|\| '', 2000\)/.test(firebaseDataSource), 'meeting image data URLs must never be truncated to 2,000 characters');
 // A rendered link is a read path: it must never fan out into Firestore/Peekalink requests just
 // because a chat, memo, or gallery card mounted. Preview fetching belongs to explicit write flows.
-const linkPreviewHook = appMainSource.match(/function useLinkPreview\(url, cachedData\) \{([\s\S]*?)\n\}/)?.[1] || '';
+// useLinkPreview moved to app-link-preview.js in U4 (split-units) -- read it from there now.
+const linkPreviewSource = fs.readFileSync(new URL('../src/core/app-link-preview.js', import.meta.url), 'utf8');
+const linkPreviewHook = linkPreviewSource.match(/function useLinkPreview\(url, cachedData\) \{([\s\S]*?)\n\}/)?.[1] || '';
 assert(linkPreviewHook && !/fetchLinkPreview\s*\(/.test(linkPreviewHook), 'link preview render hook must not fetch external previews');
-assert(appMainSource.includes('Render-time link previews are intentionally read-only'), 'link preview render path must document its no-fetch contract');
+assert(linkPreviewSource.includes('Render-time link previews are intentionally read-only'), 'link preview render path must document its no-fetch contract');
 assert(/where: \['uploadSource', '==', 'chat'\]/.test(appMainSource), 'chat realtime listener must use the dedicated chat channel');
 assert(/Firestore gallery media subscription error/.test(appMainSource), 'gallery must keep a separate unscoped realtime media listener');
 assert(/const PAGE_SIZE = 150/.test(appMainSource), 'chat preview fallback must page past a burst of hidden media uploads');
