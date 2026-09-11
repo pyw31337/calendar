@@ -414,6 +414,10 @@ export function composeGalleryPhotos({
   const broken = typeof isBrokenPhotoValue === 'function' ? isBrokenPhotoValue : () => false;
   chatMessages.forEach(msg => {
     if (!msg || (typeof isTombstone === 'function' && isTombstone(msg))) return;
+    // Meme keyboard stickers are meant to live only in chat, not leak into the gallery/memories
+    // screens alongside real photos -- they're reused emoji-like assets from a shared pool, not
+    // memories worth keeping.
+    if (msg.uploadSource === 'meme') return;
     collectMessagePhotoEntries(msg, {
       getMessageImageEntries,
       getAllDirectMediaImageEntries,

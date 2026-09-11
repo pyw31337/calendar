@@ -229,6 +229,25 @@ const writeQueueSource = fs.readFileSync(new URL('../src/core/app-write-queue.js
   assert(galleryContractPhotos.length === 3, 'gallery must union chat, memo and schedule photos and dedupe one shared asset');
   assert(new Set(galleryContractPhotos.map(photo => photo.source)).has('meeting'), 'gallery lost a schedule-only photo');
 
+  // Meme keyboard stickers live only in chat -- the gallery/memories screens must never surface
+  // them alongside real photos.
+  const galleryWithMeme = composeGalleryPhotos({
+    chatMessages: [
+      { id: 'chat-real', imageUrl: 'https://example.com/real.jpg', timestamp: 10 },
+      { id: 'chat-meme', uploadSource: 'meme', imageUrl: 'https://example.com/meme.jpg', timestamp: 20 }
+    ],
+    memos: [],
+    calendar: {},
+    isTombstone: () => false,
+    getMessageImageEntries,
+    getAllDirectMediaImageEntries: () => [],
+    getConfirmedMeetings: () => [],
+    resolveMeetingPhotoDisplay: photo => photo,
+    isBrokenPhotoValue: () => false,
+    getPhotoAssetCommentKey
+  });
+  assert(galleryWithMeme.length === 1 && galleryWithMeme[0].full === 'https://example.com/real.jpg', 'meme keyboard stickers must not appear in the gallery/memories screens');
+
   // Main-screen lightbox regression: chat attachment + auto-linked meeting copy (possibly
   // thumb-only / string sourceImageIndex / mismatched mediaKey prefix) must yield one slide.
   const mainGalleryDupes = composeGalleryPhotos({
