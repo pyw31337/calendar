@@ -223,6 +223,12 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
   const computeAdjacentIndex = (direction) => {
     if (visibleList.length === 0) return -1;
     const itemStillPresent = rawSelectedIndex !== -1;
+    // If the item just vanished from the list AND it was the LAST item (its remembered index no
+    // longer fits even after clamping), there is no item that slid into "next" -- unlike the
+    // mid-list case, clamping here would silently point back to the item before it instead of
+    // correctly reporting "no next item".
+    const wasLastItem = !itemStillPresent && lastKnownIndexRef.current > visibleList.length - 1;
+    if (direction > 0 && wasLastItem) return -1;
     const anchor = itemStillPresent ? rawSelectedIndex : Math.min(lastKnownIndexRef.current, visibleList.length - 1);
     if (anchor < 0) return -1;
     // "다음"은 사진이 아직 목록에 있으면 +1, 방금 사라졌으면(=태그 추가로 필터에서 빠짐) 그
