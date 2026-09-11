@@ -8977,7 +8977,14 @@ async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_T
     if (isStorageDisabled) return Promise.resolve(null);
     return new Promise(res => {
       let w = img.width, h = img.height;
-      const maxDimThumb = 640;
+      // 480px: this thumb is shared by the gallery grid (~122px cells) and the single-image
+      // chat bubble (renderChatMessageImages caps that display at maxWidth 420px/60vh and
+      // intentionally reuses this thumb instead of the full asset) -- 480px stays comfortably
+      // above the bubble's largest real render size while still cutting per-photo bytes well
+      // below the previous 640px cap for grid-heavy screens (gallery/summary) that load many
+      // of these at once. A grid-only tier smaller than this would need its own field/upload
+      // step since going lower here would visibly soften that single-image bubble case.
+      const maxDimThumb = 480;
       if (w > maxDimThumb || h > maxDimThumb) {
         if (w > h) { h = Math.round(h * maxDimThumb / w); w = maxDimThumb; }
         else { w = Math.round(w * maxDimThumb / h); h = maxDimThumb; }
@@ -10206,7 +10213,7 @@ function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) 
   const meta = entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, source: e.source, uploadSource: e.uploadSource, assetKey: e.assetKey, mediaKey: e.mediaKey, refKey: e.refKey }));
   if (thumbs.length === 1) {
     // The bubble caps display to maxWidth 420px/60vh (singleImageStyle below), so the small
-    // thumb (640px cap) is already higher resolution than this ever needs to render at -- using
+    // thumb (480px cap) is already higher resolution than this ever needs to render at -- using
     // the full/original asset here (up to a 2000px-capped JPEG, or an untouched original up to
     // 1.5MB) downloads and decodes several times more data than the bubble can even show. The
     // lightbox onClick below still opens `displayUrls` (the full asset) when the user taps in.
