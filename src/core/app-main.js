@@ -11079,28 +11079,6 @@ function ChatGalleryModal(props) {
 }
 
 
-// Scroll-direction-based header visibility (hide on scroll-down, reveal on scroll-up or near
-// the top), the same behavior as the chat room header (see handleChatScroll in ChatRoomView).
-// Shared here so any other full-page header (memo, and future pages) can adopt the identical
-// hide/show + floating-back-button pattern without re-deriving the threshold logic.
-function useScrollHideHeader() {
-  const [isHeaderVisible, setIsHeaderVisible] = React.useState(true);
-  const lastScrollTopRef = React.useRef(0);
-  const onScroll = React.useCallback((e) => {
-    const scrollTop = e.target.scrollTop;
-    const lastScrollTop = lastScrollTopRef.current;
-    if (scrollTop < 10) {
-      setIsHeaderVisible(true);
-    } else if (scrollTop > lastScrollTop && scrollTop > 56) {
-      setIsHeaderVisible(false);
-    } else if (scrollTop < lastScrollTop) {
-      setIsHeaderVisible(true);
-    }
-    lastScrollTopRef.current = scrollTop;
-  }, []);
-  return { isHeaderVisible, onScroll };
-}
-
 function MemoView(props) {
   const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MemoView;
   return typeof C === 'function' ? React.createElement(C, props) : null;
@@ -11882,7 +11860,6 @@ function bindGatherUiDeps() {
     extractDirectImageUrls: typeof extractDirectImageUrls === 'function' ? extractDirectImageUrls : null,
     removeFirstUrl: typeof removeFirstUrl === 'function' ? removeFirstUrl : null,
     formatChatHeaderTitle: typeof formatChatHeaderTitle === 'function' ? formatChatHeaderTitle : null,
-    useScrollHideHeader: typeof useScrollHideHeader === 'function' ? useScrollHideHeader : null,
     PlaceMapView: typeof PlaceMapView === 'function' ? PlaceMapView : null,
     PlacesView: typeof PlacesView === 'function' ? PlacesView : null,
     PlaceRegisterModal: typeof PlaceRegisterModal === 'function' ? PlaceRegisterModal : null,
