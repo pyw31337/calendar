@@ -37,6 +37,7 @@ export function getAnniversariesForDate(dateStr, anniversariesList) {
     endDate: base.endDate || ann.endDate,
     place: ann.place,
     description: ann.description,
+    memo: ann.memo,
     photos: ann.photos,
     createdAt: ann.createdAt,
     updatedAt: ann.updatedAt,

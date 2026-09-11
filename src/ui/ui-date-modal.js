@@ -2111,14 +2111,20 @@ export function DateModal({
             type: "button",
             onClick: e => { e.stopPropagation(); toggleAnnBannerExpanded(bannerKey); },
             "aria-label": isExpanded ? "기념일 상세 접기" : "기념일 상세 펼치기",
-            style: { background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', padding: '2px', display: 'flex', alignItems: 'center', flexShrink: 0 }
-          }, /*#__PURE__*/React.createElement("svg", {
-            width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor",
-            strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
-          }, isExpanded
-            ? /*#__PURE__*/React.createElement("path", { d: "M18 15l-6-6-6 6" })
-            : /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6 6-6" })
-          ))
+            title: "메모",
+            style: { background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', padding: '2px', display: 'flex', alignItems: 'center', gap: '3px', flexShrink: 0 }
+          },
+            // 화살표만 있으면 이게 메모를 열고 닫는 토글이라는 걸 알기 어려웠음 -- 컨텐츠 카드의
+            // 캘린더 연동/메모 줄과 같은 패턴으로 화살표 왼쪽에 라벨을 붙인다.
+            /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', fontWeight: 500 } }, "메모"),
+            /*#__PURE__*/React.createElement("svg", {
+              width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor",
+              strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+            }, isExpanded
+              ? /*#__PURE__*/React.createElement("path", { d: "M18 15l-6-6-6 6" })
+              : /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6 6-6" })
+            )
+          )
         );
         const placeBlock = hasRealAnnPlace(ann) ? (() => {
           const mapUrl = getAnnBannerKakaoMapLinkUrl(ann.place);
