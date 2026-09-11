@@ -52,7 +52,25 @@ const chunkGroups = [
   { name: 'notification-pwa-state', test: /[\\/]core[\\/]notification-pwa-state/, priority: 30 },
   { name: 'app-data-bootstrap', test: /[\\/]core[\\/]app-data-bootstrap/, priority: 30 },
   { name: 'app-shell-state', test: /[\\/]core[\\/]app-shell-state/, priority: 30 },
-  { name: 'app-main', test: /[\\/]core[\\/]app-main/, priority: 20 },
+  // docs/app-main-split-units.md moves pieces of app-main.js into sibling core/app-*.js
+  // modules that ONLY app-main.js imports (app-ui-wrappers.js, app-ui-hooks.js, and later
+  // app-search.js, app-link-preview.js, app-chat-render.js, app-place-map.js,
+  // app-image-pipeline.js, app-ui-deps.js). Because none of those filenames matched this
+  // group's old `app-main`-only regex, Rolldown put them in a separate auto-named chunk from
+  // app-main.js's own chunk -- and since app-main.js calls their exports at its own top level
+  // while they in turn depend on app-main.js's chunk, the two chunks formed a circular import.
+  // On that cycle, whichever chunk lost the race had its own top-level `const` arrays not yet
+  // initialized when the other chunk's top-level code called into it -- producing exactly the
+  // "<x> is not iterable" boot crash from the 2026-09-11 incident (spreading an
+  // Object.freeze([...]) array that was still undefined). Matching every current and planned
+  // split-unit sibling file here keeps them in app-main.js's own chunk, which structurally
+  // rules out that cycle. Higher-priority groups above (app-domain-helpers etc.) still win
+  // where they overlap, so this only catches files nothing else already claims.
+  {
+    name: 'app-main',
+    test: /[\\/]core[\\/]app-(main|ui-wrappers|ui-hooks|search|link-preview|chat-render|place-map|image-pipeline|ui-deps)\.js$/,
+    priority: 20
+  },
   { name: 'vendor', test: /node_modules/, priority: 10 }
 ];
 
