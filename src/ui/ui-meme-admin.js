@@ -166,7 +166,14 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
   const untaggedList = React.useMemo(() => pool.filter(p => !(p.hashtags || []).length), [pool]);
   const visibleList = filterUntaggedOnly ? untaggedList : pool;
   const pendingTags = React.useMemo(() => parseHashtagInput(tagDraft), [tagDraft]);
-  const selectedIndex = selected ? visibleList.findIndex(p => p.id === selected.id) : -1;
+  // 미태그만 보기 상태에서 태그를 추가하면 그 사진이 곧바로 목록에서 빠져버려 findIndex가 -1을
+  // 반환한다 -- Tab/이전·다음이 그 순간 먹통이 되는 원인이었다. 마지막으로 목록에 있었던 위치를
+  // 기억해뒀다가, 사라진 뒤에는 그 자리를 "다음" 앵커로 쓴다: 뒤 항목들이 한 칸씩 당겨와서
+  // 원래 자리에 있던 항목이 곧 다음 사진이기 때문에, 이 경우 다음은 +1이 아니라 앵커 그 자체다.
+  const lastKnownIndexRef = React.useRef(-1);
+  const rawSelectedIndex = selected ? visibleList.findIndex(p => p.id === selected.id) : -1;
+  if (rawSelectedIndex !== -1) lastKnownIndexRef.current = rawSelectedIndex;
+  else if (!selected) lastKnownIndexRef.current = -1;
 
   // 낙관적 저장 + 서버 반영 공통 로직: Cloud Function 호출(콜드 스타트 시 몇 초씩 걸릴 수 있음)을
   // 기다리지 않고 로컬 상태를 즉시 갱신한 뒤, 실패했을 때만 원래 태그로 되돌리고 알린다.
@@ -213,11 +220,20 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
   // Tab/Shift+Tab, 이전/다음 버튼이 공유하는 이동 로직. 저장(추가) 여부와 무관하게 현재 필터로
   // 보이는 목록(visibleList) 순서를 그대로 따라간다 -- 아직 추가하지 않은 입력창 내용은
   // openLightbox가 비워서 자연히 버려진다.
+  const computeAdjacentIndex = (direction) => {
+    if (visibleList.length === 0) return -1;
+    const itemStillPresent = rawSelectedIndex !== -1;
+    const anchor = itemStillPresent ? rawSelectedIndex : Math.min(lastKnownIndexRef.current, visibleList.length - 1);
+    if (anchor < 0) return -1;
+    // "다음"은 사진이 아직 목록에 있으면 +1, 방금 사라졌으면(=태그 추가로 필터에서 빠짐) 그
+    // 빈자리로 밀려온 항목이 이미 "다음"이므로 앵커 그대로. "이전"은 두 경우 모두 앵커-1.
+    const targetIndex = direction > 0 ? (itemStillPresent ? anchor + 1 : anchor) : anchor - 1;
+    return (targetIndex < 0 || targetIndex >= visibleList.length) ? -1 : targetIndex;
+  };
   const goToAdjacent = (direction) => {
-    if (selectedIndex === -1) return;
-    const nextIndex = selectedIndex + direction;
-    if (nextIndex < 0 || nextIndex >= visibleList.length) return;
-    openLightbox(visibleList[nextIndex]);
+    const targetIndex = computeAdjacentIndex(direction);
+    if (targetIndex === -1) return;
+    openLightbox(visibleList[targetIndex]);
   };
 
   const handleDelete = async () => {
@@ -435,12 +451,12 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
         /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
           /*#__PURE__*/React.createElement("button", {
             type: "button", className: "btn btn-secondary", onClick: () => goToAdjacent(-1),
-            disabled: selectedIndex <= 0,
+            disabled: computeAdjacentIndex(-1) === -1,
             style: { height: '40px', padding: '0 14px', fontWeight: 800, flex: 1 }
           }, "◀ 이전 (Shift+Tab)"),
           /*#__PURE__*/React.createElement("button", {
             type: "button", className: "btn btn-secondary", onClick: () => goToAdjacent(1),
-            disabled: selectedIndex === -1 || selectedIndex >= visibleList.length - 1,
+            disabled: computeAdjacentIndex(1) === -1,
             style: { height: '40px', padding: '0 14px', fontWeight: 800, flex: 1 }
           }, "다음 (Tab) ▶")
         )
