@@ -2608,6 +2608,34 @@ function getDataUrlInfo(url) {
   return { mime, sizeBytes };
 }
 
+function getShortTitleParts(dateStr) {
+  if (!dateStr) return { year: '', rest: '' };
+  const [year, month, day] = dateStr.split('-');
+  const dateObj = new Date(year, month - 1, day);
+  const dayOfWeek = ['일', '월', '화', '수', '목', '금', '토'][dateObj.getDay()];
+  const shortYear = year.slice(2);
+  return {
+    year: `${shortYear}.`,
+    rest: `${month}.${day}(${dayOfWeek})`
+  };
+}
+
+function doesPlaceMatchDate(place, dateStr) {
+  const f = GATHER_APP_UTILS.doesPlaceMatchDate;
+  return typeof f === 'function' ? f(place, dateStr) : false;
+}
+
+// Anniversary badges default to a generic type color, but when the title names an active
+// participant (e.g. "김현석 생일"), use that person's own calendar color instead. Matches
+// against the LONGEST participant name found in the title first, so a short name (e.g. "김현")
+// can't shadow a longer, more specific one (e.g. "김현석") that also appears in the list.
+function getAnniversaryDisplayColor(ann, calendar) {
+  const matched = getActiveParticipants(calendar)
+    .filter(p => p.name && ann.title.includes(p.name))
+    .sort((a, b) => b.name.length - a.name.length)[0];
+  return matched ? matched.color : ann.badgeColor;
+}
+
 export {
   PRESET_COLORS,
   DEFAULT_EXPENSE_CATEGORIES,
@@ -2839,5 +2867,8 @@ export {
   getLegacyMeetingMediaKey,
   getMessageDirectMediaEntry,
   formatBytes,
-  getDataUrlInfo
+  getDataUrlInfo,
+  getShortTitleParts,
+  doesPlaceMatchDate,
+  getAnniversaryDisplayColor
 };
