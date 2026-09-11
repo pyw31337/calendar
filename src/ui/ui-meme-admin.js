@@ -236,6 +236,21 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
     openLightbox(visibleList[targetIndex]);
   };
 
+  // 문서 전체에서 Tab/Shift+Tab을 잡는다 (입력창 자체의 onKeyDown 하나에만 의존하지 않음) --
+  // 실제 라이트박스(ui-lightbox.js)의 화살표키 리스너와 같은 방식. 좁은 화면/반응형 모드 등
+  // 포커스가 정확히 어디에 있는지 예측하기 어려운 상황에서도 라이트박스가 열려 있는 동안은
+  // 항상 동작하게 하기 위함.
+  React.useEffect(() => {
+    if (!selected) return undefined;
+    const onKeyDown = e => {
+      if (e.key !== 'Tab') return;
+      e.preventDefault();
+      goToAdjacent(e.shiftKey ? -1 : 1);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  });
+
   const handleDelete = async () => {
     if (!selected || isDeleting) return;
     setIsDeleting(true);
@@ -416,8 +431,10 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
           type: "text", value: tagDraft, onChange: e => setTagDraft(e.target.value),
           onKeyDown: e => {
             if (e.nativeEvent.isComposing) return;
-            if (e.key === 'Enter') { e.preventDefault(); handleAddTags(); return; }
-            if (e.key === 'Tab') { e.preventDefault(); goToAdjacent(e.shiftKey ? -1 : 1); }
+            if (e.key === 'Enter') { e.preventDefault(); handleAddTags(); }
+            // Tab/Shift+Tab is handled by the document-level listener below (see the
+            // useEffect near goToAdjacent) so it works regardless of which element has
+            // focus, not just this input.
           },
           placeholder: "새 태그 입력 후 Enter로 추가 (Tab: 다음, Shift+Tab: 이전)", autoFocus: true,
           className: "form-input", style: { fontSize: '16px' }

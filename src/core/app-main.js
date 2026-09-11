@@ -1059,12 +1059,33 @@ function CalendarApp() {
   const [anniversaries, setAnniversaries] = React.useState([]);
   const [customCultureItems, setCustomCultureItems] = React.useState([]);
   // 밈 키보드용 이미지 풀. calendarId로 나뉘지 않는 전역 컬렉션이라(모든 캘린더가 같은 해시태그
-  // 인덱스를 검색) 활성 캘린더가 바뀌어도 다시 불러올 필요 없이 앱 세션당 한 번만 가져온다.
+  // 인덱스를 검색) 활성 캘린더가 바뀌어도 다시 불러올 필요는 없지만, 딱 한 번만 불러오면
+  // 어드민이 다른 탭에서 태그를 편집하는 동안 이 세션은 그 변경을 영영 못 본다 -- 탭을 다시
+  // 활성화할 때마다(포커스/가시성 복귀) 재조회해서, 새로고침 없이도 몇 분 안에 반영되게 한다.
+  // 너무 잦은 재조회를 막기 위해 최소 재조회 간격을 둔다.
   const [memePool, setMemePool] = React.useState([]);
   React.useEffect(() => {
     let cancelled = false;
-    fetchMemePoolRest().then(list => { if (!cancelled) setMemePool(list); }).catch(() => {});
-    return () => { cancelled = true; };
+    let lastFetchAt = 0;
+    const MIN_REFETCH_INTERVAL_MS = 20000;
+    const load = () => {
+      const now = Date.now();
+      if (now - lastFetchAt < MIN_REFETCH_INTERVAL_MS) return;
+      lastFetchAt = now;
+      fetchMemePoolRest().then(list => { if (!cancelled) setMemePool(list); }).catch(() => {});
+    };
+    load();
+    const onVisibilityOrFocus = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      load();
+    };
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisibilityOrFocus);
+    if (typeof window !== 'undefined') window.addEventListener('focus', onVisibilityOrFocus);
+    return () => {
+      cancelled = true;
+      if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisibilityOrFocus);
+      if (typeof window !== 'undefined') window.removeEventListener('focus', onVisibilityOrFocus);
+    };
   }, []);
   // id -> poster URL from crawled culture JSON (festivals + performances). Used to enrich
   // already-registered culture anniversaries that were saved before posters were copied.
