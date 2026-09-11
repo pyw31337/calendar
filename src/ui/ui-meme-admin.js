@@ -161,12 +161,13 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
   const untaggedList = React.useMemo(() => pool.filter(p => !(p.hashtags || []).length), [pool]);
   const visibleList = filterUntaggedOnly ? untaggedList : pool;
   const liveTags = React.useMemo(() => parseHashtagInput(tagDraft), [tagDraft]);
+  const selectedIndex = selected ? visibleList.findIndex(p => p.id === selected.id) : -1;
 
-  // 낙관적 저장: Cloud Function 호출(콜드 스타트 시 몇 초씩 걸릴 수 있음)이 끝나길 기다렸다가
-  // 화면을 넘기면, 그 몇 초 사이에 다음 사진의 태그를 타이핑하기 시작한 입력이 아직 안 넘어간
-  // 이전 사진의 입력창에 섞여 들어가는 문제가 있었다 -- 화면 전환과 로컬 상태 갱신은 즉시 하고,
-  // 실제 서버 호출은 백그라운드로 보낸 뒤 실패했을 때만 그 사진으로 되돌리고 알린다.
-  const handleSaveTags = (advanceToNextUntagged) => {
+  // 낙관적 저장: Cloud Function 호출(콜드 스타트 시 몇 초씩 걸릴 수 있음)을 기다리지 않고 로컬
+  // 상태를 즉시 갱신한다. Enter는 저장만 하고 같은 사진에 머무른다 -- 다음/이전 이동은 Tab/
+  // Shift+Tab이나 버튼으로 명시적으로 하는, 실제 라이트박스(ui-lightbox.js LightboxTagPanel)와
+  // 같은 상호작용 모델이다. 실패했을 때만 그 사진으로 되돌리고 알린다.
+  const handleSaveTags = () => {
     if (!selected) return;
     const target = selected;
     const previousHashtags = target.hashtags || [];
@@ -175,13 +176,7 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
     if (typeof onPoolChange === 'function') {
       onPoolChange(prev => prev.map(p => p.id === target.id ? { ...p, hashtags } : p));
     }
-    if (advanceToNextUntagged) {
-      const next = untaggedList.find(p => p.id !== target.id);
-      if (next) openLightbox(next);
-      else closeLightbox();
-    } else {
-      closeLightbox();
-    }
+    setSelected(prev => (prev && prev.id === target.id ? { ...prev, hashtags } : prev));
 
     upsertRemote(password, { id: target.id, hashtags }).then(ok => {
       if (ok) return;
@@ -193,6 +188,17 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
       }
       notify(`"${target.fileName || target.id}" 태그 저장 실패 — ${describeMemeUploadError(err)}`, 'error');
     });
+  };
+
+  // Tab/Shift+Tab, 이전/다음 버튼이 공유하는 이동 로직. 저장 여부와 무관하게 현재 필터로 보이는
+  // 목록(visibleList) 순서를 그대로 따라간다 -- 저장 안 된 입력은 openLightbox가 다음 사진의
+  // 실제 태그로 덮어써서 자연히 버려진다 (실제 라이트박스와 달리 사진마다 태그가 완전히
+  // 교체되는 모델이라 입력을 이어 붙일 이유가 없다).
+  const goToAdjacent = (direction) => {
+    if (selectedIndex === -1) return;
+    const nextIndex = selectedIndex + direction;
+    if (nextIndex < 0 || nextIndex >= visibleList.length) return;
+    openLightbox(visibleList[nextIndex]);
   };
 
   const handleDelete = async () => {
@@ -309,11 +315,11 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
         /*#__PURE__*/React.createElement("input", {
           type: "text", value: tagDraft, onChange: e => setTagDraft(e.target.value),
           onKeyDown: e => {
-            if (e.key !== 'Enter') return;
-            e.preventDefault();
-            handleSaveTags(true);
+            if (e.nativeEvent.isComposing) return;
+            if (e.key === 'Enter') { e.preventDefault(); handleSaveTags(); return; }
+            if (e.key === 'Tab') { e.preventDefault(); goToAdjacent(e.shiftKey ? -1 : 1); }
           },
-          placeholder: "해시태그 입력 후 Enter (예: #눈물 #화남 짜증)", autoFocus: true,
+          placeholder: "해시태그 입력 후 Enter로 저장 (Tab: 다음, Shift+Tab: 이전)", autoFocus: true,
           className: "form-input", style: { fontSize: '16px' }
         }),
         /*#__PURE__*/React.createElement("div", {
@@ -339,13 +345,21 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
             style: { height: '44px', padding: '0 14px', fontWeight: 800 }
           }, "취소"),
           /*#__PURE__*/React.createElement("button", {
-            type: "button", className: "btn btn-secondary", onClick: () => handleSaveTags(false),
+            type: "button", className: "btn btn-primary", onClick: handleSaveTags,
             style: { height: '44px', padding: '0 14px', fontWeight: 800, flex: 1 }
-          }, "저장"),
+          }, "저장 (Enter)")
+        ),
+        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
           /*#__PURE__*/React.createElement("button", {
-            type: "button", className: "btn btn-primary", onClick: () => handleSaveTags(true),
-            style: { height: '44px', padding: '0 14px', fontWeight: 800, flex: 1 }
-          }, "저장하고 다음 (Enter)")
+            type: "button", className: "btn btn-secondary", onClick: () => goToAdjacent(-1),
+            disabled: selectedIndex <= 0,
+            style: { height: '40px', padding: '0 14px', fontWeight: 800, flex: 1 }
+          }, "◀ 이전 (Shift+Tab)"),
+          /*#__PURE__*/React.createElement("button", {
+            type: "button", className: "btn btn-secondary", onClick: () => goToAdjacent(1),
+            disabled: selectedIndex === -1 || selectedIndex >= visibleList.length - 1,
+            style: { height: '40px', padding: '0 14px', fontWeight: 800, flex: 1 }
+          }, "다음 (Tab) ▶")
         )
       )
     )

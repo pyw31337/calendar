@@ -1311,6 +1311,10 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
       if (e.key === 'Escape') closeLightbox();
       else if (e.key === 'ArrowLeft') animateToAdjacent(index - 1);
       else if (e.key === 'ArrowRight') animateToAdjacent(index + 1);
+      // Tab/Shift+Tab as next/prev lets someone tagging photos move between them without
+      // leaving the keyboard -- Enter already saves the current tag draft in place
+      // (LightboxTagPanel) instead of advancing, so this is the deliberate "move on" gesture.
+      else if (e.key === 'Tab') { e.preventDefault(); animateToAdjacent(index + (e.shiftKey ? -1 : 1)); }
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
