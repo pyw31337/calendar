@@ -15,13 +15,23 @@ const lines = source.split('\n');
 // Matches only column-0 top-level declarations -- the same convention every unit in the split
 // plan relies on to find safe extraction boundaries without a real parser.
 const DECL_RE = /^(?:async function|function)\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*\(|^const\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=/;
+// Split units bind several names at once from a shared alias object (e.g.
+// `const { CalendarGrid, CommentsSection } = uiWrapperAliases;`, see U1a-c). This doesn't name a
+// single declaration the way DECL_RE's other branches do, but it MUST still count as a boundary
+// marker -- otherwise a preceding declaration's (e.g. CalendarApp's) measured span silently
+// swallows everything up to the next DECL_RE match, however far away that is.
+const DESTRUCTURE_RE = /^const\s*\{/;
 
 const decls = [];
 lines.forEach((line, index) => {
   const match = DECL_RE.exec(line);
-  if (!match) return;
-  const name = match[1] || match[2];
-  decls.push({ name, startLine: index + 1 });
+  if (match) {
+    decls.push({ name: match[1] || match[2], startLine: index + 1 });
+    return;
+  }
+  if (DESTRUCTURE_RE.test(line)) {
+    decls.push({ name: '(destructure)', startLine: index + 1, isBoundaryOnly: true });
+  }
 });
 
 // Each declaration's span runs until the next one starts (or EOF) -- good enough for a line-count
@@ -31,15 +41,16 @@ for (let i = 0; i < decls.length; i += 1) {
   decls[i].endLine = endLine;
   decls[i].lineCount = endLine - decls[i].startLine + 1;
   const body = lines.slice(decls[i].startLine - 1, endLine).join('\n');
-  decls[i].isWrapper = decls[i].lineCount <= WRAPPER_MAX_BODY_LINES
+  decls[i].isWrapper = !decls[i].isBoundaryOnly && decls[i].lineCount <= WRAPPER_MAX_BODY_LINES
     && /GATHER_UI_COMPONENTS|GATHER_APP_UTILS/.test(body);
 }
 
-const calendarApp = decls.find(d => d.name === 'CalendarApp');
-const wrapperCount = decls.filter(d => d.isWrapper).length;
-const realCount = decls.length - wrapperCount - (calendarApp ? 1 : 0);
+const namedDecls = decls.filter(d => !d.isBoundaryOnly);
+const calendarApp = namedDecls.find(d => d.name === 'CalendarApp');
+const wrapperCount = namedDecls.filter(d => d.isWrapper).length;
+const realCount = namedDecls.length - wrapperCount - (calendarApp ? 1 : 0);
 
-console.log(`[app-main-inventory] ${decls.length} top-level declarations`);
+console.log(`[app-main-inventory] ${namedDecls.length} top-level declarations`);
 console.log(`[app-main-inventory] WRAPPER: ${wrapperCount}, REAL (non-CalendarApp): ${realCount}`);
 
 let failed = false;
@@ -60,7 +71,7 @@ if (!calendarApp) {
 if (process.argv.includes('--dump')) {
   console.log('');
   console.log('name\tstartLine\tendLine\tlineCount\tkind');
-  decls.forEach(d => {
+  namedDecls.forEach(d => {
     const kind = d.name === 'CalendarApp' ? 'FROZEN' : (d.isWrapper ? 'WRAPPER' : 'REAL');
     console.log(`${d.name}\t${d.startLine}\t${d.endLine}\t${d.lineCount}\t${kind}`);
   });
