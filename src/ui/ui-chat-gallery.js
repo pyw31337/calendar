@@ -2,7 +2,7 @@
  * Chat / gallery modal (P4-13)
  */
 
-import { composeGalleryPhotos, getPaginationWindow } from '../core/gallery-data.js';
+import { composeGalleryPhotos, getPaginationWindow, isMemeKeyboardPhotoEntry } from '../core/gallery-data.js';
 import { resolveGalleryLightboxTags } from '../core/photo-index.js';
 import { useScrollHideHeader } from '../core/use-scroll-hide-header.js';
 
@@ -698,6 +698,11 @@ export function ChatGalleryModal({
           if (source === 'anniversary') return false;
           return !String(photo.sourceOwner || '').startsWith('anniversary:');
         })
+        // Meme keyboard stickers: same exclusion as composeGalleryPhotos below, but this branch
+        // reads the server-maintained photoIndex directly instead of going through it, so it
+        // needs its own check (see isMemeKeyboardPhotoEntry's comment for why uploadSource alone
+        // isn't reliable here).
+        .filter(photo => !isMemeKeyboardPhotoEntry(photo))
         .map(photo => {
           const source = photo.source || 'gallery';
           const imageIndex = Number.isInteger(photo.imageIndex)

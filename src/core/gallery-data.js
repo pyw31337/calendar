@@ -420,6 +420,18 @@ function isMemeKeyboardMessage(msg) {
   if (Array.isArray(msg.thumbUrls) && msg.thumbUrls.some(isMemePoolAssetUrl)) return true;
   return false;
 }
+// Same check, but for an already-flattened gallery/photoIndex entry shape ({ full, thumb, ... })
+// rather than a raw chat message ({ imageUrl, imageUrls, ... }) -- used by callers that read the
+// server-maintained photoIndex collection directly instead of going through composeGalleryPhotos
+// (photoIndex rows are built by a Cloud Function that itself collapses any non-chat/gallery/
+// meeting uploadSource, meme included, down to 'chat' -- see getPhotoIndexEntries in
+// functions/index.js -- so uploadSource is not reliable there either; the URL is the only signal
+// that survives).
+export function isMemeKeyboardPhotoEntry(photo) {
+  if (!photo) return false;
+  if (photo.uploadSource === 'meme') return true;
+  return isMemePoolAssetUrl(photo.full) || isMemePoolAssetUrl(photo.thumb);
+}
 
 export function composeGalleryPhotos({
   chatMessages = [], memos = [], calendar = null, anniversaries = [],
