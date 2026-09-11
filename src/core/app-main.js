@@ -180,6 +180,9 @@ import {
   getMessageDirectMediaEntry,
   buildCultureEventMemoText,
   createMemoActivityLog,
+  getShortTitleParts,
+  doesPlaceMatchDate,
+  getAnniversaryDisplayColor,
 } from './app-domain-helpers.js';
 import { rebuildCalendarToTimestamp } from './app-admin-restore.js';
 import { fetchPhotoComments, savePhotoComments } from './photo-comments.js';
@@ -8250,30 +8253,9 @@ const { ChatParticipantSheet, AppSettingsModal, NotificationOnboardingModal, Not
 // value, or an earlier low-zIndex call (e.g. a chat send burst) locks the canvas behind modals.
 const CONFETTI_Z_INDEX = 999999;
 
-function getShortTitleParts(dateStr) {
-  if (!dateStr) return { year: '', rest: '' };
-  const [year, month, day] = dateStr.split('-');
-  const dateObj = new Date(year, month - 1, day);
-  const dayOfWeek = ['일', '월', '화', '수', '목', '금', '토'][dateObj.getDay()];
-  const shortYear = year.slice(2);
-  return {
-    year: `${shortYear}.`,
-    rest: `${month}.${day}(${dayOfWeek})`
-  };
-}
-
-
-
 
 const { DateModal } = uiWrapperAliases;
 
-
-
-
-function doesPlaceMatchDate(place, dateStr) {
-  const f = (window.GATHER_APP_UTILS || {}).doesPlaceMatchDate;
-  return typeof f === 'function' ? f(place, dateStr) : false;
-}
 
 
 
@@ -8381,17 +8363,6 @@ const { MainSideMenu, UpdateAvailableBanner, ImageShareViewer, ImageThumbRemoveB
 // Memo Card component for clean grid layout separation
 
 
-
-// Anniversary badges default to a generic type color, but when the title names an active
-// participant (e.g. "김현석 생일"), use that person's own calendar color instead. Matches
-// against the LONGEST participant name found in the title first, so a short name (e.g. "김현")
-// can't shadow a longer, more specific one (e.g. "김현석") that also appears in the list.
-function getAnniversaryDisplayColor(ann, calendar) {
-  const matched = getActiveParticipants(calendar)
-    .filter(p => p.name && ann.title.includes(p.name))
-    .sort((a, b) => b.name.length - a.name.length)[0];
-  return matched ? matched.color : ann.badgeColor;
-}
 
 const { AnniversaryModal, SettlementSummaryModal, PollModal } = uiWrapperAliases;
 
