@@ -38,50 +38,105 @@ function resizeImageToBlob(img, maxDim, quality, isPng) {
   canvas.width = w;
   canvas.height = h;
   canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-  return new Promise(resolve => {
-    if (isPng) canvas.toBlob(blob => resolve({ blob, width: w, height: h }), 'image/png');
-    else canvas.toBlob(blob => resolve({ blob, width: w, height: h }), 'image/jpeg', quality);
+  return new Promise((resolve, reject) => {
+    const type = isPng ? 'image/png' : 'image/jpeg';
+    const done = blob => {
+      if (!blob) {
+        reject(new Error('이미지를 변환하지 못했습니다'));
+        return;
+      }
+      resolve({ blob, width: w, height: h });
+    };
+    if (isPng) canvas.toBlob(done, type);
+    else canvas.toBlob(done, type, quality);
   });
 }
 
 // GIFs must not be re-encoded to canvas (that silently drops the animation, flattening it to
 // one frame) -- upload the original bytes for both "full" and "thumb" when the source is a gif.
 function isGif(file) {
-  return /image\/gif/i.test(file.type || '') || /\.gif$/i.test(file.name || '');
+  return /image\/gif/i.test(file?.type || '') || /\.gif$/i.test(file?.name || '');
+}
+
+function isHeicFile(file) {
+  return /image\/hei[cf]/i.test(file?.type || '') || /\.hei[cf]$/i.test(file?.name || '');
 }
 
 function getMemeStorage() {
-  return (typeof window !== 'undefined' && window.__gatherFirebaseStorage) || null;
+  try {
+    if (typeof window !== 'undefined' && window.__gatherFirebaseStorage) {
+      return window.__gatherFirebaseStorage;
+    }
+  } catch (_) {}
+  // Chat uploads already do this: loading the Storage *script* is not enough. firebase.storage
+  // is a factory -- until we call it, window.__gatherFirebaseStorage stays unset and every
+  // meme upload returns null. That is why #534 still failed on a fresh admin session: the
+  // 밈키보드 tab is usually opened before any chat/gallery upload has initialized Storage.
+  try {
+    if (typeof firebase !== 'undefined' && typeof firebase.storage === 'function') {
+      if (!firebase.apps.length) {
+        const cfg = (typeof window !== 'undefined' && window.__gatherFirebaseConfig) || null;
+        if (cfg) firebase.initializeApp(cfg);
+      }
+      if (!firebase.apps.length) return null;
+      const storage = firebase.storage();
+      if (typeof window !== 'undefined') window.__gatherFirebaseStorage = storage;
+      return storage;
+    }
+  } catch (_) {}
+  return null;
 }
 
 // Storage is loaded lazily (see main.jsx's loadFirebaseStorageSdk) so a read-only visitor never
 // pays for its script on the critical path -- the SDK only actually loads once something tries
-// to upload. Every other upload path (chat images/files) awaits window.__gatherLoadFirebaseStorageSdk()
-// before checking for storage; this one didn't, so on any admin session where nothing else had
-// already triggered an upload first (the common case -- 밈키보드 is often the first thing opened),
-// window.__gatherFirebaseStorage was still unset and every meme upload failed immediately with no
-// visible reason beyond "실패".
+// to upload. #534 started awaiting that loader here, but still only read
+// window.__gatherFirebaseStorage afterwards, which nobody had set.
 async function ensureMemeStorage() {
   let storage = getMemeStorage();
   if (storage) return storage;
   if (typeof window !== 'undefined' && typeof window.__gatherLoadFirebaseStorageSdk === 'function') {
-    try { await window.__gatherLoadFirebaseStorageSdk(); } catch (_) {}
+    try { await window.__gatherLoadFirebaseStorageSdk(); } catch (err) {
+      throw new Error(`스토리지 SDK 로드 실패: ${err?.message || err}`);
+    }
   }
-  return getMemeStorage();
+  storage = getMemeStorage();
+  if (storage) return storage;
+  throw new Error('스토리지를 시작하지 못했습니다. 새로고침 후 다시 시도해 주세요.');
 }
 
 async function uploadBlobToMemePool(storage, path, blob, contentType) {
+  if (!blob) throw new Error('업로드할 이미지가 비어 있습니다');
   const ref = storage.ref(path);
   await ref.put(blob, { contentType });
   return ref.getDownloadURL();
 }
 
+function describeMemeUploadError(err) {
+  const code = String(err?.code || '');
+  const raw = String(err?.message || err || '');
+  if (code === 'storage/unauthorized' || /unauthorized/i.test(raw)) {
+    return '저장소 규칙이 아직 반영되지 않았습니다. 운영자에게 storage 배포를 요청해 주세요.';
+  }
+  if (code === 'storage/canceled' || /canceled/i.test(raw)) return '업로드가 취소되었습니다.';
+  if (code === 'storage/retry-limit-exceeded') return '네트워크가 불안정합니다. 잠시 후 다시 시도해 주세요.';
+  if (/스토리지 SDK|스토리지를 시작/i.test(raw)) return raw;
+  if (/hei[cf]/i.test(raw) || /HEIC/i.test(raw)) return raw;
+  if (/이미지를 변환|로드하지/i.test(raw)) return raw;
+  if (/요청이 실패했습니다 \(401\)/) return '관리자 비밀번호가 맞지 않습니다. 다시 로그인해 주세요.';
+  if (/요청이 실패했습니다 \(429\)/) return '잠시 후 다시 시도해 주세요.';
+  if (/요청이 실패했습니다/) return `등록 함수 오류: ${raw}`;
+  return raw.slice(0, 180) || '알 수 없는 오류';
+}
+
 // Resizes+uploads one file to `memePool/{id}_full.<ext>` and `memePool/{id}_thumb.<ext>`,
-// returning the pair of download URLs (plus the full image's pixel size) or null on failure.
+// returning the pair of download URLs (plus the full image's pixel size).
 // Does NOT touch Firestore -- call memePoolUpsertRemote afterward to register the metadata.
 async function uploadMemePoolAssets(id, file) {
+  if (!file) throw new Error('파일이 없습니다');
+  if (isHeicFile(file)) {
+    throw new Error('HEIC 사진은 JPG/PNG/GIF/WEBP로 저장한 뒤 올려 주세요');
+  }
   const storage = await ensureMemeStorage();
-  if (!storage || !file) return null;
   try {
     if (isGif(file)) {
       const [fullUrl, thumbUrl] = await Promise.all([
@@ -105,7 +160,7 @@ async function uploadMemePoolAssets(id, file) {
     return { fullUrl, thumbUrl, width: full.width, height: full.height };
   } catch (err) {
     console.warn('uploadMemePoolAssets failed:', err);
-    return null;
+    throw err;
   }
 }
 
@@ -158,5 +213,8 @@ export {
   generateMemePoolId,
   normalizeHashtag,
   parseHashtagInput,
-  matchMemePoolByKeyword
+  matchMemePoolByKeyword,
+  describeMemeUploadError,
+  isHeicFile,
+  isGif
 };
