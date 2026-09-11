@@ -200,102 +200,19 @@ import {
 } from './app-data-bootstrap.js';
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
-// 입력필드 규칙: 멀티라인 텍스트는 값(로드/입력/붙여넣기)에 맞춰 세로로 자동 확장
-function ResizableModalContainer(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function AutoGrowTextarea(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AutoGrowTextarea;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function FormAddEditActionButtons(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.FormAddEditActionButtons;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function SegmentedToggle(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SegmentedToggle;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function UnderlineTabs(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.UnderlineTabs;
-  if (C) return React.createElement(C, props);
-  const f = window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.UnderlineTabs;
-  return typeof f === 'function' ? f(props) : null;
-}
-function ItemEditDeleteActions(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ItemEditDeleteActions;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function GamifiedConfirmButtonContent(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.GamifiedConfirmButtonContent;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function LinkPreviewCard(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LinkPreviewCard;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function LinkPreviewProgressOverlay(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LinkPreviewProgressOverlay;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function AdminLoginGate(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminLoginGate;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function DonutChart(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DonutChart;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function ColorSwatchPicker(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ColorSwatchPicker;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function StickyVideoBox(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.StickyVideoBox;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function PollVoterSheet(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PollVoterSheet;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function OperationProgressOverlay(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.OperationProgressOverlay;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function ToggleSwitch(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ToggleSwitch;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function Footer(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.Footer;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-
-function SearchResultLogRow(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SearchResultLogRow;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function TikTokEmbedWidget(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.TikTokEmbedWidget;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function UrlCapsuleBadge(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.UrlCapsuleBadge;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function ParticipantPickerButton(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ParticipantPickerButton;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function DateCapsuleBadge(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DateCapsuleBadge;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function CapsuleTextBadge(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CapsuleTextBadge;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
+// U1b (docs/app-main-split-units.md): plain GATHER_UI_COMPONENTS pass-through aliases,
+// bound once below via bindUiComponentAliases (src/core/app-ui-wrappers.js). Kept as
+// same-name const bindings because check-required-symbols.mjs (AdminLoginGate) and every
+// JSX call site in this file still reference these names directly.
+const uiWrapperAliases = bindUiComponentAliases(React);
+const {
+  ResizableModalContainer, AutoGrowTextarea, FormAddEditActionButtons, SegmentedToggle,
+  UnderlineTabs, ItemEditDeleteActions, GamifiedConfirmButtonContent, LinkPreviewCard,
+  LinkPreviewProgressOverlay, AdminLoginGate, DonutChart, ColorSwatchPicker, StickyVideoBox,
+  PollVoterSheet, OperationProgressOverlay, ToggleSwitch, Footer, SearchResultLogRow,
+  TikTokEmbedWidget, UrlCapsuleBadge, ParticipantPickerButton, DateCapsuleBadge,
+  CapsuleTextBadge
+} = uiWrapperAliases;
 
 // 입력필드 표시 규칙: 일반 텍스트 / YY.MM.DD 날짜 / URL 분리
 function tokenizeRichFieldText(text) {
@@ -548,35 +465,10 @@ async function replayQueuedCalendarWrite(operation) {
   );
   return Boolean(result?.ok);
 }
-/* Small dependency-free donut chart: N segments as SVG stroke-dasharray arcs on a ring. */
-function AdminDashboard(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminDashboard;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function AdminModal(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminModal;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function AdminUnifiedSearchResultsView(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminUnifiedSearchResultsView;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function AdminCreateCalendarModal(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminCreateCalendarModal;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function AdminRestorePhraseModal(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminRestorePhraseModal;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function AdminUnifiedSearchModal(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminUnifiedSearchModal;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function CreateSettlementModal(props) {
-  const C = window.__GATHER_CREATE_SETTLEMENT_MODAL__ || (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CreateSettlementModal);
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
+const {
+  AdminDashboard, AdminModal, AdminUnifiedSearchResultsView, AdminCreateCalendarModal,
+  AdminRestorePhraseModal, AdminUnifiedSearchModal, CreateSettlementModal
+} = uiWrapperAliases;
 function getAllDirectMediaImageEntries(message) {
   const direct = getMessageDirectMediaEntry(message);
   return direct ? [direct] : [];
@@ -9869,7 +9761,8 @@ function deleteAllChatImagesFromStorage(msg) {
 }
 
 // U1a (docs/app-main-split-units.md): the icon components below are aliases bound from
-// GATHER_UI_COMPONENTS by bindUiComponentAliases (src/core/app-ui-wrappers.js) -- kept as
+// GATHER_UI_COMPONENTS by bindUiComponentAliases (src/core/app-ui-wrappers.js), reusing the
+// single `uiWrapperAliases` object computed near the top of this file (U1b) -- kept as
 // same-name const bindings here because check-required-symbols.mjs and every JSX call site
 // in this file still reference these names directly.
 const {
@@ -9883,7 +9776,7 @@ const {
   LogIcon, HourglassIcon, AlertTriangleIcon, ShieldCheckIcon, KakaoTalkIcon,
   CalendarExportIcon, GalleryIcon, PollSectionIcon, LineHeightIcon, MegaphoneIcon,
   SmallXIcon, PlaceSectionIcon, ThreeLinesIcon, PlaceCategoryMarkerIcon, CctvIcon, DicesIcon
-} = bindUiComponentAliases(React);
+} = uiWrapperAliases;
 // Matches MenuIcon's exact svg wrapper (16x16, stroke 2, round caps) but needs a <rect> child
 // alongside its <path>s, which MenuIcon's paths-only prop can't express.
 
