@@ -3,6 +3,7 @@
  */
 
 import { MemeAdminPanel } from './ui-meme-admin.js';
+import { GalleryPagination } from './ui-chat-gallery.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_CHAT_DATA = window.GATHER_APP_CHAT_DATA || {};
@@ -266,6 +267,9 @@ function getCalendarAccentColor(...args) {
 }
 export function AdminDashboard({ initialCalendars }) {
   const React = window.React;
+  // Same one-shot breakpoint check app-chat-render.js's image-grid layout uses -- not reactive to
+  // resize, matching how every other caller of this pattern in the app already behaves.
+  const isMobile = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 640px)').matches;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const AdminCreateCalendarModal = __comp.AdminCreateCalendarModal || __deps.AdminCreateCalendarModal;
@@ -1694,13 +1698,14 @@ export function AdminDashboard({ initialCalendars }) {
   ]);
 
   // =====================================================================
-  // Supabase Design System Palette (Light)
+  // Admin dashboard chrome -- uses the same CSS custom-property design system as the rest of the
+  // app (var(--bg-card), var(--shadow-sm), etc.) so it follows the user's light/dark theme instead
+  // of a separate fixed light-only palette.
   // =====================================================================
   const styles = {
     dashboard: {
       color: 'var(--text-main)',
       minHeight: '100vh',
-      fontFamily: 'Inter, sans-serif',
       width: '100%',
       maxWidth: '100%',
       overflowX: 'hidden'
@@ -1712,10 +1717,10 @@ export function AdminDashboard({ initialCalendars }) {
       overflowX: 'hidden'
     },
     topBar: {
-      backgroundColor: '#FFFFFF',
+      backgroundColor: 'var(--bg-card)',
       borderBottom: '1px solid var(--border-subtle)',
       // Body keeps the requested 24px admin padding; the top bar absorbs that
-      // safe area with its own white background so the header never shows a gray strip.
+      // safe area with its own card-surface background so the header never shows a gray strip.
       margin: '-24px 0 0',
       paddingTop: '24px',
       boxSizing: 'border-box',
@@ -1759,7 +1764,7 @@ export function AdminDashboard({ initialCalendars }) {
       background: 'none',
       color: isActive ? 'var(--status-green)' : 'var(--text-muted)',
       borderBottom: isActive ? '3px solid var(--status-green)' : '3px solid transparent',
-      backgroundColor: isActive ? '#ECFDF5' : 'transparent',
+      backgroundColor: isActive ? 'color-mix(in srgb, var(--status-green) 14%, var(--bg-card))' : 'transparent',
       borderRadius: 'var(--radius-md) var(--radius-md) 0 0',
       cursor: 'pointer',
       outline: 'none',
@@ -1770,11 +1775,11 @@ export function AdminDashboard({ initialCalendars }) {
       gap: '4px'
     }),
     card: {
-      backgroundColor: '#FFFFFF',
+      backgroundColor: 'var(--bg-card)',
       border: 'none',
       borderRadius: 0,
       padding: '14px 24px 24px',
-      boxShadow: 'rgba(0, 0, 0, 0.05) 0px 2px 4px'
+      boxShadow: 'var(--shadow-sm)'
     },
     cardTitle: {
       fontSize: '0.96rem',
@@ -2120,19 +2125,11 @@ export function AdminDashboard({ initialCalendars }) {
                     }, "미태그")
                   ))
                 ),
-                photoPageCount > 1 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', marginTop: '12px' } },
-                  /*#__PURE__*/React.createElement("button", {
-                    type: "button", className: "btn btn-secondary", disabled: clampedPhotoPage === 0,
-                    onClick: () => setDataPoolPage(p => Math.max(0, p - 1)),
-                    style: { height: '32px', padding: '0 12px', fontWeight: 800, fontSize: 'var(--font-size-sm)' }
-                  }, "이전"),
-                  /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } }, `${clampedPhotoPage + 1} / ${photoPageCount}`),
-                  /*#__PURE__*/React.createElement("button", {
-                    type: "button", className: "btn btn-secondary", disabled: clampedPhotoPage >= photoPageCount - 1,
-                    onClick: () => setDataPoolPage(p => Math.min(photoPageCount - 1, p + 1)),
-                    style: { height: '32px', padding: '0 12px', fontWeight: 800, fontSize: 'var(--font-size-sm)' }
-                  }, "다음")
-                )
+                /*#__PURE__*/React.createElement(GalleryPagination, {
+                  page: clampedPhotoPage + 1, pageCount: photoPageCount, isMobile,
+                  onPageChange: nextPage => setDataPoolPage(nextPage - 1),
+                  ariaLabel: "데이터풀 사진 페이지"
+                })
               ),
           /*#__PURE__*/React.createElement("div", { style: { marginTop: '24px', paddingTop: '20px', borderTop: '1px solid var(--border-subtle)' } },
             /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '10px' } },
@@ -2224,23 +2221,15 @@ export function AdminDashboard({ initialCalendars }) {
                         dataPoolCategory === 'file' ? `${item.mime || ''}${item.mime ? ' · ' : ''}${formatSharedFileSize(item.size)}` : (item.siteName || item.url))
                     ),
                     /*#__PURE__*/React.createElement("span", {
-                      style: { flexShrink: 0, padding: '2px 8px', borderRadius: 'var(--radius-full)', backgroundColor: 'var(--accent-primary-soft, #EEF2FF)', color: 'var(--accent-primary)', fontSize: 'var(--font-size-2xs)', fontWeight: 800 }
+                      style: { flexShrink: 0, padding: '2px 8px', borderRadius: 'var(--radius-full)', backgroundColor: 'color-mix(in srgb, var(--accent-primary) 14%, var(--bg-card))', color: 'var(--accent-primary)', fontSize: 'var(--font-size-2xs)', fontWeight: 800 }
                     }, `${item.calendarCount}개 캘린더`)
                   ))
                 ),
-                sharedPageCount > 1 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', marginTop: '12px' } },
-                  /*#__PURE__*/React.createElement("button", {
-                    type: "button", className: "btn btn-secondary", disabled: clampedSharedPage === 0,
-                    onClick: () => setDataPoolPage(p => Math.max(0, p - 1)),
-                    style: { height: '32px', padding: '0 12px', fontWeight: 800, fontSize: 'var(--font-size-sm)' }
-                  }, "이전"),
-                  /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } }, `${clampedSharedPage + 1} / ${sharedPageCount}`),
-                  /*#__PURE__*/React.createElement("button", {
-                    type: "button", className: "btn btn-secondary", disabled: clampedSharedPage >= sharedPageCount - 1,
-                    onClick: () => setDataPoolPage(p => Math.min(sharedPageCount - 1, p + 1)),
-                    style: { height: '32px', padding: '0 12px', fontWeight: 800, fontSize: 'var(--font-size-sm)' }
-                  }, "다음")
-                )
+                /*#__PURE__*/React.createElement(GalleryPagination, {
+                  page: clampedSharedPage + 1, pageCount: sharedPageCount, isMobile,
+                  onPageChange: nextPage => setDataPoolPage(nextPage - 1),
+                  ariaLabel: "데이터풀 공용데이터 페이지"
+                })
               )
         ) : /*#__PURE__*/React.createElement("div", { style: { padding: '40px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)' } },
           categories.find(c => c.id === dataPoolCategory)?.label, " 종류의 캘린더 간 공유 데이터는 아직 없습니다.",
@@ -2432,9 +2421,9 @@ export function AdminDashboard({ initialCalendars }) {
             // undercount and mask a calendar quietly approaching the limit.
             const availabilityCount = Array.isArray(cal.availabilities) ? cal.availabilities.length : 0;
             const availabilityCapPercent = Math.min(100, Math.round(availabilityCount / 5000 * 100));
-            const availabilityCapColor = availabilityCapPercent >= 90 ? '#DC2626' : availabilityCapPercent >= 60 ? '#D97706' : '#94A3B8';
+            const availabilityCapColor = availabilityCapPercent >= 90 ? '#DC2626' : availabilityCapPercent >= 60 ? '#D97706' : 'var(--text-muted)';
             return /*#__PURE__*/React.createElement("div", {
-              key: cal.id, style: { border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '16px', backgroundColor: '#F8FAFC' }
+              key: cal.id, style: { border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '16px', backgroundColor: 'var(--bg-primary)' }
             },
               /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '8px' } },
                 /*#__PURE__*/React.createElement("div", { style: { fontSize: '0.92rem', fontWeight: 'bold', color: 'var(--text-main)' } }, cal.title || cal.id),
@@ -2444,7 +2433,7 @@ export function AdminDashboard({ initialCalendars }) {
                 style: { display: 'flex', flexWrap: 'wrap', gap: '6px', margin: '12px 0' }
               },
                 [[stat.participants.length, '명'], [stat.schedules.length, '건'], [stat.dateCount, '일'], [`투표 ${stat.pollCount}`, '건']].map(([val, unit]) => /*#__PURE__*/React.createElement("span", {
-                  key: unit + val, style: { fontSize: 'var(--font-size-xs)', padding: '2px 8px', borderRadius: '4px', backgroundColor: '#FFFFFF', border: '1px solid var(--border-subtle)', color: 'var(--text-main)' }
+                  key: unit + val, style: { fontSize: 'var(--font-size-xs)', padding: '2px 8px', borderRadius: '4px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', color: 'var(--text-main)' }
                 }, val, unit))
               ),
               /* 일정 등록 비중: 가장 일정이 많은 캘린더를 100% 기준으로 비교합니다. */
@@ -2457,7 +2446,7 @@ export function AdminDashboard({ initialCalendars }) {
               /*#__PURE__*/React.createElement("div", {
                 style: { width: '100%', height: '6px', borderRadius: 'var(--radius-full)', backgroundColor: 'var(--border-subtle)', overflow: 'hidden', marginTop: '4px' }
               },
-                /*#__PURE__*/React.createElement("div", { style: { width, height: '100%', backgroundColor: '#3ECF8E' } })
+                /*#__PURE__*/React.createElement("div", { style: { width, height: '100%', backgroundColor: 'var(--status-green)' } })
               ),
               /* Participants flow list */
               /*#__PURE__*/React.createElement("div", {
@@ -2563,7 +2552,7 @@ export function AdminDashboard({ initialCalendars }) {
             /*#__PURE__*/React.createElement("div", { className: "admin-quota-label" }, item.label),
             /*#__PURE__*/React.createElement("div", { className: "admin-quota-value" }, item.used, " / ", item.limit),
             item.percent != null && /*#__PURE__*/React.createElement("div", { className: "admin-progress" },
-              /*#__PURE__*/React.createElement("div", { className: "admin-progress-fill", style: { width: `${Math.max(2, Math.min(100, item.percent))}%`, background: item.percent >= 75 ? '#F59E0B' : '#3ECF8E' } })
+              /*#__PURE__*/React.createElement("div", { className: "admin-progress-fill", style: { width: `${Math.max(2, Math.min(100, item.percent))}%`, background: item.percent >= 75 ? '#F59E0B' : 'var(--status-green)' } })
             ),
             /*#__PURE__*/React.createElement("div", { className: "admin-quota-note" }, "잔여: ", item.remaining, /*#__PURE__*/React.createElement("br", null), item.note)
           ))
@@ -3105,7 +3094,7 @@ export function AdminDashboard({ initialCalendars }) {
 
         /* Message list -- the page itself scrolls, so this doesn't need its own scrollbox */
         /*#__PURE__*/React.createElement("div", {
-          style: { border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '8px', backgroundColor: '#F8FAFC' }
+          style: { border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '8px', backgroundColor: 'var(--bg-primary)' }
         },
           filteredMessages.length === 0 ? /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)', textAlign: 'center' } }, "표시할 채팅 내역이 없습니다.") :
           filteredMessages.map(msg => {

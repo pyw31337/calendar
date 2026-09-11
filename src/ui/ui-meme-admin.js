@@ -9,6 +9,7 @@
 import { uploadMemePoolAssets, generateMemePoolId, parseHashtagInput, describeMemeUploadError } from '../core/meme-pool.js';
 import { formatChatFileSize } from '../core/chat-file-attachments.js';
 import { ImageUploadOverlay } from './ui-overlays.js';
+import { GalleryPagination } from './ui-chat-gallery.js';
 
 // 브라우저당 동시 연결 제한(HTTP/1.1 기준 6개)은 Firebase Storage가 HTTP/2로 응답해 실제로는
 // 훨씬 많이 동시에 보낼 수 있다. 이전 "5장씩"은 700장을 올리는 데 140번의 대기 라운드가
@@ -61,6 +62,9 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
   const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
   const ConfirmDialog = __comp.ConfirmDialog || __deps.ConfirmDialog;
+  // Same one-shot breakpoint check app-chat-render.js's image-grid layout uses -- not reactive to
+  // resize, matching how every other caller of this pattern in the app already behaves.
+  const isMobile = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 640px)').matches;
   const fileInputRef = React.useRef(null);
   const [uploadProgress, setUploadProgress] = React.useState(null); // { done, total } | null
   const [resetProgress, setResetProgress] = React.useState(null); // { done, total } | null
@@ -380,19 +384,11 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
                 }
               }, "미태그")
             ))),
-            pageCount > 1 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', marginTop: '12px' } },
-              /*#__PURE__*/React.createElement("button", {
-                type: "button", className: "btn btn-secondary", disabled: clampedPage === 0,
-                onClick: () => setPage(p => Math.max(0, p - 1)),
-                style: { height: '32px', padding: '0 12px', fontWeight: 800, fontSize: 'var(--font-size-sm)' }
-              }, "이전"),
-              /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } }, `${clampedPage + 1} / ${pageCount}`),
-              /*#__PURE__*/React.createElement("button", {
-                type: "button", className: "btn btn-secondary", disabled: clampedPage >= pageCount - 1,
-                onClick: () => setPage(p => Math.min(pageCount - 1, p + 1)),
-                style: { height: '32px', padding: '0 12px', fontWeight: 800, fontSize: 'var(--font-size-sm)' }
-              }, "다음")
-            )
+            /*#__PURE__*/React.createElement(GalleryPagination, {
+              page: clampedPage + 1, pageCount, isMobile,
+              onPageChange: nextPage => setPage(nextPage - 1),
+              ariaLabel: "밈 이미지 풀 페이지"
+            })
           );
         })(),
     selected && /*#__PURE__*/React.createElement("div", {
@@ -446,7 +442,7 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
               key: tag,
               style: {
                 display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 4px 3px 10px',
-                borderRadius: 'var(--radius-full)', backgroundColor: 'var(--accent-primary-soft, #EEF2FF)',
+                borderRadius: 'var(--radius-full)', backgroundColor: 'color-mix(in srgb, var(--accent-primary) 14%, var(--bg-card))',
                 color: 'var(--accent-primary)', fontSize: 'var(--font-size-xs)', fontWeight: 800
               }
             }, `#${tag}`, /*#__PURE__*/React.createElement("button", {

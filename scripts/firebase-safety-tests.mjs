@@ -511,7 +511,7 @@ assert(chatGallerySource.includes('resolveGalleryLightboxTags'), 'gallery must r
 assert(photoIndexSource.includes('resolveGalleryLightboxTags'), 'photo-index must export sticky-first lightbox tag resolver');
 assert(appMainSource.includes('setGalleryLiveMessages(prev => prev.map(patchMessage))'), 'tag saves must patch galleryLiveMessages (gallery uploads are not in chat listener)');
 assert(summaryGallerySource.includes('resolveGalleryLightboxTags'), 'main-screen PhotoGallery must apply sticky tags on reopen');
-assert(chatGallerySource.includes('paginationDragPage'), 'mobile gallery pagination must support horizontal drag to pan the page window');
+assert(chatGallerySource.includes('dragPage') && chatGallerySource.includes('export function GalleryPagination'), 'mobile gallery pagination must support horizontal drag to pan the page window (now the shared GalleryPagination component)');
 assert(chatGallerySource.includes('is-swipeable'), 'mobile gallery pagination must mark the swipeable strip');
 assert(dateModalSource.includes('getPhotoAssetKeys(photo)'), 'schedule albums must dedupe REST/index/live copies by original or thumbnail asset');
 assert(appMainSource.includes('taggedMessages') && appMainSource.includes('fetchMessagesByImageTag(activeCalId, tag)'), 'handleFetchMeetingAlbum must also date-tag scan chat (not view-window only)');

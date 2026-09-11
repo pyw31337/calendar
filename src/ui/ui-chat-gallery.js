@@ -6,6 +6,122 @@ import { composeGalleryPhotos, getPaginationWindow, isMemeKeyboardPhotoEntry } f
 import { resolveGalleryLightboxTags } from '../core/photo-index.js';
 import { useScrollHideHeader } from '../core/use-scroll-hide-header.js';
 
+// Numbered page-window pagination (« ‹ 1 2 3 › », drag-to-page on mobile) -- originally built for
+// this gallery's photoIndex-backed grid, now the one page-picker every paginated screen in the app
+// should reuse (see the admin dashboard's 데이터풀/밈키보드 grids) instead of each growing its own
+// "이전/다음" pair. Callers own the current page; this only renders the window around it and
+// reports what the user picked -- go() and the drag handlers below are unchanged from the
+// original inline version, just parameterized over props instead of closure state.
+export function GalleryPagination({ page, pageCount, loading, onPageChange, isMobile, scrollHostRef, ariaLabel = "페이지" }) {
+  const React = window.React;
+  // Mobile pagination has no arrows -- a horizontal drag pans the centered page window so more
+  // numbers can be revealed, then a tap (or drag-release past the threshold) selects a page.
+  const [dragPage, setDragPage] = React.useState(null);
+  const dragRef = React.useRef(null);
+  const suppressClickRef = React.useRef(false);
+  React.useEffect(() => {
+    setDragPage(null);
+    dragRef.current = null;
+    suppressClickRef.current = false;
+  }, [page, pageCount]);
+  if (!pageCount || pageCount <= 1) return null;
+  const windowSize = isMobile ? 5 : 10;
+  const focusPage = dragPage != null ? dragPage : page;
+  const pages = getPaginationWindow(focusPage, pageCount, windowSize);
+  const go = target => {
+    if (loading || target < 1 || target > pageCount || target === page) return;
+    if (typeof onPageChange === 'function') onPageChange(target);
+    if (scrollHostRef?.current) scrollHostRef.current.scrollTop = 0;
+  };
+  // Same chevron used by the month-nav / BackArrowIcon (down path, rotated). Double-stack for
+  // first/last. Mobile hides arrows entirely -- number window alone is enough on a phone.
+  const chevron = (direction, key) => /*#__PURE__*/React.createElement("svg", {
+    key: key,
+    xmlns: "http://www.w3.org/2000/svg", width: "18", height: "18", viewBox: "0 0 24 24",
+    fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round",
+    style: { transform: direction === 'left' ? 'rotate(90deg)' : 'rotate(-90deg)', display: 'inline-block' },
+    className: "icon icon-tabler icons-tabler-outline icon-tabler-chevron-down", "aria-hidden": "true"
+  },
+    /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
+    /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" })
+  );
+  const doubleChevron = direction => /*#__PURE__*/React.createElement("span", {
+    style: { display: 'inline-flex', alignItems: 'center' }
+  },
+    chevron(direction, `${direction}-a`),
+    /*#__PURE__*/React.createElement("span", { style: { display: 'inline-flex', marginLeft: '-11px' } },
+      chevron(direction, `${direction}-b`)
+    )
+  );
+  const arrow = (label, targetPage, disabled, glyph) => /*#__PURE__*/React.createElement("button", {
+    key: label, type: "button", className: "gallery-pagination-button gallery-pagination-arrow",
+    "aria-label": label, disabled: disabled || loading, onClick: () => go(targetPage)
+  }, glyph);
+  const endMobileDrag = () => {
+    const drag = dragRef.current;
+    dragRef.current = null;
+    if (!drag) return;
+    const target = Math.min(pageCount, Math.max(1, Number(drag.focusPage) || page));
+    setDragPage(null);
+    if (!drag.moved) return;
+    // Prevent the synthesized click on the button under the finger from also selecting a page.
+    suppressClickRef.current = true;
+    if (target !== page) go(target);
+  };
+  const mobileDragProps = isMobile ? {
+    onPointerDown: event => {
+      if (loading || event.button != null && event.button !== 0) return;
+      dragRef.current = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        originPage: focusPage,
+        focusPage,
+        moved: false
+      };
+      try { event.currentTarget.setPointerCapture(event.pointerId); } catch (_) { /* ignore */ }
+    },
+    onPointerMove: event => {
+      const drag = dragRef.current;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      const delta = event.clientX - drag.startX;
+      if (Math.abs(delta) < 12 && !drag.moved) return;
+      // Drag left reveals higher page numbers (content moves with the finger).
+      const pageDelta = Math.round(-delta / 44);
+      const next = Math.min(pageCount, Math.max(1, drag.originPage + pageDelta));
+      drag.moved = true;
+      drag.focusPage = next;
+      if (dragPage !== next) setDragPage(next);
+      event.preventDefault();
+    },
+    onPointerUp: endMobileDrag,
+    onPointerCancel: endMobileDrag
+  } : {};
+  return /*#__PURE__*/React.createElement("nav", {
+    className: `gallery-pagination${isMobile ? ' is-mobile is-swipeable' : ''}`,
+    "aria-label": ariaLabel,
+    ...mobileDragProps
+  },
+    !isMobile && arrow('첫 페이지', 1, page <= 1, doubleChevron('left')),
+    !isMobile && arrow('이전 페이지', page - 1, page <= 1, chevron('left')),
+    pages.map(p => /*#__PURE__*/React.createElement("button", {
+      key: p, type: "button", className: `gallery-pagination-button${p === page ? ' is-active' : ''}${p === focusPage && p !== page ? ' is-focus' : ''}`,
+      "aria-current": p === page ? 'page' : undefined,
+      disabled: loading,
+      onClick: event => {
+        if (suppressClickRef.current) {
+          suppressClickRef.current = false;
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
+        go(p);
+      }
+    }, String(p))),
+    !isMobile && arrow('다음 페이지', page + 1, page >= pageCount, chevron('right')),
+    !isMobile && arrow('마지막 페이지', pageCount, page >= pageCount, doubleChevron('right'))
+  );
+}
+
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 function __gatherUiDeps() { return window.GATHER_UI_DEPS || {}; }
@@ -1989,115 +2105,14 @@ export function ChatGalleryModal({
     );
   };
   const renderGalleryLoadMoreButton = props => /*#__PURE__*/React.createElement(GalleryLoadMoreButton, props);
-  // Mobile pagination has no arrows -- a horizontal drag pans the centered page window so more
-  // numbers can be revealed, then a tap (or drag-release past the threshold) selects a page.
-  const [paginationDragPage, setPaginationDragPage] = React.useState(null);
-  const paginationDragRef = React.useRef(null);
-  const paginationSuppressClickRef = React.useRef(false);
-  React.useEffect(() => {
-    setPaginationDragPage(null);
-    paginationDragRef.current = null;
-    paginationSuppressClickRef.current = false;
-  }, [indexedPhotoPage, indexedPhotoTotal]);
   const renderGalleryPagination = () => {
     if (!usingPhotoIndex || indexedPhotoComplete || typeof onIndexedPhotoPageChange !== 'function') return null;
     const pageCount = Math.max(1, Math.ceil(Number(indexedPhotoTotal || 0) / 100));
-    if (pageCount <= 1) return null;
-    const windowSize = isMobile ? 5 : 10;
-    const focusPage = paginationDragPage != null ? paginationDragPage : indexedPhotoPage;
-    const pages = getPaginationWindow(focusPage, pageCount, windowSize);
-    const go = page => {
-      if (indexedPhotoLoading || page < 1 || page > pageCount || page === indexedPhotoPage) return;
-      void onIndexedPhotoPageChange(page);
-      if (gridHostRef.current) gridHostRef.current.scrollTop = 0;
-    };
-    // Same chevron used by the month-nav / BackArrowIcon (down path, rotated). Double-stack for
-    // first/last. Mobile hides arrows entirely -- number window alone is enough on a phone.
-    const chevron = (direction, key) => /*#__PURE__*/React.createElement("svg", {
-      key: key,
-      xmlns: "http://www.w3.org/2000/svg", width: "18", height: "18", viewBox: "0 0 24 24",
-      fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round",
-      style: { transform: direction === 'left' ? 'rotate(90deg)' : 'rotate(-90deg)', display: 'inline-block' },
-      className: "icon icon-tabler icons-tabler-outline icon-tabler-chevron-down", "aria-hidden": "true"
-    },
-      /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
-      /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" })
-    );
-    const doubleChevron = direction => /*#__PURE__*/React.createElement("span", {
-      style: { display: 'inline-flex', alignItems: 'center' }
-    },
-      chevron(direction, `${direction}-a`),
-      /*#__PURE__*/React.createElement("span", { style: { display: 'inline-flex', marginLeft: '-11px' } },
-        chevron(direction, `${direction}-b`)
-      )
-    );
-    const arrow = (label, page, disabled, glyph) => /*#__PURE__*/React.createElement("button", {
-      key: label, type: "button", className: "gallery-pagination-button gallery-pagination-arrow",
-      "aria-label": label, disabled: disabled || indexedPhotoLoading, onClick: () => go(page)
-    }, glyph);
-    const endMobileDrag = () => {
-      const drag = paginationDragRef.current;
-      paginationDragRef.current = null;
-      if (!drag) return;
-      const target = Math.min(pageCount, Math.max(1, Number(drag.focusPage) || indexedPhotoPage));
-      setPaginationDragPage(null);
-      if (!drag.moved) return;
-      // Prevent the synthesized click on the button under the finger from also selecting a page.
-      paginationSuppressClickRef.current = true;
-      if (target !== indexedPhotoPage) go(target);
-    };
-    const mobileDragProps = isMobile ? {
-      onPointerDown: event => {
-        if (indexedPhotoLoading || event.button != null && event.button !== 0) return;
-        paginationDragRef.current = {
-          pointerId: event.pointerId,
-          startX: event.clientX,
-          originPage: focusPage,
-          focusPage,
-          moved: false
-        };
-        try { event.currentTarget.setPointerCapture(event.pointerId); } catch (_) { /* ignore */ }
-      },
-      onPointerMove: event => {
-        const drag = paginationDragRef.current;
-        if (!drag || drag.pointerId !== event.pointerId) return;
-        const delta = event.clientX - drag.startX;
-        if (Math.abs(delta) < 12 && !drag.moved) return;
-        // Drag left reveals higher page numbers (content moves with the finger).
-        const pageDelta = Math.round(-delta / 44);
-        const next = Math.min(pageCount, Math.max(1, drag.originPage + pageDelta));
-        drag.moved = true;
-        drag.focusPage = next;
-        if (paginationDragPage !== next) setPaginationDragPage(next);
-        event.preventDefault();
-      },
-      onPointerUp: endMobileDrag,
-      onPointerCancel: endMobileDrag
-    } : {};
-    return /*#__PURE__*/React.createElement("nav", {
-      className: `gallery-pagination${isMobile ? ' is-mobile is-swipeable' : ''}`,
-      "aria-label": "갤러리 페이지",
-      ...mobileDragProps
-    },
-      !isMobile && arrow('첫 페이지', 1, indexedPhotoPage <= 1, doubleChevron('left')),
-      !isMobile && arrow('이전 페이지', indexedPhotoPage - 1, indexedPhotoPage <= 1, chevron('left')),
-      pages.map(page => /*#__PURE__*/React.createElement("button", {
-        key: page, type: "button", className: `gallery-pagination-button${page === indexedPhotoPage ? ' is-active' : ''}${page === focusPage && page !== indexedPhotoPage ? ' is-focus' : ''}`,
-        "aria-current": page === indexedPhotoPage ? 'page' : undefined,
-        disabled: indexedPhotoLoading,
-        onClick: event => {
-          if (paginationSuppressClickRef.current) {
-            paginationSuppressClickRef.current = false;
-            event.preventDefault();
-            event.stopPropagation();
-            return;
-          }
-          go(page);
-        }
-      }, String(page))),
-      !isMobile && arrow('다음 페이지', indexedPhotoPage + 1, indexedPhotoPage >= pageCount, chevron('right')),
-      !isMobile && arrow('마지막 페이지', pageCount, indexedPhotoPage >= pageCount, doubleChevron('right'))
-    );
+    return /*#__PURE__*/React.createElement(GalleryPagination, {
+      page: indexedPhotoPage, pageCount, loading: indexedPhotoLoading,
+      onPageChange: onIndexedPhotoPageChange, isMobile, scrollHostRef: gridHostRef,
+      ariaLabel: "갤러리 페이지"
+    });
   };
   // Distinguishes "haven't finished loading this calendar's history yet" from "genuinely no
   // photos here" -- totalGalleryCount (a global, all-months count fetched once) used to stand in
