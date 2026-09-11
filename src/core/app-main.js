@@ -17,8 +17,6 @@ import {
   filterDeletedPhotoFromIndexItems
 } from './gallery-bulk-delete.js';
 import { filterOutMemoryExclusionKeys, preserveAnniversaryCurationFields } from './gallery-data.js';
-import { bindUiComponentAliases } from './app-ui-wrappers.js';
-import { useTapRevealedMsgId, useModalDirtyGuard, useChatSendGuard } from './app-ui-hooks.js';
 import exifr from 'exifr';
 import {
   computeKoreanHolidaysForYear,
@@ -201,19 +199,102 @@ import {
 } from './app-data-bootstrap.js';
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
-// U1b (docs/app-main-split-units.md): plain GATHER_UI_COMPONENTS pass-through aliases,
-// bound once below via bindUiComponentAliases (src/core/app-ui-wrappers.js). Kept as
-// same-name const bindings because check-required-symbols.mjs (AdminLoginGate) and every
-// JSX call site in this file still reference these names directly.
-const uiWrapperAliases = bindUiComponentAliases(React);
-const {
-  ResizableModalContainer, AutoGrowTextarea, FormAddEditActionButtons, SegmentedToggle,
-  UnderlineTabs, ItemEditDeleteActions, GamifiedConfirmButtonContent, LinkPreviewCard,
-  LinkPreviewProgressOverlay, AdminLoginGate, DonutChart, ColorSwatchPicker, StickyVideoBox,
-  PollVoterSheet, OperationProgressOverlay, ToggleSwitch, Footer, SearchResultLogRow,
-  TikTokEmbedWidget, UrlCapsuleBadge, ParticipantPickerButton, DateCapsuleBadge,
-  CapsuleTextBadge
-} = uiWrapperAliases;
+// 입력필드 규칙: 멀티라인 텍스트는 값(로드/입력/붙여넣기)에 맞춰 세로로 자동 확장
+function ResizableModalContainer(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function AutoGrowTextarea(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AutoGrowTextarea;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function FormAddEditActionButtons(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.FormAddEditActionButtons;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function SegmentedToggle(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SegmentedToggle;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function UnderlineTabs(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.UnderlineTabs;
+  if (C) return React.createElement(C, props);
+  const f = window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.UnderlineTabs;
+  return typeof f === 'function' ? f(props) : null;
+}
+function ItemEditDeleteActions(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ItemEditDeleteActions;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function GamifiedConfirmButtonContent(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.GamifiedConfirmButtonContent;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function LinkPreviewCard(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LinkPreviewCard;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function LinkPreviewProgressOverlay(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LinkPreviewProgressOverlay;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function AdminLoginGate(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminLoginGate;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function DonutChart(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DonutChart;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function ColorSwatchPicker(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ColorSwatchPicker;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function StickyVideoBox(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.StickyVideoBox;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function PollVoterSheet(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PollVoterSheet;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function OperationProgressOverlay(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.OperationProgressOverlay;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function ToggleSwitch(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ToggleSwitch;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function Footer(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.Footer;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+
+function SearchResultLogRow(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SearchResultLogRow;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function TikTokEmbedWidget(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.TikTokEmbedWidget;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function UrlCapsuleBadge(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.UrlCapsuleBadge;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function ParticipantPickerButton(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ParticipantPickerButton;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function DateCapsuleBadge(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DateCapsuleBadge;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function CapsuleTextBadge(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CapsuleTextBadge;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 
 // 입력필드 표시 규칙: 일반 텍스트 / YY.MM.DD 날짜 / URL 분리
 function tokenizeRichFieldText(text) {
@@ -466,10 +547,35 @@ async function replayQueuedCalendarWrite(operation) {
   );
   return Boolean(result?.ok);
 }
-const {
-  AdminDashboard, AdminModal, AdminUnifiedSearchResultsView, AdminCreateCalendarModal,
-  AdminRestorePhraseModal, AdminUnifiedSearchModal, CreateSettlementModal
-} = uiWrapperAliases;
+/* Small dependency-free donut chart: N segments as SVG stroke-dasharray arcs on a ring. */
+function AdminDashboard(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminDashboard;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function AdminModal(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminModal;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function AdminUnifiedSearchResultsView(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminUnifiedSearchResultsView;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function AdminCreateCalendarModal(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminCreateCalendarModal;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function AdminRestorePhraseModal(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminRestorePhraseModal;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function AdminUnifiedSearchModal(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminUnifiedSearchModal;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function CreateSettlementModal(props) {
+  const C = window.__GATHER_CREATE_SETTLEMENT_MODAL__ || (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CreateSettlementModal);
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 function getAllDirectMediaImageEntries(message) {
   const direct = getMessageDirectMediaEntry(message);
   return direct ? [direct] : [];
@@ -8201,7 +8307,30 @@ function CalendarApp() {
 
 
 // Calendar Grid Component
-const { CalendarGrid, CommentsSection, MemoCard, PollList, GlobalSearchModal, EditMessageModal } = uiWrapperAliases;
+function CalendarGrid(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CalendarGrid;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function CommentsSection(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CommentsSection;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function MemoCard(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MemoCard;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function PollList(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PollList;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function GlobalSearchModal(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.GlobalSearchModal;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function EditMessageModal(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.EditMessageModal;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 
 // Link preview (OpenGraph via peekalink.io's API), fetched through the peekalinkProxy Cloud
 // Function (functions/index.js) instead of calling api.peekalink.io directly from the browser.
@@ -8446,7 +8575,22 @@ function extractDirectImageUrls(text) {
 // ~30000) so it stays visible while browsing other tabs, but below toast (99999) and confirm
 // dialogs (100000) so those never get obscured by it.
 
-const { DirectChatMediaText, DeadlineDateTimePicker, PlacesSection, ImageUrlModal } = uiWrapperAliases;
+function DirectChatMediaText(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DirectChatMediaText;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function DeadlineDateTimePicker(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DeadlineDateTimePicker;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function PlacesSection(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlacesSection;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function ImageUrlModal(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ImageUrlModal;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 
 function renderChatMessageBody(msg, setActiveLightbox, singleImageStyle = {}, searchQuery = '', stickyVideoKey = null, onActivateVideo = null, linkPreviewOnly = false, onOpenFileAttachment = null) {
   const msgImages = renderChatMessageImages(msg, setActiveLightbox, singleImageStyle);
@@ -9234,7 +9378,18 @@ async function appendChatImageFiles({
   return { handled: true, succeeded: succeeded.length, failed: failed.length };
 }
 
-const { ImageUploadOverlay, ImageProcessingOverlay, EmojiPickerSheet } = uiWrapperAliases;
+function ImageUploadOverlay(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ImageUploadOverlay;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function ImageProcessingOverlay(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ImageProcessingOverlay;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function EmojiPickerSheet(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.EmojiPickerSheet;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 
 function getUploadImageBlobMeta(blob, fallbackExt = 'jpg') {
   const mime = String(blob?.type || '').toLowerCase();
@@ -9666,23 +9821,232 @@ function deleteAllChatImagesFromStorage(msg) {
   urls.forEach(url => deleteChatImageFromStorage(url));
 }
 
-// U1a (docs/app-main-split-units.md): the icon components below are aliases bound from
-// GATHER_UI_COMPONENTS by bindUiComponentAliases (src/core/app-ui-wrappers.js), reusing the
-// single `uiWrapperAliases` object computed near the top of this file (U1b) -- kept as
-// same-name const bindings here because check-required-symbols.mjs and every JSX call site
-// in this file still reference these names directly.
-const {
-  MenuIcon, NotepadTextIcon, ChatSectionIcon, LinkIcon, MessageCommentIcon, PencilIcon,
-  BuildingIcon, BackArrowIcon, SunIcon, CloudIcon, MistIcon, CloudRainIcon, SnowflakeIcon,
-  CloudLightningIcon, SettingsIcon, MapCogIcon, GiftIcon, MoonStarsIcon, TextResizeIcon,
-  BellIcon, SearchIcon, CalendarCheckIcon, LockIcon, LogoutIcon, RefreshIcon,
-  AdminFilledMenuIcon, EmojiPickerIcon, ExternalLinkIcon, WalletIcon, CoinIcon,
-  BanknoteArrowUpIcon, BanknoteArrowDownIcon, PiggyBankIcon, ChartBarIcon, ChartPieIcon,
-  CalendarCogIcon, CalendarSearchIcon, TrophyIcon, PodiumIcon, CloudDataConnectionIcon,
-  LogIcon, HourglassIcon, AlertTriangleIcon, ShieldCheckIcon, KakaoTalkIcon,
-  CalendarExportIcon, GalleryIcon, PollSectionIcon, LineHeightIcon, MegaphoneIcon,
-  SmallXIcon, PlaceSectionIcon, ThreeLinesIcon, PlaceCategoryMarkerIcon, CctvIcon, DicesIcon
-} = uiWrapperAliases;
+// Small line-icon for the main header's menu bar (Tabler-style outline icons, matching the
+// existing icon set used elsewhere in the header/popovers).
+function MenuIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MenuIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function NotepadTextIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.NotepadTextIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function ChatSectionIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChatSectionIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function LinkIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LinkIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function MessageCommentIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MessageCommentIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function PencilIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PencilIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function BuildingIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.BuildingIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function BackArrowIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.BackArrowIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function SunIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SunIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function CloudIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CloudIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function MistIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MistIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function CloudRainIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CloudRainIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function SnowflakeIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SnowflakeIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function CloudLightningIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CloudLightningIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function SettingsIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SettingsIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function MapCogIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MapCogIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function GiftIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.GiftIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function MoonStarsIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MoonStarsIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function TextResizeIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.TextResizeIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function BellIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.BellIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function SearchIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SearchIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function CalendarCheckIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CalendarCheckIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function LockIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LockIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function LogoutIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LogoutIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function RefreshIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.RefreshIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function AdminFilledMenuIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminFilledMenuIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function EmojiPickerIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.EmojiPickerIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function ExternalLinkIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ExternalLinkIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function WalletIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.WalletIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function CoinIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CoinIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function BanknoteArrowUpIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.BanknoteArrowUpIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function BanknoteArrowDownIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.BanknoteArrowDownIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function PiggyBankIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PiggyBankIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function ChartBarIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChartBarIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function ChartPieIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChartPieIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function CalendarCogIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CalendarCogIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function CalendarSearchIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CalendarSearchIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function TrophyIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.TrophyIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function PodiumIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PodiumIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function CloudDataConnectionIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CloudDataConnectionIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function LogIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LogIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function HourglassIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.HourglassIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function AlertTriangleIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AlertTriangleIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function ShieldCheckIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ShieldCheckIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function KakaoTalkIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.KakaoTalkIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function CalendarExportIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CalendarExportIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function GalleryIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.GalleryIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function PollSectionIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PollSectionIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function LineHeightIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LineHeightIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function MegaphoneIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MegaphoneIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function SmallXIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SmallXIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function PlaceSectionIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlaceSectionIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function ThreeLinesIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ThreeLinesIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function PlaceCategoryMarkerIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlaceCategoryMarkerIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function CctvIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CctvIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function DicesIcon(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DicesIcon;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 // Matches MenuIcon's exact svg wrapper (16x16, stroke 2, round caps) but needs a <rect> child
 // alongside its <path>s, which MenuIcon's paths-only prop can't express.
 
@@ -9973,13 +10337,105 @@ function buildLightboxImageInfo(url, timestamp) {
 // buttons and dot indicators when there's more than one image, matching the KakaoTalk-style
 // multi-photo gallery UX the chat bubbles are modeled after. `meta` (optional, parallel to
 // `urls`) supplies each image's { timestamp } for the tap-to-toggle info overlay.
-const { Lightbox } = uiWrapperAliases;
+function Lightbox(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.Lightbox;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+
+
+// Tracks which message row's edit/delete controls should be revealed: desktop hover is
+// handled purely in CSS (see .msg-row-hover:hover), this only drives the mobile tap case --
+// tapping a row reveals its controls, tapping anywhere else (including another row) hides them.
+function useTapRevealedMsgId() {
+  const [revealedId, setRevealedId] = React.useState(null);
+  React.useEffect(() => {
+    const handler = e => {
+      const target = e.target.closest ? e.target.closest('[data-msg-row-id]') : null;
+      setRevealedId(target ? target.getAttribute('data-msg-row-id') : null);
+    };
+    document.addEventListener('touchstart', handler, { passive: true });
+    document.addEventListener('mousedown', handler);
+    return () => {
+      document.removeEventListener('touchstart', handler);
+      document.removeEventListener('mousedown', handler);
+    };
+  }, []);
+  return revealedId;
+}
+
+// Snapshot-based close guard for layer popups: capture the draft state when a modal becomes
+// active (or when a caller explicitly resets the baseline) and only ask for confirmation when
+// the current snapshot no longer matches that baseline. This keeps "opened then immediately
+// closed" silent, but still catches actual unsaved edits across text fields, toggles, selects,
+// reorders, and other non-text controls.
+function useModalDirtyGuard(onClose, onRequestConfirm, message, active = true, getSnapshot = null, resetKey = '') {
+  const baselineRef = React.useRef('');
+  const snapshotRef = React.useRef(getSnapshot);
+  snapshotRef.current = getSnapshot;
+  const readSnapshot = React.useCallback(() => {
+    const fn = snapshotRef.current;
+    if (typeof fn !== 'function') return '';
+    try {
+      return String(fn() ?? '');
+    } catch (e) {
+      return '';
+    }
+  }, []);
+  React.useEffect(() => {
+    if (!active) return undefined;
+    baselineRef.current = readSnapshot();
+    return undefined;
+  }, [active, resetKey, readSnapshot]);
+  const requestClose = React.useCallback(() => {
+    if (readSnapshot() !== baselineRef.current && typeof onRequestConfirm === 'function') {
+      onRequestConfirm('닫기 확인', message || '저장하지 않은 내용이 있습니다. 닫으시겠습니까?', onClose);
+      return;
+    }
+    onClose();
+  }, [onClose, onRequestConfirm, message, readSnapshot]);
+  const overlayOnClick = React.useCallback(e => {
+    if (e.target !== e.currentTarget) return;
+    requestClose();
+  }, [requestClose]);
+  return { requestClose, overlayOnClick };
+}
+
+// De-dupes rapid double-taps / pointerdown+click event duplication firing onSend() twice for the
+// same message -- extracted from ChatRoomView (see its own history of this exact bug) so
+// CommentsSection's independent Send button/Ctrl+Enter shortcut get the same protection instead
+// of quietly missing it.
+function useChatSendGuard(onSend, canSend = true) {
+  const sharedGuard = window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.useChatSendGuard;
+  if (typeof sharedGuard === 'function') return sharedGuard(onSend, canSend);
+  const lockRef = React.useRef(false);
+  return (...args) => {
+    const isAllowed = typeof canSend === 'function' ? canSend(...args) : Boolean(canSend);
+    if (!isAllowed || lockRef.current) return;
+    lockRef.current = true;
+    let result;
+    try {
+      result = onSend && onSend(...args);
+    } catch (error) {
+      setTimeout(() => { lockRef.current = false; }, 250);
+      console.error('chat send failed:', error);
+      return;
+    }
+    Promise.resolve(result).catch(error => {
+      console.error('chat send failed:', error);
+    }).finally(() => {
+      setTimeout(() => {
+        lockRef.current = false;
+      }, 250);
+    });
+  };
+}
 
 
 
-
-
-const { ChatRoomView } = uiWrapperAliases;
+function ChatRoomView(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChatRoomView;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 
 
 // A curated, cross-platform-consistent emoji set (Twemoji, the same flat-design set used by
@@ -10047,7 +10503,29 @@ function addRecentEmoji(emoji) {
 
 
 
-const { ChatParticipantSheet, AppSettingsModal, NotificationOnboardingModal, NotificationPermissionHelpModal, ConfirmDialog } = uiWrapperAliases;
+function ChatParticipantSheet(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChatParticipantSheet;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function AppSettingsModal(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AppSettingsModal;
+  return C ? React.createElement(C, props) : null;
+}
+function NotificationOnboardingModal(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.NotificationOnboardingModal;
+  return C ? React.createElement(C, props) : null;
+}
+function NotificationPermissionHelpModal(props) {
+
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.NotificationPermissionHelpModal;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+
+
+function ConfirmDialog(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ConfirmDialog;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 
 
 
@@ -10077,7 +10555,10 @@ function getShortTitleParts(dateStr) {
 
 
 
-const { DateModal } = uiWrapperAliases;
+function DateModal(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DateModal;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 
 
 
@@ -10268,7 +10749,34 @@ const rebuildCalendarToTimestamp = (calendar, T, logs = []) => {
 // A <select>-replacement styled as a form-select trigger button that opens the same bottom-sheet
 // picker pattern used elsewhere in the app (e.g. the admin header's calendar picker) -- unlike a
 // native <select>, the open dropdown list is entirely CSS-styled and follows dark mode.
-const { SectionCountBadge, SectionToggleButton, SearchCategoryTabs, SimpleBottomSheetPicker, PhotoGallery, SummaryList, MemoPreviewSection } = uiWrapperAliases;
+function SectionCountBadge(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SectionCountBadge;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function SectionToggleButton(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SectionToggleButton;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function SearchCategoryTabs(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SearchCategoryTabs;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function SimpleBottomSheetPicker(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SimpleBottomSheetPicker;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function PhotoGallery(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PhotoGallery;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function SummaryList(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SummaryList;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function MemoPreviewSection(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MemoPreviewSection;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 
 
 
@@ -10437,7 +10945,16 @@ function getAdminSearchResultTargetUrl(type, item) {
 
 
 // Share Modal
-const { ShareModal, UserManualOverlay } = uiWrapperAliases;
+function ShareModal(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ShareModal;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+
+
+function UserManualOverlay(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.UserManualOverlay;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 
 
 
@@ -10470,7 +10987,14 @@ function getWeatherIcon(code, size = 16) {
   return /*#__PURE__*/React.createElement(SunIcon, { size });
 }
 
-const { WeatherBadge, WeatherLocationModal } = uiWrapperAliases;
+function WeatherBadge(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.WeatherBadge;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function WeatherLocationModal(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.WeatherLocationModal;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 
 
 function translateKoreanToEnglish(query) {
@@ -10530,7 +11054,42 @@ function translateKoreanToEnglish(query) {
 
 
 
-const { MainSideMenu, UpdateAvailableBanner, ImageShareViewer, ImageThumbRemoveButton, InlineSearchBar, MemoShareModal, ChatGalleryModal, MemoView } = uiWrapperAliases;
+function MainSideMenu(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MainSideMenu;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+
+
+function UpdateAvailableBanner(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.UpdateAvailableBanner;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function ImageShareViewer(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ImageShareViewer;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function ImageThumbRemoveButton(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ImageThumbRemoveButton;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function InlineSearchBar(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.InlineSearchBar;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function MemoShareModal(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MemoShareModal;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function ChatGalleryModal(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChatGalleryModal;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+
+
+function MemoView(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MemoView;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 
 
 
@@ -10662,7 +11221,18 @@ function getAnniversaryDisplayColor(ann, calendar) {
   return matched ? matched.color : ann.badgeColor;
 }
 
-const { AnniversaryModal, SettlementSummaryModal, PollModal } = uiWrapperAliases;
+function AnniversaryModal(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AnniversaryModal;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function SettlementSummaryModal(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SettlementSummaryModal;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function PollModal(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PollModal;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 
 
 
@@ -11053,7 +11623,22 @@ function centerMapOnMarkerAndPopup(map, marker, opts) {
   requestAnimationFrame(() => requestAnimationFrame(tryCenter));
 }
 
-const { PlaceMapView, PlacesView, HistoryView, ContentView } = uiWrapperAliases;
+function PlaceMapView(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlaceMapView;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function PlacesView(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlacesView;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function HistoryView(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.HistoryView;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
+function ContentView(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ContentView;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 
 
 // Address/업체명 search (Nominatim, same free geocoder the weather feature already uses as a
@@ -11086,7 +11671,10 @@ async function fetchWithTimeout(url, timeoutMs) {
   }
 }
 
-const { PlaceRegisterModal } = uiWrapperAliases;
+function PlaceRegisterModal(props) {
+  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlaceRegisterModal;
+  return typeof C === 'function' ? React.createElement(C, props) : null;
+}
 
 
 // Main-screen collapsible map preview -- collapsed shows a short 16:9 map, expanded shows a
