@@ -17,6 +17,7 @@ import {
   filterDeletedPhotoFromIndexItems
 } from './gallery-bulk-delete.js';
 import { filterOutMemoryExclusionKeys, preserveAnniversaryCurationFields } from './gallery-data.js';
+import { bindUiComponentAliases } from './app-ui-wrappers.js';
 import exifr from 'exifr';
 import {
   computeKoreanHolidaysForYear,
@@ -9867,232 +9868,22 @@ function deleteAllChatImagesFromStorage(msg) {
   urls.forEach(url => deleteChatImageFromStorage(url));
 }
 
-// Small line-icon for the main header's menu bar (Tabler-style outline icons, matching the
-// existing icon set used elsewhere in the header/popovers).
-function MenuIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MenuIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function NotepadTextIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.NotepadTextIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function ChatSectionIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChatSectionIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function LinkIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LinkIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function MessageCommentIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MessageCommentIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function PencilIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PencilIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function BuildingIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.BuildingIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function BackArrowIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.BackArrowIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function SunIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SunIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function CloudIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CloudIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function MistIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MistIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function CloudRainIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CloudRainIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function SnowflakeIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SnowflakeIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function CloudLightningIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CloudLightningIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function SettingsIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SettingsIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function MapCogIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MapCogIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function GiftIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.GiftIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function MoonStarsIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MoonStarsIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function TextResizeIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.TextResizeIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function BellIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.BellIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function SearchIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SearchIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function CalendarCheckIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CalendarCheckIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function LockIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LockIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function LogoutIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LogoutIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function RefreshIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.RefreshIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function AdminFilledMenuIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AdminFilledMenuIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function EmojiPickerIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.EmojiPickerIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function ExternalLinkIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ExternalLinkIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function WalletIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.WalletIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function CoinIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CoinIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function BanknoteArrowUpIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.BanknoteArrowUpIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function BanknoteArrowDownIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.BanknoteArrowDownIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function PiggyBankIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PiggyBankIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function ChartBarIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChartBarIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function ChartPieIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChartPieIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function CalendarCogIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CalendarCogIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function CalendarSearchIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CalendarSearchIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function TrophyIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.TrophyIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function PodiumIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PodiumIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function CloudDataConnectionIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CloudDataConnectionIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function LogIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LogIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function HourglassIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.HourglassIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function AlertTriangleIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AlertTriangleIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function ShieldCheckIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ShieldCheckIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function KakaoTalkIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.KakaoTalkIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function CalendarExportIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CalendarExportIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function GalleryIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.GalleryIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function PollSectionIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PollSectionIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function LineHeightIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.LineHeightIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function MegaphoneIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MegaphoneIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function SmallXIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SmallXIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function PlaceSectionIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlaceSectionIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function ThreeLinesIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ThreeLinesIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function PlaceCategoryMarkerIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlaceCategoryMarkerIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function CctvIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CctvIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function DicesIcon(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DicesIcon;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
+// U1a (docs/app-main-split-units.md): the icon components below are aliases bound from
+// GATHER_UI_COMPONENTS by bindUiComponentAliases (src/core/app-ui-wrappers.js) -- kept as
+// same-name const bindings here because check-required-symbols.mjs and every JSX call site
+// in this file still reference these names directly.
+const {
+  MenuIcon, NotepadTextIcon, ChatSectionIcon, LinkIcon, MessageCommentIcon, PencilIcon,
+  BuildingIcon, BackArrowIcon, SunIcon, CloudIcon, MistIcon, CloudRainIcon, SnowflakeIcon,
+  CloudLightningIcon, SettingsIcon, MapCogIcon, GiftIcon, MoonStarsIcon, TextResizeIcon,
+  BellIcon, SearchIcon, CalendarCheckIcon, LockIcon, LogoutIcon, RefreshIcon,
+  AdminFilledMenuIcon, EmojiPickerIcon, ExternalLinkIcon, WalletIcon, CoinIcon,
+  BanknoteArrowUpIcon, BanknoteArrowDownIcon, PiggyBankIcon, ChartBarIcon, ChartPieIcon,
+  CalendarCogIcon, CalendarSearchIcon, TrophyIcon, PodiumIcon, CloudDataConnectionIcon,
+  LogIcon, HourglassIcon, AlertTriangleIcon, ShieldCheckIcon, KakaoTalkIcon,
+  CalendarExportIcon, GalleryIcon, PollSectionIcon, LineHeightIcon, MegaphoneIcon,
+  SmallXIcon, PlaceSectionIcon, ThreeLinesIcon, PlaceCategoryMarkerIcon, CctvIcon, DicesIcon
+} = bindUiComponentAliases(React);
 // Matches MenuIcon's exact svg wrapper (16x16, stroke 2, round caps) but needs a <rect> child
 // alongside its <path>s, which MenuIcon's paths-only prop can't express.
 
