@@ -3971,6 +3971,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
     void ok;
   };
   const [isMemoOpen, setIsMemoOpen] = React.useState(false);
+  const [isEditingMemo, setIsEditingMemo] = React.useState(false);
   const openMovieVideoSearch = item => {
     if (!item) return;
     const query = encodeURIComponent(`${item.title || ''} 영화 예고편 리뷰`.trim());
@@ -3999,6 +4000,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
   // memo (anniversary.memo / memos collection / DateModal attendance note) looked empty.
   React.useEffect(() => {
     setIsSavingMemo(false);
+    setIsEditingMemo(false);
     if (!selected) {
       setIsMemoOpen(false);
       setMemoDraft('');
@@ -4031,6 +4033,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
         // calendar-linked backdrop screenshot) instead of collapsing to an empty composer.
         if (draft) setMemoDraft(draft);
         setIsMemoOpen(true);
+        setIsEditingMemo(false);
       }
     } finally {
       setIsSavingMemo(false);
@@ -4622,30 +4625,54 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
               style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-main)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }
             }, renderDescriptionWithLinks(selected.description))
           ),
-          /*#__PURE__*/React.createElement("label", {
-            style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, padding: '10px', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)', cursor: pendingId ? 'wait' : 'pointer', fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-main)' }
+          /* 캘린더 연동 + 메모 펼치기: 예전엔 별도 두 줄(연동 체크박스, 메모 토글)이라 저장된
+             메모(예: 기념일에 남긴 "티켓 17,000원")가 있어도 한눈에 안 보였다. 한 줄에 나란히
+             두고, 우측 위아래 화살표로 그 아래 메모 영역을 펼치고/접는다 -- 다른 페이지 헤더의
+             돋보기/메뉴 두 아이콘 한 줄 배치와 같은 패턴. */
+          /*#__PURE__*/React.createElement("div", {
+            style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexShrink: 0, padding: '10px', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)' }
           },
-            /*#__PURE__*/React.createElement("input", {
-              type: "checkbox",
-              checked: !!findRegisteredAnniversary(selected.id, selected.title),
-              disabled: !!pendingId,
-              onChange: () => handleToggleRegister(selected)
-            }),
-            /*#__PURE__*/React.createElement("span", {
-              style: { display: 'inline-flex', alignItems: 'center', gap: '4px', minWidth: 0 }
+            /*#__PURE__*/React.createElement("label", {
+              style: { display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, cursor: pendingId ? 'wait' : 'pointer', fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-main)' }
             },
-              "캘린더와 연동",
-              CalendarUpIcon ? /*#__PURE__*/React.createElement(CalendarUpIcon, { size: 13 }) : null
-            )
+              /*#__PURE__*/React.createElement("input", {
+                type: "checkbox",
+                checked: !!findRegisteredAnniversary(selected.id, selected.title),
+                disabled: !!pendingId,
+                onChange: () => handleToggleRegister(selected)
+              }),
+              /*#__PURE__*/React.createElement("span", {
+                style: { display: 'inline-flex', alignItems: 'center', gap: '4px', minWidth: 0 }
+              },
+                "캘린더 연동",
+                CalendarUpIcon ? /*#__PURE__*/React.createElement(CalendarUpIcon, { size: 13 }) : null
+              )
+            ),
+            typeof onQuickSaveMemo === 'function' && /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              onClick: () => {
+                const hasMemo = !!String(memoDraft || '').trim();
+                setIsMemoOpen(open => {
+                  const next = !open;
+                  if (next && !hasMemo) setIsEditingMemo(true);
+                  return next;
+                });
+              },
+              "aria-label": isMemoOpen ? "메모 접기" : "메모 펼치기",
+              title: "메모",
+              style: { flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-main)', padding: '2px', display: 'flex', alignItems: 'center' }
+            }, /*#__PURE__*/React.createElement("svg", {
+              width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor",
+              strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+            }, isMemoOpen
+              ? /*#__PURE__*/React.createElement("path", { d: "M18 15l-6-6-6 6" })
+              : /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6 6-6" })
+            ))
           ),
-          // 캘린더연동 메모: 예전엔 "메모" 토글 버튼을 눌러야만 열리는 작성창이라, 이미 저장된
-          // 메모(예: 기념일에 남긴 "티켓 17,000원")가 있어도 안 눌러보면 안 보였다. 이제 저장된
-          // 내용을 이 줄에 항상 텍스트로 보여주고, 우측 연필 버튼으로만 편집 모드(입력창+저장)로
-          // 전환한다 -- 인물 태그 이름수정과 같은 읽기/편집 전환 패턴.
-          typeof onQuickSaveMemo === 'function' && /*#__PURE__*/React.createElement("div", {
+          typeof onQuickSaveMemo === 'function' && isMemoOpen && /*#__PURE__*/React.createElement("div", {
             style: { display: 'flex', flexDirection: 'column', gap: '8px', flexShrink: 0 }
           },
-            isMemoOpen
+            isEditingMemo
               ? /*#__PURE__*/React.createElement(React.Fragment, null,
                   /*#__PURE__*/React.createElement("textarea", {
                     value: memoDraft,
@@ -4662,7 +4689,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
                   /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
                     /*#__PURE__*/React.createElement("button", {
                       type: "button",
-                      onClick: async () => { await handleSaveQuickMemo(); setIsMemoOpen(false); },
+                      onClick: handleSaveQuickMemo,
                       disabled: isSavingMemo,
                       style: {
                         flex: 1, padding: '10px', borderRadius: 'var(--radius-md)', border: 'none',
@@ -4673,7 +4700,12 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
                     }, "메모 저장"),
                     /*#__PURE__*/React.createElement("button", {
                       type: "button",
-                      onClick: () => setIsMemoOpen(false),
+                      onClick: () => {
+                        const existing = resolveSelectedMemoText(selected);
+                        setIsEditingMemo(false);
+                        if (!existing) setIsMemoOpen(false);
+                        setMemoDraft(existing || '');
+                      },
                       disabled: isSavingMemo,
                       style: {
                         padding: '10px 16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)',
@@ -4697,7 +4729,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
                   }, memoDraft || '메모가 없습니다.'),
                   /*#__PURE__*/React.createElement("button", {
                     type: "button",
-                    onClick: () => setIsMemoOpen(true),
+                    onClick: () => setIsEditingMemo(true),
                     "aria-label": memoDraft ? "메모 편집" : "메모 추가",
                     style: {
                       flexShrink: 0, width: '32px', height: '32px', padding: 0, borderRadius: 'var(--radius-md)',

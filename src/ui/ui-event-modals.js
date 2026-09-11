@@ -360,7 +360,7 @@ export function AnniversaryModal({
     setEditingId(ann.id);
     setNewTitle(ann.title || '');
     setNewCategory(ann.category || 'birthday');
-    setNewDescription(ann.description || '');
+    setNewDescription(ann.memo || ann.description || '');
     setSelectedPlace(ann.place || null);
     setPlaceQuery('');
     setPlaceResults([]);
@@ -483,7 +483,10 @@ export function AnniversaryModal({
         createdAt: createdAt,
         updatedAt: stamp
       };
-      if (newDescription.trim()) annData.description = newDescription.trim();
+      // Saved to `memo` (not `description`) so this field is the same note shown/edited from
+      // the culture-content detail popup's memo row (ui-summary-gallery.js) -- one memo, two
+      // entry points, instead of two disconnected fields with the same-looking label.
+      if (newDescription.trim()) annData.memo = newDescription.trim();
       if (!isLegacyDdayEdit && ANNIVERSARY_CATEGORIES_WITH_PLACE.has(newCategory) && selectedPlace) {
         annData.place = selectedPlace;
       }
@@ -1008,11 +1011,11 @@ export function AnniversaryModal({
 
           /* Description Field (all categories) */
           /*#__PURE__*/React.createElement("div", null,
-            /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "설명"),
+            /*#__PURE__*/React.createElement("label", { style: { display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' } }, "메모"),
             /*#__PURE__*/React.createElement("textarea", {
               className: "form-input",
               style: { width: '100%', minHeight: '64px', resize: 'none', fontFamily: 'inherit', overflow: 'hidden' },
-              placeholder: "설명을 입력하세요. 링크를 함께 적으면 URL 뱃지로 표시됩니다.",
+              placeholder: "메모를 입력하세요. 링크를 함께 적으면 URL 뱃지로 표시됩니다.",
               value: newDescription,
               onChange: e => { setNewDescription(e.target.value); autoGrowTextarea(e.target, 240); },
               onInput: e => autoGrowTextarea(e.target, 240),
@@ -3420,7 +3423,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     /*#__PURE__*/React.createElement("button", {
       type: "button", onClick: () => setIsSettlementSearchOpen(value => !value),
       title: "정산 검색", "aria-label": "정산 검색",
-      style: { ...PAGE_HEADER_ICON_BTN_STYLE, backgroundColor: isSettlementSearchOpen ? 'var(--bg-primary)' : undefined, borderRadius: 'var(--radius-md)' }
+      style: PAGE_HEADER_ICON_BTN_STYLE
     }, /*#__PURE__*/React.createElement(SearchIcon, { size: 20 })),
     /*#__PURE__*/React.createElement("button", {
       type: "button", onClick: () => setIsSettlementMenuOpen(true),
