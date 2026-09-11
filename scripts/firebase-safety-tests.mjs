@@ -394,6 +394,7 @@ const writeQueueSource = fs.readFileSync(new URL('../src/core/app-write-queue.js
 assert(writeQueueSource.includes('nextAttemptAt: Number(operation.nextAttemptAt) || 0'), 'queued operations must persist retry backoff metadata');
 assert(writeQueueSource.includes("await deferOperation(operation, new Error('대기 저장이 완료되지 않았습니다.'))"), 'false queue handler results must be deferred with backoff');
 const appMainSource = fs.readFileSync(new URL('../src/core/app-main.js', import.meta.url), 'utf8');
+const chatRenderSource = fs.readFileSync(new URL('../src/core/app-chat-render.js', import.meta.url), 'utf8');
 const chatGallerySource = fs.readFileSync(new URL('../src/ui/ui-chat-gallery.js', import.meta.url), 'utf8');
 const lightboxSource = fs.readFileSync(new URL('../src/ui/ui-lightbox.js', import.meta.url), 'utf8');
 const summaryGallerySource = fs.readFileSync(new URL('../src/ui/ui-summary-gallery.js', import.meta.url), 'utf8');
@@ -412,7 +413,7 @@ assert(appMainSource.includes('filterOutMemoryExclusionKeys'), 'adding a photo b
 assert(appMainSource.includes('preserveAnniversaryCurationFields'), 'anniversary snapshots/saves must keep memory exclusion keys');
 assert(fs.readFileSync(new URL('../src/ui/ui-event-modals.js', import.meta.url), 'utf8').includes('preserveAnniversaryCurationFields'), 'anniversary modal set() must keep excludedMemoryPhotoKeys');
 assert(chatGallerySource.includes('btn-action-danger'), 'gallery bulk delete must use the red danger outline, not the black outline override');
-assert(appMainSource.includes('coerceIndex') && appMainSource.includes('resolveMeetingPhotoDisplay'), 'meeting photo display must coerce sourceImageIndex for gallery identity');
+assert(chatRenderSource.includes('coerceIndex') && chatRenderSource.includes('resolveMeetingPhotoDisplay'), 'meeting photo display must coerce sourceImageIndex for gallery identity');
 
 
 assert(appMainSource.includes('resolvedIndex != null && !meta.meetingDate'), 'meeting message tag edits must route to their messages document');
@@ -511,7 +512,7 @@ assert(chatGallerySource.includes('Meeting album copies store durable tags'), 'g
 assert(lightboxSource.includes('key: `tag-input-${tagTokens.length}`'), 'lightbox tag input must remount when token count changes so iOS refreshes (n/10)');
 const galleryDataSource = fs.readFileSync(new URL('../src/core/gallery-data.js', import.meta.url), 'utf8');
 assert(galleryDataSource.includes('otherTagCount > mergedTagCount'), 'gallery dedupe must keep the richer tag set across chat/meeting copies');
-assert(appMainSource.includes('entry.tags, photo?.tags'), 'meeting photo display must not blank album tags when message imageTags are empty');
+assert(chatRenderSource.includes('entry.tags, photo?.tags'), 'meeting photo display must not blank album tags when message imageTags are empty');
 const photoCommentsSource = fs.readFileSync(new URL('../src/core/photo-comments.js', import.meta.url), 'utf8');
 assert(photoIndexSource.includes('patchItems'), 'gallery photo index must support local tag patches after save');
 assert(photoCommentsSource.includes('requirePersisted: true'), 'photo comment module must require durable writes');
