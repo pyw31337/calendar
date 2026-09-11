@@ -80,6 +80,50 @@ export function ChatSectionIcon() {
   }));
 }
 
+export function KeyboardIcon() {
+  const React = window.React;
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "20",
+    height: "20",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round"
+  },
+    /*#__PURE__*/React.createElement("path", { d: "M10 8h.01" }),
+    /*#__PURE__*/React.createElement("path", { d: "M12 12h.01" }),
+    /*#__PURE__*/React.createElement("path", { d: "M14 8h.01" }),
+    /*#__PURE__*/React.createElement("path", { d: "M16 12h.01" }),
+    /*#__PURE__*/React.createElement("path", { d: "M18 8h.01" }),
+    /*#__PURE__*/React.createElement("path", { d: "M6 8h.01" }),
+    /*#__PURE__*/React.createElement("path", { d: "M7 16h10" }),
+    /*#__PURE__*/React.createElement("path", { d: "M8 12h.01" }),
+    /*#__PURE__*/React.createElement("rect", { width: "20", height: "16", x: "2", y: "4", rx: "2" })
+  );
+}
+
+export function DatabaseIcon() {
+  const React = window.React;
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "20",
+    height: "20",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round"
+  },
+    /*#__PURE__*/React.createElement("ellipse", { cx: "12", cy: "5", rx: "9", ry: "3" }),
+    /*#__PURE__*/React.createElement("path", { d: "M3 5V19A9 3 0 0 0 21 19V5" }),
+    /*#__PURE__*/React.createElement("path", { d: "M3 12A9 3 0 0 0 21 12" })
+  );
+}
+
 export function LinkIcon({ size = 16 }) {
   const React = window.React;
 
@@ -1695,6 +1739,8 @@ export function PhotoCommentCountBadge({ count = 0 } = {}) {
     ClapperboardIcon: ClapperboardIcon,
     NotepadTextIcon: NotepadTextIcon,
     ChatSectionIcon: ChatSectionIcon,
+    KeyboardIcon: KeyboardIcon,
+    DatabaseIcon: DatabaseIcon,
     LinkIcon: LinkIcon,
     MessageCommentIcon: MessageCommentIcon,
     PencilIcon: PencilIcon,

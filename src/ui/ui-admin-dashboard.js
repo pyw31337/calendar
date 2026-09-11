@@ -267,6 +267,8 @@ export function AdminDashboard({ initialCalendars }) {
   const ChartBarIcon = __comp.ChartBarIcon || __deps.ChartBarIcon;
   const ChartPieIcon = __comp.ChartPieIcon || __deps.ChartPieIcon;
   const ChatSectionIcon = __comp.ChatSectionIcon || __deps.ChatSectionIcon;
+  const KeyboardIcon = __comp.KeyboardIcon || __deps.KeyboardIcon;
+  const DatabaseIcon = __comp.DatabaseIcon || __deps.DatabaseIcon;
   const CloudDataConnectionIcon = __comp.CloudDataConnectionIcon || __deps.CloudDataConnectionIcon;
   const ColorSwatchPicker = __comp.ColorSwatchPicker || __deps.ColorSwatchPicker;
   const ConfirmDialog = __comp.ConfirmDialog || __deps.ConfirmDialog;
@@ -282,7 +284,6 @@ export function AdminDashboard({ initialCalendars }) {
   const SearchIcon = __comp.SearchIcon || __deps.SearchIcon;
   const SectionCountBadge = __comp.SectionCountBadge || __deps.SectionCountBadge;
   const SettingsIcon = __comp.SettingsIcon || __deps.SettingsIcon;
-  const ShieldCheckIcon = __comp.ShieldCheckIcon || __deps.ShieldCheckIcon;
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
   const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
   const TrophyIcon = __comp.TrophyIcon || __deps.TrophyIcon;
@@ -302,8 +303,14 @@ export function AdminDashboard({ initialCalendars }) {
   const [backupBusy, setBackupBusy] = React.useState(false);
   const isRestoreMode = isAdminRestoreRoute();
 
-  // Tab control state
-  const [activeTab, setActiveTab] = React.useState('settings'); // 'settings' (일반), 'metrics' (통계), 'logs', 'audit', 'recovery'
+  // Tab control state. Two tab sets exist depending on adminViewMode:
+  // 'global' (no particular calendar in focus) -> 'metrics'(통계) / 'meme'(밈키보드) / 'datapool'(데이터풀)
+  // 'calendar' (a calendar picked from the header) -> 'settings'(일반) / 'logs'(채팅) / 'recovery'(복구)
+  // 'audit'(로그) used to be a separate top-level tab; its data now lives inside the 복구 detail
+  // popup instead (see openRecoveryLogDetail) since it was slow to load and largely redundant with
+  // what 채팅/복구 already showed.
+  const [adminViewMode, setAdminViewMode] = React.useState('global');
+  const [activeTab, setActiveTab] = React.useState('metrics');
 
   // Selected calendar for settings and recovery tabs
   const [selectedCalId, setSelectedCalId] = React.useState(() => getAdminSelectedCalendarIdFromUrl('kkot'));
@@ -342,12 +349,14 @@ export function AdminDashboard({ initialCalendars }) {
   const [serverAuditLogs, setServerAuditLogs] = React.useState([]);
   const [pushHealth, setPushHealth] = React.useState(null);
   const [auditLoading, setAuditLoading] = React.useState(false);
-  const [auditQuery, setAuditQuery] = React.useState('');
   const [photoIndexBusy, setPhotoIndexBusy] = React.useState(false);
   const [photoIndexReport, setPhotoIndexReport] = React.useState(null);
 
+  // 서버 감사 로그는 더 이상 독립된 탭이 아니라 복구 탭의 로그 상세 팝업에 통합되어 보여진다
+  // (openRecoveryLogDetail 참고) -- 예전 '로그' 탭은 로딩이 느리고 채팅/복구 탭과 중복되는
+  // 정보가 많았다. 복구 탭을 열 때만 불러오므로 관리자가 실제로 그 정보가 필요할 때만 요청한다.
   React.useEffect(() => {
-    if (activeTab !== 'audit') return;
+    if (activeTab !== 'recovery') return;
     const session = getAdminSession();
     if (!session) return;
     let cancelled = false;
@@ -366,10 +375,15 @@ export function AdminDashboard({ initialCalendars }) {
   const [memePoolAdmin, setMemePoolAdmin] = React.useState([]);
   const memePoolFetchedRef = React.useRef(false);
   React.useEffect(() => {
-    if (activeTab !== 'meme' || memePoolFetchedRef.current) return;
+    if ((activeTab !== 'meme' && activeTab !== 'datapool') || memePoolFetchedRef.current) return;
     memePoolFetchedRef.current = true;
     fetchMemePoolRest().then(list => setMemePoolAdmin(list)).catch(() => {});
   }, [activeTab]);
+
+  // 데이터풀 탭의 카테고리 선택 (사진/파일/링크/기타) + "미태그만 보기" -- 태그 기반으로 관리하는
+  // 공유 데이터 어디서나 재사용할 수 있도록 category-agnostic 하게 둔다.
+  const [dataPoolCategory, setDataPoolCategory] = React.useState('photo');
+  const [dataPoolUntaggedOnly, setDataPoolUntaggedOnly] = React.useState(false);
 
   // Timeline filters and pagination for Tab 4 (Recovery logs)
   const [timelineSearchQuery, setTimelineSearchQuery] = React.useState('');
@@ -464,6 +478,21 @@ export function AdminDashboard({ initialCalendars }) {
       if (Number.isInteger(resource.imageIndex) && srcImages[resource.imageIndex]) images = [srcImages[resource.imageIndex]];
       else if (srcImages.length) images = srcImages;
     }
+    // 옛 '로그' 탭(서버 감사 로그)이 이 팝업으로 통합됐다 -- activityLogs(위 rows)와
+    // serverAuditLogs는 서로 다른 id 체계라 정확한 1:1 매칭은 불가능하므로, 같은 캘린더에서
+    // 이 활동 로그와 시각이 가까운(±2분) 감사 로그를 "관련"으로 묶어 보여준다. 정확한 매칭이라고
+    // 오인되지 않도록 "관련 서버 로그"라고 명확히 표시한다.
+    const logTs = Number(log.timestamp) || 0;
+    const relatedAuditLogs = logTs
+      ? serverAuditLogs
+          .filter(a => Math.abs((Number(a.receivedAt) || 0) - logTs) <= 2 * 60 * 1000)
+          .sort((a, b) => Math.abs((Number(a.receivedAt) || 0) - logTs) - Math.abs((Number(b.receivedAt) || 0) - logTs))
+          .slice(0, 3)
+      : [];
+    const auditRows = relatedAuditLogs.flatMap((a, idx) => [
+      [`관련 서버 로그 ${idx + 1}`, `${a.action || '-'} · ${new Date(Number(a.receivedAt) || 0).toLocaleString('ko-KR')}`],
+      [`  클라이언트/IP해시`, `${a.client || '-'} / ${a.ipHash || '-'}`]
+    ]);
     setLogDetail({
       title: '복구 로그 상세',
       images,
@@ -478,7 +507,9 @@ export function AdminDashboard({ initialCalendars }) {
         ['원본 리소스 ID', resource?.resourceId || ''],
         ['리소스 출처', resource?.source || ''],
         ['이미지 인덱스', Number.isInteger(resource?.imageIndex) ? String(resource.imageIndex) : ''],
-        ['로그 ID', log.id || '']
+        ['로그 ID', log.id || ''],
+        ...auditRows,
+        ...(auditLoading ? [['관련 서버 로그', '불러오는 중...']] : [])
       ].filter(([, v]) => v !== '' && v != null)
     });
   };
@@ -562,6 +593,15 @@ export function AdminDashboard({ initialCalendars }) {
     if (!isValidCalendarId(calId)) return;
     setSelectedCalId(calId);
     syncSelectedCalendarUrl(calId, mode);
+    setAdminViewMode('calendar');
+    setActiveTab(prev => (prev === 'settings' || prev === 'logs' || prev === 'recovery') ? prev : 'settings');
+  };
+  // Leaves a specific calendar's settings back to the calendar-agnostic tabs (통계/밈키보드/데이터풀).
+  // The last-selected calendar id is kept (not cleared) so switching back to 'calendar' mode later
+  // -- e.g. via the header picker -- returns to where the admin left off.
+  const returnToGlobalAdminView = () => {
+    setAdminViewMode('global');
+    setActiveTab(prev => (prev === 'metrics' || prev === 'meme' || prev === 'datapool') ? prev : 'metrics');
   };
   const setUnifiedSearchQuery = (query) => { setUnifiedSearchQueryState(query); pushSearchUrl({ query }); };
   const setUnifiedSearchCalFilter = (calFilter) => { setUnifiedSearchCalFilterState(calFilter); pushSearchUrl({ calFilter }); };
@@ -1594,15 +1634,15 @@ export function AdminDashboard({ initialCalendars }) {
     },
     tabBar: {
       display: 'grid',
-      gridTemplateColumns: 'repeat(6, minmax(0, 1fr))',
+      gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
       gap: 0,
       borderTop: '1px solid var(--border-subtle)',
-      padding: '6px 4px 0 4px',
+      padding: '6px 12px 0 12px',
       minWidth: 0
     },
     tabButton: (isActive) => ({
-      padding: '12px 4px',
-      fontSize: 'var(--font-size-sm)',
+      padding: '12px 16px',
+      fontSize: 'var(--font-size-base)',
       fontWeight: 'bold',
       whiteSpace: 'nowrap',
       overflow: 'hidden',
@@ -1808,7 +1848,7 @@ export function AdminDashboard({ initialCalendars }) {
               onClick: () => setIsHeaderCalPickerOpen(true)
             },
               /*#__PURE__*/React.createElement("span", { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } },
-                selectedCal ? `${selectedCal.title} (${selectedCal.id})` : '캘린더 선택'
+                adminViewMode === 'global' ? '전체 메뉴' : (selectedCal ? `${selectedCal.title} (${selectedCal.id})` : '캘린더 선택')
               ),
               /*#__PURE__*/React.createElement("svg", {
                 xmlns: "http://www.w3.org/2000/svg", width: "18", height: "18", viewBox: "0 0 24 24",
@@ -1834,6 +1874,12 @@ export function AdminDashboard({ initialCalendars }) {
                   }, "✕")
                 ),
                 /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-body" },
+                  /*#__PURE__*/React.createElement("button", {
+                    type: "button",
+                    className: "bottom-sheet-item",
+                    style: { fontWeight: adminViewMode === 'global' ? 800 : 600, color: adminViewMode === 'global' ? 'var(--status-green)' : undefined },
+                    onClick: () => { returnToGlobalAdminView(); setIsHeaderCalPickerOpen(false); }
+                  }, "🌐 전체 메뉴 (통계·밈키보드·데이터풀)"),
                   calendarsList.map(cal => /*#__PURE__*/React.createElement("button", {
                     key: cal.id,
                     type: "button",
@@ -1853,39 +1899,40 @@ export function AdminDashboard({ initialCalendars }) {
         )
       ),
 
-      /* Tabs Bar */
+      /* Tabs Bar -- two independent tab sets depending on adminViewMode (see its declaration
+         above for why): 'global' shows calendar-agnostic tabs, 'calendar' shows the tabs that
+         only make sense once one calendar is in focus. */
       /*#__PURE__*/React.createElement("div", {
         className: "admin-tab-bar",
         style: styles.tabBar
       },
-        /* Tab 1 button */
-        /*#__PURE__*/React.createElement("button", {
-          type: "button", className: "admin-tab-button", onClick: () => setActiveTab('settings'),
-          style: styles.tabButton(activeTab === 'settings')
-        }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(SettingsIcon, null)), "일반"),
-        /* Tab 2 button */
-        /*#__PURE__*/React.createElement("button", {
-          type: "button", className: "admin-tab-button", onClick: () => setActiveTab('metrics'),
-          style: styles.tabButton(activeTab === 'metrics')
-        }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(ChartBarIcon, null)), "통계"),
-        /* Tab 3 button */
-        /*#__PURE__*/React.createElement("button", {
-          type: "button", className: "admin-tab-button", onClick: () => setActiveTab('logs'),
-          style: styles.tabButton(activeTab === 'logs')
-        }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(ChatSectionIcon, null)), "채팅"),
-        /*#__PURE__*/React.createElement("button", {
-          type: "button", className: "admin-tab-button", onClick: () => setActiveTab('audit'),
-          style: styles.tabButton(activeTab === 'audit')
-        }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(ShieldCheckIcon, null)), "로그"),
-        /* Tab 4 button */
-        /*#__PURE__*/React.createElement("button", {
-          type: "button", className: "admin-tab-button", onClick: () => setActiveTab('recovery'),
-          style: styles.tabButton(activeTab === 'recovery')
-        }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(HourglassIcon, null)), "복구"),
-        /*#__PURE__*/React.createElement("button", {
-          type: "button", className: "admin-tab-button", onClick: () => setActiveTab('meme'),
-          style: styles.tabButton(activeTab === 'meme')
-        }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(ChatSectionIcon, null)), "밈키보드")
+        adminViewMode === 'calendar' ? [
+          /*#__PURE__*/React.createElement("button", {
+            key: "settings", type: "button", className: "admin-tab-button", onClick: () => setActiveTab('settings'),
+            style: styles.tabButton(activeTab === 'settings')
+          }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(SettingsIcon, null)), "일반"),
+          /*#__PURE__*/React.createElement("button", {
+            key: "logs", type: "button", className: "admin-tab-button", onClick: () => setActiveTab('logs'),
+            style: styles.tabButton(activeTab === 'logs')
+          }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(ChatSectionIcon, null)), "채팅"),
+          /*#__PURE__*/React.createElement("button", {
+            key: "recovery", type: "button", className: "admin-tab-button", onClick: () => setActiveTab('recovery'),
+            style: styles.tabButton(activeTab === 'recovery')
+          }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(HourglassIcon, null)), "복구")
+        ] : [
+          /*#__PURE__*/React.createElement("button", {
+            key: "metrics", type: "button", className: "admin-tab-button", onClick: () => setActiveTab('metrics'),
+            style: styles.tabButton(activeTab === 'metrics')
+          }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(ChartBarIcon, null)), "통계"),
+          /*#__PURE__*/React.createElement("button", {
+            key: "meme", type: "button", className: "admin-tab-button", onClick: () => setActiveTab('meme'),
+            style: styles.tabButton(activeTab === 'meme')
+          }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(KeyboardIcon, null)), "밈키보드"),
+          /*#__PURE__*/React.createElement("button", {
+            key: "datapool", type: "button", className: "admin-tab-button", onClick: () => setActiveTab('datapool'),
+            style: styles.tabButton(activeTab === 'datapool')
+          }, /*#__PURE__*/React.createElement("span", { className: "admin-tab-icon" }, /*#__PURE__*/React.createElement(DatabaseIcon, null)), "데이터풀")
+        ]
       )
     ),
 
@@ -1898,36 +1945,72 @@ export function AdminDashboard({ initialCalendars }) {
       })
     ),
 
-    activeTab === 'audit' && /*#__PURE__*/React.createElement("section", { style: styles.card },
-      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '12px' } },
-        /*#__PURE__*/React.createElement("div", null,
-          /*#__PURE__*/React.createElement("h4", { style: styles.cardTitle }, /*#__PURE__*/React.createElement(ShieldCheckIcon, null), "서버 감사 로그"),
-          /*#__PURE__*/React.createElement("p", { style: { margin: '3px 0 0', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' } }, "관리자 전용 기록입니다. IP는 원문이 아닌 해시로 보관되며, actor/session은 익명 상관관계 식별자입니다.")
+    // 데이터풀: 각 캘린더가 공통으로 쓰는 전역(cross-calendar) 공유 데이터를 종류별로 모아 보는
+    // 곳. 지금 이 앱에 실제로 존재하는 전역 공유 데이터는 밈키보드의 사진 풀(memePool)뿐이라,
+    // 파일/링크/기타는 아직 실제 기능이 없다는 걸 숨기지 않고 빈 상태로 정직하게 보여준다 --
+    // 나중에 그런 공유 데이터 종류가 생기면 이 자리에 채워 넣으면 된다. "미태그만 보기"는 태그
+    // 기반으로 관리하는 데이터라면 어디서든 재사용할 수 있게 dataPoolUntaggedOnly로 분리해뒀다.
+    activeTab === 'datapool' && (() => {
+      const categories = [
+        { id: 'photo', label: '사진', icon: null, count: memePoolAdmin.length },
+        { id: 'file', label: '파일', icon: null, count: 0 },
+        { id: 'link', label: '링크', icon: null, count: 0 },
+        { id: 'etc', label: '기타', icon: null, count: 0 }
+      ];
+      const untaggedPhotoCount = memePoolAdmin.filter(p => !(p.hashtags || []).length).length;
+      const visiblePhotos = dataPoolUntaggedOnly ? memePoolAdmin.filter(p => !(p.hashtags || []).length) : memePoolAdmin;
+      return /*#__PURE__*/React.createElement("section", { style: styles.card },
+        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', marginBottom: '14px' } },
+          /*#__PURE__*/React.createElement("div", null,
+            /*#__PURE__*/React.createElement("h4", { style: styles.cardTitle }, /*#__PURE__*/React.createElement(DatabaseIcon, null), "데이터풀"),
+            /*#__PURE__*/React.createElement("p", { style: { margin: '3px 0 0', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' } }, "모든 캘린더가 함께 쓰는 전역 공유 데이터를 종류별로 모아 봅니다.")
+          )
         ),
-        /*#__PURE__*/React.createElement("input", { className: "form-input", value: auditQuery, onChange: e => setAuditQuery(e.target.value), placeholder: "actor, 작업, 브라우저, IP 해시 검색", style: { maxWidth: '320px' } })
-      ),
-      pushHealth && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px', fontSize: 'var(--font-size-xs)' } },
-        [['전체', pushHealth.total], ['활성', pushHealth.active], ['30일 이상 미사용', pushHealth.stale30d], ['발송 성공', pushHealth.sent], ['실패 기록', pushHealth.failed]].map(([label, value]) => /*#__PURE__*/React.createElement("span", { key: label, style: { padding: '5px 8px', borderRadius: '999px', background: '#F1F5F9', color: '#334155', fontWeight: 700 } }, `${label} ${value}`))
-      ),
-      auditLoading ? /*#__PURE__*/React.createElement("div", { style: { padding: '28px', textAlign: 'center', color: 'var(--text-muted)' } }, "감사 로그 불러오는 중...") :
-      (() => {
-        const q = auditQuery.trim().toLowerCase();
-        const rows = serverAuditLogs.filter(log => !q || [log.action, log.actorId, log.sessionId, log.client, log.ipHash, log.userAgent, log.target].some(v => String(v || '').toLowerCase().includes(q)));
-        if (!rows.length) return /*#__PURE__*/React.createElement("div", { style: { padding: '28px', textAlign: 'center', color: 'var(--text-muted)' } }, "표시할 감사 로그가 없습니다.");
-        return /*#__PURE__*/React.createElement("div", { style: { overflowX: 'auto' } }, /*#__PURE__*/React.createElement("table", { style: { width: '100%', borderCollapse: 'collapse', fontSize: 'var(--font-size-sm)' } },
-          /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, ['시각','작업','actor/session','클라이언트','IP 해시','User-Agent','대상'].map(h => /*#__PURE__*/React.createElement("th", { key: h, style: { textAlign: 'left', padding: '8px', borderBottom: '1px solid var(--border-subtle)', whiteSpace: 'nowrap' } }, h)))),
-          /*#__PURE__*/React.createElement("tbody", null, rows.map(log => /*#__PURE__*/React.createElement("tr", { key: log.id },
-            /*#__PURE__*/React.createElement("td", { style: { padding: '8px', whiteSpace: 'nowrap' } }, new Date(Number(log.receivedAt) || 0).toLocaleString('ko-KR')),
-            /*#__PURE__*/React.createElement("td", { style: { padding: '8px', whiteSpace: 'nowrap', fontWeight: 700 } }, log.action || '-'),
-            /*#__PURE__*/React.createElement("td", { style: { padding: '8px', minWidth: '180px' } }, log.actorId || '-', /*#__PURE__*/React.createElement("br"), /*#__PURE__*/React.createElement("small", { style: { color: 'var(--text-muted)' } }, log.sessionId || '-')),
-            /*#__PURE__*/React.createElement("td", { style: { padding: '8px', whiteSpace: 'nowrap' } }, log.client || '-'),
-            /*#__PURE__*/React.createElement("td", { style: { padding: '8px', fontFamily: 'monospace', fontSize: '11px' } }, log.ipHash || '-'),
-            /*#__PURE__*/React.createElement("td", { style: { padding: '8px', maxWidth: '300px', wordBreak: 'break-word' } }, log.userAgent || '-'),
-            /*#__PURE__*/React.createElement("td", { style: { padding: '8px', maxWidth: '240px', wordBreak: 'break-word' } }, log.target || '-')
-          )))
-        ));
-      })()
-    ),
+        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '16px' } },
+          categories.map(c => /*#__PURE__*/React.createElement("button", {
+            key: c.id, type: "button",
+            onClick: () => setDataPoolCategory(c.id),
+            style: {
+              padding: '8px 14px', borderRadius: 'var(--radius-full)', border: '1px solid var(--border-subtle)',
+              backgroundColor: dataPoolCategory === c.id ? 'var(--status-green)' : 'var(--bg-primary)',
+              color: dataPoolCategory === c.id ? '#fff' : 'var(--text-main)',
+              fontWeight: 700, fontSize: 'var(--font-size-sm)', cursor: 'pointer'
+            }
+          }, `${c.label} (${c.count})`))
+        ),
+        dataPoolCategory === 'photo' ? /*#__PURE__*/React.createElement(React.Fragment, null,
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '10px' } },
+            /*#__PURE__*/React.createElement("p", { style: { margin: 0, fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } }, `밈키보드 이미지 풀 (${memePoolAdmin.length}장, 미태그 ${untaggedPhotoCount}장) -- 업로드·태그 편집은 "밈키보드" 탭에서 합니다.`),
+            /*#__PURE__*/React.createElement("button", {
+              type: "button", className: "btn btn-secondary",
+              onClick: () => setDataPoolUntaggedOnly(v => !v),
+              style: { height: '36px', padding: '0 12px', fontWeight: 800, fontSize: 'var(--font-size-sm)' }
+            }, dataPoolUntaggedOnly ? "전체 보기" : "미태그만 보기")
+          ),
+          visiblePhotos.length === 0
+            ? /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)', textAlign: 'center' } }, "표시할 이미지가 없습니다.")
+            : /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(84px, 1fr))', gap: '6px' } },
+                visiblePhotos.map(item => /*#__PURE__*/React.createElement("div", {
+                  key: item.id,
+                  style: { position: 'relative', borderRadius: 'var(--radius-sm)', overflow: 'hidden', aspectRatio: '1 / 1', backgroundColor: 'var(--bg-primary)' }
+                },
+                  /*#__PURE__*/React.createElement("img", {
+                    src: item.thumbUrl || item.fullUrl, alt: item.fileName || '', loading: "lazy",
+                    style: { width: '100%', height: '100%', objectFit: 'cover' }
+                  }),
+                  !(item.hashtags || []).length && /*#__PURE__*/React.createElement("span", {
+                    "aria-hidden": true,
+                    style: { position: 'absolute', top: '4px', left: '4px', padding: '1px 6px', borderRadius: 'var(--radius-full)', backgroundColor: 'rgba(220,38,38,0.9)', color: '#fff', fontSize: 'var(--font-size-2xs)', fontWeight: 800 }
+                  }, "미태그")
+                ))
+              )
+        ) : /*#__PURE__*/React.createElement("div", { style: { padding: '40px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)' } },
+          categories.find(c => c.id === dataPoolCategory)?.label, " 종류의 캘린더 간 공유 데이터는 아직 없습니다.",
+          /*#__PURE__*/React.createElement("br"),
+          /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)' } }, "이런 기능이 추가되면 이 자리에 표시됩니다.")
+        )
+      );
+    })(),
 
     isAdminMenuOpen && /*#__PURE__*/React.createElement("div", {
       className: "admin-side-menu-overlay",
@@ -2507,6 +2590,9 @@ export function AdminDashboard({ initialCalendars }) {
     /* ================================================================= */
     activeTab === 'recovery' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '10px' } },
       selectedCal ? /*#__PURE__*/React.createElement(React.Fragment, null,
+        pushHealth && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', flexWrap: 'wrap', fontSize: 'var(--font-size-xs)' } },
+          [['알림 구독', pushHealth.total], ['활성', pushHealth.active], ['30일 이상 미사용', pushHealth.stale30d], ['발송 성공', pushHealth.sent], ['실패 기록', pushHealth.failed]].map(([label, value]) => /*#__PURE__*/React.createElement("span", { key: label, style: { padding: '5px 8px', borderRadius: '999px', background: '#F1F5F9', color: '#334155', fontWeight: 700 } }, `${label} ${value}`))
+        ),
         /* Timeline log restore card (Combined schedules, polls and chat logs!) */
         /*#__PURE__*/React.createElement("section", { className: "recovery-timeline-card", style: styles.card },
           /* Warning banner */
