@@ -2608,6 +2608,40 @@ function getDataUrlInfo(url) {
   return { mime, sizeBytes };
 }
 
+function buildCultureEventMemoText(item) {
+  if (!item) return '';
+  const lines = [];
+  if (item.title) lines.push(item.title);
+  const period = item.dateLabel || [item.startDate, item.endDate].filter(Boolean).join(' ~ ');
+  if (period) lines.push(`기간: ${period}`);
+  if (item.venue) lines.push(`장소: ${item.venue}`);
+  if (item.address) lines.push(`주소: ${item.address}`);
+  if (item.organizer) lines.push(`주최: ${item.organizer}`);
+  if (item.contact) lines.push(`문의: ${item.contact}`);
+  if (item.price) lines.push(`가격: ${item.price}`);
+  if (item.description) lines.push(String(item.description).trim());
+  if (item.link) lines.push(String(item.link).trim());
+  return lines.join('\n');
+}
+
+function createMemoActivityLog(calendarId, action, participantId = '', timestamp = Date.now(), note = '') {
+  // toISOString() is UTC, not local time -- a memo logged between midnight and 9am KST would
+  // otherwise get attributed to the previous day in the activity log's date field.
+  const d = new Date(timestamp);
+  const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const participantPart = sanitizeText(participantId || 'system', 120);
+  return normalizeActivityLog(calendarId, {
+    id: `${calendarId}_memo_${participantPart}_${action}_${timestamp}_${Math.random().toString(36).slice(2, 8)}`,
+    calendarId,
+    participantId: sanitizeText(participantId || '', 120),
+    action,
+    note,
+    timestamp,
+    date: dateStr
+  });
+}
+
+
 export {
   PRESET_COLORS,
   DEFAULT_EXPENSE_CATEGORIES,
@@ -2839,5 +2873,7 @@ export {
   getLegacyMeetingMediaKey,
   getMessageDirectMediaEntry,
   formatBytes,
-  getDataUrlInfo
+  getDataUrlInfo,
+  buildCultureEventMemoText,
+  createMemoActivityLog
 };
