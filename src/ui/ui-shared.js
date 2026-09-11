@@ -1751,11 +1751,17 @@ export function ResizableListSection({
   const [height, setHeight] = React.useState(isAutoInitial ? minHeight : initialHeight);
   const listRef = React.useRef(null);
   const resizeRef = React.useRef(null);
+  // Once the user drags (or keyboard-resizes) the handle, their choice is final -- auto-growth
+  // below stops re-measuring so it never fights a height they picked on purpose.
+  const hasManuallyResizedRef = React.useRef(false);
   const clampHeight = h => Math.min(maxHeight, Math.max(minHeight, h));
-  // Empty dependency array is deliberate: measure once against whatever content is present at
-  // mount time only, so a later content change doesn't fight a resize the user already made.
+  // Re-measures whenever the number of list items changes (e.g. a participant/expense/place is
+  // added or removed), not just once on mount -- otherwise a new row lands below the already-
+  // fixed height and is hidden behind a scrollbar instead of being visible immediately. Still
+  // gated on hasManuallyResizedRef so it never overrides a resize the user already made by hand.
+  const childCount = React.Children.count(children);
   React.useLayoutEffect(() => {
-    if (!isAutoInitial || !listRef.current) return;
+    if (!isAutoInitial || !listRef.current || hasManuallyResizedRef.current) return;
     const el = listRef.current;
     // scrollHeight never includes border width (only padding + content), but this element's
     // own box-sizing is border-box (global `* { box-sizing: border-box }`), so setting height
@@ -1766,11 +1772,12 @@ export function ResizableListSection({
     // added back to get a height that actually fits the measured content with no scroll.
     const borderHeight = el.offsetHeight - el.clientHeight;
     setHeight(clampHeight(el.scrollHeight + borderHeight));
-  }, []);
+  }, [childCount]);
 
   const handleResizeStart = event => {
     event.preventDefault();
     event.stopPropagation();
+    hasManuallyResizedRef.current = true;
     resizeRef.current = { pointerId: event.pointerId, startY: event.clientY, startHeight: height };
     event.currentTarget.setPointerCapture?.(event.pointerId);
   };
@@ -1787,6 +1794,7 @@ export function ResizableListSection({
     const stepSize = event.shiftKey ? step * 2 : step;
     if (!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
     event.preventDefault();
+    hasManuallyResizedRef.current = true;
     const next = event.key === 'Home' ? minHeight : event.key === 'End' ? maxHeight : height + (event.key === 'ArrowDown' ? stepSize : -stepSize);
     setHeight(clampHeight(next));
   };
