@@ -3495,6 +3495,67 @@ function countCultureSearchMatches(crawledItems, extraItems, anniversaryCategory
   return regionFiltered.filter(item => cultureItemMatchesSearch(item, needle)).length;
 }
 
+// 크롤링 원본 subGenre는 콤마로 나열된 원시 조합("드라마, 가족", "액션, SF" 등)이라 장르 칩이
+// 지나치게 잘게 쪼개진다 (조합 하나하나가 전부 별도 탭이 됨). 사용자가 직접 검토해서 정리한
+// 조합→대표 장르 매핑을 우선 적용하고, 목록에 없는 새 조합은 토큰별 우선순위로 기존 장르 중
+// 하나에 편입시킨다 (새 카테고리를 만들지 않음). 순서가 다르면 결과가 달라지는 조합도 있어서
+// (예: "드라마, 가족"→가족 vs "가족, 드라마"→드라마) 토큰 정렬 없이 원본 순서 그대로 키를 만든다.
+const MOVIE_SUBGENRE_EXACT_MAP = {
+  '드라마, 가족': '가족',
+  '멜로/로맨스': '멜로',
+  '액션, SF': '액션',
+  '공포(호러)': '공포',
+  '드라마, 멜로/로맨스': '멜로',
+  '코미디, 드라마': '코미디',
+  '드라마, 코미디': '코미디',
+  '드라마, 멜로/로맨스, 미스터리': '미스터리',
+  'SF, 스릴러, 액션': '액션',
+  '액션, 어드벤처, 판타지': '액션',
+  '액션, 드라마, 어드벤처': '액션',
+  '액션, 코미디': '코미디',
+  '공포(호러), 미스터리, 스릴러': '공포',
+  '범죄': '액션',
+  '액션, 어드벤처, 미스터리, SF, 스릴러': '액션',
+  '스릴러, 액션': '액션',
+  '액션, 스릴러, 범죄': '액션',
+  '드라마, 판타지': '드라마',
+  '스릴러, 공포(호러)': '공포',
+  '액션, 스릴러': '액션',
+  '판타지, 멜로/로맨스': '멜로',
+  '액션, 공포(호러), SF': '액션',
+  '액션, 어드벤처': '액션',
+  '애니메이션, 액션, 어드벤처': '애니메이션',
+  '범죄, 드라마': '드라마',
+  '판타지, 코미디, 어드벤처': '코미디',
+  '가족, 드라마': '드라마',
+  '어드벤처, 스릴러': '액션',
+  '판타지, 드라마': '드라마',
+  '미스터리, 범죄, 스릴러': '액션',
+  '드라마, 판타지, 스릴러': '드라마',
+  '액션, 어드벤처, SF': '액션',
+  '액션, 코미디, 어드벤처, 판타지': '액션',
+  '어드벤처, 판타지, 액션': '액션'
+};
+// 위 표에 없는 새 조합의 폴백: 토큰을 이 표로 기존 장르에 편입시킨 뒤, 아래 우선순위표에서
+// 가장 앞선 장르를 대표 장르로 쓴다 (신설 카테고리 없음).
+const MOVIE_SUBGENRE_TOKEN_BUCKET = {
+  '드라마': '드라마', '가족': '가족', '멜로/로맨스': '멜로', '액션': '액션', 'SF': '액션',
+  '공포(호러)': '공포', '코미디': '코미디', '미스터리': '미스터리', '스릴러': '액션',
+  '범죄': '액션', '어드벤처': '액션', '판타지': '드라마', '애니메이션': '애니메이션',
+  '다큐멘터리': '다큐멘터리'
+};
+const MOVIE_SUBGENRE_PRIORITY = ['애니메이션', '다큐멘터리', '공포', '코미디', '미스터리', '액션', '멜로', '가족', '드라마'];
+function normalizeMovieSubGenre(rawSubGenre) {
+  const value = String(rawSubGenre || '').trim();
+  if (!value) return value;
+  const canonicalKey = value.split(',').map(part => part.trim()).filter(Boolean).join(', ');
+  if (MOVIE_SUBGENRE_EXACT_MAP[canonicalKey]) return MOVIE_SUBGENRE_EXACT_MAP[canonicalKey];
+  const buckets = canonicalKey.split(',').map(part => MOVIE_SUBGENRE_TOKEN_BUCKET[part.trim()]).filter(Boolean);
+  if (buckets.length === 0) return canonicalKey;
+  const prioritized = MOVIE_SUBGENRE_PRIORITY.find(genre => buckets.includes(genre));
+  return prioritized || buckets[0];
+}
+
 function filterAndSortCultureItems(items, category) {
   // festival / event(문화행사) / sports: 목록에서는 종료일이 지난 항목을 모두 숨긴다
   // (포털·개별등록·캘린더 연동 orphan 동일). 데이터 자체는 지우지 않는다 -- 개별등록/연동은
@@ -4263,7 +4324,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
   // counts, consistent with how RegionFilterBackdrop's own counts work off whichever tab is mounted.
   const categoryCounts = new Map();
   searchFilteredItems.forEach(item => {
-    const key = anniversaryCategory === 'movie' ? (item.subGenre || '기타') : (item.genre || '');
+    const key = anniversaryCategory === 'movie' ? (normalizeMovieSubGenre(item.subGenre) || '기타') : (item.genre || '');
     categoryCounts.set(key, (categoryCounts.get(key) || 0) + 1);
   });
   const categoryOptions = [...categoryCounts.entries()]
@@ -4276,7 +4337,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
   const filteredItems = categoryFilter === CUSTOM_CATEGORY_VALUE
     ? searchFilteredItems.filter(item => item && item.isCustomRegistered)
     : categoryFilter
-      ? searchFilteredItems.filter(item => (anniversaryCategory === 'movie' ? (item.subGenre || '기타') : (item.genre || '')) === categoryFilter)
+      ? searchFilteredItems.filter(item => (anniversaryCategory === 'movie' ? (normalizeMovieSubGenre(item.subGenre) || '기타') : (item.genre || '')) === categoryFilter)
       : searchFilteredItems;
 
   // "개별등록"은 전체/장르 칩과 마찬가지로 항상 고정 노출한다 -- 지금 등록된 개수가 0이어도
