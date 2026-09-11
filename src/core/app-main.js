@@ -15,7 +15,10 @@ import {
   deleteGalleryLinkItems,
   filterDeletedPhotoFromIndexItems
 } from './gallery-bulk-delete.js';
-import { filterOutMemoryExclusionKeys, preserveAnniversaryCurationFields } from './gallery-data.js';
+import {
+  filterOutMemoryExclusionKeys, preserveAnniversaryCurationFields,
+  getMeetingOwnedPhotoMessageIds, isChatRenderableMessage
+} from './gallery-data.js';
 import { bindUiComponentAliases } from './app-ui-wrappers.js';
 import { useTapRevealedMsgId, useModalDirtyGuard, useChatSendGuard } from './app-ui-hooks.js';
 import { highlightTextWithYellowMarker, highlightKeyword, formatLogTimestamp, computeCalendarSearchMatches, getAdminSearchResultTargetUrl } from './app-search.js';
@@ -254,6 +257,9 @@ import {
   firebaseInitError,
   firebaseRetryExhausted,
   ensureFirebaseStorageReady,
+  getLiveFirebaseStorage,
+  getFirebaseStateVersion,
+  subscribeFirebaseStateChange,
   fetchSingleCalendarWithRest,
   fetchRecentMessagesRest,
   fetchChatMessagesRest,
@@ -336,15 +342,10 @@ import { useAppFeedbackState } from './app-feedback-state.js';
 // which already re-runs the affected effects on this same event -- they just need firebaseDb
 // itself to stop being stuck at its initial null).
 var firebaseDb = (typeof window !== 'undefined' && window.__gatherFirebaseDb) || null;
-var firebaseStorage = (typeof window !== 'undefined' && window.__gatherFirebaseStorage) || null;
 if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
   window.addEventListener('gather-firebase-state-change', () => {
     if (window.__gatherFirebaseDb) firebaseDb = window.__gatherFirebaseDb;
-    if (window.__gatherFirebaseStorage) firebaseStorage = window.__gatherFirebaseStorage;
   });
-}
-function getLiveFirebaseStorage() {
-  return (typeof window !== 'undefined' && window.__gatherFirebaseStorage) || firebaseStorage;
 }
 function shouldQueueCalendarWriteFailure(error) {
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return true;
@@ -403,52 +404,14 @@ const {
   AdminDashboard, AdminModal, AdminUnifiedSearchResultsView, AdminCreateCalendarModal,
   AdminRestorePhraseModal, AdminUnifiedSearchModal, CreateSettlementModal
 } = uiWrapperAliases;
+// Kept here (not moved with isNonChatUploadSource/getMeetingOwnedPhotoMessageIds/
+// isChatRenderableMessage to gallery-data.js) because it needs getMessageDirectMediaEntry, which
+// pulls in app-domain-helpers.js's window-dependent module scope -- gallery-data.js must stay
+// importable under plain Node for firebase-safety-tests.mjs's direct unit tests.
 function getAllDirectMediaImageEntries(message) {
   const direct = getMessageDirectMediaEntry(message);
   return direct ? [direct] : [];
 }
-function getFirebaseStateVersion() {
-  if (typeof window === 'undefined') return 0;
-  return Number(window.__GATHER_FIREBASE_STATE_VERSION || 0) || 0;
-}
-
-function subscribeFirebaseStateChange(onStoreChange) {
-  if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return () => {};
-  const handler = () => onStoreChange();
-  window.addEventListener('gather-firebase-state-change', handler);
-  return () => window.removeEventListener('gather-firebase-state-change', handler);
-}
-const NON_CHAT_UPLOAD_SOURCES = new Set(['meeting', 'gallery']);
-function isNonChatUploadSource(uploadSource) {
-  return NON_CHAT_UPLOAD_SOURCES.has(String(uploadSource || '').trim().toLowerCase());
-}
-
-function getMeetingOwnedPhotoMessageIds(calendar) {
-  const ids = new Set();
-  const fn = typeof getConfirmedMeetings === 'function' ? getConfirmedMeetings : (typeof window !== 'undefined' && window.GATHER_APP_UTILS ? window.GATHER_APP_UTILS.getConfirmedMeetings : null);
-  const meetings = typeof fn === 'function' ? fn(calendar) : [];
-  meetings.forEach(meeting => {
-    (Array.isArray(meeting?.photos) ? meeting.photos : []).forEach(photo => {
-      const messageId = String(photo?.sourceMessageId || '').trim();
-      if (!messageId) return;
-      const mediaKey = String(photo?.mediaKey || photo?.assetKey || '').trim().toLowerCase();
-      const uploadSource = String(photo?.uploadSource || '').trim().toLowerCase();
-      const source = String(photo?.source || '').trim().toLowerCase();
-      if (!(mediaKey.startsWith('meeting:') || uploadSource === 'meeting' || source === 'meeting')) return;
-      ids.add(messageId);
-    });
-  });
-  return ids;
-}
-
-function isChatRenderableMessage(message, meetingPhotoMessageIds = null) {
-  if (!message || typeof message !== 'object') return false;
-  if (isNonChatUploadSource(message.uploadSource)) return false;
-  if (meetingPhotoMessageIds && meetingPhotoMessageIds.has(message.id)) return false;
-  return true;
-}
-
-
 function App() {
   // Keep hooks unconditional. The app can switch between the admin route and the regular
   // calendar route through SPA/browser-history navigation; returning before these hooks on only
