@@ -2,7 +2,7 @@
  * Summary list, photo gallery, category tabs (P4-11)
  */
 
-import { composeGalleryPhotos, collectMemoryPhotoIdentityKeys, isMemoryPhotoExcluded, expandMemoryPhotoExclusionKeys, dedupeMemoryPhotoEntries, photoBelongsToMemory } from '../core/gallery-data.js';
+import { composeGalleryPhotos, collectMemoryPhotoIdentityKeys, isMemoryPhotoExcluded, expandMemoryPhotoExclusionKeys, dedupeMemoryPhotoEntries, photoBelongsToMemory, isMemeKeyboardPhotoEntry } from '../core/gallery-data.js';
 import { resolveGalleryLightboxTags } from '../core/photo-index.js';
 import { useScrollHideHeader } from '../core/use-scroll-hide-header.js';
 
@@ -1487,7 +1487,10 @@ export function HistoryView({
   const baseHistoryPhotoEntries = React.useMemo(() => {
     const calendarId = calendar && calendar.id ? calendar.id : '';
     const canonical = indexedPhotoComplete && Array.isArray(indexedPhotos)
-      ? indexedPhotos
+      // photoIndex rows are server-maintained and never learned about meme keyboard stickers
+      // (see isMemeKeyboardPhotoEntry's comment) -- buildCombinedPhotoEntries's composeGalleryPhotos
+      // path already excludes them, this branch needs its own filter to match.
+      ? indexedPhotos.filter(photo => !isMemeKeyboardPhotoEntry(photo))
       : buildCombinedPhotoEntries(chatMessages, memos, calendar, anniversaries);
     return canonical.map(entry => ({
       ...entry,

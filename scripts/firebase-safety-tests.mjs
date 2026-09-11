@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import { GATHER_APP_UTILS, omitUndefinedDeep } from '../src/core/app-utils.js';
 import { calculateSettlementRows } from '../src/core/settlement-calculator.js';
 import { fetchPhotoComments, savePhotoComments } from '../src/core/photo-comments.js';
-import { composeGalleryPhotos, paginateGalleryItems, getPaginationWindow, dedupeGalleryPhotoEntries, getGalleryPhotoDedupeKeys, coerceGalleryImageIndex, collectMemoryPhotoIdentityKeys, isMemoryPhotoExcluded, expandMemoryPhotoExclusionKeys, filterOutMemoryExclusionKeys, dedupeMemoryPhotoEntries, preserveAnniversaryCurationFields, photoBelongsToMemory } from '../src/core/gallery-data.js';
+import { composeGalleryPhotos, paginateGalleryItems, getPaginationWindow, dedupeGalleryPhotoEntries, getGalleryPhotoDedupeKeys, coerceGalleryImageIndex, collectMemoryPhotoIdentityKeys, isMemoryPhotoExcluded, expandMemoryPhotoExclusionKeys, filterOutMemoryExclusionKeys, dedupeMemoryPhotoEntries, preserveAnniversaryCurationFields, photoBelongsToMemory, isMemeKeyboardPhotoEntry } from '../src/core/gallery-data.js';
 import { filterDeletedPhotoFromIndexItems, deleteOwnedChatFileFromStorage } from '../src/core/gallery-bulk-delete.js';
 import { cloneConfirmedMeetings, commitConfirmedMeetingChanges } from '../src/core/confirmed-meeting-coordinator.js';
 import { getInitialAppView, buildAppViewUrl } from '../src/core/app-routing-state.js';
@@ -267,6 +267,16 @@ const writeQueueSource = fs.readFileSync(new URL('../src/core/app-write-queue.js
     getPhotoAssetCommentKey
   });
   assert(galleryWithUntaggedMeme.length === 1 && galleryWithUntaggedMeme[0].full === 'https://example.com/real2.jpg', 'meme messages sent before/without the meme upload tag must still be filtered via their memePool URL');
+
+  // The full gallery page and 인물/추억 tabs read the server-maintained photoIndex collection
+  // directly (see ui-chat-gallery.js/ui-summary-gallery.js) instead of going through
+  // composeGalleryPhotos, so they need their own meme check against that entry shape
+  // ({ full, thumb, uploadSource }, not { imageUrl, imageUrls }). functions/index.js's
+  // getPhotoIndexEntries collapses uploadSource down to chat/gallery/meeting (meme included, same
+  // as before uploadSource:'meme' existed client-side), so only the memePool URL is reliable here.
+  assert(isMemeKeyboardPhotoEntry({ uploadSource: 'meme', full: 'https://example.com/x.png' }) === true, 'photoIndex entry tagged uploadSource:meme must be treated as a meme keyboard sticker');
+  assert(isMemeKeyboardPhotoEntry({ uploadSource: 'chat', full: 'https://firebasestorage.googleapis.com/v0/b/x/o/memePool%2Fabc_full.png?alt=media' }) === true, 'photoIndex entry with a memePool URL must be treated as a meme keyboard sticker even when uploadSource was collapsed to chat');
+  assert(isMemeKeyboardPhotoEntry({ uploadSource: 'chat', full: 'https://example.com/real.jpg' }) === false, 'a real chat photoIndex entry must not be treated as a meme keyboard sticker');
 
   // Main-screen lightbox regression: chat attachment + auto-linked meeting copy (possibly
   // thumb-only / string sourceImageIndex / mismatched mediaKey prefix) must yield one slide.
