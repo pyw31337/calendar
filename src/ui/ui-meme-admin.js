@@ -64,7 +64,6 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
   const [uploadProgress, setUploadProgress] = React.useState(null); // { done, total } | null
   const [selected, setSelected] = React.useState(null); // one pool item, opened in the lightbox
   const [tagDraft, setTagDraft] = React.useState('');
-  const [isSaving, setIsSaving] = React.useState(false);
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [filterUntaggedOnly, setFilterUntaggedOnly] = React.useState(false);
 
@@ -163,29 +162,37 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
   const visibleList = filterUntaggedOnly ? untaggedList : pool;
   const liveTags = React.useMemo(() => parseHashtagInput(tagDraft), [tagDraft]);
 
-  const handleSaveTags = async (advanceToNextUntagged) => {
-    if (!selected || isSaving) return;
-    setIsSaving(true);
-    try {
-      const hashtags = parseHashtagInput(tagDraft);
-      const ok = await upsertRemote(password, { id: selected.id, hashtags });
-      if (!ok) { notify('저장 실패', 'error'); return; }
-      if (typeof onPoolChange === 'function') {
-        onPoolChange(prev => prev.map(p => p.id === selected.id ? { ...p, hashtags } : p));
-      }
-      notify('태그를 저장했습니다.', 'success');
-      if (advanceToNextUntagged) {
-        const next = untaggedList.find(p => p.id !== selected.id);
-        if (next) openLightbox(next);
-        else closeLightbox();
-      } else {
-        closeLightbox();
-      }
-    } catch (err) {
-      notify(describeMemeUploadError(err), 'error');
-    } finally {
-      setIsSaving(false);
+  // 낙관적 저장: Cloud Function 호출(콜드 스타트 시 몇 초씩 걸릴 수 있음)이 끝나길 기다렸다가
+  // 화면을 넘기면, 그 몇 초 사이에 다음 사진의 태그를 타이핑하기 시작한 입력이 아직 안 넘어간
+  // 이전 사진의 입력창에 섞여 들어가는 문제가 있었다 -- 화면 전환과 로컬 상태 갱신은 즉시 하고,
+  // 실제 서버 호출은 백그라운드로 보낸 뒤 실패했을 때만 그 사진으로 되돌리고 알린다.
+  const handleSaveTags = (advanceToNextUntagged) => {
+    if (!selected) return;
+    const target = selected;
+    const previousHashtags = target.hashtags || [];
+    const hashtags = parseHashtagInput(tagDraft);
+
+    if (typeof onPoolChange === 'function') {
+      onPoolChange(prev => prev.map(p => p.id === target.id ? { ...p, hashtags } : p));
     }
+    if (advanceToNextUntagged) {
+      const next = untaggedList.find(p => p.id !== target.id);
+      if (next) openLightbox(next);
+      else closeLightbox();
+    } else {
+      closeLightbox();
+    }
+
+    upsertRemote(password, { id: target.id, hashtags }).then(ok => {
+      if (ok) return;
+      throw new Error('저장 실패');
+    }).catch(err => {
+      // 저장이 실제로는 실패했으니 로컬 상태를 원래 태그로 되돌려 화면이 거짓말하지 않게 한다.
+      if (typeof onPoolChange === 'function') {
+        onPoolChange(prev => prev.map(p => p.id === target.id ? { ...p, hashtags: previousHashtags } : p));
+      }
+      notify(`"${target.fileName || target.id}" 태그 저장 실패 — ${describeMemeUploadError(err)}`, 'error');
+    });
   };
 
   const handleDelete = async () => {
@@ -301,7 +308,12 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
         ),
         /*#__PURE__*/React.createElement("input", {
           type: "text", value: tagDraft, onChange: e => setTagDraft(e.target.value),
-          placeholder: "해시태그 입력 (예: #눈물 #화남 짜증)", autoFocus: true,
+          onKeyDown: e => {
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+            handleSaveTags(true);
+          },
+          placeholder: "해시태그 입력 후 Enter (예: #눈물 #화남 짜증)", autoFocus: true,
           className: "form-input", style: { fontSize: '16px' }
         }),
         /*#__PURE__*/React.createElement("div", {
@@ -323,17 +335,17 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
             style: { height: '44px', width: '44px', padding: 0, flexShrink: 0 }
           }, TrashIcon ? /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }) : "삭제"),
           /*#__PURE__*/React.createElement("button", {
-            type: "button", className: "btn btn-secondary", onClick: closeLightbox, disabled: isSaving,
+            type: "button", className: "btn btn-secondary", onClick: closeLightbox,
             style: { height: '44px', padding: '0 14px', fontWeight: 800 }
           }, "취소"),
           /*#__PURE__*/React.createElement("button", {
-            type: "button", className: "btn btn-secondary", onClick: () => handleSaveTags(false), disabled: isSaving,
+            type: "button", className: "btn btn-secondary", onClick: () => handleSaveTags(false),
             style: { height: '44px', padding: '0 14px', fontWeight: 800, flex: 1 }
-          }, isSaving ? "저장 중..." : "저장"),
+          }, "저장"),
           /*#__PURE__*/React.createElement("button", {
-            type: "button", className: "btn btn-primary", onClick: () => handleSaveTags(true), disabled: isSaving,
+            type: "button", className: "btn btn-primary", onClick: () => handleSaveTags(true),
             style: { height: '44px', padding: '0 14px', fontWeight: 800, flex: 1 }
-          }, isSaving ? "저장 중..." : "저장하고 다음 미태그")
+          }, "저장하고 다음 (Enter)")
         )
       )
     )

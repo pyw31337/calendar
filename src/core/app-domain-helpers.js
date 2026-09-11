@@ -773,12 +773,28 @@ function buildCultureLinkedMemoData({ existingMemo, item, text, participantId, s
   return memoData;
 }
 
-async function callAdminFunction(name, body) {
-  const res = await fetch(`https://us-central1-${window.__gatherFirebaseConfig.projectId}.cloudfunctions.net/${name}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
+// No timeout here meant a stuck request (a cold Cloud Function instance that never answers, a
+// dropped connection that doesn't surface a clean network error) left every admin action --
+// meme tag save/delete included -- stuck on its "저장 중..." state forever, with no error to
+// react to and no way out short of reloading the page. 25s is generous for a cold start but
+// still bounds the wait with a clear, actionable message instead of silence.
+async function callAdminFunction(name, body, timeoutMs = 25000) {
+  const controller = typeof AbortController === 'function' ? new AbortController() : null;
+  const timeoutId = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+  let res;
+  try {
+    res = await fetch(`https://us-central1-${window.__gatherFirebaseConfig.projectId}.cloudfunctions.net/${name}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller ? controller.signal : undefined
+    });
+  } catch (err) {
+    if (err?.name === 'AbortError') throw new Error('요청 시간이 초과되었습니다. 네트워크 상태를 확인하고 다시 시도해 주세요.', { cause: err });
+    throw err;
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
   let json = null;
   try {
     json = await res.json();
