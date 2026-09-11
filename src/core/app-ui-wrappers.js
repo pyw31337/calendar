@@ -1,19 +1,16 @@
 /**
- * U1a of docs/app-main-split-units.md: the ~56 icon components living at the bottom of
- * app-main.js were never real components -- each one was an identical 4-line pass-through to
- * `window.GATHER_UI_COMPONENTS.<Name>` (the actual SVG lives in src/ui/ui-icons.js and is
- * registered onto that global). Factored into one table-driven helper instead of 56 near-copies.
+ * docs/app-main-split-units.md units U1a/U1b: many components at the top and bottom of
+ * app-main.js were never real components -- each one was a near-identical few-line pass-through
+ * to `window.GATHER_UI_COMPONENTS.<Name>` (the real body lives in src/ui/*.js and is registered
+ * onto that global). Factored into one table-driven helper instead of dozens of near-copies.
  *
  * app-main.js keeps a same-name alias for every one of these (`const { MenuIcon, ... } =
  * bindUiComponentAliases(React)`), which is required: scripts/check-required-symbols.mjs and
  * every JSX call site in app-main.js still reference these names directly.
  */
 
-// Small line-icon set for the main header's menu bar, weather badges, admin/settlement icons,
-// and the place-category marker (Tabler-style outline icons, matching src/ui/ui-icons.js).
-// getWeatherIcon and UnderlineTabs are NOT in this list -- they aren't simple pass-throughs
-// (getWeatherIcon picks a component by weather code; UnderlineTabs falls back to
-// GATHER_APP_UTILS, not just GATHER_UI_COMPONENTS) and stay defined directly in app-main.js.
+// U1a: small line-icon set for the main header's menu bar, weather badges, admin/settlement
+// icons, and the place-category marker (Tabler-style outline icons, matching src/ui/ui-icons.js).
 const ICON_COMPONENT_NAMES = Object.freeze([
   'MenuIcon', 'NotepadTextIcon', 'ChatSectionIcon', 'LinkIcon', 'MessageCommentIcon',
   'PencilIcon', 'BuildingIcon', 'BackArrowIcon', 'SunIcon', 'CloudIcon', 'MistIcon',
@@ -29,10 +26,46 @@ const ICON_COMPONENT_NAMES = Object.freeze([
   'ThreeLinesIcon', 'PlaceCategoryMarkerIcon', 'CctvIcon', 'DicesIcon'
 ]);
 
+// U1b: top-of-file component wrappers (modals, badges, admin dialogs) that follow the exact
+// same plain pass-through shape as the icons above, just not icons.
+const PLAIN_WRAPPER_COMPONENT_NAMES = Object.freeze([
+  'ResizableModalContainer', 'AutoGrowTextarea', 'FormAddEditActionButtons', 'SegmentedToggle',
+  'ItemEditDeleteActions', 'GamifiedConfirmButtonContent', 'LinkPreviewCard',
+  'LinkPreviewProgressOverlay', 'AdminLoginGate', 'DonutChart', 'ColorSwatchPicker',
+  'StickyVideoBox', 'PollVoterSheet', 'OperationProgressOverlay', 'ToggleSwitch', 'Footer',
+  'SearchResultLogRow', 'TikTokEmbedWidget', 'UrlCapsuleBadge', 'ParticipantPickerButton',
+  'DateCapsuleBadge', 'CapsuleTextBadge', 'AdminDashboard', 'AdminModal',
+  'AdminUnifiedSearchResultsView', 'AdminCreateCalendarModal', 'AdminRestorePhraseModal',
+  'AdminUnifiedSearchModal'
+]);
+
+// getWeatherIcon (picks a component by weather code) is not a plain pass-through and stays
+// defined directly in app-main.js.
+//
+// UnderlineTabs and CreateSettlementModal are ALSO not plain pass-throughs -- each checks an
+// extra source before falling back to GATHER_UI_COMPONENTS (GATHER_APP_UTILS.UnderlineTabs, and
+// the CreateSettlementModal-specific window.__GATHER_CREATE_SETTLEMENT_MODAL__ override) -- so
+// they get their own resolver here instead of the shared plain-pass-through factory.
+function createSpecialAliases(React) {
+  return {
+    UnderlineTabs(props) {
+      const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.UnderlineTabs;
+      if (C) return React.createElement(C, props);
+      const f = window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.UnderlineTabs;
+      return typeof f === 'function' ? f(props) : null;
+    },
+    CreateSettlementModal(props) {
+      const C = window.__GATHER_CREATE_SETTLEMENT_MODAL__
+        || (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CreateSettlementModal);
+      return typeof C === 'function' ? React.createElement(C, props) : null;
+    }
+  };
+}
+
 export function bindUiComponentAliases(React) {
-  const out = {};
-  ICON_COMPONENT_NAMES.forEach(name => {
-    out[name] = function IconAlias(props) {
+  const out = createSpecialAliases(React);
+  [...ICON_COMPONENT_NAMES, ...PLAIN_WRAPPER_COMPONENT_NAMES].forEach(name => {
+    out[name] = function PassThroughAlias(props) {
       const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS[name];
       return typeof C === 'function' ? React.createElement(C, props) : null;
     };
@@ -40,4 +73,4 @@ export function bindUiComponentAliases(React) {
   return out;
 }
 
-export { ICON_COMPONENT_NAMES };
+export { ICON_COMPONENT_NAMES, PLAIN_WRAPPER_COMPONENT_NAMES };
