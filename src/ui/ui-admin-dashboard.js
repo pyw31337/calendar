@@ -446,6 +446,12 @@ export function AdminDashboard({ initialCalendars }) {
   // 공유 데이터 어디서나 재사용할 수 있도록 category-agnostic 하게 둔다.
   const [dataPoolCategory, setDataPoolCategory] = React.useState('photo');
   const [dataPoolUntaggedOnly, setDataPoolUntaggedOnly] = React.useState(false);
+  // 데이터풀 그리드는 항목이 많아지면(특히 사진) 한 번에 다 그리기 버겁기 때문에 100개 단위로
+  // 페이지네이션한다. 카테고리를 바꾸거나 "미태그만 보기"를 토글하면 목록 자체가 바뀌므로 첫
+  // 페이지로 되돌린다.
+  const DATA_POOL_PAGE_SIZE = 100;
+  const [dataPoolPage, setDataPoolPage] = React.useState(0);
+  React.useEffect(() => { setDataPoolPage(0); }, [dataPoolCategory, dataPoolUntaggedOnly]);
 
   // Timeline filters and pagination for Tab 4 (Recovery logs)
   const [timelineSearchQuery, setTimelineSearchQuery] = React.useState('');
@@ -2021,50 +2027,64 @@ export function AdminDashboard({ initialCalendars }) {
       ];
       const untaggedPhotoCount = memePoolAdmin.filter(p => !(p.hashtags || []).length).length;
       const visiblePhotos = dataPoolUntaggedOnly ? memePoolAdmin.filter(p => !(p.hashtags || []).length) : memePoolAdmin;
+      const photoPageCount = Math.max(1, Math.ceil(visiblePhotos.length / DATA_POOL_PAGE_SIZE));
+      const clampedPhotoPage = Math.min(dataPoolPage, photoPageCount - 1);
+      const pagedPhotos = visiblePhotos.slice(clampedPhotoPage * DATA_POOL_PAGE_SIZE, (clampedPhotoPage + 1) * DATA_POOL_PAGE_SIZE);
+      const categoryButtonHeight = '36px';
       return /*#__PURE__*/React.createElement("section", { style: styles.card },
-        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', marginBottom: '14px' } },
-          /*#__PURE__*/React.createElement("div", null,
-            /*#__PURE__*/React.createElement("h4", { style: styles.cardTitle }, /*#__PURE__*/React.createElement(DatabaseIcon, null), "데이터풀"),
-            /*#__PURE__*/React.createElement("p", { style: { margin: '3px 0 0', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' } }, "모든 캘린더가 함께 쓰는 전역 공유 데이터를 종류별로 모아 봅니다.")
-          )
-        ),
-        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '16px' } },
-          categories.map(c => /*#__PURE__*/React.createElement("button", {
-            key: c.id, type: "button",
-            onClick: () => setDataPoolCategory(c.id),
-            style: {
-              padding: '8px 14px', borderRadius: 'var(--radius-full)', border: '1px solid var(--border-subtle)',
-              backgroundColor: dataPoolCategory === c.id ? 'var(--status-green)' : 'var(--bg-primary)',
-              color: dataPoolCategory === c.id ? '#fff' : 'var(--text-main)',
-              fontWeight: 700, fontSize: 'var(--font-size-sm)', cursor: 'pointer'
-            }
-          }, `${c.label} (${c.count})`))
+        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', marginBottom: '16px' } },
+          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '6px', flexWrap: 'wrap' } },
+            categories.map(c => /*#__PURE__*/React.createElement("button", {
+              key: c.id, type: "button",
+              onClick: () => setDataPoolCategory(c.id),
+              style: {
+                height: categoryButtonHeight, padding: '0 14px', display: 'flex', alignItems: 'center',
+                borderRadius: 'var(--radius-full)', border: '1px solid var(--border-subtle)',
+                backgroundColor: dataPoolCategory === c.id ? 'var(--status-green)' : 'var(--bg-primary)',
+                color: dataPoolCategory === c.id ? '#fff' : 'var(--text-main)',
+                fontWeight: 700, fontSize: 'var(--font-size-sm)', cursor: 'pointer'
+              }
+            }, `${c.label} (${c.count})`))
+          ),
+          dataPoolCategory === 'photo' && /*#__PURE__*/React.createElement("button", {
+            type: "button", className: "btn btn-secondary",
+            onClick: () => setDataPoolUntaggedOnly(v => !v),
+            style: { height: categoryButtonHeight, padding: '0 12px', fontWeight: 800, fontSize: 'var(--font-size-sm)' }
+          }, dataPoolUntaggedOnly ? "전체 보기" : "미태그만 보기")
         ),
         dataPoolCategory === 'photo' ? /*#__PURE__*/React.createElement(React.Fragment, null,
-          /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '10px' } },
-            /*#__PURE__*/React.createElement("p", { style: { margin: 0, fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } }, `밈키보드 이미지 풀 (${memePoolAdmin.length}장, 미태그 ${untaggedPhotoCount}장) -- 업로드·태그 편집은 "밈키보드" 탭에서 합니다.`),
-            /*#__PURE__*/React.createElement("button", {
-              type: "button", className: "btn btn-secondary",
-              onClick: () => setDataPoolUntaggedOnly(v => !v),
-              style: { height: '36px', padding: '0 12px', fontWeight: 800, fontSize: 'var(--font-size-sm)' }
-            }, dataPoolUntaggedOnly ? "전체 보기" : "미태그만 보기")
-          ),
+          /*#__PURE__*/React.createElement("p", { style: { margin: '0 0 10px', fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } }, `밈키보드 이미지 풀 (${memePoolAdmin.length}장, 미태그 ${untaggedPhotoCount}장) -- 업로드·태그 편집은 "밈키보드" 탭에서 합니다.`),
           visiblePhotos.length === 0
             ? /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)', textAlign: 'center' } }, "표시할 이미지가 없습니다.")
-            : /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(84px, 1fr))', gap: '6px' } },
-                visiblePhotos.map(item => /*#__PURE__*/React.createElement("div", {
-                  key: item.id,
-                  style: { position: 'relative', borderRadius: 'var(--radius-sm)', overflow: 'hidden', aspectRatio: '1 / 1', backgroundColor: 'var(--bg-primary)' }
-                },
-                  /*#__PURE__*/React.createElement("img", {
-                    src: item.thumbUrl || item.fullUrl, alt: item.fileName || '', loading: "lazy",
-                    style: { width: '100%', height: '100%', objectFit: 'cover' }
-                  }),
-                  !(item.hashtags || []).length && /*#__PURE__*/React.createElement("span", {
-                    "aria-hidden": true,
-                    style: { position: 'absolute', top: '4px', left: '4px', padding: '1px 6px', borderRadius: 'var(--radius-full)', backgroundColor: 'rgba(220,38,38,0.9)', color: '#fff', fontSize: 'var(--font-size-2xs)', fontWeight: 800 }
-                  }, "미태그")
-                ))
+            : /*#__PURE__*/React.createElement(React.Fragment, null,
+                /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(84px, 1fr))', gap: '6px' } },
+                  pagedPhotos.map(item => /*#__PURE__*/React.createElement("div", {
+                    key: item.id,
+                    style: { position: 'relative', borderRadius: 'var(--radius-sm)', overflow: 'hidden', aspectRatio: '1 / 1', backgroundColor: 'var(--bg-primary)' }
+                  },
+                    /*#__PURE__*/React.createElement("img", {
+                      src: item.thumbUrl || item.fullUrl, alt: item.fileName || '', loading: "lazy",
+                      style: { width: '100%', height: '100%', objectFit: 'cover' }
+                    }),
+                    !(item.hashtags || []).length && /*#__PURE__*/React.createElement("span", {
+                      "aria-hidden": true,
+                      style: { position: 'absolute', top: '4px', left: '4px', padding: '1px 6px', borderRadius: 'var(--radius-full)', backgroundColor: 'rgba(220,38,38,0.9)', color: '#fff', fontSize: 'var(--font-size-2xs)', fontWeight: 800 }
+                    }, "미태그")
+                  ))
+                ),
+                photoPageCount > 1 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', marginTop: '12px' } },
+                  /*#__PURE__*/React.createElement("button", {
+                    type: "button", className: "btn btn-secondary", disabled: clampedPhotoPage === 0,
+                    onClick: () => setDataPoolPage(p => Math.max(0, p - 1)),
+                    style: { height: '32px', padding: '0 12px', fontWeight: 800, fontSize: 'var(--font-size-sm)' }
+                  }, "이전"),
+                  /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } }, `${clampedPhotoPage + 1} / ${photoPageCount}`),
+                  /*#__PURE__*/React.createElement("button", {
+                    type: "button", className: "btn btn-secondary", disabled: clampedPhotoPage >= photoPageCount - 1,
+                    onClick: () => setDataPoolPage(p => Math.min(photoPageCount - 1, p + 1)),
+                    style: { height: '32px', padding: '0 12px', fontWeight: 800, fontSize: 'var(--font-size-sm)' }
+                  }, "다음")
+                )
               ),
           /*#__PURE__*/React.createElement("div", { style: { marginTop: '24px', paddingTop: '20px', borderTop: '1px solid var(--border-subtle)' } },
             /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '10px' } },
