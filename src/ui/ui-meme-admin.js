@@ -69,6 +69,11 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
   const [tagDraft, setTagDraft] = React.useState('');
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [filterUntaggedOnly, setFilterUntaggedOnly] = React.useState(false);
+  // 700장 넘게 쌓이는 풀 전체를 한 번에 그리면 버벅여서 100개 단위로 나눠 보여준다. 필터를
+  // 바꾸면(전체<->미태그만) 목록 자체가 달라지므로 첫 페이지로 되돌린다.
+  const MEME_PAGE_SIZE = 100;
+  const [page, setPage] = React.useState(0);
+  React.useEffect(() => { setPage(0); }, [filterUntaggedOnly]);
 
   const notify = (msg, kind) => { if (typeof showToast === 'function') showToast(msg, kind); };
 
@@ -349,27 +354,47 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
     ),
     visibleList.length === 0
       ? /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)', textAlign: 'center' } }, "표시할 이미지가 없습니다.")
-      : /*#__PURE__*/React.createElement("div", {
-          style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(84px, 1fr))', gap: '6px' }
-        }, visibleList.map(item => /*#__PURE__*/React.createElement("button", {
-          key: item.id, type: "button", onClick: () => openLightbox(item),
-          style: {
-            position: 'relative', padding: 0, border: 'none', borderRadius: 'var(--radius-sm)', overflow: 'hidden',
-            aspectRatio: '1 / 1', cursor: 'pointer', backgroundColor: 'var(--bg-primary)'
-          }
-        },
-          /*#__PURE__*/React.createElement("img", {
-            src: item.thumbUrl || item.fullUrl, alt: item.fileName || '', loading: "lazy",
-            style: { width: '100%', height: '100%', objectFit: 'cover' }
-          }),
-          !(item.hashtags || []).length && /*#__PURE__*/React.createElement("span", {
-            "aria-hidden": true,
-            style: {
-              position: 'absolute', top: '4px', left: '4px', padding: '1px 6px', borderRadius: 'var(--radius-full)',
-              backgroundColor: 'rgba(220,38,38,0.9)', color: '#fff', fontSize: 'var(--font-size-2xs)', fontWeight: 800
-            }
-          }, "미태그")
-        ))),
+      : (() => {
+          const pageCount = Math.max(1, Math.ceil(visibleList.length / MEME_PAGE_SIZE));
+          const clampedPage = Math.min(page, pageCount - 1);
+          const pagedList = visibleList.slice(clampedPage * MEME_PAGE_SIZE, (clampedPage + 1) * MEME_PAGE_SIZE);
+          return /*#__PURE__*/React.createElement(React.Fragment, null,
+            /*#__PURE__*/React.createElement("div", {
+              style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(84px, 1fr))', gap: '6px' }
+            }, pagedList.map(item => /*#__PURE__*/React.createElement("button", {
+              key: item.id, type: "button", onClick: () => openLightbox(item),
+              style: {
+                position: 'relative', padding: 0, border: 'none', borderRadius: 'var(--radius-sm)', overflow: 'hidden',
+                aspectRatio: '1 / 1', cursor: 'pointer', backgroundColor: 'var(--bg-primary)'
+              }
+            },
+              /*#__PURE__*/React.createElement("img", {
+                src: item.thumbUrl || item.fullUrl, alt: item.fileName || '', loading: "lazy",
+                style: { width: '100%', height: '100%', objectFit: 'cover' }
+              }),
+              !(item.hashtags || []).length && /*#__PURE__*/React.createElement("span", {
+                "aria-hidden": true,
+                style: {
+                  position: 'absolute', top: '4px', left: '4px', padding: '1px 6px', borderRadius: 'var(--radius-full)',
+                  backgroundColor: 'rgba(220,38,38,0.9)', color: '#fff', fontSize: 'var(--font-size-2xs)', fontWeight: 800
+                }
+              }, "미태그")
+            ))),
+            pageCount > 1 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', marginTop: '12px' } },
+              /*#__PURE__*/React.createElement("button", {
+                type: "button", className: "btn btn-secondary", disabled: clampedPage === 0,
+                onClick: () => setPage(p => Math.max(0, p - 1)),
+                style: { height: '32px', padding: '0 12px', fontWeight: 800, fontSize: 'var(--font-size-sm)' }
+              }, "이전"),
+              /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } }, `${clampedPage + 1} / ${pageCount}`),
+              /*#__PURE__*/React.createElement("button", {
+                type: "button", className: "btn btn-secondary", disabled: clampedPage >= pageCount - 1,
+                onClick: () => setPage(p => Math.min(pageCount - 1, p + 1)),
+                style: { height: '32px', padding: '0 12px', fontWeight: 800, fontSize: 'var(--font-size-sm)' }
+              }, "다음")
+            )
+          );
+        })(),
     selected && /*#__PURE__*/React.createElement("div", {
       onClick: closeLightbox,
       style: {
