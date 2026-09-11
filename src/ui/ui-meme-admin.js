@@ -60,8 +60,11 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
   const deleteRemote = __deps.memePoolDeleteRemote || GATHER_APP_UTILS.memePoolDeleteRemote;
   const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
+  const ConfirmDialog = __comp.ConfirmDialog || __deps.ConfirmDialog;
   const fileInputRef = React.useRef(null);
   const [uploadProgress, setUploadProgress] = React.useState(null); // { done, total } | null
+  const [resetProgress, setResetProgress] = React.useState(null); // { done, total } | null
+  const [showResetConfirm, setShowResetConfirm] = React.useState(false);
   const [selected, setSelected] = React.useState(null); // one pool item, opened in the lightbox
   const [tagDraft, setTagDraft] = React.useState('');
   const [isDeleting, setIsDeleting] = React.useState(false);
@@ -216,7 +219,45 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
     }
   };
 
+  // 한글 IME 조합 중 Enter가 조합 확정으로 오인돼 잘린 텍스트("#먹방" 대신 "#먹")가 저장되고
+  // 바로 다음 사진으로 넘어가버리던 버그(입력창에 isComposing 체크가 없었음)가 있었다 -- 이미
+  // 그렇게 잘못 붙어버린 태그들을 사진 하나하나 열어 지우게 하는 대신, 한 번에 전부 비우고
+  // 고쳐진 입력으로 다시 태깅할 수 있게 하는 복구용 되돌리기.
+  const handleResetAllTags = async () => {
+    setShowResetConfirm(false);
+    const targets = pool.filter(p => (p.hashtags || []).length > 0);
+    if (targets.length === 0) return;
+    if (typeof onPoolChange === 'function') {
+      onPoolChange(prev => prev.map(p => ({ ...p, hashtags: [] })));
+    }
+    setResetProgress({ done: 0, total: targets.length });
+    let failCount = 0;
+    await runWithConcurrency(targets, async item => {
+      const ok = await upsertRemote(password, { id: item.id, hashtags: [] }).catch(() => false);
+      if (!ok) failCount += 1;
+    }, UPLOAD_CONCURRENCY, (done, total) => setResetProgress({ done, total }));
+    setResetProgress(null);
+    notify(
+      failCount > 0
+        ? `${targets.length - failCount}장 초기화 완료, ${failCount}장 실패 (새로고침 후 다시 시도해 주세요)`
+        : `${targets.length}장의 태그를 모두 초기화했습니다.`,
+      failCount > 0 ? 'error' : 'success'
+    );
+  };
+
   return /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '14px' } },
+    showResetConfirm && ConfirmDialog && /*#__PURE__*/React.createElement(ConfirmDialog, {
+      title: "전체 태그 초기화",
+      message: `현재 태그가 붙어 있는 ${pool.filter(p => (p.hashtags || []).length > 0).length}장의 해시태그를 모두 지웁니다. 되돌릴 수 없습니다. 계속할까요?`,
+      onConfirm: handleResetAllTags,
+      onCancel: () => setShowResetConfirm(false)
+    }),
+    resetProgress && /*#__PURE__*/React.createElement(ImageUploadOverlay, {
+      label: '태그 초기화 중...',
+      pct: resetProgress.total ? Math.round((resetProgress.done / resetProgress.total) * 100) : 0,
+      current: resetProgress.done,
+      total: resetProgress.total
+    }),
     uploadProgress && /*#__PURE__*/React.createElement(ImageUploadOverlay, {
       label: '밈 이미지 업로드 중...',
       pct: uploadProgress.total ? Math.round((uploadProgress.done / uploadProgress.total) * 100) : 0,
@@ -229,6 +270,13 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
         /*#__PURE__*/React.createElement("p", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', margin: '2px 0 0 0' } }, "여러 장을 한 번에 선택해 올린 뒤, 아래 그리드에서 사진을 눌러 해시태그를 입력하세요. 같은 파일명·포맷·용량의 이미지는 자동으로 건너뜁니다.")
       ),
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", className: "btn btn-danger",
+          onClick: () => setShowResetConfirm(true),
+          disabled: !!resetProgress || untaggedList.length === pool.length,
+          title: "잘못 붙은 태그를 한 번에 지우고 다시 태깅할 때 사용하세요.",
+          style: { height: '44px', padding: '0 14px', fontWeight: 800 }
+        }, "전체 태그 초기화"),
         /*#__PURE__*/React.createElement("button", {
           type: "button", className: "btn btn-secondary",
           onClick: () => setFilterUntaggedOnly(v => !v),
