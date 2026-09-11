@@ -1,6 +1,5 @@
 /** P6 ESM adapter for app-main — live assets/app-main.js unchanged */
 import './../react-globals.js';
-import { uploadBlobWithWatchdog, retryMediaTask, getAdaptiveMediaUploadConcurrency } from './app-media-upload.js';
 import {
   classifyChatComposerFiles,
   createPendingChatFileAttachment,
@@ -21,15 +20,18 @@ import { bindUiComponentAliases } from './app-ui-wrappers.js';
 import { useTapRevealedMsgId, useModalDirtyGuard, useChatSendGuard } from './app-ui-hooks.js';
 import { highlightTextWithYellowMarker, highlightKeyword, formatLogTimestamp, computeCalendarSearchMatches, getAdminSearchResultTargetUrl } from './app-search.js';
 import { fetchLinkPreview, useLinkPreview, shouldFetchLinkPreviewForChatUrl } from './app-link-preview.js';
-import { renderChatMessageBody, parseTextWithLinks, isEmojiOnlyChatText, resolveMeetingPhotoDisplay, buildLightboxImageInfo } from './app-chat-render.js';
+import { renderChatMessageBody, parseTextWithLinks, isEmojiOnlyChatText, resolveMeetingPhotoDisplay, buildLightboxImageInfo, renderTextWithUrlBadge } from './app-chat-render.js';
 import { loadLeaflet, loadLeafletMarkerCluster, loadMapLibreLeaflet, getPlaceCategoryMarkerContent, buildPlaceMarkerHtml, panMapToFitMarkerPopup, centerMapOnMarkerAndPopup } from './app-place-map.js';
 import {
   isHeicFile,
-  buildMetadataTags, buildBase64FallbackFromCompressed, revokeCompressedObjectUrls,
+  buildMetadataTags,
   forgetPreprocessedImages,
-  acquireMediaUploadWakeLock, releaseMediaUploadWakeLock, processImageFilesSequentially, chunkResolvedImagesForMessages,
-  describeImageProcessingFailures, getImageFilesFromClipboardEvent, appendChatImageFiles, getUploadImageBlobMeta,
-  uploadChatImageAssets, uploadInlineChatImageToStorage, readClipboardImageFiles
+  processImageFilesSequentially, chunkResolvedImagesForMessages,
+  describeImageProcessingFailures, getImageFilesFromClipboardEvent, appendChatImageFiles,
+  uploadInlineChatImageToStorage, readClipboardImageFiles,
+  migrateBase64ChatImagesForCalendar, backfillMeetingUploadSourcesForCalendar,
+  resolveChatImageBatch, resolveMemoImageBatch, deleteChatImageFromStorage, deleteAllChatImagesFromStorage,
+  resolveAnniversaryImageBatch
 } from './app-image-pipeline.js';
 import {
   computeKoreanHolidaysForYear,
@@ -219,96 +221,6 @@ const {
   CapsuleTextBadge
 } = uiWrapperAliases;
 
-// 입력필드 표시 규칙: 일반 텍스트 / YY.MM.DD 날짜 / URL 분리
-function tokenizeRichFieldText(text) {
-  const source = String(text || '');
-  if (!source.trim()) return [];
-  const urlRe = /https?:\/\/[^\s<>"'\]]+/gi;
-  const chunks = [];
-  let last = 0;
-  let match;
-  while ((match = urlRe.exec(source)) !== null) {
-    if (match.index > last) chunks.push({ type: 'raw', value: source.slice(last, match.index) });
-    let href = match[0].replace(/[.,);\]}]+$/g, '');
-    chunks.push({ type: 'url', value: href });
-    last = match.index + match[0].length;
-  }
-  if (last < source.length) chunks.push({ type: 'raw', value: source.slice(last) });
-  if (chunks.length === 0) chunks.push({ type: 'raw', value: source });
-
-  const tokens = [];
-  chunks.forEach(chunk => {
-    if (chunk.type === 'url') { tokens.push(chunk); return; }
-    const s = chunk.value;
-    const dateRe = /(\d{2,4}[./-]\d{1,2}[./-]\d{1,2})/g;
-    let dLast = 0, dm;
-    while ((dm = dateRe.exec(s)) !== null) {
-      if (dm.index > dLast) {
-        const piece = s.slice(dLast, dm.index);
-        if (piece) tokens.push({ type: 'text', value: piece });
-      }
-      tokens.push({ type: 'date', value: dm[1] || dm[0] });
-      dLast = dm.index + dm[0].length;
-    }
-    if (dLast < s.length) {
-      const piece = s.slice(dLast);
-      if (piece) tokens.push({ type: 'text', value: piece });
-    }
-  });
-  return tokens;
-}
-
-function renderTextWithUrlBadge(text, options = null) {
-  const tokens = tokenizeRichFieldText(text);
-  if (tokens.length === 0) return null;
-  const stackUrl = !options || options.stackUrl !== false;
-  const textRow = [];
-  const urlRow = [];
-  tokens.forEach((tok, idx) => {
-    if (tok.type === 'url') {
-      urlRow.push(/*#__PURE__*/React.createElement(UrlCapsuleBadge, {
-        key: `u-${idx}-${tok.value}`,
-        url: tok.value,
-        style: stackUrl ? { alignSelf: 'flex-start' } : { marginLeft: '4px' }
-      }));
-    } else if (tok.type === 'date') {
-      textRow.push(/*#__PURE__*/React.createElement(DateCapsuleBadge, {
-        key: `d-${idx}-${tok.value}`,
-        date: tok.value,
-        style: { marginRight: '4px' }
-      }));
-    } else {
-      const v = tok.value;
-      if (!v || !String(v).trim()) return;
-      textRow.push(/*#__PURE__*/React.createElement("span", {
-        key: `t-${idx}`,
-        style: { wordBreak: 'break-word' }
-      }, v));
-    }
-  });
-  if (!stackUrl) {
-    return /*#__PURE__*/React.createElement("span", {
-      style: { display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' }
-    }, textRow, urlRow);
-  }
-  if (urlRow.length === 0) {
-    if (textRow.length === 0) return null;
-    if (textRow.length === 1 && tokens.every(t => t.type === 'text')) return textRow[0];
-    return /*#__PURE__*/React.createElement("span", {
-      style: { display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' }
-    }, textRow);
-  }
-  return /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px', minWidth: 0 }
-  },
-    textRow.length > 0 && /*#__PURE__*/React.createElement("span", {
-      style: { display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center', gap: '2px', wordBreak: 'break-word' }
-    }, textRow),
-    /*#__PURE__*/React.createElement("div", {
-      style: { display: 'flex', flexDirection: 'column', gap: '4px', maxWidth: '100%' }
-    }, urlRow)
-  );
-}
 
 // Shared add/edit action row: 추가 | (edit) 취소 + 수정 — DateModal 참여자/장소/정산 공통 모듈
 
@@ -344,7 +256,6 @@ import {
   getLiveFirebaseStorage,
   getFirebaseStateVersion,
   subscribeFirebaseStateChange,
-  checkFirebaseStorageHealth,
   fetchSingleCalendarWithRest,
   fetchRecentMessagesRest,
   fetchChatMessagesRest,
@@ -8291,275 +8202,6 @@ const GATHER_APP_CHAT_DATA = window.GATHER_APP_CHAT_DATA || {};
 
 const { ImageUploadOverlay, ImageProcessingOverlay, EmojiPickerSheet } = uiWrapperAliases;
 
-async function migrateBase64ChatImagesForCalendar(calId, { maxMessages = 40 } = {}) {
-  if (!calId || !firebaseDb || !(getLiveFirebaseStorage() || await ensureFirebaseStorageReady())) return { migrated: 0, failed: 0, scanned: 0 };
-  const storageOk = await checkFirebaseStorageHealth();
-  if (!storageOk) return { migrated: 0, failed: 0, scanned: 0, reason: 'storage-unavailable' };
-  let migrated = 0, failed = 0, scanned = 0;
-  try {
-    const snap = await firebaseDb.collection('calendars').doc(`cal_${calId}`).collection('messages')
-      .orderBy('timestamp', 'asc').limit(200).get();
-    const docs = [];
-    snap.forEach(doc => docs.push({ id: doc.id, ...doc.data() }));
-    for (const msg of docs) {
-      if (migrated + failed >= maxMessages) break;
-      scanned += 1;
-      const urls = Array.isArray(msg.imageUrls) && msg.imageUrls.length ? msg.imageUrls : (msg.imageUrl ? [msg.imageUrl] : []);
-      const thumbs = Array.isArray(msg.thumbUrls) && msg.thumbUrls.length ? msg.thumbUrls : (msg.thumbUrl ? [msg.thumbUrl] : []);
-      if (!urls.some(u => typeof u === 'string' && u.startsWith('data:image'))) continue;
-      const newUrls = [], newThumbs = [];
-      let anyFail = false;
-      for (let i = 0; i < urls.length; i++) {
-        const u = urls[i], t = thumbs[i] || u;
-        if (typeof u === 'string' && u.startsWith('http')) {
-          newUrls.push(u);
-          newThumbs.push(typeof t === 'string' && t.startsWith('http') ? t : u);
-          continue;
-        }
-        if (typeof u !== 'string' || !u.startsWith('data:image')) { anyFail = true; break; }
-        try {
-          const uploaded = await uploadInlineChatImageToStorage(calId, u, t, i);
-          if (!uploaded || !uploaded.imageUrl) { anyFail = true; break; }
-          newUrls.push(uploaded.imageUrl);
-          newThumbs.push(uploaded.thumbUrl || uploaded.imageUrl);
-        } catch (e) {
-          console.warn('migrate image failed', msg.id, e);
-          anyFail = true; break;
-        }
-      }
-      if (anyFail || !newUrls.length) { failed += 1; continue; }
-      try {
-        const updated = await writeCollectionDocumentWithFallback('messages', calId, msg.id, {
-          imageUrl: newUrls[0] || '',
-          thumbUrl: newThumbs[0] || '',
-          imageUrls: newUrls,
-          thumbUrls: newThumbs
-        }, 'update', '기존 이미지 마이그레이션');
-        if (!updated) throw new Error('Migration update failed');
-        migrated += 1;
-      } catch (e) {
-        console.warn('migrate update failed', msg.id, e);
-        failed += 1;
-      }
-    }
-  } catch (e) {
-    console.warn('migrateBase64ChatImagesForCalendar', e);
-    return { migrated, failed, scanned, reason: String(e && e.message || e) };
-  }
-  return { migrated, failed, scanned };
-}
-
-async function backfillMeetingUploadSourcesForCalendar(calId, calendar, { maxMessages = 40 } = {}) {
-  if (!calId) return { migrated: 0, failed: 0, scanned: 0 };
-  const fn = typeof getConfirmedMeetings === 'function' ? getConfirmedMeetings : (typeof window !== 'undefined' && window.GATHER_APP_UTILS ? window.GATHER_APP_UTILS.getConfirmedMeetings : null);
-  const meetings = typeof fn === 'function' ? fn(calendar) : [];
-  const messageIds = [];
-  const seen = new Set();
-  meetings.forEach(meeting => {
-    (Array.isArray(meeting?.photos) ? meeting.photos : []).forEach(photo => {
-      const messageId = String(photo?.sourceMessageId || '').trim();
-      if (!messageId || seen.has(messageId)) return;
-      const mediaKey = String(photo?.mediaKey || photo?.assetKey || '').trim().toLowerCase();
-      const uploadSource = String(photo?.uploadSource || '').trim().toLowerCase();
-      const source = String(photo?.source || '').trim().toLowerCase();
-      if (!(mediaKey.startsWith('meeting:') || uploadSource === 'meeting' || source === 'meeting')) return;
-      seen.add(messageId);
-      messageIds.push(messageId);
-    });
-  });
-  if (messageIds.length === 0) return { migrated: 0, failed: 0, scanned: 0 };
-  let migrated = 0, failed = 0, scanned = 0;
-  try {
-    for (const messageId of messageIds) {
-      if (migrated + failed >= maxMessages) break;
-      scanned += 1;
-      try {
-        const msg = await fetchMessageRest(calId, messageId);
-        if (!msg) continue;
-        const currentSource = String(msg.uploadSource || '').trim().toLowerCase();
-        if (currentSource === 'meeting' || currentSource === 'gallery') continue;
-        const updated = await writeCollectionDocumentWithFallback('messages', calId, messageId, {
-          uploadSource: 'meeting'
-        }, 'update', '일정 사진 메타 복구');
-        if (!updated) throw new Error('Meeting uploadSource update failed');
-        migrated += 1;
-      } catch (e) {
-        console.warn('backfillMeetingUploadSourcesForCalendar failed', messageId, e);
-        failed += 1;
-      }
-    }
-  } catch (e) {
-    console.warn('backfillMeetingUploadSourcesForCalendar', e);
-    return { migrated, failed, scanned, reason: String(e && e.message || e) };
-  }
-  return { migrated, failed, scanned };
-}
-
-// Resolves the {imageUrl, thumbUrl} pair a message/memo should store: uploaded Storage
-// download URLs when possible, the original compressed base64 data URLs otherwise. uploadFn
-// is uploadChatImageAssets or uploadMemoImageAssets, keeping each feature's Storage path.
-async function resolveImageUrls(calendarId, compressed, index, onBytes, uploadFn, options = {}) {
-  try {
-    const uploaded = await retryMediaTask(() => uploadFn(calendarId, compressed, index, onBytes), options.requireStorage ? 3 : 1);
-    if (uploaded && uploaded.imageUrl && uploaded.thumbUrl) {
-      revokeCompressedObjectUrls(compressed);
-      return { ...uploaded, metadata: compressed?.metadata || null };
-    }
-  } catch (e) {
-    if (options.requireStorage) {
-      throw new Error('이미지 저장소 연결에 실패했습니다. 네트워크를 확인한 뒤 다시 시도해 주세요.', { cause: e });
-    }
-    console.warn('Image Storage upload attempt failed, falling back to base64 data URL:', e);
-  }
-  if (options.requireStorage) {
-    throw new Error('이미지 저장소를 사용할 수 없어 사진을 저장하지 않았습니다.');
-  }
-  let original = compressed && compressed.original;
-  let thumbnail = compressed && compressed.thumbnail;
-  const needsEncode = compressed && (
-    compressed.needsBase64Fallback
-    || (typeof original === 'string' && original.startsWith('blob:'))
-    || (typeof thumbnail === 'string' && thumbnail.startsWith('blob:'))
-    || !original
-  );
-  if (needsEncode) {
-    try {
-      const fb = await buildBase64FallbackFromCompressed(compressed);
-      original = fb.original || original;
-      thumbnail = fb.thumbnail || thumbnail || original;
-    } catch (err) {
-      console.warn('base64 fallback encode failed:', err);
-    }
-  }
-  revokeCompressedObjectUrls(compressed);
-  if (original || thumbnail) {
-    return {
-      imageUrl: original || thumbnail,
-      thumbUrl: thumbnail || original,
-      metadata: compressed?.metadata || null
-    };
-  }
-  throw new Error('이미지 처리 중 오류가 발생했습니다.');
-}
-
-async function resolveImageBatch(calendarId, compressedList, onProgress, uploadFn, options = {}) {
-  await acquireMediaUploadWakeLock();
-  try {
-  const uploadIndexes = compressedList
-    .map((c, idx) => ({ c, idx }))
-    .filter(({ c }) => !c.isExisting);
-
-  await checkFirebaseStorageHealth().catch(() => false);
-  if (uploadIndexes.length === 0) {
-    if (onProgress) onProgress({ pct: 100, remainingSec: 0, current: compressedList.length, total: compressedList.length });
-    return Promise.all(compressedList.map((c) =>
-      Promise.resolve({ imageUrl: c.original, thumbUrl: c.thumbnail })
-    ));
-  }
-
-  const startedAt = Date.now();
-  const total = compressedList.length;
-  let compressionDone = 0;
-  let currentIndex = 0;
-
-  const reportCompressionProgress = () => {
-    if (!onProgress) return;
-    const pct = Math.min(44, Math.round((compressionDone / total) * 45));
-    const elapsedSec = (Date.now() - startedAt) / 1000;
-    const remainingSec = compressionDone > 0
-      ? Math.max(0, Math.round((elapsedSec / compressionDone) * (total - compressionDone) * 2))
-      : null;
-    onProgress({ pct, remainingSec, current: currentIndex, total });
-  };
-
-  const progressByTask = new Map();
-  const reportUploadProgress = () => {
-    if (!onProgress) return;
-    let transferred = 0, totalBytes = 0;
-    progressByTask.forEach(p => { transferred += p.transferred; totalBytes += p.total; });
-    const uploadPct = totalBytes > 0 ? Math.min(54, Math.round((transferred / totalBytes) * 54)) : 0;
-    const pct = Math.min(99, 45 + uploadPct);
-    const elapsedSec = (Date.now() - startedAt) / 1000;
-    const remainingSec = pct > 46 ? Math.max(0, Math.round(elapsedSec * (100 - pct) / pct)) : null;
-    onProgress({ pct, remainingSec, current: currentIndex, total });
-  };
-  const onBytes = (taskKey, transferred, total) => {
-    progressByTask.set(taskKey, { transferred, total });
-    reportUploadProgress();
-  };
-
-  const results = new Array(compressedList.length);
-  let uploadCursor = 0;
-  const UPLOAD_CONCURRENCY = getAdaptiveMediaUploadConcurrency(compressedList.length, typeof navigator !== 'undefined' ? navigator : {});
-  const failed = [];
-
-  async function uploadWorker() {
-    while (true) {
-      const idx = uploadCursor++;
-      if (idx >= compressedList.length) return;
-      currentIndex = idx + 1;
-      const c = compressedList[idx];
-      if (c.isExisting) {
-        compressionDone++;
-        reportCompressionProgress();
-        results[idx] = { imageUrl: c.original, thumbUrl: c.thumbnail };
-      } else {
-        let result = null;
-        try {
-          result = await resolveImageUrls(calendarId, c, idx, onBytes, uploadFn, options);
-        } catch (error) { if (!options.continueOnError) throw error; failed.push({ index: idx, error }); if (typeof options.onItemError === 'function') options.onItemError({ index: idx, error, item: c }); }
-        compressionDone++;
-        reportCompressionProgress();
-        results[idx] = result;
-      }
-    }
-  }
-
-  await Promise.all(Array.from({ length: UPLOAD_CONCURRENCY }, () => uploadWorker()));
-  if (onProgress) onProgress({ pct: 100, remainingSec: 0, current: total, total });
-  Object.defineProperty(results, 'failed', { value: failed, enumerable: false, configurable: true });
-  return results;
-  } finally {
-    releaseMediaUploadWakeLock();
-  }
-}
-
-async function resolveChatImageBatch(calendarId, compressedList, onProgress, options = {}) {
-  return resolveImageBatch(calendarId, compressedList, onProgress, uploadChatImageAssets, options);
-}
-
-async function resolveMemoImageBatch(calendarId, compressedList, onProgress) {
-  return resolveImageBatch(calendarId, compressedList, onProgress, uploadMemoImageAssets);
-}
-
-// A Storage download URL looks like https://firebasestorage.googleapis.com/...; a fallback
-// image is an embedded data: URL. Only the former needs cleanup when a message is deleted.
-function isStorageDownloadUrl(url) {
-  return typeof url === 'string' && /^https:\/\//.test(url);
-}
-
-async function deleteChatImageFromStorage(url) {
-  if (!isStorageDownloadUrl(url)) return;
-  const storage = getLiveFirebaseStorage() || await ensureFirebaseStorageReady();
-  if (!storage) return;
-  try {
-    await storage.refFromURL(url).delete();
-  } catch (e) {
-    console.warn('Failed to delete chat image from Storage:', e);
-  }
-}
-
-// Cleans up every Storage object attached to a message being deleted, covering both the
-// legacy single-image fields and the imageUrls/thumbUrls arrays used by multi-image messages.
-function deleteAllChatImagesFromStorage(msg) {
-  if (!msg) return;
-  const urls = new Set();
-  if (msg.imageUrl) urls.add(msg.imageUrl);
-  if (msg.thumbUrl) urls.add(msg.thumbUrl);
-  if (Array.isArray(msg.imageUrls)) msg.imageUrls.forEach(u => u && urls.add(u));
-  if (Array.isArray(msg.thumbUrls)) msg.thumbUrls.forEach(u => u && urls.add(u));
-  urls.forEach(url => deleteChatImageFromStorage(url));
-}
 
 // U1a (docs/app-main-split-units.md): the icon components below are aliases bound from
 // GATHER_UI_COMPONENTS by bindUiComponentAliases (src/core/app-ui-wrappers.js), reusing the
@@ -9064,98 +8706,6 @@ function createMemoActivityLog(calendarId, action, participantId = '', timestamp
   });
 }
 
-// REST fallback helper for uploading memo image assets to Firebase Storage
-function uploadMemoImageAssets(calendarId, compressed, index, onBytes, timeoutMs = 45000) {
-  return new Promise((resolve) => {
-    const storage = getLiveFirebaseStorage();
-    if (!storage || !compressed?.originalBlob || !compressed?.thumbnailBlob) {
-      resolve(null);
-      return;
-    }
-    const stamp = Date.now();
-    const rand = Math.random().toString(36).slice(2, 8);
-    const basePath = `memoImages/${calendarId}/${stamp}_${rand}_${index}`;
-    // Byte size embedded in the filename -- see the matching comment in uploadChatImageAssets.
-    const originalMeta = getUploadImageBlobMeta(compressed.originalBlob, 'jpg');
-    const thumbMeta = getUploadImageBlobMeta(compressed.thumbnailBlob, originalMeta.ext === 'png' ? 'png' : 'jpg');
-    const originalRef = storage.ref(`${basePath}_original_${compressed.originalBlob.size}b.${originalMeta.ext}`);
-    const thumbRef = storage.ref(`${basePath}_thumb_${compressed.thumbnailBlob.size}b.${thumbMeta.ext}`);
-
-    const runUploadOnce = (blob, ref, taskKey, contentType) => uploadBlobWithWatchdog({
-      ref, blob, contentType, taskKey, onBytes, timeoutMs
-    });
-    // One retry before giving up -- see the matching comment in uploadChatImageAssets.
-    const runUpload = async (blob, ref, taskKey, contentType) => {
-      const first = await runUploadOnce(blob, ref, taskKey, contentType);
-      if (first) return first;
-      return runUploadOnce(blob, ref, taskKey, contentType);
-    };
-
-    Promise.all([
-      runUpload(compressed.originalBlob, originalRef, `${index}-orig`, originalMeta.contentType),
-      runUpload(compressed.thumbnailBlob, thumbRef, `${index}-thumb`, thumbMeta.contentType)
-    ]).then(async ([imageUrl, thumbUrl]) => {
-      if (imageUrl && thumbUrl) resolve({ imageUrl, thumbUrl });
-      else {
-        // Keep memo media atomic as well; a partial pair must never be considered reusable.
-        await Promise.allSettled([
-          originalRef.delete().catch(() => {}),
-          thumbRef.delete().catch(() => {})
-        ]);
-        console.warn('Memo image Storage upload failed');
-        resolve(null);
-      }
-    });
-  });
-}
-
-// Same shape/behavior as uploadMemoImageAssets, just its own Storage path -- anniversary photos
-// are a distinct content type from memo attachments even though the upload mechanics are
-// identical.
-function uploadAnniversaryImageAssets(calendarId, compressed, index, onBytes, timeoutMs = 45000) {
-  return new Promise((resolve) => {
-    const storage = getLiveFirebaseStorage();
-    if (!storage || !compressed?.originalBlob || !compressed?.thumbnailBlob) {
-      resolve(null);
-      return;
-    }
-    const stamp = Date.now();
-    const rand = Math.random().toString(36).slice(2, 8);
-    const basePath = `anniversaryImages/${calendarId}/${stamp}_${rand}_${index}`;
-    const originalMeta = getUploadImageBlobMeta(compressed.originalBlob, 'jpg');
-    const thumbMeta = getUploadImageBlobMeta(compressed.thumbnailBlob, originalMeta.ext === 'png' ? 'png' : 'jpg');
-    const originalRef = storage.ref(`${basePath}_original_${compressed.originalBlob.size}b.${originalMeta.ext}`);
-    const thumbRef = storage.ref(`${basePath}_thumb_${compressed.thumbnailBlob.size}b.${thumbMeta.ext}`);
-
-    const runUploadOnce = (blob, ref, taskKey, contentType) => uploadBlobWithWatchdog({
-      ref, blob, contentType, taskKey, onBytes, timeoutMs
-    });
-    const runUpload = async (blob, ref, taskKey, contentType) => {
-      const first = await runUploadOnce(blob, ref, taskKey, contentType);
-      if (first) return first;
-      return runUploadOnce(blob, ref, taskKey, contentType);
-    };
-
-    Promise.all([
-      runUpload(compressed.originalBlob, originalRef, `${index}-orig`, originalMeta.contentType),
-      runUpload(compressed.thumbnailBlob, thumbRef, `${index}-thumb`, thumbMeta.contentType)
-    ]).then(async ([imageUrl, thumbUrl]) => {
-      if (imageUrl && thumbUrl) resolve({ imageUrl, thumbUrl });
-      else {
-        await Promise.allSettled([
-          originalRef.delete().catch(() => {}),
-          thumbRef.delete().catch(() => {})
-        ]);
-        console.warn('Anniversary image Storage upload failed');
-        resolve(null);
-      }
-    });
-  });
-}
-
-async function resolveAnniversaryImageBatch(calendarId, compressedList, onProgress) {
-  return resolveImageBatch(calendarId, compressedList, onProgress, uploadAnniversaryImageAssets);
-}
 
 
 // Anniversary badges default to a generic type color, but when the title names an active
