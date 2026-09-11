@@ -526,7 +526,7 @@ assert(chatGallerySource.includes('renderFileListHeader') && chatGallerySource.i
 const imagePipelineSource = fs.readFileSync(new URL('../src/core/app-image-pipeline.js', import.meta.url), 'utf8');
 assert(imagePipelineSource.includes('async function sniffImageFormat'), 'image attach must sniff real file bytes before trusting .png names');
 assert(imagePipelineSource.includes('withCorrectedImageFile'), 'image attach must rewrite mismatched MIME/extension from sniffed bytes');
-assert(appMainSource.includes("sniffed?.kind === 'heic'"), 'HEIC bytes with a .png name must still take the HEIC convert path');
+assert(imagePipelineSource.includes("sniffed?.kind === 'heic'"), 'HEIC bytes with a .png name must still take the HEIC convert path');
 
 assert(photoIndexSource.includes("sourceEquals: 'anniversary'"), 'gallery photo count must subtract anniversary/content posters');
 assert(photoIndexSource.includes('filterGalleryPhotoIndexItems'), 'gallery photo index pages must drop anniversary/content posters');
