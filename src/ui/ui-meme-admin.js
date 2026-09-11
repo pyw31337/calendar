@@ -6,7 +6,7 @@
  * 끝날 때마다 관리자가 대기해야 해서 느려지기 때문 -- 사용자가 요청한 순서(전부 올린 뒤 태깅)
  * 그대로다.
  */
-import { uploadMemePoolAssets, generateMemePoolId, parseHashtagInput } from '../core/meme-pool.js';
+import { uploadMemePoolAssets, generateMemePoolId, parseHashtagInput, describeMemeUploadError } from '../core/meme-pool.js';
 
 // 브라우저당 동시 연결 제한(HTTP/1.1 기준 6개)은 Firebase Storage가 HTTP/2로 응답해 실제로는
 // 훨씬 많이 동시에 보낼 수 있다. 이전 "5장씩"은 700장을 올리는 데 140번의 대기 라운드가
@@ -47,28 +47,61 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
   const notify = (msg, kind) => { if (typeof showToast === 'function') showToast(msg, kind); };
 
   const handleFilesSelected = async (fileList) => {
-    const files = Array.from(fileList || []).filter(f => /^image\//i.test(f.type || '') || /\.(gif|jpg|jpeg|png|webp)$/i.test(f.name || ''));
+    const files = Array.from(fileList || []).filter(f => {
+      const type = f.type || '';
+      const name = f.name || '';
+      if (/^image\//i.test(type)) return true;
+      if (/\.(gif|jpg|jpeg|png|webp|heic|heif)$/i.test(name)) return true;
+      // iOS Files 등이 MIME/확장자를 비우는 경우가 있어 바이트 스니프에 맡긴다.
+      return !type;
+    });
     if (files.length === 0) return;
+    if (!password) {
+      notify('관리자 세션이 없습니다. 다시 로그인해 주세요.', 'error');
+      return;
+    }
+    if (typeof upsertRemote !== 'function') {
+      notify('등록 함수를 찾지 못했습니다. 새로고침 후 다시 시도해 주세요.', 'error');
+      return;
+    }
     setUploadProgress({ done: 0, total: files.length });
     const uploaded = [];
+    const failures = [];
     await runWithConcurrency(files, async file => {
-      const id = generateMemePoolId();
-      const assets = await uploadMemePoolAssets(id, file);
-      if (!assets) return null;
-      const ok = await upsertRemote(password, {
-        id, thumbUrl: assets.thumbUrl, fullUrl: assets.fullUrl, fileName: file.name,
-        width: assets.width, height: assets.height, hashtags: []
-      });
-      if (!ok) return null;
-      const item = { id, thumbUrl: assets.thumbUrl, fullUrl: assets.fullUrl, fileName: file.name, hashtags: [], width: assets.width, height: assets.height };
-      uploaded.push(item);
-      return item;
+      try {
+        const id = generateMemePoolId();
+        const assets = await uploadMemePoolAssets(id, file);
+        if (!assets) {
+          failures.push({ file, error: new Error('업로드 결과가 비었습니다') });
+          return null;
+        }
+        const ok = await upsertRemote(password, {
+          id, thumbUrl: assets.thumbUrl, fullUrl: assets.fullUrl, fileName: file.name,
+          width: assets.width, height: assets.height, hashtags: []
+        });
+        if (!ok) {
+          failures.push({ file, error: new Error('등록 함수가 거절했습니다') });
+          return null;
+        }
+        const item = { id, thumbUrl: assets.thumbUrl, fullUrl: assets.fullUrl, fileName: file.name, hashtags: [], width: assets.width, height: assets.height };
+        uploaded.push(item);
+        return item;
+      } catch (error) {
+        failures.push({ file, error });
+        return null;
+      }
     }, UPLOAD_CONCURRENCY, (done, total) => setUploadProgress({ done, total }));
     setUploadProgress(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
     if (uploaded.length > 0 && typeof onPoolChange === 'function') onPoolChange(prev => [...uploaded, ...prev]);
     const failCount = files.length - uploaded.length;
-    notify(failCount > 0 ? `${uploaded.length}장 업로드 완료, ${failCount}장 실패` : `${uploaded.length}장 업로드 완료`, failCount > 0 ? 'error' : 'success');
+    const reason = failures[0]?.error ? describeMemeUploadError(failures[0].error) : '';
+    notify(
+      failCount > 0
+        ? `${uploaded.length}장 업로드 완료, ${failCount}장 실패${reason ? ` — ${reason}` : ''}`
+        : `${uploaded.length}장 업로드 완료`,
+      failCount > 0 ? 'error' : 'success'
+    );
     // 업로드가 끝나면 바로 태깅을 시작할 수 있도록 방금 올린 첫 사진의 라이트박스를 자동으로 연다.
     if (uploaded.length > 0) openLightbox(uploaded[0]);
   };
@@ -129,7 +162,7 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
         }, uploadProgress ? `업로드 중 ${uploadProgress.done}/${uploadProgress.total}` : "+ 일괄 업로드")
       ),
       /*#__PURE__*/React.createElement("input", {
-        ref: fileInputRef, type: "file", accept: "image/*,image/gif", multiple: true, style: { display: 'none' },
+        ref: fileInputRef, type: "file", accept: "image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif,image/*", multiple: true, style: { display: 'none' },
         onChange: e => handleFilesSelected(e.target.files)
       })
     ),
