@@ -124,6 +124,7 @@ export function ChatRoomView({
   isHeaderVisible,
   handleChatScroll,
   onRevealChatInput,
+  onToggleChatInputPin,
   chatMessagesContainerRef,
   showToast,
   onPromoteImageUrl,
@@ -1127,14 +1128,16 @@ export function ChatRoomView({
       zIndex: 1020
     }
   }, /*#__PURE__*/React.createElement(BackArrowIcon, { size: 22 })),
-  !(isHeaderVisible || viewportBottom > 80 || isInputFocused || !!(chatInput && String(chatInput).trim()) || (chatImages && chatImages.length > 0) || (chatFileAttachments && chatFileAttachments.length > 0) || !!chatReplyTarget) && /*#__PURE__*/React.createElement("button", {
+  /*#__PURE__*/React.createElement("button", {
     type: "button",
     className: "chat-keyboard-reopen-btn",
     onClick: () => {
-      if (onRevealChatInput) onRevealChatInput();
-      requestAnimationFrame(() => chatTextareaRef.current && chatTextareaRef.current.focus());
+      const wasVisible = !!isHeaderVisible;
+      if (onToggleChatInputPin) onToggleChatInputPin();
+      else if (onRevealChatInput) onRevealChatInput();
+      if (!wasVisible) requestAnimationFrame(() => chatTextareaRef.current && chatTextareaRef.current.focus());
     },
-    "aria-label": "채팅 입력창 열기",
+    "aria-label": isHeaderVisible ? "채팅 입력창 숨기기" : "채팅 입력창 열기",
     style: {
       position: 'fixed',
       left: '10px',
@@ -1152,7 +1155,7 @@ export function ChatRoomView({
       color: 'var(--text-muted)',
       zIndex: 1020
     }
-  }, /*#__PURE__*/React.createElement("svg", {
+  }, isHeaderVisible ? /*#__PURE__*/React.createElement("svg", {
     xmlns: "http://www.w3.org/2000/svg",
     width: "20",
     height: "20",
@@ -1162,16 +1165,38 @@ export function ChatRoomView({
     strokeWidth: "2",
     strokeLinecap: "round",
     strokeLinejoin: "round"
-  }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
-    /*#__PURE__*/React.createElement("path", { d: "M2 6a2 2 0 0 1 2 -2h16a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-16a2 2 0 0 1 -2 -2z" }),
-    /*#__PURE__*/React.createElement("path", { d: "M6 8h.01" }),
-    /*#__PURE__*/React.createElement("path", { d: "M10 8h.01" }),
+  },
+    /*#__PURE__*/React.createElement("path", { d: "M 20 4 A2 2 0 0 1 22 6" }),
+    /*#__PURE__*/React.createElement("path", { d: "M 22 6 L 22 16.41" }),
+    /*#__PURE__*/React.createElement("path", { d: "M 7 16 L 16 16" }),
+    /*#__PURE__*/React.createElement("path", { d: "M 9.69 4 L 20 4" }),
     /*#__PURE__*/React.createElement("path", { d: "M14 8h.01" }),
     /*#__PURE__*/React.createElement("path", { d: "M18 8h.01" }),
-    /*#__PURE__*/React.createElement("path", { d: "M8 12h.01" }),
+    /*#__PURE__*/React.createElement("path", { d: "m2 2 20 20" }),
+    /*#__PURE__*/React.createElement("path", { d: "M20 20H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2" }),
+    /*#__PURE__*/React.createElement("path", { d: "M6 8h.01" }),
+    /*#__PURE__*/React.createElement("path", { d: "M8 12h.01" })
+  ) : /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "20",
+    height: "20",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round"
+  },
+    /*#__PURE__*/React.createElement("path", { d: "M10 8h.01" }),
     /*#__PURE__*/React.createElement("path", { d: "M12 12h.01" }),
+    /*#__PURE__*/React.createElement("path", { d: "M14 8h.01" }),
     /*#__PURE__*/React.createElement("path", { d: "M16 12h.01" }),
-    /*#__PURE__*/React.createElement("path", { d: "M7 16h10" }))), noticePanelMode === 'floating' && /*#__PURE__*/React.createElement("button", {
+    /*#__PURE__*/React.createElement("path", { d: "M18 8h.01" }),
+    /*#__PURE__*/React.createElement("path", { d: "M6 8h.01" }),
+    /*#__PURE__*/React.createElement("path", { d: "M7 16h10" }),
+    /*#__PURE__*/React.createElement("path", { d: "M8 12h.01" }),
+    /*#__PURE__*/React.createElement("rect", { width: "20", height: "16", x: "2", y: "4", rx: "2" })
+  )), noticePanelMode === 'floating' && /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => setNoticePanelMode(pinnedNotices.length > 0 ? 'list' : 'add'),
     title: "공지",

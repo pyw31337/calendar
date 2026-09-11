@@ -3179,6 +3179,18 @@ function CalendarApp() {
   const [isHeaderVisible, setIsHeaderVisible] = React.useState(true);
   const lastScrollTopRef = React.useRef(0);
   const chatHeaderRevealUntilRef = React.useRef(0);
+  // 채팅 입력줄(흔히 "키보드"로 불리는 하단 바) 수동 고정: null이면 기존처럼 스크롤 방향에
+  // 따라 자동으로 열고 닫힌다. 사용자가 chat-keyboard-reopen-btn을 누르면 그 순간의 반대
+  // 상태로 고정되어, 이후 스크롤과 무관하게 그 상태를 유지한다 (단, 실제 키보드가 열리거나
+  // 입력창에 포커스가 가는 등 이미 있던 강제-표시 안전장치는 그대로 우선한다 -- 타이핑 중인
+  // 입력창을 숨겨버리면 안 되므로).
+  const [chatInputPin, setChatInputPin] = React.useState(null); // null | 'visible' | 'hidden'
+  const toggleChatInputPin = () => {
+    const currentlyVisible = chatInputPin === null ? isHeaderVisible : chatInputPin === 'visible';
+    const next = currentlyVisible ? 'hidden' : 'visible';
+    setChatInputPin(next);
+    setIsHeaderVisible(next === 'visible');
+  };
 
   // Cross-browser virtual keyboard detection.
   // Strategy:
@@ -3290,6 +3302,11 @@ function CalendarApp() {
     }
     if (isKeyboardOpenRef.current || chatInputFocused || hasComposerDraft) {
       setIsHeaderVisible(true);
+      lastScrollTopRef.current = scrollTop;
+      return;
+    }
+    if (chatInputPin !== null) {
+      setIsHeaderVisible(chatInputPin === 'visible');
       lastScrollTopRef.current = scrollTop;
       return;
     }
@@ -7384,6 +7401,7 @@ function CalendarApp() {
       isHeaderVisible: isHeaderVisible,
       handleChatScroll: handleChatScroll,
       onRevealChatInput: () => setIsHeaderVisible(true),
+      onToggleChatInputPin: toggleChatInputPin,
       chatMessagesContainerRef: chatMessagesContainerRef,
       showToast: showToast,
       onPromoteImageUrl: handlePromoteInlineChatImage,
