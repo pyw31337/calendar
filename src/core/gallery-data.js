@@ -1,6 +1,9 @@
 // Pure gallery composition and pagination. Keeping this outside React makes the expensive
 // message/memo/meeting merge independently testable and prevents UI state changes from subtly
-// changing photo identity or deduplication rules.
+// changing photo identity or deduplication rules. This file must stay importable under plain
+// Node (no `window`) -- firebase-safety-tests.mjs imports it directly to unit-test these
+// functions -- so it never imports app-domain-helpers.js, which touches window at module-eval
+// time.
 
 export function coerceGalleryImageIndex(value) {
   if (Number.isInteger(value)) return value;
@@ -591,4 +594,42 @@ export function getPaginationWindow(currentPage, pageCount, windowSize) {
   if (start < 1) start = 1;
   else if (start + size - 1 > safeCount) start = safeCount - size + 1;
   return Array.from({ length: size }, (_, index) => start + index);
+}
+
+export const NON_CHAT_UPLOAD_SOURCES = new Set(['meeting', 'gallery']);
+export function isNonChatUploadSource(uploadSource) {
+  return NON_CHAT_UPLOAD_SOURCES.has(String(uploadSource || '').trim().toLowerCase());
+}
+
+// Same shape as app-domain-helpers.js's getConfirmedMeetings -- duplicated (not imported) so this
+// file can stay importable under plain Node for firebase-safety-tests.mjs; app-domain-helpers.js
+// itself references window at module-eval time.
+function getConfirmedMeetings(calendar) {
+  const cm = calendar?.confirmedMeeting;
+  if (!cm) return [];
+  return (Array.isArray(cm) ? cm : [cm]).filter(m => m && m.date);
+}
+
+export function getMeetingOwnedPhotoMessageIds(calendar) {
+  const ids = new Set();
+  const meetings = getConfirmedMeetings(calendar);
+  meetings.forEach(meeting => {
+    (Array.isArray(meeting?.photos) ? meeting.photos : []).forEach(photo => {
+      const messageId = String(photo?.sourceMessageId || '').trim();
+      if (!messageId) return;
+      const mediaKey = String(photo?.mediaKey || photo?.assetKey || '').trim().toLowerCase();
+      const uploadSource = String(photo?.uploadSource || '').trim().toLowerCase();
+      const source = String(photo?.source || '').trim().toLowerCase();
+      if (!(mediaKey.startsWith('meeting:') || uploadSource === 'meeting' || source === 'meeting')) return;
+      ids.add(messageId);
+    });
+  });
+  return ids;
+}
+
+export function isChatRenderableMessage(message, meetingPhotoMessageIds = null) {
+  if (!message || typeof message !== 'object') return false;
+  if (isNonChatUploadSource(message.uploadSource)) return false;
+  if (meetingPhotoMessageIds && meetingPhotoMessageIds.has(message.id)) return false;
+  return true;
 }
