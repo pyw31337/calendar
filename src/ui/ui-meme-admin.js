@@ -7,6 +7,8 @@
  * 그대로다.
  */
 import { uploadMemePoolAssets, generateMemePoolId, parseHashtagInput, describeMemeUploadError } from '../core/meme-pool.js';
+import { formatChatFileSize } from '../core/chat-file-attachments.js';
+import { ImageUploadOverlay } from './ui-overlays.js';
 
 // 브라우저당 동시 연결 제한(HTTP/1.1 기준 6개)은 Firebase Storage가 HTTP/2로 응답해 실제로는
 // 훨씬 많이 동시에 보낼 수 있다. 이전 "5장씩"은 700장을 올리는 데 140번의 대기 라운드가
@@ -29,6 +31,26 @@ async function runWithConcurrency(items, worker, concurrency, onProgress) {
   return results;
 }
 
+// 중복 업로드 판단 키: 파일명 + 포맷(MIME/확장자) + 용량이 전부 같으면 같은 파일로 본다.
+// 기존 풀 항목은 fileSize가 이번 변경 이전에는 저장되지 않았을 수 있어(null), 그 경우엔
+// 이 키가 서로 달라져 매칭되지 않는다 -- 안전한 방향(과거 항목은 중복판정 못 해도 새로 올라간
+// 항목끼리는 확실히 잡는다)의 절충이다.
+function buildMemeDedupKey(name, size) {
+  const normalizedName = String(name || '').trim().toLowerCase();
+  const ext = (normalizedName.match(/\.[a-z0-9]+$/) || [''])[0];
+  return `${normalizedName}|${ext}|${Number(size) || 0}`;
+}
+
+function formatUploadedAt(item) {
+  const ts = Number(item?.updatedAt || item?.createdAt);
+  if (!Number.isFinite(ts) || ts <= 0) return '';
+  try {
+    return new Date(ts).toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+  } catch (_) {
+    return '';
+  }
+}
+
 export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast }) {
   const React = window.React;
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -37,17 +59,19 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
   const upsertRemote = __deps.memePoolUpsertRemote || GATHER_APP_UTILS.memePoolUpsertRemote;
   const deleteRemote = __deps.memePoolDeleteRemote || GATHER_APP_UTILS.memePoolDeleteRemote;
   const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
+  const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
   const fileInputRef = React.useRef(null);
   const [uploadProgress, setUploadProgress] = React.useState(null); // { done, total } | null
   const [selected, setSelected] = React.useState(null); // one pool item, opened in the lightbox
   const [tagDraft, setTagDraft] = React.useState('');
   const [isSaving, setIsSaving] = React.useState(false);
+  const [isDeleting, setIsDeleting] = React.useState(false);
   const [filterUntaggedOnly, setFilterUntaggedOnly] = React.useState(false);
 
   const notify = (msg, kind) => { if (typeof showToast === 'function') showToast(msg, kind); };
 
   const handleFilesSelected = async (fileList) => {
-    const files = Array.from(fileList || []).filter(f => {
+    const rawFiles = Array.from(fileList || []).filter(f => {
       const type = f.type || '';
       const name = f.name || '';
       if (/^image\//i.test(type)) return true;
@@ -55,7 +79,7 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
       // iOS Files 등이 MIME/확장자를 비우는 경우가 있어 바이트 스니프에 맡긴다.
       return !type;
     });
-    if (files.length === 0) return;
+    if (rawFiles.length === 0) return;
     if (!password) {
       notify('관리자 세션이 없습니다. 다시 로그인해 주세요.', 'error');
       return;
@@ -64,6 +88,26 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
       notify('등록 함수를 찾지 못했습니다. 새로고침 후 다시 시도해 주세요.', 'error');
       return;
     }
+
+    // 이미 풀에 있거나, 이번에 고른 파일들 사이에서 이름+포맷+용량이 겹치는 항목은 건너뛴다.
+    const existingKeys = new Set(pool.map(p => buildMemeDedupKey(p.fileName, p.fileSize)));
+    const seenInBatch = new Set();
+    const files = [];
+    let duplicateCount = 0;
+    rawFiles.forEach(file => {
+      const key = buildMemeDedupKey(file.name, file.size);
+      if (existingKeys.has(key) || seenInBatch.has(key)) {
+        duplicateCount += 1;
+        return;
+      }
+      seenInBatch.add(key);
+      files.push(file);
+    });
+    if (files.length === 0) {
+      notify(`이미 등록된 이미지와 동일해 ${duplicateCount}장 모두 건너뛰었습니다.`, 'error');
+      return;
+    }
+
     setUploadProgress({ done: 0, total: files.length });
     const uploaded = [];
     const failures = [];
@@ -77,13 +121,18 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
         }
         const ok = await upsertRemote(password, {
           id, thumbUrl: assets.thumbUrl, fullUrl: assets.fullUrl, fileName: file.name,
-          width: assets.width, height: assets.height, hashtags: []
+          fileSize: file.size, width: assets.width, height: assets.height, hashtags: []
         });
         if (!ok) {
           failures.push({ file, error: new Error('등록 함수가 거절했습니다') });
           return null;
         }
-        const item = { id, thumbUrl: assets.thumbUrl, fullUrl: assets.fullUrl, fileName: file.name, hashtags: [], width: assets.width, height: assets.height };
+        const now = Date.now();
+        const item = {
+          id, thumbUrl: assets.thumbUrl, fullUrl: assets.fullUrl, fileName: file.name,
+          fileSize: file.size, hashtags: [], width: assets.width, height: assets.height,
+          createdAt: now, updatedAt: now
+        };
         uploaded.push(item);
         return item;
       } catch (error) {
@@ -96,10 +145,11 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
     if (uploaded.length > 0 && typeof onPoolChange === 'function') onPoolChange(prev => [...uploaded, ...prev]);
     const failCount = files.length - uploaded.length;
     const reason = failures[0]?.error ? describeMemeUploadError(failures[0].error) : '';
+    const dupSuffix = duplicateCount > 0 ? ` (중복 ${duplicateCount}장 제외)` : '';
     notify(
       failCount > 0
-        ? `${uploaded.length}장 업로드 완료, ${failCount}장 실패${reason ? ` — ${reason}` : ''}`
-        : `${uploaded.length}장 업로드 완료`,
+        ? `${uploaded.length}장 업로드 완료, ${failCount}장 실패${reason ? ` — ${reason}` : ''}${dupSuffix}`
+        : `${uploaded.length}장 업로드 완료${dupSuffix}`,
       failCount > 0 ? 'error' : 'success'
     );
     // 업로드가 끝나면 바로 태깅을 시작할 수 있도록 방금 올린 첫 사진의 라이트박스를 자동으로 연다.
@@ -111,6 +161,7 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
 
   const untaggedList = React.useMemo(() => pool.filter(p => !(p.hashtags || []).length), [pool]);
   const visibleList = filterUntaggedOnly ? untaggedList : pool;
+  const liveTags = React.useMemo(() => parseHashtagInput(tagDraft), [tagDraft]);
 
   const handleSaveTags = async (advanceToNextUntagged) => {
     if (!selected || isSaving) return;
@@ -122,6 +173,7 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
       if (typeof onPoolChange === 'function') {
         onPoolChange(prev => prev.map(p => p.id === selected.id ? { ...p, hashtags } : p));
       }
+      notify('태그를 저장했습니다.', 'success');
       if (advanceToNextUntagged) {
         const next = untaggedList.find(p => p.id !== selected.id);
         if (next) openLightbox(next);
@@ -129,24 +181,39 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
       } else {
         closeLightbox();
       }
+    } catch (err) {
+      notify(describeMemeUploadError(err), 'error');
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleDelete = async () => {
-    if (!selected) return;
-    const ok = await deleteRemote(password, selected.id);
-    if (!ok) { notify('삭제 실패', 'error'); return; }
-    if (typeof onPoolChange === 'function') onPoolChange(prev => prev.filter(p => p.id !== selected.id));
-    closeLightbox();
+    if (!selected || isDeleting) return;
+    setIsDeleting(true);
+    try {
+      const ok = await deleteRemote(password, selected.id);
+      if (!ok) { notify('삭제 실패', 'error'); return; }
+      if (typeof onPoolChange === 'function') onPoolChange(prev => prev.filter(p => p.id !== selected.id));
+      closeLightbox();
+    } catch (err) {
+      notify(describeMemeUploadError(err), 'error');
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '14px' } },
+    uploadProgress && /*#__PURE__*/React.createElement(ImageUploadOverlay, {
+      label: '밈 이미지 업로드 중...',
+      pct: uploadProgress.total ? Math.round((uploadProgress.done / uploadProgress.total) * 100) : 0,
+      current: uploadProgress.done,
+      total: uploadProgress.total
+    }),
     /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap' } },
       /*#__PURE__*/React.createElement("div", null,
         /*#__PURE__*/React.createElement("h4", { style: { fontSize: '0.96rem', fontWeight: 900, color: 'var(--text-main)', margin: 0 } }, `밈 이미지 풀 (${pool.length}장, 미태그 ${untaggedList.length}장)`),
-        /*#__PURE__*/React.createElement("p", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', margin: '2px 0 0 0' } }, "여러 장을 한 번에 선택해 올린 뒤, 아래 그리드에서 사진을 눌러 해시태그를 입력하세요.")
+        /*#__PURE__*/React.createElement("p", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', margin: '2px 0 0 0' } }, "여러 장을 한 번에 선택해 올린 뒤, 아래 그리드에서 사진을 눌러 해시태그를 입력하세요. 같은 파일명·포맷·용량의 이미지는 자동으로 건너뜁니다.")
       ),
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
         /*#__PURE__*/React.createElement("button", {
@@ -204,19 +271,55 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
           display: 'flex', flexDirection: 'column', gap: '12px'
         }
       },
+        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'flex-end' } },
+          /*#__PURE__*/React.createElement("button", {
+            type: "button", onClick: closeLightbox, "aria-label": "닫기",
+            style: {
+              width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              border: 'none', borderRadius: 'var(--radius-full)', backgroundColor: 'var(--bg-primary)',
+              color: 'var(--text-muted)', cursor: 'pointer', flexShrink: 0
+            }
+          }, SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 14 }) : "✕")
+        ),
         /*#__PURE__*/React.createElement("img", {
           src: selected.fullUrl || selected.thumbUrl, alt: selected.fileName || '',
           style: { width: '100%', maxHeight: '320px', objectFit: 'contain', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)' }
         }),
-        /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' } }, selected.fileName || selected.id),
+        /*#__PURE__*/React.createElement("div", {
+          style: {
+            display: 'flex', flexDirection: 'column', gap: '2px', padding: '8px 10px',
+            backgroundColor: 'var(--bg-primary)', borderRadius: 'var(--radius-md)',
+            fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)'
+          }
+        },
+          /*#__PURE__*/React.createElement("span", { style: { fontWeight: 700, color: 'var(--text-main)', wordBreak: 'break-all' } }, selected.fileName || selected.id),
+          /*#__PURE__*/React.createElement("span", null, [
+            selected.width && selected.height ? `${selected.width}×${selected.height}px` : '',
+            typeof selected.fileSize === 'number' ? formatChatFileSize(selected.fileSize) : '',
+            formatUploadedAt(selected)
+          ].filter(Boolean).join(' · ') || '상세 정보 없음')
+        ),
         /*#__PURE__*/React.createElement("input", {
           type: "text", value: tagDraft, onChange: e => setTagDraft(e.target.value),
           placeholder: "해시태그 입력 (예: #눈물 #화남 짜증)", autoFocus: true,
           className: "form-input", style: { fontSize: '16px' }
         }),
+        /*#__PURE__*/React.createElement("div", {
+          style: { display: 'flex', flexWrap: 'wrap', gap: '6px', minHeight: '26px' }
+        }, liveTags.length === 0
+          ? /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-light)' } }, "입력된 태그가 여기 바로 표시됩니다.")
+          : liveTags.map(tag => /*#__PURE__*/React.createElement("span", {
+              key: tag,
+              style: {
+                display: 'inline-flex', alignItems: 'center', padding: '3px 10px',
+                borderRadius: 'var(--radius-full)', backgroundColor: 'var(--accent-primary-soft, #EEF2FF)',
+                color: 'var(--accent-primary)', fontSize: 'var(--font-size-xs)', fontWeight: 800
+              }
+            }, `#${tag}`))
+        ),
         /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
           /*#__PURE__*/React.createElement("button", {
-            type: "button", className: "btn btn-danger", onClick: handleDelete,
+            type: "button", className: "btn btn-danger", onClick: handleDelete, disabled: isDeleting,
             style: { height: '44px', width: '44px', padding: 0, flexShrink: 0 }
           }, TrashIcon ? /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }) : "삭제"),
           /*#__PURE__*/React.createElement("button", {
@@ -226,11 +329,11 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
           /*#__PURE__*/React.createElement("button", {
             type: "button", className: "btn btn-secondary", onClick: () => handleSaveTags(false), disabled: isSaving,
             style: { height: '44px', padding: '0 14px', fontWeight: 800, flex: 1 }
-          }, "저장"),
+          }, isSaving ? "저장 중..." : "저장"),
           /*#__PURE__*/React.createElement("button", {
             type: "button", className: "btn btn-primary", onClick: () => handleSaveTags(true), disabled: isSaving,
             style: { height: '44px', padding: '0 14px', fontWeight: 800, flex: 1 }
-          }, "저장하고 다음 미태그")
+          }, isSaving ? "저장 중..." : "저장하고 다음 미태그")
         )
       )
     )
