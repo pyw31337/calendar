@@ -1,4 +1,11 @@
-import { withTimeout } from './app-domain-helpers.js';
+import { withTimeout, MAX_CHAT_THUMB_BASE64_LENGTH } from './app-domain-helpers.js';
+import {
+  buildMetadataTags as buildPhotoMetadataTags,
+  parseNominatimLocation
+} from './photo-metadata-tags.js';
+import { reverseGeocodeCoords } from './app-place-search.js';
+import { firebaseConfig, isStorageDisabled } from './app-firebase-data.js';
+import exifr from 'exifr';
 
 const GATHER_APP_CHAT_DATA = window.GATHER_APP_CHAT_DATA || {};
 
@@ -194,4 +201,391 @@ function resetHeic2anyLoader() {
   window.heic2any = null;
 }
 
-export { loadHeicTo, loadHeic2any, sniffImageFormat, withCorrectedImageFile, isHeicFile, loadImageElement, resetHeicToLoader, resetHeic2anyLoader };
+async function compressImageToDataUrls(file, { maxThumbBase64Length = MAX_CHAT_THUMB_BASE64_LENGTH } = {}) {
+  // Messengers often rewrite the bytes (JPEG/HEIC) while keeping a .png name or a wrong MIME.
+  // Sniff the header so decode/encode follow the real format instead of the filename.
+  const sniffed = await sniffImageFormat(file).catch(() => null);
+  const workingFile = withCorrectedImageFile(file, sniffed) || file;
+  let sourceBlob = workingFile;
+  const metadata = await extractPhotoMetadata(workingFile).catch(() => null);
+  let img = null;
+  const treatAsHeic = isHeicFile(workingFile) || sniffed?.kind === 'heic';
+
+  if (treatAsHeic) {
+    // Try every native decode path the platform might offer before falling back to a CDN
+    // library. Different engines expose HEIC support through different APIs -- some Chrome
+    // builds decode via createImageBitmap using the OS's own HEIF codec without supporting
+    // <img> for the same file, while Safari typically supports both. Trying both costs nothing
+    // on browsers that support neither: createImageBitmap rejects immediately for an
+    // undecodable blob, and <img> reports onerror almost instantly (no network wait, the file
+    // is already a local blob). This also sidesteps heic2any's bundled libheif (last published
+    // 2020) failing to parse newer HDR/gain-map HEIC variants some iPhones now produce, which
+    // the platform's own decoder often still handles fine -- and avoids the ~1.3MB CDN fetch
+    // entirely on capable browsers.
+    if (typeof createImageBitmap === 'function') {
+      try {
+        img = await withTimeout(createImageBitmap(workingFile), 6000, 'createImageBitmap timed out');
+      } catch (err) {
+        img = null;
+      }
+    }
+    if (!img) {
+      const probeUrl = URL.createObjectURL(workingFile);
+      try {
+        img = await loadImageElement(probeUrl, 6000);
+      } catch (err) {
+        img = null;
+      } finally {
+        URL.revokeObjectURL(probeUrl);
+      }
+    }
+
+    if (!img) {
+      let converted = null;
+      let lastErr = null;
+
+      // Primary: heic-to, a self-contained, actively-maintained current-libheif build. Try it
+      // twice -- the first conversion call right after the decoder's Worker spins up can
+      // transiently fail in some browsers, and one retry recovers most of those.
+      for (let attempt = 0; attempt < 2 && !converted; attempt++) {
+        try {
+          const heicTo = await loadHeicTo();
+          converted = await withTimeout(
+            heicTo({ blob: workingFile, type: 'image/jpeg', quality: 0.85 }),
+            45000,
+            'HEIC conversion timed out'
+          );
+        } catch (err) {
+          lastErr = err;
+          resetHeicToLoader(); // force a fresh load attempt on retry, not a cached failure
+        }
+      }
+
+      // Fallback: heic2any, an older/differently-built decoder kept only as a second opinion in
+      // case heic-to's specific CDN or Worker/WASM path is the one having trouble on a given
+      // device -- a genuinely different implementation succeeding where the first one failed is
+      // exactly the case this is here for.
+      if (!converted) {
+        for (let attempt = 0; attempt < 2 && !converted; attempt++) {
+          try {
+            const heic2any = await loadHeic2any();
+            // A 24MP+ HEIC on a slower mobile device can genuinely take a while to decode, but
+            // must not be allowed to hang forever -- bound it generously (45s) rather than leave
+            // the attach flow stuck with no way to recover.
+            converted = await withTimeout(
+              heic2any({ blob: workingFile, toType: 'image/jpeg', quality: 0.85 }),
+              45000,
+              'HEIC conversion timed out'
+            );
+          } catch (err) {
+            lastErr = err;
+            resetHeic2anyLoader(); // force a fresh load attempt on retry, not a cached failure
+          }
+        }
+      }
+
+      if (!converted) {
+        throw Object.assign(new Error('HEIC 이미지를 변환하지 못했습니다.'), { code: 'HEIC_CONVERT_FAILED', fileName: workingFile.name || file.name, cause: lastErr });
+      }
+      sourceBlob = Array.isArray(converted) ? converted[0] : converted;
+    }
+  }
+
+  if (!img) {
+    // Prefer createImageBitmap for ordinary images too -- some mobile WebViews decode JPEG/PNG
+    // via bitmap even when <img> onerror fires for a MIME/extension mismatch.
+    if (typeof createImageBitmap === 'function') {
+      try {
+        img = await withTimeout(createImageBitmap(sourceBlob), 8000, 'createImageBitmap timed out');
+      } catch (_) {
+        img = null;
+      }
+    }
+  }
+  if (!img) {
+    const objectUrl = URL.createObjectURL(sourceBlob);
+    try {
+      img = await loadImageElement(objectUrl);
+    } catch (err) {
+      throw Object.assign(
+        new Error('이미지를 불러오지 못했습니다. 지원하지 않는 형식이거나 손상된 파일일 수 있습니다.'),
+        { code: err.code || 'IMAGE_DECODE_FAILED', fileName: workingFile.name || file.name, sniffedKind: sniffed?.kind || null }
+      );
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+    }
+  }
+
+  // Encodes `img` as a JPEG data URL within `budget` (fallback path only).
+  const yieldToMain = () => new Promise(r => setTimeout(r, 0));
+  const encodeWithinBudget = async (maxDimStart, qualitySteps, budget, minDim) => {
+    let maxDim = maxDimStart;
+    let best = null;
+    while (true) {
+      let w = img.width, h = img.height;
+      if (w > maxDim || h > maxDim) {
+        if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
+        else { w = Math.round(w * maxDim / h); h = maxDim; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      for (const quality of qualitySteps) {
+        const base64 = canvas.toDataURL('image/jpeg', quality);
+        best = { base64, canvas, quality };
+        if (base64.length <= budget) return best;
+        await yieldToMain();
+      }
+      if (maxDim <= minDim) return best;
+      maxDim = Math.max(minDim, Math.round(maxDim * 0.75));
+    }
+  };
+
+  const preferStorage = !isStorageDisabled;
+
+  const getHighQualityBlob = () => {
+    if (isStorageDisabled) return Promise.resolve(null);
+    // 1440px/quality 0.72 was noticeably blurring dense small text (scanned notices, flyers) --
+    // this path only fires for genuinely oversized sources (small ones already return the
+    // original file untouched below), so a bigger cap and higher quality here doesn't cost much:
+    // Storage uploads aren't bounded by Firestore's 1MiB doc limit the way inline base64 is.
+    const maxDimHigh = 2000;
+    const isOversized = img.width > maxDimHigh || img.height > maxDimHigh;
+    if (!isOversized && workingFile.size <= 1.5 * 1024 * 1024) {
+      return Promise.resolve(workingFile);
+    }
+    return new Promise(res => {
+      let w = img.width, h = img.height;
+      const isPng = sniffed?.kind === 'png' || (!sniffed && (workingFile.type === 'image/png' || (workingFile.name || file.name || '').toLowerCase().endsWith('.png')));
+      if (isOversized) {
+        if (w > h) { h = Math.round(h * maxDimHigh / w); w = maxDimHigh; }
+        else { w = Math.round(w * maxDimHigh / h); h = maxDimHigh; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      if (isPng) canvas.toBlob(blob => res(blob), 'image/png');
+      else canvas.toBlob(blob => res(blob), 'image/jpeg', 0.85);
+    });
+  };
+
+  const getHighQualityThumbBlob = () => {
+    if (isStorageDisabled) return Promise.resolve(null);
+    return new Promise(res => {
+      let w = img.width, h = img.height;
+      // 640px: this thumb is shared by the gallery grid (~122px cells) and the single-image
+      // chat bubble (renderChatMessageImages caps that display at maxWidth 420px/60vh and
+      // intentionally reuses this thumb instead of the full asset). A 480px cap (tried in
+      // #556) visibly softened the chat bubble on retina/high-DPI screens -- a 420 CSS px
+      // bubble on a 2x+ display needs 840px+ of real pixels to look sharp, and 480px fell far
+      // short. Reverted back to 640px; the gallery grid can live with the larger per-photo
+      // bytes since 640px is still well under the un-thumbed full asset.
+      const maxDimThumb = 640;
+      if (w > maxDimThumb || h > maxDimThumb) {
+        if (w > h) { h = Math.round(h * maxDimThumb / w); w = maxDimThumb; }
+        else { w = Math.round(w * maxDimThumb / h); h = maxDimThumb; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      const isPng = sniffed?.kind === 'png' || (!sniffed && (workingFile.type === 'image/png' || (workingFile.name || file.name || '').toLowerCase().endsWith('.png')));
+      if (isPng) canvas.toBlob(blob => res(blob), 'image/png');
+      else canvas.toBlob(blob => res(blob), 'image/jpeg', 0.82);
+    });
+  };
+
+  let originalMeta = null;
+  let thumbnailMeta = null;
+  if (!preferStorage) {
+    originalMeta = await encodeWithinBudget(600, [0.85, 0.75, 0.65, 0.55, 0.45, 0.35], 48 * 1024, 320);
+    thumbnailMeta = await encodeWithinBudget(360, [0.78, 0.68, 0.58, 0.48], maxThumbBase64Length, 180);
+  }
+
+  const highQualityBlob = await getHighQualityBlob();
+  const highQualityThumbBlob = await getHighQualityThumbBlob();
+
+  return new Promise((resolve) => {
+    const objectUrls = [];
+    const finish = (origBlob, thumbBlob) => {
+      let originalStr = originalMeta ? originalMeta.base64 : null;
+      let thumbnailStr = thumbnailMeta ? thumbnailMeta.base64 : null;
+      if (preferStorage) {
+        const previewBlob = thumbBlob || origBlob || file;
+        try {
+          const previewUrl = URL.createObjectURL(previewBlob);
+          objectUrls.push(previewUrl);
+          originalStr = previewUrl;
+          thumbnailStr = previewUrl;
+        } catch (_) {
+          originalStr = originalStr || '';
+          thumbnailStr = thumbnailStr || originalStr;
+        }
+      }
+      resolve({
+        original: originalStr,
+        thumbnail: thumbnailStr,
+        originalBlob: origBlob,
+        thumbnailBlob: thumbBlob,
+        needsBase64Fallback: preferStorage,
+        metadata,
+        _objectUrls: objectUrls
+      });
+    };
+
+    const getOrig = (cb) => {
+      if (highQualityBlob) cb(highQualityBlob);
+      else if (originalMeta && originalMeta.canvas) originalMeta.canvas.toBlob(blob => cb(blob), 'image/jpeg', originalMeta.quality);
+      else cb(file);
+    };
+    const getThumb = (cb) => {
+      if (highQualityThumbBlob) cb(highQualityThumbBlob);
+      else if (thumbnailMeta && thumbnailMeta.canvas) thumbnailMeta.canvas.toBlob(blob => cb(blob), 'image/jpeg', thumbnailMeta.quality);
+      else getOrig(cb);
+    };
+    getOrig(origBlob => getThumb(thumbBlob => finish(origBlob, thumbBlob)));
+  });
+}
+
+// Extract only the small, user-facing subset of EXIF. The original EXIF block is never stored.
+// GPS is reverse-geocoded on a best-effort basis and cached by rounded coordinates so a batch
+// from one place does not issue one request per image.
+const photoLocationCache = new Map();
+let photoLocationRequestAt = 0;
+async function extractPhotoMetadata(file) {
+  if (!file || typeof exifr?.parse !== 'function') return null;
+  const exif = await exifr.parse(file, { pick: ['DateTimeOriginal', 'CreateDate', 'Make', 'Model', 'latitude', 'longitude'] });
+  if (!exif) return null;
+  const result = {};
+  const date = exif.DateTimeOriginal || exif.CreateDate;
+  if (date instanceof Date && !Number.isNaN(date.getTime())) result.capturedAt = date.toISOString();
+  const make = String(exif.Make || '').trim();
+  const model = String(exif.Model || '').trim();
+  if (make || model) result.device = [make, model].filter(Boolean).join(' ').replace(/\s+/g, ' ').slice(0, 100);
+  const lat = Number(exif.latitude), lon = Number(exif.longitude);
+  if (Number.isFinite(lat) && Number.isFinite(lon)) {
+    result.latitude = Number(lat.toFixed(6)); result.longitude = Number(lon.toFixed(6));
+    const key = `${lat.toFixed(4)},${lon.toFixed(4)}`;
+    if (photoLocationCache.has(key)) {
+      const cached = photoLocationCache.get(key);
+      if (cached && typeof cached === 'object') {
+        if (cached.location) result.location = cached.location;
+        if (Array.isArray(cached.locationTags) && cached.locationTags.length) result.locationTags = cached.locationTags.slice();
+      } else if (cached) {
+        result.location = cached;
+      }
+    } else {
+      try {
+        let parsed = null;
+        if (typeof reverseGeocodeCoords === 'function') {
+          parsed = await reverseGeocodeCoords(lat, lon, {
+            firebaseConfig: typeof firebaseConfig !== 'undefined' ? firebaseConfig : {}
+          });
+        } else {
+          const waitMs = Math.max(0, 1100 - (Date.now() - photoLocationRequestAt));
+          if (waitMs) await new Promise(resolve => setTimeout(resolve, waitMs));
+          photoLocationRequestAt = Date.now();
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=jsonv2&addressdetails=1&accept-language=ko&zoom=18`,
+            { headers: { Accept: 'application/json', 'User-Agent': 'GatherCalendar/1.0 (https://github.com/pyw31337/calendar)' } }
+          );
+          if (response.ok) parsed = parseNominatimLocation(await response.json());
+        }
+        if (parsed && (parsed.location || (parsed.locationTags && parsed.locationTags.length))) {
+          photoLocationCache.set(key, parsed);
+          if (parsed.location) result.location = parsed.location;
+          if (parsed.locationTags.length) result.locationTags = parsed.locationTags;
+        }
+      } catch (_) {}
+    }
+  }
+  return result;
+}
+
+function buildMetadataTags(metadata, scheduledDateOrOptions = '') {
+  return buildPhotoMetadataTags(metadata, scheduledDateOrOptions);
+}
+
+async function buildBase64FallbackFromCompressed(compressed) {
+  const blob = compressed.thumbnailBlob || compressed.originalBlob;
+  if (!blob) {
+    return {
+      original: typeof compressed.original === 'string' && compressed.original.startsWith('data:') ? compressed.original : null,
+      thumbnail: typeof compressed.thumbnail === 'string' && compressed.thumbnail.startsWith('data:') ? compressed.thumbnail : null
+    };
+  }
+  let bitmap = null;
+  try {
+    if (typeof createImageBitmap === 'function') bitmap = await createImageBitmap(blob);
+  } catch (_) { bitmap = null; }
+  if (!bitmap) {
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+    return { original: dataUrl, thumbnail: dataUrl };
+  }
+  const encode = (maxDim, quality, budget) => {
+    let w = bitmap.width, h = bitmap.height;
+    if (w > maxDim || h > maxDim) {
+      if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
+      else { w = Math.round(w * maxDim / h); h = maxDim; }
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, w, h);
+    let best = canvas.toDataURL('image/jpeg', quality);
+    if (best.length > budget) best = canvas.toDataURL('image/jpeg', Math.max(0.35, quality - 0.2));
+    return best;
+  };
+  const original = encode(600, 0.7, 48 * 1024);
+  const thumbnail = encode(360, 0.65, 24 * 1024);
+  try { bitmap.close && bitmap.close(); } catch (_) {}
+  return { original, thumbnail };
+}
+
+function revokeCompressedObjectUrls(compressed) {
+  if (!compressed || !Array.isArray(compressed._objectUrls)) return;
+  compressed._objectUrls.forEach(u => {
+    try { URL.revokeObjectURL(u); } catch (_) {}
+  });
+  compressed._objectUrls = [];
+}
+
+// Successful image preprocessing is reusable across a retry. Selecting the same files again
+// creates new File objects, so use stable browser metadata rather than object identity. Failed
+// items are never cached; the bounded map prevents a long-lived page from retaining unlimited
+// full-size blobs.
+const imagePreprocessCache = new Map();
+const IMAGE_PREPROCESS_CACHE_LIMIT = 80;
+function getImagePreprocessCacheKey(file) {
+  if (!file) return '';
+  return [file.name || '', file.size || 0, file.lastModified || 0, file.type || ''].join('::');
+}
+function rememberPreprocessedImage(file, compressed) {
+  const key = getImagePreprocessCacheKey(file);
+  if (!key || !compressed) return;
+  imagePreprocessCache.delete(key);
+  imagePreprocessCache.set(key, compressed);
+  while (imagePreprocessCache.size > IMAGE_PREPROCESS_CACHE_LIMIT) {
+    const oldest = imagePreprocessCache.keys().next().value;
+    imagePreprocessCache.delete(oldest);
+  }
+}
+function forgetPreprocessedImages(files) {
+  Array.from(files || []).forEach(file => {
+    const key = getImagePreprocessCacheKey(file);
+    if (key) imagePreprocessCache.delete(key);
+  });
+}
+
+export {
+  loadHeicTo, loadHeic2any, sniffImageFormat, withCorrectedImageFile, isHeicFile, loadImageElement, resetHeicToLoader, resetHeic2anyLoader,
+  compressImageToDataUrls, buildMetadataTags, buildBase64FallbackFromCompressed, revokeCompressedObjectUrls,
+  imagePreprocessCache, getImagePreprocessCacheKey, rememberPreprocessedImage, forgetPreprocessedImages
+};
