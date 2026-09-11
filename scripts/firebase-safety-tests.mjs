@@ -910,7 +910,7 @@ assert(/function subscribeMessages[\s\S]{0,1400}?options\.where[\s\S]{0,1400}?q 
 assert(/async function fetchRecentGalleryMessages[\s\S]{0,1800}?collection\('messages'\)[\s\S]{0,300}?orderBy\('timestamp'/.test(firebaseServicesScript), 'gallery preview must retain its independent unscoped media read');
 assert(appMainSource.includes('fetchRecentGalleryMessages(activeCalId, 18)'), 'desktop main gallery preview must hydrate enough media for its 18-thumbnail cap');
 assert(!/async function fetchOlderChatMessages[\s\S]{0,3000}?where\('uploadSource'/.test(firebaseServicesScript), 'fetchOlderChatMessages must stay unscoped so gallery/meeting uploads remain visible to every other consumer of chatMessages');
-assert(appMainSource.includes('function isChatRenderableMessage') && appMainSource.includes('visibleChatMessages'), 'hiding non-chat uploads from the chat bubble list must happen at the render layer, not the query layer');
+assert(galleryDataSource.includes('function isChatRenderableMessage') && appMainSource.includes('visibleChatMessages'), 'hiding non-chat uploads from the chat bubble list must happen at the render layer, not the query layer');
 assert(firebaseServicesScript.includes('FIRESTORE_REST_TIMEOUT_MS = 9000') && firebaseServicesScript.includes('fetchWithTimeout') && firebaseServicesScript.includes('withSdkTimeout'), 'Firebase SDK and REST reads must have bounded timeouts');
 assert(/fetchFirestoreRequest/.test(firebaseDataScript) && /image share read timeout/.test(firebaseDataScript), 'Firestore fallback and share reads must have bounded timeouts');
 assert(calendarCoreScript.includes('withFirestoreReadTimeout') && calendarCoreScript.includes('Firestore search read timed out'), 'full-history search reads must have a bounded timeout');
