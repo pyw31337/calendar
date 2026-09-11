@@ -2,6 +2,12 @@ import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// app-main-split-units.md note: moving a name's body out of app-main.js is fine as long as an
+// alias survives (`import { Name } from '...'` or `const { Name } = ...`) -- this check only
+// greps for the name appearing in one of a few textual shapes (see requireOneOf below), it does
+// not care where the real definition lives. Only remove a name from these lists once the split
+// unit that moves it has actually landed and the alias is confirmed still present.
+
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const main = readFileSync(resolve(root, 'src/core/app-main.js'), 'utf8');
 const utils = readFileSync(resolve(root, 'src/core/app-utils.js'), 'utf8');
