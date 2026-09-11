@@ -120,7 +120,21 @@ function looksLikeBlockedPreviewTitle(title) {
   return blockedPatterns.some(p => t === p || t.includes(p));
 }
 
-async function fetchLinkPreview(url) {
+// calendarId (when the caller has one in scope) records this URL as used by that calendar, via
+// a best-effort arrayUnion into the shared linkPreviews doc's `calendarIds` -- a server-side
+// trigger (onLinkPreviewWrite in functions/index.js) keeps `calendarCount` in sync so the admin
+// dashboard's 데이터풀 tab can surface links used by 2+ calendars without a client-side `list`
+// query (disallowed by firestore.rules). Purely additive/best-effort: a failed or skipped write
+// here never blocks the preview itself from being returned to the caller.
+function markLinkPreviewUsedByCalendar(urlHash, calendarId) {
+  if (!firebaseDb || !urlHash || !calendarId) return;
+  if (!(typeof firebase !== 'undefined' && firebase.firestore && firebase.firestore.FieldValue)) return;
+  firebaseDb.collection('linkPreviews').doc(urlHash).set({
+    calendarIds: firebase.firestore.FieldValue.arrayUnion(calendarId)
+  }, { merge: true }).catch(() => {});
+}
+
+async function fetchLinkPreview(url, calendarId) {
   if (linkPreviewCache.has(url)) return linkPreviewCache.get(url);
   if (linkPreviewInflight.has(url)) return linkPreviewInflight.get(url);
   const promise = (async () => {
@@ -135,6 +149,7 @@ async function fetchLinkPreview(url) {
             const d = sharedDoc.data();
             const result = { status: 'success', data: normalizeLinkPreviewData(url, d, d.fetchedAt) };
             cacheLinkPreview(url, result);
+            markLinkPreviewUsedByCalendar(urlHash, calendarId);
             return result;
           }
         } catch (e) {
@@ -172,7 +187,10 @@ async function fetchLinkPreview(url) {
       if (hasContent) {
         cacheLinkPreview(url, result);
         if (firebaseDb) {
-          firebaseDb.collection('linkPreviews').doc(urlHash).set(data).then(() => incrementLinkPreviewStat()).catch(() => {});
+          const docData = (typeof firebase !== 'undefined' && firebase.firestore && firebase.firestore.FieldValue && calendarId)
+            ? { ...data, calendarIds: firebase.firestore.FieldValue.arrayUnion(calendarId) }
+            : data;
+          firebaseDb.collection('linkPreviews').doc(urlHash).set(docData, { merge: true }).then(() => incrementLinkPreviewStat()).catch(() => {});
         }
       }
       return result;

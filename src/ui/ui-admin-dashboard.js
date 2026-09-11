@@ -194,6 +194,10 @@ function adminBulkTagPhotosRemote(...args) {
   const f = __gatherUiDeps().adminBulkTagPhotosRemote || GATHER_APP_UTILS.adminBulkTagPhotosRemote;
   return typeof f === 'function' ? f(...args) : Promise.resolve([]);
 }
+function listSharedDataPoolRemote(...args) {
+  const f = __gatherUiDeps().listSharedDataPoolRemote || GATHER_APP_UTILS.listSharedDataPoolRemote;
+  return typeof f === 'function' ? f(...args) : Promise.resolve({ items: [], nextCursor: null });
+}
 function mergeCalendarCollections(...args) {
   const f = __gatherUiDeps().mergeCalendarCollections || GATHER_APP_UTILS.mergeCalendarCollections;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -452,6 +456,40 @@ export function AdminDashboard({ initialCalendars }) {
   const DATA_POOL_PAGE_SIZE = 100;
   const [dataPoolPage, setDataPoolPage] = React.useState(0);
   React.useEffect(() => { setDataPoolPage(0); }, [dataPoolCategory, dataPoolUntaggedOnly]);
+
+  // 파일/링크 "공용데이터": sharedFiles/linkPreviews 문서 중 2개 이상의 캘린더가 공통으로 쓴
+  // 것만 골라 보여준다 (calendarCount는 functions/index.js의 onSharedFileWrite/
+  // onLinkPreviewWrite 트리거가 관리 -- 두 컬렉션 모두 firestore.rules에서 list를 막아뒀기
+  // 때문에 admin-gated Cloud Function으로만 조회할 수 있다). 탭을 처음 열 때 한 번만 전량을
+  // 불러온 뒤, 사진 그리드와 동일하게 클라이언트에서 100개 단위로 페이지네이션한다.
+  const [sharedFilePool, setSharedFilePool] = React.useState([]);
+  const [sharedLinkPool, setSharedLinkPool] = React.useState([]);
+  const sharedFilePoolFetchedRef = React.useRef(false);
+  const sharedLinkPoolFetchedRef = React.useRef(false);
+  const loadSharedDataPool = React.useCallback(async (kind, setPool) => {
+    const session = getAdminSession();
+    if (!session?.password) return;
+    let cursor = null;
+    const all = [];
+    for (let i = 0; i < 50; i += 1) { // hard cap so a server-side bug can't loop this forever
+      const { items, nextCursor } = await listSharedDataPoolRemote(session.password, kind, { cursor, limit: 200 });
+      all.push(...items);
+      if (!nextCursor) break;
+      cursor = nextCursor;
+    }
+    setPool(all);
+  }, []);
+  React.useEffect(() => {
+    if (activeTab !== 'datapool') return;
+    if (dataPoolCategory === 'file' && !sharedFilePoolFetchedRef.current) {
+      sharedFilePoolFetchedRef.current = true;
+      loadSharedDataPool('file', setSharedFilePool).catch(() => {});
+    }
+    if (dataPoolCategory === 'link' && !sharedLinkPoolFetchedRef.current) {
+      sharedLinkPoolFetchedRef.current = true;
+      loadSharedDataPool('link', setSharedLinkPool).catch(() => {});
+    }
+  }, [activeTab, dataPoolCategory, loadSharedDataPool]);
 
   // Timeline filters and pagination for Tab 4 (Recovery logs)
   const [timelineSearchQuery, setTimelineSearchQuery] = React.useState('');
@@ -2021,10 +2059,20 @@ export function AdminDashboard({ initialCalendars }) {
     activeTab === 'datapool' && (() => {
       const categories = [
         { id: 'photo', label: '사진', icon: null, count: memePoolAdmin.length },
-        { id: 'file', label: '파일', icon: null, count: 0 },
-        { id: 'link', label: '링크', icon: null, count: 0 },
+        { id: 'file', label: '파일', icon: null, count: sharedFilePool.length },
+        { id: 'link', label: '링크', icon: null, count: sharedLinkPool.length },
         { id: 'etc', label: '기타', icon: null, count: 0 }
       ];
+      const sharedPool = dataPoolCategory === 'file' ? sharedFilePool : dataPoolCategory === 'link' ? sharedLinkPool : [];
+      const sharedPageCount = Math.max(1, Math.ceil(sharedPool.length / DATA_POOL_PAGE_SIZE));
+      const clampedSharedPage = Math.min(dataPoolPage, sharedPageCount - 1);
+      const pagedShared = sharedPool.slice(clampedSharedPage * DATA_POOL_PAGE_SIZE, (clampedSharedPage + 1) * DATA_POOL_PAGE_SIZE);
+      const formatSharedFileSize = bytes => {
+        const n = Number(bytes) || 0;
+        if (n < 1024) return `${n}B`;
+        if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)}KB`;
+        return `${(n / (1024 * 1024)).toFixed(1)}MB`;
+      };
       const untaggedPhotoCount = memePoolAdmin.filter(p => !(p.hashtags || []).length).length;
       const visiblePhotos = dataPoolUntaggedOnly ? memePoolAdmin.filter(p => !(p.hashtags || []).length) : memePoolAdmin;
       const photoPageCount = Math.max(1, Math.ceil(visiblePhotos.length / DATA_POOL_PAGE_SIZE));
@@ -2154,6 +2202,46 @@ export function AdminDashboard({ initialCalendars }) {
                     )
                   )
           )
+        ) : (dataPoolCategory === 'file' || dataPoolCategory === 'link') ? /*#__PURE__*/React.createElement(React.Fragment, null,
+          /*#__PURE__*/React.createElement("p", { style: { margin: '0 0 10px', fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } },
+            `2개 이상의 캘린더에서 공용으로 사용된 ${dataPoolCategory === 'file' ? '파일' : '링크'} ${sharedPool.length}건`),
+          sharedPool.length === 0
+            ? /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)', textAlign: 'center' } }, "공용으로 사용된 데이터가 아직 없습니다.")
+            : /*#__PURE__*/React.createElement(React.Fragment, null,
+                /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
+                  pagedShared.map(item => /*#__PURE__*/React.createElement("a", {
+                    key: item.id, href: item.url, target: "_blank", rel: "noreferrer noopener",
+                    style: {
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px',
+                      padding: '10px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)',
+                      textDecoration: 'none', color: 'var(--text-main)'
+                    }
+                  },
+                    /*#__PURE__*/React.createElement("div", { style: { minWidth: 0, flex: 1 } },
+                      /*#__PURE__*/React.createElement("p", { style: { margin: 0, fontWeight: 700, fontSize: 'var(--font-size-sm)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } },
+                        dataPoolCategory === 'file' ? (item.name || item.id) : (item.title || item.url)),
+                      /*#__PURE__*/React.createElement("p", { style: { margin: '2px 0 0', fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } },
+                        dataPoolCategory === 'file' ? `${item.mime || ''}${item.mime ? ' · ' : ''}${formatSharedFileSize(item.size)}` : (item.siteName || item.url))
+                    ),
+                    /*#__PURE__*/React.createElement("span", {
+                      style: { flexShrink: 0, padding: '2px 8px', borderRadius: 'var(--radius-full)', backgroundColor: 'var(--accent-primary-soft, #EEF2FF)', color: 'var(--accent-primary)', fontSize: 'var(--font-size-2xs)', fontWeight: 800 }
+                    }, `${item.calendarCount}개 캘린더`)
+                  ))
+                ),
+                sharedPageCount > 1 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', marginTop: '12px' } },
+                  /*#__PURE__*/React.createElement("button", {
+                    type: "button", className: "btn btn-secondary", disabled: clampedSharedPage === 0,
+                    onClick: () => setDataPoolPage(p => Math.max(0, p - 1)),
+                    style: { height: '32px', padding: '0 12px', fontWeight: 800, fontSize: 'var(--font-size-sm)' }
+                  }, "이전"),
+                  /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } }, `${clampedSharedPage + 1} / ${sharedPageCount}`),
+                  /*#__PURE__*/React.createElement("button", {
+                    type: "button", className: "btn btn-secondary", disabled: clampedSharedPage >= sharedPageCount - 1,
+                    onClick: () => setDataPoolPage(p => Math.min(sharedPageCount - 1, p + 1)),
+                    style: { height: '32px', padding: '0 12px', fontWeight: 800, fontSize: 'var(--font-size-sm)' }
+                  }, "다음")
+                )
+              )
         ) : /*#__PURE__*/React.createElement("div", { style: { padding: '40px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)' } },
           categories.find(c => c.id === dataPoolCategory)?.label, " 종류의 캘린더 간 공유 데이터는 아직 없습니다.",
           /*#__PURE__*/React.createElement("br"),

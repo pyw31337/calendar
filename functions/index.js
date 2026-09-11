@@ -398,6 +398,31 @@ exports.onPhotoCommentIndexWrite = functions.firestore
     if (writeCount > 0) await batch.commit();
   });
 
+// The client can only arrayUnion its own calendarId into sharedFiles/{hash} and
+// linkPreviews/{urlHash} (see firestore.rules -- `list` is disabled on both collections, so a
+// client can never scan them for cross-calendar usage). This trigger recomputes a plain
+// `calendarCount` field server-side whenever `calendarIds` changes, so the admin dashboard's
+// 데이터풀 tab (listSharedDataPool below) can query `calendarCount >= 2` -- Firestore has no
+// "array length" query operator, so a denormalized count field is the simplest way to make that
+// filterable. Guarded against re-triggering itself: it only writes when the count actually changed.
+function makeCalendarCountSyncTrigger() {
+  return async (change) => {
+    if (!change.after.exists) return null;
+    const data = change.after.data() || {};
+    const count = Array.isArray(data.calendarIds) ? new Set(data.calendarIds).size : 0;
+    if (Number(data.calendarCount) === count) return null;
+    return change.after.ref.set({ calendarCount: count }, { merge: true });
+  };
+}
+
+exports.onSharedFileWrite = functions.firestore
+  .document('sharedFiles/{hash}')
+  .onWrite(makeCalendarCountSyncTrigger());
+
+exports.onLinkPreviewWrite = functions.firestore
+  .document('linkPreviews/{urlHash}')
+  .onWrite(makeCalendarCountSyncTrigger());
+
 async function syncMeetingPhotoIndex(change, context) {
   const db = admin.firestore();
   const calendarRef = db.collection('calendars').doc(context.params.calendarDocId);
@@ -1904,6 +1929,48 @@ exports.listUntaggedPhotoIndexEntries = functions.https.onRequest(async (req, re
     res.status(200).json({ ok: true, items, nextCursor });
   } catch (err) {
     console.error('listUntaggedPhotoIndexEntries failed:', err);
+    res.status(500).json({ ok: false });
+  }
+});
+
+// Admin-gated read of the sharedFiles/linkPreviews collections (both have `list: false` in
+// firestore.rules -- a hash/urlHash is only useful to someone who already has the matching
+// file/URL, so no client can enumerate them) filtered to entries onSharedFileWrite/
+// onLinkPreviewWrite above have marked as used by 2+ calendars, for the admin dashboard's
+// 데이터풀 tab. `calendarCount` (not `calendarIds.length`, which Firestore can't query directly)
+// is both the filter and the sort key, so this only needs the automatic single-field index.
+exports.listSharedDataPool = functions.https.onRequest(async (req, res) => {
+  setAdminCorsHeaders(res);
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  if (req.method !== 'POST') { res.status(405).json({ ok: false }); return; }
+  const { password, kind, cursor, limit } = req.body || {};
+  if (typeof password !== 'string' || !password.trim()) { res.status(400).json({ ok: false }); return; }
+  if (kind !== 'file' && kind !== 'link') { res.status(400).json({ ok: false }); return; }
+  const rateState = await checkAdminAuthRateLimit(req.ip);
+  if (rateState.blocked) { res.status(429).json({ ok: false }); return; }
+  const matches = sha256Hex(password.trim()) === await getStoredAdminPasswordHash();
+  await recordAdminAuthResult(rateState, matches);
+  if (!matches) { res.status(401).json({ ok: false }); return; }
+  try {
+    const pageSize = Math.min(200, Math.max(1, Number(limit) || 100));
+    const collectionName = kind === 'file' ? 'sharedFiles' : 'linkPreviews';
+    let query = admin.firestore().collection(collectionName)
+      .where('calendarCount', '>=', 2)
+      .orderBy('calendarCount', 'desc')
+      .limit(pageSize);
+    if (typeof cursor === 'number' && Number.isFinite(cursor)) query = query.startAfter(cursor);
+    const snap = await query.get();
+    const items = snap.docs.map(doc => {
+      const data = doc.data() || {};
+      const base = { id: doc.id, calendarCount: Number(data.calendarCount) || 0 };
+      return kind === 'file'
+        ? { ...base, name: String(data.name || ''), url: String(data.url || ''), mime: String(data.mime || ''), size: Number(data.size) || 0 }
+        : { ...base, url: String(data.url || ''), title: String(data.title || ''), image: String(data.image || ''), siteName: String(data.siteName || '') };
+    });
+    const nextCursor = snap.docs.length === pageSize ? Number(snap.docs[snap.docs.length - 1].data()?.calendarCount) : null;
+    res.status(200).json({ ok: true, items, nextCursor });
+  } catch (err) {
+    console.error('listSharedDataPool failed:', err);
     res.status(500).json({ ok: false });
   }
 });
