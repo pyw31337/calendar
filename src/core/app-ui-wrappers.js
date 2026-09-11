@@ -39,6 +39,28 @@ const PLAIN_WRAPPER_COMPONENT_NAMES = Object.freeze([
   'AdminUnifiedSearchModal'
 ]);
 
+// U1c: bottom-of-file view/modal wrappers, interspersed among real logic (image pipeline, link
+// preview, chat render helpers, hooks, search, weather, map) that U1c leaves alone for later
+// units. Includes required-symbols names (AdminLoginGate is in U1b; PlacesView, DateModal,
+// ChatGalleryModal, PhotoGallery, SummaryList are here) -- their aliases must keep these exact
+// names. AppSettingsModal/NotificationOnboardingModal previously used `C ? ... : null` instead of
+// `typeof C === 'function' ? ... : null`; behaviorally identical since C only ever holds
+// undefined or a function from these registries, normalized to the shared shape here.
+const VIEW_WRAPPER_COMPONENT_NAMES = Object.freeze([
+  'CalendarGrid', 'CommentsSection', 'MemoCard', 'PollList', 'GlobalSearchModal',
+  'EditMessageModal', 'DirectChatMediaText', 'DeadlineDateTimePicker', 'PlacesSection',
+  'ImageUrlModal', 'ImageUploadOverlay', 'ImageProcessingOverlay', 'EmojiPickerSheet',
+  'Lightbox', 'ChatRoomView', 'ChatParticipantSheet', 'AppSettingsModal',
+  'NotificationOnboardingModal', 'NotificationPermissionHelpModal', 'ConfirmDialog',
+  'DateModal', 'SectionCountBadge', 'SectionToggleButton', 'SearchCategoryTabs',
+  'SimpleBottomSheetPicker', 'PhotoGallery', 'SummaryList', 'MemoPreviewSection',
+  'ShareModal', 'UserManualOverlay', 'WeatherBadge', 'WeatherLocationModal', 'MainSideMenu',
+  'UpdateAvailableBanner', 'ImageShareViewer', 'ImageThumbRemoveButton', 'InlineSearchBar',
+  'MemoShareModal', 'ChatGalleryModal', 'MemoView', 'AnniversaryModal',
+  'SettlementSummaryModal', 'PollModal', 'PlaceMapView', 'PlacesView', 'HistoryView',
+  'ContentView', 'PlaceRegisterModal'
+]);
+
 // getWeatherIcon (picks a component by weather code) is not a plain pass-through and stays
 // defined directly in app-main.js.
 //
@@ -64,7 +86,7 @@ function createSpecialAliases(React) {
 
 export function bindUiComponentAliases(React) {
   const out = createSpecialAliases(React);
-  [...ICON_COMPONENT_NAMES, ...PLAIN_WRAPPER_COMPONENT_NAMES].forEach(name => {
+  [...ICON_COMPONENT_NAMES, ...PLAIN_WRAPPER_COMPONENT_NAMES, ...VIEW_WRAPPER_COMPONENT_NAMES].forEach(name => {
     out[name] = function PassThroughAlias(props) {
       const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS[name];
       return typeof C === 'function' ? React.createElement(C, props) : null;
@@ -73,4 +95,4 @@ export function bindUiComponentAliases(React) {
   return out;
 }
 
-export { ICON_COMPONENT_NAMES, PLAIN_WRAPPER_COMPONENT_NAMES };
+export { ICON_COMPONENT_NAMES, PLAIN_WRAPPER_COMPONENT_NAMES, VIEW_WRAPPER_COMPONENT_NAMES };

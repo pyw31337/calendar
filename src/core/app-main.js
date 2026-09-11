@@ -8250,30 +8250,7 @@ function CalendarApp() {
 
 
 // Calendar Grid Component
-function CalendarGrid(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CalendarGrid;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function CommentsSection(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.CommentsSection;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function MemoCard(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MemoCard;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function PollList(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PollList;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function GlobalSearchModal(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.GlobalSearchModal;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function EditMessageModal(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.EditMessageModal;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
+const { CalendarGrid, CommentsSection, MemoCard, PollList, GlobalSearchModal, EditMessageModal } = uiWrapperAliases;
 
 // Link preview (OpenGraph via peekalink.io's API), fetched through the peekalinkProxy Cloud
 // Function (functions/index.js) instead of calling api.peekalink.io directly from the browser.
@@ -8518,22 +8495,7 @@ function extractDirectImageUrls(text) {
 // ~30000) so it stays visible while browsing other tabs, but below toast (99999) and confirm
 // dialogs (100000) so those never get obscured by it.
 
-function DirectChatMediaText(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DirectChatMediaText;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function DeadlineDateTimePicker(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DeadlineDateTimePicker;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function PlacesSection(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlacesSection;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function ImageUrlModal(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ImageUrlModal;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
+const { DirectChatMediaText, DeadlineDateTimePicker, PlacesSection, ImageUrlModal } = uiWrapperAliases;
 
 function renderChatMessageBody(msg, setActiveLightbox, singleImageStyle = {}, searchQuery = '', stickyVideoKey = null, onActivateVideo = null, linkPreviewOnly = false, onOpenFileAttachment = null) {
   const msgImages = renderChatMessageImages(msg, setActiveLightbox, singleImageStyle);
@@ -9328,18 +9290,7 @@ async function appendChatImageFiles({
   return { handled: true, succeeded: succeeded.length, failed: failed.length };
 }
 
-function ImageUploadOverlay(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ImageUploadOverlay;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function ImageProcessingOverlay(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ImageProcessingOverlay;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function EmojiPickerSheet(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.EmojiPickerSheet;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
+const { ImageUploadOverlay, ImageProcessingOverlay, EmojiPickerSheet } = uiWrapperAliases;
 
 function getUploadImageBlobMeta(blob, fallbackExt = 'jpg') {
   const mime = String(blob?.type || '').toLowerCase();
@@ -10078,10 +10029,7 @@ function buildLightboxImageInfo(url, timestamp) {
 // buttons and dot indicators when there's more than one image, matching the KakaoTalk-style
 // multi-photo gallery UX the chat bubbles are modeled after. `meta` (optional, parallel to
 // `urls`) supplies each image's { timestamp } for the tap-to-toggle info overlay.
-function Lightbox(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.Lightbox;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
+const { Lightbox } = uiWrapperAliases;
 
 
 // Tracks which message row's edit/delete controls should be revealed: desktop hover is
@@ -10173,10 +10121,7 @@ function useChatSendGuard(onSend, canSend = true) {
 
 
 
-function ChatRoomView(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChatRoomView;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
+const { ChatRoomView } = uiWrapperAliases;
 
 
 // A curated, cross-platform-consistent emoji set (Twemoji, the same flat-design set used by
@@ -10244,29 +10189,7 @@ function addRecentEmoji(emoji) {
 
 
 
-function ChatParticipantSheet(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChatParticipantSheet;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function AppSettingsModal(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AppSettingsModal;
-  return C ? React.createElement(C, props) : null;
-}
-function NotificationOnboardingModal(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.NotificationOnboardingModal;
-  return C ? React.createElement(C, props) : null;
-}
-function NotificationPermissionHelpModal(props) {
-
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.NotificationPermissionHelpModal;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-
-
-function ConfirmDialog(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ConfirmDialog;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
+const { ChatParticipantSheet, AppSettingsModal, NotificationOnboardingModal, NotificationPermissionHelpModal, ConfirmDialog } = uiWrapperAliases;
 
 
 
@@ -10296,10 +10219,7 @@ function getShortTitleParts(dateStr) {
 
 
 
-function DateModal(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DateModal;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
+const { DateModal } = uiWrapperAliases;
 
 
 
@@ -10490,34 +10410,7 @@ const rebuildCalendarToTimestamp = (calendar, T, logs = []) => {
 // A <select>-replacement styled as a form-select trigger button that opens the same bottom-sheet
 // picker pattern used elsewhere in the app (e.g. the admin header's calendar picker) -- unlike a
 // native <select>, the open dropdown list is entirely CSS-styled and follows dark mode.
-function SectionCountBadge(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SectionCountBadge;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function SectionToggleButton(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SectionToggleButton;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function SearchCategoryTabs(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SearchCategoryTabs;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function SimpleBottomSheetPicker(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SimpleBottomSheetPicker;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function PhotoGallery(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PhotoGallery;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function SummaryList(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SummaryList;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function MemoPreviewSection(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MemoPreviewSection;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
+const { SectionCountBadge, SectionToggleButton, SearchCategoryTabs, SimpleBottomSheetPicker, PhotoGallery, SummaryList, MemoPreviewSection } = uiWrapperAliases;
 
 
 
@@ -10686,16 +10579,7 @@ function getAdminSearchResultTargetUrl(type, item) {
 
 
 // Share Modal
-function ShareModal(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ShareModal;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-
-
-function UserManualOverlay(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.UserManualOverlay;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
+const { ShareModal, UserManualOverlay } = uiWrapperAliases;
 
 
 
@@ -10728,14 +10612,7 @@ function getWeatherIcon(code, size = 16) {
   return /*#__PURE__*/React.createElement(SunIcon, { size });
 }
 
-function WeatherBadge(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.WeatherBadge;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function WeatherLocationModal(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.WeatherLocationModal;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
+const { WeatherBadge, WeatherLocationModal } = uiWrapperAliases;
 
 
 function translateKoreanToEnglish(query) {
@@ -10795,42 +10672,7 @@ function translateKoreanToEnglish(query) {
 
 
 
-function MainSideMenu(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MainSideMenu;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-
-
-function UpdateAvailableBanner(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.UpdateAvailableBanner;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function ImageShareViewer(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ImageShareViewer;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function ImageThumbRemoveButton(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ImageThumbRemoveButton;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function InlineSearchBar(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.InlineSearchBar;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function MemoShareModal(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MemoShareModal;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function ChatGalleryModal(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChatGalleryModal;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-
-
-function MemoView(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MemoView;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
+const { MainSideMenu, UpdateAvailableBanner, ImageShareViewer, ImageThumbRemoveButton, InlineSearchBar, MemoShareModal, ChatGalleryModal, MemoView } = uiWrapperAliases;
 
 
 
@@ -10962,18 +10804,7 @@ function getAnniversaryDisplayColor(ann, calendar) {
   return matched ? matched.color : ann.badgeColor;
 }
 
-function AnniversaryModal(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.AnniversaryModal;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function SettlementSummaryModal(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SettlementSummaryModal;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function PollModal(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PollModal;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
+const { AnniversaryModal, SettlementSummaryModal, PollModal } = uiWrapperAliases;
 
 
 
@@ -11364,22 +11195,7 @@ function centerMapOnMarkerAndPopup(map, marker, opts) {
   requestAnimationFrame(() => requestAnimationFrame(tryCenter));
 }
 
-function PlaceMapView(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlaceMapView;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function PlacesView(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlacesView;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function HistoryView(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.HistoryView;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
-function ContentView(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ContentView;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
+const { PlaceMapView, PlacesView, HistoryView, ContentView } = uiWrapperAliases;
 
 
 // Address/업체명 search (Nominatim, same free geocoder the weather feature already uses as a
@@ -11412,10 +11228,7 @@ async function fetchWithTimeout(url, timeoutMs) {
   }
 }
 
-function PlaceRegisterModal(props) {
-  const C = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlaceRegisterModal;
-  return typeof C === 'function' ? React.createElement(C, props) : null;
-}
+const { PlaceRegisterModal } = uiWrapperAliases;
 
 
 // Main-screen collapsible map preview -- collapsed shows a short 16:9 map, expanded shows a
