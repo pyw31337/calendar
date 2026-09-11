@@ -15,7 +15,10 @@ import {
   deleteGalleryLinkItems,
   filterDeletedPhotoFromIndexItems
 } from './gallery-bulk-delete.js';
-import { filterOutMemoryExclusionKeys, preserveAnniversaryCurationFields } from './gallery-data.js';
+import {
+  filterOutMemoryExclusionKeys, preserveAnniversaryCurationFields,
+  getMeetingOwnedPhotoMessageIds, isChatRenderableMessage
+} from './gallery-data.js';
 import { bindUiComponentAliases } from './app-ui-wrappers.js';
 import { useTapRevealedMsgId, useModalDirtyGuard, useChatSendGuard } from './app-ui-hooks.js';
 import { highlightTextWithYellowMarker, highlightKeyword, formatLogTimestamp, computeCalendarSearchMatches, getAdminSearchResultTargetUrl } from './app-search.js';
@@ -400,40 +403,14 @@ const {
   AdminDashboard, AdminModal, AdminUnifiedSearchResultsView, AdminCreateCalendarModal,
   AdminRestorePhraseModal, AdminUnifiedSearchModal, CreateSettlementModal
 } = uiWrapperAliases;
+// Kept here (not moved with isNonChatUploadSource/getMeetingOwnedPhotoMessageIds/
+// isChatRenderableMessage to gallery-data.js) because it needs getMessageDirectMediaEntry, which
+// pulls in app-domain-helpers.js's window-dependent module scope -- gallery-data.js must stay
+// importable under plain Node for firebase-safety-tests.mjs's direct unit tests.
 function getAllDirectMediaImageEntries(message) {
   const direct = getMessageDirectMediaEntry(message);
   return direct ? [direct] : [];
 }
-const NON_CHAT_UPLOAD_SOURCES = new Set(['meeting', 'gallery']);
-function isNonChatUploadSource(uploadSource) {
-  return NON_CHAT_UPLOAD_SOURCES.has(String(uploadSource || '').trim().toLowerCase());
-}
-
-function getMeetingOwnedPhotoMessageIds(calendar) {
-  const ids = new Set();
-  const fn = typeof getConfirmedMeetings === 'function' ? getConfirmedMeetings : (typeof window !== 'undefined' && window.GATHER_APP_UTILS ? window.GATHER_APP_UTILS.getConfirmedMeetings : null);
-  const meetings = typeof fn === 'function' ? fn(calendar) : [];
-  meetings.forEach(meeting => {
-    (Array.isArray(meeting?.photos) ? meeting.photos : []).forEach(photo => {
-      const messageId = String(photo?.sourceMessageId || '').trim();
-      if (!messageId) return;
-      const mediaKey = String(photo?.mediaKey || photo?.assetKey || '').trim().toLowerCase();
-      const uploadSource = String(photo?.uploadSource || '').trim().toLowerCase();
-      const source = String(photo?.source || '').trim().toLowerCase();
-      if (!(mediaKey.startsWith('meeting:') || uploadSource === 'meeting' || source === 'meeting')) return;
-      ids.add(messageId);
-    });
-  });
-  return ids;
-}
-
-function isChatRenderableMessage(message, meetingPhotoMessageIds = null) {
-  if (!message || typeof message !== 'object') return false;
-  if (isNonChatUploadSource(message.uploadSource)) return false;
-  if (meetingPhotoMessageIds && meetingPhotoMessageIds.has(message.id)) return false;
-  return true;
-}
-
 // Default empty-composer memo body for a 문화공연/지역축제 card (detail-sheet fields).
 function buildCultureEventMemoText(item) {
   if (!item) return '';
