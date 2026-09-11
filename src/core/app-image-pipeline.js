@@ -4,8 +4,22 @@ import {
   parseNominatimLocation
 } from './photo-metadata-tags.js';
 import { reverseGeocodeCoords } from './app-place-search.js';
-import { firebaseConfig, isStorageDisabled } from './app-firebase-data.js';
+import { firebaseConfig, isStorageDisabled, ensureFirebaseStorageReady, checkFirebaseStorageHealth } from './app-firebase-data.js';
+import { uploadBlobWithWatchdog } from './app-media-upload.js';
 import exifr from 'exifr';
+
+// Same live-getter pattern as chat-file-attachments.js's own getLiveFirebaseStorage -- reads the
+// global __setFirebaseDb-adjacent Storage instance set by app-firebase-data.js, rather than a
+// one-time snapshot, so it reflects the SDK actually connecting after this module first evaluates.
+function getLiveFirebaseStorage() {
+  try {
+    if (typeof window !== 'undefined' && window.__gatherFirebaseStorage) return window.__gatherFirebaseStorage;
+  } catch (_) {}
+  try {
+    if (typeof firebase !== 'undefined' && typeof firebase.storage === 'function') return firebase.storage();
+  } catch (_) {}
+  return null;
+}
 
 const GATHER_APP_CHAT_DATA = window.GATHER_APP_CHAT_DATA || {};
 
@@ -584,8 +598,367 @@ function forgetPreprocessedImages(files) {
   });
 }
 
+let activeMediaUploadCount = 0;
+let mediaUploadWakeLock = null;
+let mediaUploadWakeLockVisibilityHandler = null;
+async function acquireMediaUploadWakeLock() {
+  activeMediaUploadCount += 1;
+  if (typeof navigator === 'undefined' || !navigator.wakeLock?.request) return;
+  const request = async () => {
+    if (activeMediaUploadCount <= 0 || document.visibilityState !== 'visible' || mediaUploadWakeLock) return;
+    try {
+      mediaUploadWakeLock = await navigator.wakeLock.request('screen');
+      mediaUploadWakeLock.addEventListener?.('release', () => { mediaUploadWakeLock = null; request(); });
+    } catch (_) { /* unsupported, permission denied, or document hidden */ }
+  };
+  await request();
+  if (!mediaUploadWakeLockVisibilityHandler) {
+    mediaUploadWakeLockVisibilityHandler = () => { if (document.visibilityState === 'visible') request(); };
+    document.addEventListener('visibilitychange', mediaUploadWakeLockVisibilityHandler);
+  }
+}
+function releaseMediaUploadWakeLock() {
+  activeMediaUploadCount = Math.max(0, activeMediaUploadCount - 1);
+  if (activeMediaUploadCount > 0) return;
+  try { mediaUploadWakeLock?.release?.(); } catch (_) {}
+  mediaUploadWakeLock = null;
+  if (mediaUploadWakeLockVisibilityHandler) {
+    document.removeEventListener('visibilitychange', mediaUploadWakeLockVisibilityHandler);
+    mediaUploadWakeLockVisibilityHandler = null;
+  }
+}
+
+async function processImageFilesSequentially(files, onProgress) {
+  await acquireMediaUploadWakeLock();
+  try {
+  await checkFirebaseStorageHealth().catch(() => {});
+  const list = Array.from(files || []).sort((a, b) => String(a && a.name || '').localeCompare(String(b && b.name || ''), undefined, { numeric: true, sensitivity: 'base' }));
+  const succeeded = new Array(list.length);
+  const failed = [];
+  const startedAt = Date.now();
+  let completed = 0;
+  let cursor = 0;
+  const nav = typeof navigator !== 'undefined' ? navigator : {};
+  const CONCURRENCY = /Mobi|Android|iPhone|iPad/i.test(nav.userAgent || '') || (nav.hardwareConcurrency || 8) <= 4 ? 1 : Math.min(2, Math.max(1, list.length));
+
+  const report = (fileName) => {
+    if (!onProgress) return;
+    const elapsedSec = (Date.now() - startedAt) / 1000;
+    const pct = list.length ? Math.round((completed / list.length) * 100) : 100;
+    const remainingSec = completed > 0
+      ? Math.max(0, Math.round((elapsedSec / completed) * (list.length - completed)))
+      : null;
+    onProgress({
+      current: Math.min(list.length, completed + 1),
+      total: list.length,
+      fileName: fileName || null,
+      pct,
+      remainingSec
+    });
+  };
+
+  async function worker() {
+    while (true) {
+      const i = cursor++;
+      if (i >= list.length) return;
+      const file = list[i];
+      report(file && file.name);
+      try {
+        await new Promise(resolve => setTimeout(resolve, 0));
+        const cacheKey = getImagePreprocessCacheKey(file);
+        const cached = cacheKey ? imagePreprocessCache.get(cacheKey) : null;
+        if (cached) {
+          succeeded[i] = cached;
+        } else {
+          succeeded[i] = await compressImageToDataUrls(file);
+          rememberPreprocessedImage(file, succeeded[i]);
+        }
+        await new Promise(resolve => setTimeout(resolve, 0));
+      } catch (err) {
+        failed.push({ fileName: file && file.name, error: err });
+        succeeded[i] = null;
+      }
+      completed += 1;
+      report(file && file.name);
+    }
+  }
+
+  await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
+  if (onProgress) onProgress({ current: list.length, total: list.length, fileName: null, pct: 100, remainingSec: 0 });
+  return { succeeded: succeeded.filter(Boolean), failed };
+  } finally {
+    releaseMediaUploadWakeLock();
+  }
+}
+
+// Chunk resolved images so a base64-fallback batch never exceeds Firestore's 1MiB/doc limit.
+const CHAT_MESSAGE_SAFE_BYTE_BUDGET = 120000; // large images must use Storage URLs, not Firestore
+function chunkResolvedImagesForMessages(resolvedImages) {
+  const chunks = [];
+  let current = [];
+  let currentBytes = 0;
+  for (const img of resolvedImages) {
+    const imgBytes = (img.imageUrl?.length || 0) + (img.thumbUrl?.length || 0);
+    if (current.length > 0 && currentBytes + imgBytes > CHAT_MESSAGE_SAFE_BYTE_BUDGET) {
+      chunks.push(current);
+      current = [];
+      currentBytes = 0;
+    }
+    current.push(img);
+    currentBytes += imgBytes;
+  }
+  if (current.length > 0) chunks.push(current);
+  return chunks;
+}
+
+function describeImageProcessingFailures(failed) {
+  if (failed.length === 0) return '';
+  const first = failed[0];
+  const reason = first.error?.code === 'HEIC_CONVERT_FAILED'
+    ? 'HEIC/HEIF 변환 실패'
+    : first.error?.code === 'IMAGE_DECODE_TIMEOUT'
+    ? '처리 시간 초과'
+    : first.error?.code === 'IMAGE_DECODE_FAILED'
+    ? '이미지 디코드 실패'
+    : '지원하지 않는 형식';
+  if (failed.length === 1) return `${first.fileName} 첨부 실패 (${reason})`;
+  return `${failed.length}장 첨부 실패 (${reason} 등)`;
+}
+
+function getImageFilesFromClipboardEvent(event) {
+  const clipboard = event?.clipboardData;
+  if (!clipboard) return [];
+  const files = [];
+  const seen = new Set();
+  const appendFile = file => {
+    if (!file) return;
+    const isImageLike = /^image\//i.test(file.type || '') || isHeicFile(file);
+    if (!isImageLike) return;
+    // Deduplicate pasted images (some browsers expose the same file via items and files).
+    const stableKey = `${file.type || 'image'}:${file.size || 0}`;
+    const fallbackKey = `${file.name || 'clipboard-image'}:${file.size || 0}:${file.type || ''}:${file.lastModified || 0}`;
+    const key = file.size ? stableKey : fallbackKey;
+    if (seen.has(key) || seen.has(fallbackKey)) return;
+    seen.add(key);
+    seen.add(fallbackKey);
+    files.push(file);
+  };
+
+  Array.from(clipboard.items || []).forEach(item => {
+    if (item?.kind === 'file' && /^image\//i.test(item.type || '')) {
+      appendFile(item.getAsFile());
+    }
+  });
+  Array.from(clipboard.files || []).forEach(appendFile);
+  return files;
+}
+
+async function appendChatImageFiles({
+  files,
+  currentCount,
+  setImageProcessing,
+  setChatImages,
+  showToast
+}) {
+  const imageFiles = Array.from(files || []).filter(file => /^image\//i.test(file?.type || '') || isHeicFile(file));
+  if (imageFiles.length === 0) return { handled: false, succeeded: 0, failed: 0 };
+
+  const remainingSlots = 50 - currentCount;
+  if (remainingSlots <= 0) {
+    if (showToast) showToast('사진 최대 50장', 'error');
+    return { handled: true, succeeded: 0, failed: 0 };
+  }
+
+  const filesToProcess = imageFiles.slice(0, remainingSlots);
+  if (imageFiles.length > remainingSlots && showToast) {
+    showToast(`${remainingSlots}장만 추가됨 (최대 50장)`, 'info');
+  }
+
+  setImageProcessing({ current: 0, total: filesToProcess.length });
+  const { succeeded, failed } = await processImageFilesSequentially(
+    filesToProcess,
+    progress => setImageProcessing(progress)
+  );
+
+  if (succeeded.length > 0) {
+    setChatImages(prev => [...prev, ...succeeded]);
+  }
+  if (failed.length > 0) {
+    console.error('Image compression failed for:', failed.map(f => f.fileName));
+    if (showToast) showToast(describeImageProcessingFailures(failed), 'error', 5000);
+  } else if (succeeded.length > 0 && showToast) {
+    showToast(`${succeeded.length}장 첨부완료`, 'success', 3000);
+  }
+
+  return { handled: true, succeeded: succeeded.length, failed: failed.length };
+}
+
+function getUploadImageBlobMeta(blob, fallbackExt = 'jpg') {
+  const mime = String(blob?.type || '').toLowerCase();
+  const extByMime = {
+    'image/jpeg': 'jpg',
+    'image/jpg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+    'image/gif': 'gif',
+    'image/avif': 'avif',
+    'image/bmp': 'bmp'
+  };
+  const contentTypeByExt = {
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    png: 'image/png',
+    webp: 'image/webp',
+    gif: 'image/gif',
+    avif: 'image/avif',
+    bmp: 'image/bmp'
+  };
+  const ext = extByMime[mime] || fallbackExt || 'jpg';
+  return {
+    ext,
+    contentType: /^image\//.test(mime) ? mime : (contentTypeByExt[ext] || 'image/jpeg')
+  };
+}
+
+// Uploads a compressed chat image pair to Firebase Storage and returns download URLs, or null
+// if Storage isn't available/the upload fails -- callers should fall back to the base64 data
+// URLs already produced by compressImageToDataUrls in that case. `onBytes(taskKey, transferred,
+// total)` is called as each upload progresses so a caller can aggregate progress across a batch.
+function uploadChatImageAssets(calendarId, compressed, index, onBytes, timeoutMs = 45000) {
+  return new Promise((resolve) => {
+    const storage = getLiveFirebaseStorage();
+    if (!storage || !compressed?.originalBlob || !compressed?.thumbnailBlob) {
+      resolve(null);
+      return;
+    }
+    const stamp = Date.now();
+    const rand = Math.random().toString(36).slice(2, 8);
+    const basePath = `chatImages/${calendarId}/${stamp}_${rand}_${index}`;
+    // The byte size is embedded in the filename itself (parsed back out by
+    // getStorageUrlFileSize) so the Lightbox info panel can show it without any extra network
+    // request -- Firebase Storage's download endpoint doesn't send a CORS header by default, so
+    // a plain fetch() to read Content-Length from a different origin (like this app's GitHub
+    // Pages host) is silently blocked by the browser and would never work.
+    const originalMeta = getUploadImageBlobMeta(compressed.originalBlob, 'jpg');
+    const thumbMeta = getUploadImageBlobMeta(compressed.thumbnailBlob, originalMeta.ext === 'png' ? 'png' : 'jpg');
+    const originalRef = storage.ref(`${basePath}_original_${compressed.originalBlob.size}b.${originalMeta.ext}`);
+    const thumbRef = storage.ref(`${basePath}_thumb_${compressed.thumbnailBlob.size}b.${thumbMeta.ext}`);
+
+    // On a flaky mobile connection, a stalled upload can go silent with no error/complete event
+    // ever firing (the SDK is still waiting on a dead connection) -- without a bound here, the
+    // whole send/edit flow would hang forever with no way for the user to recover. Time out and
+    // fall back to inline base64 for that image instead.
+    const runUploadOnce = (blob, ref, taskKey, contentType) => uploadBlobWithWatchdog({
+      ref, blob, contentType, taskKey, onBytes, timeoutMs
+    });
+    // One retry before giving up -- a single failed/timed-out attempt (a brief mobile network
+    // hiccup) used to permanently drop that photo to the low-quality ~600px/48KB base64 fallback
+    // with no second chance, which is exactly what produced reports of meeting/gallery photos
+    // saved at 600x450 / ~33KB. Same fix pattern as loadScriptWithRetry in main.jsx.
+    const runUpload = async (blob, ref, taskKey, contentType) => {
+      const first = await runUploadOnce(blob, ref, taskKey, contentType);
+      if (first) return first;
+      return runUploadOnce(blob, ref, taskKey, contentType);
+    };
+
+    Promise.all([
+      runUpload(compressed.originalBlob, originalRef, `${index}-orig`, originalMeta.contentType),
+      runUpload(compressed.thumbnailBlob, thumbRef, `${index}-thumb`, thumbMeta.contentType)
+    ]).then(async ([imageUrl, thumbUrl]) => {
+      if (imageUrl && thumbUrl) resolve({ imageUrl, thumbUrl });
+      else {
+        // Treat the pair as one atomic asset: if either upload fails, remove the successful
+        // half so an orphaned original/thumbnail cannot accumulate in Storage.
+        await Promise.allSettled([
+          originalRef.delete().catch(() => {}),
+          thumbRef.delete().catch(() => {})
+        ]);
+        console.warn('Chat image Storage upload failed (no base64 fallback)');
+        resolve(null);
+      }
+    });
+  });
+}
+
+async function dataUrlToBlob(dataUrl) {
+  if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) return null;
+  const match = dataUrl.match(/^data:([^;,]+)?(;base64)?,(.*)$/);
+  if (!match) return null;
+  const mimeType = match[1] || 'application/octet-stream';
+  const isBase64 = Boolean(match[2]);
+  const payload = match[3] || '';
+  try {
+    if (isBase64) {
+      const binary = atob(payload);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+      return new Blob([bytes], { type: mimeType });
+    }
+    return new Blob([decodeURIComponent(payload)], { type: mimeType });
+  } catch (err) {
+    console.warn('dataUrlToBlob failed:', err);
+    return null;
+  }
+}
+
+async function uploadInlineChatImageToStorage(calendarId, imageUrl, thumbUrl, index = 0, onBytes, timeoutMs = 45000) {
+  if (!(getLiveFirebaseStorage() || await ensureFirebaseStorageReady())) return null;
+  if (onBytes) onBytes(`${index}-prepare`, 1, 10);
+  const originalBlob = await dataUrlToBlob(imageUrl);
+  if (onBytes) onBytes(`${index}-prepare`, 5, 10);
+  const thumbnailBlob = await dataUrlToBlob(thumbUrl && thumbUrl.startsWith('data:') ? thumbUrl : imageUrl);
+  if (onBytes) onBytes(`${index}-prepare`, 10, 10);
+  if (!originalBlob || !thumbnailBlob) return null;
+  return uploadChatImageAssets(calendarId, {
+    original: imageUrl,
+    thumbnail: thumbUrl || imageUrl,
+    originalBlob,
+    thumbnailBlob
+  }, `share_${index}`, onBytes, timeoutMs);
+}
+
+async function readClipboardImageFiles(showToast) {
+  if (typeof navigator === 'undefined' || !navigator.clipboard) {
+    if (typeof showToast === 'function') showToast('클립보드 접근을 지원하지 않는 브라우저입니다.', 'error');
+    return [];
+  }
+  try {
+    const files = [];
+    if (typeof navigator.clipboard.read === 'function') {
+      // Some mobile browsers (notably Android Chrome when Permissions-Policy silently withholds
+      // clipboard-read for this context) neither resolve nor reject this promise -- they just
+      // hang forever with no error and no data. Without a bound, that reads to the user as the
+      // 붙여넣기 button doing literally nothing when pressed (no toast, no preview, no error).
+      // Bounding it guarantees the catch block's error toast fires within a few seconds either
+      // way, so a press always produces some visible reaction.
+      const items = await withTimeout(navigator.clipboard.read(), 5000, 'clipboard read timed out');
+      for (const item of items) {
+        for (const type of item.types) {
+          if (type.startsWith('image/')) {
+            const blob = await item.getType(type);
+            const ext = type.split('/')[1] || 'png';
+            const file = new File([blob], `paste_${Date.now()}.${ext}`, { type });
+            files.push(file);
+          }
+        }
+      }
+    }
+    if (files.length === 0) {
+      if (typeof showToast === 'function') showToast('클립보드에 이미지가 없습니다.', 'info');
+    }
+    return files;
+  } catch (err) {
+    console.warn('readClipboardImageFiles failed:', err);
+    if (typeof showToast === 'function') showToast('클립보드 이미지를 읽을 수 없거나 접근 권한이 없습니다.', 'error');
+    return [];
+  }
+}
+
 export {
   loadHeicTo, loadHeic2any, sniffImageFormat, withCorrectedImageFile, isHeicFile, loadImageElement, resetHeicToLoader, resetHeic2anyLoader,
   compressImageToDataUrls, buildMetadataTags, buildBase64FallbackFromCompressed, revokeCompressedObjectUrls,
-  imagePreprocessCache, getImagePreprocessCacheKey, rememberPreprocessedImage, forgetPreprocessedImages
+  imagePreprocessCache, getImagePreprocessCacheKey, rememberPreprocessedImage, forgetPreprocessedImages,
+  acquireMediaUploadWakeLock, releaseMediaUploadWakeLock, processImageFilesSequentially, chunkResolvedImagesForMessages,
+  describeImageProcessingFailures, getImageFilesFromClipboardEvent, appendChatImageFiles, getUploadImageBlobMeta,
+  uploadChatImageAssets, uploadInlineChatImageToStorage, readClipboardImageFiles
 };
