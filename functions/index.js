@@ -1856,6 +1856,143 @@ exports.memePoolDelete = functions.https.onRequest(async (req, res) => {
   }
 });
 
+// Admin 데이터풀 > 사진 "미태그만 보기" 일괄 처리. photoIndex is a per-calendar subcollection
+// (calendars/cal_{id}/photoIndex) with client writes denied (see its firestore.rules comment),
+// so listing/tagging across EVERY calendar at once has to go through an admin-gated Cloud
+// Function using the Admin SDK, same trust model as memePoolUpsert above. A collectionGroup
+// query needs its own composite/field-override index (see firestore.indexes.json) since
+// automatic single-field indexes only cover collection-scoped queries, not collection-group ones.
+const CALENDAR_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+const PHOTO_ASSET_KEY_RE = /^asset:v1:[A-Za-z0-9-]{1,80}$/;
+
+exports.listUntaggedPhotoIndexEntries = functions.https.onRequest(async (req, res) => {
+  setAdminCorsHeaders(res);
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  if (req.method !== 'POST') { res.status(405).json({ ok: false }); return; }
+  const { password, cursor, limit } = req.body || {};
+  if (typeof password !== 'string' || !password.trim()) { res.status(400).json({ ok: false }); return; }
+  const rateState = await checkAdminAuthRateLimit(req.ip);
+  if (rateState.blocked) { res.status(429).json({ ok: false }); return; }
+  const matches = sha256Hex(password.trim()) === await getStoredAdminPasswordHash();
+  await recordAdminAuthResult(rateState, matches);
+  if (!matches) { res.status(401).json({ ok: false }); return; }
+  try {
+    const pageSize = Math.min(200, Math.max(1, Number(limit) || 60));
+    let query = admin.firestore().collectionGroup('photoIndex')
+      .where('tags', '==', '')
+      .orderBy('updatedAt', 'desc')
+      .limit(pageSize);
+    if (typeof cursor === 'number' && Number.isFinite(cursor)) query = query.startAfter(cursor);
+    const snap = await query.get();
+    const items = snap.docs.map(doc => {
+      const data = doc.data() || {};
+      // Parent chain is calendars/cal_{calendarId}/photoIndex/{assetKey}.
+      const calendarDocId = doc.ref.parent.parent ? doc.ref.parent.parent.id : '';
+      const calendarId = calendarDocId.startsWith('cal_') ? calendarDocId.slice(4) : calendarDocId;
+      return {
+        calendarId,
+        assetKey: doc.id,
+        thumb: String(data.thumb || data.full || ''),
+        full: String(data.full || data.thumb || ''),
+        text: String(data.text || ''),
+        source: String(data.source || ''),
+        updatedAt: Number(data.updatedAt) || 0
+      };
+    }).filter(item => item.calendarId && item.thumb);
+    const nextCursor = snap.docs.length === pageSize ? Number(snap.docs[snap.docs.length - 1].data()?.updatedAt) || null : null;
+    res.status(200).json({ ok: true, items, nextCursor });
+  } catch (err) {
+    console.error('listUntaggedPhotoIndexEntries failed:', err);
+    res.status(500).json({ ok: false });
+  }
+});
+
+// Writes one tag string back onto whichever document actually owns this photo (a chat/gallery
+// message's imageTags[index], a memo's imageTags[index], a directMediaTags[key] entry, or a
+// confirmedMeeting's photos[index].tags) -- mirrors handleSaveImageTags's routing in app-main.js,
+// just server-side so it can act on any calendar regardless of who's logged into it.
+async function applyPhotoIndexTagWrite(calendarId, assetKey, tags) {
+  const db = admin.firestore();
+  const calendarDocId = `cal_${calendarId}`;
+  const indexRef = db.collection('calendars').doc(calendarDocId).collection('photoIndex').doc(assetKey);
+  const indexSnap = await indexRef.get();
+  if (!indexSnap.exists) return { ok: false, reason: 'not-found' };
+  const indexData = indexSnap.data() || {};
+  const sourceOwner = String(indexData.sourceOwner || '');
+  const match = sourceOwner.match(/^(message|memo|meeting):(.+):(\d+)$/);
+  if (!match) return { ok: false, reason: 'unroutable' };
+  const [, sourceType, sourceId, imageIndexStr] = match;
+  const imageIndex = Number(imageIndexStr);
+  const cleanTags = String(tags || '').trim().slice(0, 160);
+
+  if (sourceType === 'meeting') {
+    const meetingRef = db.collection('calendars').doc(calendarDocId).collection('confirmedMeetings').doc(sourceId);
+    await db.runTransaction(async tx => {
+      const snap = await tx.get(meetingRef);
+      if (!snap.exists) return;
+      const data = snap.data() || {};
+      const photos = Array.isArray(data.photos) ? data.photos.slice() : [];
+      const target = photos.findIndex((p, i) => (Number.isInteger(p?.index) ? p.index : i) === imageIndex);
+      if (target < 0) return;
+      photos[target] = { ...photos[target], tags: cleanTags };
+      tx.update(meetingRef, { photos });
+    });
+    return { ok: true };
+  }
+
+  const collectionName = sourceType === 'memo' ? 'memos' : 'messages';
+  const docRef = db.collection('calendars').doc(calendarDocId).collection(collectionName).doc(sourceId);
+  await db.runTransaction(async tx => {
+    const snap = await tx.get(docRef);
+    if (!snap.exists) return;
+    const data = snap.data() || {};
+    if (indexData.directMediaUrl) {
+      const tagKey = getDirectMediaTagKeyForIndex(indexData.directMediaUrl);
+      const directMediaTags = (data.directMediaTags && typeof data.directMediaTags === 'object' && !Array.isArray(data.directMediaTags))
+        ? { ...data.directMediaTags } : {};
+      directMediaTags[tagKey] = cleanTags;
+      tx.update(docRef, { directMediaTags });
+      return;
+    }
+    const imageTags = Array.isArray(data.imageTags) ? data.imageTags.slice() : [];
+    while (imageTags.length <= imageIndex) imageTags.push('');
+    imageTags[imageIndex] = cleanTags;
+    tx.update(docRef, { imageTags });
+  });
+  return { ok: true };
+}
+
+exports.adminBulkTagPhotos = functions.https.onRequest(async (req, res) => {
+  setAdminCorsHeaders(res);
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  if (req.method !== 'POST') { res.status(405).json({ ok: false }); return; }
+  const { password, entries } = req.body || {};
+  if (typeof password !== 'string' || !password.trim()) { res.status(400).json({ ok: false }); return; }
+  if (!Array.isArray(entries) || entries.length === 0 || entries.length > 100) { res.status(400).json({ ok: false, message: 'invalid entries' }); return; }
+  const rateState = await checkAdminAuthRateLimit(req.ip);
+  if (rateState.blocked) { res.status(429).json({ ok: false }); return; }
+  const matches = sha256Hex(password.trim()) === await getStoredAdminPasswordHash();
+  await recordAdminAuthResult(rateState, matches);
+  if (!matches) { res.status(401).json({ ok: false }); return; }
+  const results = [];
+  for (const entry of entries) {
+    const calendarId = String(entry?.calendarId || '');
+    const assetKey = String(entry?.assetKey || '');
+    if (!CALENDAR_ID_RE.test(calendarId) || !PHOTO_ASSET_KEY_RE.test(assetKey)) {
+      results.push({ calendarId, assetKey, ok: false, reason: 'invalid' });
+      continue;
+    }
+    try {
+      const outcome = await applyPhotoIndexTagWrite(calendarId, assetKey, entry?.tags);
+      results.push({ calendarId, assetKey, ...outcome });
+    } catch (err) {
+      console.error('applyPhotoIndexTagWrite failed:', err);
+      results.push({ calendarId, assetKey, ok: false, reason: 'error' });
+    }
+  }
+  res.status(200).json({ ok: true, results });
+});
+
 // Admin-only aggregate health view for Web Push subscriptions. Endpoints and encryption keys
 // are never returned; this is intentionally a diagnostic summary to explain missed pushes and
 // bound fan-out costs without exposing credentials.
