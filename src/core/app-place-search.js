@@ -18,6 +18,17 @@ import {
 const PLACE_SEARCH_PROVIDER_KEY = 'gather_place_search_provider_v1';
 const NOMINATIM_ENDPOINT_KEY = 'gather_nominatim_endpoint_v1';
 const DEFAULT_PROVIDER_ORDER = ['kakao', 'google', 'nominatim'];
+
+// Kakao's category_group_code covers 15 fixed groups; only these have an obvious match to this
+// app's six place categories (식당/카페/놀이/숙박/쇼핑/기타) -- everything else (학교, 주차장, 지하철역
+// 등) falls back to 기타 rather than guessing.
+const KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY = {
+  FD6: 'restaurant', // 음식점
+  CE7: 'cafe',        // 카페
+  AD5: 'lodging',      // 숙박
+  AT4: 'play',         // 관광명소
+  MT1: 'shopping'      // 대형마트
+};
 const NOMINATIM_MIN_INTERVAL_MS = 1100;
 const REQUEST_TIMEOUT_MS = 4500;
 const TOUR_TYPE_LABELS = {
@@ -68,6 +79,23 @@ function fetchWithTimeout(url, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timer));
+}
+
+// Caps how long any single search tier (Kakao/Google Places/Nominatim) is allowed to hang before
+// PlaceRegisterModal.handleSearch gives up on it and moves to the next fallback -- googlePlacesSearchProxy
+// in particular is a 1st-gen Cloud Function that's called rarely (only when Kakao comes up empty),
+// so a cold start there can otherwise stall the whole 3-tier chain far longer than any one search
+// step should reasonably take. Distinct from this file's own fetchWithTimeout above (different
+// signature: no options param) -- kept separate rather than merged since callers pass args
+// positionally and a merge would silently break one side's timeoutMs into the other's options.
+async function searchTierFetchWithTimeout(url, timeoutMs) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 function cached(key) {
@@ -322,5 +350,7 @@ export {
   searchTourInfo,
   groupTourItemsByType,
   getTourApiUrl,
-  reverseGeocodeCoords
+  reverseGeocodeCoords,
+  KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY,
+  searchTierFetchWithTimeout as fetchWithTimeout
 };
