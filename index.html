@@ -5,7 +5,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="build-sha" content="ef4b917410c6d42a0d5f786c201028b214330490" />
+    <meta name="build-sha" content="af0dac08aa794f626fef94e1bb41d9a498528c8d" />
     <title>모여라 캘린더</title>
     <!-- PWA manifest + icons. Previously present only in the legacy root index.html (not the
          Vite entry actually served by dist/), so the deployed site never linked a manifest at
@@ -28,9 +28,21 @@
       // viewing ?id=kkot or ?id=cw launches back into that same calendar -- manifest.json's own
       // start_url has no query string, so without this every installed shortcut would silently
       // open the default calendar regardless of which one was on screen at install time.
+      //
+      // Must also recognize the /share/{calId}/... slash-path format (getCalendarShareUrl in
+      // app-utils.js) -- that is the actual URL this app hands out for its own "공유하기"
+      // link/KakaoTalk share feature, so most first-time visitors (and thus most "Add to Home
+      // Screen" taps) arrive via that path, not a ?id= query string. Missing this meant every
+      // shared-link visitor who added the app to their home screen got the generic
+      // manifest.json (start_url "./", no calendar id baked in) -- the installed icon then
+      // opened with no calendar id at all ("캘린더를 찾을 수 없음").
       (function () {
         var params = new URLSearchParams(window.location.search);
         var id = params.get('id') || params.get('cal');
+        if (!id) {
+          var shareMatch = window.location.pathname.match(/\/share\/([A-Za-z0-9_-]+)/);
+          if (shareMatch) id = shareMatch[1];
+        }
         var manifestByCalendar = { kkot: 'manifest-kkot.json', cw: 'manifest-cw.json', jhair: 'manifest-jhair.json' };
         if (id && manifestByCalendar[id]) {
           var link = document.querySelector('link[rel="manifest"]');
