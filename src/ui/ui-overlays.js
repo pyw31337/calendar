@@ -360,11 +360,18 @@ class AppErrorBoundary extends ReactComponentBase {
   componentDidCatch(error, errorInfo) {
     console.error('Uncaught UI Error captured by AppErrorBoundary:', error, errorInfo);
     if (isUnrecoverableFirestoreError(error) && typeof window !== 'undefined' && typeof window.sessionStorage !== 'undefined') {
-      // Guards against a reload loop if the corrupted state somehow survives the reload (e.g. a
-      // network-level issue reproducing the same SDK error immediately) -- auto-reload fires at
-      // most once per browser tab session, then falls back to the manual buttons below.
+      // Guards against a tight reload loop if the corrupted state somehow survives the reload
+      // (e.g. a network-level issue reproducing the same SDK error immediately) -- but a real,
+      // long-lived session (an iOS home-screen PWA backgrounded/foregrounded repeatedly) can hit
+      // this SDK-internal corruption more than once hours apart, and each occurrence deserves its
+      // own auto-reload rather than only the first ever getting one and every later one in the
+      // same tab falling through to the manual buttons forever. A cooldown window, not a
+      // once-per-tab-session flag, tells the two cases apart: reload immediately unless the last
+      // auto-reload from this cause was within the last minute.
       const guardKey = 'gather_firestore_assertion_reload';
-      if (!window.sessionStorage.getItem(guardKey)) {
+      const RELOAD_COOLDOWN_MS = 60000;
+      const lastReloadAt = Number(window.sessionStorage.getItem(guardKey) || 0);
+      if (!lastReloadAt || Date.now() - lastReloadAt > RELOAD_COOLDOWN_MS) {
         window.sessionStorage.setItem(guardKey, String(Date.now()));
         window.location.reload();
       }
