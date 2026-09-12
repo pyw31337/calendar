@@ -5,7 +5,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="build-sha" content="603356a859323fc64f94030edcf6912d89bbadb7" />
+    <meta name="build-sha" content="dea272e5baac60877ee2f2373aa9e239d6c76b9b" />
     <title>모여라 캘린더</title>
     <!-- PWA manifest + icons. Previously present only in the legacy root index.html (not the
          Vite entry actually served by dist/), so the deployed site never linked a manifest at
@@ -36,6 +36,14 @@
       // shared-link visitor who added the app to their home screen got the generic
       // manifest.json (start_url "./", no calendar id baked in) -- the installed icon then
       // opened with no calendar id at all ("캘린더를 찾을 수 없음").
+      //
+      // Also sets apple-mobile-web-app-title/document.title synchronously here, not only from
+      // app-main.js's activeCal effect (which waits for activeCalLoaded, i.e. real Firestore data
+      // to arrive). iOS Safari's "홈 화면에 추가" reads apple-mobile-web-app-title at the moment
+      // the share sheet opens, not the manifest -- if that tap lands before Firestore data has
+      // loaded (the common case: opening a fresh share link and immediately adding it), the tag
+      // was still stuck on the generic "모여라 캘린더" default, so every installed icon showed
+      // that instead of the calendar's own name regardless of which calendar was open.
       (function () {
         var params = new URLSearchParams(window.location.search);
         var id = params.get('id') || params.get('cal');
@@ -44,9 +52,15 @@
           if (shareMatch) id = shareMatch[1];
         }
         var manifestByCalendar = { kkot: 'manifest-kkot.json', cw: 'manifest-cw.json', jhair: 'manifest-jhair.json' };
+        var titleByCalendar = { kkot: '꽃잎반', cw: '모아엘가', jhair: '제이헤어' };
         if (id && manifestByCalendar[id]) {
           var link = document.querySelector('link[rel="manifest"]');
           if (link) link.setAttribute('href', manifestByCalendar[id]);
+        }
+        if (id && titleByCalendar[id]) {
+          var appleTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]');
+          if (appleTitle) appleTitle.setAttribute('content', titleByCalendar[id]);
+          document.title = titleByCalendar[id] + ' 캘린더';
         }
       })();
     </script>
@@ -74,12 +88,12 @@
          visitor, that no longer holds up Firebase SDK loading or anything else. -->
     <script async src="https://cdn.jsdelivr.net/npm/korean-lunar-calendar/dist/korean-lunar-calendar.min.js"></script>
     <script async src="https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode.js"></script>
-    <script type="module" crossorigin src="/calendar/assets/index-t9GLJcFj.js"></script>
+    <script type="module" crossorigin src="/calendar/assets/index-DBkzztwt.js"></script>
     <link rel="modulepreload" crossorigin href="/calendar/assets/rolldown-runtime-D1y7pCx4.js">
     <link rel="modulepreload" crossorigin href="/calendar/assets/vendor-react-DfXFE28X.js">
-    <link rel="modulepreload" crossorigin href="/calendar/assets/index-t9GLJcFj.js">
-    <link rel="modulepreload" crossorigin href="/calendar/assets/vendor-BCWtHAan.js">
-    <link rel="modulepreload" crossorigin href="/calendar/assets/vendor-react-dom-CmPPLwpy.js">
+    <link rel="modulepreload" crossorigin href="/calendar/assets/index-DBkzztwt.js">
+    <link rel="modulepreload" crossorigin href="/calendar/assets/vendor-D0kvxrdG.js">
+    <link rel="modulepreload" crossorigin href="/calendar/assets/vendor-react-dom-CeZxTPLO.js">
     <link rel="stylesheet" crossorigin href="/calendar/assets/index-BLSCkYnf.css">
   </head>
   <body>
