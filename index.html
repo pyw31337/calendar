@@ -5,7 +5,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="build-sha" content="0589814377f44c46c0198d3e73a928bf5787dac9" />
+    <meta name="build-sha" content="6acce4a8ea38b0254dbaa7e2cc5ae289932ddb1c" />
     <title>모여라 캘린더</title>
     <!-- PWA manifest + icons. Previously present only in the legacy root index.html (not the
          Vite entry actually served by dist/), so the deployed site never linked a manifest at
@@ -62,7 +62,10 @@
         if (id && titleByCalendar[id]) {
           var appleTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]');
           if (appleTitle) appleTitle.setAttribute('content', titleByCalendar[id]);
-          document.title = titleByCalendar[id] + ' 캘린더';
+          // No " 캘린더" suffix -- iOS's "홈 화면에 추가" pre-fills its editable name field from
+          // document.title, and whatever is in that field at "추가" time becomes the installed
+          // icon's permanent label (see the matching note in app-main.js's activeCal effect).
+          document.title = titleByCalendar[id];
         }
       })();
     </script>
@@ -90,12 +93,12 @@
          visitor, that no longer holds up Firebase SDK loading or anything else. -->
     <script async src="https://cdn.jsdelivr.net/npm/korean-lunar-calendar/dist/korean-lunar-calendar.min.js"></script>
     <script async src="https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode.js"></script>
-    <script type="module" crossorigin src="/calendar/assets/index-BToXD_nx.js"></script>
+    <script type="module" crossorigin src="/calendar/assets/index-CCCnWvem.js"></script>
     <link rel="modulepreload" crossorigin href="/calendar/assets/rolldown-runtime-D1y7pCx4.js">
     <link rel="modulepreload" crossorigin href="/calendar/assets/vendor-react-DfXFE28X.js">
-    <link rel="modulepreload" crossorigin href="/calendar/assets/index-BToXD_nx.js">
-    <link rel="modulepreload" crossorigin href="/calendar/assets/vendor-CbuBVFau.js">
-    <link rel="modulepreload" crossorigin href="/calendar/assets/vendor-react-dom-B2N_rl-v.js">
+    <link rel="modulepreload" crossorigin href="/calendar/assets/index-CCCnWvem.js">
+    <link rel="modulepreload" crossorigin href="/calendar/assets/vendor-DQguDC-O.js">
+    <link rel="modulepreload" crossorigin href="/calendar/assets/vendor-react-dom-5lS-hLwI.js">
     <link rel="stylesheet" crossorigin href="/calendar/assets/index-BLSCkYnf.css">
   </head>
   <body>
