@@ -5,6 +5,15 @@
  * is used instead of localStorage because writes can contain structured calendar payloads and
  * must survive a mobile tab being suspended without blocking the main thread.
  */
+import { replayQueuedRootCollectionWrite, replayQueuedMemoSave, replayQueuedMediaMessage } from './app-media-outbox.js';
+import {
+  writeRootCollectionDocumentWithFallback,
+  writeCollectionDocumentWithFallback,
+  persistCalendarAuxiliaryData,
+  pushSingleCloudCalendar
+} from './app-firebase-data.js';
+import { resolveMemoImageBatch, resolveChatImageBatch, chunkResolvedImagesForMessages } from './app-image-pipeline.js';
+
 const DB_NAME = 'gather-calendar-write-queue';
 const DB_VERSION = 2;
 const STORE_NAME = 'operations';
@@ -261,4 +270,59 @@ export async function flushWriteQueue(handler) {
 
 export async function getPendingWriteCount() {
   return (await getAllOperations()).length;
+}
+
+export function shouldQueueCalendarWriteFailure(error) {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return true;
+  const message = String(error?.message || error || '').toLowerCase();
+  return /timeout|network|fetch|offline|연결|상태를 확인/.test(message);
+}
+
+export async function replayQueuedCalendarWrite(operation) {
+  if (operation?.type === 'root-collection-write' && operation.payload) return replayQueuedRootCollectionWrite(operation, { writeDocument: (collectionName, docId, data, label, options) => writeRootCollectionDocumentWithFallback(collectionName, docId, data, label, { ...options, skipQueue: true }) });
+  if (operation?.type === 'media-memo-save' && operation.payload) {
+    return replayQueuedMemoSave(operation, {
+      resolveImages: resolveMemoImageBatch,
+      writeMemo: (calendarId, memoId, data) => writeCollectionDocumentWithFallback('memos', calendarId, memoId, data, 'set', '메모 사진 대기 저장', { skipQueue: true })
+    });
+  }
+  if (operation?.type === 'media-chat-send' && operation.payload) {
+    return replayQueuedMediaMessage(operation, {
+      resolveImages: resolveChatImageBatch,
+      chunkImages: chunkResolvedImagesForMessages,
+      writeMessage: (calendarId, data, documentId) => writeCollectionDocumentWithFallback('messages', calendarId, '', data, 'add', '사진 대기 저장', { documentId, skipQueue: true })
+    });
+  }
+  if (operation?.type === 'collection-write' && operation.payload) {
+    const payload = operation.payload;
+    const result = await writeCollectionDocumentWithFallback(
+      payload.collectionName,
+      operation.calendarId,
+      payload.docId || '',
+      payload.data,
+      payload.method || 'update',
+      payload.warnLabel || '대기 저장',
+      { deletePaths: payload.deletePaths || [], skipQueue: true }
+    );
+    return Boolean(result?.success);
+  }
+  if (operation?.type === 'calendar-auxiliary-sync' && operation.payload) {
+    return persistCalendarAuxiliaryData(
+      operation.calendarId,
+      Array.isArray(operation.payload.places) ? operation.payload.places : [],
+      Array.isArray(operation.payload.meetings) ? operation.payload.meetings : []
+    );
+  }
+  if (operation?.type !== 'calendar-snapshot' || !operation.payload?.calendar) return false;
+  const payload = operation.payload;
+  const result = await pushSingleCloudCalendar(
+    payload.calendar,
+    payload.lastModified,
+    4,
+    null,
+    payload.saveMode || 'availability',
+    Array.isArray(payload.newActivityLogs) ? payload.newActivityLogs : [],
+    payload.auxiliaryData || {}
+  );
+  return Boolean(result?.ok);
 }

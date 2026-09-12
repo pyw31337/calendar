@@ -289,7 +289,6 @@ import {
   fetchCustomCultureItemsRest,
   fetchMemePoolRest,
   writeCollectionDocumentWithFallback,
-  writeRootCollectionDocumentWithFallback,
   deleteMessageRest,
   fetchMessageRest,
   fetchSingleCloudCalendar,
@@ -306,7 +305,6 @@ import {
   mergeConfirmedMeetings,
   describeUpdateCalendarsFailure,
   pushSingleCloudCalendar,
-  persistCalendarAuxiliaryData,
   loadLocalMeta,
   saveLocalMeta,
   getMetaLastModified,
@@ -332,8 +330,7 @@ import {
   buildAdminDashboardMetrics,
   getCalendarAccentColor
 } from './app-firebase-data.js';
-import { enqueueWriteOperation, flushWriteQueue } from './app-write-queue.js';
-import { replayQueuedMediaMessage, replayQueuedMemoSave, replayQueuedRootCollectionWrite } from './app-media-outbox.js';
+import { enqueueWriteOperation, flushWriteQueue, shouldQueueCalendarWriteFailure, replayQueuedCalendarWrite } from './app-write-queue.js';
 import { useAppFeedbackState } from './app-feedback-state.js';
 // window.GATHER_APP_FIREBASE_DATA was never assigned anywhere in this codebase -- these two
 // vars were a permanently-null dead snapshot from module-eval time onward, which meant every
@@ -352,59 +349,6 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
   window.addEventListener('gather-firebase-state-change', () => {
     if (window.__gatherFirebaseDb) firebaseDb = window.__gatherFirebaseDb;
   });
-}
-function shouldQueueCalendarWriteFailure(error) {
-  if (typeof navigator !== 'undefined' && navigator.onLine === false) return true;
-  const message = String(error?.message || error || '').toLowerCase();
-  return /timeout|network|fetch|offline|연결|상태를 확인/.test(message);
-}
-async function replayQueuedCalendarWrite(operation) {
-  if (operation?.type === 'root-collection-write' && operation.payload) return replayQueuedRootCollectionWrite(operation, { writeDocument: (collectionName, docId, data, label, options) => writeRootCollectionDocumentWithFallback(collectionName, docId, data, label, { ...options, skipQueue: true }) });
-  if (operation?.type === 'media-memo-save' && operation.payload) {
-    return replayQueuedMemoSave(operation, {
-      resolveImages: resolveMemoImageBatch,
-      writeMemo: (calendarId, memoId, data) => writeCollectionDocumentWithFallback('memos', calendarId, memoId, data, 'set', '메모 사진 대기 저장', { skipQueue: true })
-    });
-  }
-  if (operation?.type === 'media-chat-send' && operation.payload) {
-    return replayQueuedMediaMessage(operation, {
-      resolveImages: resolveChatImageBatch,
-      chunkImages: chunkResolvedImagesForMessages,
-      writeMessage: (calendarId, data, documentId) => writeCollectionDocumentWithFallback('messages', calendarId, '', data, 'add', '사진 대기 저장', { documentId, skipQueue: true })
-    });
-  }
-  if (operation?.type === 'collection-write' && operation.payload) {
-    const payload = operation.payload;
-    const result = await writeCollectionDocumentWithFallback(
-      payload.collectionName,
-      operation.calendarId,
-      payload.docId || '',
-      payload.data,
-      payload.method || 'update',
-      payload.warnLabel || '대기 저장',
-      { deletePaths: payload.deletePaths || [], skipQueue: true }
-    );
-    return Boolean(result?.success);
-  }
-  if (operation?.type === 'calendar-auxiliary-sync' && operation.payload) {
-    return persistCalendarAuxiliaryData(
-      operation.calendarId,
-      Array.isArray(operation.payload.places) ? operation.payload.places : [],
-      Array.isArray(operation.payload.meetings) ? operation.payload.meetings : []
-    );
-  }
-  if (operation?.type !== 'calendar-snapshot' || !operation.payload?.calendar) return false;
-  const payload = operation.payload;
-  const result = await pushSingleCloudCalendar(
-    payload.calendar,
-    payload.lastModified,
-    4,
-    null,
-    payload.saveMode || 'availability',
-    Array.isArray(payload.newActivityLogs) ? payload.newActivityLogs : [],
-    payload.auxiliaryData || {}
-  );
-  return Boolean(result?.ok);
 }
 const {
   AdminDashboard, AdminModal, AdminUnifiedSearchResultsView, AdminCreateCalendarModal,
