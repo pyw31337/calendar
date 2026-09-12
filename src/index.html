@@ -14,7 +14,6 @@
          reach dist/. No beforeinstallprompt capture script here on purpose: this app has no
          custom install-prompt UI (see PR #236), so Chromium's own default install affordance
          (address-bar icon / mini-infobar) is left to handle itself undisturbed. -->
-    <link rel="manifest" href="manifest.json" />
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
     <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
     <link rel="icon" href="favicon.ico" />
@@ -24,26 +23,28 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="모여라 캘린더" />
     <script>
-      // Points the manifest at a per-calendar variant (start_url baked in) so installing while
-      // viewing ?id=kkot or ?id=cw launches back into that same calendar -- manifest.json's own
-      // start_url has no query string, so without this every installed shortcut would silently
-      // open the default calendar regardless of which one was on screen at install time.
+      // The <link rel="manifest"> tag is created here, in JS, instead of sitting in the HTML
+      // source and having its href mutated afterward (the previous approach). That mutation
+      // approach measurably failed on a real device: even after confirming the page had fully
+      // loaded real per-calendar data and the DOM's manifest link's href correctly read
+      // "manifest-cw.json", "홈 화면에 추가" still showed the generic name and a bare URL with no
+      // id. The most consistent explanation is WebKit eagerly resolving/caching the manifest
+      // tied to whatever href the <link> element had at the moment it was first inserted into
+      // the DOM (here, that always used to be the static "manifest.json" in the HTML source),
+      // and continuing to use that cached read for "Add to Home Screen" regardless of a later
+      // href mutation on the same element. Creating and inserting the element only once the
+      // correct per-calendar href is already known removes that wrong initial value entirely --
+      // there is no window where a <link rel="manifest"> with the generic href ever exists in
+      // the DOM for a calendar-scoped visit.
       //
-      // Must also recognize the /share/{calId}/... slash-path format (getCalendarShareUrl in
-      // app-utils.js) -- that is the actual URL this app hands out for its own "공유하기"
-      // link/KakaoTalk share feature, so most first-time visitors (and thus most "Add to Home
-      // Screen" taps) arrive via that path, not a ?id= query string. Missing this meant every
-      // shared-link visitor who added the app to their home screen got the generic
-      // manifest.json (start_url "./", no calendar id baked in) -- the installed icon then
-      // opened with no calendar id at all ("캘린더를 찾을 수 없음").
+      // Recognizes both the ?id=/?cal= query-string format and the /share/{calId}/... slash-path
+      // format (getCalendarShareUrl in app-utils.js) -- the latter is what this app's own
+      // "공유하기"/KakaoTalk share feature hands out, so most first-time visitors arrive via that
+      // path, not a ?id= query string.
       //
-      // Also sets apple-mobile-web-app-title/document.title synchronously here, not only from
-      // app-main.js's activeCal effect (which waits for activeCalLoaded, i.e. real Firestore data
-      // to arrive). iOS Safari's "홈 화면에 추가" reads apple-mobile-web-app-title at the moment
-      // the share sheet opens, not the manifest -- if that tap lands before Firestore data has
-      // loaded (the common case: opening a fresh share link and immediately adding it), the tag
-      // was still stuck on the generic "모여라 캘린더" default, so every installed icon showed
-      // that instead of the calendar's own name regardless of which calendar was open.
+      // apple-mobile-web-app-title/document.title are also set here, synchronously, rather than
+      // only from app-main.js's activeCal effect (which waits for real Firestore data to load) --
+      // iOS reads apple-mobile-web-app-title at the moment the share sheet opens.
       (function () {
         var params = new URLSearchParams(window.location.search);
         var id = params.get('id') || params.get('cal');
@@ -53,10 +54,11 @@
         }
         var manifestByCalendar = { kkot: 'manifest-kkot.json', cw: 'manifest-cw.json', jhair: 'manifest-jhair.json' };
         var titleByCalendar = { kkot: '꽃잎반', cw: '모아엘가', jhair: '제이헤어' };
-        if (id && manifestByCalendar[id]) {
-          var link = document.querySelector('link[rel="manifest"]');
-          if (link) link.setAttribute('href', manifestByCalendar[id]);
-        }
+        var manifestHref = (id && manifestByCalendar[id]) || 'manifest.json';
+        var link = document.createElement('link');
+        link.setAttribute('rel', 'manifest');
+        link.setAttribute('href', manifestHref);
+        document.head.appendChild(link);
         if (id && titleByCalendar[id]) {
           var appleTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]');
           if (appleTitle) appleTitle.setAttribute('content', titleByCalendar[id]);

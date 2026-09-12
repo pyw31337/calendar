@@ -27,7 +27,6 @@
   <meta name="twitter:image" content="https://pyw31337.github.io/calendar/og-thumb.jpg?v=20260804">
 
   <!-- Home screen / desktop shortcut icon + PWA manifest -->
-  <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="icon" href="favicon.ico">
@@ -38,25 +37,25 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="모여라 캘린더">
   <script id="pwa-manifest-switch">
-    // Point the manifest at a per-calendar variant (start_url baked in) so that installing
-    // the app while viewing ?id=kkot or ?id=cw launches back into that same calendar --
-    // manifest.json's own start_url has no query string, so without this every installed
-    // shortcut would silently open kkot regardless of which calendar was on screen at
-    // install time. Kept as a standalone inline script (not part of the main app bundle)
-    // so it still runs even if the app script itself fails to load.
+    // The <link rel="manifest"> tag is created here, in JS, instead of sitting in the HTML
+    // source with a generic href that later gets mutated (the previous approach, mirrored from
+    // src/index.html). That mutation approach measurably failed on a real device -- confirmed
+    // the page had fully loaded real per-calendar data and the DOM's manifest link's href
+    // correctly read "manifest-cw.json", yet "홈 화면에 추가" still showed the generic name and
+    // a bare URL with no id. The most consistent explanation is WebKit eagerly resolving/
+    // caching the manifest tied to whatever href the <link> element had at the moment it was
+    // first inserted into the DOM (previously always the static generic href in the HTML
+    // source), and continuing to use that cached read for "Add to Home Screen" regardless of a
+    // later href mutation on the same element. Creating and inserting the element only once the
+    // correct per-calendar href is already known removes that wrong initial value entirely.
     //
-    // Must also recognize the /share/{calId}/... slash-path format (getCalendarShareUrl in
-    // app-utils.js) -- that is the actual URL this app hands out for its own "공유하기"
-    // link/KakaoTalk share feature, so most first-time visits (and thus most "Add to Home
-    // Screen" taps) arrive via that path, not a ?id= query string. Missing this meant every
-    // shared-link visitor who added the app to their home screen got the generic
-    // manifest.json (start_url "./", no calendar id baked in) -- the installed icon then
-    // opened with no calendar id at all, surfacing as "캘린더를 찾을 수 없음"/캘린더가
-    // 저장되지 않는 것처럼 보이는 문제.
+    // Recognizes both the ?id=/?cal= query-string format and the /share/{calId}/... slash-path
+    // format (getCalendarShareUrl in app-utils.js) -- the latter is this app's own
+    // "공유하기"/KakaoTalk share feature's URL, so most first-time visits arrive via that path.
     //
-    // Also sets apple-mobile-web-app-title/document.title synchronously here (mirrors
-    // src/index.html) so the generic "모여라 캘린더" default is never what iOS captures if
-    // "홈 화면에 추가" is tapped before the app's own JS has loaded real calendar data.
+    // apple-mobile-web-app-title/document.title are also set here, synchronously, since iOS
+    // reads apple-mobile-web-app-title at the moment the share sheet opens, not after real
+    // Firestore data has loaded.
     (function () {
       var params = new URLSearchParams(window.location.search);
       var id = params.get('id') || params.get('cal');
@@ -66,10 +65,11 @@
       }
       var manifestByCalendar = { kkot: 'manifest-kkot.json', cw: 'manifest-cw.json', jhair: 'manifest-jhair.json' };
       var titleByCalendar = { kkot: '꽃잎반', cw: '모아엘가', jhair: '제이헤어' };
-      if (id && manifestByCalendar[id]) {
-        var link = document.querySelector('link[rel="manifest"]');
-        if (link) link.setAttribute('href', manifestByCalendar[id]);
-      }
+      var manifestHref = (id && manifestByCalendar[id]) || 'manifest.json';
+      var link = document.createElement('link');
+      link.setAttribute('rel', 'manifest');
+      link.setAttribute('href', manifestHref);
+      document.head.appendChild(link);
       if (id && titleByCalendar[id]) {
         var appleTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]');
         if (appleTitle) appleTitle.setAttribute('content', titleByCalendar[id]);
