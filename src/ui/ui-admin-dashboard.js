@@ -2829,7 +2829,7 @@ export function AdminDashboard({ initialCalendars }) {
     activeTab === 'recovery' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '10px' } },
       selectedCal ? /*#__PURE__*/React.createElement(React.Fragment, null,
         pushHealth && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', flexWrap: 'wrap', fontSize: 'var(--font-size-xs)' } },
-          [['알림 구독', pushHealth.total], ['활성', pushHealth.active], ['30일 이상 미사용', pushHealth.stale30d], ['발송 성공', pushHealth.sent], ['실패 기록', pushHealth.failed]].map(([label, value]) => /*#__PURE__*/React.createElement("span", { key: label, style: { padding: '5px 8px', borderRadius: '999px', background: '#F1F5F9', color: '#334155', fontWeight: 700 } }, `${label} ${value}`))
+          [['알림 구독', pushHealth.total], ['활성', pushHealth.active], ['30일 이상 미사용', pushHealth.stale30d], ['발송 성공', pushHealth.sent], ['실패 기록', pushHealth.failed]].map(([label, value]) => /*#__PURE__*/React.createElement("span", { key: label, style: { padding: '5px 8px', borderRadius: 'var(--radius-full)', background: '#F1F5F9', color: '#334155', fontWeight: 700 } }, `${label} ${value}`))
         ),
         /* Timeline log restore card (Combined schedules, polls and chat logs!) */
         /*#__PURE__*/React.createElement("section", { className: "recovery-timeline-card", style: styles.card },
