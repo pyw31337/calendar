@@ -138,6 +138,8 @@ import {
   formatChatHeaderTitle,
   isValidCalendarId,
   isAllowedCalendarId,
+  NO_CALENDAR_SELECTED_ID,
+  isRealCalendarId,
   isSettlementEnabledCalendarId,
   sanitizeText,
   describeFirebaseWriteError,
@@ -408,8 +410,11 @@ function CalendarApp() {
     const requestedId = getCalendarIdFromURL();
     if (requestedId && isAllowedCalendarId(requestedId)) return requestedId;
     try {
+      // isRealCalendarId (excludes NO_CALENDAR_SELECTED_ID below), not isAllowedCalendarId --
+      // otherwise a browser that already saved the placeholder to localStorage keeps reading it
+      // back out as if it were real. See isRealCalendarId in app-domain-helpers.js.
       const savedId = window.localStorage?.getItem('gather_last_active_cal_id');
-      if (savedId && isAllowedCalendarId(savedId)) return savedId;
+      if (savedId && isRealCalendarId(savedId)) return savedId;
     } catch (_) {}
     // This app has no real per-user login -- a calendar id IS the access secret (see
     // firestore.rules' isCalendarDoc checks). The bare app URL used to default straight into
@@ -422,11 +427,11 @@ function CalendarApp() {
     // instead of silently landing on someone's actual data. Real access still only ever works
     // via an explicit share link (?cal=.../ /share/.../) or this device's own saved last-used
     // calendar, exactly as before -- nothing changes for anyone who already has a real link.
-    return 'no-calendar-selected';
+    return NO_CALENDAR_SELECTED_ID;
   });
   normalizeCalendarUrlParams(activeCalId);
   React.useEffect(() => {
-    if (activeCalId && isAllowedCalendarId(activeCalId)) {
+    if (activeCalId && isRealCalendarId(activeCalId)) {
       try {
         window.localStorage?.setItem('gather_last_active_cal_id', activeCalId);
       } catch (_) {}
