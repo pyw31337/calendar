@@ -18,6 +18,10 @@ const uiSources = ['ui-calendar-core.js', 'ui-misc.js', 'ui-remaining.js', 'ui-a
   .map(file => read(`src/ui/${file}`)).join('\n');
 const allUiSources = readdirSync(resolve(root, 'src/ui')).filter(file => file.endsWith('.js'))
   .map(file => read(`src/ui/${file}`)).join('\n');
+const adminDashboard = read('src/ui/ui-admin-dashboard.js');
+const adminModals = read('src/ui/ui-admin-modals.js');
+const adminRestore = read('src/core/app-admin-restore.js');
+const adminSources = [adminDashboard, adminModals, adminRestore].join('\n');
 
 const failures = [];
 const requireText = (text, pattern, message) => { if (!pattern.test(text)) failures.push(message); };
@@ -90,6 +94,13 @@ if (/top:\s*['"]6px['"]\s*,\s*left:\s*['"]6px['"][\s\S]{0,120}width:\s*['"]22px[
 if (/top:\s*['"]12px['"]\s*,\s*left:\s*['"]10px['"]/.test(placesView)) {
   failures.push('places edit checkbox must use 8px inset, not 12/10');
 }
+
+// Admin dashboard is now in design-system.md's scope (docs/design-system.md, 2026-09-12) --
+// app-admin-restore.js lives in src/core so it isn't covered by allUiSources' src/ui sweep above,
+// and the native-dialog ban is worth asserting directly against admin rather than relying on it
+// falling out of some other file's check.
+if (/window\.confirm\s*\(|window\.prompt\s*\(/.test(adminSources)) failures.push('admin must not use native window.confirm/prompt');
+requireText(adminDashboard, /ConfirmDialog/, 'admin dashboard must keep using the shared ConfirmDialog instead of native confirm');
 
 const pkg = JSON.parse(read('package.json'));
 const maplibreRange = String(pkg.dependencies?.['maplibre-gl'] || '');
