@@ -1598,17 +1598,36 @@ const parseSharePathFromLocation = GATHER_APP_UTILS.parseSharePathFromLocation
     return { calendarId, view: 'calendar', memoId: null };
   };
 
+// CalendarApp's activeCalId state (app-main.js) falls back to this literal placeholder when a
+// visitor has neither a URL id nor a saved localStorage id -- e.g. a brand new device, private
+// browsing, or (critically) an iOS "Add to Home Screen" standalone launch, which gets its own
+// storage silo separate from Safari and so never sees a same-origin localStorage value set
+// there. isValidCalendarId's shape check (any 1-64 char run of letters/digits/_/-) happens to
+// accept this placeholder just like a real id, which let normalizeCalendarUrlParams below write
+// it straight into the visible URL as "?id=no-calendar-selected". Once that landed in the
+// address bar (or a bookmarked/home-screen-icon URL), every later load treated it as a real
+// requested calendar, tried to fetch a calendar that could never exist, exhausted its retries,
+// and permanently showed "캘린더를 찾을 수 없음" for what was actually just "nothing chosen
+// yet". isRealCalendarId below is the shape check PLUS this one exclusion, used everywhere a
+// string coming from the URL or from activeCalId's fallback is about to be treated as an actual
+// calendar to look up -- so the placeholder can never leak into the URL going forward, and any
+// URL that already has it baked in self-heals back to "no calendar" instead of erroring.
+const NO_CALENDAR_SELECTED_ID = 'no-calendar-selected';
+function isRealCalendarId(id) {
+  return isValidCalendarId(id) && id !== NO_CALENDAR_SELECTED_ID;
+}
+
 function getCalendarIdFromURL() {
   const href = window.location.href;
   const urlParams = new URLSearchParams(window.location.search);
-  if (isValidCalendarId(urlParams.get('id'))) return urlParams.get('id');
-  if (isValidCalendarId(urlParams.get('cal'))) return urlParams.get('cal');
+  if (isRealCalendarId(urlParams.get('id'))) return urlParams.get('id');
+  if (isRealCalendarId(urlParams.get('cal'))) return urlParams.get('cal');
   const share = parseSharePathFromLocation();
-  if (share && isValidCalendarId(share.calendarId)) return share.calendarId;
+  if (share && isRealCalendarId(share.calendarId)) return share.calendarId;
   const shareMatch = window.location.pathname.match(/\/share\/([A-Za-z0-9_-]+)/);
-  if (shareMatch && isValidCalendarId(shareMatch[1])) return shareMatch[1];
+  if (shareMatch && isRealCalendarId(shareMatch[1])) return shareMatch[1];
   const match = href.match(/[?&#/]id=([a-zA-Z0-9_-]+)/);
-  if (match && isValidCalendarId(match[1])) return match[1];
+  if (match && isRealCalendarId(match[1])) return match[1];
   return null;
 }
 
@@ -1633,7 +1652,13 @@ function normalizeCalendarUrlParams(fallbackCalId = null) {
     const url = new URL(window.location.href);
     if (url.pathname.includes('/share/')) return;
     let id = url.searchParams.get('id') || url.searchParams.get('cal');
-    if (!id && fallbackCalId && isValidCalendarId(fallbackCalId)) {
+    // isRealCalendarId, not the bare isValidCalendarId shape check -- see its definition above
+    // for why: without this, the "no calendar selected yet" placeholder itself satisfies the
+    // shape check and gets written into the address bar as if it were a real calendar id.
+    if (id && !isRealCalendarId(id)) {
+      id = null;
+    }
+    if (!id && fallbackCalId && isRealCalendarId(fallbackCalId)) {
       id = fallbackCalId;
     }
     if (id) {
@@ -2830,6 +2855,8 @@ export {
   isValidCalendarId,
   isInternalTestCalendarId,
   isAllowedCalendarId,
+  NO_CALENDAR_SELECTED_ID,
+  isRealCalendarId,
   isSettlementEnabledCalendarId,
   sanitizeText,
   stripUrlEdgePunctuation,
