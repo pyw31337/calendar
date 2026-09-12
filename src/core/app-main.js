@@ -4330,14 +4330,8 @@ function CalendarApp() {
     }
     if (requestedId && !(calendarsRef.current || []).some(c => c.id === requestedId)) {
       const resolveRequestedCalendar = async () => {
-        // A single fetchSingleCloudCalendar(requestedId, 1) attempt used to decide "not found"
-        // here -- but this effect is exactly the path a cold PWA launch from a home-screen icon
-        // takes (fresh install, nothing in calendarsRef yet), where the first network request
-        // routinely stalls or times out while iOS is still bringing the radio/DNS back up after
-        // being backgrounded. That transient hiccup then permanently showed "캘린더를 찾을 수
-        // 없음" for a calendar that genuinely exists, with no retry, unlike the main bootstrap
-        // path in app-data-bootstrap.js which retries with backoff before giving up. Mirror that
-        // resilience here instead of failing on one shot.
+        // Retry with backoff (matches app-data-bootstrap.js) instead of failing on one shot --
+        // a cold PWA launch's first network request routinely stalls/times out transiently.
         for (let attempt = 1; attempt <= FIREBASE_LOAD_MAX_ATTEMPTS; attempt += 1) {
           const existing = await fetchSingleCloudCalendar(requestedId, 1, FIREBASE_LOAD_TIMEOUT_MS);
           if (cancelled) return;
@@ -7565,7 +7559,9 @@ function CalendarApp() {
     }
   }, /*#__PURE__*/React.createElement(AdminFilledMenuIcon, null)))), activeCal?.description && /*#__PURE__*/React.createElement("div", {
     className: "calendar-desc"
-  }, renderTextWithUrlBadge(activeCal.description)), /*#__PURE__*/React.createElement("div", {
+  }, renderTextWithUrlBadge(activeCal.description),
+  // Standalone launches hide the address bar -- surface the real id/URL for diagnosis.
+  !activeCalLoaded && /*#__PURE__*/React.createElement("div", { style: { marginTop: '4px', fontSize: '0.72rem', opacity: 0.6, wordBreak: 'break-all' } }, `id: ${activeCalId} · ${window.location.pathname}${window.location.search}`)), /*#__PURE__*/React.createElement("div", {
     className: "main-menu-bar"
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",
