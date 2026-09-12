@@ -1279,7 +1279,11 @@ function CalendarApp() {
       const calTitle = `${activeCal.title} 캘린더`;
       const calDesc = activeCal.description || `${activeCal.title} 사모임 멤버들의 참석 가능 날짜 조율 캘린더입니다.`;
       const currentShareUrl = getCalendarShareUrl(activeCal.id);
-      document.title = calTitle;
+      // Just the calendar's own name here, not calTitle (+ " 캘린더") -- iOS Safari's "홈 화면에
+      // 추가" pre-fills its editable name field from document.title, and whatever is in that
+      // field at "추가" time becomes the installed icon's permanent label. og/twitter previews
+      // below keep the " 캘린더" suffix since those are read as link-preview text, not a label.
+      document.title = activeCal.title;
       const ogTitle = document.getElementById('og-title');
       if (ogTitle) ogTitle.setAttribute('content', calTitle);
       const ogDesc = document.getElementById('og-desc');

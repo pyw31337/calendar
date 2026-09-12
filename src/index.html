@@ -62,7 +62,10 @@
         if (id && titleByCalendar[id]) {
           var appleTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]');
           if (appleTitle) appleTitle.setAttribute('content', titleByCalendar[id]);
-          document.title = titleByCalendar[id] + ' 캘린더';
+          // No " 캘린더" suffix -- iOS's "홈 화면에 추가" pre-fills its editable name field from
+          // document.title, and whatever is in that field at "추가" time becomes the installed
+          // icon's permanent label (see the matching note in app-main.js's activeCal effect).
+          document.title = titleByCalendar[id];
         }
       })();
     </script>
