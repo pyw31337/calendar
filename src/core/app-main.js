@@ -4325,15 +4325,29 @@ function CalendarApp() {
     }
     if (requestedId && !(calendarsRef.current || []).some(c => c.id === requestedId)) {
       const resolveRequestedCalendar = async () => {
-        const existing = await fetchSingleCloudCalendar(requestedId, 1);
-        if (cancelled) return;
-        if (existing?.calendar) {
-          applyServerCalendars(mergeCalendarCollections(calendarsRef.current || [], [existing.calendar], {
-            replaceMatchingId: true
-          }), existing.lastModified || Date.now());
-          setActiveCalId(requestedId);
-          return;
+        // A single fetchSingleCloudCalendar(requestedId, 1) attempt used to decide "not found"
+        // here -- but this effect is exactly the path a cold PWA launch from a home-screen icon
+        // takes (fresh install, nothing in calendarsRef yet), where the first network request
+        // routinely stalls or times out while iOS is still bringing the radio/DNS back up after
+        // being backgrounded. That transient hiccup then permanently showed "캘린더를 찾을 수
+        // 없음" for a calendar that genuinely exists, with no retry, unlike the main bootstrap
+        // path in app-data-bootstrap.js which retries with backoff before giving up. Mirror that
+        // resilience here instead of failing on one shot.
+        for (let attempt = 1; attempt <= FIREBASE_LOAD_MAX_ATTEMPTS; attempt += 1) {
+          const existing = await fetchSingleCloudCalendar(requestedId, 1, FIREBASE_LOAD_TIMEOUT_MS);
+          if (cancelled) return;
+          if (existing?.calendar) {
+            applyServerCalendars(mergeCalendarCollections(calendarsRef.current || [], [existing.calendar], {
+              replaceMatchingId: true
+            }), existing.lastModified || Date.now());
+            setActiveCalId(requestedId);
+            return;
+          }
+          if (attempt < FIREBASE_LOAD_MAX_ATTEMPTS) {
+            await new Promise(resolve => setTimeout(resolve, 700 * attempt));
+          }
         }
+        if (cancelled) return;
         showToast('캘린더를 찾을 수 없음', 'error');
       };
       resolveRequestedCalendar();
