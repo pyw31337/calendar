@@ -754,7 +754,7 @@ assert(/type: 'collection-write'/.test(firebaseDataScript) && /skipQueue/.test(f
 assert(/media-chat-send/.test(sourceScript) && /originalBlob: image\.originalBlob/.test(sourceScript), 'offline chat images must be queued with their original and thumbnail blobs');
 assert(/uploadSource: 'gallery'/.test(sourceScript) && /갤러리 사진은 연결되면 자동 등록됩니다/.test(sourceScript), 'offline gallery images must use the media outbox');
 assert(/media-memo-save/.test(memoScript) && /메모와 사진을 자동 저장합니다/.test(memoScript), 'offline memo images must be queued with the memo payload');
-assert(/replayQueuedMemoSave/.test(sourceScript) && /imageUrls/.test(mediaOutboxScript), 'queued memo images must be replayed into the memo document');
+assert(/replayQueuedMemoSave/.test(writeQueueScript) && /imageUrls/.test(mediaOutboxScript), 'queued memo images must be replayed into the memo document');
 assert(/writeSharedCollection/.test(eventModalScript) && /기념일 저장/.test(eventModalScript), 'anniversary writes must use the bounded collection write path');
 assert(/writeRootCollectionDocumentWithFallback/.test(firebaseDataScript) && /root-collection-write/.test(firebaseDataScript), 'root image-share writes must have a bounded offline replay path');
 assert(/merge: Boolean\(options\?\.merge\)/.test(firebaseDataScript) && /Boolean\(payload\.merge\)/.test(mediaOutboxScript), 'queued root writes must preserve merge semantics during replay');
