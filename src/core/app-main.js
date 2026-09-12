@@ -7563,9 +7563,7 @@ function CalendarApp() {
     }
   }, /*#__PURE__*/React.createElement(AdminFilledMenuIcon, null)))), activeCal?.description && /*#__PURE__*/React.createElement("div", {
     className: "calendar-desc"
-  }, renderTextWithUrlBadge(activeCal.description),
-  // Standalone launches hide the address bar -- surface the real id/URL for diagnosis.
-  !activeCalLoaded && /*#__PURE__*/React.createElement("div", { style: { marginTop: '4px', fontSize: '0.72rem', opacity: 0.6, wordBreak: 'break-all' } }, `id: ${activeCalId} · ${window.location.pathname}${window.location.search}`)), /*#__PURE__*/React.createElement("div", {
+  }, renderTextWithUrlBadge(activeCal.description)), /*#__PURE__*/React.createElement("div", {
     className: "main-menu-bar"
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",

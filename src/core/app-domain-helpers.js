@@ -1767,20 +1767,33 @@ let activeManifestBlobUrl = null;
 // rarely-installed-to-home-screen case.
 function applyDynamicManifest(calendar) {
   try {
-    const link = document.querySelector('link[rel="manifest"]');
-    if (!link) return;
     const staticFile = STATIC_MANIFEST_FILE_BY_CALENDAR[calendar.id];
+    const nextHref = staticFile || (() => {
+      const manifest = buildDynamicManifest(calendar);
+      const blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
+      return URL.createObjectURL(blob);
+    })();
+    const oldLink = document.querySelector('link[rel="manifest"]');
+    if (oldLink && oldLink.getAttribute('href') === nextHref) return;
+    // A fresh element, not oldLink.setAttribute('href', ...) on the existing one -- confirmed on
+    // a real device that mutating an already-inserted <link rel="manifest">'s href does not
+    // reliably reach iOS Safari's "홈 화면에 추가": it keeps using whatever manifest it resolved
+    // for that element back when the element was first inserted into the DOM (see the matching
+    // fix in src/index.html's pwa-manifest-switch script, which stopped shipping a static
+    // manifest link altogether for the same reason). Creating a brand-new element here applies
+    // that same fix to this later, data-driven swap -- including the blob: URL path used for any
+    // calendar outside STATIC_MANIFEST_FILE_BY_CALENDAR.
+    const newLink = document.createElement('link');
+    newLink.setAttribute('rel', 'manifest');
+    newLink.setAttribute('href', nextHref);
+    document.head.appendChild(newLink);
+    if (oldLink) oldLink.remove();
     if (staticFile) {
       if (activeManifestBlobUrl) { URL.revokeObjectURL(activeManifestBlobUrl); activeManifestBlobUrl = null; }
-      link.setAttribute('href', staticFile);
-      return;
+    } else {
+      if (activeManifestBlobUrl) URL.revokeObjectURL(activeManifestBlobUrl);
+      activeManifestBlobUrl = nextHref;
     }
-    const manifest = buildDynamicManifest(calendar);
-    const blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
-    const nextUrl = URL.createObjectURL(blob);
-    link.setAttribute('href', nextUrl);
-    if (activeManifestBlobUrl) URL.revokeObjectURL(activeManifestBlobUrl);
-    activeManifestBlobUrl = nextUrl;
   } catch (e) {
     console.warn('Dynamic manifest generation failed:', e);
   }
