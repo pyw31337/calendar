@@ -18,6 +18,26 @@
 
   --status-green: #16A34A;
 
+  /* Semantic status tokens: each pairs a "soft" surface/border used by day-cell states,
+     date-item-btn tint variants, and btn-danger -- previously these were separate literal
+     hex values repeated once in this light block, once in each dark-mode block, and once
+     more in .admin-scope's light reset below (three places to keep in sync by hand). Naming
+     them here means the light value only needs writing once; the dark blocks below and the
+     admin-scope reset each only need to state a value once too, and every component that
+     reads var(--surface-success) etc. gets the right one automatically. */
+  --surface-success: #ECFDF5;
+  --surface-confirmed: #FAF5FF;
+  --border-confirmed: #7C3AED;
+  --surface-danger: #FEF2F2;
+  --surface-danger-hover: #FEE2E2;
+  --border-danger: #FCA5A5;
+  --text-danger: #DC2626;
+  --border-confirmed-soft: #E9D5FF;
+  --border-available-soft: #DBEAFE;
+  --surface-available-soft: #F8FAFC;
+  --border-success-soft: #A7F3D0;
+  --surface-hover-tint: #EEF2FF;
+
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
   --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.03);
@@ -80,6 +100,18 @@
     --text-light: #64748B;
     --accent-primary: #6366F1;
     --accent-secondary: #9333EA;
+    --surface-success: #0F2E22;
+    --surface-confirmed: #241B3D;
+    --border-confirmed: #9333EA;
+    --surface-danger: #2D1518;
+    --surface-danger-hover: #3A1A1E;
+    --border-danger: #7F1D1D;
+    --text-danger: #F87171;
+    --border-confirmed-soft: #5B21B6;
+    --border-available-soft: #1D4ED8;
+    --surface-available-soft: #16233E;
+    --border-success-soft: #065F46;
+    --surface-hover-tint: #1E2A4D;
     --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.25);
     --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
     --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.45), 0 8px 10px -6px rgba(0, 0, 0, 0.35);
@@ -93,12 +125,8 @@
   :root[data-theme="dark"] .day-cell { background: #1B2540; }
   :root[data-theme="dark"] .day-cell:hover { background: #212D4D; }
   :root[data-theme="dark"] .day-cell.today { background: #1E2648; }
-  :root[data-theme="dark"] .day-cell.all-available { background: #0F2E22; border-color: var(--status-green); animation: cell-glow-available 2.5s ease-in-out infinite alternate; }
-  :root[data-theme="dark"] .day-cell.confirmed-meeting { background: #241B3D; border-color: #9333EA; animation: cell-glow-confirmed 2.5s ease-in-out infinite alternate; }
   :root[data-theme="dark"] .btn-secondary { background: #1B2540; color: var(--text-main); }
   :root[data-theme="dark"] .btn-secondary:hover { background: #232F49; }
-  :root[data-theme="dark"] .btn-danger { background: #2D1518; border-color: #7F1D1D; color: #F87171; }
-  :root[data-theme="dark"] .btn-danger:hover { background: #3A1A1E; }
   :root[data-theme="dark"] .form-select,
   :root[data-theme="dark"] .form-input { background: #1B2540; }
   :root[data-theme="dark"] .poll-progress { background: #1B2540; }
@@ -111,12 +139,8 @@
 :root[data-theme="dark"] .day-cell { background: #1B2540; }
 :root[data-theme="dark"] .day-cell:hover { background: #212D4D; }
 :root[data-theme="dark"] .day-cell.today { background: #1E2648; }
-:root[data-theme="dark"] .day-cell.all-available { background: #0F2E22; border-color: var(--status-green); animation: cell-glow-available 2.5s ease-in-out infinite alternate; }
-:root[data-theme="dark"] .day-cell.confirmed-meeting { background: #241B3D; border-color: #9333EA; animation: cell-glow-confirmed 2.5s ease-in-out infinite alternate; }
 :root[data-theme="dark"] .btn-secondary { background: #1B2540; color: var(--text-main); }
 :root[data-theme="dark"] .btn-secondary:hover { background: #232F49; }
-:root[data-theme="dark"] .btn-danger { background: #2D1518; border-color: #7F1D1D; color: #F87171; }
-:root[data-theme="dark"] .btn-danger:hover { background: #3A1A1E; }
 :root[data-theme="dark"] .form-select,
 :root[data-theme="dark"] .form-input { background: #1B2540; }
 :root[data-theme="dark"] .poll-progress { background: #1B2540; }
@@ -167,6 +191,18 @@
   --text-light: #64748B;
   --accent-primary: #6366F1;
   --accent-secondary: #9333EA;
+  --surface-success: #0F2E22;
+  --surface-confirmed: #241B3D;
+  --border-confirmed: #9333EA;
+  --surface-danger: #2D1518;
+  --surface-danger-hover: #3A1A1E;
+  --border-danger: #7F1D1D;
+  --text-danger: #F87171;
+  --border-confirmed-soft: #5B21B6;
+  --border-available-soft: #1D4ED8;
+  --surface-available-soft: #16233E;
+  --border-success-soft: #065F46;
+  --surface-hover-tint: #1E2A4D;
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.25);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
   --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.45), 0 8px 10px -6px rgba(0, 0, 0, 0.35);
@@ -191,6 +227,33 @@
   --text-light: #94A3B8;
   --accent-primary: #4F46E5;
   --accent-secondary: #7C3AED;
+  /* Semantic status tokens, reassigned here so every component that reads them (day-cell
+     states, date-item-btn tint variants, btn-danger) retints for admin automatically --
+     these used to be ~15 separate ":root[data-theme=dark] .admin-scope .<class>" override
+     lines, one per component, each repeating the same light values the component's own
+     plain-light-mode rule already had. --status-green also needs resetting here: nothing
+     previously did, so .day-cell.all-available's border silently went dark-green (#4ADE80)
+     if you opened the admin dashboard while the site's dark-mode toggle was on -- a real
+     (if rare) bug this fixes as a side effect of the token move.
+     --surface-danger/-hover/--border-danger keep admin's own existing translucent-red
+     values (not the plain light pastel #FEF2F2/#FCA5A5) because that was already the
+     admin-only look under the dark-mode toggle before this change -- preserved as-is rather
+     than silently unified. --border-confirmed likewise keeps admin's existing #9333EA (the
+     *dark* accent-secondary value) paired with the light --surface-confirmed background --
+     an existing mismatch, not something introduced here; see the note to the user about it. */
+  --status-green: #16A34A;
+  --surface-success: #ECFDF5;
+  --surface-confirmed: #FAF5FF;
+  --border-confirmed: #9333EA;
+  --surface-danger: rgba(239, 68, 68, 0.12);
+  --surface-danger-hover: rgba(239, 68, 68, 0.22);
+  --border-danger: rgba(239, 68, 68, 0.35);
+  --text-danger: #F87171;
+  --border-confirmed-soft: #E9D5FF;
+  --border-available-soft: #DBEAFE;
+  --surface-available-soft: #F8FAFC;
+  --border-success-soft: #A7F3D0;
+  --surface-hover-tint: #EEF2FF;
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
   --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.03);
@@ -202,32 +265,14 @@
 :root[data-theme="dark"] .admin-scope .day-cell:hover { background: #EEF2FF; }
 :root[data-theme="dark"] .admin-scope .day-cell.today,
 :root[data-theme="dark"] .admin-scope .day-cell.today { background: #EEF2FF; }
-:root[data-theme="dark"] .admin-scope .day-cell.all-available,
-:root[data-theme="dark"] .admin-scope .day-cell.all-available { background: #ECFDF5; border-color: var(--status-green); }
-:root[data-theme="dark"] .admin-scope .day-cell.confirmed-meeting,
-:root[data-theme="dark"] .admin-scope .day-cell.confirmed-meeting { background: #FAF5FF; border-color: #9333EA; }
 :root[data-theme="dark"] .admin-scope .btn-secondary,
 :root[data-theme="dark"] .admin-scope .btn-secondary { background: #F8FAFC; color: var(--text-main); }
 :root[data-theme="dark"] .admin-scope .btn-secondary:hover,
 :root[data-theme="dark"] .admin-scope .btn-secondary:hover { background: #EEF2FF; }
-:root[data-theme="dark"] .admin-scope .btn-danger,
-:root[data-theme="dark"] .admin-scope .btn-danger { background: rgba(239, 68, 68, 0.12); border-color: rgba(239, 68, 68, 0.35); color: #F87171; }
-:root[data-theme="dark"] .admin-scope .btn-danger:hover,
-:root[data-theme="dark"] .admin-scope .btn-danger:hover { background: rgba(239, 68, 68, 0.22); }
-:root[data-theme="dark"] .admin-scope .form-select,
-:root[data-theme="dark"] .admin-scope .form-input,
-:root[data-theme="dark"] .admin-scope .form-select,
-:root[data-theme="dark"] .admin-scope .form-input { background: #FFFFFF; }
 :root[data-theme="dark"] .admin-scope .status-badge,
 :root[data-theme="dark"] .admin-scope .date-item-badge,
 :root[data-theme="dark"] .admin-scope .status-badge,
 :root[data-theme="dark"] .admin-scope .date-item-badge { filter: none; }
-:root[data-theme="dark"] .admin-scope .date-item-btn:hover,
-:root[data-theme="dark"] .admin-scope .date-item-btn:hover { background: #EEF2FF; }
-:root[data-theme="dark"] .admin-scope .date-item-btn.is-confirmed,
-:root[data-theme="dark"] .admin-scope .date-item-btn.is-confirmed { border-color: #E9D5FF; background: #FAF5FF; }
-:root[data-theme="dark"] .admin-scope .date-item-btn.is-available,
-:root[data-theme="dark"] .admin-scope .date-item-btn.is-available { border-color: #DBEAFE; background: #F8FAFC; }
 /* .admin-scope only resets tokens for its own descendants -- body itself is an ANCESTOR of
    it, so body's background-color: var(--bg-primary) below still reads the dark value from
    :root unless it's told (via :has()) that an .admin-scope is present somewhere inside it. */
@@ -1524,8 +1569,8 @@ button, input, textarea, select {
   border-color: transparent;
 }
 
-.btn-danger { background: #FEF2F2; border-color: #FCA5A5; color: #DC2626; }
-.btn-danger:hover { background: #FEE2E2; }
+.btn-danger { background: var(--surface-danger); border-color: var(--border-danger); color: var(--text-danger); }
+.btn-danger:hover { background: var(--surface-danger-hover); }
 
 
 
@@ -2014,15 +2059,15 @@ select.form-select {
 .day-cell.today { border-color: var(--accent-primary); background: #EEF2FF; overflow: visible; z-index: 2; }
 
 .day-cell.all-available {
-  background: #ECFDF5;
+  background: var(--surface-success);
   border: 1.5px solid var(--status-green);
   box-shadow: inset 0 0 4px rgba(16, 185, 129, 0.15);
   animation: cell-glow-available 2.5s ease-in-out infinite alternate;
 }
 
 .day-cell.confirmed-meeting {
-  background: #FAF5FF;
-  border: 1.5px solid #7C3AED;
+  background: var(--surface-confirmed);
+  border: 1.5px solid var(--border-confirmed);
   box-shadow: inset 0 0 5px rgba(124, 58, 237, 0.18);
   animation: cell-glow-confirmed 2.5s ease-in-out infinite alternate;
 }
@@ -4132,24 +4177,15 @@ select.form-select {
     gap: 12px;
   }
 }
-.date-item-btn:hover { background: #EEF2FF; border-color: var(--accent-primary); transform: translateX(4px); }
+.date-item-btn:hover { background: var(--surface-hover-tint); border-color: var(--accent-primary); transform: translateX(4px); }
 /* isPast/isConfirmed/isAvailable tint variants -- see App's SummaryList date-item-btn
-   usages, which pick one of these instead of inline backgroundColor/borderColor so dark
-   mode can retint them below instead of always showing the light pastel. */
+   usages, which pick one of these instead of inline backgroundColor/borderColor. Each reads
+   a semantic token so dark mode and .admin-scope retint automatically -- no separate
+   dark-mode/admin overrides needed for this selector any more. */
 .date-item-btn.is-past { opacity: 0.7; background: var(--bg-primary); border-color: transparent; }
-.date-item-btn.is-confirmed { border-color: #E9D5FF; background: #FAF5FF; }
-.date-item-btn.is-available { border-color: #DBEAFE; background: #F8FAFC; }
-.date-item-btn.is-all { border-color: #A7F3D0; background: #ECFDF5; }
-:root[data-theme="dark"] .date-item-btn:hover { background: #1E2A4D; }
-:root[data-theme="dark"] .date-item-btn.is-confirmed { border-color: #5B21B6; background: #241B3D; }
-:root[data-theme="dark"] .date-item-btn.is-available { border-color: #1D4ED8; background: #16233E; }
-:root[data-theme="dark"] .date-item-btn.is-all { border-color: #065F46; background: #0F2E22; }
-@media (prefers-color-scheme: dark) {
-  :root[data-theme="dark"] .date-item-btn:hover { background: #1E2A4D; }
-  :root[data-theme="dark"] .date-item-btn.is-confirmed { border-color: #5B21B6; background: #241B3D; }
-  :root[data-theme="dark"] .date-item-btn.is-available { border-color: #1D4ED8; background: #16233E; }
-  :root[data-theme="dark"] .date-item-btn.is-all { border-color: #065F46; background: #0F2E22; }
-}
+.date-item-btn.is-confirmed { border-color: var(--border-confirmed-soft); background: var(--surface-confirmed); }
+.date-item-btn.is-available { border-color: var(--border-available-soft); background: var(--surface-available-soft); }
+.date-item-btn.is-all { border-color: var(--border-success-soft); background: var(--surface-success); }
 
 .date-item-btn.confirmed-meeting-card {
   position: relative;
