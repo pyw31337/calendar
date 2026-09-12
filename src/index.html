@@ -36,6 +36,14 @@
       // shared-link visitor who added the app to their home screen got the generic
       // manifest.json (start_url "./", no calendar id baked in) -- the installed icon then
       // opened with no calendar id at all ("캘린더를 찾을 수 없음").
+      //
+      // Also sets apple-mobile-web-app-title/document.title synchronously here, not only from
+      // app-main.js's activeCal effect (which waits for activeCalLoaded, i.e. real Firestore data
+      // to arrive). iOS Safari's "홈 화면에 추가" reads apple-mobile-web-app-title at the moment
+      // the share sheet opens, not the manifest -- if that tap lands before Firestore data has
+      // loaded (the common case: opening a fresh share link and immediately adding it), the tag
+      // was still stuck on the generic "모여라 캘린더" default, so every installed icon showed
+      // that instead of the calendar's own name regardless of which calendar was open.
       (function () {
         var params = new URLSearchParams(window.location.search);
         var id = params.get('id') || params.get('cal');
@@ -44,9 +52,15 @@
           if (shareMatch) id = shareMatch[1];
         }
         var manifestByCalendar = { kkot: 'manifest-kkot.json', cw: 'manifest-cw.json', jhair: 'manifest-jhair.json' };
+        var titleByCalendar = { kkot: '꽃잎반', cw: '모아엘가', jhair: '제이헤어' };
         if (id && manifestByCalendar[id]) {
           var link = document.querySelector('link[rel="manifest"]');
           if (link) link.setAttribute('href', manifestByCalendar[id]);
+        }
+        if (id && titleByCalendar[id]) {
+          var appleTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]');
+          if (appleTitle) appleTitle.setAttribute('content', titleByCalendar[id]);
+          document.title = titleByCalendar[id] + ' 캘린더';
         }
       })();
     </script>

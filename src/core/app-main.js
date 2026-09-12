@@ -4353,7 +4353,8 @@ function CalendarApp() {
           }
         }
         if (cancelled) return;
-        showToast('캘린더를 찾을 수 없음', 'error');
+        // Show the actual id, not just the generic message -- concrete evidence for next time.
+        showToast(`캘린더를 찾을 수 없음 (id: ${requestedId})`, 'error', 6000);
       };
       resolveRequestedCalendar();
     }
