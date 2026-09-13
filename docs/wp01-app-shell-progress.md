@@ -216,3 +216,24 @@ npm run regression:test   # npm run build 포함
   알림 권한이라는, 잘못 다루면 사용자에게 실제로 영향이 가는 로직을 복제하는 셈이라 보류했다.
   테마 토글/글자 크기 같은 나머지 하위 기능은 단순하지만, 모달 하나를 절반만 실제로 동작하게
   만드는 건 오히려 혼란스러울 수 있어 전체를 다음 슬라이스로 미뤘다.
+
+## 2026-09-13: WP-02 착수 — 렌더얼 셸 범위의 EmptyState 공통화
+
+`docs/product-renewal-master-plan.md` §9 WP-02("공통 상태 컴포넌트 공통화")는 원래 앱 전체를
+대상으로 하는 별도 담당(디자인 시스템 에이전트) 워크스트림이지만, 지금 존재하는 "신규 화면"이
+렌더얼 셸뿐이라 그 범위 안에서 먼저 시작했다.
+
+- `EmptyState({ icon, title, subtitle })` 컴포넌트를 `ui-app-shell-v2.js`에 추가하고,
+  `PlaceholderPane`(플랫 4탭용)과 `RecordsPane`의 서브탭별 플레이스홀더가 각자 반복하던
+  3줄짜리 마크업을 이걸로 교체했다. `withCalendarPrefix(calendarName, text)` 헬퍼도 함께
+  추출해서 "`<캘린더명> · <설명>`" 문구 조합 로직 중복도 없앴다.
+- 순수 리팩터(동작 변화 없음) — `renewal-shell-placeholder*` CSS 클래스 이름/구조는 그대로라
+  `app.css`는 건드리지 않았다.
+- 검증(Playwright 헤드리스): `?tab=chat`(플랫 플레이스홀더)과 `?tab=records&sub=memo`(서브탭
+  플레이스홀더) 양쪽 다 제목 텍스트가 리팩터 전과 동일하게 렌더됨을 확인.
+- `npm run lint`/`check:all`/`safety:test`/`regression:test` 전부 통과, `app-main.js` 미변경.
+
+**다음 WP-02 후보**: 타이포그래피 5단계/spacing/divider/elevation 토큰화, `LoadingState`/
+`ErrorState`/`OfflineState`/`SectionHeader`/`CountBadge` 공통화 — 이건 앱 전체(레거시 화면
+포함) 범위라 별도로 더 크게 계획해야 한다. 참고로 색상 토큰(`--brand`, `--text-main` 등)은
+이미 앱 전역에 있고 렌더얼 셸도 처음부터 그걸 재사용해 왔다.
