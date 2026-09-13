@@ -415,3 +415,55 @@ nullable `calendar`를 그대로 넘겼다가 Playwright 헤드리스 테스트�
 정산"까지 포함하는 완전한 "내가 응답할 일" 통합 뷰(지금은 활성 투표만) — 이건 날짜 허브(WP-04)의
 selector 계층이 먼저 정의되어야 "미정 참석"이 무엇을 뜻하는지 일관되게 판단할 수 있어서, WP-04
 이후로 미룬다.
+
+## 2026-09-13: WP-05 착수 — "대화" 탭 실제 연결
+
+**배경:** 사용자가 다음 우선순위로 "대화 탭 연결"을 선택. 마스터플랜 §5.4(채팅)는 홈 미리보기,
+최초 진입 메시지 수 제한, 새 메시지 구독/과거 메시지 pagination 분리, YouTube/Vimeo 썸네일화
+등 광범위한 요구사항을 담고 있지만, 이 중 사실상 전부가 이미 기존 `ChatRoomView` 컴포넌트
+(`src/ui/ui-chat-room.js`, `app-main.js`의 `activeView === 'chat'`가 그대로 렌더하던 것)에
+구현되어 있다 — WP-03의 `CalendarGrid`/`DateModal`과 같은 성격이라, 로직을 다시 만들지 않고
+그대로 pass-through 하는 게 맞다고 판단했다.
+
+**5차 슬라이스에서 보류했던 이유가 여기서는 적용되지 않는 이유**: `ChatRoomView` 자체는 (더보기
+탭의 `AdminModal`/`GlobalSearchModal`과 달리) `onOpenChatMessage`/`onOpenImage` 같은 "대화 탭으로
+전환" 콜백이 **필요 없다** — 이미 대화 탭 그 자체이기 때문이다. 유일한 탐색 의존성은
+`onBack`/`onOpenGallery`/`onChangeView`(레거시 최상단 뷰 전환)인데, 이것들은 전부 이 셸의
+탭/서브탭 전환으로 그대로 매핑 가능하다.
+
+- **지연 로드 처리**: `ChatRoomView`는 `CalendarGrid`/`DateModal`과 달리 메인 번들에 없고
+  `window.__gatherLoadChatUi()`로 온디맨드 로드되는 별도 청크다(`app-main.js`의 `changeView`가
+  쓰는 것과 동일한 트리거). `ChatPane`이 마운트 시 이 로드를 기다렸다가 렌더하는 "wait-then-open"
+  단계를 추가했다 — 더보기 탭의 공유/매뉴얼/기념일이 이미 쓰던 패턴과 동일.
+- **`buildRenewalChatContext(calendar, deps)` 신설**: 컴포저 상태(`chatInput`/`chatImages`/
+  `chatFileAttachments`/`chatReplyTarget` 등), 메시지 전송/삭제/수정, 공지 등록/삭제, 스크롤/헤더
+  표시, 이미지 태그/검색, 점프(채팅 메시지/메모/모임 날짜), sticky-video 활성화 등 `app-main.js`의
+  `activeView === 'chat'` 호출부가 쓰던 ~35개 값/함수를 전부 그대로 pass-through. 새 로직 없음.
+- **`onChangeView` 매핑**: `ChatSideMenu`(대화 탭 내부 햄버거 메뉴)가 호출하는 레거시
+  `changeView(view)`를 재구현하는 대신, `RenewalAppShell`에 뷰 id → 탭/서브탭 매핑 함수 하나를
+  추가했다(`memo`→기록/메모, `places`→기록/장소, `gallery`→기록/사진·영상, `history`→기록/보관함,
+  `content`→기록/콘텐츠, `settlement`→정산 탭, 그 외→캘린더 탭). `onBack`/`onOpenGallery`도 이
+  같은 함수로 구성 — 새로운 네비게이션 로직이 아니라 이미 5차 슬라이스에서 쓰던 탭 전환 함수를
+  재사용하는 것.
+- **더보기 모달 재사용**: 대화 탭의 "앱 설정" 진입도 더보기 탭과 완전히 같은 `AppSettingsModal`을
+  열도록, 기존 `handleSelectMoreItem`의 트리거 로직을 `openMoreModalById(id)`로 뽑아내서
+  `onOpenAppSettings`가 그대로 재사용하게 했다(순수 리팩터, 더보기 탭 동작 변화 없음).
+- **의도적으로 보류한 것**: 탭을 벗어나도 영상이 떠 있는 채로 계속 재생되는 "sticky video"
+  전역 기능(`withStickyVideo`)은 이 셸을 감싸지 않았다 — `stickyVideoKey`/`onActivateVideo`
+  자체는 실제 값 그대로 전달해서 대화 탭 안에서 영상 재생 자체는 정상 동작하지만, 탭을 벗어났을
+  때 떠 있는 미니 플레이어로 이어지진 않는다. 이건 "일단 동작하는 대화 탭" 위에 얹는 향상
+  기능이라 이번 슬라이스 필수 범위가 아니라고 판단했다.
+- `app-main.js`의 어댑터 호출이 5번째 인자(`chatContextDeps`)를 받도록 확장 —
+  `check:app-main-inventory`로 `CalendarApp` 7700/7700 그대로 확인.
+- 검증(Playwright 헤드리스): `?shell=v2&tab=chat` 진입 시 실제 `ChatRoomView`가 렌더됨(헤더,
+  "아직 등록된 대화가 없습니다." 빈 상태, 참여자 선택/전송 버튼이 있는 컴포저, 콘솔 에러 없음).
+  헤더의 메뉴 버튼 클릭 → 크래시 없음. 캘린더 탭으로 돌아가기(하단 내비 클릭) → 실제 달력 그리드
+  정상 렌더(회귀 없음). 기본(플래그 없음) 경로 HTML 길이 36894바이트로 동일, 콘솔 에러 없음.
+- `npm run lint`/`check:app-main-inventory`/`check:all`/`safety:test`/`regression:test`(빌드
+  포함) 전부 통과.
+
+**아직 다루지 않은 것**: sticky-video 전역 플로팅(위에서 설명), 홈(캘린더 탭)의 "최근 메시지
+1~3개 미리보기"(마스터플랜 §5.4) — 대화 탭 자체가 이제 실동작하니 다음 확인 후 진행할 수 있는
+후보. 최초 메시지 로드 개수 조절/과거 메시지 pagination 분리(§5.4의 세부 성능 요구사항)는
+`ChatRoomView`/`loadOlderChatMessages`가 이미 구현한 그대로를 재사용했을 뿐, 이 슬라이스에서 그
+내부 로직을 손대거나 검증하지 않았다.
