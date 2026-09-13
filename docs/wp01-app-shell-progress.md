@@ -6,6 +6,40 @@
 **더 넓은 맥락(시안 갈래, 기능 인벤토리, 다음 작업자 체크리스트)은 `docs/design-renewal-handoff.md`를
 먼저 읽을 것** — 이 문서는 그 안의 섹션 4를 더 상세히 푼 것이다.
 
+## 2026-09-13: WP-01 완료 판정
+
+마스터플랜 §9 WP-01의 완료 기준 3개를 아래 5개 슬라이스(PR #606~#610, 전부 병합됨)가 전부
+충족한다:
+
+1. **모든 탭에 direct URL로 진입 가능** — `?tab=calendar|chat|records|settlement|more`,
+   `?sub=`(기록 탭) 전부 direct URL 진입 확인됨 (2·3차 슬라이스).
+2. **새로고침과 뒤로가기가 화면 상태를 잃지 않음** — `readTabFromLocation`/
+   `readRecordsSubTabFromLocation` + `popstate` 리스너로 확인됨 (2·3차 슬라이스).
+3. **기존 공유 URL 검사 통과** — `npm run check:all`의 `check:share-urls`가 5개 슬라이스 전부에서
+   계속 통과함.
+
+"작업" 목록의 "기존 상단 4개 기능 탭을 기능 플래그 뒤에서 새 내비게이션으로 대체한다"는 문자
+그대로의 코드 삭제는 하지 않았다 — `?shell=v2`가 켜지면 `renderRenewalShellIfEnabled`가
+`CalendarApp`의 최종 `return`보다 먼저 반환해서 기존 4탭 코드는 어차피 전혀 실행되지 않는다
+(기능적으로는 이미 "대체"된 상태). 실제 코드 삭제는 의도적으로 보류했다: 지금은 `?shell=v2`가
+옵트인 플래그일 뿐이라 기존 코드가 죽어 있어도 위험이 없고, 동결된(`docs/app-main-split-units.md`)
+`CalendarApp`에서 대량 삭제하는 건 이 플래그가 기본값으로 바뀌는 시점에 훨씬 더 큰 회귀테스트와
+함께 하는 게 안전하다고 판단했다 — 그 삭제 자체가 별도의, 더 신중한 작업이다.
+
+**다음 작업 후보** (우선순위는 사용자 지시로 결정):
+- **더보기 나머지 3개**(검색/앱 설정/캘린더 설정) 연결 — 각각 채팅 내부 로직/알림 권한처럼
+  신중하게 다뤄야 할 의존성이 있음 (5차 슬라이스의 "아직 다루지 않은 것" 참고).
+- **WP-02 디자인 토큰/공통 상태 컴포넌트** — 마스터플랜상 별도 담당(디자인 시스템 에이전트)의
+  앱 전체 작업. 참고로 렌더링 시 확인한 바, 색상 토큰(`--brand`, `--text-main` 등)은 이미 앱
+  전역에 존재하고 이번 렌더 셸도 전부 그 토큰을 재사용 중이라, WP-02의 색상 분리 항목은 상당
+  부분 이미 되어 있다. 남은 건 타이포그래피 5단계/spacing/divider/elevation 토큰화와
+  LoadingState/EmptyState/ErrorState/OfflineState/SectionHeader/CountBadge 공통 컴포넌트화 —
+  이건 앱 전체 리팩터라 범위가 크다.
+- **WP-03 캘린더 홈 재구성** — 마스터플랜 순서상 다음 단계지만 `CalendarApp` 내부의 실제
+  캘린더 렌더 로직과 깊이 얽혀 있어, U10~U14와 유사한 성격의 신중함이 필요할 수 있음.
+- **기존 상단 4탭 코드 실제 삭제** — 위에서 설명한 대로, 플래그가 기본값이 되는 시점에 맞춰서
+  하는 게 안전.
+
 ## 2026-09-13: IA 방향 결정 — 마스터플랜 우선
 
 목업 세션(Claude Design 캔버스)에서 먼저 만든 사이드바 시안은 기존 6개 저장 출처별 메뉴
@@ -210,12 +244,48 @@ npm run regression:test   # npm run build 포함
 - **검색** (`GlobalSearchModal`): 마찬가지로 `onOpenChatMessage`/`onOpenImage`를 필요로 해서
   같은 이유로 보류. 또한 마스터플랜 자체가 통합검색을 "신규 설계 과제"로 분류하고 있다
   (`docs/design-renewal-handoff.md` §4.5).
-- **앱 설정** (`AppSettingsModal`): 브라우저 알림 권한 상태(`mainNotifPermission`,
-  `mainChatNotifyEnabled`)를 여러 state setter와 Firestore 구독 설정에 걸쳐 갱신하는 로직이
-  `onToggleMasterNotify`/`onToggleNotifyChannel`에 박혀 있다. 이것도 순수 데이터 전달이 아니라
-  알림 권한이라는, 잘못 다루면 사용자에게 실제로 영향이 가는 로직을 복제하는 셈이라 보류했다.
-  테마 토글/글자 크기 같은 나머지 하위 기능은 단순하지만, 모달 하나를 절반만 실제로 동작하게
-  만드는 건 오히려 혼란스러울 수 있어 전체를 다음 슬라이스로 미뤘다.
+- ~~**앱 설정**~~ **6차 슬라이스에서 완료 (아래 참고)**.
+
+## 2026-09-13: WP-01 6차 슬라이스 — "앱 설정" 실제 연결 (5/7)
+
+**커밋 범위:** 5차 슬라이스에서 "알림 권한 로직 복제 위험"을 이유로 보류했던 앱 설정
+(`AppSettingsModal`)을 다시 검토해서 실제로 연결. 재검토 결과, 그 우려는 과했다는 걸 확인했다 —
+`onToggleMasterNotify`/`onToggleNotifyChannel`가 실제로 호출하는 함수들
+(`isNotificationSupported`, `isChatNotifyEnabledForCalendar`, `setChatNotifyEnabledForCalendar`,
+`getNotificationPermissionHelpSteps`, `setNotifGuideSeen`, `setNotifyChannel`,
+`syncPushSubscriptionChannels`)은 전부 `src/core/app-domain-helpers.js`가 export하는 순수
+유틸리티 함수라서, `app-main.js`가 하듯이 `ui-app-shell-v2.js`에서도 **같은 모듈에서 직접
+import**해서 쓰면 된다 — 로직을 복제하는 게 아니라 완전히 동일한 함수를 그대로 재사용하는
+것이다. `handleMainToggleNotifications`(브라우저 알림 권한 요청, 푸시 구독 재시도 등 훨씬 더
+복잡한 로직)는 `useNotificationPwaState` 훅이 이미 완성해 둔 함수라 이것도 그대로 참조만 하면
+된다. 반면 5차 슬라이스에서 뺀 캘린더 설정/검색은 `onOpenChatMessage`가 `changeView('chat')`로
+`activeView` state를 바꾸는데, 그 state가 구동하는 JSX는 `?shell=v2`의 조기 반환 아래에 있어
+여전히 무동작이다 — 이건 진짜 다른 문제(전환 대상 화면 자체가 없음)라 계속 보류.
+
+- `ui-app-shell-v2.js`가 `src/core/app-domain-helpers.js`에서
+  `isNotificationSupported`/`isChatNotifyEnabledForCalendar`/`setChatNotifyEnabledForCalendar`/
+  `getNotificationPermissionHelpSteps`/`setNotifGuideSeen`/`setNotifyChannel`/
+  `syncPushSubscriptionChannels`를 직접 import — `app-main.js`가 쓰는 것과 동일한 소스.
+- `REAL_MORE_MODAL_IDS`에 `'app-settings'` 추가, `MoreModalsHost`가 `AppSettingsModal`도 렌더.
+- `buildRenewalMoreContext`의 `modalProps['app-settings']`는 `app-main.js`의
+  `isAppSettingsOpen && <AppSettingsModal ...>` 호출부와 완전히 동일한 프롭 구성(테마/글자
+  크기/알림권한/알림채널/날씨위치/토스트/도움말단계/캘린더/확인다이얼로그/데이터새로고침).
+- `app-main.js`의 어댑터 호출 한 줄에 deps 추가: `toggleTheme`, `fontScalePercent`,
+  `setFontScalePercent`, `mainNotifPermission`, `setMainNotifPermission`,
+  `mainChatNotifyEnabled`, `setMainChatNotifyEnabled`, `notifyChannels`,
+  `setNotifyChannelsState`, `handleMainToggleNotifications`, `handleUpdateWeatherLocation`,
+  `handleDeleteRecentWeatherLocation`, `getCurrentChatParticipantId`, `setCloudReloadToken` —
+  전부 이미 있던 값을 그대로 전달, 새 로직 없음. `check:app-main-inventory`로 `CalendarApp`
+  7700/7700 그대로 확인.
+- 검증(Playwright 헤드리스): `?shell=v2&tab=more`에서 "앱 설정" 클릭 → 실제 `AppSettingsModal`
+  오픈 확인(`[role="dialog"]`/`.modal-overlay` 렌더, 테마/글자 크기 컨트롤 텍스트 존재 확인).
+  기본(플래그 없음) 경로 HTML 길이 36894바이트로 동일, 콘솔 에러 없음.
+- `npm run lint`/`check:all`/`safety:test`/`regression:test` 전부 통과.
+
+**아직 다루지 않은 것**: 캘린더 설정(`AdminModal`)과 검색(`GlobalSearchModal`)만 남았다 — 둘 다
+`changeView('chat')`으로 채팅 메시지 위치로 이동시키는 콜백(`onOpenChatMessage`/`onOpenImage`)이
+필요한데, 대화 탭 자체가 아직 플레이스홀더라 이동할 실제 화면이 없다. WP-05(채팅 독립 화면)가
+실제 데이터로 채워진 뒤에나 자연스럽게 풀리는 문제라 그 전까지는 보류.
 
 ## 2026-09-13: WP-02 착수 — 렌더얼 셸 범위의 EmptyState 공통화
 

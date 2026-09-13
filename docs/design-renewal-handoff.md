@@ -384,6 +384,15 @@ PWA 아이콘(3.16)으로 각각 접근한다. `getCalendarShareUrl`/`getViewSha
    나머지 3개(검색/앱 설정/캘린더 설정)는 채팅/갤러리/알림-권한 내부 로직과 깊이 얽혀 있어
    의도적으로 보류 — 이유는 진행 기록의 "아직 다루지 않은 것"에 상세히 적어뒀다.
 
+6. **`feat(wp01): wire app settings to real screen`** (6차 슬라이스,
+   `docs/wp01-app-shell-progress.md` 6차 슬라이스 항목 참고) — 5차 슬라이스에서 "알림 권한 로직
+   복제 위험"으로 보류했던 앱 설정을 재검토 후 연결. 실제로는 `onToggleMasterNotify`/
+   `onToggleNotifyChannel`이 호출하는 함수들이 전부 `src/core/app-domain-helpers.js`의 순수
+   export 함수라서, `ui-app-shell-v2.js`가 `app-main.js`와 똑같이 그 모듈에서 직접 import하면
+   로직 복제 없이 그대로 재사용된다 — 우려가 과했다. 남은 2개(캘린더 설정/검색)는 진짜 다른
+   문제(대화 탭이 아직 플레이스홀더라 `changeView('chat')`로 이동할 화면 자체가 없음)라 WP-05
+   이후로 계속 보류.
+
 ### 4.3 매우 중요한 제약 — `CalendarApp` 줄수 동결
 
 `docs/app-main-split-units.md`가 `CalendarApp` 함수를 **정확히 7700줄**로 동결해놨다
@@ -432,18 +441,16 @@ npm run regression:test ✅ (npm run build 포함)
   참고), 데이터는 여전히 미착수**: 전체/메모/사진·영상/장소/보관함/콘텐츠 6개 서브탭이 URL
   (`?sub=`)에 연결된 칩 UI로 존재한다. 각 서브탭이 보여주는 콘텐츠는 아직 플레이스홀더 —
   WP-06에서 실제 메모/갤러리/장소/보관함/콘텐츠 데이터를 서브탭별로 연결해야 한다.
-- ~~**"더보기" 탭 구조**~~ **메뉴 리스트 완료 (4차 슬라이스) + 7개 중 4개 실제 연결 완료
-  (5차 슬라이스, `docs/wp01-app-shell-progress.md` 참고)**: 공유(ShareModal)/기념일 설정
-  (AnniversaryModal)/사용자 매뉴얼(UserManualOverlay)/관리자 진입(새 탭으로 관리자 대시보드)은
-  실제로 동작한다. 남은 3개는 의도적으로 보류 중:
+- ~~**"더보기" 탭 구조**~~ **메뉴 리스트 완료 (4차 슬라이스) + 7개 중 5개 실제 연결 완료
+  (5·6차 슬라이스, `docs/wp01-app-shell-progress.md` 참고)**: 공유(ShareModal)/기념일 설정
+  (AnniversaryModal)/사용자 매뉴얼(UserManualOverlay)/앱 설정(AppSettingsModal)/관리자 진입(새
+  탭으로 관리자 대시보드)은 실제로 동작한다. 남은 2개만 보류 중:
   - **캘린더 설정** (`AdminModal`, `initialTab: 'settings'`) — 원래 호출부가 채팅/갤러리 내부
-    콜백(`onOpenChatMessage`, `onOpenImage` 등 20개 이상)에 깊이 얽혀 있어, 그대로 옮기면
-    "props 전달"이 아니라 채팅 메시지 열기 같은 실제 동작을 중복 구현하게 된다 — U10~U14가
-    경계하는 것과 같은 성격의 위험이라 별도 슬라이스로 미룸.
+    콜백(`onOpenChatMessage`, `onOpenImage` 등)에 얽혀 있는데, 이 콜백들은 `changeView('chat')`
+    로 대화 탭을 전환하는 것이 핵심이라 — 대화 탭 자체가 아직 플레이스홀더인 지금은 이동할
+    화면이 없다. WP-05(채팅 독립 화면)가 실제 데이터로 채워진 뒤 자연스럽게 풀림.
   - **검색** (`GlobalSearchModal`) — 같은 이유(채팅 내부 콜백 의존)로 보류, 게다가 마스터플랜
     자체가 통합검색을 신규 설계 과제로 분류하고 있음(위 참고).
-  - **앱 설정** (`AppSettingsModal`) — 브라우저 알림 권한 상태를 여러 state/Firestore 구독에
-    걸쳐 갱신하는 로직이 있어, 잘못 복제하면 알림 설정이 실제로 깨질 수 있는 위험이 있음.
 - **시각 디테일 이식**: 지금 `RenewalAppShell`은 무채색 최소 스타일이다. 시안(갈래 A)의 톤을
   가져오는 건 WP-02(디자인 토큰 정리) 이후로 미룬다 — 토큰이 먼저 정리돼야 하드코딩 색상이
   늘지 않는다 (마스터플랜 §8.2).
