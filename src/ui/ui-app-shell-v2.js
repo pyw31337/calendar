@@ -23,6 +23,35 @@ const TABS = [
   { id: 'settlement', label: '정산' },
   { id: 'more', label: '더보기' },
 ];
+const TAB_IDS = TABS.map(t => t.id);
+const DEFAULT_TAB = 'calendar';
+
+/** Reads `?tab=` from the current URL, falling back to 캘린더 for a missing/unknown value. */
+function readTabFromLocation() {
+  if (typeof window === 'undefined' || !window.location) return DEFAULT_TAB;
+  try {
+    const raw = new URLSearchParams(window.location.search).get('tab');
+    return TAB_IDS.includes(raw) ? raw : DEFAULT_TAB;
+  } catch (_) {
+    return DEFAULT_TAB;
+  }
+}
+
+/**
+ * Writes the tab into the URL without touching any other query param (`?id=`, `?shell=v2`, ...)
+ * or reloading the page. `push` adds a history entry (a deliberate tab switch, so the back
+ * button steps back through tabs one at a time -- 마스터플랜 §4.1's "브라우저 뒤로가기는 탭
+ * 내부 상세 → 탭 루트 → 이전 브라우저 위치 순"); `replace` (used for the very first mount, and
+ * to correct an invalid `?tab=`) does not.
+ */
+function writeTabToLocation(tabId, { push } = { push: true }) {
+  if (typeof window === 'undefined' || !window.history) return;
+  const url = new URL(window.location.href);
+  if (tabId === DEFAULT_TAB) url.searchParams.delete('tab');
+  else url.searchParams.set('tab', tabId);
+  const method = push ? 'pushState' : 'replaceState';
+  window.history[method](window.history.state, '', url);
+}
 
 const TAB_ICONS = {
   calendar: 'M3 10h18M8 2v4M16 2v4M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z',
@@ -106,8 +135,23 @@ export function renderRenewalShellIfEnabled(activeCalId, calendar) {
  */
 export function RenewalAppShell({ activeCalId, calendar }) {
   const React = window.React;
-  const [activeTab, setActiveTab] = React.useState('calendar');
+  const [activeTab, setActiveTabState] = React.useState(readTabFromLocation);
   const calendarName = calendar?.name || null;
+
+  // Correct an invalid/stale ?tab= on first mount without adding a history entry, then listen
+  // for the back/forward buttons for the rest of this shell's lifetime.
+  React.useEffect(() => {
+    writeTabToLocation(activeTab, { push: false });
+    const onPopState = () => setActiveTabState(readTabFromLocation());
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []); // mount-only: reads the initial URL once and wires the one popstate listener
+
+  const setActiveTab = (tabId) => {
+    if (tabId === activeTab) return;
+    writeTabToLocation(tabId, { push: true });
+    setActiveTabState(tabId);
+  };
 
   const navButtons = (extraClass) => TABS.map(tab =>
     React.createElement('button', {
