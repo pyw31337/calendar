@@ -19,7 +19,7 @@ import { bindUiComponentAliases } from '../core/app-ui-wrappers.js';
 import {
   isNotificationSupported, isChatNotifyEnabledForCalendar, setChatNotifyEnabledForCalendar,
   getNotificationPermissionHelpSteps, setNotifGuideSeen, setNotifyChannel, syncPushSubscriptionChannels,
-  formatDDayLabel, formatConfirmedMeetingLabel,
+  formatDDayLabel, formatConfirmedMeetingLabel, normalizePlaceDateForSort,
 } from '../core/app-domain-helpers.js';
 import { buildMainCalendarScreenState } from '../core/app-calendar-screen-state.js';
 
@@ -580,10 +580,19 @@ function PlaceholderPane({ tabId, calendarName }) {
 }
 
 /**
- * Builds the 기록 tab's real ingredients (WP-06 continuation, 사진·영상 subtab). Straight
- * pass-through of the same values/handlers `app-main.js`'s own `activeView === 'gallery'` render
- * block already uses -- `ChatGalleryModal` itself is unchanged, just rendered with `asPage: true`
- * the same way the original call site does for its full-page (non-modal) form.
+ * 기록 tab body: a sub-tab chip row (전체/메모/사진·영상/장소/보관함/콘텐츠) over the same
+ * EmptyState, keyed by sub-tab so switching filters visibly changes something even before WP-06
+ * wires real data in. This is the one tab with a second level of navigation because it alone
+ * absorbs 5 old screens (docs/design-renewal-handoff.md §2) -- the other 4 tabs stay flat.
+ */
+/**
+ * Builds the 기록 tab's real ingredients (WP-06 continuation, 사진·영상 + 장소 + 메모 subtabs).
+ * Straight pass-through of the same values/handlers `app-main.js`'s own `activeView === 'gallery'`
+ * / `activeView === 'places'` / `activeView === 'memo'` render blocks already use --
+ * `ChatGalleryModal` itself is unchanged, just rendered with `asPage: true` the same way the
+ * original call site does for its full-page (non-modal) form. `onLoadMoreMemos` is composed in
+ * `app-main.js`'s own adapter call (it needs `MEMOS_PAGE_SIZE`, a module-level constant only in
+ * scope there) and handed through already-built.
  */
 export function buildRenewalRecordsContext(calendar, deps) {
   const {
@@ -596,6 +605,9 @@ export function buildRenewalRecordsContext(calendar, deps) {
     isDarkTheme, toggleTheme, fontScalePercent, setFontScalePercent,
     mainNotifPermission, mainChatNotifyEnabled, handleMainToggleNotifications,
     syncStatus, isGalleryShareOpen, setIsGalleryShareOpen,
+    handleSavePlace, handleDeletePlace,
+    placesInitialQuery, setPlacesInitialQuery, placesInitialFocusId, setPlacesInitialFocusId,
+    isPlacesShareOpen, setIsPlacesShareOpen,
     memos, totalMemoCount, onLoadMoreMemos, sharedMemo, setSharedMemo, chatMessages,
     patchLocalMemo, upsertLocalMemo, removeLocalMemo, memoInitialTag, setMemoInitialTag,
     isMemoShareOpen, setIsMemoShareOpen,
@@ -641,6 +653,21 @@ export function buildRenewalRecordsContext(calendar, deps) {
     isGalleryShareOpen: !!isGalleryShareOpen,
     onOpenGalleryShare: () => { if (requireLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsGalleryShareOpen(true); },
     onCloseGalleryShare: () => setIsGalleryShareOpen(false),
+    placesProps: {
+      calendar: activeCal,
+      onSavePlace: handleSavePlace, onDeletePlace: handleDeletePlace,
+      showToast, onRequestConfirm: showConfirmDialog,
+      placesInitialQuery, setPlacesInitialQuery, placesInitialFocusId, setPlacesInitialFocusId,
+      isDarkTheme, onToggleTheme: toggleTheme, fontScalePercent,
+      onDecreaseFont: () => setFontScalePercent(prev => Math.max(80, prev - 10)),
+      onIncreaseFont: () => setFontScalePercent(prev => Math.min(130, prev + 10)),
+      isChatNotifyEnabled: mainNotifPermission === 'granted' && mainChatNotifyEnabled,
+      onToggleChatNotifications: handleMainToggleNotifications,
+      syncStatus,
+    },
+    isPlacesShareOpen: !!isPlacesShareOpen,
+    onOpenPlacesShare: () => { if (requireLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsPlacesShareOpen(true); },
+    onClosePlacesShare: () => setIsPlacesShareOpen(false),
     memoProps: {
       calendar: activeCal, memos, hasMoreMemos, totalMemoCount, onLoadMoreMemos,
       showToast, isDarkTheme, onRequestConfirm: showConfirmDialog,
@@ -698,11 +725,64 @@ function MediaPane({ recordsContext, onChangeView, onOpenAppSettings }) {
 }
 
 /**
- * 기록 tab body: a sub-tab chip row (전체/메모/사진·영상/장소/보관함/콘텐츠) over the same
- * EmptyState, keyed by sub-tab so switching filters visibly changes something even before WP-06
- * wires real data in. This is the one tab with a second level of navigation because it alone
- * absorbs 5 old screens (docs/design-renewal-handoff.md §2) -- the other 4 tabs stay flat.
+ * 장소 subtab body (WP-06 continuation): the real `PlacesView`, same pass-through approach as
+ * `MemoPane` (WP-06's first subtab). `PlacesView` ships in its own lazy-loaded chunk
+ * (`window.__gatherLoadViewUi('places')`), so this waits for that chunk before rendering.
+ *
+ * Owns its own local date-detail-modal state (`placeDateModalDate`) rather than sharing 캘린더's
+ * -- unlike WP-07's 정산 tab (which lifted a shared instance up to `RenewalAppShell`), this slice
+ * keeps 장소 fully self-contained so it doesn't need to land in lockstep with that unmerged work;
+ * a later cleanup can fold this into the shared instance once both are on `main` together. Reuses
+ * `calendarContext.dateModalProps` (already built at `RenewalAppShell` level) for the modal's
+ * data/handlers, since those don't depend on which component owns the "which date is open" state.
  */
+function PlacesPane({ recordsContext, calendarContext, onChangeView, onOpenAppSettings, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource }) {
+  const React = window.React;
+  const [loaded, setLoaded] = React.useState(() => !!(window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlacesView));
+  React.useEffect(() => {
+    if (loaded) return undefined;
+    if (typeof window.__gatherLoadViewUi !== 'function') { setLoaded(true); return undefined; }
+    let cancelled = false;
+    window.__gatherLoadViewUi('places').then(() => { if (!cancelled) setLoaded(true); }).catch(err => {
+      console.error('Places UI load failed:', err);
+      if (typeof recordsContext.showToast === 'function') recordsContext.showToast('장소 화면을 불러오지 못했습니다. 다시 시도해 주세요.', 'error');
+    });
+    return () => { cancelled = true; };
+  }, [loaded]);
+  const [placeDateModalDate, setPlaceDateModalDate] = React.useState(null);
+  if (!loaded) {
+    return React.createElement(EmptyState, { title: '장소 불러오는 중', subtitle: '잠시만 기다려 주세요.' });
+  }
+  const { PlacesView, ShareModal, DateModal } = bindUiComponentAliases(React);
+  const onParticipantClick = (name, dateStr) => { if (dateStr) setPlaceDateModalDate(dateStr); };
+  return React.createElement(React.Fragment, null,
+    React.createElement(PlacesView, {
+      ...recordsContext.placesProps,
+      onBack: () => onChangeView('calendar'),
+      onSelectDate: (dateStr) => {
+        const canonicalDate = normalizePlaceDateForSort(dateStr);
+        if (canonicalDate) setPlaceDateModalDate(canonicalDate);
+      },
+      onSharePlaces: recordsContext.onOpenPlacesShare,
+      onOpenAppSettings,
+    }),
+    recordsContext.isPlacesShareOpen && React.createElement(ShareModal, {
+      calendar: recordsContext.calendar, shareType: 'places', showToast: recordsContext.showToast,
+      onClose: recordsContext.onClosePlacesShare,
+    }),
+    placeDateModalDate && React.createElement(DateModal, {
+      ...calendarContext.dateModalProps,
+      dateStr: placeDateModalDate,
+      initialTab: null,
+      onClose: () => setPlaceDateModalDate(null),
+      onParticipantClick,
+      onEditAnniversary,
+      onAddAnniversaryForDate: (d) => { setPlaceDateModalDate(null); onAddAnniversaryForDate(d); },
+      onFocusCultureSource: () => onFocusCultureSource(),
+    })
+  );
+}
+
 /**
  * 메모 subtab body (WP-06 continuation): the real `MemoView`, same pass-through approach as
  * `ChatPane`/`SettlementPane`. `MemoView` ships in its own lazy-loaded chunk
@@ -739,7 +819,7 @@ function MemoPane({ recordsContext, onChangeView, onOpenAppSettings }) {
   );
 }
 
-function RecordsPane({ subTab, onSelectSubTab, calendarName, recordsContext, onChangeView, onOpenAppSettings }) {
+function RecordsPane({ subTab, onSelectSubTab, calendarName, recordsContext, calendarContext, onChangeView, onOpenAppSettings, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource }) {
   const React = window.React;
   return React.createElement(React.Fragment, null,
     React.createElement('div', { className: 'renewal-shell-subtab-row', role: 'tablist', 'aria-label': '기록 필터' },
@@ -754,6 +834,8 @@ function RecordsPane({ subTab, onSelectSubTab, calendarName, recordsContext, onC
     ),
     subTab === 'media'
       ? React.createElement(MediaPane, { recordsContext, onChangeView, onOpenAppSettings })
+      : subTab === 'places'
+      ? React.createElement(PlacesPane, { recordsContext, calendarContext, onChangeView, onOpenAppSettings, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource })
       : subTab === 'memo'
       ? React.createElement(MemoPane, { recordsContext, onChangeView, onOpenAppSettings })
       : React.createElement(EmptyState, {
@@ -1164,7 +1246,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
           : activeTab === 'settlement'
           ? React.createElement(SettlementPane, { settlementContext, onChangeView, onOpenAppSettings, onOpenDate: setDateModalDate })
           : activeTab === 'records'
-          ? React.createElement(RecordsPane, { subTab: recordsSubTab, onSelectSubTab: setRecordsSubTab, calendarName, recordsContext, onChangeView, onOpenAppSettings })
+          ? React.createElement(RecordsPane, { subTab: recordsSubTab, onSelectSubTab: setRecordsSubTab, calendarName, recordsContext, calendarContext, onChangeView, onOpenAppSettings, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource })
           : activeTab === 'more'
           ? React.createElement(MorePane, { calendarName, selectedItem: selectedMoreItem, onSelectItem: handleSelectMoreItem })
           : React.createElement(PlaceholderPane, { tabId: activeTab, calendarName }),
