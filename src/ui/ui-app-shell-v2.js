@@ -139,22 +139,43 @@ function TopHeader({ calendarName, onOpenSearch, onOpenMore }) {
   );
 }
 
+/**
+ * Shared "not built yet" state (WP-02's EmptyState, product-renewal-master-plan.md §9: "공통
+ * 상태의 문구와 버튼 구조가 모든 기능에서 재사용 가능하다"), scoped to this shell for now --
+ * every renewal-shell screen that has no real data yet (PlaceholderPane, RecordsPane's per-subtab
+ * body) renders through this ONE component instead of repeating the same 3-line markup, so a
+ * future visual pass (or wiring a "관리자에게 문의" button, etc.) only needs to change one place.
+ * `icon` is optional (RecordsPane's sub-tab filters have no per-filter icon of their own).
+ */
+function EmptyState({ icon, title, subtitle }) {
+  const React = window.React;
+  return React.createElement('div', { className: 'renewal-shell-placeholder' },
+    icon && React.createElement('div', { className: 'renewal-shell-placeholder-icon' }, icon),
+    React.createElement('div', { className: 'renewal-shell-placeholder-title' }, title),
+    React.createElement('div', { className: 'renewal-shell-placeholder-sub' }, subtitle)
+  );
+}
+
+/** Builds EmptyState's subtitle: "<캘린더명> · <설명>" once a calendar is loaded, else just <설명>. */
+function withCalendarPrefix(calendarName, text) {
+  return calendarName ? `${calendarName} · ${text}` : text;
+}
+
 function PlaceholderPane({ tabId, calendarName }) {
   const React = window.React;
   const label = TABS.find(t => t.id === tabId)?.label || tabId;
-  return React.createElement('div', { className: 'renewal-shell-placeholder' },
-    React.createElement('div', { className: 'renewal-shell-placeholder-icon' }, React.createElement(TabIcon, { id: tabId })),
-    React.createElement('div', { className: 'renewal-shell-placeholder-title' }, `${label} (준비 중)`),
-    React.createElement('div', { className: 'renewal-shell-placeholder-sub' },
-      calendarName ? `${calendarName} · WP-03~07에서 실제 데이터가 이 자리에 연결됩니다.` : 'WP-03~07에서 실제 데이터가 이 자리에 연결됩니다.')
-  );
+  return React.createElement(EmptyState, {
+    icon: React.createElement(TabIcon, { id: tabId }),
+    title: `${label} (준비 중)`,
+    subtitle: withCalendarPrefix(calendarName, 'WP-03~07에서 실제 데이터가 이 자리에 연결됩니다.'),
+  });
 }
 
 /**
  * 기록 tab body: a sub-tab chip row (전체/메모/사진·영상/장소/보관함/콘텐츠) over the same
- * placeholder pane, keyed by sub-tab so switching filters visibly changes something even before
- * WP-06 wires real data in. This is the one tab with a second level of navigation because it
- * alone absorbs 5 old screens (docs/design-renewal-handoff.md §2) -- the other 4 tabs stay flat.
+ * EmptyState, keyed by sub-tab so switching filters visibly changes something even before WP-06
+ * wires real data in. This is the one tab with a second level of navigation because it alone
+ * absorbs 5 old screens (docs/design-renewal-handoff.md §2) -- the other 4 tabs stay flat.
  */
 function RecordsPane({ subTab, onSelectSubTab, calendarName }) {
   const React = window.React;
@@ -169,12 +190,10 @@ function RecordsPane({ subTab, onSelectSubTab, calendarName }) {
         onClick: () => onSelectSubTab(t.id),
       }, t.label))
     ),
-    React.createElement('div', { className: 'renewal-shell-placeholder' },
-      React.createElement('div', { className: 'renewal-shell-placeholder-title' },
-        `${RECORDS_SUBTABS.find(t => t.id === subTab)?.label || subTab} (준비 중)`),
-      React.createElement('div', { className: 'renewal-shell-placeholder-sub' },
-        calendarName ? `${calendarName} · WP-06에서 실제 데이터가 이 자리에 연결됩니다.` : 'WP-06에서 실제 데이터가 이 자리에 연결됩니다.')
-    )
+    React.createElement(EmptyState, {
+      title: `${RECORDS_SUBTABS.find(t => t.id === subTab)?.label || subTab} (준비 중)`,
+      subtitle: withCalendarPrefix(calendarName, 'WP-06에서 실제 데이터가 이 자리에 연결됩니다.'),
+    })
   );
 }
 

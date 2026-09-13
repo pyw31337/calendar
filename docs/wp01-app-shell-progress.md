@@ -286,3 +286,24 @@ import**해서 쓰면 된다 — 로직을 복제하는 게 아니라 완전히 
 `changeView('chat')`으로 채팅 메시지 위치로 이동시키는 콜백(`onOpenChatMessage`/`onOpenImage`)이
 필요한데, 대화 탭 자체가 아직 플레이스홀더라 이동할 실제 화면이 없다. WP-05(채팅 독립 화면)가
 실제 데이터로 채워진 뒤에나 자연스럽게 풀리는 문제라 그 전까지는 보류.
+
+## 2026-09-13: WP-02 착수 — 렌더얼 셸 범위의 EmptyState 공통화
+
+`docs/product-renewal-master-plan.md` §9 WP-02("공통 상태 컴포넌트 공통화")는 원래 앱 전체를
+대상으로 하는 별도 담당(디자인 시스템 에이전트) 워크스트림이지만, 지금 존재하는 "신규 화면"이
+렌더얼 셸뿐이라 그 범위 안에서 먼저 시작했다.
+
+- `EmptyState({ icon, title, subtitle })` 컴포넌트를 `ui-app-shell-v2.js`에 추가하고,
+  `PlaceholderPane`(플랫 4탭용)과 `RecordsPane`의 서브탭별 플레이스홀더가 각자 반복하던
+  3줄짜리 마크업을 이걸로 교체했다. `withCalendarPrefix(calendarName, text)` 헬퍼도 함께
+  추출해서 "`<캘린더명> · <설명>`" 문구 조합 로직 중복도 없앴다.
+- 순수 리팩터(동작 변화 없음) — `renewal-shell-placeholder*` CSS 클래스 이름/구조는 그대로라
+  `app.css`는 건드리지 않았다.
+- 검증(Playwright 헤드리스): `?tab=chat`(플랫 플레이스홀더)과 `?tab=records&sub=memo`(서브탭
+  플레이스홀더) 양쪽 다 제목 텍스트가 리팩터 전과 동일하게 렌더됨을 확인.
+- `npm run lint`/`check:all`/`safety:test`/`regression:test` 전부 통과, `app-main.js` 미변경.
+
+**다음 WP-02 후보**: 타이포그래피 5단계/spacing/divider/elevation 토큰화, `LoadingState`/
+`ErrorState`/`OfflineState`/`SectionHeader`/`CountBadge` 공통화 — 이건 앱 전체(레거시 화면
+포함) 범위라 별도로 더 크게 계획해야 한다. 참고로 색상 토큰(`--brand`, `--text-main` 등)은
+이미 앱 전역에 있고 렌더얼 셸도 처음부터 그걸 재사용해 왔다.
