@@ -294,25 +294,26 @@ function PollsSection({ calendarContext }) {
 }
 
 /**
- * 캘린더 tab body (WP-03): the real month grid + date detail modal, using the SAME
- * `window.GATHER_UI_COMPONENTS` pass-through aliases the other real modals use
- * (`bindUiComponentAliases`) -- CalendarGrid/DateModal are not lazy-loaded chunks (they ship in
- * the main bundle, same as app-main.js's own usage), so no wait-then-open step is needed here
- * the way share/manual/anniversaries needed. Order below matches master-plan.md §4.2's 캘린더 홈
- * 표시 순서 (월간 캘린더 -> 가까운 일정 -> 내가 응답할 일 -> 최근 소식); 최근 소식 is deferred
- * (see docs/wp01-app-shell-progress.md's WP-03 note -- no existing data model maps to it, unlike
- * the other two which reuse `buildMainCalendarScreenState` untouched).
+ * 캘린더 tab body (WP-03): the real month grid, using the SAME `window.GATHER_UI_COMPONENTS`
+ * pass-through aliases the other real modals use (`bindUiComponentAliases`) -- `CalendarGrid` is
+ * not a lazy-loaded chunk (it ships in the main bundle, same as app-main.js's own usage), so no
+ * wait-then-open step is needed here the way share/manual/anniversaries needed. Order below
+ * matches master-plan.md §4.2's 캘린더 홈 표시 순서 (월간 캘린더 -> 가까운 일정 -> 내가 응답할 일
+ * -> 최근 소식); 최근 소식 is deferred (see docs/wp01-app-shell-progress.md's WP-03 note -- no
+ * existing data model maps to it, unlike the other two which reuse `buildMainCalendarScreenState`
+ * untouched).
  *
- * Month navigation and which date's modal is open are local state, same reasoning as
- * `openMoreModal`: CalendarApp's own `currentMonthDate`/`isModalOpen` drive JSX this shell's
- * early return never reaches, so reusing them would silently no-op.
+ * The date detail modal itself now lives at `RenewalAppShell` level (`onOpenDate` opens it) --
+ * WP-05's 정산 탭 also needs to open the exact same modal from its own date list, so a single
+ * shared instance beats each tab owning (and duplicating) its own. Month navigation is still
+ * local state here, same reasoning as `openMoreModal`: CalendarApp's own `currentMonthDate` drives
+ * JSX this shell's early return never reaches, so reusing it would silently no-op.
  */
-function CalendarPane({ calendarContext, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource }) {
+function CalendarPane({ calendarContext, onOpenDate }) {
   const React = window.React;
-  const { CalendarGrid, DateModal } = bindUiComponentAliases(React);
+  const { CalendarGrid } = bindUiComponentAliases(React);
   const [monthDate, setMonthDate] = React.useState(() => new Date());
-  const [dateModalDate, setDateModalDate] = React.useState(null);
-  const onParticipantClick = (name, dateStr) => { if (dateStr) setDateModalDate(dateStr); };
+  const onParticipantClick = (name, dateStr) => { if (dateStr) onOpenDate(dateStr); };
   return React.createElement(React.Fragment, null,
     React.createElement(CalendarGrid, {
       anniversaries: calendarContext.anniversaries,
@@ -323,25 +324,35 @@ function CalendarPane({ calendarContext, onEditAnniversary, onAddAnniversaryForD
       onNextMonth: () => setMonthDate(d => new Date(d.getFullYear(), d.getMonth() + 1, 1)),
       onToday: () => setMonthDate(new Date()),
       onJumpToMonth: (y, m) => setMonthDate(new Date(y, m, 1)),
-      onSelectDate: d => setDateModalDate(d),
+      onSelectDate: onOpenDate,
       onMoveAvailability: calendarContext.handleMoveAvailability,
       onParticipantClick,
     }),
-    React.createElement(UpcomingMeetingsSection, { meetings: calendarContext.upcomingMeetings, onSelectDate: setDateModalDate }),
-    React.createElement(PollsSection, { calendarContext }),
-    dateModalDate && React.createElement(DateModal, {
-      ...calendarContext.dateModalProps,
-      dateStr: dateModalDate,
-      initialTab: null,
-      onClose: () => setDateModalDate(null),
-      onParticipantClick,
-      onEditAnniversary,
-      onAddAnniversaryForDate: (d) => { setDateModalDate(null); onAddAnniversaryForDate(d); },
-      // 컨텐츠 원본 포커스는 아직 실제 컨텐츠 화면(WP-06)이 없어 기록 탭 콘텐츠 서브탭으로만
-      // 이동시킨다 -- localStorage 포커스 힌트는 그 화면이 실제로 연결될 때 함께 넣는다.
-      onFocusCultureSource: () => onFocusCultureSource(),
-    })
+    React.createElement(UpcomingMeetingsSection, { meetings: calendarContext.upcomingMeetings, onSelectDate: onOpenDate }),
+    React.createElement(PollsSection, { calendarContext })
   );
+}
+
+/**
+ * Shared date detail modal (WP-05): lives at `RenewalAppShell` level so 캘린더 and 정산 both open
+ * the exact same instance instead of each tab duplicating it (WP-03 originally nested this inside
+ * `CalendarPane` alone; lifted out once 정산 needed the same "click a date, see its detail" flow).
+ */
+function SharedDateModal({ calendarContext, dateModalDate, onClose, onSelectDate, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource }) {
+  const React = window.React;
+  const { DateModal } = bindUiComponentAliases(React);
+  return React.createElement(DateModal, {
+    ...calendarContext.dateModalProps,
+    dateStr: dateModalDate,
+    initialTab: null,
+    onClose,
+    onParticipantClick: (name, dateStr) => { if (dateStr) onSelectDate(dateStr); },
+    onEditAnniversary,
+    onAddAnniversaryForDate: (d) => { onClose(); onAddAnniversaryForDate(d); },
+    // 컨텐츠 원본 포커스는 아직 실제 컨텐츠 화면(WP-06)이 없어 기록 탭 콘텐츠 서브탭으로만
+    // 이동시킨다 -- localStorage 포커스 힌트는 그 화면이 실제로 연결될 때 함께 넣는다.
+    onFocusCultureSource: () => onFocusCultureSource(),
+  });
 }
 
 /**
@@ -439,6 +450,99 @@ function ChatPane({ chatContext, onChangeView, onOpenAppSettings }) {
     chatContext.isChatShareOpen && React.createElement(ShareModal, {
       calendar: chatContext.calendar, shareType: 'chat', showToast: chatContext.showToast,
       onClose: chatContext.onCloseChatShare,
+    })
+  );
+}
+
+/**
+ * Builds the 정산 tab's real ingredients (WP-05 continuation). Straight pass-through of the same
+ * handlers `app-main.js`'s own `activeView === 'settlement'` render block already uses. Mirrors
+ * that call site's one deliberate quirk exactly: `onOpenCreateSettlement` is left unset, so
+ * `SettlementSummaryModal` falls back to its OWN internal create-settlement state/modal (it does
+ * this natively -- see its `handleOpenCreateSettlement`) rather than routing through CalendarApp's
+ * `isCreateSettlementOpen`, which the original render also never wires here. Only the EDIT flow
+ * (`onOpenSettlementEditor`) routes externally, matching the original.
+ */
+export function buildRenewalSettlementContext(calendar, deps) {
+  const {
+    activeCal, canUseSettlement, showToast, showConfirmDialog,
+    handleToggleSettlementCardStatus, handleDeleteSettlementCard, handleSaveSettlementCard,
+    editingSettlementCard, setEditingSettlementCard, isShareOpen, setIsShareOpen,
+  } = deps || {};
+  const requireLoadedCalendar = (message) => {
+    if (activeCal) return true;
+    if (typeof showToast === 'function') showToast(message, 'error');
+    return false;
+  };
+  return {
+    calendar: activeCal,
+    showToast,
+    onRequestConfirm: showConfirmDialog,
+    summaryProps: {
+      calendar: activeCal,
+      onToggleSettlementCardStatus: handleToggleSettlementCardStatus,
+      onDeleteSettlementCard: handleDeleteSettlementCard,
+      onSaveSettlementCard: handleSaveSettlementCard,
+      onOpenSettlementEditor: (card) => setEditingSettlementCard(card ? { ...card } : null),
+      showToast, onRequestConfirm: showConfirmDialog,
+    },
+    isShareOpen: !!isShareOpen,
+    onOpenShare: () => { if (requireLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsShareOpen(true); },
+    onCloseShare: () => setIsShareOpen(false),
+    editingSettlementCard,
+    onCloseSettlementEditor: () => setEditingSettlementCard(null),
+    onDeleteSettlementCard: handleDeleteSettlementCard,
+    onToggleSettlementCardStatus: handleToggleSettlementCardStatus,
+    onSaveSettlementCard: handleSaveSettlementCard,
+    canUseSettlement: !!canUseSettlement,
+  };
+}
+
+/**
+ * 정산 tab body (WP-05 continuation): the real `SettlementSummaryModal`, same pass-through
+ * approach as `ChatPane`. `SettlementSummaryModal`/`CreateSettlementModal` ship in the same
+ * lazy-loaded chunk as `PollModal`/`AnniversaryModal` (`window.__gatherLoadEventUi`), so this
+ * needs the same "wait for the chunk" step.
+ */
+function SettlementPane({ settlementContext, onChangeView, onOpenAppSettings, onOpenDate }) {
+  const React = window.React;
+  const [loaded, setLoaded] = React.useState(() => !!(window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SettlementSummaryModal));
+  React.useEffect(() => {
+    if (loaded) return undefined;
+    if (typeof window.__gatherLoadEventUi !== 'function') { setLoaded(true); return undefined; }
+    let cancelled = false;
+    window.__gatherLoadEventUi().then(() => { if (!cancelled) setLoaded(true); }).catch(err => {
+      console.error('Settlement UI load failed:', err);
+      if (typeof settlementContext.showToast === 'function') settlementContext.showToast('정산 화면을 불러오지 못했습니다. 다시 시도해 주세요.', 'error');
+    });
+    return () => { cancelled = true; };
+  }, [loaded]);
+  if (!loaded) {
+    return React.createElement(EmptyState, { title: '정산 화면 불러오는 중', subtitle: '잠시만 기다려 주세요.' });
+  }
+  const { SettlementSummaryModal, ShareModal, CreateSettlementModal } = bindUiComponentAliases(React);
+  return React.createElement(React.Fragment, null,
+    React.createElement(SettlementSummaryModal, {
+      ...settlementContext.summaryProps,
+      onBack: () => onChangeView('calendar'),
+      onSelectDate: onOpenDate,
+      onOpenShare: settlementContext.onOpenShare,
+      onOpenAppSettings,
+      onChangeView,
+    }),
+    settlementContext.isShareOpen && React.createElement(ShareModal, {
+      calendar: settlementContext.calendar, shareType: 'settlement', showToast: settlementContext.showToast,
+      onClose: settlementContext.onCloseShare,
+    }),
+    settlementContext.editingSettlementCard && React.createElement(CreateSettlementModal, {
+      calendar: settlementContext.calendar,
+      initialData: settlementContext.editingSettlementCard,
+      showToast: settlementContext.showToast,
+      onClose: settlementContext.onCloseSettlementEditor,
+      onDeleteCard: settlementContext.onDeleteSettlementCard,
+      onToggleStatus: settlementContext.onToggleSettlementCardStatus,
+      onSave: settlementContext.onSaveSettlementCard,
+      onRequestConfirm: settlementContext.onRequestConfirm,
     })
   );
 }
@@ -822,7 +926,7 @@ function MorePane({ calendarName, onSelectItem, selectedItem }) {
  * the shell element when `?shell=v2` is set, otherwise null so the caller falls through to the
  * existing return unchanged.
  */
-export function renderRenewalShellIfEnabled(activeCalId, calendar, moreContextDeps, calendarContextDeps, chatContextDeps, recordsContextDeps) {
+export function renderRenewalShellIfEnabled(activeCalId, calendar, moreContextDeps, calendarContextDeps, chatContextDeps, settlementContextDeps, recordsContextDeps) {
   const React = window.React;
   if (!isRenewalShellEnabled()) return null;
   return React.createElement(RenewalAppShell, {
@@ -830,21 +934,23 @@ export function renderRenewalShellIfEnabled(activeCalId, calendar, moreContextDe
     moreContext: buildRenewalMoreContext(calendar, moreContextDeps),
     calendarContext: buildRenewalCalendarContext(calendar, calendarContextDeps),
     chatContext: buildRenewalChatContext(calendar, chatContextDeps),
+    settlementContext: buildRenewalSettlementContext(calendar, settlementContextDeps),
     recordsContext: buildRenewalRecordsContext(calendar, recordsContextDeps),
   });
 }
 
 /**
- * @param {{ activeCalId: string, calendar: object | null, moreContext: object, calendarContext: object, chatContext: object, recordsContext: object }} props
+ * @param {{ activeCalId: string, calendar: object | null, moreContext: object, calendarContext: object, chatContext: object, settlementContext: object, recordsContext: object }} props
  *   `calendar` is the already-loaded record for activeCalId (or null while it loads) --
  *   passed in from CalendarApp's existing state as a plain prop (the adapter pattern from
  *   product-renewal-master-plan.md §8.2), never re-fetched here. `moreContext` (see
  *   `buildRenewalMoreContext`) is the 더보기 tab's real destinations; `calendarContext` (see
  *   `buildRenewalCalendarContext`) is the 캘린더 tab's; `chatContext` (see
- *   `buildRenewalChatContext`) is the 대화 tab's; `recordsContext` (see
- *   `buildRenewalRecordsContext`) is the 기록 tab's -- all built the same way.
+ *   `buildRenewalChatContext`) is the 대화 tab's; `settlementContext` (see
+ *   `buildRenewalSettlementContext`) is the 정산 tab's; `recordsContext` (see
+ *   `buildRenewalRecordsContext`) is the 기록 탭's -- all built the same way.
  */
-export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarContext, chatContext, recordsContext }) {
+export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarContext, chatContext, settlementContext, recordsContext }) {
   const React = window.React;
   const [activeTab, setActiveTabState] = React.useState(readTabFromLocation);
   const [recordsSubTab, setRecordsSubTabState] = React.useState(readRecordsSubTabFromLocation);
@@ -856,6 +962,11 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   // Set only when DateModal's "+ 기념일 등록"/편집 opens the 기념일 설정 modal on top of (or after
   // closing) it, so that modal opens pre-filled the same way the old side-menu flow did.
   const [anniversaryOverride, setAnniversaryOverride] = React.useState(null);
+  // Shared date detail modal (WP-05): both 캘린더 (grid/가까운 일정) and 정산 (date list) tabs open
+  // the SAME DateModal instance from here instead of each owning its own -- CalendarApp's own
+  // `selectedDate`/`isModalOpen` drive JSX this shell's early return never reaches, same reasoning
+  // as `openMoreModal`.
+  const [dateModalDate, setDateModalDate] = React.useState(null);
   const calendarName = calendar?.name || null;
 
   // Shared by the 더보기 list AND any other pane (e.g. ChatPane's "앱 설정" entry) that needs to
@@ -967,14 +1078,22 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
           onOpenMore: () => setActiveTab('more'),
         }),
         activeTab === 'calendar'
-          ? React.createElement(CalendarPane, { calendarContext, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource })
+          ? React.createElement(CalendarPane, { calendarContext, onOpenDate: setDateModalDate })
           : activeTab === 'chat'
           ? React.createElement(ChatPane, { chatContext, onChangeView, onOpenAppSettings })
+          : activeTab === 'settlement'
+          ? React.createElement(SettlementPane, { settlementContext, onChangeView, onOpenAppSettings, onOpenDate: setDateModalDate })
           : activeTab === 'records'
           ? React.createElement(RecordsPane, { subTab: recordsSubTab, onSelectSubTab: setRecordsSubTab, calendarName, recordsContext, onChangeView, onOpenAppSettings })
           : activeTab === 'more'
           ? React.createElement(MorePane, { calendarName, selectedItem: selectedMoreItem, onSelectItem: handleSelectMoreItem })
-          : React.createElement(PlaceholderPane, { tabId: activeTab, calendarName })
+          : React.createElement(PlaceholderPane, { tabId: activeTab, calendarName }),
+        dateModalDate && React.createElement(SharedDateModal, {
+          calendarContext, dateModalDate,
+          onClose: () => setDateModalDate(null),
+          onSelectDate: setDateModalDate,
+          onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource,
+        })
       ),
       React.createElement('nav', { className: 'renewal-shell-bottom-nav', 'aria-label': '주 메뉴' },
         ...navButtons('renewal-shell-bottom-nav-item')
