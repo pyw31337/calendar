@@ -139,6 +139,117 @@ function TopHeader({ calendarName, onOpenSearch, onOpenMore }) {
   );
 }
 
+/**
+ * Builds the 캘린더 tab's real ingredients from CalendarApp's own state/helpers (WP-03). Every
+ * value here is a straight pass-through of an already-existing, already-tested CalendarApp
+ * function/value -- CalendarGrid and DateModal are self-contained (no onOpenChatMessage/
+ * onOpenImage-style navigation dependency the way AdminModal/GlobalSearchModal are), so unlike
+ * those two this can be wired for real in this slice.
+ *
+ * @param {object|null} calendar - unused for the grid/date-modal `calendar` prop itself (see
+ *   `activeCal` below) -- kept as a parameter only for signature symmetry with
+ *   `buildRenewalMoreContext`.
+ * @param {object} deps - activeCal, anniversariesWithPosters, isInitialDataLoading,
+ *   handleMoveAvailability, displayChatMessages, memos, customCultureItems,
+ *   handleSaveAvailability, handleDeleteAvailability, handleReorderAvailability,
+ *   handleDeleteAllForDate, handleConfirmMeeting, handleSaveExpense, handleDeleteExpense,
+ *   handleReorderExpenses, handleAddMeetingPhotos, handleDeletePhoto, handleDeleteMeetingPhoto,
+ *   findChatMessageById, handleFetchDateTaggedMessages, handleFetchDateTaggedMemos,
+ *   handleFetchMeetingPhotoIndex, handleFetchMeetingAlbum, loadOlderChatMessages,
+ *   hasMoreOlderChat, loadingOlderChat, fullChatMessages, handleSavePlace, handleDeletePlace,
+ *   handleReorderPlaces, showToast, showConfirmDialog, syncStatus, photoCommentCounts,
+ *   setActiveLightbox.
+ */
+export function buildRenewalCalendarContext(calendar, deps) {
+  const {
+    // CalendarGrid/DateModal need CalendarApp's OWN `activeCal` -- never null, always at least
+    // `{ places: [...], confirmedMeeting: ... }` even before Firestore data loads, since it's
+    // built by spreading `rawActiveCal` (`{...null}` is `{}` in JS). The `calendar` prop this
+    // shell otherwise passes around (`activeCalLoaded ? activeCal : null`) is deliberately
+    // nullable so the 더보기 tab can toast "not loaded yet" -- but CalendarGrid has no such guard
+    // and reads straight into `calendar.availabilities`, so passing it the nullable one crashes
+    // (caught via Playwright: "Cannot read properties of null (reading 'availabilities')").
+    activeCal,
+    anniversariesWithPosters, isInitialDataLoading, handleMoveAvailability,
+    displayChatMessages, memos, customCultureItems,
+    handleSaveAvailability, handleDeleteAvailability, handleReorderAvailability, handleDeleteAllForDate,
+    handleConfirmMeeting, handleSaveExpense, handleDeleteExpense, handleReorderExpenses,
+    handleAddMeetingPhotos, handleDeletePhoto, handleDeleteMeetingPhoto, findChatMessageById,
+    handleFetchDateTaggedMessages, handleFetchDateTaggedMemos, handleFetchMeetingPhotoIndex,
+    handleFetchMeetingAlbum, loadOlderChatMessages, hasMoreOlderChat, loadingOlderChat, fullChatMessages,
+    handleSavePlace, handleDeletePlace, handleReorderPlaces,
+    showToast, showConfirmDialog, syncStatus, photoCommentCounts, setActiveLightbox,
+  } = deps || {};
+  return {
+    calendar: activeCal,
+    anniversaries: anniversariesWithPosters,
+    isLoading: !!isInitialDataLoading,
+    handleMoveAvailability,
+    dateModalProps: {
+      calendar: activeCal, chatMessages: displayChatMessages, memos, customCultureItems,
+      onSave: handleSaveAvailability, onDelete: handleDeleteAvailability,
+      onReorderAvailability: handleReorderAvailability, onDeleteDate: handleDeleteAllForDate,
+      onConfirmMeeting: handleConfirmMeeting, onSaveExpense: handleSaveExpense,
+      onDeleteExpense: handleDeleteExpense, onReorderExpenses: handleReorderExpenses,
+      onAddMeetingPhotos: handleAddMeetingPhotos, onDeletePhoto: handleDeletePhoto,
+      onDeleteMeetingPhoto: handleDeleteMeetingPhoto, onFindChatMessageById: findChatMessageById,
+      onFetchDateTaggedMessages: handleFetchDateTaggedMessages, onFetchDateTaggedMemos: handleFetchDateTaggedMemos,
+      onFetchMeetingPhotoIndex: handleFetchMeetingPhotoIndex, onFetchMeetingAlbum: handleFetchMeetingAlbum,
+      onLoadOlderChat: loadOlderChatMessages,
+      hasMoreOlderChat: !Array.isArray(fullChatMessages) && !!hasMoreOlderChat,
+      loadingOlderChat, setActiveLightbox,
+      onSavePlace: handleSavePlace, onDeletePlace: handleDeletePlace, onReorderPlaces: handleReorderPlaces,
+      showToast, onRequestConfirm: showConfirmDialog, syncStatus, photoCommentCounts,
+    },
+  };
+}
+
+/**
+ * 캘린더 tab body (WP-03): the real month grid + date detail modal, using the SAME
+ * `window.GATHER_UI_COMPONENTS` pass-through aliases the other real modals use
+ * (`bindUiComponentAliases`) -- CalendarGrid/DateModal are not lazy-loaded chunks (they ship in
+ * the main bundle, same as app-main.js's own usage), so no wait-then-open step is needed here
+ * the way share/manual/anniversaries needed.
+ *
+ * Month navigation and which date's modal is open are local state, same reasoning as
+ * `openMoreModal`: CalendarApp's own `currentMonthDate`/`isModalOpen` drive JSX this shell's
+ * early return never reaches, so reusing them would silently no-op.
+ */
+function CalendarPane({ calendarContext, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource }) {
+  const React = window.React;
+  const { CalendarGrid, DateModal } = bindUiComponentAliases(React);
+  const [monthDate, setMonthDate] = React.useState(() => new Date());
+  const [dateModalDate, setDateModalDate] = React.useState(null);
+  const onParticipantClick = (name, dateStr) => { if (dateStr) setDateModalDate(dateStr); };
+  return React.createElement(React.Fragment, null,
+    React.createElement(CalendarGrid, {
+      anniversaries: calendarContext.anniversaries,
+      calendar: calendarContext.calendar,
+      isLoading: calendarContext.isLoading,
+      monthDate,
+      onPrevMonth: () => setMonthDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1)),
+      onNextMonth: () => setMonthDate(d => new Date(d.getFullYear(), d.getMonth() + 1, 1)),
+      onToday: () => setMonthDate(new Date()),
+      onJumpToMonth: (y, m) => setMonthDate(new Date(y, m, 1)),
+      onSelectDate: d => setDateModalDate(d),
+      onMoveAvailability: calendarContext.handleMoveAvailability,
+      onParticipantClick,
+    }),
+    dateModalDate && React.createElement(DateModal, {
+      ...calendarContext.dateModalProps,
+      dateStr: dateModalDate,
+      initialTab: null,
+      onClose: () => setDateModalDate(null),
+      onParticipantClick,
+      onEditAnniversary,
+      onAddAnniversaryForDate: (d) => { setDateModalDate(null); onAddAnniversaryForDate(d); },
+      // 컨텐츠 원본 포커스는 아직 실제 컨텐츠 화면(WP-06)이 없어 기록 탭 콘텐츠 서브탭으로만
+      // 이동시킨다 -- localStorage 포커스 힌트는 그 화면이 실제로 연결될 때 함께 넣는다.
+      onFocusCultureSource: () => onFocusCultureSource(),
+    })
+  );
+}
+
 function PlaceholderPane({ tabId, calendarName }) {
   const React = window.React;
   const label = TABS.find(t => t.id === tabId)?.label || tabId;
@@ -373,12 +484,12 @@ export function buildRenewalMoreContext(calendar, deps) {
  * pass-through aliases app-main.js itself uses (`bindUiComponentAliases`) -- so this reuses the
  * exact lazy-loaded chunk/component app-main.js already has, no separate copy bundled here.
  */
-function MoreModalsHost({ openModal, onClose, modalProps }) {
+function MoreModalsHost({ openModal, onClose, modalProps, anniversaryOverride }) {
   const React = window.React;
   if (!openModal) return null;
   const { ShareModal, AnniversaryModal, UserManualOverlay, AppSettingsModal } = bindUiComponentAliases(React);
   if (openModal === 'share') return React.createElement(ShareModal, { ...modalProps.share, onClose });
-  if (openModal === 'anniversaries') return React.createElement(AnniversaryModal, { ...modalProps.anniversaries, onClose });
+  if (openModal === 'anniversaries') return React.createElement(AnniversaryModal, { ...modalProps.anniversaries, ...anniversaryOverride, onClose });
   if (openModal === 'manual') return React.createElement(UserManualOverlay, { ...modalProps.manual, onClose });
   if (openModal === 'app-settings') return React.createElement(AppSettingsModal, { ...modalProps['app-settings'], onClose });
   return null;
@@ -421,20 +532,25 @@ function MorePane({ calendarName, onSelectItem, selectedItem }) {
  * the shell element when `?shell=v2` is set, otherwise null so the caller falls through to the
  * existing return unchanged.
  */
-export function renderRenewalShellIfEnabled(activeCalId, calendar, moreContextDeps) {
+export function renderRenewalShellIfEnabled(activeCalId, calendar, moreContextDeps, calendarContextDeps) {
   const React = window.React;
   if (!isRenewalShellEnabled()) return null;
-  return React.createElement(RenewalAppShell, { activeCalId, calendar, moreContext: buildRenewalMoreContext(calendar, moreContextDeps) });
+  return React.createElement(RenewalAppShell, {
+    activeCalId, calendar,
+    moreContext: buildRenewalMoreContext(calendar, moreContextDeps),
+    calendarContext: buildRenewalCalendarContext(calendar, calendarContextDeps),
+  });
 }
 
 /**
- * @param {{ activeCalId: string, calendar: object | null, moreContext: object }} props
+ * @param {{ activeCalId: string, calendar: object | null, moreContext: object, calendarContext: object }} props
  *   `calendar` is the already-loaded record for activeCalId (or null while it loads) --
  *   passed in from CalendarApp's existing state as a plain prop (the adapter pattern from
  *   product-renewal-master-plan.md §8.2), never re-fetched here. `moreContext` (see
- *   `buildRenewalMoreContext`) is the 더보기 tab's real destinations, built the same way.
+ *   `buildRenewalMoreContext`) is the 더보기 tab's real destinations; `calendarContext` (see
+ *   `buildRenewalCalendarContext`) is the 캘린더 tab's, both built the same way.
  */
-export function RenewalAppShell({ activeCalId, calendar, moreContext }) {
+export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarContext }) {
   const React = window.React;
   const [activeTab, setActiveTabState] = React.useState(readTabFromLocation);
   const [recordsSubTab, setRecordsSubTabState] = React.useState(readRecordsSubTabFromLocation);
@@ -443,17 +559,44 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext }) {
   // this shell (see buildRenewalMoreContext's doc comment for why this doesn't reuse
   // CalendarApp's own isShareOpen/isAnniversariesOpen/isGuideOpen state).
   const [openMoreModal, setOpenMoreModal] = React.useState(null);
+  // Set only when DateModal's "+ 기념일 등록"/편집 opens the 기념일 설정 modal on top of (or after
+  // closing) it, so that modal opens pre-filled the same way the old side-menu flow did.
+  const [anniversaryOverride, setAnniversaryOverride] = React.useState(null);
   const calendarName = calendar?.name || null;
 
   const handleSelectMoreItem = (id) => {
     setSelectedMoreItem(id);
     if (id === 'admin') { moreContext.onOpenAdmin(); return; }
-    if (!REAL_MORE_MODAL_IDS.includes(id)) return; // search/app-settings/calendar-settings: selection only for now
+    if (!REAL_MORE_MODAL_IDS.includes(id)) return; // search/calendar-settings: selection only for now
+    if (id === 'anniversaries') setAnniversaryOverride(null); // opened from the 더보기 list itself, not a date's edit/add flow
     const trigger = {
       share: moreContext.onSelectShare, anniversaries: moreContext.onSelectAnniversaries,
       manual: moreContext.onSelectManual, 'app-settings': moreContext.onSelectAppSettings,
     }[id];
     Promise.resolve(trigger()).then(() => setOpenMoreModal(id)).catch(() => {});
+  };
+
+  // DateModal's "기념일 편집"/"+ 기념일 등록" buttons (WP-03) open the SAME 기념일 설정 modal the
+  // 더보기 tab does, pre-filled with an edit id or a starting date -- exactly what the old
+  // MainSideMenu-driven flow did, just routed through this shell's own openMoreModal state.
+  const openAnniversariesWith = (override) => {
+    setAnniversaryOverride(override);
+    Promise.resolve(moreContext.onSelectAnniversaries()).then(() => setOpenMoreModal('anniversaries')).catch(() => {});
+  };
+  const onEditAnniversary = (ann) => {
+    if (!ann?.id) return;
+    openAnniversariesWith({ initialEditId: ann.id, initialDate: null });
+  };
+  const onAddAnniversaryForDate = (dateStr) => {
+    if (!dateStr) return;
+    openAnniversariesWith({ initialEditId: null, initialDate: dateStr });
+  };
+  // 컨텐츠 원본(지역축제/문화행사 등) 포커스는 아직 실제 컨텐츠 화면이 없어(WP-06), 기록 탭의
+  // 콘텐츠 서브탭으로만 이동시킨다 -- 특정 항목을 펼쳐서 보여주는 것은 그 화면이 실제로
+  // 연결될 때 함께 다룬다.
+  const onFocusCultureSource = () => {
+    setActiveTab('records');
+    setRecordsSubTab('content');
   };
 
   // Correct an invalid/stale ?tab=/?sub= on first mount without adding a history entry, then
@@ -506,7 +649,9 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext }) {
           onOpenSearch: () => setActiveTab('more'),
           onOpenMore: () => setActiveTab('more'),
         }),
-        activeTab === 'records'
+        activeTab === 'calendar'
+          ? React.createElement(CalendarPane, { calendarContext, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource })
+          : activeTab === 'records'
           ? React.createElement(RecordsPane, { subTab: recordsSubTab, onSelectSubTab: setRecordsSubTab, calendarName })
           : activeTab === 'more'
           ? React.createElement(MorePane, { calendarName, selectedItem: selectedMoreItem, onSelectItem: handleSelectMoreItem })
@@ -516,6 +661,9 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext }) {
         ...navButtons('renewal-shell-bottom-nav-item')
       )
     ),
-    React.createElement(MoreModalsHost, { openModal: openMoreModal, onClose: () => setOpenMoreModal(null), modalProps: moreContext.modalProps })
+    React.createElement(MoreModalsHost, {
+      openModal: openMoreModal, onClose: () => setOpenMoreModal(null),
+      modalProps: moreContext.modalProps, anniversaryOverride,
+    })
   );
 }
