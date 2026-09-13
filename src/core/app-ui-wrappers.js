@@ -84,7 +84,21 @@ function createSpecialAliases(React) {
   };
 }
 
+// Cached per `React` argument (in practice always the same window.React) so every caller gets
+// back the exact same alias functions. Several src/ui/ui-app-shell-v2.js panes call this fresh
+// on every render (unlike app-main.js's one-time top-of-module call) -- without caching, each
+// render would hand React a brand-new component identity for e.g. HistoryView, forcing a full
+// unmount/remount every render. For a view with a mount-time effect that calls back into a
+// parent-owned state setter (HistoryView's photo-index hydration), that remount-on-every-render
+// re-fires the effect every time, which re-triggers the parent render that caused the remount --
+// a self-sustaining loop (observed as thousands of ERR_INSUFFICIENT_RESOURCES from the resulting
+// fetch storm). The aliases themselves are pure pass-throughs to window.GATHER_UI_COMPONENTS
+// read at call time, so caching them changes nothing about which real component ends up rendered.
+const aliasCache = new WeakMap();
+
 export function bindUiComponentAliases(React) {
+  const cached = aliasCache.get(React);
+  if (cached) return cached;
   const out = createSpecialAliases(React);
   [...ICON_COMPONENT_NAMES, ...PLAIN_WRAPPER_COMPONENT_NAMES, ...VIEW_WRAPPER_COMPONENT_NAMES].forEach(name => {
     out[name] = function PassThroughAlias(props) {
@@ -92,6 +106,7 @@ export function bindUiComponentAliases(React) {
       return typeof C === 'function' ? React.createElement(C, props) : null;
     };
   });
+  aliasCache.set(React, out);
   return out;
 }
 
