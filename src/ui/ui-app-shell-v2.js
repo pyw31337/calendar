@@ -19,7 +19,7 @@ import { bindUiComponentAliases } from '../core/app-ui-wrappers.js';
 import {
   isNotificationSupported, isChatNotifyEnabledForCalendar, setChatNotifyEnabledForCalendar,
   getNotificationPermissionHelpSteps, setNotifGuideSeen, setNotifyChannel, syncPushSubscriptionChannels,
-  formatDDayLabel, formatConfirmedMeetingLabel,
+  formatDDayLabel, formatConfirmedMeetingLabel, normalizePlaceDateForSort,
 } from '../core/app-domain-helpers.js';
 import { buildMainCalendarScreenState } from '../core/app-calendar-screen-state.js';
 
@@ -481,7 +481,105 @@ function PlaceholderPane({ tabId, calendarName }) {
  * wires real data in. This is the one tab with a second level of navigation because it alone
  * absorbs 5 old screens (docs/design-renewal-handoff.md §2) -- the other 4 tabs stay flat.
  */
-function RecordsPane({ subTab, onSelectSubTab, calendarName }) {
+/**
+ * Builds the 기록 tab's real ingredients (WP-06 continuation, 장소 subtab). Straight pass-through
+ * of the same values/handlers `app-main.js`'s own `activeView === 'places'` render block already
+ * uses.
+ */
+export function buildRenewalRecordsContext(calendar, deps) {
+  const {
+    activeCal, showToast, showConfirmDialog, handleSavePlace, handleDeletePlace,
+    placesInitialQuery, setPlacesInitialQuery, placesInitialFocusId, setPlacesInitialFocusId,
+    isDarkTheme, toggleTheme, fontScalePercent, setFontScalePercent,
+    mainNotifPermission, mainChatNotifyEnabled, handleMainToggleNotifications,
+    syncStatus, isPlacesShareOpen, setIsPlacesShareOpen,
+  } = deps || {};
+  const requireLoadedCalendar = (message) => {
+    if (activeCal) return true;
+    if (typeof showToast === 'function') showToast(message, 'error');
+    return false;
+  };
+  return {
+    calendar: activeCal,
+    showToast,
+    placesProps: {
+      calendar: activeCal,
+      onSavePlace: handleSavePlace, onDeletePlace: handleDeletePlace,
+      showToast, onRequestConfirm: showConfirmDialog,
+      placesInitialQuery, setPlacesInitialQuery, placesInitialFocusId, setPlacesInitialFocusId,
+      isDarkTheme, onToggleTheme: toggleTheme, fontScalePercent,
+      onDecreaseFont: () => setFontScalePercent(prev => Math.max(80, prev - 10)),
+      onIncreaseFont: () => setFontScalePercent(prev => Math.min(130, prev + 10)),
+      isChatNotifyEnabled: mainNotifPermission === 'granted' && mainChatNotifyEnabled,
+      onToggleChatNotifications: handleMainToggleNotifications,
+      syncStatus,
+    },
+    isPlacesShareOpen: !!isPlacesShareOpen,
+    onOpenPlacesShare: () => { if (requireLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsPlacesShareOpen(true); },
+    onClosePlacesShare: () => setIsPlacesShareOpen(false),
+  };
+}
+
+/**
+ * 장소 subtab body (WP-06 continuation): the real `PlacesView`, same pass-through approach as
+ * `MemoPane` (WP-06's first subtab). `PlacesView` ships in its own lazy-loaded chunk
+ * (`window.__gatherLoadViewUi('places')`), so this waits for that chunk before rendering.
+ *
+ * Owns its own local date-detail-modal state (`placeDateModalDate`) rather than sharing 캘린더's
+ * -- unlike WP-07's 정산 tab (which lifted a shared instance up to `RenewalAppShell`), this slice
+ * keeps 장소 fully self-contained so it doesn't need to land in lockstep with that unmerged work;
+ * a later cleanup can fold this into the shared instance once both are on `main` together. Reuses
+ * `calendarContext.dateModalProps` (already built at `RenewalAppShell` level) for the modal's
+ * data/handlers, since those don't depend on which component owns the "which date is open" state.
+ */
+function PlacesPane({ recordsContext, calendarContext, onChangeView, onOpenAppSettings, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource }) {
+  const React = window.React;
+  const [loaded, setLoaded] = React.useState(() => !!(window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlacesView));
+  React.useEffect(() => {
+    if (loaded) return undefined;
+    if (typeof window.__gatherLoadViewUi !== 'function') { setLoaded(true); return undefined; }
+    let cancelled = false;
+    window.__gatherLoadViewUi('places').then(() => { if (!cancelled) setLoaded(true); }).catch(err => {
+      console.error('Places UI load failed:', err);
+      if (typeof recordsContext.showToast === 'function') recordsContext.showToast('장소 화면을 불러오지 못했습니다. 다시 시도해 주세요.', 'error');
+    });
+    return () => { cancelled = true; };
+  }, [loaded]);
+  const [placeDateModalDate, setPlaceDateModalDate] = React.useState(null);
+  if (!loaded) {
+    return React.createElement(EmptyState, { title: '장소 불러오는 중', subtitle: '잠시만 기다려 주세요.' });
+  }
+  const { PlacesView, ShareModal, DateModal } = bindUiComponentAliases(React);
+  const onParticipantClick = (name, dateStr) => { if (dateStr) setPlaceDateModalDate(dateStr); };
+  return React.createElement(React.Fragment, null,
+    React.createElement(PlacesView, {
+      ...recordsContext.placesProps,
+      onBack: () => onChangeView('calendar'),
+      onSelectDate: (dateStr) => {
+        const canonicalDate = normalizePlaceDateForSort(dateStr);
+        if (canonicalDate) setPlaceDateModalDate(canonicalDate);
+      },
+      onSharePlaces: recordsContext.onOpenPlacesShare,
+      onOpenAppSettings,
+    }),
+    recordsContext.isPlacesShareOpen && React.createElement(ShareModal, {
+      calendar: recordsContext.calendar, shareType: 'places', showToast: recordsContext.showToast,
+      onClose: recordsContext.onClosePlacesShare,
+    }),
+    placeDateModalDate && React.createElement(DateModal, {
+      ...calendarContext.dateModalProps,
+      dateStr: placeDateModalDate,
+      initialTab: null,
+      onClose: () => setPlaceDateModalDate(null),
+      onParticipantClick,
+      onEditAnniversary,
+      onAddAnniversaryForDate: (d) => { setPlaceDateModalDate(null); onAddAnniversaryForDate(d); },
+      onFocusCultureSource: () => onFocusCultureSource(),
+    })
+  );
+}
+
+function RecordsPane({ subTab, onSelectSubTab, calendarName, recordsContext, calendarContext, onChangeView, onOpenAppSettings, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource }) {
   const React = window.React;
   return React.createElement(React.Fragment, null,
     React.createElement('div', { className: 'renewal-shell-subtab-row', role: 'tablist', 'aria-label': '기록 필터' },
@@ -494,10 +592,12 @@ function RecordsPane({ subTab, onSelectSubTab, calendarName }) {
         onClick: () => onSelectSubTab(t.id),
       }, t.label))
     ),
-    React.createElement(EmptyState, {
-      title: `${RECORDS_SUBTABS.find(t => t.id === subTab)?.label || subTab} (준비 중)`,
-      subtitle: withCalendarPrefix(calendarName, 'WP-06에서 실제 데이터가 이 자리에 연결됩니다.'),
-    })
+    subTab === 'places'
+      ? React.createElement(PlacesPane, { recordsContext, calendarContext, onChangeView, onOpenAppSettings, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource })
+      : React.createElement(EmptyState, {
+        title: `${RECORDS_SUBTABS.find(t => t.id === subTab)?.label || subTab} (준비 중)`,
+        subtitle: withCalendarPrefix(calendarName, 'WP-06에서 실제 데이터가 이 자리에 연결됩니다.'),
+      })
   );
 }
 
@@ -744,7 +844,7 @@ function MorePane({ calendarName, onSelectItem, selectedItem }) {
  * the shell element when `?shell=v2` is set, otherwise null so the caller falls through to the
  * existing return unchanged.
  */
-export function renderRenewalShellIfEnabled(activeCalId, calendar, moreContextDeps, calendarContextDeps, chatContextDeps) {
+export function renderRenewalShellIfEnabled(activeCalId, calendar, moreContextDeps, calendarContextDeps, chatContextDeps, recordsContextDeps) {
   const React = window.React;
   if (!isRenewalShellEnabled()) return null;
   return React.createElement(RenewalAppShell, {
@@ -752,19 +852,21 @@ export function renderRenewalShellIfEnabled(activeCalId, calendar, moreContextDe
     moreContext: buildRenewalMoreContext(calendar, moreContextDeps),
     calendarContext: buildRenewalCalendarContext(calendar, calendarContextDeps),
     chatContext: buildRenewalChatContext(calendar, chatContextDeps),
+    recordsContext: buildRenewalRecordsContext(calendar, recordsContextDeps),
   });
 }
 
 /**
- * @param {{ activeCalId: string, calendar: object | null, moreContext: object, calendarContext: object, chatContext: object }} props
+ * @param {{ activeCalId: string, calendar: object | null, moreContext: object, calendarContext: object, chatContext: object, recordsContext: object }} props
  *   `calendar` is the already-loaded record for activeCalId (or null while it loads) --
  *   passed in from CalendarApp's existing state as a plain prop (the adapter pattern from
  *   product-renewal-master-plan.md §8.2), never re-fetched here. `moreContext` (see
  *   `buildRenewalMoreContext`) is the 더보기 tab's real destinations; `calendarContext` (see
  *   `buildRenewalCalendarContext`) is the 캘린더 tab's; `chatContext` (see
- *   `buildRenewalChatContext`) is the 대화 tab's -- all built the same way.
+ *   `buildRenewalChatContext`) is the 대화 tab's; `recordsContext` (see
+ *   `buildRenewalRecordsContext`) is the 기록 tab's -- all built the same way.
  */
-export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarContext, chatContext }) {
+export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarContext, chatContext, recordsContext }) {
   const React = window.React;
   const [activeTab, setActiveTabState] = React.useState(readTabFromLocation);
   const [recordsSubTab, setRecordsSubTabState] = React.useState(readRecordsSubTabFromLocation);
@@ -891,7 +993,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
           : activeTab === 'chat'
           ? React.createElement(ChatPane, { chatContext, onChangeView, onOpenAppSettings })
           : activeTab === 'records'
-          ? React.createElement(RecordsPane, { subTab: recordsSubTab, onSelectSubTab: setRecordsSubTab, calendarName })
+          ? React.createElement(RecordsPane, { subTab: recordsSubTab, onSelectSubTab: setRecordsSubTab, calendarName, recordsContext, calendarContext, onChangeView, onOpenAppSettings, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource })
           : activeTab === 'more'
           ? React.createElement(MorePane, { calendarName, selectedItem: selectedMoreItem, onSelectItem: handleSelectMoreItem })
           : React.createElement(PlaceholderPane, { tabId: activeTab, calendarName })
