@@ -26,6 +26,22 @@ const TABS = [
 const TAB_IDS = TABS.map(t => t.id);
 const DEFAULT_TAB = 'calendar';
 
+/**
+ * 기록 sub-tabs (docs/design-renewal-handoff.md §2's mapping table): the 5 screens 기록 absorbs
+ * -- 메모/갤러리(사진·영상)/장소/보관함(추억)/콘텐츠 -- plus 전체 as the default landing filter.
+ * Still placeholder content only; real data wiring is WP-06.
+ */
+const RECORDS_SUBTABS = [
+  { id: 'all', label: '전체' },
+  { id: 'memo', label: '메모' },
+  { id: 'media', label: '사진·영상' },
+  { id: 'places', label: '장소' },
+  { id: 'archive', label: '보관함' },
+  { id: 'content', label: '콘텐츠' },
+];
+const RECORDS_SUBTAB_IDS = RECORDS_SUBTABS.map(t => t.id);
+const DEFAULT_RECORDS_SUBTAB = 'all';
+
 /** Reads `?tab=` from the current URL, falling back to 캘린더 for a missing/unknown value. */
 function readTabFromLocation() {
   if (typeof window === 'undefined' || !window.location) return DEFAULT_TAB;
@@ -37,18 +53,32 @@ function readTabFromLocation() {
   }
 }
 
+/** Reads `?sub=` -- only meaningful on the 기록 tab, ignored (and later stripped) elsewhere. */
+function readRecordsSubTabFromLocation() {
+  if (typeof window === 'undefined' || !window.location) return DEFAULT_RECORDS_SUBTAB;
+  try {
+    const raw = new URLSearchParams(window.location.search).get('sub');
+    return RECORDS_SUBTAB_IDS.includes(raw) ? raw : DEFAULT_RECORDS_SUBTAB;
+  } catch (_) {
+    return DEFAULT_RECORDS_SUBTAB;
+  }
+}
+
 /**
- * Writes the tab into the URL without touching any other query param (`?id=`, `?shell=v2`, ...)
- * or reloading the page. `push` adds a history entry (a deliberate tab switch, so the back
- * button steps back through tabs one at a time -- 마스터플랜 §4.1's "브라우저 뒤로가기는 탭
- * 내부 상세 → 탭 루트 → 이전 브라우저 위치 순"); `replace` (used for the very first mount, and
- * to correct an invalid `?tab=`) does not.
+ * Writes the tab (and, for 기록, its sub-tab) into the URL without touching any other query
+ * param (`?id=`, `?shell=v2`, ...) or reloading the page. `push` adds a history entry (a
+ * deliberate tab switch, so the back button steps back through tabs one at a time -- 마스터플랜
+ * §4.1's "브라우저 뒤로가기는 탭 내부 상세 → 탭 루트 → 이전 브라우저 위치 순"); `replace` (used
+ * for the very first mount, and to correct an invalid `?tab=`/`?sub=`) does not. `?sub=` is
+ * dropped whenever the tab isn't 기록, so it never lingers into an unrelated tab's URL.
  */
-function writeTabToLocation(tabId, { push } = { push: true }) {
+function writeLocationState(tabId, subTabId, { push } = { push: true }) {
   if (typeof window === 'undefined' || !window.history) return;
   const url = new URL(window.location.href);
   if (tabId === DEFAULT_TAB) url.searchParams.delete('tab');
   else url.searchParams.set('tab', tabId);
+  if (tabId !== 'records' || subTabId === DEFAULT_RECORDS_SUBTAB) url.searchParams.delete('sub');
+  else url.searchParams.set('sub', subTabId);
   const method = push ? 'pushState' : 'replaceState';
   window.history[method](window.history.state, '', url);
 }
@@ -116,6 +146,34 @@ function PlaceholderPane({ tabId, calendarName }) {
 }
 
 /**
+ * 기록 tab body: a sub-tab chip row (전체/메모/사진·영상/장소/보관함/콘텐츠) over the same
+ * placeholder pane, keyed by sub-tab so switching filters visibly changes something even before
+ * WP-06 wires real data in. This is the one tab with a second level of navigation because it
+ * alone absorbs 5 old screens (docs/design-renewal-handoff.md §2) -- the other 4 tabs stay flat.
+ */
+function RecordsPane({ subTab, onSelectSubTab, calendarName }) {
+  const React = window.React;
+  return React.createElement(React.Fragment, null,
+    React.createElement('div', { className: 'renewal-shell-subtab-row', role: 'tablist', 'aria-label': '기록 필터' },
+      RECORDS_SUBTABS.map(t => React.createElement('button', {
+        key: t.id,
+        type: 'button',
+        role: 'tab',
+        'aria-selected': subTab === t.id,
+        className: `renewal-shell-subtab-item ${subTab === t.id ? 'is-active' : ''}`.trim(),
+        onClick: () => onSelectSubTab(t.id),
+      }, t.label))
+    ),
+    React.createElement('div', { className: 'renewal-shell-placeholder' },
+      React.createElement('div', { className: 'renewal-shell-placeholder-title' },
+        `${RECORDS_SUBTABS.find(t => t.id === subTab)?.label || subTab} (준비 중)`),
+      React.createElement('div', { className: 'renewal-shell-placeholder-sub' },
+        calendarName ? `${calendarName} · WP-06에서 실제 데이터가 이 자리에 연결됩니다.` : 'WP-06에서 실제 데이터가 이 자리에 연결됩니다.')
+    )
+  );
+}
+
+/**
  * One-call adapter for CalendarApp's return statement (kept to a single call there deliberately
  * -- CalendarApp is frozen at a hard line-count ceiling, docs/app-main-split-units.md). Returns
  * the shell element when `?shell=v2` is set, otherwise null so the caller falls through to the
@@ -136,21 +194,32 @@ export function renderRenewalShellIfEnabled(activeCalId, calendar) {
 export function RenewalAppShell({ activeCalId, calendar }) {
   const React = window.React;
   const [activeTab, setActiveTabState] = React.useState(readTabFromLocation);
+  const [recordsSubTab, setRecordsSubTabState] = React.useState(readRecordsSubTabFromLocation);
   const calendarName = calendar?.name || null;
 
-  // Correct an invalid/stale ?tab= on first mount without adding a history entry, then listen
-  // for the back/forward buttons for the rest of this shell's lifetime.
+  // Correct an invalid/stale ?tab=/?sub= on first mount without adding a history entry, then
+  // listen for the back/forward buttons for the rest of this shell's lifetime.
   React.useEffect(() => {
-    writeTabToLocation(activeTab, { push: false });
-    const onPopState = () => setActiveTabState(readTabFromLocation());
+    writeLocationState(activeTab, recordsSubTab, { push: false });
+    const onPopState = () => {
+      setActiveTabState(readTabFromLocation());
+      setRecordsSubTabState(readRecordsSubTabFromLocation());
+    };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, []); // mount-only: reads the initial URL once and wires the one popstate listener
 
   const setActiveTab = (tabId) => {
     if (tabId === activeTab) return;
-    writeTabToLocation(tabId, { push: true });
+    const nextSub = tabId === 'records' ? recordsSubTab : DEFAULT_RECORDS_SUBTAB;
+    writeLocationState(tabId, nextSub, { push: true });
     setActiveTabState(tabId);
+  };
+
+  const setRecordsSubTab = (subTabId) => {
+    if (subTabId === recordsSubTab) return;
+    writeLocationState('records', subTabId, { push: true });
+    setRecordsSubTabState(subTabId);
   };
 
   const navButtons = (extraClass) => TABS.map(tab =>
@@ -177,7 +246,9 @@ export function RenewalAppShell({ activeCalId, calendar }) {
         onOpenSearch: () => setActiveTab('more'),
         onOpenMore: () => setActiveTab('more'),
       }),
-      React.createElement(PlaceholderPane, { tabId: activeTab, calendarName })
+      activeTab === 'records'
+        ? React.createElement(RecordsPane, { subTab: recordsSubTab, onSelectSubTab: setRecordsSubTab, calendarName })
+        : React.createElement(PlaceholderPane, { tabId: activeTab, calendarName })
     ),
     React.createElement('nav', { className: 'renewal-shell-bottom-nav', 'aria-label': '주 메뉴' },
       ...navButtons('renewal-shell-bottom-nav-item')
