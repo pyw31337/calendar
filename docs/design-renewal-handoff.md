@@ -371,6 +371,19 @@ PWA 아이콘(3.16)으로 각각 접근한다. `getCalendarShareUrl`/`getViewSha
    — 실제 화면/다이얼로그 연결은 각 항목이 실제로 설계되는 WP에서 다룬다. 헤더의 검색/더보기
    아이콘이 이 탭으로 보내는 동작은 그대로 유지.
 
+5. **`feat(wp01): wire more tab items to real screens`** (5차 슬라이스,
+   `docs/wp01-app-shell-progress.md` 5차 슬라이스 항목 참고) — 4차 슬라이스가 만든 7개 항목 중
+   4개(공유/기념일 설정/사용자 매뉴얼/관리자 진입)를 실제 기존 화면에 연결. 이 과정에서 발견한
+   중요한 사실: `renderRenewalShellIfEnabled`의 조기 반환 때문에 `CalendarApp`의 기존
+   `isShareOpen`/`isAnniversariesOpen`/`isGuideOpen` state가 구동하는 모달 JSX는 `?shell=v2`에서
+   전혀 렌더되지 않는다 — 그래서 그 state의 setter를 그대로 재사용하려던 4차 슬라이스의 시도는
+   조용히 아무 효과가 없었다. 해결: `RenewalAppShell`이 독립적인 로컬 `openMoreModal` state를
+   갖고, 실제 모달은 `MoreModalsHost`가 `bindUiComponentAliases`(U1a/b/c가 만든
+   `window.GATHER_UI_COMPONENTS` pass-through, `src/core/app-ui-wrappers.js`)로 직접 렌더링한다
+   — `app-main.js`가 이미 쓰는 것과 완전히 같은 지연로드/등록 메커니즘 재사용, 중복 번들링 없음.
+   나머지 3개(검색/앱 설정/캘린더 설정)는 채팅/갤러리/알림-권한 내부 로직과 깊이 얽혀 있어
+   의도적으로 보류 — 이유는 진행 기록의 "아직 다루지 않은 것"에 상세히 적어뒀다.
+
 ### 4.3 매우 중요한 제약 — `CalendarApp` 줄수 동결
 
 `docs/app-main-split-units.md`가 `CalendarApp` 함수를 **정확히 7700줄**로 동결해놨다
@@ -419,14 +432,18 @@ npm run regression:test ✅ (npm run build 포함)
   참고), 데이터는 여전히 미착수**: 전체/메모/사진·영상/장소/보관함/콘텐츠 6개 서브탭이 URL
   (`?sub=`)에 연결된 칩 UI로 존재한다. 각 서브탭이 보여주는 콘텐츠는 아직 플레이스홀더 —
   WP-06에서 실제 메모/갤러리/장소/보관함/콘텐츠 데이터를 서브탭별로 연결해야 한다.
-- ~~**"더보기" 탭 구조**~~ **메뉴 리스트는 완료 (4차 슬라이스), 각 항목의 실제 동작은 여전히
-  미착수**: 검색/공유/기념일 설정/캘린더 설정/앱 설정/사용자 매뉴얼/관리자 진입 7개 항목이
-  전부 `MorePane`에 리스트로 존재한다. 지금은 각 행을 눌러도 선택 상태만 바뀔 뿐, 실제
-  화면(예: 관리자 진입은 기존 관리자 대시보드로, 사용자 매뉴얼은 기존 `ui-user-manual.js`로)에
-  연결돼 있지 않다 — 각 항목이 가리켜야 할 기존 기능은 섹션 3(특히 3.10, 3.17, 3.18)의
-  인벤토리를 그대로 재사용하면 되고, 검색·캘린더 전환처럼 아예 신규 설계가 필요한 것과 공유·
-  기념일 설정·앱 설정·매뉴얼·관리자 진입처럼 이미 있는 화면을 여기로 연결만 하면 되는 것을
-  구분해서 다음 슬라이스를 나눌 것.
+- ~~**"더보기" 탭 구조**~~ **메뉴 리스트 완료 (4차 슬라이스) + 7개 중 4개 실제 연결 완료
+  (5차 슬라이스, `docs/wp01-app-shell-progress.md` 참고)**: 공유(ShareModal)/기념일 설정
+  (AnniversaryModal)/사용자 매뉴얼(UserManualOverlay)/관리자 진입(새 탭으로 관리자 대시보드)은
+  실제로 동작한다. 남은 3개는 의도적으로 보류 중:
+  - **캘린더 설정** (`AdminModal`, `initialTab: 'settings'`) — 원래 호출부가 채팅/갤러리 내부
+    콜백(`onOpenChatMessage`, `onOpenImage` 등 20개 이상)에 깊이 얽혀 있어, 그대로 옮기면
+    "props 전달"이 아니라 채팅 메시지 열기 같은 실제 동작을 중복 구현하게 된다 — U10~U14가
+    경계하는 것과 같은 성격의 위험이라 별도 슬라이스로 미룸.
+  - **검색** (`GlobalSearchModal`) — 같은 이유(채팅 내부 콜백 의존)로 보류, 게다가 마스터플랜
+    자체가 통합검색을 신규 설계 과제로 분류하고 있음(위 참고).
+  - **앱 설정** (`AppSettingsModal`) — 브라우저 알림 권한 상태를 여러 state/Firestore 구독에
+    걸쳐 갱신하는 로직이 있어, 잘못 복제하면 알림 설정이 실제로 깨질 수 있는 위험이 있음.
 - **시각 디테일 이식**: 지금 `RenewalAppShell`은 무채색 최소 스타일이다. 시안(갈래 A)의 톤을
   가져오는 건 WP-02(디자인 토큰 정리) 이후로 미룬다 — 토큰이 먼저 정리돼야 하드코딩 색상이
   늘지 않는다 (마스터플랜 §8.2).

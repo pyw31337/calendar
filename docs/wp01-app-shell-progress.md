@@ -141,8 +141,78 @@ npm run regression:test   # npm run build 포함
   Claude Design 목업(글래스 아이콘 버튼, 접기/펼치기, 브랜드 그라디언트 등)의 톤을 그대로
   가져오는 건 WP-02(디자인 토큰) 이후로 미뤘다 — 토큰이 먼저 정리돼야 하드코딩 색상이 늘지
   않는다.
-- **더보기 탭 각 항목의 실제 연결**: 지금은 7개 항목이 리스트로만 존재하고 각 항목을 눌러도
-  선택 상태만 바뀐다. 기존 기능(관리자 대시보드, 사용자 매뉴얼 등) 재연결과, 완전히 신규 설계가
-  필요한 것(통합검색, 캘린더 전환)을 구분해서 각각 별도 슬라이스로 다뤄야 한다.
+- **더보기 탭 각 항목의 실제 연결**: 5차 슬라이스(아래)에서 7개 중 4개(공유/기념일 설정/사용자
+  매뉴얼/관리자 진입)를 실제로 연결했다. 나머지 3개(검색/앱 설정/캘린더 설정)는 왜 이번에
+  포함하지 않았는지 5차 슬라이스 항목의 "아직 다루지 않은 것"을 참고.
 - **실제 데이터 연결**: WP-03(캘린더 홈) → WP-04(날짜 허브) → WP-05(채팅) → WP-06(기록) →
   WP-07(정산) 순서로, 마스터플랜 §10 Phase B/C를 따른다.
+
+## 2026-09-13: WP-01 5차 슬라이스 — "더보기" 항목 실제 연결 (4/7)
+
+**커밋 범위:** 4차 슬라이스에서 리스트만 존재하던 더보기 항목 중 4개를 기존 화면에 실제로
+연결. 나머지 3개(검색/앱 설정/캘린더 설정)는 의도적으로 이번 범위에서 뺐다 — 이유는 아래
+"아직 다루지 않은 것" 참고.
+
+- **핵심 발견**: `renderRenewalShellIfEnabled`가 `CalendarApp`의 최종 `return`보다 앞에서
+  조기 반환하기 때문에, `CalendarApp`의 기존 `isShareOpen`/`isAnniversariesOpen`/`isGuideOpen`
+  같은 state가 구동하는 모달 JSX(ShareModal/AnniversaryModal/UserManualOverlay 등)는 그
+  `return` 아래쪽에 있어서 `?shell=v2`에서는 아예 렌더되지 않는다. 그래서 4차 슬라이스의
+  `buildRenewalMoreActions`가 그 state의 setter를 호출해도 실제로는 아무 일도 안 일어나는
+  조용한 버그였다 — Playwright로 "앱 설정" 클릭 후 `.modal-overlay` 개수를 세어보다가 발견.
+- **해결책**: `CalendarApp`의 state를 재사용하는 대신, `RenewalAppShell`이 어떤 모달이 열려
+  있는지를 스스로 관리하는 로컬 `openMoreModal` state를 두고, 실제 모달 컴포넌트(ShareModal/
+  AnniversaryModal/UserManualOverlay)는 `MoreModalsHost`가 `bindUiComponentAliases`
+  (`src/core/app-ui-wrappers.js`, U1a/b/c가 만든 `window.GATHER_UI_COMPONENTS` pass-through
+  헬퍼)로 직접 렌더링한다. `app-main.js`가 이미 쓰는 것과 완전히 같은 지연로드/등록 메커니즘을
+  재사용하는 것이라 별도 번들링이나 중복 로직이 생기지 않는다.
+  - 사용자 매뉴얼은 `window.__gatherLoadManualUi()`, 기념일 설정은
+    `window.__gatherLoadEventUi()`(`src/main.jsx`, `CalendarApp`의 `withEventUi`가 쓰는 것과
+    동일한 지연로더)를 열기 전에 기다린다. 공유는 원래 코드도 지연로드 없이 바로 열길래
+    그대로 뒀다.
+- `buildRenewalMoreActions` → `buildRenewalMoreContext(calendar, deps)`로 이름 변경 + 재설계:
+  `calendar` 인자(어댑터가 이미 받는 두 번째 인자, 재조회 없음)로 `!calendar`면 토스트만 띄우고
+  아무 것도 열지 않는 자체 가드(`requireLoadedCalendar`)를 갖췄다 — `CalendarApp`의
+  `guardLoadedCalendar`에 더 이상 의존하지 않는다. 반환값은 `modalProps`(각 모달에 그대로
+  넘길 props)와 `onSelect*`/`onOpenAdmin` 트리거 함수들.
+- `app-main.js`의 어댑터 호출 한 줄도 이 새 모양에 맞게 deps를 바꿨다: `guardLoadedCalendar`,
+  `setIsShareOpen`, `setIsAnniversariesOpen`, `setIsAppSettingsOpen`, `setIsGuideOpen`,
+  `setIsAdminOpen`, `setAdminInitialTab`는 더 이상 필요 없어서 뺐고, 대신
+  `showConfirmDialog`, `handleBulkRegisterAvailability`, `handleAnniversarySaved`,
+  `handleAnniversaryDeleted`, `isDarkTheme`, `setActiveLightbox`를 추가했다(모두 기존 값을
+  그대로 전달하는 것뿐, 새 로직 없음). `check:app-main-inventory`로 `CalendarApp` 7700/7700
+  줄 그대로 확인.
+- 검증(Playwright 헤드리스):
+  - 사용자 매뉴얼: 실제로 열림 확인 (`[role="dialog"][aria-label="사용자 매뉴얼"]` 렌더 확인).
+  - 관리자 진입: 클릭 시 새 탭이 `&admin=1`이 붙은 URL로 정상 오픈됨을 `context.waitForEvent
+    ('page')`로 확인.
+  - 공유/기념일 설정: 이 샌드박스 환경은 Firestore 접근이 막혀 있어(`docs/renewal-baseline.md`
+    기록된 환경 고유 제약) `calendar`가 끝내 로드되지 않으므로 실제 모달 오픈까지는 이 세션에서
+    검증 불가 — 대신 (a) `requireLoadedCalendar` 가드가 `calendar`가 null일 때 아무 것도 열지
+    않고 조용히 넘어가는 것(의도된 안전한 동작)을 확인했고, (b) props 구성이 `app-main.js`의
+    원래 호출부(`isShareOpen && <ShareModal calendar={activeCal} showToast={showToast}
+    onClose={...} />`, `isAnniversariesOpen && <AnniversaryModal ... />`)와 한 글자도 다르지
+    않게 그대로 옮겨졌음을 코드 대조로 확인했다. 프로덕션에서 실제 캘린더 데이터가 있으면
+    동작할 것으로 기대하지만, 이 부분은 다음에 실데이터가 있는 환경에서 한 번 더 확인이
+    필요하다.
+  - 기본(플래그 없음) 경로: HTML 길이 36894바이트로 4차 슬라이스와 동일, 콘솔 에러 없음.
+- `npm run lint`/`check:all`/`safety:test`/`regression:test` 전부 통과.
+
+**아직 다루지 않은 것 (의도적으로 이번 슬라이스에서 제외)**:
+
+- **캘린더 설정** (`AdminModal`, `initialTab: 'settings'`): 원래 호출부가 `recentMessages`,
+  `chatMessages`, `onDeleteMessage`, `onOpenChatMessage`(채팅 메시지로 스크롤+포커스),
+  `onOpenImage`(라이트박스 오픈, 메시지 조회) 등 20개 이상의 채팅/갤러리 내부 상태·콜백에
+  깊이 얽혀 있다. 이걸 `ui-app-shell-v2.js` 쪽에서 다시 만들면 "props를 그대로 전달"이 아니라
+  채팅 메시지 열기 같은 실제 동작 로직을 중복 구현하게 되는데, 이는 `CLAUDE.md`가 U10~U14에서
+  경계하는 "사용자가 매일 쓰는 채팅/사진 관련 핵심 동작"과 정확히 같은 위험 성격이라고 판단해
+  이번 슬라이스에서 뺐다. `AdminModal` 자체는 U10~U14 명단에 있는 훅은 아니지만, 신중하게 별도
+  슬라이스로 다루는 게 맞다고 본다.
+- **검색** (`GlobalSearchModal`): 마찬가지로 `onOpenChatMessage`/`onOpenImage`를 필요로 해서
+  같은 이유로 보류. 또한 마스터플랜 자체가 통합검색을 "신규 설계 과제"로 분류하고 있다
+  (`docs/design-renewal-handoff.md` §4.5).
+- **앱 설정** (`AppSettingsModal`): 브라우저 알림 권한 상태(`mainNotifPermission`,
+  `mainChatNotifyEnabled`)를 여러 state setter와 Firestore 구독 설정에 걸쳐 갱신하는 로직이
+  `onToggleMasterNotify`/`onToggleNotifyChannel`에 박혀 있다. 이것도 순수 데이터 전달이 아니라
+  알림 권한이라는, 잘못 다루면 사용자에게 실제로 영향이 가는 로직을 복제하는 셈이라 보류했다.
+  테마 토글/글자 크기 같은 나머지 하위 기능은 단순하지만, 모달 하나를 절반만 실제로 동작하게
+  만드는 건 오히려 혼란스러울 수 있어 전체를 다음 슬라이스로 미뤘다.

@@ -15,6 +15,7 @@
  */
 
 import { isRenewalShellEnabled } from '../core/app-feature-flags.js';
+import { bindUiComponentAliases } from '../core/app-ui-wrappers.js';
 
 const TABS = [
   { id: 'calendar', label: '캘린더' },
@@ -208,11 +209,126 @@ function MoreItemIcon({ id }) {
 }
 
 /**
+ * Which 더보기 items open a real modal in THIS shell (rendered by `MoreModalsHost` below) vs.
+ * still just toggle the placeholder selection state. 캘린더 설정 (AdminModal) and 검색
+ * (GlobalSearchModal) are deliberately left out of this slice: both need a long tail of chat/
+ * gallery-internals props (message lookup, lightbox opening, notification-permission state) that
+ * would mean duplicating real chat behavior outside CalendarApp, not just passing data through --
+ * exactly the kind of core-functionality risk docs/design-renewal-handoff.md §4.5 flags as its
+ * own follow-up slice, not this one.
+ */
+const REAL_MORE_MODAL_IDS = ['share', 'anniversaries', 'manual'];
+
+/**
+ * Builds the 더보기 list's real destinations from CalendarApp's own state/helpers, passed in as
+ * `deps` from the single adapter call site in app-main.js (CalendarApp is frozen at 7700 lines,
+ * so this logic has to live here, not inline at that call site, or it would need many new
+ * physical lines inside CalendarApp). Unlike the old MainSideMenu handlers this ports from, these
+ * do NOT touch CalendarApp's own isShareOpen/isAnniversariesOpen/isGuideOpen state -- that state
+ * drives a JSX tree this shell's early return never reaches, so reusing it would silently no-op.
+ * Instead each `onSelect*` here is a side-effect-only trigger (a lazy-load wait, an anniversaries
+ * refetch) that RenewalAppShell awaits before flipping its OWN local `openMoreModal` state; the
+ * `calendar` argument is the same prop `renderRenewalShellIfEnabled` already receives, not
+ * re-fetched.
+ *
+ * @param {object|null} calendar - activeCalLoaded ? activeCal : null, same value passed to
+ *   `renderRenewalShellIfEnabled`'s 2nd argument.
+ * @param {object} deps - showToast, activeCalId, anniversaries, fetchAnniversariesRest,
+ *   setAnniversaries, showConfirmDialog, handleBulkRegisterAvailability, handleAnniversarySaved,
+ *   handleAnniversaryDeleted, isDarkTheme, setActiveLightbox.
+ */
+export function buildRenewalMoreContext(calendar, deps) {
+  const {
+    showToast, activeCalId, anniversaries, fetchAnniversariesRest, setAnniversaries,
+    showConfirmDialog, handleBulkRegisterAvailability, handleAnniversarySaved, handleAnniversaryDeleted,
+    isDarkTheme, setActiveLightbox,
+  } = deps || {};
+  const requireLoadedCalendar = (message) => {
+    if (calendar) return true;
+    if (typeof showToast === 'function') showToast(message, 'error');
+    return false;
+  };
+  return {
+    modalProps: {
+      share: { calendar, showToast },
+      anniversaries: {
+        calendar, anniversaries, initialEditId: null, initialDate: null,
+        onInitialEditConsumed: () => {}, showToast, onRequestConfirm: showConfirmDialog,
+        onBulkRegister: handleBulkRegisterAvailability, onAnniversarySaved: handleAnniversarySaved,
+        onAnniversaryDeleted: handleAnniversaryDeleted, isDarkTheme, setActiveLightbox,
+      },
+      manual: { calendar },
+    },
+    // Each resolves (or rejects) once it's safe to show the modal; RenewalAppShell opens it on
+    // resolve and swallows a rejection (the lazy-load failure already showed its own toast).
+    onSelectShare: () => requireLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')
+      ? Promise.resolve() : Promise.reject(),
+    onSelectAnniversaries: () => {
+      if (!requireLoadedCalendar('Firebase 데이터를 불러온 뒤 기념일 설정을 수정해 주세요.')) return Promise.reject();
+      if (activeCalId && typeof fetchAnniversariesRest === 'function' && typeof setAnniversaries === 'function') {
+        fetchAnniversariesRest(activeCalId).then(list => {
+          if (Array.isArray(list) && list.length > 0) {
+            setAnniversaries(list.slice().sort((a, b) =>
+              (Number(b.createdAt) || Number(b.updatedAt) || 0) - (Number(a.createdAt) || Number(a.updatedAt) || 0)
+            ));
+          }
+        }).catch(() => {});
+      }
+      // AnniversaryModal ships in the same code-split chunk as PollModal/SettlementSummaryModal
+      // (ui-event-modals.js) -- loaded on demand via window.__gatherLoadEventUi (src/main.jsx),
+      // same lazy trigger CalendarApp's own withEventUi helper uses.
+      if (typeof window.__gatherLoadEventUi !== 'function') return Promise.resolve();
+      return window.__gatherLoadEventUi().catch(err => {
+        console.error('Anniversary UI load failed:', err);
+        if (typeof showToast === 'function') showToast('기념일 설정을 불러오지 못했습니다. 다시 시도해 주세요.', 'error');
+        throw err;
+      });
+    },
+    onSelectManual: () => {
+      if (typeof window.__gatherLoadManualUi !== 'function') return Promise.resolve();
+      return window.__gatherLoadManualUi().catch(err => {
+        console.error('User manual UI load failed:', err);
+        if (typeof showToast === 'function') showToast('사용자 매뉴얼을 불러오지 못했습니다. 다시 시도해 주세요.', 'error');
+        throw err;
+      });
+    },
+    onOpenAdmin: () => {
+      const adminUrl = new URL(window.location.href);
+      adminUrl.searchParams.delete('view');
+      adminUrl.searchParams.delete('msg');
+      adminUrl.searchParams.delete('img');
+      adminUrl.searchParams.delete('memo');
+      adminUrl.searchParams.delete('place');
+      adminUrl.searchParams.set('admin', '1');
+      if (activeCalId) adminUrl.searchParams.set('id', activeCalId);
+      window.open(adminUrl.toString(), '_blank', 'noopener,noreferrer');
+    },
+  };
+}
+
+/**
+ * Renders whichever of the 3 real 더보기 modals (share/anniversaries/manual, see
+ * REAL_MORE_MODAL_IDS above) is currently open, using the SAME `window.GATHER_UI_COMPONENTS`
+ * pass-through aliases app-main.js itself uses (`bindUiComponentAliases`) -- so this reuses the
+ * exact lazy-loaded chunk/component app-main.js already has, no separate copy bundled here.
+ */
+function MoreModalsHost({ openModal, onClose, modalProps }) {
+  const React = window.React;
+  if (!openModal) return null;
+  const { ShareModal, AnniversaryModal, UserManualOverlay } = bindUiComponentAliases(React);
+  if (openModal === 'share') return React.createElement(ShareModal, { ...modalProps.share, onClose });
+  if (openModal === 'anniversaries') return React.createElement(AnniversaryModal, { ...modalProps.anniversaries, onClose });
+  if (openModal === 'manual') return React.createElement(UserManualOverlay, { ...modalProps.manual, onClose });
+  return null;
+}
+
+/**
  * 더보기 tab body: a flat list of the 7 destinations it absorbs (docs/design-renewal-handoff.md
  * §2). 검색 also has a header shortcut (TopHeader's onOpenSearch), so choosing it here and there
  * both land on the same tab -- this list is the one place all 7 exist, header included or not.
- * Each row is a placeholder tap target for now (`onSelectItem` just no-ops beyond WP-01); real
- * navigation to each destination's screen/dialog is wired as each is built, not in this slice.
+ * `onSelectItem` (owned by RenewalAppShell) decides per-id whether that's a real destination
+ * (share/anniversaries/manual/admin) or still just a placeholder selection (search, app-settings,
+ * calendar-settings -- see REAL_MORE_MODAL_IDS above); this component stays presentation-only.
  */
 function MorePane({ calendarName, onSelectItem, selectedItem }) {
   const React = window.React;
@@ -233,7 +349,7 @@ function MorePane({ calendarName, onSelectItem, selectedItem }) {
       ))
     ),
     React.createElement('div', { className: 'renewal-shell-placeholder-sub renewal-shell-more-note' },
-      calendarName ? `${calendarName} · WP-08 이후 각 항목의 실제 화면이 연결됩니다.` : 'WP-08 이후 각 항목의 실제 화면이 연결됩니다.')
+      calendarName ? `${calendarName} · 검색/앱 설정/캘린더 설정은 아직 준비 중입니다.` : '검색/앱 설정/캘린더 설정은 아직 준비 중입니다.')
   );
 }
 
@@ -243,24 +359,37 @@ function MorePane({ calendarName, onSelectItem, selectedItem }) {
  * the shell element when `?shell=v2` is set, otherwise null so the caller falls through to the
  * existing return unchanged.
  */
-export function renderRenewalShellIfEnabled(activeCalId, calendar) {
+export function renderRenewalShellIfEnabled(activeCalId, calendar, moreContextDeps) {
   const React = window.React;
   if (!isRenewalShellEnabled()) return null;
-  return React.createElement(RenewalAppShell, { activeCalId, calendar });
+  return React.createElement(RenewalAppShell, { activeCalId, calendar, moreContext: buildRenewalMoreContext(calendar, moreContextDeps) });
 }
 
 /**
- * @param {{ activeCalId: string, calendar: object | null }} props
+ * @param {{ activeCalId: string, calendar: object | null, moreContext: object }} props
  *   `calendar` is the already-loaded record for activeCalId (or null while it loads) --
  *   passed in from CalendarApp's existing state as a plain prop (the adapter pattern from
- *   product-renewal-master-plan.md §8.2), never re-fetched here.
+ *   product-renewal-master-plan.md §8.2), never re-fetched here. `moreContext` (see
+ *   `buildRenewalMoreContext`) is the 더보기 tab's real destinations, built the same way.
  */
-export function RenewalAppShell({ activeCalId, calendar }) {
+export function RenewalAppShell({ activeCalId, calendar, moreContext }) {
   const React = window.React;
   const [activeTab, setActiveTabState] = React.useState(readTabFromLocation);
   const [recordsSubTab, setRecordsSubTabState] = React.useState(readRecordsSubTabFromLocation);
   const [selectedMoreItem, setSelectedMoreItem] = React.useState(null);
+  // Which of the 3 real 더보기 modals (share/anniversaries/manual) is open, if any -- local to
+  // this shell (see buildRenewalMoreContext's doc comment for why this doesn't reuse
+  // CalendarApp's own isShareOpen/isAnniversariesOpen/isGuideOpen state).
+  const [openMoreModal, setOpenMoreModal] = React.useState(null);
   const calendarName = calendar?.name || null;
+
+  const handleSelectMoreItem = (id) => {
+    setSelectedMoreItem(id);
+    if (id === 'admin') { moreContext.onOpenAdmin(); return; }
+    if (!REAL_MORE_MODAL_IDS.includes(id)) return; // search/app-settings/calendar-settings: selection only for now
+    const trigger = { share: moreContext.onSelectShare, anniversaries: moreContext.onSelectAnniversaries, manual: moreContext.onSelectManual }[id];
+    Promise.resolve(trigger()).then(() => setOpenMoreModal(id)).catch(() => {});
+  };
 
   // Correct an invalid/stale ?tab=/?sub= on first mount without adding a history entry, then
   // listen for the back/forward buttons for the rest of this shell's lifetime.
@@ -300,25 +429,28 @@ export function RenewalAppShell({ activeCalId, calendar }) {
     )
   );
 
-  return React.createElement('div', { className: 'renewal-shell' },
-    React.createElement('nav', { className: 'renewal-shell-side-nav', 'aria-label': '주 메뉴' },
-      React.createElement('div', { className: 'renewal-shell-side-nav-brand' }, calendarName || '모여라 캘린더'),
-      ...navButtons('renewal-shell-side-nav-item')
+  return React.createElement(React.Fragment, null,
+    React.createElement('div', { className: 'renewal-shell' },
+      React.createElement('nav', { className: 'renewal-shell-side-nav', 'aria-label': '주 메뉴' },
+        React.createElement('div', { className: 'renewal-shell-side-nav-brand' }, calendarName || '모여라 캘린더'),
+        ...navButtons('renewal-shell-side-nav-item')
+      ),
+      React.createElement('main', { className: 'renewal-shell-main' },
+        React.createElement(TopHeader, {
+          calendarName,
+          onOpenSearch: () => setActiveTab('more'),
+          onOpenMore: () => setActiveTab('more'),
+        }),
+        activeTab === 'records'
+          ? React.createElement(RecordsPane, { subTab: recordsSubTab, onSelectSubTab: setRecordsSubTab, calendarName })
+          : activeTab === 'more'
+          ? React.createElement(MorePane, { calendarName, selectedItem: selectedMoreItem, onSelectItem: handleSelectMoreItem })
+          : React.createElement(PlaceholderPane, { tabId: activeTab, calendarName })
+      ),
+      React.createElement('nav', { className: 'renewal-shell-bottom-nav', 'aria-label': '주 메뉴' },
+        ...navButtons('renewal-shell-bottom-nav-item')
+      )
     ),
-    React.createElement('main', { className: 'renewal-shell-main' },
-      React.createElement(TopHeader, {
-        calendarName,
-        onOpenSearch: () => setActiveTab('more'),
-        onOpenMore: () => setActiveTab('more'),
-      }),
-      activeTab === 'records'
-        ? React.createElement(RecordsPane, { subTab: recordsSubTab, onSelectSubTab: setRecordsSubTab, calendarName })
-        : activeTab === 'more'
-        ? React.createElement(MorePane, { calendarName, selectedItem: selectedMoreItem, onSelectItem: setSelectedMoreItem })
-        : React.createElement(PlaceholderPane, { tabId: activeTab, calendarName })
-    ),
-    React.createElement('nav', { className: 'renewal-shell-bottom-nav', 'aria-label': '주 메뉴' },
-      ...navButtons('renewal-shell-bottom-nav-item')
-    )
+    React.createElement(MoreModalsHost, { openModal: openMoreModal, onClose: () => setOpenMoreModal(null), modalProps: moreContext.modalProps })
   );
 }
