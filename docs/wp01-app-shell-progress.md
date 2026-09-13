@@ -307,3 +307,58 @@ import**해서 쓰면 된다 — 로직을 복제하는 게 아니라 완전히 
 `ErrorState`/`OfflineState`/`SectionHeader`/`CountBadge` 공통화 — 이건 앱 전체(레거시 화면
 포함) 범위라 별도로 더 크게 계획해야 한다. 참고로 색상 토큰(`--brand`, `--text-main` 등)은
 이미 앱 전역에 있고 렌더얼 셸도 처음부터 그걸 재사용해 왔다.
+
+## 2026-09-13: WP-03 착수 — 캘린더 탭 실제 연결 (달력 그리드 + 날짜 모달)
+
+**배경:** 사용자가 "메인화면부터 채워줘" — `?shell=v2`의 캘린더 탭이 지금까지 완전히 빈
+플레이스홀더였던 것을 실제 콘텐츠로 채우는 작업. `CalendarGrid`/`DateModal`은 (더보기 탭의
+`AdminModal`/`GlobalSearchModal`과 달리) `onOpenChatMessage`/`onOpenImage` 같은 대화 탭 전환
+콜백에 의존하지 않는 자기완결적 컴포넌트라, 5차 슬라이스에서 보류했던 것들과 달리 이번 슬라이스
+에서 바로 실제로 연결할 수 있었다.
+
+**핵심 발견 (activeCal null vs. 항상-객체 버그):** `app-main.js`의 `activeCal`은
+`React.useMemo(() => ({...rawActiveCal, places: ..., confirmedMeeting: ...}))`로 만들어져서,
+`rawActiveCal`이 아직 로드되지 않아 `null`이어도 `{...null}`은 자바스크립트에서 `{}`이 되므로
+`activeCal`은 **항상 최소 `{places, confirmedMeeting}` 형태의 객체**다 — 절대 `null`이 아니다.
+반면 이 셸이 여기저기 돌려쓰는 공유 `calendar` prop(`activeCalLoaded ? activeCal : null`)은
+더보기 탭의 "아직 로드 안 됨" 토스트(`requireLoadedCalendar`)를 위해 **의도적으로 null이 될 수
+있게** 설계되어 있다. `CalendarGrid`/`DateModal`은 원본 그대로 가져다 쓰는 컴포넌트라
+`calendar.availabilities` 등을 null 가드 없이 바로 읽는데, 이건 원본 `app-main.js` 호출부가
+항상 진짜 `activeCal`(null 아님)을 넘기기 때문에 원래는 문제가 안 됐던 코드다. 이 공유
+nullable `calendar`를 그대로 넘겼다가 Playwright 헤드리스 테스트에서 실제 런타임 크래시로
+잡혔다: `TypeError: Cannot read properties of null (reading 'availabilities')` at
+`ui-calendar-core.js`, `AppErrorBoundary`로 떨어짐.
+
+**해결책:** `calendarContextDeps`에 CalendarApp의 `activeCal`(항상 객체)을 새 의존성으로 추가해서,
+`buildRenewalCalendarContext`가 자신의 nullable `calendar` 파라미터 대신 이 `activeCal`을
+`calendar: activeCal`(그리드용)과 `dateModalProps.calendar: activeCal`(날짜 모달용)로 반환하도록
+수정. 로직 재구현이 아니라 "어느 값을 넘기느냐"만 고친 것.
+
+- `buildRenewalCalendarContext(calendar, deps)` 신설 — `deps`로 `activeCal`,
+  `anniversariesWithPosters`, `isInitialDataLoading`, `handleMoveAvailability`,
+  `displayChatMessages`, `memos`, `customCultureItems`, 참석/삭제/정산/사진/장소 관련 20여개
+  핸들러, `showToast`, `showConfirmDialog`, `syncStatus`, `photoCommentCounts`,
+  `setActiveLightbox` 등 — 전부 이미 있던 `app-main.js`의 값/함수를 그대로 전달, 새 로직 없음.
+  `calendar` 파라미터 자체는 쓰지 않는다(시그니처 대칭용으로만 유지).
+- `CalendarPane` 컴포넌트 신설 — 자신의 로컬 `monthDate`/`dateModalDate` state로 월 이동과
+  날짜 모달 열기/닫기를 직접 관리(`CalendarApp`의 `currentMonthDate`/`isModalOpen` state는
+  `?shell=v2` 조기 반환 아래라 무동작이므로, 이전 슬라이스들과 같은 패턴으로 셸이 자체 state
+  소유). `bindUiComponentAliases`로 실제 `CalendarGrid`/`DateModal`을 렌더.
+- 날짜 모달의 "기념일 편집"/"+ 기념일 등록" 버튼은 더보기 탭과 동일한 `AnniversaryModal`을
+  편집 id 또는 시작 날짜로 미리 채워 연다(기존 `MainSideMenu` 플로우와 동일). "컨텐츠 원본"
+  포커스는 아직 실제 컨텐츠 화면(WP-06 몫)이 없어 기록 탭의 콘텐츠 서브탭으로만 이동시킨다.
+- `renderRenewalShellIfEnabled`가 4번째 인자 `calendarContextDeps`를 받도록 확장,
+  `app-main.js`의 어댑터 호출 한 줄에 `activeCal`을 포함한 새 객체 리터럴 추가 —
+  `check:app-main-inventory`로 `CalendarApp` 7700/7700 그대로 확인.
+- 검증(Playwright 헤드리스): `?shell=v2&tab=calendar`에서 실제 달력 그리드가 렌더됨(2026년 9월,
+  공휴일 라벨 "백로"/"추분"/"추석 연휴"/"개천절" 등 실데이터 확인, 이전의 null 크래시 없음).
+  날짜(15일) 클릭 → 실제 `DateModal` 오픈 확인(참석/장소/정산/사진 탭, 참여자 선택 UI 등 실제
+  내용 렌더, 콘솔 에러 없음). 기본(플래그 없음) 경로 HTML 길이 36894바이트로 이전과 동일, 콘솔
+  에러 없음(네트워크가 차단된 샌드박스 환경에서 나오는 `ERR_CONNECTION_RESET` 제외).
+- `npm run lint`/`check:app-main-inventory`/`check:all`/`safety:test`/`regression:test`(빌드
+  포함) 전부 통과.
+
+**아직 다루지 않은 것**: 마스터플랜의 캘린더 탭 설명에 있는 "가까운 일정/응답 필요/최근 소식"
+같은 홈 요약 섹션은 이번 슬라이스 범위 밖 — 사용자의 "메인화면부터 채워줘" 요청은 우선 달력
+그리드+날짜 모달 자체를 실동작시키는 것으로 해석했다. 요약 섹션 추가는 다음 확인 후 별도
+슬라이스로 진행할지 결정.
