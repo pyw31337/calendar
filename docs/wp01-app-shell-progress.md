@@ -467,3 +467,45 @@ selector 계층이 먼저 정의되어야 "미정 참석"이 무엇을 뜻하는
 후보. 최초 메시지 로드 개수 조절/과거 메시지 pagination 분리(§5.4의 세부 성능 요구사항)는
 `ChatRoomView`/`loadOlderChatMessages`가 이미 구현한 그대로를 재사용했을 뿐, 이 슬라이스에서 그
 내부 로직을 손대거나 검증하지 않았다.
+
+## 2026-09-13: WP-08 착수 — 더보기 "검색" 실제 연결 (대화 탭이 생겨서 풀린 이전 보류)
+
+**배경:** 사용자가 "묻지 말고 밤새 계속 진행"을 지시. 정산/기록 슬라이스들이 병합 대기 중이라
+서로 충돌 위험이 있는 `RecordsPane` 관련 작업을 더 쌓는 대신, 겹치지 않는 독립 작업으로 전환.
+4차 슬라이스에서 검색/캘린더 설정을 보류했던 이유가 "`onOpenChatMessage`/`onOpenImage`가
+`changeView('chat')`로 이동시키는데 대화 탭 자체가 플레이스홀더라 갈 곳이 없다"는 것이었는데,
+WP-05(#616)가 이미 병합되어 대화 탭이 실제로 동작하므로 이제 그 블로커가 풀렸다. 이번 슬라이스는
+"검색"만 다룬다 — "캘린더 설정"(`AdminModal`)은 캘린더 전환/활동로그 삭제 등 더 넓고 민감한
+표면을 가져서 별도 슬라이스로 남겨둔다.
+
+- **`GlobalSearchModal`은 메인 번들(`ui-calendar-core.js`, 부팅 시 즉시 로드)에 있어서**
+  `CalendarGrid`/`PollList`처럼 지연 로드 대기가 필요 없다 — `REAL_MORE_MODAL_IDS`에 그냥
+  추가.
+- **`onOpenChatMessage`/`onOpenImage`/`onSelectDate`/`onOpenMemo`는 `buildRenewalMoreContext`가
+  아니라 `RenewalAppShell`에서 조립**: 대화 탭으로 전환하는 것(`onChangeView('chat')`)과 날짜
+  모달을 여는 것 둘 다 셸 레벨 개념이라 컨텍스트 빌더에는 없다. 라이트박스 항목 구성 로직
+  자체는 `app-main.js`의 원래 `AdminModal`/`GlobalSearchModal` 호출부와 완전히 동일한 코드를
+  그대로 복사(재구현이 아니라 같은 유틸 함수 `getMessageDirectMediaEntry`/
+  `getMessageImageEntries`를 그대로 호출) — 바뀐 건 "어느 탭이 활성인가"뿐이다.
+  `MoreModalsHost`가 `searchExtra`라는 새 prop으로 이 조합된 콜백들을 받아
+  `modalProps.search`와 병합해서 렌더한다.
+  - 날짜 모달은 이번에도 (WP-07 #617이 아직 병합 전이라) 공유 인스턴스에 의존하지 않고
+    `SearchDateModal`이라는 자체 로컬 인스턴스를 하나 더 둔다(`PlacesPane`과 같은 이유) —
+    데이터/핸들러는 `calendarContext.dateModalProps`를 그대로 재사용.
+- **헤더의 "검색" 아이콘이 이제 더보기 탭으로 이동하는 대신 검색 모달을 바로 연다** —
+  `handleSelectMoreItem('search')`를 재사용해서 더보기 탭의 "검색" 항목을 누른 것과 동일하게
+  동작(모달 오픈 + 더보기 리스트의 선택 상태도 같이 갱신).
+- `buildRenewalMoreContext`에 새 deps 추가: `chatMessages`, `memos`, `globalSearchInitialQuery`,
+  `focusChatMessage`, `openNotificationHelp` — 전부 `app-main.js`의 기존 값 pass-through.
+  `check:app-main-inventory`로 `CalendarApp` 7700/7700 그대로 확인.
+- 검증(Playwright 헤드리스): `?shell=v2&tab=calendar`에서 헤더의 검색 아이콘 클릭 → 실제
+  `GlobalSearchModal` 오픈 확인("검색어를 입력해 주세요." 안내 문구 렌더, 콘솔 에러 없음).
+  더보기 탭 자체도 회귀 없이 정상 렌더. 기본(플래그 없음) 경로 HTML 길이 36894바이트로 동일,
+  콘솔 에러 없음.
+- `npm run lint`/`check:app-main-inventory`/`check:all`/`safety:test`/`regression:test`(빌드
+  포함) 전부 통과.
+
+**아직 다루지 않은 것**: "캘린더 설정"(`AdminModal`, 위에서 설명한 대로 별도 슬라이스로 미룸),
+검색 결과에서 실제로 채팅 메시지로 점프하는 것까지는 헤드리스로 끝까지 확인 못함(네트워크 차단
+환경이라 검색할 실데이터가 없음) — 로직 자체는 원본과 100% 동일한 pass-through라 별도 위험은
+낮다고 판단.
