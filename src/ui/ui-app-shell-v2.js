@@ -596,6 +596,9 @@ export function buildRenewalRecordsContext(calendar, deps) {
     isDarkTheme, toggleTheme, fontScalePercent, setFontScalePercent,
     mainNotifPermission, mainChatNotifyEnabled, handleMainToggleNotifications,
     syncStatus, isGalleryShareOpen, setIsGalleryShareOpen,
+    memos, totalMemoCount, onLoadMoreMemos, sharedMemo, setSharedMemo, chatMessages,
+    patchLocalMemo, upsertLocalMemo, removeLocalMemo, memoInitialTag, setMemoInitialTag,
+    isMemoShareOpen, setIsMemoShareOpen,
   } = deps || {};
   const requireLoadedCalendar = (message) => {
     if (activeCal) return true;
@@ -638,6 +641,22 @@ export function buildRenewalRecordsContext(calendar, deps) {
     isGalleryShareOpen: !!isGalleryShareOpen,
     onOpenGalleryShare: () => { if (requireLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsGalleryShareOpen(true); },
     onCloseGalleryShare: () => setIsGalleryShareOpen(false),
+    memoProps: {
+      calendar: activeCal, memos, hasMoreMemos, totalMemoCount, onLoadMoreMemos,
+      showToast, isDarkTheme, onRequestConfirm: showConfirmDialog,
+      sharedMemo, chatMessages, setActiveLightbox,
+      onDismissSharedMemo: () => {
+        if (typeof setSharedMemo === 'function') setSharedMemo(null);
+        const url = new URL(window.location.href);
+        url.searchParams.delete('memo');
+        window.history.replaceState({}, '', url);
+      },
+      onUpdateMemo: patchLocalMemo, onUpsertMemo: upsertLocalMemo, onDeleteMemo: removeLocalMemo,
+      memoInitialTag, setMemoInitialTag,
+    },
+    isMemoShareOpen: !!isMemoShareOpen,
+    onOpenMemoShare: () => { if (requireLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsMemoShareOpen(true); },
+    onCloseMemoShare: () => setIsMemoShareOpen(false),
   };
 }
 
@@ -684,6 +703,42 @@ function MediaPane({ recordsContext, onChangeView, onOpenAppSettings }) {
  * wires real data in. This is the one tab with a second level of navigation because it alone
  * absorbs 5 old screens (docs/design-renewal-handoff.md §2) -- the other 4 tabs stay flat.
  */
+/**
+ * 메모 subtab body (WP-06 continuation): the real `MemoView`, same pass-through approach as
+ * `ChatPane`/`SettlementPane`. `MemoView` ships in its own lazy-loaded chunk
+ * (`window.__gatherLoadViewUi('memo')`), so this waits for that chunk before rendering.
+ */
+function MemoPane({ recordsContext, onChangeView, onOpenAppSettings }) {
+  const React = window.React;
+  const [loaded, setLoaded] = React.useState(() => !!(window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MemoView));
+  React.useEffect(() => {
+    if (loaded) return undefined;
+    if (typeof window.__gatherLoadViewUi !== 'function') { setLoaded(true); return undefined; }
+    let cancelled = false;
+    window.__gatherLoadViewUi('memo').then(() => { if (!cancelled) setLoaded(true); }).catch(err => {
+      console.error('Memo UI load failed:', err);
+      if (typeof recordsContext.showToast === 'function') recordsContext.showToast('메모 화면을 불러오지 못했습니다. 다시 시도해 주세요.', 'error');
+    });
+    return () => { cancelled = true; };
+  }, [loaded]);
+  if (!loaded) {
+    return React.createElement(EmptyState, { title: '메모 불러오는 중', subtitle: '잠시만 기다려 주세요.' });
+  }
+  const { MemoView, ShareModal } = bindUiComponentAliases(React);
+  return React.createElement(React.Fragment, null,
+    React.createElement(MemoView, {
+      ...recordsContext.memoProps,
+      onBack: () => onChangeView('calendar'),
+      onOpenShare: recordsContext.onOpenMemoShare,
+      onOpenAppSettings,
+    }),
+    recordsContext.isMemoShareOpen && React.createElement(ShareModal, {
+      calendar: recordsContext.calendar, shareType: 'memo', showToast: recordsContext.showToast,
+      onClose: recordsContext.onCloseMemoShare,
+    })
+  );
+}
+
 function RecordsPane({ subTab, onSelectSubTab, calendarName, recordsContext, onChangeView, onOpenAppSettings }) {
   const React = window.React;
   return React.createElement(React.Fragment, null,
@@ -699,10 +754,12 @@ function RecordsPane({ subTab, onSelectSubTab, calendarName, recordsContext, onC
     ),
     subTab === 'media'
       ? React.createElement(MediaPane, { recordsContext, onChangeView, onOpenAppSettings })
+      : subTab === 'memo'
+      ? React.createElement(MemoPane, { recordsContext, onChangeView, onOpenAppSettings })
       : React.createElement(EmptyState, {
-      title: `${RECORDS_SUBTABS.find(t => t.id === subTab)?.label || subTab} (준비 중)`,
-      subtitle: withCalendarPrefix(calendarName, 'WP-06에서 실제 데이터가 이 자리에 연결됩니다.'),
-    })
+        title: `${RECORDS_SUBTABS.find(t => t.id === subTab)?.label || subTab} (준비 중)`,
+        subtitle: withCalendarPrefix(calendarName, 'WP-06에서 실제 데이터가 이 자리에 연결됩니다.'),
+      })
   );
 }
 
