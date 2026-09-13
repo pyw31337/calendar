@@ -547,3 +547,39 @@ WP-07("정산 화면 재배치")에 해당하는 작업으로, 대화 탭과 완
 
 **아직 다루지 않은 것**: 장소/사진·영상/보관함/콘텐츠/전체 서브탭(다음 슬라이스들), 위에서 설명한
 이중 헤더 시각적 이슈(디자인 패스로 미룸).
+
+## 2026-09-13: WP-06 착수 (병렬) — "기록" 탭의 "장소" 서브탭 실제 연결
+
+**배경:** 사용자가 "묻지 말고 밤새 계속 진행"을 지시. 메모 서브탭과 별도로, "메모" 슬라이스가
+아직 병합 대기 중인 상태에서 이 슬라이스는 병합된 `main`(PR #616까지) 기준으로 독립적으로
+시작했다 — 두 슬라이스 모두 `RecordsPane`/`buildRenewalRecordsContext`라는 같은 이름을 건드리기
+때문에 나중에 머지될 때 충돌이 날 것으로 예상하지만(이전 WP-02/WP-03 충돌과 같은 성격), 각
+서브탭을 독립적으로 검토 가능한 작은 PR로 유지하는 게 더 낫다고 판단했다.
+
+- **`buildRenewalRecordsContext(calendar, deps)` 신설** (메모 슬라이스와 이름은 같지만 이
+  브랜치에서는 장소만 담음 — 병합 시 두 슬라이스의 deps를 합칠 예정) — `app-main.js`의
+  `activeView === 'places'` 호출부가 쓰는 값/함수(장소 저장/삭제, 검색 초기값, 포커스 대상,
+  테마/글자크기, 공유) 그대로 pass-through.
+- **`PlacesPane`** — `MemoPane`과 같은 "지연 로드 대기" 패턴(`window.__gatherLoadViewUi
+  ('places')`, `ui-places.js` 청크).
+- **핵심 설계 결정 (날짜 모달을 굳이 공유하지 않음)**: WP-07(정산, #617)이 이미 날짜 모달을
+  `RenewalAppShell` 레벨로 끌어올리는 리팩터를 진행 중이지만, 그 PR이 아직 병합되지 않은 상태라
+  이 슬라이스가 거기 의존하면 두 PR 사이에 순서 종속성이 생긴다. 그래서 `PlacesPane`은 일부러
+  자기 자신의 로컬 `placeDateModalDate` state로 독립적인 `DateModal` 인스턴스를 하나 더
+  렌더링한다(WP-03 최초 버전의 `CalendarPane`과 같은 모양) — 다만 모달 자체의 데이터/핸들러는
+  이미 `RenewalAppShell`에 있는 `calendarContext.dateModalProps`를 그대로 재사용해서 로직
+  중복은 없다("어떤 날짜가 열려 있는가"라는 state 하나만 중복). WP-07이 먼저 병합되면 다음
+  정리 슬라이스에서 이 로컬 state를 공유 인스턴스로 통합할 계획.
+- `renderRenewalShellIfEnabled`가 6번째 인자(`recordsContextDeps`)를 받도록 확장(메모
+  슬라이스와 마찬가지로 병합 시 순서 재조정 필요) — `check:app-main-inventory`로 `CalendarApp`
+  7700/7700 그대로 확인.
+- 검증(Playwright 헤드리스): `?shell=v2&tab=records&sub=places`에서 실제 `PlacesView` 렌더
+  확인(지도, 카테고리 필터 칩, "등록된 장소가 없습니다..." 빈 상태, 콘솔 에러 없음). 다른
+  서브탭(`sub=memo`, 이 브랜치 기준)은 여전히 플레이스홀더로 정상 동작(회귀 없음). 기본
+  (플래그 없음) 경로 HTML 길이 36894바이트로 동일, 콘솔 에러 없음.
+- `npm run lint`/`check:app-main-inventory`/`check:all`/`safety:test`/`regression:test`(빌드
+  포함) 전부 통과.
+
+**아직 다루지 않은 것**: 사진·영상/보관함/콘텐츠/전체 서브탭(다음 슬라이스들), 메모/정산 슬라이스와의
+머지 충돌 해소(각각 병합될 때), `placeDateModalDate`를 WP-07의 공유 인스턴스로 통합하는 정리
+작업(WP-07 병합 후).
