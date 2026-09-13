@@ -467,3 +467,43 @@ selector 계층이 먼저 정의되어야 "미정 참석"이 무엇을 뜻하는
 후보. 최초 메시지 로드 개수 조절/과거 메시지 pagination 분리(§5.4의 세부 성능 요구사항)는
 `ChatRoomView`/`loadOlderChatMessages`가 이미 구현한 그대로를 재사용했을 뿐, 이 슬라이스에서 그
 내부 로직을 손대거나 검증하지 않았다.
+
+## 2026-09-13: WP-08 — "더보기" 탭 "캘린더 설정" 실제 연결 (+ 셸 공용 버그 이식)
+
+**배경:** 5차 슬라이스에서 "onOpenChatMessage/onOpenImage 같은 탐색 의존성이 있어 보류"했던
+캘린더 설정(`AdminModal`)을, WP-08(검색/`GlobalSearchModal`)이 이미 같은 문제를 해결한 방식
+그대로 적용해 연결했다 — `app-main.js`의 `activeView` 상태를 바꾸는 대신, `RenewalAppShell`이
+`onChangeView`(탭 전환)로 매핑해서 조립하는 패턴.
+
+- `buildRenewalMoreContext`에 `modalProps['calendar-settings']`(원본 `isAdminOpen &&
+  <AdminModal ...>` 호출부의 프롭 전부 — `allCalendars`/`onSelectCalendar`/활동 로그/테마/폰트
+  등)과 `onSelectCalendarSettings`(지연 로드 대기, `window.__gatherLoadAdminUi` — 원본의
+  `onOpenSettings` 핸들러가 쓰는 것과 동일한 트리거) 추가. `unionActivityLogs`도
+  `app-domain-helpers.js`에서 그대로 import해서 원본과 동일하게 병합.
+- `RenewalAppShell`에 `calendarSettingsExtra`(`onSelectDate`/`onOpenChatMessage`/`onOpenImage`)를
+  WP-08의 `searchExtra`와 완전히 같은 방식으로 조립 — 대화 탭 전환 + `focusChatMessage`/
+  `setActiveLightbox` 재사용, 새 로직 없음. 날짜 상세는 `PlacesPane`/`HistoryPane`과 같은 이유로
+  이 슬라이스만의 로컬 `calendarSettingsDateModalDate` 상태를 씀(WP-07 공유 리프트 병합 전까지).
+- `REAL_MORE_MODAL_IDS`에 `calendar-settings` 추가, `MoreModalsHost`가 `AdminModal`도 렌더하도록
+  확장. 더보기 리스트/안내문의 "캘린더 설정은 아직 준비 중" 문구도 제거.
+- `app-main.js`의 어댑터 호출 1번째 인자(`moreContextDeps`)가 `calendars`/`handleSelectCalendar`/
+  `adminActivityLogs`/`loadAdminActivityLogs`/`handleSaveAdmin`/`recentMessages`/
+  `displayChatMessages`/`handleDeleteMessage`/`handleDeleteAvailability`/`handleDeleteAllForDate`/
+  `handleDeleteActivityLog`/`chatParticipantId`/`themeChoice`/`focusChatMessage`/`chatMessages`를
+  추가로 받도록 확장 — `check:app-main-inventory`로 `CalendarApp` 7700/7700 그대로 확인.
+- **`bindUiComponentAliases` 캐시 수정 이식**: 이 슬라이스도 병합된 `main` 기준 새 브랜치라
+  PR #621의 `WeakMap` 캐시 수정을 동일하게 옮겨왔다.
+- 검증(Playwright 헤드리스): `?shell=v2&tab=more`에서 "캘린더 설정" 항목 클릭 → 크래시/콘솔
+  에러 없음. 이 세션은 네트워크가 차단돼 있어 `activeCal`이 끝까지 로드되지 않으므로
+  `requireLoadedCalendar` 가드가 막아 모달이 열리지 않는데, 이미 검증된 "공유" 항목을 똑같은
+  방식(같은 클릭 → 같은 결과: 본문 변화 없음, 에러 없음)으로 클릭해 봐서 이게 새 버그가 아니라
+  이미 확립된 가드 패턴과 동일한 샌드박스 제약임을 확인했다. 실제 데이터가 있는 환경에서
+  가드를 통과한 뒤 `AdminModal`이 여는지는 이 세션에서 직접 검증하지 못함(다른 가드된 항목들과
+  동일한 한계).
+- `npm run lint`/`check:app-main-inventory`(7700/7700)/`check:all`/`safety:test`/`regression:test`
+  (빌드 포함) 전부 통과.
+
+**아직 다루지 않은 것**: `AdminModal` 내부 로직(계산기, 캘린더 삭제/이전, 활동 로그 등)은 기존
+구현 그대로 재사용했을 뿐 손대지 않음. "관리자 진입"(전체 관리자 대시보드, 새 탭)과는 별개
+기능임 — 이미 이전 슬라이스에서 `onOpenAdmin`으로 연결됨. 실제 네트워크가 있는 환경에서의
+end-to-end 클릭 검증(가드 통과 후 모달 오픈)은 미완.

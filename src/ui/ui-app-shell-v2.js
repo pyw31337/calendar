@@ -19,7 +19,8 @@ import { bindUiComponentAliases } from '../core/app-ui-wrappers.js';
 import {
   isNotificationSupported, isChatNotifyEnabledForCalendar, setChatNotifyEnabledForCalendar,
   getNotificationPermissionHelpSteps, setNotifGuideSeen, setNotifyChannel, syncPushSubscriptionChannels,
-  formatDDayLabel, formatConfirmedMeetingLabel,
+  formatDDayLabel, formatConfirmedMeetingLabel, unionActivityLogs,
+  getMessageDirectMediaEntry, getMessageImageEntries,
 } from '../core/app-domain-helpers.js';
 import { buildMainCalendarScreenState } from '../core/app-calendar-screen-state.js';
 
@@ -537,17 +538,19 @@ function MoreItemIcon({ id }) {
 
 /**
  * Which 더보기 items open a real modal in THIS shell (rendered by `MoreModalsHost` below) vs.
- * still just toggle the placeholder selection state. 캘린더 설정 (AdminModal) and 검색
- * (GlobalSearchModal) are deliberately left out of this slice: both need onOpenChatMessage/
- * onOpenImage-style props that navigate to a chat message location via `changeView('chat')` --
- * that sets CalendarApp's `activeView` state, which drives the SAME old JSX tree this shell's
- * early return never reaches, so it would silently no-op exactly like the isShareOpen bug the
- * previous slice found (docs/wp01-app-shell-progress.md 5th slice). 앱 설정 (AppSettingsModal)
- * has no such navigation dependency -- every one of its props is a self-contained toggle (theme,
- * font size, notification permission, weather location), so it's wired for real here using the
- * exact same handlers/utilities CalendarApp's own old menu uses (no reimplementation).
+ * still just toggle the placeholder selection state. 검색 (GlobalSearchModal) is deliberately
+ * left out of this slice -- it needs its own onOpenChatMessage/onOpenImage-style navigation
+ * wiring, done separately (WP-08). 캘린더 설정 (AdminModal) needed the exact same class of
+ * navigation props (onOpenChatMessage/onOpenImage jump to a chat message location, onSelectDate
+ * opens a date's detail) -- those are shell-navigation concepts `buildRenewalMoreContext` has no
+ * access to, so `RenewalAppShell` composes them the same way it does for WP-08's GlobalSearchModal
+ * (`calendarSettingsExtra` below), reusing the exact same lightbox-entry-building logic
+ * app-main.js's own AdminModal call site uses. 앱 설정 (AppSettingsModal) has no such navigation
+ * dependency -- every one of its props is a self-contained toggle (theme, font size, notification
+ * permission, weather location), so it's wired for real here using the exact same handlers/
+ * utilities CalendarApp's own old menu uses (no reimplementation).
  */
-const REAL_MORE_MODAL_IDS = ['share', 'anniversaries', 'manual', 'app-settings'];
+const REAL_MORE_MODAL_IDS = ['share', 'anniversaries', 'manual', 'app-settings', 'calendar-settings'];
 
 /**
  * Builds the 더보기 list's real destinations from CalendarApp's own state/helpers, passed in as
@@ -581,6 +584,10 @@ export function buildRenewalMoreContext(calendar, deps) {
     notifyChannels, setNotifyChannelsState, handleMainToggleNotifications,
     handleUpdateWeatherLocation, handleDeleteRecentWeatherLocation, getCurrentChatParticipantId,
     setCloudReloadToken,
+    calendars, handleSelectCalendar, adminActivityLogs, loadAdminActivityLogs, handleSaveAdmin,
+    recentMessages, displayChatMessages, handleDeleteMessage, handleDeleteAvailability,
+    handleDeleteAllForDate, handleDeleteActivityLog, chatParticipantId, themeChoice,
+    focusChatMessage, chatMessages,
   } = deps || {};
   const requireLoadedCalendar = (message) => {
     if (calendar) return true;
@@ -639,6 +646,28 @@ export function buildRenewalMoreContext(calendar, deps) {
         onRequestConfirm: showConfirmDialog,
         onRequestDataRefresh: () => { if (typeof setCloudReloadToken === 'function') setCloudReloadToken(token => token + 1); },
       },
+      // Straight port of app-main.js's own isAdminOpen && <AdminModal ...> call site (its
+      // onOpenSettings handler, which opens with initialTab: 'settings') -- everything except
+      // onSelectDate/onOpenChatMessage/onOpenImage/onClose, which need shell-navigation concepts
+      // (which tab is active) this context builder has no access to; RenewalAppShell composes
+      // those the same way WP-08's GlobalSearchModal wiring does.
+      'calendar-settings': {
+        initialTab: 'settings',
+        calendar: calendar ? { ...calendar, activityLogs: unionActivityLogs(calendar, adminActivityLogs) } : calendar,
+        allCalendars: calendars,
+        onSelectCalendar: handleSelectCalendar,
+        onLoadActivityLogs: loadAdminActivityLogs,
+        onSave: handleSaveAdmin,
+        recentMessages, chatMessages: displayChatMessages,
+        onDeleteMessage: handleDeleteMessage,
+        onDeleteAvailability: handleDeleteAvailability,
+        onDeleteAllForDate: handleDeleteAllForDate,
+        onRequestConfirm: showConfirmDialog,
+        showToast,
+        onDeleteLog: handleDeleteActivityLog,
+        chatParticipantId, themeChoice, toggleTheme, isDarkTheme,
+        fontScalePercent, setFontScalePercent,
+      },
     },
     // Each resolves (or rejects) once it's safe to show the modal; RenewalAppShell opens it on
     // resolve and swallows a rejection (the lazy-load failure already showed its own toast).
@@ -676,6 +705,24 @@ export function buildRenewalMoreContext(calendar, deps) {
     // AppSettingsModal is already in the main bundle (no lazy chunk to wait for, matching the
     // original isAppSettingsOpen call site) and has no loaded-calendar guard either.
     onSelectAppSettings: () => Promise.resolve(),
+    // AdminModal (캘린더 설정) ships in its own lazy-loaded chunk (window.__gatherLoadAdminUi),
+    // the exact trigger app-main.js's own onOpenSettings handler uses -- same "wait for chunk"
+    // pattern ChatPane/MediaPane already established, guarded the same way (loaded calendar
+    // required, matching the original's guardLoadedCalendar check).
+    onSelectCalendarSettings: () => {
+      if (!requireLoadedCalendar('Firebase 데이터를 불러온 뒤 설정을 수정해 주세요.')) return Promise.reject();
+      if (typeof window.__gatherLoadAdminUi !== 'function') return Promise.resolve();
+      return window.__gatherLoadAdminUi().catch(err => {
+        console.error('Calendar settings UI load failed:', err);
+        if (typeof showToast === 'function') showToast('캘린더 설정을 불러오지 못했습니다. 다시 시도해 주세요.', 'error');
+        throw err;
+      });
+    },
+    // Raw ingredients for RenewalAppShell's onOpenChatMessage/onOpenImage navigators (AdminModal
+    // needs to jump into a specific chat message/image the same way app-main.js's own AdminModal
+    // call site's inline handlers do) -- composed there, not here, since switching to the 대화
+    // tab is a shell-navigation concept this context builder has no access to.
+    focusChatMessage, chatMessages, setActiveLightbox,
     onOpenAdmin: () => {
       const adminUrl = new URL(window.location.href);
       adminUrl.searchParams.delete('view');
@@ -696,14 +743,15 @@ export function buildRenewalMoreContext(calendar, deps) {
  * pass-through aliases app-main.js itself uses (`bindUiComponentAliases`) -- so this reuses the
  * exact lazy-loaded chunk/component app-main.js already has, no separate copy bundled here.
  */
-function MoreModalsHost({ openModal, onClose, modalProps, anniversaryOverride }) {
+function MoreModalsHost({ openModal, onClose, modalProps, anniversaryOverride, calendarSettingsExtra }) {
   const React = window.React;
   if (!openModal) return null;
-  const { ShareModal, AnniversaryModal, UserManualOverlay, AppSettingsModal } = bindUiComponentAliases(React);
+  const { ShareModal, AnniversaryModal, UserManualOverlay, AppSettingsModal, AdminModal } = bindUiComponentAliases(React);
   if (openModal === 'share') return React.createElement(ShareModal, { ...modalProps.share, onClose });
   if (openModal === 'anniversaries') return React.createElement(AnniversaryModal, { ...modalProps.anniversaries, ...anniversaryOverride, onClose });
   if (openModal === 'manual') return React.createElement(UserManualOverlay, { ...modalProps.manual, onClose });
   if (openModal === 'app-settings') return React.createElement(AppSettingsModal, { ...modalProps['app-settings'], onClose });
+  if (openModal === 'calendar-settings') return React.createElement(AdminModal, { ...modalProps['calendar-settings'], ...calendarSettingsExtra, onClose });
   return null;
 }
 
@@ -712,8 +760,8 @@ function MoreModalsHost({ openModal, onClose, modalProps, anniversaryOverride })
  * §2). 검색 also has a header shortcut (TopHeader's onOpenSearch), so choosing it here and there
  * both land on the same tab -- this list is the one place all 7 exist, header included or not.
  * `onSelectItem` (owned by RenewalAppShell) decides per-id whether that's a real destination
- * (share/anniversaries/manual/app-settings/admin) or still just a placeholder selection (search,
- * calendar-settings -- see REAL_MORE_MODAL_IDS above); this component stays presentation-only.
+ * (share/anniversaries/manual/app-settings/calendar-settings/admin) or still just a placeholder
+ * selection (search -- see REAL_MORE_MODAL_IDS above); this component stays presentation-only.
  */
 function MorePane({ calendarName, onSelectItem, selectedItem }) {
   const React = window.React;
@@ -734,7 +782,7 @@ function MorePane({ calendarName, onSelectItem, selectedItem }) {
       ))
     ),
     React.createElement('div', { className: 'renewal-shell-placeholder-sub renewal-shell-more-note' },
-      calendarName ? `${calendarName} · 검색/캘린더 설정은 아직 준비 중입니다.` : '검색/캘린더 설정은 아직 준비 중입니다.')
+      calendarName ? `${calendarName} · 검색은 아직 준비 중입니다.` : '검색은 아직 준비 중입니다.')
   );
 }
 
@@ -784,6 +832,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
     const trigger = {
       share: moreContext.onSelectShare, anniversaries: moreContext.onSelectAnniversaries,
       manual: moreContext.onSelectManual, 'app-settings': moreContext.onSelectAppSettings,
+      'calendar-settings': moreContext.onSelectCalendarSettings,
     }[id];
     if (!trigger) return;
     Promise.resolve(trigger()).then(() => setOpenMoreModal(id)).catch(() => {});
@@ -791,7 +840,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   const handleSelectMoreItem = (id) => {
     setSelectedMoreItem(id);
     if (id === 'admin') { moreContext.onOpenAdmin(); return; }
-    if (!REAL_MORE_MODAL_IDS.includes(id)) return; // search/calendar-settings: selection only for now
+    if (!REAL_MORE_MODAL_IDS.includes(id)) return; // search: selection only for now
     if (id === 'anniversaries') setAnniversaryOverride(null); // opened from the 더보기 list itself, not a date's edit/add flow
     openMoreModalById(id);
   };
@@ -835,6 +884,41 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
     setActiveTab('calendar');
   };
   const onOpenAppSettings = () => openMoreModalById('app-settings');
+
+  // AdminModal (캘린더 설정)'s date/chat-message/image navigation: composed here, not in
+  // `buildRenewalMoreContext`, because switching to the 대화 tab (`onChangeView`) and opening a
+  // date's detail are shell-navigation concepts that context builder has no access to. Reuses the
+  // exact same lightbox-entry-building logic app-main.js's own AdminModal call site uses
+  // (moreContext.chatMessages/setActiveLightbox/focusChatMessage are plain pass-through of those
+  // same CalendarApp values) -- only "which tab is active" is new, same approach WP-08's
+  // GlobalSearchModal wiring uses for the identical prop pair.
+  //
+  // `calendarSettingsDateModalDate` is its own small local instance (like PlacesPane's) rather
+  // than a shared one: WP-07's date-modal lift (#617) isn't merged yet, so this avoids an
+  // inter-PR ordering dependency; a later cleanup can fold it into the shared instance once that
+  // lands.
+  const [calendarSettingsDateModalDate, setCalendarSettingsDateModalDate] = React.useState(null);
+  const calendarSettingsExtra = {
+    onSelectDate: (d) => setCalendarSettingsDateModalDate(d),
+    onOpenChatMessage: (messageId) => {
+      onChangeView('chat');
+      setTimeout(() => { if (typeof moreContext.focusChatMessage === 'function') moreContext.focusChatMessage(messageId); }, 350);
+    },
+    onOpenImage: (messageId, imageIndex, directMediaUrl = '') => {
+      onChangeView('chat');
+      setTimeout(() => {
+        const msg = (moreContext.chatMessages || []).find(m => m.id === messageId);
+        if (!msg || typeof moreContext.setActiveLightbox !== 'function') return;
+        const directEntry = getMessageDirectMediaEntry(msg);
+        const entries = directMediaUrl && directEntry ? [directEntry] : getMessageImageEntries(msg);
+        moreContext.setActiveLightbox({
+          urls: entries.map(e => e.full),
+          meta: entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, directMediaUrl: e.directMediaUrl, source: e.source, uploadSource: e.uploadSource, assetKey: e.assetKey, mediaKey: e.mediaKey, refKey: e.refKey })),
+          index: directMediaUrl ? 0 : imageIndex,
+        });
+      }, 350);
+    },
+  };
 
   // Correct an invalid/stale ?tab=/?sub= on first mount without adding a history entry, then
   // listen for the back/forward buttons for the rest of this shell's lifetime.
@@ -902,7 +986,17 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
     ),
     React.createElement(MoreModalsHost, {
       openModal: openMoreModal, onClose: () => setOpenMoreModal(null),
-      modalProps: moreContext.modalProps, anniversaryOverride,
+      modalProps: moreContext.modalProps, anniversaryOverride, calendarSettingsExtra,
+    }),
+    calendarSettingsDateModalDate && React.createElement(bindUiComponentAliases(React).DateModal, {
+      ...calendarContext.dateModalProps,
+      dateStr: calendarSettingsDateModalDate,
+      initialTab: null,
+      onClose: () => setCalendarSettingsDateModalDate(null),
+      onParticipantClick: (name, dateStr) => { if (dateStr) setCalendarSettingsDateModalDate(dateStr); },
+      onEditAnniversary,
+      onAddAnniversaryForDate: (d) => { setCalendarSettingsDateModalDate(null); onAddAnniversaryForDate(d); },
+      onFocusCultureSource,
     })
   );
 }
