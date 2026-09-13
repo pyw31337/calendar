@@ -467,3 +467,38 @@ selector 계층이 먼저 정의되어야 "미정 참석"이 무엇을 뜻하는
 후보. 최초 메시지 로드 개수 조절/과거 메시지 pagination 분리(§5.4의 세부 성능 요구사항)는
 `ChatRoomView`/`loadOlderChatMessages`가 이미 구현한 그대로를 재사용했을 뿐, 이 슬라이스에서 그
 내부 로직을 손대거나 검증하지 않았다.
+
+## 2026-09-13: WP-06 — "기록" 탭 "사진·영상" 서브탭 실제 연결 (+ 셸 공용 버그 이식)
+
+**배경:** 기록 탭의 "사진·영상" 서브탭(옛 `activeView === 'gallery'`, 실제 컴포넌트는 `asPage:
+true`로 렌더되는 `ChatGalleryModal`)을 실제 연결. WP-05/WP-06(메모·장소·보관함)과 동일한
+pass-through 패턴: `app-main.js`의 `activeView === 'gallery'` 호출부가 쓰던 프롭 전부를
+`buildRenewalRecordsContext`의 새 `mediaProps`로 그대로 전달. `ChatGalleryModal`은 `ChatRoomView`와
+같은 지연 로드 청크(`window.__gatherLoadChatUi`)에 있어, `ChatPane`이 이미 쓰던 "청크 로드 대기 →
+렌더" 패턴을 `MediaPane`에도 그대로 재사용했다.
+
+- `onChangeView`가 이미 WP-05에서 `gallery` → 기록/사진·영상으로 매핑해 둔 상태라(`ChatRoomView`
+  내부의 "갤러리로 이동" 진입점을 위해 미리 준비됨), 이 슬라이스는 그 매핑의 목적지를 실제로
+  채우기만 하면 됐다 — 새로운 네비게이션 로직 없음.
+- `app-main.js`의 어댑터 호출이 6번째 인자(`recordsContextDeps`)를 받도록 확장 —
+  `check:app-main-inventory`로 `CalendarApp` 7700/7700 그대로 확인.
+- **`bindUiComponentAliases` 캐시 수정을 이 브랜치에도 이식**: 이 슬라이스는 병합된 `main`
+  기준으로 새로 브랜치했는데(당시 PR #621의 "보관함" 슬라이스가 아직 병합되지 않은 상태), #621에서
+  발견/수정한 셸 전역 버그(`bindUiComponentAliases`가 호출마다 새 함수 객체를 반환해서, 렌더
+  본문에서 호출하는 모든 Pane이 컴포넌트를 매 렌더마다 리마운트시키는 문제 — `src/core/
+  app-ui-wrappers.js`에 `WeakMap` 캐시 추가로 수정)가 아직 이 브랜치의 베이스에는 없었으므로,
+  동일한 수정을 이 브랜치에도 그대로 옮겨왔다(같은 패치를 #617/#618/#619/#620에도 이식 완료 —
+  전부 같은 근본 원인을 공유하는 알려진 버그였음). `main`에 병합될 때 중복 diff로 충돌하겠지만,
+  git이 동일 패치를 인식하고 자동 정리되거나 트리비얼하게 해소될 것으로 예상.
+- 검증(Playwright 헤드리스): `?shell=v2&tab=records&sub=media`가 실제 `ChatGalleryModal`을
+  렌더(헤더, 사진/링크/파일 탭, "사진 목록을 불러오는 중…" 빈 상태) — 플래그 없는 `?view=gallery`
+  컨트롤 경로와 동일한 HTML 패턴, `ERR_INSUFFICIENT_RESOURCES` 0건(컨트롤도 0건, PR #621에서
+  고친 리마운트 버그가 여기서도 재발하지 않음을 함께 확인). 회귀 확인으로 `tab=calendar`도 정상
+  렌더.
+- `npm run lint`/`check:app-main-inventory`(7700/7700)/`check:all`/`safety:test`/`regression:test`
+  (빌드 포함) 전부 통과.
+
+**아직 다루지 않은 것**: `ChatGalleryModal` 내부의 사진 인덱스/페이지네이션/파일 업로드 등은
+기존 구현을 그대로 재사용했을 뿐 이 슬라이스에서 손대지 않음. 기록 탭의 "전체" 서브탭(사진·영상/
+메모/장소/보관함을 한데 모아 보여주는 통합 뷰)은 원본 앱에 직접 대응하는 화면이 없어 별도 설계가
+필요 — 아직 착수 안 함.
