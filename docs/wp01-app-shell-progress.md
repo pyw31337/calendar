@@ -210,9 +210,45 @@ npm run regression:test   # npm run build 포함
 - **검색** (`GlobalSearchModal`): 마찬가지로 `onOpenChatMessage`/`onOpenImage`를 필요로 해서
   같은 이유로 보류. 또한 마스터플랜 자체가 통합검색을 "신규 설계 과제"로 분류하고 있다
   (`docs/design-renewal-handoff.md` §4.5).
-- **앱 설정** (`AppSettingsModal`): 브라우저 알림 권한 상태(`mainNotifPermission`,
-  `mainChatNotifyEnabled`)를 여러 state setter와 Firestore 구독 설정에 걸쳐 갱신하는 로직이
-  `onToggleMasterNotify`/`onToggleNotifyChannel`에 박혀 있다. 이것도 순수 데이터 전달이 아니라
-  알림 권한이라는, 잘못 다루면 사용자에게 실제로 영향이 가는 로직을 복제하는 셈이라 보류했다.
-  테마 토글/글자 크기 같은 나머지 하위 기능은 단순하지만, 모달 하나를 절반만 실제로 동작하게
-  만드는 건 오히려 혼란스러울 수 있어 전체를 다음 슬라이스로 미뤘다.
+- ~~**앱 설정**~~ **6차 슬라이스에서 완료 (아래 참고)**.
+
+## 2026-09-13: WP-01 6차 슬라이스 — "앱 설정" 실제 연결 (5/7)
+
+**커밋 범위:** 5차 슬라이스에서 "알림 권한 로직 복제 위험"을 이유로 보류했던 앱 설정
+(`AppSettingsModal`)을 다시 검토해서 실제로 연결. 재검토 결과, 그 우려는 과했다는 걸 확인했다 —
+`onToggleMasterNotify`/`onToggleNotifyChannel`가 실제로 호출하는 함수들
+(`isNotificationSupported`, `isChatNotifyEnabledForCalendar`, `setChatNotifyEnabledForCalendar`,
+`getNotificationPermissionHelpSteps`, `setNotifGuideSeen`, `setNotifyChannel`,
+`syncPushSubscriptionChannels`)은 전부 `src/core/app-domain-helpers.js`가 export하는 순수
+유틸리티 함수라서, `app-main.js`가 하듯이 `ui-app-shell-v2.js`에서도 **같은 모듈에서 직접
+import**해서 쓰면 된다 — 로직을 복제하는 게 아니라 완전히 동일한 함수를 그대로 재사용하는
+것이다. `handleMainToggleNotifications`(브라우저 알림 권한 요청, 푸시 구독 재시도 등 훨씬 더
+복잡한 로직)는 `useNotificationPwaState` 훅이 이미 완성해 둔 함수라 이것도 그대로 참조만 하면
+된다. 반면 5차 슬라이스에서 뺀 캘린더 설정/검색은 `onOpenChatMessage`가 `changeView('chat')`로
+`activeView` state를 바꾸는데, 그 state가 구동하는 JSX는 `?shell=v2`의 조기 반환 아래에 있어
+여전히 무동작이다 — 이건 진짜 다른 문제(전환 대상 화면 자체가 없음)라 계속 보류.
+
+- `ui-app-shell-v2.js`가 `src/core/app-domain-helpers.js`에서
+  `isNotificationSupported`/`isChatNotifyEnabledForCalendar`/`setChatNotifyEnabledForCalendar`/
+  `getNotificationPermissionHelpSteps`/`setNotifGuideSeen`/`setNotifyChannel`/
+  `syncPushSubscriptionChannels`를 직접 import — `app-main.js`가 쓰는 것과 동일한 소스.
+- `REAL_MORE_MODAL_IDS`에 `'app-settings'` 추가, `MoreModalsHost`가 `AppSettingsModal`도 렌더.
+- `buildRenewalMoreContext`의 `modalProps['app-settings']`는 `app-main.js`의
+  `isAppSettingsOpen && <AppSettingsModal ...>` 호출부와 완전히 동일한 프롭 구성(테마/글자
+  크기/알림권한/알림채널/날씨위치/토스트/도움말단계/캘린더/확인다이얼로그/데이터새로고침).
+- `app-main.js`의 어댑터 호출 한 줄에 deps 추가: `toggleTheme`, `fontScalePercent`,
+  `setFontScalePercent`, `mainNotifPermission`, `setMainNotifPermission`,
+  `mainChatNotifyEnabled`, `setMainChatNotifyEnabled`, `notifyChannels`,
+  `setNotifyChannelsState`, `handleMainToggleNotifications`, `handleUpdateWeatherLocation`,
+  `handleDeleteRecentWeatherLocation`, `getCurrentChatParticipantId`, `setCloudReloadToken` —
+  전부 이미 있던 값을 그대로 전달, 새 로직 없음. `check:app-main-inventory`로 `CalendarApp`
+  7700/7700 그대로 확인.
+- 검증(Playwright 헤드리스): `?shell=v2&tab=more`에서 "앱 설정" 클릭 → 실제 `AppSettingsModal`
+  오픈 확인(`[role="dialog"]`/`.modal-overlay` 렌더, 테마/글자 크기 컨트롤 텍스트 존재 확인).
+  기본(플래그 없음) 경로 HTML 길이 36894바이트로 동일, 콘솔 에러 없음.
+- `npm run lint`/`check:all`/`safety:test`/`regression:test` 전부 통과.
+
+**아직 다루지 않은 것**: 캘린더 설정(`AdminModal`)과 검색(`GlobalSearchModal`)만 남았다 — 둘 다
+`changeView('chat')`으로 채팅 메시지 위치로 이동시키는 콜백(`onOpenChatMessage`/`onOpenImage`)이
+필요한데, 대화 탭 자체가 아직 플레이스홀더라 이동할 실제 화면이 없다. WP-05(채팅 독립 화면)가
+실제 데이터로 채워진 뒤에나 자연스럽게 풀리는 문제라 그 전까지는 보류.
