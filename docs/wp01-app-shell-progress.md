@@ -84,6 +84,25 @@ npm run regression:test   # npm run build 포함
 데이터가 들어가는 WP-03~07에서 각 탭이 자체적으로 더 깊은 URL 상태(예: `?tab=records&item=...`)
 를 쌓을 때 이 패턴(다른 파라미터 보존 + push/replace 구분)을 그대로 재사용할 것.
 
+## 2026-09-13: WP-01 3차 슬라이스 — "기록" 탭 서브탭
+
+**커밋 범위:** 기록 탭에 서브탭 6개(전체/메모/사진·영상/장소/보관함/콘텐츠 —
+`docs/design-renewal-handoff.md` §2 매핑표 그대로) 추가. 여전히 플레이스홀더 콘텐츠뿐, 실제
+데이터는 WP-06 몫.
+
+- `RECORDS_SUBTABS` 배열 + `readRecordsSubTabFromLocation()`/`writeLocationState(tab, sub,
+  opts)`. 기존 `writeTabToLocation`을 `writeLocationState`로 확장해서 tab과 sub를 한 번에
+  다룬다 — 2차 슬라이스에서 예고했던 "이 패턴을 그대로 확장" 그 자리.
+- `?sub=`는 `tab=records`일 때만 의미가 있고, 다른 탭으로 전환하면 자동으로 URL에서 빠진다
+  (무관한 탭의 URL에 남아있지 않도록).
+- `RecordsPane` 컴포넌트: 서브탭 칩 행 + 그 아래 플레이스홀더. `PlaceholderPane`은 나머지 4개
+  플랫 탭에서 그대로 사용.
+- 검증: `?tab=records`로 직접 진입 → 서브탭 6개 전부 렌더 → 메모/장소 클릭마다 `&sub=`가
+  바뀜 → 정산 탭으로 전환하면 `sub` 파라미터가 사라짐 → 뒤로가기하면 `tab=records&sub=places`로
+  복귀. 기본(플래그 없음) 경로 HTML 길이 동일, 콘솔 에러 없음.
+- `npm run lint`/`check:all`/`safety:test`/`regression:test` 전부 통과 (`app-main.js` 미변경,
+  7700줄 예산 그대로).
+
 ## 다음 단계 (착수 안 함)
 
 - **기존 상단 4탭 → 5탭 매핑/치환**: 마스터플랜은 "기존 상단 4개 기능 탭은 기능 플래그 뒤에서

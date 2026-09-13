@@ -6024,6 +6024,16 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 .renewal-shell-placeholder-title { font-weight: 800; font-size: 0.9rem; color: var(--text-main, #0f172a); }
 .renewal-shell-placeholder-sub { font-size: 0.76rem; max-width: 320px; line-height: 1.5; }
 
+.renewal-shell-subtab-row {
+  display: flex; gap: 6px; overflow-x: auto; padding: 10px 14px; border-bottom: 1px solid var(--border-subtle, #e2e8f0);
+}
+.renewal-shell-subtab-row::-webkit-scrollbar { display: none; }
+.renewal-shell-subtab-item {
+  flex: 0 0 auto; background: var(--bg-primary, #f8fafc); border: 1px solid transparent; border-radius: 9999px;
+  padding: 6px 14px; font-size: 0.76rem; font-weight: 700; color: var(--text-muted, #64748b); cursor: pointer; font-family: inherit;
+}
+.renewal-shell-subtab-item.is-active { background: var(--brand-soft, #eef2ff); border-color: var(--brand, #4f46e5); color: var(--brand, #4f46e5); }
+
 @media (min-width: 1024px) {
   .renewal-shell { padding-bottom: 0; padding-left: 220px; }
   .renewal-shell-bottom-nav { display: none; }
