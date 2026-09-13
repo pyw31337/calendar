@@ -40,6 +40,41 @@ function TabIcon({ id }) {
   );
 }
 
+/**
+ * Top header bar -- brand/캘린더명 + 검색 + 더보기, matching the Claude Design 목업 (Mobile320
+ * artboard)'s hero-zone brand row. Unlike that mockup, there is no separate 메뉴/hamburger icon
+ * here: 더보기 is now one of the 5 tabs (§4.1), so a second, redundant menu affordance in the
+ * header would just recreate the duplicate-entry-point problem the master plan calls out
+ * (docs/renewal-baseline.md §5). 검색 stays a header action since 검색 has no tab of its own
+ * (§4.1: "더보기 탭에 검색, 공유, 기념일, 설정, 도움말을 정리한다" -- it lives inside 더보기,
+ * but WP-01 §5.1 also keeps a direct header shortcut: "모바일 헤더에는 브랜드/캘린더명, 검색,
+ * 더보기만 둔다"). Shared across all 5 tabs, sitting above wherever each tab's own summary badge
+ * (예: 캘린더 tab의 D-day 요약, WP-03) will render.
+ */
+function TopHeader({ calendarName, onOpenSearch, onOpenMore }) {
+  const React = window.React;
+  return React.createElement('div', { className: 'renewal-shell-header' },
+    React.createElement('div', { className: 'renewal-shell-header-brand' },
+      React.createElement('svg', { width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' },
+        React.createElement('rect', { x: 3, y: 4, width: 18, height: 18, rx: 2 }),
+        React.createElement('path', { d: 'M8 2v4M16 2v4M3 10h18' })
+      ),
+      React.createElement('span', null, calendarName || '모여라 캘린더')
+    ),
+    React.createElement('div', { className: 'renewal-shell-header-actions' },
+      React.createElement('button', { type: 'button', className: 'renewal-shell-header-icon-btn', 'aria-label': '검색', onClick: onOpenSearch },
+        React.createElement('svg', { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' },
+          React.createElement('circle', { cx: 11, cy: 11, r: 8 }),
+          React.createElement('path', { d: 'm21 21-4.3-4.3' })
+        )
+      ),
+      React.createElement('button', { type: 'button', className: 'renewal-shell-header-icon-btn', 'aria-label': '더보기', onClick: onOpenMore },
+        React.createElement(TabIcon, { id: 'more' })
+      )
+    )
+  );
+}
+
 function PlaceholderPane({ tabId, calendarName }) {
   const React = window.React;
   const label = TABS.find(t => t.id === tabId)?.label || tabId;
@@ -93,6 +128,11 @@ export function RenewalAppShell({ activeCalId, calendar }) {
       ...navButtons('renewal-shell-side-nav-item')
     ),
     React.createElement('main', { className: 'renewal-shell-main' },
+      React.createElement(TopHeader, {
+        calendarName,
+        onOpenSearch: () => setActiveTab('more'),
+        onOpenMore: () => setActiveTab('more'),
+      }),
       React.createElement(PlaceholderPane, { tabId: activeTab, calendarName })
     ),
     React.createElement('nav', { className: 'renewal-shell-bottom-nav', 'aria-label': '주 메뉴' },
