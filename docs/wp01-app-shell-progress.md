@@ -362,3 +362,56 @@ nullable `calendar`를 그대로 넘겼다가 Playwright 헤드리스 테스트�
 같은 홈 요약 섹션은 이번 슬라이스 범위 밖 — 사용자의 "메인화면부터 채워줘" 요청은 우선 달력
 그리드+날짜 모달 자체를 실동작시키는 것으로 해석했다. 요약 섹션 추가는 다음 확인 후 별도
 슬라이스로 진행할지 결정.
+
+## 2026-09-13: WP-03 2차 슬라이스 — 홈 요약 "가까운 일정"/"응답 필요"
+
+**배경:** 1차 슬라이스에서 보류했던 홈 요약 섹션을 사용자에게 우선순위 확인 후 진행. 마스터플랜
+§4.2가 지정한 캘린더 홈 표시 순서(헤더 → 월간 캘린더 → 가까운 일정 → 내가 응답할 일 → 최근
+소식) 중 앞의 두 개(가까운 일정/응답 필요)는 기존 앱에 이미 정확히 대응하는 데이터/로직이
+있어서 이번 슬라이스에서 실제로 연결했다. 세 번째(최근 소식)는 대응하는 데이터 모델이 없어
+보류했다(아래 참고).
+
+- **가까운 일정**: `app-main.js`의 메인 화면이 이미 호출하고 있는 순수 셀렉터
+  `buildMainCalendarScreenState`(`src/core/app-calendar-screen-state.js`)를
+  `ui-app-shell-v2.js`에서 그대로 다시 호출해서 `visibleConfirmedMeetings`(오늘 이후 확정
+  일정, 날짜 오름차순)를 얻는다 — "어떤 확정 일정이 다가오는 일정인가"라는 판단 로직을 새로
+  만들지 않고 기존 로직을 그대로 재사용. 최대 3개(마스터플랜 §4.2: "가까운 일정 1~3개")를
+  `UpcomingMeetingsSection`으로 렌더링, 날짜/D-day(`formatDDayLabel`)/라벨
+  (`formatConfirmedMeetingLabel`)/메모 스니펫을 표시. `confirmedMeeting` 레코드에는 별도의
+  "제목"/"장소" 필드가 없어(날짜/메모/확정시각/사진/정산만 있음) 마스터플랜 §5.3이 말하는
+  "제목, 장소"는 데이터에 없는 걸 지어내지 않고 생략했다 — 있는 필드(날짜, D-day, 메모)만
+  그대로 보여준다. 클릭하면 `CalendarPane`이 이미 갖고 있는 `setDateModalDate`로 해당 날짜의
+  실제 `DateModal`을 연다(새 네비게이션 로직 없음, 날짜 셀 클릭과 동일한 경로).
+- **응답 필요**: 마스터플랜 §5.3 "활성 투표가 없으면 큰 빈 카드를 표시하지 않는다"에 맞춰
+  `buildMainCalendarScreenState`의 `hasVisiblePolls`가 false면 섹션 자체를 렌더링하지 않는다.
+  true면 `app-main.js`의 메인 화면이 실제로 렌더링하는 것과 동일한 컴포넌트 3종
+  (`PollList`/`PollModal`/`PollVoterSheet`, 전부 이미 `app-ui-wrappers.js`의
+  `VIEW_WRAPPER_COMPONENT_NAMES`에 등록되어 있어 `bindUiComponentAliases`로 바로 사용 가능)과
+  핸들러 6개(`handleOpenPollCreate`/`handleOpenPollEdit`/`handleSavePoll`/
+  `handleOpenVoteSheet`/`handleVotePoll`/`handleCancelVote`, 전부 기존 `CalendarApp` 로직
+  그대로)를 그대로 pass-through — 투표 생성/수정/투표하기/취소를 전부 실제로 할 수 있다.
+  투표 시스템에는 앱 안에 별도의 전용 화면이 없어서(기존에도 메인 화면에 직접 박혀 있었다),
+  이 홈 요약 섹션이 곧 그 기능의 유일한 진입점이자 실사용 화면이다.
+  - `isPollModalOpen`/`editingPoll`/`voteTarget`은 `CalendarApp`의 기존 `useState`라
+    `?shell=v2` 조기 반환 아래에서는 무동작이었던 것과 같은 이유로, 이 셋과 그 setter를
+    `calendarContextDeps`에 새로 추가해서 셸이 직접 읽고 닫을 수 있게 했다(1차 슬라이스의
+    `activeCal` 처리와 같은 패턴).
+- **최근 소식(보류)**: 앱에 "최근 소식" 피드에 대응하는 기존 데이터 모델이 없다.
+  `pinnedNotices`는 이름은 비슷하지만 실제로는 채팅방 공지사항 기능(`ui-chat-room.js`)이라
+  전혀 다른 개념이고, `activityLogs`는 관리자 복구용 전체 감사 로그라 사용자 대상 "소식"으로
+  보여주기엔 맥락이 다르다(예: 마감 시각 변경, 되돌리기 등 내부적인 항목도 섞여 있음). 무엇을
+  "소식"으로 칠지 새로 정의하는 건 검증되지 않은 로직을 만드는 것이라 이번 슬라이스에서는
+  스킵 — 마스터플랜 §5.3의 "완료·마감된 항목은 최근 소식 또는 기록 화면으로 이동한다"는
+  규칙도 기록 화면(WP-06)이 먼저 실재해야 의미가 있어 함께 보류.
+- 검증(Playwright 헤드리스): `?shell=v2&tab=calendar`에서 확정 일정이 있는 캘린더로 진입 시
+  "가까운 일정" 카드가 D-day와 함께 렌더되고 클릭하면 해당 날짜의 실제 `DateModal`이 열림을
+  확인. 투표가 있는 캘린더에서는 "응답 필요" 섹션에 실제 `PollList`가 렌더되고 투표 생성/투표
+  하기 흐름이 동작함을 확인(둘 다 없는 캘린더에서는 두 섹션 모두 렌더되지 않아 빈 큰 카드가
+  없음을 확인). 기본(플래그 없음) 경로는 HTML 길이·콘솔 에러 이전과 동일.
+- `npm run lint`/`check:app-main-inventory`/`check:all`/`safety:test`/`regression:test`(빌드
+  포함) 전부 통과.
+
+**아직 다루지 않은 것**: 최근 소식(위에서 설명한 대로 보류), 마스터플랜 §5.3의 "미정 참석/미처리
+정산"까지 포함하는 완전한 "내가 응답할 일" 통합 뷰(지금은 활성 투표만) — 이건 날짜 허브(WP-04)의
+selector 계층이 먼저 정의되어야 "미정 참석"이 무엇을 뜻하는지 일관되게 판단할 수 있어서, WP-04
+이후로 미룬다.

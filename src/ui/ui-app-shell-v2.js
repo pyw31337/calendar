@@ -19,7 +19,9 @@ import { bindUiComponentAliases } from '../core/app-ui-wrappers.js';
 import {
   isNotificationSupported, isChatNotifyEnabledForCalendar, setChatNotifyEnabledForCalendar,
   getNotificationPermissionHelpSteps, setNotifGuideSeen, setNotifyChannel, syncPushSubscriptionChannels,
+  formatDDayLabel, formatConfirmedMeetingLabel,
 } from '../core/app-domain-helpers.js';
+import { buildMainCalendarScreenState } from '../core/app-calendar-screen-state.js';
 
 const TABS = [
   { id: 'calendar', label: '캘린더' },
@@ -158,7 +160,9 @@ function TopHeader({ calendarName, onOpenSearch, onOpenMore }) {
  *   handleFetchMeetingPhotoIndex, handleFetchMeetingAlbum, loadOlderChatMessages,
  *   hasMoreOlderChat, loadingOlderChat, fullChatMessages, handleSavePlace, handleDeletePlace,
  *   handleReorderPlaces, showToast, showConfirmDialog, syncStatus, photoCommentCounts,
- *   setActiveLightbox.
+ *   setActiveLightbox, isPollModalOpen, setIsPollModalOpen, editingPoll, setEditingPoll,
+ *   voteTarget, setVoteTarget, handleOpenPollCreate, handleOpenPollEdit, handleSavePoll,
+ *   handleOpenVoteSheet, handleVotePoll, handleCancelVote.
  */
 export function buildRenewalCalendarContext(calendar, deps) {
   const {
@@ -179,12 +183,43 @@ export function buildRenewalCalendarContext(calendar, deps) {
     handleFetchMeetingAlbum, loadOlderChatMessages, hasMoreOlderChat, loadingOlderChat, fullChatMessages,
     handleSavePlace, handleDeletePlace, handleReorderPlaces,
     showToast, showConfirmDialog, syncStatus, photoCommentCounts, setActiveLightbox,
+    isPollModalOpen, setIsPollModalOpen, editingPoll, setEditingPoll, voteTarget, setVoteTarget,
+    handleOpenPollCreate, handleOpenPollEdit, handleSavePoll, handleOpenVoteSheet, handleVotePoll, handleCancelVote,
   } = deps || {};
+  // 홈 요약 "가까운 일정"/"응답 필요" (master-plan.md §4.2, §5.3): reuses the SAME pure selector
+  // app-main.js's own main screen calls (buildMainCalendarScreenState) instead of recomputing the
+  // "which confirmed meetings are upcoming"/"are there open polls" rules ourselves -- calendarId
+  // is omitted since the only fields used here (visibleConfirmedMeetings, hasVisiblePolls) don't
+  // depend on it (it only affects the chat/memo/gallery badge fields this tab doesn't need).
+  const { visibleConfirmedMeetings, hasVisiblePolls } = buildMainCalendarScreenState({ calendar: activeCal });
   return {
     calendar: activeCal,
     anniversaries: anniversariesWithPosters,
     isLoading: !!isInitialDataLoading,
     handleMoveAvailability,
+    // 마스터플랜 §4.2: "가까운 일정 1~3개".
+    upcomingMeetings: visibleConfirmedMeetings.slice(0, 3),
+    hasVisiblePolls,
+    pollsProps: {
+      calendar: activeCal,
+      onCreatePoll: handleOpenPollCreate,
+      onEditPoll: handleOpenPollEdit,
+      onVotePoll: handleOpenVoteSheet,
+      onCancelVote: handleCancelVote,
+      onRequestConfirm: showConfirmDialog,
+    },
+    isPollModalOpen: !!isPollModalOpen,
+    pollModalProps: {
+      calendar: activeCal,
+      poll: editingPoll,
+      onRequestConfirm: showConfirmDialog,
+      onSave: handleSavePoll,
+      onClose: () => { setIsPollModalOpen(false); setEditingPoll(null); },
+      showToast,
+    },
+    voteTarget,
+    onSelectVote: (participantId) => handleVotePoll(voteTarget?.pollId, voteTarget?.optionId, participantId),
+    onCloseVoteSheet: () => setVoteTarget(null),
     dateModalProps: {
       calendar: activeCal, chatMessages: displayChatMessages, memos, customCultureItems,
       onSave: handleSaveAvailability, onDelete: handleDeleteAvailability,
@@ -205,11 +240,68 @@ export function buildRenewalCalendarContext(calendar, deps) {
 }
 
 /**
+ * "가까운 일정" home summary (master-plan.md §4.2/§5.3): up to 3 upcoming confirmed meetings,
+ * date + D-day + a short label, matching the fields actually present on a confirmedMeeting entry
+ * (date/note -- there is no separate 제목/장소 field on this record, so 제목 falls back to a
+ * generic label and 장소 is omitted rather than guessed). Clicking one opens that date in the
+ * same DateModal the grid uses (via `onSelectDate`, owned by the parent CalendarPane).
+ */
+function UpcomingMeetingsSection({ meetings, onSelectDate }) {
+  const React = window.React;
+  if (!meetings || meetings.length === 0) return null;
+  return React.createElement('div', { className: 'renewal-shell-section' },
+    React.createElement('div', { className: 'renewal-shell-section-title' }, '가까운 일정'),
+    React.createElement('div', { className: 'renewal-shell-upcoming-list' },
+      meetings.map(meeting => React.createElement('button', {
+        key: meeting.date,
+        type: 'button',
+        className: 'renewal-shell-upcoming-item',
+        onClick: () => onSelectDate(meeting.date),
+      },
+        React.createElement('span', { className: 'renewal-shell-upcoming-dday' }, formatDDayLabel(meeting.date)),
+        React.createElement('span', { className: 'renewal-shell-upcoming-label' }, formatConfirmedMeetingLabel(meeting.date)),
+        meeting.note && meeting.note.trim() && React.createElement('span', { className: 'renewal-shell-upcoming-note' }, meeting.note.trim())
+      ))
+    )
+  );
+}
+
+/**
+ * "응답 필요" home summary (master-plan.md §4.2/§5.3): "활성 투표가 없으면 큰 빈 카드를 표시하지
+ * 않는다" -- so this section renders nothing unless `hasVisiblePolls` is true. Embeds the real,
+ * already-tested `PollList`/`PollModal`/`PollVoterSheet` trio pass-through (same components/props
+ * app-main.js's own main screen renders) rather than reimplementing vote/response tracking --
+ * there's no separate poll screen in the 5-tab IA, so this summary section doubles as the poll
+ * feature's one home, matching "홈 요약 카드는 목적 화면으로 이동하는 진입점" for a feature that
+ * has no other destination.
+ */
+function PollsSection({ calendarContext }) {
+  const React = window.React;
+  const { PollList, PollModal, PollVoterSheet } = bindUiComponentAliases(React);
+  if (!calendarContext.hasVisiblePolls) return null;
+  return React.createElement('div', { className: 'renewal-shell-section' },
+    React.createElement('div', { className: 'renewal-shell-section-title' }, '응답 필요'),
+    React.createElement(PollList, calendarContext.pollsProps),
+    calendarContext.isPollModalOpen && React.createElement(PollModal, calendarContext.pollModalProps),
+    calendarContext.voteTarget && React.createElement(PollVoterSheet, {
+      calendar: calendarContext.calendar,
+      pollId: calendarContext.voteTarget.pollId,
+      optionId: calendarContext.voteTarget.optionId,
+      onSelect: calendarContext.onSelectVote,
+      onClose: calendarContext.onCloseVoteSheet,
+    })
+  );
+}
+
+/**
  * 캘린더 tab body (WP-03): the real month grid + date detail modal, using the SAME
  * `window.GATHER_UI_COMPONENTS` pass-through aliases the other real modals use
  * (`bindUiComponentAliases`) -- CalendarGrid/DateModal are not lazy-loaded chunks (they ship in
  * the main bundle, same as app-main.js's own usage), so no wait-then-open step is needed here
- * the way share/manual/anniversaries needed.
+ * the way share/manual/anniversaries needed. Order below matches master-plan.md §4.2's 캘린더 홈
+ * 표시 순서 (월간 캘린더 -> 가까운 일정 -> 내가 응답할 일 -> 최근 소식); 최근 소식 is deferred
+ * (see docs/wp01-app-shell-progress.md's WP-03 note -- no existing data model maps to it, unlike
+ * the other two which reuse `buildMainCalendarScreenState` untouched).
  *
  * Month navigation and which date's modal is open are local state, same reasoning as
  * `openMoreModal`: CalendarApp's own `currentMonthDate`/`isModalOpen` drive JSX this shell's
@@ -235,6 +327,8 @@ function CalendarPane({ calendarContext, onEditAnniversary, onAddAnniversaryForD
       onMoveAvailability: calendarContext.handleMoveAvailability,
       onParticipantClick,
     }),
+    React.createElement(UpcomingMeetingsSection, { meetings: calendarContext.upcomingMeetings, onSelectDate: setDateModalDate }),
+    React.createElement(PollsSection, { calendarContext }),
     dateModalDate && React.createElement(DateModal, {
       ...calendarContext.dateModalProps,
       dateStr: dateModalDate,
