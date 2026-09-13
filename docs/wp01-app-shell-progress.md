@@ -103,6 +103,34 @@ npm run regression:test   # npm run build 포함
 - `npm run lint`/`check:all`/`safety:test`/`regression:test` 전부 통과 (`app-main.js` 미변경,
   7700줄 예산 그대로).
 
+## 2026-09-13: WP-01 4차 슬라이스 — "더보기" 탭 메뉴
+
+**커밋 범위:** 더보기 탭에 `docs/design-renewal-handoff.md` §2 매핑표의 7개 항목(검색/공유/
+기념일 설정/캘린더 설정/앱 설정/사용자 매뉴얼/관리자 진입)을 세로 리스트로 추가. 여전히
+플레이스홀더 동작뿐 — 각 항목을 실제 화면/기존 기능으로 연결하는 건 다음 슬라이스 몫.
+
+- `MORE_ITEMS` 배열 + `MORE_ITEM_ICONS` 맵 + `MoreItemIcon`/`MorePane` 컴포넌트. `RecordsPane`과
+  같은 패턴(플랫 리스트, 선택 상태만 로컬 `useState`로 토글)으로 최소 슬라이스를 유지했다 —
+  기록 탭과 달리 URL 상태(`?sub=` 같은)는 아직 추가하지 않았다: 더보기의 각 항목은 "탭 안
+  필터"가 아니라 각기 다른 화면/다이얼로그로 이어질 것이라, 그 목적지가 실제로 정해지기 전에
+  URL 스킴을 먼저 설계하면 다시 갈아엎을 가능성이 높다고 판단해 보류했다.
+- `RenewalAppShell`의 렌더 분기에 `activeTab === 'more'` 케이스 추가 (`RecordsPane`과 같은 자리,
+  `PlaceholderPane` 폴백 앞).
+- `app.css`에 `renewal-shell-more*` 접두사로만 이루어진 섹션 추가 (리스트/행/아이콘/셰브런/
+  하단 안내문). 기존 선택자는 하나도 건드리지 않았다.
+- 검증: `?tab=more`로 직접 진입 → 7개 항목 전부 렌더 확인(Playwright로 `.renewal-shell-more-item`
+  텍스트 7개 모두 확인: 검색/공유/기념일 설정/캘린더 설정/앱 설정/사용자 매뉴얼/관리자 진입).
+  기본(플래그 없음) 경로 HTML 길이 이전 슬라이스와 동일 패턴 유지, 콘솔 에러 없음(이 환경의
+  `ERR_CONNECTION_RESET`/`networkidle` 타임아웃은 Firebase 네트워크 차단에 의한 것으로
+  `docs/renewal-baseline.md`에 이미 기록된 환경 고유 제약).
+- `npm run lint`/`check:all`/`safety:test`/`regression:test` 전부 통과 (`app-main.js` 미변경,
+  `check:app-main-inventory`가 `CalendarApp: lines 409-8108 (7700/7700)`으로 그대로 확인).
+
+**아직 다루지 않은 것**: 각 항목을 눌렀을 때의 실제 동작(관리자 진입 → 기존 관리자 대시보드,
+사용자 매뉴얼 → 기존 `ui-user-manual.js`, 캘린더 설정/앱 설정/기념일 설정/공유는 각각 기존
+설정 UI 재사용 또는 신규 설계, 검색은 아예 신규 설계 — `docs/design-renewal-handoff.md` §4.5
+참고)은 다음 WP-01(또는 그 이후) 슬라이스 몫이다.
+
 ## 다음 단계 (착수 안 함)
 
 - **기존 상단 4탭 → 5탭 매핑/치환**: 마스터플랜은 "기존 상단 4개 기능 탭은 기능 플래그 뒤에서
@@ -113,5 +141,8 @@ npm run regression:test   # npm run build 포함
   Claude Design 목업(글래스 아이콘 버튼, 접기/펼치기, 브랜드 그라디언트 등)의 톤을 그대로
   가져오는 건 WP-02(디자인 토큰) 이후로 미뤘다 — 토큰이 먼저 정리돼야 하드코딩 색상이 늘지
   않는다.
+- **더보기 탭 각 항목의 실제 연결**: 지금은 7개 항목이 리스트로만 존재하고 각 항목을 눌러도
+  선택 상태만 바뀐다. 기존 기능(관리자 대시보드, 사용자 매뉴얼 등) 재연결과, 완전히 신규 설계가
+  필요한 것(통합검색, 캘린더 전환)을 구분해서 각각 별도 슬라이스로 다뤄야 한다.
 - **실제 데이터 연결**: WP-03(캘린더 홈) → WP-04(날짜 허브) → WP-05(채팅) → WP-06(기록) →
   WP-07(정산) 순서로, 마스터플랜 §10 Phase B/C를 따른다.

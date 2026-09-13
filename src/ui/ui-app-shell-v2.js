@@ -174,6 +174,70 @@ function RecordsPane({ subTab, onSelectSubTab, calendarName }) {
 }
 
 /**
+ * 더보기 tab items (docs/design-renewal-handoff.md §2's mapping table row for 더보기, itself
+ * from product-renewal-master-plan.md §5.10): the 7 destinations 더보기 absorbs. Each is a
+ * placeholder action for now -- real screens/dialogs land WP-08+ as each is actually wired
+ * (this slice only proves the menu list itself, matching the 기록 sub-tab slice's scope).
+ */
+const MORE_ITEMS = [
+  { id: 'search', label: '검색' },
+  { id: 'share', label: '공유' },
+  { id: 'anniversaries', label: '기념일 설정' },
+  { id: 'calendar-settings', label: '캘린더 설정' },
+  { id: 'app-settings', label: '앱 설정' },
+  { id: 'manual', label: '사용자 매뉴얼' },
+  { id: 'admin', label: '관리자 진입' },
+];
+
+const MORE_ITEM_ICONS = {
+  search: 'M15.5 15.5 21 21M17 10.5A6.5 6.5 0 1 1 4 10.5a6.5 6.5 0 0 1 13 0Z',
+  share: 'M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7M16 6l-4-4-4 4M12 2v14',
+  anniversaries: 'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2ZM8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01',
+  'calendar-settings': 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.13.36.35.68.63.94.28.26.62.44 1 .5H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z',
+  'app-settings': 'M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6',
+  manual: 'M4 19.5A2.5 2.5 0 0 1 6.5 17H20V2H6.5A2.5 2.5 0 0 0 4 4.5v15ZM8 7h8M8 11h8',
+  admin: 'M12 2 3 6v6c0 5 3.8 8.7 9 10 5.2-1.3 9-5 9-10V6l-9-4Z',
+};
+
+function MoreItemIcon({ id }) {
+  const React = window.React;
+  return React.createElement(
+    'svg', { width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' },
+    React.createElement('path', { d: MORE_ITEM_ICONS[id] || '' })
+  );
+}
+
+/**
+ * 더보기 tab body: a flat list of the 7 destinations it absorbs (docs/design-renewal-handoff.md
+ * §2). 검색 also has a header shortcut (TopHeader's onOpenSearch), so choosing it here and there
+ * both land on the same tab -- this list is the one place all 7 exist, header included or not.
+ * Each row is a placeholder tap target for now (`onSelectItem` just no-ops beyond WP-01); real
+ * navigation to each destination's screen/dialog is wired as each is built, not in this slice.
+ */
+function MorePane({ calendarName, onSelectItem, selectedItem }) {
+  const React = window.React;
+  return React.createElement('div', { className: 'renewal-shell-more' },
+    React.createElement('ul', { className: 'renewal-shell-more-list', role: 'list' },
+      MORE_ITEMS.map(item => React.createElement('li', { key: item.id },
+        React.createElement('button', {
+          type: 'button',
+          className: `renewal-shell-more-item ${selectedItem === item.id ? 'is-active' : ''}`.trim(),
+          onClick: () => onSelectItem(item.id),
+        },
+          React.createElement('span', { className: 'renewal-shell-more-item-icon' }, React.createElement(MoreItemIcon, { id: item.id })),
+          React.createElement('span', { className: 'renewal-shell-more-item-label' }, item.label),
+          React.createElement('svg', { className: 'renewal-shell-more-item-chevron', width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' },
+            React.createElement('path', { d: 'm9 18 6-6-6-6' })
+          )
+        )
+      ))
+    ),
+    React.createElement('div', { className: 'renewal-shell-placeholder-sub renewal-shell-more-note' },
+      calendarName ? `${calendarName} · WP-08 이후 각 항목의 실제 화면이 연결됩니다.` : 'WP-08 이후 각 항목의 실제 화면이 연결됩니다.')
+  );
+}
+
+/**
  * One-call adapter for CalendarApp's return statement (kept to a single call there deliberately
  * -- CalendarApp is frozen at a hard line-count ceiling, docs/app-main-split-units.md). Returns
  * the shell element when `?shell=v2` is set, otherwise null so the caller falls through to the
@@ -195,6 +259,7 @@ export function RenewalAppShell({ activeCalId, calendar }) {
   const React = window.React;
   const [activeTab, setActiveTabState] = React.useState(readTabFromLocation);
   const [recordsSubTab, setRecordsSubTabState] = React.useState(readRecordsSubTabFromLocation);
+  const [selectedMoreItem, setSelectedMoreItem] = React.useState(null);
   const calendarName = calendar?.name || null;
 
   // Correct an invalid/stale ?tab=/?sub= on first mount without adding a history entry, then
@@ -248,6 +313,8 @@ export function RenewalAppShell({ activeCalId, calendar }) {
       }),
       activeTab === 'records'
         ? React.createElement(RecordsPane, { subTab: recordsSubTab, onSelectSubTab: setRecordsSubTab, calendarName })
+        : activeTab === 'more'
+        ? React.createElement(MorePane, { calendarName, selectedItem: selectedMoreItem, onSelectItem: setSelectedMoreItem })
         : React.createElement(PlaceholderPane, { tabId: activeTab, calendarName })
     ),
     React.createElement('nav', { className: 'renewal-shell-bottom-nav', 'aria-label': '주 메뉴' },
