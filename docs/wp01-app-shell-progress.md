@@ -514,6 +514,40 @@ WP-07("정산 화면 재배치")에 해당하는 작업으로, 대화 탭과 완
 상호작용은 데이터 의존적). 로직 자체는 원본과 100% 동일한 pass-through라 별도 위험은 낮다고
 판단했다.
 
+## 2026-09-13: WP-06 착수 — "기록" 탭의 "메모" 서브탭 실제 연결
+
+**배경:** 사용자가 "묻지 말고 밤새 계속 진행"을 지시. 마스터플랜 §9 WP-06(기록 허브)의 첫
+서브탭 — 기록 탭의 6개 서브탭(전체/메모/사진·영상/장소/보관함/콘텐츠) 중 대응하는 기존 화면이
+가장 단순한 "메모"부터 시작.
+
+- **`buildRenewalRecordsContext(calendar, deps)` 신설** — `app-main.js`의
+  `activeView === 'memo'` 호출부가 쓰는 값/함수(메모 목록/더보기/총개수, 공유 메모 딥링크,
+  메모 수정·추가·삭제, 태그 필터, 공유 모달) 그대로 pass-through. `onLoadMoreMemos`만
+  예외적으로 `app-main.js`의 어댑터 호출 자리에서 미리 조립해서 넘긴다 — `MEMOS_PAGE_SIZE`가
+  거기서만 import된 모듈 상수라서, `ui-app-shell-v2.js`에는 완성된 함수만 전달.
+- **`MemoPane`** — `ChatPane`/`SettlementPane`과 같은 "지연 로드 대기" 패턴. `MemoView`는
+  `window.__gatherLoadViewUi('memo')`로 온디맨드 로드되는 별도 청크(`ui-memo-view.js`)라서,
+  마운트 시 그 로드를 기다렸다가 렌더.
+- **`RecordsPane`이 서브탭을 인지하게 변경** — 지금까지는 어느 서브탭이든 같은 플레이스홀더만
+  보여줬는데, 이제 `subTab === 'memo'`일 때만 실제 `MemoPane`을 렌더하고 나머지 5개는 그대로
+  플레이스홀더 유지(장소/사진·영상/보관함/콘텐츠/전체는 다음 슬라이스들의 몫).
+- `renderRenewalShellIfEnabled`가 6번째 인자(`recordsContextDeps`)를 받도록 확장,
+  `app-main.js`의 어댑터 호출에 새 객체 리터럴 추가 — `check:app-main-inventory`로 `CalendarApp`
+  7700/7700 그대로 확인.
+- **알려진 시각적 이슈(디자인 패스에서 다룰 예정)**: `RenewalAppShell`의 공용 `TopHeader`가
+  `MemoView`/`ChatRoomView`/`SettlementSummaryModal`처럼 자체 헤더(뒤로가기 버튼 포함)를 가진
+  화면 위에도 그대로 렌더돼서 헤더가 이중으로 보인다. 기능적으로는 문제 없지만(각자 정상 동작),
+  사용자가 "기능 연결 먼저, 디자인은 나중에"로 우선순위를 정해서 지금은 기록만 해두고 넘어간다.
+- 검증(Playwright 헤드리스): `?shell=v2&tab=records&sub=memo`에서 실제 `MemoView` 렌더 확인
+  (서브탭 칩 행 유지, "새로운 메모를 남겨보세요..." 입력창, "등록된 메모가 없거나..." 빈 상태,
+  콘솔 에러 없음). 다른 서브탭(`sub=places`)은 여전히 플레이스홀더로 정상 동작(회귀 없음).
+  기본(플래그 없음) 경로 HTML 길이 36894바이트로 동일, 콘솔 에러 없음.
+- `npm run lint`/`check:app-main-inventory`/`check:all`/`safety:test`/`regression:test`(빌드
+  포함) 전부 통과.
+
+**아직 다루지 않은 것**: 장소/사진·영상/보관함/콘텐츠/전체 서브탭(다음 슬라이스들), 위에서 설명한
+이중 헤더 시각적 이슈(디자인 패스로 미룸).
+
 ## 2026-09-13: WP-08 착수 — 더보기 "검색" 실제 연결 (대화 탭이 생겨서 풀린 이전 보류)
 
 **배경:** 사용자가 "묻지 말고 밤새 계속 진행"을 지시. 정산/기록 슬라이스들이 병합 대기 중이라
