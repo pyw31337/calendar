@@ -6024,6 +6024,25 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 .renewal-shell-placeholder-title { font-weight: 800; font-size: 0.9rem; color: var(--text-main, #0f172a); }
 .renewal-shell-placeholder-sub { font-size: 0.76rem; max-width: 320px; line-height: 1.5; }
 
+/* 캘린더 홈 요약 섹션 (가까운 일정 / 응답 필요, WP-03) -- master-plan.md §4.2/§5.3 */
+.renewal-shell-section { padding: 12px 14px 0; }
+.renewal-shell-section-title { font-weight: 800; font-size: 0.82rem; color: var(--text-main, #0f172a); margin-bottom: 8px; }
+.renewal-shell-upcoming-list { display: flex; flex-direction: column; gap: 6px; }
+.renewal-shell-upcoming-item {
+  display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+  padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border-subtle, #e2e8f0);
+  background: var(--bg-primary, #f8fafc); cursor: pointer; font: inherit;
+}
+.renewal-shell-upcoming-dday {
+  flex-shrink: 0; font-weight: 800; font-size: 0.72rem; color: #fff;
+  background: var(--brand, #4f46e5); padding: 2px 8px; border-radius: var(--radius-full, 999px);
+}
+.renewal-shell-upcoming-label { font-weight: 700; font-size: 0.82rem; color: var(--text-main, #0f172a); }
+.renewal-shell-upcoming-note {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 0.76rem; color: var(--text-muted, #64748b); text-align: right;
+}
+
 .renewal-shell-subtab-row {
   display: flex; gap: 6px; overflow-x: auto; padding: 10px 14px; border-bottom: 1px solid var(--border-subtle, #e2e8f0);
 }
