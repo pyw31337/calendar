@@ -16,6 +16,10 @@
 
 import { isRenewalShellEnabled } from '../core/app-feature-flags.js';
 import { bindUiComponentAliases } from '../core/app-ui-wrappers.js';
+import {
+  isNotificationSupported, isChatNotifyEnabledForCalendar, setChatNotifyEnabledForCalendar,
+  getNotificationPermissionHelpSteps, setNotifGuideSeen, setNotifyChannel, syncPushSubscriptionChannels,
+} from '../core/app-domain-helpers.js';
 
 const TABS = [
   { id: 'calendar', label: '캘린더' },
@@ -211,13 +215,16 @@ function MoreItemIcon({ id }) {
 /**
  * Which 더보기 items open a real modal in THIS shell (rendered by `MoreModalsHost` below) vs.
  * still just toggle the placeholder selection state. 캘린더 설정 (AdminModal) and 검색
- * (GlobalSearchModal) are deliberately left out of this slice: both need a long tail of chat/
- * gallery-internals props (message lookup, lightbox opening, notification-permission state) that
- * would mean duplicating real chat behavior outside CalendarApp, not just passing data through --
- * exactly the kind of core-functionality risk docs/design-renewal-handoff.md §4.5 flags as its
- * own follow-up slice, not this one.
+ * (GlobalSearchModal) are deliberately left out of this slice: both need onOpenChatMessage/
+ * onOpenImage-style props that navigate to a chat message location via `changeView('chat')` --
+ * that sets CalendarApp's `activeView` state, which drives the SAME old JSX tree this shell's
+ * early return never reaches, so it would silently no-op exactly like the isShareOpen bug the
+ * previous slice found (docs/wp01-app-shell-progress.md 5th slice). 앱 설정 (AppSettingsModal)
+ * has no such navigation dependency -- every one of its props is a self-contained toggle (theme,
+ * font size, notification permission, weather location), so it's wired for real here using the
+ * exact same handlers/utilities CalendarApp's own old menu uses (no reimplementation).
  */
-const REAL_MORE_MODAL_IDS = ['share', 'anniversaries', 'manual'];
+const REAL_MORE_MODAL_IDS = ['share', 'anniversaries', 'manual', 'app-settings'];
 
 /**
  * Builds the 더보기 list's real destinations from CalendarApp's own state/helpers, passed in as
@@ -235,13 +242,22 @@ const REAL_MORE_MODAL_IDS = ['share', 'anniversaries', 'manual'];
  *   `renderRenewalShellIfEnabled`'s 2nd argument.
  * @param {object} deps - showToast, activeCalId, anniversaries, fetchAnniversariesRest,
  *   setAnniversaries, showConfirmDialog, handleBulkRegisterAvailability, handleAnniversarySaved,
- *   handleAnniversaryDeleted, isDarkTheme, setActiveLightbox.
+ *   handleAnniversaryDeleted, isDarkTheme, toggleTheme, fontScalePercent, setFontScalePercent,
+ *   mainNotifPermission, setMainNotifPermission, mainChatNotifyEnabled, setMainChatNotifyEnabled,
+ *   notifyChannels, setNotifyChannelsState, handleMainToggleNotifications,
+ *   handleUpdateWeatherLocation, handleDeleteRecentWeatherLocation, getCurrentChatParticipantId,
+ *   setCloudReloadToken, setActiveLightbox.
  */
 export function buildRenewalMoreContext(calendar, deps) {
   const {
     showToast, activeCalId, anniversaries, fetchAnniversariesRest, setAnniversaries,
     showConfirmDialog, handleBulkRegisterAvailability, handleAnniversarySaved, handleAnniversaryDeleted,
     isDarkTheme, setActiveLightbox,
+    toggleTheme, fontScalePercent, setFontScalePercent,
+    mainNotifPermission, setMainNotifPermission, mainChatNotifyEnabled, setMainChatNotifyEnabled,
+    notifyChannels, setNotifyChannelsState, handleMainToggleNotifications,
+    handleUpdateWeatherLocation, handleDeleteRecentWeatherLocation, getCurrentChatParticipantId,
+    setCloudReloadToken,
   } = deps || {};
   const requireLoadedCalendar = (message) => {
     if (calendar) return true;
@@ -258,6 +274,48 @@ export function buildRenewalMoreContext(calendar, deps) {
         onAnniversaryDeleted: handleAnniversaryDeleted, isDarkTheme, setActiveLightbox,
       },
       manual: { calendar },
+      // Every prop here is a straight port of app-main.js's own isAppSettingsOpen &&
+      // <AppSettingsModal ...> call site: same handlers, same utility functions
+      // (isNotificationSupported/isChatNotifyEnabledForCalendar/etc., imported above from the
+      // same shared app-domain-helpers.js CalendarApp itself imports them from), not
+      // reimplemented -- this is why 앱 설정 is safe to wire for real (see REAL_MORE_MODAL_IDS
+      // doc comment above) while 캘린더 설정/검색 are not.
+      'app-settings': {
+        isDarkTheme, onToggleTheme: toggleTheme, fontScalePercent,
+        onDecreaseFont: () => setFontScalePercent(prev => Math.max(80, prev - 10)),
+        onIncreaseFont: () => setFontScalePercent(prev => Math.min(130, prev + 10)),
+        isNotifPermissionGranted: mainNotifPermission === 'granted',
+        isMasterNotifyEnabled: mainNotifPermission === 'granted' && mainChatNotifyEnabled,
+        onToggleMasterNotify: async () => {
+          await handleMainToggleNotifications();
+          if (typeof setNotifGuideSeen === 'function') setNotifGuideSeen(true);
+          setMainNotifPermission(isNotificationSupported() ? Notification.permission : 'unsupported');
+          setMainChatNotifyEnabled(isChatNotifyEnabledForCalendar(activeCalId));
+        },
+        notifyChannels,
+        onToggleNotifyChannel: async (key) => {
+          if (typeof setNotifyChannel !== 'function') return;
+          const next = setNotifyChannel(key, !(notifyChannels && notifyChannels[key]));
+          setNotifyChannelsState(next);
+          if (key === 'chat' && typeof setChatNotifyEnabledForCalendar === 'function') {
+            setChatNotifyEnabledForCalendar(activeCalId, !!(next && next.chat));
+            setMainChatNotifyEnabled(!!(next && next.chat));
+          }
+          try {
+            await syncPushSubscriptionChannels(activeCalId, getCurrentChatParticipantId ? getCurrentChatParticipantId() : undefined);
+          } catch (_) {}
+        },
+        calendarId: activeCalId,
+        weatherLocation: calendar && calendar.weatherLocation,
+        recentLocations: (calendar && calendar.recentLocations) || [],
+        onUpdateWeatherLocation: handleUpdateWeatherLocation,
+        onDeleteRecentLocation: handleDeleteRecentWeatherLocation,
+        showToast,
+        helpSteps: typeof getNotificationPermissionHelpSteps === 'function' ? getNotificationPermissionHelpSteps() : [],
+        calendar,
+        onRequestConfirm: showConfirmDialog,
+        onRequestDataRefresh: () => { if (typeof setCloudReloadToken === 'function') setCloudReloadToken(token => token + 1); },
+      },
     },
     // Each resolves (or rejects) once it's safe to show the modal; RenewalAppShell opens it on
     // resolve and swallows a rejection (the lazy-load failure already showed its own toast).
@@ -292,6 +350,9 @@ export function buildRenewalMoreContext(calendar, deps) {
         throw err;
       });
     },
+    // AppSettingsModal is already in the main bundle (no lazy chunk to wait for, matching the
+    // original isAppSettingsOpen call site) and has no loaded-calendar guard either.
+    onSelectAppSettings: () => Promise.resolve(),
     onOpenAdmin: () => {
       const adminUrl = new URL(window.location.href);
       adminUrl.searchParams.delete('view');
@@ -307,7 +368,7 @@ export function buildRenewalMoreContext(calendar, deps) {
 }
 
 /**
- * Renders whichever of the 3 real 더보기 modals (share/anniversaries/manual, see
+ * Renders whichever of the 4 real 더보기 modals (share/anniversaries/manual/app-settings, see
  * REAL_MORE_MODAL_IDS above) is currently open, using the SAME `window.GATHER_UI_COMPONENTS`
  * pass-through aliases app-main.js itself uses (`bindUiComponentAliases`) -- so this reuses the
  * exact lazy-loaded chunk/component app-main.js already has, no separate copy bundled here.
@@ -315,10 +376,11 @@ export function buildRenewalMoreContext(calendar, deps) {
 function MoreModalsHost({ openModal, onClose, modalProps }) {
   const React = window.React;
   if (!openModal) return null;
-  const { ShareModal, AnniversaryModal, UserManualOverlay } = bindUiComponentAliases(React);
+  const { ShareModal, AnniversaryModal, UserManualOverlay, AppSettingsModal } = bindUiComponentAliases(React);
   if (openModal === 'share') return React.createElement(ShareModal, { ...modalProps.share, onClose });
   if (openModal === 'anniversaries') return React.createElement(AnniversaryModal, { ...modalProps.anniversaries, onClose });
   if (openModal === 'manual') return React.createElement(UserManualOverlay, { ...modalProps.manual, onClose });
+  if (openModal === 'app-settings') return React.createElement(AppSettingsModal, { ...modalProps['app-settings'], onClose });
   return null;
 }
 
@@ -327,7 +389,7 @@ function MoreModalsHost({ openModal, onClose, modalProps }) {
  * §2). 검색 also has a header shortcut (TopHeader's onOpenSearch), so choosing it here and there
  * both land on the same tab -- this list is the one place all 7 exist, header included or not.
  * `onSelectItem` (owned by RenewalAppShell) decides per-id whether that's a real destination
- * (share/anniversaries/manual/admin) or still just a placeholder selection (search, app-settings,
+ * (share/anniversaries/manual/app-settings/admin) or still just a placeholder selection (search,
  * calendar-settings -- see REAL_MORE_MODAL_IDS above); this component stays presentation-only.
  */
 function MorePane({ calendarName, onSelectItem, selectedItem }) {
@@ -349,7 +411,7 @@ function MorePane({ calendarName, onSelectItem, selectedItem }) {
       ))
     ),
     React.createElement('div', { className: 'renewal-shell-placeholder-sub renewal-shell-more-note' },
-      calendarName ? `${calendarName} · 검색/앱 설정/캘린더 설정은 아직 준비 중입니다.` : '검색/앱 설정/캘린더 설정은 아직 준비 중입니다.')
+      calendarName ? `${calendarName} · 검색/캘린더 설정은 아직 준비 중입니다.` : '검색/캘린더 설정은 아직 준비 중입니다.')
   );
 }
 
@@ -377,7 +439,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext }) {
   const [activeTab, setActiveTabState] = React.useState(readTabFromLocation);
   const [recordsSubTab, setRecordsSubTabState] = React.useState(readRecordsSubTabFromLocation);
   const [selectedMoreItem, setSelectedMoreItem] = React.useState(null);
-  // Which of the 3 real 더보기 modals (share/anniversaries/manual) is open, if any -- local to
+  // Which of the 4 real 더보기 modals (share/anniversaries/manual/app-settings) is open, if any -- local to
   // this shell (see buildRenewalMoreContext's doc comment for why this doesn't reuse
   // CalendarApp's own isShareOpen/isAnniversariesOpen/isGuideOpen state).
   const [openMoreModal, setOpenMoreModal] = React.useState(null);
@@ -387,7 +449,10 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext }) {
     setSelectedMoreItem(id);
     if (id === 'admin') { moreContext.onOpenAdmin(); return; }
     if (!REAL_MORE_MODAL_IDS.includes(id)) return; // search/app-settings/calendar-settings: selection only for now
-    const trigger = { share: moreContext.onSelectShare, anniversaries: moreContext.onSelectAnniversaries, manual: moreContext.onSelectManual }[id];
+    const trigger = {
+      share: moreContext.onSelectShare, anniversaries: moreContext.onSelectAnniversaries,
+      manual: moreContext.onSelectManual, 'app-settings': moreContext.onSelectAppSettings,
+    }[id];
     Promise.resolve(trigger()).then(() => setOpenMoreModal(id)).catch(() => {});
   };
 
