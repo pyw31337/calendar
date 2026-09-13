@@ -87,6 +87,11 @@ npm run regression:test     # npm run build 포함 — 실제 프로덕션 번�
 
 ## 더 읽을 문서
 
+- `docs/design-renewal-handoff.md` — **UI/UX 디자인 리뉴얼(제품 정보구조 재편) 작업 중이라면
+  가장 먼저 읽을 문서.** 지금까지의 시안·결정·실제 코드 구현 현황·빠뜨리면 안 되는 기존 기능
+  전체 인벤토리를 한 곳에 모아둔 인계 문서. 이 문서 자체가 `docs/product-renewal-master-plan.md`,
+  `docs/renewal-baseline.md`, `docs/wp01-app-shell-progress.md`, `docs/page-feature-contract.md`로
+  가는 읽기 순서도 안내한다.
 - `docs/module-map.md` — 로드 순서, 파일 귀속 규칙
 - `docs/app-main-split-units.md` — 이 리팩터의 전체 유닛 카탈로그와 진행 로그
 - `docs/architecture-review-20260821.md` — 더 넓은 아키텍처 리스크/개선 순서
