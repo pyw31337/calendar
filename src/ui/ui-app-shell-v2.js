@@ -586,7 +586,83 @@ function PlaceholderPane({ tabId, calendarName }) {
  * wires real data in. This is the one tab with a second level of navigation because it alone
  * absorbs 5 old screens (docs/design-renewal-handoff.md §2) -- the other 4 tabs stay flat.
  */
-function RecordsPane({ subTab, onSelectSubTab, calendarName }) {
+/**
+ * Builds the 기록 tab's real ingredients (WP-06 continuation, 메모 subtab first). Straight
+ * pass-through of the same values/handlers `app-main.js`'s own `activeView === 'memo'` render
+ * block already uses. `onLoadMoreMemos` is composed in `app-main.js`'s own adapter call (it needs
+ * `MEMOS_PAGE_SIZE`, a module-level constant only in scope there) and handed through already-built.
+ */
+export function buildRenewalRecordsContext(calendar, deps) {
+  const {
+    activeCal, memos, hasMoreMemos, totalMemoCount, onLoadMoreMemos, sharedMemo, setSharedMemo,
+    showToast, isDarkTheme, showConfirmDialog, chatMessages, setActiveLightbox,
+    patchLocalMemo, upsertLocalMemo, removeLocalMemo, memoInitialTag, setMemoInitialTag,
+    isMemoShareOpen, setIsMemoShareOpen,
+  } = deps || {};
+  const requireLoadedCalendar = (message) => {
+    if (activeCal) return true;
+    if (typeof showToast === 'function') showToast(message, 'error');
+    return false;
+  };
+  return {
+    calendar: activeCal,
+    showToast,
+    memoProps: {
+      calendar: activeCal, memos, hasMoreMemos, totalMemoCount, onLoadMoreMemos,
+      showToast, isDarkTheme, onRequestConfirm: showConfirmDialog,
+      sharedMemo, chatMessages, setActiveLightbox,
+      onDismissSharedMemo: () => {
+        if (typeof setSharedMemo === 'function') setSharedMemo(null);
+        const url = new URL(window.location.href);
+        url.searchParams.delete('memo');
+        window.history.replaceState({}, '', url);
+      },
+      onUpdateMemo: patchLocalMemo, onUpsertMemo: upsertLocalMemo, onDeleteMemo: removeLocalMemo,
+      memoInitialTag, setMemoInitialTag,
+    },
+    isMemoShareOpen: !!isMemoShareOpen,
+    onOpenMemoShare: () => { if (requireLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsMemoShareOpen(true); },
+    onCloseMemoShare: () => setIsMemoShareOpen(false),
+  };
+}
+
+/**
+ * 메모 subtab body (WP-06 continuation): the real `MemoView`, same pass-through approach as
+ * `ChatPane`/`SettlementPane`. `MemoView` ships in its own lazy-loaded chunk
+ * (`window.__gatherLoadViewUi('memo')`), so this waits for that chunk before rendering.
+ */
+function MemoPane({ recordsContext, onChangeView, onOpenAppSettings }) {
+  const React = window.React;
+  const [loaded, setLoaded] = React.useState(() => !!(window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MemoView));
+  React.useEffect(() => {
+    if (loaded) return undefined;
+    if (typeof window.__gatherLoadViewUi !== 'function') { setLoaded(true); return undefined; }
+    let cancelled = false;
+    window.__gatherLoadViewUi('memo').then(() => { if (!cancelled) setLoaded(true); }).catch(err => {
+      console.error('Memo UI load failed:', err);
+      if (typeof recordsContext.showToast === 'function') recordsContext.showToast('메모 화면을 불러오지 못했습니다. 다시 시도해 주세요.', 'error');
+    });
+    return () => { cancelled = true; };
+  }, [loaded]);
+  if (!loaded) {
+    return React.createElement(EmptyState, { title: '메모 불러오는 중', subtitle: '잠시만 기다려 주세요.' });
+  }
+  const { MemoView, ShareModal } = bindUiComponentAliases(React);
+  return React.createElement(React.Fragment, null,
+    React.createElement(MemoView, {
+      ...recordsContext.memoProps,
+      onBack: () => onChangeView('calendar'),
+      onOpenShare: recordsContext.onOpenMemoShare,
+      onOpenAppSettings,
+    }),
+    recordsContext.isMemoShareOpen && React.createElement(ShareModal, {
+      calendar: recordsContext.calendar, shareType: 'memo', showToast: recordsContext.showToast,
+      onClose: recordsContext.onCloseMemoShare,
+    })
+  );
+}
+
+function RecordsPane({ subTab, onSelectSubTab, calendarName, recordsContext, onChangeView, onOpenAppSettings }) {
   const React = window.React;
   return React.createElement(React.Fragment, null,
     React.createElement('div', { className: 'renewal-shell-subtab-row', role: 'tablist', 'aria-label': '기록 필터' },
@@ -599,10 +675,12 @@ function RecordsPane({ subTab, onSelectSubTab, calendarName }) {
         onClick: () => onSelectSubTab(t.id),
       }, t.label))
     ),
-    React.createElement(EmptyState, {
-      title: `${RECORDS_SUBTABS.find(t => t.id === subTab)?.label || subTab} (준비 중)`,
-      subtitle: withCalendarPrefix(calendarName, 'WP-06에서 실제 데이터가 이 자리에 연결됩니다.'),
-    })
+    subTab === 'memo'
+      ? React.createElement(MemoPane, { recordsContext, onChangeView, onOpenAppSettings })
+      : React.createElement(EmptyState, {
+        title: `${RECORDS_SUBTABS.find(t => t.id === subTab)?.label || subTab} (준비 중)`,
+        subtitle: withCalendarPrefix(calendarName, 'WP-06에서 실제 데이터가 이 자리에 연결됩니다.'),
+      })
   );
 }
 
@@ -896,7 +974,7 @@ function MorePane({ calendarName, onSelectItem, selectedItem }) {
  * the shell element when `?shell=v2` is set, otherwise null so the caller falls through to the
  * existing return unchanged.
  */
-export function renderRenewalShellIfEnabled(activeCalId, calendar, moreContextDeps, calendarContextDeps, chatContextDeps, settlementContextDeps) {
+export function renderRenewalShellIfEnabled(activeCalId, calendar, moreContextDeps, calendarContextDeps, chatContextDeps, settlementContextDeps, recordsContextDeps) {
   const React = window.React;
   if (!isRenewalShellEnabled()) return null;
   return React.createElement(RenewalAppShell, {
@@ -905,20 +983,22 @@ export function renderRenewalShellIfEnabled(activeCalId, calendar, moreContextDe
     calendarContext: buildRenewalCalendarContext(calendar, calendarContextDeps),
     chatContext: buildRenewalChatContext(calendar, chatContextDeps),
     settlementContext: buildRenewalSettlementContext(calendar, settlementContextDeps),
+    recordsContext: buildRenewalRecordsContext(calendar, recordsContextDeps),
   });
 }
 
 /**
- * @param {{ activeCalId: string, calendar: object | null, moreContext: object, calendarContext: object, chatContext: object, settlementContext: object }} props
+ * @param {{ activeCalId: string, calendar: object | null, moreContext: object, calendarContext: object, chatContext: object, settlementContext: object, recordsContext: object }} props
  *   `calendar` is the already-loaded record for activeCalId (or null while it loads) --
  *   passed in from CalendarApp's existing state as a plain prop (the adapter pattern from
  *   product-renewal-master-plan.md §8.2), never re-fetched here. `moreContext` (see
  *   `buildRenewalMoreContext`) is the 더보기 tab's real destinations; `calendarContext` (see
  *   `buildRenewalCalendarContext`) is the 캘린더 tab's; `chatContext` (see
  *   `buildRenewalChatContext`) is the 대화 tab's; `settlementContext` (see
- *   `buildRenewalSettlementContext`) is the 정산 tab's -- all built the same way.
+ *   `buildRenewalSettlementContext`) is the 정산 tab's; `recordsContext` (see
+ *   `buildRenewalRecordsContext`) is the 기록 탭's -- all built the same way.
  */
-export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarContext, chatContext, settlementContext }) {
+export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarContext, chatContext, settlementContext, recordsContext }) {
   const React = window.React;
   const [activeTab, setActiveTabState] = React.useState(readTabFromLocation);
   const [recordsSubTab, setRecordsSubTabState] = React.useState(readRecordsSubTabFromLocation);
@@ -1088,7 +1168,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
           : activeTab === 'settlement'
           ? React.createElement(SettlementPane, { settlementContext, onChangeView, onOpenAppSettings, onOpenDate: setDateModalDate })
           : activeTab === 'records'
-          ? React.createElement(RecordsPane, { subTab: recordsSubTab, onSelectSubTab: setRecordsSubTab, calendarName })
+          ? React.createElement(RecordsPane, { subTab: recordsSubTab, onSelectSubTab: setRecordsSubTab, calendarName, recordsContext, onChangeView, onOpenAppSettings })
           : activeTab === 'more'
           ? React.createElement(MorePane, { calendarName, selectedItem: selectedMoreItem, onSelectItem: handleSelectMoreItem })
           : React.createElement(PlaceholderPane, { tabId: activeTab, calendarName }),
