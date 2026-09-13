@@ -345,6 +345,105 @@ function CalendarPane({ calendarContext, onEditAnniversary, onAddAnniversaryForD
 }
 
 /**
+ * Builds the 대화 tab's real ingredients (WP-03 continuation): straight pass-through of the SAME
+ * ~35 CalendarApp state values/handlers that already drive the original `activeView === 'chat'`
+ * render block (app-main.js) -- composer state, media/attachment state, jump/ordinal helpers,
+ * sticky-video activation, etc. `onBack`/`onOpenGallery`/`onChangeView`/`onOpenAppSettings` are
+ * NOT built here -- those need shell tab-navigation (setActiveTab/setRecordsSubTab), which only
+ * `RenewalAppShell` owns, so `ChatPane` composes them from the `onChangeView`/`onOpenAppSettings`
+ * props it receives instead.
+ *
+ * Deliberately deferred: the cross-tab "sticky video keeps floating after you leave 대화"
+ * behavior (`withStickyVideo` in app-main.js) isn't wrapped around this shell -- `stickyVideoKey`/
+ * `onActivateVideo` still make a tapped video actually play inline in the chat feed (that's a
+ * pure pass-through of existing state), but it won't keep floating as a mini-player after
+ * switching tabs. That's a nice-to-have on top of a working 대화 tab, not required for one.
+ */
+export function buildRenewalChatContext(calendar, deps) {
+  const {
+    activeCal, memePool, handleSendMemeImage, displayChatMessages, loadingOlderChat, hasMoreOlderChat, loadOlderChatMessages,
+    chatInput, setChatInput, chatParticipantId, setChatParticipantId, isChatSheetOpen, setIsChatSheetOpen, isChatSubmitting,
+    chatTextareaRef, chatImages, setChatImages, chatFileAttachments, setChatFileAttachments, chatReplyTarget, setChatReplyTarget,
+    setActiveLightbox, handleSendChatMessage, handleDeleteMessage, handleEditMessage, handleAddPinnedNotice, handleRemovePinnedNotice,
+    isHeaderVisible, setIsHeaderVisible, handleChatScroll, toggleChatInputPin, chatMessagesContainerRef, showToast,
+    handlePromoteInlineChatImage, handleSaveImageTags, handleSearchTag, isDarkTheme, toggleTheme,
+    fontScalePercent, setFontScalePercent, mainNotifPermission, mainChatNotifyEnabled, handleMainToggleNotifications,
+    stickyVideo, handleActivateChatVideo, handleJumpToChatMessage, handleJumpToMemo, handleJumpToMeetingDate,
+    handleGetChatMessageOrdinal, handleGetGalleryPhotoOrdinal, showConfirmDialog, syncStatus, externalFocusMsgId,
+    isChatShareOpen, setIsChatShareOpen,
+  } = deps || {};
+  return {
+    calendar: activeCal,
+    showToast,
+    isChatShareOpen: !!isChatShareOpen,
+    onOpenChatShare: () => setIsChatShareOpen(true),
+    onCloseChatShare: () => setIsChatShareOpen(false),
+    chatRoomProps: {
+      calendar: activeCal, memePool, onSendMemeImage: handleSendMemeImage,
+      chatMessages: displayChatMessages, loadingOlderChat, hasMoreOlderChat, onLoadOlderChat: loadOlderChatMessages,
+      chatInput, setChatInput, chatParticipantId, setChatParticipantId, isChatSheetOpen, setIsChatSheetOpen, isChatSubmitting,
+      chatTextareaRef, chatImage: chatImages, setChatImage: setChatImages, chatFileAttachments, setChatFileAttachments,
+      chatReplyTarget, setChatReplyTarget,
+      activeLightbox: null, // rendered via a shared Lightbox host elsewhere once WP-05 needs it; not required for a working chat tab
+      setActiveLightbox,
+      onSend: handleSendChatMessage, onDeleteMessage: handleDeleteMessage, onEditMessage: handleEditMessage,
+      onAddPinnedNotice: handleAddPinnedNotice, onRemovePinnedNotice: handleRemovePinnedNotice,
+      isHeaderVisible, handleChatScroll, onRevealChatInput: () => setIsHeaderVisible(true), onToggleChatInputPin: toggleChatInputPin,
+      chatMessagesContainerRef, showToast, onPromoteImageUrl: handlePromoteInlineChatImage, onSaveImageTags: handleSaveImageTags,
+      onSearchTag: handleSearchTag, isDarkTheme, onToggleTheme: toggleTheme, fontScalePercent,
+      onDecreaseFont: () => setFontScalePercent(prev => Math.max(80, prev - 10)),
+      onIncreaseFont: () => setFontScalePercent(prev => Math.min(130, prev + 10)),
+      isChatNotifyEnabled: mainNotifPermission === 'granted' && mainChatNotifyEnabled,
+      onToggleChatNotifications: handleMainToggleNotifications,
+      stickyVideoKey: stickyVideo ? stickyVideo.key : null, onActivateVideo: handleActivateChatVideo,
+      onJumpToChatMessage: handleJumpToChatMessage, onJumpToMemo: handleJumpToMemo, onJumpToMeetingDate: handleJumpToMeetingDate,
+      onGetChatMessageOrdinal: handleGetChatMessageOrdinal, onGetGalleryPhotoOrdinal: handleGetGalleryPhotoOrdinal,
+      onRequestConfirm: showConfirmDialog, syncStatus, externalFocusMessageId: externalFocusMsgId,
+    },
+  };
+}
+
+/**
+ * 대화 tab body (WP-03 continuation): the real `ChatRoomView`, same pass-through approach as
+ * `CalendarPane`. Unlike `CalendarGrid`/`DateModal`, `ChatRoomView` ships in its OWN lazy-loaded
+ * chunk (`window.__gatherLoadChatUi`, the exact trigger CalendarApp's own `changeView('chat')`
+ * uses) rather than the main bundle, so this needs the same "wait for the chunk, then render"
+ * step the 더보기 tab's share/manual/anniversaries entries needed (`buildRenewalMoreContext`).
+ */
+function ChatPane({ chatContext, onChangeView, onOpenAppSettings }) {
+  const React = window.React;
+  const [loaded, setLoaded] = React.useState(() => !!(window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChatRoomView));
+  React.useEffect(() => {
+    if (loaded) return undefined;
+    if (typeof window.__gatherLoadChatUi !== 'function') { setLoaded(true); return undefined; }
+    let cancelled = false;
+    window.__gatherLoadChatUi().then(() => { if (!cancelled) setLoaded(true); }).catch(err => {
+      console.error('Chat UI load failed:', err);
+      if (typeof chatContext.showToast === 'function') chatContext.showToast('채팅 화면을 불러오지 못했습니다. 다시 시도해 주세요.', 'error');
+    });
+    return () => { cancelled = true; };
+  }, [loaded]);
+  if (!loaded) {
+    return React.createElement(EmptyState, { title: '채팅 불러오는 중', subtitle: '잠시만 기다려 주세요.' });
+  }
+  const { ChatRoomView, ShareModal } = bindUiComponentAliases(React);
+  return React.createElement(React.Fragment, null,
+    React.createElement(ChatRoomView, {
+      ...chatContext.chatRoomProps,
+      onBack: () => onChangeView('calendar'),
+      onOpenGallery: () => onChangeView('gallery'),
+      onChangeView,
+      onShare: chatContext.onOpenChatShare,
+      onOpenAppSettings,
+    }),
+    chatContext.isChatShareOpen && React.createElement(ShareModal, {
+      calendar: chatContext.calendar, shareType: 'chat', showToast: chatContext.showToast,
+      onClose: chatContext.onCloseChatShare,
+    })
+  );
+}
+
+/**
  * Shared "not built yet" state (WP-02's EmptyState, product-renewal-master-plan.md §9: "공통
  * 상태의 문구와 버튼 구조가 모든 기능에서 재사용 가능하다"), scoped to this shell for now --
  * every renewal-shell screen that has no real data yet (PlaceholderPane, RecordsPane's per-subtab
@@ -645,25 +744,27 @@ function MorePane({ calendarName, onSelectItem, selectedItem }) {
  * the shell element when `?shell=v2` is set, otherwise null so the caller falls through to the
  * existing return unchanged.
  */
-export function renderRenewalShellIfEnabled(activeCalId, calendar, moreContextDeps, calendarContextDeps) {
+export function renderRenewalShellIfEnabled(activeCalId, calendar, moreContextDeps, calendarContextDeps, chatContextDeps) {
   const React = window.React;
   if (!isRenewalShellEnabled()) return null;
   return React.createElement(RenewalAppShell, {
     activeCalId, calendar,
     moreContext: buildRenewalMoreContext(calendar, moreContextDeps),
     calendarContext: buildRenewalCalendarContext(calendar, calendarContextDeps),
+    chatContext: buildRenewalChatContext(calendar, chatContextDeps),
   });
 }
 
 /**
- * @param {{ activeCalId: string, calendar: object | null, moreContext: object, calendarContext: object }} props
+ * @param {{ activeCalId: string, calendar: object | null, moreContext: object, calendarContext: object, chatContext: object }} props
  *   `calendar` is the already-loaded record for activeCalId (or null while it loads) --
  *   passed in from CalendarApp's existing state as a plain prop (the adapter pattern from
  *   product-renewal-master-plan.md §8.2), never re-fetched here. `moreContext` (see
  *   `buildRenewalMoreContext`) is the 더보기 tab's real destinations; `calendarContext` (see
- *   `buildRenewalCalendarContext`) is the 캘린더 tab's, both built the same way.
+ *   `buildRenewalCalendarContext`) is the 캘린더 tab's; `chatContext` (see
+ *   `buildRenewalChatContext`) is the 대화 tab's -- all built the same way.
  */
-export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarContext }) {
+export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarContext, chatContext }) {
   const React = window.React;
   const [activeTab, setActiveTabState] = React.useState(readTabFromLocation);
   const [recordsSubTab, setRecordsSubTabState] = React.useState(readRecordsSubTabFromLocation);
@@ -677,16 +778,22 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   const [anniversaryOverride, setAnniversaryOverride] = React.useState(null);
   const calendarName = calendar?.name || null;
 
+  // Shared by the 더보기 list AND any other pane (e.g. ChatPane's "앱 설정" entry) that needs to
+  // open one of the 4 real 더보기 modals directly, without going through the 더보기 tab's own list.
+  const openMoreModalById = (id) => {
+    const trigger = {
+      share: moreContext.onSelectShare, anniversaries: moreContext.onSelectAnniversaries,
+      manual: moreContext.onSelectManual, 'app-settings': moreContext.onSelectAppSettings,
+    }[id];
+    if (!trigger) return;
+    Promise.resolve(trigger()).then(() => setOpenMoreModal(id)).catch(() => {});
+  };
   const handleSelectMoreItem = (id) => {
     setSelectedMoreItem(id);
     if (id === 'admin') { moreContext.onOpenAdmin(); return; }
     if (!REAL_MORE_MODAL_IDS.includes(id)) return; // search/calendar-settings: selection only for now
     if (id === 'anniversaries') setAnniversaryOverride(null); // opened from the 더보기 list itself, not a date's edit/add flow
-    const trigger = {
-      share: moreContext.onSelectShare, anniversaries: moreContext.onSelectAnniversaries,
-      manual: moreContext.onSelectManual, 'app-settings': moreContext.onSelectAppSettings,
-    }[id];
-    Promise.resolve(trigger()).then(() => setOpenMoreModal(id)).catch(() => {});
+    openMoreModalById(id);
   };
 
   // DateModal's "기념일 편집"/"+ 기념일 등록" buttons (WP-03) open the SAME 기념일 설정 modal the
@@ -711,6 +818,23 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
     setActiveTab('records');
     setRecordsSubTab('content');
   };
+
+  // ChatRoomView's internal side menu (ChatSideMenu) calls this the same way app-main.js's own
+  // `changeView` did to jump between the old top-level views -- those views are now tabs/subtabs
+  // in this shell, so this just maps the old view id to the equivalent tab/subtab instead of
+  // reimplementing navigation. `onBack`/`onOpenGallery` (ChatPane) reuse this same mapping.
+  const onChangeView = (view) => {
+    if (view === 'chat') return; // already there
+    if (view === 'settlement') { setActiveTab('settlement'); return; }
+    const recordsSubTabByView = { memo: 'memo', places: 'places', gallery: 'media', history: 'archive', content: 'content' };
+    if (recordsSubTabByView[view]) {
+      setActiveTab('records');
+      setRecordsSubTab(recordsSubTabByView[view]);
+      return;
+    }
+    setActiveTab('calendar');
+  };
+  const onOpenAppSettings = () => openMoreModalById('app-settings');
 
   // Correct an invalid/stale ?tab=/?sub= on first mount without adding a history entry, then
   // listen for the back/forward buttons for the rest of this shell's lifetime.
@@ -764,6 +888,8 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
         }),
         activeTab === 'calendar'
           ? React.createElement(CalendarPane, { calendarContext, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource })
+          : activeTab === 'chat'
+          ? React.createElement(ChatPane, { chatContext, onChangeView, onOpenAppSettings })
           : activeTab === 'records'
           ? React.createElement(RecordsPane, { subTab: recordsSubTab, onSelectSubTab: setRecordsSubTab, calendarName })
           : activeTab === 'more'
