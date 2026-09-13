@@ -467,3 +467,30 @@ selector 계층이 먼저 정의되어야 "미정 참석"이 무엇을 뜻하는
 후보. 최초 메시지 로드 개수 조절/과거 메시지 pagination 분리(§5.4의 세부 성능 요구사항)는
 `ChatRoomView`/`loadOlderChatMessages`가 이미 구현한 그대로를 재사용했을 뿐, 이 슬라이스에서 그
 내부 로직을 손대거나 검증하지 않았다.
+
+## 2026-09-13: WP-06 — "기록" 탭 "콘텐츠" 서브탭 실제 연결 (+ 셸 공용 버그 이식)
+
+**배경:** 기록 탭의 "콘텐츠" 서브탭(옛 `activeView === 'content'`, 실제 컴포넌트는 `ContentView`
+— 지역축제/문화행사/스포츠/영화 통합 뷰)을 실제 연결. `ContentView`는 `HistoryView`/`PlacesView`와
+같은 파일(`src/ui/ui-summary-gallery.js`, 부팅 시 항상 즉시 로드되는 메인 번들)에 있어 별도
+지연 로드 대기가 필요 없다 — `HistoryPane`/`PlacesPane`과 같은 "대기 없이 바로 렌더" 패턴.
+
+- `buildRenewalRecordsContext`에 `contentProps`(캘린더/기념일/메모/커스텀 콘텐츠 항목/등록·해제·
+  빠른 메모 핸들러)를 추가 — `app-main.js`의 `activeView === 'content'` 호출부가 쓰던 프롭 전부를
+  그대로 pass-through. 새 로직 없음.
+- `app-main.js`의 어댑터 호출이 6번째 인자(`recordsContextDeps`)를 받도록 확장 —
+  `check:app-main-inventory`로 `CalendarApp` 7700/7700 그대로 확인.
+- **`bindUiComponentAliases` 캐시 수정 이식**: 이 슬라이스도 병합된 `main` 기준 새 브랜치라
+  PR #621에서 발견/수정한 셸 전역 리마운트 버그(`src/core/app-ui-wrappers.js`의 `WeakMap` 캐시)를
+  동일하게 옮겨왔다 — `ContentPane`도 같은 `bindUiComponentAliases(React)`-in-render 패턴을 쓰므로.
+- 검증(Playwright 헤드리스): `?shell=v2&tab=records&sub=content`가 실제 `ContentView`를 렌더 —
+  지역축제/문화행사/스포츠/영화 탭, 지역 선택, 실제 등록된 138건의 콘텐츠 목록까지 컨트롤 경로
+  (`?view=content`)와 완전히 동일하게 표시됨(HTML 길이도 거의 동일: 117307 vs 111318, 차이는 셸
+  네비게이션 마크업만큼). `ERR_INSUFFICIENT_RESOURCES` 0건. 회귀 확인으로 `tab=calendar`도 정상
+  렌더.
+- `npm run lint`/`check:app-main-inventory`(7700/7700)/`check:all`/`safety:test`/`regression:test`
+  (빌드 포함) 전부 통과.
+
+**아직 다루지 않은 것**: `ContentView` 내부의 지역 필터/개별 등록/포스터 표시 등은 기존 구현을
+그대로 재사용했을 뿐 이 슬라이스에서 손대지 않음. 기록 탭의 "전체" 서브탭은 여전히 미착수(별도
+설계 필요, WP-06 사진·영상 슬라이스에서도 같은 메모 남김).
