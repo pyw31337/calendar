@@ -468,6 +468,52 @@ selector 계층이 먼저 정의되어야 "미정 참석"이 무엇을 뜻하는
 `ChatRoomView`/`loadOlderChatMessages`가 이미 구현한 그대로를 재사용했을 뿐, 이 슬라이스에서 그
 내부 로직을 손대거나 검증하지 않았다.
 
+## 2026-09-13: WP-07 착수 — "정산" 탭 실제 연결 + 날짜 모달 공유화
+
+**배경:** 사용자가 "묻지 말고 밤새 계속 진행"을 지시. 마스터플랜 §5.7(정산)보다 앞서 §9의
+WP-07("정산 화면 재배치")에 해당하는 작업으로, 대화 탭과 완전히 같은 성격 — 기존
+`SettlementSummaryModal`이 이미 실제 화면을 전부 구현하고 있어 pass-through로 연결.
+
+- **핵심 발견 (날짜 모달을 탭 하나가 독점할 수 없음)**: WP-03에서는 `DateModal`과 그 열림 상태
+  (`dateModalDate`)를 `CalendarPane`이 로컬로 소유했다. 그런데 `SettlementSummaryModal`도
+  "정산 내역 항목을 누르면 그 날짜의 상세(DateModal)를 연다"는 동일한 동작이 필요해서, 두 탭이
+  각자 `DateModal`을 따로 렌더링(중복 인스턴스, 상태 불일치 위험)하게 두는 대신
+  `dateModalDate`/`DateModal` 렌더를 `RenewalAppShell` 레벨로 끌어올렸다. `CalendarPane`은
+  이제 `onOpenDate` prop(사실상 `setDateModalDate`)만 받아서 호출하고, `SettlementPane`도
+  같은 `onOpenDate`를 받는다 — 하나의 공유 `SharedDateModal` 인스턴스를 재사용. 날짜 허브
+  (WP-04)가 이미 지향하던 방향("모든 탭이 같은 selectedDate/meetingId 컨텍스트 공유")과도
+  들어맞는다.
+- **`onOpenCreateSettlement`을 일부러 넘기지 않음**: 원본 `app-main.js`의 정산 화면 호출부를
+  보면 `...navMenuProps`로 `onOpenCreateSettlement`가 세팅됐다가 바로 아래서 명시적으로
+  `undefined`로 덮어쓴다. 이유를 `SettlementSummaryModal` 소스에서 확인: 이 prop이 없으면
+  컴포넌트가 **자기 내부의** `isCreateSettlementOpen` state로 새 정산 생성 모달을 스스로 띄운다
+  (`handleOpenCreateSettlement`). 반면 "기존 카드 편집"(`onOpenSettlementEditor`)은 외부
+  (`CalendarApp`의 `editingSettlementCard` state)로 라우팅된다 — 이 비대칭을 그대로 재현해서
+  새 로직을 만들지 않았다.
+  - `buildRenewalSettlementContext(calendar, deps)` 신설 — `activeCal`, `canUseSettlement`,
+    정산 카드 저장/삭제/상태토글 핸들러 3개, `editingSettlementCard`/`setEditingSettlementCard`,
+    `isShareOpen`/`setIsShareOpen`(정산 공유는 대화 탭과 달리 원본이 범용 `isShareOpen`을 쓰므로
+    그대로 재사용) 전부 pass-through.
+  - `SettlementPane`도 `ChatPane`과 같은 "지연 로드 대기" 패턴 필요: `SettlementSummaryModal`/
+    `CreateSettlementModal`은 `PollModal`/`AnniversaryModal`과 같은 청크(`ui-event-modals.js`,
+    `window.__gatherLoadEventUi`)에 있어서, 마운트 시 그 로드를 기다렸다가 렌더.
+  - `RenewalAppShell`의 `activeTab === 'settlement'` 분기 추가, 하단/사이드 내비의 "정산" 탭이
+    실제로 이 화면으로 연결됨.
+- `app-main.js`의 어댑터 호출이 6번째 인자(`settlementContextDeps`)를 받도록 확장 —
+  `check:app-main-inventory`로 `CalendarApp` 7700/7700 그대로 확인.
+- 검증(Playwright 헤드리스): `?shell=v2&tab=settlement`에서 실제 `SettlementSummaryModal`
+  렌더 확인(누적보기/월별보기 토글, 총 수입/지출/잔액 0원, "등록된 정산 내역이 없습니다." 빈
+  상태, 콘솔 에러 없음). `?shell=v2&tab=calendar`에서 날짜 클릭 → 리팩터 후에도 여전히 실제
+  `DateModal`이 정상적으로 열림 확인(회귀 없음). 기본(플래그 없음) 경로 HTML 길이 36894바이트로
+  동일, 콘솔 에러 없음.
+- `npm run lint`/`check:app-main-inventory`/`check:all`/`safety:test`/`regression:test`(빌드
+  포함) 전부 통과.
+
+**아직 다루지 않은 것**: 정산 카드 생성(내부 self-managed 모달 경로) 자체를 헤드리스로 끝까지
+클릭해보진 못했다(네트워크 차단 환경이라 실제 정산 카드가 없어 "새 정산 만들기" 버튼까지 도달하는
+상호작용은 데이터 의존적). 로직 자체는 원본과 100% 동일한 pass-through라 별도 위험은 낮다고
+판단했다.
+
 ## 2026-09-13: WP-06 착수 (병렬) — "기록" 탭의 "장소" 서브탭 실제 연결
 
 **배경:** 사용자가 "묻지 말고 밤새 계속 진행"을 지시. 메모 서브탭과 별도로, "메모" 슬라이스가
