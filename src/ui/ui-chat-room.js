@@ -1556,7 +1556,13 @@ export function ChatRoomView({
           event.preventDefault();
           setComposerInputHeight(height => Math.max(44, Math.min(260, height + (event.key === 'ArrowUp' ? 12 : -12))));
         }
-      }, /*#__PURE__*/React.createElement("span", { "aria-hidden": "true" }, "⋮")),
+      }, /*#__PURE__*/React.createElement("svg", {
+        xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24",
+        fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round",
+        "aria-hidden": "true"
+      }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
+      /*#__PURE__*/React.createElement("path", { d: "M8 9l4 -4l4 4" }),
+      /*#__PURE__*/React.createElement("path", { d: "M16 15l-4 4l-4 -4" }))),
       memeMatches.length > 0 && /*#__PURE__*/React.createElement("div", {
         style: { display: 'flex', flexDirection: 'column', gap: '8px' }
       },
