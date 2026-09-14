@@ -995,6 +995,26 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   const currentTags = (tagOverrideKey && Object.prototype.hasOwnProperty.call(tagOverrides, tagOverrideKey))
     ? tagOverrides[tagOverrideKey]
     : (currentMeta?.tags || '');
+  // A photoIndex row can briefly lag its source message's imageTags while the
+  // denormalization trigger runs. Keep the durable source untouched, but avoid
+  // showing an empty tag panel for a newly uploaded chat/gallery photo.
+  const currentTagsWithUploadDate = (() => {
+    if (String(currentTags || '').trim()) return currentTags;
+    const source = String(currentMeta?.source || currentMeta?.uploadSource || '').toLowerCase();
+    if (source === 'meme' || source === 'anniversary' || source === 'meeting') return currentTags;
+    const rawTimestamp = currentMeta?.timestamp || currentMeta?.createdAt;
+    const timestamp = rawTimestamp && typeof rawTimestamp === 'object' && typeof rawTimestamp.toMillis === 'function'
+      ? rawTimestamp.toMillis()
+      : Number(rawTimestamp);
+    if (!Number.isFinite(timestamp) || timestamp <= 0) return currentTags;
+    try {
+      const ymd = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(timestamp));
+      const compact = ymd.replace(/-/g, '').slice(2);
+      return /^\d{6}$/.test(compact) ? `#${compact}` : currentTags;
+    } catch (_) {
+      return currentTags;
+    }
+  })();
   // Mirrors handleSaveImageTags' own parse/dedupe/limit rules so the optimistic override shown
   // here matches what actually got persisted, without needing the save call to round-trip it.
   const normalizeTagsForDisplay = text => Array.from(new Set(
@@ -1789,7 +1809,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
         }),
         showTags && zoomLevel === ZOOM_DEFAULT && /*#__PURE__*/React.createElement(LightboxTagPanel, {
           key: `tags-${tagOverrideKey || String(currentUrl || index)}`,
-          tags: currentTags,
+          tags: currentTagsWithUploadDate,
           onSaveTags: saveCurrentTags,
           onSearchTag: onSearchTag,
           showToast: showToast,
@@ -1957,7 +1977,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     }),
     showTags && zoomLevel === ZOOM_DEFAULT && /*#__PURE__*/React.createElement(LightboxTagPanel, {
       key: `tags-${tagOverrideKey || String(currentUrl || index)}`,
-      tags: currentTags,
+      tags: currentTagsWithUploadDate,
       onSaveTags: saveCurrentTags,
       onSearchTag: onSearchTag,
       showToast: showToast,
@@ -2015,7 +2035,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     );
   })()), imageUrlModalOpen && /*#__PURE__*/React.createElement(ImageUrlModal, {
     imageUrl: currentUrl,
-    tags: currentTags,
+    tags: currentTagsWithUploadDate,
     onClose: () => setImageUrlModalOpen(false),
     showToast,
     onEnsureShareUrl: ensureCurrentShareUrl
