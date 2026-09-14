@@ -680,6 +680,14 @@ export function ChatRoomView({
   const typingParticipants = typingParticipantIds
     .map(id => participantsMap[String(id ?? '').trim()])
     .filter(Boolean);
+  // Firestore presence는 자기 자신을 제외하지만, 입력 중인 사용자는 자신의 상태도
+  // 즉시 확인할 수 있어야 한다. 전송/blur 시 기존 stopTyping 경로가 이를 함께 닫는다.
+  const selfTypingParticipant = chatInput && String(chatInput).trim() && selectedParticipant
+    ? { ...selectedParticipant, id: String(selectedParticipant.id), __self: true }
+    : null;
+  const visibleTypingParticipants = selfTypingParticipant
+    ? [...typingParticipants, selfTypingParticipant]
+    : typingParticipants;
   // Kakao-style reply quote card, rendered at the top of a bubble when msg.replyTo is set --
   // shows the quoted sender + a 1-2 line snippet of what they said, and jumps back to that
   // original bubble (scroll + highlight, paginating through older history if needed) on tap.
@@ -1380,7 +1388,7 @@ export function ChatRoomView({
       /*#__PURE__*/React.createElement("strong", null, "공지 "), renderTextWithUrlBadge(notice.text)
     )
   ))), /*#__PURE__*/React.createElement("div", { ref: messagesListInnerRef },
-    renderedMessages.length === 0 && typingParticipants.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    renderedMessages.length === 0 && visibleTypingParticipants.length === 0 ? /*#__PURE__*/React.createElement("div", {
       style: {
         textAlign: 'center',
         color: 'var(--text-light)',
@@ -1388,8 +1396,8 @@ export function ChatRoomView({
         marginTop: '40px'
       }
     }, "\uC544\uC9C1 \uB4F1\uB85D\uB41C \uB300\uD654\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.") : renderedMessages,
-    typingParticipants.map(participant => /*#__PURE__*/React.createElement("div", {
-      key: `typing-${participant.id}`,
+    visibleTypingParticipants.map(participant => /*#__PURE__*/React.createElement("div", {
+      key: `typing-${participant.__self ? 'self' : participant.id}`,
       className: "chat-typing-row",
       role: "status",
       "aria-label": `${participant.name || '상대방'}님이 입력 중입니다`
