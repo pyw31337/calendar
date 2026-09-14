@@ -644,6 +644,9 @@ function mergeConfirmedMeetings(serverList = [], incomingList = []) {
     const base = incomingStamp >= existingStamp ? { ...existing, ...normalized } : { ...normalized, ...existing };
     byDate.set(normalized.date, {
       ...base,
+      // Settlement-only rows may carry confirmed:false; never downgrade a real
+      // confirmation that is present on either side of the merge.
+      confirmed: existing.confirmed === true || normalized.confirmed === true ? true : base.confirmed,
       // Merge independent edits by stable item IDs. Deleted items remain as tombstones so a
       // stale client cannot resurrect them during a concurrent save.
       photos: mergeConfirmedMeetingItems(existing.photos, normalized.photos,

@@ -1432,6 +1432,10 @@ function unionConfirmedMeetings(calendar, subcollectionMeetings) {
       const base = subTime >= existingTime ? { ...existing, ...subM } : { ...subM, ...existing };
       byDate.set(subM.date, {
         ...base,
+        // A settlement-only subcollection row may carry confirmed:false while the
+        // legacy calendar row still records the real confirmed meeting. Never let
+        // that bookkeeping row downgrade an existing confirmation in the merged view.
+        confirmed: existing.confirmed === true || subM.confirmed === true ? true : base.confirmed,
         photos: mergeMeetingItems(existing.photos, subM.photos, photoKey),
         expenses: mergeMeetingItems(existing.expenses, subM.expenses, expenseKey)
       });

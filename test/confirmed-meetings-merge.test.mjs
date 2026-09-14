@@ -29,6 +29,14 @@ test('a newer incoming record does overwrite older server data', () => {
   assert.equal(merged[0].note, 'fresh note');
 });
 
+test('a settlement-only false row never downgrades an existing confirmed meeting', () => {
+  const server = [{ date: '2026-01-01', confirmed: true, updatedAt: 1000 }];
+  const incoming = [{ date: '2026-01-01', confirmed: false, updatedAt: 2000, expenses: [{ id: 'e1', amount: 5000 }] }];
+  const merged = mergeConfirmedMeetings(server, incoming);
+  assert.equal(merged[0].confirmed, true);
+  assert.equal(merged[0].expenses[0].id, 'e1');
+});
+
 test('expenses from both sides are merged by id, not replaced wholesale', () => {
   const server = [{
     date: '2026-01-01', updatedAt: 1000,
