@@ -587,35 +587,42 @@ function PlaceholderPane({ tabId, calendarName }) {
  * absorbs 5 old screens (docs/design-renewal-handoff.md §2) -- the other 4 tabs stay flat.
  */
 /**
- * Builds the 기록 tab's real ingredients (WP-06 continuation, 보관함 + 장소 + 메모 subtabs).
- * Straight pass-through of the same values/handlers `app-main.js`'s own `activeView === 'history'`
- * / `activeView === 'places'` / `activeView === 'memo'` render blocks already use -- person-tag
- * management, travel-memory group hide/restore/remove, photo comments, the shared gallery photo
- * index (`galleryPhotoIndex`), place save/delete/search, and the memo list/share/tag-filter
- * pass-throughs, all pre-existing. `onLoadMoreMemos` is composed in `app-main.js`'s own adapter
- * call (it needs `MEMOS_PAGE_SIZE`, a module-level constant only in scope there) and handed
- * through already-built.
+ * Builds the 기록 tab's real ingredients (WP-06 continuation, 사진·영상 + 보관함 + 장소 + 메모
+ * subtabs). Straight pass-through of the same values/handlers `app-main.js`'s own
+ * `activeView === 'gallery'` / `activeView === 'history'` / `activeView === 'places'` /
+ * `activeView === 'memo'` render blocks already use -- `ChatGalleryModal` itself is unchanged,
+ * just rendered with `asPage: true` the same way the original call site does for its full-page
+ * (non-modal) form; person-tag management, travel-memory group hide/restore/remove, photo
+ * comments, the shared gallery photo index (`galleryPhotoIndex`), place save/delete/search, and
+ * the memo list/share/tag-filter pass-throughs, all pre-existing. `onLoadMoreMemos` is composed in
+ * `app-main.js`'s own adapter call (it needs `MEMOS_PAGE_SIZE`, a module-level constant only in
+ * scope there) and handed through already-built.
  */
 export function buildRenewalRecordsContext(calendar, deps) {
   const {
-    activeCal, showToast, showConfirmDialog, isDarkTheme, toggleTheme, fontScalePercent, setFontScalePercent,
+    activeCal, galleryChatMessages, galleryMemos, showToast, showConfirmDialog,
+    handleUploadGalleryImages, handleAddGalleryLink, handleAddGalleryFiles, handleDeleteGalleryFiles,
+    handleDeleteGalleryLinks, handlePasteGatherPhoto, handlePasteGatherPhotos,
+    setActiveLightbox, handleDeletePhoto, photoCommentCounts, galleryPhotoIndex,
+    hasMoreOlderChat, fullChatMessages, loadingOlderChat, loadOlderChatMessages,
+    hasMoreMemos, setMemosLimit, MEMOS_PAGE_SIZE,
+    isDarkTheme, toggleTheme, fontScalePercent, setFontScalePercent,
     mainNotifPermission, mainChatNotifyEnabled, handleMainToggleNotifications,
-    syncStatus, isHistoryShareOpen, setIsHistoryShareOpen,
+    syncStatus, isGalleryShareOpen, setIsGalleryShareOpen,
+    isHistoryShareOpen, setIsHistoryShareOpen,
     handleAddPersonTag, handleRenamePersonTag, handleDeletePersonTag,
-    anniversaries, galleryChatMessages, historyMemosSnapshot, setActiveLightbox,
+    anniversaries, historyMemosSnapshot,
     handlePromoteInlineChatImage, handleSaveImageTags, handleSearchTag,
-    handleDeletePhoto, handleReplacePhoto,
+    handleReplacePhoto,
     handleJumpToChatMessage, handleJumpToMemo, handleJumpToMeetingDate,
     handleGetChatMessageOrdinal, handleGetGalleryPhotoOrdinal,
     handleRemovePhotoFromTravelMemory, handleRemovePhotosFromTravelMemory,
     handleHideMemoryGroup, handleRestoreMemoryGroup, handleAddPhotosBackToTravelMemory,
     handleFetchPhotoComments, handleSavePhotoComments, handleFetchMeetingPhotoIndex,
-    galleryPhotoIndex, photoCommentCounts,
     handleSavePlace, handleDeletePlace,
     placesInitialQuery, setPlacesInitialQuery, placesInitialFocusId, setPlacesInitialFocusId,
     isPlacesShareOpen, setIsPlacesShareOpen,
-    memos, hasMoreMemos, totalMemoCount, onLoadMoreMemos, sharedMemo, setSharedMemo,
-    chatMessages,
+    memos, totalMemoCount, onLoadMoreMemos, sharedMemo, setSharedMemo, chatMessages,
     patchLocalMemo, upsertLocalMemo, removeLocalMemo, memoInitialTag, setMemoInitialTag,
     isMemoShareOpen, setIsMemoShareOpen,
   } = deps || {};
@@ -627,6 +634,39 @@ export function buildRenewalRecordsContext(calendar, deps) {
   return {
     calendar: activeCal,
     showToast,
+    mediaProps: {
+      calendar: activeCal,
+      chatMessages: galleryChatMessages, memos: galleryMemos,
+      asPage: true,
+      onUploadImages: handleUploadGalleryImages, onAddLink: handleAddGalleryLink,
+      onAddFiles: handleAddGalleryFiles, onDeleteFiles: handleDeleteGalleryFiles,
+      onDeleteGalleryLinks: handleDeleteGalleryLinks,
+      onRequestConfirm: showConfirmDialog,
+      onPasteGatherPhoto: handlePasteGatherPhoto, onPasteGatherPhotos: handlePasteGatherPhotos,
+      setActiveLightbox, onDeletePhoto: handleDeletePhoto, photoCommentCounts,
+      indexedPhotos: galleryPhotoIndex && galleryPhotoIndex.status === 'ready'
+        ? galleryPhotoIndex.items
+        : (galleryPhotoIndex && galleryPhotoIndex.status === 'fallback' ? null : []),
+      indexedPhotoStatus: galleryPhotoIndex ? galleryPhotoIndex.status : undefined,
+      indexedPhotoTotal: galleryPhotoIndex && galleryPhotoIndex.status === 'ready' ? galleryPhotoIndex.total : null,
+      indexedPhotoPage: galleryPhotoIndex ? galleryPhotoIndex.page : undefined,
+      indexedPhotoLoading: galleryPhotoIndex ? galleryPhotoIndex.loading : undefined,
+      indexedPhotoComplete: galleryPhotoIndex ? galleryPhotoIndex.complete : undefined,
+      onIndexedPhotoPageChange: galleryPhotoIndex ? galleryPhotoIndex.loadPage : undefined,
+      onIndexedPhotoLoadAll: galleryPhotoIndex ? galleryPhotoIndex.loadAll : undefined,
+      hasMoreOlderChat: !Array.isArray(fullChatMessages) && hasMoreOlderChat,
+      loadingOlderChat, onLoadOlderChat: loadOlderChatMessages,
+      hasMoreMemos, onLoadMoreMemos: () => { if (typeof setMemosLimit === 'function') setMemosLimit(prev => prev + MEMOS_PAGE_SIZE); },
+      isDarkTheme, onToggleTheme: toggleTheme, fontScalePercent,
+      onDecreaseFont: () => setFontScalePercent(prev => Math.max(80, prev - 10)),
+      onIncreaseFont: () => setFontScalePercent(prev => Math.min(130, prev + 10)),
+      isChatNotifyEnabled: mainNotifPermission === 'granted' && mainChatNotifyEnabled,
+      onToggleChatNotifications: handleMainToggleNotifications,
+      showToast, syncStatus,
+    },
+    isGalleryShareOpen: !!isGalleryShareOpen,
+    onOpenGalleryShare: () => { if (requireLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsGalleryShareOpen(true); },
+    onCloseGalleryShare: () => setIsGalleryShareOpen(false),
     historyProps: {
       calendar: activeCal,
       isDarkTheme, onToggleTheme: toggleTheme, fontScalePercent,
@@ -687,6 +727,43 @@ export function buildRenewalRecordsContext(calendar, deps) {
     onOpenMemoShare: () => { if (requireLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsMemoShareOpen(true); },
     onCloseMemoShare: () => setIsMemoShareOpen(false),
   };
+}
+
+/**
+ * 사진·영상 subtab body (WP-06 continuation): the real `ChatGalleryModal` in its `asPage: true`
+ * form, same pass-through approach as `MemoPane`. `ChatGalleryModal` ships in the SAME lazy-loaded
+ * chunk as `ChatRoomView` (`window.__gatherLoadChatUi`), so this waits for that chunk before
+ * rendering -- identical "wait-then-open" step `ChatPane` already uses.
+ */
+function MediaPane({ recordsContext, onChangeView, onOpenAppSettings }) {
+  const React = window.React;
+  const [loaded, setLoaded] = React.useState(() => !!(window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChatGalleryModal));
+  React.useEffect(() => {
+    if (loaded) return undefined;
+    if (typeof window.__gatherLoadChatUi !== 'function') { setLoaded(true); return undefined; }
+    let cancelled = false;
+    window.__gatherLoadChatUi().then(() => { if (!cancelled) setLoaded(true); }).catch(err => {
+      console.error('Gallery UI load failed:', err);
+      if (typeof recordsContext.showToast === 'function') recordsContext.showToast('갤러리 화면을 불러오지 못했습니다. 다시 시도해 주세요.', 'error');
+    });
+    return () => { cancelled = true; };
+  }, [loaded]);
+  if (!loaded) {
+    return React.createElement(EmptyState, { title: '사진·영상 불러오는 중', subtitle: '잠시만 기다려 주세요.' });
+  }
+  const { ChatGalleryModal, ShareModal } = bindUiComponentAliases(React);
+  return React.createElement(React.Fragment, null,
+    React.createElement(ChatGalleryModal, {
+      ...recordsContext.mediaProps,
+      onClose: () => onChangeView('calendar'),
+      onOpenShare: recordsContext.onOpenGalleryShare,
+      onOpenAppSettings,
+    }),
+    recordsContext.isGalleryShareOpen && React.createElement(ShareModal, {
+      calendar: recordsContext.calendar, shareType: 'gallery', showToast: recordsContext.showToast,
+      onClose: recordsContext.onCloseGalleryShare,
+    })
+  );
 }
 
 /**
@@ -837,7 +914,9 @@ function RecordsPane({ subTab, onSelectSubTab, calendarName, recordsContext, cal
         onClick: () => onSelectSubTab(t.id),
       }, t.label))
     ),
-    subTab === 'archive'
+    subTab === 'media'
+      ? React.createElement(MediaPane, { recordsContext, onChangeView, onOpenAppSettings })
+      : subTab === 'archive'
       ? React.createElement(HistoryPane, { recordsContext, calendarContext, onChangeView, onOpenAppSettings, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource })
       : subTab === 'places'
       ? React.createElement(PlacesPane, { recordsContext, calendarContext, onChangeView, onOpenAppSettings, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource })
