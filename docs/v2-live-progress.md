@@ -66,3 +66,10 @@
 - 수정: 더보기 안내 문구를 실제 동작과 일치하도록 갱신, 준비 중 문구의 내부 WP 노출 제거
 - 수정: 로딩 상태에 접근 가능한 스피너와 `prefers-reduced-motion` 대응 추가
 - 검증 예정: lint/build 및 Pages 배포 후 V2 기록·더보기 화면 확인
+
+## 2026-09-14 13:08 KST
+
+- 유닛: PC·모바일 3개 캘린더(kkot/cw/jhair) 브라우저 회귀 스모크
+- 결과: Chromium 94/0, Firefox 93/0 통과. WebKit은 장소·갤러리 전환에서 Firestore `INTERNAL ASSERTION FAILED: Unexpected state`와 `Unexpected token '<'`가 반복되어 실패(19건).
+- 판단: Chromium/Firefox 공통 기능 회귀는 확인되지 않았고, WebKit에서 Firestore Listen 취소·로컬 HTTP 프리뷰 응답 파싱 문제가 집중됨. 실패를 무시하지 않고 WebKit 단독 재현/원인 분리 대상으로 승격.
+- 안전 조치: 데이터 쓰기·삭제 없이 읽기 전용으로 수행. 코드 변경 없이 현상 기록.
