@@ -206,3 +206,8 @@
 - 소규모 접근성 유닛: 외부 미디어 fallback 포커스 표시
 - 수정: `다시 시도` 버튼과 출처 링크에 `:focus-visible` 고대비 outline 추가.
 - 검증: lint·design-rules·accessibility-safety 통과.
+
+## 2026-09-14 20:40 KST
+
+- 접근성 보완 후 운영 회귀 검증
+- 결과: production build 성공, Chromium 94/94 통과(PC·모바일·저속 3G·세 캘린더).
