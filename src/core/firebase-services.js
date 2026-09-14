@@ -97,7 +97,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
 
   function isChatChannelMessage(msg) {
     const source = String(msg && msg.uploadSource || '').trim().toLowerCase();
-    return !source || source === 'chat';
+    return !source || source === 'chat' || source === 'meme';
   }
 
   async function fetchChatMessagesRest(calId) {
@@ -187,7 +187,7 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
     try {
       if (firebaseDb) {
         const snap = await withSdkTimeout(firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
-          .where('uploadSource', '==', 'chat').orderBy('timestamp', 'desc').limit(pageSize).get(), FIRESTORE_REST_TIMEOUT_MS);
+          .orderBy('timestamp', 'desc').limit(pageSize).get(), FIRESTORE_REST_TIMEOUT_MS);
         const list = [];
         snap.forEach(function (doc) {
           const message = slimMessage({ id: doc.id, ...doc.data() });
@@ -222,7 +222,6 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ structuredQuery: {
           from: [{ collectionId: 'messages' }],
-          where: { fieldFilter: { field: { fieldPath: 'uploadSource' }, op: 'EQUAL', value: { stringValue: 'chat' } } },
           orderBy: [{ field: { fieldPath: 'timestamp' }, direction: 'DESCENDING' }],
           limit: pageSize
         } })

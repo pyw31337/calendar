@@ -908,9 +908,10 @@ assert(galleryBulkDeleteSource.includes('filterDeletedPhotoFromIndexItems'), 'ph
 assert(domainHelpersScript.includes('fileAttachments'), 'message sanitizer must preserve fileAttachments');
 const chatFilesUi = fs.readFileSync('src/ui/ui-chat-files.js', 'utf8');
 assert(chatFilesUi.includes('DocumentLightbox') && chatFilesUi.includes('FileAttachmentCard'), 'document lightbox and attachment cards must ship');
-// Chat and media now have independent read paths: recent chat is server-scoped, while gallery
-// preview/full-history and the gallery live listener remain unscoped so no media disappears.
-assert(/async function fetchRecentChatMessages[\s\S]{0,2200}?where\('uploadSource', '==', 'chat'\)/.test(firebaseServicesScript), 'recent chat reads must be scoped before applying their bounded limit');
+// Chat and media share a bounded recent read; the render layer removes meeting/gallery uploads
+// while retaining meme-keyboard messages stored with uploadSource=='meme'.
+assert(/async function fetchRecentChatMessages[\s\S]{0,2200}?orderBy\('timestamp', 'desc'\)\.limit\(pageSize\)/.test(firebaseServicesScript), 'recent chat reads must remain bounded before rendering');
+assert(/source === 'chat' \|\| source === 'meme'/.test(firebaseServicesScript), 'recent chat reads must retain meme-keyboard messages');
 assert(/function subscribeMessages[\s\S]{0,1400}?options\.where[\s\S]{0,1400}?q = q\.where/.test(firebaseServicesScript), 'message subscriptions must support an explicit channel scope');
 assert(/async function fetchRecentGalleryMessages[\s\S]{0,1800}?collection\('messages'\)[\s\S]{0,300}?orderBy\('timestamp'/.test(firebaseServicesScript), 'gallery preview must retain its independent unscoped media read');
 assert(appMainSource.includes('fetchRecentGalleryMessages(activeCalId, 18)'), 'desktop main gallery preview must hydrate enough media for its 18-thumbnail cap');
