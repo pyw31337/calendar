@@ -35,6 +35,7 @@ const chatGallery = read('src/ui/ui-chat-gallery.js');
 requireText(chatGallery, /\(!isBulkShareMode \|\| !isMobile\) && renderVisitFilterToggleMobile\(\)/, 'gallery must hide 전체|일자 only on mobile edit; PC keeps the tabs');
 requireText(chatGallery, /getListEditTextBtnStyle/, 'gallery edit text actions must use the shared compact padding helper');
 if (/padding: isMobile \? '0 6px'/.test(chatGallery)) failures.push('gallery text actions must not use 6px mobile padding that makes 취소 taller than wide');
+requireText(css, /@media \(max-width: 1023px\)\s*\{\s*\.renewal-home-photo-strip\s*\{\s*grid-template-columns:\s*repeat\(3,/, 'V2 tablet home gallery must keep a readable 3-column thumbnail grid');
 requireText(picker, /\(!isMemoryListEditMode \|\| !isMobile\) && renderMemoryAllDateToggle\(\)/, 'memories must hide 전체|일자 only on mobile edit');
 requireText(picker, /getListEditTextBtnStyle/, 'memories 취소 must use shared compact padding');
 const placesView = read('src/ui/ui-places.js');
