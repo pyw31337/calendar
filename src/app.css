@@ -6180,8 +6180,8 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 }
 .chat-composer-resize-handle {
   position: absolute;
-  top: 4px;
-  right: 10px;
+  top: 8px;
+  right: 8px;
   width: 28px;
   height: 18px;
   display: grid;
