@@ -94,3 +94,10 @@
 - 수정: WebKit `pageshow`에서 `enableNetwork()` 강제 토글을 생략해 Listen 스트림 assertion 방지; WebKit에서는 MapLibre 벡터 오버레이를 건너뛰고 OSM 래스터 폴백 사용.
 - 검증: WebKit 94/0, lint 통과, 단위 테스트 25/25 통과.
 - 안전성: Chromium/Firefox 경로와 기존 지도 데이터·Firestore 데이터는 변경하지 않음.
+
+## 2026-09-14 14:10 KST
+
+- 유닛 완료: WebKit 장소 지도 재검증
+- 수정: WebKit에서 선택적 MapLibre 벡터 오버레이를 비활성화하고 기존 OSM 래스터 폴백 유지.
+- 검증: WebKit 전체 94/94 통과(장소 PC·모바일 포함), `Unexpected token '<'` 0건.
+- 다음: 세 캘린더 사진·댓글·태그 실데이터 회귀 및 V2 최종 판정.
