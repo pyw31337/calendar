@@ -1528,7 +1528,7 @@ export function ClickToPlayVideoCard({ url, mediaInfo = null, fallbackTitle = ''
   const thumbnailUrl = previewData?.image || '';
 
   // Active playing state for YouTube / direct video
-  if (isPlaying) {
+  if (isPlaying || (isDirectVideo && info.autoPlay)) {
     if (isEmbed) {
       const embedUrl = info.url + (info.url.includes('?') ? '&autoplay=1&playsinline=1' : '?autoplay=1&playsinline=1');
       return /*#__PURE__*/React.createElement("div", {
@@ -1561,6 +1561,8 @@ export function ClickToPlayVideoCard({ url, mediaInfo = null, fallbackTitle = ''
         src: info.url,
         controls: true,
         autoPlay: true,
+        muted: !!info.autoPlay,
+        loop: !!info.autoPlay,
         playsInline: true,
         style: {
           display: 'block',

@@ -2222,6 +2222,10 @@ function getDirectChatMediaInfo(url) {
     try {
       const parsed = new URL(candidate);
       const path = decodeURIComponent(parsed.pathname || '').toLowerCase();
+      const host = parsed.hostname.replace(/^www\./i, '').toLowerCase();
+      // Naver Blog video CDN may keep a `.gif` path while returning video/mp4 when
+      // `type=mp4...` is requested. Treat the response form as video, not as a still image.
+      if (host === 'mblogvideo-phinf.pstatic.net' && /^mp4/i.test(parsed.searchParams.get('type') || '')) return 'video';
       if (imageExtensions.some(ext => path.endsWith(ext))) return 'image';
       if (videoExtensions.some(ext => path.endsWith(ext))) return 'video';
     } catch (e) {
@@ -2294,7 +2298,7 @@ function getDirectChatMediaInfo(url) {
 
   for (const candidate of candidates) {
     const type = getExtensionType(candidate);
-    if (type) return { type, url: normalizedUrl, playsInline: type === 'video' };
+    if (type) return { type, url: normalizedUrl, playsInline: type === 'video', autoPlay: type === 'video' && /mblogvideo-phinf\.pstatic\.net/i.test(normalizedUrl) };
   }
   return null;
 }
