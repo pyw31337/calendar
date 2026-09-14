@@ -268,3 +268,8 @@
 - 라이브 전체 경로 smoke 재검증: cw/kkot/jhair 캘린더·채팅·메모·장소·갤러리·관리자·공유 경로 200
 - 정적 Vite 청크 및 핵심 Cloud Functions probe 통과
 - 판정: `cae173ce` 태블릿 썸네일 변경 이후 운영 회귀 없음
+## 2026-09-14 15:50 KST
+
+- 브라우저 전체 회귀 완료: Chromium 94/94, Firefox 93/93, WebKit 93/93 통과
+- PC·모바일 및 `cw·kkot·jhair` 주요 화면/메뉴 전환·저속 3G 부팅 검증 완료
+- Firebase safety test 통과, 외부 리소스 경고는 테스트 fixture의 의도된 경고로 기능 실패 아님
