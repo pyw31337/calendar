@@ -73,3 +73,10 @@
 - 결과: Chromium 94/0, Firefox 93/0 통과. WebKit은 장소·갤러리 전환에서 Firestore `INTERNAL ASSERTION FAILED: Unexpected state`와 `Unexpected token '<'`가 반복되어 실패(19건).
 - 판단: Chromium/Firefox 공통 기능 회귀는 확인되지 않았고, WebKit에서 Firestore Listen 취소·로컬 HTTP 프리뷰 응답 파싱 문제가 집중됨. 실패를 무시하지 않고 WebKit 단독 재현/원인 분리 대상으로 승격.
 - 안전 조치: 데이터 쓰기·삭제 없이 읽기 전용으로 수행. 코드 변경 없이 현상 기록.
+
+## 2026-09-14 13:28 KST
+
+- WebKit 단독 재현 및 transport 플래그 실험
+- 결과: Apple WebKit 자동감지를 강제 장기폴링으로 바꿔도 Firestore assertion이 재현되고 채팅 오류 범위가 증가함.
+- 조치: 실험 변경 즉시 원복하여 운영 코드에 미반영. 단순 transport 설정 변경은 해결책으로 확정하지 않음.
+- 다음: WebKit에서 중복 초기화·리스너 취소 순서를 추적하고, 재현 가능한 최소 수정만 별도 유닛으로 검증.
