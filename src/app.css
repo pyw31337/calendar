@@ -6036,7 +6036,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 }
 .renewal-home-hero {
   width: calc(100% - 24px); max-width: var(--renewal-page-max); box-sizing: border-box;
-  margin: 14px auto 0; padding: 14px; border-radius: 20px;
+  margin: 0 auto; padding: 14px; border-radius: 0 0 20px 20px;
   background: linear-gradient(120deg, #4c1d95 0%, #7c3aed 48%, #0d9488 100%);
   box-shadow: 0 14px 28px rgba(76, 29, 149, .2); color: #fff;
 }
@@ -6165,7 +6165,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 /* Tablet and phone summaries keep the requested 3-column thumbnail rhythm so a 3x3
    first viewport remains readable instead of collapsing into six tiny tiles. */
 @media (max-width: 1023px) { .renewal-home-photo-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (min-width: 1024px) { .renewal-home-hero { margin-top: 20px; padding: 16px 20px 14px; } .renewal-home-hero-chip { min-width: 108px; } }
+@media (min-width: 1024px) { .renewal-home-hero { margin-top: 0; padding: 16px 20px 14px; border-radius: 0 0 18px 18px; } .renewal-home-hero-chip { min-width: 108px; } }
 .renewal-records-overview-subtitle { margin: -2px 0 16px; color: var(--text-muted, #64748b); font-size: .84rem; }
 .renewal-records-overview-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .renewal-records-overview-card { display: flex; align-items: center; gap: 10px; min-height: 104px; padding: 14px; border: 1px solid var(--border, #e2e8f0); border-radius: 16px; background: var(--surface, #fff); color: inherit; text-align: left; cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; }
@@ -6308,7 +6308,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
     max-width: var(--renewal-page-max);
     margin: 0 auto;
     border: 1px solid rgba(255, 255, 255, .2);
-    border-radius: 18px;
+    border-radius: 18px 18px 0 0;
   }
   .renewal-shell-main.is-calendar > .calendar-card,
   .renewal-shell-main.is-calendar > .renewal-shell-section,
