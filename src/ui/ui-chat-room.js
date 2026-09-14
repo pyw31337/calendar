@@ -247,6 +247,7 @@ export function ChatRoomView({
     } catch (_) { return 44; }
   });
   const composerResizeRef = React.useRef(null);
+  const textareaScrollRestoreRef = React.useRef(null);
   const chatComposerRef = React.useRef(null);
   const [isInputFocused, setIsInputFocused] = React.useState(false);
   // 밈 키보드: 입력 중인 텍스트가 memePool의 해시태그와 겹치면 "#태그 (n)" 칩을 보여주고,
@@ -594,6 +595,16 @@ export function ChatRoomView({
     setComposerInputHeight(next);
   };
   const endComposerResize = () => { composerResizeRef.current = null; };
+
+  // Tag/meme matching causes a controlled-textarea rerender. Preserve the caret's lower
+  // scroll position across that rerender so the viewport never jumps to the first line.
+  React.useLayoutEffect(() => {
+    const restore = textareaScrollRestoreRef.current;
+    const el = chatTextareaRef.current;
+    if (!restore || !el) return;
+    el.scrollTop = restore.keepBottom ? el.scrollHeight : restore.scrollTop;
+    textareaScrollRestoreRef.current = null;
+  }, [chatInput, memeMatches]);
 
   const docFileInputRefChat = React.useRef(null);
   const [imageProcessingChat, setImageProcessingChat] = React.useState(null);
@@ -1678,6 +1689,12 @@ export function ChatRoomView({
           }, 50);
         },
         onChange: e => {
+          const textarea = e.target;
+          const distanceFromBottom = textarea.scrollHeight - textarea.scrollTop - textarea.clientHeight;
+          textareaScrollRestoreRef.current = {
+            scrollTop: textarea.scrollTop,
+            keepBottom: distanceFromBottom < 24 || textarea.selectionStart >= textarea.value.length,
+          };
           setChatInput(e.target.value);
           announceTyping(e.target.value);
           autoGrowTextarea(e.target, 100);
