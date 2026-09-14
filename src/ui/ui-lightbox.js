@@ -608,6 +608,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   const [imageDimensions, setImageDimensions] = React.useState({});
   const [displayUrls, setDisplayUrls] = React.useState(urls);
   const [loadedOriginalUrls, setLoadedOriginalUrls] = React.useState(() => new Set());
+  const [failedOriginalUrls, setFailedOriginalUrls] = React.useState(() => new Set());
   const [imageLoadFailed, setImageLoadFailed] = React.useState(false);
   // Zoom is PC-only -- mobile already has native pinch-to-zoom on the image, and a live
   // matchMedia listener (not a one-time read) so the buttons correctly appear/disappear if a
@@ -764,14 +765,16 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   const [tagOverrides, setTagOverrides] = React.useState({});
   const currentMeta = Array.isArray(meta) ? (meta[index] || {}) : (meta || {});
   const currentThumbUrl = String(currentMeta?.thumb || currentMeta?.thumbUrl || '').trim();
-  const currentVisualUrl = currentThumbUrl && currentThumbUrl !== currentUrl && !loadedOriginalUrls.has(currentUrl)
+  const currentVisualUrl = currentThumbUrl && currentThumbUrl !== currentUrl
+    && !loadedOriginalUrls.has(currentUrl) && !failedOriginalUrls.has(currentUrl)
     ? currentThumbUrl
     : currentUrl;
   // Paint the already-loaded thumbnail immediately, then swap in the original only after its
   // bytes decode. Date-group lightboxes often point at older Storage objects, so binding the
   // visible <img> directly to the original left a dark blank stage on slow/mobile networks.
   React.useEffect(() => {
-    if (!currentUrl || !currentThumbUrl || currentThumbUrl === currentUrl || loadedOriginalUrls.has(currentUrl)) return undefined;
+    if (!currentUrl || !currentThumbUrl || currentThumbUrl === currentUrl
+      || loadedOriginalUrls.has(currentUrl) || failedOriginalUrls.has(currentUrl)) return undefined;
     let cancelled = false;
     const original = new Image();
     original.decoding = 'async';
@@ -784,7 +787,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     };
     original.src = currentUrl;
     return () => { cancelled = true; original.onload = null; };
-  }, [currentUrl, currentThumbUrl, loadedOriginalUrls]);
+  }, [currentUrl, currentThumbUrl, loadedOriginalUrls, failedOriginalUrls]);
   // Never trust a duplicated legacy identity when the rendered assets are different.  A few
   // upload/import paths historically copied the first image's messageId/imageIndex into every
   // metadata row; using that key here made one Firestore comment document appear on the whole
@@ -1550,6 +1553,13 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
       setLoadedOriginalUrls(prev => new Set(prev).add(currentUrl));
       return;
     }
+    // If the original URL expired or was blocked, keep the already-valid
+    // thumbnail visible instead of replacing the whole photo with an error card.
+    if (currentThumbUrl && currentThumbUrl !== currentUrl) {
+      setFailedOriginalUrls(prev => new Set(prev).add(currentUrl));
+      setImageLoadFailed(false);
+      return;
+    }
     setImageLoadFailed(true);
   };
 
@@ -1756,7 +1766,8 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     const slideIndex = slot === 'prev' ? index - 1 : (slot === 'next' ? index + 1 : index);
     const slideMeta = Array.isArray(meta) ? (meta[slideIndex] || {}) : (meta || {});
     const slideThumb = String(slideMeta.thumb || slideMeta.thumbUrl || '').trim();
-    const visualUrl = slideThumb && slideThumb !== url && !loadedOriginalUrls.has(url) ? slideThumb : url;
+    const visualUrl = slideThumb && slideThumb !== url
+      && !loadedOriginalUrls.has(url) && !failedOriginalUrls.has(url) ? slideThumb : url;
 
     if (slot === 'current') {
       if (imageLoadFailed) {
