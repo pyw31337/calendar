@@ -234,6 +234,14 @@
 - 결과: check:all·Firebase safety·production build·dist budget 전부 통과. lint 경고 0, 단위 테스트 27/27, npm audit 취약점 0.
 - 판정: 현재 메인 상태는 안전한 배포 기준 충족. 추가 기능은 별도 유닛/브랜치로 진행.
 
+## 2026-09-14 16:55 KST
+
+- P1 유닛: V2 캘린더 홈 갤러리 요약 인덱스 연결 보완
+- 원인: 사진 인덱스 훅이 `gallery`·`history` 화면에서만 조회되어 캘린더 홈의 갤러리 스트립이 항상 빈 상태로 남음
+- 수정: 캘린더 홈에서도 canonical `photoIndex` 1페이지를 warm-up 조회해 최근 썸네일 6개를 동일 인덱스 계약으로 표시
+- 검증: lint·단위 테스트 27/27·production build·dist budget 통과, Pages 배포 성공, `cw&shell=v2` 라이브에서 사진 버튼 6개 및 빈 상태 문구 미표시 확인
+- 커밋: `091b8149`
+
 ## 2026-09-14 19:10 KST
 
 - 최종 라이브 smoke 계약 보정
