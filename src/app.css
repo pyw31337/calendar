@@ -6120,6 +6120,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 .external-media-fallback { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; padding: 8px 10px; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); background: var(--bg-primary); color: var(--text-muted); font-size: var(--font-size-sm); text-decoration: none; }
 .external-media-fallback:hover { color: var(--brand); border-color: var(--brand); }
 .external-media-fallback .external-media-retry { border: 0; border-radius: var(--radius-sm); padding: 4px 8px; background: var(--brand); color: #fff; font-size: var(--font-size-xs); cursor: pointer; }
+.external-media-fallback a:focus-visible, .external-media-fallback .external-media-retry:focus-visible { outline: 3px solid color-mix(in srgb, var(--brand) 55%, #fff); outline-offset: 2px; }
 .chat-typing-name {
   flex-shrink: 0;
   margin-top: 2px;

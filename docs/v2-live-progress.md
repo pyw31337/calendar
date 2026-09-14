@@ -200,3 +200,9 @@
 - 추가 점검: 전체 검색 하이라이트·V2 디자인 시스템 계약
 - 결과: 캘린더/채팅/메모/장소/보관함/관리자 검색이 공통 하이라이트 헬퍼를 사용하며, 디자인 토큰·모바일 입력 규격·공유/라이트박스 구조 규칙이 모두 통과.
 - 검증: `check:design-rules`, `check:design-system` 통과. 코드 변경 없음.
+
+## 2026-09-14 20:00 KST
+
+- 소규모 접근성 유닛: 외부 미디어 fallback 포커스 표시
+- 수정: `다시 시도` 버튼과 출처 링크에 `:focus-visible` 고대비 outline 추가.
+- 검증: lint·design-rules·accessibility-safety 통과.
