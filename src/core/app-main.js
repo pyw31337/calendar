@@ -1427,8 +1427,11 @@ function CalendarApp() {
     // ascending order for rendering.
     let hasSeenInitialChatSnapshot = false;
     let lastNotifiedMessageId = null;
+    // Do not constrain the realtime query to uploadSource=='chat': meme-keyboard messages are
+    // intentional chat content but carry uploadSource=='meme'. Meeting/gallery uploads are
+    // removed by the existing client-side isChatRenderableMessage filter, so querying the
+    // bounded newest window here preserves both kinds without leaking non-chat media.
     const unsubscribeChat = subscribeMessages(activeCalId, {
-      where: ['uploadSource', '==', 'chat'],
       orderBy: 'timestamp', direction: 'desc', limit: chatLimit
     }, snapshot => {
         if (!isMounted) return;
