@@ -276,6 +276,25 @@ function UpcomingMeetingsSection({ meetings, onSelectDate }) {
   );
 }
 
+/** Compact hero zone from the approved BentoPink reference: one primary D-day plus
+ * horizontally-scannable upcoming chips. It is presentation-only and reuses the same
+ * confirmed meeting selector as the list below. */
+function RenewalHero({ meetings, onSelectDate }) {
+  const React = window.React;
+  if (!meetings || meetings.length === 0) return null;
+  const [primary, ...rest] = meetings;
+  return React.createElement('section', { className: 'renewal-home-hero', 'aria-label': '가까운 확정 일정' },
+    React.createElement('button', { type: 'button', className: 'renewal-home-hero-primary', onClick: () => onSelectDate(primary.date) },
+      React.createElement('span', { className: 'renewal-home-hero-dday' }, formatDDayLabel(primary.date)),
+      React.createElement('span', { className: 'renewal-home-hero-label' }, formatConfirmedMeetingLabel(primary.date)),
+      React.createElement('span', { className: 'renewal-home-hero-arrow', 'aria-hidden': 'true' }, '›')
+    ),
+    rest.length > 0 && React.createElement('div', { className: 'renewal-home-hero-chips' }, rest.map(meeting => React.createElement('button', {
+      key: meeting.date, type: 'button', className: 'renewal-home-hero-chip', onClick: () => onSelectDate(meeting.date)
+    }, React.createElement('strong', null, formatConfirmedMeetingLabel(meeting.date)), React.createElement('small', null, formatDDayLabel(meeting.date)))))
+  );
+}
+
 /**
  * "응답 필요" home summary (master-plan.md §4.2/§5.3): "활성 투표가 없으면 큰 빈 카드를 표시하지
  * 않는다" -- so this section renders nothing unless `hasVisiblePolls` is true. Embeds the real,
@@ -325,6 +344,7 @@ function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeVie
   const [monthDate, setMonthDate] = React.useState(() => new Date());
   const onParticipantClick = (name, dateStr) => { if (dateStr) onOpenDate(dateStr); };
   return React.createElement(React.Fragment, null,
+    React.createElement(RenewalHero, { meetings: calendarContext.upcomingMeetings, onSelectDate: onOpenDate }),
     React.createElement(CalendarGrid, {
       anniversaries: calendarContext.anniversaries,
       calendar: calendarContext.calendar,
