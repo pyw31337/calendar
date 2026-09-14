@@ -596,7 +596,9 @@ function SettlementPane({ settlementContext, onChangeView, onOpenAppSettings, on
  */
 function EmptyState({ icon, title, subtitle }) {
   const React = window.React;
+  const isLoading = /불러오는 중|로딩/.test(String(title || ''));
   return React.createElement('div', { className: 'renewal-shell-placeholder' },
+    isLoading && React.createElement('span', { className: 'renewal-shell-loading-spinner', role: 'status', 'aria-label': '불러오는 중' }),
     icon && React.createElement('div', { className: 'renewal-shell-placeholder-icon' }, icon),
     React.createElement('div', { className: 'renewal-shell-placeholder-title' }, title),
     React.createElement('div', { className: 'renewal-shell-placeholder-sub' }, subtitle)
@@ -614,7 +616,7 @@ function PlaceholderPane({ tabId, calendarName }) {
   return React.createElement(EmptyState, {
     icon: React.createElement(TabIcon, { id: tabId }),
     title: `${label} (준비 중)`,
-    subtitle: withCalendarPrefix(calendarName, 'WP-03~07에서 실제 데이터가 이 자리에 연결됩니다.'),
+    subtitle: withCalendarPrefix(calendarName, '이 기능은 준비가 끝나는 대로 이 화면에서 제공됩니다.'),
   });
 }
 
@@ -1342,7 +1344,7 @@ function MorePane({ calendarName, onSelectItem, selectedItem }) {
       ))
     ),
     React.createElement('div', { className: 'renewal-shell-placeholder-sub renewal-shell-more-note' },
-      calendarName ? `${calendarName} · 검색은 아직 준비 중입니다.` : '검색은 아직 준비 중입니다.')
+    calendarName ? `${calendarName} · 검색과 설정은 위 메뉴에서 바로 열 수 있습니다.` : '검색과 설정은 위 메뉴에서 바로 열 수 있습니다.')
   );
 }
 
