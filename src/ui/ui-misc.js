@@ -41,6 +41,16 @@ function readCurrentUpdateBuildId() {
   return null;
 }
 
+function reloadForLatestBuild() {
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.set('_update', `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+    window.location.assign(url.toString());
+  } catch (_) {
+    window.location.reload();
+  }
+}
+
 export function UpdateAvailableBanner() {
   const React = window.React;
 
@@ -97,7 +107,7 @@ export function UpdateAvailableBanner() {
     /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 } },
       /*#__PURE__*/React.createElement("button", {
         type: "button",
-        onClick: () => window.location.reload(),
+        onClick: reloadForLatestBuild,
         style: {
           backgroundColor: '#4F46E5', color: '#FFFFFF', border: 'none', borderRadius: 'var(--radius-md)',
           padding: '6px 14px', fontSize: 'var(--font-size-md)', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap'
