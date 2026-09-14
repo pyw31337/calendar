@@ -1427,11 +1427,8 @@ function CalendarApp() {
     // ascending order for rendering.
     let hasSeenInitialChatSnapshot = false;
     let lastNotifiedMessageId = null;
-    // Do not constrain the realtime query to uploadSource=='chat': meme-keyboard messages are
-    // intentional chat content but carry uploadSource=='meme'. Meeting/gallery uploads are
-    // removed by the existing client-side isChatRenderableMessage filter, so querying the
-    // bounded newest window here preserves both kinds without leaking non-chat media.
     const unsubscribeChat = subscribeMessages(activeCalId, {
+      where: ['uploadSource', '==', 'chat'],
       orderBy: 'timestamp', direction: 'desc', limit: chatLimit
     }, snapshot => {
         if (!isMounted) return;
@@ -1463,9 +1460,36 @@ function CalendarApp() {
         });
       });
 
+    // Meme-keyboard uploads are chat messages too, but are stored with uploadSource=='meme'.
+    // Keep the dedicated chat channel above (important for bounded realtime reads) and merge
+    // this small companion channel into the same render list instead of broadening the query.
+    const unsubscribeMeme = subscribeMessages(activeCalId, {
+      where: ['uploadSource', '==', 'meme'],
+      orderBy: 'timestamp', direction: 'desc', limit: chatLimit
+    }, snapshot => {
+      if (!isMounted) return;
+      const memeList = [];
+      snapshot.forEach(doc => {
+        memeList.push(slimMessageForClient({ id: doc.id, ...doc.data() }));
+      });
+      memeList.reverse();
+      if (!memeList.length) return;
+      setChatMessages(prev => {
+        const byId = new Map((Array.isArray(prev) ? prev : []).map(message => [message.id, message]));
+        memeList.forEach(message => byId.set(message.id, message));
+        return Array.from(byId.values()).sort((a, b) =>
+          (Number(a.timestamp) || 0) - (Number(b.timestamp) || 0)
+          || String(a.id || '').localeCompare(String(b.id || '')));
+      });
+      invalidateGalleryItemCount(activeCalId);
+    }, err => {
+      console.warn(`Firestore meme chat subscription error:`, err);
+    });
+
     return () => {
       isMounted = false;
       if (unsubscribeChat) unsubscribeChat();
+      if (unsubscribeMeme) unsubscribeMeme();
     };
   // Re-run when the Firebase bootstrap/retry loop recovers the SDK after the first
   // render. Without this dependency, a page that initially fell back to REST never

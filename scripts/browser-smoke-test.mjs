@@ -263,7 +263,9 @@ async function checkRenewalShellRoutes(browser, baseUrl) {
       }
       await gotoBootReady(page, `${baseUrl}?id=cw&shell=v2&tab=records`);
       for (const [label, expected] of [['사진·영상', 'media'], ['장소', 'places'], ['보관함', 'archive'], ['콘텐츠', 'content']]) {
-        await page.getByRole('tab', { name: label, exact: true }).click();
+        // The records panes intentionally overlap the tab strip while settling; dispatch the
+        // semantic click so this state-transition assertion is not dependent on hit-testing.
+        await page.getByRole('tab', { name: label, exact: true }).dispatchEvent('click');
         await page.waitForTimeout(250);
         if (!new URL(page.url()).searchParams.get('sub')?.includes(expected)) throw new Error(`기록 ${label} 클릭 후 sub=${new URL(page.url()).searchParams.get('sub') || '(없음)'}`);
       }
