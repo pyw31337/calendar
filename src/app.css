@@ -6172,4 +6172,12 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
   }
   .renewal-shell-side-nav-item:hover { background: var(--bg-primary, #f8fafc); }
   .renewal-shell-side-nav-item.is-active { background: var(--brand-soft, #eef2ff); color: var(--brand, #4f46e5); }
+  .renewal-shell-side-nav-divider { height: 1px; margin: 12px 8px 6px; background: var(--border-subtle, #e2e8f0); }
+  .renewal-shell-side-nav-quick-item {
+    display: flex; align-items: center; gap: 9px; text-align: left; background: none; border: none;
+    padding: 8px 10px; border-radius: 9px; font-weight: 600; font-size: 0.76rem;
+    color: var(--text-muted, #64748b); cursor: pointer; font-family: inherit;
+  }
+  .renewal-shell-side-nav-quick-item:hover { background: var(--bg-primary, #f8fafc); color: var(--text-main, #0f172a); }
+  .renewal-shell-side-nav-quick-dot { width: 16px; text-align: center; color: var(--brand, #4f46e5); font-size: 1rem; line-height: 1; }
 }

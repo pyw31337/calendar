@@ -32,6 +32,13 @@ const TABS = [
   { id: 'settlement', label: '정산' },
   { id: 'more', label: '더보기' },
 ];
+const DESKTOP_QUICK_ITEMS = [
+  { id: 'manual', label: '사용자 매뉴얼' },
+  { id: 'calendar-settings', label: '캘린더 설정' },
+  { id: 'anniversaries', label: '기념일 설정' },
+  { id: 'share', label: '공유' },
+  { id: 'app-settings', label: '설정' },
+];
 const TAB_IDS = TABS.map(t => t.id);
 const DEFAULT_TAB = 'calendar';
 
@@ -1568,12 +1575,20 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
       React.createElement('span', { className: 'renewal-shell-nav-label' }, tab.label)
     )
   );
+  const desktopQuickButtons = DESKTOP_QUICK_ITEMS.map(item => React.createElement('button', {
+    key: item.id,
+    type: 'button',
+    className: 'renewal-shell-side-nav-quick-item',
+    onClick: () => openMoreModalById(item.id),
+  }, React.createElement('span', { className: 'renewal-shell-side-nav-quick-dot', 'aria-hidden': 'true' }, '•'), item.label));
 
   return React.createElement(React.Fragment, null,
     React.createElement('div', { className: 'renewal-shell' },
       React.createElement('nav', { className: 'renewal-shell-side-nav', 'aria-label': '주 메뉴' },
         React.createElement('div', { className: 'renewal-shell-side-nav-brand' }, calendarName || '모여라 캘린더'),
-        ...navButtons('renewal-shell-side-nav-item')
+        ...navButtons('renewal-shell-side-nav-item'),
+        React.createElement('div', { className: 'renewal-shell-side-nav-divider', 'aria-hidden': 'true' }),
+        ...desktopQuickButtons
       ),
       React.createElement('main', { className: 'renewal-shell-main' },
         React.createElement(TopHeader, {
