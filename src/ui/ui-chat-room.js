@@ -247,6 +247,7 @@ export function ChatRoomView({
     } catch (_) { return 44; }
   });
   const composerResizeRef = React.useRef(null);
+  const memeTagDragRef = React.useRef(null);
   const textareaScrollRestoreRef = React.useRef(null);
   const chatComposerRef = React.useRef(null);
   const [isInputFocused, setIsInputFocused] = React.useState(false);
@@ -595,6 +596,20 @@ export function ChatRoomView({
     setComposerInputHeight(next);
   };
   const endComposerResize = () => { composerResizeRef.current = null; };
+  const beginMemeTagDrag = (event) => {
+    const row = event.currentTarget;
+    memeTagDragRef.current = { startX: event.clientX, startScroll: row.scrollLeft, moved: false };
+    if (row.setPointerCapture) row.setPointerCapture(event.pointerId);
+  };
+  const moveMemeTagDrag = (event) => {
+    const row = event.currentTarget;
+    const drag = memeTagDragRef.current;
+    if (!drag) return;
+    const delta = event.clientX - drag.startX;
+    if (Math.abs(delta) > 3) drag.moved = true;
+    row.scrollLeft = drag.startScroll - delta;
+  };
+  const endMemeTagDrag = () => { memeTagDragRef.current = null; };
 
   // Tag/meme matching causes a controlled-textarea rerender. Preserve the caret's lower
   // scroll position across that rerender so the viewport never jumps to the first line.
@@ -1580,7 +1595,11 @@ export function ChatRoomView({
       },
         /*#__PURE__*/React.createElement("div", {
           className: "chat-composer-meme-tag-row",
-          style: { display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '2px' }
+          style: { display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '2px', cursor: 'grab' },
+          onPointerDown: beginMemeTagDrag,
+          onPointerMove: moveMemeTagDrag,
+          onPointerUp: endMemeTagDrag,
+          onPointerCancel: endMemeTagDrag
         }, memeMatches.map(({ tag, items }) => /*#__PURE__*/React.createElement("button", {
           key: tag,
           type: "button",
