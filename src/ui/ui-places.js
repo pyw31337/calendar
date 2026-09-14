@@ -278,7 +278,14 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       }).addTo(map);
       const rasterFallbackLayer = addOpenStreetMapLayer();
-      if (typeof loadMapLibreLeaflet === 'function') {
+      const userAgent = typeof navigator !== 'undefined' ? String(navigator.userAgent || '') : '';
+      const isAppleWebKit = /AppleWebKit/i.test(userAgent)
+        && !/(Chrome|Chromium|Edg|OPR|Whale|SamsungBrowser)/i.test(userAgent);
+      // WebKit intermittently parses the OpenFreeMap vector response as HTML and throws
+      // `Unexpected token '<'` inside the MapLibre worker. The raster layer above is complete
+      // and interactive, so prefer it on WebKit rather than letting an optional vector overlay
+      // break the entire Places view.
+      if (!isAppleWebKit && typeof loadMapLibreLeaflet === 'function') {
         try {
           await loadMapLibreLeaflet();
           if (!cancelled && mapRef.current && L.maplibreGL) {

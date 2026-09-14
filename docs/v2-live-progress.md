@@ -87,3 +87,10 @@
 - 결과: lint 통과, 단위 테스트 25/25 통과.
 - 운영 배포 확인: 문서 커밋 `ac14320d` Pages 배포 성공.
 - 현재 판정: V2 공통 기능은 Chromium/Firefox에서 정상. WebKit Firestore 리스너 문제는 미해결로 유지하며 다음 분석 유닛으로 이월.
+
+## 2026-09-14 13:52 KST
+
+- 유닛 완료: WebKit Firestore/장소 화면 안정화
+- 수정: WebKit `pageshow`에서 `enableNetwork()` 강제 토글을 생략해 Listen 스트림 assertion 방지; WebKit에서는 MapLibre 벡터 오버레이를 건너뛰고 OSM 래스터 폴백 사용.
+- 검증: WebKit 94/0, lint 통과, 단위 테스트 25/25 통과.
+- 안전성: Chromium/Firefox 경로와 기존 지도 데이터·Firestore 데이터는 변경하지 않음.
