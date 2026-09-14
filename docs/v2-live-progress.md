@@ -331,3 +331,12 @@
 - 검증: `check:all`, production build, 번들·아키텍처·디자인 가드 통과. 전용 preview에서 Chromium 94/94, Firefox 93/93, WebKit 94/94 통과.
 - 배포: 코드 커밋 `ef4032b5` Pages 배포 `34827464119`, Verify Calendar `34827464048` 성공. 캐시 버스트 라이브 URL에서 카드 radius/padding/shadow와 사진 6개를 직접 확인.
 - 다음: 캘린더 홈 카드의 세부 타이포그래피·D-day 요약 영역을 목업과 대조하는 다음 독립 유닛. `shell=v2` 플래그는 유지.
+
+## 2026-09-14 18:42 KST
+
+- P0 디자인 유닛 완료: 홈 요약 제목·본문·보조문구·장소 아이콘 텍스트를 `--font-size-*` 기반 공통 토큰으로 정렬하고 행간을 안정화.
+- 범위: `src/app.css`의 V2 홈 요약 타이포그래피 변수와 선택자만 변경. 사진·태그·댓글·Firestore/Storage 계약은 변경하지 않음.
+- 직접 검토: 캐시 버스트 라이브 URL에서 제목 13.6px, 본문 12.8px, 메타 11.52px, 갤러리 썸네일 6개를 확인. 모바일 캡처를 저장함.
+- 검증: `check:all`, production build 및 dist 예산 통과. Pages 배포 전 Chromium 브라우저 스모크 통과.
+- 배포: 코드 커밋 `69a6e29e`, Pages `34828327007`, Verify Calendar `34828327051`(verify/live-smoke) 모두 성공.
+- 다음: 캘린더 홈 D-day/상단 요약 영역을 목업과 대조하는 독립 P0 유닛. `shell=v2` 플래그는 유지.
