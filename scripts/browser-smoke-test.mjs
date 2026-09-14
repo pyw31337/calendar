@@ -245,6 +245,30 @@ async function checkManifests(browser, baseUrl) {
   await context.close();
 }
 
+async function checkRenewalShellRoutes(browser, baseUrl) {
+  const routes = [
+    ['', '캘린더'], ['&tab=chat', '대화'], ['&tab=records', '기록'],
+    ['&tab=settlement', '정산'], ['&tab=more', '더보기']
+  ];
+  for (const viewport of VIEWPORTS) {
+    const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height }, hasTouch: viewport.hasTouch });
+    const page = await context.newPage();
+    try {
+      for (const [suffix, label] of routes) {
+        await gotoBootReady(page, `${baseUrl}?id=cw&shell=v2${suffix}`);
+        await page.locator('.renewal-shell').waitFor({ state: 'visible', timeout: 10000 });
+        const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+        if (overflow > 2) throw new Error(`가로 스크롤 ${overflow}px`);
+        pass(`[${viewport.name}] V2 ${label}`);
+      }
+    } catch (err) {
+      fail(`[${viewport.name}] V2 목적지`, err.message);
+    } finally {
+      await context.close();
+    }
+  }
+}
+
 async function checkEmojiCategories(browser, baseUrl) {
   const label = '이모티콘 피커 전체 카테고리';
   const context = await browser.newContext(mobileContextOptions());
@@ -587,6 +611,9 @@ async function main() {
 
     console.log('\n-- PWA manifest --');
     await checkManifests(browser, baseUrl);
+
+    console.log('\n-- V2 renewal shell routes --');
+    await checkRenewalShellRoutes(browser, baseUrl);
 
     console.log('\n-- 상호작용 스모크 (읽기 전용) --');
     await checkEmojiCategories(browser, baseUrl);
