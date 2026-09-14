@@ -600,6 +600,8 @@ function PlaceholderPane({ tabId, calendarName }) {
  */
 export function buildRenewalRecordsContext(calendar, deps) {
   const {
+    handleRegisterCultureEvent, handleUnregisterCultureEvent, handleQuickSaveCultureMemo,
+    customCultureItems, handleSaveCustomCultureItem,
     activeCal, galleryChatMessages, galleryMemos, showToast, showConfirmDialog,
     handleUploadGalleryImages, handleAddGalleryLink, handleAddGalleryFiles, handleDeleteGalleryFiles,
     handleDeleteGalleryLinks, handlePasteGatherPhoto, handlePasteGatherPhotos,
@@ -634,6 +636,14 @@ export function buildRenewalRecordsContext(calendar, deps) {
   return {
     calendar: activeCal,
     showToast,
+    contentProps: {
+      calendar: activeCal, anniversaries, memos,
+      onRegisterCultureEvent: handleRegisterCultureEvent,
+      onUnregisterCultureEvent: handleUnregisterCultureEvent,
+      onQuickSaveMemo: handleQuickSaveCultureMemo,
+      customCultureItems, onSaveCustomCultureItem: handleSaveCustomCultureItem,
+      showToast,
+    },
     mediaProps: {
       calendar: activeCal,
       chatMessages: galleryChatMessages, memos: galleryMemos,
@@ -764,6 +774,17 @@ function MediaPane({ recordsContext, onChangeView, onOpenAppSettings }) {
       onClose: recordsContext.onCloseGalleryShare,
     })
   );
+}
+
+/** 콘텐츠 subtab body (WP-06 continuation): the existing ContentView with unchanged app-main props. */
+function ContentPane({ recordsContext, onChangeView, onOpenAppSettings }) {
+  const React = window.React;
+  const { ContentView } = bindUiComponentAliases(React);
+  return React.createElement(ContentView, {
+    ...recordsContext.contentProps,
+    onBack: () => onChangeView('calendar'),
+    onOpenAppSettings,
+  });
 }
 
 /**
@@ -916,6 +937,8 @@ function RecordsPane({ subTab, onSelectSubTab, calendarName, recordsContext, cal
     ),
     subTab === 'media'
       ? React.createElement(MediaPane, { recordsContext, onChangeView, onOpenAppSettings })
+      : subTab === 'content'
+      ? React.createElement(ContentPane, { recordsContext, onChangeView, onOpenAppSettings })
       : subTab === 'archive'
       ? React.createElement(HistoryPane, { recordsContext, calendarContext, onChangeView, onOpenAppSettings, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource })
       : subTab === 'places'
