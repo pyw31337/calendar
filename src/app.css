@@ -6035,6 +6035,14 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
   box-shadow: 0 12px 34px rgba(15, 23, 42, .07);
 }
 .renewal-shell-main.is-calendar > .renewal-shell-section { padding: 20px 2px 0; }
+.renewal-shell-main.is-calendar > .renewal-shell-section:has(.renewal-shell-upcoming-list) {
+  margin-top: 14px;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--border-subtle, #e2e8f0) 82%, transparent);
+  border-radius: 14px;
+  background: var(--bg-card, #fff);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, .045);
+}
 
 .renewal-shell-bottom-nav {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
@@ -6147,11 +6155,12 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 .renewal-shell-upcoming-item {
   display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
   padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border-subtle, #e2e8f0);
-  background: var(--bg-primary, #f8fafc); cursor: pointer; font: inherit;
+  background: var(--bg-primary, #f8fafc); cursor: pointer; font: inherit; transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
 }
+.renewal-shell-upcoming-item:hover, .renewal-shell-upcoming-item:focus-visible { border-color: color-mix(in srgb, var(--brand, #4f46e5) 35%, var(--border-subtle, #e2e8f0)); box-shadow: 0 4px 12px rgba(15, 23, 42, .08); transform: translateY(-1px); outline: none; }
 .renewal-shell-upcoming-dday {
   flex-shrink: 0; font-weight: 800; font-size: 0.72rem; color: #fff;
-  background: var(--brand, #4f46e5); padding: 2px 8px; border-radius: var(--radius-full, 999px);
+  background: linear-gradient(120deg, var(--brand, #4f46e5), #7c3aed); padding: 3px 9px; border-radius: var(--radius-full, 999px); line-height: 1.25; letter-spacing: .01em;
 }
 .renewal-shell-upcoming-label { font-weight: 700; font-size: 0.82rem; color: var(--text-main, #0f172a); }
 .renewal-shell-upcoming-note {
