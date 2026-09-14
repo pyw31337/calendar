@@ -3182,7 +3182,9 @@ function CalendarApp() {
             thumbUrl: chunkImages[0].thumbUrl,
             imageUrls: chunkImages.map(r => r.imageUrl),
             thumbUrls: chunkImages.map(r => r.thumbUrl),
-            imageTags: chunkImages.map(r => buildMetadataTags(r.metadata, todayUploadTagOptions())),
+            // Always persist the upload-date tag even if optional metadata parsing
+            // returns no tags (e.g. a browser-provided Blob without EXIF).
+            imageTags: chunkImages.map(r => buildMetadataTags(r.metadata, todayUploadTagOptions()) || withUploadDateTag('')),
             timestamp: baseTimestamp + i,
             uploadSource: 'chat'
           };
@@ -3353,7 +3355,7 @@ function CalendarApp() {
           thumbUrl: chunkImages[0].thumbUrl,
           imageUrls: chunkImages.map(r => r.imageUrl),
           thumbUrls: chunkImages.map(r => r.thumbUrl),
-          imageTags: chunkImages.map(r => buildMetadataTags(r.metadata, todayUploadTagOptions())),
+          imageTags: chunkImages.map(r => buildMetadataTags(r.metadata, todayUploadTagOptions()) || withUploadDateTag('')),
           timestamp: now + i,
           // Marks this message as gallery-uploaded (vs typed into the chat composer) so the
           // Lightbox info panel can show "갤러리에서 업로드됨" instead of "채팅방에서 업로드됨".
