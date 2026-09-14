@@ -6072,13 +6072,14 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 .renewal-shell .renewal-shell-bottom-nav { z-index: 1100; }
 .renewal-shell-bottom-nav-item {
   flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
-  background: none; border: none; padding: 8px 4px 6px; cursor: pointer;
+  position: relative; background: none; border: none; padding: 9px 4px 7px; cursor: pointer;
   color: var(--text-muted, #64748b); font-size: 0.64rem; font-weight: 700; font-family: inherit;
 }
 .renewal-shell-bottom-nav-item.is-active {
   color: var(--brand, #4f46e5); font-weight: 800;
   background: linear-gradient(180deg, transparent 0%, color-mix(in srgb, var(--brand-soft, #eef2ff) 72%, transparent) 100%);
 }
+.renewal-shell-bottom-nav-item.is-active::before { content: ''; position: absolute; top: 0; left: 22%; right: 22%; height: 3px; border-radius: 0 0 4px 4px; background: var(--brand, #4f46e5); }
 
 .renewal-shell-placeholder {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
