@@ -672,12 +672,13 @@ export function ChatRoomView({
   };
   const participants = getActiveParticipants(calendar);
   const participantsMap = participants.reduce((acc, p) => {
-    acc[p.id] = p;
+    const id = String(p?.id ?? '').trim();
+    if (id) acc[id] = p;
     return acc;
   }, {});
   const selectedParticipant = participants.find(p => p.id === chatParticipantId);
   const typingParticipants = typingParticipantIds
-    .map(id => participantsMap[id])
+    .map(id => participantsMap[String(id ?? '').trim()])
     .filter(Boolean);
   // Kakao-style reply quote card, rendered at the top of a bubble when msg.replyTo is set --
   // shows the quoted sender + a 1-2 line snippet of what they said, and jumps back to that
