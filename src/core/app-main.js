@@ -1422,13 +1422,11 @@ function CalendarApp() {
     // fresh listener's own first snapshot instead of immediately judging it stale.
     lastChatSnapshotAtRef.current = Date.now();
 
-    // Subscribe only to chat-channel history. Gallery/meeting uploads can be much larger than
-    // the conversation stream; including them in this listener made every chat snapshot bill
-    // reads for unrelated media. Meme-keyboard messages use a bounded companion listener below.
+    // Subscribe to the bounded recent message window; render-layer filtering removes non-chat
+    // gallery/meeting uploads while retaining meme-keyboard messages.
     let hasSeenInitialChatSnapshot = false;
     let lastNotifiedMessageId = null;
     const unsubscribeChat = subscribeMessages(activeCalId, {
-      where: ['uploadSource', '==', 'chat'],
       orderBy: 'timestamp', direction: 'desc', limit: chatLimit
     }, snapshot => {
         if (!isMounted) return;
@@ -1460,30 +1458,9 @@ function CalendarApp() {
         });
       });
 
-    const unsubscribeMeme = subscribeMessages(activeCalId, {
-      where: ['uploadSource', '==', 'meme'],
-      orderBy: 'timestamp', direction: 'desc', limit: chatLimit
-    }, snapshot => {
-      if (!isMounted) return;
-      const memeList = [];
-      snapshot.forEach(doc => memeList.push(slimMessageForClient({ id: doc.id, ...doc.data() })));
-      memeList.reverse();
-      if (!memeList.length) return;
-      setChatMessages(prev => {
-        const byId = new Map((Array.isArray(prev) ? prev : []).map(message => [message.id, message]));
-        memeList.forEach(message => byId.set(message.id, message));
-        return Array.from(byId.values()).sort((a, b) =>
-          (Number(a.timestamp) || 0) - (Number(b.timestamp) || 0)
-          || String(a.id || '').localeCompare(String(b.id || '')));
-      });
-    }, err => {
-      console.warn('Firestore meme chat subscription error:', err);
-    });
-
     return () => {
       isMounted = false;
       if (unsubscribeChat) unsubscribeChat();
-      if (unsubscribeMeme) unsubscribeMeme();
     };
   // Re-run when the Firebase bootstrap/retry loop recovers the SDK after the first
   // render. Without this dependency, a page that initially fell back to REST never
@@ -2828,8 +2805,8 @@ function CalendarApp() {
     setChatMessages(prev => prev.map(patchMessage));
     setOlderChatMessages(prev => prev.map(patchMessage));
     setGalleryPreviewMessages(prev => prev.map(patchMessage));
-    // Gallery uploads live here (chat listener is uploadSource=='chat' only). Missing this
-    // left allChatMessages on a stale live snapshot whose empty imageTags overrode archive.
+    // Gallery uploads live in the shared live snapshot. Missing this left allChatMessages on a
+    // stale snapshot whose empty imageTags overrode archive.
     setGalleryLiveMessages(prev => prev.map(patchMessage));
     patchGalleryArchiveMessage(messageId, patch);
   };
