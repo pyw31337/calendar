@@ -188,3 +188,9 @@
 - 최종 유닛: 운영 배포 전 `predeploy` 전체 검증
 - 결과: check:all·Firebase safety·production build·dist budget 전부 통과. lint 경고 0, 단위 테스트 27/27, npm audit 취약점 0.
 - 판정: 현재 메인 상태는 안전한 배포 기준 충족. 추가 기능은 별도 유닛/브랜치로 진행.
+
+## 2026-09-14 19:10 KST
+
+- 최종 라이브 smoke 계약 보정
+- 수정: `kakaoLocalSearchProxy`의 현재 정상 200 coordinate-mode 응답을 smoke 기준에 반영(기존 400/query required 계약 제거).
+- 검증: 라이브 주요 경로·정적 청크·Cloud Functions probe 전체 통과(`Live smoke check passed`).

@@ -213,7 +213,9 @@ const FUNCTIONS_BASE = 'https://us-central1-metro-live-2918e.cloudfunctions.net'
 const functionProbes = [
   ['rebuildPhotoIndex', [405], 'Method not allowed'],
   ['listPublicCalendarSummaries', [200], '"ok":true'],
-  ['kakaoLocalSearchProxy', [400], 'query is required']
+  // The proxy now treats an empty request as a valid coordinate-mode probe and returns a
+  // structured empty result, so the smoke contract must not require the retired 400 response.
+  ['kakaoLocalSearchProxy', [200], '"ok":true']
 ];
 for (const [name, okCodes, needle] of functionProbes) {
   const url = `${FUNCTIONS_BASE}/${name}`;
