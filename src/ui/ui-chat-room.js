@@ -240,12 +240,9 @@ export function ChatRoomView({
 
   const [viewportBottom, setViewportBottom] = React.useState(0);
   const [composerHeight, setComposerHeight] = React.useState(0);
-  const [composerInputHeight, setComposerInputHeight] = React.useState(() => {
-    try {
-      const stored = Number(window.localStorage.getItem('gather-chat-composer-height'));
-      return Number.isFinite(stored) ? Math.max(44, Math.min(260, stored)) : 44;
-    } catch (_) { return 44; }
-  });
+  // Keep the desktop composer at the original compact height on every open. Height is
+  // intentionally session-local; a previous oversized drag must not become the new default.
+  const [composerInputHeight, setComposerInputHeight] = React.useState(44);
   const composerResizeRef = React.useRef(null);
   const memeTagDragRef = React.useRef(null);
   const textareaScrollRestoreRef = React.useRef(null);
@@ -580,10 +577,6 @@ export function ChatRoomView({
     return () => window.removeEventListener('resize', measure);
   }, [chatReplyTarget, chatInput, chatImages, isInputFocused, viewportBottom]);
 
-  React.useEffect(() => {
-    try { window.localStorage.setItem('gather-chat-composer-height', String(composerInputHeight)); } catch (_) { /* storage is optional */ }
-  }, [composerInputHeight]);
-
   const beginComposerResize = (event) => {
     event.preventDefault();
     composerResizeRef.current = { startY: event.clientY, startHeight: composerInputHeight };
@@ -592,7 +585,7 @@ export function ChatRoomView({
   const moveComposerResize = (event) => {
     const drag = composerResizeRef.current;
     if (!drag) return;
-    const next = Math.max(44, Math.min(260, drag.startHeight + drag.startY - event.clientY));
+    const next = Math.max(44, Math.min(100, drag.startHeight + drag.startY - event.clientY));
     setComposerInputHeight(next);
   };
   const endComposerResize = () => { composerResizeRef.current = null; };
@@ -1580,7 +1573,7 @@ export function ChatRoomView({
         onKeyDown: event => {
           if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
           event.preventDefault();
-          setComposerInputHeight(height => Math.max(44, Math.min(260, height + (event.key === 'ArrowUp' ? 12 : -12))));
+          setComposerInputHeight(height => Math.max(44, Math.min(100, height + (event.key === 'ArrowUp' ? 12 : -12))));
         }
       }, /*#__PURE__*/React.createElement("svg", {
         xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24",
@@ -1732,7 +1725,7 @@ export function ChatRoomView({
           width: '100%',
           height: `${composerInputHeight}px`,
           minHeight: '44px',
-          maxHeight: '260px',
+          maxHeight: '100px',
           resize: 'none',
           border: 'none',
           background: 'none',
