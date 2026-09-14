@@ -581,6 +581,35 @@ function PlaceholderPane({ tabId, calendarName }) {
   });
 }
 
+/** 기록 > 전체: 이미 로드된 데이터만 사용하는 빠른 요약 허브. */
+function RecordsOverviewPane({ recordsContext, calendarName, onSelectSubTab }) {
+  const React = window.React;
+  const memoCount = Array.isArray(recordsContext?.memoProps?.memos) ? recordsContext.memoProps.memos.length : 0;
+  const mediaCount = Array.isArray(recordsContext?.mediaProps?.indexedPhotos) ? recordsContext.mediaProps.indexedPhotos.length : 0;
+  const placeCount = Array.isArray(recordsContext?.placesProps?.calendar?.places) ? recordsContext.placesProps.calendar.places.length : 0;
+  const cards = [
+    { id: 'memo', label: '메모', count: memoCount, icon: '📝', hint: '날짜와 태그로 정리된 메모' },
+    { id: 'media', label: '사진·영상', count: mediaCount, icon: '🖼️', hint: '모임과 대화에 연결된 미디어' },
+    { id: 'places', label: '장소', count: placeCount, icon: '📍', hint: '저장한 장소와 방문 기록' },
+    { id: 'archive', label: '보관함', count: Array.isArray(recordsContext?.historyProps?.anniversaries) ? recordsContext.historyProps.anniversaries.length : 0, icon: '🗂️', hint: '기념일과 추억 모음' },
+  ];
+  return React.createElement('section', { className: 'renewal-records-overview', 'aria-label': '기록 요약' },
+    React.createElement('div', { className: 'renewal-shell-section-title' }, calendarName ? `${calendarName} 기록` : '기록 요약'),
+    React.createElement('p', { className: 'renewal-records-overview-subtitle' }, '메모, 사진, 장소와 추억을 한곳에서 확인하세요.'),
+    React.createElement('div', { className: 'renewal-records-overview-grid' }, cards.map(card =>
+      React.createElement('button', { key: card.id, type: 'button', className: 'renewal-records-overview-card', onClick: () => onSelectSubTab(card.id) },
+        React.createElement('span', { className: 'renewal-records-overview-icon', 'aria-hidden': 'true' }, card.icon),
+        React.createElement('span', { className: 'renewal-records-overview-card-main' },
+          React.createElement('span', { className: 'renewal-records-overview-card-label' }, card.label),
+          React.createElement('span', { className: 'renewal-records-overview-card-count' }, `${card.count}개`),
+          React.createElement('span', { className: 'renewal-records-overview-card-hint' }, card.hint)
+        ),
+        React.createElement('span', { className: 'renewal-records-overview-arrow', 'aria-hidden': 'true' }, '›')
+      )
+    ))
+  );
+}
+
 /**
  * 기록 tab body: a sub-tab chip row (전체/메모/사진·영상/장소/보관함/콘텐츠) over the same
  * EmptyState, keyed by sub-tab so switching filters visibly changes something even before WP-06
@@ -940,6 +969,8 @@ function RecordsPane({ subTab, onSelectSubTab, calendarName, recordsContext, cal
       ? React.createElement(MediaPane, { recordsContext, onChangeView, onOpenAppSettings })
       : subTab === 'content'
       ? React.createElement(ContentPane, { recordsContext, onChangeView, onOpenAppSettings })
+      : subTab === 'all'
+      ? React.createElement(RecordsOverviewPane, { recordsContext, calendarName, onSelectSubTab })
       : subTab === 'archive'
       ? React.createElement(HistoryPane, { recordsContext, calendarContext, onChangeView, onOpenAppSettings, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource })
       : subTab === 'places'
