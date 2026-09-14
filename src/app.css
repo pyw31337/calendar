@@ -6199,14 +6199,15 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 .chat-composer-resize-handle::before {
   content: '';
   position: absolute;
-  top: -4px;
-  right: -8px;
-  width: 150px;
-  height: 26px;
-  background: linear-gradient(90deg, transparent 0%, var(--bg-card) 55%);
+  top: -9px;
+  right: -12px;
+  width: 184px;
+  height: 44px;
+  background: linear-gradient(90deg, transparent 0%, var(--bg-card) 45%, var(--bg-card) 100%);
   pointer-events: none;
-  z-index: -1;
+  z-index: 0;
 }
+.chat-composer-resize-handle > svg { position: relative; z-index: 1; }
 .chat-composer-meme-tag-row { padding-right: 82px !important; scrollbar-width: none; }
 .chat-composer-meme-tag-row::-webkit-scrollbar { display: none; }
 .chat-composer-resize-handle:hover,
