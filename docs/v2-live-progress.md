@@ -49,6 +49,12 @@
 - 결과: lint 경고 0, 단위 테스트 27/27, rules/egress/accessibility/isolation/design 검사 전부 통과, 아키텍처·번들 예산 통과, npm audit 취약점 0.
 - 판정: 현재 main 안정성 기준 유지 확인. 코드·Firebase·Storage 데이터 변경 없음.
 
+## 2026-09-14 14:48 KST
+
+- 유닛: 최신 Pages 배포 후 라이브 smoke 재검증
+- 결과: `cw·jhair·kkot` 주요 화면·공유 URL·관리자 URL·정적 청크 전체 200. `rebuildPhotoIndex` 405, `listPublicCalendarSummaries` 200, `kakaoLocalSearchProxy` 200, 사진 인덱스 트리거 인증 거부 401로 보안 계약 정상.
+- 판정: 배포 성공과 실제 라이브 응답 일치 확인.
+
 ## 2026-09-14 10:42 KST
 
 - 기준 메인: `ce75dd99`
