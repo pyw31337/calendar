@@ -1295,7 +1295,10 @@ export function ChatRoomView({
       // `bottom: viewportBottom` below) -- without adding that same amount here, scrolling to
       // scrollHeight still leaves the newest bubble sitting right where the keyboard now covers
       // it, since the reserved bottom space never grew to match.
-      paddingBottom: `${Math.max(152, composerHeight + 24) + viewportBottom}px`
+      // The emoji/meme sheet is positioned above the fixed composer and can be taller than the
+      // composer itself. Reserve that CSS-variable height here as well, otherwise the last
+      // bubbles slide underneath the sheet when thumbnails or the keyboard are expanded.
+      paddingBottom: `calc(${Math.max(152, composerHeight + 24) + viewportBottom}px + var(--emoji-sheet-h, 0px) + 16px)`
     }
   }, (loadingOlderChat || hasMoreOlderChat) && /*#__PURE__*/React.createElement("div", {
     style: { textAlign: 'center', fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', padding: '8px 0 12px' }
