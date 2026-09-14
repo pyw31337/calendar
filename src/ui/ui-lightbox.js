@@ -365,7 +365,7 @@ export function LightboxInfoPanel({ info, sourceInfo = null, onRemoveFromMemory 
 
 // 사진을 탭하면 여는 태그 패널 -- 해시태그 목록과 태그입력만 보여준다. URL 버튼은 좌측 상단
 // 상시 노출 URL 버튼으로 옮겨갔으므로 여기서는 렌더링하지 않는다.
-export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast }) {
+export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast, autoFocus = false, onInputFocus, onInputBlur }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const TrashIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.TrashIcon) || __deps.TrashIcon;
@@ -386,6 +386,13 @@ export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast
     keepTagFocusRef.current = false;
     refocusComposerField(tagInputRef);
   }, [tagTokens.length, tagInput]);
+  React.useEffect(() => {
+    if (!autoFocus) return;
+    // Navigation replaces the tag panel for the next photo. Restore focus after
+    // the new input is mounted so Tab/arrow navigation can continue uninterrupted.
+    const timer = window.setTimeout(() => refocusComposerField(tagInputRef), 0);
+    return () => window.clearTimeout(timer);
+  }, [autoFocus]);
   // Keep the draft while navigating between photos. The lightbox intentionally reuses this
   // panel so a user can tap a photo once, then enter tags continuously with previous/next.
   if (tagTokens.length === 0 && !onSaveTags) return null;
@@ -483,6 +490,8 @@ export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast
         type: "text",
         className: "lightbox-tag-input",
         ref: tagInputRef,
+        onFocus: onInputFocus,
+        onBlur: onInputBlur,
         value: tagInput,
         onChange: e => setTagInput(e.target.value),
         onCompositionEnd: e => setTagInput(e.target.value),
@@ -583,6 +592,8 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   // of letting them stack on top of each other.
   const [showInfo, setShowInfo] = React.useState(false);
   const [showTags, setShowTags] = React.useState(false);
+  const tagInputFocusRef = React.useRef(false);
+  const [focusTagInputAfterNav, setFocusTagInputAfterNav] = React.useState(false);
   const toggleShowInfo = () => setShowInfo(prev => {
     const next = !prev;
     if (next) setShowTags(false);
@@ -1288,6 +1299,9 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     // nothing.
     const from = pendingNavRef.current != null ? pendingNavRef.current : index;
     if (newIndex < 0 || newIndex >= total || newIndex === from) return;
+    const activeTagInput = typeof document !== 'undefined'
+      && document.activeElement?.classList?.contains('lightbox-tag-input');
+    if (tagInputFocusRef.current || activeTagInput) setFocusTagInputAfterNav(true);
     setShowInfo(false);
     if (pendingNavRef.current != null) {
       // Commit the in-flight nav immediately (skipping its remaining animation) so the new one
@@ -1778,7 +1792,10 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
           tags: currentTags,
           onSaveTags: saveCurrentTags,
           onSearchTag: onSearchTag,
-          showToast: showToast
+          showToast: showToast,
+          autoFocus: focusTagInputAfterNav,
+          onInputFocus: () => { tagInputFocusRef.current = true; setFocusTagInputAfterNav(false); },
+          onInputBlur: () => { window.setTimeout(() => { tagInputFocusRef.current = false; }, 0); }
         })));
     }
 
@@ -1943,7 +1960,10 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
       tags: currentTags,
       onSaveTags: saveCurrentTags,
       onSearchTag: onSearchTag,
-      showToast: showToast
+      showToast: showToast,
+      autoFocus: focusTagInputAfterNav,
+      onInputFocus: () => { tagInputFocusRef.current = true; setFocusTagInputAfterNav(false); },
+      onInputBlur: () => { window.setTimeout(() => { tagInputFocusRef.current = false; }, 0); }
     })),
   renderCommentThread(),
   total > 1 && (() => {
