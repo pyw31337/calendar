@@ -626,6 +626,54 @@ WP-05(#616)가 이미 병합되어 대화 탭이 실제로 동작하므로 이�
 환경이라 검색할 실데이터가 없음) — 로직 자체는 원본과 100% 동일한 pass-through라 별도 위험은
 낮다고 판단.
 
+## 2026-09-13: WP-06 — "기록" 탭 "보관함" 서브탭 실제 연결 (+ 셸 공용 버그 수정)
+
+**배경:** 기록 탭의 나머지 서브탭 중 "보관함"(옛 `activeView === 'history'`, 실제 컴포넌트는
+`HistoryView` — 추억/인물/지난모임 뷰)을 실제 연결. WP-05/WP-03과 같은 패턴: `HistoryView`는
+이미 완성된 컴포넌트이므로 `app-main.js`의 `activeView === 'history'` 호출부가 쓰던 프롭 전부를
+`buildRenewalRecordsContext(calendar, deps)`로 그대로 pass-through. `PlacesPane`과 마찬가지로
+WP-07(#617, 아직 미병합)의 공유 `DateModal` 상태 리프트에 기대지 않고, 이 슬라이스만의 로컬
+`historyDateModalDate` 상태를 따로 둠(병합 시 정리 예정, `PlacesPane` 주석과 동일한 이유).
+
+**핵심 발견 — 렌더얼 셸 전반에 걸친 리마운트 폭주 버그 (`bindUiComponentAliases` 캐시 누락):**
+자동 검증 스위트(lint/inventory/check:all/safety/regression)는 전부 통과했지만, 이 저장소
+관행대로 진행한 Playwright 헤드리스 확인에서 `?shell=v2&tab=records&sub=archive` 진입 시
+`ERR_INSUFFICIENT_RESOURCES` 콘솔 에러가 4~6초 안에 수백~수천 건 발생하는 것을 발견했다(플래그
+없는 `?view=history` 컨트롤 경로는 동일 조건에서 0건). 계측 결과:
+
+- `RenewalAppShell`/`HistoryPane`이 4초 동안 700회 이상 재렌더되고 있었고, `HistoryView` 컴포넌트는
+  거의 매 렌더마다 **완전히 마운트 해제 후 재마운트**되고 있었다(mount count ≈ unmount count ≈
+  render count). 재마운트 때마다 `HistoryView` 내부의 "사진 인덱스 전체 로드" 마운트 이펙트가 처음부터
+  다시 실행되어 `galleryPhotoIndex.loadAll()`을 호출했고, 네트워크가 막힌 샌드박스에서 이 호출들이
+  즉시 실패하며 콘솔 에러를 쏟아냈다.
+- 원인은 `src/core/app-ui-wrappers.js`의 `bindUiComponentAliases(React)`였다: 이 함수는 호출될
+  때마다 `HistoryView` 등 각 컴포넌트에 대해 **새로운 함수 객체**(`PassThroughAlias`)를 생성해서
+  반환한다. `app-main.js`(모듈 최상단에서 1회 호출)나 `app-chat-render.js`(모듈 스코프)에서는
+  문제가 없었지만, 이번 렌더얼 셸 작업에서 여러 Pane(`CalendarPane`/`ChatPane`/`HistoryPane`/
+  `MorePane`)이 **컴포넌트 렌더 본문 안에서** 이 함수를 호출하고 있었다 — 즉 매 렌더마다
+  `HistoryView`가 "새로운 컴포넌트 타입"이 되어 React가 이전 인스턴스를 버리고 새로 마운트한다.
+  `HistoryView`의 마운트 이펙트가 부모(`CalendarApp`)가 소유한 `galleryPhotoIndex` 상태를
+  갱신(`setState`)하자 이것이 다시 `CalendarApp` 재렌더를 유발했고, 그 재렌더가 다시
+  `HistoryPane`을 새 `bindUiComponentAliases` 호출로 이어가며 `HistoryView`를 다시 마운트시키는
+  **자기강화 루프**가 만들어졌다.
+- **수정**: `bindUiComponentAliases`를 `React` 인자별로 결과를 캐시하도록 변경(`src/core/app-ui-wrappers.js`,
+  `WeakMap` 캐시) — 반환되는 별칭 함수들은 순수 pass-through(호출 시점에 `window.GATHER_UI_COMPONENTS`를
+  읽음)라 캐싱해도 실제 렌더링되는 컴포넌트는 전혀 달라지지 않는다. 이 수정은 `HistoryPane`뿐 아니라
+  같은 패턴을 쓰는 다른 모든 Pane에도 적용되어, 겉으로 드러나지 않았을 수 있는 동일한 리마운트
+  낭비(스크롤 위치 유실, 불필요한 재요청 등)를 셸 전체에서 함께 없앤다. `app-main.js`는 건드리지
+  않음(어댑터 호출 라인만 6번째 인자로 확장, `CalendarApp` 7700/7700 그대로).
+- **재검증**: 수정 후 `?shell=v2&tab=records&sub=archive`는 컨트롤 경로와 동일하게
+  `ERR_INSUFFICIENT_RESOURCES` 0건(샌드박스 고유의 `ERR_CONNECTION_RESET` 3건만 남음), 보관함/추억/
+  인물/지난모임 탭과 빈 상태 문구가 정상 렌더됨을 확인. 회귀 확인으로 `tab=calendar`/`tab=chat`도
+  같은 alias 패턴을 쓰므로 함께 재확인 — 둘 다 0건, 정상 렌더.
+- `npm run lint`/`check:app-main-inventory`(7700/7700)/`check:all`/`safety:test`/`regression:test`
+  (빌드 포함) 전부 통과.
+
+**아직 다루지 않은 것**: `PlacesPane`/`HistoryPane`이 각자 로컬로 들고 있는 `DateModal` 상태를
+WP-07의 공유 리프트로 합치는 작업(WP-07 병합 후). "지난모임" 관련 메모리 그룹 편집/삭제/사진
+재배치 등 `HistoryView` 내부 로직 자체는 기존 구현을 그대로 재사용했을 뿐 이 슬라이스에서 손대지
+않음.
+
 ## 2026-09-13: WP-06 — "기록" 탭 "사진·영상" 서브탭 실제 연결 (+ 셸 공용 버그 이식)
 
 **배경:** 기록 탭의 "사진·영상" 서브탭(옛 `activeView === 'gallery'`, 실제 컴포넌트는 `asPage:
