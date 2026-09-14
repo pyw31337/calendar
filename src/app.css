@@ -5994,9 +5994,9 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 
 .renewal-shell-header {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 16px; background: var(--brand, #4f46e5); color: #fff;
+  padding: 15px 18px; background: var(--brand, #4f46e5); color: #fff;
 }
-.renewal-shell-header-brand { display: flex; align-items: center; gap: 6px; font-weight: 800; font-size: 1rem; }
+.renewal-shell-header-brand { display: flex; align-items: center; gap: 7px; font-weight: 800; font-size: 1rem; letter-spacing: -.02em; }
 .renewal-shell-header-actions { display: flex; gap: 6px; }
 .renewal-shell-header-icon-btn {
   background: rgba(255,255,255,0.16); border: 1px solid rgba(255,255,255,0.32); border-radius: 9999px;
@@ -6195,7 +6195,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
   .renewal-shell-side-nav-brand { font-weight: 800; font-size: 0.92rem; color: var(--text-main, #0f172a); padding: 6px 10px 16px; }
   .renewal-shell-side-nav-item {
     display: flex; align-items: center; gap: 10px; text-align: left; background: none; border: none;
-    padding: 10px; border-radius: 10px; font-weight: 700; font-size: 0.82rem; color: var(--text-muted, #64748b);
+    padding: 10px; border-radius: 10px; font-weight: 700; font-size: 0.82rem; letter-spacing: -.01em; color: var(--text-muted, #64748b);
     cursor: pointer; font-family: inherit;
   }
   .renewal-shell-side-nav-item:hover { background: var(--bg-primary, #f8fafc); }
@@ -6204,7 +6204,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
   .renewal-shell-side-nav-quick-item {
     display: flex; align-items: center; gap: 9px; text-align: left; background: none; border: none;
     padding: 8px 10px; border-radius: 9px; font-weight: 600; font-size: 0.76rem;
-    color: var(--text-muted, #64748b); cursor: pointer; font-family: inherit;
+    color: var(--text-muted, #64748b); cursor: pointer; font-family: inherit; letter-spacing: -.01em;
   }
   .renewal-shell-side-nav-quick-item:hover { background: var(--bg-primary, #f8fafc); color: var(--text-main, #0f172a); }
   .renewal-shell-side-nav-quick-dot { width: 16px; text-align: center; color: var(--brand, #4f46e5); font-size: 1rem; line-height: 1; }
