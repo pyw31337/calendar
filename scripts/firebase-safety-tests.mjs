@@ -780,8 +780,13 @@ const chatFileModule = fs.readFileSync('src/core/chat-file-attachments.js', 'utf
 assert(/fileAttachments/.test(chatFileModule) && /uploadChatFileAttachment/.test(chatFileModule), 'chat file attachment helper module must exist');
 assert(/classifyChatComposerFiles/.test(chatFileModule) && /isChatDocumentFile/.test(chatFileModule), 'composer must classify images vs documents');
 const chatRoomSource = fs.readFileSync('src/ui/ui-chat-room.js', 'utf8');
+const chatTypingPresenceSource = fs.readFileSync('src/core/chat-typing-presence.js', 'utf8');
 assert(chatRoomSource.includes('파일 업로드') && chatRoomSource.includes('lucide-paperclip'), 'chat composer must expose a file upload paperclip control');
 assert(chatRoomSource.includes('handleDocFileChangeChat') && chatRoomSource.includes('classifyChatComposerFiles'), 'file button must classify and route images through the photo pipeline');
+assert(chatRoomSource.includes('useChatTypingPresence') && chatRoomSource.includes('chat-typing-dot'), 'chat must render shared typing presence in both shells');
+assert(chatTypingPresenceSource.includes("collection('typingPresence')"), 'typing presence must stay isolated from permanent message history');
+assert(!chatTypingPresenceSource.includes("collection('messages')") && !chatTypingPresenceSource.includes('localStorage'), 'typing presence must not affect message counts or add browser persistence');
+assert(chatTypingPresenceSource.includes('CHAT_TYPING_TTL_MS = 10000') && chatTypingPresenceSource.includes('CHAT_TYPING_HEARTBEAT_MS = 4000'), 'typing presence must remain bounded and self-expiring');
 assert(chatGallerySource.includes("value: 'files'") && chatGallerySource.includes("label: '파일'") && chatGallerySource.includes('renderFileListHeader'), 'gallery must expose a 파일 tab');
 assert(chatGallerySource.includes("kind: 'gather-files'") && chatGallerySource.includes('storagePath'), 'file bulk-share payload must keep storagePath so sanitizer does not drop attachments');
 assert(appMainSource.includes('handleAddGalleryFiles') && appMainSource.includes('sanitizeFileAttachment'), 'pasted gallery files must keep sanitized storagePath before write');
@@ -1748,4 +1753,3 @@ console.log('Firebase-only calendar safety tests passed');
   );
   assert(merged.locationTags.some(tag => tag.includes('천왕역') && tag.includes('모아엘가')), 'Kakao building + Nominatim station must combine');
 }
-
