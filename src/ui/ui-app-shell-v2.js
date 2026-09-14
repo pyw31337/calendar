@@ -587,21 +587,35 @@ function PlaceholderPane({ tabId, calendarName }) {
  * absorbs 5 old screens (docs/design-renewal-handoff.md §2) -- the other 4 tabs stay flat.
  */
 /**
- * Builds the 기록 tab's real ingredients (WP-06 continuation, 장소 + 메모 subtabs). Straight
- * pass-through of the same values/handlers `app-main.js`'s own `activeView === 'places'` /
- * `activeView === 'memo'` render blocks already use. `onLoadMoreMemos` is composed in
- * `app-main.js`'s own adapter call (it needs `MEMOS_PAGE_SIZE`, a module-level constant only in
- * scope there) and handed through already-built.
+ * Builds the 기록 tab's real ingredients (WP-06 continuation, 보관함 + 장소 + 메모 subtabs).
+ * Straight pass-through of the same values/handlers `app-main.js`'s own `activeView === 'history'`
+ * / `activeView === 'places'` / `activeView === 'memo'` render blocks already use -- person-tag
+ * management, travel-memory group hide/restore/remove, photo comments, the shared gallery photo
+ * index (`galleryPhotoIndex`), place save/delete/search, and the memo list/share/tag-filter
+ * pass-throughs, all pre-existing. `onLoadMoreMemos` is composed in `app-main.js`'s own adapter
+ * call (it needs `MEMOS_PAGE_SIZE`, a module-level constant only in scope there) and handed
+ * through already-built.
  */
 export function buildRenewalRecordsContext(calendar, deps) {
   const {
-    activeCal, showToast, showConfirmDialog, handleSavePlace, handleDeletePlace,
-    placesInitialQuery, setPlacesInitialQuery, placesInitialFocusId, setPlacesInitialFocusId,
-    isDarkTheme, toggleTheme, fontScalePercent, setFontScalePercent,
+    activeCal, showToast, showConfirmDialog, isDarkTheme, toggleTheme, fontScalePercent, setFontScalePercent,
     mainNotifPermission, mainChatNotifyEnabled, handleMainToggleNotifications,
-    syncStatus, isPlacesShareOpen, setIsPlacesShareOpen,
+    syncStatus, isHistoryShareOpen, setIsHistoryShareOpen,
+    handleAddPersonTag, handleRenamePersonTag, handleDeletePersonTag,
+    anniversaries, galleryChatMessages, historyMemosSnapshot, setActiveLightbox,
+    handlePromoteInlineChatImage, handleSaveImageTags, handleSearchTag,
+    handleDeletePhoto, handleReplacePhoto,
+    handleJumpToChatMessage, handleJumpToMemo, handleJumpToMeetingDate,
+    handleGetChatMessageOrdinal, handleGetGalleryPhotoOrdinal,
+    handleRemovePhotoFromTravelMemory, handleRemovePhotosFromTravelMemory,
+    handleHideMemoryGroup, handleRestoreMemoryGroup, handleAddPhotosBackToTravelMemory,
+    handleFetchPhotoComments, handleSavePhotoComments, handleFetchMeetingPhotoIndex,
+    galleryPhotoIndex, photoCommentCounts,
+    handleSavePlace, handleDeletePlace,
+    placesInitialQuery, setPlacesInitialQuery, placesInitialFocusId, setPlacesInitialFocusId,
+    isPlacesShareOpen, setIsPlacesShareOpen,
     memos, hasMoreMemos, totalMemoCount, onLoadMoreMemos, sharedMemo, setSharedMemo,
-    chatMessages, setActiveLightbox,
+    chatMessages,
     patchLocalMemo, upsertLocalMemo, removeLocalMemo, memoInitialTag, setMemoInitialTag,
     isMemoShareOpen, setIsMemoShareOpen,
   } = deps || {};
@@ -613,6 +627,34 @@ export function buildRenewalRecordsContext(calendar, deps) {
   return {
     calendar: activeCal,
     showToast,
+    historyProps: {
+      calendar: activeCal,
+      isDarkTheme, onToggleTheme: toggleTheme, fontScalePercent,
+      onDecreaseFont: () => setFontScalePercent(prev => Math.max(80, prev - 10)),
+      onIncreaseFont: () => setFontScalePercent(prev => Math.min(130, prev + 10)),
+      isChatNotifyEnabled: mainNotifPermission === 'granted' && mainChatNotifyEnabled,
+      onToggleChatNotifications: handleMainToggleNotifications,
+      syncStatus,
+      onAddPersonTag: handleAddPersonTag, onRenamePersonTag: handleRenamePersonTag, onDeletePersonTag: handleDeletePersonTag,
+      anniversaries, chatMessages: galleryChatMessages, memos: historyMemosSnapshot, setActiveLightbox,
+      showToast, onPromoteImageUrl: handlePromoteInlineChatImage, onSaveImageTags: handleSaveImageTags, onSearchTag: handleSearchTag,
+      onDeletePhoto: handleDeletePhoto, onReplacePhoto: handleReplacePhoto,
+      onJumpToChatMessage: handleJumpToChatMessage, onJumpToMemo: handleJumpToMemo, onJumpToMeetingDate: handleJumpToMeetingDate,
+      onGetChatMessageOrdinal: handleGetChatMessageOrdinal, onGetGalleryPhotoOrdinal: handleGetGalleryPhotoOrdinal,
+      onRequestConfirm: showConfirmDialog,
+      onRemovePhotoFromMemory: handleRemovePhotoFromTravelMemory, onRemovePhotosFromMemory: handleRemovePhotosFromTravelMemory,
+      onHideMemoryGroup: handleHideMemoryGroup, onRestoreMemoryGroup: handleRestoreMemoryGroup,
+      onAddPhotosBackToMemory: handleAddPhotosBackToTravelMemory,
+      onFetchPhotoComments: handleFetchPhotoComments, onSavePhotoComments: handleSavePhotoComments,
+      onFetchMeetingPhotoIndex: handleFetchMeetingPhotoIndex,
+      indexedPhotos: galleryPhotoIndex ? galleryPhotoIndex.items : [],
+      indexedPhotoComplete: galleryPhotoIndex ? galleryPhotoIndex.complete : false,
+      onIndexedPhotoLoadAll: galleryPhotoIndex ? galleryPhotoIndex.loadAll : undefined,
+      photoCommentCounts,
+    },
+    isHistoryShareOpen: !!isHistoryShareOpen,
+    onOpenHistoryShare: () => { if (requireLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsHistoryShareOpen(true); },
+    onCloseHistoryShare: () => setIsHistoryShareOpen(false),
     placesProps: {
       calendar: activeCal,
       onSavePlace: handleSavePlace, onDeletePlace: handleDeletePlace,
@@ -645,6 +687,46 @@ export function buildRenewalRecordsContext(calendar, deps) {
     onOpenMemoShare: () => { if (requireLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsMemoShareOpen(true); },
     onCloseMemoShare: () => setIsMemoShareOpen(false),
   };
+}
+
+/**
+ * 보관함 subtab body (WP-06 continuation): the real `HistoryView`, same pass-through approach as
+ * `MemoPane`/`PlacesPane`. Unlike those two, `HistoryView` ships in `ui-summary-gallery.js`, which
+ * is eagerly imported at boot (same reason `CalendarGrid`/`PollList` needed no lazy-load wait), so
+ * no "wait for the chunk" step is needed here.
+ *
+ * Owns its own local date-detail-modal state (like `PlacesPane`'s) rather than depending on
+ * WP-07's (not yet merged) shared date-modal lift -- see `PlacesPane`'s doc comment for the full
+ * reasoning. `calendarContext` is threaded down through `RecordsPane` just for
+ * `dateModalProps`'s data/handlers.
+ */
+function HistoryPane({ recordsContext, calendarContext, onChangeView, onOpenAppSettings, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource }) {
+  const React = window.React;
+  const [historyDateModalDate, setHistoryDateModalDate] = React.useState(null);
+  const { HistoryView, ShareModal, DateModal } = bindUiComponentAliases(React);
+  return React.createElement(React.Fragment, null,
+    React.createElement(HistoryView, {
+      ...recordsContext.historyProps,
+      onBack: () => onChangeView('calendar'),
+      onSelectDate: (dateStr) => setHistoryDateModalDate(dateStr),
+      onOpenShare: recordsContext.onOpenHistoryShare,
+      onOpenAppSettings,
+    }),
+    recordsContext.isHistoryShareOpen && React.createElement(ShareModal, {
+      calendar: recordsContext.calendar, shareType: 'history', showToast: recordsContext.showToast,
+      onClose: recordsContext.onCloseHistoryShare,
+    }),
+    historyDateModalDate && React.createElement(DateModal, {
+      ...calendarContext.dateModalProps,
+      dateStr: historyDateModalDate,
+      initialTab: null,
+      onClose: () => setHistoryDateModalDate(null),
+      onParticipantClick: (name, dateStr) => { if (dateStr) setHistoryDateModalDate(dateStr); },
+      onEditAnniversary,
+      onAddAnniversaryForDate: (d) => { setHistoryDateModalDate(null); onAddAnniversaryForDate(d); },
+      onFocusCultureSource: () => onFocusCultureSource(),
+    })
+  );
 }
 
 /**
@@ -755,7 +837,9 @@ function RecordsPane({ subTab, onSelectSubTab, calendarName, recordsContext, cal
         onClick: () => onSelectSubTab(t.id),
       }, t.label))
     ),
-    subTab === 'places'
+    subTab === 'archive'
+      ? React.createElement(HistoryPane, { recordsContext, calendarContext, onChangeView, onOpenAppSettings, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource })
+      : subTab === 'places'
       ? React.createElement(PlacesPane, { recordsContext, calendarContext, onChangeView, onOpenAppSettings, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource })
       : subTab === 'memo'
       ? React.createElement(MemoPane, { recordsContext, onChangeView, onOpenAppSettings })
