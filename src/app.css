@@ -6068,6 +6068,49 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 .renewal-shell-more-item-chevron { color: var(--text-muted, #64748b); }
 .renewal-shell-more-note { text-align: center; padding: 16px 20px 0; }
 
+/* Ephemeral chat presence. Kept visually aligned with incoming chat bubbles while remaining
+   outside message history, so it never affects chat/gallery counts or persists as content. */
+.chat-typing-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+.chat-typing-name {
+  flex-shrink: 0;
+  margin-top: 2px;
+  padding: 3px 8px;
+  border-radius: var(--radius-full, 999px);
+  color: #fff;
+  font-size: var(--font-size-md);
+  font-weight: 700;
+}
+.chat-typing-bubble {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+}
+.chat-typing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  animation: chat-typing-bounce 1.05s ease-in-out infinite;
+}
+@keyframes chat-typing-bounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.45; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-typing-dot { animation: none; opacity: 0.75; }
+}
+
 @media (min-width: 1024px) {
   .renewal-shell { padding-bottom: 0; padding-left: 220px; }
   .renewal-shell-bottom-nav { display: none; }

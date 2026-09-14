@@ -16,6 +16,8 @@ assert(!/allow\s+(?:read|write|read,\s*write)\s*:\s*if\s+true\s*;/.test(firestor
 assert(!/allow\s+(?:read|write|read,\s*write)\s*:\s*if\s+true\s*;/.test(storage), 'Storage must not grant unconditional read/write');
 assert(/match \/calendars\/\{calendarDocId\}[\s\S]*allow get: if isCalendarDoc\(calendarDocId\);/.test(firestore), 'calendar reads must stay scoped to validated document IDs');
 assert(/match \/messages\/\{messageId\}[\s\S]*allow get, list: if isCalendarDoc\(calendarDocId\);/.test(firestore), 'message reads must stay calendar-scoped');
+assert(/match \/typingPresence\/\{sessionId\}[\s\S]{0,260}allow get, list: if isCalendarDoc\(calendarDocId\);/.test(firestore), 'typing presence reads must stay calendar-scoped');
+assert(/hasValidTypingPresence\(sessionId\)[\s\S]{0,900}expiresAt <= request\.resource\.data\.updatedAt \+ 15000;/.test(firestore), 'typing presence writes must keep a strict shape and bounded TTL');
 assert(/match \/meetingPhotoIndex\/\{photoId\}[\s\S]*allow write: if false;/.test(firestore), 'meeting photo index must remain server-maintained');
 assert(/match \/photoIndex\/\{photoKey\}[\s\S]{0,180}allow write: if false;/.test(firestore), 'canonical photo index must remain server-maintained');
 const activityLogRules = firestore.match(/match \/activityLogs\/\{logId\} \{([\s\S]*?)\n\s{6}\}/)?.[1] || '';

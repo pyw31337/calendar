@@ -3,6 +3,7 @@
  */
 
 import { matchMemePoolByKeyword } from '../core/meme-pool.js';
+import { useChatTypingPresence } from '../core/chat-typing-presence.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -167,6 +168,12 @@ export function ChatRoomView({
   memoLastTitleWord = null
 }) {
   const React = window.React;
+  const { typingParticipantIds, announceTyping, stopTyping } = useChatTypingPresence({
+    React,
+    getDb: __fb,
+    calendarId: calendar?.id,
+    participantId: chatParticipantId
+  });
   const HeaderSearchIcon = ({ size = 20 }) => /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true }, /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /*#__PURE__*/React.createElement("path", { d: "m21 21-4.3-4.3" }));
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -415,9 +422,11 @@ export function ChatRoomView({
     if (!canSendChatNow()) return;
     event.preventDefault();
     event.stopPropagation();
+    stopTyping();
     triggerChatSend();
   };
   const handleSendClick = () => {
+    stopTyping();
     triggerChatSend();
   };
 
@@ -667,6 +676,9 @@ export function ChatRoomView({
     return acc;
   }, {});
   const selectedParticipant = participants.find(p => p.id === chatParticipantId);
+  const typingParticipants = typingParticipantIds
+    .map(id => participantsMap[id])
+    .filter(Boolean);
   // Kakao-style reply quote card, rendered at the top of a bubble when msg.replyTo is set --
   // shows the quoted sender + a 1-2 line snippet of what they said, and jumps back to that
   // original bubble (scroll + highlight, paginating through older history if needed) on tap.
@@ -1367,14 +1379,30 @@ export function ChatRoomView({
       /*#__PURE__*/React.createElement("strong", null, "공지 "), renderTextWithUrlBadge(notice.text)
     )
   ))), /*#__PURE__*/React.createElement("div", { ref: messagesListInnerRef },
-    renderedMessages.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    renderedMessages.length === 0 && typingParticipants.length === 0 ? /*#__PURE__*/React.createElement("div", {
       style: {
         textAlign: 'center',
         color: 'var(--text-light)',
         fontSize: 'var(--font-size-base)',
         marginTop: '40px'
       }
-    }, "\uC544\uC9C1 \uB4F1\uB85D\uB41C \uB300\uD654\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.") : renderedMessages
+    }, "\uC544\uC9C1 \uB4F1\uB85D\uB41C \uB300\uD654\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.") : renderedMessages,
+    typingParticipants.map(participant => /*#__PURE__*/React.createElement("div", {
+      key: `typing-${participant.id}`,
+      className: "chat-typing-row",
+      role: "status",
+      "aria-label": `${participant.name || '상대방'}님이 입력 중입니다`
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "chat-typing-name",
+      style: { backgroundColor: participant.color || '#94A3B8' }
+    }, participant.name || '알수없음'), /*#__PURE__*/React.createElement("span", {
+      className: "chat-typing-bubble",
+      "aria-hidden": "true"
+    }, [0, 1, 2].map(index => /*#__PURE__*/React.createElement("span", {
+      key: index,
+      className: "chat-typing-dot",
+      style: { animationDelay: `${index * 0.16}s` }
+    })))))
   )), showScrollToBottom && !hasNewMessageBelow && /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: scrollToBottom,
@@ -1576,6 +1604,7 @@ export function ChatRoomView({
         maxLength: 5000,
         onFocus: () => setIsInputFocused(true),
         onBlur: () => {
+          stopTyping();
           setTimeout(() => {
             const a = document.activeElement;
             if (a && a.closest && a.closest('.chat-composer')) {
@@ -1589,11 +1618,16 @@ export function ChatRoomView({
             setIsInputFocused(false);
           }, 50);
         },
-        onChange: e => { setChatInput(e.target.value); autoGrowTextarea(e.target, 100); },
+        onChange: e => {
+          setChatInput(e.target.value);
+          announceTyping(e.target.value);
+          autoGrowTextarea(e.target, 100);
+        },
         onPaste: handlePasteImagesChat,
         onKeyDown: e => {
           if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
             e.preventDefault();
+            stopTyping();
             triggerChatSend();
           }
         },

@@ -193,6 +193,29 @@ service cloud.firestore {
         allow delete: if isCalendarDoc(calendarDocId);
       }
 
+      // Short-lived "typing…" presence is intentionally separate from messages. Treating it as
+      // a chat message would corrupt recent-message counts and make transient UI state permanent.
+      // Clients refresh every four seconds and ignore expired rows; the strict shape/TTL cap keeps
+      // each session bounded even though shared calendars intentionally use link-based access.
+      function hasValidTypingPresence(sessionId) {
+        return request.resource.data.keys().hasOnly(['participantId', 'sessionId', 'updatedAt', 'expiresAt'])
+          && request.resource.data.participantId is string
+          && request.resource.data.participantId.size() > 0
+          && request.resource.data.participantId.size() <= 160
+          && request.resource.data.sessionId is string
+          && request.resource.data.sessionId == sessionId
+          && request.resource.data.sessionId.matches('^[A-Za-z0-9_-]{1,80}$')
+          && request.resource.data.updatedAt is number
+          && request.resource.data.expiresAt is number
+          && request.resource.data.expiresAt > request.resource.data.updatedAt
+          && request.resource.data.expiresAt <= request.resource.data.updatedAt + 15000;
+      }
+      match /typingPresence/{sessionId} {
+        allow get, list: if isCalendarDoc(calendarDocId);
+        allow create, update: if isCalendarDoc(calendarDocId) && hasValidTypingPresence(sessionId);
+        allow delete: if isCalendarDoc(calendarDocId);
+      }
+
       // Read-only denormalized index for date-specific meeting photos. It is maintained by the
       // server-side message trigger; clients never write index rows directly.
       match /meetingPhotoIndex/{photoId} {
