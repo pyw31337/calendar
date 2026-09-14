@@ -261,6 +261,13 @@ async function checkRenewalShellRoutes(browser, baseUrl) {
         if (overflow > 2) throw new Error(`가로 스크롤 ${overflow}px`);
         pass(`[${viewport.name}] V2 ${label}`);
       }
+      await gotoBootReady(page, `${baseUrl}?id=cw&shell=v2&tab=records`);
+      for (const [label, expected] of [['사진·영상', 'media'], ['장소', 'places'], ['보관함', 'archive'], ['콘텐츠', 'content']]) {
+        await page.getByRole('tab', { name: label, exact: true }).click();
+        await page.waitForTimeout(250);
+        if (!new URL(page.url()).searchParams.get('sub')?.includes(expected)) throw new Error(`기록 ${label} 클릭 후 sub=${new URL(page.url()).searchParams.get('sub') || '(없음)'}`);
+      }
+      pass(`[${viewport.name}] V2 기록 서브탭 클릭 전환`);
     } catch (err) {
       fail(`[${viewport.name}] V2 목적지`, err.message);
     } finally {
