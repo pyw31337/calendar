@@ -682,8 +682,8 @@ export function ChatRoomView({
     .filter(Boolean);
   // Firestore presence는 자기 자신을 제외하지만, 입력 중인 사용자는 자신의 상태도
   // 즉시 확인할 수 있어야 한다. 전송/blur 시 기존 stopTyping 경로가 이를 함께 닫는다.
-  const selfTypingParticipant = chatInput && String(chatInput).trim() && selectedParticipant
-    ? { ...selectedParticipant, id: String(selectedParticipant.id), __self: true }
+  const selfTypingParticipant = chatInput && String(chatInput).trim() && chatParticipantId
+    ? { ...(selectedParticipant || {}), id: String(chatParticipantId), name: selectedParticipant?.name || '나', __self: true }
     : null;
   const visibleTypingParticipants = selfTypingParticipant
     ? [...typingParticipants, selfTypingParticipant]
