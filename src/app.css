@@ -6029,6 +6029,24 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 .renewal-shell-section-title { font-weight: 800; font-size: 0.82rem; color: var(--text-main, #0f172a); margin-bottom: 8px; }
 
 .renewal-records-overview { padding: 20px 0 32px; }
+
+.renewal-home-summary { display: grid; gap: 18px; padding: 18px 0 34px; }
+.renewal-home-summary-section { border-top: 1px solid var(--border, #e2e8f0); padding-top: 14px; }
+.renewal-home-summary-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; font-weight: 800; font-size: .9rem; }
+.renewal-home-summary-heading button { border: 0; background: none; color: var(--brand, #4f46e5); font-size: .75rem; font-weight: 700; cursor: pointer; }
+.renewal-home-chat-list, .renewal-home-memo-list { display: grid; gap: 8px; }
+.renewal-home-chat-item, .renewal-home-memo-card { display: flex; align-items: center; gap: 10px; width: 100%; padding: 11px 12px; border: 1px solid var(--border, #e2e8f0); border-radius: 12px; background: var(--surface, #fff); color: inherit; text-align: left; cursor: pointer; }
+.renewal-home-avatar { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: #e9d5ff; color: #6b21a8; font-size: .72rem; font-weight: 800; flex: 0 0 auto; }
+.renewal-home-chat-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .8rem; }
+.renewal-home-chat-time { color: var(--text-muted, #64748b); font-size: .7rem; }
+.renewal-home-memo-card { display: grid; align-items: start; gap: 4px; }
+.renewal-home-memo-card strong { font-size: .82rem; }
+.renewal-home-memo-card span { color: var(--text-muted, #64748b); font-size: .74rem; line-height: 1.45; }
+.renewal-home-photo-strip { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 7px; }
+.renewal-home-photo-strip button { aspect-ratio: 1; padding: 0; overflow: hidden; border: 0; border-radius: 10px; background: #eef2f7; cursor: pointer; }
+.renewal-home-photo-strip img { width: 100%; height: 100%; object-fit: cover; }
+.renewal-home-empty { margin: 0; color: var(--text-muted, #64748b); font-size: .78rem; }
+@media (max-width: 560px) { .renewal-home-photo-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .renewal-records-overview-subtitle { margin: -2px 0 16px; color: var(--text-muted, #64748b); font-size: .84rem; }
 .renewal-records-overview-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .renewal-records-overview-card { display: flex; align-items: center; gap: 10px; min-height: 104px; padding: 14px; border: 1px solid var(--border, #e2e8f0); border-radius: 16px; background: var(--surface, #fff); color: inherit; text-align: left; cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; }

@@ -184,7 +184,7 @@ export function buildRenewalCalendarContext(calendar, deps) {
     handleFetchDateTaggedMessages, handleFetchDateTaggedMemos, handleFetchMeetingPhotoIndex,
     handleFetchMeetingAlbum, loadOlderChatMessages, hasMoreOlderChat, loadingOlderChat, fullChatMessages,
     handleSavePlace, handleDeletePlace, handleReorderPlaces,
-    showToast, showConfirmDialog, syncStatus, photoCommentCounts, setActiveLightbox,
+    showToast, showConfirmDialog, syncStatus, photoCommentCounts, setActiveLightbox, galleryPhotoIndex,
     isPollModalOpen, setIsPollModalOpen, editingPoll, setEditingPoll, voteTarget, setVoteTarget,
     handleOpenPollCreate, handleOpenPollEdit, handleSavePoll, handleOpenVoteSheet, handleVotePoll, handleCancelVote,
   } = deps || {};
@@ -196,6 +196,7 @@ export function buildRenewalCalendarContext(calendar, deps) {
   const { visibleConfirmedMeetings, hasVisiblePolls } = buildMainCalendarScreenState({ calendar: activeCal });
   return {
     calendar: activeCal,
+    displayChatMessages, memos, galleryPhotoIndex, setActiveLightbox,
     anniversaries: anniversariesWithPosters,
     isLoading: !!isInitialDataLoading,
     handleMoveAvailability,
@@ -311,7 +312,7 @@ function PollsSection({ calendarContext }) {
  * local state here, same reasoning as `openMoreModal`: CalendarApp's own `currentMonthDate` drives
  * JSX this shell's early return never reaches, so reusing it would silently no-op.
  */
-function CalendarPane({ calendarContext, onOpenDate }) {
+function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeView }) {
   const React = window.React;
   const { CalendarGrid } = bindUiComponentAliases(React);
   const [monthDate, setMonthDate] = React.useState(() => new Date());
@@ -331,7 +332,37 @@ function CalendarPane({ calendarContext, onOpenDate }) {
       onParticipantClick,
     }),
     React.createElement(UpcomingMeetingsSection, { meetings: calendarContext.upcomingMeetings, onSelectDate: onOpenDate }),
-    React.createElement(PollsSection, { calendarContext })
+    React.createElement(PollsSection, { calendarContext }),
+    React.createElement(HomeActivitySummary, { calendarContext: { ...calendarContext, displayChatMessages: recordsContext?.mediaProps?.chatMessages, memos: recordsContext?.memoProps?.memos, galleryPhotoIndex: recordsContext?.mediaProps?.indexedPhotos ? { items: recordsContext.mediaProps.indexedPhotos } : null, setActiveLightbox: recordsContext?.mediaProps?.setActiveLightbox }, onOpenDate, onChangeView })
+  );
+}
+
+/** 클로드 목업의 홈 요약 흐름을 기존 로드 상태로 구현한다. 전체 목록을 추가 조회하지 않는다. */
+function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
+  const React = window.React;
+  const messages = Array.isArray(calendarContext?.displayChatMessages) ? calendarContext.displayChatMessages.slice(-3).reverse() : [];
+  const memos = Array.isArray(calendarContext?.memos) ? calendarContext.memos.slice(0, 2) : [];
+  const photos = Array.isArray(calendarContext?.galleryPhotoIndex?.items) ? calendarContext.galleryPhotoIndex.items.slice(0, 6) : [];
+  const Section = ({ title, children, onMore }) => React.createElement('section', { className: 'renewal-home-summary-section' },
+    React.createElement('div', { className: 'renewal-home-summary-heading' },
+      React.createElement('span', null, title), onMore && React.createElement('button', { type: 'button', onClick: onMore }, '전체보기')
+    ), children);
+  return React.createElement('div', { className: 'renewal-home-summary' },
+    React.createElement(Section, { title: '채팅', onMore: () => onChangeView?.('chat') },
+      messages.length ? React.createElement('div', { className: 'renewal-home-chat-list' }, messages.map((m, i) => React.createElement('button', { type: 'button', className: 'renewal-home-chat-item', key: m.id || i, onClick: () => calendarContext.onChangeView?.('chat') },
+        React.createElement('span', { className: 'renewal-home-avatar' }, String(m.senderName || m.author || '•').slice(0, 1)),
+        React.createElement('span', { className: 'renewal-home-chat-text' }, String(m.text || m.content || '사진 또는 첨부파일').slice(0, 80)),
+        React.createElement('span', { className: 'renewal-home-chat-time' }, m.createdAt ? new Date(m.createdAt).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' }) : '')
+      ))) : React.createElement('p', { className: 'renewal-home-empty' }, '최근 대화가 없습니다.')
+    ),
+    React.createElement(Section, { title: '메모', onMore: () => onChangeView?.('records') },
+      memos.length ? React.createElement('div', { className: 'renewal-home-memo-list' }, memos.map((memo, i) => React.createElement('button', { type: 'button', className: 'renewal-home-memo-card', key: memo.id || i, onClick: () => calendarContext.onChangeView?.('records') },
+        React.createElement('strong', null, memo.title || memo.text || '메모'), React.createElement('span', null, String(memo.content || memo.description || '').slice(0, 100))
+      ))) : React.createElement('p', { className: 'renewal-home-empty' }, '최근 메모가 없습니다.')
+    ),
+    React.createElement(Section, { title: '갤러리', onMore: () => onChangeView?.('gallery') },
+      photos.length ? React.createElement('div', { className: 'renewal-home-photo-strip' }, photos.map((photo, i) => React.createElement('button', { type: 'button', key: photo.id || photo.mediaKey || i, onClick: () => calendarContext.setActiveLightbox?.(photo), 'aria-label': `사진 ${i + 1} 크게 보기` }, React.createElement('img', { src: photo.thumbnailUrl || photo.url || photo.downloadURL, alt: '', loading: 'lazy' })))) : React.createElement('p', { className: 'renewal-home-empty' }, '등록된 사진이 없습니다.')
+    )
   );
 }
 
@@ -1540,7 +1571,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
           onOpenMore: () => setActiveTab('more'),
         }),
         activeTab === 'calendar'
-          ? React.createElement(CalendarPane, { calendarContext, onOpenDate: setDateModalDate })
+          ? React.createElement(CalendarPane, { calendarContext, recordsContext, onOpenDate: setDateModalDate, onChangeView })
           : activeTab === 'chat'
           ? React.createElement(ChatPane, { chatContext, onChangeView, onOpenAppSettings })
           : activeTab === 'settlement'
