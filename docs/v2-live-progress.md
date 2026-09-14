@@ -348,3 +348,11 @@
 - 검증: `check:all`, production build, dist/architecture budget 통과. Pages 배포 전 브라우저 smoke를 통과했고 Verify의 정적 회귀·live-smoke도 성공.
 - 배포: 코드 커밋 `15de76dc`, Pages `34829145146`, Verify Calendar `34829145152`(verify/live-smoke) 성공. 캐시 버스트 URL에서 V2 플래그 유지 상태를 확인.
 - 다음: 4개 뷰포트 시각 회귀 스냅샷을 기준으로 전체 P0 승인 여부를 검토. `shell=v2` 플래그는 유지.
+
+## 2026-09-14 19:34 KST
+
+- 모바일 5탭 직접 전환 테스트에서 발견한 레이어 회귀를 수정: 채팅 화면의 고정 컨테이너가 하단 내비게이션 클릭을 가로채던 문제를 V2 내비게이션 `z-index:1100`으로 해결.
+- 범위: `src/app.css`의 V2 하단 내비게이션 레이어 규칙만 변경. 채팅 입력·메시지·사진·태그·댓글 데이터 계약은 변경하지 않음.
+- 직접 검토: 라이브 캐시 버스트 URL에서 대화→기록 전환 성공, 기록 허브 텍스트 노출, 하단 내비게이션 z-index 1100 확인.
+- 검증/배포: `npm run lint -- --quiet`, `check:design-system`, build/dist 예산 통과. 코드 `62b14cfa`, Pages `34829986501`, Verify Calendar `34829986529`(verify/live-smoke) 성공.
+- 다음: 5탭 전환과 4개 뷰포트 스냅샷을 릴리스 승인 체크리스트에 반영. `shell=v2` 플래그는 유지.
