@@ -6113,6 +6113,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
   gap: 8px;
   margin: 0 0 12px;
 }
+.chat-typing-row-self { justify-content: flex-end; }
 .chat-typing-name {
   flex-shrink: 0;
   margin-top: 2px;

@@ -1401,7 +1401,7 @@ export function ChatRoomView({
     }, "\uC544\uC9C1 \uB4F1\uB85D\uB41C \uB300\uD654\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.") : renderedMessages,
     visibleTypingParticipants.map(participant => /*#__PURE__*/React.createElement("div", {
       key: `typing-${participant.__self ? 'self' : participant.id}`,
-      className: "chat-typing-row",
+      className: `chat-typing-row${participant.__self ? ' chat-typing-row-self' : ''}`,
       role: "status",
       "aria-label": `${participant.name || '상대방'}님이 입력 중입니다`
     }, /*#__PURE__*/React.createElement("span", {
