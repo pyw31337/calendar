@@ -340,3 +340,11 @@
 - 검증: `check:all`, production build 및 dist 예산 통과. Pages 배포 전 Chromium 브라우저 스모크 통과.
 - 배포: 코드 커밋 `69a6e29e`, Pages `34828327007`, Verify Calendar `34828327051`(verify/live-smoke) 모두 성공.
 - 다음: 캘린더 홈 D-day/상단 요약 영역을 목업과 대조하는 독립 P0 유닛. `shell=v2` 플래그는 유지.
+
+## 2026-09-14 19:06 KST
+
+- P0 디자인 유닛 완료: V2 캘린더 홈의 가까운 일정 영역을 독립 카드 표면으로 정리하고 D-day 배지를 인디고→보라 그라디언트로 보강. hover/focus-visible 상태와 텍스트 행간을 추가해 키보드 탐색 시에도 동일한 계층을 유지.
+- 범위: `src/app.css`의 `.renewal-shell-upcoming-*` 및 캘린더 셸 한정 규칙만 변경. 일정 선택 핸들러와 날짜 데이터, 사진·태그·댓글·Firestore/Storage 계약은 변경하지 않음.
+- 검증: `check:all`, production build, dist/architecture budget 통과. Pages 배포 전 브라우저 smoke를 통과했고 Verify의 정적 회귀·live-smoke도 성공.
+- 배포: 코드 커밋 `15de76dc`, Pages `34829145146`, Verify Calendar `34829145152`(verify/live-smoke) 성공. 캐시 버스트 URL에서 V2 플래그 유지 상태를 확인.
+- 다음: 4개 뷰포트 시각 회귀 스냅샷을 기준으로 전체 P0 승인 여부를 검토. `shell=v2` 플래그는 유지.
