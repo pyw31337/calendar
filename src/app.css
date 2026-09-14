@@ -5988,13 +5988,25 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
    file (docs/product-renewal-master-plan.md §0.5). Mobile gets a fixed bottom nav (the 5-tab IA
    this plan calls for); >=1024px swaps to the same 5 destinations as a left side rail instead
    (§4.1) and hides the bottom nav. */
-.renewal-shell { min-height: 100%; padding-bottom: 64px; }
+.renewal-shell {
+  --renewal-page-max: 1180px;
+  --renewal-hero-gradient: linear-gradient(118deg, #4338ca 0%, #7c3aed 52%, #14b8a6 100%);
+  min-height: 100%;
+  padding-bottom: 64px;
+}
 .renewal-shell-side-nav { display: none; }
 .renewal-shell-main { padding: 0; }
+.renewal-shell-main.is-calendar {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 88% 5%, color-mix(in srgb, var(--brand, #4f46e5) 8%, transparent) 0, transparent 28%),
+    var(--bg-primary, #f8fafc);
+}
 
 .renewal-shell-header {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 15px 18px; background: var(--brand, #4f46e5); color: #fff;
+  min-height: 58px; padding: 14px 18px; background: var(--renewal-hero-gradient); color: #fff;
+  box-shadow: 0 12px 30px rgba(67, 56, 202, .18);
 }
 .renewal-shell-header-brand { display: flex; align-items: center; gap: 7px; font-weight: 800; font-size: 1rem; letter-spacing: -.02em; }
 .renewal-shell-header-actions { display: flex; gap: 6px; }
@@ -6003,6 +6015,26 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
   color: #fff; padding: 7px; display: inline-flex; cursor: pointer;
 }
 .renewal-shell-header-icon-btn:hover { background: rgba(255,255,255,0.28); }
+
+/* V2 calendar-home surface: the production grid remains untouched, while the flagged shell
+   gives it the same floating-card hierarchy as the approved visual mock. */
+.renewal-shell-main.is-calendar > .calendar-card,
+.renewal-shell-main.is-calendar > .renewal-shell-section,
+.renewal-shell-main.is-calendar > .renewal-home-summary {
+  width: calc(100% - 24px);
+  max-width: var(--renewal-page-max);
+  box-sizing: border-box;
+  margin-left: auto;
+  margin-right: auto;
+}
+.renewal-shell-main.is-calendar > .calendar-card {
+  margin-top: 12px;
+  margin-bottom: 0;
+  border: 1px solid color-mix(in srgb, var(--border-subtle, #e2e8f0) 82%, transparent);
+  border-radius: 16px;
+  box-shadow: 0 12px 34px rgba(15, 23, 42, .07);
+}
+.renewal-shell-main.is-calendar > .renewal-shell-section { padding: 20px 2px 0; }
 
 .renewal-shell-bottom-nav {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
@@ -6222,11 +6254,23 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 
 @media (min-width: 1024px) {
   .renewal-shell { padding-bottom: 0; padding-left: 220px; }
+  .renewal-shell-main.is-calendar { padding: 24px 24px 48px; }
+  .renewal-shell-main.is-calendar > .renewal-shell-header {
+    max-width: var(--renewal-page-max);
+    margin: 0 auto;
+    border: 1px solid rgba(255, 255, 255, .2);
+    border-radius: 18px;
+  }
+  .renewal-shell-main.is-calendar > .calendar-card,
+  .renewal-shell-main.is-calendar > .renewal-shell-section,
+  .renewal-shell-main.is-calendar > .renewal-home-summary { width: 100%; }
+  .renewal-shell-main.is-calendar > .calendar-card { margin-top: 18px; }
   .renewal-shell-bottom-nav { display: none; }
   .renewal-shell-side-nav {
     display: flex; flex-direction: column; gap: 2px; position: fixed; top: 0; left: 0; bottom: 0;
     width: 220px; padding: 18px 12px; background: var(--bg-card, #fff);
     border-right: 1px solid var(--border-subtle, #e2e8f0); overflow-y: auto;
+    box-shadow: 10px 0 32px rgba(15, 23, 42, .035);
   }
   .renewal-shell-side-nav-brand { font-weight: 800; font-size: 0.92rem; color: var(--text-main, #0f172a); padding: 6px 10px 16px; }
   .renewal-shell-side-nav-item {

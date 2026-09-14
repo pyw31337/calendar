@@ -1590,7 +1590,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
         React.createElement('div', { className: 'renewal-shell-side-nav-divider', 'aria-hidden': 'true' }),
         ...desktopQuickButtons
       ),
-      React.createElement('main', { className: 'renewal-shell-main' },
+      React.createElement('main', { className: `renewal-shell-main is-${activeTab}` },
         React.createElement(TopHeader, {
           calendarName,
           onOpenSearch: () => handleSelectMoreItem('search'),
