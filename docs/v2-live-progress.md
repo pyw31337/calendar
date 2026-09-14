@@ -322,3 +322,12 @@
 - 검증: `check:all`, production build, dist/architecture/design budget 통과. 충돌 없는 전용 preview 포트에서 Chromium 94/94, Firefox 93/93, WebKit 93/93 통과.
 - 배포: 코드 커밋 `599b0304`, Pages `34826051653` 및 Verify Calendar `34826051662` 성공. 캐시 버스트 라이브에서 그라디언트 헤더, 16px 캘린더 카드, 데스크톱 18px 헤더 radius, 사진 6개를 확인했고 `smoke:live` 통과.
 - 다음: 홈 요약 카드의 제목/본문/보조문구 타이포그래피와 카드 내부 여백을 목업에 맞추는 독립 P0 유닛.
+
+## 2026-09-14 18:24 KST
+
+- P0 디자인 유닛 완료: 홈 채팅·메모·갤러리·장소 요약 섹션을 독립 카드로 만들고 14px 외곽 radius, 16px 내부 여백, 공통 얇은 테두리·그림자와 제목/본문/보조문구 간격을 적용.
+- 범위: `src/app.css`의 V2 홈 요약 스타일만 변경. 데이터 조회, 사진·태그·댓글 identity, Firestore/Storage 계약은 변경하지 않음.
+- 직접 검토: 375×812·768×1024·1024×900·1440×900에서 overflow 0. 모바일 하단 내비게이션, 데스크톱 사이드 레일, 6개 홈 갤러리 썸네일 확인.
+- 검증: `check:all`, production build, 번들·아키텍처·디자인 가드 통과. 전용 preview에서 Chromium 94/94, Firefox 93/93, WebKit 94/94 통과.
+- 배포: 코드 커밋 `ef4032b5` Pages 배포 `34827464119`, Verify Calendar `34827464048` 성공. 캐시 버스트 라이브 URL에서 카드 radius/padding/shadow와 사진 6개를 직접 확인.
+- 다음: 캘린더 홈 카드의 세부 타이포그래피·D-day 요약 영역을 목업과 대조하는 다음 독립 유닛. `shell=v2` 플래그는 유지.
