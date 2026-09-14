@@ -155,6 +155,12 @@ function computeChatImageGridMaxWidth(count) {
 function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) {
   const entries = getMessageImageEntries(msg);
   if (entries.length === 0) return null;
+  // Meme-keyboard messages are sent from an already-hosted, small shared asset. Keep those
+  // newest chat bubbles visible immediately; lazy loading can defer a just-sent sticker until
+  // the scroll container moves, which makes the message look empty in the first paint.
+  const isMemeAsset = msg?.uploadSource === 'meme'
+    || entries.some(entry => /\/memePool(?:%2F|\/)/i.test(String(entry.full || entry.thumb || '')));
+  const imageLoading = isMemeAsset ? 'eager' : 'lazy';
   const thumbs = entries.map(e => e.thumb);
   const displayUrls = entries.map(e => e.full);
   const meta = entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, source: e.source, uploadSource: e.uploadSource, assetKey: e.assetKey, mediaKey: e.mediaKey, refKey: e.refKey }));
@@ -167,7 +173,7 @@ function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) 
     return /*#__PURE__*/React.createElement('img', {
       src: thumbs[0] || displayUrls[0],
       alt: '첨부이미지',
-      loading: 'lazy',
+      loading: imageLoading,
       decoding: 'async',
       referrerPolicy: 'no-referrer',
       onClick: () => setActiveLightbox && setActiveLightbox({ urls: displayUrls, index: 0, meta }),
@@ -221,7 +227,7 @@ function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) 
     key: idx,
     src: thumb,
     alt: `첨부이미지 ${idx + 1}`,
-    loading: 'lazy',
+    loading: imageLoading,
     decoding: 'async',
     referrerPolicy: 'no-referrer',
     onClick: () => setActiveLightbox && setActiveLightbox({ urls: displayUrls, index: idx, meta }),
