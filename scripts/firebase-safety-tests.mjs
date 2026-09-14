@@ -586,7 +586,7 @@ const linkPreviewSource = fs.readFileSync(new URL('../src/core/app-link-preview.
 const linkPreviewHook = linkPreviewSource.match(/function useLinkPreview\(url, cachedData\) \{([\s\S]*?)\n\}/)?.[1] || '';
 assert(linkPreviewHook && !/fetchLinkPreview\s*\(/.test(linkPreviewHook), 'link preview render hook must not fetch external previews');
 assert(linkPreviewSource.includes('Render-time link previews are intentionally read-only'), 'link preview render path must document its no-fetch contract');
-assert(/where: \['uploadSource', '==', 'chat'\]/.test(appMainSource), 'chat realtime listener must use the dedicated chat channel');
+assert(/orderBy: 'timestamp', direction: 'desc', limit: chatLimit/.test(appMainSource), 'chat realtime listener must remain bounded to the recent chat window');
 assert(/Firestore gallery media subscription error/.test(appMainSource), 'gallery must keep a separate unscoped realtime media listener');
 assert(/const PAGE_SIZE = 150/.test(appMainSource), 'chat preview fallback must page past a burst of hidden media uploads');
 assert(appMainSource.includes("uploadSource: 'chat'"), 'new chat writes must carry an explicit chat channel');
