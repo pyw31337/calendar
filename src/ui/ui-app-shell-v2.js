@@ -283,15 +283,20 @@ function RenewalHero({ meetings, onSelectDate }) {
   const React = window.React;
   if (!meetings || meetings.length === 0) return null;
   const [primary, ...rest] = meetings;
+  const labelFor = (meeting) => {
+    const base = formatConfirmedMeetingLabel(meeting.date);
+    const note = typeof meeting.note === 'string' ? meeting.note.trim().replace(/\s+/g, ' ') : '';
+    return note ? `${base} · ${note.slice(0, 48)}` : base;
+  };
   return React.createElement('section', { className: 'renewal-home-hero', 'aria-label': '가까운 확정 일정' },
     React.createElement('button', { type: 'button', className: 'renewal-home-hero-primary', onClick: () => onSelectDate(primary.date) },
       React.createElement('span', { className: 'renewal-home-hero-dday' }, formatDDayLabel(primary.date)),
-      React.createElement('span', { className: 'renewal-home-hero-label' }, formatConfirmedMeetingLabel(primary.date)),
+      React.createElement('span', { className: 'renewal-home-hero-label' }, labelFor(primary)),
       React.createElement('span', { className: 'renewal-home-hero-arrow', 'aria-hidden': 'true' }, '›')
     ),
     rest.length > 0 && React.createElement('div', { className: 'renewal-home-hero-chips' }, rest.map(meeting => React.createElement('button', {
       key: meeting.date, type: 'button', className: 'renewal-home-hero-chip', onClick: () => onSelectDate(meeting.date)
-    }, React.createElement('strong', null, formatConfirmedMeetingLabel(meeting.date)), React.createElement('small', null, formatDDayLabel(meeting.date)))))
+    }, React.createElement('strong', null, labelFor(meeting)), React.createElement('small', null, formatDDayLabel(meeting.date)))))
   );
 }
 
