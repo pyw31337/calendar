@@ -240,6 +240,13 @@ export function ChatRoomView({
 
   const [viewportBottom, setViewportBottom] = React.useState(0);
   const [composerHeight, setComposerHeight] = React.useState(0);
+  const [composerInputHeight, setComposerInputHeight] = React.useState(() => {
+    try {
+      const stored = Number(window.localStorage.getItem('gather-chat-composer-height'));
+      return Number.isFinite(stored) ? Math.max(44, Math.min(260, stored)) : 44;
+    } catch (_) { return 44; }
+  });
+  const composerResizeRef = React.useRef(null);
   const chatComposerRef = React.useRef(null);
   const [isInputFocused, setIsInputFocused] = React.useState(false);
   // 밈 키보드: 입력 중인 텍스트가 memePool의 해시태그와 겹치면 "#태그 (n)" 칩을 보여주고,
@@ -570,6 +577,23 @@ export function ChatRoomView({
     window.addEventListener('resize', measure);
     return () => window.removeEventListener('resize', measure);
   }, [chatReplyTarget, chatInput, chatImages, isInputFocused, viewportBottom]);
+
+  React.useEffect(() => {
+    try { window.localStorage.setItem('gather-chat-composer-height', String(composerInputHeight)); } catch (_) { /* storage is optional */ }
+  }, [composerInputHeight]);
+
+  const beginComposerResize = (event) => {
+    event.preventDefault();
+    composerResizeRef.current = { startY: event.clientY, startHeight: composerInputHeight };
+    if (event.currentTarget.setPointerCapture) event.currentTarget.setPointerCapture(event.pointerId);
+  };
+  const moveComposerResize = (event) => {
+    const drag = composerResizeRef.current;
+    if (!drag) return;
+    const next = Math.max(44, Math.min(260, drag.startHeight + drag.startY - event.clientY));
+    setComposerInputHeight(next);
+  };
+  const endComposerResize = () => { composerResizeRef.current = null; };
 
   const docFileInputRefChat = React.useRef(null);
   const [imageProcessingChat, setImageProcessingChat] = React.useState(null);
@@ -1510,12 +1534,29 @@ export function ChatRoomView({
         display: 'flex',
         flexDirection: 'column',
         gap: '10px',
+        position: 'relative',
         boxSizing: 'border-box',
         width: '100%'
       }
     },
       /* 밈 키보드: 입력창 바로 위, 이모지 피커와 같은 자리 개념. 매칭된 해시태그가 있을 때만
          보인다 -- 평소엔 아무 자리도 차지하지 않는다. */
+      /*#__PURE__*/React.createElement("div", {
+        className: "chat-composer-resize-handle",
+        role: "separator",
+        "aria-label": "대화 입력창 높이 조절",
+        "aria-orientation": "horizontal",
+        tabIndex: 0,
+        onPointerDown: beginComposerResize,
+        onPointerMove: moveComposerResize,
+        onPointerUp: endComposerResize,
+        onPointerCancel: endComposerResize,
+        onKeyDown: event => {
+          if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+          event.preventDefault();
+          setComposerInputHeight(height => Math.max(44, Math.min(260, height + (event.key === 'ArrowUp' ? 12 : -12))));
+        }
+      }, /*#__PURE__*/React.createElement("span", { "aria-hidden": "true" }, "⋮")),
       memeMatches.length > 0 && /*#__PURE__*/React.createElement("div", {
         style: { display: 'flex', flexDirection: 'column', gap: '8px' }
       },
@@ -1645,9 +1686,9 @@ export function ChatRoomView({
         },
         style: {
           width: '100%',
-          height: '44px',
+          height: `${composerInputHeight}px`,
           minHeight: '44px',
-          maxHeight: '100px',
+          maxHeight: '260px',
           resize: 'none',
           border: 'none',
           background: 'none',
