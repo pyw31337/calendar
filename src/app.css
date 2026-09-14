@@ -6165,6 +6165,11 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 /* Tablet and phone summaries keep the requested 3-column thumbnail rhythm so a 3x3
    first viewport remains readable instead of collapsing into six tiny tiles. */
 @media (max-width: 1023px) { .renewal-home-photo-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 520px) {
+  .renewal-home-summary { gap: 16px; padding-top: 22px; }
+  .renewal-home-summary-section { padding: 16px; border-radius: 16px; }
+  .renewal-home-summary-heading { margin-bottom: 14px; }
+}
 @media (min-width: 1024px) { .renewal-home-hero { margin-top: 0; padding: 16px 20px 14px; border-radius: 0 0 18px 18px; } .renewal-home-hero-chip { min-width: 108px; } }
 .renewal-records-overview-subtitle { margin: -2px 0 16px; color: var(--text-muted, #64748b); font-size: .84rem; }
 .renewal-records-overview-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
