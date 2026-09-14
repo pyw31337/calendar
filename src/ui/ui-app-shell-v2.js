@@ -333,7 +333,7 @@ function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeVie
     }),
     React.createElement(UpcomingMeetingsSection, { meetings: calendarContext.upcomingMeetings, onSelectDate: onOpenDate }),
     React.createElement(PollsSection, { calendarContext }),
-    React.createElement(HomeActivitySummary, { calendarContext: { ...calendarContext, displayChatMessages: recordsContext?.mediaProps?.chatMessages, memos: recordsContext?.memoProps?.memos, galleryPhotoIndex: recordsContext?.mediaProps?.indexedPhotos ? { items: recordsContext.mediaProps.indexedPhotos } : null, setActiveLightbox: recordsContext?.mediaProps?.setActiveLightbox }, onOpenDate, onChangeView })
+    React.createElement(HomeActivitySummary, { calendarContext: { ...calendarContext, displayChatMessages: recordsContext?.mediaProps?.chatMessages, memos: recordsContext?.memoProps?.memos, places: recordsContext?.placesProps?.calendar?.places, galleryPhotoIndex: recordsContext?.mediaProps?.indexedPhotos ? { items: recordsContext.mediaProps.indexedPhotos } : null, setActiveLightbox: recordsContext?.mediaProps?.setActiveLightbox }, onOpenDate, onChangeView })
   );
 }
 
@@ -343,6 +343,7 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
   const messages = Array.isArray(calendarContext?.displayChatMessages) ? calendarContext.displayChatMessages.slice(-3).reverse() : [];
   const memos = Array.isArray(calendarContext?.memos) ? calendarContext.memos.slice(0, 2) : [];
   const photos = Array.isArray(calendarContext?.galleryPhotoIndex?.items) ? calendarContext.galleryPhotoIndex.items.slice(0, 6) : [];
+  const places = Array.isArray(calendarContext?.places) ? calendarContext.places.slice(0, 2) : [];
   const Section = ({ title, children, onMore }) => React.createElement('section', { className: 'renewal-home-summary-section' },
     React.createElement('div', { className: 'renewal-home-summary-heading' },
       React.createElement('span', null, title), onMore && React.createElement('button', { type: 'button', onClick: onMore }, '전체보기')
@@ -362,6 +363,11 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
     ),
     React.createElement(Section, { title: '갤러리', onMore: () => onChangeView?.('gallery') },
       photos.length ? React.createElement('div', { className: 'renewal-home-photo-strip' }, photos.map((photo, i) => React.createElement('button', { type: 'button', key: photo.id || photo.mediaKey || i, onClick: () => calendarContext.setActiveLightbox?.(photo), 'aria-label': `사진 ${i + 1} 크게 보기` }, React.createElement('img', { src: photo.thumbnailUrl || photo.url || photo.downloadURL, alt: '', loading: 'lazy' })))) : React.createElement('p', { className: 'renewal-home-empty' }, '등록된 사진이 없습니다.')
+    ),
+    React.createElement(Section, { title: '장소', onMore: () => onChangeView?.('records') },
+      places.length ? React.createElement('div', { className: 'renewal-home-place-list' }, places.map((place, i) => React.createElement('button', { type: 'button', className: 'renewal-home-place-card', key: place.id || i, onClick: () => onChangeView?.('records') },
+        React.createElement('span', { className: 'renewal-home-place-icon', 'aria-hidden': 'true' }, '📍'), React.createElement('span', null, React.createElement('strong', null, place.name || place.title || '저장한 장소'), React.createElement('small', null, place.address || place.description || ''))
+      ))) : React.createElement('p', { className: 'renewal-home-empty' }, '저장한 장소가 없습니다.')
     )
   );
 }
