@@ -194,3 +194,9 @@
 - 최종 라이브 smoke 계약 보정
 - 수정: `kakaoLocalSearchProxy`의 현재 정상 200 coordinate-mode 응답을 smoke 기준에 반영(기존 400/query required 계약 제거).
 - 검증: 라이브 주요 경로·정적 청크·Cloud Functions probe 전체 통과(`Live smoke check passed`).
+
+## 2026-09-14 19:30 KST
+
+- 추가 점검: 전체 검색 하이라이트·V2 디자인 시스템 계약
+- 결과: 캘린더/채팅/메모/장소/보관함/관리자 검색이 공통 하이라이트 헬퍼를 사용하며, 디자인 토큰·모바일 입력 규격·공유/라이트박스 구조 규칙이 모두 통과.
+- 검증: `check:design-rules`, `check:design-system` 통과. 코드 변경 없음.
