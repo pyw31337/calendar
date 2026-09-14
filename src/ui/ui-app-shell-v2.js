@@ -1395,7 +1395,10 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   // `selectedDate`/`isModalOpen` drive JSX this shell's early return never reaches, same reasoning
   // as `openMoreModal`.
   const [dateModalDate, setDateModalDate] = React.useState(null);
-  const calendarName = calendar?.name || null;
+  // Firestore calendar records use `title`; a few legacy callers still provide `name`.
+  // Prefer the canonical title so the renewal shell reflects the active calendar identity
+  // (e.g. cw → 모아엘가) instead of silently falling back to the generic brand.
+  const calendarName = calendar?.title || calendar?.name || null;
 
   // Shared by the 더보기 list AND any other pane (e.g. ChatPane's "앱 설정" entry) that needs to
   // open one of the 4 real 더보기 modals directly, without going through the 더보기 tab's own list.
