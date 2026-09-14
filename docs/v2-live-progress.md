@@ -263,3 +263,8 @@
 - 반응형: 1024px 이상에서만 카드 그리드 적용, 모바일·태블릿 기존 3열 갤러리 흐름 유지
 - 검증: `npm run lint`, `npm test` (27/27), `npm run build`, `npm run check:dist-budget` 통과
 - 다음: 라이브 Pages 배포 확인 후 목업 대비 타이포그래피/간격 세부 조정
+## 2026-09-14 15:34 KST
+
+- 라이브 전체 경로 smoke 재검증: cw/kkot/jhair 캘린더·채팅·메모·장소·갤러리·관리자·공유 경로 200
+- 정적 Vite 청크 및 핵심 Cloud Functions probe 통과
+- 판정: `cae173ce` 태블릿 썸네일 변경 이후 운영 회귀 없음
