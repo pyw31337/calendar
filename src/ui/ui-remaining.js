@@ -187,8 +187,10 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
     });
   }, []);
   const [failed, setFailed] = React.useState(false);
+  const [mediaRetryToken, setMediaRetryToken] = React.useState(0);
   React.useEffect(() => {
     setFailed(false);
+    setMediaRetryToken(0);
   }, [firstUrl]);
   // Several pasted image links (not an actual upload) shown as a thumbnail grid, same as a real
   // multi-image message -- see extractDirectImageUrls. Computed unconditionally every render like
@@ -318,13 +320,23 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
       }, textNode)
       : textNode;
     const failedMediaNotice = failed && mediaInfo && firstUrl
-      ? /*#__PURE__*/React.createElement('a', {
-        href: firstUrl,
-        target: '_blank',
-        rel: 'noopener noreferrer',
-        className: 'external-media-fallback',
-        onClick: e => e.stopPropagation()
-      }, `${mediaInfo.type === 'video' ? '원본 영상을' : '원본 이미지를'} 재생할 수 없습니다 · 출처에서 확인`)
+      ? /*#__PURE__*/React.createElement('div', { className: 'external-media-fallback' },
+        /*#__PURE__*/React.createElement('button', {
+          type: 'button',
+          className: 'external-media-retry',
+          onClick: e => {
+            e.stopPropagation();
+            setFailed(false);
+            setMediaRetryToken(token => token + 1);
+          }
+        }, '다시 시도'),
+        /*#__PURE__*/React.createElement('a', {
+          href: firstUrl,
+          target: '_blank',
+          rel: 'noopener noreferrer',
+          onClick: e => e.stopPropagation()
+        }, `${mediaInfo.type === 'video' ? '원본 영상을' : '원본 이미지를'} 재생할 수 없습니다 · 출처에서 확인`)
+      )
       : null;
     // textMaxWidth (multi-image grid caption from app-main) wins; else match attached image
     // layout width; else null so stretch uses width/maxWidth 100% and fills the bubble.
@@ -396,6 +408,7 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
       }))
       : mediaInfo.type === 'image'
       ? /*#__PURE__*/React.createElement('img', {
+        key: `${mediaInfo.url}:${mediaRetryToken}`,
         src: mediaInfo.url,
         alt: '링크 이미지',
         loading: 'lazy',
@@ -438,6 +451,7 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
       })
       : mediaInfo.type === 'video'
       ? /*#__PURE__*/React.createElement('video', {
+        key: `${mediaInfo.url}:${mediaRetryToken}`,
         src: mediaInfo.url,
         muted: true,
         autoPlay: true,
