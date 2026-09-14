@@ -1575,9 +1575,11 @@ export function ChatRoomView({
       /*#__PURE__*/React.createElement("path", { d: "M8 9l4 -4l4 4" }),
       /*#__PURE__*/React.createElement("path", { d: "M16 15l-4 4l-4 -4" }))),
       memeMatches.length > 0 && /*#__PURE__*/React.createElement("div", {
+        className: "chat-composer-meme-area",
         style: { display: 'flex', flexDirection: 'column', gap: '8px' }
       },
         /*#__PURE__*/React.createElement("div", {
+          className: "chat-composer-meme-tag-row",
           style: { display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '2px' }
         }, memeMatches.map(({ tag, items }) => /*#__PURE__*/React.createElement("button", {
           key: tag,

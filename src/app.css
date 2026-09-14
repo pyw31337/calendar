@@ -6194,7 +6194,21 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
   user-select: none;
   border-radius: 6px;
   z-index: 2;
+  isolation: isolate;
 }
+.chat-composer-resize-handle::before {
+  content: '';
+  position: absolute;
+  top: -4px;
+  right: -8px;
+  width: 96px;
+  height: 26px;
+  background: linear-gradient(90deg, transparent 0%, var(--bg-card) 68%);
+  pointer-events: none;
+  z-index: -1;
+}
+.chat-composer-meme-tag-row { padding-right: 58px !important; scrollbar-width: none; }
+.chat-composer-meme-tag-row::-webkit-scrollbar { display: none; }
 .chat-composer-resize-handle:hover,
 .chat-composer-resize-handle:focus-visible { background: var(--bg-primary); color: var(--text-main); outline: 2px solid var(--brand); outline-offset: 1px; }
 @keyframes chat-typing-bounce {
