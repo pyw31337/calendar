@@ -6114,6 +6114,8 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
   margin: 0 0 12px;
 }
 .chat-typing-row-self { justify-content: flex-end; }
+.external-media-fallback { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; padding: 8px 10px; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); background: var(--bg-primary); color: var(--text-muted); font-size: var(--font-size-sm); text-decoration: none; }
+.external-media-fallback:hover { color: var(--brand); border-color: var(--brand); }
 .chat-typing-name {
   flex-shrink: 0;
   margin-top: 2px;

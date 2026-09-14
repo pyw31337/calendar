@@ -317,6 +317,15 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
         style: { maxWidth: effectiveMaxWidth, width: '100%', boxSizing: 'border-box' }
       }, textNode)
       : textNode;
+    const failedMediaNotice = failed && mediaInfo && firstUrl
+      ? /*#__PURE__*/React.createElement('a', {
+        href: firstUrl,
+        target: '_blank',
+        rel: 'noopener noreferrer',
+        className: 'external-media-fallback',
+        onClick: e => e.stopPropagation()
+      }, `${mediaInfo.type === 'video' ? '원본 영상을' : '원본 이미지를'} 재생할 수 없습니다 · 출처에서 확인`)
+      : null;
     // textMaxWidth (multi-image grid caption from app-main) wins; else match attached image
     // layout width; else null so stretch uses width/maxWidth 100% and fills the bubble.
     const cardStretchWidth = textMaxWidth
@@ -324,6 +333,7 @@ export function DirectChatMediaText({ text, searchQuery = '', setActiveLightbox,
       : (hasAttachedImages ? (style.maxWidth || '420px') : null);
     return /*#__PURE__*/React.createElement(React.Fragment, null,
       cappedTextNode,
+      failedMediaNotice,
       previewUrls.map((url, idx) => /*#__PURE__*/React.createElement(LinkPreviewCard, {
         key: url,
         url,
