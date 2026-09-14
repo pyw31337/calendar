@@ -402,7 +402,11 @@ export function useGalleryPhotoIndex({ React, calendarId, activeView, projectId,
     });
   }, [calendarId]);
   React.useEffect(() => {
-    if (!calendarId || (activeView !== 'gallery' && activeView !== 'history')) {
+    // The V2 calendar home renders a six-photo gallery strip from the same
+    // canonical index. Keep the first page warm there as well; otherwise the
+    // home summary is permanently empty until the user visits Gallery.
+    const shouldLoadPreview = activeView === 'calendar';
+    if (!calendarId || (!shouldLoadPreview && activeView !== 'gallery' && activeView !== 'history')) {
       setState({ status: 'idle', items: [], total: 0, page: 1, loading: false, complete: false });
       return undefined;
     }
