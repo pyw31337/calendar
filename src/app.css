@@ -2694,6 +2694,103 @@ select.form-select {
   }
 }
 
+/* ===== V2 visual parity pass (Claude reference contracts) =====
+   Keep data/components unchanged; these rules bring the feature-flagged shell back to the
+   reference surfaces.  Bento owns the saturated hero, while the focused destination screens
+   (Chat/Memo/Places/Settlement) use the quiet white header from their respective references. */
+.renewal-shell {
+  --renewal-page-max: 1080px;
+  --renewal-bg: #FAFAFC;
+  --renewal-card: #FFFFFF;
+  --renewal-border: #ECEAF5;
+  --renewal-text: #1E1B2E;
+  --renewal-muted: #6B6580;
+  background: var(--renewal-bg);
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Noto Sans KR', sans-serif;
+}
+.renewal-shell-main { background: var(--renewal-bg); color: var(--renewal-text); }
+.renewal-shell-main:not(.is-calendar) > .renewal-shell-header {
+  min-height: 56px;
+  padding: 12px 14px 10px;
+  background: var(--renewal-card);
+  color: var(--renewal-text);
+  border-bottom: 1px solid var(--renewal-border);
+  box-shadow: none;
+}
+.renewal-shell-main:not(.is-calendar) .renewal-shell-header-icon-btn {
+  background: transparent;
+  border-color: transparent;
+  color: var(--renewal-muted);
+  padding: 6px;
+}
+.renewal-shell-main:not(.is-calendar) .renewal-shell-header-icon-btn:hover {
+  background: var(--renewal-bg);
+  color: var(--brand, #7C3AED);
+}
+.renewal-shell-main:not(.is-calendar) .renewal-shell-header-brand { font-size: .96rem; }
+.renewal-shell-main.is-calendar > .renewal-shell-header {
+  background: linear-gradient(135deg, #4C1D95 0%, #7C3AED 58%, #22D3B8 100%);
+  box-shadow: none;
+}
+.renewal-home-hero {
+  width: 100%;
+  max-width: var(--renewal-page-max);
+  margin: 0 auto;
+  border-radius: 0;
+  padding: 10px 14px 14px;
+  box-sizing: border-box;
+  background: linear-gradient(135deg, #4C1D95 0%, #7C3AED 58%, #22D3B8 100%);
+  box-shadow: none;
+}
+.renewal-shell-main.is-calendar > .calendar-card,
+.renewal-shell-main.is-calendar > .renewal-shell-section,
+.renewal-shell-main.is-calendar > .renewal-home-summary {
+  max-width: var(--renewal-page-max);
+}
+.renewal-shell-main.is-calendar > .calendar-card {
+  margin-top: 14px;
+  border-color: var(--renewal-border);
+  border-radius: 18px;
+  box-shadow: 0 2px 8px rgba(30, 27, 46, .05);
+}
+.renewal-shell-main.is-calendar > .renewal-shell-section { padding-top: 14px; }
+.renewal-shell-main.is-calendar > .renewal-shell-section:has(.renewal-shell-upcoming-list) {
+  margin-top: 10px;
+  padding: 14px;
+  border-color: var(--renewal-border);
+  border-radius: 18px;
+  box-shadow: 0 2px 8px rgba(30, 27, 46, .05);
+}
+.renewal-home-summary {
+  gap: 10px;
+  padding: 14px 0 28px;
+}
+.renewal-home-summary-section {
+  padding: 18px 14px;
+  border: 0;
+  border-radius: 0;
+  background: var(--renewal-card);
+  box-shadow: none;
+}
+.renewal-home-summary-heading {
+  margin-bottom: 10px;
+  font-size: .78rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--renewal-muted);
+}
+.renewal-home-chat-item, .renewal-home-memo-card {
+  border-color: var(--renewal-border);
+  border-radius: 12px;
+  box-shadow: none;
+}
+.renewal-shell-section-title { font-size: .72rem; letter-spacing: .08em; color: var(--renewal-muted); text-transform: uppercase; }
+
+@media (min-width: 768px) {
+  .renewal-shell-main:not(.is-calendar) > .renewal-shell-header { padding-left: 18px; padding-right: 18px; }
+  .renewal-home-summary-section { padding-left: 18px; padding-right: 18px; }
+}
+
 /* Memo comment composer (MemoCard, shared by main-screen memo preview and the
    full memo page): always column — input on its own line, author picker/cancel/save
    footer below. Desktop only shrinks the input font-size (see media query below). */
@@ -6338,3 +6435,31 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
   .renewal-shell-side-nav-quick-item:hover { background: var(--bg-primary, #f8fafc); color: var(--text-main, #0f172a); }
   .renewal-shell-side-nav-quick-dot { width: 16px; text-align: center; color: var(--brand, #4f46e5); font-size: 1rem; line-height: 1; }
 }
+
+/* V2 reference parity overrides (must remain after the shell's base rules). */
+.renewal-shell {
+  --renewal-page-max: 1080px; --renewal-bg: #FAFAFC; --renewal-card: #FFFFFF;
+  --renewal-border: #ECEAF5; --renewal-text: #1E1B2E; --renewal-muted: #6B6580;
+  background: var(--renewal-bg);
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Noto Sans KR', sans-serif;
+}
+.renewal-shell-main { background: var(--renewal-bg); color: var(--renewal-text); }
+.renewal-shell-main:not(.is-calendar) > .renewal-shell-header {
+  min-height: 56px; padding: 12px 14px 10px; background: var(--renewal-card);
+  color: var(--renewal-text); border-bottom: 1px solid var(--renewal-border); box-shadow: none;
+}
+.renewal-shell-main:not(.is-calendar) .renewal-shell-header-icon-btn { background: transparent; border-color: transparent; color: var(--renewal-muted); padding: 6px; }
+.renewal-shell-main:not(.is-calendar) .renewal-shell-header-icon-btn:hover { background: var(--renewal-bg); color: var(--brand, #7C3AED); }
+.renewal-shell-main:not(.is-calendar) .renewal-shell-header-brand { font-size: .96rem; }
+.renewal-shell-main.is-calendar > .renewal-shell-header { background: linear-gradient(135deg, #4C1D95 0%, #7C3AED 58%, #22D3B8 100%); box-shadow: none; }
+.renewal-home-hero { width: 100%; max-width: var(--renewal-page-max); margin: 0 auto; border-radius: 0; padding: 10px 14px 14px; box-sizing: border-box; background: linear-gradient(135deg, #4C1D95 0%, #7C3AED 58%, #22D3B8 100%); box-shadow: none; }
+.renewal-shell-main.is-calendar > .calendar-card, .renewal-shell-main.is-calendar > .renewal-shell-section, .renewal-shell-main.is-calendar > .renewal-home-summary { max-width: var(--renewal-page-max); }
+.renewal-shell-main.is-calendar > .calendar-card { margin-top: 14px; border-color: var(--renewal-border); border-radius: 18px; box-shadow: 0 2px 8px rgba(30, 27, 46, .05); }
+.renewal-shell-main.is-calendar > .renewal-shell-section { padding-top: 14px; }
+.renewal-shell-main.is-calendar > .renewal-shell-section:has(.renewal-shell-upcoming-list) { margin-top: 10px; padding: 14px; border-color: var(--renewal-border); border-radius: 18px; box-shadow: 0 2px 8px rgba(30, 27, 46, .05); }
+.renewal-home-summary { gap: 10px; padding: 14px 0 28px; }
+.renewal-home-summary-section { padding: 18px 14px; border: 0; border-radius: 0; background: var(--renewal-card); box-shadow: none; }
+.renewal-home-summary-heading { margin-bottom: 10px; font-size: .78rem; letter-spacing: .08em; text-transform: uppercase; color: var(--renewal-muted); }
+.renewal-home-chat-item, .renewal-home-memo-card { border-color: var(--renewal-border); border-radius: 12px; box-shadow: none; }
+.renewal-shell-section-title { font-size: .72rem; letter-spacing: .08em; color: var(--renewal-muted); text-transform: uppercase; }
+@media (min-width: 768px) { .renewal-shell-main:not(.is-calendar) > .renewal-shell-header { padding-left: 18px; padding-right: 18px; } .renewal-home-summary-section { padding-left: 18px; padding-right: 18px; } }
