@@ -395,3 +395,10 @@
 - 직접 검증: Chromium 브라우저 스모크 106/106 통과(PC·모바일, kkot/cw/jhair, V2 5탭·기록 서브탭·사이드메뉴 전환), 라이브 smoke 200 응답 및 청크 마커/Cloud Function 확인.
 - 검증: `npm run check:all`(lint·28 tests·보안/예산/아키텍처/CI 시나리오/npm audit) 통과, `CALENDAR_SMOKE_BROWSER=chromium npm run smoke:browser` 106 passed.
 - 배포: 코드 `b63bb2a1`, Deploy Vite Pages 및 Verify Calendar 성공. 최신 확인 URL: `https://pyw31337.github.io/calendar/?id=cw&shell=v2&v=b63bb2a1` (`shell=v2` 유지).
+
+## 2026-09-15 12:08 KST
+
+- 피드백 반영: 모바일 Bento 홈 하단 채팅·메모·갤러리·장소를 개별 카드로 그룹핑하지 않고 시안처럼 edge-to-edge 세로 흐름으로 변경. PC/태블릿에서만 카드 프레임과 2열 배치를 유지.
+- 범위: `src/app.css`, `src/ui/ui-app-shell-v2.js`의 V2 홈 표현만 변경. 데이터·Firebase·Storage·사진·태그·댓글 계약은 변경하지 않음.
+- 검증: lint, 테스트 28개, build/dist budget, Chromium 스모크 106/106 통과.
+- 배포: 코드 `617d589f` 후속 스타일 수정 커밋을 배포 중이며, 완료 후 최신 cachebuster URL로 확인.
