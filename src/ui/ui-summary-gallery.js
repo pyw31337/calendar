@@ -4691,56 +4691,74 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
               style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-main)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }
             }, renderDescriptionWithLinks(selected.description))
           ),
-          /* 캘린더 연동 + 메모 펼치기: 예전엔 별도 두 줄(연동 체크박스, 메모 토글)이라 저장된
-             메모(예: 기념일에 남긴 "티켓 17,000원")가 있어도 한눈에 안 보였다. 한 줄에 나란히
-             두고, 우측 위아래 화살표로 그 아래 메모 영역을 펼치고/접는다 -- 다른 페이지 헤더의
-             돋보기/메뉴 두 아이콘 한 줄 배치와 같은 패턴. */
+          /* 캘린더 연동과 메모는 별개 기능이라 박스를 나눈다. 연동은 남는 가로폭, 메모+화살표는
+             nowrap 고정폭이라 "메모"가 두 줄로 떨어지지 않는다. 펼치면 메모 탭과 본문이 공백 없이
+             이어지는 폴더 모양(탭 하단 라운드 제거 + 본문 우측 상단 라운드 제거). */
           /*#__PURE__*/React.createElement("div", {
-            style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexShrink: 0, padding: '10px', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)' }
+            style: { display: 'flex', flexDirection: 'column', flexShrink: 0 }
           },
-            /*#__PURE__*/React.createElement("label", {
-              style: { display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, cursor: pendingId ? 'wait' : 'pointer', fontSize: 'var(--font-size-md)', fontWeight: 700, color: 'var(--text-main)' }
+            /*#__PURE__*/React.createElement("div", {
+              style: { display: 'flex', alignItems: 'flex-end', gap: '8px' }
             },
-              /*#__PURE__*/React.createElement("input", {
-                type: "checkbox",
-                checked: !!findRegisteredAnniversary(selected.id, selected.title),
-                disabled: !!pendingId,
-                onChange: () => handleToggleRegister(selected)
-              }),
-              /*#__PURE__*/React.createElement("span", {
-                style: { display: 'inline-flex', alignItems: 'center', gap: '4px', minWidth: 0 }
+              /*#__PURE__*/React.createElement("label", {
+                style: {
+                  flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '8px',
+                  padding: '10px 12px', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)',
+                  cursor: pendingId ? 'wait' : 'pointer', fontSize: 'var(--font-size-md)', fontWeight: 700,
+                  color: 'var(--text-main)',
+                  marginBottom: (typeof onQuickSaveMemo === 'function' && isMemoOpen) ? '8px' : 0
+                }
               },
-                "캘린더 연동",
-                CalendarUpIcon ? /*#__PURE__*/React.createElement(CalendarUpIcon, { size: 13 }) : null
+                /*#__PURE__*/React.createElement("input", {
+                  type: "checkbox",
+                  checked: !!findRegisteredAnniversary(selected.id, selected.title),
+                  disabled: !!pendingId,
+                  onChange: () => handleToggleRegister(selected)
+                }),
+                /*#__PURE__*/React.createElement("span", {
+                  style: { display: 'inline-flex', alignItems: 'center', gap: '4px', minWidth: 0 }
+                },
+                  "캘린더 연동",
+                  CalendarUpIcon ? /*#__PURE__*/React.createElement(CalendarUpIcon, { size: 13 }) : null
+                )
+              ),
+              typeof onQuickSaveMemo === 'function' && /*#__PURE__*/React.createElement("button", {
+                type: "button",
+                onClick: () => {
+                  const hasMemo = !!String(memoDraft || '').trim();
+                  setIsMemoOpen(open => {
+                    const next = !open;
+                    if (next && !hasMemo) setIsEditingMemo(true);
+                    return next;
+                  });
+                },
+                "aria-label": isMemoOpen ? "메모 접기" : "메모 펼치기",
+                title: "메모",
+                style: {
+                  flex: '0 0 auto', whiteSpace: 'nowrap', backgroundColor: 'var(--bg-primary)', border: 'none',
+                  cursor: 'pointer', color: 'var(--text-main)', padding: '10px 12px', display: 'flex',
+                  alignItems: 'center', justifyContent: 'center', gap: '4px', fontSize: 'var(--font-size-sm)',
+                  fontWeight: 700, lineHeight: 1.2,
+                  borderRadius: isMemoOpen ? 'var(--radius-md) var(--radius-md) 0 0' : 'var(--radius-md)'
+                }
+              },
+                /*#__PURE__*/React.createElement("span", null, "메모"),
+                /*#__PURE__*/React.createElement("svg", {
+                  width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor",
+                  strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+                }, isMemoOpen
+                  ? /*#__PURE__*/React.createElement("path", { d: "M18 15l-6-6-6 6" })
+                  : /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6 6-6" })
+                )
               )
             ),
-            typeof onQuickSaveMemo === 'function' && /*#__PURE__*/React.createElement("button", {
-              type: "button",
-              onClick: () => {
-                const hasMemo = !!String(memoDraft || '').trim();
-                setIsMemoOpen(open => {
-                  const next = !open;
-                  if (next && !hasMemo) setIsEditingMemo(true);
-                  return next;
-                });
-              },
-              "aria-label": isMemoOpen ? "메모 접기" : "메모 펼치기",
-              title: "메모",
-              style: { flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-main)', padding: '2px', display: 'flex', alignItems: 'center', gap: '3px' }
+            typeof onQuickSaveMemo === 'function' && isMemoOpen && /*#__PURE__*/React.createElement("div", {
+              style: {
+                display: 'flex', flexDirection: 'column', gap: '8px', flexShrink: 0, padding: '10px 12px 12px',
+                backgroundColor: 'var(--bg-primary)',
+                borderRadius: 'var(--radius-md) 0 var(--radius-md) var(--radius-md)'
+              }
             },
-              /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', fontWeight: 500 } }, "메모"),
-              /*#__PURE__*/React.createElement("svg", {
-                width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor",
-                strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
-              }, isMemoOpen
-                ? /*#__PURE__*/React.createElement("path", { d: "M18 15l-6-6-6 6" })
-                : /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6 6-6" })
-              )
-            )
-          ),
-          typeof onQuickSaveMemo === 'function' && isMemoOpen && /*#__PURE__*/React.createElement("div", {
-            style: { display: 'flex', flexDirection: 'column', gap: '8px', flexShrink: 0 }
-          },
             isEditingMemo
               ? /*#__PURE__*/React.createElement(React.Fragment, null,
                   /*#__PURE__*/React.createElement("textarea", {
@@ -4785,10 +4803,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
                   )
                 )
               : /*#__PURE__*/React.createElement("div", {
-                  style: {
-                    display: 'flex', alignItems: 'center', gap: '8px', padding: '10px',
-                    borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)'
-                  }
+                  style: { display: 'flex', alignItems: 'center', gap: '8px' }
                 },
                   /*#__PURE__*/React.createElement("span", {
                     style: {
@@ -4807,6 +4822,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
                     }
                   }, PencilIcon ? /*#__PURE__*/React.createElement(PencilIcon, { size: 15 }) : "✎")
                 )
+            )
           ),
           (() => {
             // 자세히보기 URL이 없으면 공유만 남는데, 44px 아이콘만 두면 로드 깨진 것처럼 보인다.
