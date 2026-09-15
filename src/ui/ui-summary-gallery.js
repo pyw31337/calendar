@@ -4002,18 +4002,11 @@ function resolveExistingCultureMemoText(item, {
   return '';
 }
 
-// Preview-only mirror of app-main.js's buildCultureEventMemoText -- shown as the textarea's
-// placeholder so the user can see what gets saved if they leave the memo blank. The actual
-// save always goes through onQuickSaveMemo (app-main.js), which is the single source of truth
-// for the saved text; this is just a hint and doesn't need to stay byte-identical.
+// Empty-state hint for the culture-detail memo textarea. Event info is no longer previewed
+// here; blank saves still go through onQuickSaveMemo (app-main.js).
 function buildQuickMemoPlaceholder(item) {
-  if (!item) return '';
-  const lines = [];
-  const period = item.dateLabel || [item.startDate, item.endDate].filter(Boolean).join(' ~ ');
-  if (period) lines.push(`기간: ${period}`);
-  if (item.venue && item.kind !== 'movie' && item.genre !== 'movie') lines.push(`장소: ${item.venue}`);
-  if (item.address) lines.push(`주소: ${item.address}`);
-  return lines.join('\n') || '비워두면 행사 정보가 그대로 저장됩니다';
+  void item;
+  return '메모를 입력하세요';
 }
 
 export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [], onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo = null, onEditContent = null, dataUrl = CULTURE_PERFORMANCES_URL, emptyLabel = "상영중이거나 예정된 문화공연이 없습니다.", regionSelections = [], onItemsLoaded, anniversaryCategory = 'event', extraItems = [], chipRowSlot = null, contentPaddingTop = 0, onScroll, gridCols = '2', focusItemId = null, focusTitle = '', searchQuery = '' }) {
@@ -4733,14 +4726,17 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
               },
               "aria-label": isMemoOpen ? "메모 접기" : "메모 펼치기",
               title: "메모",
-              style: { flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-main)', padding: '2px', display: 'flex', alignItems: 'center' }
-            }, /*#__PURE__*/React.createElement("svg", {
-              width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor",
-              strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
-            }, isMemoOpen
-              ? /*#__PURE__*/React.createElement("path", { d: "M18 15l-6-6-6 6" })
-              : /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6 6-6" })
-            ))
+              style: { flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-main)', padding: '2px', display: 'flex', alignItems: 'center', gap: '3px' }
+            },
+              /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', fontWeight: 500 } }, "메모"),
+              /*#__PURE__*/React.createElement("svg", {
+                width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor",
+                strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
+              }, isMemoOpen
+                ? /*#__PURE__*/React.createElement("path", { d: "M18 15l-6-6-6 6" })
+                : /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6 6-6" })
+              )
+            )
           ),
           typeof onQuickSaveMemo === 'function' && isMemoOpen && /*#__PURE__*/React.createElement("div", {
             style: { display: 'flex', flexDirection: 'column', gap: '8px', flexShrink: 0 }
