@@ -4698,15 +4698,15 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
             style: { display: 'flex', flexDirection: 'column', flexShrink: 0 }
           },
             /*#__PURE__*/React.createElement("div", {
-              style: { display: 'flex', alignItems: 'flex-end', gap: '8px' }
+              style: { display: 'flex', alignItems: 'stretch', gap: '8px' }
             },
               /*#__PURE__*/React.createElement("label", {
                 style: {
                   flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '8px',
-                  padding: '10px 12px', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)',
+                  padding: '10px 12px', borderRadius: 'var(--radius-md)',
+                  backgroundColor: 'var(--bg-primary)',
                   cursor: pendingId ? 'wait' : 'pointer', fontSize: 'var(--font-size-md)', fontWeight: 700,
-                  color: 'var(--text-main)',
-                  marginBottom: (typeof onQuickSaveMemo === 'function' && isMemoOpen) ? '8px' : 0
+                  color: 'var(--text-main)'
                 }
               },
                 /*#__PURE__*/React.createElement("input", {
@@ -4738,7 +4738,8 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
                   flex: '0 0 auto', whiteSpace: 'nowrap', backgroundColor: 'var(--bg-primary)', border: 'none',
                   cursor: 'pointer', color: 'var(--text-main)', padding: '10px 12px', display: 'flex',
                   alignItems: 'center', justifyContent: 'center', gap: '4px', fontSize: 'var(--font-size-sm)',
-                  fontWeight: 700, lineHeight: 1.2,
+                  fontWeight: 700, lineHeight: 1.2, position: 'relative', zIndex: 1,
+                  marginBottom: isMemoOpen ? '-1px' : 0,
                   borderRadius: isMemoOpen ? 'var(--radius-md) var(--radius-md) 0 0' : 'var(--radius-md)'
                 }
               },
@@ -4756,7 +4757,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
               style: {
                 display: 'flex', flexDirection: 'column', gap: '8px', flexShrink: 0, padding: '10px 12px 12px',
                 backgroundColor: 'var(--bg-primary)',
-                borderRadius: 'var(--radius-md) 0 var(--radius-md) var(--radius-md)'
+                borderRadius: '0 0 var(--radius-md) var(--radius-md)'
               }
             },
             isEditingMemo
