@@ -378,3 +378,12 @@
 - 직접 라이브 확인: `cw` V2 캐시 버스트 화면에서 `확정` 표시 7건, `전원` 표시 1건을 확인하고 렌더 오류 없음.
 - 검증/배포: `check:all` 및 Pages/Verify 성공. 코드 `1a4a5e33`, Pages `34837158919`, Verify Calendar `34837158926`.
 - 사진·태그·댓글·Storage 데이터는 읽기 전용으로 유지했으며 일괄 수정/삭제/재업로드는 수행하지 않음.
+
+## 2026-09-15 10:28 KST
+
+- 시안 대조 기반 P0 스타일 유닛: Bento 홈의 보라→민트 히어로/평면 벤토 표면과 Chat·Memo·Places·Settlement의 흰색 집중형 헤더 토큰을 V2 셸에 적용.
+- 범위: `src/app.css`의 V2 전용 스타일만 변경. Firebase/Storage, 메시지·사진·태그·댓글·일정 데이터와 기존 컴포넌트 로직은 변경하지 않음.
+- 직접 검토: Pages 캐시 버스트 URL에서 `tab=chat`의 흰색 헤더·`#FAFAFC` 배경, `tab=calendar`의 히어로 그라디언트와 홈 카드 표면을 확인.
+- 검증: lint, 테스트 28개, production build, dist budget, architecture budget 통과.
+- 배포: 코드 커밋 `ebe25c78`, Pages 배포 성공 확인. 라이브 CSS 청크 `index-rCMWn-L4.css` 및 V2 URL 응답 확인.
+- 다음: ChatFull/MemoFull/PlacesFull/SettlementFull 각각의 카드·타이포그래피·반응형 폭을 화면별 독립 유닛으로 맞춤. `shell=v2` 플래그 유지.
