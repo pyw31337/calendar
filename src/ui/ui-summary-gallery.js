@@ -392,7 +392,7 @@ export function MemoPreviewSection({ memos = [], calendar = null, onViewAll, onO
 
   if (sortedMemos.length === 0) return null;
 
-  const displayedMemos = sortedMemos.slice(0, collapsed ? 1 : 3);
+  const displayedMemos = sortedMemos.slice(0, collapsed ? 2 : 3);
   const openMemoPage = () => { if (typeof onViewAll === 'function') onViewAll(); };
   const handleTitleKeyDown = event => handleSectionHeaderKeyDown(event, () => setCollapsed(prev => !prev));
 
