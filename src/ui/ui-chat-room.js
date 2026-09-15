@@ -254,9 +254,18 @@ export function ChatRoomView({
   // 좁은 화면에서 입력창을 다 가림).
   const memeMatches = React.useMemo(() => matchMemePoolByKeyword(memePool, chatInput), [memePool, chatInput]);
   const [expandedMemeTag, setExpandedMemeTag] = React.useState(null);
+  const [memePreviewItem, setMemePreviewItem] = React.useState(null);
   React.useEffect(() => {
     if (!memeMatches.some(m => m.tag === expandedMemeTag)) setExpandedMemeTag(null);
   }, [memeMatches, expandedMemeTag]);
+  React.useEffect(() => {
+    if (!memePreviewItem) return undefined;
+    const handleEscape = event => {
+      if (event.key === 'Escape') setMemePreviewItem(null);
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [memePreviewItem]);
   // 'closed' (default -- nothing shown) | 'list' (existing notices + 공지 추가) | 'add' (textarea)
   const [noticePanelMode, setNoticePanelMode] = React.useState('closed');
   const [noticeInput, setNoticeInput] = React.useState('');
@@ -1627,7 +1636,7 @@ export function ChatRoomView({
         }, (memeMatches.find(m => m.tag === expandedMemeTag)?.items || []).map(item => /*#__PURE__*/React.createElement("button", {
           key: item.id,
           type: "button",
-          onClick: () => { if (typeof onSendMemeImage === 'function') onSendMemeImage(item); },
+          onClick: () => setMemePreviewItem(item),
           style: {
             flexShrink: 0, width: '64px', height: '64px', padding: 0, borderRadius: 'var(--radius-md)',
             border: '1px solid var(--border-subtle)', overflow: 'hidden', cursor: 'pointer', backgroundColor: 'var(--bg-primary)'
@@ -1963,6 +1972,37 @@ export function ChatRoomView({
     onClose: () => setActiveDocumentLightbox(null),
     onNavigate: i => setActiveDocumentLightbox(prev => prev ? { ...prev, index: i } : prev)
   }) : null,
+  memePreviewItem && /*#__PURE__*/React.createElement("div", {
+    role: "dialog",
+    "aria-modal": "true",
+    "aria-label": "밈 이미지 전송 확인",
+    onClick: event => { if (event.target === event.currentTarget) setMemePreviewItem(null); },
+    onKeyDown: event => { if (event.key === 'Escape') setMemePreviewItem(null); },
+    tabIndex: -1,
+    style: {
+      position: 'fixed', inset: 0, zIndex: 14000, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: '24px', background: 'rgba(15, 23, 42, 0.72)'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: 'min(92vw, 520px)', maxHeight: '90vh', overflow: 'auto', display: 'flex', flexDirection: 'column',
+      gap: '14px', padding: '16px', borderRadius: '16px', background: 'var(--bg-card)', boxShadow: 'var(--shadow-lg)'
+    }
+  }, /*#__PURE__*/React.createElement("img", {
+    src: memePreviewItem.fullUrl || memePreviewItem.thumbUrl,
+    alt: '전송할 밈 이미지 미리보기',
+    style: { width: '100%', maxHeight: '65vh', objectFit: 'contain', borderRadius: '10px', background: 'var(--bg-primary)' }
+  }), /*#__PURE__*/React.createElement("p", {
+    style: { margin: 0, color: 'var(--text-main)', fontSize: 'var(--font-size-md)', textAlign: 'center' }
+  }, '이 이미지를 채팅창에 전송하시겠습니까?'), /*#__PURE__*/React.createElement("div", {
+    style: { display: 'flex', justifyContent: 'flex-end', gap: '8px' }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: 'button', onClick: () => setMemePreviewItem(null),
+    style: { minHeight: '40px', padding: '0 16px', borderRadius: '10px', border: '1px solid var(--border-subtle)', background: 'var(--bg-primary)', color: 'var(--text-main)', cursor: 'pointer' }
+  }, '취소'), /*#__PURE__*/React.createElement("button", {
+    type: 'button', onClick: () => { const item = memePreviewItem; setMemePreviewItem(null); if (typeof onSendMemeImage === 'function') onSendMemeImage(item); },
+    style: { minHeight: '40px', padding: '0 16px', borderRadius: '10px', border: 'none', background: 'var(--accent-primary)', color: '#fff', cursor: 'pointer', fontWeight: 700 }
+  }, '확인')))),
   isEmojiPickerOpen && /*#__PURE__*/React.createElement(EmojiPickerSheet, {
     onSelect: insertEmojiIntoChatInput,
     onClose: () => setIsEmojiPickerOpen(false)
