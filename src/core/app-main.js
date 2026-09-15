@@ -1492,13 +1492,8 @@ function CalendarApp() {
     };
   }, [activeCalId, activeView, firebaseDb, firebaseConnectionVersion]);
 
-  // Chat listener watchdog: self-heals a silently stalled onSnapshot stream.
-  // Firestore onSnapshot only delivers events when documents actually change -- quiet chat
-  // channels do not emit snapshots. Checking on a 2-4s interval previously caused false "stalled"
-  // detections, making idle clients read 30-60 docs every few seconds continuously.
-  // We heal stalled streams safely without excessive read costs by:
-  // 1) Reconciling immediately when tab becomes visible again or returns online
-  // 2) Running a conservative backup check (60s stale threshold) ONLY while actively in chat view
+  // Chat listener watchdog: throttled self-healing for stalled onSnapshot stream.
+  // Reconciles on tab visibility/online return, and runs 60s backup only while viewing chat.
   React.useEffect(() => {
     if (!activeCalId || !firebaseDb) return undefined;
     const isChatView = activeView === 'chat';
@@ -1539,20 +1534,12 @@ function CalendarApp() {
     }
 
     const handleVisible = () => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-        if (Date.now() - lastChatSnapshotAtRef.current > 10000) {
-          void reconcile();
-        }
-      }
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible' && Date.now() - lastChatSnapshotAtRef.current > 10000) void reconcile();
     };
-
-    const handleOnline = () => {
-      void reconcile();
-    };
+    const handleOnline = () => { void reconcile(); };
 
     document.addEventListener('visibilitychange', handleVisible);
     window.addEventListener('online', handleOnline);
-
     return () => {
       isMounted = false;
       if (timer) clearInterval(timer);

@@ -6744,6 +6744,7 @@ body:has(.renewal-shell) { padding: 0; }
 .renewal-shell-main.is-calendar .renewal-home-summary-section.is-gallery .renewal-home-summary-heading { padding: 0 14px; }
 .renewal-shell-main.is-calendar .renewal-home-photo-strip { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px; }
 .renewal-shell-main.is-calendar .renewal-home-photo-strip button { border-radius: 0; }
+@media (max-width: 1023px) { .renewal-home-photo-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 
 .renewal-shell-main.is-calendar .renewal-home-place-list { gap: 8px; }
 .renewal-shell-main.is-calendar .renewal-home-place-card { display: block; width: 100%; padding: 12px; border: 0; border-radius: 12px; background: #fafafc; box-shadow: none; text-align: left; }
