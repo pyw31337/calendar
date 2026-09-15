@@ -4703,8 +4703,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
               /*#__PURE__*/React.createElement("label", {
                 style: {
                   flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '8px',
-                  padding: '10px 12px', borderRadius: 'var(--radius-md)',
-                  backgroundColor: 'var(--bg-primary)',
+                  padding: '10px 12px',
                   cursor: pendingId ? 'wait' : 'pointer', fontSize: 'var(--font-size-md)', fontWeight: 700,
                   color: 'var(--text-main)'
                 }
