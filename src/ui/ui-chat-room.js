@@ -243,6 +243,7 @@ export function ChatRoomView({
   // Keep the desktop composer at the original compact height on every open. Height is
   // intentionally session-local; a previous oversized drag must not become the new default.
   const [composerInputHeight, setComposerInputHeight] = React.useState(44);
+  const MAX_COMPOSER_INPUT_HEIGHT = 360;
   const composerResizeRef = React.useRef(null);
   const memeTagDragRef = React.useRef(null);
   const textareaScrollRestoreRef = React.useRef(null);
@@ -585,7 +586,7 @@ export function ChatRoomView({
   const moveComposerResize = (event) => {
     const drag = composerResizeRef.current;
     if (!drag) return;
-    const next = Math.max(44, Math.min(100, drag.startHeight + drag.startY - event.clientY));
+    const next = Math.max(44, Math.min(MAX_COMPOSER_INPUT_HEIGHT, drag.startHeight + drag.startY - event.clientY));
     setComposerInputHeight(next);
   };
   const endComposerResize = () => { composerResizeRef.current = null; };
@@ -1573,7 +1574,7 @@ export function ChatRoomView({
         onKeyDown: event => {
           if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
           event.preventDefault();
-          setComposerInputHeight(height => Math.max(44, Math.min(100, height + (event.key === 'ArrowUp' ? 12 : -12))));
+          setComposerInputHeight(height => Math.max(44, Math.min(MAX_COMPOSER_INPUT_HEIGHT, height + (event.key === 'ArrowUp' ? 12 : -12))));
         }
       }, /*#__PURE__*/React.createElement("svg", {
         xmlns: "http://www.w3.org/2000/svg", width: "14", height: "14", viewBox: "0 0 24 24",
