@@ -6266,7 +6266,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 }
 .chat-composer-resize-handle {
   position: absolute;
-  top: -19px;
+  top: 9px;
   left: 50%;
   right: auto;
   width: 14px;

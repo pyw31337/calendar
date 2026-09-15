@@ -1549,7 +1549,7 @@ export function ChatRoomView({
         backgroundColor: 'var(--bg-card)',
         border: '1px solid var(--border-subtle)',
         borderRadius: 'var(--radius-md)',
-        padding: '12px',
+        padding: '32px 12px 12px',
         display: 'flex',
         flexDirection: 'column',
         gap: '10px',
