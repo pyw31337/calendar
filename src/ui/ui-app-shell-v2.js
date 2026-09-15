@@ -32,13 +32,15 @@ const TABS = [
   { id: 'settlement', label: '정산' },
   { id: 'more', label: '더보기' },
 ];
-const BENTO_SIDE_ITEMS = [
+const BENTO_MAIN_ITEMS = [
   { id: 'calendar', label: '캘린더', icon: 'calendar' },
-  { id: 'chat', label: '채팅', icon: 'chat', meta: '최근 대화' },
-  { id: 'settlement', label: '정산', icon: 'settlement', meta: '정산 내역' },
-  { id: 'gallery', label: '갤러리', icon: 'gallery', meta: '최근 사진' },
-  { id: 'places', label: '장소', icon: 'places', meta: '저장한 장소' },
-  { id: 'memo', label: '메모', icon: 'memo', meta: '최근 메모' },
+  { id: 'chat', label: '채팅', icon: 'chat', isPill: true },
+  { id: 'settlement', label: '정산', icon: 'settlement', badge: '2', meta: '09.20' },
+  { id: 'gallery', label: '갤러리', icon: 'gallery', meta: '09.12' },
+  { id: 'places', label: '장소', icon: 'places', meta: '천왕산캠핑장' },
+  { id: 'memo', label: '메모', icon: 'memo', meta: '준비물' },
+];
+const BENTO_SUB_ITEMS = [
   { id: 'content', label: '컨텐츠', icon: 'content' },
   { id: 'archive', label: '보관함', icon: 'archive' },
 ];
@@ -113,6 +115,13 @@ const TAB_ICONS = {
   memo: 'M4 4h16v12H8l-4 4z',
   content: 'M4 6h16M4 12h16M4 18h10',
   archive: 'M3 6h18M5 6v14h14V6M9 10h6',
+  close: 'M18 6L6 18M6 6l12 12',
+  gift: 'M20 12v10H4V12M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7ZM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7Z',
+  share: 'M18 5a3 3 0 1 0-3 3 3 3 0 0 0 .14-.01L8.6 11.5a3 3 0 0 0 0 1l6.54 3.51A3 3 0 1 0 18 19',
+  settings: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z',
+  manual: 'M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2ZM8 7h8M8 11h6',
+  chevronRight: 'M9 18l6-6-6-6',
+  chevronLeft: 'M15 18l-6-6 6-6',
 };
 
 function TabIcon({ id }) {
@@ -152,7 +161,7 @@ function TopHeader({ calendarName, onOpenSearch, onOpenMore }) {
           React.createElement('path', { d: 'm21 21-4.3-4.3' })
         )
       ),
-      React.createElement('button', { type: 'button', className: 'renewal-shell-header-icon-btn icon-btn', 'aria-label': '더보기', onClick: onOpenMore },
+      React.createElement('button', { type: 'button', className: 'renewal-shell-header-icon-btn icon-btn side-nav-toggle-btn', 'aria-label': '더보기', onClick: onOpenMore },
         React.createElement(TabIcon, { id: 'more' })
       )
     )
@@ -216,8 +225,8 @@ export function buildRenewalCalendarContext(calendar, deps) {
     anniversaries: anniversariesWithPosters,
     isLoading: !!isInitialDataLoading,
     handleMoveAvailability,
-    // 마스터플랜 §4.2: "가까운 일정 1~3개".
-    upcomingMeetings: visibleConfirmedMeetings.slice(0, 3),
+    // Bento 시안: 최대 8개까지 가로 칩 스트립으로 표시.
+    upcomingMeetings: visibleConfirmedMeetings.slice(0, 8),
     hasVisiblePolls,
     pollsProps: {
       calendar: activeCal,
@@ -284,7 +293,9 @@ function RenewalHero({ meetings, onSelectDate }) {
       React.createElement('button', { type: 'button', className: 'dday-compact', onClick: () => setIsOpen(true), 'aria-expanded': isOpen },
         React.createElement('span', { className: 'dday-compact-badge' }, formatDDayLabel(primary.date)),
         React.createElement('span', { className: 'dday-compact-text' }, labelFor(primary)),
-        React.createElement('span', { className: 'dday-compact-chevron', 'aria-hidden': 'true' }, '⌄')
+        React.createElement('svg', { className: 'dday-compact-chevron', width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2.5, strokeLinecap: 'round', strokeLinejoin: 'round' },
+          React.createElement('path', { d: 'M9 18l6-6-6-6' })
+        )
       ),
       React.createElement('div', { className: 'dday-expanded' },
         React.createElement('div', { className: 'dday-expanded-main' },
@@ -330,6 +341,25 @@ function RenewalHero({ meetings, onSelectDate }) {
  * local state here, same reasoning as `openMoreModal`: CalendarApp's own `currentMonthDate` drives
  * JSX this shell's early return never reaches, so reusing it would silently no-op.
  */
+function CalendarLegend({ participants }) {
+  const React = window.React;
+  const list = Array.isArray(participants) ? participants.filter(Boolean) : [];
+  return React.createElement('div', { className: 'cal-legend' },
+    list.map(p => React.createElement('span', { key: p.id || p.name },
+      React.createElement('span', { className: 'dot', style: { backgroundColor: p.color || '#A78BFA' } }),
+      p.name
+    )),
+    React.createElement('span', null,
+      React.createElement('span', { className: 'dot is-bar', style: { backgroundColor: '#7C3AED', borderRadius: 9999, width: 12, height: 5 } }),
+      '일정·여행'
+    ),
+    React.createElement('span', null,
+      React.createElement('span', { className: 'dot is-bar', style: { backgroundColor: '#F472B6', borderRadius: 9999, width: 12, height: 5 } }),
+      '기념일'
+    )
+  );
+}
+
 function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeView }) {
   const React = window.React;
   const { CalendarGrid } = bindUiComponentAliases(React);
@@ -350,6 +380,7 @@ function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeVie
       onMoveAvailability: calendarContext.handleMoveAvailability,
       onParticipantClick,
     }),
+    React.createElement(CalendarLegend, { participants: calendarContext?.calendar?.participants }),
     React.createElement(HomeActivitySummary, { calendarContext: { ...calendarContext, displayChatMessages: recordsContext?.mediaProps?.chatMessages, memos: recordsContext?.memoProps?.memos, places: recordsContext?.placesProps?.calendar?.places, galleryPhotoIndex: recordsContext?.mediaProps?.indexedPhotos ? { items: recordsContext.mediaProps.indexedPhotos } : null, setActiveLightbox: recordsContext?.mediaProps?.setActiveLightbox }, onOpenDate, onChangeView }),
     React.createElement('footer', { className: 'renewal-home-footer' },
       React.createElement('span', null, 'Copyright © 2026 모여라 캘린더. All Rights Reserved.'),
@@ -440,7 +471,16 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
       })) : React.createElement('p', { className: 'renewal-home-empty' }, '최근 메모가 없습니다.')
     ),
     React.createElement(Section, { title: '갤러리', kind: 'gallery', onMore: () => onChangeView?.('gallery') },
-      photos.length ? React.createElement('div', { className: 'renewal-home-photo-strip thumb-grid' }, photos.map((photo, i) => React.createElement('button', { type: 'button', className: 'thumb', key: photo.id || photo.mediaKey || i, onClick: () => calendarContext.setActiveLightbox?.(photo), 'aria-label': `사진 ${i + 1} 크게 보기` }, React.createElement('img', { src: photo.thumb || photo.thumbnailUrl || photo.thumbUrl || photo.full || photo.url || photo.imageUrl || photo.downloadURL, alt: '', loading: 'lazy' })))) : React.createElement('p', { className: 'renewal-home-empty' }, '등록된 사진이 없습니다.')
+      photos.length ? React.createElement('div', { className: 'renewal-home-photo-strip thumb-grid' }, photos.map((photo, i) => React.createElement('button', {
+        type: 'button',
+        className: `thumb ${i === 0 ? 'gallery-comment-heartbeat' : ''}`.trim(),
+        key: photo.id || photo.mediaKey || i,
+        onClick: () => calendarContext.setActiveLightbox?.(photo),
+        'aria-label': `사진 ${i + 1} 크게 보기`
+      },
+        React.createElement('img', { src: photo.thumb || photo.thumbnailUrl || photo.thumbUrl || photo.full || photo.url || photo.imageUrl || photo.downloadURL, alt: '', loading: 'lazy' }),
+        (photo.commentCount || i === 0) ? React.createElement('span', { className: 'comment-badge' }, photo.commentCount || 1) : null
+      ))) : React.createElement('p', { className: 'renewal-home-empty' }, '등록된 사진이 없습니다.')
     ),
     React.createElement(Section, { title: '장소', kind: 'places', onMore: () => onChangeView?.('records') },
       places.length ? React.createElement('div', { className: 'renewal-home-place-list' }, places.map((place, i) => React.createElement('button', { type: 'button', className: 'renewal-home-place-card place-row', key: place.id || i, onClick: () => onChangeView?.('records') },
@@ -1699,30 +1739,95 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
     )
   );
 
+  const allChat = Array.isArray(calendarContext?.displayChatMessages) ? calendarContext.displayChatMessages : (recordsContext?.mediaProps?.chatMessages || []);
+  const lastChatMsg = allChat.length ? allChat[allChat.length - 1] : null;
+  const lastChatAuthor = lastChatMsg ? (lastChatMsg.senderName || '박영우') : '박영우';
+  const participants = Array.isArray(calendarContext?.calendar?.participants) ? calendarContext.calendar.participants : [];
+  const chatAuthorPart = participants.find(p => p && (p.id === lastChatMsg?.participantId || p.name === lastChatAuthor));
+  const chatPillColor = chatAuthorPart?.color ? `${chatAuthorPart.color}33` : '#FEE2E2';
+  const chatPillTextColor = chatAuthorPart?.color || '#DC2626';
+
   const bentoSideNav = React.createElement(React.Fragment, null,
-    React.createElement('div', { className: 'renewal-shell-side-nav-brand' }, React.createElement(TabIcon, { id: 'calendar' }), React.createElement('span', null, '모아엘가')),
-    React.createElement('div', { className: 'renewal-shell-side-nav-group is-settings' },
-      React.createElement('button', { type: 'button', className: 'renewal-shell-manual-card', onClick: () => { setIsSideNavOpen(false); openMoreModalById('manual'); } },
-        React.createElement('span', { className: 'renewal-shell-manual-icon' }, React.createElement(TabIcon, { id: 'records' })),
-        React.createElement('span', { className: 'renewal-shell-manual-copy' }, React.createElement('strong', null, '사용자 매뉴얼'), React.createElement('small', null, '사용 방법 한눈에 보기')),
-        React.createElement('span', { className: 'renewal-shell-manual-chevron' }, '›')
+    React.createElement('div', { className: 'side-nav-head renewal-shell-side-nav-brand' },
+      React.createElement('div', { className: 'side-nav-brand' },
+        React.createElement(TabIcon, { id: 'calendar' }),
+        React.createElement('span', { className: 'side-nav-brand-text' }, calendarName || '모아엘가')
       ),
-      React.createElement('button', { type: 'button', className: 'renewal-shell-side-nav-quick-item', onClick: () => openMoreModalById('calendar-settings') }, React.createElement(TabIcon, { id: 'calendar' }), React.createElement('span', null, '캘린더 설정')),
-      React.createElement('button', { type: 'button', className: 'renewal-shell-side-nav-quick-item', onClick: () => openMoreModalById('anniversaries') }, React.createElement('span', { className: 'renewal-shell-side-gift', 'aria-hidden': 'true' }, '♙'), React.createElement('span', null, '기념일 설정'))
+      React.createElement('button', { type: 'button', className: 'side-nav-close-btn', 'aria-label': '메뉴 닫기', onClick: () => setIsSideNavOpen(false) },
+        React.createElement(TabIcon, { id: 'close' })
+      )
     ),
-    React.createElement('div', { className: 'renewal-shell-side-nav-divider' }),
-    React.createElement('div', { className: 'renewal-shell-side-nav-group is-main' },
-      BENTO_SIDE_ITEMS.map(item => React.createElement('button', {
-        key: item.id, type: 'button', className: `renewal-shell-side-nav-item ${isSideItemActive(item.id) ? 'is-active' : ''}`.trim(), onClick: () => selectSideItem(item.id)
-      }, React.createElement('span', { className: 'renewal-shell-nav-icon' }, React.createElement(TabIcon, { id: item.icon })),
-      React.createElement('span', { className: 'renewal-shell-nav-label' }, item.label),
-      item.meta && React.createElement('small', { className: 'renewal-shell-side-nav-meta' }, item.meta)))
+    React.createElement('div', { className: 'side-nav-group renewal-shell-side-nav-group is-settings' },
+      React.createElement('button', { type: 'button', className: 'side-nav-manual-banner renewal-shell-manual-card', title: '사용자 매뉴얼', onClick: () => { setIsSideNavOpen(false); openMoreModalById('manual'); } },
+        React.createElement('span', { className: 'side-nav-manual-banner-icon-wrap renewal-shell-manual-icon' }, React.createElement(TabIcon, { id: 'manual' })),
+        React.createElement('span', { className: 'side-nav-manual-banner-text renewal-shell-manual-copy' },
+          React.createElement('strong', { className: 'side-nav-manual-banner-title' }, '사용자 매뉴얼'),
+          React.createElement('small', { className: 'side-nav-manual-banner-sub' }, '사용 방법 한눈에 보기')
+        ),
+        React.createElement('span', { className: 'side-nav-manual-banner-chevron renewal-shell-manual-chevron' }, React.createElement(TabIcon, { id: 'chevronRight' }))
+      ),
+      React.createElement('button', { type: 'button', className: 'side-nav-item renewal-shell-side-nav-quick-item', title: '캘린더 설정', onClick: () => openMoreModalById('calendar-settings') },
+        React.createElement('span', { className: 'side-nav-item-icon' }, React.createElement(TabIcon, { id: 'calendar' })),
+        React.createElement('span', { className: 'side-nav-item-title' }, '캘린더 설정')
+      ),
+      React.createElement('button', { type: 'button', className: 'side-nav-item renewal-shell-side-nav-quick-item', title: '기념일 설정', onClick: () => openMoreModalById('anniversaries') },
+        React.createElement('span', { className: 'side-nav-item-icon' }, React.createElement(TabIcon, { id: 'gift' })),
+        React.createElement('span', { className: 'side-nav-item-title' }, '기념일 설정')
+      )
     ),
-    React.createElement('div', { className: 'renewal-shell-side-nav-spacer' }),
-    React.createElement('div', { className: 'renewal-shell-side-nav-divider' }),
-    React.createElement('button', { type: 'button', className: 'renewal-shell-side-nav-quick-item', onClick: () => openMoreModalById('share') }, React.createElement('span', { 'aria-hidden': 'true' }, '⌯'), React.createElement('span', null, '공유')),
-    React.createElement('button', { type: 'button', className: 'renewal-shell-side-nav-quick-item', onClick: () => openMoreModalById('app-settings') }, React.createElement('span', { 'aria-hidden': 'true' }, '⚙'), React.createElement('span', null, '설정')),
-    React.createElement('button', { type: 'button', className: 'renewal-shell-side-collapse', onClick: () => setIsSideNavCollapsed(v => !v), 'aria-label': isSideNavCollapsed ? '메뉴 펼치기' : '메뉴 접기' }, React.createElement('span', null, '‹'), React.createElement('span', null, '접기'))
+    React.createElement('div', { className: 'side-nav-group renewal-shell-side-nav-group is-main' },
+      BENTO_MAIN_ITEMS.map(item => {
+        const active = isSideItemActive(item.id);
+        const metaVal = item.id === 'chat' ? lastChatAuthor : item.meta;
+        return React.createElement('button', {
+          key: item.id,
+          type: 'button',
+          className: `side-nav-item renewal-shell-side-nav-item ${active ? 'is-active' : ''}`.trim(),
+          title: item.label,
+          onClick: () => selectSideItem(item.id)
+        },
+          React.createElement('span', { className: 'side-nav-item-icon renewal-shell-nav-icon' }, React.createElement(TabIcon, { id: item.icon })),
+          React.createElement('span', { className: 'side-nav-item-title renewal-shell-nav-label' },
+            item.label,
+            item.badge && React.createElement('span', { className: 'side-nav-item-badge' }, item.badge)
+          ),
+          metaVal && (
+            item.isPill
+              ? React.createElement('span', { className: 'side-nav-item-meta chat-name-pill', style: { backgroundColor: chatPillColor, color: chatPillTextColor } }, metaVal)
+              : React.createElement('span', { className: 'side-nav-item-meta renewal-shell-side-nav-meta' }, metaVal)
+          )
+        );
+      })
+    ),
+    React.createElement('div', { className: 'side-nav-group renewal-shell-side-nav-group is-sub' },
+      BENTO_SUB_ITEMS.map(item => {
+        const active = isSideItemActive(item.id);
+        return React.createElement('button', {
+          key: item.id,
+          type: 'button',
+          className: `side-nav-item renewal-shell-side-nav-item ${active ? 'is-active' : ''}`.trim(),
+          title: item.label,
+          onClick: () => selectSideItem(item.id)
+        },
+          React.createElement('span', { className: 'side-nav-item-icon renewal-shell-nav-icon' }, React.createElement(TabIcon, { id: item.icon })),
+          React.createElement('span', { className: 'side-nav-item-title renewal-shell-nav-label' }, item.label)
+        );
+      })
+    ),
+    React.createElement('div', { className: 'side-nav-footer renewal-shell-side-nav-footer' },
+      React.createElement('button', { type: 'button', className: 'side-nav-item renewal-shell-side-nav-quick-item', title: '공유', onClick: () => openMoreModalById('share') },
+        React.createElement('span', { className: 'side-nav-item-icon' }, React.createElement(TabIcon, { id: 'share' })),
+        React.createElement('span', { className: 'side-nav-item-title' }, '공유')
+      ),
+      React.createElement('button', { type: 'button', className: 'side-nav-item renewal-shell-side-nav-quick-item', title: '설정', onClick: () => openMoreModalById('app-settings') },
+        React.createElement('span', { className: 'side-nav-item-icon' }, React.createElement(TabIcon, { id: 'settings' })),
+        React.createElement('span', { className: 'side-nav-item-title' }, '설정')
+      ),
+      React.createElement('button', { type: 'button', className: 'side-nav-collapse-btn renewal-shell-side-collapse', title: isSideNavCollapsed ? '메뉴 펼치기' : '메뉴 접기', 'aria-label': isSideNavCollapsed ? '메뉴 펼치기' : '메뉴 접기', onClick: () => setIsSideNavCollapsed(v => !v) },
+        React.createElement(TabIcon, { id: isSideNavCollapsed ? 'chevronRight' : 'chevronLeft' }),
+        React.createElement('span', { className: 'side-nav-collapse-label' }, isSideNavCollapsed ? '펼치기' : '접기')
+      )
+    )
   );
 
   return React.createElement(React.Fragment, null,
