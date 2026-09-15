@@ -1973,35 +1973,29 @@ export function ChatRoomView({
     onNavigate: i => setActiveDocumentLightbox(prev => prev ? { ...prev, index: i } : prev)
   }) : null,
   memePreviewItem && /*#__PURE__*/React.createElement("div", {
+    className: "modal-overlay meme-preview-overlay",
     role: "dialog",
     "aria-modal": "true",
     "aria-label": "밈 이미지 전송 확인",
     onClick: event => { if (event.target === event.currentTarget) setMemePreviewItem(null); },
     onKeyDown: event => { if (event.key === 'Escape') setMemePreviewItem(null); },
-    tabIndex: -1,
-    style: {
-      position: 'fixed', inset: 0, zIndex: 14000, display: 'flex', alignItems: 'center', justifyContent: 'center',
-      padding: '24px', background: 'rgba(15, 23, 42, 0.72)'
-    }
+    tabIndex: -1
   }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      width: 'min(92vw, 520px)', maxHeight: '90vh', overflow: 'auto', display: 'flex', flexDirection: 'column',
-      gap: '14px', padding: '16px', borderRadius: '16px', background: 'var(--bg-card)', boxShadow: 'var(--shadow-lg)'
-    }
+    className: "modal meme-preview-modal"
   }, /*#__PURE__*/React.createElement("img", {
+    className: "meme-preview-image",
     src: memePreviewItem.fullUrl || memePreviewItem.thumbUrl,
-    alt: '전송할 밈 이미지 미리보기',
-    style: { width: '100%', maxHeight: '65vh', objectFit: 'contain', borderRadius: '10px', background: 'var(--bg-primary)' }
+    alt: '전송할 밈 이미지 미리보기'
   }), /*#__PURE__*/React.createElement("p", {
-    style: { margin: 0, color: 'var(--text-main)', fontSize: 'var(--font-size-md)', textAlign: 'center' }
+    className: "meme-preview-message"
   }, '이 이미지를 채팅창에 전송하시겠습니까?'), /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', justifyContent: 'flex-end', gap: '8px' }
+    className: "meme-preview-actions"
   }, /*#__PURE__*/React.createElement("button", {
-    type: 'button', onClick: () => setMemePreviewItem(null),
-    style: { minHeight: '40px', padding: '0 16px', borderRadius: '10px', border: '1px solid var(--border-subtle)', background: 'var(--bg-primary)', color: 'var(--text-main)', cursor: 'pointer' }
+    className: "meme-preview-cancel",
+    type: 'button', onClick: () => setMemePreviewItem(null)
   }, '취소'), /*#__PURE__*/React.createElement("button", {
-    type: 'button', onClick: () => { const item = memePreviewItem; setMemePreviewItem(null); if (typeof onSendMemeImage === 'function') onSendMemeImage(item); },
-    style: { minHeight: '40px', padding: '0 16px', borderRadius: '10px', border: 'none', background: 'var(--accent-primary)', color: '#fff', cursor: 'pointer', fontWeight: 700 }
+    className: "meme-preview-confirm",
+    type: 'button', onClick: () => { const item = memePreviewItem; setMemePreviewItem(null); if (typeof onSendMemeImage === 'function') onSendMemeImage(item); }
   }, '확인')))),
   isEmojiPickerOpen && /*#__PURE__*/React.createElement(EmojiPickerSheet, {
     onSelect: insertEmojiIntoChatInput,
