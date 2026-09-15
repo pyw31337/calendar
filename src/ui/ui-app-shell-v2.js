@@ -22,7 +22,10 @@ import {
   formatDDayLabel, formatConfirmedMeetingLabel, unionActivityLogs,
   getMessageDirectMediaEntry, getMessageImageEntries,
   normalizePlaceDateForSort,
+  getTrulyConfirmedMeetings, getActiveAvailabilities, getActiveParticipants,
 } from '../core/app-domain-helpers.js';
+import { computeKoreanHolidaysForYear, getKoreanSolarTermsForYear } from '../core/app-calendar-holidays.js';
+import { getAnniversariesForDate } from '../core/app-anniversary-dates.js';
 import { buildMainCalendarScreenState } from '../core/app-calendar-screen-state.js';
 
 const TABS = [
@@ -341,50 +344,254 @@ function RenewalHero({ meetings, onSelectDate }) {
  * local state here, same reasoning as `openMoreModal`: CalendarApp's own `currentMonthDate` drives
  * JSX this shell's early return never reaches, so reusing it would silently no-op.
  */
-function CalendarLegend({ participants }) {
+
+function BentoCalendarCard({ calendarContext, onSelectDate }) {
   const React = window.React;
-  const list = Array.isArray(participants) ? participants.filter(Boolean) : [];
-  return React.createElement('div', { className: 'cal-legend' },
-    list.map(p => React.createElement('span', { key: p.id || p.name },
-      React.createElement('span', { className: 'dot', style: { backgroundColor: p.color || '#A78BFA' } }),
-      p.name
-    )),
-    React.createElement('span', null,
-      React.createElement('span', { className: 'dot is-bar', style: { backgroundColor: '#7C3AED', borderRadius: 9999, width: 12, height: 5 } }),
-      '일정·여행'
+  const [monthDate, setMonthDate] = React.useState(() => new Date());
+  const year = monthDate.getFullYear();
+  const month = monthDate.getMonth();
+
+  const calendar = calendarContext?.calendar || {};
+  const participants = Array.isArray(calendar.participants) ? calendar.participants : [];
+  const anniversariesList = Array.isArray(calendarContext?.anniversaries) ? calendarContext.anniversaries : [];
+
+  const participantsMap = React.useMemo(() => {
+    return getActiveParticipants(calendar).reduce((acc, p) => {
+      acc[p.id] = p;
+      return acc;
+    }, {});
+  }, [calendar.participants]);
+
+  const availMap = React.useMemo(() => {
+    return getActiveAvailabilities(calendar).reduce((acc, entry) => {
+      if (!acc[entry.date]) acc[entry.date] = [];
+      acc[entry.date].push(entry);
+      return acc;
+    }, {});
+  }, [calendar.availabilities]);
+
+  const confirmedMeetings = React.useMemo(() => {
+    return getTrulyConfirmedMeetings(calendar);
+  }, [calendar]);
+
+  const meetingMap = React.useMemo(() => {
+    const map = {};
+    confirmedMeetings.forEach(m => {
+      if (m?.date) map[m.date] = m;
+      if (Array.isArray(m?.dates)) {
+        m.dates.forEach(d => { map[d] = m; });
+      }
+    });
+    return map;
+  }, [confirmedMeetings]);
+
+  const holidayMap = React.useMemo(() => {
+    const map = {};
+    [year - 1, year, year + 1].forEach(y => {
+      computeKoreanHolidaysForYear(y).forEach(e => {
+        (map[e.date] = map[e.date] || []).push(e.name);
+      });
+    });
+    return map;
+  }, [year]);
+
+  const solarTermMap = React.useMemo(() => {
+    const map = {};
+    [year - 1, year, year + 1].forEach(y => {
+      Object.assign(map, getKoreanSolarTermsForYear(y));
+    });
+    return map;
+  }, [year]);
+
+  // Compute days array
+  const firstDay = new Date(year, month, 1).getDay();
+  const lastDate = new Date(year, month + 1, 0).getDate();
+  const prevLastDate = new Date(year, month, 0).getDate();
+  const days = [];
+
+  // Prev month
+  for (let i = firstDay - 1; i >= 0; i--) {
+    const d = prevLastDate - i;
+    const prevD = new Date(year, month - 1, d);
+    days.push({
+      dayNum: d,
+      dateStr: `${prevD.getFullYear()}-${String(prevD.getMonth() + 1).padStart(2, '0')}-${String(prevD.getDate()).padStart(2, '0')}`,
+      isCurrentMonth: false,
+    });
+  }
+  // Current month
+  for (let i = 1; i <= lastDate; i++) {
+    days.push({
+      dayNum: i,
+      dateStr: `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`,
+      isCurrentMonth: true,
+    });
+  }
+  // Next month
+  const totalCells = Math.ceil(days.length / 7) * 7;
+  const nextDaysNeeded = totalCells - days.length;
+  for (let i = 1; i <= nextDaysNeeded; i++) {
+    const nextD = new Date(year, month + 1, i);
+    days.push({
+      dayNum: i,
+      dateStr: `${nextD.getFullYear()}-${String(nextD.getMonth() + 1).padStart(2, '0')}-${String(nextD.getDate()).padStart(2, '0')}`,
+      isCurrentMonth: false,
+    });
+  }
+
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+  return React.createElement('div', { className: 'cal-card' },
+    // Month nav
+    React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' } },
+      React.createElement('button', {
+        className: 'ghost-btn',
+        style: { gap: '4px', fontWeight: 800, fontSize: '0.92rem', color: 'var(--text-main)', padding: '2px 0' },
+        type: 'button',
+      },
+        `${year}년 ${month + 1}월`,
+        React.createElement('svg', { width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' },
+          React.createElement('path', { d: 'M6 9l6 6l6 -6' })
+        )
+      ),
+      React.createElement('div', { style: { display: 'flex', gap: '0px' } },
+        React.createElement('button', {
+          className: 'ghost-btn',
+          'aria-label': '이전달',
+          type: 'button',
+          onClick: () => setMonthDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1)),
+        },
+          React.createElement('svg', { width: 15, height: 15, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', style: { transform: 'rotate(90deg)' } },
+            React.createElement('path', { d: 'M6 9l6 6l6 -6' })
+          )
+        ),
+        React.createElement('button', {
+          className: 'ghost-btn',
+          style: { fontWeight: 700, fontSize: '0.72rem', padding: '6px 8px' },
+          type: 'button',
+          onClick: () => setMonthDate(new Date()),
+        }, '오늘'),
+        React.createElement('button', {
+          className: 'ghost-btn',
+          'aria-label': '다음달',
+          type: 'button',
+          onClick: () => setMonthDate(d => new Date(d.getFullYear(), d.getMonth() + 1, 1)),
+        },
+          React.createElement('svg', { width: 15, height: 15, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', style: { transform: 'rotate(-90deg)' } },
+            React.createElement('path', { d: 'M6 9l6 6l6 -6' })
+          )
+        )
+      )
     ),
-    React.createElement('span', null,
-      React.createElement('span', { className: 'dot is-bar', style: { backgroundColor: '#F472B6', borderRadius: 9999, width: 12, height: 5 } }),
-      '기념일'
+
+    // Weekdays
+    React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', marginBottom: '2px' } },
+      React.createElement('div', { className: 'weekday-label', style: { color: '#EF4444' } }, '일'),
+      React.createElement('div', { className: 'weekday-label' }, '월'),
+      React.createElement('div', { className: 'weekday-label' }, '화'),
+      React.createElement('div', { className: 'weekday-label' }, '수'),
+      React.createElement('div', { className: 'weekday-label' }, '목'),
+      React.createElement('div', { className: 'weekday-label' }, '금'),
+      React.createElement('div', { className: 'weekday-label', style: { color: '#2563EB' } }, '토')
+    ),
+
+    // Days grid
+    React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', rowGap: '1px' } },
+      days.map(day => {
+        const { dayNum, dateStr, isCurrentMonth } = day;
+        const cellDate = new Date(dateStr);
+        const dayOfWeek = cellDate.getDay();
+        const isToday = dateStr === todayStr;
+        const holidays = holidayMap[dateStr] || [];
+        const isHoliday = holidays.length > 0 || dayOfWeek === 0;
+        const solarTerm = solarTermMap[dateStr];
+        const cornerLabel = holidays[0] || solarTerm || '';
+        const isHolidayCorner = holidays.length > 0;
+        const meeting = meetingMap[dateStr];
+        const hasMeeting = !!meeting;
+        const availEntries = availMap[dateStr] || [];
+        const seenPids = new Set();
+        const dots = [];
+        availEntries.forEach(entry => {
+          const p = participantsMap[entry.participantId];
+          if (p && !seenPids.has(p.id)) {
+            seenPids.add(p.id);
+            dots.push(p);
+          }
+        });
+        const anns = getAnniversariesForDate(dateStr, anniversariesList);
+        const cellClasses = [
+          'day-cell',
+          !isCurrentMonth ? 'other-month' : '',
+          isToday ? 'today' : '',
+          isHoliday ? 'holiday' : '',
+          hasMeeting ? 'confirmed has-event' : '',
+        ].filter(Boolean).join(' ');
+
+        return React.createElement('button', {
+          key: dateStr,
+          className: cellClasses,
+          type: 'button',
+          onClick: () => onSelectDate?.(dateStr),
+          'aria-label': `${dateStr} 일정 상세`,
+        },
+          React.createElement('span', { className: 'day-num' }, dayNum),
+          cornerLabel ? React.createElement('div', { className: `day-corner-label ${isHolidayCorner ? 'is-holiday' : ''}`.trim() }, cornerLabel) : null,
+          hasMeeting ? React.createElement('span', { className: 'day-event-title' }, meeting.title || '일정') : null,
+          dots.length > 0 ? React.createElement('div', { className: 'dot-row' },
+            dots.map(p => React.createElement('span', {
+              key: p.id,
+              className: 'p-dot',
+              'data-name': (p.name || '').slice(-2),
+              style: { background: p.color || 'var(--brand)' },
+            }))
+          ) : null,
+          hasMeeting ? React.createElement('div', { className: 'day-bar solo' }) : null,
+          anns.length > 0 ? React.createElement('div', { className: 'day-anniversary' },
+            React.createElement('span', { className: 'day-anniversary-label' }, anns[0].title || '기념일')
+          ) : null
+        );
+      })
+    ),
+
+    // Legend
+    React.createElement('div', { className: 'cal-legend' },
+      participants.map(p => React.createElement('span', { key: p.id },
+        React.createElement('span', { className: 'dot', style: { background: p.color || '#A78BFA' } }),
+        p.name
+      )),
+      React.createElement('span', null,
+        React.createElement('span', { className: 'dot', style: { background: 'var(--brand)', borderRadius: 'var(--radius-full)', width: '12px', height: '5px' } }),
+        '일정·여행'
+      ),
+      React.createElement('span', null,
+        React.createElement('span', { className: 'dot', style: { background: '#F472B6', borderRadius: 'var(--radius-full)', width: '12px', height: '5px' } }),
+        '기념일'
+      )
     )
   );
 }
 
 function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeView }) {
   const React = window.React;
-  const { CalendarGrid } = bindUiComponentAliases(React);
-  const [monthDate, setMonthDate] = React.useState(() => new Date());
-  const onParticipantClick = (name, dateStr) => { if (dateStr) onOpenDate(dateStr); };
   return React.createElement(React.Fragment, null,
     React.createElement(RenewalHero, { meetings: calendarContext.upcomingMeetings, onSelectDate: onOpenDate }),
-    React.createElement(CalendarGrid, {
-      anniversaries: calendarContext.anniversaries,
-      calendar: calendarContext.calendar,
-      isLoading: calendarContext.isLoading,
-      monthDate,
-      onPrevMonth: () => setMonthDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1)),
-      onNextMonth: () => setMonthDate(d => new Date(d.getFullYear(), d.getMonth() + 1, 1)),
-      onToday: () => setMonthDate(new Date()),
-      onJumpToMonth: (y, m) => setMonthDate(new Date(y, m, 1)),
-      onSelectDate: onOpenDate,
-      onMoveAvailability: calendarContext.handleMoveAvailability,
-      onParticipantClick,
+    React.createElement(HomeActivitySummary, {
+      calendarContext: {
+        ...calendarContext,
+        displayChatMessages: recordsContext?.mediaProps?.chatMessages,
+        memos: recordsContext?.memoProps?.memos,
+        places: recordsContext?.placesProps?.calendar?.places,
+        galleryPhotoIndex: recordsContext?.mediaProps?.indexedPhotos ? { items: recordsContext.mediaProps.indexedPhotos } : null,
+        setActiveLightbox: recordsContext?.mediaProps?.setActiveLightbox
+      },
+      onOpenDate,
+      onChangeView
     }),
-    React.createElement(CalendarLegend, { participants: calendarContext?.calendar?.participants }),
-    React.createElement(HomeActivitySummary, { calendarContext: { ...calendarContext, displayChatMessages: recordsContext?.mediaProps?.chatMessages, memos: recordsContext?.memoProps?.memos, places: recordsContext?.placesProps?.calendar?.places, galleryPhotoIndex: recordsContext?.mediaProps?.indexedPhotos ? { items: recordsContext.mediaProps.indexedPhotos } : null, setActiveLightbox: recordsContext?.mediaProps?.setActiveLightbox }, onOpenDate, onChangeView }),
-    React.createElement('footer', { className: 'renewal-home-footer' },
+    React.createElement('footer', { className: 'renewal-home-footer footer' },
       React.createElement('span', null, 'Copyright © 2026 모여라 캘린더. All Rights Reserved.'),
-      React.createElement('span', { className: 'renewal-home-footer-links' },
+      React.createElement('span', { className: 'renewal-home-footer-links links' },
         React.createElement('b', null, 'FAMILY LINK'), React.createElement('b', null, '밖에눈오나'), React.createElement('b', null, 'Culture Flow')
       )
     )
@@ -427,7 +634,10 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
     const d = dateValue(value);
     return Number.isNaN(d.getTime()) ? '' : `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}(${['일','월','화','수','목','금','토'][d.getDay()]}) ${formatTime(value)}`;
   };
-  const Section = ({ title, kind, children, onMore }) => React.createElement('section', { className: `renewal-home-summary-section bento-card is-${kind}${kind === 'gallery' ? ' gallery-bleed' : ''}` },
+  const Section = ({ title, kind, children, onMore, delay }) => React.createElement('section', {
+    className: `renewal-home-summary-section bento-card wide enter is-${kind}${kind === 'gallery' ? ' gallery-bleed' : ''}`,
+    style: delay ? { animationDelay: delay } : undefined,
+  },
     React.createElement('div', { className: 'renewal-home-summary-heading bento-card-head' },
       React.createElement('span', { className: 'renewal-home-summary-heading-label' },
         React.createElement('span', { className: 'renewal-home-summary-heading-icon bento-card-icon' }, React.createElement(HomeSectionIcon, { kind })),
@@ -435,7 +645,10 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
       ), onMore && React.createElement('button', { type: 'button', className: 'more-link', onClick: onMore }, '전체보기')
     ), children);
   return React.createElement('div', { className: 'renewal-home-summary bento-grid' },
-    React.createElement(Section, { title: '채팅', kind: 'chat', onMore: () => onChangeView?.('chat') },
+    React.createElement('div', { className: 'renewal-home-summary-section bento-card wide enter', style: { animationDelay: '0.04s' } },
+      React.createElement(BentoCalendarCard, { calendarContext, onSelectDate: onOpenDate })
+    ),
+    React.createElement(Section, { title: '채팅', kind: 'chat', delay: '0.08s', onMore: () => onChangeView?.('chat') },
       messages.length ? React.createElement('div', { className: 'renewal-home-chat-list' }, messages.map((m, i) => {
         const image = m.thumbUrl || (Array.isArray(m.thumbUrls) && m.thumbUrls[0]) || m.imageUrl || (Array.isArray(m.imageUrls) && m.imageUrls[0]);
         return React.createElement('button', { type: 'button', className: `renewal-home-chat-item chat-row${image ? ' has-image' : ''}`, key: m.id || i, onClick: () => onChangeView?.('chat') },
@@ -452,11 +665,11 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
         );
       })) : React.createElement('p', { className: 'renewal-home-empty' }, '최근 대화가 없습니다.')
     ),
-    React.createElement(Section, { title: '메모', kind: 'memo', onMore: () => onChangeView?.('records') },
+    React.createElement(Section, { title: '메모', kind: 'memo', delay: '0.12s', onMore: () => onChangeView?.('records') },
       memos.length ? React.createElement('div', { className: 'renewal-home-memo-list' }, memos.map((memo, i) => {
         const preview = memo.linkPreview || (Array.isArray(memo.linkPreviews) && memo.linkPreviews[0]);
         const tags = Array.isArray(memo.tags) ? memo.tags.slice(0, 3) : [];
-        return React.createElement('button', { type: 'button', className: 'renewal-home-memo-card memo-card', key: memo.id || i, style: { '--renewal-memo-author': displayColor(memo) }, onClick: () => onChangeView?.('records') },
+        return React.createElement('button', { type: 'button', className: 'renewal-home-memo-card memo-card', key: memo.id || i, style: { '--renewal-memo-author': displayColor(memo), '--memo-author-color': displayColor(memo) }, onClick: () => onChangeView?.('records') },
           React.createElement('strong', { className: 'renewal-home-memo-title memo-card-title' }, memo.title || '메모'),
           React.createElement('span', { className: 'renewal-home-memo-summary memo-summary' }, String(memo.text || memo.content || memo.description || '').slice(0, 170)),
           preview && React.createElement('span', { className: 'renewal-home-memo-preview memo-link-card' },
@@ -470,7 +683,7 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
         );
       })) : React.createElement('p', { className: 'renewal-home-empty' }, '최근 메모가 없습니다.')
     ),
-    React.createElement(Section, { title: '갤러리', kind: 'gallery', onMore: () => onChangeView?.('gallery') },
+    React.createElement(Section, { title: '갤러리', kind: 'gallery', delay: '0.16s', onMore: () => onChangeView?.('gallery') },
       photos.length ? React.createElement('div', { className: 'renewal-home-photo-strip thumb-grid' }, photos.map((photo, i) => React.createElement('button', {
         type: 'button',
         className: `thumb ${i === 0 ? 'gallery-comment-heartbeat' : ''}`.trim(),
@@ -482,12 +695,17 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
         (photo.commentCount || i === 0) ? React.createElement('span', { className: 'comment-badge' }, photo.commentCount || 1) : null
       ))) : React.createElement('p', { className: 'renewal-home-empty' }, '등록된 사진이 없습니다.')
     ),
-    React.createElement(Section, { title: '장소', kind: 'places', onMore: () => onChangeView?.('records') },
+    React.createElement(Section, { title: '장소', kind: 'places', delay: '0.20s', onMore: () => onChangeView?.('records') },
       places.length ? React.createElement('div', { className: 'renewal-home-place-list' }, places.map((place, i) => React.createElement('button', { type: 'button', className: 'renewal-home-place-card place-row', key: place.id || i, onClick: () => onChangeView?.('records') },
         React.createElement('span', { className: 'renewal-home-place-copy' },
           React.createElement('span', { className: 'renewal-home-place-tags place-tags' },
-            React.createElement('em', { className: 'place-tag' }, place.categoryName || place.categoryId || '기타'),
-            React.createElement('em', { className: `place-tag ${place.visitStatus === 'planned' ? 'is-planned' : 'is-visited'}` }, place.visitStatus === 'planned' ? '방문예정' : '방문')
+            React.createElement('em', { className: 'place-tag', style: { background: '#F1F5F9', color: 'var(--text-muted)' } }, place.categoryName || place.categoryId || '기타'),
+            React.createElement('em', {
+              className: `place-tag ${place.visitStatus === 'planned' ? 'is-planned' : 'is-visited'}`,
+              style: place.visitStatus === 'planned'
+                ? { background: 'var(--brand-soft)', color: 'var(--brand)' }
+                : { background: '#ECFDF5', color: 'var(--status-green)' }
+            }, place.visitStatus === 'planned' ? '방문예정' : '방문')
           ),
           React.createElement('strong', { className: 'place-name' }, place.name || place.title || '저장한 장소'),
           React.createElement('small', { className: 'place-addr' }, place.address || place.description || ''),
