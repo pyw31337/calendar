@@ -1748,7 +1748,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   const chatPillTextColor = chatAuthorPart?.color || '#DC2626';
 
   const bentoSideNav = React.createElement(React.Fragment, null,
-    React.createElement('div', { className: 'side-nav-head renewal-shell-side-nav-brand' },
+    React.createElement('div', { className: 'side-nav-head' },
       React.createElement('div', { className: 'side-nav-brand' },
         React.createElement(TabIcon, { id: 'calendar' }),
         React.createElement('span', { className: 'side-nav-brand-text' }, calendarName || '모아엘가')
@@ -1832,8 +1832,8 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
 
   return React.createElement(React.Fragment, null,
     React.createElement('div', { className: `renewal-shell ${isSideNavCollapsed ? 'is-side-collapsed' : ''}`.trim() },
-      React.createElement('button', { type: 'button', className: `renewal-shell-side-backdrop ${isSideNavOpen ? 'is-open' : ''}`.trim(), onClick: () => setIsSideNavOpen(false), 'aria-label': '메뉴 닫기' }),
-      React.createElement('nav', { className: `renewal-shell-side-nav ${isSideNavOpen ? 'is-open' : ''}`.trim(), 'aria-label': '주 메뉴' }, bentoSideNav),
+      React.createElement('button', { type: 'button', className: `renewal-shell-side-backdrop side-nav-backdrop ${isSideNavOpen ? 'is-open' : ''}`.trim(), onClick: () => setIsSideNavOpen(false), 'aria-label': '메뉴 닫기' }),
+      React.createElement('nav', { className: `renewal-shell-side-nav side-nav ${isSideNavOpen ? 'is-open' : ''} ${isSideNavCollapsed ? 'is-collapsed' : ''}`.trim(), 'aria-label': '주 메뉴' }, bentoSideNav),
       React.createElement('main', { className: `renewal-shell-main is-${activeTab}` },
         React.createElement(TopHeader, {
           calendarName,
