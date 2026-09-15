@@ -6569,3 +6569,39 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 .renewal-home-hero .dday-expanded-badge, .renewal-home-hero .dday-view-btn { background: #fff; color: #7C3AED; font-weight: 800; border-radius: 9999px; }
 .renewal-home-hero .dday-expanded-badge { font-size: .62rem; padding: 3px 8px; }
 .renewal-home-hero .dday-view-btn { border: 0; font-size: .66rem; padding: 6px 12px; white-space: nowrap; cursor: pointer; }
+
+/* Destination surfaces follow each Full reference's focused-page geometry. */
+.renewal-shell-main.is-chat > .chat-room-container,
+.renewal-shell-main.is-records > .renewal-shell-subtab-row,
+.renewal-shell-main.is-records > .memo-view-container,
+.renewal-shell-main.is-records > .places-view-container,
+.renewal-shell-main.is-settlement > .settlement-page-body {
+  width: 100%; max-width: 1080px; margin-left: auto; margin-right: auto; box-sizing: border-box;
+}
+.renewal-shell-main.is-chat > .chat-room-container { background: #FAFAFC; }
+.renewal-shell-main.is-chat .chat-room-header { background: #FFFFFF; border-bottom: 1px solid #ECEAF5; }
+.renewal-shell-main.is-chat .chat-composer { border-top-color: #ECEAF5; background: #FFFFFF; }
+.renewal-shell-main.is-records > .renewal-shell-subtab-row {
+  background: #FFFFFF; border-bottom: 1px solid #ECEAF5; padding-left: 14px; padding-right: 14px;
+}
+.renewal-shell-main.is-records .memo-view-container,
+.renewal-shell-main.is-records .places-view-container,
+.renewal-shell-main.is-settlement .settlement-page-body { background: #FAFAFC; }
+.renewal-shell-main.is-records .memo-card-hover,
+.renewal-shell-main.is-records .place-card,
+.renewal-shell-main.is-settlement .settlement-metric-card,
+.renewal-shell-main.is-settlement .settlement-person-card {
+  border-color: #ECEAF5; border-radius: 18px; box-shadow: 0 2px 8px rgba(30,27,46,.07);
+}
+@media (min-width: 768px) {
+  .renewal-shell-main.is-chat > .chat-room-container { max-width: 640px; }
+  .renewal-shell-main.is-records .memo-view-container,
+  .renewal-shell-main.is-records .places-view-container,
+  .renewal-shell-main.is-settlement .settlement-page-body { max-width: 720px; margin: 0 auto; }
+}
+@media (min-width: 1200px) {
+  .renewal-shell-main.is-chat > .chat-room-container { max-width: 820px; }
+  .renewal-shell-main.is-records .memo-view-container,
+  .renewal-shell-main.is-records .places-view-container,
+  .renewal-shell-main.is-settlement .settlement-page-body { max-width: 1080px; }
+}
