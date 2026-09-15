@@ -561,7 +561,10 @@ export function ChatRoomView({
       }, 100);
       return () => clearTimeout(t);
     }
-  }, [viewportBottom]);
+  // The fixed composer can grow by drag-resize without a visualViewport event. Re-anchor the
+  // message list in that case as well, otherwise the newly taller composer covers the newest
+  // bubbles even though the bottom padding has already been recalculated.
+  }, [viewportBottom, composerHeight]);
 
   // Reserve the actual composer height so a tall reply preview can never cover the last bubble.
   React.useEffect(() => {
