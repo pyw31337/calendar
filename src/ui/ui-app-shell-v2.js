@@ -634,15 +634,14 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
     const d = dateValue(value);
     return Number.isNaN(d.getTime()) ? '' : `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}(${['일','월','화','수','목','금','토'][d.getDay()]}) ${formatTime(value)}`;
   };
-  const Section = ({ title, kind, children, onMore, delay }) => React.createElement('section', {
+  const Section = ({ title, kind, children, onMore, delay }) => React.createElement('div', {
     className: `renewal-home-summary-section bento-card wide enter is-${kind}${kind === 'gallery' ? ' gallery-bleed' : ''}`,
     style: delay ? { animationDelay: delay } : undefined,
   },
     React.createElement('div', { className: 'renewal-home-summary-heading bento-card-head' },
-      React.createElement('span', { className: 'renewal-home-summary-heading-label' },
-        React.createElement('span', { className: 'renewal-home-summary-heading-icon bento-card-icon' }, React.createElement(HomeSectionIcon, { kind })),
-        React.createElement('span', { className: 'bento-card-title' }, title)
-      ), onMore && React.createElement('button', { type: 'button', className: 'more-link', onClick: onMore }, '전체보기')
+      React.createElement('span', { className: 'renewal-home-summary-heading-icon bento-card-icon' }, React.createElement(HomeSectionIcon, { kind })),
+      React.createElement('span', { className: 'bento-card-title' }, title),
+      onMore && React.createElement('button', { type: 'button', className: 'more-link', onClick: onMore }, '전체보기')
     ), children);
   return React.createElement('div', { className: 'renewal-home-summary bento-grid' },
     React.createElement('div', { className: 'renewal-home-summary-section bento-card wide enter', style: { animationDelay: '0.04s' } },

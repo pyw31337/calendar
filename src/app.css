@@ -7197,19 +7197,54 @@ body:has(.renewal-shell) { padding: 0; }
   background: #fff;
   box-shadow: none !important;
 }
-.renewal-shell-main.is-calendar .renewal-home-summary-heading {
-  margin-bottom: 14px;
-  color: #83798f;
-  font-size: .66rem;
-  font-weight: 700;
-  letter-spacing: .08em;
-  text-transform: uppercase;
+.renewal-shell-main.is-calendar .renewal-home-summary-heading,
+.bento-card-head {
+  display: flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+  margin-bottom: 14px !important;
 }
-.renewal-shell-main.is-calendar .renewal-home-summary-heading-label { gap: 7px; }
-.renewal-shell-main.is-calendar .renewal-home-summary-heading-icon {
-  display: inline-flex; width: 15px; height: 15px; padding: 0; border-radius: 0; background: transparent !important; color: #7c3aed !important;
+.renewal-shell-main.is-calendar .renewal-home-summary-heading-icon,
+.bento-card-icon {
+  display: inline-flex !important;
+  width: 15px !important;
+  height: 15px !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: #7c3aed !important;
+  opacity: 0.8 !important;
+  flex-shrink: 0 !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
-.renewal-shell-main.is-calendar .renewal-home-summary-heading button { padding: 2px 0; color: #83798f; font-size: .64rem; }
+.bento-card-title {
+  font-weight: 700 !important;
+  font-size: .66rem !important;
+  color: #83798f !important;
+  letter-spacing: .08em !important;
+  text-transform: uppercase !important;
+  flex: 1 !important;
+}
+.bento-card .more-link,
+.renewal-shell-main.is-calendar .renewal-home-summary-heading button,
+.more-link {
+  margin-left: auto !important;
+  background: none !important;
+  border: none !important;
+  outline: none !important;
+  padding: 0 !important;
+  color: #83798f !important;
+  font-size: .64rem !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+  transition: color 0.15s ease !important;
+}
+.bento-card .more-link:hover,
+.renewal-shell-main.is-calendar .renewal-home-summary-heading button:hover,
+.more-link:hover {
+  color: #7c3aed !important;
+}
 
 .renewal-shell-main.is-calendar .renewal-home-chat-list { display: flex; flex-direction: column; gap: 12px; }
 .renewal-shell-main.is-calendar .renewal-home-chat-item {
@@ -7455,8 +7490,10 @@ body:has(.renewal-shell) { padding: 0; }
     border: 1px solid #eceaf5 !important;
     border-radius: 16px !important;
     box-shadow: 0 1px 4px rgba(30,27,46,.07) !important;
+    grid-column: auto !important;
   }
-  .renewal-shell-main.is-calendar .renewal-home-summary-section:first-of-type.wide {
+  .renewal-shell-main.is-calendar .renewal-home-summary-section:first-child,
+  .renewal-shell-main.is-calendar > .renewal-home-summary > :first-child {
     grid-column: 1 / -1 !important;
   }
   .renewal-shell-main.is-calendar .renewal-home-summary-section.is-gallery { padding: 18px !important; }
@@ -7554,9 +7591,9 @@ body:has(.renewal-shell) { padding: 0; }
     padding: 24px 0 !important;
     align-items: start !important;
   }
-  .renewal-shell-main.is-calendar .renewal-home-summary-section { padding: 20px !important; }
-  .renewal-shell-main.is-calendar .renewal-home-summary-section.wide { grid-column: auto; }
-  .renewal-shell-main.is-calendar .renewal-home-summary-section:first-of-type.wide { grid-column: 1 / -1 !important; }
+  .renewal-shell-main.is-calendar .renewal-home-summary-section { padding: 20px !important; grid-column: auto !important; }
+  .renewal-shell-main.is-calendar .renewal-home-summary-section:first-child,
+  .renewal-shell-main.is-calendar > .renewal-home-summary > :first-child { grid-column: 1 / -1 !important; }
   .renewal-shell-main.is-calendar .renewal-home-summary-section.is-gallery { padding: 24px !important; }
   .renewal-shell-main.is-calendar .renewal-home-summary-section.is-places { grid-column: 1 / 2 !important; }
   .renewal-shell-main.is-calendar .renewal-home-photo-strip {
