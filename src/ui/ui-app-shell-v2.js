@@ -655,6 +655,14 @@ function SettlementPane({ settlementContext, onChangeView, onOpenAppSettings, on
       onOpenAppSettings,
       onChangeView,
     }),
+    React.createElement('button', {
+      type: 'button',
+      className: 'fab',
+      'aria-label': '지출 추가',
+      onClick: () => settlementContext.summaryProps.onOpenSettlementEditor(null),
+    }, React.createElement('svg', { width: 22, height: 22, viewBox: '0 0 24 24', fill: 'none', stroke: '#fff', strokeWidth: 2.4, strokeLinecap: 'round', strokeLinejoin: 'round' },
+      React.createElement('path', { d: 'M12 5v14M5 12h14' })
+    )),
     settlementContext.isShareOpen && React.createElement(ShareModal, {
       calendar: settlementContext.calendar, shareType: 'settlement', showToast: settlementContext.showToast,
       onClose: settlementContext.onCloseShare,
@@ -1024,6 +1032,17 @@ function PlacesPane({ recordsContext, calendarContext, onChangeView, onOpenAppSe
       onSharePlaces: recordsContext.onOpenPlacesShare,
       onOpenAppSettings,
     }),
+    React.createElement('button', {
+      type: 'button',
+      className: 'fab',
+      'aria-label': '장소 등록',
+      onClick: () => {
+        const addBtn = document.querySelector('.renewal-shell-main.is-records button[aria-label="장소 추가"]');
+        if (addBtn) addBtn.click();
+      },
+    }, React.createElement('svg', { width: 22, height: 22, viewBox: '0 0 24 24', fill: 'none', stroke: '#fff', strokeWidth: 2.4, strokeLinecap: 'round', strokeLinejoin: 'round' },
+      React.createElement('path', { d: 'M12 5v14M5 12h14' })
+    )),
     recordsContext.isPlacesShareOpen && React.createElement(ShareModal, {
       calendar: recordsContext.calendar, shareType: 'places', showToast: recordsContext.showToast,
       onClose: recordsContext.onClosePlacesShare,
@@ -1070,6 +1089,20 @@ function MemoPane({ recordsContext, onChangeView, onOpenAppSettings }) {
       onOpenShare: recordsContext.onOpenMemoShare,
       onOpenAppSettings,
     }),
+    React.createElement('button', {
+      type: 'button',
+      className: 'fab',
+      'aria-label': '메모 작성',
+      onClick: () => {
+        const composer = document.querySelector('.renewal-shell-main.is-records textarea, .renewal-shell-main.is-records [style*="newColor"]');
+        if (composer) {
+          composer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          composer.click();
+        }
+      },
+    }, React.createElement('svg', { width: 22, height: 22, viewBox: '0 0 24 24', fill: 'none', stroke: '#fff', strokeWidth: 2.4, strokeLinecap: 'round', strokeLinejoin: 'round' },
+      React.createElement('path', { d: 'M12 5v14M5 12h14' })
+    )),
     recordsContext.isMemoShareOpen && React.createElement(ShareModal, {
       calendar: recordsContext.calendar, shareType: 'memo', showToast: recordsContext.showToast,
       onClose: recordsContext.onCloseMemoShare,
