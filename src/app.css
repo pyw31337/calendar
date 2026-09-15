@@ -6324,6 +6324,53 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
   .renewal-home-summary-heading { margin-bottom: 14px; }
 }
 @media (min-width: 1024px) { .renewal-home-hero { margin-top: 0; padding: 16px 20px 14px; border-radius: 0 0 18px 18px; } .renewal-home-hero-chip { min-width: 108px; } }
+
+/* Bento home summary parity: four quiet, framed cards below the calendar.  The mock uses
+   compact icon-led headings, generous card gutters, and pairs gallery/places on wide screens;
+   only the gallery imagery is allowed to bleed on a phone. */
+.renewal-shell-main.is-calendar > .renewal-home-summary {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  width: calc(100% - 24px);
+  max-width: var(--renewal-page-max);
+  margin: 0 auto;
+  padding: 18px 0 38px;
+}
+.renewal-shell-main.is-calendar .renewal-home-summary-section {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--renewal-border);
+  border-radius: 16px;
+  background: var(--renewal-card);
+  box-shadow: 0 1px 4px rgba(30,27,46,.07);
+}
+.renewal-home-summary-heading { margin-bottom: 14px; color: var(--renewal-text); font-size: .82rem; letter-spacing: 0; text-transform: none; }
+.renewal-home-summary-heading-label { display: inline-flex; align-items: center; gap: 8px; }
+.renewal-home-summary-heading-icon { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 8px; background: #f3eeff; color: #7c3aed; font-size: .96rem; font-weight: 800; line-height: 1; }
+.renewal-home-summary-section.is-chat .renewal-home-summary-heading-icon { color: #2563eb; background: #eff6ff; }
+.renewal-home-summary-section.is-memo .renewal-home-summary-heading-icon { color: #d97706; background: #fff7ed; }
+.renewal-home-summary-section.is-gallery .renewal-home-summary-heading-icon { color: #0d9488; background: #f0fdfa; }
+.renewal-home-summary-section.is-places .renewal-home-summary-heading-icon { color: #e11d48; background: #fff1f2; }
+.renewal-home-summary-heading button { padding: 4px 7px; border-radius: 7px; color: var(--renewal-muted); font-size: .68rem; }
+.renewal-home-summary-heading button:hover { background: #f3eeff; color: #7c3aed; }
+.renewal-home-chat-list, .renewal-home-memo-list, .renewal-home-place-list { gap: 8px; }
+.renewal-home-chat-item, .renewal-home-memo-card, .renewal-home-place-card { border-color: #eceaf5; border-radius: 11px; background: #fafafc; padding: 10px 11px; }
+.renewal-home-chat-text, .renewal-home-memo-card strong, .renewal-home-place-card strong { font-size: .78rem; }
+.renewal-home-chat-time, .renewal-home-memo-card span, .renewal-home-place-card small { font-size: .66rem; color: #83798f; }
+.renewal-home-avatar, .renewal-home-place-icon { width: 26px; height: 26px; }
+.renewal-shell-main.is-calendar .renewal-home-summary-section.is-gallery { padding: 0; overflow: hidden; }
+.renewal-home-summary-section.is-gallery .renewal-home-summary-heading { padding: 16px 16px 0; }
+.renewal-home-summary-section.is-gallery .renewal-home-photo-strip { gap: 3px; }
+.renewal-home-summary-section.is-gallery .renewal-home-photo-strip button { border-radius: 0; }
+@media (min-width: 768px) {
+  .renewal-shell-main.is-calendar > .renewal-home-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; padding: 22px 0 42px; }
+  .renewal-shell-main.is-calendar .renewal-home-summary-section { padding: 18px; }
+  .renewal-shell-main.is-calendar .renewal-home-summary-section.is-gallery { padding: 18px; }
+  .renewal-home-summary-section.is-gallery .renewal-home-summary-heading { padding: 0; }
+  .renewal-home-summary-section.is-gallery .renewal-home-photo-strip { gap: 5px; }
+  .renewal-home-summary-section.is-gallery .renewal-home-photo-strip button { border-radius: 9px; }
+}
 .renewal-records-overview-subtitle { margin: -2px 0 16px; color: var(--text-muted, #64748b); font-size: .84rem; }
 .renewal-records-overview-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .renewal-records-overview-card { display: flex; align-items: center; gap: 10px; min-height: 104px; padding: 14px; border: 1px solid var(--border, #e2e8f0); border-radius: 16px; background: var(--surface, #fff); color: inherit; text-align: left; cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; }
