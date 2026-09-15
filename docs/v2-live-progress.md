@@ -387,3 +387,11 @@
 - 검증: lint, 테스트 28개, production build, dist budget, architecture budget 통과.
 - 배포: 코드 커밋 `ebe25c78`, Pages 배포 성공 확인. 라이브 CSS 청크 `index-rCMWn-L4.css` 및 V2 URL 응답 확인.
 - 다음: ChatFull/MemoFull/PlacesFull/SettlementFull 각각의 카드·타이포그래피·반응형 폭을 화면별 독립 유닛으로 맞춤. `shell=v2` 플래그 유지.
+
+## 2026-09-15 11:33 KST
+
+- 시안 대조 후 잔여 V2 화면 스타일 유닛을 반영: Bento 홈의 단일 연속 히어로 그라디언트·컴팩트 디데이(heartbeat/펼침 상세)·bleed 갤러리, Chat/Memo/Places/Settlement의 화면별 폭·카드·검색/탭 표면을 적용.
+- 범위: `src/app.css`, `src/ui/ui-app-shell-v2.js`의 V2 전용 표현만 변경. Firebase/Storage 및 원본 메시지·사진·태그·댓글·일정 데이터는 읽기/쓰기 모두 변경하지 않음.
+- 직접 검증: Chromium 브라우저 스모크 106/106 통과(PC·모바일, kkot/cw/jhair, V2 5탭·기록 서브탭·사이드메뉴 전환), 라이브 smoke 200 응답 및 청크 마커/Cloud Function 확인.
+- 검증: `npm run check:all`(lint·28 tests·보안/예산/아키텍처/CI 시나리오/npm audit) 통과, `CALENDAR_SMOKE_BROWSER=chromium npm run smoke:browser` 106 passed.
+- 배포: 코드 `b63bb2a1`, Deploy Vite Pages 및 Verify Calendar 성공. 최신 확인 URL: `https://pyw31337.github.io/calendar/?id=cw&shell=v2&v=b63bb2a1` (`shell=v2` 유지).
