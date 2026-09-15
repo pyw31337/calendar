@@ -1576,12 +1576,16 @@ export function ChatRoomView({
           setComposerInputHeight(height => Math.max(44, Math.min(100, height + (event.key === 'ArrowUp' ? 12 : -12))));
         }
       }, /*#__PURE__*/React.createElement("svg", {
-        xmlns: "http://www.w3.org/2000/svg", width: "20", height: "20", viewBox: "0 0 24 24",
+        xmlns: "http://www.w3.org/2000/svg", width: "24", height: "24", viewBox: "0 0 24 24",
         fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round",
+        className: "lucide lucide-grip-horizontal",
         "aria-hidden": "true"
-      }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
-      /*#__PURE__*/React.createElement("path", { d: "M8 9l4 -4l4 4" }),
-      /*#__PURE__*/React.createElement("path", { d: "M16 15l-4 4l-4 -4" }))),
+      }, /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "9", r: "1" }),
+      /*#__PURE__*/React.createElement("circle", { cx: "19", cy: "9", r: "1" }),
+      /*#__PURE__*/React.createElement("circle", { cx: "5", cy: "9", r: "1" }),
+      /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "15", r: "1" }),
+      /*#__PURE__*/React.createElement("circle", { cx: "19", cy: "15", r: "1" }),
+      /*#__PURE__*/React.createElement("circle", { cx: "5", cy: "15", r: "1" }))),
       memeMatches.length > 0 && /*#__PURE__*/React.createElement("div", {
         className: "chat-composer-meme-area",
         style: { display: 'flex', flexDirection: 'column', gap: '8px' }
