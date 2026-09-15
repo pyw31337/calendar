@@ -35,6 +35,7 @@ const EXPLICIT_BASE_URL = process.env.CALENDAR_SMOKE_BASE_URL || null;
 const BROWSER_NAME = process.env.CALENDAR_SMOKE_BROWSER || 'chromium';
 const BROWSER_TYPES = { chromium, firefox, webkit };
 const DEPLOY_SCOPE = process.env.CALENDAR_SMOKE_SCOPE === 'deploy';
+const BLOCK_PRODUCTION_DATA = true;
 const LOCAL_PORT = process.env.CALENDAR_SMOKE_PORT || '4173';
 const LOCAL_BASE_PATH = `/${String(process.env.CALENDAR_SMOKE_BASE_PATH || '').replace(/^\/+|\/+$/g, '')}`;
 const LOCAL_BASE_URL = `http://127.0.0.1:${LOCAL_PORT}${LOCAL_BASE_PATH === '/' ? '/' : `${LOCAL_BASE_PATH}/`}`;
@@ -79,6 +80,15 @@ function fail(label, detail) {
   console.error(`  ✗ ${label} -- ${detail}`);
 }
 function isIgnorableConsoleError(text, url = '') {
+  if (BLOCK_PRODUCTION_DATA && text.includes('net::ERR_FAILED')
+    && (url.includes('firestore.googleapis.com') || text.includes('firestore.googleapis.com'))) {
+    knownExternalWarningCount += 1;
+    return true;
+  }
+  if (BLOCK_PRODUCTION_DATA && text.includes('Could not reach Cloud Firestore backend')) {
+    knownExternalWarningCount += 1;
+    return true;
+  }
   if (url.includes('firebasestorage.googleapis.com') && text.includes('status of 404')) {
     knownExternalWarningCount += 1;
     return true;
@@ -606,6 +616,17 @@ async function main() {
   if (DEPLOY_SCOPE) console.log('[browser-smoke-test] scope: deploy-critical (full matrix runs locally)\n');
 
   const browser = await browserType.launch();
+  // Browser smoke is a UI/layout gate, not a production-data load test. Blocking Firestore
+  // transport here prevents every deploy/matrix run from billing reads against live calendars;
+  // the explicit live-smoke script remains the place for read-only production API checks.
+  const createContext = browser.newContext.bind(browser);
+  browser.newContext = async (...args) => {
+    const context = await createContext(...args);
+    await context.route('**://firestore.googleapis.com/**', route => route.abort());
+    await context.route('**://*.firebaseio.com/**', route => route.abort());
+    return context;
+  };
+  console.log('[browser-smoke-test] production Firestore transport blocked (UI-only smoke)');
   try {
     console.log('-- 페이지 렌더 / 콘솔 에러 / 레이아웃 오버플로우 --');
     for (const viewport of VIEWPORTS) {
