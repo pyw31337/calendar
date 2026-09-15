@@ -1604,6 +1604,8 @@ export function ChatRoomView({
         }, memeMatches.map(({ tag, items }) => /*#__PURE__*/React.createElement("button", {
           key: tag,
           type: "button",
+          'data-meme-tag': tag,
+          onPointerDown: event => event.stopPropagation(),
           onClick: () => setExpandedMemeTag(prev => prev === tag ? null : tag),
           style: {
             flexShrink: 0, display: 'flex', alignItems: 'center', gap: '4px',
