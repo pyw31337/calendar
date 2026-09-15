@@ -1,0 +1,2348 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./vendor/react.js"></script>
+<script src="./vendor/react-dom.js"></script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    :root {
+      --bg-primary: #FAFAFC;
+      --bg-card: #FFFFFF;
+      --border-subtle: #ECEAF5;
+      --text-main: #1E1B2E;
+      --text-muted: #6B6580;
+      --text-light: #83798F;
+      --brand: #7C3AED;
+      --brand-soft: #F3EEFF;
+      --status-green: #16A34A;
+      --surface-success: #ECFDF5;
+      --surface-confirmed: #F3EEFF;
+      --radius-lg: 18px;
+      --radius-md: 12px;
+      --radius-sm: 8px;
+      --radius-full: 9999px;
+      /* Real participants from the live screenshot -- one dot color each, used everywhere
+         a name would otherwise need to render as text. */
+      --p-yeongwoo: #F87171;
+      --p-yuri: #FB923C;
+      --p-manshik: #34D399;
+      --p-eunhye: #22D3EE;
+      /* Kids named in the D-day card's per-item memos -- distinct from the 4 adult dots above so
+         a memo's color always maps to exactly one person. */
+      --p-doeun: #A78BFA;
+      --p-seojun: #FBBF24;
+      /* Point color moves to a vivid violet (all buttons, today marker, event bars, focus rings,
+         hover states) -- the hero gradient carries it into a blue-mint accent at the far edge. */
+      --brand: #7C3AED;
+      --brand-soft: #F3EEFF;
+      --acc-cal: #7C3AED;
+      --acc-cal-soft: #F3EEFF;
+      --acc-chat: #2563EB;
+      --acc-chat-soft: #EFF6FF;
+      --acc-memo: #D97706;
+      --acc-memo-soft: #FEF3C7;
+      --acc-gallery: #0D9488;
+      --acc-gallery-soft: #CCFBF1;
+      --acc-places: #E11D48;
+      --acc-places-soft: #FFE4E9;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Noto Sans KR', sans-serif; background: var(--bg-primary); }
+    a { color: var(--brand); } a:hover { color: #6D28D9; }
+
+    .ellipsis-1 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    button { font-family: inherit; }
+    input, textarea { font-family: inherit; }
+
+    /* Back to the original Mobile320 glass icon button, since the top bar now sits on the
+       gradient again instead of the flat page background. */
+    .icon-btn {
+      background: rgba(255,255,255,0.16); backdrop-filter: blur(10px) saturate(180%); -webkit-backdrop-filter: blur(10px) saturate(180%);
+      border: 1px solid rgba(255,255,255,0.32); border-radius: var(--radius-full);
+      padding: 7px; color: rgba(255,255,255,0.96); display: inline-flex; cursor: pointer;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.5); transition: transform 0.15s ease;
+    }
+    .icon-btn:active { transform: scale(0.94); }
+    .icon-btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; border-radius: var(--radius-full); }
+    .ghost-btn { background: none; border: none; color: var(--text-muted); padding: 6px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; border-radius: var(--radius-sm); }
+    .ghost-btn:hover { color: var(--brand); }
+    .ghost-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+    .surface { background: var(--bg-card); margin-bottom: 8px; }
+
+    .bento-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 14px 4px; }
+    .bento-title { font-weight: 800; font-size: 1.05rem; color: var(--text-main); display: flex; align-items: center; gap: 6px; }
+    /* This header only ever sits on the hero gradient now, so every icon in it -- brand mark,
+       search, menu -- must inherit the white text color set inline on .bento-title. (Used to
+       force var(--brand) here, which made the icons low-contrast violet-on-violet.) */
+    .bento-title-actions { display: flex; gap: 6px; margin-left: auto; }
+
+    /* Legacy tab-row kept only so shared CSS selectors elsewhere resolve; unused in this layout. */
+    .tab-row { display: none; }
+    .tab-item { display: none; }
+    .tab-warn { display: none; }
+
+    /* Hero: D-day as its own vivid card (not a full-width gradient banner) -- a bold coral-to-
+       amber gradient, sized to content, sitting at the top of the bento grid like any other
+       card but with more visual weight. */
+    /* The one deliberately loud, glassy object on the page: a real frosted-glass panel (blur +
+       saturate, not just flat transparency) over a jewel-tone gradient, so it reads as a
+       genuinely different material from the flat white sections below -- the strong
+       "강약대비" the flat version was missing. Everything else on the page stays quiet so this
+       stays the loudest thing on screen. */
+    /* No gradient -- one flat, fully saturated magenta-pink. The glass panels floating on top
+       (backdrop-filter blur) are what now supplies the depth, not a color blend behind them. */
+    /* Deep magenta-into-violet gradient -- both stops kept dark and saturated (not pastel) so
+       the mix reads as rich rather than washed out. */
+    /* Hot pink now carries most of the card; violet is a supporting accent tucked into one
+       corner rather than an equal partner in the blend. Full-bleed again like the original
+       Mobile320 hero -- edge to edge, no rounded card margin. */
+    /* Flipped again: violet now carries most of the card, hot pink arrives only toward the
+       far corner as the accent it hands off to. */
+    .hero-zone {
+      position: relative; overflow: hidden; margin: 0; border-radius: 0; padding-bottom: 14px;
+      background: linear-gradient(135deg, #4C1D95 0%, #7C3AED 58%, #22D3B8 100%);
+    }
+    .hero-zone::after { content: none; }
+    .hero-zone::before { content: none; }
+
+    .dday-toggle-wrap { margin: 0; padding: 14px; position: relative; z-index: 2; }
+    .dday-compact {
+      display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; cursor: pointer;
+      background: rgba(255,255,255,0.16); backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border: 1px solid rgba(255,255,255,0.36); border-radius: var(--radius-full); color: #fff;
+      padding: 7px 10px 7px 8px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.5);
+      font-family: inherit; transition: transform 0.16s ease;
+    }
+    .dday-compact:active { transform: scale(0.98); }
+    .dday-compact-badge {
+      background: rgba(255,255,255,0.95); color: var(--brand); font-weight: 900; font-size: 1.1rem; line-height: 1;
+      padding: 6px 10px; border-radius: var(--radius-full); flex-shrink: 0; letter-spacing: -0.02em;
+      /* Straight from the live app's collapsed-lead-meeting "두근두근" heartbeat -- stops once
+         the card is expanded (the .dday-toggle-wrap.is-open rule below wins by source order). */
+      animation: confirmed-meeting-heartbeat 0.75s ease-in-out infinite;
+      transform-origin: center center;
+    }
+    @keyframes confirmed-meeting-heartbeat {
+      0% { transform: scale(1); } 14% { transform: scale(1.07); } 28% { transform: scale(1); }
+      42% { transform: scale(1.08); } 70% { transform: scale(1); } 100% { transform: scale(1); }
+    }
+    @media (prefers-reduced-motion: reduce) { .dday-compact-badge { animation: none; } }
+    .dday-compact-text { font-size: 0.7rem; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+    .dday-compact-chevron { flex-shrink: 0; opacity: 0.85; transform: rotate(-90deg); }
+    .dday-toggle-wrap.is-open .dday-compact { display: none; }
+
+    .dday-expanded {
+      position: relative; padding: 16px; border-radius: 18px;
+      background: rgba(255,255,255,0.14); backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border: 1px solid rgba(255,255,255,0.32); color: #fff;
+      display: none;
+    }
+    .dday-toggle-wrap.is-open .dday-expanded { display: flex; justify-content: space-between; gap: 10px; animation: dday-morph-in 0.32s cubic-bezier(.22,1,.36,1); }
+    @keyframes dday-morph-in { from { opacity: 0; transform: scaleY(0.88) translateY(-4px); } to { opacity: 1; transform: none; } }
+    @media (prefers-reduced-motion: reduce) {
+      .dday-toggle-wrap.is-open .dday-expanded { animation: none; }
+    }
+    .dday-expanded-title-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .dday-expanded-title { font-weight: 800; font-size: 0.82rem; }
+    .dday-collapse-btn { flex-shrink: 0; background: rgba(255,255,255,0.24); border: none; color: #fff; width: 20px; height: 20px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+    .dday-collapse-btn:hover { background: rgba(255,255,255,0.36); }
+    .dday-collapse-btn:active { transform: scale(0.9); }
+    .dday-expanded-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 2px; }
+    .dday-expanded-tag { display: inline-flex; align-items: center; gap: 5px; background: rgba(255,255,255,0.28); border-radius: var(--radius-full); padding: 3px 9px 3px 6px; font-size: 0.62rem; font-weight: 700; }
+    .dday-expanded-tag .tag-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 0 1.5px rgba(255,255,255,0.95); }
+    .dday-expanded-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
+    .dday-expanded-badge { background: #fff; color: var(--brand); font-weight: 800; font-size: 0.62rem; padding: 3px 8px; border-radius: var(--radius-full); }
+    .dday-view-btn { background: #fff; color: var(--brand); font-weight: 800; font-size: 0.66rem; border: none; border-radius: var(--radius-full); padding: 6px 12px; white-space: nowrap; cursor: pointer; }
+    .dday-view-btn:hover { background: #FFF0F2; }
+    .dday-view-btn:active { transform: scale(0.96); }
+    .dday-view-btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+    .dday-strip { display: flex; gap: 8px; overflow-x: auto; padding: 0 12px 12px; -webkit-overflow-scrolling: touch; position: relative; z-index: 2; }
+    .dday-strip::-webkit-scrollbar { display: none; }
+    .dday-chip {
+      flex: 0 0 auto; width: 68px; border-radius: var(--radius-md);
+      background: rgba(255,255,255,0.14); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(255,255,255,0.28); color: #fff; padding: 7px 5px; text-align: center; cursor: pointer;
+      transition: transform 0.14s ease, background 0.14s ease; font: inherit;
+    }
+    .dday-chip:hover { background: rgba(255,255,255,0.3); }
+    .dday-chip:active { transform: scale(0.95); }
+    .dday-date { font-size: 0.66rem; font-weight: 800; }
+    .dday-dow { font-size: 0.56rem; opacity: 0.85; margin-bottom: 3px; }
+    .dday-pill { display: inline-block; background: rgba(255,255,255,0.3); border-radius: var(--radius-full); font-size: 0.56rem; font-weight: 800; padding: 1px 6px; }
+
+    /* Bento grid, take 2: the first pass double-padded everything (14px grid gutter PLUS 14px
+       card padding = 28px lost per side on a 320px screen) and every card was "wide" anyway, so
+       the 2-column grid was pure overhead. Now it's a single edge-to-edge column -- same width
+       budget as the original flat sections -- with only ONE padding layer, and each "card" is a
+       full-bleed row distinguished by a colored top rule + icon badge instead of a floating,
+       bordered tile. The D-day hero above is the one element that keeps real card framing
+       (margin + radius): it's the exception that earns the extra weight, not the rule. */
+    /* Refined pass: no rules between sections at all -- separation comes purely from generous
+       vertical rhythm (28px). Section labels drop to a quiet uppercase eyebrow (the way an
+       editorial page marks a new section) instead of an equal-weight icon+title row, so the
+       ONE thing that should carry visual weight -- the glass D-day card above -- actually reads
+       as the loudest thing on the page instead of competing with five equally-loud card headers.
+       Icons lose their colored circles: color is reserved for things that mean something
+       (a person's dot, an event bar, a memo's own chosen swatch, the hero glass) so it isn't
+       spent decorating a chat icon. */
+    .bento-grid { display: block; }
+    .bento-card { background: var(--bg-card); border: none; padding: 28px 14px; }
+    /* Detail pass: the section icon now carries a quiet wash of the brand pink (55% opacity)
+       instead of flat gray -- just enough for the one accent color to tie every section back
+       to the hero without spending a full colored badge on each one. */
+    .bento-card-head { display: flex; align-items: center; gap: 7px; margin-bottom: 14px; }
+    .bento-card-icon { width: 15px; height: 15px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--brand); opacity: 0.8; }
+    .bento-card-title { font-weight: 700; font-size: 0.66rem; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.08em; flex: 1; }
+    .bento-card .more-link { font-size: 0.64rem; }
+
+    /* Calendar (lives in a wide bento card) */
+    .cal-card { padding: 0; }
+    .weekday-label { font-size: 0.6rem; font-weight: 700; color: var(--text-light); padding: 3px 0; text-align: center; }
+    .day-cell {
+      min-height: 40px; border-radius: var(--radius-sm); padding: 2px 1px; display: flex; flex-direction: column;
+      align-items: center; gap: 1px; position: relative; cursor: pointer; background: none; border: none; width: 100%;
+      font: inherit; color: inherit;
+    }
+    .day-cell:focus-visible { outline: 1.5px solid var(--brand); outline-offset: 1px; }
+    .day-cell { transition: transform 0.12s ease; }
+    .day-cell.has-event { cursor: pointer; }
+    .day-cell.has-event:active { transform: scale(0.93); }
+    .day-num { font-size: 0.66rem; font-weight: 700; color: var(--text-main); }
+    .day-cell.other-month .day-num { color: var(--text-light); opacity: 0.5; }
+    .day-cell.today .day-num {
+      position: relative; background: var(--brand); color: #fff; border-radius: 50%; width: 16px; height: 16px;
+      display: flex; align-items: center; justify-content: center; font-size: 0.62rem; z-index: 1;
+    }
+    .day-cell.today .day-num::after {
+      content: ''; position: absolute; inset: -3px; border-radius: 50%; border: 1.5px solid var(--brand);
+      animation: today-ripple 1.8s ease-out infinite; pointer-events: none;
+    }
+    @keyframes today-ripple {
+      0% { transform: scale(0.85); opacity: 0.75; }
+      100% { transform: scale(1.9); opacity: 0; }
+    }
+    .day-cell.confirmed { background: var(--surface-confirmed); }
+    .day-cell.holiday .day-num { color: #EF4444; }
+    .dot-row { display: flex; gap: 2px; flex-wrap: wrap; justify-content: center; max-width: 100%; }
+    .p-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 0 1px rgba(30,27,46,0.08); }
+    /* Mobile: a bare color dot (no room for a name). Tablet/desktop grow the cell enough that the
+       dot can carry its own name -- see the >=768px block, which turns it into a small colored
+       capsule with the person's name inside via ::after, using the same data-name already on the
+       markup rather than duplicating names into a second element. */
+    .p-dot::after { content: none; }
+
+    .day-bar { position: absolute; bottom: 3px; height: 4px; background: var(--brand); transition: opacity 0.15s ease; }
+    .day-bar.solo { left: 4px; right: 4px; border-radius: var(--radius-full); }
+    .day-bar.start { left: 4px; right: -1px; border-radius: 8px 0 0 8px; }
+    .day-bar.end { left: -1px; right: 4px; border-radius: 0 8px 8px 0; }
+    .day-bar.lvl-1 { bottom: 9px; }
+    .day-anniversary {
+      position: absolute; bottom: 3px; left: 4px; right: 4px; height: 4px; border-radius: var(--radius-full);
+      background: #F472B6; display: flex; align-items: center; justify-content: center; overflow: hidden;
+    }
+    .day-anniversary.lvl-1 { bottom: 9px; }
+    .day-anniversary-label { display: none; }
+    /* Matches the real app's own pattern (day-corner-label/date-year hidden under 640px, shown
+       above it) and extends it: a confirmed day's event TITLE is also mobile-only-hidden, so a
+       wider viewport shows genuinely more information per cell -- not just bigger dots. */
+    .day-corner-label { display: none; font-size: 0.52rem; font-weight: 700; color: var(--text-light); }
+    .day-corner-label.is-holiday { color: #EF4444; }
+    .day-event-title {
+      display: none; font-size: 0.56rem; font-weight: 800; color: var(--brand); line-height: 1.15;
+      max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 2px;
+    }
+    .cal-legend { display: flex; flex-wrap: wrap; gap: 8px 12px; padding: 12px 0 20px; font-size: 0.62rem; font-weight: 700; color: var(--text-muted); }
+    .cal-legend span { display: inline-flex; align-items: center; gap: 4px; }
+    .cal-legend .dot { width: 9px; height: 9px; border-radius: 50%; box-shadow: 0 0 0 1px rgba(30,27,46,0.08); }
+
+    .section { padding: 0; }
+    .section-title { display: none; }
+    .more-link { margin-left: auto; font-size: 0.68rem; font-weight: 700; color: var(--text-light); background: none; border: none; cursor: pointer; transition: color 0.15s ease; }
+    .more-link:hover { color: var(--brand); }
+
+    /* Chat: reply-quote card (kakao-style) sits above a bubble that is answering another one. */
+    .chat-row { display: flex; gap: 6px; margin-bottom: 12px; align-items: flex-start; }
+    .chat-row:last-child { margin-bottom: 0; }
+    .chat-name-pill { flex-shrink: 0; font-size: 0.6rem; font-weight: 800; color: #fff; padding: 2px 6px; border-radius: var(--radius-full); height: fit-content; }
+    .chat-text { font-size: 0.76rem; color: var(--text-main); line-height: 1.4; }
+    .chat-meta-row { display: flex; align-items: center; gap: 6px; margin-top: 3px; }
+    .chat-meta { font-size: 0.6rem; color: var(--text-light); }
+    .chat-img { margin-top: 6px; width: 92px; height: 130px; border-radius: var(--radius-md); background-size: cover; background-position: center; cursor: pointer; transition: transform 0.16s ease, box-shadow 0.16s ease; border: none; padding: 0; position: relative; }
+    .chat-img:hover { transform: scale(1.03); box-shadow: 0 6px 16px rgba(30,27,46,0.2); }
+    .chat-img:active { transform: scale(0.98); }
+    .chat-actions { display: inline-flex; gap: 2px; }
+    .chat-action-btn { width: 18px; height: 18px; border-radius: 50%; background: var(--bg-primary); color: var(--text-light); border: none; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+    .chat-action-btn:hover { color: var(--brand); background: var(--brand-soft); }
+    .chat-hover-note { font-size: 0.6rem; color: var(--text-light); margin-top: 14px; text-align: center; }
+    .chat-reply-quote {
+      display: flex; flex-direction: column; gap: 1px; border-left: 2.5px solid var(--brand); background: var(--brand-soft);
+      border-radius: 0 var(--radius-sm) var(--radius-sm) 0; padding: 4px 8px; margin-bottom: 4px; max-width: 210px; cursor: pointer;
+    }
+    .chat-reply-quote-author { font-size: 0.6rem; font-weight: 800; color: var(--brand); }
+    .chat-reply-quote-text { font-size: 0.66rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .comment-badge {
+      position: absolute; top: 4px; right: 4px; background: rgba(20,15,35,0.62); color: #fff; font-size: 0.56rem; font-weight: 800;
+      padding: 1px 6px; border-radius: var(--radius-full); display: inline-flex; align-items: center; gap: 2px;
+    }
+    /* Straight from the live app's own delight touch for a thumbnail with a new comment: a
+       quiet, staggered "두근두근" cue -- scale pulse + purple border flash-in/fade + a brief
+       white camera-flash overlay -- rather than an invented sparkle. */
+    .gallery-comment-heartbeat { animation: gallery-comment-heartbeat 2.8s ease-in-out infinite; will-change: transform; }
+    .gallery-comment-heartbeat::before, .gallery-comment-heartbeat::after {
+      content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0;
+      animation-duration: 2.8s; animation-timing-function: ease-in-out; animation-iteration-count: infinite; animation-delay: inherit;
+    }
+    .gallery-comment-heartbeat::before {
+      z-index: 1; box-sizing: border-box; border: 2px solid var(--brand);
+      box-shadow: 0 0 0 1px rgba(124,58,237,0.35); animation-name: gallery-comment-border-flash;
+    }
+    .gallery-comment-heartbeat::after { z-index: 2; background: #fff; animation-name: gallery-comment-white-flash; }
+    @keyframes gallery-comment-heartbeat {
+      0%, 72%, 100% { transform: scale(1); }
+      76% { transform: scale(1.018); } 80% { transform: scale(0.994); } 84% { transform: scale(1.012); } 88% { transform: scale(1); }
+    }
+    @keyframes gallery-comment-border-flash {
+      0%, 71% { opacity: 0; } 72% { opacity: 1; } 80% { opacity: 0.65; } 90% { opacity: 0.2; } 100% { opacity: 0; }
+    }
+    @keyframes gallery-comment-white-flash {
+      0%, 71% { opacity: 0; } 72% { opacity: 0.55; } 75% { opacity: 0.18; } 78%, 100% { opacity: 0; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .gallery-comment-heartbeat, .gallery-comment-heartbeat::before, .gallery-comment-heartbeat::after { animation: none; }
+    }
+
+    /* Memo: real fields -- a chosen swatch background, a hashtag tag row, and a comment count.
+       Given its own material (a soft lifted shadow, no border) so it reads as a distinct
+       "sticky note" object rather than another flat list row -- one of the few deliberately
+       varied silhouettes on an otherwise quiet page. */
+    /* Was a random pastel background wash per card (no meaning behind which memo got which
+       color) -- now a flat card with a left accent bar in the AUTHOR's own color, the same dot
+       color already used everywhere else (attendee dots, chat name pills), so the color says
+       something real ("who wrote this") instead of looking arbitrary. Same flat-left-edge
+       convention as .chat-reply-quote's own color bar -- a rounded corner where a solid accent
+       bar meets the card edge reads as a rendering glitch, not a design choice, so every
+       left-border-accent block in this file keeps its left corners square. */
+    .memo-card {
+      background: var(--bg-card); border-radius: 0 14px 14px 0; border-left: 4px solid var(--memo-author-color, var(--border-subtle));
+      padding: 14px; margin-bottom: 10px; position: relative;
+      box-shadow: 0 4px 14px rgba(30,27,46,0.07);
+    }
+    .memo-card:last-child { margin-bottom: 0; }
+    .memo-pin-badge { position: absolute; top: 10px; right: 10px; color: var(--brand); opacity: 0.8; }
+    .memo-card-title { font-weight: 800; font-size: 0.86rem; color: var(--text-main); margin-bottom: 4px; padding-right: 18px; }
+    .memo-subtag { display: inline-block; font-size: 0.62rem; font-weight: 700; color: var(--brand); background: rgba(124,58,237,0.1); border-radius: var(--radius-sm); padding: 2px 6px; margin-bottom: 10px; }
+    .memo-summary { font-size: 0.72rem; color: var(--text-muted); margin-bottom: 12px; }
+    .memo-link-card { display: flex; gap: 10px; background: var(--bg-primary); border-radius: var(--radius-md); padding: 10px; margin-bottom: 10px; }
+    .memo-link-thumb { width: 52px; height: 52px; border-radius: var(--radius-sm); flex-shrink: 0; background-size: cover; background-position: center; }
+    .memo-link-title { font-weight: 800; font-size: 0.76rem; color: var(--text-main); margin-bottom: 2px; }
+    .memo-link-desc { font-size: 0.68rem; color: var(--text-muted); margin-bottom: 3px; }
+    .memo-link-domain { font-size: 0.62rem; color: var(--text-light); }
+    .memo-tags-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }
+    .memo-tag { color: var(--brand); font-weight: 700; font-size: 0.64rem; }
+    .memo-footer-row { display: flex; align-items: center; justify-content: space-between; }
+    .memo-comment-count { display: inline-flex; align-items: center; gap: 3px; font-size: 0.64rem; font-weight: 700; color: var(--text-light); background: none; border: none; cursor: pointer; }
+    .memo-comment-count:hover { color: var(--brand); }
+    /* Comments show inline on the main screen by default (not hidden behind a tap) -- only when
+       a thread grows past one comment does a 더보기/접기 toggle appear, revealing the rest. */
+    .memo-comments { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-subtle); }
+    .memo-comment-item { display: flex; gap: 6px; align-items: flex-start; }
+    .memo-comment-avatar { width: 16px; height: 16px; border-radius: 50%; flex-shrink: 0; margin-top: 1px; box-shadow: 0 0 0 1px rgba(30,27,46,0.08); }
+    .memo-comment-body { min-width: 0; }
+    .memo-comment-author { font-size: 0.66rem; font-weight: 800; color: var(--text-main); margin-right: 4px; }
+    .memo-comment-text { font-size: 0.7rem; color: var(--text-muted); line-height: 1.4; }
+    .memo-comments-toggle {
+      align-self: flex-start; font-size: 0.66rem; font-weight: 700; color: var(--brand); background: none; border: none;
+      cursor: pointer; padding: 2px 0; display: inline-flex; align-items: center; gap: 3px;
+    }
+    .memo-comments-toggle:hover { text-decoration: underline; }
+    .memo-comments-toggle svg { transition: transform 0.15s ease; }
+    .memo-comments-toggle.is-expanded svg { transform: rotate(180deg); }
+
+    .thumb-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+    /* Gallery is the other deliberately loud object: images bleed to the screen edges (the one
+       place besides the hero where the grid, not text, IS the section) -- a bold visual break
+       against the otherwise text-led, padded sections around it. */
+    .bento-card.gallery-bleed { padding-left: 0; padding-right: 0; }
+    .bento-card.gallery-bleed .bento-card-head { padding: 0 14px; }
+    .bento-card.gallery-bleed .thumb-grid { gap: 2px; }
+    .bento-card.gallery-bleed .thumb { border-radius: 0; }
+    .thumb { aspect-ratio: 1; border-radius: var(--radius-sm); background-size: cover; background-position: center; cursor: pointer; transition: transform 0.16s ease, box-shadow 0.16s ease; border: none; padding: 0; position: relative; }
+    .thumb:hover { transform: scale(1.05); box-shadow: 0 4px 14px rgba(30,27,46,0.18); }
+    .thumb:active { transform: scale(0.97); }
+
+    .place-row { padding: 12px; border-radius: var(--radius-md); background: var(--bg-primary); }
+    .place-row + .place-row { margin-top: 8px; }
+    .place-tags { display: flex; gap: 4px; margin-bottom: 6px; }
+    .place-tag { font-size: 0.58rem; font-weight: 800; padding: 2px 6px; border-radius: var(--radius-full); }
+    .place-name { font-weight: 800; font-size: 0.8rem; color: var(--text-main); }
+    .place-addr { font-size: 0.68rem; color: var(--text-muted); margin: 2px 0; }
+    .place-note { font-size: 0.66rem; color: var(--text-light); }
+
+    .footer { padding: 24px 14px 28px; text-align: center; font-size: 0.62rem; color: var(--text-light); }
+    .footer .links { margin-top: 8px; display: flex; justify-content: center; gap: 12px; font-size: 0.6rem; font-weight: 700; color: var(--text-muted); }
+
+    @keyframes rise-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+    .enter { animation: rise-in 0.5s cubic-bezier(.22,1,.36,1) both; }
+    @media (prefers-reduced-motion: reduce) {
+      .enter { animation: none; }
+    }
+
+    /* Event detail sheet -- rebuilt as a real TABBED modal (참석/장소/정산/사진), matching the
+       live app's DateModal instead of one long scrolling sheet. */
+    .sheet-backdrop {
+      position: fixed; inset: 0; background: rgba(20,15,35,0.5);
+      opacity: 0; pointer-events: none; transition: opacity 0.28s ease; z-index: 90; border: none; padding: 0;
+    }
+    .sheet-backdrop.is-open { opacity: 1; pointer-events: auto; }
+    .event-sheet {
+      position: fixed; left: 50%; bottom: 0; width: 320px; transform: translate(-50%, 100%);
+      background: var(--bg-card); border-radius: 20px 20px 0 0;
+      box-shadow: 0 -16px 44px rgba(76,29,149,0.28);
+      transition: transform 0.4s cubic-bezier(.22,1,.36,1);
+      z-index: 91; max-height: 84vh; overflow-y: auto; padding: 10px 0 20px;
+    }
+    .event-sheet.is-open { transform: translate(-50%, 0); }
+    .sheet-inner { padding: 0 18px; }
+    .sheet-handle { width: 34px; height: 4px; border-radius: 2px; background: var(--border-subtle); margin: 6px auto 14px; }
+    .sheet-close {
+      position: absolute; top: 14px; right: 14px; width: 26px; height: 26px; border-radius: 50%;
+      background: var(--bg-primary); border: none; color: var(--text-muted); display: inline-flex;
+      align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s ease, color 0.15s ease; z-index: 2;
+    }
+    .sheet-close:hover { background: var(--brand-soft); color: var(--brand); }
+    .sheet-eyebrow { display: inline-flex; align-items: center; gap: 4px; background: var(--surface-confirmed); color: var(--brand); font-weight: 800; font-size: 0.64rem; padding: 3px 9px; border-radius: var(--radius-full); margin-bottom: 8px; }
+    .sheet-title { font-weight: 800; font-size: 1.02rem; color: var(--text-main); margin-bottom: 4px; }
+    .sheet-meta-row { display: flex; align-items: center; gap: 5px; font-size: 0.72rem; color: var(--text-muted); margin-bottom: 3px; }
+    .sheet-meta-row svg { flex-shrink: 0; color: var(--text-light); }
+    .sheet-divider { height: 1px; background: var(--border-subtle); margin: 14px 0; }
+    .sheet-section-label { font-size: 0.66rem; font-weight: 800; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.02em; margin-bottom: 8px; }
+
+    .sheet-tabs { display: flex; background: var(--bg-primary); border-radius: var(--radius-full); padding: 3px; margin: 12px 0 4px; }
+    .sheet-tab-item { flex: 1; background: none; border: none; padding: 8px 2px; font-size: 0.7rem; font-weight: 800; color: var(--text-muted); border-radius: var(--radius-full); cursor: pointer; }
+    .sheet-tab-item.is-active { background: var(--bg-card); color: var(--brand); box-shadow: 0 2px 6px rgba(30,27,46,0.1); }
+    .sheet-tab-panel { padding-top: 14px; }
+
+    .attend-row { display: flex; align-items: center; gap: 8px; background: var(--bg-primary); border-radius: var(--radius-md); padding: 8px 10px; margin-bottom: 6px; }
+    .attend-row .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 0 1px rgba(30,27,46,0.08); }
+    .attend-row-name { font-weight: 800; font-size: 0.76rem; color: var(--text-main); }
+    .attend-row-note { font-size: 0.66rem; color: var(--text-muted); margin-top: 1px; }
+    .attend-row-remove { margin-left: auto; background: none; border: none; color: var(--text-light); cursor: pointer; padding: 4px; flex-shrink: 0; }
+    .attend-row-remove:hover { color: #EF4444; }
+    .attend-add-btn {
+      width: 100%; border: 1.5px dashed var(--border-subtle); background: none; border-radius: var(--radius-md);
+      padding: 9px; font-weight: 800; font-size: 0.74rem; color: var(--brand); cursor: pointer; margin-top: 4px;
+      display: flex; align-items: center; justify-content: center; gap: 5px; transition: border-color 0.15s ease, background 0.15s ease;
+    }
+    .attend-add-btn:hover { border-color: var(--brand); background: var(--brand-soft); }
+
+    /* ===== Gamified meeting-confirm button -- lifted straight from the live app's own
+       btn-gamified-confirm/GamifiedConfirmButtonContent (the one thing in the codebase literally
+       named "gamified"): a rainbow gradient pan, a whole-button shake tic, a diagonal shine
+       sweep, a spinning double "electric" ring outside the border, and 6 lightning-bolt sparks +
+       6 star sparklets popping around the edges. Appears once every attendee has said they can
+       make it and the meeting isn't confirmed yet -- otherwise a plain confirm/cancel button. */
+    .gamified-confirm-wrap { overflow: visible; border-radius: var(--radius-md); margin-top: 4px; }
+    .btn-meeting-confirm-plain {
+      width: 100%; border: 1.5px solid #C4B5FD; background: rgba(124,58,237,0.08); color: var(--brand);
+      font-weight: 800; font-size: 0.8rem; padding: 11px; border-radius: var(--radius-md); cursor: pointer;
+    }
+    .btn-meeting-confirm-plain.is-confirmed { border-color: #EF4444; background: rgba(239,68,68,0.06); color: #EF4444; }
+    .btn-gamified-confirm {
+      position: relative; width: 100%; background: transparent; color: #fff; font-weight: 800; font-size: 0.86rem;
+      text-shadow: 0 1.5px 2px rgba(0,0,0,0.5); border: 2px solid rgba(255,255,255,0.35);
+      border-bottom: 3px solid rgba(76,29,149,0.9); border-radius: var(--radius-md);
+      box-shadow: 0 4px 18px rgba(236,72,153,0.45), 0 0 24px rgba(139,92,246,0.28);
+      padding: 12px; cursor: pointer; overflow: visible; animation: gamified-shake 2.5s ease-in-out infinite;
+      transform-origin: center center; z-index: 1; --btn-scale: 1;
+    }
+    .btn-gamified-confirm::before {
+      content: ''; position: absolute; inset: 0; border-radius: var(--radius-md);
+      background: linear-gradient(90deg, #EC4899 0%, #D946EF 20%, #8B5CF6 40%, #3B82F6 60%, #00FFFF 80%, #EC4899 100%);
+      background-size: 300% 100%; animation: gamified-bg-pan 0.8s linear infinite; z-index: -1; pointer-events: none;
+    }
+    .btn-gamified-confirm:active { --btn-scale: 0.98; border-bottom-width: 2px; }
+    @keyframes gamified-bg-pan { 0% { background-position: 0% 0%; } 100% { background-position: -300% 0%; } }
+    @keyframes gamified-shake {
+      0%, 10% { transform: translate3d(0,0,0) scale(var(--btn-scale,1)); }
+      12% { transform: translate3d(-1.5px,0,0) scale(var(--btn-scale,1)); }
+      14% { transform: translate3d(1.5px,0,0) scale(var(--btn-scale,1)); }
+      16% { transform: translate3d(-1px,0,0) scale(var(--btn-scale,1)); }
+      18% { transform: translate3d(1px,0,0) scale(var(--btn-scale,1)); }
+      20%, 100% { transform: translate3d(0,0,0) scale(var(--btn-scale,1)); }
+    }
+    .gamified-shiny-glow-wrapper { position: absolute; inset: 0; overflow: hidden; border-radius: var(--radius-md); pointer-events: none; z-index: 1; }
+    .gamified-shiny-glow {
+      position: absolute; top: 0; left: -100%; width: 50%; height: 100%;
+      background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.65) 50%, rgba(255,255,255,0) 100%);
+      transform: skewX(-25deg); animation: gamified-sheen 3s infinite ease-in-out; pointer-events: none;
+    }
+    @keyframes gamified-sheen { 0% { left: -100%; } 45% { left: 180%; } 100% { left: 180%; } }
+    .gamified-border-electric {
+      position: absolute; inset: -3px; border-radius: calc(var(--radius-md) + 3px); pointer-events: none;
+      z-index: 2; overflow: hidden; padding: 2.5px; box-sizing: border-box;
+      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor; mask-composite: exclude;
+      filter: drop-shadow(0 0 3px rgba(103,232,249,0.95)) drop-shadow(0 0 10px rgba(192,132,252,0.7));
+    }
+    .gamified-border-electric::before {
+      content: ''; position: absolute; left: 50%; top: 50%; width: 220%; height: 220%; transform: translate(-50%,-50%);
+      background: conic-gradient(from 0deg, transparent 0deg, transparent 200deg, #67E8F9 225deg, #FFFFFF 250deg, #C4B5FD 275deg, #F0ABFC 300deg, transparent 330deg, transparent 360deg);
+      animation: gamified-electric-spin 1.35s linear infinite;
+    }
+    .gamified-border-electric-secondary { padding: 2px; opacity: 0.9; filter: drop-shadow(0 0 2px rgba(255,255,255,0.85)) drop-shadow(0 0 8px rgba(236,72,153,0.6)); }
+    .gamified-border-electric-secondary::before {
+      background: conic-gradient(from 0deg, transparent 0deg, transparent 30deg, #F9A8D4 50deg, #FFFFFF 70deg, #A5F3FC 95deg, transparent 125deg, transparent 360deg);
+      animation-duration: 2s; animation-direction: reverse;
+    }
+    @keyframes gamified-electric-spin { to { transform: translate(-50%,-50%) rotate(360deg); } }
+    .gamified-sparks-container { position: absolute; top: -10px; left: -10px; right: -10px; bottom: -10px; pointer-events: none; overflow: visible; z-index: 2; }
+    .gamified-spark, .gamified-sparklet { position: absolute; opacity: 0; pointer-events: none; transform: scale(0); }
+    .gamified-spark { width: 18px; height: 36px; }
+    .gamified-sparklet { width: 14px; height: 14px; }
+    .gamified-spark-1 { top: -10px; left: 15%; color: #fff; filter: drop-shadow(0 0 3px #fff) drop-shadow(0 0 6px #8B5CF6); animation: spark-pop-1 2s infinite linear; }
+    .gamified-spark-2 { top: 2px; right: -5px; color: #00FFFF; filter: drop-shadow(0 0 3px #00FFFF) drop-shadow(0 0 6px #0088FF); animation: spark-pop-2 2s infinite linear; animation-delay: -0.4s; }
+    .gamified-spark-3 { bottom: -10px; left: 35%; color: #FF007F; filter: drop-shadow(0 0 3px #FF007F) drop-shadow(0 0 6px #D946EF); animation: spark-pop-3 2s infinite linear; animation-delay: -0.8s; }
+    .gamified-spark-4 { top: 2px; left: -5px; color: #00FFFF; filter: drop-shadow(0 0 3px #00FFFF) drop-shadow(0 0 6px #0088FF); animation: spark-pop-4 2s infinite linear; animation-delay: -1.2s; }
+    .gamified-spark-5 { top: -10px; right: 25%; color: #FF007F; filter: drop-shadow(0 0 3px #FF007F) drop-shadow(0 0 6px #D946EF); animation: spark-pop-5 2s infinite linear; animation-delay: -1.6s; }
+    .gamified-spark-6 { bottom: -10px; right: 15%; color: #fff; filter: drop-shadow(0 0 3px #fff) drop-shadow(0 0 6px #8B5CF6); animation: spark-pop-6 2s infinite linear; animation-delay: -2s; }
+    @keyframes spark-pop-1 { 0%,80%,100% { opacity:0; transform:scale(0) rotate(90deg);} 81%{opacity:1;transform:scale(1.3) rotate(95deg);} 83%{opacity:.2;transform:scale(.8) rotate(85deg);} 85%{opacity:1;transform:scale(1.4) rotate(100deg);} 87%{opacity:.3;transform:scale(.7) rotate(80deg);} 89%{opacity:1;transform:scale(1.2) rotate(90deg);} 91%{opacity:0;transform:scale(0) rotate(90deg);} }
+    @keyframes spark-pop-2 { 0%,80%,100% { opacity:0; transform:scale(0) rotate(0deg);} 81%{opacity:1;transform:scale(1.3) rotate(10deg);} 83%{opacity:.2;transform:scale(.8) rotate(-10deg);} 85%{opacity:1;transform:scale(1.4) rotate(15deg);} 87%{opacity:.3;transform:scale(.7) rotate(-5deg);} 89%{opacity:1;transform:scale(1.2) rotate(5deg);} 91%{opacity:0;transform:scale(0) rotate(0deg);} }
+    @keyframes spark-pop-3 { 0%,80%,100% { opacity:0; transform:scale(0) rotate(-90deg);} 81%{opacity:1;transform:scale(1.3) rotate(-85deg);} 83%{opacity:.2;transform:scale(.8) rotate(-95deg);} 85%{opacity:1;transform:scale(1.4) rotate(-80deg);} 87%{opacity:.3;transform:scale(.7) rotate(-100deg);} 89%{opacity:1;transform:scale(1.2) rotate(-90deg);} 91%{opacity:0;transform:scale(0) rotate(-90deg);} }
+    @keyframes spark-pop-4 { 0%,80%,100% { opacity:0; transform:scale(0) rotate(180deg);} 81%{opacity:1;transform:scale(1.3) rotate(190deg);} 83%{opacity:.2;transform:scale(.8) rotate(170deg);} 85%{opacity:1;transform:scale(1.4) rotate(195deg);} 87%{opacity:.3;transform:scale(.7) rotate(175deg);} 89%{opacity:1;transform:scale(1.2) rotate(185deg);} 91%{opacity:0;transform:scale(0) rotate(180deg);} }
+    @keyframes spark-pop-5 { 0%,80%,100% { opacity:0; transform:scale(0) rotate(90deg);} 81%{opacity:1;transform:scale(1.3) rotate(100deg);} 83%{opacity:.2;transform:scale(.8) rotate(80deg);} 85%{opacity:1;transform:scale(1.4) rotate(95deg);} 87%{opacity:.3;transform:scale(.7) rotate(85deg);} 89%{opacity:1;transform:scale(1.2) rotate(90deg);} 91%{opacity:0;transform:scale(0) rotate(90deg);} }
+    @keyframes spark-pop-6 { 0%,80%,100% { opacity:0; transform:scale(0) rotate(-90deg);} 81%{opacity:1;transform:scale(1.3) rotate(-95deg);} 83%{opacity:.2;transform:scale(.8) rotate(-85deg);} 85%{opacity:1;transform:scale(1.4) rotate(-100deg);} 87%{opacity:.3;transform:scale(.7) rotate(-90deg);} 89%{opacity:1;transform:scale(1.2) rotate(-95deg);} 91%{opacity:0;transform:scale(0) rotate(-90deg);} }
+    .gamified-sparklet-1 { top: 15%; left: 25%; color: #fff; filter: drop-shadow(0 0 2px #fff) drop-shadow(0 0 4px #00FFFF); animation: sparklet-pop .7s infinite linear; }
+    .gamified-sparklet-2 { top: 45%; right: 15%; color: #FFFF00; filter: drop-shadow(0 0 2px #FFFF00) drop-shadow(0 0 4px #FF007F); animation: sparklet-pop .8s infinite linear; animation-delay: -0.15s; }
+    .gamified-sparklet-3 { bottom: 12%; left: 45%; color: #00FFFF; filter: drop-shadow(0 0 2px #00FFFF) drop-shadow(0 0 4px #fff); animation: sparklet-pop .75s infinite linear; animation-delay: -0.3s; }
+    .gamified-sparklet-4 { bottom: 35%; left: 12%; color: #FF007F; filter: drop-shadow(0 0 2px #FF007F) drop-shadow(0 0 4px #D946EF); animation: sparklet-pop .85s infinite linear; animation-delay: -0.45s; }
+    .gamified-sparklet-5 { top: 8%; right: 30%; color: #fff; filter: drop-shadow(0 0 2px #fff) drop-shadow(0 0 4px #00FFFF); animation: sparklet-pop .68s infinite linear; animation-delay: -0.6s; }
+    .gamified-sparklet-6 { bottom: 22%; right: 25%; color: #FFFF00; filter: drop-shadow(0 0 2px #FFFF00) drop-shadow(0 0 4px #FF007F); animation: sparklet-pop .78s infinite linear; animation-delay: -0.75s; }
+    @keyframes sparklet-pop { 0%,80%,100% { opacity:0; transform:scale(0) rotate(0deg);} 81%{opacity:1;transform:scale(1.2) rotate(15deg);} 83%{opacity:.2;transform:scale(.6) rotate(-10deg);} 85%{opacity:1;transform:scale(1.4) rotate(45deg);} 87%{opacity:.3;transform:scale(.5) rotate(20deg);} 89%{opacity:1;transform:scale(1.1) rotate(0deg);} 91%{opacity:0;transform:scale(0);} }
+    .gamified-confirm-label { position: relative; z-index: 3; letter-spacing: 0.02em; }
+    @media (prefers-reduced-motion: reduce) {
+      .btn-gamified-confirm, .btn-gamified-confirm::before, .gamified-shiny-glow,
+      .gamified-border-electric::before, .gamified-border-electric-secondary::before,
+      .gamified-spark, .gamified-sparklet { animation: none; }
+    }
+    .empty-state { font-size: 0.7rem; color: var(--text-light); padding: 10px 0; text-align: center; }
+
+    /* Sub-sheets: nested bottom sheets for "참여자 추가" and "장소 검색" -- higher z-index than
+       the event sheet they float above, sharing the same slide-up mechanics. */
+    .subsheet-backdrop {
+      position: fixed; inset: 0; background: rgba(20,15,35,0.55); opacity: 0; pointer-events: none;
+      transition: opacity 0.24s ease; z-index: 92; border: none; padding: 0;
+    }
+    .subsheet-backdrop.is-open { opacity: 1; pointer-events: auto; }
+    .subsheet {
+      position: fixed; left: 50%; bottom: 0; width: 300px; transform: translate(-50%, 100%);
+      background: var(--bg-card); border-radius: 18px 18px 0 0; box-shadow: 0 -14px 36px rgba(76,29,149,0.26);
+      transition: transform 0.36s cubic-bezier(.22,1,.36,1); z-index: 93; max-height: 74vh; overflow-y: auto; padding: 10px 16px 20px;
+    }
+    .subsheet.is-open { transform: translate(-50%, 0); }
+    .subsheet-title { font-weight: 800; font-size: 0.86rem; color: var(--text-main); margin: 4px 0 12px; }
+    .person-pick-btn {
+      width: 100%; display: flex; align-items: center; gap: 8px; background: var(--bg-primary); border: none;
+      border-radius: var(--radius-md); padding: 10px 12px; font-weight: 700; font-size: 0.76rem; color: var(--text-main);
+      cursor: pointer; margin-bottom: 6px; text-align: left;
+    }
+    .person-pick-btn:hover { background: var(--brand-soft); }
+    .person-pick-btn .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 0 1px rgba(30,27,46,0.08); }
+    .note-textarea {
+      width: 100%; resize: none; font: inherit; font-size: 0.76rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+      padding: 9px 11px; color: var(--text-main); background: var(--bg-primary); min-height: 56px; margin-bottom: 10px;
+    }
+    .note-textarea:focus { outline: none; border-color: var(--brand); }
+    .subsheet-confirm-btn { width: 100%; background: var(--brand); color: #fff; font-weight: 800; font-size: 0.78rem; border: none; border-radius: var(--radius-full); padding: 11px; cursor: pointer; }
+    .subsheet-confirm-btn:hover { background: #6D28D9; }
+    .subsheet-back-row { display: flex; align-items: center; gap: 6px; font-size: 0.7rem; font-weight: 700; color: var(--text-muted); background: none; border: none; cursor: pointer; margin-bottom: 10px; padding: 2px 0; }
+    .subsheet-back-row:hover { color: var(--brand); }
+
+    .place-search-input {
+      width: 100%; font: inherit; font-size: 0.78rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-full);
+      padding: 10px 14px; color: var(--text-main); background: var(--bg-primary); margin-bottom: 10px;
+    }
+    .place-search-input:focus { outline: none; border-color: var(--brand); }
+    .place-result-section-label { font-size: 0.6rem; font-weight: 800; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.02em; margin: 10px 0 6px; }
+    .place-result-item { width: 100%; text-align: left; background: var(--bg-primary); border: none; border-radius: var(--radius-md); padding: 9px 11px; margin-bottom: 6px; cursor: pointer; }
+    .place-result-item:hover { background: var(--brand-soft); }
+    .place-result-name { font-weight: 800; font-size: 0.76rem; color: var(--text-main); }
+    .place-result-addr { font-size: 0.66rem; color: var(--text-muted); margin-top: 1px; }
+    .place-result-existing { display: inline-block; font-size: 0.56rem; font-weight: 800; color: var(--brand); background: var(--brand-soft); border-radius: var(--radius-sm); padding: 1px 5px; margin-left: 5px; }
+    .place-cat-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+    .place-cat-chip { border: 1.5px solid transparent; background: var(--bg-primary); color: var(--text-muted); font-weight: 700; font-size: 0.68rem; padding: 5px 11px; border-radius: var(--radius-full); cursor: pointer; }
+    .place-cat-chip.is-selected { border-color: currentColor; }
+    .field-label { font-size: 0.66rem; font-weight: 800; color: var(--text-light); margin-bottom: 4px; }
+    .text-input { width: 100%; font: inherit; font-size: 0.78rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 9px 11px; color: var(--text-main); background: var(--bg-primary); margin-bottom: 10px; }
+    .text-input:focus { outline: none; border-color: var(--brand); }
+    .visit-toggle-row { display: flex; gap: 6px; margin-bottom: 12px; }
+    .visit-toggle-btn { flex: 1; border: 1.5px solid var(--border-subtle); background: none; border-radius: var(--radius-full); padding: 7px; font-weight: 700; font-size: 0.7rem; color: var(--text-muted); cursor: pointer; }
+    .visit-toggle-btn.is-selected { border-color: var(--brand); color: var(--brand); background: var(--brand-soft); }
+
+    .sheet-place-row { padding: 10px 12px; border-radius: var(--radius-md); background: var(--bg-primary); }
+    .sheet-place-name { font-weight: 800; font-size: 0.78rem; color: var(--text-main); }
+    .sheet-place-addr { font-size: 0.68rem; color: var(--text-muted); margin-top: 2px; }
+    .sheet-place-memo { font-size: 0.66rem; color: var(--text-light); margin-top: 4px; }
+    .sheet-change-btn { background: none; border: none; color: var(--brand); font-weight: 800; font-size: 0.68rem; cursor: pointer; margin-top: 8px; padding: 0; }
+    .sheet-change-btn:hover { text-decoration: underline; }
+
+    /* Empty-day sheet: opened from a day cell with no event and no participants -- quick
+       actions reuse the same 참여자/장소 sub-sheets, plus a one-step 기념일 quick-register form. */
+    .empty-day-icon { width: 44px; height: 44px; border-radius: 50%; background: var(--brand-soft); color: var(--brand); display: flex; align-items: center; justify-content: center; margin: 4px auto 10px; }
+    .empty-day-title { text-align: center; font-weight: 800; font-size: 0.86rem; color: var(--text-main); margin-bottom: 2px; }
+    .empty-day-sub { text-align: center; font-size: 0.7rem; color: var(--text-light); margin-bottom: 16px; }
+    .quick-action-row { background: var(--bg-primary); border-radius: var(--radius-md); padding: 10px 12px; margin-bottom: 8px; }
+    .quick-action-top { display: flex; align-items: center; gap: 8px; }
+    .quick-action-label { font-weight: 800; font-size: 0.76rem; color: var(--text-main); flex: 1; }
+    .quick-action-btn { background: var(--brand-soft); color: var(--brand); font-weight: 800; font-size: 0.68rem; border: none; border-radius: var(--radius-full); padding: 6px 12px; cursor: pointer; }
+    .quick-action-btn:hover { background: #EDE4FF; }
+    .quick-action-status { font-size: 0.66rem; color: var(--text-muted); margin-top: 4px; }
+    .ann-section { margin-top: 10px; }
+    .empty-photo-row { display: flex; gap: 6px; margin-top: 8px; }
+    .empty-photo-thumb { width: 40px; height: 40px; border-radius: var(--radius-sm); background-size: cover; background-position: center; flex-shrink: 0; }
+    .ann-cat-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+    .ann-cat-chip { border: 1.5px solid transparent; background: var(--bg-primary); color: var(--text-muted); font-weight: 700; font-size: 0.66rem; padding: 5px 10px; border-radius: var(--radius-full); cursor: pointer; }
+    .ann-cat-chip.is-selected { border-color: currentColor; }
+    .ann-submit-btn { width: 100%; background: #EC4899; color: #fff; font-weight: 800; font-size: 0.76rem; border: none; border-radius: var(--radius-full); padding: 10px; cursor: pointer; }
+    .ann-submit-btn:hover { background: #DB2777; }
+    .ann-success-box { background: #FDF2F8; border: 1px solid #FBCFE8; border-radius: var(--radius-md); padding: 12px; text-align: center; }
+    .ann-success-title { font-weight: 800; font-size: 0.78rem; color: #BE185D; margin-bottom: 2px; }
+    .ann-success-sub { font-size: 0.68rem; color: var(--text-muted); }
+
+    /* Settlement tab */
+    .expense-mode-toggle { display: flex; gap: 6px; margin-bottom: 10px; }
+    .expense-mode-btn { flex: 1; border: 1.5px solid var(--border-subtle); background: none; border-radius: var(--radius-full); padding: 7px; font-weight: 800; font-size: 0.72rem; color: var(--text-muted); cursor: pointer; }
+    .expense-mode-btn.is-selected.is-expense { border-color: #EF4444; color: #EF4444; background: #FEF2F2; }
+    .expense-mode-btn.is-selected.is-income { border-color: var(--status-green); color: var(--status-green); background: var(--surface-success); }
+    .expense-cat-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+    .expense-cat-chip { border: 1.5px solid transparent; background: var(--bg-primary); color: var(--text-muted); font-weight: 700; font-size: 0.66rem; padding: 5px 10px; border-radius: var(--radius-full); cursor: pointer; }
+    .expense-cat-chip.is-selected { border-color: currentColor; }
+    .expense-payer-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+    .expense-payer-chip { border: 1.5px solid var(--border-subtle); background: none; color: var(--text-muted); font-weight: 700; font-size: 0.66rem; padding: 5px 10px; border-radius: var(--radius-full); cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+    .expense-payer-chip.is-selected { border-color: var(--brand); color: var(--brand); background: var(--brand-soft); }
+    .expense-payer-chip .dot { width: 7px; height: 7px; border-radius: 50%; }
+    .expense-selfpay-row { display: flex; align-items: center; gap: 6px; margin-bottom: 12px; font-size: 0.7rem; font-weight: 700; color: var(--text-muted); }
+    .expense-form-row { display: flex; gap: 6px; margin-bottom: 10px; }
+    .expense-add-btn { width: 100%; background: var(--brand); color: #fff; font-weight: 800; font-size: 0.76rem; border: none; border-radius: var(--radius-full); padding: 10px; cursor: pointer; margin-bottom: 16px; }
+    .expense-add-btn:hover { background: #6D28D9; }
+    .expense-row { display: flex; align-items: center; gap: 8px; padding: 9px 10px; background: var(--bg-primary); border-radius: var(--radius-md); margin-bottom: 6px; }
+    .expense-row .cat-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .expense-row-label { font-weight: 700; font-size: 0.74rem; color: var(--text-main); flex: 1; min-width: 0; }
+    .expense-row-payer { font-size: 0.6rem; color: var(--text-light); }
+    .expense-row-amount { font-weight: 800; font-size: 0.76rem; flex-shrink: 0; }
+    .expense-row-amount.is-expense { color: #DC2626; }
+    .expense-row-amount.is-income { color: var(--status-green); }
+    .settlement-card-preview { background: var(--brand-soft); border-radius: var(--radius-md); padding: 12px; margin-top: 4px; }
+    .settlement-card-title { font-weight: 800; font-size: 0.76rem; color: var(--brand); margin-bottom: 6px; }
+    .settlement-card-row { display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--text-main); padding: 3px 0; }
+    .settlement-card-row .name { font-weight: 700; }
+    .settlement-card-row .amt.is-refund { color: var(--status-green); font-weight: 800; }
+    .settlement-card-row .amt.is-owe { color: #DC2626; font-weight: 800; }
+
+    .sheet-photos { display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
+    .sheet-photo { width: 64px; height: 64px; border-radius: var(--radius-md); background-size: cover; background-position: center; cursor: pointer; flex-shrink: 0; transition: transform 0.16s ease; border: none; padding: 0; }
+    .sheet-photo:hover { transform: scale(1.05); }
+    .sheet-photo:active { transform: scale(0.96); }
+    .sheet-photo-add {
+      width: 64px; height: 64px; border-radius: var(--radius-md); flex-shrink: 0; cursor: pointer;
+      border: 1.5px dashed var(--border-subtle); background: var(--bg-primary); color: var(--text-light);
+      display: flex; align-items: center; justify-content: center; transition: border-color 0.15s ease, color 0.15s ease;
+    }
+    .sheet-photo-add:hover { border-color: var(--brand); color: var(--brand); }
+    .sheet-actions { display: flex; gap: 8px; margin-top: 16px; }
+    .sheet-action-btn { flex: 1; background: var(--brand-soft); color: var(--brand); font-weight: 800; font-size: 0.76rem; border: none; border-radius: var(--radius-full); padding: 10px; cursor: pointer; transition: background 0.15s ease, transform 0.15s ease; }
+    .sheet-action-btn:hover { background: #EDE4FF; }
+    .sheet-action-btn:active { transform: scale(0.97); }
+    .sheet-action-btn.primary { background: var(--brand); color: #fff; }
+    .sheet-action-btn.primary:hover { background: #6D28D9; }
+
+    /* Lightbox / photo detail */
+    .lightbox-backdrop {
+      position: fixed; inset: 0; background: rgba(12,9,20,0.94);
+      display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+      opacity: 0; pointer-events: none; transition: opacity 0.26s ease; z-index: 95;
+    }
+    .lightbox-backdrop.is-open { opacity: 1; pointer-events: auto; }
+    .lightbox-topbar { position: absolute; top: 14px; left: 14px; right: 14px; display: flex; justify-content: space-between; align-items: center; z-index: 2; }
+    .lightbox-topbar-actions { display: flex; gap: 8px; }
+    .lightbox-icon-btn {
+      width: 30px; height: 30px; border-radius: 50%; background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.22);
+      color: #fff; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s ease;
+    }
+    .lightbox-icon-btn:hover { background: rgba(255,255,255,0.26); }
+    .lightbox-stage { position: relative; display: flex; align-items: center; gap: 10px; padding: 56px 10px 12px; flex-shrink: 0; }
+    .lightbox-img { width: 220px; aspect-ratio: 4/5; border-radius: 14px; background-size: cover; background-position: center; box-shadow: 0 24px 60px rgba(0,0,0,0.5); }
+    .lightbox-nav {
+      width: 34px; height: 34px; border-radius: 50%; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2);
+      color: #fff; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;
+      transition: background 0.15s ease, transform 0.15s ease;
+    }
+    .lightbox-nav:hover { background: rgba(255,255,255,0.22); }
+    .lightbox-nav:active { transform: scale(0.92); }
+    .lightbox-counter { color: rgba(255,255,255,0.7); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.02em; text-align: center; margin-top: -2px; flex-shrink: 0; }
+    .lightbox-panel {
+      width: 320px; background: var(--bg-card); border-radius: 18px 18px 0 0; padding: 14px 16px 18px;
+      max-height: 46vh; overflow-y: auto; flex-shrink: 0;
+    }
+    .lightbox-fileinfo { font-size: 0.66rem; color: var(--text-light); margin-bottom: 12px; }
+    .lightbox-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+    .lightbox-tag { display: inline-flex; align-items: center; gap: 4px; font-size: 0.66rem; font-weight: 700; color: var(--brand); background: var(--brand-soft); border-radius: var(--radius-full); padding: 3px 6px 3px 10px; }
+    .lightbox-tag-remove { background: none; border: none; color: var(--brand); opacity: 0.7; cursor: pointer; padding: 0; display: inline-flex; }
+    .lightbox-tag-remove:hover { opacity: 1; }
+    .lightbox-tag-add-row { display: flex; gap: 6px; margin-bottom: 14px; }
+    .lightbox-tag-input { flex: 1; font: inherit; font-size: 0.7rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-full); padding: 6px 12px; color: var(--text-main); background: var(--bg-primary); }
+    .lightbox-tag-input:focus { outline: none; border-color: var(--brand); }
+    .lightbox-tag-submit { background: var(--bg-primary); color: var(--brand); font-weight: 800; font-size: 0.66rem; border: none; border-radius: var(--radius-full); padding: 0 12px; cursor: pointer; }
+    .lightbox-tag-submit:hover { background: var(--brand-soft); }
+    .lightbox-tag-hint { font-size: 0.6rem; color: var(--text-light); margin: -6px 0 12px; }
+    .lightbox-comment-row { display: flex; gap: 7px; margin-bottom: 10px; align-items: flex-start; }
+    .lightbox-comment-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; box-shadow: 0 0 0 1px rgba(30,27,46,0.08); }
+    .lightbox-comment-author { font-weight: 800; font-size: 0.68rem; color: var(--text-main); }
+    .lightbox-comment-text { font-size: 0.72rem; color: var(--text-muted); line-height: 1.4; }
+    .lightbox-comment-actions { display: inline-flex; gap: 2px; margin-left: auto; flex-shrink: 0; }
+    .lightbox-comment-empty { font-size: 0.68rem; color: var(--text-light); margin-bottom: 10px; }
+    .lightbox-author-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+    .lightbox-author-label { font-size: 0.62rem; color: var(--text-light); font-weight: 700; margin-right: 2px; }
+    .lightbox-author-btn { width: 24px; height: 24px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; flex-shrink: 0; }
+    .lightbox-author-btn.is-selected { border-color: var(--text-main); }
+    .lightbox-comment-input-row { display: flex; gap: 6px; align-items: flex-end; margin-top: 4px; }
+    .lightbox-comment-input {
+      flex: 1; resize: none; font: inherit; font-size: 0.74rem; border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md); padding: 8px 10px; color: var(--text-main); background: var(--bg-primary); min-height: 34px;
+    }
+    .lightbox-comment-input:focus { outline: none; border-color: var(--brand); }
+    .lightbox-comment-submit { background: var(--brand); color: #fff; border: none; border-radius: var(--radius-full); padding: 8px 14px; font-weight: 800; font-size: 0.7rem; cursor: pointer; flex-shrink: 0; }
+    .lightbox-comment-submit:hover { background: #6D28D9; }
+    .lightbox-editing-note { font-size: 0.62rem; color: var(--brand); font-weight: 700; margin-bottom: 4px; }
+
+    /* ===== Side nav: drawer (all widths) + persistent collapsible rail (desktop) =====
+       Below 1200px this is a slide-over drawer -- fixed, off-canvas by default, opened by the
+       header's 메뉴 button and closed by its own X or the backdrop. At >=1200px it becomes an
+       always-on fixed rail (see the 1200px block) that can itself collapse to icon-only. */
+    .side-nav-backdrop {
+      position: fixed; inset: 0; background: rgba(20,15,35,0.5); border: none; padding: 0; margin: 0;
+      opacity: 0; pointer-events: none; transition: opacity 0.25s ease; z-index: 149;
+    }
+    .side-nav-backdrop.is-open { opacity: 1; pointer-events: auto; }
+    /* The drawer opens from the RIGHT, matching where the header's 메뉴 button that opens it
+       actually sits -- opening from the opposite side than the trigger is disorienting. Below
+       1200px this is the only side-nav position; the 1200px block re-pins it to the left as a
+       persistent rail (a fixed sidebar living opposite its own now-hidden trigger reads fine,
+       since there's no click-to-open motion to match at that width). */
+    .side-nav {
+      position: fixed; top: 0; right: 0; bottom: 0; width: 274px; z-index: 150;
+      background: var(--bg-card); border-left: 1px solid var(--border-subtle);
+      display: flex; flex-direction: column; overflow-y: auto;
+      transform: translateX(100%); transition: transform 0.32s cubic-bezier(.22,1,.36,1);
+      box-shadow: -10px 0 30px rgba(30,27,46,0.18);
+    }
+    .side-nav.is-open { transform: translateX(0); }
+    @media (prefers-reduced-motion: reduce) { .side-nav { transition: none; } }
+
+    .side-nav-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 14px 8px; flex-shrink: 0; }
+    .side-nav-brand { font-weight: 800; font-size: 0.98rem; color: var(--text-main); display: flex; align-items: center; gap: 7px; overflow: hidden; }
+    .side-nav-brand svg { color: var(--brand); flex-shrink: 0; }
+    .side-nav-close-btn { background: none; border: none; color: var(--text-muted); padding: 5px; display: inline-flex; cursor: pointer; border-radius: var(--radius-sm); flex-shrink: 0; }
+    .side-nav-close-btn:hover { background: var(--bg-primary); color: var(--brand); }
+
+    .side-nav-group { padding: 4px 10px; border-top: 1px solid var(--border-subtle); }
+    .side-nav-group:first-of-type { border-top: none; }
+    .side-nav-footer { padding: 8px 10px 16px; border-top: 1px solid var(--border-subtle); margin-top: auto; flex-shrink: 0; }
+
+    .side-nav-item {
+      width: 100%; display: flex; align-items: center; gap: 10px; text-align: left; background: none; border: none;
+      padding: 9px 10px; border-radius: 10px; font-weight: 700; font-size: 0.82rem; color: var(--text-muted); cursor: pointer; margin: 2px 0;
+    }
+    .side-nav-item:hover { background: var(--bg-primary); }
+    .side-nav-item.is-active { background: var(--brand-soft); color: var(--brand); }
+    .side-nav-item-icon { display: inline-flex; flex-shrink: 0; }
+    .side-nav-item-copy { display: flex; flex-direction: column; min-width: 0; }
+    .side-nav-item-title { display: flex; align-items: center; gap: 6px; }
+    .side-nav-item-sub { font-size: 0.64rem; font-weight: 600; color: var(--text-light); }
+    .side-nav-item-meta {
+      margin-left: auto; font-size: 0.66rem; font-weight: 600; color: var(--text-light); flex-shrink: 0;
+      max-width: 6.5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .side-nav-item-badge { background: #EF4444; color: #fff; font-size: 0.56rem; font-weight: 800; padding: 1px 6px; border-radius: var(--radius-full); margin-left: 4px; }
+
+    /* 사용자 매뉴얼 is a distinct banner (tinted card, icon circle, chevron) rather than a plain
+       list row -- matching the real app's own MainSideMenu, which gives this one entry special
+       visual weight since it's the onboarding/help entry point. */
+    .side-nav-manual-banner {
+      width: 100%; display: flex; align-items: center; gap: 10px; text-align: left;
+      background: var(--brand-soft); border: none; border-radius: 12px; padding: 10px 10px 10px 8px;
+      cursor: pointer; margin: 4px 0 6px;
+    }
+    .side-nav-manual-banner:hover { background: #EDE4FF; }
+    .side-nav-manual-banner-icon-wrap {
+      flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%; background: #fff; color: var(--brand);
+      display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(30,27,46,0.1);
+    }
+    .side-nav-manual-banner-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+    .side-nav-manual-banner-title { font-weight: 800; font-size: 0.82rem; color: var(--brand); }
+    .side-nav-manual-banner-sub { font-size: 0.66rem; font-weight: 600; color: var(--text-muted); margin-top: 1px; }
+    .side-nav-manual-banner-chevron { flex-shrink: 0; color: var(--brand); opacity: 0.7; display: flex; }
+
+    .side-nav-collapse-btn {
+      display: none; width: 100%; align-items: center; justify-content: center; gap: 6px; margin-top: 6px;
+      background: none; border: 1px solid var(--border-subtle); border-radius: 10px; padding: 7px;
+      font-weight: 700; font-size: 0.72rem; color: var(--text-muted); cursor: pointer;
+    }
+    .side-nav-collapse-btn:hover { background: var(--bg-primary); color: var(--brand); }
+
+    /* ===== Responsive shell =====
+       Mobile stays exactly the current single-column, edge-to-edge design (the thing already
+       approved), with the side nav living as an off-canvas drawer. Tablet turns the bento rows
+       into a real two-column grid with card framing. Desktop pins the side nav as a persistent
+       rail (collapsible to icon-only) and widens the grid to three columns -- and, per the
+       actual production site's own breakpoints (day-corner-label/date-year revealed >=640px,
+       gallery grid 4->6 cols >=1024px), genuinely shows MORE information at each step rather
+       than just reflowing the same content: calendar cells grow and reveal event titles +
+       holiday labels, the gallery grid gains columns. */
+    .app-shell { width: 100%; max-width: 480px; margin: 0 auto; background: var(--bg-primary); min-height: 100%; }
+
+    @media (min-width: 640px) {
+      /* Mirrors the real app's own .day-corner-label/.date-year reveal at this exact breakpoint. */
+      .day-corner-label, .day-event-title { display: block; }
+      .day-cell { min-height: 52px; padding: 3px 2px; }
+      .day-num { font-size: 0.74rem; }
+    }
+
+    @media (min-width: 768px) {
+      .app-shell { max-width: 760px; }
+      .hero-zone { border-radius: 20px; margin: 16px 20px 0; }
+      .bento-title { padding-left: 20px !important; padding-right: 20px !important; }
+      .dday-toggle-wrap { padding: 18px 20px !important; }
+      .dday-strip { padding: 0 20px 18px !important; }
+      .bento-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 20px !important; }
+      .bento-card { border-top: none !important; border-radius: 16px; box-shadow: 0 1px 4px rgba(30,27,46,0.07); padding: 18px !important; }
+      /* Only the calendar (first card) actually spans both columns -- chat+memo and
+         gallery+places pair up side by side, so the grid is doing real work here, not just
+         wider single-column cards. */
+      .bento-card:first-of-type.wide { grid-column: 1 / -1; }
+      .bento-card.gallery-bleed { padding: 18px !important; }
+      .bento-card.gallery-bleed .bento-card-head { padding: 0 !important; }
+      .bento-card.gallery-bleed .thumb-grid { border-radius: 10px; overflow: hidden; }
+      .day-cell { min-height: 60px; }
+      .thumb-grid { grid-template-columns: repeat(5, 1fr); }
+      /* The cell is finally wide enough to name names: dots become small colored capsules with
+         the person's own name inside (via the data-name already on each dot), instead of relying
+         purely on color -- the same "increase detail, don't just resize" move used for the day
+         corner labels above. */
+      .dot-row { gap: 3px; }
+      .p-dot {
+        width: auto; height: auto; border-radius: var(--radius-full); box-shadow: none;
+        display: inline-flex; align-items: center; padding: 1px 6px;
+      }
+      .p-dot::after {
+        content: attr(data-name); display: inline; color: #fff; font-size: 0.56rem; font-weight: 800;
+        line-height: 1.4; white-space: nowrap;
+      }
+      /* Anniversary bar grows tall enough to hold its own label text, same treatment as the
+         confirmed-event day-bar getting a .day-event-title. */
+      /* Only a bar that actually CARRIES a label grows tall enough to show it -- a day like the
+         20th already gets its anniversary spelled out via .day-event-title ("캠핑 · 만식생일"),
+         so its own anniversary bar stays a plain slim marker instead of an empty tall capsule
+         with nothing in it (which was rendering as a broken-looking blank pink block). */
+      .day-anniversary:has(.day-anniversary-label) { height: 13px; bottom: 3px; }
+      .day-anniversary.lvl-1:has(.day-anniversary-label) { bottom: 20px; }
+      .day-anniversary-label {
+        display: block; font-size: 0.5rem; font-weight: 800; color: #fff; white-space: nowrap;
+        overflow: hidden; text-overflow: ellipsis; padding: 0 4px;
+      }
+    }
+
+    @media (min-width: 1024px) {
+      /* The real app's own gallery grid goes to 6 columns here, but that's inside a full-width
+         single-column page -- in this bento layout the gallery card shares its row with 장소, so
+         more columns would just shrink each photo instead of showing more. Hold at tablet's 5
+         rather than crowd it further; the 1200px block below goes the other way (fewer, bigger
+         tiles) once the card gets even narrower relative to its neighbors. */
+      .thumb-grid { gap: 5px; }
+    }
+
+    @media (min-width: 1200px) {
+      .side-nav-backdrop { display: none; }
+      .side-nav-toggle-btn { display: none; }
+      .side-nav {
+        left: 0; right: auto; border-left: none; border-right: 1px solid var(--border-subtle);
+        transform: none; box-shadow: none; width: 232px; transition: width 0.22s ease;
+      }
+      .side-nav-close-btn { display: none; }
+      .side-nav-collapse-btn { display: flex; }
+      body { padding-left: 232px; transition: padding-left 0.22s ease; }
+      body:has(.side-nav.is-collapsed) { padding-left: 76px; }
+      .side-nav.is-collapsed { width: 76px; }
+      .side-nav.is-collapsed .side-nav-brand-text,
+      .side-nav.is-collapsed .side-nav-item-title,
+      .side-nav.is-collapsed .side-nav-item-sub,
+      .side-nav.is-collapsed .side-nav-item-copy .side-nav-item-sub,
+      .side-nav.is-collapsed .side-nav-item-meta,
+      .side-nav.is-collapsed .side-nav-manual-banner-text,
+      .side-nav.is-collapsed .side-nav-manual-banner-chevron,
+      .side-nav.is-collapsed .side-nav-collapse-label { display: none; }
+      .side-nav.is-collapsed .side-nav-item { justify-content: center; padding: 10px 6px; }
+      .side-nav.is-collapsed .side-nav-manual-banner { justify-content: center; padding: 8px; }
+      .side-nav.is-collapsed .side-nav-head { justify-content: center; }
+      .app-shell { max-width: 1180px; margin: 0 auto; padding: 0 32px; }
+      .bento-title-brand { display: none !important; }
+      .hero-zone { border-radius: 20px; margin: 28px 0 0; }
+      /* The tablet rule spans every .wide card full-width; desktop has room for three real
+         columns, so undo that span here and re-apply it only to the calendar (the first card),
+         which stays the one deliberately wide element. */
+      .bento-grid { grid-template-columns: 1.4fr 1fr 1fr; padding: 24px 0 !important; gap: 20px; }
+      .bento-card.wide { grid-column: auto; }
+      .bento-card:first-of-type.wide { grid-column: 1 / -1; }
+      .day-cell { min-height: 76px; padding: 5px 3px; }
+      .day-num { font-size: 0.8rem; }
+      .day-event-title { font-size: 0.6rem; }
+      /* Calendar/chat/memo genuinely gain more DETAIL at this width (taller cells, name
+         capsules, a fuller sidebar) -- gallery has a fixed 8-photo sample, so it can't gain more
+         content the same way. Rather than cram more, smaller thumbnails into the same narrow
+         shared column (which would read as LESS, not more), fewer/bigger tiles keep its visual
+         weight even with the sections around it. */
+      .thumb-grid { grid-template-columns: repeat(4, 1fr); gap: 7px; }
+      .bento-card.gallery-bleed { padding: 24px !important; }
+    }
+
+  </style>
+</helmet>
+<!-- Side nav: a mobile/tablet slide-over drawer below 1200px (opened by the header's 메뉴
+     button, closed by its own X or the backdrop), and a persistent fixed rail at >=1200px that
+     can itself collapse to icon-only via the chevron at its foot. Carries every item the real
+     app's MainSideMenu has -- manual/설정/기념일 group, the 6 section links each with the same
+     live-preview meta text the production drawer shows (last chat author, settlement badge,
+     last gallery date, etc.), 컨텐츠/보관함, and the 공유/설정 footer -- nothing dropped. -->
+<button class="side-nav-backdrop {{sidebarBackdropClass}}" type="button" aria-label="메뉴 닫기" onClick="{{closeSidebar}}"></button>
+<nav class="side-nav {{sidebarOpenClass}} {{sidebarCollapsedClass}}">
+  <div class="side-nav-head">
+    <div class="side-nav-brand">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M8 2v4M16 2v4M3 10h18"></path></svg>
+      <span class="side-nav-brand-text">모아엘가</span>
+    </div>
+    <button class="side-nav-close-btn" type="button" aria-label="메뉴 닫기" onClick="{{closeSidebar}}"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>
+  </div>
+
+  <div class="side-nav-group">
+    <button class="side-nav-manual-banner" type="button" title="사용자 매뉴얼">
+      <span class="side-nav-manual-banner-icon-wrap"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path><path d="M8 7h8"></path><path d="M8 11h6"></path></svg></span>
+      <span class="side-nav-manual-banner-text">
+        <span class="side-nav-manual-banner-title">사용자 매뉴얼</span>
+        <span class="side-nav-manual-banner-sub">사용 방법 한눈에 보기</span>
+      </span>
+      <span class="side-nav-manual-banner-chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg></span>
+    </button>
+    <button class="side-nav-item" type="button" title="캘린더 설정">
+      <span class="side-nav-item-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M8 2v4M16 2v4M3 10h18"></path><circle cx="12" cy="15" r="2"></circle></svg></span>
+      <span class="side-nav-item-title">캘린더 설정</span>
+    </button>
+    <button class="side-nav-item" type="button" title="기념일 설정">
+      <span class="side-nav-item-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="13" rx="2"></rect><path d="M12 8v13M3 12h18"></path><path d="M12 8a2.5 2.5 0 1 1-4-3c1.5 0 4 1.5 4 3Z"></path><path d="M12 8a2.5 2.5 0 1 0 4-3c-1.5 0-4 1.5-4 3Z"></path></svg></span>
+      <span class="side-nav-item-title">기념일 설정</span>
+    </button>
+  </div>
+
+  <div class="side-nav-group">
+    <button class="side-nav-item is-active" type="button" title="캘린더">
+      <span class="side-nav-item-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M8 2v4M16 2v4M3 10h18"></path></svg></span>
+      <span class="side-nav-item-title">캘린더</span>
+    </button>
+    <button class="side-nav-item" type="button" title="채팅 · {{chatMetaLabel}}">
+      <span class="side-nav-item-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg></span>
+      <span class="side-nav-item-title">채팅</span>
+      <span class="side-nav-item-meta" style="{{chatMetaStyle}}">{{chatMetaLabel}}</span>
+    </button>
+    <button class="side-nav-item" type="button" title="정산 · {{settlementMetaLabel}}">
+      <span class="side-nav-item-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"></rect><path d="M6 12h.01M18 12h.01"></path></svg></span>
+      <span class="side-nav-item-title">정산<span class="side-nav-item-badge">{{settlementBadgeText}}</span></span>
+      <span class="side-nav-item-meta">{{settlementMetaLabel}}</span>
+    </button>
+    <button class="side-nav-item" type="button" title="갤러리 · {{galleryMetaLabel}}">
+      <span class="side-nav-item-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="9" cy="9" r="2"></circle><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"></path></svg></span>
+      <span class="side-nav-item-title">갤러리</span>
+      <span class="side-nav-item-meta">{{galleryMetaLabel}}</span>
+    </button>
+    <button class="side-nav-item" type="button" title="장소 · {{placeMetaLabel}}">
+      <span class="side-nav-item-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3"></circle></svg></span>
+      <span class="side-nav-item-title">장소</span>
+      <span class="side-nav-item-meta">{{placeMetaLabel}}</span>
+    </button>
+    <button class="side-nav-item" type="button" title="메모 · {{memoMetaLabel}}">
+      <span class="side-nav-item-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v12H8l-4 4z"></path></svg></span>
+      <span class="side-nav-item-title">메모</span>
+      <span class="side-nav-item-meta">{{memoMetaLabel}}</span>
+    </button>
+  </div>
+
+  <div class="side-nav-group">
+    <button class="side-nav-item" type="button" title="컨텐츠">
+      <span class="side-nav-item-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-8.5 4.5L12 12l8.5-4.5L12 3Z"></path><path d="m3.5 12 8.5 4.5 8.5-4.5"></path><path d="m3.5 16.5 8.5 4.5 8.5-4.5"></path></svg></span>
+      <span class="side-nav-item-title">컨텐츠</span>
+    </button>
+    <button class="side-nav-item" type="button" title="보관함">
+      <span class="side-nav-item-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6"></path><path d="M2 7h20v5H2z"></path><path d="M12 12v3"></path></svg></span>
+      <span class="side-nav-item-title">보관함</span>
+    </button>
+  </div>
+
+  <div class="side-nav-footer">
+    <button class="side-nav-item" type="button" title="공유">
+      <span class="side-nav-item-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"></path></svg></span>
+      <span class="side-nav-item-title">공유</span>
+    </button>
+    <button class="side-nav-item" type="button" title="설정">
+      <span class="side-nav-item-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"></path></svg></span>
+      <span class="side-nav-item-title">설정</span>
+    </button>
+    <button class="side-nav-collapse-btn" type="button" title="{{sidebarCollapseLabel}}" aria-label="{{sidebarCollapseLabel}}" onClick="{{toggleSidebarCollapse}}">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="{{sidebarCollapseIconStyle}}"><path d="m15 6-6 6 6 6"></path></svg>
+      <span class="side-nav-collapse-label">접기</span>
+    </button>
+  </div>
+</nav>
+
+<div class="app-shell">
+
+  <!-- Top bar moves back onto the gradient itself, like the original Mobile320 header, but
+       sized to this card's compact footprint rather than a full-height banner. Hidden at the
+       desktop breakpoint, where the sidebar already carries the brand mark. -->
+  <div class="hero-zone">
+    <div class="bento-title" style="padding: 12px 12px 2px; color: #fff;">
+      <span class="bento-title-brand">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M8 2v4M16 2v4M3 10h18"></path></svg>
+        모아엘가
+      </span>
+      <div class="bento-title-actions">
+        <button class="icon-btn" aria-label="검색" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg></button>
+        <button class="icon-btn side-nav-toggle-btn" aria-label="메뉴" type="button" onClick="{{toggleSidebar}}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"></line><line x1="4" y1="12" x2="20" y2="12"></line><line x1="4" y1="18" x2="20" y2="18"></line></svg></button>
+      </div>
+    </div>
+    <div class="{{ddayWrapClass}}">
+      <button class="dday-compact" type="button" onClick="{{toggleDdayMain}}">
+        <span class="dday-compact-badge">D-7</span>
+        <span class="dday-compact-text">모임확정 · 26.09.19(토) · 천왕산가족캠핑장</span>
+        <svg class="dday-compact-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6l6 -6"></path></svg>
+      </button>
+      <div class="dday-expanded">
+        <div style="min-width: 0;">
+          <div class="dday-expanded-title-row">
+            <div class="dday-expanded-title">모임확정 · 26.09.19 (토)</div>
+          </div>
+          <div class="dday-expanded-tags">
+            <span class="dday-expanded-tag">
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.85;"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+              천왕산가족캠핑장 · 11번 데크
+            </span>
+            <span class="dday-expanded-tag"><span class="tag-dot" style="background:var(--p-doeun)"></span>도은 · 쿠킹클래스 13시</span>
+            <span class="dday-expanded-tag"><span class="tag-dot" style="background:var(--p-seojun)"></span>서준 · 쿠킹클래스 13시</span>
+          </div>
+        </div>
+        <div class="dday-expanded-side">
+          <button class="dday-collapse-btn" type="button" aria-label="접기" onClick="{{toggleDdayMain}}">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15l-6-6l-6 6"></path></svg>
+          </button>
+          <span class="dday-expanded-badge">D-7</span>
+          <button class="dday-view-btn" type="button" onClick="{{openTripSheet}}">일정보기</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="dday-strip">
+      <button class="dday-chip" type="button" onClick="{{openTripSheet}}"><div class="dday-date">26.09.19</div><div class="dday-dow">토요일</div><span class="dday-pill">D-7</span></button>
+      <button class="dday-chip" type="button" onClick="{{openTripSheet}}"><div class="dday-date">26.09.20</div><div class="dday-dow">일요일</div><span class="dday-pill">D-8</span></button>
+      <button class="dday-chip" type="button" onClick="{{openOctSheet}}"><div class="dday-date">26.10.03</div><div class="dday-dow">토요일</div><span class="dday-pill">D-21</span></button>
+      <button class="dday-chip" type="button" onClick="{{openOctSheet}}"><div class="dday-date">26.10.04</div><div class="dday-dow">일요일</div><span class="dday-pill">D-22</span></button>
+      <button class="dday-chip" type="button" onClick="{{openOctSheet}}"><div class="dday-date">26.10.09</div><div class="dday-dow">금요일</div><span class="dday-pill">D-27</span></button>
+      <button class="dday-chip" type="button" onClick="{{openOctSheet}}"><div class="dday-date">26.10.10</div><div class="dday-dow">토요일</div><span class="dday-pill">D-28</span></button>
+      <button class="dday-chip" type="button" onClick="{{openOctSheet}}"><div class="dday-date">26.10.11</div><div class="dday-dow">일요일</div><span class="dday-pill">D-29</span></button>
+    </div>
+  </div>
+
+  <div class="bento-grid">
+  <!-- Calendar: wide card -->
+  <div class="bento-card wide enter" style="animation-delay: 0.04s">
+  <div class="cal-card">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+      <button class="ghost-btn" style="gap: 4px; font-weight: 800; font-size: 0.92rem; color: var(--text-main); padding: 2px 0;" type="button">
+        2026년 9월
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6l6 -6"></path></svg>
+      </button>
+      <div style="display: flex; gap: 0px;">
+        <button class="ghost-btn" aria-label="이전달" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate(90deg)"><path d="M6 9l6 6l6 -6"></path></svg></button>
+        <button class="ghost-btn" style="font-weight: 700; font-size: 0.72rem; padding: 6px 8px;" type="button">오늘</button>
+        <button class="ghost-btn" aria-label="다음달" type="button"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate(-90deg)"><path d="M6 9l6 6l6 -6"></path></svg></button>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(7, 1fr); margin-bottom: 2px;">
+      <div class="weekday-label" style="color:#EF4444;">일</div><div class="weekday-label">월</div><div class="weekday-label">화</div>
+      <div class="weekday-label">수</div><div class="weekday-label">목</div><div class="weekday-label">금</div>
+      <div class="weekday-label" style="color:#2563EB;">토</div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(7, 1fr); row-gap: 1px;">
+      <div class="day-cell other-month"><span class="day-num">30</span><div class="dot-row"><span class="p-dot" data-name="영우" style="background:var(--p-yeongwoo)"></span><span class="p-dot" data-name="유리" style="background:var(--p-yuri)"></span><span class="p-dot" data-name="만식" style="background:var(--p-manshik)"></span><span class="p-dot" data-name="은혜" style="background:var(--p-eunhye)"></span></div></div>
+      <div class="day-cell other-month"><span class="day-num">31</span></div>
+      <div class="day-cell"><span class="day-num">1</span></div>
+      <div class="day-cell"><span class="day-num">2</span></div>
+      <div class="day-cell"><span class="day-num">3</span></div>
+      <div class="day-cell"><span class="day-num">4</span></div>
+      <div class="day-cell"><span class="day-num">5</span><div class="dot-row"><span class="p-dot" data-name="만식" style="background:var(--p-manshik)"></span><span class="p-dot" data-name="은혜" style="background:var(--p-eunhye)"></span><span class="p-dot" data-name="영우" style="background:var(--p-yeongwoo)"></span></div><div class="day-bar solo"></div></div>
+
+      <button class="day-cell" type="button" title="일정·참여자 없는 날짜" onClick="{{openEmptyDay}}"><span class="day-num">6</span></button>
+      <div class="day-cell"><span class="day-num">7</span></div>
+      <div class="day-cell"><span class="day-num">8</span></div>
+      <div class="day-cell"><span class="day-num">9</span><div class="dot-row"><span class="p-dot" data-name="은혜" style="background:var(--p-eunhye)"></span></div></div>
+      <div class="day-cell"><span class="day-num">10</span><div class="dot-row"><span class="p-dot" data-name="유리" style="background:var(--p-yuri)"></span><span class="p-dot" data-name="은혜" style="background:var(--p-eunhye)"></span></div></div>
+      <div class="day-cell"><span class="day-num">11</span></div>
+      <div class="day-cell today"><span class="day-num">12</span><div class="dot-row"><span class="p-dot" data-name="만식" style="background:var(--p-manshik)"></span><span class="p-dot" data-name="은혜" style="background:var(--p-eunhye)"></span><span class="p-dot" data-name="영우" style="background:var(--p-yeongwoo)"></span><span class="p-dot" data-name="유리" style="background:var(--p-yuri)"></span></div></div>
+
+      <div class="day-cell"><span class="day-num">13</span><div class="dot-row"><span class="p-dot" data-name="만식" style="background:var(--p-manshik)"></span><span class="p-dot" data-name="은혜" style="background:var(--p-eunhye)"></span><span class="p-dot" data-name="영우" style="background:var(--p-yeongwoo)"></span></div></div>
+      <div class="day-cell"><span class="day-num">14</span></div>
+      <div class="day-cell"><span class="day-num">15</span><div class="dot-row"><span class="p-dot" data-name="영우" style="background:var(--p-yeongwoo)"></span><span class="p-dot" data-name="은혜" style="background:var(--p-eunhye)"></span><span class="p-dot" data-name="만식" style="background:var(--p-manshik)"></span></div></div>
+      <div class="day-cell"><span class="day-num">16</span><div class="dot-row"><span class="p-dot" data-name="은혜" style="background:var(--p-eunhye)"></span><span class="p-dot" data-name="영우" style="background:var(--p-yeongwoo)"></span></div></div>
+      <div class="day-cell"><span class="day-num">17</span></div>
+      <div class="day-cell"><span class="day-num">18</span><div class="dot-row"><span class="p-dot" data-name="유리" style="background:var(--p-yuri)"></span><span class="p-dot" data-name="은혜" style="background:var(--p-eunhye)"></span></div></div>
+      <button class="day-cell confirmed has-event" type="button" title="천왕산가족캠핑장" onClick="{{openTripSheet}}"><span class="day-num">19</span><span class="day-event-title">가족캠핑</span><div class="dot-row"><span class="p-dot" data-name="영우" style="background:var(--p-yeongwoo)"></span><span class="p-dot" data-name="유리" style="background:var(--p-yuri)"></span><span class="p-dot" data-name="만식" style="background:var(--p-manshik)"></span><span class="p-dot" data-name="은혜" style="background:var(--p-eunhye)"></span></div><div class="day-bar start"></div></button>
+
+      <button class="day-cell confirmed has-event" type="button" style="min-height:46px;" title="캠핑 마지막날 + 만식 생일" onClick="{{openTripSheet}}"><span class="day-num">20</span><span class="day-event-title">캠핑 · 만식생일</span><div class="dot-row"><span class="p-dot" data-name="영우" style="background:var(--p-yeongwoo)"></span><span class="p-dot" data-name="유리" style="background:var(--p-yuri)"></span><span class="p-dot" data-name="만식" style="background:var(--p-manshik)"></span><span class="p-dot" data-name="은혜" style="background:var(--p-eunhye)"></span></div><div class="day-bar end"></div><div class="day-anniversary lvl-1"></div></button>
+      <div class="day-cell"><span class="day-num">21</span></div>
+      <div class="day-cell"><span class="day-num">22</span></div>
+      <div class="day-cell"><span class="day-num">23</span><div class="day-corner-label">추분</div></div>
+      <div class="day-cell holiday"><span class="day-num">24</span><div class="day-corner-label is-holiday">추석연휴</div></div>
+      <div class="day-cell holiday"><span class="day-num">25</span><div class="day-corner-label is-holiday">추석</div></div>
+      <div class="day-cell holiday"><span class="day-num">26</span><div class="day-corner-label is-holiday">추석연휴</div><div class="day-bar solo"></div></div>
+
+      <div class="day-cell"><span class="day-num">27</span><div class="day-bar solo"></div></div>
+      <div class="day-cell"><span class="day-num">28</span><div class="dot-row"><span class="p-dot" data-name="은혜" style="background:var(--p-eunhye)"></span></div></div>
+      <div class="day-cell"><span class="day-num">29</span></div>
+      <div class="day-cell"><span class="day-num">30</span></div>
+      <div class="day-cell other-month"><span class="day-num">1</span><div class="day-anniversary"><span class="day-anniversary-label">국군의날</span></div></div>
+      <div class="day-cell other-month"><span class="day-num">2</span></div>
+      <button class="day-cell other-month confirmed has-event" type="button" onClick="{{openOctSheet}}"><span class="day-num">3</span><span class="day-event-title">정기모임</span><div class="dot-row"><span class="p-dot" data-name="영우" style="background:var(--p-yeongwoo)"></span><span class="p-dot" data-name="유리" style="background:var(--p-yuri)"></span><span class="p-dot" data-name="만식" style="background:var(--p-manshik)"></span><span class="p-dot" data-name="은혜" style="background:var(--p-eunhye)"></span></div><div class="day-bar solo"></div></button>
+    </div>
+
+    <div class="cal-legend">
+      <span><span class="dot" style="background:var(--p-yeongwoo)"></span>영우</span>
+      <span><span class="dot" style="background:var(--p-yuri)"></span>유리</span>
+      <span><span class="dot" style="background:var(--p-manshik)"></span>만식</span>
+      <span><span class="dot" style="background:var(--p-eunhye)"></span>은혜</span>
+      <span><span class="dot" style="background:var(--brand); border-radius:var(--radius-full); width:12px; height:5px;"></span>일정·여행</span>
+      <span><span class="dot" style="background:#F472B6; border-radius:var(--radius-full); width:12px; height:5px;"></span>기념일</span>
+    </div>
+  </div>
+  </div>
+
+  <!-- Chat: real fields -- participantId-based names/colors, a reply-quote card, edit/delete on own bubbles only -->
+  <div class="bento-card wide enter" style="animation-delay: 0.08s">
+    <div class="bento-card-head">
+      <span class="bento-card-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg></span>
+      <span class="bento-card-title">채팅</span>
+      <button class="more-link" type="button" onClick="{{toggleChatExpanded}}">{{chatMoreLabel}}</button>
+    </div>
+    <div class="chat-row">
+      <span class="chat-name-pill" style="background:var(--p-eunhye)">송은혜</span>
+      <div>
+        <button class="chat-img gallery-comment-heartbeat" type="button" style="background-color:#E9E5F7; animation-delay: 0.9s;" onClick="{{openLightbox8}}" aria-label="사진 크게 보기">
+          <span class="comment-badge">
+            <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>1
+          </span>
+        </button>
+        <div class="chat-meta">09.11(금) 15:44:51</div>
+      </div>
+    </div>
+    <div class="chat-row">
+      <span class="chat-name-pill" style="background:var(--p-eunhye)">송은혜</span>
+      <div><span class="chat-text">이렇게 잘 나옵니다!</span><div class="chat-meta">15:45:04</div></div>
+    </div>
+    <div class="chat-row">
+      <span class="chat-name-pill" style="background:var(--p-yeongwoo)">박영우</span>
+      <div>
+        <div class="chat-reply-quote">
+          <span class="chat-reply-quote-author">송은혜</span>
+          <span class="chat-reply-quote-text">이렇게 잘 나옵니다!</span>
+        </div>
+        <span class="chat-text">오~ 멋드러지게 잘 나오는군여 ㅋ 감사합니당 ㅋ</span>
+        <div class="chat-meta-row">
+          <span class="chat-meta">15:45:27</span>
+          <span class="chat-actions">
+            <button class="chat-action-btn" aria-label="답장" type="button"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17l-5-5 5-5M4 12h10a5 5 0 0 1 5 5v1"></path></svg></button>
+            <button class="chat-action-btn" aria-label="수정" type="button"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path></svg></button>
+            <button class="chat-action-btn" aria-label="삭제" type="button"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"></path></svg></button>
+          </span>
+        </div>
+      </div>
+    </div>
+    <sc-if value="{{chatExpanded}}" hint-placeholder-val="{{false}}">
+      <div class="chat-row">
+        <span class="chat-name-pill" style="background:var(--p-manshik)">김만식</span>
+        <div><span class="chat-text">저도 인화 신청하고 싶은데 파일 좀 공유해주세요</span><div class="chat-meta">15:47:02</div></div>
+      </div>
+      <div class="chat-row">
+        <span class="chat-name-pill" style="background:var(--p-eunhye)">송은혜</span>
+        <div><span class="chat-text">넵! 갤러리에 다 올려놨어요~</span><div class="chat-meta">15:48:19</div></div>
+      </div>
+    </sc-if>
+  </div>
+
+  <!-- Memo: real fields -- color swatch, tag row, link previews, comment count (no linked date range: memos aren't bound to a date in the schema) -->
+  <div class="bento-card wide enter" style="animation-delay: 0.12s">
+    <div class="bento-card-head">
+      <span class="bento-card-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v12H8l-4 4z"></path></svg></span>
+      <span class="bento-card-title">메모</span>
+      <button class="more-link" type="button" onClick="{{toggleMemoExpanded}}">{{memoMoreLabel}}</button>
+    </div>
+    <div class="memo-card" style="--memo-author-color: var(--p-yeongwoo);">
+      <div class="memo-card-title ellipsis-1">서천 '반값 여행' 지역사랑 휴가지원</div>
+      <div class="memo-summary clamp-2">참여대상: 타 지역에서 서천을 여행하고 싶은 관광객 · 지원내용: 서천에서 소비한 관광 경비의 최대 50% 환급 (1인 최대 10만원 · 가족 최대 50만원)</div>
+      <div class="memo-link-card">
+        <div class="memo-link-thumb" style="background-color:#8FBF8A"></div>
+        <div style="min-width: 0;">
+          <div class="memo-link-title ellipsis-1">서천 반값여행</div>
+          <div class="memo-link-desc clamp-2">서천군을 여행하고 정산 신청하면 여행경비의 최대 50%를 모바일 서천사랑상품권으로 돌려받는 지역사랑 휴가지원 사업입니다.</div>
+          <div class="memo-link-domain">seocheontour.kr</div>
+        </div>
+      </div>
+      <div class="memo-tags-row">
+        <span class="chat-name-pill" style="background:var(--p-yeongwoo)">박영우</span>
+        <span class="memo-tag">#충남서천</span><span class="memo-tag">#반값여행</span><span class="memo-tag">#지역사랑</span>
+      </div>
+      <div class="memo-comments">
+        <div class="memo-comment-item">
+          <span class="memo-comment-avatar" style="background:var(--p-eunhye)"></span>
+          <div class="memo-comment-body"><span class="memo-comment-author">송은혜</span><span class="memo-comment-text">오 이거 우리도 신청 가능한거야? 링크 봤는데 완전 좋다</span></div>
+        </div>
+        <sc-if value="{{memo1CommentsExpanded}}" hint-placeholder-val="{{false}}">
+          <div class="memo-comment-item">
+            <span class="memo-comment-avatar" style="background:var(--p-yeongwoo)"></span>
+            <div class="memo-comment-body"><span class="memo-comment-author">박영우</span><span class="memo-comment-text">응 가능! 10월 연휴 캠핑 갈 때 겸사겸사 신청하자</span></div>
+          </div>
+        </sc-if>
+        <button class="memo-comments-toggle {{memo1ToggleClass}}" type="button" onClick="{{toggleMemo1Comments}}">
+          {{memo1ToggleLabel}}
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+        </button>
+      </div>
+    </div>
+    <div class="memo-card" style="--memo-author-color: var(--p-eunhye);">
+      <svg class="memo-pin-badge" width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.5 5.5L19 9l-5.5 1.5L12 16l-1.5-5.5L5 9l5.5-1.5z"></path></svg>
+      <div class="memo-card-title ellipsis-1">10월 연휴 캠핑용품 체크리스트</div>
+      <div class="memo-summary clamp-2">텐트·버너·랜턴은 지난번 그대로, 은혜가 침낭 2개 추가 구매 예정. 도은이 우비 사이즈 확인 필요.</div>
+      <div class="memo-tags-row">
+        <span class="chat-name-pill" style="background:var(--p-eunhye)">송은혜</span>
+        <span class="memo-tag">#캠핑준비물</span>
+      </div>
+      <div class="memo-footer-row">
+        <button class="memo-comment-count" type="button">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+          댓글 없음
+        </button>
+      </div>
+    </div>
+    <sc-if value="{{memoExpanded}}" hint-placeholder-val="{{false}}">
+      <div class="memo-card" style="--memo-author-color: var(--p-yuri);">
+        <div class="memo-card-title ellipsis-1">연지근린공원 유치원 면담 후기</div>
+        <div class="memo-summary clamp-2">담임 선생님이 서준이 요즘 친구들이랑 잘 어울린다고 칭찬해주심. 다음 학기 준비물 목록은 알림장으로 따로 옴.</div>
+        <div class="memo-tags-row">
+          <span class="chat-name-pill" style="background:var(--p-yuri)">김유리</span>
+          <span class="memo-tag">#유치원면담</span>
+        </div>
+        <div class="memo-comments" style="margin-top: 8px; padding-top: 8px;">
+          <div class="memo-comment-item">
+            <span class="memo-comment-avatar" style="background:var(--p-yeongwoo)"></span>
+            <div class="memo-comment-body"><span class="memo-comment-author">박영우</span><span class="memo-comment-text">서준이 요즘 부쩍 의젓해졌네 ㅎㅎ</span></div>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+  </div>
+
+  <!-- Gallery: server-indexed at scale (100/page numbered pagination) -- see the separate
+       "GalleryPaged" screen for what 전체보기 opens into once photo count grows past a page. -->
+  <div class="bento-card gallery-bleed wide enter" style="animation-delay: 0.16s">
+    <div class="bento-card-head">
+      <span class="bento-card-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="9" cy="9" r="2"></circle><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"></path></svg></span>
+      <span class="bento-card-title">갤러리</span>
+      <button class="more-link" type="button" onClick="{{openLightbox0}}">전체보기</button>
+    </div>
+    <div class="thumb-grid">
+      <button class="thumb gallery-comment-heartbeat" type="button" style="background-color:#86A585; animation-delay: 0s;" onClick="{{openLightbox0}}" aria-label="사진 크게 보기"><span class="comment-badge">1</span></button>
+      <button class="thumb" type="button" style="background-color:#8B5A2B" onClick="{{openLightbox1}}" aria-label="사진 크게 보기"></button>
+      <button class="thumb" type="button" style="background-color:#4A5568" onClick="{{openLightbox2}}" aria-label="사진 크게 보기"></button>
+      <button class="thumb" type="button" style="background-color:#22C55E" onClick="{{openLightbox3}}" aria-label="사진 크게 보기"></button>
+      <button class="thumb" type="button" style="background-color:#6B8E5A" onClick="{{openLightbox4}}" aria-label="사진 크게 보기"></button>
+      <button class="thumb" type="button" style="background-color:#7A5C3E" onClick="{{openLightbox5}}" aria-label="사진 크게 보기"></button>
+      <button class="thumb" type="button" style="background-color:#5B7A5B" onClick="{{openLightbox6}}" aria-label="사진 크게 보기"></button>
+      <button class="thumb" type="button" style="background-color:#8A9B7E" onClick="{{openLightbox7}}" aria-label="사진 크게 보기"></button>
+    </div>
+  </div>
+
+  <!-- Places -->
+  <div class="bento-card wide enter" style="animation-delay: 0.2s">
+    <div class="bento-card-head">
+      <span class="bento-card-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3"></circle></svg></span>
+      <span class="bento-card-title">장소</span>
+      <button class="more-link" type="button" onClick="{{togglePlacesExpanded}}">{{placesMoreLabel}}</button>
+    </div>
+    <div class="place-row">
+      <div class="place-tags">
+        <span class="place-tag" style="background:#F1F5F9; color:var(--text-muted);">기타</span>
+        <span class="place-tag" style="background:var(--brand-soft); color:var(--brand);">방문예정 · 총 1회</span>
+      </div>
+      <div class="place-name">나눔농장</div>
+      <div class="place-addr">경기 부천시 오정구 대장로118</div>
+      <div class="place-note">2026.09.18(금) 김도연 / 현장학습</div>
+    </div>
+    <div class="place-row">
+      <div class="place-tags">
+        <span class="place-tag" style="background:#EFF6FF; color:#2563EB;">놀이</span>
+        <span class="place-tag" style="background:#ECFDF5; color:var(--status-green);">방문 · 총 1회</span>
+      </div>
+      <div class="place-name">연지근린공원</div>
+      <div class="place-addr">서울 구로구 천왕로 45</div>
+      <div class="place-note">2026.09.10(목) 유리 서준 은도 도연 / 유치원 면담 후 산책</div>
+    </div>
+    <sc-if value="{{placesExpanded}}" hint-placeholder-val="{{false}}">
+      <div class="place-row">
+        <div class="place-tags">
+          <span class="place-tag" style="background:#FEF3C7; color:#B45309;">숙박</span>
+          <span class="place-tag" style="background:#ECFDF5; color:var(--status-green);">방문 · 총 2회</span>
+        </div>
+        <div class="place-name">천왕산가족캠핑장</div>
+        <div class="place-addr">경남 하동군 옥종면</div>
+        <div class="place-note">2026.09.19(토) 전체 참석 / 캠핑</div>
+      </div>
+    </sc-if>
+  </div>
+  </div>
+
+  <div class="footer">
+    Copyright © 2026 모여라 캘린더. All Rights Reserved.
+    <div class="links"><span>FAMILY LINK</span><span>밖에눈오나</span><span>Culture Flow</span></div>
+  </div>
+
+  <!-- Event detail sheet: real tabbed structure (참석/장소/정산/사진), one shared sheet driven by state.activeEvent -->
+  <div class="{{sheetBackdropClass}}" onClick="{{closeSheet}}"></div>
+  <div class="{{eventSheetClass}}" role="dialog" aria-label="일정 상세">
+    <button class="sheet-close" aria-label="닫기" type="button" onClick="{{closeSheet}}">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+    </button>
+    <div class="sheet-inner">
+    <div class="sheet-handle"></div>
+    <span class="sheet-eyebrow">{{evEyebrow}}</span>
+    <div class="sheet-title">{{evTitle}}</div>
+    <div class="sheet-meta-row">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M8 2v4M16 2v4M3 10h18"></path></svg>
+      {{evDate}}
+    </div>
+
+    <div class="sheet-tabs">
+      <button class="{{tabAttendClass}}" type="button" onClick="{{gotoTabAttend}}">참석</button>
+      <button class="{{tabPlaceClass}}" type="button" onClick="{{gotoTabPlace}}">장소</button>
+      <button class="{{tabSettlementClass}}" type="button" onClick="{{gotoTabSettlement}}">정산</button>
+      <button class="{{tabPhotoClass}}" type="button" onClick="{{gotoTabPhoto}}">사진</button>
+    </div>
+
+    <!-- 참석 tab -->
+    <sc-if value="{{isTabAttend}}" hint-placeholder-val="{{true}}">
+      <div class="sheet-tab-panel">
+        <sc-for list="{{attendees}}" as="p" hint-placeholder-count="6">
+          <div class="attend-row">
+            <span class="dot" style="background:{{p.color}}"></span>
+            <div style="min-width:0;">
+              <div class="attend-row-name">{{p.name}}</div>
+              <sc-if value="{{p.hasNote}}" hint-placeholder-val="{{false}}">
+                <div class="attend-row-note">{{p.note}}</div>
+              </sc-if>
+            </div>
+            <button class="attend-row-remove" type="button" onClick="{{p.remove}}" aria-label="참석 취소">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+            </button>
+          </div>
+        </sc-for>
+        <sc-if value="{{attendeesEmpty}}" hint-placeholder-val="{{false}}">
+          <div class="empty-state">아직 등록된 참석자가 없습니다</div>
+        </sc-if>
+        <button class="attend-add-btn" type="button" onClick="{{openAttendSheet}}">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"></path></svg>
+          참여자 추가
+        </button>
+        <div class="gamified-confirm-wrap">
+          <sc-if value="{{showGamifiedConfirm}}" hint-placeholder-val="{{false}}">
+            <button class="btn-gamified-confirm" type="button" onClick="{{toggleMeetingConfirm}}">
+              <span class="gamified-shiny-glow-wrapper"><span class="gamified-shiny-glow"></span></span>
+              <span class="gamified-border-electric"></span>
+              <span class="gamified-border-electric gamified-border-electric-secondary"></span>
+              <span class="gamified-sparks-container">
+                <span class="gamified-spark gamified-spark-1"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 3 14h8l-1 8 10-12h-8l1-8z"></path></svg></span>
+                <span class="gamified-spark gamified-spark-2"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 3 14h8l-1 8 10-12h-8l1-8z"></path></svg></span>
+                <span class="gamified-spark gamified-spark-3"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 3 14h8l-1 8 10-12h-8l1-8z"></path></svg></span>
+                <span class="gamified-spark gamified-spark-4"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 3 14h8l-1 8 10-12h-8l1-8z"></path></svg></span>
+                <span class="gamified-spark gamified-spark-5"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 3 14h8l-1 8 10-12h-8l1-8z"></path></svg></span>
+                <span class="gamified-spark gamified-spark-6"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 3 14h8l-1 8 10-12h-8l1-8z"></path></svg></span>
+                <span class="gamified-sparklet gamified-sparklet-1"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.2H22l-6 4.8 2.3 7.2L12 16.8 5.7 21.2 8 14 2 9.2h7.6z"></path></svg></span>
+                <span class="gamified-sparklet gamified-sparklet-2"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.2H22l-6 4.8 2.3 7.2L12 16.8 5.7 21.2 8 14 2 9.2h7.6z"></path></svg></span>
+                <span class="gamified-sparklet gamified-sparklet-3"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.2H22l-6 4.8 2.3 7.2L12 16.8 5.7 21.2 8 14 2 9.2h7.6z"></path></svg></span>
+                <span class="gamified-sparklet gamified-sparklet-4"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.2H22l-6 4.8 2.3 7.2L12 16.8 5.7 21.2 8 14 2 9.2h7.6z"></path></svg></span>
+                <span class="gamified-sparklet gamified-sparklet-5"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.2H22l-6 4.8 2.3 7.2L12 16.8 5.7 21.2 8 14 2 9.2h7.6z"></path></svg></span>
+                <span class="gamified-sparklet gamified-sparklet-6"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.2H22l-6 4.8 2.3 7.2L12 16.8 5.7 21.2 8 14 2 9.2h7.6z"></path></svg></span>
+              </span>
+              <span class="gamified-confirm-label">모임 확정</span>
+            </button>
+          </sc-if>
+          <sc-if value="{{showPlainConfirm}}" hint-placeholder-val="{{true}}">
+            <button class="btn-meeting-confirm-plain {{confirmPlainClass}}" type="button" onClick="{{toggleMeetingConfirm}}">{{confirmPlainLabel}}</button>
+          </sc-if>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- 장소 tab -->
+    <sc-if value="{{isTabPlace}}" hint-placeholder-val="{{false}}">
+      <div class="sheet-tab-panel">
+        <sc-if value="{{hasPlace}}" hint-placeholder-val="{{true}}">
+          <div class="sheet-place-row">
+            <div class="place-tags" style="margin-bottom:8px;">
+              <span class="place-tag" style="background:{{placeCatBg}}; color:{{placeCatColor}};">{{placeCatLabel}}</span>
+              <span class="place-tag" style="background:var(--brand-soft); color:var(--brand);">{{placeVisitLabel}}</span>
+            </div>
+            <div class="sheet-place-name">{{placeName}}</div>
+            <div class="sheet-place-addr">{{placeAddr}}</div>
+            <sc-if value="{{placeHasMemo}}" hint-placeholder-val="{{false}}">
+              <div class="sheet-place-memo">{{placeMemo}}</div>
+            </sc-if>
+            <button class="sheet-change-btn" type="button" onClick="{{openPlaceSheet}}">장소 변경</button>
+          </div>
+        </sc-if>
+        <sc-if value="{{placeEmpty}}" hint-placeholder-val="{{false}}">
+          <div class="empty-state" style="margin-bottom:10px;">아직 등록된 장소가 없습니다</div>
+          <button class="attend-add-btn" type="button" onClick="{{openPlaceSheet}}">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"></path></svg>
+            장소 검색
+          </button>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <!-- 정산 tab -->
+    <sc-if value="{{isTabSettlement}}" hint-placeholder-val="{{false}}">
+      <div class="sheet-tab-panel">
+        <div class="expense-mode-toggle">
+          <button class="{{expenseModeExpenseClass}}" type="button" onClick="{{setModeExpense}}">지출</button>
+          <button class="{{expenseModeIncomeClass}}" type="button" onClick="{{setModeIncome}}">수입</button>
+        </div>
+        <div class="expense-cat-row">
+          <sc-for list="{{expenseCats}}" as="c" hint-placeholder-count="6">
+            <button class="{{c.chipClass}}" type="button" style="color:{{c.color}};" onClick="{{c.select}}">{{c.label}}</button>
+          </sc-for>
+        </div>
+        <div class="field-label">지출자</div>
+        <div class="expense-payer-row">
+          <sc-for list="{{payerChips}}" as="p" hint-placeholder-count="5">
+            <button class="{{p.chipClass}}" type="button" onClick="{{p.select}}"><span class="dot" style="background:{{p.color}}"></span>{{p.label}}</button>
+          </sc-for>
+        </div>
+        <label class="expense-selfpay-row">
+          <input type="checkbox" checked="{{selfPayChecked}}" onChange="{{toggleSelfPay}}">
+          자비부담 (공금 정산에서 제외)
+        </label>
+        <div class="expense-form-row">
+          <input class="text-input" style="flex:1.6; margin-bottom:0;" placeholder="지출명목" value="{{expenseLabel}}" onInput="{{onExpenseLabelChange}}">
+          <input class="text-input" style="flex:1; margin-bottom:0;" placeholder="금액" inputmode="numeric" value="{{expenseAmount}}" onInput="{{onExpenseAmountChange}}">
+        </div>
+        <button class="expense-add-btn" type="button" onClick="{{addExpense}}">추가</button>
+
+        <div class="sheet-section-label">지출 내역</div>
+        <sc-for list="{{expenseRows}}" as="e" hint-placeholder-count="2">
+          <div class="expense-row">
+            <span class="cat-dot" style="background:{{e.color}}"></span>
+            <div style="min-width:0;">
+              <div class="expense-row-label ellipsis-1">{{e.label}}</div>
+              <div class="expense-row-payer">{{e.payerLabel}}</div>
+            </div>
+            <span class="{{e.amountClass}}">{{e.amountLabel}}</span>
+          </div>
+        </sc-for>
+        <sc-if value="{{expensesEmpty}}" hint-placeholder-val="{{false}}">
+          <div class="empty-state">등록된 내역이 없습니다</div>
+        </sc-if>
+
+        <div class="settlement-card-preview">
+          <div class="settlement-card-title">이번 달 정산카드 미리보기</div>
+          <sc-for list="{{settlementRows}}" as="s" hint-placeholder-count="4">
+            <div class="settlement-card-row">
+              <span class="name">{{s.name}}</span>
+              <span class="{{s.amtClass}}">{{s.amtLabel}}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- 사진 tab -->
+    <sc-if value="{{isTabPhoto}}" hint-placeholder-val="{{false}}">
+      <div class="sheet-tab-panel">
+        <div class="sheet-photos">
+          <sc-for list="{{evPhotos}}" as="ph" hint-placeholder-count="3">
+            <button class="sheet-photo" type="button" style="{{ph.style}}" onClick="{{ph.open}}" aria-label="사진 크게 보기"></button>
+          </sc-for>
+          <label class="sheet-photo-add" for="sheetPhotoUpload" aria-label="사진 추가">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"></path></svg>
+          </label>
+          <input id="sheetPhotoUpload" type="file" accept="image/*" style="display:none" onChange="{{onFileChange}}">
+        </div>
+        <div class="sheet-actions">
+          <button class="sheet-action-btn" type="button" onClick="{{gotoTabPlace}}">장소 지도에서 보기</button>
+          <button class="sheet-action-btn primary" type="button" onClick="{{closeSheet}}">채팅으로 이동</button>
+        </div>
+      </div>
+    </sc-if>
+    </div>
+  </div>
+
+  <!-- Sub-sheet: 참여자 추가 (one person at a time, matching the live app) -->
+  <div class="{{attendSubBackdropClass}}" onClick="{{closeAttendSheet}}"></div>
+  <div class="{{attendSubClass}}">
+    <div class="sheet-handle"></div>
+    <sc-if value="{{attendStepPick}}" hint-placeholder-val="{{true}}">
+      <div class="subsheet-title">참여자 선택</div>
+      <sc-for list="{{remainingPeople}}" as="p" hint-placeholder-count="4">
+        <button class="person-pick-btn" type="button" onClick="{{p.pick}}">
+          <span class="dot" style="background:{{p.color}}"></span>{{p.name}}
+        </button>
+      </sc-for>
+      <sc-if value="{{remainingEmpty}}" hint-placeholder-val="{{false}}">
+        <div class="empty-state">모든 참여자가 이미 등록되어 있습니다</div>
+      </sc-if>
+    </sc-if>
+    <sc-if value="{{attendStepNote}}" hint-placeholder-val="{{false}}">
+      <button class="subsheet-back-row" type="button" onClick="{{backToAttendPick}}">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6l6-6"></path></svg>
+        다시 선택
+      </button>
+      <div class="subsheet-title">{{attendPickName}}님 메모 (선택)</div>
+      <textarea class="note-textarea" placeholder="예: 오전 반차 쓰고 늦게 합류" onInput="{{onAttendNoteChange}}">{{attendNoteDraft}}</textarea>
+      <button class="subsheet-confirm-btn" type="button" onClick="{{confirmAttend}}">등록</button>
+    </sc-if>
+  </div>
+
+  <!-- Sub-sheet: 장소 검색 (search + "이미 등록된 장소" + result → alias/category/memo/방문상태 confirm form) -->
+  <div class="{{placeSubBackdropClass}}" onClick="{{closePlaceSheet}}"></div>
+  <div class="{{placeSubClass}}">
+    <div class="sheet-handle"></div>
+    <sc-if value="{{placeStepSearch}}" hint-placeholder-val="{{true}}">
+      <div class="subsheet-title">장소 검색</div>
+      <input class="place-search-input" placeholder="장소명, 주소로 검색" value="{{placeQuery}}" onInput="{{onPlaceQueryChange}}">
+      <div class="place-result-section-label">이미 등록된 장소</div>
+      <button class="place-result-item" type="button" onClick="{{pickExistingNanum}}">
+        <span class="place-result-name">나눔농장<span class="place-result-existing">등록됨</span></span>
+        <div class="place-result-addr">경기 부천시 오정구 대장로118</div>
+      </button>
+      <button class="place-result-item" type="button" onClick="{{pickExistingYeonji}}">
+        <span class="place-result-name">연지근린공원<span class="place-result-existing">등록됨</span></span>
+        <div class="place-result-addr">서울 구로구 천왕로 45</div>
+      </button>
+      <div class="place-result-section-label">검색 결과 (카카오)</div>
+      <button class="place-result-item" type="button" onClick="{{pickResultHadong}}">
+        <span class="place-result-name">천왕산가족캠핑장</span>
+        <div class="place-result-addr">경남 하동군 옥종면</div>
+      </button>
+      <button class="place-result-item" type="button" onClick="{{pickResultSeocheon}}">
+        <span class="place-result-name">서천 春 캠핑장</span>
+        <div class="place-result-addr">충남 서천군 마서면</div>
+      </button>
+    </sc-if>
+    <sc-if value="{{placeStepConfirm}}" hint-placeholder-val="{{false}}">
+      <button class="subsheet-back-row" type="button" onClick="{{backToPlaceSearch}}">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6l6-6"></path></svg>
+        다시 검색
+      </button>
+      <div class="subsheet-title">{{placeDraftName}}</div>
+      <div class="field-label">카테고리</div>
+      <div class="place-cat-row">
+        <sc-for list="{{placeCats}}" as="c" hint-placeholder-count="6">
+          <button class="{{c.chipClass}}" type="button" style="color:{{c.color}};" onClick="{{c.select}}">{{c.label}}</button>
+        </sc-for>
+      </div>
+      <div class="field-label">별칭 (선택)</div>
+      <input class="text-input" placeholder="예: 11번 데크" value="{{placeAliasDraft}}" onInput="{{onPlaceAliasChange}}">
+      <div class="field-label">방문상태</div>
+      <div class="visit-toggle-row">
+        <button class="{{visitPlannedClass}}" type="button" onClick="{{setVisitPlanned}}">방문예정</button>
+        <button class="{{visitDoneClass}}" type="button" onClick="{{setVisitDone}}">방문완료</button>
+      </div>
+      <div class="field-label">메모 (선택)</div>
+      <textarea class="note-textarea" placeholder="이 날짜의 장소 메모" onInput="{{onPlaceMemoChange}}">{{placeMemoDraft}}</textarea>
+      <button class="subsheet-confirm-btn" type="button" onClick="{{confirmPlace}}">등록</button>
+    </sc-if>
+  </div>
+
+  <!-- Sub-sheet: 빠른 정산 등록 (empty-day only) -- reuses the exact same category chips, form
+       fields and addExpense() the 정산 tab uses, since s.activeEvent is set to 'blank' before
+       this opens. Deliberately no mode/payer/자비부담 controls here -- those stay in the full
+       event sheet; this is a quick add, not a duplicate of the whole settlement tab. -->
+  <div class="{{blankExpenseBackdropClass}}" onClick="{{closeBlankExpenseSheet}}"></div>
+  <div class="{{blankExpenseSubClass}}">
+    <div class="sheet-handle"></div>
+    <div class="subsheet-title">지출 빠르게 추가</div>
+    <div class="expense-cat-row">
+      <sc-for list="{{expenseCats}}" as="c" hint-placeholder-count="6">
+        <button class="{{c.chipClass}}" type="button" style="color:{{c.color}};" onClick="{{c.select}}">{{c.label}}</button>
+      </sc-for>
+    </div>
+    <div class="expense-form-row">
+      <input class="text-input" style="flex:1.6; margin-bottom:0;" placeholder="지출명목" value="{{expenseLabel}}" onInput="{{onExpenseLabelChange}}">
+      <input class="text-input" style="flex:1; margin-bottom:0;" placeholder="금액" inputmode="numeric" value="{{expenseAmount}}" onInput="{{onExpenseAmountChange}}">
+    </div>
+    <button class="expense-add-btn" type="button" onClick="{{addExpense}}" style="margin-bottom:12px;">추가</button>
+    <sc-for list="{{expenseRows}}" as="e" hint-placeholder-count="2">
+      <div class="expense-row">
+        <span class="cat-dot" style="background:{{e.color}}"></span>
+        <div style="min-width:0;">
+          <div class="expense-row-label ellipsis-1">{{e.label}}</div>
+          <div class="expense-row-payer">{{e.payerLabel}}</div>
+        </div>
+        <span class="{{e.amountClass}}">{{e.amountLabel}}</span>
+      </div>
+    </sc-for>
+  </div>
+
+  <!-- Empty-day sheet: sample for tapping a date with no event and no participants -- quick
+       actions to add attendees/place (reusing the same sub-sheets above), or register the date
+       straight as an anniversary without leaving this sheet. -->
+  <div class="{{emptyBackdropClass}}" onClick="{{closeEmptyDay}}"></div>
+  <div class="{{emptySheetClass}}">
+    <div class="sheet-inner">
+    <div class="sheet-handle"></div>
+    <div class="empty-day-icon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M8 2v4M16 2v4M3 10h18"></path></svg>
+    </div>
+    <div class="empty-day-title"><svg class="empty-day-title-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M8 2v4M16 2v4M3 10h18"></path></svg>{{emptyDayLabel}}</div>
+    <div class="empty-day-sub">아직 등록된 일정도, 참여자도 없는 날짜입니다</div>
+
+    <div class="quick-action-row">
+      <div class="quick-action-top">
+        <span class="quick-action-label">참여자</span>
+        <button class="quick-action-btn" type="button" onClick="{{openAttendFromEmpty}}">추가</button>
+      </div>
+      <div class="quick-action-status">{{emptyAttendStatus}}</div>
+    </div>
+    <div class="quick-action-row">
+      <div class="quick-action-top">
+        <span class="quick-action-label">장소</span>
+        <button class="quick-action-btn" type="button" onClick="{{openPlaceFromEmpty}}">추가</button>
+      </div>
+      <div class="quick-action-status">{{emptyPlaceStatus}}</div>
+    </div>
+
+    <div class="quick-action-row">
+      <div class="quick-action-top">
+        <span class="quick-action-label">정산</span>
+        <button class="quick-action-btn" type="button" onClick="{{openBlankExpenseSheet}}">추가</button>
+      </div>
+      <div class="quick-action-status">{{emptyExpenseStatus}}</div>
+    </div>
+
+    <div class="quick-action-row">
+      <div class="quick-action-top">
+        <span class="quick-action-label">사진</span>
+        <label class="quick-action-btn" for="emptyDayPhotoUpload" style="cursor:pointer;">추가</label>
+        <input id="emptyDayPhotoUpload" type="file" accept="image/*" style="display:none" onChange="{{addBlankPhoto}}">
+      </div>
+      <div class="quick-action-status">{{emptyPhotoStatus}}</div>
+      <sc-if value="{{emptyHasPhotos}}" hint-placeholder-val="{{false}}">
+        <div class="empty-photo-row">
+          <sc-for list="{{emptyPhotoThumbs}}" as="ph" hint-placeholder-count="2">
+            <div class="empty-photo-thumb" style="{{ph.style}}"></div>
+          </sc-for>
+        </div>
+      </sc-if>
+    </div>
+
+    <!-- 기념일: collapsed to one row by default (used far less often than 참여자/장소/정산/사진),
+         and only expands into the category+title form when the user actually taps 설정. -->
+    <div class="quick-action-row">
+      <div class="quick-action-top">
+        <span class="quick-action-label">기념일로 등록</span>
+        <button class="quick-action-btn" type="button" onClick="{{toggleAnnForm}}">설정</button>
+      </div>
+      <sc-if value="{{annSubmitted}}" hint-placeholder-val="{{false}}">
+        <div class="quick-action-status">✓ {{annCatLabel}} · {{annTitle}}</div>
+      </sc-if>
+      <sc-if value="{{annFormOpen}}" hint-placeholder-val="{{false}}">
+        <div class="ann-section">
+          <div class="ann-cat-row">
+            <sc-for list="{{annCats}}" as="c" hint-placeholder-count="7">
+              <button class="{{c.chipClass}}" type="button" style="color:{{c.color}};" onClick="{{c.select}}">{{c.label}}</button>
+            </sc-for>
+          </div>
+          <input class="text-input" placeholder="기념일 제목 (예: 만식이 생일)" value="{{annTitle}}" onInput="{{onAnnTitleChange}}">
+          <button class="ann-submit-btn" type="button" onClick="{{submitAnniversary}}">기념일로 등록</button>
+        </div>
+      </sc-if>
+    </div>
+    </div>
+  </div>
+
+  <!-- Lightbox / photo detail -->
+  <div class="{{lightboxBackdropClass}}">
+    <div class="lightbox-topbar">
+      <div class="lightbox-counter" style="margin-top:0;">{{lightboxCounterText}}</div>
+      <div class="lightbox-topbar-actions">
+        <button class="lightbox-icon-btn" aria-label="수정" type="button">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path></svg>
+        </button>
+        <button class="lightbox-icon-btn" aria-label="삭제" type="button">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"></path></svg>
+        </button>
+        <button class="lightbox-icon-btn" aria-label="닫기" type="button" onClick="{{closeLightbox}}">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+        </button>
+      </div>
+    </div>
+    <div class="lightbox-stage">
+      <button class="lightbox-nav" aria-label="이전 사진" type="button" onClick="{{prevPhoto}}">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6l6-6"></path></svg>
+      </button>
+      <div class="lightbox-img" style="{{lightboxImgStyle}}"></div>
+      <button class="lightbox-nav" aria-label="다음 사진" type="button" onClick="{{nextPhoto}}">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6l6-6"></path></svg>
+      </button>
+    </div>
+    <div class="lightbox-panel">
+      <div class="lightbox-fileinfo">{{lightboxFileInfo}}</div>
+
+      <div class="field-label">태그 (최대 10개, 자유 해시태그)</div>
+      <div class="lightbox-tags">
+        <sc-for list="{{lightboxTags}}" as="t" hint-placeholder-count="2">
+          <span class="lightbox-tag">#{{t.label}}<button class="lightbox-tag-remove" type="button" onClick="{{t.remove}}" aria-label="태그 삭제">
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+          </button></span>
+        </sc-for>
+      </div>
+      <div class="lightbox-tag-add-row">
+        <input class="lightbox-tag-input" placeholder="태그 입력 후 추가 (예: 캠핑)" value="{{tagDraft}}" onInput="{{onTagDraftChange}}">
+        <button class="lightbox-tag-submit" type="button" onClick="{{addTag}}">추가</button>
+      </div>
+      <div class="lightbox-tag-hint">{{tagCountHint}}</div>
+
+      <div class="sheet-section-label">댓글</div>
+      <sc-if value="{{lightboxHasComments}}" hint-placeholder-val="{{true}}">
+        <sc-for list="{{lightboxComments}}" as="c" hint-placeholder-count="1">
+          <div class="lightbox-comment-row">
+            <span class="lightbox-comment-dot" style="background:{{c.color}}"></span>
+            <div style="min-width:0;">
+              <span class="lightbox-comment-author">{{c.author}}</span>
+              <div class="lightbox-comment-text">{{c.text}}</div>
+            </div>
+            <span class="lightbox-comment-actions">
+              <button class="chat-action-btn" aria-label="댓글 수정" type="button" onClick="{{c.onEdit}}"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path></svg></button>
+              <button class="chat-action-btn" aria-label="댓글 삭제" type="button" onClick="{{c.onDelete}}"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"></path></svg></button>
+            </span>
+          </div>
+        </sc-for>
+      </sc-if>
+      <sc-if value="{{lightboxNoComments}}" hint-placeholder-val="{{false}}">
+        <div class="lightbox-comment-empty">아직 댓글이 없습니다. 첫 댓글을 남겨보세요.</div>
+      </sc-if>
+      <sc-if value="{{isEditingComment}}" hint-placeholder-val="{{false}}">
+        <div class="lightbox-editing-note">댓글 수정 중...</div>
+      </sc-if>
+
+      <div class="lightbox-author-row">
+        <span class="lightbox-author-label">누구로 작성?</span>
+        <sc-for list="{{authorPickers}}" as="a" hint-placeholder-count="6">
+          <button class="{{a.btnClass}}" type="button" style="background:{{a.color}};" onClick="{{a.select}}" aria-label="{{a.name}}"></button>
+        </sc-for>
+      </div>
+      <div class="lightbox-comment-input-row">
+        <textarea class="lightbox-comment-input" placeholder="댓글을 입력하세요..." rows="1" onInput="{{onCommentDraftChange}}">{{commentDraft}}</textarea>
+        <button class="lightbox-comment-submit" type="button" onClick="{{submitComment}}">등록</button>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script data-dc-script>
+class Component extends DCLogic {
+  state = {
+    sidebarOpen: false,
+    sidebarCollapsed: false,
+    memo1CommentsExpanded: false,
+    meetingConfirmed: { trip: true, oct: false, blank: false },
+    ddayMainOpen: false,
+    sheetOpen: false,
+    activeEvent: 'trip',
+    activeSheetTab: 'attend',
+    attendSheetOpen: false,
+    attendStep: 'pick',
+    attendPickId: null,
+    attendNoteDraft: '',
+    placeSheetOpen: false,
+    placeStep: 'search',
+    placeQuery: '',
+    placeDraft: null,
+    placeCatDraft: 'etc',
+    placeAliasDraft: '',
+    placeMemoDraft: '',
+    placeVisitDraft: 'planned',
+    expenseMode: 'expense',
+    expenseCat: 'food',
+    expensePayerId: '',
+    expenseSelfPay: false,
+    expenseLabel: '',
+    expenseAmount: '',
+    lightboxOpen: false,
+    lightboxIndex: 0,
+    photos: ['#86A585', '#8B5A2B', '#4A5568', '#22C55E', '#6B8E5A', '#7A5C3E', '#5B7A5B', '#8A9B7E', '#E9E5F7'],
+    comments: {
+      0: [{ id: 1, author: '김만식', color: 'var(--p-manshik)', text: '역시 여기 뷰가 최고네요 ㅎㅎ' }],
+      8: [{ id: 2, author: '박영우', color: 'var(--p-yeongwoo)', text: '인화 잘 나왔다 다음에도 여기서 뽑자' }],
+    },
+    commentDraft: '',
+    editingCommentId: null,
+    commentAuthorId: 'yeongwoo',
+    tagDraft: '',
+    photoTagsOverride: {},
+    eventData: {
+      trip: {
+        eyebrow: 'D-DAY · 모임확정',
+        title: '천왕산가족캠핑장 캠핑',
+        date: '2026.09.19(토) ~ 09.20(일)',
+        attendees: [
+          { id: 'yeongwoo', note: '' },
+          { id: 'yuri', note: '' },
+          { id: 'manshik', note: '' },
+          { id: 'eunhye', note: '' },
+          { id: 'doeun', note: '쿠킹클래스 13시' },
+          { id: 'seojun', note: '쿠킹클래스 13시' },
+        ],
+        place: { name: '천왕산가족캠핑장', addr: '경남 하동군 옥종면 (11번 데크)', category: 'etc', alias: '11번 데크', memo: '', visitStatus: 'planned' },
+        photos: [0, 1, 3],
+        expenses: [
+          { id: 'exp1', label: '캠핑장 이용료', amount: 180000, category: 'lodging', payerId: '', selfPay: false },
+          { id: 'exp2', label: '장작 · 숯', amount: 32000, category: 'goods', payerId: 'manshik', selfPay: false },
+          { id: 'exp3', label: '개인 간식비', amount: 15000, category: 'food', payerId: 'yuri', selfPay: true },
+        ],
+      },
+      oct: {
+        eyebrow: '일정 조율 중',
+        title: '10월 연휴 가족 모임 (장소 미정)',
+        date: '2026.10.03(토) ~ 10.11(일) 중',
+        attendees: [
+          { id: 'yeongwoo', note: '' },
+          { id: 'yuri', note: '' },
+          { id: 'manshik', note: '' },
+          { id: 'eunhye', note: '' },
+        ],
+        place: null,
+        photos: [4, 6],
+        expenses: [],
+      },
+      blank: {
+        eyebrow: '', title: '', date: '',
+        attendees: [], place: null, photos: [], expenses: [],
+      },
+    },
+    emptyDaySheetOpen: false,
+    emptyDayLabel: '',
+    annFormOpen: false,
+    annCatDraft: 'etc',
+    annTitle: '',
+    annSubmittedFlag: false,
+    blankExpenseSheetOpen: false,
+    chatExpanded: false,
+    memoExpanded: false,
+    placesExpanded: false,
+  };
+
+  // Grounded in what was already confirmed from this family's real screenshots earlier in this
+  // project (참석자, 캠핑장, 정산 잔액 등) -- this session has no live Firestore connection, so
+  // this could not be re-pulled fresh from the 모아엘가 database; treat these as realistic
+  // sample values, and the interaction mechanics as verified against the real DateModal source
+  // (참여자 한 명씩 추가, 장소 검색 카카오→구글→노미나텀, 정산 카테고리/자비부담 등), not a live export.
+  PEOPLE = {
+    yeongwoo: { name: '영우', color: 'var(--p-yeongwoo)' },
+    yuri: { name: '유리', color: 'var(--p-yuri)' },
+    manshik: { name: '만식', color: 'var(--p-manshik)' },
+    eunhye: { name: '은혜', color: 'var(--p-eunhye)' },
+    doeun: { name: '도은', color: 'var(--p-doeun)' },
+    seojun: { name: '서준', color: 'var(--p-seojun)' },
+  };
+  PLACE_CATS = {
+    restaurant: { label: '식당', color: '#F97316' },
+    cafe: { label: '카페', color: '#92400E' },
+    play: { label: '놀이', color: '#2563EB' },
+    lodging: { label: '숙박', color: '#7C3AED' },
+    shopping: { label: '쇼핑', color: '#DB2777' },
+    etc: { label: '기타', color: '#64748B' },
+  };
+  EXPENSE_CATS = {
+    food: { label: '식품', color: '#F97316' },
+    goods: { label: '물품', color: '#3B82F6' },
+    transport: { label: '교통', color: '#10B981' },
+    lodging: { label: '숙박', color: '#8B5CF6' },
+    culture: { label: '문화', color: '#EC4899' },
+    etc: { label: '기타', color: '#64748B' },
+  };
+  PHOTO_META = {
+    0: { tags: ['캠핑', '천왕산'], uploader: '박영우', date: '2026.09.19' },
+    1: { tags: ['캠핑', '저녁'], uploader: '김만식', date: '2026.09.19' },
+    2: { tags: ['풍경'], uploader: '송은혜', date: '2026.09.10' },
+    3: { tags: ['캠핑', '아이들'], uploader: '김유리', date: '2026.09.20' },
+    4: { tags: ['나들이'], uploader: '박영우', date: '2026.08.30' },
+    5: { tags: ['나들이', '음식'], uploader: '송은혜', date: '2026.08.30' },
+    6: { tags: ['풍경'], uploader: '김만식', date: '2026.08.15' },
+    7: { tags: ['가족'], uploader: '김유리', date: '2026.07.20' },
+    8: { tags: ['사진 인화'], uploader: '송은혜', date: '2026.09.11' },
+  };
+  // 7 real anniversary categories from AnniversaryModal (생일/행사/축제/스포츠/영화/여행/기타).
+  ANN_CATS = {
+    birthday: { label: '생일', color: '#EF4444' },
+    event: { label: '행사', color: '#F59E0B' },
+    festival: { label: '축제', color: '#EC4899' },
+    sports: { label: '스포츠', color: '#0EA5E9' },
+    movie: { label: '영화', color: '#8B5CF6' },
+    trip: { label: '여행', color: '#10B981' },
+    etc: { label: '기타', color: '#64748B' },
+  };
+
+  // --- generic sheet controls ---
+  toggleDdayMain() { this.setState({ ddayMainOpen: !this.state.ddayMainOpen }); }
+  toggleSidebar() { this.setState({ sidebarOpen: !this.state.sidebarOpen }); }
+  closeSidebar() { this.setState({ sidebarOpen: false }); }
+  toggleSidebarCollapse() { this.setState({ sidebarCollapsed: !this.state.sidebarCollapsed }); }
+  toggleMemo1Comments() { this.setState({ memo1CommentsExpanded: !this.state.memo1CommentsExpanded }); }
+  toggleMeetingConfirm() {
+    const key = this.state.activeEvent;
+    this.setState({ meetingConfirmed: { ...this.state.meetingConfirmed, [key]: !this.state.meetingConfirmed[key] } });
+  }
+  openSheet(key) { this.setState({ sheetOpen: true, activeEvent: key, activeSheetTab: 'attend' }); }
+  closeSheet() { this.setState({ sheetOpen: false, attendSheetOpen: false, placeSheetOpen: false }); }
+  gotoTab(tab) { this.setState({ activeSheetTab: tab }); }
+
+  // --- empty-day sheet (sample: a date with no event and no participants) ---
+  openEmptyDay() {
+    this.setState({
+      emptyDaySheetOpen: true, emptyDayLabel: '2026년 9월 6일 (일)',
+      annFormOpen: false, annCatDraft: 'etc', annTitle: '', annSubmittedFlag: false,
+      eventData: { ...this.state.eventData, blank: { eyebrow: '', title: '', date: '', attendees: [], place: null, photos: [], expenses: [] } },
+    });
+  }
+  closeEmptyDay() { this.setState({ emptyDaySheetOpen: false, attendSheetOpen: false, placeSheetOpen: false, blankExpenseSheetOpen: false }); }
+  openAttendFromEmpty() { this.setState({ activeEvent: 'blank', attendSheetOpen: true, attendStep: 'pick', attendPickId: null, attendNoteDraft: '' }); }
+  openPlaceFromEmpty() { this.setState({ activeEvent: 'blank', placeSheetOpen: true, placeStep: 'search' }); }
+  openBlankExpenseSheet() { this.setState({ activeEvent: 'blank', blankExpenseSheetOpen: true, expenseLabel: '', expenseAmount: '' }); }
+  closeBlankExpenseSheet() { this.setState({ blankExpenseSheetOpen: false }); }
+  addBlankPhoto(e) {
+    const file = e && e.target && e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const s = this.state;
+      const nextPhotos = [...s.photos, reader.result];
+      const newIdx = nextPhotos.length - 1;
+      const blank = s.eventData.blank;
+      this.setState({
+        photos: nextPhotos,
+        eventData: { ...s.eventData, blank: { ...blank, photos: [...blank.photos, newIdx] } },
+      });
+    };
+    reader.readAsDataURL(file);
+  }
+  toggleAnnForm() { this.setState({ annFormOpen: !this.state.annFormOpen }); }
+  toggleChatExpanded() { this.setState({ chatExpanded: !this.state.chatExpanded }); }
+  toggleMemoExpanded() { this.setState({ memoExpanded: !this.state.memoExpanded }); }
+  togglePlacesExpanded() { this.setState({ placesExpanded: !this.state.placesExpanded }); }
+  submitAnniversary() {
+    if (!this.state.annTitle.trim()) return;
+    this.setState({ annSubmittedFlag: true });
+  }
+
+  // --- attendee sub-sheet ---
+  openAttendSheet() { this.setState({ attendSheetOpen: true, attendStep: 'pick', attendPickId: null, attendNoteDraft: '' }); }
+  closeAttendSheet() { this.setState({ attendSheetOpen: false }); }
+  pickAttendPerson(id) { this.setState({ attendStep: 'note', attendPickId: id, attendNoteDraft: '' }); }
+  backToAttendPick() { this.setState({ attendStep: 'pick', attendPickId: null }); }
+  confirmAttend() {
+    const s = this.state;
+    const ev = s.eventData[s.activeEvent];
+    const nextAttendees = [...ev.attendees, { id: s.attendPickId, note: (s.attendNoteDraft || '').trim() }];
+    this.setState({
+      eventData: { ...s.eventData, [s.activeEvent]: { ...ev, attendees: nextAttendees } },
+      attendSheetOpen: false,
+    });
+  }
+  removeAttendee(id) {
+    const s = this.state;
+    const ev = s.eventData[s.activeEvent];
+    const nextAttendees = ev.attendees.filter((a) => a.id !== id);
+    this.setState({ eventData: { ...s.eventData, [s.activeEvent]: { ...ev, attendees: nextAttendees } } });
+  }
+
+  // --- place sub-sheet ---
+  openPlaceSheet() { this.setState({ placeSheetOpen: true, placeStep: 'search' }); }
+  closePlaceSheet() { this.setState({ placeSheetOpen: false }); }
+  pickPlaceResult(draft) {
+    this.setState({
+      placeStep: 'confirm', placeDraft: draft, placeCatDraft: 'etc', placeAliasDraft: '',
+      placeMemoDraft: '', placeVisitDraft: 'planned',
+    });
+  }
+  backToPlaceSearch() { this.setState({ placeStep: 'search' }); }
+  confirmPlace() {
+    const s = this.state;
+    const ev = s.eventData[s.activeEvent];
+    const place = {
+      name: s.placeDraft.name, addr: s.placeDraft.addr, category: s.placeCatDraft,
+      alias: s.placeAliasDraft, memo: s.placeMemoDraft, visitStatus: s.placeVisitDraft,
+    };
+    this.setState({
+      eventData: { ...s.eventData, [s.activeEvent]: { ...ev, place } },
+      placeSheetOpen: false,
+    });
+  }
+
+  // --- settlement ---
+  addExpense() {
+    const s = this.state;
+    const amt = parseInt(String(s.expenseAmount).replace(/[^0-9]/g, ''), 10);
+    if (!s.expenseLabel.trim() || !amt) return;
+    const ev = s.eventData[s.activeEvent];
+    const signed = s.expenseMode === 'income' ? -Math.abs(amt) : Math.abs(amt);
+    const row = { id: 'exp' + Date.now(), label: s.expenseLabel.trim(), amount: signed, category: s.expenseCat, payerId: s.expensePayerId, selfPay: s.expenseSelfPay };
+    this.setState({
+      eventData: { ...s.eventData, [s.activeEvent]: { ...ev, expenses: [...ev.expenses, row] } },
+      expenseLabel: '', expenseAmount: '',
+    });
+  }
+
+  // --- photo / lightbox ---
+  openLightboxAt(i) {
+    const n = this.state.photos.length;
+    const idx = ((i % n) + n) % n;
+    this.setState({ lightboxOpen: true, lightboxIndex: idx, commentDraft: '', editingCommentId: null, tagDraft: '' });
+  }
+  closeLightbox() { this.setState({ lightboxOpen: false }); }
+  stepPhoto(delta) { this.openLightboxAt(this.state.lightboxIndex + delta); }
+  onFileChange(e) {
+    const file = e && e.target && e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => { this.setState({ photos: [...this.state.photos, reader.result] }); };
+    reader.readAsDataURL(file);
+  }
+  addTag() {
+    const s = this.state;
+    const text = (s.tagDraft || '').trim().replace(/^#/, '');
+    if (!text) return;
+    const idx = s.lightboxIndex;
+    const current = s.photoTagsOverride[idx] || (this.PHOTO_META[idx] || { tags: [] }).tags;
+    if (current.length >= 10 || current.includes(text)) { this.setState({ tagDraft: '' }); return; }
+    this.setState({ photoTagsOverride: { ...s.photoTagsOverride, [idx]: [...current, text] }, tagDraft: '' });
+  }
+  removeTag(text) {
+    const s = this.state;
+    const idx = s.lightboxIndex;
+    const current = s.photoTagsOverride[idx] || (this.PHOTO_META[idx] || { tags: [] }).tags;
+    this.setState({ photoTagsOverride: { ...s.photoTagsOverride, [idx]: current.filter((t) => t !== text) } });
+  }
+  submitComment() {
+    const text = (this.state.commentDraft || '').trim();
+    if (!text) return;
+    const idx = this.state.lightboxIndex;
+    const author = this.PEOPLE[this.state.commentAuthorId];
+    const list = (this.state.comments[idx] || []).slice();
+    if (this.state.editingCommentId) {
+      const i = list.findIndex((c) => c.id === this.state.editingCommentId);
+      if (i >= 0) list[i] = { ...list[i], text, author: author.name, color: author.color };
+    } else {
+      list.push({ id: Date.now(), author: author.name, color: author.color, text });
+    }
+    this.setState({ comments: { ...this.state.comments, [idx]: list }, commentDraft: '', editingCommentId: null });
+  }
+  startEditComment(c) { this.setState({ commentDraft: c.text, editingCommentId: c.id }); }
+  deleteComment(id) {
+    const idx = this.state.lightboxIndex;
+    const list = (this.state.comments[idx] || []).filter((c) => c.id !== id);
+    this.setState({ comments: { ...this.state.comments, [idx]: list } });
+  }
+
+  renderVals() {
+    const s = this.state;
+    const ev = s.eventData[s.activeEvent];
+    const photo = s.photos[s.lightboxIndex] || s.photos[0];
+    const meta = this.PHOTO_META[s.lightboxIndex] || { tags: [], uploader: '나', date: '방금' };
+    const tags = s.photoTagsOverride[s.lightboxIndex] || meta.tags;
+    const photoStyle = photo && photo.indexOf('data:') === 0 ? `background-image:url(${photo})` : `background-color:${photo}`;
+    const commentList = (s.comments[s.lightboxIndex] || []).map((c) => ({ ...c, onEdit: () => this.startEditComment(c), onDelete: () => this.deleteComment(c.id) }));
+
+    // 참석
+    const attendingIds = ev.attendees.map((a) => a.id);
+    const attendees = ev.attendees.map((a) => {
+      const p = this.PEOPLE[a.id];
+      return { name: p.name, color: p.color, note: a.note, hasNote: !!a.note, remove: () => this.removeAttendee(a.id) };
+    });
+    const remainingPeople = Object.keys(this.PEOPLE).filter((id) => !attendingIds.includes(id)).map((id) => ({
+      name: this.PEOPLE[id].name, color: this.PEOPLE[id].color, pick: () => this.pickAttendPerson(id),
+    }));
+
+    // 장소
+    const placeCat = ev.place ? this.PLACE_CATS[ev.place.category] : null;
+
+    // 정산
+    const expenseCats = Object.keys(this.EXPENSE_CATS).map((id) => ({
+      label: this.EXPENSE_CATS[id].label, color: this.EXPENSE_CATS[id].color,
+      chipClass: 'expense-cat-chip' + (s.expenseCat === id ? ' is-selected' : ''),
+      select: () => this.setState({ expenseCat: id }),
+    }));
+    const payerChips = [{ id: '', label: '공금지출', color: '#94A3B8' }, ...ev.attendees.map((a) => ({ id: a.id, label: this.PEOPLE[a.id].name, color: this.PEOPLE[a.id].color }))].map((p) => ({
+      label: p.label, color: p.color, chipClass: 'expense-payer-chip' + (s.expensePayerId === p.id ? ' is-selected' : ''),
+      select: () => this.setState({ expensePayerId: p.id }),
+    }));
+    const expenseRows = ev.expenses.map((e) => {
+      const cat = this.EXPENSE_CATS[e.category];
+      const payerName = e.payerId ? this.PEOPLE[e.payerId].name : '공금지출';
+      return {
+        color: cat.color,
+        label: e.label,
+        payerLabel: payerName + (e.selfPay ? ' · 자비부담' : ''),
+        amountClass: 'expense-row-amount ' + (e.amount >= 0 ? 'is-expense' : 'is-income'),
+        amountLabel: (e.amount >= 0 ? '-' : '+') + Math.abs(e.amount).toLocaleString() + '원',
+      };
+    });
+    const totalExpense = ev.expenses.filter((e) => !e.selfPay).reduce((sum, e) => sum + e.amount, 0);
+    const names = attendingIds.map((id) => this.PEOPLE[id].name);
+    const perHead = names.length ? Math.round(totalExpense / names.length) : 0;
+    const settlementRows = names.map((name) => ({
+      name, amtClass: perHead <= 0 ? 'amt is-refund' : 'amt is-owe',
+      amtLabel: (perHead <= 0 ? '+' : '-') + Math.abs(perHead).toLocaleString() + '원',
+    }));
+
+    return {
+      sidebarOpenClass: s.sidebarOpen ? 'is-open' : '',
+      sidebarCollapsedClass: s.sidebarCollapsed ? 'is-collapsed' : '',
+      sidebarBackdropClass: s.sidebarOpen ? 'is-open' : '',
+      toggleSidebar: () => this.toggleSidebar(),
+      closeSidebar: () => this.closeSidebar(),
+      toggleSidebarCollapse: () => this.toggleSidebarCollapse(),
+      memo1CommentsExpanded: s.memo1CommentsExpanded,
+      toggleMemo1Comments: () => this.toggleMemo1Comments(),
+      memo1ToggleLabel: s.memo1CommentsExpanded ? '접기' : '댓글 1개 더보기',
+      memo1ToggleClass: s.memo1CommentsExpanded ? 'is-expanded' : '',
+
+      showGamifiedConfirm: !s.meetingConfirmed[s.activeEvent] && attendees.length > 0,
+      showPlainConfirm: s.meetingConfirmed[s.activeEvent] || attendees.length === 0,
+      confirmPlainLabel: s.meetingConfirmed[s.activeEvent] ? '모임 취소' : '모임 확정',
+      confirmPlainClass: s.meetingConfirmed[s.activeEvent] ? 'is-confirmed' : '',
+      toggleMeetingConfirm: () => this.toggleMeetingConfirm(),
+      sidebarCollapseLabel: s.sidebarCollapsed ? '펼치기' : '접기',
+      sidebarCollapseIconStyle: s.sidebarCollapsed ? 'transform:rotate(180deg)' : '',
+      chatMetaLabel: '박영우',
+      chatMetaStyle: 'color:var(--p-yeongwoo)',
+      settlementBadgeText: '2',
+      settlementMetaLabel: '09.20',
+      galleryMetaLabel: '09.12',
+      placeMetaLabel: '천왕산캠핑장',
+      memoMetaLabel: '준비물',
+
+      ddayWrapClass: 'dday-toggle-wrap' + (s.ddayMainOpen ? ' is-open' : ''),
+      toggleDdayMain: () => this.toggleDdayMain(),
+      openTripSheet: () => this.openSheet('trip'),
+      openOctSheet: () => this.openSheet('oct'),
+
+      sheetBackdropClass: 'sheet-backdrop' + (s.sheetOpen ? ' is-open' : ''),
+      eventSheetClass: 'event-sheet' + (s.sheetOpen ? ' is-open' : ''),
+      closeSheet: () => this.closeSheet(),
+      evEyebrow: ev.eyebrow,
+      evTitle: ev.title,
+      evDate: ev.date,
+
+      tabAttendClass: 'sheet-tab-item' + (s.activeSheetTab === 'attend' ? ' is-active' : ''),
+      tabPlaceClass: 'sheet-tab-item' + (s.activeSheetTab === 'place' ? ' is-active' : ''),
+      tabSettlementClass: 'sheet-tab-item' + (s.activeSheetTab === 'settlement' ? ' is-active' : ''),
+      tabPhotoClass: 'sheet-tab-item' + (s.activeSheetTab === 'photo' ? ' is-active' : ''),
+      gotoTabAttend: () => this.gotoTab('attend'),
+      gotoTabPlace: () => this.gotoTab('place'),
+      gotoTabSettlement: () => this.gotoTab('settlement'),
+      gotoTabPhoto: () => this.gotoTab('photo'),
+      isTabAttend: s.activeSheetTab === 'attend',
+      isTabPlace: s.activeSheetTab === 'place',
+      isTabSettlement: s.activeSheetTab === 'settlement',
+      isTabPhoto: s.activeSheetTab === 'photo',
+
+      attendees,
+      attendeesEmpty: attendees.length === 0,
+      openAttendSheet: () => this.openAttendSheet(),
+
+      openEmptyDay: () => this.openEmptyDay(),
+      closeEmptyDay: () => this.closeEmptyDay(),
+      emptyBackdropClass: 'sheet-backdrop' + (s.emptyDaySheetOpen ? ' is-open' : ''),
+      emptySheetClass: 'event-sheet' + (s.emptyDaySheetOpen ? ' is-open' : ''),
+      emptyDayLabel: s.emptyDayLabel,
+      openAttendFromEmpty: () => this.openAttendFromEmpty(),
+      openPlaceFromEmpty: () => this.openPlaceFromEmpty(),
+      emptyAttendStatus: s.eventData.blank.attendees.length > 0
+        ? `${s.eventData.blank.attendees.map((a) => this.PEOPLE[a.id].name).join(', ')} 등록됨`
+        : '아직 등록된 참여자가 없습니다',
+      emptyPlaceStatus: s.eventData.blank.place ? `장소: ${s.eventData.blank.place.name}` : '아직 등록된 장소가 없습니다',
+      annCats: Object.keys(this.ANN_CATS).map((id) => ({
+        label: this.ANN_CATS[id].label, color: this.ANN_CATS[id].color,
+        chipClass: 'ann-cat-chip' + (s.annCatDraft === id ? ' is-selected' : ''),
+        select: () => this.setState({ annCatDraft: id }),
+      })),
+      annTitle: s.annTitle,
+      onAnnTitleChange: (e) => this.setState({ annTitle: e.target.value }),
+      annNotSubmitted: !s.annSubmittedFlag,
+      annSubmitted: s.annSubmittedFlag,
+      annCatLabel: this.ANN_CATS[s.annCatDraft].label,
+      submitAnniversary: () => this.submitAnniversary(),
+      annFormOpen: s.annFormOpen,
+      toggleAnnForm: () => this.toggleAnnForm(),
+
+      emptyExpenseStatus: s.eventData.blank.expenses.length > 0
+        ? `지출 ${s.eventData.blank.expenses.length}건 · 총 ${s.eventData.blank.expenses.reduce((sum, e2) => sum + e2.amount, 0).toLocaleString()}원`
+        : '아직 등록된 지출 내역이 없습니다',
+      openBlankExpenseSheet: () => this.openBlankExpenseSheet(),
+      closeBlankExpenseSheet: () => this.closeBlankExpenseSheet(),
+      blankExpenseBackdropClass: 'subsheet-backdrop' + (s.blankExpenseSheetOpen ? ' is-open' : ''),
+      blankExpenseSubClass: 'subsheet' + (s.blankExpenseSheetOpen ? ' is-open' : ''),
+
+      emptyPhotoStatus: s.eventData.blank.photos.length > 0 ? `사진 ${s.eventData.blank.photos.length}장 등록됨` : '아직 등록된 사진이 없습니다',
+      emptyHasPhotos: s.eventData.blank.photos.length > 0,
+      emptyPhotoThumbs: s.eventData.blank.photos.map((i) => ({
+        style: (s.photos[i] || '').indexOf('data:') === 0 ? `background-image:url(${s.photos[i]})` : `background-color:${s.photos[i]}`,
+      })),
+      addBlankPhoto: (e) => this.addBlankPhoto(e),
+
+      chatExpanded: s.chatExpanded,
+      toggleChatExpanded: () => this.toggleChatExpanded(),
+      chatMoreLabel: s.chatExpanded ? '접기' : '전체보기',
+      memoExpanded: s.memoExpanded,
+      toggleMemoExpanded: () => this.toggleMemoExpanded(),
+      memoMoreLabel: s.memoExpanded ? '접기' : '전체보기',
+      placesExpanded: s.placesExpanded,
+      togglePlacesExpanded: () => this.togglePlacesExpanded(),
+      placesMoreLabel: s.placesExpanded ? '접기' : '전체보기',
+
+      hasPlace: !!ev.place,
+      placeEmpty: !ev.place,
+      placeCatLabel: placeCat ? placeCat.label : '',
+      placeCatBg: placeCat ? placeCat.color + '22' : 'transparent',
+      placeCatColor: placeCat ? placeCat.color : 'inherit',
+      placeVisitLabel: ev.place && ev.place.visitStatus === 'visited' ? '방문완료' : '방문예정',
+      placeName: ev.place ? (ev.place.alias ? `${ev.place.name} · ${ev.place.alias}` : ev.place.name) : '',
+      placeAddr: ev.place ? ev.place.addr : '',
+      placeHasMemo: !!(ev.place && ev.place.memo),
+      placeMemo: ev.place ? ev.place.memo : '',
+      openPlaceSheet: () => this.openPlaceSheet(),
+
+      expenseModeExpenseClass: 'expense-mode-btn is-expense' + (s.expenseMode === 'expense' ? ' is-selected' : ''),
+      expenseModeIncomeClass: 'expense-mode-btn is-income' + (s.expenseMode === 'income' ? ' is-selected' : ''),
+      setModeExpense: () => this.setState({ expenseMode: 'expense' }),
+      setModeIncome: () => this.setState({ expenseMode: 'income' }),
+      expenseCats,
+      payerChips,
+      selfPayChecked: s.expenseSelfPay,
+      toggleSelfPay: () => this.setState({ expenseSelfPay: !this.state.expenseSelfPay }),
+      expenseLabel: s.expenseLabel,
+      onExpenseLabelChange: (e) => this.setState({ expenseLabel: e.target.value }),
+      expenseAmount: s.expenseAmount,
+      onExpenseAmountChange: (e) => this.setState({ expenseAmount: e.target.value }),
+      addExpense: () => this.addExpense(),
+      expenseRows,
+      expensesEmpty: expenseRows.length === 0,
+      settlementRows,
+
+      evPhotos: ev.photos.map((i) => ({
+        style: (s.photos[i] || '').indexOf('data:') === 0 ? `background-image:url(${s.photos[i]})` : `background-color:${s.photos[i]}`,
+        open: () => this.openLightboxAt(i),
+      })),
+      onFileChange: (e) => this.onFileChange(e),
+
+      attendSubBackdropClass: 'subsheet-backdrop' + (s.attendSheetOpen ? ' is-open' : ''),
+      attendSubClass: 'subsheet' + (s.attendSheetOpen ? ' is-open' : ''),
+      attendStepPick: s.attendStep === 'pick',
+      attendStepNote: s.attendStep === 'note',
+      remainingPeople,
+      remainingEmpty: remainingPeople.length === 0,
+      attendPickName: s.attendPickId ? this.PEOPLE[s.attendPickId].name : '',
+      attendNoteDraft: s.attendNoteDraft,
+      onAttendNoteChange: (e) => this.setState({ attendNoteDraft: e.target.value }),
+      backToAttendPick: () => this.backToAttendPick(),
+      confirmAttend: () => this.confirmAttend(),
+
+      placeSubBackdropClass: 'subsheet-backdrop' + (s.placeSheetOpen ? ' is-open' : ''),
+      placeSubClass: 'subsheet' + (s.placeSheetOpen ? ' is-open' : ''),
+      placeStepSearch: s.placeStep === 'search',
+      placeStepConfirm: s.placeStep === 'confirm',
+      placeQuery: s.placeQuery,
+      onPlaceQueryChange: (e) => this.setState({ placeQuery: e.target.value }),
+      pickExistingNanum: () => this.pickPlaceResult({ name: '나눔농장', addr: '경기 부천시 오정구 대장로118' }),
+      pickExistingYeonji: () => this.pickPlaceResult({ name: '연지근린공원', addr: '서울 구로구 천왕로 45' }),
+      pickResultHadong: () => this.pickPlaceResult({ name: '천왕산가족캠핑장', addr: '경남 하동군 옥종면' }),
+      pickResultSeocheon: () => this.pickPlaceResult({ name: '서천 春 캠핑장', addr: '충남 서천군 마서면' }),
+      backToPlaceSearch: () => this.backToPlaceSearch(),
+      placeDraftName: s.placeDraft ? s.placeDraft.name : '',
+      placeCats: Object.keys(this.PLACE_CATS).map((id) => ({
+        label: this.PLACE_CATS[id].label, color: this.PLACE_CATS[id].color,
+        chipClass: 'place-cat-chip' + (s.placeCatDraft === id ? ' is-selected' : ''),
+        select: () => this.setState({ placeCatDraft: id }),
+      })),
+      placeAliasDraft: s.placeAliasDraft,
+      onPlaceAliasChange: (e) => this.setState({ placeAliasDraft: e.target.value }),
+      visitPlannedClass: 'visit-toggle-btn' + (s.placeVisitDraft === 'planned' ? ' is-selected' : ''),
+      visitDoneClass: 'visit-toggle-btn' + (s.placeVisitDraft === 'visited' ? ' is-selected' : ''),
+      setVisitPlanned: () => this.setState({ placeVisitDraft: 'planned' }),
+      setVisitDone: () => this.setState({ placeVisitDraft: 'visited' }),
+      placeMemoDraft: s.placeMemoDraft,
+      onPlaceMemoChange: (e) => this.setState({ placeMemoDraft: e.target.value }),
+      confirmPlace: () => this.confirmPlace(),
+
+      openLightbox0: () => this.openLightboxAt(0),
+      openLightbox1: () => this.openLightboxAt(1),
+      openLightbox2: () => this.openLightboxAt(2),
+      openLightbox3: () => this.openLightboxAt(3),
+      openLightbox4: () => this.openLightboxAt(4),
+      openLightbox5: () => this.openLightboxAt(5),
+      openLightbox6: () => this.openLightboxAt(6),
+      openLightbox7: () => this.openLightboxAt(7),
+      openLightbox8: () => this.openLightboxAt(8),
+      lightboxBackdropClass: 'lightbox-backdrop' + (s.lightboxOpen ? ' is-open' : ''),
+      lightboxImgStyle: photoStyle,
+      lightboxCounterText: `${s.lightboxIndex + 1} / ${s.photos.length}`,
+      closeLightbox: () => this.closeLightbox(),
+      prevPhoto: () => this.stepPhoto(-1),
+      nextPhoto: () => this.stepPhoto(1),
+      lightboxFileInfo: `${meta.uploader} 업로드 · ${meta.date}`,
+      lightboxTags: tags.map((label) => ({ label, remove: () => this.removeTag(label) })),
+      tagDraft: s.tagDraft,
+      onTagDraftChange: (e) => this.setState({ tagDraft: e.target.value }),
+      addTag: () => this.addTag(),
+      tagCountHint: `${tags.length} / 10개 · 업로드일·장소는 자동으로 태그에 추가됩니다`,
+      lightboxComments: commentList,
+      lightboxHasComments: commentList.length > 0,
+      lightboxNoComments: commentList.length === 0,
+      isEditingComment: !!s.editingCommentId,
+      authorPickers: Object.keys(this.PEOPLE).map((id) => ({
+        color: this.PEOPLE[id].color, name: this.PEOPLE[id].name,
+        btnClass: 'lightbox-author-btn' + (s.commentAuthorId === id ? ' is-selected' : ''),
+        select: () => this.setState({ commentAuthorId: id }),
+      })),
+      commentDraft: s.commentDraft,
+      onCommentDraftChange: (e) => this.setState({ commentDraft: e.target.value }),
+      submitComment: () => this.submitComment(),
+    };
+  }
+}
+</script>
+</body>
+</html>
