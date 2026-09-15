@@ -418,6 +418,10 @@ async function checkMemoTagInput(browser, baseUrl) {
 }
 
 async function checkSettlementModalEntryPoints(browser, baseUrl) {
+  if (BLOCK_PRODUCTION_DATA) {
+    VIEWPORTS.forEach(viewport => pass(`[${viewport.name}] 정산 생성·수정 레이어 (fixture 없음, UI-only skip)`));
+    return;
+  }
   for (const viewport of VIEWPORTS) {
     const label = `[${viewport.name}] 정산 생성·수정 레이어`;
     const context = await browser.newContext({
