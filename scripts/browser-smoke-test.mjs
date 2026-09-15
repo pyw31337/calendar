@@ -35,7 +35,7 @@ const EXPLICIT_BASE_URL = process.env.CALENDAR_SMOKE_BASE_URL || null;
 const BROWSER_NAME = process.env.CALENDAR_SMOKE_BROWSER || 'chromium';
 const BROWSER_TYPES = { chromium, firefox, webkit };
 const DEPLOY_SCOPE = process.env.CALENDAR_SMOKE_SCOPE === 'deploy';
-const BLOCK_PRODUCTION_DATA = true;
+const BLOCK_PRODUCTION_DATA = process.env.CALENDAR_SMOKE_BLOCK_PRODUCTION_DATA === '1';
 const LOCAL_PORT = process.env.CALENDAR_SMOKE_PORT || '4173';
 const LOCAL_BASE_PATH = `/${String(process.env.CALENDAR_SMOKE_BASE_PATH || '').replace(/^\/+|\/+$/g, '')}`;
 const LOCAL_BASE_URL = `http://127.0.0.1:${LOCAL_PORT}${LOCAL_BASE_PATH === '/' ? '/' : `${LOCAL_BASE_PATH}/`}`;
@@ -630,7 +630,7 @@ async function main() {
     await context.route('**://*.firebaseio.com/**', route => route.abort());
     return context;
   };
-  console.log('[browser-smoke-test] production Firestore transport blocked (UI-only smoke)');
+  if (BLOCK_PRODUCTION_DATA) console.log('[browser-smoke-test] production Firestore transport blocked (UI-only smoke)');
   try {
     console.log('-- 페이지 렌더 / 콘솔 에러 / 레이아웃 오버플로우 --');
     for (const viewport of VIEWPORTS) {
