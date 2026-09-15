@@ -402,3 +402,12 @@
 - 범위: `src/app.css`, `src/ui/ui-app-shell-v2.js`의 V2 홈 표현만 변경. 데이터·Firebase·Storage·사진·태그·댓글 계약은 변경하지 않음.
 - 검증: lint, 테스트 28개, build/dist budget, Chromium 스모크 106/106 통과.
 - 배포: 코드 `617d589f` 후속 스타일 수정 커밋을 배포 중이며, 완료 후 최신 cachebuster URL로 확인.
+
+## 2026-09-15 13:31 KST
+
+- 첨부된 BentoPinkFinal PC·태블릿·모바일 시안을 다시 대조해 V2 홈을 반응형으로 재구성: 모바일은 외곽 카드 없이 edge-to-edge 세로 흐름, 태블릿은 2열, PC는 채팅·메모·갤러리 3열과 장소의 다음 행 배치를 적용.
+- 단일 보라→민트 히어로 안에 헤더·D-day 스트립을 정렬하고, 캘린더 높이·평면 셀·참여자 점/이름 배지·확정 일정 하단 바를 뷰포트별로 조정. 홈 채팅·메모 링크 미리보기·8장 갤러리·장소·푸터의 간격과 표면도 시안 규칙에 맞춤.
+- 직접 검토 중 홈 갤러리가 인덱스의 `thumb/full` 필드를 읽지 못해 빈 칸으로 보이던 회귀를 발견해 표시 필드 fallback을 복구. 실제 8개 이미지 모두 `naturalWidth > 0` 로딩을 확인.
+- 범위: `src/app.css`, `src/ui/ui-app-shell-v2.js`의 V2 표시 로직만 변경. Firebase/Storage 및 원본 메시지·사진·태그·댓글·일정 데이터는 쓰거나 변경하지 않음. 제공된 `designv2/` 원본도 미추적 상태로 보존.
+- 검증: 배포 대상 소스 lint, 테스트 28/28, production build, dist/architecture budget, Chromium 브라우저 스모크 106/106 통과. PC 1440×900, 태블릿 887×1024, 모바일 478×812에서 직접 캡처 비교 및 가로 overflow 0 확인.
+- `shell=v2` 플래그는 유지하며 이 유닛 배포 후 cachebuster URL에서 다시 확인 예정.

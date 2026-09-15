@@ -128,13 +128,14 @@ function TabIcon({ id }) {
  */
 function TopHeader({ calendarName, onOpenSearch, onOpenMore }) {
   const React = window.React;
+  const brandName = String(calendarName || '모여라 캘린더').replace(/^[^\p{L}\p{N}]+/u, '').trim();
   return React.createElement('div', { className: 'renewal-shell-header' },
     React.createElement('div', { className: 'renewal-shell-header-brand' },
       React.createElement('svg', { width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' },
         React.createElement('rect', { x: 3, y: 4, width: 18, height: 18, rx: 2 }),
         React.createElement('path', { d: 'M8 2v4M16 2v4M3 10h18' })
       ),
-      React.createElement('span', null, calendarName || '모여라 캘린더')
+      React.createElement('span', null, brandName)
     ),
     React.createElement('div', { className: 'renewal-shell-header-actions' },
       React.createElement('button', { type: 'button', className: 'renewal-shell-header-icon-btn', 'aria-label': '검색', onClick: onOpenSearch },
@@ -381,46 +382,109 @@ function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeVie
       onMoveAvailability: calendarContext.handleMoveAvailability,
       onParticipantClick,
     }),
-    React.createElement(UpcomingMeetingsSection, { meetings: calendarContext.upcomingMeetings, onSelectDate: onOpenDate }),
-    React.createElement(PollsSection, { calendarContext }),
-    React.createElement(HomeActivitySummary, { calendarContext: { ...calendarContext, displayChatMessages: recordsContext?.mediaProps?.chatMessages, memos: recordsContext?.memoProps?.memos, places: recordsContext?.placesProps?.calendar?.places, galleryPhotoIndex: recordsContext?.mediaProps?.indexedPhotos ? { items: recordsContext.mediaProps.indexedPhotos } : null, setActiveLightbox: recordsContext?.mediaProps?.setActiveLightbox }, onOpenDate, onChangeView })
+    React.createElement(HomeActivitySummary, { calendarContext: { ...calendarContext, displayChatMessages: recordsContext?.mediaProps?.chatMessages, memos: recordsContext?.memoProps?.memos, places: recordsContext?.placesProps?.calendar?.places, galleryPhotoIndex: recordsContext?.mediaProps?.indexedPhotos ? { items: recordsContext.mediaProps.indexedPhotos } : null, setActiveLightbox: recordsContext?.mediaProps?.setActiveLightbox }, onOpenDate, onChangeView }),
+    React.createElement('footer', { className: 'renewal-home-footer' },
+      React.createElement('span', null, 'Copyright © 2026 모여라 캘린더. All Rights Reserved.'),
+      React.createElement('span', { className: 'renewal-home-footer-links' },
+        React.createElement('b', null, 'FAMILY LINK'), React.createElement('b', null, '밖에눈오나'), React.createElement('b', null, 'Culture Flow')
+      )
+    )
+  );
+}
+
+const HOME_SECTION_ICON_PATHS = {
+  chat: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z',
+  memo: 'M4 4h16v12H8l-4 4z',
+  gallery: 'M3 3h18v18H3z M8.5 9a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z M21 15l-4-4-7 7-3-3-4 4',
+  places: 'M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 1 1 16 0z M12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
+};
+
+function HomeSectionIcon({ kind }) {
+  const React = window.React;
+  return React.createElement('svg', { width: 15, height: 15, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': 'true' },
+    React.createElement('path', { d: HOME_SECTION_ICON_PATHS[kind] || HOME_SECTION_ICON_PATHS.chat })
   );
 }
 
 /** 클로드 목업의 홈 요약 흐름을 기존 로드 상태로 구현한다. 전체 목록을 추가 조회하지 않는다. */
 function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
   const React = window.React;
-  const messages = Array.isArray(calendarContext?.displayChatMessages) ? calendarContext.displayChatMessages.slice(-3).reverse() : [];
+  const allMessages = Array.isArray(calendarContext?.displayChatMessages) ? calendarContext.displayChatMessages : [];
+  const imageMessage = allMessages.slice().reverse().find(m => m && (m.imageUrl || (Array.isArray(m.imageUrls) && m.imageUrls.length)));
+  const messages = [imageMessage, ...allMessages.slice().reverse().filter(m => m && m !== imageMessage && (m.text || m.content)).slice(0, 2)].filter(Boolean);
   const memos = Array.isArray(calendarContext?.memos) ? calendarContext.memos.slice(0, 2) : [];
-  const photos = Array.isArray(calendarContext?.galleryPhotoIndex?.items) ? calendarContext.galleryPhotoIndex.items.slice(0, 6) : [];
+  const photos = Array.isArray(calendarContext?.galleryPhotoIndex?.items) ? calendarContext.galleryPhotoIndex.items.slice(0, 8) : [];
   const places = Array.isArray(calendarContext?.places) ? calendarContext.places.slice(0, 2) : [];
-  const sectionIcons = { chat: '◌', memo: '✎', gallery: '▧', places: '⌖' };
+  const participants = Array.isArray(calendarContext?.calendar?.participants) ? calendarContext.calendar.participants : [];
+  const participantFor = row => participants.find(p => p && (p.id === row?.participantId || p.name === row?.senderName || p.name === row?.author));
+  const displayName = row => row?.senderName || row?.author || participantFor(row)?.name || '알 수 없음';
+  const displayColor = row => row?.color || participantFor(row)?.color || '#A78BFA';
+  const dateValue = value => value?.toDate ? value.toDate() : value?.seconds ? new Date(value.seconds * 1000) : new Date(value || 0);
+  const formatTime = value => {
+    const d = dateValue(value);
+    return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
+  };
+  const formatShortDateTime = value => {
+    const d = dateValue(value);
+    return Number.isNaN(d.getTime()) ? '' : `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}(${['일','월','화','수','목','금','토'][d.getDay()]}) ${formatTime(value)}`;
+  };
   const Section = ({ title, kind, children, onMore }) => React.createElement('section', { className: `renewal-home-summary-section is-${kind}` },
     React.createElement('div', { className: 'renewal-home-summary-heading' },
       React.createElement('span', { className: 'renewal-home-summary-heading-label' },
-        React.createElement('span', { className: 'renewal-home-summary-heading-icon', 'aria-hidden': 'true' }, sectionIcons[kind] || '•'),
+        React.createElement('span', { className: 'renewal-home-summary-heading-icon' }, React.createElement(HomeSectionIcon, { kind })),
         React.createElement('span', null, title)
       ), onMore && React.createElement('button', { type: 'button', onClick: onMore }, '전체보기')
     ), children);
   return React.createElement('div', { className: 'renewal-home-summary' },
     React.createElement(Section, { title: '채팅', kind: 'chat', onMore: () => onChangeView?.('chat') },
-      messages.length ? React.createElement('div', { className: 'renewal-home-chat-list' }, messages.map((m, i) => React.createElement('button', { type: 'button', className: 'renewal-home-chat-item', key: m.id || i, onClick: () => calendarContext.onChangeView?.('chat') },
-        React.createElement('span', { className: 'renewal-home-avatar' }, String(m.senderName || m.author || '•').slice(0, 1)),
-        React.createElement('span', { className: 'renewal-home-chat-text' }, String(m.text || m.content || '사진 또는 첨부파일').slice(0, 80)),
-        React.createElement('span', { className: 'renewal-home-chat-time' }, m.createdAt ? new Date(m.createdAt).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' }) : '')
-      ))) : React.createElement('p', { className: 'renewal-home-empty' }, '최근 대화가 없습니다.')
+      messages.length ? React.createElement('div', { className: 'renewal-home-chat-list' }, messages.map((m, i) => {
+        const image = m.thumbUrl || (Array.isArray(m.thumbUrls) && m.thumbUrls[0]) || m.imageUrl || (Array.isArray(m.imageUrls) && m.imageUrls[0]);
+        return React.createElement('button', { type: 'button', className: `renewal-home-chat-item${image ? ' has-image' : ''}`, key: m.id || i, onClick: () => onChangeView?.('chat') },
+          React.createElement('span', { className: 'renewal-home-chat-name', style: { backgroundColor: displayColor(m) } }, displayName(m)),
+          React.createElement('span', { className: 'renewal-home-chat-content' },
+            image && React.createElement('img', { className: 'renewal-home-chat-image', src: image, alt: '', loading: 'lazy' }),
+            m.replyTo && React.createElement('span', { className: 'renewal-home-chat-reply' },
+              React.createElement('strong', null, m.replyTo.senderName || participantFor(m.replyTo)?.name || '답장'),
+              React.createElement('span', null, m.replyTo.text || '사진')
+            ),
+            (m.text || m.content) && React.createElement('span', { className: 'renewal-home-chat-text' }, String(m.text || m.content).slice(0, 120)),
+            React.createElement('span', { className: 'renewal-home-chat-time' }, image ? formatShortDateTime(m.createdAt) : formatTime(m.createdAt))
+          )
+        );
+      })) : React.createElement('p', { className: 'renewal-home-empty' }, '최근 대화가 없습니다.')
     ),
     React.createElement(Section, { title: '메모', kind: 'memo', onMore: () => onChangeView?.('records') },
-      memos.length ? React.createElement('div', { className: 'renewal-home-memo-list' }, memos.map((memo, i) => React.createElement('button', { type: 'button', className: 'renewal-home-memo-card', key: memo.id || i, onClick: () => calendarContext.onChangeView?.('records') },
-        React.createElement('strong', null, memo.title || memo.text || '메모'), React.createElement('span', null, String(memo.content || memo.description || '').slice(0, 100))
-      ))) : React.createElement('p', { className: 'renewal-home-empty' }, '최근 메모가 없습니다.')
+      memos.length ? React.createElement('div', { className: 'renewal-home-memo-list' }, memos.map((memo, i) => {
+        const preview = memo.linkPreview || (Array.isArray(memo.linkPreviews) && memo.linkPreviews[0]);
+        const tags = Array.isArray(memo.tags) ? memo.tags.slice(0, 3) : [];
+        return React.createElement('button', { type: 'button', className: 'renewal-home-memo-card', key: memo.id || i, style: { '--renewal-memo-author': displayColor(memo) }, onClick: () => onChangeView?.('records') },
+          React.createElement('strong', { className: 'renewal-home-memo-title' }, memo.title || '메모'),
+          React.createElement('span', { className: 'renewal-home-memo-summary' }, String(memo.text || memo.content || memo.description || '').slice(0, 170)),
+          preview && React.createElement('span', { className: 'renewal-home-memo-preview' },
+            preview.image && React.createElement('img', { src: preview.image, alt: '', loading: 'lazy' }),
+            React.createElement('span', null, React.createElement('strong', null, preview.title || '링크 미리보기'), React.createElement('small', null, preview.description || preview.url || ''))
+          ),
+          React.createElement('span', { className: 'renewal-home-memo-meta' },
+            React.createElement('b', { style: { backgroundColor: displayColor(memo) } }, displayName(memo)),
+            tags.map(tag => React.createElement('em', { key: tag }, `#${String(tag).replace(/^#/, '')}`))
+          )
+        );
+      })) : React.createElement('p', { className: 'renewal-home-empty' }, '최근 메모가 없습니다.')
     ),
     React.createElement(Section, { title: '갤러리', kind: 'gallery', onMore: () => onChangeView?.('gallery') },
-      photos.length ? React.createElement('div', { className: 'renewal-home-photo-strip' }, photos.map((photo, i) => React.createElement('button', { type: 'button', key: photo.id || photo.mediaKey || i, onClick: () => calendarContext.setActiveLightbox?.(photo), 'aria-label': `사진 ${i + 1} 크게 보기` }, React.createElement('img', { src: photo.thumbnailUrl || photo.url || photo.downloadURL, alt: '', loading: 'lazy' })))) : React.createElement('p', { className: 'renewal-home-empty' }, '등록된 사진이 없습니다.')
+      photos.length ? React.createElement('div', { className: 'renewal-home-photo-strip' }, photos.map((photo, i) => React.createElement('button', { type: 'button', key: photo.id || photo.mediaKey || i, onClick: () => calendarContext.setActiveLightbox?.(photo), 'aria-label': `사진 ${i + 1} 크게 보기` }, React.createElement('img', { src: photo.thumb || photo.thumbnailUrl || photo.thumbUrl || photo.full || photo.url || photo.imageUrl || photo.downloadURL, alt: '', loading: 'lazy' })))) : React.createElement('p', { className: 'renewal-home-empty' }, '등록된 사진이 없습니다.')
     ),
     React.createElement(Section, { title: '장소', kind: 'places', onMore: () => onChangeView?.('records') },
       places.length ? React.createElement('div', { className: 'renewal-home-place-list' }, places.map((place, i) => React.createElement('button', { type: 'button', className: 'renewal-home-place-card', key: place.id || i, onClick: () => onChangeView?.('records') },
-        React.createElement('span', { className: 'renewal-home-place-icon', 'aria-hidden': 'true' }, '📍'), React.createElement('span', null, React.createElement('strong', null, place.name || place.title || '저장한 장소'), React.createElement('small', null, place.address || place.description || ''))
+        React.createElement('span', { className: 'renewal-home-place-copy' },
+          React.createElement('span', { className: 'renewal-home-place-tags' },
+            React.createElement('em', null, place.categoryName || place.categoryId || '기타'),
+            React.createElement('em', { className: place.visitStatus === 'planned' ? 'is-planned' : 'is-visited' }, place.visitStatus === 'planned' ? '방문예정' : '방문')
+          ),
+          React.createElement('strong', null, place.name || place.title || '저장한 장소'),
+          React.createElement('small', null, place.address || place.description || ''),
+          place.memo && React.createElement('small', { className: 'renewal-home-place-note' }, String(place.memo).split('\n')[0].slice(0, 90))
+        )
       ))) : React.createElement('p', { className: 'renewal-home-empty' }, '저장한 장소가 없습니다.')
     )
   );
@@ -1632,7 +1696,13 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   return React.createElement(React.Fragment, null,
     React.createElement('div', { className: 'renewal-shell' },
       React.createElement('nav', { className: 'renewal-shell-side-nav', 'aria-label': '주 메뉴' },
-        React.createElement('div', { className: 'renewal-shell-side-nav-brand' }, calendarName || '모여라 캘린더'),
+        React.createElement('div', { className: 'renewal-shell-side-nav-brand' },
+          React.createElement('svg', { width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': 'true' },
+            React.createElement('rect', { x: 3, y: 4, width: 18, height: 18, rx: 2 }),
+            React.createElement('path', { d: 'M8 2v4M16 2v4M3 10h18' })
+          ),
+          React.createElement('span', null, String(calendarName || '모여라 캘린더').replace(/^[^\p{L}\p{N}]+/u, '').trim())
+        ),
         ...navButtons('renewal-shell-side-nav-item'),
         React.createElement('div', { className: 'renewal-shell-side-nav-divider', 'aria-hidden': 'true' }),
         ...desktopQuickButtons
