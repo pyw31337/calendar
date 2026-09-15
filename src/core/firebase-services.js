@@ -3,6 +3,21 @@
  * Loaded before app-main.js. Runtime deps: window.GATHER_FIREBASE_DEPS
  */
 function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
+// Read-only client diagnostics. Disabled unless the URL contains ?usage=1, so normal users
+// never pay extra writes or receive console noise. Counts listener attachments and snapshot
+// documents, which lets operators compare cost-heavy paths before/after a rollout.
+function recordUsage(kind, value = 1, detail = '') {
+  try {
+    if (typeof window === 'undefined' || !window.location.search.includes('usage=1')) return;
+    const state = window.__GATHER_FIREBASE_USAGE__ || (window.__GATHER_FIREBASE_USAGE__ = {
+      startedAt: Date.now(), listeners: 0, snapshots: 0, documents: 0, byKind: {}
+    });
+    const n = Number(value) || 0;
+    state[kind] = (Number(state[kind]) || 0) + n;
+    const key = detail ? `${kind}:${detail}` : kind;
+    state.byKind[key] = (Number(state.byKind[key]) || 0) + n;
+  } catch (_) {}
+}
   const FIRESTORE_REST_TIMEOUT_MS = 9000;
   function fetchWithTimeout(url, init, timeoutMs) {
     const controller = typeof AbortController === 'function' ? new AbortController() : null;
@@ -895,7 +910,12 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
       if (options.limit != null && options.limit > 0) {
         q = q.limit(options.limit);
       }
-      return q.onSnapshot(onSnapshot, onError || noop);
+      recordUsage('listeners', 1, subName);
+      return q.onSnapshot(snapshot => {
+        recordUsage('snapshots', 1, subName);
+        recordUsage('documents', snapshot?.size || 0, subName);
+        onSnapshot(snapshot);
+      }, onError || noop);
     } catch (err) {
       console.warn('subscribeCalSubcollection', subName, err);
       if (typeof onError === 'function') onError(err);
@@ -952,8 +972,11 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
         let q = messagesRef;
         if (where) q = q.where(where[0], where[1], where[2]);
         q = q.limit(limitN ? Math.max(limitN * 4, 200) : 200);
+        recordUsage('listeners', 1, `messages:${where ? where[2] : 'all'}`);
         innerUnsub = q.onSnapshot(function (snap) {
           if (stopped) return;
+          recordUsage('snapshots', 1, `messages:${where ? where[2] : 'all'}`);
+          recordUsage('documents', snap?.size || 0, `messages:${where ? where[2] : 'all'}`);
           onSnapshot(sortedSnapshotFrom(snap.docs));
         }, onError || noop);
       } catch (err) {
@@ -969,8 +992,11 @@ function deps() { return window.GATHER_FIREBASE_DEPS || {}; }
         if (where) q = q.where(where[0], where[1], where[2]);
         q = q.orderBy(orderField, direction);
         if (limitN) q = q.limit(limitN);
+        recordUsage('listeners', 1, `messages:${where ? where[2] : 'all'}`);
         innerUnsub = q.onSnapshot(function (snap) {
           if (stopped) return;
+          recordUsage('snapshots', 1, `messages:${where ? where[2] : 'all'}`);
+          recordUsage('documents', snap?.size || 0, `messages:${where ? where[2] : 'all'}`);
           if (snap.empty && !usedFallback) {
             usedFallback = true;
             const prevUnsub = innerUnsub;
