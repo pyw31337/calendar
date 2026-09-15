@@ -283,16 +283,34 @@ function RenewalHero({ meetings, onSelectDate }) {
   const React = window.React;
   if (!meetings || meetings.length === 0) return null;
   const [primary, ...rest] = meetings;
+  const [isOpen, setIsOpen] = React.useState(false);
   const labelFor = (meeting) => {
     const base = formatConfirmedMeetingLabel(meeting.date);
     const note = typeof meeting.note === 'string' ? meeting.note.trim().replace(/\s+/g, ' ') : '';
     return note ? `${base} · ${note.slice(0, 48)}` : base;
   };
   return React.createElement('section', { className: 'renewal-home-hero', 'aria-label': '가까운 확정 일정' },
-    React.createElement('button', { type: 'button', className: 'renewal-home-hero-primary', onClick: () => onSelectDate(primary.date) },
-      React.createElement('span', { className: 'renewal-home-hero-dday' }, formatDDayLabel(primary.date)),
-      React.createElement('span', { className: 'renewal-home-hero-label' }, labelFor(primary)),
-      React.createElement('span', { className: 'renewal-home-hero-arrow', 'aria-hidden': 'true' }, '›')
+    React.createElement('div', { className: `dday-toggle-wrap ${isOpen ? 'is-open' : ''}`.trim() },
+      React.createElement('button', { type: 'button', className: 'dday-compact', onClick: () => setIsOpen(true), 'aria-expanded': isOpen },
+        React.createElement('span', { className: 'dday-compact-badge' }, formatDDayLabel(primary.date)),
+        React.createElement('span', { className: 'dday-compact-text' }, labelFor(primary)),
+        React.createElement('span', { className: 'dday-compact-chevron', 'aria-hidden': 'true' }, '⌄')
+      ),
+      React.createElement('div', { className: 'dday-expanded' },
+        React.createElement('div', { className: 'dday-expanded-main' },
+          React.createElement('div', { className: 'dday-expanded-title-row' },
+            React.createElement('div', { className: 'dday-expanded-title' }, labelFor(primary))
+          ),
+          primary.note && React.createElement('div', { className: 'dday-expanded-tags' },
+            React.createElement('span', { className: 'dday-expanded-tag' }, primary.note.trim())
+          )
+        ),
+        React.createElement('div', { className: 'dday-expanded-side' },
+          React.createElement('button', { type: 'button', className: 'dday-collapse-btn', onClick: () => setIsOpen(false), 'aria-label': '접기' }, '⌃'),
+          React.createElement('span', { className: 'dday-expanded-badge' }, formatDDayLabel(primary.date)),
+          React.createElement('button', { type: 'button', className: 'dday-view-btn', onClick: () => onSelectDate(primary.date) }, '일정보기')
+        )
+      )
     ),
     rest.length > 0 && React.createElement('div', { className: 'renewal-home-hero-chips' }, rest.map(meeting => React.createElement('button', {
       key: meeting.date, type: 'button', className: 'renewal-home-hero-chip', onClick: () => onSelectDate(meeting.date)
