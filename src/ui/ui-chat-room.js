@@ -1716,7 +1716,7 @@ export function ChatRoomView({
           };
           setChatInput(e.target.value);
           announceTyping(e.target.value);
-          autoGrowTextarea(e.target, 100);
+          autoGrowTextarea(e.target, MAX_COMPOSER_INPUT_HEIGHT);
         },
         onPaste: handlePasteImagesChat,
         onKeyDown: e => {
@@ -1730,7 +1730,7 @@ export function ChatRoomView({
           width: '100%',
           height: `${composerInputHeight}px`,
           minHeight: '44px',
-          maxHeight: '100px',
+          maxHeight: `${MAX_COMPOSER_INPUT_HEIGHT}px`,
           resize: 'none',
           border: 'none',
           background: 'none',
