@@ -2729,6 +2729,7 @@ select.form-select {
 }
 .renewal-shell-main:not(.is-calendar) .renewal-shell-header-brand { font-size: .96rem; }
 .renewal-shell-main:not(.is-calendar) > .renewal-shell-header { display: none !important; }
+.renewal-shell { min-height: 100vh; }
 .renewal-shell-main.is-calendar > .renewal-shell-header {
   background: linear-gradient(135deg, #4C1D95 0%, #7C3AED 58%, #22D3B8 100%);
   box-shadow: none;
@@ -6643,6 +6644,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
   background: #FFFFFF; border: 1px solid #ECEAF5; border-radius: 18px;
   padding: 16px; box-shadow: 0 2px 8px rgba(30,27,46,.07);
 }
+.renewal-shell { min-height: 100vh !important; }
 @media (min-width: 768px) {
   .renewal-shell-main.is-records .memo-view-container .memo-card-list,
   .renewal-shell-main.is-records .places-view-container .places-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
