@@ -6463,3 +6463,18 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 .renewal-home-chat-item, .renewal-home-memo-card { border-color: var(--renewal-border); border-radius: 12px; box-shadow: none; }
 .renewal-shell-section-title { font-size: .72rem; letter-spacing: .08em; color: var(--renewal-muted); text-transform: uppercase; }
 @media (min-width: 768px) { .renewal-shell-main:not(.is-calendar) > .renewal-shell-header { padding-left: 18px; padding-right: 18px; } .renewal-home-summary-section { padding-left: 18px; padding-right: 18px; } }
+
+/* Home hero/header are one continuous Bento surface, not two stacked gradients. */
+.renewal-shell-main.is-calendar { position: relative; }
+.renewal-shell-main.is-calendar > .renewal-shell-header {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 3;
+  background: transparent;
+  border: 0;
+}
+.renewal-shell-main.is-calendar > .renewal-home-hero {
+  position: relative;
+  z-index: 1;
+  padding-top: 68px;
+}
