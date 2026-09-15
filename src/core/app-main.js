@@ -2395,9 +2395,9 @@ function CalendarApp() {
       setHasMoreMemos(false);
       return;
     }
-    // Gallery needs a paginated memo window for memo-attached photos/links; other routes only
-    // need the latest memo for their summary badge/snippet.
-    const effectiveMemosLimit = needsMemoCollection ? memosLimit : 1;
+    // Gallery/memo page need a paginated window; the home preview shows 2 cards by default
+    // (and 3 when the section is expanded), so other routes still fetch a tiny recent set.
+    const effectiveMemosLimit = needsMemoCollection ? memosLimit : 3;
     let isMounted = true;
     const liveDb = (typeof window !== 'undefined' && window.__gatherFirebaseDb) || firebaseDb;
     if (!liveDb) {
