@@ -3958,9 +3958,16 @@ function resolveExistingCultureMemoText(item, {
   findRegisteredAnniversary = null
 } = {}) {
   if (!item) return '';
+  const normalizeKey = value => String(value || '').trim().normalize('NFC');
+  // Custom content snapshots may already carry the memo copied from the calendar. Prefer it
+  // when present so a stale/partial anniversaries list cannot make a visibly saved memo vanish.
+  const fromItem = String(item.memo || item.note || '').trim();
+  if (fromItem) return fromItem;
+  const itemKey = normalizeKey(item.id);
+  const titleKey = normalizeKey(item.title);
   const ann = typeof findRegisteredAnniversary === 'function'
     ? findRegisteredAnniversary(item.id, item.title)
-    : (anniversaries || []).find(a => a && (a.cultureSourceId === item.id || a.id === item.id)) || null;
+    : (anniversaries || []).find(a => a && (normalizeKey(a.cultureSourceId) === itemKey || normalizeKey(a.id) === itemKey)) || null;
   const fromAnn = String(ann?.memo || '').trim();
   if (fromAnn) return fromAnn;
   // findRegisteredAnniversary only matches within this tab's own category (festival/sports/
@@ -3968,24 +3975,24 @@ function resolveExistingCultureMemoText(item, {
   // But that same scoping meant a memo written while the item was linked under a different
   // category (or before a category re-classification) silently failed to show here even though
   // the memo genuinely belongs to this title -- read-only fallback: title match, any category.
-  const titleAny = String(item.title || '').trim();
+  const titleAny = titleKey;
   if (titleAny) {
-    const byTitleAnyCategory = (anniversaries || []).find(a => a && String(a.title || '').trim() === titleAny && String(a?.memo || '').trim());
+    const byTitleAnyCategory = (anniversaries || []).find(a => a && normalizeKey(a.title) === titleAny && String(a?.memo || '').trim());
     if (byTitleAnyCategory) return String(byTitleAnyCategory.memo || '').trim();
   }
 
-  const itemId = String(item.id || '').trim();
-  const title = String(item.title || '').trim();
-  const liveMemos = (memos || []).filter(m => m && !isTombstone(m) && String(m.text || '').trim());
+  const itemId = itemKey;
+  const title = titleKey;
+  const liveMemos = (memos || []).filter(m => m && !isTombstone(m) && String(m.text || m.content || m.body || '').trim());
   const bySource = itemId
-    ? liveMemos.find(m => String(m.cultureSourceId || '').trim() === itemId)
+    ? liveMemos.find(m => normalizeKey(m.cultureSourceId) === itemId)
     : null;
-  if (bySource) return String(bySource.text || '').trim();
+  if (bySource) return String(bySource.text || bySource.content || bySource.body || '').trim();
   if (title) {
     const byTitle = liveMemos
-      .filter(m => String(m.title || '').trim() === title)
+      .filter(m => normalizeKey(m.title) === title)
       .sort((a, b) => (Number(b.updatedAt) || Number(b.createdAt) || 0) - (Number(a.updatedAt) || Number(a.createdAt) || 0));
-    if (byTitle[0]) return String(byTitle[0].text || '').trim();
+    if (byTitle[0]) return String(byTitle[0].text || byTitle[0].content || byTitle[0].body || '').trim();
   }
 
   void calendar;
