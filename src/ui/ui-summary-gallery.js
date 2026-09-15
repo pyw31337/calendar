@@ -3968,7 +3968,9 @@ function resolveExistingCultureMemoText(item, {
   const ann = typeof findRegisteredAnniversary === 'function'
     ? findRegisteredAnniversary(item.id, item.title)
     : (anniversaries || []).find(a => a && (normalizeKey(a.cultureSourceId) === itemKey || normalizeKey(a.id) === itemKey)) || null;
-  const fromAnn = String(ann?.memo || '').trim();
+  // Older calendar-event forms stored the user's note in `description` instead of `memo`.
+  // Read both so a saved note does not disappear merely because it was created by that form.
+  const fromAnn = String(ann?.memo || ann?.description || '').trim();
   if (fromAnn) return fromAnn;
   // findRegisteredAnniversary only matches within this tab's own category (festival/sports/
   // movie/event) so an unrelated same-titled card can't false-match for the register checkbox.
@@ -3977,8 +3979,8 @@ function resolveExistingCultureMemoText(item, {
   // the memo genuinely belongs to this title -- read-only fallback: title match, any category.
   const titleAny = titleKey;
   if (titleAny) {
-    const byTitleAnyCategory = (anniversaries || []).find(a => a && normalizeKey(a.title) === titleAny && String(a?.memo || '').trim());
-    if (byTitleAnyCategory) return String(byTitleAnyCategory.memo || '').trim();
+    const byTitleAnyCategory = (anniversaries || []).find(a => a && normalizeKey(a.title) === titleAny && String(a?.memo || a?.description || '').trim());
+    if (byTitleAnyCategory) return String(byTitleAnyCategory.memo || byTitleAnyCategory.description || '').trim();
   }
 
   const itemId = itemKey;

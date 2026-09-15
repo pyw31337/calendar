@@ -31,7 +31,7 @@ export default [
     // copied verbatim into dist/ by copy-static-to-dist.mjs, e.g. vendored third-party SDKs) --
     // see copy-static-to-dist.mjs / check-asset-mirrors.mjs. None of these are source anyone
     // edits directly.
-    ignores: ['dist/**', 'node_modules/**', 'assets/**', 'public/**', 'public-vite/**', 'functions/node_modules/**', 'share/**']
+    ignores: ['dist/**', 'node_modules/**', 'assets/**', 'public/**', 'public-vite/**', 'functions/node_modules/**', 'share/**', 'designv2/**']
   },
   js.configs.recommended,
   {

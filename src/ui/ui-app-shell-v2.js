@@ -39,6 +39,16 @@ const DESKTOP_QUICK_ITEMS = [
   { id: 'share', label: '공유' },
   { id: 'app-settings', label: '설정' },
 ];
+const BENTO_SIDE_ITEMS = [
+  { id: 'calendar', label: '캘린더', icon: 'calendar' },
+  { id: 'chat', label: '채팅', icon: 'chat', meta: '최근 대화' },
+  { id: 'settlement', label: '정산', icon: 'settlement', meta: '정산 내역' },
+  { id: 'gallery', label: '갤러리', icon: 'gallery', meta: '최근 사진' },
+  { id: 'places', label: '장소', icon: 'places', meta: '저장한 장소' },
+  { id: 'memo', label: '메모', icon: 'memo', meta: '최근 메모' },
+  { id: 'content', label: '컨텐츠', icon: 'content' },
+  { id: 'archive', label: '보관함', icon: 'archive' },
+];
 const TAB_IDS = TABS.map(t => t.id);
 const DEFAULT_TAB = 'calendar';
 
@@ -105,6 +115,11 @@ const TAB_ICONS = {
   records: 'M4 19.5A2.5 2.5 0 0 1 6.5 17H20V2H6.5A2.5 2.5 0 0 0 4 4.5v15Z',
   settlement: 'M2 6h20v12H2zM2 10h20',
   more: 'M4 7h16M4 12h16M4 17h16',
+  gallery: 'M3 3h18v18H3z M8.5 9a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z M21 15l-4-4-7 7-3-3-4 4',
+  places: 'M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 1 1 16 0z M12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
+  memo: 'M4 4h16v12H8l-4 4z',
+  content: 'M4 6h16M4 12h16M4 18h10',
+  archive: 'M3 6h18M5 6v14h14V6M9 10h6',
 };
 
 function TabIcon({ id }) {
@@ -263,6 +278,14 @@ function RenewalHero({ meetings, onSelectDate }) {
     const note = typeof meeting.note === 'string' ? meeting.note.trim().replace(/\s+/g, ' ') : '';
     return note ? `${base} · ${note.slice(0, 48)}` : base;
   };
+  const chipDateFor = (dateValue) => {
+    const date = new Date(`${dateValue}T00:00:00`);
+    if (Number.isNaN(date.getTime())) return { date: String(dateValue || ''), day: '' };
+    return {
+      date: `${String(date.getFullYear()).slice(-2)}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`,
+      day: ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'][date.getDay()],
+    };
+  };
   return React.createElement('section', { className: 'renewal-home-hero', 'aria-label': '가까운 확정 일정' },
     React.createElement('div', { className: `dday-toggle-wrap ${isOpen ? 'is-open' : ''}`.trim() },
       React.createElement('button', { type: 'button', className: 'dday-compact', onClick: () => setIsOpen(true), 'aria-expanded': isOpen },
@@ -286,9 +309,15 @@ function RenewalHero({ meetings, onSelectDate }) {
         )
       )
     ),
-    rest.length > 0 && React.createElement('div', { className: 'renewal-home-hero-chips' }, rest.map(meeting => React.createElement('button', {
-      key: meeting.date, type: 'button', className: 'renewal-home-hero-chip', onClick: () => onSelectDate(meeting.date)
-    }, React.createElement('strong', null, labelFor(meeting)), React.createElement('small', null, formatDDayLabel(meeting.date)))))
+    React.createElement('div', { className: 'renewal-home-hero-chips' }, meetings.map(meeting => {
+      const chipDate = chipDateFor(meeting.date);
+      return React.createElement('button', {
+        key: meeting.date, type: 'button', className: 'renewal-home-hero-chip', onClick: () => onSelectDate(meeting.date), title: labelFor(meeting)
+      },
+      React.createElement('strong', { className: 'renewal-home-hero-chip-date' }, chipDate.date),
+      React.createElement('span', { className: 'renewal-home-hero-chip-day' }, chipDate.day),
+      React.createElement('small', { className: 'renewal-home-hero-chip-dday' }, formatDDayLabel(meeting.date)));
+    }))
   );
 }
 
@@ -1447,6 +1476,8 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   const [activeTab, setActiveTabState] = React.useState(readTabFromLocation);
   const [recordsSubTab, setRecordsSubTabState] = React.useState(readRecordsSubTabFromLocation);
   const [selectedMoreItem, setSelectedMoreItem] = React.useState(null);
+  const [isSideNavOpen, setIsSideNavOpen] = React.useState(false);
+  const [isSideNavCollapsed, setIsSideNavCollapsed] = React.useState(false);
   // Which of the 4 real 더보기 modals (share/anniversaries/manual/app-settings) is open, if any -- local to
   // this shell (see buildRenewalMoreContext's doc comment for why this doesn't reuse
   // CalendarApp's own isShareOpen/isAnniversariesOpen/isGuideOpen state).
@@ -1620,6 +1651,15 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
     setRecordsSubTabState(subTabId);
   };
 
+  const selectSideItem = (id) => {
+    setIsSideNavOpen(false);
+    if (id === 'calendar' || id === 'chat' || id === 'settlement') { setActiveTab(id); return; }
+    const subById = { gallery: 'media', places: 'places', memo: 'memo', content: 'content', archive: 'archive' };
+    if (subById[id]) { setActiveTab('records'); setRecordsSubTab(subById[id]); }
+  };
+  const sideSubById = { gallery: 'media', places: 'places', memo: 'memo', content: 'content', archive: 'archive' };
+  const isSideItemActive = (id) => id === activeTab || (activeTab === 'records' && sideSubById[id] === recordsSubTab);
+
   const navButtons = (extraClass) => TABS.map(tab =>
     React.createElement('button', {
       key: tab.id,
@@ -1639,25 +1679,41 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
     onClick: () => openMoreModalById(item.id),
   }, React.createElement('span', { className: 'renewal-shell-side-nav-quick-dot', 'aria-hidden': 'true' }, '•'), item.label));
 
-  return React.createElement(React.Fragment, null,
-    React.createElement('div', { className: 'renewal-shell' },
-      React.createElement('nav', { className: 'renewal-shell-side-nav', 'aria-label': '주 메뉴' },
-        React.createElement('div', { className: 'renewal-shell-side-nav-brand' },
-          React.createElement('svg', { width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': 'true' },
-            React.createElement('rect', { x: 3, y: 4, width: 18, height: 18, rx: 2 }),
-            React.createElement('path', { d: 'M8 2v4M16 2v4M3 10h18' })
-          ),
-          React.createElement('span', null, String(calendarName || '모여라 캘린더').replace(/^[^\p{L}\p{N}]+/u, '').trim())
-        ),
-        ...navButtons('renewal-shell-side-nav-item'),
-        React.createElement('div', { className: 'renewal-shell-side-nav-divider', 'aria-hidden': 'true' }),
-        ...desktopQuickButtons
+  const bentoSideNav = React.createElement(React.Fragment, null,
+    React.createElement('div', { className: 'renewal-shell-side-nav-brand' }, React.createElement(TabIcon, { id: 'calendar' }), React.createElement('span', null, '모아엘가')),
+    React.createElement('div', { className: 'renewal-shell-side-nav-group is-settings' },
+      React.createElement('button', { type: 'button', className: 'renewal-shell-manual-card', onClick: () => { setIsSideNavOpen(false); openMoreModalById('manual'); } },
+        React.createElement('span', { className: 'renewal-shell-manual-icon' }, React.createElement(TabIcon, { id: 'records' })),
+        React.createElement('span', { className: 'renewal-shell-manual-copy' }, React.createElement('strong', null, '사용자 매뉴얼'), React.createElement('small', null, '사용 방법 한눈에 보기')),
+        React.createElement('span', { className: 'renewal-shell-manual-chevron' }, '›')
       ),
+      React.createElement('button', { type: 'button', className: 'renewal-shell-side-nav-quick-item', onClick: () => openMoreModalById('calendar-settings') }, React.createElement(TabIcon, { id: 'calendar' }), React.createElement('span', null, '캘린더 설정')),
+      React.createElement('button', { type: 'button', className: 'renewal-shell-side-nav-quick-item', onClick: () => openMoreModalById('anniversaries') }, React.createElement('span', { className: 'renewal-shell-side-gift', 'aria-hidden': 'true' }, '♙'), React.createElement('span', null, '기념일 설정'))
+    ),
+    React.createElement('div', { className: 'renewal-shell-side-nav-divider' }),
+    React.createElement('div', { className: 'renewal-shell-side-nav-group is-main' },
+      BENTO_SIDE_ITEMS.map(item => React.createElement('button', {
+        key: item.id, type: 'button', className: `renewal-shell-side-nav-item ${isSideItemActive(item.id) ? 'is-active' : ''}`.trim(), onClick: () => selectSideItem(item.id)
+      }, React.createElement('span', { className: 'renewal-shell-nav-icon' }, React.createElement(TabIcon, { id: item.icon })),
+      React.createElement('span', { className: 'renewal-shell-nav-label' }, item.label),
+      item.meta && React.createElement('small', { className: 'renewal-shell-side-nav-meta' }, item.meta)))
+    ),
+    React.createElement('div', { className: 'renewal-shell-side-nav-spacer' }),
+    React.createElement('div', { className: 'renewal-shell-side-nav-divider' }),
+    React.createElement('button', { type: 'button', className: 'renewal-shell-side-nav-quick-item', onClick: () => openMoreModalById('share') }, React.createElement('span', { 'aria-hidden': 'true' }, '⌯'), React.createElement('span', null, '공유')),
+    React.createElement('button', { type: 'button', className: 'renewal-shell-side-nav-quick-item', onClick: () => openMoreModalById('app-settings') }, React.createElement('span', { 'aria-hidden': 'true' }, '⚙'), React.createElement('span', null, '설정')),
+    React.createElement('button', { type: 'button', className: 'renewal-shell-side-collapse', onClick: () => setIsSideNavCollapsed(v => !v), 'aria-label': isSideNavCollapsed ? '메뉴 펼치기' : '메뉴 접기' }, React.createElement('span', null, '‹'), React.createElement('span', null, '접기'))
+  );
+
+  return React.createElement(React.Fragment, null,
+    React.createElement('div', { className: `renewal-shell ${isSideNavCollapsed ? 'is-side-collapsed' : ''}`.trim() },
+      React.createElement('button', { type: 'button', className: `renewal-shell-side-backdrop ${isSideNavOpen ? 'is-open' : ''}`.trim(), onClick: () => setIsSideNavOpen(false), 'aria-label': '메뉴 닫기' }),
+      React.createElement('nav', { className: `renewal-shell-side-nav ${isSideNavOpen ? 'is-open' : ''}`.trim(), 'aria-label': '주 메뉴' }, bentoSideNav),
       React.createElement('main', { className: `renewal-shell-main is-${activeTab}` },
         React.createElement(TopHeader, {
           calendarName,
           onOpenSearch: () => handleSelectMoreItem('search'),
-          onOpenMore: () => setActiveTab('more'),
+          onOpenMore: () => setIsSideNavOpen(true),
         }),
         activeTab === 'calendar'
           ? React.createElement(CalendarPane, { calendarContext, recordsContext, onOpenDate: setDateModalDate, onChangeView })

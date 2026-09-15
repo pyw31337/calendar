@@ -1414,7 +1414,7 @@ function CalendarApp() {
         });
       };
       poll();
-      const pollTimer = setInterval(poll, 6000);
+      const pollTimer = setInterval(poll, activeView === 'chat' ? 12000 : 60000);
       return () => { cancelled = true; clearInterval(pollTimer); };
     }
     let isMounted = true;
@@ -1492,25 +1492,23 @@ function CalendarApp() {
     };
   }, [activeCalId, activeView, firebaseDb, firebaseConnectionVersion]);
 
-  // Chat listener watchdog: self-heals a silently stalled onSnapshot stream. Checks periodically
-  // whether the listener above has gone quiet for too long and, if so, pulls the same recent
-  // window directly (SDK read with a REST fallback baked into fetchRecentChatMessages) and
-  // reconciles it into local state -- picking up creates/edits/deletes and other participants'
-  // messages without requiring a manual page reload. Cheap while the listener is healthy (the
-  // timestamp keeps getting refreshed by real snapshots, so the check below is a no-op almost
-  // every tick); only starts actually re-fetching once the stream has genuinely stopped.
+  // Chat listener watchdog: self-heals a silently stalled onSnapshot stream.
+  // Firestore onSnapshot only delivers events when documents actually change -- quiet chat
+  // channels do not emit snapshots. Checking on a 2-4s interval previously caused false "stalled"
+  // detections, making idle clients read 30-60 docs every few seconds continuously.
+  // We heal stalled streams safely without excessive read costs by:
+  // 1) Reconciling immediately when tab becomes visible again or returns online
+  // 2) Running a conservative backup check (60s stale threshold) ONLY while actively in chat view
   React.useEffect(() => {
     if (!activeCalId || !firebaseDb) return undefined;
-    const chatLimit = activeView === 'chat' ? Math.max(chatLiveLimit, 60) : CHAT_INITIAL_MESSAGE_LIMIT;
-    // Tightened from 9000/5000: on a connection where the realtime stream never recovers (see
-    // the long-polling notes above attemptFirebaseInit), this fallback is the only thing that
-    // ever shows the other participant's message, and 9-14s felt like "it's broken" in a chat UI.
-    const STALE_AFTER_MS = 4000;
-    const CHECK_INTERVAL_MS = 2000;
+    const isChatView = activeView === 'chat';
+    const chatLimit = isChatView ? Math.max(chatLiveLimit, 60) : CHAT_INITIAL_MESSAGE_LIMIT;
+    const STALE_AFTER_MS = 60000;
+    const CHECK_INTERVAL_MS = 30000;
     let isMounted = true;
     let reconciling = false;
     const reconcile = async () => {
-      if (reconciling) return;
+      if (reconciling || !isMounted) return;
       reconciling = true;
       try {
         const fresh = await fetchRecentChatMessages(activeCalId, chatLimit);
@@ -1527,32 +1525,39 @@ function CalendarApp() {
       } catch (err) {
         console.warn('Chat listener watchdog reconcile notice:', err);
       } finally {
-        // Whether or not the fetch found anything new, treat a completed reconcile as "caught
-        // up" so the watchdog doesn't hammer the network every single tick while the realtime
-        // stream stays stuck -- it'll try again after another full stale interval.
         lastChatSnapshotAtRef.current = Date.now();
         reconciling = false;
       }
     };
-    const timer = setInterval(() => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
-      if (Date.now() - lastChatSnapshotAtRef.current > STALE_AFTER_MS) void reconcile();
-    }, CHECK_INTERVAL_MS);
-    // Some mobile browsers (observed on Samsung Internet) suspend the page's timers and the
-    // Firestore onSnapshot stream together while backgrounded, then resume the tab without
-    // promptly redelivering a fresh snapshot -- the periodic check above can then sit waiting
-    // up to CHECK_INTERVAL_MS behind a `lastChatSnapshotAtRef` that never advanced while hidden,
-    // and in practice never catches up until a manual reload. Reconciling immediately the moment
-    // the page becomes visible again -- rather than only on the next interval tick -- closes
-    // that gap; it's cheap when the stream was actually healthy since `reconciling` is a no-op.
+
+    let timer = null;
+    if (isChatView) {
+      timer = setInterval(() => {
+        if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+        if (Date.now() - lastChatSnapshotAtRef.current > STALE_AFTER_MS) void reconcile();
+      }, CHECK_INTERVAL_MS);
+    }
+
     const handleVisible = () => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'visible') void reconcile();
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        if (Date.now() - lastChatSnapshotAtRef.current > 10000) {
+          void reconcile();
+        }
+      }
     };
+
+    const handleOnline = () => {
+      void reconcile();
+    };
+
     document.addEventListener('visibilitychange', handleVisible);
+    window.addEventListener('online', handleOnline);
+
     return () => {
       isMounted = false;
-      clearInterval(timer);
+      if (timer) clearInterval(timer);
       document.removeEventListener('visibilitychange', handleVisible);
+      window.removeEventListener('online', handleOnline);
     };
   }, [activeCalId, activeView, chatLiveLimit, firebaseDb, CHAT_INITIAL_MESSAGE_LIMIT]);
 
