@@ -250,33 +250,6 @@ export function buildRenewalCalendarContext(calendar, deps) {
   };
 }
 
-/**
- * "가까운 일정" home summary (master-plan.md §4.2/§5.3): up to 3 upcoming confirmed meetings,
- * date + D-day + a short label, matching the fields actually present on a confirmedMeeting entry
- * (date/note -- there is no separate 제목/장소 field on this record, so 제목 falls back to a
- * generic label and 장소 is omitted rather than guessed). Clicking one opens that date in the
- * same DateModal the grid uses (via `onSelectDate`, owned by the parent CalendarPane).
- */
-function UpcomingMeetingsSection({ meetings, onSelectDate }) {
-  const React = window.React;
-  if (!meetings || meetings.length === 0) return null;
-  return React.createElement('div', { className: 'renewal-shell-section' },
-    React.createElement('div', { className: 'renewal-shell-section-title' }, '가까운 일정'),
-    React.createElement('div', { className: 'renewal-shell-upcoming-list' },
-      meetings.map(meeting => React.createElement('button', {
-        key: meeting.date,
-        type: 'button',
-        className: 'renewal-shell-upcoming-item',
-        onClick: () => onSelectDate(meeting.date),
-      },
-        React.createElement('span', { className: 'renewal-shell-upcoming-dday' }, formatDDayLabel(meeting.date)),
-        React.createElement('span', { className: 'renewal-shell-upcoming-label' }, formatConfirmedMeetingLabel(meeting.date)),
-        meeting.note && meeting.note.trim() && React.createElement('span', { className: 'renewal-shell-upcoming-note' }, meeting.note.trim())
-      ))
-    )
-  );
-}
-
 /** Compact hero zone from the approved BentoPink reference: one primary D-day plus
  * horizontally-scannable upcoming chips. It is presentation-only and reuses the same
  * confirmed meeting selector as the list below. */
@@ -316,33 +289,6 @@ function RenewalHero({ meetings, onSelectDate }) {
     rest.length > 0 && React.createElement('div', { className: 'renewal-home-hero-chips' }, rest.map(meeting => React.createElement('button', {
       key: meeting.date, type: 'button', className: 'renewal-home-hero-chip', onClick: () => onSelectDate(meeting.date)
     }, React.createElement('strong', null, labelFor(meeting)), React.createElement('small', null, formatDDayLabel(meeting.date)))))
-  );
-}
-
-/**
- * "응답 필요" home summary (master-plan.md §4.2/§5.3): "활성 투표가 없으면 큰 빈 카드를 표시하지
- * 않는다" -- so this section renders nothing unless `hasVisiblePolls` is true. Embeds the real,
- * already-tested `PollList`/`PollModal`/`PollVoterSheet` trio pass-through (same components/props
- * app-main.js's own main screen renders) rather than reimplementing vote/response tracking --
- * there's no separate poll screen in the 5-tab IA, so this summary section doubles as the poll
- * feature's one home, matching "홈 요약 카드는 목적 화면으로 이동하는 진입점" for a feature that
- * has no other destination.
- */
-function PollsSection({ calendarContext }) {
-  const React = window.React;
-  const { PollList, PollModal, PollVoterSheet } = bindUiComponentAliases(React);
-  if (!calendarContext.hasVisiblePolls) return null;
-  return React.createElement('div', { className: 'renewal-shell-section' },
-    React.createElement('div', { className: 'renewal-shell-section-title' }, '응답 필요'),
-    React.createElement(PollList, calendarContext.pollsProps),
-    calendarContext.isPollModalOpen && React.createElement(PollModal, calendarContext.pollModalProps),
-    calendarContext.voteTarget && React.createElement(PollVoterSheet, {
-      calendar: calendarContext.calendar,
-      pollId: calendarContext.voteTarget.pollId,
-      optionId: calendarContext.voteTarget.optionId,
-      onSelect: calendarContext.onSelectVote,
-      onClose: calendarContext.onCloseVoteSheet,
-    })
   );
 }
 
