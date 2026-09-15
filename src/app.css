@@ -6594,14 +6594,23 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 .renewal-shell-main.is-settlement .settlement-person-card {
   border-color: #ECEAF5; border-radius: 18px; box-shadow: 0 2px 8px rgba(30,27,46,.07);
 }
+/* Full references are centered focused pages; their legacy views carry inline full-viewport
+   positioning, so the V2 adapter constrains only the visual frame (not their data behavior). */
+.renewal-shell-main.is-chat > .chat-room-container,
+.renewal-shell-main.is-records > .memo-view-container,
+.renewal-shell-main.is-records > .places-view-container,
+.renewal-shell-main.is-settlement > .settlement-page-body {
+  left: 50% !important; right: auto !important; width: 100% !important; max-width: 480px !important;
+  transform: translateX(-50%);
+}
 @media (min-width: 768px) {
-  .renewal-shell-main.is-chat > .chat-room-container { max-width: 640px; }
+  .renewal-shell-main.is-chat > .chat-room-container,
   .renewal-shell-main.is-records .memo-view-container,
   .renewal-shell-main.is-records .places-view-container,
-  .renewal-shell-main.is-settlement .settlement-page-body { max-width: 720px; margin: 0 auto; }
+  .renewal-shell-main.is-settlement .settlement-page-body { max-width: 720px !important; }
 }
 @media (min-width: 1200px) {
-  .renewal-shell-main.is-chat > .chat-room-container { max-width: 820px; }
+  .renewal-shell-main.is-chat > .chat-room-container { max-width: 820px !important; }
   .renewal-shell-main.is-records .memo-view-container,
   .renewal-shell-main.is-records .places-view-container,
   .renewal-shell-main.is-settlement .settlement-page-body { max-width: 1080px; }
