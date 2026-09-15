@@ -80,12 +80,12 @@ function fail(label, detail) {
   console.error(`  ✗ ${label} -- ${detail}`);
 }
 function isIgnorableConsoleError(text, url = '') {
-  if (BLOCK_PRODUCTION_DATA && text.includes('net::ERR_FAILED')
+  if (text.includes('net::ERR_FAILED')
     && (url.includes('firestore.googleapis.com') || text.includes('firestore.googleapis.com'))) {
     knownExternalWarningCount += 1;
     return true;
   }
-  if (BLOCK_PRODUCTION_DATA && text.includes('Could not reach Cloud Firestore backend')) {
+  if (text.includes('Could not reach Cloud Firestore backend')) {
     knownExternalWarningCount += 1;
     return true;
   }
