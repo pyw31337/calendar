@@ -6518,6 +6518,10 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 .renewal-home-summary-heading { margin-bottom: 10px; font-size: .78rem; letter-spacing: .08em; text-transform: uppercase; color: var(--renewal-muted); }
 .renewal-home-chat-item, .renewal-home-memo-card { border-color: var(--renewal-border); border-radius: 12px; box-shadow: none; }
 .renewal-shell-section-title { font-size: .72rem; letter-spacing: .08em; color: var(--renewal-muted); text-transform: uppercase; }
+.renewal-home-summary-section:has(.renewal-home-photo-strip) { padding: 0; overflow: hidden; }
+.renewal-home-summary-section:has(.renewal-home-photo-strip) .renewal-home-summary-heading { padding: 18px 14px 0; }
+.renewal-home-summary-section:has(.renewal-home-photo-strip) .renewal-home-photo-strip { gap: 2px; }
+.renewal-home-summary-section:has(.renewal-home-photo-strip) .renewal-home-photo-strip button { border-radius: 0; }
 @media (min-width: 768px) { .renewal-shell-main:not(.is-calendar) > .renewal-shell-header { padding-left: 18px; padding-right: 18px; } .renewal-home-summary-section { padding-left: 18px; padding-right: 18px; } }
 
 /* Home hero/header are one continuous Bento surface, not two stacked gradients. */
