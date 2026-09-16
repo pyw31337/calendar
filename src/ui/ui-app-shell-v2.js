@@ -858,6 +858,11 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
         const preview = memo.linkPreview || (Array.isArray(memo.linkPreviews) && memo.linkPreviews[0]);
         const tags = Array.isArray(memo.tags) ? memo.tags.slice(0, 3) : [];
         const memoMeta = formatShortDateTime(memo.updatedAt ?? memo.createdAt);
+        // 홈 화면에서 "지금 어디서 활동이 일어나는지" 바로 보여야 바로 피드백을 달아줄 수 있다는
+        // 요구사항 -- 메모에 댓글이 달리면 최신 댓글을 미리보기로 바로 노출한다(전체보기 없이도
+        // 반응이 왔다는 걸 즉시 알 수 있게).
+        const memoComments = Array.isArray(memo.comments) ? memo.comments : [];
+        const latestComment = memoComments.length ? memoComments[memoComments.length - 1] : null;
         return React.createElement(ChatBubbleFrame, {
           key: memo.id || i,
           name: displayName(memo),
@@ -883,7 +888,12 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
           ),
           tags.length ? React.createElement('span', { className: 'v2-bubble-tags' },
             tags.map(tag => React.createElement('em', { className: 'v2-bubble-tag', key: tag }, `#${String(tag).replace(/^#/, '')}`))
-          ) : null
+          ) : null,
+          latestComment && React.createElement('span', { className: 'v2-bubble-comment-preview' },
+            React.createElement(NameColorPill, { className: 'v2-bubble-comment-author', name: participantFor(latestComment)?.name || '댓글', color: participantFor(latestComment)?.color }),
+            React.createElement('span', { className: 'v2-bubble-comment-text' }, String(latestComment.text || '').slice(0, 90)),
+            memoComments.length > 1 ? React.createElement('em', { className: 'v2-bubble-comment-count' }, `댓글 ${memoComments.length}개`) : null
+          )
         );
       })) : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '최근 메모가 없습니다.')
     ),

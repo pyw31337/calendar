@@ -235,6 +235,45 @@
 .v2-design .bp-dday-strip::-webkit-scrollbar { display: none; }
 
 /* Home feed cards */
+/* Richer per-kind identity on the home summary cards — a plain white card with a thin outline
+ * icon read as flat/empty even when it had content. Each kind gets its own filled, tinted icon
+ * badge (chat=indigo, memo=purple, gallery=pink, places=green) plus a matching top accent bar,
+ * so someone glancing at the home screen can immediately see WHICH surface has fresh activity
+ * without opening it — the whole point of surfacing this on the home screen at all. */
+.v2-design .bp-bento-card.bp-is-chat,
+.v2-design .bp-bento-card.bp-is-memo,
+.v2-design .bp-bento-card.bp-is-gallery,
+.v2-design .bp-bento-card.bp-is-places {
+  position: relative;
+  overflow: hidden;
+}
+.v2-design .bp-bento-card.bp-is-chat::before,
+.v2-design .bp-bento-card.bp-is-memo::before,
+.v2-design .bp-bento-card.bp-is-gallery::before,
+.v2-design .bp-bento-card.bp-is-places::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+}
+.v2-design .bp-bento-card.bp-is-chat::before { background: linear-gradient(90deg, #4F46E5, #818CF8); }
+.v2-design .bp-bento-card.bp-is-memo::before { background: linear-gradient(90deg, #7C2FE5, #A78BFA); }
+.v2-design .bp-bento-card.bp-is-gallery::before { background: linear-gradient(90deg, #DB2777, #F9A8D4); }
+.v2-design .bp-bento-card.bp-is-places::before { background: linear-gradient(90deg, #059669, #34D399); }
+.v2-design .bp-bento-card.bp-is-chat .bp-bento-card-icon,
+.v2-design .bp-bento-card.bp-is-memo .bp-bento-card-icon,
+.v2-design .bp-bento-card.bp-is-gallery .bp-bento-card-icon,
+.v2-design .bp-bento-card.bp-is-places .bp-bento-card-icon {
+  width: 24px !important;
+  height: 24px !important;
+  border-radius: 8px;
+  opacity: 1 !important;
+  color: #fff !important;
+}
+.v2-design .bp-bento-card.bp-is-chat .bp-bento-card-icon { background: linear-gradient(135deg, #4F46E5, #818CF8); }
+.v2-design .bp-bento-card.bp-is-memo .bp-bento-card-icon { background: linear-gradient(135deg, #7C2FE5, #A78BFA); }
+.v2-design .bp-bento-card.bp-is-gallery .bp-bento-card-icon { background: linear-gradient(135deg, #DB2777, #F9A8D4); }
+.v2-design .bp-bento-card.bp-is-places .bp-bento-card-icon { background: linear-gradient(135deg, #059669, #34D399); }
 .v2-design .bp-renewal-home-chat-item { width: 100%; padding: 0; border: 0; background: none; text-align: left; cursor: pointer; }
 .v2-design .bp-renewal-home-chat-content { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
 .v2-design .bp-chat-img { object-fit: cover; display: block; }
