@@ -692,13 +692,15 @@
   }
 }
 
-/* Gallery: hide redundant records subtab when side-nav already selects 갤러리;
-   keep feature tabs 사진/링크/파일. Soften emoji-era chrome. */
-.v2-design .renewal-shell-main.v2-records-media .renewal-shell-subtab-row,
-.v2-design .renewal-shell-main.is-records.v2-records-media .renewal-shell-subtab-row {
-  /* Keep for 전체 hub; when on media the side-nav is source of IA — compress row */
-  padding: 6px 12px !important;
+/* Gallery/Content/Archive: remove redundant records subtab when side-nav already
+   selects the destination. JS also omits the row (v2-records-no-subtab); CSS is belt+suspenders. */
+.v2-design .v2-records-no-subtab > .renewal-shell-subtab-row,
+.v2-design .renewal-shell-main.v2-records-media > .v2-records-frame > .renewal-shell-subtab-row,
+.v2-design .renewal-shell-main.v2-records-content > .v2-records-frame > .renewal-shell-subtab-row,
+.v2-design .renewal-shell-main.v2-records-archive > .v2-records-frame > .renewal-shell-subtab-row {
+  display: none !important;
 }
+
 .v2-design .v2-gallery .gallery-page-header {
   height: 52px !important;
 }
@@ -802,20 +804,30 @@
   overflow: hidden !important;
 }
 
-/* Preferred ChatFull path (v2-chat-root): same bubble density as wrap-legacy rules */
+/* ========== ChatFull bubble parity (loop7) ==========
+   Others: name pill left of bubble column; timestamp under bubble.
+   Own: keep end alignment; meta under bubble (not beside); white bubble; no speech tails. */
 .v2-design .v2-chat-root .msg-row-hover,
-.v2-design .v2-chat-scroll .msg-row-hover {
+.v2-design .v2-chat-scroll .msg-row-hover,
+.v2-design .v2-chat-legacy .msg-row-hover {
+  margin-bottom: 12px !important;
+  align-items: flex-start !important;
+  gap: 6px !important;
+}
+
+/* Other participants: ChatFull horizontal pill + stacked bubble/meta */
+.v2-design .v2-chat .msg-row-hover:not([style*="flex-end"]) {
   display: grid !important;
-  grid-template-columns: max-content minmax(0, 1fr);
+  grid-template-columns: max-content minmax(0, max-content) !important;
+  grid-template-rows: auto auto !important;
   column-gap: 6px !important;
   row-gap: 3px !important;
-  margin-bottom: 14px !important;
-  align-items: start !important;
+  justify-content: flex-start !important;
 }
-.v2-design .v2-chat-root .msg-row-hover > span:first-child,
-.v2-design .v2-chat-scroll .msg-row-hover > span:first-child {
-  grid-column: 1;
-  grid-row: 1;
+.v2-design .v2-chat .msg-row-hover:not([style*="flex-end"]) > span:first-child {
+  grid-column: 1 !important;
+  grid-row: 1 / span 2 !important;
+  align-self: start !important;
   font-size: 0.62rem !important;
   padding: 2px 6px !important;
   font-weight: 800 !important;
@@ -824,24 +836,91 @@
   color: #fff !important;
   line-height: 1.3 !important;
 }
-.v2-design .v2-chat-root .msg-row-hover > div,
-.v2-design .v2-chat-scroll .msg-row-hover > div {
-  grid-column: 2;
+.v2-design .v2-chat .msg-row-hover:not([style*="flex-end"]) > div:nth-child(2) {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  max-width: min(65vw, 420px) !important;
 }
-/* Own messages: keep end alignment without breaking name-pill grid for others */
-.v2-design .v2-chat-root .msg-row-hover[style*="flex-end"],
-.v2-design .v2-chat-scroll .msg-row-hover[style*="flex-end"] {
+.v2-design .v2-chat .msg-row-hover:not([style*="flex-end"]) > div:nth-child(3) {
+  grid-column: 2 !important;
+  grid-row: 2 !important;
   display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 6px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  min-width: 0 !important;
+  align-self: start !important;
+}
+
+/* Own messages: bubble on top, meta under (ChatFull meta layout) while keeping end align */
+.v2-design .v2-chat .msg-row-hover[style*="flex-end"] {
+  display: grid !important;
+  grid-template-columns: minmax(0, max-content) !important;
+  grid-template-rows: auto auto !important;
+  justify-content: end !important;
+  justify-items: end !important;
+  column-gap: 0 !important;
+  row-gap: 3px !important;
+}
+.v2-design .v2-chat .msg-row-hover[style*="flex-end"] > div:first-child {
+  grid-column: 1 !important;
+  grid-row: 2 !important;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
   justify-content: flex-end !important;
   gap: 6px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  min-width: 0 !important;
+  align-self: end !important;
 }
+.v2-design .v2-chat .msg-row-hover[style*="flex-end"] > div:last-child {
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+  max-width: min(65vw, 420px) !important;
+  align-self: end !important;
+}
+
+/* Hide legacy speech-bubble triangles under V2 */
+.v2-design .v2-chat .msg-row-hover > div > div[style*="border-left"],
+.v2-design .v2-chat .msg-row-hover > div > div[style*="borderLeft"],
+.v2-design .v2-chat .msg-row-hover > div > div[style*="border-right"],
+.v2-design .v2-chat .msg-row-hover > div > div[style*="borderRight"] {
+  display: none !important;
+}
+
+/* White ChatFull bubbles (own + others); slight radius bump */
+.v2-design .v2-chat .msg-row-hover > div > div[style*="backgroundColor"],
+.v2-design .v2-chat .msg-row-hover > div > div[style*="background-color"] {
+  background: #fff !important;
+  border: 1px solid #eceaf5 !important;
+  border-radius: 14px !important;
+  box-shadow: 0 2px 8px rgba(30, 27, 46, 0.05) !important;
+  color: #1e1b2e !important;
+  font-size: 0.86rem !important;
+  line-height: 1.45 !important;
+  padding: 8px 12px !important;
+}
+
+/* Meta timestamp denser */
+.v2-design .v2-chat .msg-row-hover > div > span[style*="fontSize"],
+.v2-design .v2-chat .msg-row-hover > div span[style*="font-size"] {
+  font-size: 0.62rem !important;
+  color: #9ca3af !important;
+  line-height: 1.3 !important;
+}
+
 .v2-design .v2-chat-root .chat-messages-scroll,
 .v2-design .v2-chat-scroll {
   padding: 8px 14px 100px !important;
   background: #fafafc !important;
 }
 
-/* Gallery: tighten records subtab + page header stack */
+/* Gallery: tighten records subtab + page header stack (when strip visible on 전체) */
 .v2-design .v2-records-frame > .renewal-shell-subtab-row {
   padding: 4px 10px !important;
   gap: 4px !important;
@@ -877,3 +956,166 @@
   z-index: 6 !important;
 }
 
+/* ========== SettlementFull denser card chrome (loop7) ========== */
+.v2-design .v2-settlement .settlement-person-grid {
+  gap: 6px !important;
+}
+.v2-design .v2-settlement .settlement-person-card {
+  padding: 8px 8px 7px !important;
+  border-radius: 12px !important;
+  gap: 6px !important;
+  box-shadow: 0 2px 8px rgba(30, 27, 46, 0.05) !important;
+}
+.v2-design .v2-settlement .settlement-person-name {
+  font-size: 0.72rem !important;
+  gap: 4px !important;
+}
+.v2-design .v2-settlement .settlement-person-amount {
+  font-size: 0.82rem !important;
+}
+.v2-design .v2-settlement .settlement-person-dot {
+  width: 7px !important;
+  height: 7px !important;
+}
+.v2-design .v2-settlement .settlement-ledger-row {
+  gap: 2px !important;
+  padding: 7px 10px !important;
+  border: 1px solid #eceaf5 !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+  margin: 0 !important;
+}
+.v2-design .v2-settlement .settlement-page-body section,
+.v2-design .v2-settlement .v2-settlement-body section {
+  padding: 10px !important;
+  gap: 6px !important;
+}
+.v2-design .v2-settlement .settlement-page-body section > div[style*="flex-direction: column"],
+.v2-design .v2-settlement .v2-settlement-body > div {
+  gap: 6px !important;
+}
+.v2-design .v2-settlement .settlement-ledger-row > div:first-child strong {
+  font-size: 0.82rem !important;
+}
+.v2-design .v2-settlement .settlement-ledger-row > span:first-of-type {
+  font-size: 0.78rem !important;
+  font-weight: 600 !important;
+}
+.v2-design .v2-settlement .settlement-running-balance {
+  font-size: 0.62rem !important;
+  margin-top: 0 !important;
+}
+.v2-design .v2-settlement .settlement-page-body {
+  gap: 10px !important;
+  padding-left: 14px !important;
+  padding-right: 14px !important;
+}
+.v2-design .v2-settlement .settlement-page-body > div > div[role="button"] {
+  padding: 10px 12px 9px !important;
+  gap: 8px !important;
+  border-radius: 14px !important;
+}
+
+/* ========== PlacesFull card density via live .place-card-row (loop7) ========== */
+.v2-design .v2-places .place-card-row,
+.v2-design .v2-places-legacy .place-card-row,
+.v2-design .v2-places .places-list-body .place-card-row {
+  padding: 8px 10px !important;
+  gap: 2px !important;
+  border-radius: 12px !important;
+  border: 1px solid #eceaf5 !important;
+  box-shadow: 0 1px 4px rgba(30, 27, 46, 0.04) !important;
+  background: #fff !important;
+  margin-bottom: 6px !important;
+}
+.v2-design .v2-places .place-card-row > div {
+  gap: 4px !important;
+}
+.v2-design .v2-places .place-card-row [style*="fontSize: 'var(--font-size-xs)'"],
+.v2-design .v2-places .place-card-row [style*="font-size: var(--font-size-xs)"] {
+  font-size: 0.62rem !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+.v2-design .v2-places .place-card-row button[title],
+.v2-design .v2-places .place-card-row button[aria-label] {
+  width: 24px !important;
+  height: 24px !important;
+}
+.v2-design .v2-places .places-list-body {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0 !important;
+  padding: 8px 12px 88px !important;
+}
+.v2-design .v2-places .place-card-row [style*="fontWeight: 900"],
+.v2-design .v2-places .place-card-row strong {
+  font-size: 0.88rem !important;
+  font-weight: 800 !important;
+  color: #1e1b2e !important;
+}
+.v2-design .v2-places .places-list-toolbar {
+  padding: 8px 12px !important;
+  gap: 6px !important;
+}
+.v2-design .v2-places .places-category-sticky-tabs {
+  padding: 6px 10px !important;
+  gap: 4px !important;
+}
+
+/* ========== Content + Archive Bento page chrome (loop7) ========== */
+.v2-design .v2-content .places-view-header,
+.v2-design .v2-archive .places-view-header,
+.v2-design .v2-content-legacy .places-view-header,
+.v2-design .v2-archive-legacy .places-view-header {
+  height: 52px !important;
+  padding: 0 14px !important;
+  background: #fff !important;
+  border-bottom: 1px solid #eceaf5 !important;
+  box-shadow: none !important;
+}
+.v2-design .v2-content .places-view-container,
+.v2-design .v2-archive .places-view-container {
+  background: #fafafc !important;
+}
+.v2-design .v2-content [class*="category-chip"],
+.v2-design .v2-archive [class*="category-chip"],
+.v2-design .v2-content .underline-tabs,
+.v2-design .v2-archive .underline-tabs {
+  background: #fff !important;
+  border-bottom: 1px solid #eceaf5 !important;
+}
+.v2-design .v2-content .content-card,
+.v2-design .v2-content [class*="culture-card"],
+.v2-design .v2-archive .history-card,
+.v2-design .v2-archive [class*="memory-card"] {
+  border-radius: 14px !important;
+  border: 1px solid #eceaf5 !important;
+  box-shadow: 0 2px 8px rgba(30, 27, 46, 0.05) !important;
+  background: #fff !important;
+}
+.v2-design .v2-records-no-subtab .v2-records-body {
+  /* full height when strip removed */
+  top: 0;
+}
+
+/* Loop8: tighter own bubbles + ensure meta row doesn't stretch wide */
+.v2-design .v2-chat .msg-row-hover[style*="flex-end"] > div:last-child > div[style*="background"] {
+  max-width: min(58vw, 380px) !important;
+}
+.v2-design .v2-chat .msg-row-hover:not([style*="flex-end"]) > div:nth-child(2) > div[style*="background"] {
+  max-width: min(58vw, 380px) !important;
+  border-radius: 0 14px 14px 14px !important;
+}
+.v2-design .v2-chat .msg-row-hover[style*="flex-end"] > div:last-child > div[style*="background"] {
+  border-radius: 14px 0 14px 14px !important;
+}
+.v2-design .v2-chat .msg-actions-group {
+  opacity: 0;
+  pointer-events: none;
+}
+.v2-design .v2-chat .msg-row-hover:hover .msg-actions-group,
+.v2-design .v2-chat .msg-row-hover.msg-actions-revealed .msg-actions-group {
+  opacity: 1;
+  pointer-events: auto;
+}

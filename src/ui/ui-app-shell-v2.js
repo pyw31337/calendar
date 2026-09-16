@@ -1558,17 +1558,23 @@ function RecordsPane({ subTab, onSelectSubTab, calendarName, recordsContext, cal
     if (subTab === 'memo') onChangeView('memo');
     else if (subTab === 'places') onChangeView('places');
   }, [subTab]);
-  return React.createElement('div', { className: 'v2-records-frame' },
-    React.createElement('div', { className: 'renewal-shell-subtab-row', role: 'tablist', 'aria-label': '기록 필터' },
-      RECORDS_SUBTABS.map(t => React.createElement('button', {
-        key: t.id,
-        type: 'button',
-        role: 'tab',
-        'aria-selected': subTab === t.id,
-        className: `renewal-shell-subtab-item ${subTab === t.id ? 'is-active' : ''}`.trim(),
-        onClick: () => onSelectSubTab(t.id),
-      }, t.label))
-    ),
+  // Gallery/Content/Archive are selected from the side-nav — the records subtab strip
+  // (전체/사진·영상/보관함/콘텐츠) is redundant IA when those destinations are already active.
+  // Keep the strip only for the 전체 hub overview.
+  const hideSubtabStrip = subTab === 'media' || subTab === 'content' || subTab === 'archive';
+  return React.createElement('div', { className: `v2-records-frame${hideSubtabStrip ? ' v2-records-no-subtab' : ''}`.trim() },
+    hideSubtabStrip
+      ? null
+      : React.createElement('div', { className: 'renewal-shell-subtab-row', role: 'tablist', 'aria-label': '기록 필터' },
+          RECORDS_SUBTABS.map(t => React.createElement('button', {
+            key: t.id,
+            type: 'button',
+            role: 'tab',
+            'aria-selected': subTab === t.id,
+            className: `renewal-shell-subtab-item ${subTab === t.id ? 'is-active' : ''}`.trim(),
+            onClick: () => onSelectSubTab(t.id),
+          }, t.label))
+        ),
     React.createElement('div', { className: 'v2-records-body' },
     subTab === 'media'
       ? React.createElement(MediaPane, { recordsContext, onChangeView, onOpenAppSettings })
