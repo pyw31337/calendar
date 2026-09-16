@@ -43,3 +43,39 @@ Other screens look coherent post-#644 (memo clean, gallery 4-col, settlement sin
 
 Hide `.v2-design .v2-places button[aria-label="장소 추가"]` so only `.bp-fab` remains for create. Default shell untouched. No feature/URL change.
 
+
+---
+
+## Unit 1 — Places duplicate create (shipped)
+
+**PR:** [#645](https://github.com/pyw31337/calendar/pull/645)  
+**Commit:** `9604d107` (merge `191e98bf`)  
+**Change:** `.v2-design .v2-places button.btn-action-dark[aria-label="장소 추가"] { display: none }` in `src/ui/v2/screens.css`  
+**Default shell:** untouched (toolbar `+` still present off `shell=v2`)
+
+### Post-Pages re-capture (390×844)
+
+| Shot | Path |
+|------|------|
+| places (focus) | `unit-loop/unit1/places.png` |
+| home / chat / memo / gallery / settlement / content / side-nav / home-pc | `unit-loop/unit1/*.png` |
+| measure | `unit-loop/unit1/report.json` |
+
+### Review
+
+| Check | Result |
+|-------|--------|
+| Toolbar `장소 추가` hidden | **PASS** — DOM present, `display:none`, not visible |
+| Purple FAB `장소 등록` kept | **PASS** |
+| 편집 kept | **PASS** |
+| Prior Unit 0 gates still green | **PASS** (memo / side-nav / gallery 4-col / anniv) |
+
+### Remaining queue (next units)
+
+1. **Content / Archive visual polish** — chips/grid density vs Bento; content header actions sparse vs other destinations.
+2. **Chat / Memo body density** — still largely legacy trees under V2 chrome (ChatFull composer/message density incomplete per gap audit).
+3. **Gallery records subtab strip** — denser Bento header integration if strip still peeks under V2.
+4. **Home / PC density** — hero/type scale polish (P1, non-blocking).
+5. **Places map chrome** — map height / resize handle token pass only if still noisy after create fix.
+
+Do **not** start multi-screen rewrites; pick one focused pain per unit from live captures.
