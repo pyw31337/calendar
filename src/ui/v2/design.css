@@ -1385,6 +1385,36 @@
 }
 @keyframes bp-edge-sheen-spin { to { transform: rotate(360deg); } }
 
+/* Legacy .btn-action-dark/.btn-action-outline (src/app.css, shared with the default shell --
+ * left byte-for-byte unchanged there) render as a near-black #0F172A square button wherever a
+ * wrapped legacy view (gallery/archive/content toolbars) supplies its own "추가"/"편집" action.
+ * That flat black button breaks the vivid+glassy purple identity everywhere else in v2, so
+ * recolor it here, scoped to .v2-design only. */
+.v2-design .btn-action-dark,
+.v2-design .btn.btn-action-dark {
+  background: var(--v2-primary, #7C2FE5) !important;
+  border-color: var(--v2-primary, #7C2FE5) !important;
+  color: #fff !important;
+  box-shadow: var(--v2-primary-glow-sm) !important;
+}
+.v2-design .btn-action-dark:hover,
+.v2-design .btn.btn-action-dark:hover {
+  background: #6D28D9 !important;
+  border-color: #6D28D9 !important;
+}
+.v2-design .btn-action-outline,
+.v2-design .btn.btn-action-outline {
+  background: var(--v2-glass-light-fill, rgba(255,255,255,0.88)) !important;
+  border: 1px solid var(--v2-glass-light-border, #eceaf5) !important;
+  color: var(--brand, #7C2FE5) !important;
+  box-shadow: var(--v2-glass-light-inset, inset 0 1px 0 rgba(255,255,255,0.95)), var(--v2-glass-light-shadow, 0 1px 2px rgba(30,27,46,0.04)) !important;
+}
+.v2-design .btn-action-outline:hover,
+.v2-design .btn.btn-action-outline:hover {
+  background: var(--v2-glass-light-hover-fill, rgba(243,238,255,0.78)) !important;
+  border-color: var(--v2-glass-light-hover-border, #e0d4ff) !important;
+}
+
 /* Chips / author pills / settlement badges — more chroma, crisp edge */
 .v2-design .bp-tag-chip,
 .v2-design .bp-cat-chip,
