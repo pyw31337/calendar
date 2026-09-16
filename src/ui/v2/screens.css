@@ -1392,10 +1392,25 @@
 .v2-design .v2-has-page-header > .v2-legacy-body,
 .v2-design .v2-has-page-header > .v2-gallery-legacy,
 .v2-design .v2-has-page-header > .v2-content-legacy,
-.v2-design .v2-has-page-header > .v2-archive-legacy {
+.v2-design .v2-has-page-header > .v2-archive-legacy,
+.v2-design .v2-has-page-header > .places-view-container,
+/* .places-view-container is also targeted by the older, higher-specificity
+   `.renewal-shell-main.is-records .places-view-container { position: absolute; top: 0 }` rule
+   (Content/Archive/History all reuse that legacy class name from before they got a v2 PageHeader
+   wrapping them) — match that same specificity here so this reset actually wins and the legacy
+   body stacks below the header inside the flex column instead of jumping back to inset:0 and
+   overlapping it. */
+.v2-design .renewal-shell-main.is-records .v2-has-page-header > .places-view-container {
   flex: 1 1 auto !important;
   min-height: 0 !important;
   position: relative !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  height: auto !important;
+  min-height: 0 !important;
+  z-index: auto !important;
 }
 
 /* ========== loop10 / rebuild-4: denser chat column, in-pane scroll, density ========== */
@@ -1645,15 +1660,43 @@
   box-shadow: 0 2px 8px rgba(30, 27, 46, 0.05) !important;
   overflow: hidden;
 }
+/* Segmented-pill tabs (지역축제/문화행사/스포츠/영화, 추억/인물/지난모임) — same treatment as the
+   Settlement 누적보기/일자별보기 toggle and the event-sheet tabs, instead of the plain
+   underline style: a rounded pill track with the active segment lifted on a white chip. */
 .v2-design .v2-content .underline-tabs,
 .v2-design .v2-archive .underline-tabs {
-  padding: 0 12px !important;
+  display: flex !important;
+  gap: 0 !important;
+  background: var(--bg-primary, #fafafc) !important;
+  border-radius: 9999px !important;
+  padding: 3px !important;
+  margin: 10px var(--v2-dest-content-pad-x, 14px) !important;
+  border: none !important;
+  border-bottom: none !important;
+  width: auto !important;
+  box-sizing: border-box !important;
 }
 .v2-design .v2-content .underline-tabs button,
 .v2-design .v2-archive .underline-tabs button {
+  flex: 1 !important;
+  border: none !important;
+  border-bottom: none !important;
+  border-radius: 9999px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--text-muted, #6b6580) !important;
+  font-weight: 800 !important;
   font-size: 0.74rem !important;
-  font-weight: 700 !important;
-  padding: 6px 8px !important;
+  padding: 8px 4px !important;
+  margin-bottom: 0 !important;
+  opacity: 1 !important;
+}
+.v2-design .v2-content .underline-tabs button[aria-selected="true"],
+.v2-design .v2-archive .underline-tabs button[aria-selected="true"] {
+  background: var(--bg-card, #fff) !important;
+  color: var(--brand, #7C2FE5) !important;
+  box-shadow: 0 2px 6px rgba(30, 27, 46, 0.1) !important;
+  border-bottom: none !important;
 }
 /* Genre / category chips: portal into a classless slot, then an inner classless row */
 .v2-design .v2-content .history-header-stack > div:not([class]),
