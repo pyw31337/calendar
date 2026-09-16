@@ -87,3 +87,20 @@ test('V2 date modal opts into bento sheet chrome without changing default export
   assert.match(shell, /sub === 'memo' \|\| sub === 'places'/);
   assert.match(shell, /Only gallery\/content\/archive \(records\) keep \?sub=/);
 });
+
+test('V2 PC polish keeps wider rail, fluid content, 3x3 gallery, and participant memos', async () => {
+  const { readFileSync } = await import('node:fs');
+  const design = readFileSync(new URL('../src/ui/v2/design.css', import.meta.url), 'utf8');
+  const shell = readFileSync(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
+  assert.match(design, /--v2-side-nav-width:\s*280px/);
+  assert.match(design, /--v2-content-max:\s*1600px/);
+  assert.match(design, /grid-template-columns:\s*repeat\(3, 1fr\)/);
+  assert.match(design, /min-width:\s*2\.4em/);
+  assert.match(design, /bp-day-bar-stack/);
+  assert.match(design, /\.bp-p-dot::after[\s\S]*font-size:\s*0\.72rem/);
+  assert.match(shell, /slice\(0, 9\)/);
+  assert.match(shell, /dday-participant-memos/);
+  assert.match(shell, /participantMemosFor/);
+  assert.match(shell, /day-bar-stack/);
+  assert.match(shell, /anns\.slice\(0, 4\)\.map/);
+});

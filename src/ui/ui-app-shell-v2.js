@@ -14,6 +14,8 @@ import {
 
 const bentoClass = value => String(value || '').split(/\s+/).filter(Boolean).map(name => `bp-${name}`).join(' ');
 
+const BULK_NO_PARTICIPANT_ID = '__none__';
+
 import { getInitialAppView } from '../core/app-routing-state.js';
 import { isRenewalShellEnabled } from '../core/app-feature-flags.js';
 import { bindUiComponentAliases } from '../core/app-ui-wrappers.js';
@@ -331,12 +333,22 @@ export function buildRenewalCalendarContext(calendar, deps) {
 /** Compact hero zone from the approved BentoPink reference: one primary D-day plus
  * horizontally-scannable upcoming chips. It is presentation-only and reuses the same
  * confirmed meeting selector as the list below. */
-function RenewalHero({ meetings, onSelectDate }) {
+function RenewalHero({ meetings, calendar, onSelectDate }) {
   const React = window.React;
   const list = Array.isArray(meetings) ? meetings : [];
   const [isOpen, setIsOpen] = React.useState(false);
   if (!list.length) return React.createElement('p', { className: 'bp-empty-hero', 'aria-label': '가까운 확정 일정' }, '다가오는 확정 일정이 없습니다.');
   const primary = list[0];
+  const participants = getActiveParticipants(calendar || {});
+  const participantMemosFor = (dateStr) => getActiveAvailabilities(calendar || {})
+    .filter(e => e.date === dateStr && e.note && String(e.note).trim() && e.participantId !== BULK_NO_PARTICIPANT_ID)
+    .map(e => {
+      const p = participants.find(part => part.id === e.participantId);
+      const note = String(e.note).trim().replace(/\s+/g, ' ');
+      if (!note) return null;
+      return { id: e.participantId || e.id, name: p?.name || '참여자', color: p?.color || '#A78BFA', note };
+    })
+    .filter(Boolean);
   const labelFor = (meeting) => {
     const base = formatConfirmedMeetingLabel(meeting.date);
     const note = typeof meeting.note === 'string' ? meeting.note.trim().replace(/\s+/g, ' ') : '';
@@ -369,7 +381,22 @@ function RenewalHero({ meetings, onSelectDate }) {
           ),
           primary.note && React.createElement('div', { className: bentoClass('dday-expanded-tags') },
             React.createElement('span', { className: bentoClass('dday-expanded-tag') }, primary.note.trim())
-          )
+          ),
+          (() => {
+            const memos = participantMemosFor(primary.date);
+            if (!memos.length) return null;
+            return React.createElement('div', { className: bentoClass('dday-participant-memos'), 'aria-label': '참여자 일정 메모' },
+              memos.map(m => React.createElement('span', {
+                key: m.id,
+                className: bentoClass('dday-participant-memo'),
+                title: `${m.name}: ${m.note}`,
+                style: { borderColor: m.color },
+              },
+                React.createElement('span', { className: bentoClass('dday-participant-memo-name'), style: { color: m.color } }, m.name),
+                m.note
+              ))
+            );
+          })()
         ),
         React.createElement('div', { className: bentoClass('dday-expanded-side') },
           React.createElement('button', { type: 'button', className: bentoClass('dday-collapse-btn'), onClick: () => setIsOpen(false), 'aria-label': '접기' }, '⌃'),
@@ -617,9 +644,16 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
               style: { background: p.color || 'var(--brand)' },
             }))
           ) : null,
-          hasMeeting ? React.createElement('div', { className: bentoClass('day-bar solo') }) : null,
-          anns.length > 0 ? React.createElement('div', { className: bentoClass('day-anniversary') },
-            React.createElement('span', { className: bentoClass('day-anniversary-label') }, anns[0].title || '기념일')
+          (anns.length > 0 || hasMeeting) ? React.createElement('div', { className: bentoClass('day-bar-stack') },
+            // Flex stack (gap) — never absolute-overlap. Meeting strip last (= bottom).
+            anns.slice(0, 4).map((ann, annIdx) => React.createElement('div', {
+              key: ann.id || `${dateStr}_ann_${annIdx}`,
+              className: bentoClass('day-anniversary'),
+              title: ann.title || '기념일',
+            },
+              React.createElement('span', { className: bentoClass('day-anniversary-label') }, ann.title || '기념일')
+            )),
+            hasMeeting ? React.createElement('div', { key: `${dateStr}_meeting_bar`, className: bentoClass('day-bar solo') }) : null
           ) : null
         );
       })
@@ -649,7 +683,7 @@ function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeVie
   return React.createElement(React.Fragment, null,
     React.createElement('div', { className: 'bp-hero-zone' },
       React.createElement(TopHeader, { calendarName, onOpenSearch, onOpenMore }),
-      React.createElement(RenewalHero, { meetings: calendarContext.upcomingMeetings, onSelectDate: onOpenDate })
+      React.createElement(RenewalHero, { meetings: calendarContext.upcomingMeetings, calendar: calendarContext.calendar, onSelectDate: onOpenDate })
     ),
 
     React.createElement(HomeActivitySummary, {
@@ -713,7 +747,7 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
   const imageMessage = newestMessages.find(m => getMessageImageEntries(m).length);
   const messages = [imageMessage, ...newestMessages.filter(m => m !== imageMessage && (m.text || m.content)).slice(0, 2)].filter(Boolean);
   const memos = Array.isArray(calendarContext?.memos) ? latestRows(calendarContext.memos).slice(0, 2) : [];
-  const photos = Array.isArray(calendarContext?.galleryPhotoIndex?.items) ? calendarContext.galleryPhotoIndex.items.slice(0, 8) : [];
+  const photos = Array.isArray(calendarContext?.galleryPhotoIndex?.items) ? calendarContext.galleryPhotoIndex.items.slice(0, 9) : [];
   const places = Array.isArray(calendarContext?.places) ? latestRows(calendarContext.places).slice(0, 2) : [];
   const participants = Array.isArray(calendarContext?.calendar?.participants) ? calendarContext.calendar.participants : [];
   const participantFor = row => participants.find(p => p && (p.id === row?.participantId || p.name === row?.senderName || p.name === row?.author));
