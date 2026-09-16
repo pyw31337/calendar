@@ -190,7 +190,7 @@ export function MemoScreen(p) {
     if (slots.body) {
       return h(
         'section',
-        { className: 'v2-memo v2-fullscreen v2-dest-page' },
+        { className: 'v2-memo v2-dest-page' },
         h(
           'div',
           { className: 'bp-app-shell' },
@@ -234,7 +234,7 @@ export function MemoScreen(p) {
     }
     return h(
       'section',
-      { className: 'v2-memo v2-fullscreen v2-wrap-legacy' },
+      { className: 'v2-memo v2-dest-page v2-wrap-legacy' },
       h(
         'div',
         { className: 'bp-app-shell' },
@@ -279,7 +279,7 @@ export function MemoScreen(p) {
 
   return h(
     'section',
-    { className: 'v2-memo v2-fullscreen' },
+    { className: 'v2-memo v2-dest-page' },
     h(
       'div',
       { className: 'bp-app-shell' },
@@ -387,7 +387,7 @@ export function PlacesScreen(p) {
     if (slots.list || slots.map) {
       return h(
         'section',
-        { className: 'v2-places v2-fullscreen v2-dest-page' },
+        { className: 'v2-places v2-dest-page' },
         h(
           'div',
           { className: 'bp-app-shell' },
@@ -425,7 +425,7 @@ export function PlacesScreen(p) {
     }
     return h(
       'section',
-      { className: 'v2-places v2-fullscreen v2-wrap-legacy' },
+      { className: 'v2-places v2-dest-page v2-wrap-legacy' },
       h(
         'div',
         { className: 'bp-app-shell' },
@@ -461,7 +461,7 @@ export function PlacesScreen(p) {
 
   return h(
     'section',
-    { className: 'v2-places v2-fullscreen' },
+    { className: 'v2-places v2-dest-page' },
     h(
       'div',
       { className: 'bp-app-shell' },
@@ -606,7 +606,7 @@ export function SettlementScreen(p) {
     if (slots.body) {
       return h(
         'section',
-        { className: 'v2-settlement v2-fullscreen v2-dest-page' },
+        { className: 'v2-settlement v2-dest-page' },
         h(
           'div',
           { className: 'bp-app-shell' },
@@ -625,7 +625,7 @@ export function SettlementScreen(p) {
     }
     return h(
       'section',
-      { className: 'v2-settlement v2-fullscreen v2-wrap-legacy' },
+      { className: 'v2-settlement v2-dest-page v2-wrap-legacy' },
       h(
         'div',
         { className: 'bp-app-shell' },
@@ -649,7 +649,7 @@ export function SettlementScreen(p) {
 
   return h(
     'section',
-    { className: 'v2-settlement v2-fullscreen' },
+    { className: 'v2-settlement v2-dest-page' },
     h(
       'div',
       { className: 'bp-app-shell' },
@@ -907,7 +907,7 @@ export function ChatScreen(p) {
 
     return h(
       'section',
-      { className: `v2-chat${p.isSearchOpen ? ' v2-chat-search-open' : ''}` },
+      { className: `v2-chat v2-dest-page${p.isSearchOpen ? ' v2-chat-search-open' : ''}` },
       clone(
         originalRoot,
         { className: 'chat-room-container v2-chat-root' },
@@ -936,7 +936,7 @@ export function ChatScreen(p) {
   // Wrap path: inject dedicated header over the live ChatRoomView tree (no slot extraction yet).
   return h(
     'section',
-    { className: `v2-chat v2-fullscreen v2-wrap-legacy${p.isSearchOpen ? ' v2-chat-search-open' : ''}` },
+    { className: `v2-chat v2-dest-page v2-wrap-legacy${p.isSearchOpen ? ' v2-chat-search-open' : ''}` },
     h(
       'div',
       { className: 'bp-app-shell v2-chat-shell' },
@@ -960,3 +960,40 @@ export const renderMemoScreen = props => h(MemoScreen, props);
 export const renderPlacesScreen = props => h(PlacesScreen, props);
 export const renderSettlementScreen = props => h(SettlementScreen, props);
 export const renderChatScreen = props => h(ChatScreen, props);
+
+/* -------------------------------------------------------------------------- */
+/* Gallery / Content / Archive — V2 page frames (restyle legacy chrome in place) */
+/* Dedicated Full mocks do not exist; match BentoPinkFinal IA + home density.   */
+/* Header actions (search/share/menu) stay on the live feature tree.            */
+/* -------------------------------------------------------------------------- */
+
+export function GalleryScreen(p) {
+  return h(
+    'section',
+    { className: 'v2-gallery v2-dest-page v2-embed-frame v2-records-media' },
+    wrapLegacy(p.legacyView, 'v2-legacy-body v2-gallery-legacy'),
+    overlays(p.slots)
+  );
+}
+
+export function ContentScreen(p) {
+  return h(
+    'section',
+    { className: 'v2-content v2-dest-page v2-embed-frame' },
+    wrapLegacy(p.legacyView, 'v2-legacy-body v2-content-legacy'),
+    overlays(p.slots)
+  );
+}
+
+export function ArchiveScreen(p) {
+  return h(
+    'section',
+    { className: 'v2-archive v2-dest-page v2-embed-frame' },
+    wrapLegacy(p.legacyView, 'v2-legacy-body v2-archive-legacy'),
+    overlays(p.slots)
+  );
+}
+
+export const renderGalleryScreen = props => h(GalleryScreen, props);
+export const renderContentScreen = props => h(ContentScreen, props);
+export const renderArchiveScreen = props => h(ArchiveScreen, props);

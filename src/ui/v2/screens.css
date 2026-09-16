@@ -1,12 +1,14 @@
 /* Dedicated chrome + legacy-body restyle for Chat/Memo/Places/Settlement (?shell=v2 only). */
 
 .v2-design .v2-fullscreen {
-  position: fixed; inset: 0; z-index: 1050; overflow-y: auto; overflow-x: hidden;
+  /* First-class pane inside renewal-shell-main (beside side rail) — not a viewport overlay. */
+  position: relative; inset: auto; z-index: 1; overflow-y: auto; overflow-x: hidden;
+  min-height: 100dvh; width: 100%;
   background: #fafafc; color: #1e1b2e; font-family: var(--font-sans);
   padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 .v2-design .v2-fullscreen > .bp-app-shell {
-  width: 100%; max-width: 480px; padding: 0 0 90px; margin: 0 auto; min-height: 100%;
+  width: 100%; max-width: none; padding: 0 0 90px; margin: 0; min-height: 100%;
   background: #fafafc; position: relative;
 }
 .v2-design .v2-page-header { display: block; }
@@ -139,7 +141,7 @@
 
 /* Chat */
 .v2-design .v2-chat { background: #fafafc; }
-.v2-design .v2-chat-shell { max-width: 480px; padding-bottom: 0 !important; }
+.v2-design .v2-chat-shell { max-width: none; width: 100%; padding-bottom: 0 !important; }
 .v2-design .v2-chat-root,
 .v2-design .v2-chat-legacy {
   background: #fafafc !important;
@@ -223,19 +225,19 @@
 }
 
 @media (min-width: 768px) {
-  .v2-design .v2-fullscreen > .bp-app-shell { max-width: 720px; }
-  .v2-design .v2-chat-shell { max-width: 640px; }
-  .v2-design .v2-chat .inline-search-bar { max-width: 640px; }
+  .v2-design .v2-fullscreen > .bp-app-shell { max-width: none; }
+  .v2-design .v2-chat-shell { max-width: min(960px, 100%); margin: 0 auto; }
+  .v2-design .v2-chat .inline-search-bar { max-width: min(960px, 100%); }
   .v2-design .v2-chat { --v2-chat-image-width: 150px; }
   .v2-design .v2-chat .v2-chat-message-content,
-  .v2-design .v2-chat-legacy .msg-row-hover [style*="background"] { max-width: 340px !important; }
-  .v2-design .v2-fullscreen .bp-fab { right: max(20px, calc(50% - 360px + 20px)); }
+  .v2-design .v2-chat-legacy .msg-row-hover [style*="background"] { max-width: 420px !important; }
+  .v2-design .v2-fullscreen .bp-fab { right: 24px; }
 }
 @media (min-width: 1200px) {
-  .v2-design .v2-fullscreen > .bp-app-shell { max-width: 1080px; padding: 0 20px 90px; }
-  .v2-design .v2-chat-shell { max-width: 820px; padding: 0 20px !important; }
-  .v2-design .v2-chat .inline-search-bar { max-width: 820px; }
-  .v2-design .v2-fullscreen .bp-fab { right: max(20px, calc(50% - 540px + 20px)); }
+  .v2-design .v2-fullscreen > .bp-app-shell { max-width: none; padding: 0 0 90px; }
+  .v2-design .v2-chat-shell { max-width: min(1100px, 100%); padding: 0 24px !important; margin: 0 auto; }
+  .v2-design .v2-chat .inline-search-bar { max-width: min(1100px, 100%); }
+  .v2-design .v2-fullscreen .bp-fab { right: 28px; }
 }
 @media (max-width: 767px) {
   .v2-design .bp-search-input { font-size: 16px; }
@@ -456,3 +458,422 @@
   /* keep controls visible — do not hide FABs/actions */
   visibility: visible !important;
 }
+
+
+/* --------------------------------------------------------------------------
+ * Structural rebuild: contain legacy fixed page shells inside the V2 main pane
+ * so the Bento side rail stays visible. Default shell never loads this file.
+ * -------------------------------------------------------------------------- */
+
+.v2-design .renewal-shell-main {
+  position: relative;
+  min-height: 100dvh;
+  width: 100%;
+  isolation: isolate;
+  background: #fafafc;
+}
+
+.v2-design .renewal-shell-main .chat-room-container,
+.v2-design .renewal-shell-main .memo-view-container,
+.v2-design .renewal-shell-main .places-view-container,
+.v2-design .renewal-shell-main .settlement-page-container,
+.v2-design .renewal-shell-main .gallery-page-container,
+.v2-design .renewal-shell-main .v2-fullscreen,
+.v2-design .renewal-shell-main .v2-dest-page,
+.v2-design .renewal-shell-main .v2-chat,
+.v2-design .renewal-shell-main .v2-memo,
+.v2-design .renewal-shell-main .v2-places,
+.v2-design .renewal-shell-main .v2-settlement,
+.v2-design .renewal-shell-main .v2-gallery,
+.v2-design .renewal-shell-main .v2-content,
+.v2-design .renewal-shell-main .v2-archive {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  max-width: none !important;
+  height: auto !important;
+  min-height: 100% !important;
+  z-index: 1 !important;
+  transform: none !important;
+}
+
+/* Sticky headers inside the pane (were viewport-fixed) */
+.v2-design .renewal-shell-main .gallery-page-header,
+.v2-design .renewal-shell-main .memo-view-header,
+.v2-design .renewal-shell-main .places-view-header,
+.v2-design .renewal-shell-main .settlement-page-header,
+.v2-design .renewal-shell-main .history-header-stack,
+.v2-design .renewal-shell-main .chat-room-header,
+.v2-design .renewal-shell-main .inline-search-bar,
+.v2-design .renewal-shell-main .settlement-page-tabs {
+  position: sticky !important;
+  top: 0 !important;
+  left: auto !important;
+  right: auto !important;
+  width: 100% !important;
+  max-width: none !important;
+  z-index: 5 !important;
+}
+
+/* Restyle legacy page headers to V2 chrome (keep search/share/menu wired) */
+.v2-design .v2-gallery-legacy .gallery-page-header,
+.v2-design .v2-content-legacy .places-view-header,
+.v2-design .v2-archive-legacy .places-view-header {
+  height: 52px !important;
+  padding: 0 14px !important;
+  background: #fff !important;
+  border-bottom: 1px solid #eceaf5 !important;
+  box-shadow: none !important;
+}
+.v2-design .v2-gallery-legacy .gallery-page-header [style*="fontWeight"],
+.v2-design .v2-content-legacy .places-view-header [style*="fontWeight"],
+.v2-design .v2-archive-legacy .places-view-header [style*="fontWeight"] {
+  font-weight: 800 !important;
+  font-size: 0.96rem !important;
+  color: #1e1b2e !important;
+}
+.v2-design .v2-embed-frame {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  background: #fafafc;
+}
+.v2-design .v2-embed-frame > .v2-legacy-body {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* Records hub: keep subtab row above contained page bodies */
+.v2-design .renewal-shell-subtab-row {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  background: #fafafc;
+  border-bottom: 1px solid #eceaf5;
+  padding: 8px 12px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.v2-design .renewal-shell-main.is-records {
+  display: flex;
+  flex-direction: column;
+}
+.v2-design .renewal-shell-main.is-records .renewal-shell-subtab-row { flex-shrink: 0; }
+.v2-design .renewal-shell-main.is-records .v2-records-media,
+.v2-design .renewal-shell-main.is-records .v2-gallery,
+.v2-design .renewal-shell-main.is-records .v2-content,
+.v2-design .renewal-shell-main.is-records .v2-archive {
+  position: relative !important;
+  flex: 1 1 auto;
+  min-height: 0;
+  inset: auto !important;
+  height: auto !important;
+}
+
+/* Gallery dense grid under V2 chrome */
+.v2-design .v2-gallery .gallery-page-scroll,
+.v2-design .v2-records-media .gallery-page-scroll {
+  padding-top: 8px !important;
+}
+.v2-design .v2-gallery .bp-header,
+.v2-design .v2-content .bp-header,
+.v2-design .v2-archive .bp-header {
+  background: #fff;
+  border-bottom: 1px solid #eceaf5;
+  padding: 10px 14px 8px;
+}
+
+/* Chat density: slightly wider bubbles on PC, keep mock scale */
+@media (min-width: 1200px) {
+  .v2-design .v2-chat .v2-chat-message-content { max-width: 460px !important; }
+  .v2-design .renewal-shell-main .v2-memo .bp-memo-grid,
+  .v2-design .v2-memo .bp-memo-grid {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 12px;
+    padding: 12px 16px 96px;
+  }
+}
+
+/* FAB sits in pane corner, not centered on 480px column */
+.v2-design .v2-fullscreen .bp-fab,
+.v2-design .v2-dest-page .bp-fab,
+.v2-design .v2-gallery .bp-fab,
+.v2-design .v2-settlement .bp-fab,
+.v2-design .v2-memo .bp-fab,
+.v2-design .v2-places .bp-fab {
+  position: absolute;
+  right: 20px;
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  z-index: 8;
+}
+
+/* Chat: always hide legacy title bar when V2 PageHeader is present */
+.v2-design .v2-chat .chat-room-header,
+.v2-design .v2-chat-legacy .chat-room-header,
+.v2-design .v2-wrap-legacy .chat-room-header {
+  display: none !important;
+}
+/* Chat column density on PC: ChatFull-scale centered pane beside rail */
+@media (min-width: 1200px) {
+  .v2-design .v2-chat.v2-dest-page,
+  .v2-design .renewal-shell-main.v2-chat {
+    background: #f3f1f8;
+  }
+  .v2-design .v2-chat-shell,
+  .v2-design .v2-chat .v2-chat-root,
+  .v2-design .v2-chat .chat-room-container {
+    max-width: min(1080px, 100%) !important;
+    width: 100% !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    background: #fafafc !important;
+    box-shadow: 0 0 0 1px #eceaf5;
+  }
+  .v2-design .v2-chat .chat-composer {
+    position: absolute !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    max-width: min(1080px, 100%) !important;
+    margin: 0 auto !important;
+    z-index: 6 !important;
+  }
+  .v2-design .v2-chat .chat-messages-scroll {
+    padding: 8px 16px 110px !important;
+  }
+}
+
+/* Memo PC: MemoFull-like single column + dense tags beside rail */
+@media (min-width: 1200px) {
+  .v2-design .v2-memo.v2-dest-page .bp-app-shell,
+  .v2-design .renewal-shell-main.v2-memo .bp-app-shell {
+    max-width: 760px !important;
+    margin: 0 auto !important;
+    background: #fafafc;
+  }
+  .v2-design .v2-memo .bp-tag-filter-row {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+    padding: 8px 14px 4px !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  .v2-design .v2-memo .bp-tag-chip {
+    font-size: 0.68rem !important;
+    padding: 4px 10px !important;
+  }
+  .v2-design .v2-memo .v2-dest-body,
+  .v2-design .v2-memo .v2-memo-body {
+    padding: 0 8px 96px !important;
+  }
+}
+
+/* Settlement PC: card column, not edge-to-edge stretch */
+@media (min-width: 1200px) {
+  .v2-design .v2-settlement.v2-dest-page .bp-app-shell,
+  .v2-design .renewal-shell-main.v2-settlement .bp-app-shell {
+    max-width: 760px !important;
+    margin: 0 auto !important;
+  }
+  .v2-design .v2-settlement .settlement-page-body,
+  .v2-design .v2-settlement .v2-settlement-body {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 12px 16px 96px !important;
+  }
+  .v2-design .v2-settlement .settlement-page-tabs {
+    max-width: 760px;
+    margin: 0 auto;
+  }
+}
+
+/* Gallery: hide redundant records subtab when side-nav already selects 갤러리;
+   keep feature tabs 사진/링크/파일. Soften emoji-era chrome. */
+.v2-design .renewal-shell-main.v2-records-media .renewal-shell-subtab-row,
+.v2-design .renewal-shell-main.is-records.v2-records-media .renewal-shell-subtab-row {
+  /* Keep for 전체 hub; when on media the side-nav is source of IA — compress row */
+  padding: 6px 12px !important;
+}
+.v2-design .v2-gallery .gallery-page-header {
+  height: 52px !important;
+}
+.v2-design .v2-gallery .gallery-page-container {
+  background: #fafafc !important;
+}
+@media (min-width: 1200px) {
+  .v2-design .v2-gallery .gallery-page-inner,
+  .v2-design .v2-records-media .gallery-page-inner {
+    max-width: none !important;
+  }
+}
+
+/* Places PC column */
+@media (min-width: 1200px) {
+  .v2-design .v2-places.v2-dest-page .bp-app-shell {
+    max-width: 960px !important;
+    margin: 0 auto !important;
+  }
+}
+
+/* Gallery/Content/Archive: fill remaining height under records subtabs (fix empty pane) */
+.v2-design .renewal-shell-main.is-records {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  overflow: hidden !important;
+}
+.v2-design .renewal-shell-main.is-records > .renewal-shell-subtab-row {
+  flex: 0 0 auto !important;
+}
+.v2-design .renewal-shell-main.is-records > .v2-records-media,
+.v2-design .renewal-shell-main.is-records > .v2-gallery,
+.v2-design .renewal-shell-main.is-records > .v2-content,
+.v2-design .renewal-shell-main.is-records > .v2-archive,
+.v2-design .renewal-shell-main.is-records > section {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: auto !important;
+  position: relative !important;
+  inset: auto !important;
+  overflow: hidden !important;
+}
+.v2-design .renewal-shell-main.is-records .v2-gallery,
+.v2-design .renewal-shell-main.is-records .v2-embed-frame,
+.v2-design .renewal-shell-main.is-records .v2-gallery-legacy,
+.v2-design .renewal-shell-main.is-records .gallery-page-container,
+.v2-design .renewal-shell-main.is-records .gallery-page-inner,
+.v2-design .renewal-shell-main.is-records .v2-content-legacy,
+.v2-design .renewal-shell-main.is-records .v2-archive-legacy,
+.v2-design .renewal-shell-main.is-records .places-view-container {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+.v2-design .renewal-shell-main.is-records .gallery-page-scroll,
+.v2-design .renewal-shell-main.is-records .history-page-scroll {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  position: relative !important;
+}
+
+.v2-design .v2-records-frame {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  min-height: 100dvh;
+  overflow: hidden;
+  background: #fafafc;
+}
+.v2-design .v2-records-frame > .renewal-shell-subtab-row { flex: 0 0 auto; }
+.v2-design .v2-records-frame > .v2-records-body {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Critical: MediaPane wrapper collapses when children are absolute — force fill */
+.v2-design .v2-records-body > .v2-records-media,
+.v2-design .v2-records-body > .v2-gallery,
+.v2-design .v2-records-body > .v2-content,
+.v2-design .v2-records-body > .v2-archive,
+.v2-design .v2-records-body > section {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  overflow: hidden !important;
+}
+
+/* Preferred ChatFull path (v2-chat-root): same bubble density as wrap-legacy rules */
+.v2-design .v2-chat-root .msg-row-hover,
+.v2-design .v2-chat-scroll .msg-row-hover {
+  display: grid !important;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: 6px !important;
+  row-gap: 3px !important;
+  margin-bottom: 14px !important;
+  align-items: start !important;
+}
+.v2-design .v2-chat-root .msg-row-hover > span:first-child,
+.v2-design .v2-chat-scroll .msg-row-hover > span:first-child {
+  grid-column: 1;
+  grid-row: 1;
+  font-size: 0.62rem !important;
+  padding: 2px 6px !important;
+  font-weight: 800 !important;
+  margin-top: 1px !important;
+  border-radius: 999px !important;
+  color: #fff !important;
+  line-height: 1.3 !important;
+}
+.v2-design .v2-chat-root .msg-row-hover > div,
+.v2-design .v2-chat-scroll .msg-row-hover > div {
+  grid-column: 2;
+}
+/* Own messages: keep end alignment without breaking name-pill grid for others */
+.v2-design .v2-chat-root .msg-row-hover[style*="flex-end"],
+.v2-design .v2-chat-scroll .msg-row-hover[style*="flex-end"] {
+  display: flex !important;
+  justify-content: flex-end !important;
+  gap: 6px !important;
+}
+.v2-design .v2-chat-root .chat-messages-scroll,
+.v2-design .v2-chat-scroll {
+  padding: 8px 14px 100px !important;
+  background: #fafafc !important;
+}
+
+/* Gallery: tighten records subtab + page header stack */
+.v2-design .v2-records-frame > .renewal-shell-subtab-row {
+  padding: 4px 10px !important;
+  gap: 4px !important;
+  border-bottom: 1px solid #eceaf5;
+  background: #fff;
+}
+.v2-design .v2-records-frame .renewal-shell-subtab-item {
+  font-size: 0.72rem !important;
+  padding: 5px 10px !important;
+  border-radius: 999px !important;
+}
+.v2-design .v2-gallery .gallery-page-header {
+  border-bottom: 1px solid #eceaf5 !important;
+}
+
+/* Gallery tabs must not be viewport-fixed under the side rail */
+.v2-design .gallery-page-tabs,
+.v2-design .gallery-page-tabs-mobile {
+  position: sticky !important;
+  top: 0 !important;
+  left: auto !important;
+  right: auto !important;
+  width: 100% !important;
+  z-index: 5 !important;
+  transform: none !important;
+}
+.v2-design .gallery-page-header {
+  position: sticky !important;
+  top: 0 !important;
+  left: auto !important;
+  right: auto !important;
+  width: 100% !important;
+  z-index: 6 !important;
+}
+

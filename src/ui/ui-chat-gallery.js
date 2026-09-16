@@ -381,6 +381,7 @@ export function ChatGalleryModal({
   memos = [],
   calendar = null,
   asPage = false,
+  v2Embed = false,
   onClose,
   onUploadImages = null,
   onAddLink = null,
@@ -1737,9 +1738,16 @@ export function ChatGalleryModal({
   )) : null;
 
   const galleryShellStyle = asPage ? {
-    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1005,
+    position: v2Embed ? 'relative' : 'fixed',
+    top: v2Embed ? undefined : 0,
+    left: v2Embed ? undefined : 0,
+    right: v2Embed ? undefined : 0,
+    bottom: v2Embed ? undefined : 0,
+    zIndex: v2Embed ? 1 : 1005,
     backgroundColor: 'var(--bg-primary)', display: 'flex', flexDirection: 'column',
-    width: '100%', maxWidth: '100%', overflow: 'hidden'
+    width: '100%', maxWidth: '100%', overflow: 'hidden',
+    height: v2Embed ? '100%' : undefined,
+    minHeight: v2Embed ? '100%' : undefined,
   } : { zIndex: 11000 };
   const galleryInnerStyle = asPage ? {
     width: '100%', height: '100%', display: 'flex', flexDirection: 'column',
@@ -1754,7 +1762,11 @@ export function ChatGalleryModal({
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
     // top shifts down by env(safe-area-inset-top) for iOS standalone (see .main-header) --
     // 0 in a normal browser tab, so this is a no-op there.
-    position: 'fixed', top: 'env(safe-area-inset-top, 0px)', left: 0, right: 0, zIndex: 1010, overflow: 'hidden', flexShrink: 0,
+    position: v2Embed ? 'sticky' : 'fixed',
+    top: v2Embed ? 0 : 'env(safe-area-inset-top, 0px)',
+    left: v2Embed ? undefined : 0,
+    right: v2Embed ? undefined : 0,
+    zIndex: v2Embed ? 5 : 1010, overflow: 'hidden', flexShrink: 0,
     backgroundColor: 'var(--bg-card)',
     transition: 'transform 0.3s ease',
     transform: isHeaderVisible ? 'translateY(0)' : 'translateY(-100%)'
@@ -2365,7 +2377,7 @@ export function ChatGalleryModal({
           }, /*#__PURE__*/React.createElement(BackArrowIcon, { size: 22 })),
           /*#__PURE__*/React.createElement("div", {
             style: PAGE_HEADER_TITLE_STYLE
-          }, formatChatHeaderTitle(calendar?.title) ? formatChatHeaderTitle(calendar?.title) + " 갤러리" : "갤러리"),
+          }, v2Embed ? '갤러리' : (formatChatHeaderTitle(calendar?.title) ? formatChatHeaderTitle(calendar?.title) + " 갤러리" : "갤러리")),
           /*#__PURE__*/React.createElement("div", {
             style: PAGE_HEADER_ACTIONS_WRAP_STYLE
           },
@@ -2536,7 +2548,7 @@ export function ChatGalleryModal({
       display: 'flex', alignItems: 'center', padding: '0',
       borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)',
       flexShrink: 0,
-      position: 'fixed', top: `calc(${isSearchOpen ? '104px' : '56px'} + env(safe-area-inset-top, 0px))`, left: 0, right: 0, zIndex: 1009,
+      position: v2Embed ? 'sticky' : 'fixed', top: v2Embed ? 0 : `calc(${isSearchOpen ? '104px' : '56px'} + env(safe-area-inset-top, 0px))`, left: v2Embed ? undefined : 0, right: v2Embed ? undefined : 0, zIndex: v2Embed ? 5 : 1009,
       transition: 'transform 0.3s ease, top 0.3s ease',
       transform: isHeaderVisible ? 'translateY(0)' : 'translateY(calc(-100% - 56px))'
     }
@@ -2558,7 +2570,7 @@ export function ChatGalleryModal({
       display: 'flex', alignItems: 'center', padding: '0',
       borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)',
       flexShrink: 0,
-      position: 'fixed', top: `calc(${isSearchOpen ? '104px' : '56px'} + env(safe-area-inset-top, 0px))`, left: 0, right: 0, zIndex: 1009,
+      position: v2Embed ? 'sticky' : 'fixed', top: v2Embed ? 0 : `calc(${isSearchOpen ? '104px' : '56px'} + env(safe-area-inset-top, 0px))`, left: v2Embed ? undefined : 0, right: v2Embed ? undefined : 0, zIndex: v2Embed ? 5 : 1009,
       transition: 'transform 0.3s ease, top 0.3s ease',
       transform: isHeaderVisible ? 'translateY(0)' : 'translateY(calc(-100% - 56px))'
     }
@@ -2588,10 +2600,14 @@ export function ChatGalleryModal({
       // that far down on iOS standalone instead of at the very top of the screen (0 elsewhere).
       padding: asPage
         ? (
-            `calc(${(!isHeaderVisible
-              ? '12px'
-              : (isSearchOpen ? '156px' : '108px'))} + env(safe-area-inset-top, 0px))`
-            + ' 16px 16px 16px'
+            v2Embed
+              ? '12px 16px 16px 16px'
+              : (
+                  `calc(${(!isHeaderVisible
+                    ? '12px'
+                    : (isSearchOpen ? '156px' : '108px'))} + env(safe-area-inset-top, 0px))`
+                  + ' 16px 16px 16px'
+                )
           )
         : '16px',
       display: 'flex', flexDirection: 'column', gap: '12px', boxSizing: 'border-box',

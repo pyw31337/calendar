@@ -89,9 +89,14 @@ export function extractChatSlots(legacyTree) {
       if (type === 'textarea' && !bag.textarea) bag.textarea = node;
       if (type === 'button') {
         const label = String(props['aria-label'] || props.title || '');
-        if (!bag.attach && /첨부|파일|사진|attach/i.test(label)) bag.attach = node;
-        if (!bag.send && /전송|보내|send/i.test(label)) bag.send = node;
-        if (!bag.paste && /붙여넣기|paste/i.test(label)) bag.paste = node;
+        const childText = typeof props.children === 'string' ? props.children
+          : Array.isArray(props.children)
+            ? props.children.filter(c => typeof c === 'string').join('')
+            : '';
+        const hay = `${label} ${childText}`;
+        if (!bag.attach && /첨부|파일|사진|attach/i.test(hay)) bag.attach = node;
+        if (!bag.send && /전송|보내|send/i.test(hay)) bag.send = node;
+        if (!bag.paste && /붙여넣기|paste/i.test(hay)) bag.paste = node;
       }
       if (type === 'input' && props.type === 'file' && !bag.fileInput) bag.fileInput = node;
       walk(props.children, bag);

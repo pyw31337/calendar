@@ -1167,7 +1167,8 @@ function SideMenuOverlay({ isOpen, onClose, homeLabel, ariaLabel, calendar, onGo
 // for that date (see doesPlaceMatchDate), since a confirmed meeting's place is exactly the kind
 // of detail worth keeping alongside its history entry.
 export function HistoryView({
-  calendar, onBack, onSelectDate, onChangeView, onOpenAppSettings, onOpenShare = null,
+  calendar, onBack, onSelectDate, onChangeView, onOpenAppSettings,
+  v2Embed = false, onOpenShare = null,
   chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, historyCount = 0,
   chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null,
   showSettlement = true, onOpenCreateSettlement,
@@ -2049,10 +2050,17 @@ export function HistoryView({
   return /*#__PURE__*/React.createElement("div", {
     className: "places-view-container",
     style: {
-      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      position: v2Embed ? 'relative' : 'fixed',
+      top: v2Embed ? undefined : 0,
+      left: v2Embed ? undefined : 0,
+      right: v2Embed ? undefined : 0,
+      bottom: v2Embed ? undefined : 0,
       backgroundColor: 'var(--bg-primary)',
       display: 'flex', flexDirection: 'column',
-      width: '100%', maxWidth: '100%', overflow: 'hidden'
+      width: '100%', maxWidth: '100%', overflow: 'hidden',
+      height: v2Embed ? '100%' : undefined,
+      minHeight: v2Embed ? '100%' : undefined,
+      zIndex: v2Embed ? 1 : undefined,
     }
   },
     /*#__PURE__*/React.createElement("div", {
@@ -2062,7 +2070,7 @@ export function HistoryView({
         // iOS 홈화면 설치(standalone) 상태에서는 상태바 영역까지 콘텐츠가 그려지므로, top:0
         // 대신 env(safe-area-inset-top)만큼 아래로 밀어야 상태바 아이콘과 겹치지 않고 버튼도
         // 눌린다. 일반 브라우저 탭에서는 이 값이 0이라 동작 변화 없음.
-        position: 'fixed', top: 'env(safe-area-inset-top, 0px)', left: 0, right: 0, zIndex: 1010,
+        position: v2Embed ? 'sticky' : 'fixed', top: v2Embed ? 0 : 'env(safe-area-inset-top, 0px)', left: v2Embed ? undefined : 0, right: v2Embed ? undefined : 0, zIndex: v2Embed ? 5 : 1010,
         backgroundColor: 'var(--bg-primary)',
         transition: 'transform 0.3s ease',
         transform: isHeaderVisible ? 'translateY(0)' : 'translateY(-100%)'
@@ -2083,7 +2091,7 @@ export function HistoryView({
       }, BackArrowIcon ? /*#__PURE__*/React.createElement(BackArrowIcon, { size: 22 }) : "←"),
       /*#__PURE__*/React.createElement("div", {
         style: PAGE_HEADER_TITLE_STYLE
-      }, calendar.title, " 보관함"),
+      }, v2Embed ? '보관함' : (calendar.title + " 보관함")),
       /*#__PURE__*/React.createElement("div", { style: PAGE_HEADER_ACTIONS_WRAP_STYLE },
         /*#__PURE__*/React.createElement("button", {
           type: "button", onClick: () => setIsSearchOpen(v => !v), title: "보관함 검색", "aria-label": "보관함 검색",
@@ -2600,7 +2608,8 @@ export function HistoryView({
 // 컨텐츠: 사이드메뉴 "컨텐츠" 항목이 여는 페이지. 예전 보관함의 지역축제/문화공연 탭 chrome을 그대로
 // 이어받아 스포츠 탭을 추가한 것 -- 지역 필터/그리드 밀도 토글/컨텐츠 등록까지 동일하게 유지된다.
 export function ContentView({
-  calendar, onBack, onChangeView, onOpenAppSettings, onOpenShare = null,
+  calendar, onBack, onChangeView, onOpenAppSettings,
+  v2Embed = false, onOpenShare = null,
   chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, historyCount = 0,
   chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null,
   showSettlement = true, onOpenCreateSettlement,
@@ -2914,17 +2923,24 @@ export function ContentView({
   return /*#__PURE__*/React.createElement("div", {
     className: "places-view-container",
     style: {
-      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      position: v2Embed ? 'relative' : 'fixed',
+      top: v2Embed ? undefined : 0,
+      left: v2Embed ? undefined : 0,
+      right: v2Embed ? undefined : 0,
+      bottom: v2Embed ? undefined : 0,
       backgroundColor: 'var(--bg-primary)',
       display: 'flex', flexDirection: 'column',
-      width: '100%', maxWidth: '100%', overflow: 'hidden'
+      width: '100%', maxWidth: '100%', overflow: 'hidden',
+      height: v2Embed ? '100%' : undefined,
+      minHeight: v2Embed ? '100%' : undefined,
+      zIndex: v2Embed ? 1 : undefined,
     }
   },
     /*#__PURE__*/React.createElement("div", {
       ref: headerStackRef,
       className: "history-header-stack",
       style: {
-        position: 'fixed', top: 'env(safe-area-inset-top, 0px)', left: 0, right: 0, zIndex: 1010,
+        position: v2Embed ? 'sticky' : 'fixed', top: v2Embed ? 0 : 'env(safe-area-inset-top, 0px)', left: v2Embed ? undefined : 0, right: v2Embed ? undefined : 0, zIndex: v2Embed ? 5 : 1010,
         backgroundColor: 'var(--bg-primary)',
         transition: 'transform 0.3s ease',
         transform: isHeaderVisible ? 'translateY(0)' : 'translateY(-100%)'
@@ -2945,7 +2961,7 @@ export function ContentView({
       }, BackArrowIcon ? /*#__PURE__*/React.createElement(BackArrowIcon, { size: 22 }) : "←"),
       /*#__PURE__*/React.createElement("div", {
         style: PAGE_HEADER_TITLE_STYLE
-      }, calendar.title, " 컨텐츠"),
+      }, v2Embed ? '컨텐츠' : (calendar.title + " 컨텐츠")),
       /*#__PURE__*/React.createElement("div", { style: PAGE_HEADER_ACTIONS_WRAP_STYLE },
         /*#__PURE__*/React.createElement("button", {
           type: "button", onClick: () => setIsSearchOpen(v => !v), title: "컨텐츠 검색", "aria-label": "컨텐츠 검색",
