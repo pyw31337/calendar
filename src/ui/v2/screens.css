@@ -1683,3 +1683,156 @@
     gap: 4px !important;
   }
 }
+
+/* ========== Unit 3: Chat + Memo body density (ChatFull / MemoFull tokens) ==========
+   Densify legacy body under .v2-design only. Tool-icon row already shipped — tighten
+   vertical rhythm / padding, not chrome rewrite. Scale = mock + slight bump. */
+
+/* --- Chat: message list + bubbles + composer bar --- */
+.v2-design .v2-chat-root .chat-messages-scroll,
+.v2-design .v2-chat-scroll,
+.v2-design .v2-chat .chat-messages-scroll {
+  padding: 4px 14px 88px !important;
+}
+
+.v2-design .v2-chat-root .msg-row-hover,
+.v2-design .v2-chat-scroll .msg-row-hover,
+.v2-design .v2-chat-legacy .msg-row-hover,
+.v2-design .v2-chat .msg-row-hover {
+  margin-bottom: 12px !important;
+  row-gap: 2px !important;
+}
+
+/* ChatFull bubble type/padding (was 0.86rem / 8×12 — slightly bloated vs mock 0.8 / 8×11) */
+.v2-design .v2-chat .msg-row-hover > div > div[style*="backgroundColor"],
+.v2-design .v2-chat .msg-row-hover > div > div[style*="background-color"],
+.v2-design .v2-chat .v2-message-bubble,
+.v2-design .v2-chat-legacy .msg-row-hover [style*="backgroundColor: 'var(--bg-card)'"],
+.v2-design .v2-chat-legacy .msg-row-hover [style*="background-color: var(--bg-card)"],
+.v2-design .v2-chat-legacy .msg-row-hover [style*="backgroundColor: 'var(--brand)'"],
+.v2-design .v2-chat-legacy .msg-row-hover [style*="background-color: var(--brand)"] {
+  font-size: 0.8rem !important;
+  line-height: 1.45 !important;
+  padding: 8px 11px !important;
+  border-radius: 0 12px 12px 12px !important;
+  box-shadow: none !important;
+}
+
+.v2-design .v2-chat .msg-row-hover[style*="flex-end"] > div:last-child > div[style*="background"],
+.v2-design .v2-chat .msg-row-hover.msg-row-own-with-pill[style*="flex-end"] > div:nth-child(3) > div[style*="background"] {
+  border-radius: 12px 0 12px 12px !important;
+}
+
+.v2-design .v2-chat .msg-row-hover:not([style*="flex-end"]) > div:nth-child(2) > div[style*="background"] {
+  border-radius: 0 12px 12px 12px !important;
+}
+
+/* Date divider — ChatFull 14/10 → slight denser */
+.v2-design .v2-chat-legacy div[style*="margin: 24px 0 16px"],
+.v2-design .v2-chat .chat-messages-scroll > div:has(> span[style*="borderRadius"]) {
+  padding: 10px 0 8px !important;
+  margin: 0 !important;
+}
+
+/* Composer bar density (keep tool icons; shrink chrome around them) */
+.v2-design .v2-chat-composer,
+.v2-design .v2-chat .chat-composer,
+.v2-design .v2-chat-legacy .chat-composer {
+  padding: 8px 12px !important;
+}
+
+.v2-design .v2-chat .bp-composer-input,
+.v2-design .v2-chat-compose-row > textarea,
+.v2-design .v2-chat-legacy .chat-composer textarea {
+  font-size: 0.8rem !important;
+  padding: 8px 14px !important;
+  min-height: 36px !important;
+  height: 36px !important;
+  line-height: 1.35 !important;
+  box-sizing: border-box !important;
+}
+
+.v2-design .v2-chat .bp-composer-send,
+.v2-design .v2-chat-compose-row > button:last-child {
+  width: 34px !important;
+  height: 34px !important;
+}
+
+.v2-design .v2-chat-compose-tools {
+  padding: 4px 2px 0 !important;
+  gap: 6px !important;
+}
+
+.v2-design .v2-tool-icon-btn {
+  width: 30px !important;
+  height: 30px !important;
+}
+
+.v2-design .v2-chat-compose-tools .participant-picker-button {
+  height: 28px !important;
+  font-size: 0.72rem !important;
+  padding: 0 8px !important;
+}
+
+/* --- Memo: search→composer spacing, list gap, card/composer padding --- */
+.v2-design .v2-memo .v2-page-header {
+  padding: 10px 14px 6px !important;
+}
+
+.v2-design .v2-memo .bp-search-row {
+  margin-top: 8px !important;
+}
+
+.v2-design .v2-memo .bp-search-input {
+  padding: 8px 14px 8px 34px !important;
+  font-size: 0.78rem !important;
+}
+
+.v2-design .v2-memo .v2-memo-body,
+.v2-design .v2-memo .v2-dest-body {
+  padding-bottom: 88px !important;
+}
+
+.v2-design .v2-memo .v2-memo-body .memo-list-scroll,
+.v2-design .v2-memo .memo-list-scroll {
+  padding: 8px 14px 24px !important;
+  gap: 10px !important;
+}
+
+.v2-design .v2-memo .memo-composer-card {
+  padding: 10px 12px !important;
+  gap: 6px !important;
+  border-radius: 12px !important;
+  box-shadow: 0 2px 8px rgba(30, 27, 46, 0.05) !important;
+  max-width: none !important;
+  width: 100% !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+}
+
+/* Legacy memo cards → MemoFull left-accent + denser internal rhythm */
+.v2-design .v2-memo .memo-card-hover,
+.v2-design .v2-memo-card-wrap .memo-card-hover {
+  padding: 12px !important;
+  border-radius: 0 14px 14px 0 !important;
+  border-left: 4px solid var(--memo-author-color, #eceaf5) !important;
+  box-shadow: 0 4px 14px rgba(30, 27, 46, 0.07) !important;
+  background: #fff !important;
+}
+
+.v2-design .v2-memo .memo-card-hover [style*="marginBottom"],
+.v2-design .v2-memo-card-wrap .v2-memo-text {
+  margin-bottom: 8px !important;
+}
+
+.v2-design .v2-memo .bp-memo-grid {
+  gap: 10px !important;
+  padding: 10px 14px 24px !important;
+}
+
+/* Section labels (최근 활동 / 메모 목록) sit in the 10px list gap — keep type compact */
+.v2-design .v2-memo .memo-list-scroll > div > div[style*="fontWeight"]:first-child,
+.v2-design .v2-memo .memo-section-label {
+  font-size: 0.72rem !important;
+  margin: 2px 0 0 !important;
+}
