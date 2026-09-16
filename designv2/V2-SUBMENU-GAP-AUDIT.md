@@ -216,3 +216,29 @@ Priority user specs (t175) preempted leftover density polish. Local preview 1440
 - Settlement has no fake 1/N meeting cards (data model) — ledger/metric chrome only
 - Content/Archive still no dedicated Full mocks — Bento density only
 - Optional Chat own-name-pill still open (end-align preserved)
+
+---
+
+## Phase E status (feat/v2-submenu-rebuild-4) — 2026-09-16 KST loop10
+
+Compare→fix→recompare on remaining #642 gaps. Local preview 1440×900:
+`designv2/parity-shots/audit-live-capture/loop10-*.png` + `loop10-report.json`.
+
+| Gate | Result |
+|------|--------|
+| Chat bubble column usable PC width | **Pass** — full-bleed list/composer retained (t175); bubble wrap max `min(72vw, 620px)` (was ~380–420). Scroll width=1160. |
+| Memo in-pane scroll | **Pass** — shell h=900 (was ~3571 page grow); body `overflow-y:auto` under sticky header/tags |
+| Settlement in-pane scroll | **Pass** — shell h=900 (was ~1113); body scroll h≈758 |
+| Settlement/content/archive density | **Pass (polish)** — tighter metric/ledger/person padding; content/archive grid gap 8px. No fake 1/N meeting cards |
+| Chat own-name-pill | **Pass (optional)** — V2-only via `renderV2`; `msg-row-own-with-pill` + end-align grid. Default shell unchanged |
+| t175 wins kept | **Pass** — full-bleed, PageHeader, author picker, tool icons, side brand 모여라 캘린더, hero 모아엘가 |
+
+### Code
+- `screens.css`: loop10 — wider bubbles, memo/settlement gallery-style pane fill, density polish, chat main overflow hidden
+- `ui-chat-room.js`: own name pill when `renderV2` present
+
+### Remaining honest gaps
+- Short chat lines still look narrow (fit-content); long lines use up to 620px
+- Settlement ledger rows stretch full-bleed (intentional; data model ≠ SettlementFull 1/N cards)
+- Content/Archive still no dedicated Full mocks — Bento density only
+

@@ -886,9 +886,10 @@ export function ChatRoomView({
     // link -- see focusChatMessage in app-main.js) -- both render identically, the same purple
     // border + up/down shake as the in-chat search feature has always used.
     const isSearchFocused = (isSearchMatch && rowId === focusedMsgId) || (!!externalFocusMessageId && rowId === externalFocusMessageId);
+    const showOwnNamePill = typeof renderV2 === 'function' && isMe;
     renderedMessages.push(/*#__PURE__*/React.createElement("div", {
       key: rowId,
-      className: `msg-row-hover ${revealedMsgId === rowId ? 'msg-actions-revealed' : ''}`,
+      className: `msg-row-hover ${revealedMsgId === rowId ? 'msg-actions-revealed' : ''}${showOwnNamePill ? ' msg-row-own-with-pill' : ''}`,
       'data-msg-row-id': rowId,
       style: {
         display: 'flex',
@@ -897,7 +898,7 @@ export function ChatRoomView({
         marginBottom: '12px',
         justifyContent: isMe ? 'flex-end' : 'flex-start'
       }
-    }, !isMe && /*#__PURE__*/React.createElement("span", {
+    }, (!isMe || showOwnNamePill) && /*#__PURE__*/React.createElement("span", {
       style: {
         backgroundColor: p?.color || '#94A3B8',
         color: '#FFFFFF',
