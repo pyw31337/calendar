@@ -1449,3 +1449,62 @@
   border: 1px solid transparent;
   box-sizing: border-box !important;
 }
+
+/* --------------------------------------------------------------------------
+ * 더보기 (More) tab -- the one Pane with no legacy view underneath, so it never
+ * picked up the v2 PageHeader/glass-card chrome the rest of the shell has (see
+ * MorePane's doc comment, src/ui/ui-app-shell-v2.js). Glass list-card rows using
+ * the same tokens as everywhere else, not a new visual language.
+ * -------------------------------------------------------------------------- */
+.v2-design .v2-more-list {
+  list-style: none;
+  margin: 0;
+  padding: 12px var(--v2-dest-content-pad-x, 14px) 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.v2-design .v2-more-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 14px;
+  border-radius: var(--radius-md, 12px);
+  background: var(--v2-glass-light-fill, rgba(255,255,255,0.88));
+  border: 1px solid var(--v2-glass-light-border, #eceaf5);
+  box-shadow: var(--v2-glass-light-inset, inset 0 1px 0 rgba(255,255,255,0.95)), var(--v2-glass-light-shadow, 0 1px 2px rgba(30,27,46,0.04));
+  color: var(--text-main, #1e1b2e);
+  font-size: var(--v2-fs-md);
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.v2-design .v2-more-item:hover {
+  background: var(--v2-glass-light-hover-fill, rgba(243,238,255,0.78));
+  border-color: var(--v2-glass-light-hover-border, #e0d4ff);
+}
+.v2-design .v2-more-item.is-active {
+  color: var(--brand, #7C2FE5);
+  border-color: var(--v2-glass-purple-border, rgba(124,47,229,0.26));
+  background: var(--brand-soft, #F3EEFF);
+}
+.v2-design .v2-more-item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: var(--brand, #7C2FE5);
+  flex-shrink: 0;
+}
+.v2-design .v2-more-item-icon svg { width: 18px; height: 18px; }
+.v2-design .v2-more-item-label { flex: 1; }
+.v2-design .v2-more-item-chevron { color: var(--text-light, #83798f); flex-shrink: 0; }
+.v2-design .v2-more-note {
+  text-align: center;
+  padding: 4px 20px 20px;
+  font-size: var(--v2-fs-xs);
+  color: var(--text-muted, #6b6580);
+}

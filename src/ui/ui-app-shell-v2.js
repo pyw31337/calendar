@@ -6,7 +6,7 @@
 
 import './v2/reference-home.css';
 import './v2/design.css';
-import { renderMemoScreen, renderPlacesScreen, renderSettlementScreen, renderChatScreen, renderGalleryScreen, renderContentScreen, renderArchiveScreen } from './v2/screens.js';
+import { renderMemoScreen, renderPlacesScreen, renderSettlementScreen, renderChatScreen, renderGalleryScreen, renderContentScreen, renderArchiveScreen, PageHeader } from './v2/screens.js';
 import { authorFor, latestRows, timestampMs, photoLightbox } from './v2/view-data.js';
 import { ChatBubbleFrame, NameColorPill, ReplyQuote } from './v2/chat-bubble-modules.js';
 import {
@@ -1937,27 +1937,37 @@ function SearchDateModal({ calendarContext, dateStr, onClose, onEditAnniversary,
  * `onSelectItem` (owned by RenewalAppShell) decides per-id whether that's a real destination
  * (share/anniversaries/manual/app-settings/calendar-settings/admin) or still just a placeholder
  * selection (search -- see REAL_MORE_MODAL_IDS above); this component stays presentation-only.
+ *
+ * Unlike every sibling Pane, this one has no legacy view underneath to extract slots from --
+ * it's shell-authored from scratch -- so it never picked up the v2 PageHeader/glass-card chrome
+ * the rest of the shell got (it still used pre-Bento `renewal-shell-more-*` classes). Wrap it in
+ * the same `PageHeader` (with the shared hamburger via `onOpenSideNav`, matching ChatPane/
+ * MemoPane/etc.) and restyle the rows as glass list cards using the existing `--v2-glass-light-*`
+ * tokens, rather than introducing a new visual language.
  */
-function MorePane({ calendarName, onSelectItem, selectedItem }) {
+function MorePane({ calendarName, onSelectItem, selectedItem, onOpenSideNav }) {
   const React = window.React;
-  return React.createElement('div', { className: 'renewal-shell-more' },
-    React.createElement('ul', { className: 'renewal-shell-more-list', role: 'list' },
-      MORE_ITEMS.map(item => React.createElement('li', { key: item.id },
-        React.createElement('button', {
-          type: 'button',
-          className: `renewal-shell-more-item ${selectedItem === item.id ? 'is-active' : ''}`.trim(),
-          onClick: () => onSelectItem(item.id),
-        },
-          React.createElement('span', { className: 'renewal-shell-more-item-icon' }, React.createElement(MoreItemIcon, { id: item.id })),
-          React.createElement('span', { className: 'renewal-shell-more-item-label' }, item.label),
-          React.createElement('svg', { className: 'renewal-shell-more-item-chevron', width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' },
-            React.createElement('path', { d: 'm9 18 6-6-6-6' })
+  return React.createElement('section', { className: 'v2-more v2-dest-page' },
+    React.createElement('div', { className: 'bp-app-shell' },
+      React.createElement(PageHeader, { title: '더보기', subtitle: calendarName, onMenu: onOpenSideNav }),
+      React.createElement('ul', { className: 'v2-more-list', role: 'list' },
+        MORE_ITEMS.map(item => React.createElement('li', { key: item.id },
+          React.createElement('button', {
+            type: 'button',
+            className: `v2-more-item ${selectedItem === item.id ? 'is-active' : ''}`.trim(),
+            onClick: () => onSelectItem(item.id),
+          },
+            React.createElement('span', { className: 'v2-more-item-icon' }, React.createElement(MoreItemIcon, { id: item.id })),
+            React.createElement('span', { className: 'v2-more-item-label' }, item.label),
+            React.createElement('svg', { className: 'v2-more-item-chevron', width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' },
+              React.createElement('path', { d: 'm9 18 6-6-6-6' })
+            )
           )
-        )
-      ))
-    ),
-    React.createElement('div', { className: 'renewal-shell-placeholder-sub renewal-shell-more-note' },
-    calendarName ? `${calendarName} · 검색과 설정은 위 메뉴에서 바로 열 수 있습니다.` : '검색과 설정은 위 메뉴에서 바로 열 수 있습니다.')
+        ))
+      ),
+      React.createElement('div', { className: 'v2-more-note' },
+        calendarName ? `${calendarName} · 검색과 설정은 위 메뉴에서 바로 열 수 있습니다.` : '검색과 설정은 위 메뉴에서 바로 열 수 있습니다.')
+    )
   );
 }
 
@@ -2331,7 +2341,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
           : activeTab === 'records'
           ? React.createElement(RecordsPane, { subTab: recordsSubTab, onSelectSubTab: setRecordsSubTab, calendarName, recordsContext, calendarContext, onChangeView, onOpenAppSettings, onOpenSideNav: () => setIsSideNavOpen(true), onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource })
           : activeTab === 'more'
-          ? React.createElement(MorePane, { calendarName, selectedItem: selectedMoreItem, onSelectItem: handleSelectMoreItem })
+          ? React.createElement(MorePane, { calendarName, selectedItem: selectedMoreItem, onSelectItem: handleSelectMoreItem, onOpenSideNav: () => setIsSideNavOpen(true) })
           : React.createElement(PlaceholderPane, { tabId: activeTab, calendarName }),
 
         dateModalDate && React.createElement(SharedDateModal, {
