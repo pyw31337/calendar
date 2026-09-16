@@ -173,6 +173,21 @@
   background: #fafafc !important;
 }
 .v2-design .v2-chat .v2-page-header { flex-shrink: 0; display: block; position: sticky; top: 0; z-index: 30; }
+/* The live ChatRoomView renders its message list as `position:absolute;inset:0` inside a
+ * dedicated `flex:1;position:relative` wrapper div (ui-chat-room.js) so it fills whatever space
+ * is left in the flex column. `extractChatSlots` pulls out the message-list div itself (not that
+ * wrapper), so once it's spliced in here as a direct flex child of `.chat-room-container`, its
+ * `position:absolute;inset:0` has no flex-sized ancestor to size against and it collapses out of
+ * flow entirely -- the composer (also a flex child, right after it) then has nothing above it
+ * pushing it down and renders immediately under the header instead of at the bottom of the
+ * screen. Turn the message list back into the flex item itself instead of an absolutely
+ * positioned child of one. */
+.v2-design .v2-chat-scroll {
+  position: relative !important;
+  inset: auto !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+}
 .v2-design .v2-chat-scroll > div:first-child { padding: 4px 14px !important; }
 .v2-design .v2-chat-search-open .v2-chat-scroll > div:first-child { padding-top: 62px !important; }
 .v2-design .v2-chat .inline-search-bar {
