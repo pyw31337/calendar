@@ -215,6 +215,10 @@ function wrapLegacy(legacyView, className) {
 export function MemoScreen(p) {
   // Tag cloud under search removed (V2-MOBILE-IA-PLAN): tags still filter via card taps / search.
   const useDedicatedCards = typeof p.renderCard === 'function' && Array.isArray(p.memos);
+  // Search starts closed — the header search icon (PageHeader's onSearch) toggles the input row
+  // into view instead of it sitting open by default on every page load.
+  const [isSearchOpen, setIsSearchOpen] = window.React.useState(false);
+  const toggleSearch = () => setIsSearchOpen(v => !v);
 
   if (!useDedicatedCards && p.legacyView) {
     const slots = { ...extractMemoSlots(p.legacyView), ...(p.slots || {}) };
@@ -232,10 +236,12 @@ export function MemoScreen(p) {
               title: '메모',
               subtitle: p.subtitle || pageSubtitle(p.calendar),
               onBack: p.onBack,
+              onSearch: toggleSearch,
+              searchLabel: '메모 검색',
               onShare: p.onShare,
               onMenu: p.onMenu,
             },
-            h(Search, {
+            isSearchOpen && h(Search, {
               value: p.searchQuery || '',
               onChange: p.onSearch || (() => {}),
               placeholder: '메모 검색',
@@ -259,10 +265,12 @@ export function MemoScreen(p) {
             title: '메모',
             subtitle: p.subtitle || pageSubtitle(p.calendar),
             onBack: p.onBack,
+            onSearch: toggleSearch,
+            searchLabel: '메모 검색',
             onShare: p.onShare,
             onMenu: p.onMenu,
           },
-          h(Search, {
+          isSearchOpen && h(Search, {
             value: p.searchQuery || '',
             onChange: p.onSearch || (() => {}),
             placeholder: '메모 검색',
@@ -287,10 +295,12 @@ export function MemoScreen(p) {
           title: '메모',
           subtitle: p.subtitle || pageSubtitle(p.calendar),
           onBack: p.onBack,
+          onSearch: toggleSearch,
+          searchLabel: '메모 검색',
           onShare: p.onShare,
           onMenu: p.onMenu,
         },
-        h(Search, {
+        isSearchOpen && h(Search, {
           value: p.searchQuery,
           onChange: p.onSearch,
           placeholder: '메모 검색',
@@ -358,6 +368,9 @@ export function MemoScreen(p) {
 
 export function PlacesScreen(p) {
   const [mapOpen, setMapOpen] = window.React.useState(p.mapOpenDefault !== false);
+  // Search starts closed — the header search icon toggles the input row into view.
+  const [isSearchOpen, setIsSearchOpen] = window.React.useState(false);
+  const toggleSearch = () => setIsSearchOpen(v => !v);
   const select = place => {
     setMapOpen(true);
     if (p.onSelect) p.onSelect(place);
@@ -379,6 +392,8 @@ export function PlacesScreen(p) {
               subtitle: p.subtitle || pageSubtitle(p.calendar),
               count: p.countLabel,
               onBack: p.onBack,
+              onSearch: toggleSearch,
+              searchLabel: '장소 검색',
               onShare: p.onShare,
               onMenu: p.onMenu,
               extra: h(IconButton, {
@@ -390,7 +405,7 @@ export function PlacesScreen(p) {
                 },
               }),
             },
-            h(Search, {
+            isSearchOpen && h(Search, {
               value: p.searchQuery || '',
               onChange: p.onSearch || (() => {}),
               placeholder: '장소 검색',
@@ -418,6 +433,8 @@ export function PlacesScreen(p) {
             subtitle: p.subtitle || pageSubtitle(p.calendar),
             count: p.countLabel,
             onBack: p.onBack,
+            onSearch: toggleSearch,
+            searchLabel: '장소 검색',
             onShare: p.onShare,
             onMenu: p.onMenu,
             extra: h(IconButton, {
@@ -429,7 +446,7 @@ export function PlacesScreen(p) {
               },
             }),
           },
-          h(Search, {
+          isSearchOpen && h(Search, {
             value: p.searchQuery || '',
             onChange: p.onSearch || (() => {}),
             placeholder: '장소 검색',
@@ -455,6 +472,8 @@ export function PlacesScreen(p) {
           subtitle: p.subtitle || pageSubtitle(p.calendar),
           count: `등록 ${(p.places || []).length}곳`,
           onBack: p.onBack,
+          onSearch: toggleSearch,
+          searchLabel: '장소 검색',
           onShare: p.onShare,
           onMenu: p.onMenu,
           extra: h(IconButton, {
@@ -463,7 +482,7 @@ export function PlacesScreen(p) {
             onClick: () => setMapOpen(value => !value),
           }),
         },
-        h(Search, {
+        isSearchOpen && h(Search, {
           value: p.searchQuery,
           onChange: p.onSearch,
           placeholder: '장소 검색',

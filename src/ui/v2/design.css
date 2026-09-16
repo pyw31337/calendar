@@ -200,6 +200,9 @@
 }
 
 .v2-design .bp-day-cell { font-family: inherit; }
+/* Mock ships a 1px gap between day-num / meeting-pill / dots / anniversary bars — reads as
+ * everything glued together edge-to-edge. Give the stack real breathing room at every tier. */
+.v2-design .bp-day-cell { gap: 4px !important; }
 .v2-design .bp-dday-chip {
   display: flex;
   flex-direction: column;
@@ -654,13 +657,14 @@
   .v2-design .bp-day-cell {
     min-height: 66px !important;
     padding: 4px 2px 3px !important;
-    gap: 2px !important;
+    gap: 5px !important;
   }
 }
 @media (min-width: 1200px) {
   .v2-design .bp-day-cell {
     min-height: 84px !important;
     padding: 5px 3px 4px !important;
+    gap: 6px !important;
   }
 }
 
@@ -957,7 +961,7 @@
   .v2-design .bp-day-cell {
     min-height: 84px !important;
     padding: 5px 3px 4px !important;
-    gap: 2px !important;
+    gap: 6px !important;
     border-radius: 10px !important;
   }
   .v2-design .bp-day-num {
@@ -1033,13 +1037,20 @@
 }
 
 @media (min-width: 768px) {
+  /* .bp-end keeps the same full height as .bp-start/.bp-solo (below) so a same-row run still
+   * reads as one unbroken capsule — only the LABEL is restricted to .bp-start/.bp-solo so the
+   * title never prints twice inside a single connected run. A run that gets cut by a week-row
+   * wrap legitimately starts a new .bp-start segment on the next row, which is exactly where the
+   * title should reappear — that's a different capsule, not a duplicate of this one. */
   .v2-design .bp-day-bar-stack .bp-day-anniversary:not(.bp-mid):not(.bp-bar-only) {
     height: auto !important;
     min-height: 1.05rem !important;
     padding: 0.08rem 0.32rem !important;
   }
-  .v2-design .bp-day-bar-stack .bp-day-anniversary:not(.bp-mid):not(.bp-bar-only) > .bp-day-anniversary-label,
-  .v2-design .bp-day-anniversary:not(.bp-mid):not(.bp-bar-only) > .bp-day-anniversary-label {
+  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-start > .bp-day-anniversary-label,
+  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-solo > .bp-day-anniversary-label,
+  .v2-design .bp-day-anniversary.bp-start > .bp-day-anniversary-label,
+  .v2-design .bp-day-anniversary.bp-solo > .bp-day-anniversary-label {
     display: block !important;
     font-size: 0.5rem !important;
     font-weight: 800 !important;
@@ -1056,7 +1067,8 @@
     min-height: 0.34rem !important;
     padding: 0 !important;
   }
-  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-mid > .bp-day-anniversary-label {
+  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-mid > .bp-day-anniversary-label,
+  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-end > .bp-day-anniversary-label {
     display: none !important;
   }
 }
@@ -1065,7 +1077,8 @@
   .v2-design .bp-day-bar-stack .bp-day-anniversary:not(.bp-mid):not(.bp-bar-only) {
     min-height: 1.1rem !important;
   }
-  .v2-design .bp-day-bar-stack .bp-day-anniversary:not(.bp-mid):not(.bp-bar-only) > .bp-day-anniversary-label {
+  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-start > .bp-day-anniversary-label,
+  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-solo > .bp-day-anniversary-label {
     font-size: 0.56rem !important;
   }
 }
