@@ -4,6 +4,8 @@
   --font-sans: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Noto Sans KR', sans-serif;
   --renewal-page-max: 1600px;
   --v2-side-nav-width: 280px;
+  --cal-schedule: #7C2FE5;
+  --cal-anniversary: #F76AAD;
   padding: 0 !important;
   padding-bottom: 0 !important;
   min-height: 100dvh;
@@ -59,6 +61,45 @@
 .v2-design .bp-bento-title-brand { display: inline-flex; align-items: center; gap: 6px; }
 .v2-design .bp-renewal-home-hero { margin: 0; padding: 0; }
 .v2-design .bp-empty-hero { color: rgba(255, 255, 255, 0.92); padding: 14px; font-size: 0.8rem; }
+
+/* Hero vivid glass (mock parity) — reinforces reference-home under .v2-design */
+.v2-design .bp-hero-zone {
+  background: linear-gradient(135deg, #3B0764 0%, #6D28D9 38%, #A21CAF 62%, #06B6D4 100%) !important;
+}
+.v2-design .bp-hero-zone .bp-icon-btn,
+.v2-design .bp-hero-zone .bp-renewal-shell-header-icon-btn {
+  background: rgba(255,255,255,0.22) !important;
+  border: 1px solid rgba(255,255,255,0.55) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.65), 0 0 0 1px rgba(255,255,255,0.12), 0 4px 14px rgba(76, 29, 149, 0.22) !important;
+}
+.v2-design .bp-dday-compact {
+  background: rgba(255,255,255,0.22) !important;
+  border: 1px solid rgba(255,255,255,0.55) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.65), 0 8px 24px rgba(59, 7, 100, 0.18) !important;
+}
+.v2-design .bp-dday-compact-badge {
+  background: linear-gradient(135deg, #7C2FE5 0%, #4F46E5 55%, #2563EB 100%) !important;
+  color: #fff !important;
+  border: 1px solid rgba(255,255,255,0.45) !important;
+}
+.v2-design .bp-dday-chip {
+  background: rgba(255,255,255,0.18) !important;
+  border: 1px solid rgba(255,255,255,0.5) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.45) !important;
+}
+.v2-design .bp-dday-compact-text,
+.v2-design .bp-dday-compact-prefix,
+.v2-design .bp-dday-compact-detail,
+.v2-design .bp-dday-expanded-title {
+  color: #fff !important;
+}
+
 .v2-design .bp-day-cell { font-family: inherit; }
 .v2-design .bp-dday-chip {
   display: flex;
@@ -518,14 +559,14 @@
   flex-shrink: 0;
   box-sizing: border-box;
 }
-/* Green anniversary badge (V2: 기념일 = green).
+/* Pink anniversary badge (V2: 기념일 = --cal-anniversary).
    Progressive disclosure: mobile/narrow = thin bar; PC/wide = title inside. */
 .v2-design .bp-day-bar-stack .bp-day-anniversary {
   display: flex !important;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  background: var(--status-green, #16A34A) !important;
+  background: var(--cal-anniversary, #F76AAD) !important;
   border-radius: 999px !important; /* single-day / solo default */
   /* Mobile / narrow default: compact color bar */
   height: 0.34rem !important;
@@ -566,12 +607,12 @@
   max-width: 100%;
   padding: 0 !important;
 }
-/* Purple confirmed-meeting bars (V2: 모임확정 / 일정·여행 = brand purple) */
+/* Purple confirmed-meeting bars (V2: 모임확정 / 일정·여행 = --cal-schedule) */
 .v2-design .bp-day-bar-stack .bp-day-bar {
   height: auto !important;
   min-height: 0.28rem !important;
   border-radius: 999px !important;
-  background: var(--brand, #7C3AED) !important;
+  background: var(--cal-schedule, #7C2FE5) !important;
   display: flex !important;
   align-items: center;
   justify-content: center;
