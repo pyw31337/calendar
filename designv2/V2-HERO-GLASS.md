@@ -36,3 +36,22 @@ Compact + expanded hero labels render a non-shrinking **`[모임확정]`** prefi
 - `src/ui/v2/reference-home.css` — tokens + hero glass
 - `src/ui/v2/design.css` — tokens + bar colors + glass reinforces
 - `src/ui/ui-app-shell-v2.js` — legend dots + `meetingLabelParts` / `renderMeetingLabel`
+
+## Living aurora (Gemini-style)
+
+**Captures:** `designv2/parity-shots/unit-loop/hero-aurora/`
+
+Home hero (`.bp-hero-zone`) uses a **CSS-only living mesh** — not a static linear wash:
+
+| Layer | Role |
+|-------|------|
+| Base | Deep purple → violet → teal linear + soft bottom darken |
+| `::before` | Purple / magenta radial blobs — `bp-hero-aurora-drift-a` (~22s) |
+| `::after` | Cyan / blue / magenta blobs — `bp-hero-aurora-drift-b` (~28s, counter) |
+| `.bp-hero-aurora` | Soft top bloom + bottom vignette — `bp-hero-aurora-pulse` (~16s) |
+
+- Animations use GPU-friendly `transform` + `opacity` only (no canvas / per-frame JS).
+- Glass chips / compact meeting card / icon buttons stay as-is (frost over the mesh).
+- Bottom vignette keeps white title / `[모임확정]` readable when hues peak bright.
+- `prefers-reduced-motion: reduce` → static vivid mesh (no drift/pulse). Existing global V2 reduce rule plus hero-specific override.
+- Scoped to `.v2-design` only; default shell untouched.

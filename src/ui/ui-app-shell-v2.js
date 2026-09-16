@@ -750,6 +750,7 @@ function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeVie
   const React = window.React;
   return React.createElement(React.Fragment, null,
     React.createElement('div', { className: 'bp-hero-zone' },
+      React.createElement('span', { className: 'bp-hero-aurora', 'aria-hidden': 'true' }),
       React.createElement(TopHeader, { calendarName, onOpenSearch, onOpenMore }),
       React.createElement(RenewalHero, { meetings: calendarContext.upcomingMeetings, calendar: calendarContext.calendar, onSelectDate: onOpenDate })
     ),
