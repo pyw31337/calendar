@@ -86,6 +86,20 @@ export function extractChatSlots(legacyTree) {
       if (!React.isValidElement(node)) return;
       const type = node.type;
       const props = node.props || {};
+      const cls = String(props.className || '');
+      // Shared ParticipantPickerButton (ui-widgets) — required before compose when no login.
+      // Component elements carry props.participant/onClick; className is applied inside render.
+      const typeName = typeof type === 'function'
+        ? String(type.displayName || type.name || '')
+        : (type && type.$$typeof ? String(type.displayName || '') : '');
+      if (!bag.participant && (
+        cls.split(/\s+/).includes('participant-picker-button')
+        || cls.includes('participant-picker')
+        || /ParticipantPickerButton/i.test(typeName)
+        || (Object.prototype.hasOwnProperty.call(props, 'participant') && typeof props.onClick === 'function' && 'placeholder' in props)
+      )) {
+        bag.participant = node;
+      }
       if (type === 'textarea' && !bag.textarea) bag.textarea = node;
       if (type === 'button') {
         const label = String(props['aria-label'] || props.title || '');
@@ -97,6 +111,7 @@ export function extractChatSlots(legacyTree) {
         if (!bag.attach && /첨부|파일|사진|attach/i.test(hay)) bag.attach = node;
         if (!bag.send && /전송|보내|send/i.test(hay)) bag.send = node;
         if (!bag.paste && /붙여넣기|paste/i.test(hay)) bag.paste = node;
+        if (!bag.emoji && /이모티콘|emoji/i.test(hay)) bag.emoji = node;
       }
       if (type === 'input' && props.type === 'file' && !bag.fileInput) bag.fileInput = node;
       walk(props.children, bag);
