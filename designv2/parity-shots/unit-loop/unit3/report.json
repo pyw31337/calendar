@@ -1,0 +1,89 @@
+{
+  "base": "https://pyw31337.github.io/calendar",
+  "phase": "post",
+  "mergeSha": "7841c153",
+  "capturedAt": "2026-09-16T07:49:52.808Z",
+  "chat": {
+    "v2": true,
+    "header": "채팅 모아엘가 · 4명",
+    "scrollPadding": "4px 14px 88px",
+    "composerPadding": "8px 12px",
+    "composerHeight": 87,
+    "textareaPadding": "8px 14px",
+    "textareaFont": "12.8px",
+    "textareaHeight": 36,
+    "toolsPadding": "4px 2px 0px",
+    "toolBtnSize": {
+      "w": 30,
+      "h": 30
+    },
+    "bubbles": [
+      {
+        "rowMarginBottom": "12px",
+        "bubblePadding": "8px 11px",
+        "bubbleFont": "12.8px",
+        "bubbleRadius": "0px 12px 12px"
+      },
+      {
+        "rowMarginBottom": "12px",
+        "bubblePadding": "8px 11px",
+        "bubbleFont": "12.8px",
+        "bubbleRadius": "12px 0px 12px 12px"
+      },
+      {
+        "rowMarginBottom": "12px",
+        "bubblePadding": "8px 11px",
+        "bubbleFont": "12.8px",
+        "bubbleRadius": "12px 0px 12px 12px"
+      },
+      {
+        "rowMarginBottom": "12px",
+        "bubblePadding": "8px 11px",
+        "bubbleFont": "12.8px",
+        "bubbleRadius": "0px 12px 12px"
+      }
+    ],
+    "features": {
+      "send": true,
+      "attach": true,
+      "tools": true,
+      "search": true
+    }
+  },
+  "memo": {
+    "v2": true,
+    "header": "메모",
+    "listPadding": "8px 14px 24px",
+    "listGap": "10px",
+    "composerPadding": "10px 12px",
+    "composerHeight": 42,
+    "searchToComposer": 29,
+    "composerToFirst": 10,
+    "cards": [
+      {
+        "padding": "12px",
+        "borderRadius": "0px 14px 14px 0px",
+        "borderLeft": "4px solid rgb(236, 234, 245)"
+      },
+      {
+        "padding": "12px",
+        "borderRadius": "0px 14px 14px 0px",
+        "borderLeft": "4px solid rgb(236, 234, 245)"
+      },
+      {
+        "padding": "12px",
+        "borderRadius": "0px 14px 14px 0px",
+        "borderLeft": "4px solid rgb(236, 234, 245)"
+      }
+    ],
+    "tagChipCount": 0,
+    "fab": {
+      "aria": "메모 작성",
+      "visible": true
+    },
+    "searchVisible": true
+  },
+  "home": {
+    "v2": true
+  }
+}

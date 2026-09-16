@@ -118,8 +118,66 @@ Do **not** start multi-screen rewrites; pick one focused pain per unit from live
 
 ### Remaining pain (next units)
 
-1. **Chat / Memo body density** — legacy trees under V2 chrome still sparse vs ChatFull/MemoFull.
+1. **Chat / Memo body density** — addressed in Unit 3 (#650).
 2. **Gallery records strip / header search** — Gallery `onSearch` still undefined; optional same click-legacy pattern.
 3. **Home / PC density** — hero/type scale (P1).
 4. **Places map chrome** — only if still noisy after Unit 1.
+
+---
+
+## Unit 3 — Chat + Memo body density (shipped)
+
+**PR:** [#650](https://github.com/pyw31337/calendar/pull/650)  
+**Merge:** `7841c153`  
+**Deploy:** Pages production from `7841c153` (Deploy Vite Pages after flaky records-subtab smoke rerun)
+
+### Change
+Densify legacy Chat/Memo **body** under `.v2-design` only — ChatFull/MemoFull spacing tokens (mock + slight bump). No tree rewrite; tool-icon row kept; Gallery `onSearch` deferred.
+
+1. **Chat:** message list padding `4px 14px 88px`; bubble `0.8rem` / `8×11` / ChatFull radii; composer bar `8px 12px`; input `36px`/`8×14`; tool icons `30px`; tools row padding tighter.
+2. **Memo:** list gap `20→10`, gutters `14px`; composer card `10×12`; cards left-accent `0 14px` radius; header/search row slightly tighter.
+
+**Files:** `src/ui/v2/screens.css`, `src/ui/v2/screens.js`  
+**Default shell:** untouched
+
+### Pre → post measures (390×844 live)
+
+| Metric | Pre | Post |
+|--------|-----|------|
+| Chat scroll padding | `8px 14px 100px` | `4px 14px 88px` |
+| Chat composer height | 101 | 87 |
+| Chat bubble padding / font | `8×12` / 0.86rem | `8×11` / 0.8rem |
+| Chat tool icon | 34×34 | 30×30 |
+| Memo list gap | 20px | 10px |
+| Memo composer→first | 20px | 10px |
+| Memo composer padding | 12px | 10×12 |
+| Memo card radius / border | `12px` / none | `0 14px` / 4px accent |
+
+### Post-Pages capture (390×844)
+
+| Shot | Path |
+|------|------|
+| chat (focus) | `unit-loop/unit3/chat.png` (local; `*.png` gitignored) |
+| memo (focus) | `unit-loop/unit3/memo.png` |
+| home regression | `unit-loop/unit3/home.png` |
+| measure | `unit-loop/unit3/report.json` (+ `pre-report.json`) |
+
+### Review
+
+| Check | Result |
+|-------|--------|
+| Chat denser vs pre | **PASS** — composer 101→87; list/bubble tokens match ChatFull |
+| Memo denser vs pre | **PASS** — list gap 20→10; composer→section 20→10; card accent |
+| Features preserved | **PASS** — send/attach/tools/search; memo FAB + search; tag cloud still 0 |
+| Default shell | **PASS** — only `src/ui/v2/` edits |
+| Verify CI | **PASS** on #650 |
+
+### Remaining pain (next units)
+
+1. **Gallery records strip / header search** — Gallery `onSearch` still undefined; optional Unit-2 click-legacy pattern.
+2. **Memo search→composer** — still ~29px (header search geometry); further tighten only if still feels sparse after card/list win.
+3. **Home / PC density** — hero/type scale (P1).
+4. **Places map chrome** — only if still noisy after Unit 1.
+
+Do **not** start multi-screen rewrites; pick one focused pain per unit from live captures.
 
