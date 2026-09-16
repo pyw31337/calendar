@@ -210,4 +210,4 @@ Files: `src/ui/ui-app-shell-v2.js`, `src/ui/v2/design.css`.
 - [x] Shared header/FAB/padding tokens applied
 - [x] Content/Gallery no double title chrome
 - [x] Post-fix mobile screenshots under `designv2/parity-shots/phase0-mobile/v2-after/`
-- [ ] PR merged + GitHub Pages updated
+- [x] PR merged + GitHub Pages updated
