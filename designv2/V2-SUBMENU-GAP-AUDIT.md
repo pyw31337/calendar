@@ -119,3 +119,33 @@ Shipped structural fixes (not claim-complete Full parity):
 - Gallery still shows records subtab strip + legacy tabs; needs denser Bento header integration.
 - Content/Archive visual polish (chips/grid) deferred to next PR on this series.
 - Places Full card grid parity incomplete.
+
+---
+
+## Compare loop (2026-09-16 KST) — local preview after structural rebuild
+
+### Method
+PC 1440×900 screenshots in `designv2/parity-shots/audit-live-capture/loop{2,3,4}-*.png` vs `mock-*-full.png` + `audit-live-user/`.
+
+### Results after fix cycles
+
+| Screen | Gate | Notes |
+|--------|------|-------|
+| Chat | **Pass (structure)** | Rail 280; ChatFull path (`v2-chat-root`); single V2 header; composer = attach + pill + send. Dual legacy header fixed. |
+| Memo | **Pass (structure)** | Rail + MemoFull chrome (search/tags/composer/cards/FAB). ~760px column. |
+| Settlement | **Pass (structure)** | Rail + header/tabs/summary/category/list/FAB; ~760px column (not edge-stretch). |
+| Gallery | **Pass (structure)** after height fix | Was empty (absolute children collapsed MediaPane). Now scroll≈810px, dense grid, 사진/링크/파일 + 전체\|일자. |
+| Places | Partial | Rail + dest header; PlacesFull card density still follow-up. |
+| Content/Archive | Partial | Embed + rail; visual polish follow-up. |
+
+### Remaining diffs → next slice
+1. **Chat bubbles:** mock uses colored name pills left of every bubble + timestamp under bubble; live still uses mixed legacy bubble chrome.
+2. **Gallery chrome:** records subtab strip (전체/사진·영상/…) still sits above gallery — compress or fold when side-nav already selected 갤러리; unify header hierarchy.
+3. **Settlement:** SettlementFull card chrome (rounded cards per meeting) vs live list rows — restyle rows into cards.
+4. **Content/Archive:** dedicated Full mocks absent — continue Bento density pass.
+
+### Fixes landed this loop
+- `extractChatSlots` detects send via button children text (`전송`)
+- Hide `.chat-room-header` whenever `.v2-chat` present
+- PC density columns for chat/memo/settlement
+- `v2-records-frame` / body flex + absolute fill (gallery empty-pane regression)

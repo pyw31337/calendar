@@ -610,3 +610,194 @@
   bottom: calc(20px + env(safe-area-inset-bottom, 0px));
   z-index: 8;
 }
+
+/* Chat: always hide legacy title bar when V2 PageHeader is present */
+.v2-design .v2-chat .chat-room-header,
+.v2-design .v2-chat-legacy .chat-room-header,
+.v2-design .v2-wrap-legacy .chat-room-header {
+  display: none !important;
+}
+/* Chat column density on PC: ChatFull-scale centered pane beside rail */
+@media (min-width: 1200px) {
+  .v2-design .v2-chat.v2-dest-page,
+  .v2-design .renewal-shell-main.v2-chat {
+    background: #f3f1f8;
+  }
+  .v2-design .v2-chat-shell,
+  .v2-design .v2-chat .v2-chat-root,
+  .v2-design .v2-chat .chat-room-container {
+    max-width: 720px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    background: #fafafc !important;
+    box-shadow: 0 0 0 1px #eceaf5;
+  }
+  .v2-design .v2-chat .chat-composer {
+    position: absolute !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    max-width: 720px !important;
+    margin: 0 auto !important;
+    z-index: 6 !important;
+  }
+  .v2-design .v2-chat .chat-messages-scroll {
+    padding: 8px 16px 110px !important;
+  }
+}
+
+/* Memo PC: MemoFull-like single column + dense tags beside rail */
+@media (min-width: 1200px) {
+  .v2-design .v2-memo.v2-dest-page .bp-app-shell,
+  .v2-design .renewal-shell-main.v2-memo .bp-app-shell {
+    max-width: 760px !important;
+    margin: 0 auto !important;
+    background: #fafafc;
+  }
+  .v2-design .v2-memo .bp-tag-filter-row {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+    padding: 8px 14px 4px !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  .v2-design .v2-memo .bp-tag-chip {
+    font-size: 0.68rem !important;
+    padding: 4px 10px !important;
+  }
+  .v2-design .v2-memo .v2-dest-body,
+  .v2-design .v2-memo .v2-memo-body {
+    padding: 0 8px 96px !important;
+  }
+}
+
+/* Settlement PC: card column, not edge-to-edge stretch */
+@media (min-width: 1200px) {
+  .v2-design .v2-settlement.v2-dest-page .bp-app-shell,
+  .v2-design .renewal-shell-main.v2-settlement .bp-app-shell {
+    max-width: 760px !important;
+    margin: 0 auto !important;
+  }
+  .v2-design .v2-settlement .settlement-page-body,
+  .v2-design .v2-settlement .v2-settlement-body {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 12px 16px 96px !important;
+  }
+  .v2-design .v2-settlement .settlement-page-tabs {
+    max-width: 760px;
+    margin: 0 auto;
+  }
+}
+
+/* Gallery: hide redundant records subtab when side-nav already selects 갤러리;
+   keep feature tabs 사진/링크/파일. Soften emoji-era chrome. */
+.v2-design .renewal-shell-main.v2-records-media .renewal-shell-subtab-row,
+.v2-design .renewal-shell-main.is-records.v2-records-media .renewal-shell-subtab-row {
+  /* Keep for 전체 hub; when on media the side-nav is source of IA — compress row */
+  padding: 6px 12px !important;
+}
+.v2-design .v2-gallery .gallery-page-header {
+  height: 52px !important;
+}
+.v2-design .v2-gallery .gallery-page-container {
+  background: #fafafc !important;
+}
+@media (min-width: 1200px) {
+  .v2-design .v2-gallery .gallery-page-inner,
+  .v2-design .v2-records-media .gallery-page-inner {
+    max-width: none !important;
+  }
+}
+
+/* Places PC column */
+@media (min-width: 1200px) {
+  .v2-design .v2-places.v2-dest-page .bp-app-shell {
+    max-width: 960px !important;
+    margin: 0 auto !important;
+  }
+}
+
+/* Gallery/Content/Archive: fill remaining height under records subtabs (fix empty pane) */
+.v2-design .renewal-shell-main.is-records {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  overflow: hidden !important;
+}
+.v2-design .renewal-shell-main.is-records > .renewal-shell-subtab-row {
+  flex: 0 0 auto !important;
+}
+.v2-design .renewal-shell-main.is-records > .v2-records-media,
+.v2-design .renewal-shell-main.is-records > .v2-gallery,
+.v2-design .renewal-shell-main.is-records > .v2-content,
+.v2-design .renewal-shell-main.is-records > .v2-archive,
+.v2-design .renewal-shell-main.is-records > section {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: auto !important;
+  position: relative !important;
+  inset: auto !important;
+  overflow: hidden !important;
+}
+.v2-design .renewal-shell-main.is-records .v2-gallery,
+.v2-design .renewal-shell-main.is-records .v2-embed-frame,
+.v2-design .renewal-shell-main.is-records .v2-gallery-legacy,
+.v2-design .renewal-shell-main.is-records .gallery-page-container,
+.v2-design .renewal-shell-main.is-records .gallery-page-inner,
+.v2-design .renewal-shell-main.is-records .v2-content-legacy,
+.v2-design .renewal-shell-main.is-records .v2-archive-legacy,
+.v2-design .renewal-shell-main.is-records .places-view-container {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+.v2-design .renewal-shell-main.is-records .gallery-page-scroll,
+.v2-design .renewal-shell-main.is-records .history-page-scroll {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  position: relative !important;
+}
+
+.v2-design .v2-records-frame {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  min-height: 100dvh;
+  overflow: hidden;
+  background: #fafafc;
+}
+.v2-design .v2-records-frame > .renewal-shell-subtab-row { flex: 0 0 auto; }
+.v2-design .v2-records-frame > .v2-records-body {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Critical: MediaPane wrapper collapses when children are absolute — force fill */
+.v2-design .v2-records-body > .v2-records-media,
+.v2-design .v2-records-body > .v2-gallery,
+.v2-design .v2-records-body > .v2-content,
+.v2-design .v2-records-body > .v2-archive,
+.v2-design .v2-records-body > section {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  overflow: hidden !important;
+}
+

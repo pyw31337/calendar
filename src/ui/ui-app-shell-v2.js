@@ -1558,7 +1558,7 @@ function RecordsPane({ subTab, onSelectSubTab, calendarName, recordsContext, cal
     if (subTab === 'memo') onChangeView('memo');
     else if (subTab === 'places') onChangeView('places');
   }, [subTab]);
-  return React.createElement(React.Fragment, null,
+  return React.createElement('div', { className: 'v2-records-frame' },
     React.createElement('div', { className: 'renewal-shell-subtab-row', role: 'tablist', 'aria-label': '기록 필터' },
       RECORDS_SUBTABS.map(t => React.createElement('button', {
         key: t.id,
@@ -1569,6 +1569,7 @@ function RecordsPane({ subTab, onSelectSubTab, calendarName, recordsContext, cal
         onClick: () => onSelectSubTab(t.id),
       }, t.label))
     ),
+    React.createElement('div', { className: 'v2-records-body' },
     subTab === 'media'
       ? React.createElement(MediaPane, { recordsContext, onChangeView, onOpenAppSettings })
       : subTab === 'content'
@@ -1581,6 +1582,7 @@ function RecordsPane({ subTab, onSelectSubTab, calendarName, recordsContext, cal
         title: `${RECORDS_SUBTABS.find(t => t.id === subTab)?.label || subTab} (준비 중)`,
         subtitle: withCalendarPrefix(calendarName, '갤러리·보관함·콘텐츠는 기록 허브에 남아 있습니다. 메모·장소는 사이드 메뉴의 독립 페이지입니다.'),
       })
+    )
   );
 }
 
