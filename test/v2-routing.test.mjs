@@ -116,7 +116,7 @@ test('V2 PC polish keeps wider rail, fluid content, 3x3 gallery, and participant
   assert.match(shell, /day-head-row/);
   assert.match(shell, /day-meeting-pill/);
   assert.match(shell, /anniversarySpanRole/);
-  assert.match(shell, /day-anniversary \$\{anniversarySpanRole/);
+  assert.match(shell, /day-anniversary \$\{role\}/);
   assert.match(shell, /chat-bubble-modules/);
   assert.match(shell, /ChatBubbleFrame/);
   // V2 badge colors: 모임확정/일정·여행 = brand purple; 기념일 = status-green
