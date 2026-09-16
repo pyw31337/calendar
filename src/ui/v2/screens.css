@@ -1613,12 +1613,13 @@
   font-weight: 700 !important;
   padding: 6px 8px !important;
 }
-/* Genre / category chips are inline-styled portal buttons (no class) under header stack */
-.v2-design .v2-content .history-header-stack > div:not([class]) {
+/* Genre / category chips: portal into a classless slot, then an inner classless row */
+.v2-design .v2-content .history-header-stack > div:not([class]),
+.v2-design .v2-content .history-header-stack > div:not([class]) > div {
   gap: 4px !important;
   padding: 0 12px 8px !important;
 }
-.v2-design .v2-content .history-header-stack > div:not([class]) > button {
+.v2-design .v2-content .history-header-stack > div:not([class]) button {
   padding: 4px 8px !important;
   font-size: 0.68rem !important;
   gap: 4px !important;
