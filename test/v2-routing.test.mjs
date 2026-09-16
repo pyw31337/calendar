@@ -148,7 +148,7 @@ test('V2 destination screens keep live feature entry points', async () => {
   assert.match(shell, /v2-records-media/);
   assert.match(shell, /onOpenGalleryShare/);
   assert.match(shell, /clickLegacyAriaButton\('갤러리 검색'/);
-  assert.match(screens, /label: '갤러리 검색'/);
+  assert.match(screens, /searchLabel: '갤러리 검색'|label: '갤러리 검색'/);
   assert.match(shell, /setActiveLightbox/);
   assert.match(shell, /dday-participant-memos/);
   assert.match(styles, /chat-reply-quote-card/);

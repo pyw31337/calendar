@@ -181,3 +181,13 @@ Densify legacy Chat/Memo **body** under `.v2-design` only — ChatFull/MemoFull 
 
 Do **not** start multi-screen rewrites; pick one focused pain per unit from live captures.
 
+
+---
+
+## Header module (PC mock chat-header-side)
+
+**Branch/PR:** `feat/v2-chat-header-side-mock`  
+**Doc:** `designv2/V2-HEADER-MODULE.md`  
+**Captures:** `parity-shots/unit-loop/header-module/` (PC chat 1280×800, mobile chat, memo header)
+
+Shared PageHeader (back + title/subtitle + search/menu) applied to all destinations; side-nav brand calendar pill; chat composer/body aligned to attachment mock. Default shell untouched.
