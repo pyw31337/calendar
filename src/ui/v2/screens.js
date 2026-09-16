@@ -114,7 +114,22 @@ function IconButton({ label, icon, onClick, size = 16 }) {
   );
 }
 
-export function PageHeader({ title, subtitle, count, onBack, onShare, onMenu, extra, children }) {
+/** Strip leading emoji/symbols from calendar title for header/side badges. */
+function cleanCalendarName(calendar) {
+  return String(calendar?.title || calendar?.name || '')
+    .replace(/^[^\p{L}\p{N}]+/u, '')
+    .trim();
+}
+
+/** Shared subtitle: calendar name, optionally with a real trailing fragment (e.g. member count). */
+function pageSubtitle(calendar, trailing) {
+  const name = cleanCalendarName(calendar);
+  const extra = trailing == null || trailing === '' ? '' : String(trailing).trim();
+  if (name && extra) return `${name} · ${extra}`;
+  return name || extra || undefined;
+}
+
+export function PageHeader({ title, subtitle, count, onBack, onSearch, searchLabel, onShare, onMenu, extra, children }) {
   return h(
     'header',
     { className: 'bp-header v2-page-header' },
@@ -126,17 +141,18 @@ export function PageHeader({ title, subtitle, count, onBack, onShare, onMenu, ex
         { className: 'bp-back-btn', type: 'button', 'aria-label': '뒤로가기', onClick: onBack },
         h(DesignIcon, { name: 'back', size: 18 })
       ),
-      subtitle
-        ? h('div', { className: 'v2-header-title-block' },
-            h('div', { className: 'bp-header-title' }, title),
-            h('div', { className: 'bp-header-sub' }, subtitle)
-          )
-        : h('span', { className: 'bp-header-title' }, title),
+      h(
+        'div',
+        { className: 'v2-header-title-block' },
+        h('div', { className: 'bp-header-title' }, title),
+        subtitle ? h('div', { className: 'bp-header-sub' }, subtitle) : null
+      ),
       count && h('span', { className: 'bp-header-count' }, count),
       h(
         'div',
         { className: 'bp-header-actions' },
         extra,
+        onSearch && h(IconButton, { label: searchLabel || `${title} 검색`, icon: 'search', onClick: onSearch }),
         onShare && h(IconButton, { label: `${title} 공유`, icon: 'share', onClick: onShare }),
         onMenu && h(IconButton, { label: `${title} 메뉴`, icon: 'menu', onClick: onMenu })
       )
@@ -213,6 +229,7 @@ export function MemoScreen(p) {
             PageHeader,
             {
               title: '메모',
+              subtitle: p.subtitle || pageSubtitle(p.calendar),
               onBack: p.onBack,
               onShare: p.onShare,
               onMenu: p.onMenu,
@@ -239,6 +256,7 @@ export function MemoScreen(p) {
           PageHeader,
           {
             title: '메모',
+            subtitle: p.subtitle || pageSubtitle(p.calendar),
             onBack: p.onBack,
             onShare: p.onShare,
             onMenu: p.onMenu,
@@ -266,6 +284,7 @@ export function MemoScreen(p) {
         PageHeader,
         {
           title: '메모',
+          subtitle: p.subtitle || pageSubtitle(p.calendar),
           onBack: p.onBack,
           onShare: p.onShare,
           onMenu: p.onMenu,
@@ -356,6 +375,7 @@ export function PlacesScreen(p) {
             PageHeader,
             {
               title: '장소',
+              subtitle: p.subtitle || pageSubtitle(p.calendar),
               count: p.countLabel,
               onBack: p.onBack,
               onShare: p.onShare,
@@ -394,6 +414,7 @@ export function PlacesScreen(p) {
           PageHeader,
           {
             title: '장소',
+            subtitle: p.subtitle || pageSubtitle(p.calendar),
             count: p.countLabel,
             onBack: p.onBack,
             onShare: p.onShare,
@@ -430,6 +451,7 @@ export function PlacesScreen(p) {
         PageHeader,
         {
           title: '장소',
+          subtitle: p.subtitle || pageSubtitle(p.calendar),
           count: `등록 ${(p.places || []).length}곳`,
           onBack: p.onBack,
           onShare: p.onShare,
@@ -573,6 +595,7 @@ export function SettlementScreen(p) {
           { className: 'bp-app-shell' },
           h(PageHeader, {
             title: '정산',
+            subtitle: p.subtitle || pageSubtitle(p.calendar),
             onBack: p.onBack,
             onShare: p.onShare,
             onMenu: p.onMenu,
@@ -592,6 +615,7 @@ export function SettlementScreen(p) {
         { className: 'bp-app-shell' },
         h(PageHeader, {
           title: '정산',
+          subtitle: p.subtitle || pageSubtitle(p.calendar),
           onBack: p.onBack,
           onShare: p.onShare,
           onMenu: p.onMenu,
@@ -616,6 +640,7 @@ export function SettlementScreen(p) {
       { className: 'bp-app-shell' },
       h(PageHeader, {
         title: '정산',
+        subtitle: p.subtitle || pageSubtitle(p.calendar),
         onBack: p.onBack,
         onShare: p.onShare,
         onMenu: p.onMenu,
@@ -804,8 +829,9 @@ export function ChatScreen(p) {
   const React = window.React;
   const [toolsOpen, setToolsOpen] = React.useState(false);
   const slots = { ...(p.legacyView ? extractChatSlots(p.legacyView) : {}), ...(p.slots || {}) };
+  const memberCount = (p.calendar?.participants || []).filter(person => !person.deletedAt).length;
   const subtitle = p.subtitle
-    || `${String(p.calendar?.title || '').replace(/^[^\p{L}\p{N}]+/u, '').trim()} · ${(p.calendar?.participants || []).filter(person => !person.deletedAt).length}명`;
+    || pageSubtitle(p.calendar, memberCount ? `${memberCount}명` : '');
 
   // Preferred path: mock header + live message list + composer slots (ChatFull structure).
   // Require textarea+send so we can rebuild the composer row; otherwise fall back to wrap.
@@ -820,6 +846,7 @@ export function ChatScreen(p) {
         className: 'chat-composer v2-chat-composer',
         style: { ...slots.composer.props.style, transform: 'none', opacity: 1, pointerEvents: 'auto' },
       },
+      slots.resize,
       slots.reply,
       slots.photos,
       slots.files,
@@ -830,6 +857,7 @@ export function ChatScreen(p) {
         slots.attach,
         clone(slots.textarea, {
           className: 'bp-composer-input',
+          placeholder: slots.textarea.props.placeholder || '메시지를 입력하세요...',
           style: {
             ...slots.textarea.props.style,
             minHeight: '36px',
@@ -839,6 +867,25 @@ export function ChatScreen(p) {
             resize: 'none',
           },
         }),
+        slots.emoji
+          ? clone(slots.emoji, {
+              className: 'v2-tool-icon-btn',
+              'aria-label': '이모티콘',
+              title: '이모티콘',
+            }, h(DesignIcon, { name: 'emoji', size: 18 }))
+          : null,
+        h(
+          'button',
+          {
+            type: 'button',
+            className: `v2-tool-icon-btn${toolsOpen ? ' is-active' : ''}`,
+            'aria-label': '밈',
+            'aria-pressed': toolsOpen,
+            title: '밈',
+            onClick: () => setToolsOpen(value => !value),
+          },
+          h(DesignIcon, { name: 'meme', size: 18 })
+        ),
         clone(
           slots.send,
           { 'aria-label': '메시지 전송', className: 'bp-composer-send' },
@@ -855,36 +902,29 @@ export function ChatScreen(p) {
         h(
           'div',
           { className: 'v2-chat-tool-icons', role: 'toolbar', 'aria-label': '채팅 입력 도구' },
-          slots.emoji
-            ? clone(slots.emoji, {
-                className: 'v2-tool-icon-btn',
-                'aria-label': '이모티콘',
-                title: '이모티콘',
-              }, h(DesignIcon, { name: 'emoji', size: 18 }))
-            : null,
-          h(
-            'button',
-            {
-              type: 'button',
-              className: `v2-tool-icon-btn${toolsOpen ? ' is-active' : ''}`,
-              'aria-label': '밈',
-              'aria-pressed': toolsOpen,
-              title: '밈',
-              onClick: () => setToolsOpen(value => !value),
-            },
-            h(DesignIcon, { name: 'meme', size: 18 })
-          ),
           slots.paste
             ? clone(slots.paste, {
                 className: 'v2-tool-icon-btn',
                 'aria-label': '붙여넣기',
                 title: '붙여넣기',
               }, h(DesignIcon, { name: 'paste', size: 18 }))
+            : null,
+          p.onOpenGallery
+            ? h(
+                'button',
+                {
+                  type: 'button',
+                  className: 'v2-tool-icon-btn',
+                  'aria-label': '사진첨부',
+                  title: '사진첨부',
+                  onClick: p.onOpenGallery,
+                },
+                h(DesignIcon, { name: 'photo', size: 18 })
+              )
             : null
         )
       ),
-      toolsOpen && slots.memes,
-      toolsOpen && slots.resize
+      toolsOpen && slots.memes
     );
 
     return h(
@@ -897,11 +937,9 @@ export function ChatScreen(p) {
           title: '채팅',
           subtitle,
           onBack: p.onBack,
+          onSearch: p.onSearch,
+          searchLabel: '대화 검색',
           onMenu: p.onMenu,
-          extra: h(window.React.Fragment, null,
-            h(IconButton, { label: '대화 검색', icon: 'search', onClick: p.onSearch }),
-            p.onOpenGallery && h(IconButton, { label: '사진첨부', icon: 'photo', onClick: p.onOpenGallery })
-          ),
         }),
         slots.notice,
         clone(slots.body, { className: 'v2-chat-scroll' }),
@@ -926,11 +964,9 @@ export function ChatScreen(p) {
         title: '채팅',
         subtitle,
         onBack: p.onBack,
+        onSearch: p.onSearch,
+        searchLabel: '대화 검색',
         onMenu: p.onMenu,
-        extra: h(window.React.Fragment, null,
-          h(IconButton, { label: '대화 검색', icon: 'search', onClick: p.onSearch }),
-          p.onOpenGallery && h(IconButton, { label: '사진첨부', icon: 'photo', onClick: p.onOpenGallery })
-        ),
       }),
       wrapLegacy(p.legacyView, 'v2-legacy-body v2-chat-legacy')
     ),
@@ -955,10 +991,12 @@ export function GalleryScreen(p) {
     { className: 'v2-gallery v2-dest-page v2-embed-frame v2-records-media v2-has-page-header' },
     h(PageHeader, {
       title: '갤러리',
+      subtitle: p.subtitle || pageSubtitle(p.calendar),
       onBack: p.onBack,
+      onSearch: p.onSearch,
+      searchLabel: '갤러리 검색',
       onShare: p.onShare,
       onMenu: p.onMenu,
-      extra: p.onSearch && h(IconButton, { label: '갤러리 검색', icon: 'search', onClick: p.onSearch }),
     }),
     wrapLegacy(p.legacyView, 'v2-legacy-body v2-gallery-legacy'),
     overlays(p.slots)
@@ -971,10 +1009,12 @@ export function ContentScreen(p) {
     { className: 'v2-content v2-dest-page v2-embed-frame v2-has-page-header' },
     h(PageHeader, {
       title: '컨텐츠',
+      subtitle: p.subtitle || pageSubtitle(p.calendar),
       onBack: p.onBack,
+      onSearch: p.onSearch,
+      searchLabel: '컨텐츠 검색',
       onShare: p.onShare,
       onMenu: p.onMenu,
-      extra: p.onSearch && h(IconButton, { label: '컨텐츠 검색', icon: 'search', onClick: p.onSearch }),
     }),
     wrapLegacy(p.legacyView, 'v2-legacy-body v2-content-legacy'),
     overlays(p.slots)
@@ -987,10 +1027,12 @@ export function ArchiveScreen(p) {
     { className: 'v2-archive v2-dest-page v2-embed-frame v2-has-page-header' },
     h(PageHeader, {
       title: '보관함',
+      subtitle: p.subtitle || pageSubtitle(p.calendar),
       onBack: p.onBack,
+      onSearch: p.onSearch,
+      searchLabel: '보관함 검색',
       onShare: p.onShare,
       onMenu: p.onMenu,
-      extra: p.onSearch && h(IconButton, { label: '보관함 검색', icon: 'search', onClick: p.onSearch }),
     }),
     wrapLegacy(p.legacyView, 'v2-legacy-body v2-archive-legacy'),
     overlays(p.slots)

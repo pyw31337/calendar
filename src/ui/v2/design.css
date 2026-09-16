@@ -986,3 +986,119 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+
+/* --------------------------------------------------------------------------
+ * Header module + side-nav brand badge (PC mock chat-header-side)
+ * -------------------------------------------------------------------------- */
+.v2-design .bp-side-nav-cal-badge {
+  flex-shrink: 0;
+  max-width: 7.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.62rem !important;
+  font-weight: 800;
+  line-height: 1.3;
+  color: #7c3aed;
+  background: #f3eeff;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  margin-left: 2px;
+}
+
+.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-cal-badge,
+.v2-design.is-side-collapsed .bp-side-nav-cal-badge {
+  display: none !important;
+}
+
+.v2-design .bp-side-nav-item.bp-is-active {
+  background: #f3eeff !important;
+  color: #7c3aed !important;
+}
+
+.v2-design .bp-side-nav-item.bp-is-active .bp-side-nav-item-icon,
+.v2-design .bp-side-nav-item.bp-is-active .bp-side-nav-item-title {
+  color: #7c3aed !important;
+}
+
+/* Chat author pill in side-nav — solid color + white text (mock) */
+.v2-design .bp-side-nav-item-meta.bp-chat-name-pill,
+.v2-design .bp-side-nav-item-meta.chat-name-pill {
+  color: #fff !important;
+  font-size: 0.62rem !important;
+  font-weight: 800 !important;
+  padding: 2px 7px !important;
+  border-radius: 9999px !important;
+  max-width: 5.5rem;
+}
+
+.v2-design .bp-side-nav-date-chip {
+  background: #f3f1f7 !important;
+  color: #83798f !important;
+  font-size: 0.6rem !important;
+  font-weight: 700 !important;
+  padding: 2px 7px !important;
+  border-radius: 9999px !important;
+  max-width: none;
+}
+
+/* Shared PageHeader — stacked title/subtitle denser (mock + slight bump) */
+.v2-design .v2-page-header {
+  padding: 11px 14px 9px !important;
+  background: #fff !important;
+  border-bottom: 1px solid #eceaf5 !important;
+}
+.v2-design .v2-page-header .bp-header-row {
+  align-items: center !important;
+  gap: 8px !important;
+}
+.v2-design .v2-header-title-block {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  justify-content: center;
+}
+.v2-design .v2-page-header .bp-header-title {
+  font-size: 0.98rem !important;
+  font-weight: 800 !important;
+  color: #1e1b2e !important;
+  line-height: 1.25 !important;
+}
+.v2-design .v2-page-header .bp-header-sub {
+  font-size: 0.66rem !important;
+  font-weight: 700 !important;
+  color: #83798f !important;
+  line-height: 1.3 !important;
+}
+.v2-design .v2-page-header .bp-back-btn {
+  background: none !important;
+  border: none !important;
+  color: #6b6580 !important;
+  padding: 4px !important;
+  display: inline-flex !important;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.v2-design .v2-page-header .bp-back-btn:hover { color: #7c3aed !important; }
+.v2-design .v2-page-header .bp-header-actions {
+  margin-left: auto !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 2px !important;
+  flex-shrink: 0;
+}
+.v2-design .v2-page-header .bp-icon-btn {
+  background: none !important;
+  border: none !important;
+  color: #6b6580 !important;
+  padding: 7px !important;
+  border-radius: 9999px !important;
+  box-shadow: none !important;
+}
+.v2-design .v2-page-header .bp-icon-btn:hover {
+  background: #fafafc !important;
+  color: #7c3aed !important;
+}

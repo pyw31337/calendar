@@ -1347,7 +1347,7 @@ export function buildRenewalRecordsContext(calendar, deps) {
  * chunk as `ChatRoomView` (`window.__gatherLoadChatUi`), so this waits for that chunk before
  * rendering -- identical "wait-then-open" step `ChatPane` already uses.
  */
-function MediaPane({ recordsContext, onChangeView, onOpenAppSettings, onOpenSideNav }) {
+function MediaPane({ recordsContext, calendarName, onChangeView, onOpenAppSettings, onOpenSideNav }) {
   const React = window.React;
   const [loaded, setLoaded] = React.useState(() => !!(window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChatGalleryModal));
   React.useEffect(() => {
@@ -1375,6 +1375,7 @@ function MediaPane({ recordsContext, onChangeView, onOpenAppSettings, onOpenSide
     React.createElement('div', { className: 'v2-records-media' },
       renderGalleryScreen({
         legacyView: galleryView,
+        subtitle: calendarName || undefined,
         onBack: () => onChangeView('calendar'),
         onShare: recordsContext.onOpenGalleryShare,
         onMenu: onOpenSideNav || onOpenAppSettings,
@@ -1401,7 +1402,7 @@ function clickLegacyAriaButton(ariaLabel, scopeSelector) {
 }
 
 /** 콘텐츠 subtab body (WP-06 continuation): the existing ContentView with unchanged app-main props. */
-function ContentPane({ recordsContext, onChangeView, onOpenAppSettings, onOpenSideNav }) {
+function ContentPane({ recordsContext, calendarName, onChangeView, onOpenAppSettings, onOpenSideNav }) {
   const React = window.React;
   const { ContentView } = bindUiComponentAliases(React);
   const contentView = React.createElement(ContentView, {
@@ -1412,6 +1413,7 @@ function ContentPane({ recordsContext, onChangeView, onOpenAppSettings, onOpenSi
   });
   return renderContentScreen({
     legacyView: contentView,
+    subtitle: calendarName || undefined,
     onBack: () => onChangeView('calendar'),
     onMenu: onOpenSideNav || onOpenAppSettings,
     onSearch: () => clickLegacyAriaButton('컨텐츠 검색', '.v2-content'),
@@ -1430,7 +1432,7 @@ function ContentPane({ recordsContext, onChangeView, onOpenAppSettings, onOpenSi
  * reasoning. `calendarContext` is threaded down through `RecordsPane` just for
  * `dateModalProps`'s data/handlers.
  */
-function HistoryPane({ recordsContext, calendarContext, onChangeView, onOpenAppSettings, onOpenSideNav, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource }) {
+function HistoryPane({ recordsContext, calendarContext, calendarName, onChangeView, onOpenAppSettings, onOpenSideNav, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource }) {
   const React = window.React;
   const [historyDateModalDate, setHistoryDateModalDate] = React.useState(null);
   const { HistoryView, ShareModal, DateModal } = bindUiComponentAliases(React);
@@ -1445,6 +1447,7 @@ function HistoryPane({ recordsContext, calendarContext, onChangeView, onOpenAppS
   return React.createElement(React.Fragment, null,
     renderArchiveScreen({
       legacyView: historyView,
+      subtitle: calendarName || undefined,
       onBack: () => onChangeView('calendar'),
       onShare: recordsContext.onOpenHistoryShare,
       onMenu: onOpenSideNav || onOpenAppSettings,
@@ -1595,13 +1598,13 @@ function RecordsPane({ subTab, onSelectSubTab, calendarName, recordsContext, cal
         ),
     React.createElement('div', { className: 'v2-records-body' },
     subTab === 'media'
-      ? React.createElement(MediaPane, { recordsContext, onChangeView, onOpenAppSettings, onOpenSideNav })
+      ? React.createElement(MediaPane, { recordsContext, calendarName, onChangeView, onOpenAppSettings, onOpenSideNav })
       : subTab === 'content'
-      ? React.createElement(ContentPane, { recordsContext, onChangeView, onOpenAppSettings, onOpenSideNav })
+      ? React.createElement(ContentPane, { recordsContext, calendarName, onChangeView, onOpenAppSettings, onOpenSideNav })
       : subTab === 'all'
       ? React.createElement(RecordsOverviewPane, { recordsContext, calendarName, onSelectSubTab, onChangeView })
       : subTab === 'archive'
-      ? React.createElement(HistoryPane, { recordsContext, calendarContext, onChangeView, onOpenAppSettings, onOpenSideNav, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource })
+      ? React.createElement(HistoryPane, { recordsContext, calendarContext, calendarName, onChangeView, onOpenAppSettings, onOpenSideNav, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource })
       : React.createElement(EmptyState, {
         title: `${RECORDS_SUBTABS.find(t => t.id === subTab)?.label || subTab} (준비 중)`,
         subtitle: withCalendarPrefix(calendarName, '갤러리·보관함·콘텐츠는 기록 허브에 남아 있습니다. 메모·장소는 사이드 메뉴의 독립 페이지입니다.'),
@@ -2174,8 +2177,8 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
     : null;
   const participants = Array.isArray(calendarContext?.calendar?.participants) ? calendarContext.calendar.participants : [];
   const chatAuthorPart = participants.find(p => p && (p.id === lastChatMsg?.participantId || p.name === lastChatAuthor));
-  const chatPillColor = chatAuthorPart?.color ? `${chatAuthorPart.color}33` : '#FEE2E2';
-  const chatPillTextColor = chatAuthorPart?.color || '#DC2626';
+  const chatPillColor = chatAuthorPart?.color || '#EF4444';
+  const chatPillTextColor = '#FFFFFF';
 
   const hasFullScreen = activeTab === 'chat' || activeTab === 'settlement' || activeTab === 'memo' || activeTab === 'places';
   const bentoSideNav = React.createElement(React.Fragment, null,
@@ -2189,7 +2192,13 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
           height: 22,
           decoding: 'async',
         }),
-        React.createElement('span', { className: bentoClass('side-nav-brand-text') }, '모여라 캘린더')
+        React.createElement('span', { className: bentoClass('side-nav-brand-text') }, '모여라 캘린더'),
+        calendarName
+          ? React.createElement('span', {
+              className: bentoClass('side-nav-cal-badge'),
+              title: calendarName,
+            }, calendarName)
+          : null
       ),
       React.createElement('button', { type: 'button', className: bentoClass('side-nav-close-btn'), 'aria-label': '메뉴 닫기', onClick: () => setIsSideNavOpen(false) },
         React.createElement(TabIcon, { id: 'close' })
@@ -2236,7 +2245,13 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
           metaVal && (
             item.isPill
               ? React.createElement('span', { className: bentoClass('side-nav-item-meta chat-name-pill'), style: { backgroundColor: chatPillColor, color: chatPillTextColor } }, metaVal)
-              : React.createElement('span', { className: bentoClass('side-nav-item-meta renewal-shell-side-nav-meta') }, metaVal)
+              : React.createElement('span', {
+                  className: bentoClass(
+                    item.id === 'settlement'
+                      ? 'side-nav-item-meta side-nav-date-chip renewal-shell-side-nav-meta'
+                      : 'side-nav-item-meta renewal-shell-side-nav-meta'
+                  ),
+                }, metaVal)
           )
         );
       })
