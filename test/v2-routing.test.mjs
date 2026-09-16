@@ -83,4 +83,7 @@ test('V2 date modal opts into bento sheet chrome without changing default export
   assert.match(shell, /activeTab === 'memo'/);
   assert.match(shell, /activeTab === 'places'/);
   assert.match(shell, /resolveV2Destination/);
+  // Legacy ?tab=records&sub=memo|places bookmarks promote to first-class tabs; sub is stripped.
+  assert.match(shell, /sub === 'memo' \|\| sub === 'places'/);
+  assert.match(shell, /Only gallery\/content\/archive \(records\) keep \?sub=/);
 });

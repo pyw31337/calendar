@@ -258,14 +258,15 @@ async function checkManifests(browser, baseUrl) {
 async function checkRenewalShellRoutes(browser, baseUrl) {
   const routes = [
     ['', '캘린더'], ['&tab=chat', '대화'], ['&tab=records', '기록'],
+    ['&tab=memo', '메모'], ['&tab=places', '장소'],
     ['&tab=settlement', '정산'], ['&tab=more', '더보기']
   ];
-  // Chip-row subtabs keep role=tablist visible. memo/places intentionally hide that row for
-  // Bento full-chrome (RecordsPane: !['memo','places'].includes(subTab)), so they must not be
-  // clicked mid-loop — otherwise the next getByRole('tab') times out and the catch used to
-  // mislabel the failure as "V2 목적지".
+  // Chip-row subtabs keep role=tablist visible under 기록. memo/places are first-class
+  // ?tab= destinations (not records subs) and must not be clicked mid-loop — otherwise the
+  // next getByRole('tab') times out and the catch used to mislabel the failure as "V2 목적지".
   const chipSubtabs = [['사진·영상', 'media'], ['보관함', 'archive'], ['콘텐츠', 'content']];
-  const fullChromeSubs = [['places', '장소'], ['memo', '메모']];
+  // Legacy ?tab=records&sub=memo|places bookmarks promote on load to tab=memo|places with sub cleared.
+  const firstClassDests = [['places', '장소'], ['memo', '메모']];
   for (const viewport of VIEWPORTS) {
     const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height }, hasTouch: viewport.hasTouch });
     const page = await context.newPage();
@@ -296,16 +297,29 @@ async function checkRenewalShellRoutes(browser, baseUrl) {
       }
       pass(`[${viewport.name}] V2 기록 서브탭 클릭 전환`);
 
-      for (const [sub, label] of fullChromeSubs) {
-        await gotoBootReady(page, `${baseUrl}?id=cw&shell=v2&tab=records&sub=${sub}`);
+      for (const [dest, label] of firstClassDests) {
+        // Legacy bookmark URL — shell promotes to first-class tab and clears sub.
+        await gotoBootReady(page, `${baseUrl}?id=cw&shell=v2&tab=records&sub=${dest}`);
         await page.locator('.renewal-shell').waitFor({ state: 'visible', timeout: 10000 });
-        if (new URL(page.url()).searchParams.get('sub') !== sub) {
-          throw new Error(`기록 full-chrome ${label} URL 진입 후 sub=${new URL(page.url()).searchParams.get('sub') || '(없음)'}`);
+        const promoted = new URL(page.url()).searchParams;
+        if (promoted.get('tab') !== dest) {
+          throw new Error(`기록 full-chrome ${label} URL 진입 후 tab=${promoted.get('tab') || '(없음)'}`);
+        }
+        if (promoted.get('sub')) {
+          throw new Error(`기록 full-chrome ${label} URL 진입 후 sub=${promoted.get('sub')} (없어야 함)`);
         }
         const tablistCount = await page.locator('.renewal-shell-subtab-row[role="tablist"]').count();
-        if (tablistCount !== 0) throw new Error(`기록 full-chrome ${label} 에서 서브탭 행이 숨겨져야 함 (count=${tablistCount})`);
+        if (tablistCount !== 0) throw new Error(`${label} first-class 목적지에서 기록 서브탭 행이 숨겨져야 함 (count=${tablistCount})`);
+
+        // Direct first-class URL also lands cleanly.
+        await gotoBootReady(page, `${baseUrl}?id=cw&shell=v2&tab=${dest}`);
+        await page.locator('.renewal-shell').waitFor({ state: 'visible', timeout: 10000 });
+        const direct = new URL(page.url()).searchParams;
+        if (direct.get('tab') !== dest || direct.get('sub')) {
+          throw new Error(`${label} 직접 tab=${dest} 진입 후 tab=${direct.get('tab') || '(없음)'} sub=${direct.get('sub') || '(없음)'}`);
+        }
       }
-      pass(`[${viewport.name}] V2 기록 full-chrome (장소/메모)`);
+      pass(`[${viewport.name}] V2 장소/메모 first-class 목적지`);
     } catch (err) {
       fail(`[${viewport.name}] V2 기록 라우트`, err.message);
     } finally {
