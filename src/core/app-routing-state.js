@@ -5,10 +5,12 @@ export function getInitialAppView(locationLike, parseSharePath) {
   // Opt-in V2 shell maps tab/sub onto the existing data views without changing default routes.
   if (params.get('shell') === 'v2' && params.has('tab')) {
     const tab = params.get('tab');
+    // First-class destinations (post shell-structure upgrade).
+    if (tab === 'memo' || tab === 'places' || tab === 'chat' || tab === 'settlement') return tab;
     if (tab === 'records') {
       return ({ memo: 'memo', places: 'places', media: 'gallery', archive: 'history', content: 'content' })[params.get('sub')] || 'calendar';
     }
-    return ['chat', 'settlement'].includes(tab) ? tab : 'calendar';
+    return 'calendar';
   }
   return params.get('view') || 'calendar';
 }
@@ -27,10 +29,15 @@ export function buildAppViewUrl(locationLike, view, currentMonthDate) {
   }
   if (view === 'calendar') params.delete('view'); else params.set('view', view);
   if (params.get('shell') === 'v2') {
-    const sub = { memo: 'memo', places: 'places', gallery: 'media', history: 'archive', content: 'content' }[view];
-    if (sub) {
+    // First-class: memo/places/chat/settlement use ?tab=<dest> (no records sub).
+    // Gallery/history/content remain under records + sub.
+    const recordsSub = { gallery: 'media', history: 'archive', content: 'content' }[view];
+    if (view === 'memo' || view === 'places' || view === 'chat' || view === 'settlement') {
+      params.delete('sub');
+      params.set('tab', view);
+    } else if (recordsSub) {
       params.set('tab', 'records');
-      params.set('sub', sub);
+      params.set('sub', recordsSub);
     } else {
       params.delete('sub');
       if (view === 'calendar') params.delete('tab');
