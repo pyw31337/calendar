@@ -2163,8 +2163,15 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   const bentoSideNav = React.createElement(React.Fragment, null,
     React.createElement('div', { className: bentoClass('side-nav-head') },
       React.createElement('div', { className: bentoClass('side-nav-brand') },
-        React.createElement(TabIcon, { id: 'calendar' }),
-        React.createElement('span', { className: bentoClass('side-nav-brand-text') }, String(calendarName || '모여라 캘린더').replace(/^[^\p{L}\p{N}]+/u, '').trim())
+        React.createElement('img', {
+          className: bentoClass('side-nav-brand-icon'),
+          src: './icons/icon-192.png',
+          alt: '',
+          width: 22,
+          height: 22,
+          decoding: 'async',
+        }),
+        React.createElement('span', { className: bentoClass('side-nav-brand-text') }, '모여라 캘린더')
       ),
       React.createElement('button', { type: 'button', className: bentoClass('side-nav-close-btn'), 'aria-label': '메뉴 닫기', onClick: () => setIsSideNavOpen(false) },
         React.createElement(TabIcon, { id: 'close' })

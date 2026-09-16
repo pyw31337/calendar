@@ -922,3 +922,25 @@
 .v2-design .bp-day-anniversary .bp-day-anniversary-label {
   display: block !important;
 }
+
+
+/* Side-nav service brand (모여라 캘린더) — not calendar title */
+.v2-design .bp-side-nav-brand {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.v2-design .bp-side-nav-brand-icon {
+  width: 22px !important;
+  height: 22px !important;
+  border-radius: 6px !important;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.v2-design .bp-side-nav-brand-text {
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

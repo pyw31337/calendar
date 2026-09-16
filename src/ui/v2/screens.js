@@ -66,6 +66,21 @@ const ICON_NODES = {
     ['path', { d: 'M10 18h4' }],
   ],
   attach: [['path', { d: 'M21.4 11.6 12.9 20a5 5 0 0 1-7-7l8-8a3.5 3.5 0 0 1 5 5l-8 8a2 2 0 0 1-2.8-2.8l7.1-7.1' }]],
+  emoji: [
+    ['circle', { cx: 12, cy: 12, r: 10 }],
+    ['path', { d: 'M8 14s1.5 2 4 2 4-2 4-2' }],
+    ['path', { d: 'M9 9h.01' }],
+    ['path', { d: 'M15 9h.01' }],
+  ],
+  meme: [
+    ['rect', { x: 3, y: 3, width: 18, height: 18, rx: 2 }],
+    ['circle', { cx: 8.5, cy: 8.5, r: 1.5 }],
+    ['path', { d: 'm21 15-5-5L5 21' }],
+  ],
+  paste: [
+    ['path', { d: 'M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2' }],
+    ['rect', { x: 9, y: 3, width: 6, height: 4, rx: 1 }],
+  ],
   send: [['path', { d: 'M22 2 11 13M22 2l-7 20-4-9-9-4 20-7Z' }]],
   chevronLeft: [['path', { d: 'm15 18-6-6 6-6' }]],
   chevronRight: [['path', { d: 'm9 18 6-6-6-6' }]],
@@ -99,7 +114,7 @@ function IconButton({ label, icon, onClick, size = 16 }) {
   );
 }
 
-function PageHeader({ title, subtitle, count, onBack, onShare, onMenu, extra, children }) {
+export function PageHeader({ title, subtitle, count, onBack, onShare, onMenu, extra, children }) {
   return h(
     'header',
     { className: 'bp-header v2-page-header' },
@@ -376,7 +391,7 @@ export function MemoScreen(p) {
 /* -------------------------------------------------------------------------- */
 
 export function PlacesScreen(p) {
-  const [mapOpen, setMapOpen] = window.React.useState(!!p.mapOpenDefault);
+  const [mapOpen, setMapOpen] = window.React.useState(p.mapOpenDefault !== false);
   const select = place => {
     setMapOpen(true);
     if (p.onSelect) p.onSelect(place);
@@ -887,19 +902,40 @@ export function ChatScreen(p) {
       h(
         'div',
         { className: 'v2-chat-compose-tools' },
-        slots.participant,
+        slots.participant || h('span', {
+          className: 'v2-chat-participant-missing',
+          role: 'status',
+        }, '작성자 선택 필요'),
         h(
-          'button',
-          {
-            type: 'button',
-            className: 'v2-tools-toggle',
-            'aria-expanded': toolsOpen,
-            onClick: () => setToolsOpen(value => !value),
-          },
-          toolsOpen ? '입력 도구 접기' : '이모티콘 · 밈 · 붙여넣기'
-        ),
-        toolsOpen && slots.emoji,
-        toolsOpen && slots.paste
+          'div',
+          { className: 'v2-chat-tool-icons', role: 'toolbar', 'aria-label': '채팅 입력 도구' },
+          slots.emoji
+            ? clone(slots.emoji, {
+                className: 'v2-tool-icon-btn',
+                'aria-label': '이모티콘',
+                title: '이모티콘',
+              }, h(DesignIcon, { name: 'emoji', size: 18 }))
+            : null,
+          h(
+            'button',
+            {
+              type: 'button',
+              className: `v2-tool-icon-btn${toolsOpen ? ' is-active' : ''}`,
+              'aria-label': '밈',
+              'aria-pressed': toolsOpen,
+              title: '밈',
+              onClick: () => setToolsOpen(value => !value),
+            },
+            h(DesignIcon, { name: 'meme', size: 18 })
+          ),
+          slots.paste
+            ? clone(slots.paste, {
+                className: 'v2-tool-icon-btn',
+                'aria-label': '붙여넣기',
+                title: '붙여넣기',
+              }, h(DesignIcon, { name: 'paste', size: 18 }))
+            : null
+        )
       ),
       toolsOpen && slots.memes,
       toolsOpen && slots.resize
@@ -970,7 +1006,14 @@ export const renderChatScreen = props => h(ChatScreen, props);
 export function GalleryScreen(p) {
   return h(
     'section',
-    { className: 'v2-gallery v2-dest-page v2-embed-frame v2-records-media' },
+    { className: 'v2-gallery v2-dest-page v2-embed-frame v2-records-media v2-has-page-header' },
+    h(PageHeader, {
+      title: '갤러리',
+      onBack: p.onBack,
+      onShare: p.onShare,
+      onMenu: p.onMenu,
+      extra: p.onSearch && h(IconButton, { label: '갤러리 검색', icon: 'search', onClick: p.onSearch }),
+    }),
     wrapLegacy(p.legacyView, 'v2-legacy-body v2-gallery-legacy'),
     overlays(p.slots)
   );
@@ -979,7 +1022,13 @@ export function GalleryScreen(p) {
 export function ContentScreen(p) {
   return h(
     'section',
-    { className: 'v2-content v2-dest-page v2-embed-frame' },
+    { className: 'v2-content v2-dest-page v2-embed-frame v2-has-page-header' },
+    h(PageHeader, {
+      title: '컨텐츠',
+      onBack: p.onBack,
+      onShare: p.onShare,
+      onMenu: p.onMenu,
+    }),
     wrapLegacy(p.legacyView, 'v2-legacy-body v2-content-legacy'),
     overlays(p.slots)
   );
@@ -988,7 +1037,13 @@ export function ContentScreen(p) {
 export function ArchiveScreen(p) {
   return h(
     'section',
-    { className: 'v2-archive v2-dest-page v2-embed-frame' },
+    { className: 'v2-archive v2-dest-page v2-embed-frame v2-has-page-header' },
+    h(PageHeader, {
+      title: '보관함',
+      onBack: p.onBack,
+      onShare: p.onShare,
+      onMenu: p.onMenu,
+    }),
     wrapLegacy(p.legacyView, 'v2-legacy-body v2-archive-legacy'),
     overlays(p.slots)
   );

@@ -180,3 +180,39 @@ Local preview 1440×900: `designv2/parity-shots/audit-live-capture/loop{7,8}-*.p
 - Settlement: hero 1/N gradient cards ≠ SettlementFull white meeting cards (data model differs); ledger denser but not Full row chrome.
 - Places: card height still content-bound (~110px); map+list dual pane polish.
 - Content/Archive: no dedicated Full mocks — further Bento type/grid polish only.
+
+
+---
+
+## Phase D status (feat/v2-submenu-rebuild-3) — 2026-09-16 KST loop9 / t175
+
+Priority user specs (t175) preempted leftover density polish. Local preview 1440×900:
+`designv2/parity-shots/audit-live-capture/loop9-*.png` + `loop9-t175-report.json`
+(vs user refs `audit-live-user/t175/`).
+
+| Gate | Result |
+|------|--------|
+| Full-bleed subpage main | **Pass** — dest shells `max-width:none`, width=1160 beside 280 rail (chat/settlement/places/memo/gallery/content/archive) |
+| Chat composer tools | **Pass** — 3 icon buttons (emoji/meme/paste); plain-text toggle removed |
+| Author badge picker | **Pass** — `ParticipantPickerButton` extracted + shown in chat composer (`박영우 ▼`); memo keeps shared picker in expanded composer |
+| Shared V2 PageHeader | **Pass** — chat/memo/places/settlement + gallery/content/archive mount `PageHeader`; legacy title bars hidden |
+| Side-nav brand | **Pass** — **모여라 캘린더** + `./icons/icon-192.png` (not calendar title) |
+| Hero calendar title | **Pass** — purple hero `TopHeader` keeps calendar name **모아엘가** |
+
+### Also in this slice
+- Places: pane-bounded scroll (`placeBodyH≈412`); map panel default-open height 220px
+- Settlement: metric cards → SettlementFull-ish bordered cards; denser ledger chrome
+- Content/Archive: Bento grid density polish under shared header
+
+### Code
+- `shell-nav.js`: extract `participant` + `emoji` from chat composer
+- `screens.js`: tool icon buttons; PageHeader on gallery/content/archive; map default open
+- `screens.css` / `design.css`: full-bleed overrides; tool icons; map/places height; brand icon
+- `ui-app-shell-v2.js`: side-nav service brand string + favicon image
+
+### Remaining honest gaps
+- Chat bubbles still max-width capped (product), so message column looks padded vs edge — pane chrome is full-bleed
+- Memo/settlement body can still grow past viewport (page scroll) vs gallery-style in-pane scroll
+- Settlement has no fake 1/N meeting cards (data model) — ledger/metric chrome only
+- Content/Archive still no dedicated Full mocks — Bento density only
+- Optional Chat own-name-pill still open (end-align preserved)

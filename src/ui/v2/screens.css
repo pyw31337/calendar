@@ -226,7 +226,7 @@
 
 @media (min-width: 768px) {
   .v2-design .v2-fullscreen > .bp-app-shell { max-width: none; }
-  .v2-design .v2-chat-shell { max-width: min(960px, 100%); margin: 0 auto; }
+  .v2-design .v2-chat-shell { max-width: none !important; margin: 0; width: 100%; }
   .v2-design .v2-chat .inline-search-bar { max-width: min(960px, 100%); }
   .v2-design .v2-chat { --v2-chat-image-width: 150px; }
   .v2-design .v2-chat .v2-chat-message-content,
@@ -235,7 +235,7 @@
 }
 @media (min-width: 1200px) {
   .v2-design .v2-fullscreen > .bp-app-shell { max-width: none; padding: 0 0 90px; }
-  .v2-design .v2-chat-shell { max-width: min(1100px, 100%); padding: 0 24px !important; margin: 0 auto; }
+  .v2-design .v2-chat-shell { max-width: none !important; padding: 0 !important; margin: 0; width: 100%; }
   .v2-design .v2-chat .inline-search-bar { max-width: min(1100px, 100%); }
   .v2-design .v2-fullscreen .bp-fab { right: 28px; }
 }
@@ -617,29 +617,29 @@
 .v2-design .v2-wrap-legacy .chat-room-header {
   display: none !important;
 }
-/* Chat column density on PC: ChatFull-scale centered pane beside rail */
+/* Chat PC: full-bleed under rail (t175) — composer pinned to pane bottom */
 @media (min-width: 1200px) {
   .v2-design .v2-chat.v2-dest-page,
   .v2-design .renewal-shell-main.v2-chat {
-    background: #f3f1f8;
+    background: #fafafc;
   }
   .v2-design .v2-chat-shell,
   .v2-design .v2-chat .v2-chat-root,
   .v2-design .v2-chat .chat-room-container {
-    max-width: min(1080px, 100%) !important;
+    max-width: none !important;
     width: 100% !important;
-    margin-left: auto !important;
-    margin-right: auto !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
     background: #fafafc !important;
-    box-shadow: 0 0 0 1px #eceaf5;
+    box-shadow: none;
   }
   .v2-design .v2-chat .chat-composer {
     position: absolute !important;
     left: 0 !important;
     right: 0 !important;
     bottom: 0 !important;
-    max-width: min(1080px, 100%) !important;
-    margin: 0 auto !important;
+    max-width: none !important;
+    margin: 0 !important;
     z-index: 6 !important;
   }
   .v2-design .v2-chat .chat-messages-scroll {
@@ -647,12 +647,13 @@
   }
 }
 
-/* Memo PC: MemoFull-like single column + dense tags beside rail */
+/* Memo PC: full-bleed under rail; keep dense tags */
 @media (min-width: 1200px) {
   .v2-design .v2-memo.v2-dest-page .bp-app-shell,
   .v2-design .renewal-shell-main.v2-memo .bp-app-shell {
-    max-width: 760px !important;
-    margin: 0 auto !important;
+    max-width: none !important;
+    margin: 0 !important;
+    width: 100% !important;
     background: #fafafc;
   }
   .v2-design .v2-memo .bp-tag-filter-row {
@@ -669,26 +670,29 @@
   }
   .v2-design .v2-memo .v2-dest-body,
   .v2-design .v2-memo .v2-memo-body {
-    padding: 0 8px 96px !important;
+    padding: 0 14px 96px !important;
   }
 }
 
-/* Settlement PC: card column, not edge-to-edge stretch */
+/* Settlement PC: full-bleed under rail */
 @media (min-width: 1200px) {
   .v2-design .v2-settlement.v2-dest-page .bp-app-shell,
   .v2-design .renewal-shell-main.v2-settlement .bp-app-shell {
-    max-width: 760px !important;
-    margin: 0 auto !important;
+    max-width: none !important;
+    margin: 0 !important;
+    width: 100% !important;
   }
   .v2-design .v2-settlement .settlement-page-body,
   .v2-design .v2-settlement .v2-settlement-body {
-    max-width: 760px;
-    margin: 0 auto;
+    max-width: none !important;
+    margin: 0 !important;
+    width: 100% !important;
     padding: 12px 16px 96px !important;
   }
   .v2-design .v2-settlement .settlement-page-tabs {
-    max-width: 760px;
-    margin: 0 auto;
+    max-width: none !important;
+    margin: 0 !important;
+    width: 100% !important;
   }
 }
 
@@ -714,11 +718,12 @@
   }
 }
 
-/* Places PC column */
+/* Places PC: full-bleed under rail */
 @media (min-width: 1200px) {
   .v2-design .v2-places.v2-dest-page .bp-app-shell {
-    max-width: 960px !important;
-    margin: 0 auto !important;
+    max-width: none !important;
+    margin: 0 !important;
+    width: 100% !important;
   }
 }
 
@@ -1118,4 +1123,277 @@
 .v2-design .v2-chat .msg-row-hover.msg-actions-revealed .msg-actions-group {
   opacity: 1;
   pointer-events: auto;
+}
+
+
+/* ========== t175 / loop9: full-bleed + shared header + composer tools ========== */
+
+/* Destinations fill the right pane edge-to-edge under the rail (no floating max-width cards). */
+.v2-design .renewal-shell-main.v2-destination,
+.v2-design .renewal-shell-main.is-chat,
+.v2-design .renewal-shell-main.is-settlement,
+.v2-design .renewal-shell-main.is-memo,
+.v2-design .renewal-shell-main.is-places,
+.v2-design .renewal-shell-main.is-records {
+  width: 100% !important;
+  max-width: none !important;
+}
+.v2-design .v2-dest-page,
+.v2-design .v2-dest-page > .bp-app-shell,
+.v2-design .v2-chat-root,
+.v2-design .v2-chat-shell,
+.v2-design .v2-memo .bp-app-shell,
+.v2-design .v2-places .bp-app-shell,
+.v2-design .v2-settlement .bp-app-shell {
+  max-width: none !important;
+  width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  box-sizing: border-box;
+}
+
+/* Shared PageHeader sticky chrome */
+.v2-design .v2-page-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: #fff;
+  border-bottom: 1px solid #eceaf5;
+  padding: 10px 14px 8px;
+}
+.v2-design .v2-page-header .bp-header-row { gap: 8px; }
+.v2-design .v2-page-header .bp-header-actions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* Hide legacy title bars when shared V2 PageHeader is mounted */
+.v2-design .v2-has-page-header .gallery-page-header,
+.v2-design .v2-has-page-header .places-view-header,
+.v2-design .v2-has-page-header .history-header-stack > .places-view-header,
+.v2-design .v2-gallery.v2-has-page-header .gallery-page-header,
+.v2-design .v2-content.v2-has-page-header .places-view-header,
+.v2-design .v2-archive.v2-has-page-header .places-view-header {
+  display: none !important;
+}
+
+/* Chat composer tool icons (replace plain-text 이모티콘 · 밈 · 붙여넣기) */
+.v2-design .v2-chat-compose-tools {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 2px 2px !important;
+  width: 100%;
+  box-sizing: border-box;
+}
+.v2-design .v2-chat-tool-icons {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+.v2-design .v2-tool-icon-btn {
+  width: 34px !important;
+  height: 34px !important;
+  border-radius: 50% !important;
+  border: 1px solid #eceaf5 !important;
+  background: #fafafc !important;
+  color: #6b6580 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.v2-design .v2-tool-icon-btn:hover,
+.v2-design .v2-tool-icon-btn.is-active {
+  color: #7c3aed !important;
+  border-color: #d8c7ff !important;
+  background: #f3eeff !important;
+}
+.v2-design .v2-chat-participant-missing {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #dc2626;
+  background: #fef2f2;
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+.v2-design .v2-chat-compose-tools .participant-picker-button {
+  height: 32px !important;
+  font-size: 0.78rem !important;
+}
+.v2-design .v2-tools-toggle { display: none !important; }
+
+/* Side-nav service brand icon */
+.v2-design .bp-side-nav-brand-icon,
+.v2-design .bp-side-nav-brand img {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+  display: block;
+}
+
+/* Places: pane-bounded height + map panel (loop9) */
+.v2-design .renewal-shell-main.is-places,
+.v2-design .renewal-shell-main:has(> .v2-places) {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100dvh !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+.v2-design .v2-places.v2-dest-page {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+.v2-design .v2-places .bp-app-shell {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+.v2-design .v2-places .v2-page-header { flex: 0 0 auto; }
+.v2-design .v2-places .v2-map-panel {
+  flex: 0 0 auto;
+  margin: 10px 14px 0 !important;
+  height: 220px !important;
+  min-height: 180px !important;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid #eceaf5;
+  background: #f3eeff;
+}
+.v2-design .v2-places .v2-map-panel .places-map-sticky-area {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 180px !important;
+}
+.v2-design .v2-places .v2-places-body {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  height: auto !important;
+  padding: 0 0 88px !important;
+}
+.v2-design .v2-places .places-list-body {
+  height: auto !important;
+  overflow: visible !important;
+  padding: 10px 14px 24px !important;
+}
+.v2-design .v2-places .place-card-row {
+  padding: 10px 12px !important;
+  border-radius: 14px !important;
+  border: 1px solid #eceaf5 !important;
+  box-shadow: 0 2px 8px rgba(30, 27, 46, 0.05) !important;
+  margin-bottom: 8px !important;
+}
+
+/* Settlement denser SettlementFull-ish chrome within ledger model */
+.v2-design .v2-settlement .settlement-metric-grid {
+  gap: 8px !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  margin-top: 8px !important;
+}
+.v2-design .v2-settlement .settlement-metric-card {
+  border: 1px solid #eceaf5 !important;
+  border-radius: 14px !important;
+  border-right: 1px solid #eceaf5 !important;
+  background: #fff !important;
+  box-shadow: 0 2px 8px rgba(30, 27, 46, 0.05) !important;
+  padding: 12px 10px !important;
+}
+.v2-design .v2-settlement .settlement-metric-card-label {
+  font-size: 0.68rem !important;
+  color: #6b6580 !important;
+  font-weight: 700 !important;
+}
+.v2-design .v2-settlement .settlement-metric-card-value {
+  font-size: 0.92rem !important;
+}
+.v2-design .v2-settlement .settlement-ledger-row {
+  padding: 10px 12px !important;
+  border-radius: 12px !important;
+  border: 1px solid #eceaf5 !important;
+  background: #fff !important;
+  box-shadow: 0 1px 4px rgba(30, 27, 46, 0.04) !important;
+  margin-bottom: 6px !important;
+}
+.v2-design .v2-settlement .settlement-page-body section {
+  background: #fff !important;
+  border: 1px solid #eceaf5 !important;
+  border-radius: 16px !important;
+  padding: 12px !important;
+  box-shadow: 0 2px 8px rgba(30, 27, 46, 0.05) !important;
+}
+
+/* Memo composer / cards full-bleed (kill 520px float) */
+.v2-design .v2-memo .memo-composer-card,
+.v2-design .v2-memo .memo-list-scroll > div[style*="maxWidth"],
+.v2-design .v2-memo .v2-memo-body .memo-composer-card {
+  max-width: none !important;
+  width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+/* Content / Archive Bento density */
+.v2-design .v2-content .culture-items-grid {
+  gap: 10px !important;
+  padding: 10px 14px 88px !important;
+}
+.v2-design .v2-content .culture-items-grid > * {
+  border-radius: 14px !important;
+  border: 1px solid #eceaf5 !important;
+  box-shadow: 0 2px 8px rgba(30, 27, 46, 0.05) !important;
+  overflow: hidden;
+  background: #fff !important;
+}
+.v2-design .v2-archive .history-bento-grid {
+  gap: 10px !important;
+  padding: 10px 14px 88px !important;
+}
+.v2-design .v2-archive .history-bento-grid > * {
+  border-radius: 14px !important;
+  box-shadow: 0 2px 8px rgba(30, 27, 46, 0.05) !important;
+  overflow: hidden;
+}
+.v2-design .v2-content .underline-tabs,
+.v2-design .v2-archive .underline-tabs {
+  padding: 0 14px !important;
+}
+.v2-design .v2-content .underline-tabs button,
+.v2-design .v2-archive .underline-tabs button {
+  font-size: 0.78rem !important;
+  font-weight: 700 !important;
+}
+
+/* Embed frames with shared header: fill below sticky header */
+.v2-design .v2-has-page-header.v2-embed-frame {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  min-height: 0 !important;
+}
+.v2-design .v2-has-page-header > .v2-legacy-body,
+.v2-design .v2-has-page-header > .v2-gallery-legacy,
+.v2-design .v2-has-page-header > .v2-content-legacy,
+.v2-design .v2-has-page-header > .v2-archive-legacy {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  position: relative !important;
 }
