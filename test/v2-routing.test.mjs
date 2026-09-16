@@ -95,9 +95,12 @@ test('V2 PC polish keeps wider rail, fluid content, 3x3 gallery, and participant
   assert.match(design, /--v2-side-nav-width:\s*280px/);
   assert.match(design, /--v2-content-max:\s*1600px/);
   assert.match(design, /grid-template-columns:\s*repeat\(3, 1fr\)/);
-  assert.match(design, /min-width:\s*1\.7em/);
+  assert.match(design, /min-width:\s*2\.4em/);
+  assert.match(design, /bp-day-bar-stack/);
+  assert.match(design, /\.bp-p-dot::after[\s\S]*font-size:\s*0\.72rem/);
   assert.match(shell, /slice\(0, 9\)/);
   assert.match(shell, /dday-participant-memos/);
   assert.match(shell, /participantMemosFor/);
+  assert.match(shell, /day-bar-stack/);
   assert.match(shell, /anns\.slice\(0, 4\)\.map/);
 });

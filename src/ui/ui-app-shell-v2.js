@@ -644,16 +644,17 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
               style: { background: p.color || 'var(--brand)' },
             }))
           ) : null,
-          anns.length > 0 ? anns.slice(0, 4).map((ann, annIdx) => React.createElement('div', {
-            key: ann.id || `${dateStr}_ann_${annIdx}`,
-            className: bentoClass(`day-anniversary${annIdx > 0 ? ` lvl-${annIdx}` : ''}`.trim()),
-            title: ann.title || '기념일',
-          },
-            React.createElement('span', { className: bentoClass('day-anniversary-label') }, ann.title || '기념일')
-          )) : null,
-          hasMeeting ? React.createElement('div', {
-            className: bentoClass(`day-bar solo${anns.length ? ` lvl-${Math.min(anns.length, 4)}` : ''}`.trim()),
-          }) : null
+          (anns.length > 0 || hasMeeting) ? React.createElement('div', { className: bentoClass('day-bar-stack') },
+            // Flex stack (gap) — never absolute-overlap. Meeting strip last (= bottom).
+            anns.slice(0, 4).map((ann, annIdx) => React.createElement('div', {
+              key: ann.id || `${dateStr}_ann_${annIdx}`,
+              className: bentoClass('day-anniversary'),
+              title: ann.title || '기념일',
+            },
+              React.createElement('span', { className: bentoClass('day-anniversary-label') }, ann.title || '기념일')
+            )),
+            hasMeeting ? React.createElement('div', { key: `${dateStr}_meeting_bar`, className: bentoClass('day-bar solo') }) : null
+          ) : null
         );
       })
     ),
