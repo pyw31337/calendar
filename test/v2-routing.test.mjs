@@ -103,4 +103,8 @@ test('V2 PC polish keeps wider rail, fluid content, 3x3 gallery, and participant
   assert.match(shell, /participantMemosFor/);
   assert.match(shell, /day-bar-stack/);
   assert.match(shell, /anns\.slice\(0, 4\)\.map/);
+  assert.match(shell, /day-bar-label/);
+  assert.match(shell, /day-bar solo has-label/);
+  assert.match(design, /background:\s*var\(--brand/);
+  assert.match(design, /#F472B6/);
 });
