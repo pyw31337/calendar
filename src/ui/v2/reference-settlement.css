@@ -3,7 +3,7 @@
     .v2-settlement {
       --bg-primary: #FAFAFC; --bg-card: #FFFFFF; --border-subtle: #ECEAF5;
       --text-main: #1E1B2E; --text-muted: #6B6580; --text-light: #83798F;
-      --brand: #7C3AED; --brand-soft: #F3EEFF; --status-green: #16A34A; --surface-success: #ECFDF5;
+      --brand: #7C2FE5; --brand-soft: #F3EEFF; --status-green: #16A34A; --surface-success: #ECFDF5;
       --radius-lg: 18px; --radius-md: 12px; --radius-sm: 8px; --radius-full: 9999px;
       --p-yeongwoo: #F87171; --p-yuri: #FB923C; --p-manshik: #34D399; --p-eunhye: #22D3EE;
     }
@@ -18,7 +18,7 @@
     .v2-settlement .bp-header-actions { margin-left: auto; display: flex; gap: 4px; }
     .v2-settlement .bp-icon-btn { background: none; border: none; color: var(--text-muted); padding: 7px; display: inline-flex; cursor: pointer; border-radius: var(--radius-full); }
     .v2-settlement .bp-icon-btn:hover { background: var(--bg-primary); color: var(--brand); }
-    .v2-settlement .bp-fab { position: fixed; right: 20px; bottom: 24px; width: 52px; height: 52px; border-radius: 50%; background: var(--brand); color: #fff; border: none; box-shadow: 0 8px 20px rgba(124,58,237,0.35); display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 6; }
+    .v2-settlement .bp-fab { position: fixed; right: 20px; bottom: 24px; width: 52px; height: 52px; border-radius: 50%; background: var(--brand); color: #fff; border: 1px solid rgba(255,255,255,0.28); box-shadow: 0 6px 18px rgba(124,47,229,0.40), inset 0 1px 0 rgba(255,255,255,0.28); display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 6; }
 
     .v2-settlement .bp-content { padding: 14px; }
     .v2-settlement .bp-month-nav { display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 14px; }

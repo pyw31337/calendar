@@ -4,8 +4,37 @@
   --font-sans: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Noto Sans KR', sans-serif;
   --renewal-page-max: 1600px;
   --v2-side-nav-width: 280px;
+  /* Brand = vivid schedule purple (same family as --cal-schedule) */
+  --brand: #7C2FE5;
+  --brand-soft: #F3EEFF;
   --cal-schedule: #7C2FE5;
   --cal-anniversary: #F76AAD;
+  /* --- V2 glass / vivid system (see designv2/V2-GLASS-SYSTEM.md) --- */
+  --v2-glass-blur: blur(20px) saturate(180%);
+  --v2-glass-blur-strong: blur(24px) saturate(180%);
+  /* Dark glass (on purple/hero gradients) */
+  --v2-glass-dark-fill: rgba(255, 255, 255, 0.22);
+  --v2-glass-dark-border: rgba(255, 255, 255, 0.55);
+  --v2-glass-dark-inset: inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  --v2-glass-dark-glow: 0 4px 14px rgba(76, 29, 149, 0.22);
+  /* Light glass (on white / near-white pages) */
+  --v2-glass-light-fill: rgba(255, 255, 255, 0.88);
+  --v2-glass-light-border: #eceaf5;
+  --v2-glass-light-inset: inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  --v2-glass-light-shadow: 0 1px 2px rgba(30, 27, 46, 0.04);
+  --v2-glass-light-hover-fill: rgba(243, 238, 255, 0.78);
+  --v2-glass-light-hover-border: #e0d4ff;
+  /* Soft purple glass (side-nav active, tinted chips) */
+  --v2-glass-purple-fill: rgba(124, 47, 229, 0.10);
+  --v2-glass-purple-border: rgba(124, 47, 229, 0.26);
+  --v2-glass-purple-inset: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  /* Primary action glow */
+  --v2-primary: #7C2FE5;
+  --v2-primary-glow: 0 6px 18px rgba(124, 47, 229, 0.40);
+  --v2-primary-glow-sm: 0 3px 10px rgba(124, 47, 229, 0.32);
+  /* Apple-like card chrome */
+  --v2-card-border: #eceaf5;
+  --v2-card-shadow: 0 1px 3px rgba(30, 27, 46, 0.04), 0 4px 12px rgba(30, 27, 46, 0.03);
   padding: 0 !important;
   padding-bottom: 0 !important;
   min-height: 100dvh;
@@ -68,18 +97,18 @@
 }
 .v2-design .bp-hero-zone .bp-icon-btn,
 .v2-design .bp-hero-zone .bp-renewal-shell-header-icon-btn {
-  background: rgba(255,255,255,0.22) !important;
-  border: 1px solid rgba(255,255,255,0.55) !important;
-  backdrop-filter: blur(20px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.65), 0 0 0 1px rgba(255,255,255,0.12), 0 4px 14px rgba(76, 29, 149, 0.22) !important;
+  background: var(--v2-glass-dark-fill) !important;
+  border: 1px solid var(--v2-glass-dark-border) !important;
+  backdrop-filter: var(--v2-glass-blur) !important;
+  -webkit-backdrop-filter: var(--v2-glass-blur) !important;
+  box-shadow: var(--v2-glass-dark-inset), 0 0 0 1px rgba(255,255,255,0.12), var(--v2-glass-dark-glow) !important;
 }
 .v2-design .bp-dday-compact {
-  background: rgba(255,255,255,0.22) !important;
-  border: 1px solid rgba(255,255,255,0.55) !important;
-  backdrop-filter: blur(24px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.65), 0 8px 24px rgba(59, 7, 100, 0.18) !important;
+  background: var(--v2-glass-dark-fill) !important;
+  border: 1px solid var(--v2-glass-dark-border) !important;
+  backdrop-filter: var(--v2-glass-blur-strong) !important;
+  -webkit-backdrop-filter: var(--v2-glass-blur-strong) !important;
+  box-shadow: var(--v2-glass-dark-inset), 0 8px 24px rgba(59, 7, 100, 0.18) !important;
 }
 .v2-design .bp-dday-compact-badge {
   background: linear-gradient(135deg, #7C2FE5 0%, #4F46E5 55%, #2563EB 100%) !important;
@@ -251,7 +280,7 @@
 .v2-design .bp-event-sheet .underline-tabs button[aria-selected="true"],
 .v2-design .bp-event-sheet [role="tab"][aria-selected="true"] {
   background: var(--bg-card, #fff) !important;
-  color: var(--brand, #7c3aed) !important;
+  color: var(--brand, #7C2FE5) !important;
   box-shadow: 0 2px 6px rgba(30, 27, 46, 0.1) !important;
   border-bottom: none !important;
 }
@@ -963,7 +992,7 @@
   min-height: 1.05rem;
   padding: 0.08rem 0.32rem;
   border-radius: 999px;
-  background: var(--brand, #7C3AED);
+  background: var(--brand, #7C2FE5);
   color: #fff !important;
   font-size: 0.56rem !important;
   font-weight: 800 !important;
@@ -994,7 +1023,7 @@
   justify-content: center;
   width: 18px !important;
   height: 18px !important;
-  color: #7c3aed;
+  color: var(--brand, #7C2FE5);
   flex-shrink: 0;
 }
 .v2-design .bp-side-nav-brand-icon svg {
@@ -1021,8 +1050,10 @@
   font-size: 0.62rem !important;
   font-weight: 800;
   line-height: 1.3;
-  color: #7c3aed;
-  background: #f3eeff;
+  color: var(--brand, #7C2FE5);
+  background: var(--brand-soft, #F3EEFF);
+  border: 1px solid var(--v2-glass-purple-border, rgba(124, 47, 229, 0.26));
+  box-shadow: var(--v2-glass-purple-inset, inset 0 1px 0 rgba(255,255,255,0.72));
   padding: 2px 8px;
   border-radius: 9999px;
   margin-left: 2px;
@@ -1034,13 +1065,17 @@
 }
 
 .v2-design .bp-side-nav-item.bp-is-active {
-  background: #f3eeff !important;
-  color: #7c3aed !important;
+  background: var(--v2-glass-purple-fill, rgba(124, 47, 229, 0.10)) !important;
+  color: var(--brand, #7C2FE5) !important;
+  border: 1px solid var(--v2-glass-purple-border, rgba(124, 47, 229, 0.26)) !important;
+  box-shadow: var(--v2-glass-purple-inset, inset 0 1px 0 rgba(255,255,255,0.72)) !important;
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
 }
 
 .v2-design .bp-side-nav-item.bp-is-active .bp-side-nav-item-icon,
 .v2-design .bp-side-nav-item.bp-is-active .bp-side-nav-item-title {
-  color: #7c3aed !important;
+  color: var(--brand, #7C2FE5) !important;
 }
 
 /* Chat author pill in side-nav — solid color + white text (mock) */
@@ -1055,8 +1090,9 @@
 }
 
 .v2-design .bp-side-nav-date-chip {
-  background: #f3f1f7 !important;
-  color: #83798f !important;
+  background: #f5f2fb !important;
+  color: #6b6580 !important;
+  border: 1px solid var(--v2-card-border, #eceaf5) !important;
   font-size: 0.6rem !important;
   font-weight: 700 !important;
   padding: 2px 7px !important;
@@ -1103,25 +1139,29 @@
   cursor: pointer;
   flex-shrink: 0;
 }
-.v2-design .v2-page-header .bp-back-btn:hover { color: #7c3aed !important; }
+.v2-design .v2-page-header .bp-back-btn:hover { color: var(--brand, #7C2FE5) !important; }
 .v2-design .v2-page-header .bp-header-actions {
   margin-left: auto !important;
   display: inline-flex !important;
   align-items: center !important;
-  gap: 2px !important;
+  gap: 4px !important;
   flex-shrink: 0;
 }
+/* Light glass icon buttons on white PageHeader (shared token language) */
 .v2-design .v2-page-header .bp-icon-btn {
-  background: none !important;
-  border: none !important;
+  background: var(--v2-glass-light-fill, rgba(255,255,255,0.88)) !important;
+  border: 1px solid var(--v2-glass-light-border, #eceaf5) !important;
   color: #6b6580 !important;
   padding: 7px !important;
   border-radius: 9999px !important;
-  box-shadow: none !important;
+  backdrop-filter: var(--v2-glass-blur, blur(20px) saturate(180%)) !important;
+  -webkit-backdrop-filter: var(--v2-glass-blur, blur(20px) saturate(180%)) !important;
+  box-shadow: var(--v2-glass-light-inset, inset 0 1px 0 rgba(255,255,255,0.95)), var(--v2-glass-light-shadow, 0 1px 2px rgba(30,27,46,0.04)) !important;
 }
 .v2-design .v2-page-header .bp-icon-btn:hover {
-  background: #fafafc !important;
-  color: #7c3aed !important;
+  background: var(--v2-glass-light-hover-fill, rgba(243,238,255,0.78)) !important;
+  border-color: var(--v2-glass-light-hover-border, #e0d4ff) !important;
+  color: var(--brand, #7C2FE5) !important;
 }
 
 /* --------------------------------------------------------------------------
@@ -1143,8 +1183,8 @@
   font-weight: 800 !important;
   line-height: 1.3 !important;
   padding: 2px 8px !important;
-  color: #7c3aed !important;
-  background: #f3eeff !important;
+  color: var(--brand, #7C2FE5) !important;
+  background: var(--brand-soft, #F3EEFF) !important;
 }
 .v2-design .bp-side-nav-group {
   padding: 6px 10px !important;
@@ -1198,6 +1238,17 @@
   padding: 8px !important;
   border-radius: 9999px !important;
   margin-top: 8px !important;
+  background: var(--v2-glass-light-fill, rgba(255,255,255,0.88)) !important;
+  border: 1px solid var(--v2-glass-light-border, #eceaf5) !important;
+  color: #6b6580 !important;
+  box-shadow: var(--v2-glass-light-inset, inset 0 1px 0 rgba(255,255,255,0.95)), var(--v2-glass-light-shadow, 0 1px 2px rgba(30,27,46,0.04)) !important;
+  backdrop-filter: var(--v2-glass-blur, blur(20px) saturate(180%));
+  -webkit-backdrop-filter: var(--v2-glass-blur, blur(20px) saturate(180%));
+}
+.v2-design .bp-side-nav-collapse-btn:hover {
+  background: var(--v2-glass-light-hover-fill, rgba(243,238,255,0.78)) !important;
+  border-color: var(--v2-glass-light-hover-border, #e0d4ff) !important;
+  color: var(--brand, #7C2FE5) !important;
 }
 
 @media (min-width: 1200px) {
@@ -1220,4 +1271,75 @@
     padding-top: 28px !important;
     border-top: none !important;
   }
+}
+
+/* --------------------------------------------------------------------------
+ * V2 glass system — shared utilities + chrome surfaces
+ * Concept: vivid + glassy (Apple-like). Future V2 polish must stay vivid+glassy.
+ * Doc: designv2/V2-GLASS-SYSTEM.md
+ * -------------------------------------------------------------------------- */
+
+/* Utility: light glass surface (frosted white + crisp edge) */
+.v2-design .v2-glass-light {
+  background: var(--v2-glass-light-fill);
+  border: 1px solid var(--v2-glass-light-border);
+  box-shadow: var(--v2-glass-light-inset), var(--v2-glass-light-shadow);
+  backdrop-filter: var(--v2-glass-blur);
+  -webkit-backdrop-filter: var(--v2-glass-blur);
+}
+.v2-design .v2-glass-purple {
+  background: var(--v2-glass-purple-fill);
+  border: 1px solid var(--v2-glass-purple-border);
+  box-shadow: var(--v2-glass-purple-inset);
+}
+
+/* Apple-like card: thin crisp border + optional light shadow (not heavy drop) */
+.v2-design .v2-card-glass {
+  background: var(--bg-card, #fff);
+  border: 1px solid var(--v2-card-border, #eceaf5);
+  box-shadow: var(--v2-card-shadow);
+}
+
+/* Vivid primary FAB / circle action */
+.v2-design .bp-fab,
+.v2-design .v2-fab-vivid {
+  background: var(--v2-primary, var(--brand, #7C2FE5)) !important;
+  color: #fff !important;
+  border: 1px solid rgba(255, 255, 255, 0.28) !important;
+  box-shadow: var(--v2-primary-glow), inset 0 1px 0 rgba(255, 255, 255, 0.28) !important;
+}
+
+/* Chips / author pills / settlement badges — more chroma, crisp edge */
+.v2-design .bp-tag-chip,
+.v2-design .bp-cat-chip,
+.v2-design .bp-place-cat-chip,
+.v2-design .bp-ann-cat-chip,
+.v2-design .bp-expense-cat-chip {
+  border-color: var(--v2-card-border, #eceaf5);
+}
+.v2-design .bp-tag-chip.bp-is-selected,
+.v2-design .bp-cat-chip.bp-is-selected {
+  border-color: var(--brand, #7C2FE5) !important;
+  background: var(--brand-soft, #F3EEFF) !important;
+  color: var(--brand, #7C2FE5) !important;
+  box-shadow: var(--v2-glass-purple-inset);
+}
+.v2-design .bp-settlement-card-badge,
+.v2-design .v2-settlement .bp-settlement-card-badge {
+  color: var(--brand, #7C2FE5) !important;
+  background: var(--brand-soft, #F3EEFF) !important;
+  border: 1px solid var(--v2-glass-purple-border, rgba(124, 47, 229, 0.26));
+  box-shadow: var(--v2-glass-purple-inset);
+}
+.v2-design .bp-chat-name-pill,
+.v2-design .bp-side-nav-item-meta.bp-chat-name-pill,
+.v2-design .bp-side-nav-item-meta.chat-name-pill {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+/* Side-nav items default: ensure inactive don't inherit active border box-sizing surprises */
+.v2-design .bp-side-nav-item {
+  border: 1px solid transparent;
+  box-sizing: border-box !important;
 }
