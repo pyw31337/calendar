@@ -1,0 +1,73 @@
+{
+  "chat": {
+    "title": "채팅 모아엘가 · 4명",
+    "tagChipCount": 0,
+    "hasFab": false,
+    "railDisplay": "flex",
+    "railOpen": false,
+    "fakeFilters": [],
+    "bodyClass": "no-body-padding",
+    "rootClass": "",
+    "v2": true
+  },
+  "memo": {
+    "title": "메모 전체 #준비물 #예당호 #충남서천 #반값여행 #지역사랑 #휴가지원 #안동 #여행경비지원 #네이버예약 #야놀자 #티켓링크 #타임티켓 #예스24 #공연할인 #관람료할인 #추석연휴 #문여는약국 #문여는병원 #구급상황",
+    "tagChipCount": 89,
+    "hasFab": true,
+    "railDisplay": "flex",
+    "railOpen": false,
+    "fakeFilters": [
+      "정렬"
+    ],
+    "bodyClass": "no-body-padding",
+    "rootClass": "",
+    "v2": true
+  },
+  "gallery": {
+    "title": "갤러리",
+    "tagChipCount": 0,
+    "hasFab": false,
+    "railDisplay": "flex",
+    "railOpen": false,
+    "fakeFilters": [],
+    "bodyClass": "",
+    "rootClass": "",
+    "v2": true
+  },
+  "places": {
+    "title": "장소 등록 73곳",
+    "tagChipCount": 0,
+    "hasFab": true,
+    "railDisplay": "flex",
+    "railOpen": false,
+    "fakeFilters": [],
+    "bodyClass": "no-body-padding",
+    "rootClass": "",
+    "v2": true
+  },
+  "settlement": {
+    "title": "정산",
+    "tagChipCount": 0,
+    "hasFab": true,
+    "railDisplay": "flex",
+    "railOpen": false,
+    "fakeFilters": [],
+    "bodyClass": "no-body-padding",
+    "rootClass": "",
+    "v2": true
+  },
+  "content": {
+    "title": "컨텐츠",
+    "tagChipCount": 0,
+    "hasFab": false,
+    "railDisplay": "flex",
+    "railOpen": false,
+    "fakeFilters": [],
+    "bodyClass": "no-body-padding",
+    "rootClass": "",
+    "v2": true
+  },
+  "side-menu": {
+    "opened": true
+  }
+}
