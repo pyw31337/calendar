@@ -7,7 +7,7 @@
 
 | Layer | Before (dull) | After (mock) |
 |-------|---------------|--------------|
-| Hero gradient | `#4C1D95 → #7C3AED → #22D3B8` (lower chroma) | `#3B0764 → #6D28D9 → #A21CAF → #06B6D4` (high chroma purple→magenta→cyan) |
+| Hero gradient | `#4C1D95 → #7C3AED → #22D3B8` (lower chroma) | CodePen animated: `#7C2FE5 → #A21CAF → #e73c7e → #23a6d5 → #23d5ab` (400% size, 15s ease) |
 | Glass fill | `rgba(255,255,255,0.16)` | `rgba(255,255,255,0.18–0.22)` |
 | Glass border | `rgba(255,255,255,0.28–0.36)` | `rgba(255,255,255,0.50–0.55)` + inset highlight |
 | Blur | 10–20px | 20–24px + `saturate(180%)` |
@@ -37,21 +37,25 @@ Compact + expanded hero labels render a non-shrinking **`[모임확정]`** prefi
 - `src/ui/v2/design.css` — tokens + bar colors + glass reinforces
 - `src/ui/ui-app-shell-v2.js` — legend dots + `meetingLabelParts` / `renderMeetingLabel`
 
-## Living aurora (Gemini-style)
+## Living aurora (Gemini-style) — superseded
 
-**Captures:** `designv2/parity-shots/unit-loop/hero-aurora/`
+Replaced by **CodePen animated gradient** below. Prior captures remain at `designv2/parity-shots/unit-loop/hero-aurora/`.
 
-Home hero (`.bp-hero-zone`) uses a **CSS-only living mesh** — not a static linear wash:
+## CodePen animated gradient background
+
+**Technique:** [Pure CSS Animated Gradient Background](https://codepen.io/P1N2O/pen/pyBNzX) (P1N2O) — `linear-gradient(-45deg, …)` + `background-size: 400% 400%` + `@keyframes` shifting `background-position` 0%↔100% at 50% Y.
+
+**Captures:** `designv2/parity-shots/unit-loop/hero-codepen-gradient/`
+
+Home hero (`.bp-hero-zone`) uses this as the **primary** animated background (replaces multi-layer aurora drift):
 
 | Layer | Role |
 |-------|------|
-| Base | Deep purple → violet → teal linear + soft bottom darken |
-| `::before` | Purple / magenta radial blobs — `bp-hero-aurora-drift-a` (~22s) |
-| `::after` | Cyan / blue / magenta blobs — `bp-hero-aurora-drift-b` (~28s, counter) |
-| `.bp-hero-aurora` | Soft top bloom + bottom vignette — `bp-hero-aurora-pulse` (~16s) |
+| Base (`.bp-hero-zone`) | Brand stops `#7C2FE5`, `#A21CAF`, `#e73c7e`, `#23a6d5`, `#23d5ab` — `bp-hero-codepen-gradient` **15s** ease infinite |
+| `::before` / `::after` | Disabled (`content: none`) — aurora mesh no longer the main motion |
+| `.bp-hero-aurora` | Static soft bottom darken/vignette only (readable white text / `[모임확정]`) |
 
-- Animations use GPU-friendly `transform` + `opacity` only (no canvas / per-frame JS).
-- Glass chips / compact meeting card / icon buttons stay as-is (frost over the mesh).
-- Bottom vignette keeps white title / `[모임확정]` readable when hues peak bright.
-- `prefers-reduced-motion: reduce` → static vivid mesh (no drift/pulse). Existing global V2 reduce rule plus hero-specific override.
+- Exact CodePen motion model; palette adapted to 모여라 V2 brand (deep purple / magenta / cyan / teal — no clashing orange).
+- Glass chips / compact meeting card / icon buttons stay on top (frost over the wash).
+- `prefers-reduced-motion: reduce` → static gradient at `background-position: 0% 50%` (no animation). Global V2 reduce rule plus hero-specific override in `design.css`.
 - Scoped to `.v2-design` only; default shell untouched.

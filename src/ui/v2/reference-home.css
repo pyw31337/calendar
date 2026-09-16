@@ -68,81 +68,39 @@
     .v2-design .bp-tab-warn { display: none; }
     .v2-design .bp-hero-zone {
       position: relative; overflow: hidden; margin: 0; border-radius: 0; padding-bottom: 14px;
-      /* Living aurora base — deep purple/cyan so bright blobs stay readable */
-      background:
-        linear-gradient(180deg, rgba(24, 8, 48, 0.12) 0%, rgba(15, 5, 40, 0.42) 100%),
-        linear-gradient(135deg, #3B0764 0%, #5B21B6 42%, #6D28D9 68%, #0E7490 100%);
+      /* CodePen Pure CSS Animated Gradient (P1N2O/pyBNzX) — brand vivid stops */
+      background: linear-gradient(-45deg, #7C2FE5, #A21CAF, #e73c7e, #23a6d5, #23d5ab);
+      background-size: 400% 400%;
+      animation: bp-hero-codepen-gradient 15s ease infinite;
       isolation: isolate;
     }
-    /* Aurora layer A — purple / magenta mesh (drifts slowly) */
-    .v2-design .bp-hero-zone::before {
-      content: "";
-      position: absolute;
-      inset: -38%;
-      z-index: 0;
-      pointer-events: none;
-      background:
-        radial-gradient(ellipse 55% 48% at 18% 26%, rgba(167, 139, 250, 0.95) 0%, transparent 58%),
-        radial-gradient(ellipse 48% 42% at 78% 16%, rgba(236, 72, 153, 0.88) 0%, transparent 55%),
-        radial-gradient(ellipse 42% 50% at 40% 82%, rgba(124, 47, 229, 0.72) 0%, transparent 60%);
-      background-repeat: no-repeat;
-      transform: translate3d(0, 0, 0) scale(1);
-      opacity: 0.92;
-      animation: bp-hero-aurora-drift-a 22s ease-in-out infinite alternate;
-      will-change: transform, opacity;
-    }
-    /* Aurora layer B — cyan / blue / magenta (counter-drift) */
+    /* Disable prior aurora mesh pseudos — CodePen gradient is the primary motion */
+    .v2-design .bp-hero-zone::before,
     .v2-design .bp-hero-zone::after {
-      content: "";
-      position: absolute;
-      inset: -42%;
-      z-index: 0;
-      pointer-events: none;
-      background:
-        radial-gradient(ellipse 52% 46% at 74% 74%, rgba(6, 182, 212, 0.92) 0%, transparent 56%),
-        radial-gradient(ellipse 40% 38% at 26% 64%, rgba(59, 130, 246, 0.72) 0%, transparent 52%),
-        radial-gradient(ellipse 36% 40% at 90% 36%, rgba(162, 28, 175, 0.58) 0%, transparent 50%);
-      background-repeat: no-repeat;
-      transform: translate3d(0, 0, 0) scale(1.06);
-      opacity: 0.82;
-      animation: bp-hero-aurora-drift-b 28s ease-in-out infinite alternate;
-      will-change: transform, opacity;
+      content: none;
+      display: none;
+      animation: none;
     }
-    /* Soft top bloom + bottom vignette for white text contrast */
+    /* Soft bottom vignette only — keeps white titles / [모임확정] readable */
     .v2-design .bp-hero-zone > .bp-hero-aurora {
       position: absolute;
       inset: 0;
       z-index: 0;
       pointer-events: none;
-      background:
-        radial-gradient(ellipse 75% 55% at 50% -8%, rgba(192, 132, 252, 0.42) 0%, transparent 58%),
-        linear-gradient(180deg, transparent 38%, rgba(24, 8, 48, 0.32) 76%, rgba(15, 5, 40, 0.55) 100%);
-      opacity: 0.85;
-      animation: bp-hero-aurora-pulse 16s ease-in-out infinite alternate;
-      will-change: opacity, transform;
+      background: linear-gradient(180deg, transparent 42%, rgba(24, 8, 48, 0.28) 78%, rgba(15, 5, 40, 0.52) 100%);
+      opacity: 1;
+      animation: none;
     }
     .v2-design .bp-hero-zone > :not(.bp-hero-aurora) { position: relative; z-index: 1; }
-    @keyframes bp-hero-aurora-drift-a {
-      0% { transform: translate3d(-5%, -3%, 0) scale(1) rotate(0deg); opacity: 0.82; }
-      50% { transform: translate3d(7%, 5%, 0) scale(1.14) rotate(5deg); opacity: 1; }
-      100% { transform: translate3d(3%, -6%, 0) scale(1.06) rotate(-4deg); opacity: 0.88; }
-    }
-    @keyframes bp-hero-aurora-drift-b {
-      0% { transform: translate3d(6%, 4%, 0) scale(1.1) rotate(0deg); opacity: 0.72; }
-      50% { transform: translate3d(-8%, -5%, 0) scale(1) rotate(-6deg); opacity: 0.95; }
-      100% { transform: translate3d(-3%, 7%, 0) scale(1.16) rotate(4deg); opacity: 0.78; }
-    }
-    @keyframes bp-hero-aurora-pulse {
-      0% { opacity: 0.7; transform: translate3d(0, 0, 0) scale(1); }
-      100% { opacity: 1; transform: translate3d(0, -2%, 0) scale(1.05); }
+    @keyframes bp-hero-codepen-gradient {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
     }
     @media (prefers-reduced-motion: reduce) {
-      .v2-design .bp-hero-zone::before,
-      .v2-design .bp-hero-zone::after,
-      .v2-design .bp-hero-zone > .bp-hero-aurora {
-        animation: none !important;
-        transform: none;
-        opacity: 1;
+      .v2-design .bp-hero-zone {
+        animation: none;
+        background-position: 0% 50%;
       }
     }
 
