@@ -1,0 +1,101 @@
+/**
+ * V2 destination full-bleed layout module
+ * ---------------------------------------
+ * Chat is the baseline: edge-to-edge under the side rail (no outer page margin /
+ * floating max-width card). All `.v2-dest-page` screens share these tokens so
+ * one-shot visual tweaks land here — see designv2/V2-DEST-LAYOUT.md.
+ *
+ * Scope: .v2-design only (default shell untouched).
+ */
+
+.v2-design {
+  /* Outer shell: flush to rail / header / pane edges (chat baseline). */
+  --v2-dest-pad-x: 0px;
+  --v2-dest-pad-y: 0px;
+  /* Optional inner content column pad (messages / lists / grids). */
+  --v2-dest-content-pad-x: 14px;
+  --v2-dest-content-pad-y: 0px;
+}
+
+/* ---- Shared destination page shell (Memo / Places / Settlement / Gallery /
+      Content / Archive / Chat) ---- */
+.v2-design .v2-dest-page {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: var(--v2-dest-pad-y) var(--v2-dest-pad-x) !important;
+  box-sizing: border-box !important;
+  background: #fafafc;
+}
+
+.v2-design .v2-dest-page > .bp-app-shell,
+.v2-design .v2-dest-page > .v2-chat-root,
+.v2-design .v2-dest-page > .chat-room-container,
+.v2-design .v2-dest-page.v2-chat-shell,
+.v2-design .v2-chat-shell,
+.v2-design .v2-memo > .bp-app-shell,
+.v2-design .v2-places > .bp-app-shell,
+.v2-design .v2-settlement > .bp-app-shell {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  /* Defeat design.css --v2-page-pad and reference-* 20px side pads on dest shells */
+  padding: var(--v2-dest-pad-y) var(--v2-dest-pad-x) !important;
+  box-sizing: border-box !important;
+}
+
+/* Sticky PageHeader flush to pane top (no shell pad above it) */
+.v2-design .v2-dest-page > .bp-app-shell > .v2-page-header,
+.v2-design .v2-dest-page > .v2-page-header {
+  margin: 0 !important;
+}
+
+/* Body / legacy fill under sticky PageHeader — no outer inset */
+.v2-design .v2-dest-page .v2-dest-body,
+.v2-design .v2-dest-page .v2-legacy-body,
+.v2-design .v2-wrap-legacy > .v2-legacy-body,
+.v2-design .v2-embed-frame > .v2-legacy-body {
+  width: 100% !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  box-sizing: border-box !important;
+}
+
+/* Kill floating “card in a frame” outer gutters on map / sticky map shells.
+   Internal list padding may still use --v2-dest-content-pad-x. */
+.v2-design .v2-dest-page .v2-map-panel,
+.v2-design .v2-map-panel {
+  margin: var(--v2-dest-pad-y) var(--v2-dest-pad-x) 0 !important;
+}
+
+.v2-design .v2-dest-page .places-map-sticky-area,
+.v2-design .v2-places-legacy .places-map-sticky-area,
+.v2-design .v2-map-panel .places-map-sticky-area {
+  margin-left: var(--v2-dest-pad-x) !important;
+  margin-right: var(--v2-dest-pad-x) !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Optional helper: apply content-column pad without reintroducing outer gutters */
+.v2-design .v2-dest-page .v2-dest-content-pad {
+  padding-left: var(--v2-dest-content-pad-x);
+  padding-right: var(--v2-dest-content-pad-x);
+  box-sizing: border-box;
+}
+
+
+/* Reference CSS (memo/places/settlement) still ships max-width + padding at ≥1200px.
+   Keep dest shells full-bleed regardless of import order. */
+@media (min-width: 1200px) {
+  .v2-design .v2-dest-page > .bp-app-shell,
+  .v2-design .v2-memo.v2-dest-page > .bp-app-shell,
+  .v2-design .v2-places.v2-dest-page > .bp-app-shell,
+  .v2-design .v2-settlement.v2-dest-page > .bp-app-shell {
+    max-width: none !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: var(--v2-dest-pad-y, 0px) var(--v2-dest-pad-x, 0px) !important;
+  }
+}

@@ -7,6 +7,7 @@ import './reference-memo.css';
 import './reference-places.css';
 import './reference-settlement.css';
 import './reference-chat.css';
+import './dest-layout.css';
 import './screens.css';
 import { calculateSettlementRows } from '../../core/settlement-calculator.js';
 import { authorFor } from './view-data.js';

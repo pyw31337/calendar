@@ -115,13 +115,19 @@
 .v2-design .v2-place-title-button { display: block; text-align: left; background: none; padding: 0; border: 0; cursor: pointer; width: 100%; }
 .v2-design .v2-place-title-button > span { display: block; }
 .v2-design .bp-place-note { margin: 3px 0; line-height: 1.5; white-space: pre-line; overflow-wrap: anywhere; }
-.v2-design .v2-map-panel { margin: 14px; }
+/* Outer map gutters owned by dest-layout.css (--v2-dest-pad-*); keep radius/height only. */
+.v2-design .v2-map-panel { margin: var(--v2-dest-pad-y, 0) var(--v2-dest-pad-x, 0); }
 .v2-design .v2-map-panel .places-map-sticky-area { width: 100%; }
 .v2-design .v2-map-panel .places-map-sticky-area > div:first-child { height: 100% !important; }
-.v2-design .v2-bulk-places { padding: 14px; }
+.v2-design .v2-bulk-places { padding: var(--v2-dest-content-pad-x, 14px); }
 .v2-design button.bp-place-map-thumb { border: 0; cursor: pointer; }
-.v2-design .v2-places-legacy .places-map-sticky-area { border-radius: 12px; overflow: hidden; margin: 10px 14px 0; }
-.v2-design .v2-places-legacy .places-list-toolbar { padding: 10px 14px !important; }
+.v2-design .v2-places-legacy .places-map-sticky-area {
+  border-radius: 0; overflow: hidden;
+  margin: var(--v2-dest-pad-y, 0) var(--v2-dest-pad-x, 0) 0;
+}
+.v2-design .v2-places-legacy .places-list-toolbar {
+  padding: 10px var(--v2-dest-content-pad-x, 14px) !important;
+}
 
 /* Settlement */
 .v2-design .v2-period-toggle {
@@ -271,10 +277,14 @@
 }
 
 
-/* Destination page frame: mock chrome owns layout; live slots fill the body. */
+/* Destination page frame: outer full-bleed via dest-layout.css; body fill below. */
 .v2-design .v2-dest-page .v2-dest-body {
   position: relative;
   min-height: calc(100dvh - 120px);
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  box-sizing: border-box;
 }
 .v2-design .v2-dest-page .v2-memo-body,
 .v2-design .v2-dest-page .v2-memo-body .memo-list-scroll {
@@ -648,10 +658,10 @@
     width: 100% !important;
     background: #fafafc;
   }
-  /* tag cloud removed — keep body padding only */
+  /* tag cloud removed — inner content pad via dest-layout tokens */
   .v2-design .v2-memo .v2-dest-body,
   .v2-design .v2-memo .v2-memo-body {
-    padding: 0 14px 96px !important;
+    padding: 0 var(--v2-dest-content-pad-x, 14px) 96px !important;
   }
 }
 
@@ -668,7 +678,7 @@
     max-width: none !important;
     margin: 0 !important;
     width: 100% !important;
-    padding: 12px 16px 96px !important;
+    padding: 12px var(--v2-dest-content-pad-x, 14px) 96px !important;
   }
   .v2-design .v2-settlement .settlement-page-tabs {
     max-width: none !important;
@@ -1114,7 +1124,8 @@
 
 /* ========== t175 / loop9: full-bleed + shared header + composer tools ========== */
 
-/* Destinations fill the right pane edge-to-edge under the rail (no floating max-width cards). */
+/* Destinations fill the right pane edge-to-edge under the rail.
+   Canonical outer shell tokens/rules: dest-layout.css (.v2-dest-page). */
 .v2-design .renewal-shell-main.v2-destination,
 .v2-design .renewal-shell-main.is-chat,
 .v2-design .renewal-shell-main.is-settlement,
@@ -1130,11 +1141,13 @@
 .v2-design .v2-chat-shell,
 .v2-design .v2-memo .bp-app-shell,
 .v2-design .v2-places .bp-app-shell,
-.v2-design .v2-settlement .bp-app-shell {
+.v2-design .v2-settlement .bp-app-shell,
+.v2-design .v2-gallery.v2-dest-page,
+.v2-design .v2-content.v2-dest-page,
+.v2-design .v2-archive.v2-dest-page {
   max-width: none !important;
   width: 100% !important;
-  margin-left: 0 !important;
-  margin-right: 0 !important;
+  margin: 0 !important;
   box-sizing: border-box;
 }
 
@@ -1254,12 +1267,14 @@
 .v2-design .v2-places .v2-page-header { flex: 0 0 auto; }
 .v2-design .v2-places .v2-map-panel {
   flex: 0 0 auto;
-  margin: 10px 14px 0 !important;
+  /* Full-bleed under header (chat baseline) — no side/top page margin */
+  margin: 0 !important;
   height: 220px !important;
   min-height: 180px !important;
-  border-radius: 14px;
+  border-radius: 0;
   overflow: hidden;
-  border: 1px solid #eceaf5;
+  border: none;
+  border-bottom: 1px solid #eceaf5;
   background: #f3eeff;
 }
 .v2-design .v2-places .v2-map-panel .places-map-sticky-area {
@@ -1277,7 +1292,7 @@
 .v2-design .v2-places .places-list-body {
   height: auto !important;
   overflow: visible !important;
-  padding: 10px 14px 24px !important;
+  padding: 10px var(--v2-dest-content-pad-x, 14px) 24px !important;
 }
 .v2-design .v2-places .place-card-row {
   padding: 10px 12px !important;
@@ -1795,7 +1810,7 @@
 
 .v2-design .v2-memo .v2-memo-body .memo-list-scroll,
 .v2-design .v2-memo .memo-list-scroll {
-  padding: 8px 14px 24px !important;
+  padding: 8px var(--v2-dest-content-pad-x, 14px) 24px !important;
   gap: 10px !important;
 }
 
