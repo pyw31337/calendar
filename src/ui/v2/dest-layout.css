@@ -12,9 +12,18 @@
   /* Outer shell: flush to rail / header / pane edges (chat baseline). */
   --v2-dest-pad-x: 0px;
   --v2-dest-pad-y: 0px;
-  /* Optional inner content column pad (messages / lists / grids). */
-  --v2-dest-content-pad-x: 14px;
-  --v2-dest-content-pad-y: 0px;
+  /* Optional inner content column pad (messages / lists / grids). 14px read as content sitting
+   * flush against the device edge on real phones — widened so every dest page keeps genuine
+   * breathing room on all four sides without giving back the flush shell/header baseline above. */
+  --v2-dest-content-pad-x: 20px;
+  --v2-dest-content-pad-y: 14px;
+}
+
+@media (min-width: 768px) {
+  .v2-design {
+    --v2-dest-content-pad-x: 28px;
+    --v2-dest-content-pad-y: 18px;
+  }
 }
 
 /* ---- Shared destination page shell (Memo / Places / Settlement / Gallery /

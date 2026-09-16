@@ -356,15 +356,23 @@
 }
 
 @media (min-width: 768px) {
-  /* Fluid, not a fixed 760px column: the mock's own 768px tier used a flat 760px cap, which
-   * reads fine on iPad-portrait widths (~768-834px) but leaves a large dead gutter on either
-   * side on wider tablets/small laptops below the 1200px "PC rail" breakpoint (e.g. ~132px per
-   * side at 1024px, ~210px at 1180px) — exactly the side-margin the mock never had to deal with
-   * since it wasn't previewed at those widths. The 2-column bento grid (reference-home.css,
-   * same 768px tier) already fills a wider column fine, so just let the column grow with the
-   * viewport instead of plateauing. */
+  /* Full-width, not a fluid-but-still-capped column: `min(94vw, 1100px)` still left a real
+   * unused gutter on either side at tablet widths (~23px/side at 768px, ~31px/side at 1024px)
+   * that read as an accidental empty margin rather than intentional whitespace. The tablet tier
+   * has no persistent side rail (that only starts at 1200px), so there is nothing to make room
+   * for — let the shell claim the full viewport width up to the 1100px cap and use real padding
+   * (below) for breathing room instead of a shrink-and-center margin. */
   .renewal-shell.v2-design > .bp-app-shell.is-bento-home,
-  .renewal-shell.v2-design .bp-app-shell.is-bento-home { max-width: min(94vw, 1100px); }
+  .renewal-shell.v2-design .bp-app-shell.is-bento-home { max-width: min(100%, 1100px); }
+
+  /* reference-home.css's 20px side gutter reads cramped once the shell is full-width — widen it
+   * so tablet keeps real breathing room instead of trading "wasted outer margin" for "content
+   * flush against the edge". */
+  .v2-design .bp-hero-zone { margin-left: 28px !important; margin-right: 28px !important; }
+  .v2-design .bp-bento-title { padding-left: 28px !important; padding-right: 28px !important; }
+  .v2-design .bp-dday-toggle-wrap { padding-left: 28px !important; padding-right: 28px !important; }
+  .v2-design .bp-dday-strip { padding-left: 28px !important; padding-right: 28px !important; }
+  .v2-design .bp-bento-grid { padding: 28px !important; }
 
   /* reference-home.css gives bento cards a near-invisible neutral shadow at this tier
    * (0 1px 4px rgba(...,0.07)) — swap in the same purple-tinted --v2-card-shadow every other
@@ -1503,7 +1511,7 @@
 .v2-design .v2-more-list {
   list-style: none;
   margin: 0;
-  padding: 12px var(--v2-dest-content-pad-x, 14px) 24px;
+  padding: var(--v2-dest-content-pad-y, 12px) var(--v2-dest-content-pad-x, 14px) 24px;
   display: flex;
   flex-direction: column;
   gap: 8px;
