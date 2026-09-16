@@ -752,6 +752,7 @@ export function ChatRoomView({
     if (!replyTo) return null;
     const qp = participantsMap[replyTo.participantId];
     return /*#__PURE__*/React.createElement("div", {
+      className: "chat-reply-quote-card",
       onClick: e => {
         e.stopPropagation();
         if (onJumpToChatMessage && replyTo.id) onJumpToChatMessage(replyTo.id);

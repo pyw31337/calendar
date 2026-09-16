@@ -126,3 +126,29 @@ test('V2 PC polish keeps wider rail, fluid content, 3x3 gallery, and participant
   assert.match(design, /background:\s*var\(--status-green/);
   assert.doesNotMatch(design, /#F472B6/);
 });
+
+
+test('V2 destination screens keep live feature entry points', async () => {
+  const { readFileSync } = await import('node:fs');
+  const screens = readFileSync(new URL('../src/ui/v2/screens.js', import.meta.url), 'utf8');
+  const shell = readFileSync(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
+  const styles = readFileSync(new URL('../src/ui/v2/screens.css', import.meta.url), 'utf8');
+  // Search / share / FAB / map / composer remain wired (design is chrome-only).
+  assert.match(screens, /placeholder: '장소 검색'/);
+  assert.match(screens, /placeholder: '메모 검색'|메모 검색/);
+  assert.match(screens, /Fab\(/);
+  assert.match(screens, /label: '메모 작성'/);
+  assert.match(screens, /label: '장소 등록'/);
+  assert.match(screens, /label: '지출 추가'/);
+  assert.match(screens, /label: '지도로 보기'|icon: 'map'/);
+  assert.match(screens, /onShare/);
+  assert.match(screens, /bp-composer-input|composer/);
+  assert.match(screens, /대화 검색/);
+  // Gallery/media keeps share + lightbox plumbing; v2 wrapper is presentation-only.
+  assert.match(shell, /v2-records-media/);
+  assert.match(shell, /onOpenGalleryShare/);
+  assert.match(shell, /setActiveLightbox/);
+  assert.match(shell, /dday-participant-memos/);
+  assert.match(styles, /chat-reply-quote-card/);
+  assert.match(styles, /v2-records-media/);
+});

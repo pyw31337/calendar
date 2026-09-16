@@ -1160,7 +1160,7 @@ function RecordsOverviewPane({ recordsContext, calendarName, onSelectSubTab, onC
     if (card.firstClass && typeof onChangeView === 'function') onChangeView(card.id);
     else onSelectSubTab(card.id);
   };
-  return React.createElement('section', { className: 'renewal-records-overview', 'aria-label': '기록 요약' },
+  return React.createElement('section', { className: 'renewal-records-overview v2-records-overview', 'aria-label': '기록 요약' },
     React.createElement('div', { className: 'renewal-shell-section-title' }, calendarName ? `${calendarName} 기록` : '기록 요약'),
     React.createElement('p', { className: 'renewal-records-overview-subtitle' }, '메모·장소는 독립 페이지, 사진·보관함은 기록 허브에서 이어집니다.'),
     React.createElement('div', { className: 'renewal-records-overview-grid' }, cards.map(card =>
@@ -1359,7 +1359,7 @@ function MediaPane({ recordsContext, onChangeView, onOpenAppSettings }) {
     return React.createElement(EmptyState, { title: '사진·영상 불러오는 중', subtitle: '잠시만 기다려 주세요.' });
   }
   const { ChatGalleryModal, ShareModal } = bindUiComponentAliases(React);
-  return React.createElement(React.Fragment, null,
+  return React.createElement('div', { className: 'v2-records-media' },
     React.createElement(ChatGalleryModal, {
       ...recordsContext.mediaProps,
       onClose: () => onChangeView('calendar'),
