@@ -120,13 +120,13 @@
    * below so the mock's teal corner reads as a stable color family on the right, not something
    * the animation pans away from — the magenta/purple blobs get the wide, free-roaming travel. */
   background:
-    radial-gradient(circle at 14% 18%, rgba(217, 70, 239, 0.55) 0%, rgba(217, 70, 239, 0) 46%),
-    radial-gradient(circle at 30% 62%, rgba(139, 76, 247, 0.9) 0%, rgba(139, 76, 247, 0) 52%),
-    radial-gradient(circle at 88% 20%, rgba(56, 189, 248, 0.6) 0%, rgba(56, 189, 248, 0) 48%),
-    radial-gradient(circle at 92% 58%, rgba(45, 226, 196, 0.88) 0%, rgba(45, 226, 196, 0) 50%),
+    radial-gradient(circle at 14% 18%, rgba(217, 70, 239, 0.4) 0%, rgba(217, 70, 239, 0) 46%),
+    radial-gradient(circle at 30% 62%, rgba(139, 76, 247, 0.72) 0%, rgba(139, 76, 247, 0) 52%),
+    radial-gradient(circle at 88% 20%, rgba(56, 189, 248, 0.46) 0%, rgba(56, 189, 248, 0) 48%),
+    radial-gradient(circle at 92% 58%, rgba(45, 226, 196, 0.7) 0%, rgba(45, 226, 196, 0) 50%),
     radial-gradient(circle at 55% 88%, rgba(88, 28, 165, 0.9) 0%, rgba(88, 28, 165, 0) 55%),
-    radial-gradient(circle at 45% 30%, rgba(124, 58, 237, 0.7) 0%, rgba(124, 58, 237, 0) 50%),
-    linear-gradient(135deg, #4C1D95 0%, #7C3AED 58%, #22D3B8 100%) !important;
+    radial-gradient(circle at 45% 30%, rgba(124, 58, 237, 0.55) 0%, rgba(124, 58, 237, 0) 50%),
+    linear-gradient(135deg, #3B1670 0%, #6B2FD6 58%, #189E8E 100%) !important;
   background-repeat: no-repeat !important;
   background-size:
     150% 150%, 160% 160%, 130% 130%, 140% 140%, 155% 155%, 145% 145%, 100% 100% !important;
@@ -145,12 +145,17 @@
   inset: 0 !important;
   z-index: 0 !important;
   pointer-events: none !important;
+  /* Uniform dark wash (rgba(10,4,28,0.22) flat, no gradient) sits under everything else so text
+   * stays readable against the mesh no matter which bright blob happens to be under it at a given
+   * animation frame -- the vertical vignette alone (next layer) only protected the bottom third,
+   * leaving the title/D-day row at the top exposed to the screen-blended blobs at full brightness. */
   background:
     linear-gradient(115deg, transparent 32%, rgba(255, 255, 255, 0.16) 45%, rgba(255, 255, 255, 0.32) 50%, rgba(255, 255, 255, 0.16) 55%, transparent 68%),
-    linear-gradient(180deg, transparent 42%, rgba(24, 8, 48, 0.28) 78%, rgba(15, 5, 40, 0.52) 100%) !important;
+    linear-gradient(180deg, rgba(15, 5, 36, 0.2) 0%, rgba(20, 6, 42, 0.16) 38%, rgba(24, 8, 48, 0.32) 78%, rgba(15, 5, 40, 0.56) 100%),
+    rgba(10, 4, 28, 0.22) !important;
   background-repeat: no-repeat !important;
-  background-size: 260% 260%, 100% 100% !important;
-  background-position: 0% 0%, 0 0 !important;
+  background-size: 260% 260%, 100% 100%, 100% 100% !important;
+  background-position: 0% 0%, 0 0, 0 0 !important;
   animation: bp-hero-glass-sheen 6.5s ease-in-out infinite !important;
   opacity: 1 !important;
 }
@@ -167,9 +172,9 @@
 /* Independent, faster loop so the panel keeps visibly changing even while a position keyframe
  * above is mid-transition — a screenshot taken at any moment still shows movement in progress. */
 @keyframes bp-hero-fluid-tone {
-  0%   { filter: saturate(1.3) contrast(1.08) hue-rotate(0deg); }
-  50%  { filter: saturate(1.7) contrast(1.16) hue-rotate(6deg); }
-  100% { filter: saturate(1.3) contrast(1.08) hue-rotate(0deg); }
+  0%   { filter: saturate(1.2) contrast(1.06) brightness(0.94) hue-rotate(0deg); }
+  50%  { filter: saturate(1.45) contrast(1.12) brightness(0.98) hue-rotate(6deg); }
+  100% { filter: saturate(1.2) contrast(1.06) brightness(0.94) hue-rotate(0deg); }
 }
 @keyframes bp-hero-glass-sheen {
   0%   { background-position: -40% -20%, 0 0; }
@@ -692,6 +697,15 @@
     grid-template-columns: repeat(3, 1fr) !important;
     gap: 12px !important;
   }
+}
+
+/* Home activity cards (채팅/메모/갤러리/장소): 1 column on phone, 2 on tablet (reference-home.css
+ * 768px tier), 4 side by side once there's room for all of them on one row -- reference-home.css's
+ * 1200px tier used an asymmetric 3-column split (1.4fr 1fr 1fr) that wrapped the 4th card onto its
+ * own row. The calendar card itself stays full-width via the existing `.bp-wide` grid-column
+ * span, unaffected by the column count here. */
+@media (min-width: 1200px) {
+  .v2-design .bp-bento-grid { grid-template-columns: repeat(4, 1fr) !important; }
 }
 
 /* Today badge: mock-dense circle with slight inset for 2-digit days */
