@@ -335,6 +335,13 @@
   .renewal-shell.v2-design > .bp-app-shell.is-bento-home,
   .renewal-shell.v2-design .bp-app-shell.is-bento-home { max-width: min(94vw, 1100px); }
 
+  /* reference-home.css gives bento cards a near-invisible neutral shadow at this tier
+   * (0 1px 4px rgba(...,0.07)) — swap in the same purple-tinted --v2-card-shadow every other
+   * glass surface uses so the home cards read as lifted too, not just the destination cards. */
+  .v2-design .bp-bento-card {
+    box-shadow: var(--v2-card-shadow) !important;
+  }
+
   .v2-design .bp-sheet-backdrop.modal-overlay {
     align-items: center !important;
   }
