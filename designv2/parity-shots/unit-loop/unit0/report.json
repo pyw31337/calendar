@@ -1,0 +1,171 @@
+{
+  "base": "https://pyw31337.github.io/calendar",
+  "capturedAt": "2026-09-16T07:06:56.813Z",
+  "gates": {
+    "memoNoTagCloud": true,
+    "hamburgerOpensSideNav": true,
+    "galleryApprox4Cols": true,
+    "annivHiddenMobile": true,
+    "annivVisiblePc": true
+  },
+  "home": {
+    "tagChipCount": 0,
+    "tagRowDisplay": null,
+    "tagRowExists": false,
+    "hasSort": false,
+    "hasMenu": false,
+    "railOpen": false,
+    "railDisplay": "flex",
+    "annLabelDom": 12,
+    "annLabelVisible": 0,
+    "annLabelVisibleCss": 0,
+    "galleryCols": 7,
+    "header": "",
+    "v2": true,
+    "painNotes": []
+  },
+  "chat": {
+    "tagChipCount": 0,
+    "tagRowDisplay": null,
+    "tagRowExists": false,
+    "hasSort": false,
+    "hasMenu": true,
+    "railOpen": false,
+    "railDisplay": "flex",
+    "annLabelDom": 0,
+    "annLabelVisible": 0,
+    "annLabelVisibleCss": 0,
+    "galleryCols": 2,
+    "header": "채팅 모아엘가 · 4명",
+    "v2": true,
+    "painNotes": []
+  },
+  "memo": {
+    "tagChipCount": 0,
+    "tagRowDisplay": null,
+    "tagRowExists": false,
+    "hasSort": false,
+    "hasMenu": true,
+    "railOpen": false,
+    "railDisplay": "flex",
+    "annLabelDom": 0,
+    "annLabelVisible": 0,
+    "annLabelVisibleCss": 0,
+    "galleryCols": 1,
+    "header": "메모",
+    "v2": true,
+    "painNotes": []
+  },
+  "gallery": {
+    "tagChipCount": 0,
+    "tagRowDisplay": null,
+    "tagRowExists": false,
+    "hasSort": false,
+    "hasMenu": true,
+    "railOpen": false,
+    "railDisplay": "flex",
+    "annLabelDom": 0,
+    "annLabelVisible": 0,
+    "annLabelVisibleCss": 0,
+    "galleryCols": 4,
+    "header": "갤러리",
+    "v2": true,
+    "painNotes": []
+  },
+  "places": {
+    "tagChipCount": 0,
+    "tagRowDisplay": null,
+    "tagRowExists": false,
+    "hasSort": false,
+    "hasMenu": true,
+    "railOpen": false,
+    "railDisplay": "flex",
+    "annLabelDom": 0,
+    "annLabelVisible": 0,
+    "annLabelVisibleCss": 0,
+    "galleryCols": null,
+    "header": "장소 등록 73곳",
+    "v2": true,
+    "painNotes": []
+  },
+  "settlement": {
+    "tagChipCount": 0,
+    "tagRowDisplay": null,
+    "tagRowExists": false,
+    "hasSort": false,
+    "hasMenu": true,
+    "railOpen": false,
+    "railDisplay": "flex",
+    "annLabelDom": 0,
+    "annLabelVisible": 0,
+    "annLabelVisibleCss": 0,
+    "galleryCols": 3,
+    "header": "정산",
+    "v2": true,
+    "painNotes": []
+  },
+  "content": {
+    "tagChipCount": 0,
+    "tagRowDisplay": null,
+    "tagRowExists": false,
+    "hasSort": false,
+    "hasMenu": true,
+    "railOpen": false,
+    "railDisplay": "flex",
+    "annLabelDom": 0,
+    "annLabelVisible": 0,
+    "annLabelVisibleCss": 0,
+    "galleryCols": null,
+    "header": "컨텐츠",
+    "v2": true,
+    "painNotes": []
+  },
+  "side-nav-from-memo": {
+    "opened": {
+      "ok": true,
+      "label": "메모 메뉴"
+    },
+    "hasOpenClass": true,
+    "transform": "matrix(1, 0, 0, 1, 0, 0)",
+    "visibility": "visible",
+    "brand": "모여라 캘린더",
+    "visibleText": "모여라 캘린더 사용자 매뉴얼 사용 방법 한눈에 보기 캘린더 설정 기념일 설정 캘린더 채팅 박영우 정산 -32만 09.01 갤러리 장소 예산상설시장 메모 26.09.19(토) 예당호 여행 준비물 컨텐츠 보관함 공유 설"
+  },
+  "home-pc": {
+    "annLabelDom": 12,
+    "annLabelVisibleCss": 12,
+    "sample": [
+      {
+        "text": "서준네 강원도 고성 여행",
+        "display": "block",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "2026 서울세계불꽃축제",
+        "display": "block",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "도은네 인천 영흥도 캠핑여행",
+        "display": "block",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "서준네 강원도 고성 여행",
+        "display": "block",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "도은네 인천 영흥도 캠핑여행",
+        "display": "block",
+        "opacity": "1",
+        "visibility": "visible"
+      }
+    ],
+    "v2": true
+  }
+}
