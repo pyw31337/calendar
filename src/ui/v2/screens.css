@@ -1044,6 +1044,11 @@
   padding: 8px 12px !important;
   gap: 6px !important;
 }
+/* Unit 1: single create surface — hide legacy toolbar + when V2 FAB is present */
+.v2-design .v2-places button.btn-action-dark[aria-label="장소 추가"],
+.v2-design .v2-places-legacy button.btn-action-dark[aria-label="장소 추가"] {
+  display: none !important;
+}
 .v2-design .v2-places .places-category-sticky-tabs {
   padding: 6px 10px !important;
   gap: 4px !important;
