@@ -57,7 +57,7 @@
 .v2-design .v2-bubble-surface:focus-visible,
 .v2-chat .v2-bubble-surface:focus-visible,
 .v2-memo .v2-bubble-surface:focus-visible {
-  outline: 2px solid var(--brand, #7C3AED);
+  outline: 2px solid var(--brand, #7C2FE5);
   outline-offset: 2px;
 }
 
@@ -67,7 +67,7 @@
   display: flex;
   flex-direction: column;
   gap: 1px;
-  border-left: 2.5px solid var(--brand, #7C3AED);
+  border-left: 2.5px solid var(--brand, #7C2FE5);
   background: var(--brand-soft, #F3EEFF);
   border-radius: 0 8px 8px 0;
   padding: 6px 10px;
@@ -82,7 +82,7 @@
 .v2-memo .v2-reply-quote-author {
   font-size: 0.6rem;
   font-weight: 800;
-  color: var(--brand, #7C3AED);
+  color: var(--brand, #7C2FE5);
 }
 
 .v2-design .v2-reply-quote-text,

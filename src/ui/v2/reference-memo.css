@@ -3,7 +3,7 @@
     .v2-memo {
       --bg-primary: #FAFAFC; --bg-card: #FFFFFF; --border-subtle: #ECEAF5;
       --text-main: #1E1B2E; --text-muted: #6B6580; --text-light: #83798F;
-      --brand: #7C3AED; --brand-soft: #F3EEFF;
+      --brand: #7C2FE5; --brand-soft: #F3EEFF;
       --radius-lg: 18px; --radius-md: 12px; --radius-sm: 8px; --radius-full: 9999px;
       --p-yeongwoo: #F87171; --p-yuri: #FB923C; --p-manshik: #34D399; --p-eunhye: #22D3EE;
       --p-doeun: #A78BFA; --p-seojun: #FBBF24;
@@ -21,7 +21,7 @@
     .v2-memo .bp-header-actions { margin-left: auto; display: flex; gap: 4px; }
     .v2-memo .bp-icon-btn { background: none; border: none; color: var(--text-muted); padding: 7px; display: inline-flex; cursor: pointer; border-radius: var(--radius-full); }
     .v2-memo .bp-icon-btn:hover { background: var(--bg-primary); color: var(--brand); }
-    .v2-memo .bp-fab { position: fixed; right: 20px; bottom: 24px; width: 52px; height: 52px; border-radius: 50%; background: var(--brand); color: #fff; border: none; box-shadow: 0 8px 20px rgba(124,58,237,0.35); display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 6; }
+    .v2-memo .bp-fab { position: fixed; right: 20px; bottom: 24px; width: 52px; height: 52px; border-radius: 50%; background: var(--brand); color: #fff; border: 1px solid rgba(255,255,255,0.28); box-shadow: 0 6px 18px rgba(124,47,229,0.40), inset 0 1px 0 rgba(255,255,255,0.28); display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 6; }
 
     .v2-memo .bp-search-row { margin-top: 10px; position: relative; }
     .v2-memo .bp-search-input { width: 100%; border: 1px solid var(--border-subtle); border-radius: var(--radius-full); padding: 9px 14px 9px 34px; font-size: 0.78rem; background: var(--bg-primary); color: var(--text-main); }

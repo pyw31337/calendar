@@ -1,0 +1,126 @@
+{
+  "base": "http://127.0.0.1:5188",
+  "capturedAt": "2026-09-16T09:03:58.692Z",
+  "shots": {
+    "sideNavHome": {
+      "tokens": {
+        "brand": "#7C2FE5",
+        "primary": "#7C2FE5",
+        "lightBorder": "#eceaf5",
+        "purpleFill": "rgba(124, 47, 229, 0.10)"
+      },
+      "active": {
+        "bg": "rgba(124, 47, 229, 0.1)",
+        "border": "rgba(124, 47, 229, 0.26)"
+      },
+      "badge": {
+        "color": "rgb(124, 47, 229)",
+        "border": "rgba(124, 47, 229, 0.26)"
+      },
+      "collapse": {
+        "border": "rgb(236, 234, 245)",
+        "bg": "rgba(255, 255, 255, 0.88)"
+      },
+      "headerIcon": null,
+      "fab": null,
+      "send": null,
+      "memoCard": null
+    },
+    "chatHeader": {
+      "tokens": {
+        "brand": "#7C2FE5",
+        "primary": "#7C2FE5",
+        "lightBorder": "#eceaf5",
+        "purpleFill": "rgba(124, 47, 229, 0.10)"
+      },
+      "active": {
+        "bg": "rgba(124, 47, 229, 0.1)",
+        "border": "rgba(124, 47, 229, 0.26)"
+      },
+      "badge": {
+        "color": "rgb(124, 47, 229)",
+        "border": "rgba(124, 47, 229, 0.26)"
+      },
+      "collapse": {
+        "border": "rgb(236, 234, 245)",
+        "bg": "rgba(255, 255, 255, 0.88)"
+      },
+      "headerIcon": {
+        "bg": "rgba(255, 255, 255, 0.88)",
+        "border": "rgb(236, 234, 245)",
+        "filter": "blur(20px) saturate(1.8)"
+      },
+      "fab": null,
+      "send": {
+        "bg": "rgb(124, 47, 229)",
+        "shadow": "rgba(124, 47, 229, 0.32) 0px 3px 10px 0px, rgba(255, 255, 255, 0.28) 0px 1px 0px 0px inset"
+      },
+      "memoCard": null
+    },
+    "memo": {
+      "tokens": {
+        "brand": "#7C2FE5",
+        "primary": "#7C2FE5",
+        "lightBorder": "#eceaf5",
+        "purpleFill": "rgba(124, 47, 229, 0.10)"
+      },
+      "active": {
+        "bg": "rgba(124, 47, 229, 0.1)",
+        "border": "rgba(124, 47, 229, 0.26)"
+      },
+      "badge": {
+        "color": "rgb(124, 47, 229)",
+        "border": "rgba(124, 47, 229, 0.26)"
+      },
+      "collapse": {
+        "border": "rgb(236, 234, 245)",
+        "bg": "rgba(255, 255, 255, 0.88)"
+      },
+      "headerIcon": {
+        "bg": "rgba(255, 255, 255, 0.88)",
+        "border": "rgb(236, 234, 245)",
+        "filter": "blur(20px) saturate(1.8)"
+      },
+      "fab": {
+        "bg": "rgb(124, 47, 229)",
+        "shadow": "rgba(124, 47, 229, 0.4) 0px 6px 18px 0px, rgba(255, 255, 255, 0.28) 0px 1px 0px 0px inset"
+      },
+      "send": null,
+      "memoCard": {
+        "border": "rgb(236, 234, 245)",
+        "shadow": "rgba(30, 27, 46, 0.04) 0px 1px 3px 0px, rgba(30, 27, 46, 0.03) 0px 4px 12px 0px"
+      }
+    },
+    "places": {
+      "tokens": {
+        "brand": "#7C2FE5",
+        "primary": "#7C2FE5",
+        "lightBorder": "#eceaf5",
+        "purpleFill": "rgba(124, 47, 229, 0.10)"
+      },
+      "active": {
+        "bg": "rgba(124, 47, 229, 0.1)",
+        "border": "rgba(124, 47, 229, 0.26)"
+      },
+      "badge": {
+        "color": "rgb(124, 47, 229)",
+        "border": "rgba(124, 47, 229, 0.26)"
+      },
+      "collapse": {
+        "border": "rgb(236, 234, 245)",
+        "bg": "rgba(255, 255, 255, 0.88)"
+      },
+      "headerIcon": {
+        "bg": "rgba(255, 255, 255, 0.88)",
+        "border": "rgb(236, 234, 245)",
+        "filter": "blur(20px) saturate(1.8)"
+      },
+      "fab": {
+        "bg": "rgb(124, 47, 229)",
+        "shadow": "rgba(124, 47, 229, 0.4) 0px 6px 18px 0px, rgba(255, 255, 255, 0.28) 0px 1px 0px 0px inset"
+      },
+      "send": null,
+      "memoCard": null
+    }
+  }
+}
