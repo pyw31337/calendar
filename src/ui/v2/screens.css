@@ -1337,36 +1337,8 @@
   margin-right: 0 !important;
 }
 
-/* Content / Archive Bento density */
-.v2-design .v2-content .culture-items-grid {
-  gap: 10px !important;
-  padding: 10px 14px 88px !important;
-}
-.v2-design .v2-content .culture-items-grid > * {
-  border-radius: 14px !important;
-  border: 1px solid #eceaf5 !important;
-  box-shadow: 0 2px 8px rgba(30, 27, 46, 0.05) !important;
-  overflow: hidden;
-  background: #fff !important;
-}
-.v2-design .v2-archive .history-bento-grid {
-  gap: 10px !important;
-  padding: 10px 14px 88px !important;
-}
-.v2-design .v2-archive .history-bento-grid > * {
-  border-radius: 14px !important;
-  box-shadow: 0 2px 8px rgba(30, 27, 46, 0.05) !important;
-  overflow: hidden;
-}
-.v2-design .v2-content .underline-tabs,
-.v2-design .v2-archive .underline-tabs {
-  padding: 0 14px !important;
-}
-.v2-design .v2-content .underline-tabs button,
-.v2-design .v2-archive .underline-tabs button {
-  font-size: 0.78rem !important;
-  font-weight: 700 !important;
-}
+/* Content / Archive density: see Unit 2 coherent block below */
+
 
 /* Embed frames with shared header: fill below sticky header */
 .v2-design .v2-has-page-header.v2-embed-frame {
@@ -1613,25 +1585,76 @@
   padding: 6px 12px !important;
 }
 
-/* Content / Archive density polish */
+/* ========== Unit 2: Content / Archive density (single coherent set) ========== */
 .v2-design .v2-content .culture-items-grid,
 .v2-design .v2-archive .history-bento-grid {
   gap: 8px !important;
   padding: 8px 12px 88px !important;
 }
-.v2-design .v2-content .culture-items-grid > *,
+.v2-design .v2-content .culture-items-grid > * {
+  border-radius: 12px !important;
+  border: 1px solid #eceaf5 !important;
+  box-shadow: 0 2px 8px rgba(30, 27, 46, 0.05) !important;
+  overflow: hidden;
+  background: #fff !important;
+}
 .v2-design .v2-archive .history-bento-grid > * {
   border-radius: 12px !important;
+  box-shadow: 0 2px 8px rgba(30, 27, 46, 0.05) !important;
+  overflow: hidden;
+}
+.v2-design .v2-content .underline-tabs,
+.v2-design .v2-archive .underline-tabs {
+  padding: 0 12px !important;
 }
 .v2-design .v2-content .underline-tabs button,
 .v2-design .v2-archive .underline-tabs button {
   font-size: 0.74rem !important;
+  font-weight: 700 !important;
   padding: 6px 8px !important;
+}
+/* Genre / category chips are inline-styled portal buttons (no class) under header stack */
+.v2-design .v2-content .history-header-stack > div:not([class]) {
+  gap: 4px !important;
+  padding: 0 12px 8px !important;
+}
+.v2-design .v2-content .history-header-stack > div:not([class]) > button {
+  padding: 4px 8px !important;
+  font-size: 0.68rem !important;
+  gap: 4px !important;
 }
 .v2-design .v2-content [class*="category-chip"],
 .v2-design .v2-archive [class*="category-chip"] {
   font-size: 0.68rem !important;
   padding: 4px 8px !important;
+}
+/* Region / view toolbar — match Places toolbar density; keep ≥16px type for iOS */
+.v2-design .v2-content .region-filter-trigger-row {
+  gap: 6px !important;
+  padding: 6px 12px 8px !important;
+}
+.v2-design .v2-content .region-filter-trigger {
+  min-height: 40px !important;
+  height: 40px !important;
+  padding-left: 12px !important;
+  padding-right: 8px !important;
+  border-radius: 10px !important;
+}
+.v2-design .v2-content .current-location-btn {
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 10px !important;
+}
+.v2-design .v2-content .culture-grid-cols-toggle {
+  height: 40px !important;
+  border-radius: 10px !important;
+}
+.v2-design .v2-content .culture-grid-cols-btn {
+  width: 34px !important;
+}
+.v2-design .v2-content .region-selection-badges-row {
+  padding: 0 12px 8px !important;
+  gap: 6px !important;
 }
 .v2-design .v2-memo .bp-memo-grid {
   gap: 10px !important;

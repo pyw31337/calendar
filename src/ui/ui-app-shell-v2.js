@@ -1389,6 +1389,15 @@ function MediaPane({ recordsContext, onChangeView, onOpenAppSettings, onOpenSide
   );
 }
 
+
+/** Click still-mounted legacy header search (parent may be display:none under V2 PageHeader).
+ * Scope to .places-view-header so we do not re-click the V2 PageHeader IconButton (same aria-label). */
+function clickLegacyAriaButton(ariaLabel, scopeSelector) {
+  const scope = (scopeSelector && document.querySelector(scopeSelector)) || document;
+  const btn = scope.querySelector(`.places-view-header button[aria-label="${ariaLabel}"]`);
+  if (btn) btn.click();
+}
+
 /** 콘텐츠 subtab body (WP-06 continuation): the existing ContentView with unchanged app-main props. */
 function ContentPane({ recordsContext, onChangeView, onOpenAppSettings, onOpenSideNav }) {
   const React = window.React;
@@ -1403,6 +1412,7 @@ function ContentPane({ recordsContext, onChangeView, onOpenAppSettings, onOpenSi
     legacyView: contentView,
     onBack: () => onChangeView('calendar'),
     onMenu: onOpenSideNav || onOpenAppSettings,
+    onSearch: () => clickLegacyAriaButton('컨텐츠 검색', '.v2-content'),
     slots: {},
   });
 }
@@ -1436,6 +1446,7 @@ function HistoryPane({ recordsContext, calendarContext, onChangeView, onOpenAppS
       onBack: () => onChangeView('calendar'),
       onShare: recordsContext.onOpenHistoryShare,
       onMenu: onOpenSideNav || onOpenAppSettings,
+      onSearch: () => clickLegacyAriaButton('보관함 검색', '.v2-archive'),
       slots: {},
     }),
     recordsContext.isHistoryShareOpen && React.createElement(ShareModal, {
