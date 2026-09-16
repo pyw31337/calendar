@@ -1409,13 +1409,17 @@
 .v2-design .v2-has-page-header > .v2-content-legacy,
 .v2-design .v2-has-page-header > .v2-archive-legacy,
 .v2-design .v2-has-page-header > .places-view-container,
-/* .places-view-container is also targeted by the older, higher-specificity
-   `.renewal-shell-main.is-records .places-view-container { position: absolute; top: 0 }` rule
-   (Content/Archive/History all reuse that legacy class name from before they got a v2 PageHeader
-   wrapping them) — match that same specificity here so this reset actually wins and the legacy
-   body stacks below the header inside the flex column instead of jumping back to inset:0 and
-   overlapping it. */
-.v2-design .renewal-shell-main.is-records .v2-has-page-header > .places-view-container {
+.v2-design .v2-has-page-header > .gallery-page-container,
+/* .places-view-container / .gallery-page-container are also targeted by the older,
+   higher-specificity `.renewal-shell-main.is-records .places-view-container { position:
+   absolute; top: 0 }` rule (Content/Archive/History/Gallery all reuse these legacy class names
+   from before they got a v2 PageHeader wrapping them) — match that same specificity here so
+   this reset actually wins and the legacy body stacks below the header inside the flex column
+   instead of jumping back to inset:0 and overlapping it. Gallery's own 사진/링크/파일 tab row
+   was never removed, it was rendering right under the header the same way Content/Archive's
+   tabs were (see fix/v2-content-archive-header-overlap). */
+.v2-design .renewal-shell-main.is-records .v2-has-page-header > .places-view-container,
+.v2-design .renewal-shell-main.is-records .v2-has-page-header > .gallery-page-container {
   flex: 1 1 auto !important;
   min-height: 0 !important;
   position: relative !important;
