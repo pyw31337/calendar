@@ -1318,6 +1318,16 @@
   color: #1e1b2e !important;
   line-height: 1.25 !important;
 }
+.v2-design .v2-page-header .bp-header-title,
+.v2-design .v2-page-header .bp-header-sub {
+  /* At 320px a subtitle like "캘린더 불러오는 중..." plus the count label and 3-4 header icons
+   * left no room, and it wrapped onto a second line instead of the header staying one row --
+   * truncate instead. */
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  max-width: 100%;
+}
 .v2-design .v2-page-header .bp-header-sub {
   font-size: 0.66rem !important;
   font-weight: 700 !important;

@@ -1960,6 +1960,14 @@
 .v2-design .v2-chat-compose-row > textarea.bp-composer-input {
   flex: 1 1 auto !important;
   min-width: 0 !important;
+  /* The composer forces a fixed 36px single-line height (inline style) but a <textarea> still
+   * wraps long content onto a second line by default -- at 320px, with 4 icon buttons sharing
+   * the row, there's only ~140px left for the input and the Korean placeholder text wraps,
+   * overflowing the fixed-height box and clipping. Scroll sideways instead of wrapping, matching
+   * how a single-line chat composer is expected to behave. */
+  white-space: nowrap !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
 }
 .v2-design .v2-chat-compose-row > .v2-tool-icon-btn {
   flex-shrink: 0;
