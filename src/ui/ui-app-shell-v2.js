@@ -281,7 +281,7 @@ function RenewalHero({ meetings, onSelectDate }) {
   const React = window.React;
   const list = Array.isArray(meetings) ? meetings : [];
   const [isOpen, setIsOpen] = React.useState(false);
-  if (!list.length) return React.createElement('p', { className: 'bp-empty-hero' }, '다가오는 확정 일정이 없습니다.');
+  if (!list.length) return React.createElement('p', { className: 'bp-empty-hero', 'aria-label': '가까운 확정 일정' }, '다가오는 확정 일정이 없습니다.');
   const primary = list[0];
   const labelFor = (meeting) => {
     const base = formatConfirmedMeetingLabel(meeting.date);
@@ -297,8 +297,9 @@ function RenewalHero({ meetings, onSelectDate }) {
     };
   };
 
-  return React.createElement('section', { className: bentoClass('renewal-home-hero'), 'aria-label': '가까운 확정 일정' },
-    React.createElement('div', { className: bentoClass(`dday-toggle-wrap ${isOpen ? 'is-open' : ''}`.trim()) },
+  // Match BentoPinkFinal: dday-toggle-wrap + dday-strip are direct hero-zone children (no extra wrapper).
+  return React.createElement(React.Fragment, null,
+    React.createElement('div', { className: bentoClass(`dday-toggle-wrap ${isOpen ? 'is-open' : ''}`.trim()), 'aria-label': '가까운 확정 일정' },
       React.createElement('button', { type: 'button', className: bentoClass('dday-compact'), onClick: () => setIsOpen(true), 'aria-expanded': isOpen },
         React.createElement('span', { className: bentoClass('dday-compact-badge') }, formatDDayLabel(primary.date)),
         React.createElement('span', { className: bentoClass('dday-compact-text') }, labelFor(primary)),
@@ -748,6 +749,7 @@ function SharedDateModal({ calendarContext, dateModalDate, initialTab = null, on
     ...calendarContext.dateModalProps,
     dateStr: dateModalDate,
     initialTab,
+    shellChrome: 'bento',
     onClose,
     onParticipantClick: (name, dateStr) => { if (dateStr) onSelectDate(dateStr); },
     onEditAnniversary,
@@ -1253,6 +1255,7 @@ function HistoryPane({ recordsContext, calendarContext, onChangeView, onOpenAppS
     historyDateModalDate && React.createElement(DateModal, {
       ...calendarContext.dateModalProps,
       dateStr: historyDateModalDate,
+      shellChrome: 'bento',
       initialTab: null,
       onClose: () => setHistoryDateModalDate(null),
       onParticipantClick: (name, dateStr) => { if (dateStr) setHistoryDateModalDate(dateStr); },
@@ -1314,6 +1317,7 @@ function PlacesPane({ recordsContext, calendarContext, onChangeView, onOpenAppSe
     placeDateModalDate && React.createElement(DateModal, {
       ...calendarContext.dateModalProps,
       dateStr: placeDateModalDate,
+      shellChrome: 'bento',
       initialTab: null,
       onClose: () => setPlaceDateModalDate(null),
       onParticipantClick,
@@ -1681,7 +1685,7 @@ function SearchDateModal({ calendarContext, dateStr, onClose, onEditAnniversary,
   const { DateModal } = bindUiComponentAliases(React);
   return React.createElement(DateModal, {
     ...calendarContext.dateModalProps,
-    dateStr, initialTab: null, onClose,
+    dateStr, initialTab: null, shellChrome: 'bento', onClose,
     onParticipantClick: () => {},
     onEditAnniversary, onAddAnniversaryForDate,
     onFocusCultureSource: () => onFocusCultureSource(),

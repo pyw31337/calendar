@@ -268,7 +268,8 @@ export function DateModal({
   onEditAnniversary,
   onAddAnniversaryForDate = null,
   onFocusCultureSource = null,
-  photoCommentCounts = {}
+  photoCommentCounts = {},
+  shellChrome = null
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -1924,17 +1925,18 @@ export function DateModal({
     onClose();
   };
 
+  const isBentoSheet = shellChrome === 'bento';
   const portalContent = /*#__PURE__*/React.createElement("div", {
-    className: "modal-overlay",
+    className: isBentoSheet ? "modal-overlay bp-sheet-backdrop bp-is-open" : "modal-overlay",
     onClick: e => {
       if (e.target !== e.currentTarget) return;
       requestClose();
     },
     style: { zIndex: 11000 }
   }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
-    className: "modal-container",
+    className: isBentoSheet ? "modal-container bp-event-sheet bp-is-open" : "modal-container",
     onClick: e => e.stopPropagation()
-  }, /*#__PURE__*/React.createElement("div", {
+  }, isBentoSheet ? /*#__PURE__*/React.createElement("div", { className: "bp-sheet-handle", "aria-hidden": true }) : null, /*#__PURE__*/React.createElement("div", {
     className: "modal-header",
     style: {
       display: 'flex',
@@ -3412,8 +3414,11 @@ export function DateModal({
   )) : null;
 
   const portaled = /*#__PURE__*/React.createElement(React.Fragment, null, portalContent, participantSheet, pastePreviewModal);
-  return typeof document !== 'undefined' && ReactDOM.createPortal
-    ? ReactDOM.createPortal(portaled, document.body)
+  const portalRoot = (typeof document !== 'undefined' && isBentoSheet)
+    ? (document.querySelector('.renewal-shell.v2-design') || document.body)
+    : (typeof document !== 'undefined' ? document.body : null);
+  return portalRoot && ReactDOM.createPortal
+    ? ReactDOM.createPortal(portaled, portalRoot)
     : portaled;
 }
 
