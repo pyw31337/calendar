@@ -810,7 +810,7 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
 }
 
 export function PlacesView({
-  onOpenAppSettings, onChangeView, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, historyCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null, calendar, onBack, onSavePlace, onDeletePlace, showToast, onRequestConfirm, placesInitialQuery, setPlacesInitialQuery, placesInitialFocusId, setPlacesInitialFocusId, isDarkTheme, onToggleTheme, fontScalePercent, onDecreaseFont, onIncreaseFont, isChatNotifyEnabled, onToggleChatNotifications, onSharePlaces, onSelectDate, syncStatus = null }) {
+  onOpenAppSettings, onChangeView, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, historyCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null, calendar, onBack, onSavePlace, onDeletePlace, showToast, onRequestConfirm, placesInitialQuery, setPlacesInitialQuery, placesInitialFocusId, setPlacesInitialFocusId, isDarkTheme, onToggleTheme, fontScalePercent, onDecreaseFont, onIncreaseFont, isChatNotifyEnabled, onToggleChatNotifications, onSharePlaces, onSelectDate, syncStatus = null, renderV2 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -1437,7 +1437,7 @@ export function PlacesView({
     return true;
   });
 
-  return /*#__PURE__*/React.createElement("div", {
+  const __placesLegacyTree = /*#__PURE__*/React.createElement("div", {
     className: "places-view-container",
     style: {
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -2156,6 +2156,23 @@ export function PlacesView({
       )
     ))
   );
+
+  if (typeof renderV2 === 'function') {
+    return renderV2({
+      legacyView: __placesLegacyTree,
+      calendar,
+      searchQuery: listSearchQuery,
+      countLabel: `등록 ${(typeof filteredPlaces !== 'undefined' ? filteredPlaces : places).length}곳`,
+      onBack,
+      onShare: onSharePlaces,
+      onMenu: () => setIsPlacesMenuOpen(true),
+      onSearch: (value) => { setListSearchQuery(value); setIsSearchOpen(true); },
+      onCompose: () => { setEditingPlace(null); setIsRegisterOpen(true); },
+      onToggleMap: () => setMapExpanded(v => !v),
+      slots: {},
+    });
+  }
+  return __placesLegacyTree;
 }
 
   if (typeof window !== 'undefined') {
