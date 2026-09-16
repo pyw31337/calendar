@@ -350,10 +350,32 @@ function RenewalHero({ meetings, calendar, onSelectDate }) {
       return { id: e.participantId || e.id, name: p?.name || '참여자', color: p?.color || '#A78BFA', note };
     })
     .filter(Boolean);
+  /** Always expose a clear 모임확정 prefix; detail (date · note/title) may ellipsis. */
+  const meetingLabelParts = (meeting) => {
+    const rawTitle = typeof meeting?.title === 'string' ? meeting.title.trim().replace(/\s+/g, ' ') : '';
+    const rawNote = typeof meeting?.note === 'string' ? meeting.note.trim().replace(/\s+/g, ' ') : '';
+    const formatted = formatConfirmedMeetingLabel(meeting?.date) || '';
+    // formatConfirmedMeetingLabel → "[모임확정] YY.MM.DD (요일)"; strip any leading tag for parts.
+    const stripped = formatted.replace(/^\[?모임확정\]?\s*/u, '').trim();
+    const datePart = stripped || (meeting?.date ? String(meeting.date) : '');
+    const extra = (rawTitle && rawTitle !== '모임확정' ? rawTitle : '') || rawNote;
+    const detail = extra
+      ? `${datePart}${datePart ? ' · ' : ''}${extra.slice(0, 48)}`
+      : datePart;
+    return { prefix: '[모임확정]', detail };
+  };
   const labelFor = (meeting) => {
-    const base = formatConfirmedMeetingLabel(meeting.date);
-    const note = typeof meeting.note === 'string' ? meeting.note.trim().replace(/\s+/g, ' ') : '';
-    return note ? `${base} · ${note.slice(0, 48)}` : base;
+    const { prefix, detail } = meetingLabelParts(meeting);
+    return detail ? `${prefix} ${detail}` : prefix;
+  };
+  const renderMeetingLabel = (meeting, className) => {
+    const { prefix, detail } = meetingLabelParts(meeting);
+    return React.createElement('span', { className },
+      React.createElement('span', { className: bentoClass('dday-compact-prefix') }, prefix),
+      detail
+        ? React.createElement('span', { className: bentoClass('dday-compact-detail') }, detail)
+        : null
+    );
   };
   const chipDateFor = (dateValue) => {
     const date = new Date(`${dateValue}T00:00:00`);
@@ -369,7 +391,7 @@ function RenewalHero({ meetings, calendar, onSelectDate }) {
     React.createElement('div', { className: bentoClass(`dday-toggle-wrap ${isOpen ? 'is-open' : ''}`.trim()), 'aria-label': '가까운 확정 일정' },
       React.createElement('button', { type: 'button', className: bentoClass('dday-compact'), onClick: () => setIsOpen(true), 'aria-expanded': isOpen },
         React.createElement('span', { className: bentoClass('dday-compact-badge') }, formatDDayLabel(primary.date)),
-        React.createElement('span', { className: bentoClass('dday-compact-text') }, labelFor(primary)),
+        renderMeetingLabel(primary, bentoClass('dday-compact-text')),
         React.createElement('svg', { className: bentoClass('dday-compact-chevron'), width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2.5, strokeLinecap: 'round', strokeLinejoin: 'round' },
           React.createElement('path', { d: 'M6 9l6 6l6 -6' })
 
@@ -378,7 +400,7 @@ function RenewalHero({ meetings, calendar, onSelectDate }) {
       React.createElement('div', { className: bentoClass('dday-expanded') },
         React.createElement('div', { className: bentoClass('dday-expanded-main') },
           React.createElement('div', { className: bentoClass('dday-expanded-title-row') },
-            React.createElement('div', { className: bentoClass('dday-expanded-title') }, labelFor(primary))
+            renderMeetingLabel(primary, bentoClass('dday-expanded-title'))
           ),
           primary.note && React.createElement('div', { className: bentoClass('dday-expanded-tags') },
             React.createElement('span', { className: bentoClass('dday-expanded-tag') }, primary.note.trim())
@@ -684,7 +706,7 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
               style: { background: p.color || 'var(--brand)' },
             }))
           ) : null,
-          // Anniversary bars only in the stack (green). Meeting pill lives in day-head-row.
+          // Anniversary bars only in the stack (pink --cal-anniversary). Meeting pill lives in day-head-row.
           // Range (연일) keeps start/mid/end radius classes from #636/#637.
           anns.length > 0 ? React.createElement('div', { className: bentoClass('day-bar-stack') },
             // Progressive disclosure: label in DOM; CSS shows on PC/wide, hides on mobile/narrow.
@@ -712,11 +734,11 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
         p.name
       )),
       React.createElement('span', null,
-        React.createElement('span', { className: bentoClass('dot'), style: { background: 'var(--brand, #7C3AED)', borderRadius: 'var(--radius-full)', width: '12px', height: '5px' } }),
+        React.createElement('span', { className: bentoClass('dot'), style: { background: 'var(--cal-schedule, #7C2FE5)', borderRadius: 'var(--radius-full)', width: '12px', height: '5px' } }),
         '일정·여행'
       ),
       React.createElement('span', null,
-        React.createElement('span', { className: bentoClass('dot'), style: { background: 'var(--status-green, #16A34A)', borderRadius: 'var(--radius-full)', width: '12px', height: '5px' } }),
+        React.createElement('span', { className: bentoClass('dot'), style: { background: 'var(--cal-anniversary, #F76AAD)', borderRadius: 'var(--radius-full)', width: '12px', height: '5px' } }),
         '기념일'
       )
     )
