@@ -599,11 +599,13 @@ export function ChatGalleryModal({
     if (pastePreview) pastePreview.previewUrls.forEach(url => { try { URL.revokeObjectURL(url); } catch (e) {} });
   }, [pastePreview]);
   // 창이 넓어지면 썸네일을 키우지 않고 단 수(2~12)를 늘린다. 셀 목표 너비 ~108px.
+  // V2 mobile embed: denser ~90px target so 390px viewports get 4 columns (original product).
   const [gridCols, setGridCols] = React.useState(() => {
     const w = typeof window !== 'undefined' ? window.innerWidth : 400;
     const gap = 6;
-    const target = 108;
-    return Math.max(2, Math.min(12, Math.floor((w + gap) / (target + gap)) || 2));
+    const target = (v2Embed && w < 640) ? 78 : 108;
+    const minCols = (v2Embed && w < 640) ? 4 : 2;
+    return Math.max(minCols, Math.min(12, Math.floor((w + gap) / (target + gap)) || minCols));
   });
   const gridHostRef = React.useRef(null);
   const { isHeaderVisible, onScroll: handleGalleryScroll } = useScrollHideHeader();
@@ -611,10 +613,12 @@ export function ChatGalleryModal({
   React.useEffect(() => {
     const computeCols = width => {
       const gap = 6;
-      const targetCell = 108;
       const usable = Math.max(0, Number(width) || 0);
+      // V2 mobile: match original 4-col gallery density (pad shrinks usable width below 390).
+      const targetCell = (v2Embed && usable < 640) ? 78 : 108;
       const cols = Math.floor((usable + gap) / (targetCell + gap));
-      return Math.max(2, Math.min(12, cols || 2));
+      const minCols = (v2Embed && usable > 0 && usable < 640) ? 4 : 2;
+      return Math.max(minCols, Math.min(12, cols || minCols));
     };
     const apply = width => setGridCols(prev => {
       const next = computeCols(Math.max(0, width || 0));
@@ -634,7 +638,7 @@ export function ChatGalleryModal({
     onWin();
     window.addEventListener('resize', onWin);
     return () => window.removeEventListener('resize', onWin);
-  }, [asPage, activeTab]);
+  }, [asPage, activeTab, v2Embed]);
 
   const sharedLinks = React.useMemo(() => {
     // Was extractFirstUrl -- a message or memo with several distinct links (not just a multi-image

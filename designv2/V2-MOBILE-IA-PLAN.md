@@ -201,13 +201,13 @@ Files: `src/ui/ui-app-shell-v2.js`, `src/ui/v2/design.css`.
 
 ## 6. Phase 1 checklist (track in PR)
 
-- [ ] Destination hamburger opens side-nav on mobile
-- [ ] Memo tag cloud removed under search
-- [ ] No fake memo sort/filter icon
-- [ ] Memo tags still filter via card tag taps / existing `selectedTag`
-- [ ] Anniversary: mobile bar-only, PC/wide label
-- [ ] Gallery mobile 4-column
-- [ ] Shared header/FAB/padding tokens applied
-- [ ] Content/Gallery no double title chrome
-- [ ] Post-fix mobile screenshots under `designv2/parity-shots/phase0-mobile/v2-after/`
+- [x] Destination hamburger opens side-nav on mobile
+- [x] Memo tag cloud removed under search
+- [x] No fake memo sort/filter icon
+- [x] Memo tags still filter via card tag taps / existing `selectedTag`
+- [x] Anniversary: mobile bar-only, PC/wide label
+- [x] Gallery mobile 4-column
+- [x] Shared header/FAB/padding tokens applied
+- [x] Content/Gallery no double title chrome
+- [x] Post-fix mobile screenshots under `designv2/parity-shots/phase0-mobile/v2-after/`
 - [ ] PR merged + GitHub Pages updated

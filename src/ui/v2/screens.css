@@ -354,20 +354,12 @@
   border-radius: 999px !important;
 }
 
-/* Memo tag filter chips denser (MemoFull) */
+/* Memo tag cloud under search removed (V2-MOBILE-IA-PLAN). Hide any leftover rows. */
 .v2-design .v2-memo .bp-tag-filter-row,
-.v2-design .v2-memo .tag-filter-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 8px 14px 4px;
-}
-.v2-design .v2-memo .bp-tag-chip,
-.v2-design .v2-memo .tag-chip {
-  border-radius: 999px !important;
-  font-size: 0.68rem !important;
-  font-weight: 700 !important;
-  padding: 5px 10px !important;
+.v2-design .v2-memo .tag-filter-row,
+.v2-design .v2-memo-legacy .bp-tag-filter-row,
+.v2-design .v2-memo-legacy .tag-filter-row {
+  display: none !important;
 }
 
 /* Places cards — PlacesFull density while keeping map/search/FAB/edit */
@@ -656,18 +648,7 @@
     width: 100% !important;
     background: #fafafc;
   }
-  .v2-design .v2-memo .bp-tag-filter-row {
-    display: flex !important;
-    flex-wrap: wrap !important;
-    gap: 6px !important;
-    padding: 8px 14px 4px !important;
-    max-height: none !important;
-    overflow: visible !important;
-  }
-  .v2-design .v2-memo .bp-tag-chip {
-    font-size: 0.68rem !important;
-    padding: 4px 10px !important;
-  }
+  /* tag cloud removed — keep body padding only */
   .v2-design .v2-memo .v2-dest-body,
   .v2-design .v2-memo .v2-memo-body {
     padding: 0 14px 96px !important;
@@ -1585,10 +1566,9 @@
   min-height: 0 !important;
   padding-top: 8px !important;
 }
-.v2-design .v2-memo .bp-tag-filter-row {
-  flex: 0 0 auto !important;
-  max-height: none !important;
-  overflow: visible !important;
+.v2-design .v2-memo .bp-tag-filter-row,
+.v2-design .v2-memo .tag-filter-row {
+  display: none !important;
 }
 
 /* Settlement density polish (ledger model — no fake 1/N meeting cards) */
@@ -1657,5 +1637,20 @@
     grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)) !important;
     gap: 12px !important;
     padding: 12px 16px 24px !important;
+  }
+}
+
+
+/* Phase 1 mobile consistency: hide legacy memo search when V2 header search exists */
+.v2-design .v2-memo .v2-memo-legacy > .inline-search-bar,
+.v2-design .v2-memo .v2-memo-body .inline-search-bar:first-child {
+  display: none !important;
+}
+
+/* Gallery denser gap on mobile; column count set in ChatGalleryModal when v2Embed */
+@media (max-width: 639px) {
+  .v2-design .v2-gallery .gallery-page-scroll > div > div[style*="grid"],
+  .v2-design .v2-records-media .gallery-page-scroll > div > div[style*="grid"] {
+    gap: 4px !important;
   }
 }

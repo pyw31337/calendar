@@ -687,14 +687,19 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
           // Anniversary bars only in the stack (green). Meeting pill lives in day-head-row.
           // Range (연일) keeps start/mid/end radius classes from #636/#637.
           anns.length > 0 ? React.createElement('div', { className: bentoClass('day-bar-stack') },
-            // Green color bars only — no anniversary/trip/participant note strings in cell body.
-            // Titles remain on title= + date modal; multi-day start/mid/end radii preserved.
-            anns.slice(0, 4).map((ann, annIdx) => React.createElement('div', {
-              key: ann.id || `${dateStr}_ann_${annIdx}`,
-              className: bentoClass(`day-anniversary ${anniversarySpanRole(ann, dateStr)} bar-only`),
-              title: ann.title || '기념일',
-              'aria-label': ann.title || '기념일',
-            }))
+            // Progressive disclosure: label in DOM; CSS shows on PC/wide, hides on mobile/narrow.
+            anns.slice(0, 4).map((ann, annIdx) => {
+              const role = anniversarySpanRole(ann, dateStr);
+              const title = ann.title || '기념일';
+              return React.createElement('div', {
+                key: ann.id || `${dateStr}_ann_${annIdx}`,
+                className: bentoClass(`day-anniversary ${role}`),
+                title,
+                'aria-label': title,
+              }, React.createElement('span', {
+                className: bentoClass('day-anniversary-label'),
+              }, title));
+            })
           ) : null
         );
       })
@@ -981,7 +986,7 @@ export function buildRenewalChatContext(calendar, deps) {
  * uses) rather than the main bundle, so this needs the same "wait for the chunk, then render"
  * step the 더보기 tab's share/manual/anniversaries entries needed (`buildRenewalMoreContext`).
  */
-function ChatPane({ chatContext, onChangeView, onOpenAppSettings }) {
+function ChatPane({ chatContext, onChangeView, onOpenAppSettings, onOpenSideNav }) {
   const React = window.React;
   const [loaded, setLoaded] = React.useState(() => !!(window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChatRoomView));
   React.useEffect(() => {
@@ -1001,7 +1006,7 @@ function ChatPane({ chatContext, onChangeView, onOpenAppSettings }) {
   return React.createElement(React.Fragment, null,
     React.createElement(ChatRoomView, {
       ...chatContext.chatRoomProps,
-      renderV2: renderChatScreen,
+      renderV2: (props) => renderChatScreen({ ...props, onMenu: onOpenSideNav || props.onMenu }),
       onBack: () => onChangeView('calendar'),
       onOpenGallery: () => onChangeView('gallery'),
       onChangeView,
@@ -1065,7 +1070,7 @@ export function buildRenewalSettlementContext(calendar, deps) {
  * lazy-loaded chunk as `PollModal`/`AnniversaryModal` (`window.__gatherLoadEventUi`), so this
  * needs the same "wait for the chunk" step.
  */
-function SettlementPane({ settlementContext, onChangeView, onOpenAppSettings, onOpenDate }) {
+function SettlementPane({ settlementContext, onChangeView, onOpenAppSettings, onOpenDate, onOpenSideNav }) {
   const React = window.React;
   const [loaded, setLoaded] = React.useState(() => !!(window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SettlementSummaryModal));
   React.useEffect(() => {
@@ -1085,7 +1090,7 @@ function SettlementPane({ settlementContext, onChangeView, onOpenAppSettings, on
   return React.createElement(React.Fragment, null,
     React.createElement(SettlementSummaryModal, {
       ...settlementContext.summaryProps,
-      renderV2: renderSettlementScreen,
+      renderV2: (props) => renderSettlementScreen({ ...props, onMenu: onOpenSideNav || props.onMenu }),
       onBack: () => onChangeView('calendar'),
       onSelectDate: onOpenDate,
       onOpenShare: settlementContext.onOpenShare,
@@ -1342,7 +1347,7 @@ export function buildRenewalRecordsContext(calendar, deps) {
  * chunk as `ChatRoomView` (`window.__gatherLoadChatUi`), so this waits for that chunk before
  * rendering -- identical "wait-then-open" step `ChatPane` already uses.
  */
-function MediaPane({ recordsContext, onChangeView, onOpenAppSettings }) {
+function MediaPane({ recordsContext, onChangeView, onOpenAppSettings, onOpenSideNav }) {
   const React = window.React;
   const [loaded, setLoaded] = React.useState(() => !!(window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChatGalleryModal));
   React.useEffect(() => {
@@ -1372,7 +1377,7 @@ function MediaPane({ recordsContext, onChangeView, onOpenAppSettings }) {
         legacyView: galleryView,
         onBack: () => onChangeView('calendar'),
         onShare: recordsContext.onOpenGalleryShare,
-        onMenu: onOpenAppSettings,
+        onMenu: onOpenSideNav || onOpenAppSettings,
         onSearch: undefined,
         slots: {},
       })
@@ -1385,7 +1390,7 @@ function MediaPane({ recordsContext, onChangeView, onOpenAppSettings }) {
 }
 
 /** 콘텐츠 subtab body (WP-06 continuation): the existing ContentView with unchanged app-main props. */
-function ContentPane({ recordsContext, onChangeView, onOpenAppSettings }) {
+function ContentPane({ recordsContext, onChangeView, onOpenAppSettings, onOpenSideNav }) {
   const React = window.React;
   const { ContentView } = bindUiComponentAliases(React);
   const contentView = React.createElement(ContentView, {
@@ -1397,7 +1402,7 @@ function ContentPane({ recordsContext, onChangeView, onOpenAppSettings }) {
   return renderContentScreen({
     legacyView: contentView,
     onBack: () => onChangeView('calendar'),
-    onMenu: onOpenAppSettings,
+    onMenu: onOpenSideNav || onOpenAppSettings,
     slots: {},
   });
 }
@@ -1413,7 +1418,7 @@ function ContentPane({ recordsContext, onChangeView, onOpenAppSettings }) {
  * reasoning. `calendarContext` is threaded down through `RecordsPane` just for
  * `dateModalProps`'s data/handlers.
  */
-function HistoryPane({ recordsContext, calendarContext, onChangeView, onOpenAppSettings, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource }) {
+function HistoryPane({ recordsContext, calendarContext, onChangeView, onOpenAppSettings, onOpenSideNav, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource }) {
   const React = window.React;
   const [historyDateModalDate, setHistoryDateModalDate] = React.useState(null);
   const { HistoryView, ShareModal, DateModal } = bindUiComponentAliases(React);
@@ -1430,7 +1435,7 @@ function HistoryPane({ recordsContext, calendarContext, onChangeView, onOpenAppS
       legacyView: historyView,
       onBack: () => onChangeView('calendar'),
       onShare: recordsContext.onOpenHistoryShare,
-      onMenu: onOpenAppSettings,
+      onMenu: onOpenSideNav || onOpenAppSettings,
       slots: {},
     }),
     recordsContext.isHistoryShareOpen && React.createElement(ShareModal, {
@@ -1463,7 +1468,7 @@ function HistoryPane({ recordsContext, calendarContext, onChangeView, onOpenAppS
  * `calendarContext.dateModalProps` (already built at `RenewalAppShell` level) for the modal's
  * data/handlers, since those don't depend on which component owns the "which date is open" state.
  */
-function PlacesPane({ recordsContext, calendarContext, onChangeView, onOpenAppSettings, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource }) {
+function PlacesPane({ recordsContext, calendarContext, onChangeView, onOpenAppSettings, onOpenSideNav, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource }) {
   const React = window.React;
   const [loaded, setLoaded] = React.useState(() => !!(window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlacesView));
   React.useEffect(() => {
@@ -1485,7 +1490,7 @@ function PlacesPane({ recordsContext, calendarContext, onChangeView, onOpenAppSe
   return React.createElement(React.Fragment, null,
     React.createElement(PlacesView, {
       ...recordsContext.placesProps,
-      renderV2: renderPlacesScreen,
+      renderV2: (props) => renderPlacesScreen({ ...props, onMenu: onOpenSideNav || props.onMenu }),
       onBack: () => onChangeView('calendar'),
       onSelectDate: (dateStr) => {
         const canonicalDate = normalizePlaceDateForSort(dateStr);
@@ -1518,7 +1523,7 @@ function PlacesPane({ recordsContext, calendarContext, onChangeView, onOpenAppSe
  * `ChatPane`/`SettlementPane`. `MemoView` ships in its own lazy-loaded chunk
  * (`window.__gatherLoadViewUi('memo')`), so this waits for that chunk before rendering.
  */
-function MemoPane({ recordsContext, onChangeView, onOpenAppSettings }) {
+function MemoPane({ recordsContext, onChangeView, onOpenAppSettings, onOpenSideNav }) {
   const React = window.React;
   const [loaded, setLoaded] = React.useState(() => !!(window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MemoView));
   React.useEffect(() => {
@@ -1538,7 +1543,7 @@ function MemoPane({ recordsContext, onChangeView, onOpenAppSettings }) {
   return React.createElement(React.Fragment, null,
     React.createElement(MemoView, {
       ...recordsContext.memoProps,
-      renderV2: renderMemoScreen,
+      renderV2: (props) => renderMemoScreen({ ...props, onMenu: onOpenSideNav || props.onMenu }),
       onBack: () => onChangeView('calendar'),
       onOpenShare: recordsContext.onOpenMemoShare,
       onOpenAppSettings,
@@ -1551,7 +1556,7 @@ function MemoPane({ recordsContext, onChangeView, onOpenAppSettings }) {
   );
 }
 
-function RecordsPane({ subTab, onSelectSubTab, calendarName, recordsContext, calendarContext, onChangeView, onOpenAppSettings, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource }) {
+function RecordsPane({ subTab, onSelectSubTab, calendarName, recordsContext, calendarContext, onChangeView, onOpenAppSettings, onOpenSideNav, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource }) {
   const React = window.React;
   // Memo/Places are first-class destinations — never show renewal-shell-subtab chrome for them.
   React.useEffect(() => {
@@ -1577,13 +1582,13 @@ function RecordsPane({ subTab, onSelectSubTab, calendarName, recordsContext, cal
         ),
     React.createElement('div', { className: 'v2-records-body' },
     subTab === 'media'
-      ? React.createElement(MediaPane, { recordsContext, onChangeView, onOpenAppSettings })
+      ? React.createElement(MediaPane, { recordsContext, onChangeView, onOpenAppSettings, onOpenSideNav })
       : subTab === 'content'
-      ? React.createElement(ContentPane, { recordsContext, onChangeView, onOpenAppSettings })
+      ? React.createElement(ContentPane, { recordsContext, onChangeView, onOpenAppSettings, onOpenSideNav })
       : subTab === 'all'
       ? React.createElement(RecordsOverviewPane, { recordsContext, calendarName, onSelectSubTab, onChangeView })
       : subTab === 'archive'
-      ? React.createElement(HistoryPane, { recordsContext, calendarContext, onChangeView, onOpenAppSettings, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource })
+      ? React.createElement(HistoryPane, { recordsContext, calendarContext, onChangeView, onOpenAppSettings, onOpenSideNav, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource })
       : React.createElement(EmptyState, {
         title: `${RECORDS_SUBTABS.find(t => t.id === subTab)?.label || subTab} (준비 중)`,
         subtitle: withCalendarPrefix(calendarName, '갤러리·보관함·콘텐츠는 기록 허브에 남아 있습니다. 메모·장소는 사이드 메뉴의 독립 페이지입니다.'),
@@ -2264,15 +2269,15 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
         activeTab === 'calendar'
           ? React.createElement(CalendarPane, { calendarContext, recordsContext, onOpenDate: setDateModalDate, onChangeView, calendarName, onOpenSearch: () => handleSelectMoreItem('search'), onOpenMore: () => setIsSideNavOpen(true) })
           : activeTab === 'chat'
-          ? React.createElement(ChatPane, { chatContext, onChangeView, onOpenAppSettings })
+          ? React.createElement(ChatPane, { chatContext, onChangeView, onOpenAppSettings, onOpenSideNav: () => setIsSideNavOpen(true) })
           : activeTab === 'memo'
-          ? React.createElement(MemoPane, { recordsContext, onChangeView, onOpenAppSettings })
+          ? React.createElement(MemoPane, { recordsContext, onChangeView, onOpenAppSettings, onOpenSideNav: () => setIsSideNavOpen(true) })
           : activeTab === 'places'
-          ? React.createElement(PlacesPane, { recordsContext, calendarContext, onChangeView, onOpenAppSettings, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource })
+          ? React.createElement(PlacesPane, { recordsContext, calendarContext, onChangeView, onOpenAppSettings, onOpenSideNav: () => setIsSideNavOpen(true), onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource })
           : activeTab === 'settlement'
-          ? React.createElement(SettlementPane, { settlementContext, onChangeView, onOpenAppSettings, onOpenDate: setDateModalDate })
+          ? React.createElement(SettlementPane, { settlementContext, onChangeView, onOpenAppSettings, onOpenDate: setDateModalDate, onOpenSideNav: () => setIsSideNavOpen(true) })
           : activeTab === 'records'
-          ? React.createElement(RecordsPane, { subTab: recordsSubTab, onSelectSubTab: setRecordsSubTab, calendarName, recordsContext, calendarContext, onChangeView, onOpenAppSettings, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource })
+          ? React.createElement(RecordsPane, { subTab: recordsSubTab, onSelectSubTab: setRecordsSubTab, calendarName, recordsContext, calendarContext, onChangeView, onOpenAppSettings, onOpenSideNav: () => setIsSideNavOpen(true), onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource })
           : activeTab === 'more'
           ? React.createElement(MorePane, { calendarName, selectedItem: selectedMoreItem, onSelectItem: handleSelectMoreItem })
           : React.createElement(PlaceholderPane, { tabId: activeTab, calendarName }),
