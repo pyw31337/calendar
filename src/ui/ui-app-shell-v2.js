@@ -6,7 +6,7 @@
 
 import './v2/reference-home.css';
 import './v2/design.css';
-import { renderMemoScreen, renderPlacesScreen, renderSettlementScreen, renderChatScreen } from './v2/screens.js';
+import { renderMemoScreen, renderPlacesScreen, renderSettlementScreen, renderChatScreen, renderGalleryScreen, renderContentScreen, renderArchiveScreen } from './v2/screens.js';
 import { authorFor, latestRows, timestampMs, photoLightbox } from './v2/view-data.js';
 import { ChatBubbleFrame, NameColorPill, ReplyQuote } from './v2/chat-bubble-modules.js';
 import {
@@ -1359,12 +1359,21 @@ function MediaPane({ recordsContext, onChangeView, onOpenAppSettings }) {
     return React.createElement(EmptyState, { title: '사진·영상 불러오는 중', subtitle: '잠시만 기다려 주세요.' });
   }
   const { ChatGalleryModal, ShareModal } = bindUiComponentAliases(React);
-  return React.createElement('div', { className: 'v2-records-media' },
-    React.createElement(ChatGalleryModal, {
-      ...recordsContext.mediaProps,
-      onClose: () => onChangeView('calendar'),
-      onOpenShare: recordsContext.onOpenGalleryShare,
-      onOpenAppSettings,
+  const galleryView = React.createElement(ChatGalleryModal, {
+    ...recordsContext.mediaProps,
+    onClose: () => onChangeView('calendar'),
+    onOpenShare: recordsContext.onOpenGalleryShare,
+    onOpenAppSettings,
+    v2Embed: true,
+  });
+  return React.createElement(React.Fragment, null,
+    renderGalleryScreen({
+      legacyView: galleryView,
+      onBack: () => onChangeView('calendar'),
+      onShare: recordsContext.onOpenGalleryShare,
+      onMenu: onOpenAppSettings,
+      onSearch: undefined,
+      slots: {},
     }),
     recordsContext.isGalleryShareOpen && React.createElement(ShareModal, {
       calendar: recordsContext.calendar, shareType: 'gallery', showToast: recordsContext.showToast,
@@ -1377,10 +1386,17 @@ function MediaPane({ recordsContext, onChangeView, onOpenAppSettings }) {
 function ContentPane({ recordsContext, onChangeView, onOpenAppSettings }) {
   const React = window.React;
   const { ContentView } = bindUiComponentAliases(React);
-  return React.createElement(ContentView, {
+  const contentView = React.createElement(ContentView, {
     ...recordsContext.contentProps,
     onBack: () => onChangeView('calendar'),
     onOpenAppSettings,
+    v2Embed: true,
+  });
+  return renderContentScreen({
+    legacyView: contentView,
+    onBack: () => onChangeView('calendar'),
+    onMenu: onOpenAppSettings,
+    slots: {},
   });
 }
 
@@ -1399,13 +1415,21 @@ function HistoryPane({ recordsContext, calendarContext, onChangeView, onOpenAppS
   const React = window.React;
   const [historyDateModalDate, setHistoryDateModalDate] = React.useState(null);
   const { HistoryView, ShareModal, DateModal } = bindUiComponentAliases(React);
+  const historyView = React.createElement(HistoryView, {
+    ...recordsContext.historyProps,
+    onBack: () => onChangeView('calendar'),
+    onSelectDate: (dateStr) => setHistoryDateModalDate(dateStr),
+    onOpenShare: recordsContext.onOpenHistoryShare,
+    onOpenAppSettings,
+    v2Embed: true,
+  });
   return React.createElement(React.Fragment, null,
-    React.createElement(HistoryView, {
-      ...recordsContext.historyProps,
+    renderArchiveScreen({
+      legacyView: historyView,
       onBack: () => onChangeView('calendar'),
-      onSelectDate: (dateStr) => setHistoryDateModalDate(dateStr),
-      onOpenShare: recordsContext.onOpenHistoryShare,
-      onOpenAppSettings,
+      onShare: recordsContext.onOpenHistoryShare,
+      onMenu: onOpenAppSettings,
+      slots: {},
     }),
     recordsContext.isHistoryShareOpen && React.createElement(ShareModal, {
       calendar: recordsContext.calendar, shareType: 'history', showToast: recordsContext.showToast,
