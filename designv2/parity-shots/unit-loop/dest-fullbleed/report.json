@@ -1,0 +1,224 @@
+{
+  "base": "http://127.0.0.1:5179",
+  "capturedAt": "2026-09-16T08:49:07.726Z",
+  "screens": {
+    "chat-baseline": {
+      "url": "http://127.0.0.1:5179/?id=cw&shell=v2&tab=chat",
+      "clip": {
+        "x": 280,
+        "y": 0,
+        "width": 980,
+        "height": 720
+      },
+      "metrics": {
+        "tokens": {
+          "padX": "0px",
+          "padY": "0px",
+          "contentPadX": "14px"
+        },
+        "railRight": 280,
+        "main": {
+          "x": 280,
+          "y": 0,
+          "w": 1000
+        },
+        "dest": {
+          "x": 280,
+          "y": 0,
+          "w": 1000,
+          "margin": "0px",
+          "padding": "0px",
+          "maxWidth": "none"
+        },
+        "shell": {
+          "x": 280,
+          "y": 0,
+          "w": 1000,
+          "margin": "0px",
+          "padding": "0px",
+          "maxWidth": "none"
+        },
+        "header": {
+          "x": 280,
+          "y": 0,
+          "w": 1000
+        },
+        "map": null
+      }
+    },
+    "memo": {
+      "url": "http://127.0.0.1:5179/?id=cw&shell=v2&tab=memo",
+      "clip": {
+        "x": 280,
+        "y": 0,
+        "width": 980,
+        "height": 720
+      },
+      "metrics": {
+        "tokens": {
+          "padX": "0px",
+          "padY": "0px",
+          "contentPadX": "14px"
+        },
+        "railRight": 280,
+        "main": {
+          "x": 280,
+          "y": 0,
+          "w": 1000
+        },
+        "dest": {
+          "x": 280,
+          "y": 0,
+          "w": 1000,
+          "margin": "0px",
+          "padding": "0px",
+          "maxWidth": "none"
+        },
+        "shell": {
+          "x": 280,
+          "y": 0,
+          "w": 1000,
+          "margin": "0px",
+          "padding": "0px",
+          "maxWidth": "none"
+        },
+        "header": {
+          "x": 280,
+          "y": 0,
+          "w": 1000
+        },
+        "map": null
+      }
+    },
+    "places": {
+      "url": "http://127.0.0.1:5179/?id=cw&shell=v2&tab=places",
+      "clip": {
+        "x": 280,
+        "y": 0,
+        "width": 980,
+        "height": 720
+      },
+      "metrics": {
+        "tokens": {
+          "padX": "0px",
+          "padY": "0px",
+          "contentPadX": "14px"
+        },
+        "railRight": 280,
+        "main": {
+          "x": 280,
+          "y": 0,
+          "w": 1000
+        },
+        "dest": {
+          "x": 280,
+          "y": 0,
+          "w": 1000,
+          "margin": "0px",
+          "padding": "0px",
+          "maxWidth": "none"
+        },
+        "shell": {
+          "x": 280,
+          "y": 0,
+          "w": 1000,
+          "margin": "0px",
+          "padding": "0px",
+          "maxWidth": "none"
+        },
+        "header": {
+          "x": 280,
+          "y": 0,
+          "w": 1000
+        },
+        "map": {
+          "x": 280,
+          "y": 100.3,
+          "w": 1000,
+          "margin": "0px"
+        }
+      }
+    },
+    "settlement": {
+      "url": "http://127.0.0.1:5179/?id=cw&shell=v2&tab=settlement",
+      "clip": {
+        "x": 280,
+        "y": 0,
+        "width": 980,
+        "height": 720
+      },
+      "metrics": {
+        "tokens": {
+          "padX": "0px",
+          "padY": "0px",
+          "contentPadX": "14px"
+        },
+        "railRight": 280,
+        "main": {
+          "x": 280,
+          "y": 0,
+          "w": 1000
+        },
+        "dest": {
+          "x": 280,
+          "y": 0,
+          "w": 1000,
+          "margin": "0px",
+          "padding": "0px",
+          "maxWidth": "none"
+        },
+        "shell": {
+          "x": 280,
+          "y": 0,
+          "w": 1000,
+          "margin": "0px",
+          "padding": "0px",
+          "maxWidth": "none"
+        },
+        "header": {
+          "x": 280,
+          "y": 0,
+          "w": 1000
+        },
+        "map": null
+      }
+    },
+    "gallery": {
+      "url": "http://127.0.0.1:5179/?id=cw&shell=v2&tab=records&sub=media",
+      "clip": {
+        "x": 280,
+        "y": 0,
+        "width": 980,
+        "height": 720
+      },
+      "metrics": {
+        "tokens": {
+          "padX": "0px",
+          "padY": "0px",
+          "contentPadX": "14px"
+        },
+        "railRight": 280,
+        "main": {
+          "x": 280,
+          "y": 0,
+          "w": 1000
+        },
+        "dest": {
+          "x": 280,
+          "y": 0,
+          "w": 1000,
+          "margin": "0px",
+          "padding": "0px",
+          "maxWidth": "none"
+        },
+        "shell": {},
+        "header": {
+          "x": 280,
+          "y": 0,
+          "w": 1000
+        },
+        "map": null
+      }
+    }
+  }
+}
