@@ -235,3 +235,122 @@
 @media (prefers-reduced-motion: reduce) {
   .v2-design *, .v2-design *::before, .v2-design *::after { animation: none !important; scroll-behavior: auto !important; }
 }
+
+/* --------------------------------------------------------------------------
+ * Gather type-scale remap for shell=v2 only.
+ * Claude mock CSS ships sub-token sizes (0.52–0.66rem). Map chrome/body copy
+ * onto the existing app.css tokens so V2 matches the live Gather system
+ * without inventing a second scale. Default shell is untouched.
+ *
+ * Tokens (from :root in app.css):
+ *   --font-size-2xs: 0.62rem
+ *   --font-size-xs:  0.68rem
+ *   --font-size-sm:  0.72rem
+ *   --font-size-md:  0.8rem
+ *   --font-size-base: 0.85rem
+ * -------------------------------------------------------------------------- */
+.v2-design {
+  /* Prefer Plus Jakarta / Noto stack already set on :root; keep Pretendard as fallback only. */
+  font-size: var(--font-size-base);
+}
+
+/* Home / bento chrome */
+.v2-design .bp-bento-title { font-size: 1.15rem !important; }
+.v2-design .bp-bento-card-title { font-size: var(--font-size-xs) !important; letter-spacing: 0.06em; }
+.v2-design .bp-bento-card .bp-more-link,
+.v2-design .bp-more-link { font-size: var(--font-size-sm) !important; }
+.v2-design .bp-weekday-label { font-size: 0.75rem !important; }
+.v2-design .bp-day-num { font-size: var(--font-size-sm) !important; }
+.v2-design .bp-cal-legend { font-size: var(--font-size-xs) !important; }
+.v2-design .bp-day-corner-label { font-size: var(--font-size-2xs) !important; }
+.v2-design .bp-day-event-title { font-size: var(--font-size-2xs) !important; }
+.v2-design .bp-day-anniversary-label { font-size: var(--font-size-2xs) !important; }
+
+/* D-day / hero */
+.v2-design .bp-dday-compact-badge { font-size: 1.05rem !important; }
+.v2-design .bp-dday-compact-text { font-size: var(--font-size-sm) !important; }
+.v2-design .bp-dday-expanded-title { font-size: var(--font-size-md) !important; }
+.v2-design .bp-dday-expanded-tag,
+.v2-design .bp-dday-expanded-badge { font-size: var(--font-size-2xs) !important; }
+.v2-design .bp-dday-view-btn { font-size: var(--font-size-sm) !important; }
+.v2-design .bp-dday-date { font-size: var(--font-size-sm) !important; }
+.v2-design .bp-dday-dow,
+.v2-design .bp-dday-pill { font-size: var(--font-size-2xs) !important; }
+
+/* Home activity sections */
+.v2-design .bp-chat-text,
+.v2-design .bp-renewal-home-chat-text { font-size: var(--font-size-md) !important; }
+.v2-design .bp-chat-name-pill,
+.v2-design .bp-chat-meta,
+.v2-design .bp-chat-hover-note,
+.v2-design .bp-chat-reply-quote-author { font-size: var(--font-size-2xs) !important; }
+.v2-design .bp-chat-reply-quote-text { font-size: var(--font-size-xs) !important; }
+.v2-design .bp-memo-card-title,
+.v2-design .bp-renewal-home-memo-title { font-size: var(--font-size-base) !important; }
+.v2-design .bp-memo-summary,
+.v2-design .bp-renewal-home-memo-summary { font-size: var(--font-size-sm) !important; }
+.v2-design .bp-memo-link-title { font-size: var(--font-size-md) !important; }
+.v2-design .bp-memo-link-desc { font-size: var(--font-size-xs) !important; }
+.v2-design .bp-memo-tag,
+.v2-design .bp-memo-subtag,
+.v2-design .bp-memo-comment-count,
+.v2-design .bp-memo-link-domain { font-size: var(--font-size-2xs) !important; }
+.v2-design .bp-memo-comment-author,
+.v2-design .bp-memo-comment-text { font-size: var(--font-size-xs) !important; }
+.v2-design .bp-place-name { font-size: var(--font-size-md) !important; }
+.v2-design .bp-place-addr { font-size: var(--font-size-xs) !important; }
+.v2-design .bp-place-note,
+.v2-design .bp-place-tag { font-size: var(--font-size-2xs) !important; }
+.v2-design .bp-renewal-home-empty { font-size: var(--font-size-sm) !important; }
+.v2-design .bp-footer,
+.v2-design .bp-renewal-home-footer { font-size: var(--font-size-2xs) !important; }
+.v2-design .bp-footer .bp-links,
+.v2-design .bp-renewal-home-footer-links { font-size: var(--font-size-2xs) !important; }
+
+/* Side menu */
+.v2-design .bp-side-nav-brand { font-size: 1.05rem !important; }
+.v2-design .bp-side-nav-item { font-size: var(--font-size-base) !important; }
+.v2-design .bp-side-nav-item-meta,
+.v2-design .bp-side-nav-item-sub,
+.v2-design .bp-side-nav-manual-banner-sub { font-size: var(--font-size-xs) !important; }
+.v2-design .bp-side-nav-item-badge { font-size: var(--font-size-2xs) !important; }
+.v2-design .bp-side-nav-manual-banner-title { font-size: var(--font-size-base) !important; }
+.v2-design .bp-side-nav-collapse-btn { font-size: var(--font-size-sm) !important; }
+
+/* Date event sheet chrome */
+.v2-design .bp-sheet-title { font-size: 1.1rem !important; }
+.v2-design .bp-sheet-eyebrow { font-size: var(--font-size-2xs) !important; }
+.v2-design .bp-sheet-meta-row { font-size: var(--font-size-sm) !important; }
+.v2-design .bp-sheet-section-label { font-size: var(--font-size-xs) !important; }
+.v2-design .bp-sheet-tab-item { font-size: var(--font-size-sm) !important; }
+.v2-design .bp-attend-row-name { font-size: var(--font-size-md) !important; }
+.v2-design .bp-attend-row-note { font-size: var(--font-size-xs) !important; }
+
+/* Crisp side-nav icons: native 16px / stroke 2 (no soft 20→16 downscale) */
+.v2-design .bp-side-nav-item-icon svg,
+.v2-design .bp-side-nav-brand svg,
+.v2-design .bp-side-nav-close-btn svg,
+.v2-design .bp-side-nav-manual-banner-icon-wrap svg,
+.v2-design .bp-side-nav-manual-banner-chevron svg,
+.v2-design .bp-side-nav-collapse-btn svg {
+  width: 16px;
+  height: 16px;
+  shape-rendering: geometricPrecision;
+}
+
+/* Enter animation: play once per mount; remounts were the flicker (see HomeSummarySection). */
+.v2-design .bp-enter {
+  animation: bp-rise-in 0.45s cubic-bezier(.22, 1, .36, 1) both;
+  animation-iteration-count: 1;
+}
+
+@media (min-width: 640px) {
+  .v2-design .bp-day-num { font-size: 0.85rem !important; }
+}
+@media (min-width: 768px) {
+  .v2-design .bp-day-num { font-size: 0.9rem !important; }
+  .v2-design .bp-bento-title { font-size: 1.25rem !important; }
+}
+@media (min-width: 1200px) {
+  .v2-design .bp-day-num { font-size: 0.95rem !important; }
+}

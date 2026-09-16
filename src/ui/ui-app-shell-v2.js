@@ -21,6 +21,7 @@ import {
   getMessageDirectMediaEntry, getMessageImageEntries,
   normalizePlaceDateForSort,
   getTrulyConfirmedMeetings, getActiveAvailabilities, getActiveParticipants,
+  calculateSettlementBalance, formatBalanceBadge,
 } from '../core/app-domain-helpers.js';
 import { computeKoreanHolidaysForYear, getKoreanSolarTermsForYear } from '../core/app-calendar-holidays.js';
 import { getAnniversariesForDate } from '../core/app-anniversary-dates.js';
@@ -111,31 +112,80 @@ function writeLocationState(tabId, subTabId, { push } = { push: true }) {
   window.dispatchEvent(new PopStateEvent('popstate'));
 }
 
-const TAB_ICONS = {
-  calendar: 'M3 10h18M8 2v4M16 2v4M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z',
-  chat: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z',
-  records: 'M4 19.5A2.5 2.5 0 0 1 6.5 17H20V2H6.5A2.5 2.5 0 0 0 4 4.5v15Z',
-  settlement: 'M2 6h20v12H2zM2 10h20',
-  more: 'M4 7h16M4 12h16M4 17h16',
-  gallery: 'M3 3h18v18H3z M8.5 9a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z M21 15l-4-4-7 7-3-3-4 4',
-  places: 'M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 1 1 16 0z M12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
-  memo: 'M4 4h16v12H8l-4 4z',
-  content: 'M4 6h16M4 12h16M4 18h10',
-  archive: 'M3 6h18M5 6v14h14V6M9 10h6',
-  close: 'M18 6L6 18M6 6l12 12',
-  gift: 'M20 12v10H4V12M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7ZM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7Z',
-  share: 'M18 5a3 3 0 1 0-3 3 3 3 0 0 0 .14-.01L8.6 11.5a3 3 0 0 0 0 1l6.54 3.51A3 3 0 1 0 18 19',
-  settings: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z',
-  manual: 'M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2ZM8 7h8M8 11h6',
-  chevronRight: 'M9 18l6-6-6-6',
-  chevronLeft: 'M15 18l-6-6 6-6',
+// Multi-element icon defs matching designv2/BentoPinkFinal (crisp 16px / stroke 2).
+// Single-path approximations (esp. share circles as one path) looked soft/wrong when CSS
+// scaled a 20x1.8 SVG down to 16px.
+const TAB_ICON_NODES = {
+  calendar: [
+    ['rect', { x: 3, y: 4, width: 18, height: 18, rx: 2 }],
+    ['path', { d: 'M8 2v4M16 2v4M3 10h18' }],
+  ],
+  chat: [['path', { d: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z' }]],
+  records: [['path', { d: 'M4 19.5A2.5 2.5 0 0 1 6.5 17H20V2H6.5A2.5 2.5 0 0 0 4 4.5v15Z' }]],
+  settlement: [
+    ['rect', { x: 2, y: 6, width: 20, height: 12, rx: 2 }],
+    ['path', { d: 'M6 12h.01M18 12h.01' }],
+  ],
+  more: [['path', { d: 'M4 7h16M4 12h16M4 17h16' }]],
+  gallery: [
+    ['rect', { x: 3, y: 3, width: 18, height: 18, rx: 2 }],
+    ['circle', { cx: 9, cy: 9, r: 2 }],
+    ['path', { d: 'm21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21' }],
+  ],
+  places: [
+    ['path', { d: 'M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z' }],
+    ['circle', { cx: 12, cy: 10, r: 3 }],
+  ],
+  memo: [['path', { d: 'M4 4h16v12H8l-4 4z' }]],
+  content: [
+    ['path', { d: 'm12 3-8.5 4.5L12 12l8.5-4.5L12 3Z' }],
+    ['path', { d: 'm3.5 12 8.5 4.5 8.5-4.5' }],
+    ['path', { d: 'm3.5 16.5 8.5 4.5 8.5-4.5' }],
+  ],
+  archive: [
+    ['path', { d: 'M22 12v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6' }],
+    ['path', { d: 'M2 7h20v5H2z' }],
+    ['path', { d: 'M12 12v3' }],
+  ],
+  close: [['path', { d: 'M18 6 6 18M6 6l12 12' }]],
+  gift: [
+    ['rect', { x: 3, y: 8, width: 18, height: 13, rx: 2 }],
+    ['path', { d: 'M12 8v13M3 12h18' }],
+    ['path', { d: 'M12 8a2.5 2.5 0 1 1-4-3c1.5 0 4 1.5 4 3Z' }],
+    ['path', { d: 'M12 8a2.5 2.5 0 1 0 4-3c-1.5 0-4 1.5-4 3Z' }],
+  ],
+  // Correct Share2: three nodes + connectors (single-path version rendered as a blob).
+  share: [
+    ['circle', { cx: 18, cy: 5, r: 3 }],
+    ['circle', { cx: 6, cy: 12, r: 3 }],
+    ['circle', { cx: 18, cy: 19, r: 3 }],
+    ['path', { d: 'm8.6 13.5 6.8 4M15.4 6.5l-6.8 4' }],
+  ],
+  settings: [
+    ['circle', { cx: 12, cy: 12, r: 3 }],
+    ['path', { d: 'M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z' }],
+  ],
+  manual: [
+    ['path', { d: 'M4 19.5A2.5 2.5 0 0 1 6.5 17H20' }],
+    ['path', { d: 'M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z' }],
+    ['path', { d: 'M8 7h8' }],
+    ['path', { d: 'M8 11h6' }],
+  ],
+  chevronRight: [['path', { d: 'm9 18 6-6-6-6' }]],
+  chevronLeft: [['path', { d: 'm15 18-6-6 6-6' }]],
 };
 
 function TabIcon({ id }) {
   const React = window.React;
+  const nodes = TAB_ICON_NODES[id] || [];
   return React.createElement(
-    'svg', { width: 20, height: 20, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' },
-    React.createElement('path', { d: TAB_ICONS[id] || '' })
+    'svg', {
+      width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
+      strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': 'true',
+      // Keep vectors on pixel grid when CSS sizes the icon; avoids soft antialias from 20→16 downscale.
+      style: { display: 'block', shapeRendering: 'geometricPrecision' },
+    },
+    ...nodes.map(([tag, props], i) => React.createElement(tag, { key: i, ...props }))
   );
 }
 
@@ -633,6 +683,24 @@ function HomeSectionIcon({ kind }) {
   );
 }
 
+/**
+ * Module-scoped so React keeps a stable component type across parent re-renders.
+ * Defining this inside HomeActivitySummary remounted every section on each render and
+ * replayed bp-rise-in (enter), which looked like 채팅/메모/갤러리/장소 flickering while scrolling.
+ */
+function HomeSummarySection({ title, kind, children, onMore, delay }) {
+  const React = window.React;
+  return React.createElement('div', {
+    className: bentoClass(`renewal-home-summary-section bento-card wide enter is-${kind}${kind === 'gallery' ? ' gallery-bleed' : ''}`),
+    style: delay ? { animationDelay: delay } : undefined,
+  },
+    React.createElement('div', { className: bentoClass('renewal-home-summary-heading bento-card-head') },
+      React.createElement('span', { className: bentoClass('renewal-home-summary-heading-icon bento-card-icon') }, React.createElement(HomeSectionIcon, { kind })),
+      React.createElement('span', { className: bentoClass('bento-card-title') }, title),
+      onMore && React.createElement('button', { type: 'button', className: bentoClass('more-link'), onClick: onMore }, '전체보기')
+    ), children);
+}
+
 /** 클로드 목업의 홈 요약 흐름을 기존 로드 상태로 구현한다. 전체 목록을 추가 조회하지 않는다. */
 function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
   const React = window.React;
@@ -656,20 +724,11 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
     const d = dateValue(value);
     return Number.isNaN(d.getTime()) ? '' : `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}(${['일','월','화','수','목','금','토'][d.getDay()]}) ${formatTime(value)}`;
   };
-  const Section = ({ title, kind, children, onMore, delay }) => React.createElement('div', {
-    className: bentoClass(`renewal-home-summary-section bento-card wide enter is-${kind}${kind === 'gallery' ? ' gallery-bleed' : ''}`),
-    style: delay ? { animationDelay: delay } : undefined,
-  },
-    React.createElement('div', { className: bentoClass('renewal-home-summary-heading bento-card-head') },
-      React.createElement('span', { className: bentoClass('renewal-home-summary-heading-icon bento-card-icon') }, React.createElement(HomeSectionIcon, { kind })),
-      React.createElement('span', { className: bentoClass('bento-card-title') }, title),
-      onMore && React.createElement('button', { type: 'button', className: bentoClass('more-link'), onClick: onMore }, '전체보기')
-    ), children);
   return React.createElement('div', { className: bentoClass('renewal-home-summary bento-grid') },
     React.createElement('div', { className: bentoClass('renewal-home-summary-section bento-card wide enter'), style: { animationDelay: '0.04s' } },
       React.createElement(BentoCalendarCard, { calendarContext, onSelectDate: onOpenDate })
     ),
-    React.createElement(Section, { title: '채팅', kind: 'chat', delay: '0.08s', onMore: () => onChangeView?.('chat') },
+    React.createElement(HomeSummarySection, { title: '채팅', kind: 'chat', delay: '0.08s', onMore: () => onChangeView?.('chat') },
       messages.length ? React.createElement('div', { className: bentoClass('renewal-home-chat-list') }, messages.map((m, i) => {
         const image = m.thumbUrl || (Array.isArray(m.thumbUrls) && m.thumbUrls[0]) || m.imageUrl || (Array.isArray(m.imageUrls) && m.imageUrls[0]);
         return React.createElement('button', { type: 'button', className: bentoClass(`renewal-home-chat-item chat-row${image ? ' has-image' : ''}`), key: m.id || i, onClick: () => onChangeView?.('chat') },
@@ -686,7 +745,7 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
         );
       })) : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '최근 대화가 없습니다.')
     ),
-    React.createElement(Section, { title: '메모', kind: 'memo', delay: '0.12s', onMore: () => onChangeView?.('memo') },
+    React.createElement(HomeSummarySection, { title: '메모', kind: 'memo', delay: '0.12s', onMore: () => onChangeView?.('memo') },
       memos.length ? React.createElement('div', { className: bentoClass('renewal-home-memo-list') }, memos.map((memo, i) => {
         const preview = memo.linkPreview || (Array.isArray(memo.linkPreviews) && memo.linkPreviews[0]);
         const tags = Array.isArray(memo.tags) ? memo.tags.slice(0, 3) : [];
@@ -704,7 +763,7 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
         );
       })) : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '최근 메모가 없습니다.')
     ),
-    React.createElement(Section, { title: '갤러리', kind: 'gallery', delay: '0.16s', onMore: () => onChangeView?.('gallery') },
+    React.createElement(HomeSummarySection, { title: '갤러리', kind: 'gallery', delay: '0.16s', onMore: () => onChangeView?.('gallery') },
       photos.length ? React.createElement('div', { className: bentoClass('renewal-home-photo-strip thumb-grid') }, photos.map((photo, i) => React.createElement('button', {
         type: 'button',
         className: bentoClass(`thumb ${photo.commentCount > 0 ? 'gallery-comment-heartbeat' : ''}`.trim()),
@@ -716,7 +775,7 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
         photo.commentCount > 0 ? React.createElement('span', { className: bentoClass('comment-badge') }, photo.commentCount) : null
       ))) : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '등록된 사진이 없습니다.')
     ),
-    React.createElement(Section, { title: '장소', kind: 'places', delay: '0.20s', onMore: () => onChangeView?.('places') },
+    React.createElement(HomeSummarySection, { title: '장소', kind: 'places', delay: '0.20s', onMore: () => onChangeView?.('places') },
       places.length ? React.createElement('div', { className: bentoClass('renewal-home-place-list') }, places.map((place, i) => React.createElement('button', { type: 'button', className: bentoClass('renewal-home-place-card place-row'), key: place.id || i, onClick: () => onChangeView?.('places') },
         React.createElement('span', { className: bentoClass('renewal-home-place-copy') },
           React.createElement('span', { className: bentoClass('renewal-home-place-tags place-tags') },
@@ -1951,7 +2010,10 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   const settlementCards = calendar?.settlementCards || [];
   const shortDate = value => { const ms = timestampMs(value); return ms ? new Date(ms).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' }).replace(/\. /g, '.').replace(/\.$/, '') : ''; };
   const sideMeta = { chat: lastChatAuthor, memo: lastMemo?.title || '', places: lastPlace?.alias || lastPlace?.name || '', gallery: shortDate(lastPhoto?.timestamp), settlement: shortDate(latestRows(settlementCards)[0]?.updatedAt || latestRows(settlementCards)[0]?.createdAt) };
-  const settlementCount = settlementCards.filter(card => !card.deletedAt && card.status !== 'closed').length;
+  // Same 잔액 source as default-shell side menu / settlement summary (공금 running balance).
+  const settlementBalanceBadge = calendar
+    ? formatBalanceBadge(calculateSettlementBalance(calendar))
+    : null;
   const participants = Array.isArray(calendarContext?.calendar?.participants) ? calendarContext.calendar.participants : [];
   const chatAuthorPart = participants.find(p => p && (p.id === lastChatMsg?.participantId || p.name === lastChatAuthor));
   const chatPillColor = chatAuthorPart?.color ? `${chatAuthorPart.color}33` : '#FEE2E2';
@@ -2000,7 +2062,11 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
           React.createElement('span', { className: bentoClass('side-nav-item-icon renewal-shell-nav-icon') }, React.createElement(TabIcon, { id: item.icon })),
           React.createElement('span', { className: bentoClass('side-nav-item-title renewal-shell-nav-label') },
             item.label,
-            item.id === 'settlement' && settlementCount > 0 && React.createElement('span', { className: bentoClass('side-nav-item-badge') }, settlementCount)
+            item.id === 'settlement' && settlementBalanceBadge?.text && React.createElement('span', {
+              className: bentoClass('side-nav-item-badge'),
+              style: { backgroundColor: settlementBalanceBadge.bgColor || '#EF4444' },
+              title: '정산 잔액'
+            }, settlementBalanceBadge.text)
           ),
           metaVal && (
             item.isPill
