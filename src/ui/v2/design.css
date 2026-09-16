@@ -1,3 +1,4 @@
+/* v2-shell-structure: first-class memo/places destinations; Bento side-nav is source of IA. */
 /* Only the opt-in V2 root is affected. app.css remains byte-for-byte unchanged. */
 .renewal-shell.v2-design {
   --font-sans: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Noto Sans KR', sans-serif;
