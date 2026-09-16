@@ -36,3 +36,21 @@
 - `src/ui/ui-app-shell-v2.js` — brand badge, pill/chip, calendarName → records panes
 - `src/ui/v2/design.css` / `screens.css` — header / side-nav / composer CSS
 - `test/v2-routing.test.mjs` — searchLabel assertion tweak
+
+## Side-nav mock parity tokens (2026-09-16)
+
+Measured against `parity-shots/mock-chat-header-side.png` vs local `?shell=v2` PC (1280×800).
+
+| Token | Before (live) | After | Mock target |
+|-------|---------------|-------|-------------|
+| Brand top (`.bp-side-nav-head` pad-top) | 16px | **28px** | ~28px generous |
+| Brand icon | 22px favicon PNG | **18px** outline calendar SVG | outline ~18–20 |
+| Cal badge | emoji risk | **모아엘가** text only (strip pictographs) | no emoji |
+| Nav label | 13.76px (rem) | **14px** | ~14 |
+| Nav icon | 16px | **18px** | ~18–20 |
+| Row pitch | ~34px | **46px** | ~45–47 |
+| Brand→first primary gap | crowded (manual card) | **50px** | ~50 |
+| IA | manual banner + settings → primary | **primary → content/archive → settings + manual row → footer** | mock order |
+
+Files: `src/ui/ui-app-shell-v2.js`, `src/ui/v2/design.css`, measure `parity-shots/unit-loop/side-nav-measure.json`.
+

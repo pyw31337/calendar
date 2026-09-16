@@ -2181,20 +2181,22 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   const chatPillTextColor = '#FFFFFF';
 
   const hasFullScreen = activeTab === 'chat' || activeTab === 'settlement' || activeTab === 'memo' || activeTab === 'places';
+  const cleanCalBadge = (value) => String(value || '')
+    .replace(/[\p{Extended_Pictographic}\p{Emoji_Presentation}\uFE0F\u200D]/gu, '')
+    .replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
   const bentoSideNav = React.createElement(React.Fragment, null,
     React.createElement('div', { className: bentoClass('side-nav-head') },
       React.createElement('div', { className: bentoClass('side-nav-brand') },
-        React.createElement('img', {
+        React.createElement('span', {
           className: bentoClass('side-nav-brand-icon'),
-          src: './icons/icon-192.png',
-          alt: '',
-          width: 22,
-          height: 22,
-          decoding: 'async',
-        }),
+          'aria-hidden': 'true',
+        }, React.createElement(TabIcon, { id: 'calendar' })),
         React.createElement('span', { className: bentoClass('side-nav-brand-text') }, '모여라 캘린더'),
         (() => {
-          const calBadge = String(calendarName || '').replace(/^[^\p{L}\p{N}]+/u, '').trim();
+          const calBadge = cleanCalBadge(calendarName);
           return calBadge
             ? React.createElement('span', {
                 className: bentoClass('side-nav-cal-badge'),
@@ -2205,24 +2207,6 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
       ),
       React.createElement('button', { type: 'button', className: bentoClass('side-nav-close-btn'), 'aria-label': '메뉴 닫기', onClick: () => setIsSideNavOpen(false) },
         React.createElement(TabIcon, { id: 'close' })
-      )
-    ),
-    React.createElement('div', { className: bentoClass('side-nav-group renewal-shell-side-nav-group is-settings') },
-      React.createElement('button', { type: 'button', className: bentoClass('side-nav-manual-banner renewal-shell-manual-card'), title: '사용자 매뉴얼', onClick: () => { setIsSideNavOpen(false); openMoreModalById('manual'); } },
-        React.createElement('span', { className: bentoClass('side-nav-manual-banner-icon-wrap renewal-shell-manual-icon') }, React.createElement(TabIcon, { id: 'manual' })),
-        React.createElement('span', { className: bentoClass('side-nav-manual-banner-text renewal-shell-manual-copy') },
-          React.createElement('strong', { className: bentoClass('side-nav-manual-banner-title') }, '사용자 매뉴얼'),
-          React.createElement('small', { className: bentoClass('side-nav-manual-banner-sub') }, '사용 방법 한눈에 보기')
-        ),
-        React.createElement('span', { className: bentoClass('side-nav-manual-banner-chevron renewal-shell-manual-chevron') }, React.createElement(TabIcon, { id: 'chevronRight' }))
-      ),
-      React.createElement('button', { type: 'button', className: bentoClass('side-nav-item renewal-shell-side-nav-quick-item'), title: '캘린더 설정', onClick: () => openMoreModalById('calendar-settings') },
-        React.createElement('span', { className: bentoClass('side-nav-item-icon') }, React.createElement(TabIcon, { id: 'calendar' })),
-        React.createElement('span', { className: bentoClass('side-nav-item-title') }, '캘린더 설정')
-      ),
-      React.createElement('button', { type: 'button', className: bentoClass('side-nav-item renewal-shell-side-nav-quick-item'), title: '기념일 설정', onClick: () => openMoreModalById('anniversaries') },
-        React.createElement('span', { className: bentoClass('side-nav-item-icon') }, React.createElement(TabIcon, { id: 'gift' })),
-        React.createElement('span', { className: bentoClass('side-nav-item-title') }, '기념일 설정')
       )
     ),
     React.createElement('div', { className: bentoClass('side-nav-group renewal-shell-side-nav-group is-main') },
@@ -2273,6 +2257,20 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
           React.createElement('span', { className: bentoClass('side-nav-item-title renewal-shell-nav-label') }, item.label)
         );
       })
+    ),
+    React.createElement('div', { className: bentoClass('side-nav-group renewal-shell-side-nav-group is-settings') },
+      React.createElement('button', { type: 'button', className: bentoClass('side-nav-item renewal-shell-side-nav-quick-item'), title: '캘린더 설정', onClick: () => openMoreModalById('calendar-settings') },
+        React.createElement('span', { className: bentoClass('side-nav-item-icon') }, React.createElement(TabIcon, { id: 'calendar' })),
+        React.createElement('span', { className: bentoClass('side-nav-item-title') }, '캘린더 설정')
+      ),
+      React.createElement('button', { type: 'button', className: bentoClass('side-nav-item renewal-shell-side-nav-quick-item'), title: '기념일 설정', onClick: () => openMoreModalById('anniversaries') },
+        React.createElement('span', { className: bentoClass('side-nav-item-icon') }, React.createElement(TabIcon, { id: 'gift' })),
+        React.createElement('span', { className: bentoClass('side-nav-item-title') }, '기념일 설정')
+      ),
+      React.createElement('button', { type: 'button', className: bentoClass('side-nav-item renewal-shell-side-nav-quick-item'), title: '사용자 매뉴얼', onClick: () => { setIsSideNavOpen(false); openMoreModalById('manual'); } },
+        React.createElement('span', { className: bentoClass('side-nav-item-icon') }, React.createElement(TabIcon, { id: 'manual' })),
+        React.createElement('span', { className: bentoClass('side-nav-item-title') }, '사용자 매뉴얼')
+      )
     ),
     React.createElement('div', { className: bentoClass('side-nav-footer renewal-shell-side-nav-footer') },
       React.createElement('button', { type: 'button', className: bentoClass('side-nav-item renewal-shell-side-nav-quick-item'), title: '공유', onClick: () => openMoreModalById('share') },

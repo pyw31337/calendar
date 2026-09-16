@@ -96,7 +96,7 @@
 .v2-design .bp-month-picker input { font: inherit; padding: 6px; max-width: 180px; }
 .v2-design .v2-destination { padding: 0; min-height: 100dvh; }
 .v2-design .renewal-shell-subtab-row { position: relative; z-index: 1; }
-.v2-design .bp-side-nav-item-icon svg { width: 16px; height: 16px; }
+.v2-design .bp-side-nav-item-icon svg { width: 18px; height: 18px; }
 .renewal-shell.v2-design.v2-has-detail {
   /* Destinations stay inside the Bento shell (rail visible on PC). Do NOT zero padding or hide nav. */
   background: #fafafc;
@@ -334,14 +334,7 @@
 .v2-design .bp-footer .bp-links,
 .v2-design .bp-renewal-home-footer-links { font-size: var(--font-size-2xs) !important; }
 
-/* Side menu */
-.v2-design .bp-side-nav-brand { font-size: 1.05rem !important; }
-.v2-design .bp-side-nav-item { font-size: var(--font-size-base) !important; }
-.v2-design .bp-side-nav-item-meta,
-.v2-design .bp-side-nav-item-sub,
-.v2-design .bp-side-nav-manual-banner-sub { font-size: var(--font-size-xs) !important; }
-.v2-design .bp-side-nav-item-badge { font-size: var(--font-size-2xs) !important; }
-.v2-design .bp-side-nav-manual-banner-title { font-size: var(--font-size-base) !important; }
+/* Side menu — rem sizes deferred; mock-parity px tokens at file end win on PC */
 .v2-design .bp-side-nav-collapse-btn { font-size: var(--font-size-sm) !important; }
 
 /* Date event sheet chrome */
@@ -353,15 +346,13 @@
 .v2-design .bp-attend-row-name { font-size: var(--font-size-md) !important; }
 .v2-design .bp-attend-row-note { font-size: var(--font-size-xs) !important; }
 
-/* Crisp side-nav icons: native 16px / stroke 2 (no soft 20→16 downscale) */
+/* Side-nav icons: explicit 18px (mock ~18–20); stroke stays 2 on 24 viewBox */
 .v2-design .bp-side-nav-item-icon svg,
-.v2-design .bp-side-nav-brand svg,
+.v2-design .bp-side-nav-brand-icon svg,
 .v2-design .bp-side-nav-close-btn svg,
-.v2-design .bp-side-nav-manual-banner-icon-wrap svg,
-.v2-design .bp-side-nav-manual-banner-chevron svg,
 .v2-design .bp-side-nav-collapse-btn svg {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   shape-rendering: geometricPrecision;
 }
 
@@ -711,13 +702,7 @@
 .v2-design .bp-place-note,
 .v2-design .bp-place-tag { font-size: var(--v2-fs-2xs) !important; }
 
-.v2-design .bp-side-nav-brand { font-size: var(--v2-fs-lg) !important; font-weight: 800 !important; }
-.v2-design .bp-side-nav-item { font-size: var(--v2-fs-base) !important; }
-.v2-design .bp-side-nav-item-meta,
-.v2-design .bp-side-nav-item-sub,
-.v2-design .bp-side-nav-manual-banner-sub { font-size: var(--v2-fs-xs) !important; }
-.v2-design .bp-side-nav-item-badge { font-size: var(--v2-fs-2xs) !important; }
-.v2-design .bp-side-nav-manual-banner-title { font-size: var(--v2-fs-base) !important; font-weight: 800 !important; }
+/* Side-nav type: see mock-parity block (explicit px under .v2-design) */
 .v2-design .bp-side-nav-collapse-btn { font-size: var(--v2-fs-sm) !important; }
 
 .v2-design .v2-page-header .bp-header-title { font-size: var(--v2-fs-title) !important; }
@@ -847,18 +832,7 @@
   .v2-design .bp-side-nav {
     width: var(--v2-side-nav-width, 280px) !important;
   }
-  .v2-design .bp-side-nav-brand { font-size: 1.02rem !important; }
-  .v2-design .bp-side-nav-item {
-    font-size: 0.86rem !important;
-    padding: 8px 10px !important;
-    border-radius: 10px !important;
-  }
-  .v2-design .bp-side-nav-item-meta,
-  .v2-design .bp-side-nav-item-sub { font-size: 0.66rem !important; }
-  .v2-design .bp-side-nav-manual-banner {
-    padding: 9px 10px !important;
-    border-radius: 12px !important;
-  }
+  /* item density / brand type: mock-parity block below */
   .v2-design .bp-thumb-grid { gap: 10px !important; }
   .v2-design .bp-thumb { border-radius: 12px !important; }
 }
@@ -966,7 +940,7 @@
 /* (mobile consistency) always-show override removed — progressive rules above */
 
 
-/* Side-nav service brand (모여라 캘린더) — not calendar title */
+/* Side-nav service brand (모여라 캘린더) — outline icon + text + cal pill */
 .v2-design .bp-side-nav-brand {
   display: inline-flex !important;
   align-items: center;
@@ -974,11 +948,17 @@
   min-width: 0;
 }
 .v2-design .bp-side-nav-brand-icon {
-  width: 22px !important;
-  height: 22px !important;
-  border-radius: 6px !important;
-  object-fit: cover;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 18px !important;
+  height: 18px !important;
+  color: #7c3aed;
   flex-shrink: 0;
+}
+.v2-design .bp-side-nav-brand-icon svg {
+  width: 18px !important;
+  height: 18px !important;
 }
 .v2-design .bp-side-nav-brand-text {
   font-weight: 800;
@@ -1101,4 +1081,102 @@
 .v2-design .v2-page-header .bp-icon-btn:hover {
   background: #fafafc !important;
   color: #7c3aed !important;
+}
+
+/* --------------------------------------------------------------------------
+ * Side-nav mock parity (mock-chat-header-side.png)
+ * Measured: brand top ~16–28px air; nav pitch ~44–48px; icons ~18px; labels ~14px.
+ * Explicit px under .v2-design kills rem-drift from competing --v2-fs / font-size rules.
+ * IA: brand → primary → content/archive → settings/manual → footer (JS).
+ * -------------------------------------------------------------------------- */
+.v2-design .bp-side-nav-head {
+  padding: 24px 14px 12px !important;
+}
+.v2-design .bp-side-nav-brand-text {
+  font-size: 15px !important;
+  font-weight: 800 !important;
+  line-height: 1.25 !important;
+}
+.v2-design .bp-side-nav-cal-badge {
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  line-height: 1.3 !important;
+  padding: 2px 8px !important;
+  color: #7c3aed !important;
+  background: #f3eeff !important;
+}
+.v2-design .bp-side-nav-group {
+  padding: 6px 10px !important;
+}
+.v2-design .bp-side-nav-item {
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  line-height: 1.25 !important;
+  padding: 11px 12px !important;
+  margin: 3px 0 !important;
+  gap: 12px !important;
+  border-radius: 10px !important;
+  min-height: 40px !important;
+  box-sizing: border-box !important;
+}
+.v2-design .bp-side-nav-item-icon {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.v2-design .bp-side-nav-item-icon svg {
+  width: 18px !important;
+  height: 18px !important;
+}
+.v2-design .bp-side-nav-item-meta,
+.v2-design .bp-side-nav-item-sub {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+}
+.v2-design .bp-side-nav-item-badge {
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  padding: 1px 6px !important;
+}
+.v2-design .bp-side-nav-item-meta.bp-chat-name-pill,
+.v2-design .bp-side-nav-item-meta.chat-name-pill {
+  font-size: 10px !important;
+  padding: 2px 7px !important;
+}
+.v2-design .bp-side-nav-date-chip {
+  font-size: 10px !important;
+  padding: 2px 7px !important;
+}
+.v2-design .bp-side-nav-footer {
+  padding: 10px 10px 16px !important;
+}
+.v2-design .bp-side-nav-collapse-btn {
+  font-size: 12px !important;
+  padding: 8px !important;
+  border-radius: 9999px !important;
+  margin-top: 8px !important;
+}
+
+@media (min-width: 1200px) {
+  .v2-design .bp-side-nav-head {
+    padding: 28px 16px 18px !important;
+  }
+  .v2-design .bp-side-nav-brand {
+    gap: 8px !important;
+  }
+  .v2-design .bp-side-nav-brand-text {
+    font-size: 15px !important;
+  }
+  .v2-design .bp-side-nav-item {
+    font-size: 14px !important;
+    padding: 11px 12px !important;
+    margin: 4px 0 !important;
+    min-height: 42px !important;
+  }
+  .v2-design .bp-side-nav-group.bp-is-main {
+    padding-top: 28px !important;
+    border-top: none !important;
+  }
 }
