@@ -628,7 +628,7 @@ function isAnniversaryToday(ann, y, m, d) {
   return false;
 }
 
-// Daily anniversary push -- fires once at 09:00 KST, scans every calendar's anniversaries
+// Daily anniversary push -- fires once at 06:30 KST, scans every calendar's anniversaries
 // subcollection via a single collectionGroup query (cheaper than looping per-calendar fetches),
 // and pushes to every subscriber of a calendar with a match today. New Cloud Function; requires
 // `firebase deploy --only functions` to go live (unlike the rest of this app, which redeploys
@@ -723,7 +723,7 @@ exports.onCalendarDocWrite = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] 
     }
   });
 
-exports.sendAnniversaryReminders = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).pubsub.schedule('0 9 * * *').timeZone('Asia/Seoul').onRun(async () => {
+exports.sendAnniversaryReminders = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).pubsub.schedule('30 6 * * *').timeZone('Asia/Seoul').onRun(async () => {
   ensureVapidConfigured();
   const kstParts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit'
@@ -795,10 +795,10 @@ exports.sendAnniversaryReminders = functions.runWith({ secrets: ['VAPID_PRIVATE_
   return null;
 });
 
-// Eve-of schedule push at 18:00 KST: tomorrow's confirmed meetings + tomorrow's matching
+// Eve-of schedule push at 18:30 KST: tomorrow's confirmed meetings + tomorrow's matching
 // type:repeat anniversary rules (e.g. 매월 셋째주 수요일). Complements the local D-1 nudge
-// (client only fires when the tab is open after 18:00) and the morning anniversary job.
-exports.sendEveScheduleReminders = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).pubsub.schedule('0 18 * * *').timeZone('Asia/Seoul').onRun(async () => {
+// (client only fires when the tab is open after 18:30) and the morning anniversary job.
+exports.sendEveScheduleReminders = functions.runWith({ secrets: ['VAPID_PRIVATE_KEY'] }).pubsub.schedule('30 18 * * *').timeZone('Asia/Seoul').onRun(async () => {
   ensureVapidConfigured();
   const kstNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
   const tomorrow = new Date(kstNow.getFullYear(), kstNow.getMonth(), kstNow.getDate() + 1);
