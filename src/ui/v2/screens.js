@@ -107,7 +107,7 @@ export function DesignIcon({ name, size = 18, strokeWidth = 2 }) {
   );
 }
 
-function IconButton({ label, icon, onClick, size = 16 }) {
+function IconButton({ label, icon, onClick, size = 18 }) {
   return h(
     'button',
     { type: 'button', className: 'bp-icon-btn', 'aria-label': label, onClick },
