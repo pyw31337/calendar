@@ -2960,7 +2960,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
   )));
 }
 
-export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenShare, onOpenAppSettings, onChangeView, onOpenCreateSettlement, onOpenSettlementEditor, onToggleSettlementCardStatus, onDeleteSettlementCard, onSaveSettlementCard, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, historyCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null, showToast, onRequestConfirm }) {
+export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenShare, onOpenAppSettings, onChangeView, onOpenCreateSettlement, onOpenSettlementEditor, onToggleSettlementCardStatus, onDeleteSettlementCard, onSaveSettlementCard, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, historyCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null, showToast, onRequestConfirm, renderV2 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -3385,7 +3385,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
 
   const bodyContent = allTimeItems.length === 0 && baseBudget === 0 ? emptyContent : activeTab === 'total' ? totalContent : dailyContent;
 
-  return /*#__PURE__*/React.createElement("div", {
+  const __settlementLegacyTree = /*#__PURE__*/React.createElement("div", {
     className: "settlement-page-container",
     style: {
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -4140,6 +4140,22 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     return editor;
   })()
   );
+
+  if (typeof renderV2 === 'function') {
+    return renderV2({
+      legacyView: __settlementLegacyTree,
+      calendar,
+      onBack,
+      onShare: onOpenShare,
+      onMenu: () => setIsSettlementMenuOpen(true),
+      onCompose: () => {
+        if (typeof onOpenCreateSettlement === 'function') onOpenCreateSettlement();
+        else setIsCreateSettlementOpen(true);
+      },
+      slots: {},
+    });
+  }
+  return __settlementLegacyTree;
 }
 
 export function PollModal({ calendar, poll, onSave, onClose, showToast, onRequestConfirm }) {
