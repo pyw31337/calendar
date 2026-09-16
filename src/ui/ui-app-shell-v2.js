@@ -436,6 +436,38 @@ function RenewalHero({ meetings, calendar, onSelectDate }) {
  * JSX this shell's early return never reaches, so reusing it would silently no-op.
  */
 
+
+/** YYYY-MM-DD ± n days (local noon to avoid DST edge). */
+function shiftDateStr(dateStr, deltaDays) {
+  const d = new Date(`${dateStr}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
+  d.setDate(d.getDate() + deltaDays);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * Multi-day (연일) range anniversary → start / mid / end / solo for connected bar radii.
+ * Week-row aware: Sunday never continues left, Saturday never continues right (grid wraps).
+ */
+function anniversarySpanRole(ann, dateStr) {
+  const start = ann && ann.startDate;
+  const end = ann && ann.endDate;
+  const isMulti = ann && ann.type === 'range' && start && end && start < end
+    && dateStr >= start && dateStr <= end;
+  if (!isMulti) return 'solo';
+  const d = new Date(`${dateStr}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return 'solo';
+  const dow = d.getDay(); // 0 Sun … 6 Sat
+  const prevStr = shiftDateStr(dateStr, -1);
+  const nextStr = shiftDateStr(dateStr, 1);
+  const contLeft = dateStr !== start && prevStr && prevStr >= start && dow !== 0;
+  const contRight = dateStr !== end && nextStr && nextStr <= end && dow !== 6;
+  if (!contLeft && contRight) return 'start';
+  if (contLeft && !contRight) return 'end';
+  if (contLeft && contRight) return 'mid';
+  return 'solo';
+}
+
 function BentoCalendarCard({ calendarContext, onSelectDate }) {
   const React = window.React;
   const [monthDate, setMonthDate] = React.useState(() => new Date());
@@ -646,9 +678,10 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
           ) : null,
           (anns.length > 0 || hasMeeting) ? React.createElement('div', { className: bentoClass('day-bar-stack') },
             // Flex stack (gap) — never absolute-overlap. Anniversary (purple+title) then meeting (pink+title).
+            // Range (연일) gets start/mid/end radius classes so per-cell segments read as one bar.
             anns.slice(0, 4).map((ann, annIdx) => React.createElement('div', {
               key: ann.id || `${dateStr}_ann_${annIdx}`,
-              className: bentoClass('day-anniversary'),
+              className: bentoClass(`day-anniversary ${anniversarySpanRole(ann, dateStr)}`),
               title: ann.title || '기념일',
             },
               React.createElement('span', { className: bentoClass('day-anniversary-label') }, ann.title || '기념일')

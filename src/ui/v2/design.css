@@ -531,12 +531,33 @@
   justify-content: center;
   overflow: hidden;
   background: var(--brand, #7C3AED) !important;
+  border-radius: 999px !important; /* single-day / solo default */
+}
+/* Multi-day (연일) connected segments — square the joining edges */
+.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-solo {
   border-radius: 999px !important;
+}
+.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-start {
+  border-radius: 999px 0 0 999px !important;
+  /* Nudge into the gap so adjacent cells read as one continuous bar */
+  margin-right: -1px;
+  width: calc(100% + 1px) !important;
+}
+.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-mid {
+  border-radius: 0 !important;
+  margin-left: -1px;
+  margin-right: -1px;
+  width: calc(100% + 2px) !important;
+}
+.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-end {
+  border-radius: 0 999px 999px 0 !important;
+  margin-left: -1px;
+  width: calc(100% + 1px) !important;
 }
 .v2-design .bp-day-anniversary-label,
 .v2-design .bp-day-bar-stack .bp-day-anniversary-label {
   display: block !important;
-  font-size: 0.72rem !important;
+  font-size: 0.68rem !important;
   font-weight: 800 !important;
   line-height: 1.2 !important;
   color: #fff !important;
@@ -563,7 +584,7 @@
 }
 .v2-design .bp-day-bar-stack .bp-day-bar-label {
   display: block !important;
-  font-size: 0.72rem !important;
+  font-size: 0.68rem !important;
   font-weight: 800 !important;
   line-height: 1.2 !important;
   color: #fff !important;
@@ -579,7 +600,7 @@
     padding: 0.18rem 0.45rem !important;
   }
   .v2-design .bp-p-dot::after {
-    font-size: 0.72rem !important;
+    font-size: 0.68rem !important;
     font-weight: 800 !important;
     line-height: 1.35 !important;
   }
@@ -588,12 +609,12 @@
 
 /* Calendar cell type hierarchy (holiday / 모임확정 / day num) */
 .v2-design .bp-day-corner-label {
-  font-size: 0.72rem !important;
+  font-size: 0.68rem !important;
   font-weight: 800 !important;
   line-height: 1.2 !important;
 }
 .v2-design .bp-day-event-title {
-  font-size: 0.78rem !important;
+  font-size: 0.72rem !important;
   font-weight: 800 !important;
   line-height: 1.25 !important;
   white-space: normal !important;
@@ -603,25 +624,31 @@
   overflow: hidden;
 }
 .v2-design .bp-day-num {
-  font-size: 1.05rem !important;
+  font-size: 0.98rem !important;
   font-weight: 800 !important;
 }
 @media (min-width: 768px) {
-  .v2-design .bp-day-num { font-size: 1.12rem !important; }
+  .v2-design .bp-day-num { font-size: 1.05rem !important; }
 }
 @media (min-width: 1200px) {
-  .v2-design .bp-day-num { font-size: 1.18rem !important; }
+  .v2-design .bp-day-num { font-size: 1.1rem !important; }
 }
 
-/* Type scale: larger than default Gather tokens; clear title/body/meta hierarchy */
+/* Type scale: mid between prior "too big" (~1.1 base) and Gather small (~0.85).
+ * Also remap --font-size-* so screens.css / widgets inherit the same mid scale. */
 .v2-design {
-  --v2-fs-2xs: 0.78rem;
-  --v2-fs-xs: 0.86rem;
-  --v2-fs-sm: 0.94rem;
-  --v2-fs-md: 1.02rem;
-  --v2-fs-base: 1.1rem;
-  --v2-fs-lg: 1.22rem;
-  --v2-fs-title: 1.4rem;
+  --v2-fs-2xs: 0.72rem;
+  --v2-fs-xs: 0.8rem;
+  --v2-fs-sm: 0.88rem;
+  --v2-fs-md: 0.95rem;
+  --v2-fs-base: 1.02rem;
+  --v2-fs-lg: 1.12rem;
+  --v2-fs-title: 1.28rem;
+  --font-size-2xs: var(--v2-fs-2xs);
+  --font-size-xs: var(--v2-fs-xs);
+  --font-size-sm: var(--v2-fs-sm);
+  --font-size-md: var(--v2-fs-md);
+  --font-size-base: var(--v2-fs-base);
   font-size: var(--v2-fs-base);
 }
 .v2-design .bp-bento-title { font-size: var(--v2-fs-title) !important; font-weight: 800 !important; }
@@ -636,11 +663,11 @@
 .v2-design .bp-weekday-label { font-size: var(--v2-fs-xs) !important; font-weight: 700 !important; }
 .v2-design .bp-day-num { font-size: var(--v2-fs-md) !important; font-weight: 800 !important; }
 .v2-design .bp-cal-legend { font-size: var(--v2-fs-xs) !important; }
-.v2-design .bp-day-corner-label { font-size: 0.72rem !important; font-weight: 800 !important; }
-.v2-design .bp-day-event-title { font-size: 0.78rem !important; font-weight: 800 !important; }
-.v2-design .bp-day-anniversary-label { font-size: 0.72rem !important; font-weight: 800 !important; }
+.v2-design .bp-day-corner-label { font-size: 0.68rem !important; font-weight: 800 !important; }
+.v2-design .bp-day-event-title { font-size: 0.72rem !important; font-weight: 800 !important; }
+.v2-design .bp-day-anniversary-label { font-size: 0.68rem !important; font-weight: 800 !important; }
 
-.v2-design .bp-dday-compact-badge { font-size: 1.2rem !important; font-weight: 900 !important; }
+.v2-design .bp-dday-compact-badge { font-size: 1.1rem !important; font-weight: 900 !important; }
 .v2-design .bp-dday-compact-text { font-size: var(--v2-fs-md) !important; font-weight: 700 !important; }
 .v2-design .bp-dday-expanded-title { font-size: var(--v2-fs-lg) !important; font-weight: 800 !important; }
 .v2-design .bp-dday-expanded-tag,
@@ -739,16 +766,16 @@
     margin: 0 0 20px !important;
   }
   .v2-design .bp-dday-compact-text {
-    font-size: 1.05rem !important;
+    font-size: 0.95rem !important;
     font-weight: 700 !important;
   }
   .v2-design .bp-dday-compact-badge {
-    font-size: 1.28rem !important;
+    font-size: 1.16rem !important;
     padding: 8px 14px !important;
   }
-  .v2-design .bp-dday-date { font-size: 0.9rem !important; }
+  .v2-design .bp-dday-date { font-size: 0.84rem !important; }
   .v2-design .bp-dday-dow,
-  .v2-design .bp-dday-pill { font-size: 0.78rem !important; }
+  .v2-design .bp-dday-pill { font-size: 0.72rem !important; }
   .v2-design .bp-dday-chip {
     width: 78px !important;
     padding: 9px 6px !important;
@@ -757,7 +784,7 @@
     padding: 8px 4px 0 !important;
   }
   .v2-design .bp-weekday-label {
-    font-size: 0.9rem !important;
+    font-size: 0.84rem !important;
     padding: 6px 0 8px !important;
   }
   .v2-design .bp-day-cell {
@@ -767,21 +794,21 @@
     border-radius: 12px !important;
   }
   .v2-design .bp-day-num {
-    font-size: 1.2rem !important;
+    font-size: 1.1rem !important;
     font-weight: 800 !important;
   }
   .v2-design .bp-day-corner-label {
-    font-size: 0.78rem !important;
+    font-size: 0.72rem !important;
   }
   .v2-design .bp-day-event-title {
-    font-size: 0.82rem !important;
+    font-size: 0.76rem !important;
     -webkit-line-clamp: 2;
   }
   .v2-design .bp-p-dot {
-    padding: 0.22rem 0.5rem !important;
+    padding: 0.2rem 0.45rem !important;
   }
   .v2-design .bp-p-dot::after {
-    font-size: 0.78rem !important;
+    font-size: 0.72rem !important;
   }
   .v2-design .bp-dot-row { gap: 0.3rem !important; }
   .v2-design .bp-day-bar-stack {
@@ -793,10 +820,10 @@
   }
   .v2-design .bp-day-anniversary-label,
   .v2-design .bp-day-bar-label {
-    font-size: 0.78rem !important;
+    font-size: 0.72rem !important;
   }
   .v2-design .bp-cal-legend {
-    font-size: 0.86rem !important;
+    font-size: 0.8rem !important;
     padding: 14px 4px 8px !important;
     gap: 10px 16px !important;
   }
@@ -809,21 +836,21 @@
     border-radius: 16px !important;
   }
   .v2-design .bp-bento-card-title {
-    font-size: 0.92rem !important;
+    font-size: 0.86rem !important;
     letter-spacing: 0.06em;
   }
-  .v2-design .bp-more-link { font-size: 0.9rem !important; }
+  .v2-design .bp-more-link { font-size: 0.84rem !important; }
   .v2-design .bp-side-nav {
     width: var(--v2-side-nav-width, 280px) !important;
   }
-  .v2-design .bp-side-nav-brand { font-size: 1.28rem !important; }
+  .v2-design .bp-side-nav-brand { font-size: 1.16rem !important; }
   .v2-design .bp-side-nav-item {
-    font-size: 1.02rem !important;
+    font-size: 0.95rem !important;
     padding: 11px 12px !important;
     border-radius: 12px !important;
   }
   .v2-design .bp-side-nav-item-meta,
-  .v2-design .bp-side-nav-item-sub { font-size: 0.82rem !important; }
+  .v2-design .bp-side-nav-item-sub { font-size: 0.76rem !important; }
   .v2-design .bp-side-nav-manual-banner {
     padding: 12px 14px !important;
     border-radius: 14px !important;

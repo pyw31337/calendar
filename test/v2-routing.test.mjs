@@ -98,6 +98,13 @@ test('V2 PC polish keeps wider rail, fluid content, 3x3 gallery, and participant
   assert.match(design, /min-width:\s*2\.4em/);
   assert.match(design, /bp-day-bar-stack/);
   assert.match(design, /\.bp-p-dot::after[\s\S]*font-size:\s*0\.72rem/);
+  assert.match(design, /bp-day-anniversary\.bp-start/);
+  assert.match(design, /bp-day-anniversary\.bp-mid/);
+  assert.match(design, /bp-day-anniversary\.bp-end/);
+  assert.match(design, /bp-day-anniversary\.bp-solo/);
+  assert.match(design, /border-radius:\s*999px 0 0 999px/);
+  assert.match(design, /border-radius:\s*0 999px 999px 0/);
+  assert.match(design, /--v2-fs-base:\s*1\.02rem/);
   assert.match(shell, /slice\(0, 9\)/);
   assert.match(shell, /dday-participant-memos/);
   assert.match(shell, /participantMemosFor/);
@@ -105,6 +112,8 @@ test('V2 PC polish keeps wider rail, fluid content, 3x3 gallery, and participant
   assert.match(shell, /anns\.slice\(0, 4\)\.map/);
   assert.match(shell, /day-bar-label/);
   assert.match(shell, /day-bar solo has-label/);
+  assert.match(shell, /anniversarySpanRole/);
+  assert.match(shell, /day-anniversary \$\{anniversarySpanRole/);
   assert.match(design, /background:\s*var\(--brand/);
   assert.match(design, /#F472B6/);
 });
