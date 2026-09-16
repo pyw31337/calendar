@@ -14,7 +14,7 @@ import {
 
 const bentoClass = value => String(value || '').split(/\s+/).filter(Boolean).map(name => `bp-${name}`).join(' ');
 
-const BULK_NO_PARTICIPANT_ID = (typeof GATHER_APP_CONSTANTS !== 'undefined' && GATHER_APP_CONSTANTS.BULK_NO_PARTICIPANT_ID) || '__none__';
+const BULK_NO_PARTICIPANT_ID = '__none__';
 
 import { getInitialAppView } from '../core/app-routing-state.js';
 import { isRenewalShellEnabled } from '../core/app-feature-flags.js';
