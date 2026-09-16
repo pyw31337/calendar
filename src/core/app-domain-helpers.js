@@ -1187,7 +1187,9 @@ async function syncPushSubscriptionChannels(calendarId, activeParticipantId) {
     const channelPrefs = typeof getNotifyChannels === 'function' ? getNotifyChannels() : {};
     const nowTs = Date.now();
     const subId = getSubscriptionHashId(subscription.endpoint);
-    const saved = await writeSharedCollection('push_subscriptions', calendarId, subId, {
+    // Prefer update (field-only) so we never replace endpoint/keys even if a writer forgets merge.
+    // Fall back to set+merge only when the subscription doc is missing (update fails).
+    const channelPatch = {
       participantId: activeParticipantId,
       updatedAt: nowTs,
       lastSeenAt: nowTs,
@@ -1197,7 +1199,11 @@ async function syncPushSubscriptionChannels(calendarId, activeParticipantId) {
         poll: channelPrefs.poll !== false,
         schedule: channelPrefs.schedule !== false
       }
-    }, 'set', '알림 채널 설정 동기화', { merge: true });
+    };
+    let saved = await writeSharedCollection('push_subscriptions', calendarId, subId, channelPatch, 'update', '알림 채널 설정 동기화');
+    if (!saved?.success) {
+      saved = await writeSharedCollection('push_subscriptions', calendarId, subId, channelPatch, 'set', '알림 채널 설정 동기화', { merge: true });
+    }
     return saved?.success ? { ok: true, subId } : { ok: false, reason: 'subscription-update-failed' };
   } catch (err) {
     console.warn('Failed to sync push notification channels:', err);

@@ -302,7 +302,7 @@ export async function replayQueuedCalendarWrite(operation) {
       payload.data,
       payload.method || 'update',
       payload.warnLabel || '대기 저장',
-      { deletePaths: payload.deletePaths || [], skipQueue: true }
+      { deletePaths: payload.deletePaths || [], skipQueue: true, merge: Boolean(payload.merge) }
     );
     return Boolean(result?.success);
   }

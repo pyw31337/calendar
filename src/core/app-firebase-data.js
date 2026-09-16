@@ -1722,7 +1722,7 @@ async function sendChatMessageRest(calId, message) {
   }
 }
 
-async function writeCollectionDocumentRest(collectionName, calId, docId, data, method = 'update', deletePaths = [], timeoutMs = FIRESTORE_REQUEST_TIMEOUT_MS) {
+async function writeCollectionDocumentRest(collectionName, calId, docId, data, method = 'update', deletePaths = [], timeoutMs = FIRESTORE_REQUEST_TIMEOUT_MS, options = {}) {
   try {
     const cleanCollection = sanitizeText(collectionName || '', 80);
     const cleanCalId = sanitizeText(calId || '', 64);
@@ -1758,7 +1758,10 @@ async function writeCollectionDocumentRest(collectionName, calId, docId, data, m
     }
 
     if (!cleanDocId) return false;
-    const query = method === 'update'
+    // Firestore REST PATCH without an updateMask overwrites the whole document. Treat set+merge
+    // the same as update so channel/health syncs do not wipe endpoint/keys/lastPush*.
+    const useFieldMask = method === 'update' || (method === 'set' && options?.merge);
+    const query = useFieldMask
       ? `?${Array.from(new Set([...Object.keys(fields), ...cleanDeletePaths])).map(key => `updateMask.fieldPaths=${encodeURIComponent(key)}`).join('&')}`
       : '';
     const patchRes = await fetchFirestoreRequest(`${baseUrl}/${cleanDocId}${query}`, {
@@ -1801,7 +1804,10 @@ async function writeCollectionDocumentWithFallback(collectionName, calId, docId,
         return { success: true, id: docId, transport: 'sdk' };
       }
       if (method === 'set') {
-        await withTimeout(colRef.doc(docId).set(cleanData), attemptTimeout(), `${warnLabel} timeout`);
+        // Honor options.merge so callers like syncPushSubscriptionChannels / subscribeUserToPush
+        // can patch channels without wiping endpoint, keys, or Functions-owned lastPush* fields.
+        const setOpts = options?.merge ? { merge: true } : undefined;
+        await withTimeout(colRef.doc(docId).set(cleanData, setOpts), attemptTimeout(), `${warnLabel} timeout`);
         return { success: true, id: docId, transport: 'sdk' };
       }
       let updateData = cleanData;
@@ -1829,7 +1835,7 @@ async function writeCollectionDocumentWithFallback(collectionName, calId, docId,
   }
   const restMethod = method === 'add' ? 'set' : method;
   const restDocId = method === 'add' ? addDocumentId : docId;
-  const restResult = await writeCollectionDocumentRest(cleanCollection, calId, restDocId, data, restMethod, cleanDeletePaths, remainingWriteTime());
+  const restResult = await writeCollectionDocumentRest(cleanCollection, calId, restDocId, data, restMethod, cleanDeletePaths, remainingWriteTime(), { merge: Boolean(options?.merge) });
   if (restResult?.success || options?.skipQueue || !shouldQueueCollectionWrite(restResult?.error || null, sdkError)) {
     return restResult?.success ? restResult : false;
   }

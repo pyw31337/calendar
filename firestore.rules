@@ -242,21 +242,34 @@ service cloud.firestore {
       match /push_subscriptions/{subId} {
         // list/get: device management in Settings (endpoints are already writeable by clients)
         allow get, list: if isCalendarDoc(calendarDocId);
-        allow create, update: if isCalendarDoc(calendarDocId)
-          && request.resource.data.keys().hasOnly(['endpoint', 'keys', 'participantId', 'createdAt', 'updatedAt', 'userAgent', 'deviceId', 'deviceLabel', 'lastSeenAt', 'channels'])
-          && request.resource.data.endpoint is string
-          && request.resource.data.keys is map
-          && request.resource.data.keys.auth is string
-          && request.resource.data.keys.p256dh is string
-          && request.resource.data.participantId is string
-          && request.resource.data.participantId.size() <= 160
-          && request.resource.data.createdAt is number
-          && (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is number)
-          && (!('userAgent' in request.resource.data) || (request.resource.data.userAgent is string && request.resource.data.userAgent.size() <= 600))
-          && (!('deviceId' in request.resource.data) || (request.resource.data.deviceId is string && request.resource.data.deviceId.size() <= 80))
-          && (!('deviceLabel' in request.resource.data) || (request.resource.data.deviceLabel is string && request.resource.data.deviceLabel.size() <= 120))
-          && (!('lastSeenAt' in request.resource.data) || request.resource.data.lastSeenAt is number)
-          && (!('channels' in request.resource.data) || request.resource.data.channels is map);
+        // Client-writable subscription fields. Cloud Functions also stamp lastPush* health keys
+        // onto the same docs; those must remain readable on the resulting document but must NOT
+        // be client-writable (affectedKeys gate on update) and must NOT block channel/health
+        // syncs via a whole-document hasOnly() check after Functions have written them.
+        function hasValidPushSubscriptionShape(data) {
+          return data.endpoint is string
+            && data.keys is map
+            && data.keys.auth is string
+            && data.keys.p256dh is string
+            && data.participantId is string
+            && data.participantId.size() <= 160
+            && data.createdAt is number
+            && (!('updatedAt' in data) || data.updatedAt is number)
+            && (!('userAgent' in data) || (data.userAgent is string && data.userAgent.size() <= 600))
+            && (!('deviceId' in data) || (data.deviceId is string && data.deviceId.size() <= 80))
+            && (!('deviceLabel' in data) || (data.deviceLabel is string && data.deviceLabel.size() <= 120))
+            && (!('lastSeenAt' in data) || data.lastSeenAt is number)
+            && (!('channels' in data) || data.channels is map);
+        }
+        function pushClientWritableKeys() {
+          return ['endpoint', 'keys', 'participantId', 'createdAt', 'updatedAt', 'userAgent', 'deviceId', 'deviceLabel', 'lastSeenAt', 'channels'];
+        }
+        allow create: if isCalendarDoc(calendarDocId)
+          && request.resource.data.keys().hasOnly(pushClientWritableKeys())
+          && hasValidPushSubscriptionShape(request.resource.data);
+        allow update: if isCalendarDoc(calendarDocId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(pushClientWritableKeys())
+          && hasValidPushSubscriptionShape(request.resource.data);
         allow delete: if isCalendarDoc(calendarDocId);
       }
 

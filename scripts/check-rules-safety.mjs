@@ -24,4 +24,9 @@ const activityLogRules = firestore.match(/match \/activityLogs\/\{logId\} \{([\s
 assert(/allow create:/.test(activityLogRules) && /allow update: if false;/.test(activityLogRules), 'activity logs must be append-only');
 assert(!/allow create,\s*update:/.test(activityLogRules), 'activity log updates must not be granted by an earlier rule');
 
+const pushSubRules = firestore.match(/match \/push_subscriptions\/\{subId\} \{([\s\S]*?)\n\s{6}\}/)?.[1] || '';
+assert(/allow create:/.test(pushSubRules) && /allow update:/.test(pushSubRules), 'push_subscriptions create/update must be split');
+assert(/affectedKeys\(\)\.hasOnly\(pushClientWritableKeys\(\)\)/.test(pushSubRules), 'push_subscriptions updates must use affectedKeys so lastPush* health fields do not block channel sync');
+assert(!/allow create,\s*update:/.test(pushSubRules), 'push_subscriptions must not use a combined create,update hasOnly gate');
+
 console.log('[rules-safety] passed: wildcard denies, scoped calendar reads, and server-only index are intact');
