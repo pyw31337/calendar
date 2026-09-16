@@ -974,6 +974,7 @@ export function ContentScreen(p) {
       onBack: p.onBack,
       onShare: p.onShare,
       onMenu: p.onMenu,
+      extra: p.onSearch && h(IconButton, { label: '컨텐츠 검색', icon: 'search', onClick: p.onSearch }),
     }),
     wrapLegacy(p.legacyView, 'v2-legacy-body v2-content-legacy'),
     overlays(p.slots)
@@ -989,6 +990,7 @@ export function ArchiveScreen(p) {
       onBack: p.onBack,
       onShare: p.onShare,
       onMenu: p.onMenu,
+      extra: p.onSearch && h(IconButton, { label: '보관함 검색', icon: 'search', onClick: p.onSearch }),
     }),
     wrapLegacy(p.legacyView, 'v2-legacy-body v2-archive-legacy'),
     overlays(p.slots)
