@@ -527,17 +527,19 @@
   flex-shrink: 0;
   box-sizing: border-box;
 }
-/* Green anniversary badge with title text inside (V2: 기념일 = green) */
+/* Green anniversary badge (V2: 기념일 = green).
+   Progressive disclosure: mobile/narrow = thin bar; PC/wide = title inside. */
 .v2-design .bp-day-bar-stack .bp-day-anniversary {
-  height: auto !important;
-  min-height: 1.05rem !important;
-  padding: 0.08rem 0.32rem !important;
   display: flex !important;
   align-items: center;
   justify-content: center;
   overflow: hidden;
   background: var(--status-green, #16A34A) !important;
   border-radius: 999px !important; /* single-day / solo default */
+  /* Mobile / narrow default: compact color bar */
+  height: 0.34rem !important;
+  min-height: 0.34rem !important;
+  padding: 0 !important;
 }
 /* Multi-day (연일) connected segments — square the joining edges */
 .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-solo {
@@ -562,7 +564,7 @@
 }
 .v2-design .bp-day-anniversary-label,
 .v2-design .bp-day-bar-stack .bp-day-anniversary-label {
-  display: block !important;
+  /* visibility controlled by progressive media queries */
   font-size: 0.56rem !important;
   font-weight: 800 !important;
   line-height: 1.15 !important;
@@ -816,11 +818,11 @@
   .v2-design .bp-day-bar-stack {
     gap: 0.16rem;
   }
-  .v2-design .bp-day-bar-stack .bp-day-anniversary,
+  .v2-design .bp-day-bar-stack .bp-day-anniversary:not(.bp-mid):not(.bp-bar-only),
   .v2-design .bp-day-bar-stack .bp-day-bar.bp-has-label {
     min-height: 1.1rem !important;
   }
-  .v2-design .bp-day-anniversary-label,
+  .v2-design .bp-day-anniversary:not(.bp-mid):not(.bp-bar-only) > .bp-day-anniversary-label,
   .v2-design .bp-day-bar-label {
     font-size: 0.58rem !important;
   }
@@ -863,7 +865,12 @@
 
 
 
-/* Month-grid anniversary: color bar only (no title/memo text in cell body) */
+/* Progressive disclosure: hide anniversary title on narrow; show inside badge on PC/wide.
+   Multi-day mid segments stay bar-only so the range reads as one continuous strip. */
+.v2-design .bp-day-bar-stack .bp-day-anniversary-label,
+.v2-design .bp-day-anniversary .bp-day-anniversary-label {
+  display: none !important;
+}
 .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-bar-only {
   min-height: 0.34rem !important;
   height: 0.34rem !important;
@@ -871,6 +878,44 @@
 }
 .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-bar-only .bp-day-anniversary-label {
   display: none !important;
+}
+
+@media (min-width: 768px) {
+  .v2-design .bp-day-bar-stack .bp-day-anniversary:not(.bp-mid):not(.bp-bar-only) {
+    height: auto !important;
+    min-height: 1.05rem !important;
+    padding: 0.08rem 0.32rem !important;
+  }
+  .v2-design .bp-day-bar-stack .bp-day-anniversary:not(.bp-mid):not(.bp-bar-only) > .bp-day-anniversary-label,
+  .v2-design .bp-day-anniversary:not(.bp-mid):not(.bp-bar-only) > .bp-day-anniversary-label {
+    display: block !important;
+    font-size: 0.5rem !important;
+    font-weight: 800 !important;
+    line-height: 1.15 !important;
+    color: #fff !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    padding: 0 2px !important;
+  }
+  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-mid {
+    height: 0.34rem !important;
+    min-height: 0.34rem !important;
+    padding: 0 !important;
+  }
+  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-mid > .bp-day-anniversary-label {
+    display: none !important;
+  }
+}
+
+@media (min-width: 1200px) {
+  .v2-design .bp-day-bar-stack .bp-day-anniversary:not(.bp-mid):not(.bp-bar-only) {
+    min-height: 1.1rem !important;
+  }
+  .v2-design .bp-day-bar-stack .bp-day-anniversary:not(.bp-mid):not(.bp-bar-only) > .bp-day-anniversary-label {
+    font-size: 0.56rem !important;
+  }
 }
 
 /* Holiday + 모임확정 on one row (e.g. 추석 연휴 | 모임확정) */
@@ -918,10 +963,7 @@
   display: none !important;
 }
 
-/* Always show anniversary title inside green badge (override mobile display:none) */
-.v2-design .bp-day-anniversary .bp-day-anniversary-label {
-  display: block !important;
-}
+/* (mobile consistency) always-show override removed — progressive rules above */
 
 
 /* Side-nav service brand (모여라 캘린더) — not calendar title */

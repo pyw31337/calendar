@@ -196,7 +196,7 @@ function wrapLegacy(legacyView, className) {
 /* -------------------------------------------------------------------------- */
 
 export function MemoScreen(p) {
-  const tags = [...new Set((p.allMemos || p.memos || []).flatMap(memo => memo.tags || []))];
+  // Tag cloud under search removed (V2-MOBILE-IA-PLAN): tags still filter via card taps / search.
   const useDedicatedCards = typeof p.renderCard === 'function' && Array.isArray(p.memos);
 
   if (!useDedicatedCards && p.legacyView) {
@@ -216,30 +216,12 @@ export function MemoScreen(p) {
               onBack: p.onBack,
               onShare: p.onShare,
               onMenu: p.onMenu,
-              extra: h(IconButton, { label: '정렬', icon: 'sort', onClick: p.onSort || p.onMenu }),
             },
             h(Search, {
               value: p.searchQuery || '',
               onChange: p.onSearch || (() => {}),
               placeholder: '메모 검색',
-            }),
-            h(
-              'div',
-              { className: 'bp-tag-filter-row', 'aria-label': '메모 태그 필터' },
-              ['', ...tags].map(tag =>
-                h(
-                  'button',
-                  {
-                    key: tag || 'all',
-                    type: 'button',
-                    className: `bp-tag-chip${(p.selectedTag || '') === tag ? ' bp-is-selected' : ''}`,
-                    'aria-pressed': (p.selectedTag || '') === tag,
-                    onClick: () => p.onSelectTag && p.onSelectTag(tag),
-                  },
-                  tag ? (tag.startsWith('#') ? tag : `#${tag}`) : '전체'
-                )
-              )
-            )
+            })
           ),
           h('div', { className: 'v2-dest-body v2-memo-body' }, slots.body),
           h(Fab, { label: '메모 작성', onClick: p.onCompose })
@@ -260,30 +242,12 @@ export function MemoScreen(p) {
             onBack: p.onBack,
             onShare: p.onShare,
             onMenu: p.onMenu,
-            extra: h(IconButton, { label: '정렬', icon: 'sort', onClick: p.onSort || p.onMenu }),
           },
           h(Search, {
             value: p.searchQuery || '',
             onChange: p.onSearch || (() => {}),
             placeholder: '메모 검색',
-          }),
-          h(
-            'div',
-            { className: 'bp-tag-filter-row', 'aria-label': '메모 태그 필터' },
-            ['', ...tags].map(tag =>
-              h(
-                'button',
-                {
-                  key: tag || 'all',
-                  type: 'button',
-                  className: `bp-tag-chip${(p.selectedTag || '') === tag ? ' bp-is-selected' : ''}`,
-                  'aria-pressed': (p.selectedTag || '') === tag,
-                  onClick: () => p.onSelectTag && p.onSelectTag(tag),
-                },
-                tag ? (tag.startsWith('#') ? tag : `#${tag}`) : '전체'
-              )
-            )
-          )
+          })
         ),
         wrapLegacy(p.legacyView, 'v2-legacy-body v2-memo-legacy'),
         h(Fab, { label: '메모 작성', onClick: p.onCompose })
@@ -305,30 +269,12 @@ export function MemoScreen(p) {
           onBack: p.onBack,
           onShare: p.onShare,
           onMenu: p.onMenu,
-          extra: h(IconButton, { label: '정렬', icon: 'sort', onClick: p.onSort || p.onMenu }),
         },
         h(Search, {
           value: p.searchQuery,
           onChange: p.onSearch,
           placeholder: '메모 검색',
-        }),
-        h(
-          'div',
-          { className: 'bp-tag-filter-row', 'aria-label': '메모 태그 필터' },
-          ['', ...tags].map(tag =>
-            h(
-              'button',
-              {
-                key: tag || 'all',
-                type: 'button',
-                className: `bp-tag-chip${p.selectedTag === tag ? ' bp-is-selected' : ''}`,
-                'aria-pressed': p.selectedTag === tag,
-                onClick: () => p.onSelectTag(tag),
-              },
-              tag ? (tag.startsWith('#') ? tag : `#${tag}`) : '전체'
-            )
-          )
-        )
+        })
       ),
       p.slots && p.slots.shared,
       h(

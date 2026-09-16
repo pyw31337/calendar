@@ -1,0 +1,86 @@
+{
+  "chat": {
+    "tagChipCount": 0,
+    "tagRowDisplay": null,
+    "hasSort": false,
+    "hasMenu": true,
+    "railOpen": false,
+    "annLabelDom": 0,
+    "annLabelVisible": 0,
+    "galleryCols": null,
+    "header": "채팅 모아엘가 · 4명"
+  },
+  "memo": {
+    "tagChipCount": 0,
+    "tagRowDisplay": null,
+    "hasSort": false,
+    "hasMenu": true,
+    "railOpen": false,
+    "annLabelDom": 0,
+    "annLabelVisible": 0,
+    "galleryCols": null,
+    "header": "메모"
+  },
+  "gallery": {
+    "tagChipCount": 0,
+    "tagRowDisplay": null,
+    "hasSort": false,
+    "hasMenu": true,
+    "railOpen": false,
+    "annLabelDom": 0,
+    "annLabelVisible": 0,
+    "galleryCols": 4,
+    "header": "갤러리"
+  },
+  "places": {
+    "tagChipCount": 0,
+    "tagRowDisplay": null,
+    "hasSort": false,
+    "hasMenu": true,
+    "railOpen": false,
+    "annLabelDom": 0,
+    "annLabelVisible": 0,
+    "galleryCols": null,
+    "header": "장소 등록 73곳"
+  },
+  "settlement": {
+    "tagChipCount": 0,
+    "tagRowDisplay": null,
+    "hasSort": false,
+    "hasMenu": true,
+    "railOpen": false,
+    "annLabelDom": 0,
+    "annLabelVisible": 0,
+    "galleryCols": null,
+    "header": "정산"
+  },
+  "content": {
+    "tagChipCount": 0,
+    "tagRowDisplay": null,
+    "hasSort": false,
+    "hasMenu": true,
+    "railOpen": false,
+    "annLabelDom": 0,
+    "annLabelVisible": 0,
+    "galleryCols": null,
+    "header": "컨텐츠"
+  },
+  "home-anniv": {
+    "tagChipCount": 0,
+    "tagRowDisplay": null,
+    "hasSort": false,
+    "hasMenu": false,
+    "railOpen": false,
+    "annLabelDom": 12,
+    "annLabelVisible": 0,
+    "galleryCols": null,
+    "header": ""
+  },
+  "side-menu-from-memo": {
+    "opened": true,
+    "openedClick": true,
+    "hasOpenClass": true,
+    "transform": "matrix(1, 0, 0, 1, 0, 0)",
+    "brand": "모여라 캘린더"
+  }
+}
