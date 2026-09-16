@@ -1711,6 +1711,7 @@ export function PlacesView({
     /* Scrollable Cards List Container (Scrolling independently) */
     !mapExpanded && /*#__PURE__*/React.createElement("div", {
       ref: scrollBodyRef,
+      className: "places-list-body",
       style: { flex: 1, overflowY: 'auto', padding: '8px 16px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }
     },
       /* Place cards list layout */

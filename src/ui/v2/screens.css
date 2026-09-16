@@ -267,3 +267,43 @@
   width: auto; height: auto;
   shape-rendering: geometricPrecision;
 }
+
+
+/* Destination page frame: mock chrome owns layout; live slots fill the body. */
+.v2-design .v2-dest-page .v2-dest-body {
+  position: relative;
+  min-height: calc(100dvh - 120px);
+}
+.v2-design .v2-dest-page .v2-memo-body,
+.v2-design .v2-dest-page .v2-memo-body .memo-list-scroll {
+  position: relative !important;
+  inset: auto !important;
+  height: auto !important;
+  min-height: 50dvh;
+  padding-top: 14px !important;
+}
+.v2-design .v2-dest-page .v2-places-body {
+  padding: 0 0 24px;
+}
+.v2-design .v2-dest-page .v2-settlement-body {
+  position: relative !important;
+  padding-top: 14px !important;
+  overflow: visible !important;
+  height: auto !important;
+}
+.v2-design .v2-dest-page .settlement-page-tabs {
+  position: sticky !important;
+  top: 0 !important;
+  transform: none !important;
+  left: auto !important;
+  right: auto !important;
+  width: 100% !important;
+}
+/* When body was lifted into the destination frame, hide leftover fixed chrome still
+   present in overlays (menus/modals remain via overlays()). */
+.v2-design .v2-dest-page .memo-view-header,
+.v2-design .v2-dest-page .places-view-header,
+.v2-design .v2-dest-page .settlement-page-header,
+.v2-design .v2-dest-page > .bp-app-shell > button[aria-label="뒤로가기"] {
+  display: none !important;
+}

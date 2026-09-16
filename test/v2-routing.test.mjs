@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { URL } from 'node:url';
 import { getInitialAppView, buildAppViewUrl } from '../src/core/app-routing-state.js';
 import { photoLightbox, timestampMs } from '../src/ui/v2/view-data.js';
+import { resolveV2Destination, V2_PRIMARY } from '../src/ui/v2/shell-nav.js';
 
 const location = search => ({ pathname: '/calendar/', search });
 test('default routes ignore V2 tab/sub parameters', () => {
@@ -10,21 +11,34 @@ test('default routes ignore V2 tab/sub parameters', () => {
   assert.equal(getInitialAppView(location('?view=chat&tab=records&sub=memo')), 'chat');
   assert.equal(buildAppViewUrl(location('?id=example'), 'memo'), '/calendar/?id=example&view=memo');
 });
-test('V2 destinations activate the corresponding existing data view', () => {
-  for (const [sub, view] of Object.entries({ memo: 'memo', places: 'places', media: 'gallery', archive: 'history', content: 'content' })) {
+test('V2 first-class destinations use ?tab=memo|places (not records sub)', () => {
+  assert.equal(getInitialAppView(location('?shell=v2&tab=memo')), 'memo');
+  assert.equal(getInitialAppView(location('?shell=v2&tab=places')), 'places');
+  assert.equal(getInitialAppView(location('?shell=v2&tab=chat')), 'chat');
+  assert.equal(getInitialAppView(location('?shell=v2&tab=settlement')), 'settlement');
+  // Legacy bookmark still resolves to the same data view, then shell promotes tab.
+  assert.equal(getInitialAppView(location('?shell=v2&tab=records&sub=memo&view=chat')), 'memo');
+  assert.equal(getInitialAppView(location('?shell=v2&tab=records&sub=places')), 'places');
+  for (const view of ['memo', 'places', 'chat', 'settlement']) {
+    const url = buildAppViewUrl(location('?id=example&shell=v2&tab=chat'), view);
+    const params = new URL(url, 'https://example.test').searchParams;
+    assert.equal(params.get('tab'), view);
+    assert.equal(params.has('sub'), false);
+    assert.equal(params.get('id'), 'example');
+  }
+});
+test('V2 records subs remain for gallery/history/content only', () => {
+  for (const [sub, view] of Object.entries({ media: 'gallery', archive: 'history', content: 'content' })) {
     assert.equal(getInitialAppView(location(`?shell=v2&tab=records&sub=${sub}&view=chat`)), view);
     const url = buildAppViewUrl(location('?id=example&shell=v2&tab=chat'), view);
     const params = new URL(url, 'https://example.test').searchParams;
     assert.equal(params.get('tab'), 'records');
     assert.equal(params.get('sub'), sub);
-    assert.equal(params.get('id'), 'example');
   }
-  assert.equal(getInitialAppView(location('?shell=v2&tab=chat')), 'chat');
-  assert.equal(getInitialAppView(location('?shell=v2&tab=settlement')), 'settlement');
   assert.equal(getInitialAppView(location('?shell=v2&tab=more')), 'calendar');
 });
 test('V2 home clears stale detail routes while retaining calendar identity', () => {
-  const result = buildAppViewUrl(location('?shell=v2&id=example&tab=records&sub=memo&view=memo'), 'calendar');
+  const result = buildAppViewUrl(location('?shell=v2&id=example&tab=memo&view=memo'), 'calendar');
   const params = new URL(result, 'https://example.test').searchParams;
   for (const key of ['tab', 'sub', 'view']) assert.equal(params.has(key), false);
   assert.equal(params.get('shell'), 'v2');
@@ -32,6 +46,13 @@ test('V2 home clears stale detail routes while retaining calendar identity', () 
 });
 test('direct share views remain authoritative', () => {
   assert.equal(getInitialAppView(location('?shell=v2&tab=chat'), () => ({ view: 'memo' })), 'memo');
+});
+test('shell-nav resolves Bento IA to first-class destinations', () => {
+  assert.deepEqual(resolveV2Destination('memo'), { tab: 'memo', sub: null });
+  assert.deepEqual(resolveV2Destination('places'), { tab: 'places', sub: null });
+  assert.deepEqual(resolveV2Destination('gallery'), { tab: 'records', sub: 'media' });
+  assert.equal(V2_PRIMARY.some(i => i.id === 'memo'), true);
+  assert.equal(V2_PRIMARY.some(i => i.id === 'places'), true);
 });
 test('gallery preview uses the shared lightbox URL and identity contract', () => {
   const photos = [{ full: 'https://example.test/a.jpg', messageId: 'm1', imageIndex: 0, assetKey: 'asset-1', thumb: 'thumb-1' }, { url: 'https://example.test/b.jpg', memoId: 'memo2', refKey: 'ref-2' }];
@@ -58,4 +79,8 @@ test('V2 date modal opts into bento sheet chrome without changing default export
   assert.match(modal, /\.renewal-shell\.v2-design/);
   assert.match(shell, /shellChrome:\s*'bento'/);
   assert.equal((shell.match(/shellChrome:\s*'bento'/g) || []).length >= 3, true);
+  // First-class destination tabs present in shell.
+  assert.match(shell, /activeTab === 'memo'/);
+  assert.match(shell, /activeTab === 'places'/);
+  assert.match(shell, /resolveV2Destination/);
 });

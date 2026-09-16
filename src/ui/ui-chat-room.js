@@ -1340,6 +1340,7 @@ export function ChatRoomView({
     style: { flex: 1, position: 'relative', minHeight: 0 }
   }, /*#__PURE__*/React.createElement("div", {
     ref: chatMessagesContainerRef,
+    className: "chat-messages-scroll",
     onScroll: handleScrollCombined,
     style: {
       position: 'absolute',

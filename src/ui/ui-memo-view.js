@@ -1223,8 +1223,10 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
 
     /* Main Scrollable Body */
     /*#__PURE__*/React.createElement("div", {
+      className: "memo-view-body",
       style: { flex: 1, position: 'relative', minHeight: 0 }
     }, /*#__PURE__*/React.createElement("div", {
+      className: "memo-list-scroll",
       onScroll: handleMemoScroll,
       style: { position: 'absolute', inset: 0, overflowY: 'auto', padding: '16px', paddingTop: `calc(${isSearchOpen ? '116px' : '72px'} + env(safe-area-inset-top, 0px))`, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '20px' }
     },
@@ -1280,6 +1282,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
 
       /* Rich Memo Input Composer (Google Keep style) */
       /*#__PURE__*/React.createElement("div", {
+        className: "memo-composer-card",
         style: {
           width: '100%',
           maxWidth: '520px',

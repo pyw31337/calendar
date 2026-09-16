@@ -10,6 +10,9 @@ import './reference-chat.css';
 import './screens.css';
 import { calculateSettlementRows } from '../../core/settlement-calculator.js';
 import { authorFor } from './view-data.js';
+import {
+  extractChatSlots, extractMemoSlots, extractPlacesSlots, extractSettlementSlots,
+} from './shell-nav.js';
 
 const h = (...args) => window.React.createElement(...args);
 
@@ -181,6 +184,53 @@ export function MemoScreen(p) {
   const useDedicatedCards = typeof p.renderCard === 'function' && Array.isArray(p.memos);
 
   if (!useDedicatedCards && p.legacyView) {
+    const slots = { ...extractMemoSlots(p.legacyView), ...(p.slots || {}) };
+    // Prefer mock page frame + live body/composer slots over opaque wrap of the whole tree.
+    if (slots.body) {
+      return h(
+        'section',
+        { className: 'v2-memo v2-fullscreen v2-dest-page' },
+        h(
+          'div',
+          { className: 'bp-app-shell' },
+          h(
+            PageHeader,
+            {
+              title: '메모',
+              onBack: p.onBack,
+              onShare: p.onShare,
+              onMenu: p.onMenu,
+              extra: h(IconButton, { label: '정렬', icon: 'sort', onClick: p.onSort || p.onMenu }),
+            },
+            h(Search, {
+              value: p.searchQuery || '',
+              onChange: p.onSearch || (() => {}),
+              placeholder: '메모 검색',
+            }),
+            h(
+              'div',
+              { className: 'bp-tag-filter-row', 'aria-label': '메모 태그 필터' },
+              ['', ...tags].map(tag =>
+                h(
+                  'button',
+                  {
+                    key: tag || 'all',
+                    type: 'button',
+                    className: `bp-tag-chip${(p.selectedTag || '') === tag ? ' bp-is-selected' : ''}`,
+                    'aria-pressed': (p.selectedTag || '') === tag,
+                    onClick: () => p.onSelectTag && p.onSelectTag(tag),
+                  },
+                  tag ? (tag.startsWith('#') ? tag : `#${tag}`) : '전체'
+                )
+              )
+            )
+          ),
+          h('div', { className: 'v2-dest-body v2-memo-body' }, slots.body),
+          h(Fab, { label: '메모 작성', onClick: p.onCompose })
+        ),
+        overlays(slots, ['body', 'composer', 'list'])
+      );
+    }
     return h(
       'section',
       { className: 'v2-memo v2-fullscreen v2-wrap-legacy' },
@@ -222,7 +272,7 @@ export function MemoScreen(p) {
         wrapLegacy(p.legacyView, 'v2-legacy-body v2-memo-legacy'),
         h(Fab, { label: '메모 작성', onClick: p.onCompose })
       ),
-      overlays(p.slots)
+      overlays(slots)
     );
   }
 
@@ -317,6 +367,46 @@ export function PlacesScreen(p) {
   };
 
   if (!Array.isArray(p.places) && p.legacyView) {
+    const slots = { ...extractPlacesSlots(p.legacyView), ...(p.slots || {}) };
+    if (slots.list || slots.map) {
+      return h(
+        'section',
+        { className: 'v2-places v2-fullscreen v2-dest-page' },
+        h(
+          'div',
+          { className: 'bp-app-shell' },
+          h(
+            PageHeader,
+            {
+              title: '장소',
+              count: p.countLabel,
+              onBack: p.onBack,
+              onShare: p.onShare,
+              onMenu: p.onMenu,
+              extra: h(IconButton, {
+                label: mapOpen ? '지도 닫기' : '지도로 보기',
+                icon: 'map',
+                onClick: () => {
+                  setMapOpen(v => !v);
+                  if (p.onToggleMap) p.onToggleMap();
+                },
+              }),
+            },
+            h(Search, {
+              value: p.searchQuery || '',
+              onChange: p.onSearch || (() => {}),
+              placeholder: '장소 검색',
+            })
+          ),
+          mapOpen && slots.map && h('div', { className: 'v2-map-panel' }, slots.map),
+          slots.filters,
+          slots.toolbar,
+          h('div', { className: 'v2-dest-body v2-places-body' }, slots.list || slots.map),
+          h(Fab, { label: '장소 등록', onClick: p.onCompose })
+        ),
+        overlays(slots, ['map', 'toolbar', 'list', 'filters'])
+      );
+    }
     return h(
       'section',
       { className: 'v2-places v2-fullscreen v2-wrap-legacy' },
@@ -349,7 +439,7 @@ export function PlacesScreen(p) {
         wrapLegacy(p.legacyView, 'v2-legacy-body v2-places-legacy'),
         h(Fab, { label: '장소 등록', onClick: p.onCompose })
       ),
-      overlays(p.slots)
+      overlays(slots)
     );
   }
 
@@ -496,6 +586,27 @@ const won = amount => `${Math.abs(Number(amount) || 0).toLocaleString('ko-KR')}�
 
 export function SettlementScreen(p) {
   if (p.legacyView && !Array.isArray(p.cards)) {
+    const slots = { ...extractSettlementSlots(p.legacyView), ...(p.slots || {}) };
+    if (slots.body) {
+      return h(
+        'section',
+        { className: 'v2-settlement v2-fullscreen v2-dest-page' },
+        h(
+          'div',
+          { className: 'bp-app-shell' },
+          h(PageHeader, {
+            title: '정산',
+            onBack: p.onBack,
+            onShare: p.onShare,
+            onMenu: p.onMenu,
+          }),
+          slots.tabs,
+          h('div', { className: 'v2-dest-body v2-settlement-body' }, slots.body),
+          h(Fab, { label: '지출 추가', onClick: p.onCompose })
+        ),
+        overlays(slots, ['body', 'tabs'])
+      );
+    }
     return h(
       'section',
       { className: 'v2-settlement v2-fullscreen v2-wrap-legacy' },
@@ -511,7 +622,7 @@ export function SettlementScreen(p) {
         wrapLegacy(p.legacyView, 'v2-legacy-body v2-settlement-legacy'),
         h(Fab, { label: '지출 추가', onClick: p.onCompose })
       ),
-      overlays(p.slots)
+      overlays(slots)
     );
   }
 
@@ -715,12 +826,13 @@ export function SettlementScreen(p) {
 export function ChatScreen(p) {
   const React = window.React;
   const [toolsOpen, setToolsOpen] = React.useState(false);
-  const slots = p.slots || {};
+  const slots = { ...(p.legacyView ? extractChatSlots(p.legacyView) : {}), ...(p.slots || {}) };
   const subtitle = p.subtitle
     || `${String(p.calendar?.title || '').replace(/^[^\p{L}\p{N}]+/u, '').trim()} · ${(p.calendar?.participants || []).filter(person => !person.deletedAt).length}명`;
 
-  // Preferred path: feature view extracted named slots (composer / body / …).
-  if (slots.body && slots.composer && p.legacyView && React.isValidElement(p.legacyView)) {
+  // Preferred path: mock header + live message list + composer slots (ChatFull structure).
+  // Require textarea+send so we can rebuild the composer row; otherwise fall back to wrap.
+  if (slots.body && slots.composer && slots.textarea && slots.send && p.legacyView && React.isValidElement(p.legacyView)) {
     const clone = React.cloneElement;
     const originalRoot = Array.isArray(p.legacyView.props.children)
       ? p.legacyView.props.children[0]

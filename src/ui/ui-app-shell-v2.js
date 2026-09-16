@@ -8,6 +8,9 @@ import './v2/reference-home.css';
 import './v2/design.css';
 import { renderMemoScreen, renderPlacesScreen, renderSettlementScreen, renderChatScreen } from './v2/screens.js';
 import { authorFor, latestRows, timestampMs, photoLightbox } from './v2/view-data.js';
+import {
+  V2_PRIMARY, V2_SECONDARY, V2_DESTINATION_TABS, resolveV2Destination,
+} from './v2/shell-nav.js';
 
 const bentoClass = value => String(value || '').split(/\s+/).filter(Boolean).map(name => `bp-${name}`).join(' ');
 
@@ -27,26 +30,19 @@ import { computeKoreanHolidaysForYear, getKoreanSolarTermsForYear } from '../cor
 import { getAnniversariesForDate } from '../core/app-anniversary-dates.js';
 import { buildMainCalendarScreenState } from '../core/app-calendar-screen-state.js';
 
+/** Legacy 5-tab labels kept for PlaceholderPane; primary IA is V2_PRIMARY side-nav. */
 const TABS = [
   { id: 'calendar', label: '캘린더' },
   { id: 'chat', label: '대화' },
+  { id: 'memo', label: '메모' },
+  { id: 'places', label: '장소' },
   { id: 'records', label: '기록' },
   { id: 'settlement', label: '정산' },
   { id: 'more', label: '더보기' },
 ];
-const BENTO_MAIN_ITEMS = [
-  { id: 'calendar', label: '캘린더', icon: 'calendar' },
-  { id: 'chat', label: '채팅', icon: 'chat', isPill: true },
-  { id: 'settlement', label: '정산', icon: 'settlement' },
-  { id: 'gallery', label: '갤러리', icon: 'gallery' },
-  { id: 'places', label: '장소', icon: 'places' },
-  { id: 'memo', label: '메모', icon: 'memo' },
-];
-const BENTO_SUB_ITEMS = [
-  { id: 'content', label: '컨텐츠', icon: 'content' },
-  { id: 'archive', label: '보관함', icon: 'archive' },
-];
-const TAB_IDS = TABS.map(t => t.id);
+const BENTO_MAIN_ITEMS = V2_PRIMARY;
+const BENTO_SUB_ITEMS = V2_SECONDARY;
+const TAB_IDS = V2_DESTINATION_TABS;
 const DEFAULT_TAB = 'calendar';
 
 /**
@@ -56,9 +52,7 @@ const DEFAULT_TAB = 'calendar';
  */
 const RECORDS_SUBTABS = [
   { id: 'all', label: '전체' },
-  { id: 'memo', label: '메모' },
   { id: 'media', label: '사진·영상' },
-  { id: 'places', label: '장소' },
   { id: 'archive', label: '보관함' },
   { id: 'content', label: '콘텐츠' },
 ];
@@ -71,7 +65,14 @@ function readTabFromLocation() {
   try {
     const params = new URLSearchParams(window.location.search);
     const view = getInitialAppView(window.location);
-    const raw = params.get('tab') || ({ memo: 'records', places: 'records', gallery: 'records', history: 'records', content: 'records' }[view] || view);
+    // Prefer explicit ?tab=; otherwise map data-view → first-class destination.
+    const fromView = ({ memo: 'memo', places: 'places', gallery: 'records', history: 'records', content: 'records', chat: 'chat', settlement: 'settlement' })[view];
+    let raw = params.get('tab') || fromView || view;
+    // Old bookmarks: ?tab=records&sub=memo|places → promote to first-class tabs.
+    if (raw === 'records') {
+      const sub = params.get('sub');
+      if (sub === 'memo' || sub === 'places') raw = sub;
+    }
     return TAB_IDS.includes(raw) ? raw : DEFAULT_TAB;
   } catch (_) {
     return DEFAULT_TAB;
@@ -83,7 +84,9 @@ function readRecordsSubTabFromLocation() {
   if (typeof window === 'undefined' || !window.location) return DEFAULT_RECORDS_SUBTAB;
   try {
     const params = new URLSearchParams(window.location.search);
-    const raw = params.get('sub') || ({ memo: 'memo', places: 'places', gallery: 'media', history: 'archive', content: 'content' }[params.get('view')]);
+    const raw = params.get('sub') || ({ gallery: 'media', history: 'archive', content: 'content' }[params.get('view')]);
+    // memo/places are first-class now — ignore as records sub.
+    if (raw === 'memo' || raw === 'places') return DEFAULT_RECORDS_SUBTAB;
     return RECORDS_SUBTAB_IDS.includes(raw) ? raw : DEFAULT_RECORDS_SUBTAB;
   } catch (_) {
     return DEFAULT_RECORDS_SUBTAB;
@@ -103,7 +106,8 @@ function writeLocationState(tabId, subTabId, { push } = { push: true }) {
   const url = new URL(window.location.href);
   if (tabId === DEFAULT_TAB) url.searchParams.delete('tab');
   else url.searchParams.set('tab', tabId);
-  if (tabId !== 'records' || subTabId === DEFAULT_RECORDS_SUBTAB) url.searchParams.delete('sub');
+  // Only gallery/content/archive (records) keep ?sub=; memo/places are first-class tabs.
+  if (tabId !== 'records' || !subTabId || subTabId === DEFAULT_RECORDS_SUBTAB) url.searchParams.delete('sub');
   else url.searchParams.set('sub', subTabId);
   url.searchParams.delete('view');
   const method = push ? 'pushState' : 'replaceState';
@@ -1049,22 +1053,26 @@ function PlaceholderPane({ tabId, calendarName }) {
 }
 
 /** 기록 > 전체: 이미 로드된 데이터만 사용하는 빠른 요약 허브. */
-function RecordsOverviewPane({ recordsContext, calendarName, onSelectSubTab }) {
+function RecordsOverviewPane({ recordsContext, calendarName, onSelectSubTab, onChangeView }) {
   const React = window.React;
   const memoCount = Array.isArray(recordsContext?.memoProps?.memos) ? recordsContext.memoProps.memos.length : 0;
   const mediaCount = Array.isArray(recordsContext?.mediaProps?.indexedPhotos) ? recordsContext.mediaProps.indexedPhotos.length : 0;
   const placeCount = Array.isArray(recordsContext?.placesProps?.calendar?.places) ? recordsContext.placesProps.calendar.places.length : 0;
   const cards = [
-    { id: 'memo', label: '메모', count: memoCount, icon: '📝', hint: '날짜와 태그로 정리된 메모' },
+    { id: 'memo', label: '메모', count: memoCount, icon: '📝', hint: '날짜와 태그로 정리된 메모', firstClass: true },
     { id: 'media', label: '사진·영상', count: mediaCount, icon: '🖼️', hint: '모임과 대화에 연결된 미디어' },
-    { id: 'places', label: '장소', count: placeCount, icon: '📍', hint: '저장한 장소와 방문 기록' },
+    { id: 'places', label: '장소', count: placeCount, icon: '📍', hint: '저장한 장소와 방문 기록', firstClass: true },
     { id: 'archive', label: '보관함', count: Array.isArray(recordsContext?.historyProps?.anniversaries) ? recordsContext.historyProps.anniversaries.length : 0, icon: '🗂️', hint: '기념일과 추억 모음' },
   ];
+  const openCard = (card) => {
+    if (card.firstClass && typeof onChangeView === 'function') onChangeView(card.id);
+    else onSelectSubTab(card.id);
+  };
   return React.createElement('section', { className: 'renewal-records-overview', 'aria-label': '기록 요약' },
     React.createElement('div', { className: 'renewal-shell-section-title' }, calendarName ? `${calendarName} 기록` : '기록 요약'),
-    React.createElement('p', { className: 'renewal-records-overview-subtitle' }, '메모, 사진, 장소와 추억을 한곳에서 확인하세요.'),
+    React.createElement('p', { className: 'renewal-records-overview-subtitle' }, '메모·장소는 독립 페이지, 사진·보관함은 기록 허브에서 이어집니다.'),
     React.createElement('div', { className: 'renewal-records-overview-grid' }, cards.map(card =>
-      React.createElement('button', { key: card.id, type: 'button', className: 'renewal-records-overview-card', onClick: () => onSelectSubTab(card.id) },
+      React.createElement('button', { key: card.id, type: 'button', className: 'renewal-records-overview-card', onClick: () => openCard(card) },
         React.createElement('span', { className: 'renewal-records-overview-icon', 'aria-hidden': 'true' }, card.icon),
         React.createElement('span', { className: 'renewal-records-overview-card-main' },
           React.createElement('span', { className: 'renewal-records-overview-card-label' }, card.label),
@@ -1427,8 +1435,13 @@ function MemoPane({ recordsContext, onChangeView, onOpenAppSettings }) {
 
 function RecordsPane({ subTab, onSelectSubTab, calendarName, recordsContext, calendarContext, onChangeView, onOpenAppSettings, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource }) {
   const React = window.React;
+  // Memo/Places are first-class destinations — never show renewal-shell-subtab chrome for them.
+  React.useEffect(() => {
+    if (subTab === 'memo') onChangeView('memo');
+    else if (subTab === 'places') onChangeView('places');
+  }, [subTab]);
   return React.createElement(React.Fragment, null,
-    !['memo', 'places'].includes(subTab) && React.createElement('div', { className: 'renewal-shell-subtab-row', role: 'tablist', 'aria-label': '기록 필터' },
+    React.createElement('div', { className: 'renewal-shell-subtab-row', role: 'tablist', 'aria-label': '기록 필터' },
       RECORDS_SUBTABS.map(t => React.createElement('button', {
         key: t.id,
         type: 'button',
@@ -1443,16 +1456,12 @@ function RecordsPane({ subTab, onSelectSubTab, calendarName, recordsContext, cal
       : subTab === 'content'
       ? React.createElement(ContentPane, { recordsContext, onChangeView, onOpenAppSettings })
       : subTab === 'all'
-      ? React.createElement(RecordsOverviewPane, { recordsContext, calendarName, onSelectSubTab })
+      ? React.createElement(RecordsOverviewPane, { recordsContext, calendarName, onSelectSubTab, onChangeView })
       : subTab === 'archive'
       ? React.createElement(HistoryPane, { recordsContext, calendarContext, onChangeView, onOpenAppSettings, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource })
-      : subTab === 'places'
-      ? React.createElement(PlacesPane, { recordsContext, calendarContext, onChangeView, onOpenAppSettings, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource })
-      : subTab === 'memo'
-      ? React.createElement(MemoPane, { recordsContext, onChangeView, onOpenAppSettings })
       : React.createElement(EmptyState, {
         title: `${RECORDS_SUBTABS.find(t => t.id === subTab)?.label || subTab} (준비 중)`,
-        subtitle: withCalendarPrefix(calendarName, 'WP-06에서 실제 데이터가 이 자리에 연결됩니다.'),
+        subtitle: withCalendarPrefix(calendarName, '갤러리·보관함·콘텐츠는 기록 허브에 남아 있습니다. 메모·장소는 사이드 메뉴의 독립 페이지입니다.'),
       })
   );
 }
@@ -1884,15 +1893,13 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   // in this shell, so this just maps the old view id to the equivalent tab/subtab instead of
   // reimplementing navigation. `onBack`/`onOpenGallery` (ChatPane) reuse this same mapping.
   const onChangeView = (view) => {
-    if (view === 'chat') { setActiveTab('chat'); return; }
-    if (view === 'settlement') { setActiveTab('settlement'); return; }
-    const recordsSubTabByView = { memo: 'memo', places: 'places', gallery: 'media', history: 'archive', content: 'content' };
-    if (recordsSubTabByView[view]) {
+    const dest = resolveV2Destination(view);
+    if (dest.tab === 'records' && dest.sub) {
       setActiveTab('records');
-      setRecordsSubTab(recordsSubTabByView[view]);
+      setRecordsSubTab(dest.sub);
       return;
     }
-    setActiveTab('calendar');
+    setActiveTab(dest.tab);
   };
   const onOpenAppSettings = () => openMoreModalById('app-settings');
 
@@ -1994,12 +2001,19 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
 
   const selectSideItem = (id) => {
     setIsSideNavOpen(false);
-    if (id === 'calendar' || id === 'chat' || id === 'settlement') { setActiveTab(id); return; }
-    const subById = { gallery: 'media', places: 'places', memo: 'memo', content: 'content', archive: 'archive' };
-    if (subById[id]) { setActiveTab('records'); setRecordsSubTab(subById[id]); }
+    const dest = resolveV2Destination(id);
+    if (dest.tab === 'records' && dest.sub) {
+      setActiveTab('records');
+      setRecordsSubTab(dest.sub);
+      return;
+    }
+    setActiveTab(dest.tab);
   };
-  const sideSubById = { gallery: 'media', places: 'places', memo: 'memo', content: 'content', archive: 'archive' };
-  const isSideItemActive = (id) => id === activeTab || (activeTab === 'records' && sideSubById[id] === recordsSubTab);
+  const isSideItemActive = (id) => {
+    const dest = resolveV2Destination(id);
+    if (dest.tab === 'records') return activeTab === 'records' && dest.sub === recordsSubTab;
+    return id === activeTab || dest.tab === activeTab;
+  };
 
   const allChat = Array.isArray(calendarContext?.displayChatMessages) ? calendarContext.displayChatMessages : (recordsContext?.mediaProps?.chatMessages || []);
   const lastChatMsg = latestRows(allChat)[0];
@@ -2019,7 +2033,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   const chatPillColor = chatAuthorPart?.color ? `${chatAuthorPart.color}33` : '#FEE2E2';
   const chatPillTextColor = chatAuthorPart?.color || '#DC2626';
 
-  const hasFullScreen = activeTab === 'chat' || activeTab === 'settlement' || (activeTab === 'records' && ['memo', 'places'].includes(recordsSubTab));
+  const hasFullScreen = activeTab === 'chat' || activeTab === 'settlement' || activeTab === 'memo' || activeTab === 'places';
   const bentoSideNav = React.createElement(React.Fragment, null,
     React.createElement('div', { className: bentoClass('side-nav-head') },
       React.createElement('div', { className: bentoClass('side-nav-brand') },
@@ -2112,12 +2126,16 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
     React.createElement('div', { className: `renewal-shell v2-design ${hasFullScreen ? 'v2-has-detail' : ''} ${isSideNavCollapsed ? 'is-side-collapsed' : ''}`.trim() },
       React.createElement('button', { type: 'button', className: bentoClass(`side-nav-backdrop ${isSideNavOpen ? 'is-open' : ''}`), onClick: () => setIsSideNavOpen(false), 'aria-label': '메뉴 닫기' }),
       React.createElement('nav', { className: bentoClass(`side-nav ${isSideNavOpen ? 'is-open' : ''} ${isSideNavCollapsed ? 'is-collapsed' : ''}`), 'aria-label': '주 메뉴' }, bentoSideNav),
-      React.createElement('main', { className: activeTab === 'calendar' ? 'bp-app-shell is-bento-home' : `renewal-shell-main v2-destination ${hasFullScreen ? (activeTab === 'records' ? `v2-${recordsSubTab}` : `v2-${activeTab}`) : `is-${activeTab}`}` },
+      React.createElement('main', { className: activeTab === 'calendar' ? 'bp-app-shell is-bento-home' : `renewal-shell-main v2-destination ${hasFullScreen ? `v2-${activeTab}` : (activeTab === 'records' ? `is-records v2-records-${recordsSubTab}` : `is-${activeTab}`)}` },
 
         activeTab === 'calendar'
           ? React.createElement(CalendarPane, { calendarContext, recordsContext, onOpenDate: setDateModalDate, onChangeView, calendarName, onOpenSearch: () => handleSelectMoreItem('search'), onOpenMore: () => setIsSideNavOpen(true) })
           : activeTab === 'chat'
           ? React.createElement(ChatPane, { chatContext, onChangeView, onOpenAppSettings })
+          : activeTab === 'memo'
+          ? React.createElement(MemoPane, { recordsContext, onChangeView, onOpenAppSettings })
+          : activeTab === 'places'
+          ? React.createElement(PlacesPane, { recordsContext, calendarContext, onChangeView, onOpenAppSettings, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource })
           : activeTab === 'settlement'
           ? React.createElement(SettlementPane, { settlementContext, onChangeView, onOpenAppSettings, onOpenDate: setDateModalDate })
           : activeTab === 'records'
