@@ -149,3 +149,8 @@ PC 1440×900 screenshots in `designv2/parity-shots/audit-live-capture/loop{2,3,4
 - Hide `.chat-room-header` whenever `.v2-chat` present
 - PC density columns for chat/memo/settlement
 - `v2-records-frame` / body flex + absolute fill (gallery empty-pane regression)
+
+### Loop 6 (gallery tabs + chat width)
+- Gallery `사진|링크|파일` were `position:fixed; left:0` → 사진 tab hid under 280px rail. Fixed via `v2Embed` sticky + CSS.
+- Chat column widened 720→1080px beside rail (loop6-chat).
+- Still open: bubble own-message color vs ChatFull white bubbles; SettlementFull card chrome; Content/Archive polish.

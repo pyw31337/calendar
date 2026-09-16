@@ -2548,7 +2548,7 @@ export function ChatGalleryModal({
       display: 'flex', alignItems: 'center', padding: '0',
       borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)',
       flexShrink: 0,
-      position: 'fixed', top: `calc(${isSearchOpen ? '104px' : '56px'} + env(safe-area-inset-top, 0px))`, left: 0, right: 0, zIndex: 1009,
+      position: v2Embed ? 'sticky' : 'fixed', top: v2Embed ? 0 : `calc(${isSearchOpen ? '104px' : '56px'} + env(safe-area-inset-top, 0px))`, left: v2Embed ? undefined : 0, right: v2Embed ? undefined : 0, zIndex: v2Embed ? 5 : 1009,
       transition: 'transform 0.3s ease, top 0.3s ease',
       transform: isHeaderVisible ? 'translateY(0)' : 'translateY(calc(-100% - 56px))'
     }
@@ -2570,7 +2570,7 @@ export function ChatGalleryModal({
       display: 'flex', alignItems: 'center', padding: '0',
       borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)',
       flexShrink: 0,
-      position: 'fixed', top: `calc(${isSearchOpen ? '104px' : '56px'} + env(safe-area-inset-top, 0px))`, left: 0, right: 0, zIndex: 1009,
+      position: v2Embed ? 'sticky' : 'fixed', top: v2Embed ? 0 : `calc(${isSearchOpen ? '104px' : '56px'} + env(safe-area-inset-top, 0px))`, left: v2Embed ? undefined : 0, right: v2Embed ? undefined : 0, zIndex: v2Embed ? 5 : 1009,
       transition: 'transform 0.3s ease, top 0.3s ease',
       transform: isHeaderVisible ? 'translateY(0)' : 'translateY(calc(-100% - 56px))'
     }
@@ -2600,10 +2600,14 @@ export function ChatGalleryModal({
       // that far down on iOS standalone instead of at the very top of the screen (0 elsewhere).
       padding: asPage
         ? (
-            `calc(${(!isHeaderVisible
-              ? '12px'
-              : (isSearchOpen ? '156px' : '108px'))} + env(safe-area-inset-top, 0px))`
-            + ' 16px 16px 16px'
+            v2Embed
+              ? '12px 16px 16px 16px'
+              : (
+                  `calc(${(!isHeaderVisible
+                    ? '12px'
+                    : (isSearchOpen ? '156px' : '108px'))} + env(safe-area-inset-top, 0px))`
+                  + ' 16px 16px 16px'
+                )
           )
         : '16px',
       display: 'flex', flexDirection: 'column', gap: '12px', boxSizing: 'border-box',
