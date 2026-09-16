@@ -1367,14 +1367,16 @@ function MediaPane({ recordsContext, onChangeView, onOpenAppSettings }) {
     v2Embed: true,
   });
   return React.createElement(React.Fragment, null,
-    renderGalleryScreen({
-      legacyView: galleryView,
-      onBack: () => onChangeView('calendar'),
-      onShare: recordsContext.onOpenGalleryShare,
-      onMenu: onOpenAppSettings,
-      onSearch: undefined,
-      slots: {},
-    }),
+    React.createElement('div', { className: 'v2-records-media' },
+      renderGalleryScreen({
+        legacyView: galleryView,
+        onBack: () => onChangeView('calendar'),
+        onShare: recordsContext.onOpenGalleryShare,
+        onMenu: onOpenAppSettings,
+        onSearch: undefined,
+        slots: {},
+      })
+    ),
     recordsContext.isGalleryShareOpen && React.createElement(ShareModal, {
       calendar: recordsContext.calendar, shareType: 'gallery', showToast: recordsContext.showToast,
       onClose: recordsContext.onCloseGalleryShare,

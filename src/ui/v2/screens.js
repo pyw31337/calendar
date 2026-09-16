@@ -970,7 +970,7 @@ export const renderChatScreen = props => h(ChatScreen, props);
 export function GalleryScreen(p) {
   return h(
     'section',
-    { className: 'v2-gallery v2-dest-page v2-embed-frame' },
+    { className: 'v2-gallery v2-dest-page v2-embed-frame v2-records-media' },
     wrapLegacy(p.legacyView, 'v2-legacy-body v2-gallery-legacy'),
     overlays(p.slots)
   );
