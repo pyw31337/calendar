@@ -74,17 +74,25 @@
   min-width: 0;
 }
 .v2-design .bp-hero-zone .bp-bento-title-brand {
-  display: inline-flex;
+  display: inline-flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
   align-items: center;
   gap: 6px;
-  min-width: 0;
+  /* flex: 1 (not the default 0 1 auto) so this claims the row's free space instead of shrinking
+   * toward its own min-content the moment .bp-bento-title-actions's flex-shrink:0 icons compete
+   * for room — a title row must never squeeze the brand down to near-zero width. */
+  flex: 1 1 auto;
+  min-width: 28px;
   color: #fff;
 }
 .v2-design .bp-hero-zone .bp-brand-name {
+  display: inline-block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   min-width: 0;
+  max-width: 100%;
   font-weight: 800;
 }
 .v2-design .bp-hero-zone .bp-bento-title-actions { flex-shrink: 0; }
@@ -94,21 +102,26 @@
 .v2-design .bp-renewal-home-hero { margin: 0; padding: 0; }
 .v2-design .bp-empty-hero { color: rgba(255, 255, 255, 0.92); padding: 14px; font-size: 0.8rem; }
 
-/* Hero: fluid "AI thinking"-style gradient (Gemini/Siri-glow reference), NOT a rainbow hue
- * sweep — every stop stays inside the original mock's violet→purple→teal family
- * (#4C1D95 / #7C3AED / #22D3B8, see designv2/BentoPinkFinal-html). Technique: 3 soft blurred
- * radial-gradient "blobs" layered over the mock's static linear-gradient base, each drifting
- * along its own path inside ONE keyframes block so the blobs move out of phase with each other
- * (that asynchrony is what reads as organic/fluid instead of a mechanical pan). */
+/* Hero: fluid "liquid glass" gradient (Gemini/Siri-glow reference), NOT a rainbow hue sweep —
+ * every stop stays inside the original mock's violet→purple→teal family (#4C1D95 / #7C3AED /
+ * #22D3B8, see designv2/BentoPinkFinal-html). Technique: 3 saturated radial-gradient "blobs"
+ * layered over the mock's static linear-gradient base, each traveling a WIDE, asymmetric path
+ * (not a mirrored back-and-forth) inside ONE keyframes block so the blobs move out of phase with
+ * each other and never visually "park" at a repeated-looking position — that's what reads as
+ * organic/fluid instead of a mechanical pan. `filter` rides its own faster, independent keyframe
+ * loop (saturate/contrast/hue-rotate breathing) so the color itself keeps shifting even during
+ * the slow position travel — this is what makes the motion legible at a glance, not just on
+ * close inspection. Blob opacity/saturation are pushed hard (0.9+, saturated hex, no muddy
+ * mid-tones) so the panel reads 쨍한/비비드 rather than a soft muted wash. */
 .v2-design .bp-hero-zone {
   background:
-    radial-gradient(circle at 22% 24%, rgba(124, 58, 237, 0.85) 0%, rgba(124, 58, 237, 0) 58%),
-    radial-gradient(circle at 78% 30%, rgba(34, 211, 184, 0.65) 0%, rgba(34, 211, 184, 0) 55%),
-    radial-gradient(circle at 46% 88%, rgba(76, 29, 149, 0.85) 0%, rgba(76, 29, 149, 0) 62%),
+    radial-gradient(circle at 20% 20%, rgba(139, 76, 247, 0.95) 0%, rgba(139, 76, 247, 0) 60%),
+    radial-gradient(circle at 82% 26%, rgba(45, 226, 196, 0.85) 0%, rgba(45, 226, 196, 0) 58%),
+    radial-gradient(circle at 50% 92%, rgba(88, 28, 165, 0.92) 0%, rgba(88, 28, 165, 0) 65%),
     linear-gradient(135deg, #4C1D95 0%, #7C3AED 58%, #22D3B8 100%) !important;
   background-repeat: no-repeat !important;
-  background-size: 160% 160%, 170% 170%, 180% 180%, 100% 100% !important;
-  animation: bp-hero-fluid-gradient 26s ease-in-out infinite !important;
+  background-size: 220% 220%, 240% 240%, 230% 230%, 100% 100% !important;
+  animation: bp-hero-fluid-gradient 16s ease-in-out infinite, bp-hero-fluid-tone 7s ease-in-out infinite !important;
   isolation: isolate;
 }
 .v2-design .bp-hero-zone::before,
@@ -122,17 +135,35 @@
   inset: 0 !important;
   z-index: 0 !important;
   pointer-events: none !important;
-  background: linear-gradient(180deg, transparent 42%, rgba(24, 8, 48, 0.28) 78%, rgba(15, 5, 40, 0.52) 100%) !important;
+  background:
+    linear-gradient(115deg, transparent 32%, rgba(255, 255, 255, 0.16) 45%, rgba(255, 255, 255, 0.32) 50%, rgba(255, 255, 255, 0.16) 55%, transparent 68%),
+    linear-gradient(180deg, transparent 42%, rgba(24, 8, 48, 0.28) 78%, rgba(15, 5, 40, 0.52) 100%) !important;
+  background-repeat: no-repeat !important;
+  background-size: 260% 260%, 100% 100% !important;
+  background-position: 0% 0%, 0 0 !important;
+  animation: bp-hero-glass-sheen 6.5s ease-in-out infinite !important;
   opacity: 1 !important;
-  animation: none !important;
 }
 .v2-design .bp-hero-zone > :not(.bp-hero-aurora) { position: relative; z-index: 1; }
 @keyframes bp-hero-fluid-gradient {
-  0%   { background-position: 22% 24%, 78% 30%, 46% 88%, 0% 0%; }
-  25%  { background-position: 40% 55%, 55% 62%, 70% 34%, 0% 0%; }
-  50%  { background-position: 66% 30%, 28% 70%, 34% 58%, 0% 0%; }
-  75%  { background-position: 34% 68%, 64% 42%, 62% 76%, 0% 0%; }
-  100% { background-position: 22% 24%, 78% 30%, 46% 88%, 0% 0%; }
+  0%   { background-position: 20% 20%, 82% 26%, 50% 92%, 0% 0%; }
+  20%  { background-position: 62% 12%, 34% 68%, 78% 40%, 0% 0%; }
+  40%  { background-position: 84% 62%, 12% 30%, 30% 78%, 0% 0%; }
+  60%  { background-position: 30% 78%, 70% 84%, 66% 18%, 0% 0%; }
+  80%  { background-position: 10% 38%, 46% 14%, 88% 64%, 0% 0%; }
+  100% { background-position: 20% 20%, 82% 26%, 50% 92%, 0% 0%; }
+}
+/* Independent, faster loop so the panel keeps visibly changing even while a position keyframe
+ * above is mid-transition — a screenshot taken at any moment still shows movement in progress. */
+@keyframes bp-hero-fluid-tone {
+  0%   { filter: saturate(1.2) contrast(1.04) hue-rotate(0deg); }
+  50%  { filter: saturate(1.55) contrast(1.1) hue-rotate(8deg); }
+  100% { filter: saturate(1.2) contrast(1.04) hue-rotate(0deg); }
+}
+@keyframes bp-hero-glass-sheen {
+  0%   { background-position: -40% -20%, 0 0; }
+  50%  { background-position: 60% 60%, 0 0; }
+  100% { background-position: -40% -20%, 0 0; }
 }
 .v2-design .bp-hero-zone .bp-icon-btn,
 .v2-design .bp-hero-zone .bp-renewal-shell-header-icon-btn {
@@ -384,10 +415,16 @@
 
 @media (prefers-reduced-motion: reduce) {
   .v2-design *, .v2-design *::before, .v2-design *::after { animation: none !important; scroll-behavior: auto !important; }
-  /* Hero fluid gradient uses !important animation — pin the resting frame (matches 0%/100%) */
+  /* Hero fluid gradient + glass sheen use !important animations — pin the resting frame (matches
+   * each keyframe's 0%/100%) and drop the tone-breathing filter entirely. */
   .v2-design .bp-hero-zone {
     animation: none !important;
-    background-position: 22% 24%, 78% 30%, 46% 88%, 0% 0% !important;
+    filter: none !important;
+    background-position: 20% 20%, 82% 26%, 50% 92%, 0% 0% !important;
+  }
+  .v2-design .bp-hero-zone > .bp-hero-aurora {
+    animation: none !important;
+    background-position: -40% -20%, 0 0 !important;
   }
 }
 
