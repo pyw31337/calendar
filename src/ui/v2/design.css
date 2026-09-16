@@ -325,8 +325,15 @@
 }
 
 @media (min-width: 768px) {
+  /* Fluid, not a fixed 760px column: the mock's own 768px tier used a flat 760px cap, which
+   * reads fine on iPad-portrait widths (~768-834px) but leaves a large dead gutter on either
+   * side on wider tablets/small laptops below the 1200px "PC rail" breakpoint (e.g. ~132px per
+   * side at 1024px, ~210px at 1180px) — exactly the side-margin the mock never had to deal with
+   * since it wasn't previewed at those widths. The 2-column bento grid (reference-home.css,
+   * same 768px tier) already fills a wider column fine, so just let the column grow with the
+   * viewport instead of plateauing. */
   .renewal-shell.v2-design > .bp-app-shell.is-bento-home,
-  .renewal-shell.v2-design .bp-app-shell.is-bento-home { max-width: 760px; }
+  .renewal-shell.v2-design .bp-app-shell.is-bento-home { max-width: min(94vw, 1100px); }
 
   .v2-design .bp-sheet-backdrop.modal-overlay {
     align-items: center !important;
