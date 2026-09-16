@@ -114,13 +114,23 @@
  * close inspection. Blob opacity/saturation are pushed hard (0.9+, saturated hex, no muddy
  * mid-tones) so the panel reads 쨍한/비비드 rather than a soft muted wash. */
 .v2-design .bp-hero-zone {
+  /* 6 smaller blobs instead of 3 big ones, each on `screen` blend so overlaps optically MIX into
+   * new in-between hues (a real mesh gradient) rather than one blob simply painting over the
+   * last. Two of the six (mint + sky-blue) keep a right-anchored travel range in the keyframes
+   * below so the mock's teal corner reads as a stable color family on the right, not something
+   * the animation pans away from — the magenta/purple blobs get the wide, free-roaming travel. */
   background:
-    radial-gradient(circle at 20% 20%, rgba(139, 76, 247, 0.95) 0%, rgba(139, 76, 247, 0) 60%),
-    radial-gradient(circle at 82% 26%, rgba(45, 226, 196, 0.85) 0%, rgba(45, 226, 196, 0) 58%),
-    radial-gradient(circle at 50% 92%, rgba(88, 28, 165, 0.92) 0%, rgba(88, 28, 165, 0) 65%),
+    radial-gradient(circle at 14% 18%, rgba(217, 70, 239, 0.55) 0%, rgba(217, 70, 239, 0) 46%),
+    radial-gradient(circle at 30% 62%, rgba(139, 76, 247, 0.9) 0%, rgba(139, 76, 247, 0) 52%),
+    radial-gradient(circle at 88% 20%, rgba(56, 189, 248, 0.6) 0%, rgba(56, 189, 248, 0) 48%),
+    radial-gradient(circle at 92% 58%, rgba(45, 226, 196, 0.88) 0%, rgba(45, 226, 196, 0) 50%),
+    radial-gradient(circle at 55% 88%, rgba(88, 28, 165, 0.9) 0%, rgba(88, 28, 165, 0) 55%),
+    radial-gradient(circle at 45% 30%, rgba(124, 58, 237, 0.7) 0%, rgba(124, 58, 237, 0) 50%),
     linear-gradient(135deg, #4C1D95 0%, #7C3AED 58%, #22D3B8 100%) !important;
   background-repeat: no-repeat !important;
-  background-size: 220% 220%, 240% 240%, 230% 230%, 100% 100% !important;
+  background-size:
+    150% 150%, 160% 160%, 130% 130%, 140% 140%, 155% 155%, 145% 145%, 100% 100% !important;
+  background-blend-mode: screen, screen, screen, screen, screen, screen, normal !important;
   animation: bp-hero-fluid-gradient 16s ease-in-out infinite, bp-hero-fluid-tone 7s ease-in-out infinite !important;
   isolation: isolate;
 }
@@ -146,19 +156,20 @@
 }
 .v2-design .bp-hero-zone > :not(.bp-hero-aurora) { position: relative; z-index: 1; }
 @keyframes bp-hero-fluid-gradient {
-  0%   { background-position: 20% 20%, 82% 26%, 50% 92%, 0% 0%; }
-  20%  { background-position: 62% 12%, 34% 68%, 78% 40%, 0% 0%; }
-  40%  { background-position: 84% 62%, 12% 30%, 30% 78%, 0% 0%; }
-  60%  { background-position: 30% 78%, 70% 84%, 66% 18%, 0% 0%; }
-  80%  { background-position: 10% 38%, 46% 14%, 88% 64%, 0% 0%; }
-  100% { background-position: 20% 20%, 82% 26%, 50% 92%, 0% 0%; }
+  /* Layer order: magenta, purple, sky-blue(right), mint(right), violet, purple-core, [base]. */
+  0%   { background-position: 14% 18%, 30% 62%, 88% 20%, 92% 58%, 55% 88%, 45% 30%, 0% 0%; }
+  20%  { background-position: 40% 45%, 55% 20%, 78% 42%, 80% 30%, 25% 60%, 65% 65%, 0% 0%; }
+  40%  { background-position: 60% 70%, 15% 35%, 92% 65%, 70% 78%, 40% 22%, 30% 50%, 0% 0%; }
+  60%  { background-position: 25% 30%, 45% 80%, 70% 30%, 88% 40%, 65% 55%, 55% 15%, 0% 0%; }
+  80%  { background-position: 45% 60%, 20% 15%, 82% 55%, 78% 68%, 30% 80%, 40% 40%, 0% 0%; }
+  100% { background-position: 14% 18%, 30% 62%, 88% 20%, 92% 58%, 55% 88%, 45% 30%, 0% 0%; }
 }
 /* Independent, faster loop so the panel keeps visibly changing even while a position keyframe
  * above is mid-transition — a screenshot taken at any moment still shows movement in progress. */
 @keyframes bp-hero-fluid-tone {
-  0%   { filter: saturate(1.2) contrast(1.04) hue-rotate(0deg); }
-  50%  { filter: saturate(1.55) contrast(1.1) hue-rotate(8deg); }
-  100% { filter: saturate(1.2) contrast(1.04) hue-rotate(0deg); }
+  0%   { filter: saturate(1.3) contrast(1.08) hue-rotate(0deg); }
+  50%  { filter: saturate(1.7) contrast(1.16) hue-rotate(6deg); }
+  100% { filter: saturate(1.3) contrast(1.08) hue-rotate(0deg); }
 }
 @keyframes bp-hero-glass-sheen {
   0%   { background-position: -40% -20%, 0 0; }
@@ -174,11 +185,20 @@
   box-shadow: var(--v2-glass-dark-inset), 0 0 0 1px rgba(255,255,255,0.12), var(--v2-glass-dark-glow) !important;
 }
 .v2-design .bp-dday-compact {
-  background: var(--v2-glass-dark-fill) !important;
+  position: relative !important;
+  overflow: hidden !important;
+  /* Diagonal sheen layer on top of the frosted fill — the same "light hitting curved glass"
+   * highlight the hero's aurora sheen uses, scaled down for a small card. */
+  background:
+    linear-gradient(125deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0.1) 28%, rgba(255, 255, 255, 0) 52%),
+    var(--v2-glass-dark-fill) !important;
   border: 1px solid var(--v2-glass-dark-border) !important;
-  backdrop-filter: var(--v2-glass-blur-strong) !important;
-  -webkit-backdrop-filter: var(--v2-glass-blur-strong) !important;
-  box-shadow: var(--v2-glass-dark-inset), 0 8px 24px rgba(59, 7, 100, 0.18) !important;
+  backdrop-filter: blur(28px) saturate(220%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(220%) !important;
+  box-shadow:
+    var(--v2-glass-dark-inset),
+    0 0 0 1px rgba(255, 255, 255, 0.14),
+    0 10px 28px rgba(59, 7, 100, 0.26) !important;
 }
 .v2-design .bp-dday-compact-badge {
   background: linear-gradient(135deg, #7C2FE5 0%, #4F46E5 55%, #2563EB 100%) !important;
@@ -431,7 +451,7 @@
   .v2-design .bp-hero-zone {
     animation: none !important;
     filter: none !important;
-    background-position: 20% 20%, 82% 26%, 50% 92%, 0% 0% !important;
+    background-position: 14% 18%, 30% 62%, 88% 20%, 92% 58%, 55% 88%, 45% 30%, 0% 0% !important;
   }
   .v2-design .bp-hero-zone > .bp-hero-aurora {
     animation: none !important;
