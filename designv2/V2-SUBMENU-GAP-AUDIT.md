@@ -154,3 +154,29 @@ PC 1440×900 screenshots in `designv2/parity-shots/audit-live-capture/loop{2,3,4
 - Gallery `사진|링크|파일` were `position:fixed; left:0` → 사진 tab hid under 280px rail. Fixed via `v2Embed` sticky + CSS.
 - Chat column widened 720→1080px beside rail (loop6-chat).
 - Still open: bubble own-message color vs ChatFull white bubbles; SettlementFull card chrome; Content/Archive polish.
+
+---
+
+## Phase C status (feat/v2-submenu-rebuild-2) — 2026-09-16 KST loop7–8
+
+Local preview 1440×900: `designv2/parity-shots/audit-live-capture/loop{7,8}-*.png`
+
+| Screen | Gate | After / before notes |
+|--------|------|----------------------|
+| Chat | **Pass (meta layout)** | Meta under bubble for own+others (`metaBelow:true`). Name pills left of others. Own stays end-aligned; white bubbles; speech tails hidden. Before: meta beside bubble / mixed chrome. |
+| Gallery | **Pass** | Records strip (전체/사진·영상/…) **removed** when `sub=media` (`v2-records-no-subtab`). Feature tabs 사진/링크/파일 kept; rail 280. Before: redundant strip above 갤러리 header. |
+| Settlement | **Pass (denser chrome)** | `.settlement-ledger-row` bordered cards ~63px avg; person-grid gaps tightened. Before: airy padding / no ledger class. |
+| Places | **Pass (structure+density)** | `.place-card-row` PlacesFull-ish chrome (12px radius, tighter pad/gap). Before: CSS only targeted unused `.bp-place-card`. |
+| Content | **Pass (chrome)** | No records strip; rail + culture tabs/chips/grid intact. |
+| Archive | **Pass (chrome)** | No records strip; 추억/인물/지난모임 + cards. |
+
+### Code
+- `RecordsPane`: omit subtab row for media/content/archive
+- `SettlementSummaryModal`: `settlement-ledger-row` class (presentation hook)
+- `screens.css`: ChatFull bubble grid, gallery strip hide, settlement/places density, content/archive chrome
+
+### Remaining gaps (next slice OK)
+- Chat: ChatFull mock left-aligns *all* rows (live keeps own end-align by product choice); optional own name-pill.
+- Settlement: hero 1/N gradient cards ≠ SettlementFull white meeting cards (data model differs); ledger denser but not Full row chrome.
+- Places: card height still content-bound (~110px); map+list dual pane polish.
+- Content/Archive: no dedicated Full mocks — further Bento type/grid polish only.
