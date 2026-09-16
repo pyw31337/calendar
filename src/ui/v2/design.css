@@ -1,0 +1,79 @@
+/* Only the opt-in V2 root is affected. app.css remains byte-for-byte unchanged. */
+.renewal-shell.v2-design {
+  --font-sans: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Noto Sans KR', sans-serif;
+  --renewal-page-max: 1180px;
+  padding: 0 !important;
+  padding-bottom: 0 !important;
+  min-height: 100dvh;
+  font-family: var(--font-sans);
+  line-height: normal;
+  letter-spacing: normal;
+  background: #fafafc;
+}
+
+/* Neutralize legacy renewal page-max / bottom-nav chrome that still lives in app.css.
+   Home chrome is rebuilt under .bp-* inside .v2-design; do not fight it with overlays. */
+.renewal-shell.v2-design .renewal-shell-bottom-nav { display: none !important; }
+.renewal-shell.v2-design > .bp-app-shell.is-bento-home,
+.renewal-shell.v2-design .bp-app-shell.is-bento-home {
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  background: var(--bg-primary, #fafafc);
+  min-height: 100%;
+  box-sizing: border-box;
+}
+
+.v2-design .bp-app-shell { box-sizing: border-box; }
+.v2-design .bp-v2-title-row,
+.v2-design .bp-bento-title.bp-v2-title-row { padding: 12px 12px 2px; color: white; }
+.v2-design .bp-bento-title-brand { display: inline-flex; align-items: center; gap: 6px; }
+.v2-design .bp-renewal-home-hero { margin: 0; padding: 0; }
+.v2-design .bp-empty-hero { color: white; padding: 14px; font-size: .8rem; }
+.v2-design .bp-day-cell { font-family: inherit; }
+.v2-design .bp-renewal-home-chat-item { width: 100%; padding: 0; border: 0; background: none; text-align: left; cursor: pointer; }
+.v2-design .bp-renewal-home-chat-content { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
+.v2-design .bp-chat-img { object-fit: cover; display: block; }
+.v2-design .bp-renewal-home-memo-card { display: block; width: 100%; border-top: 0; border-right: 0; border-bottom: 0; text-align: left; cursor: pointer; }
+.v2-design .bp-renewal-home-memo-card > span,
+.v2-design .bp-renewal-home-memo-card > strong,
+.v2-design .bp-memo-link-title,
+.v2-design .bp-memo-link-desc { display: block; }
+.v2-design .bp-renewal-home-memo-card > .bp-memo-link-card,
+.v2-design .bp-renewal-home-memo-card > .bp-memo-tags-row { display: flex; }
+.v2-design .bp-memo-link-thumb { object-fit: cover; }
+.v2-design .bp-memo-tag, .v2-design .bp-place-tag { font-style: normal; }
+.v2-design .bp-thumb { padding: 0; border: 0; width: 100%; position: relative; overflow: hidden; }
+.v2-design .bp-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.v2-design .bp-renewal-home-place-card { width: 100%; text-align: left; cursor: pointer; border: 0; background: none; }
+.v2-design .bp-renewal-home-place-copy { display: block; min-width: 0; }
+.v2-design .bp-place-name, .v2-design .bp-place-addr, .v2-design .bp-place-note { display: block; }
+.v2-design .bp-renewal-home-footer { text-align: center; color: var(--text-light, #83798f); font-size: .62rem; padding: 18px 14px 28px; }
+.v2-design .bp-renewal-home-footer-links { display: flex; gap: 12px; justify-content: center; margin-top: 8px; }
+.v2-design .bp-renewal-home-empty { color: var(--text-muted); font-size: .75rem; }
+.v2-design .bp-month-picker { position: absolute; z-index: 10; top: 36px; left: 0; padding: 12px; border: 1px solid var(--border-subtle); border-radius: 12px; background: white; box-shadow: 0 8px 24px #1e1b2e20; }
+.v2-design .bp-month-picker input { font: inherit; padding: 6px; max-width: 180px; }
+.v2-design .v2-destination { padding: 0; min-height: 100dvh; }
+.v2-design .renewal-shell-subtab-row { position: relative; z-index: 1; }
+.v2-design .bp-side-nav-item-icon svg { width: 16px; height: 16px; }
+.renewal-shell.v2-design.v2-has-detail { padding: 0 !important; background: #fafafc; }
+.v2-design.v2-has-detail > .bp-side-nav,
+.v2-design.v2-has-detail > .bp-side-nav-backdrop { display: none !important; }
+.v2-design .bp-bento-title-actions svg { width: 15px; height: 15px; }
+.v2-design .bp-chat-text { overflow-wrap: anywhere; }
+
+/* Breakpoint parity with BentoPinkFinal (verify at 390 / 768 / 1180 CSS px).
+   Mock uses max-width 480 → 760@768 → 1180@1200; 1180-wide viewports still hit the 1200 rail. */
+@media (min-width: 768px) {
+  .renewal-shell.v2-design > .bp-app-shell.is-bento-home,
+  .renewal-shell.v2-design .bp-app-shell.is-bento-home { max-width: 760px; }
+}
+@media (min-width: 1200px) {
+  .renewal-shell.v2-design { padding-left: 232px !important; }
+  .renewal-shell.v2-design.is-side-collapsed { padding-left: 76px !important; }
+  .renewal-shell.v2-design > .bp-app-shell.is-bento-home,
+  .renewal-shell.v2-design .bp-app-shell.is-bento-home { max-width: 1180px; padding: 0 32px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .v2-design *, .v2-design *::before, .v2-design *::after { animation: none !important; scroll-behavior: auto !important; }
+}

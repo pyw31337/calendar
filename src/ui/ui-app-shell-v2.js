@@ -1,19 +1,17 @@
 /**
- * WP-01 renewal app shell (feature-flagged, `?shell=v2`).
- *
- * Implements the 5-destination IA from docs/product-renewal-master-plan.md §4.1:
- * 캘린더 / 대화 / 기록 / 정산 / 더보기 -- a mobile bottom nav, and the SAME five destinations
- * as a desktop side rail (§4.1: "데스크톱은 동일한 목적지를 좌측 또는 상단 내비게이션으로
- * 표현하되 정보 구조는 모바일과 동일하게 유지한다"). 기록 replaces the old separate
- * 메모/갤러리/장소 menu entries -- those become tabs inside 기록, not top-level destinations
- * (docs/renewal-baseline.md §5 gap note).
- *
- * This is the WP-01 slice only: the nav shell and its routing/tab state. Real data (calendar
- * grid, chat messages, memo/gallery/place records, settlement) is wired screen-by-screen in
- * WP-03 through WP-07 -- each tab below renders a placeholder pane, not live content, so this
- * can ship with zero risk to the default (flag-off) experience while later work fills it in.
+ * Claude HTML design adapters, enabled exclusively by ?shell=v2.
+ * The reference CSS is namespaced; existing feature components supply their real
+ * state and actions through optional renderers. Default routes retain their UI.
  */
 
+import './v2/reference-home.css';
+import './v2/design.css';
+import { renderMemoScreen, renderPlacesScreen, renderSettlementScreen, renderChatScreen } from './v2/screens.js';
+import { authorFor, latestRows, timestampMs, photoLightbox } from './v2/view-data.js';
+
+const bentoClass = value => String(value || '').split(/\s+/).filter(Boolean).map(name => `bp-${name}`).join(' ');
+
+import { getInitialAppView } from '../core/app-routing-state.js';
 import { isRenewalShellEnabled } from '../core/app-feature-flags.js';
 import { bindUiComponentAliases } from '../core/app-ui-wrappers.js';
 import {
@@ -38,10 +36,10 @@ const TABS = [
 const BENTO_MAIN_ITEMS = [
   { id: 'calendar', label: '캘린더', icon: 'calendar' },
   { id: 'chat', label: '채팅', icon: 'chat', isPill: true },
-  { id: 'settlement', label: '정산', icon: 'settlement', badge: '2', meta: '09.20' },
-  { id: 'gallery', label: '갤러리', icon: 'gallery', meta: '09.12' },
-  { id: 'places', label: '장소', icon: 'places', meta: '천왕산캠핑장' },
-  { id: 'memo', label: '메모', icon: 'memo', meta: '준비물' },
+  { id: 'settlement', label: '정산', icon: 'settlement' },
+  { id: 'gallery', label: '갤러리', icon: 'gallery' },
+  { id: 'places', label: '장소', icon: 'places' },
+  { id: 'memo', label: '메모', icon: 'memo' },
 ];
 const BENTO_SUB_ITEMS = [
   { id: 'content', label: '컨텐츠', icon: 'content' },
@@ -70,7 +68,9 @@ const DEFAULT_RECORDS_SUBTAB = 'all';
 function readTabFromLocation() {
   if (typeof window === 'undefined' || !window.location) return DEFAULT_TAB;
   try {
-    const raw = new URLSearchParams(window.location.search).get('tab');
+    const params = new URLSearchParams(window.location.search);
+    const view = getInitialAppView(window.location);
+    const raw = params.get('tab') || ({ memo: 'records', places: 'records', gallery: 'records', history: 'records', content: 'records' }[view] || view);
     return TAB_IDS.includes(raw) ? raw : DEFAULT_TAB;
   } catch (_) {
     return DEFAULT_TAB;
@@ -81,7 +81,8 @@ function readTabFromLocation() {
 function readRecordsSubTabFromLocation() {
   if (typeof window === 'undefined' || !window.location) return DEFAULT_RECORDS_SUBTAB;
   try {
-    const raw = new URLSearchParams(window.location.search).get('sub');
+    const params = new URLSearchParams(window.location.search);
+    const raw = params.get('sub') || ({ memo: 'memo', places: 'places', gallery: 'media', history: 'archive', content: 'content' }[params.get('view')]);
     return RECORDS_SUBTAB_IDS.includes(raw) ? raw : DEFAULT_RECORDS_SUBTAB;
   } catch (_) {
     return DEFAULT_RECORDS_SUBTAB;
@@ -103,8 +104,11 @@ function writeLocationState(tabId, subTabId, { push } = { push: true }) {
   else url.searchParams.set('tab', tabId);
   if (tabId !== 'records' || subTabId === DEFAULT_RECORDS_SUBTAB) url.searchParams.delete('sub');
   else url.searchParams.set('sub', subTabId);
+  url.searchParams.delete('view');
   const method = push ? 'pushState' : 'replaceState';
   window.history[method](window.history.state, '', url);
+  // Existing core subscribers use popstate to select the correct data collection.
+  window.dispatchEvent(new PopStateEvent('popstate'));
 }
 
 const TAB_ICONS = {
@@ -149,22 +153,22 @@ function TabIcon({ id }) {
 function TopHeader({ calendarName, onOpenSearch, onOpenMore }) {
   const React = window.React;
   const brandName = String(calendarName || '모여라 캘린더').replace(/^[^\p{L}\p{N}]+/u, '').trim();
-  return React.createElement('div', { className: 'renewal-shell-header bento-header' },
-    React.createElement('div', { className: 'renewal-shell-header-brand bento-title' },
+  return React.createElement('div', { className: bentoClass('bento-title v2-title-row') },
+    React.createElement('div', { className: bentoClass('bento-title-brand') },
       React.createElement('svg', { width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' },
         React.createElement('rect', { x: 3, y: 4, width: 18, height: 18, rx: 2 }),
         React.createElement('path', { d: 'M8 2v4M16 2v4M3 10h18' })
       ),
-      React.createElement('span', { className: 'bento-title-brand' }, brandName)
+      React.createElement('span', { className: bentoClass('brand-name') }, brandName)
     ),
-    React.createElement('div', { className: 'renewal-shell-header-actions bento-title-actions' },
-      React.createElement('button', { type: 'button', className: 'renewal-shell-header-icon-btn icon-btn', 'aria-label': '검색', onClick: onOpenSearch },
+    React.createElement('div', { className: bentoClass('renewal-shell-header-actions bento-title-actions') },
+      React.createElement('button', { type: 'button', className: bentoClass('renewal-shell-header-icon-btn icon-btn'), 'aria-label': '검색', onClick: onOpenSearch },
         React.createElement('svg', { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' },
           React.createElement('circle', { cx: 11, cy: 11, r: 8 }),
           React.createElement('path', { d: 'm21 21-4.3-4.3' })
         )
       ),
-      React.createElement('button', { type: 'button', className: 'renewal-shell-header-icon-btn icon-btn side-nav-toggle-btn', 'aria-label': '더보기', onClick: onOpenMore },
+      React.createElement('button', { type: 'button', className: bentoClass('renewal-shell-header-icon-btn icon-btn side-nav-toggle-btn'), 'aria-label': '더보기', onClick: onOpenMore },
         React.createElement(TabIcon, { id: 'more' })
       )
     )
@@ -273,11 +277,12 @@ export function buildRenewalCalendarContext(calendar, deps) {
 /** Compact hero zone from the approved BentoPink reference: one primary D-day plus
  * horizontally-scannable upcoming chips. It is presentation-only and reuses the same
  * confirmed meeting selector as the list below. */
-function RenewalHero({ meetings, onSelectDate, header }) {
+function RenewalHero({ meetings, onSelectDate }) {
   const React = window.React;
   const list = Array.isArray(meetings) ? meetings : [];
-  const primary = list[0] || null;
   const [isOpen, setIsOpen] = React.useState(false);
+  if (!list.length) return React.createElement('p', { className: 'bp-empty-hero' }, '다가오는 확정 일정이 없습니다.');
+  const primary = list[0];
   const labelFor = (meeting) => {
     const base = formatConfirmedMeetingLabel(meeting.date);
     const note = typeof meeting.note === 'string' ? meeting.note.trim().replace(/\s+/g, ' ') : '';
@@ -291,40 +296,43 @@ function RenewalHero({ meetings, onSelectDate, header }) {
       day: ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'][date.getDay()],
     };
   };
-  return React.createElement('section', { className: 'renewal-home-hero hero-zone', 'aria-label': '가까운 확정 일정' },
-    header || null,
-    !primary ? null : React.createElement('div', { className: `dday-toggle-wrap ${isOpen ? 'is-open' : ''}`.trim() },
-      React.createElement('button', { type: 'button', className: 'dday-compact', onClick: () => setIsOpen(true), 'aria-expanded': isOpen },
-        React.createElement('span', { className: 'dday-compact-badge' }, formatDDayLabel(primary.date)),
-        React.createElement('span', { className: 'dday-compact-text' }, labelFor(primary)),
-        React.createElement('svg', { className: 'dday-compact-chevron', width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2.5, strokeLinecap: 'round', strokeLinejoin: 'round' },
-          React.createElement('path', { d: 'M9 18l6-6-6-6' })
+
+  return React.createElement('section', { className: bentoClass('renewal-home-hero'), 'aria-label': '가까운 확정 일정' },
+    React.createElement('div', { className: bentoClass(`dday-toggle-wrap ${isOpen ? 'is-open' : ''}`.trim()) },
+      React.createElement('button', { type: 'button', className: bentoClass('dday-compact'), onClick: () => setIsOpen(true), 'aria-expanded': isOpen },
+        React.createElement('span', { className: bentoClass('dday-compact-badge') }, formatDDayLabel(primary.date)),
+        React.createElement('span', { className: bentoClass('dday-compact-text') }, labelFor(primary)),
+        React.createElement('svg', { className: bentoClass('dday-compact-chevron'), width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2.5, strokeLinecap: 'round', strokeLinejoin: 'round' },
+          React.createElement('path', { d: 'M6 9l6 6l6 -6' })
+
         )
       ),
-      React.createElement('div', { className: 'dday-expanded' },
-        React.createElement('div', { className: 'dday-expanded-main' },
-          React.createElement('div', { className: 'dday-expanded-title-row' },
-            React.createElement('div', { className: 'dday-expanded-title' }, labelFor(primary))
+      React.createElement('div', { className: bentoClass('dday-expanded') },
+        React.createElement('div', { className: bentoClass('dday-expanded-main') },
+          React.createElement('div', { className: bentoClass('dday-expanded-title-row') },
+            React.createElement('div', { className: bentoClass('dday-expanded-title') }, labelFor(primary))
           ),
-          primary.note && React.createElement('div', { className: 'dday-expanded-tags' },
-            React.createElement('span', { className: 'dday-expanded-tag' }, primary.note.trim())
+          primary.note && React.createElement('div', { className: bentoClass('dday-expanded-tags') },
+            React.createElement('span', { className: bentoClass('dday-expanded-tag') }, primary.note.trim())
           )
         ),
-        React.createElement('div', { className: 'dday-expanded-side' },
-          React.createElement('button', { type: 'button', className: 'dday-collapse-btn', onClick: () => setIsOpen(false), 'aria-label': '접기' }, '⌃'),
-          React.createElement('span', { className: 'dday-expanded-badge' }, formatDDayLabel(primary.date)),
-          React.createElement('button', { type: 'button', className: 'dday-view-btn', onClick: () => onSelectDate(primary.date) }, '일정보기')
+        React.createElement('div', { className: bentoClass('dday-expanded-side') },
+          React.createElement('button', { type: 'button', className: bentoClass('dday-collapse-btn'), onClick: () => setIsOpen(false), 'aria-label': '접기' }, '⌃'),
+          React.createElement('span', { className: bentoClass('dday-expanded-badge') }, formatDDayLabel(primary.date)),
+          React.createElement('button', { type: 'button', className: bentoClass('dday-view-btn'), onClick: () => onSelectDate(primary.date) }, '일정보기')
         )
       )
     ),
-    !list.length ? null : React.createElement('div', { className: 'dday-strip renewal-home-hero-chips' }, list.map(meeting => {
+
+    React.createElement('div', { className: bentoClass('dday-strip renewal-home-hero-chips') }, list.map(meeting => {
+
       const chipDate = chipDateFor(meeting.date);
       return React.createElement('button', {
-        key: meeting.date, type: 'button', className: 'dday-chip renewal-home-hero-chip', onClick: () => onSelectDate(meeting.date), title: labelFor(meeting)
+        key: meeting.date, type: 'button', className: bentoClass('dday-chip renewal-home-hero-chip'), onClick: () => onSelectDate(meeting.date), title: labelFor(meeting)
       },
-      React.createElement('strong', { className: 'dday-date renewal-home-hero-chip-date' }, chipDate.date),
-      React.createElement('span', { className: 'dday-dow renewal-home-hero-chip-day' }, chipDate.day),
-      React.createElement('small', { className: 'dday-pill renewal-home-hero-chip-dday' }, formatDDayLabel(meeting.date)));
+      React.createElement('strong', { className: bentoClass('dday-date renewal-home-hero-chip-date') }, chipDate.date),
+      React.createElement('span', { className: bentoClass('dday-dow renewal-home-hero-chip-day') }, chipDate.day),
+      React.createElement('small', { className: bentoClass('dday-pill renewal-home-hero-chip-dday') }, formatDDayLabel(meeting.date)));
     }))
   );
 }
@@ -349,6 +357,7 @@ function RenewalHero({ meetings, onSelectDate, header }) {
 function BentoCalendarCard({ calendarContext, onSelectDate }) {
   const React = window.React;
   const [monthDate, setMonthDate] = React.useState(() => new Date());
+  const [monthPickerOpen, setMonthPickerOpen] = React.useState(false);
   const year = monthDate.getFullYear();
   const month = monthDate.getMonth();
 
@@ -443,11 +452,13 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
   const now = new Date();
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
-  return React.createElement('div', { className: 'cal-card' },
+  return React.createElement('div', { className: bentoClass('cal-card') },
     // Month nav
-    React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' } },
+    React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', position: 'relative' } },
       React.createElement('button', {
-        className: 'ghost-btn',
+        onClick: () => setMonthPickerOpen(value => !value),
+        'aria-expanded': monthPickerOpen,
+        className: bentoClass('ghost-btn'),
         style: { gap: '4px', fontWeight: 800, fontSize: '0.92rem', color: 'var(--text-main)', padding: '2px 0' },
         type: 'button',
       },
@@ -456,9 +467,12 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
           React.createElement('path', { d: 'M6 9l6 6l6 -6' })
         )
       ),
+      monthPickerOpen && React.createElement('div', { className: 'bp-month-picker' },
+        React.createElement('input', { type: 'month', 'aria-label': '이동할 연월', value: `${year}-${String(month + 1).padStart(2, '0')}`, onChange: event => { const [y, m] = event.target.value.split('-').map(Number); if (y && m) { setMonthDate(new Date(y, m - 1, 1)); setMonthPickerOpen(false); } } })
+      ),
       React.createElement('div', { style: { display: 'flex', gap: '0px' } },
         React.createElement('button', {
-          className: 'ghost-btn',
+          className: bentoClass('ghost-btn'),
           'aria-label': '이전달',
           type: 'button',
           onClick: () => setMonthDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1)),
@@ -468,13 +482,13 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
           )
         ),
         React.createElement('button', {
-          className: 'ghost-btn',
+          className: bentoClass('ghost-btn'),
           style: { fontWeight: 700, fontSize: '0.72rem', padding: '6px 8px' },
           type: 'button',
           onClick: () => setMonthDate(new Date()),
         }, '오늘'),
         React.createElement('button', {
-          className: 'ghost-btn',
+          className: bentoClass('ghost-btn'),
           'aria-label': '다음달',
           type: 'button',
           onClick: () => setMonthDate(d => new Date(d.getFullYear(), d.getMonth() + 1, 1)),
@@ -488,13 +502,13 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
 
     // Weekdays
     React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', marginBottom: '2px' } },
-      React.createElement('div', { className: 'weekday-label', style: { color: '#EF4444' } }, '일'),
-      React.createElement('div', { className: 'weekday-label' }, '월'),
-      React.createElement('div', { className: 'weekday-label' }, '화'),
-      React.createElement('div', { className: 'weekday-label' }, '수'),
-      React.createElement('div', { className: 'weekday-label' }, '목'),
-      React.createElement('div', { className: 'weekday-label' }, '금'),
-      React.createElement('div', { className: 'weekday-label', style: { color: '#2563EB' } }, '토')
+      React.createElement('div', { className: bentoClass('weekday-label'), style: { color: '#EF4444' } }, '일'),
+      React.createElement('div', { className: bentoClass('weekday-label') }, '월'),
+      React.createElement('div', { className: bentoClass('weekday-label') }, '화'),
+      React.createElement('div', { className: bentoClass('weekday-label') }, '수'),
+      React.createElement('div', { className: bentoClass('weekday-label') }, '목'),
+      React.createElement('div', { className: bentoClass('weekday-label') }, '금'),
+      React.createElement('div', { className: bentoClass('weekday-label'), style: { color: '#2563EB' } }, '토')
     ),
 
     // Days grid
@@ -532,52 +546,57 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
 
         return React.createElement('button', {
           key: dateStr,
-          className: cellClasses,
+          className: bentoClass(cellClasses),
           type: 'button',
           onClick: () => onSelectDate?.(dateStr),
           'aria-label': `${dateStr} 일정 상세`,
         },
-          React.createElement('span', { className: 'day-num' }, dayNum),
-          cornerLabel ? React.createElement('div', { className: `day-corner-label ${isHolidayCorner ? 'is-holiday' : ''}`.trim() }, cornerLabel) : null,
-          hasMeeting ? React.createElement('span', { className: 'day-event-title' }, meeting.title || '일정') : null,
-          dots.length > 0 ? React.createElement('div', { className: 'dot-row' },
+          React.createElement('span', { className: bentoClass('day-num') }, dayNum),
+          cornerLabel ? React.createElement('div', { className: bentoClass(`day-corner-label ${isHolidayCorner ? 'is-holiday' : ''}`.trim()) }, cornerLabel) : null,
+          hasMeeting ? React.createElement('span', { className: bentoClass('day-event-title') }, meeting.title || meeting.note || '모임확정') : null,
+          dots.length > 0 ? React.createElement('div', { className: bentoClass('dot-row') },
             dots.map(p => React.createElement('span', {
               key: p.id,
-              className: 'p-dot',
+              className: bentoClass('p-dot'),
               'data-name': (p.name || '').slice(-2),
               style: { background: p.color || 'var(--brand)' },
             }))
           ) : null,
-          hasMeeting ? React.createElement('div', { className: 'day-bar solo' }) : null,
-          anns.length > 0 ? React.createElement('div', { className: 'day-anniversary' },
-            React.createElement('span', { className: 'day-anniversary-label' }, anns[0].title || '기념일')
+          hasMeeting ? React.createElement('div', { className: bentoClass('day-bar solo') }) : null,
+          anns.length > 0 ? React.createElement('div', { className: bentoClass('day-anniversary') },
+            React.createElement('span', { className: bentoClass('day-anniversary-label') }, anns[0].title || '기념일')
           ) : null
         );
       })
     ),
 
     // Legend
-    React.createElement('div', { className: 'cal-legend' },
+    React.createElement('div', { className: bentoClass('cal-legend') },
       participants.map(p => React.createElement('span', { key: p.id },
-        React.createElement('span', { className: 'dot', style: { background: p.color || '#A78BFA' } }),
+        React.createElement('span', { className: bentoClass('dot'), style: { background: p.color || '#A78BFA' } }),
         p.name
       )),
       React.createElement('span', null,
-        React.createElement('span', { className: 'dot', style: { background: 'var(--brand)', borderRadius: 'var(--radius-full)', width: '12px', height: '5px' } }),
+        React.createElement('span', { className: bentoClass('dot'), style: { background: 'var(--brand)', borderRadius: 'var(--radius-full)', width: '12px', height: '5px' } }),
         '일정·여행'
       ),
       React.createElement('span', null,
-        React.createElement('span', { className: 'dot', style: { background: '#F472B6', borderRadius: 'var(--radius-full)', width: '12px', height: '5px' } }),
+        React.createElement('span', { className: bentoClass('dot'), style: { background: '#F472B6', borderRadius: 'var(--radius-full)', width: '12px', height: '5px' } }),
         '기념일'
       )
     )
   );
 }
 
-function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeView, header }) {
+
+function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeView, calendarName, onOpenSearch, onOpenMore }) {
   const React = window.React;
   return React.createElement(React.Fragment, null,
-    React.createElement(RenewalHero, { meetings: calendarContext.upcomingMeetings, onSelectDate: onOpenDate, header }),
+    React.createElement('div', { className: 'bp-hero-zone' },
+      React.createElement(TopHeader, { calendarName, onOpenSearch, onOpenMore }),
+      React.createElement(RenewalHero, { meetings: calendarContext.upcomingMeetings, onSelectDate: onOpenDate })
+    ),
+
     React.createElement(HomeActivitySummary, {
       calendarContext: {
         ...calendarContext,
@@ -590,9 +609,9 @@ function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeVie
       onOpenDate,
       onChangeView
     }),
-    React.createElement('footer', { className: 'renewal-home-footer footer' },
+    React.createElement('footer', { className: bentoClass('renewal-home-footer footer') },
       React.createElement('span', null, 'Copyright © 2026 모여라 캘린더. All Rights Reserved.'),
-      React.createElement('span', { className: 'renewal-home-footer-links links' },
+      React.createElement('span', { className: bentoClass('renewal-home-footer-links links') },
         React.createElement('b', null, 'FAMILY LINK'), React.createElement('b', null, '밖에눈오나'), React.createElement('b', null, 'Culture Flow')
       )
     )
@@ -617,16 +636,17 @@ function HomeSectionIcon({ kind }) {
 function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
   const React = window.React;
   const allMessages = Array.isArray(calendarContext?.displayChatMessages) ? calendarContext.displayChatMessages : [];
-  const imageMessage = allMessages.slice().reverse().find(m => m && (m.imageUrl || (Array.isArray(m.imageUrls) && m.imageUrls.length)));
-  const messages = [imageMessage, ...allMessages.slice().reverse().filter(m => m && m !== imageMessage && (m.text || m.content)).slice(0, 2)].filter(Boolean);
-  const memos = Array.isArray(calendarContext?.memos) ? calendarContext.memos.slice(0, 2) : [];
+  const newestMessages = latestRows(allMessages);
+  const imageMessage = newestMessages.find(m => getMessageImageEntries(m).length);
+  const messages = [imageMessage, ...newestMessages.filter(m => m !== imageMessage && (m.text || m.content)).slice(0, 2)].filter(Boolean);
+  const memos = Array.isArray(calendarContext?.memos) ? latestRows(calendarContext.memos).slice(0, 2) : [];
   const photos = Array.isArray(calendarContext?.galleryPhotoIndex?.items) ? calendarContext.galleryPhotoIndex.items.slice(0, 8) : [];
-  const places = Array.isArray(calendarContext?.places) ? calendarContext.places.slice(0, 2) : [];
+  const places = Array.isArray(calendarContext?.places) ? latestRows(calendarContext.places).slice(0, 2) : [];
   const participants = Array.isArray(calendarContext?.calendar?.participants) ? calendarContext.calendar.participants : [];
   const participantFor = row => participants.find(p => p && (p.id === row?.participantId || p.name === row?.senderName || p.name === row?.author));
-  const displayName = row => row?.senderName || row?.author || participantFor(row)?.name || '알 수 없음';
-  const displayColor = row => row?.color || participantFor(row)?.color || '#A78BFA';
-  const dateValue = value => value?.toDate ? value.toDate() : value?.seconds ? new Date(value.seconds * 1000) : new Date(value || 0);
+  const displayName = row => authorFor(row, participants).name;
+  const displayColor = row => authorFor(row, participants).color;
+  const dateValue = value => new Date(timestampMs(value) || NaN);
   const formatTime = value => {
     const d = dateValue(value);
     return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
@@ -636,82 +656,82 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
     return Number.isNaN(d.getTime()) ? '' : `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}(${['일','월','화','수','목','금','토'][d.getDay()]}) ${formatTime(value)}`;
   };
   const Section = ({ title, kind, children, onMore, delay }) => React.createElement('div', {
-    className: `renewal-home-summary-section bento-card wide enter is-${kind}${kind === 'gallery' ? ' gallery-bleed' : ''}`,
+    className: bentoClass(`renewal-home-summary-section bento-card wide enter is-${kind}${kind === 'gallery' ? ' gallery-bleed' : ''}`),
     style: delay ? { animationDelay: delay } : undefined,
   },
-    React.createElement('div', { className: 'renewal-home-summary-heading bento-card-head' },
-      React.createElement('span', { className: 'renewal-home-summary-heading-icon bento-card-icon' }, React.createElement(HomeSectionIcon, { kind })),
-      React.createElement('span', { className: 'bento-card-title' }, title),
-      onMore && React.createElement('button', { type: 'button', className: 'more-link', onClick: onMore }, '전체보기')
+    React.createElement('div', { className: bentoClass('renewal-home-summary-heading bento-card-head') },
+      React.createElement('span', { className: bentoClass('renewal-home-summary-heading-icon bento-card-icon') }, React.createElement(HomeSectionIcon, { kind })),
+      React.createElement('span', { className: bentoClass('bento-card-title') }, title),
+      onMore && React.createElement('button', { type: 'button', className: bentoClass('more-link'), onClick: onMore }, '전체보기')
     ), children);
-  return React.createElement('div', { className: 'renewal-home-summary bento-grid' },
-    React.createElement('div', { className: 'renewal-home-summary-section bento-card wide enter', style: { animationDelay: '0.04s' } },
+  return React.createElement('div', { className: bentoClass('renewal-home-summary bento-grid') },
+    React.createElement('div', { className: bentoClass('renewal-home-summary-section bento-card wide enter'), style: { animationDelay: '0.04s' } },
       React.createElement(BentoCalendarCard, { calendarContext, onSelectDate: onOpenDate })
     ),
     React.createElement(Section, { title: '채팅', kind: 'chat', delay: '0.08s', onMore: () => onChangeView?.('chat') },
-      messages.length ? React.createElement('div', { className: 'renewal-home-chat-list' }, messages.map((m, i) => {
+      messages.length ? React.createElement('div', { className: bentoClass('renewal-home-chat-list') }, messages.map((m, i) => {
         const image = m.thumbUrl || (Array.isArray(m.thumbUrls) && m.thumbUrls[0]) || m.imageUrl || (Array.isArray(m.imageUrls) && m.imageUrls[0]);
-        return React.createElement('button', { type: 'button', className: `renewal-home-chat-item chat-row${image ? ' has-image' : ''}`, key: m.id || i, onClick: () => onChangeView?.('chat') },
-          React.createElement('span', { className: 'renewal-home-chat-name chat-name-pill', style: { backgroundColor: displayColor(m) } }, displayName(m)),
-          React.createElement('span', { className: 'renewal-home-chat-content chat-content' },
-            image && React.createElement('img', { className: 'renewal-home-chat-image chat-img', src: image, alt: '', loading: 'lazy' }),
-            m.replyTo && React.createElement('span', { className: 'renewal-home-chat-reply chat-reply-quote' },
-              React.createElement('strong', { className: 'chat-reply-quote-author' }, m.replyTo.senderName || participantFor(m.replyTo)?.name || '답장'),
-              React.createElement('span', { className: 'chat-reply-quote-text' }, m.replyTo.text || '사진')
+        return React.createElement('button', { type: 'button', className: bentoClass(`renewal-home-chat-item chat-row${image ? ' has-image' : ''}`), key: m.id || i, onClick: () => onChangeView?.('chat') },
+          React.createElement('span', { className: bentoClass('renewal-home-chat-name chat-name-pill'), style: { backgroundColor: displayColor(m) } }, displayName(m)),
+          React.createElement('span', { className: bentoClass('renewal-home-chat-content chat-content') },
+            image && React.createElement('img', { className: bentoClass('renewal-home-chat-image chat-img'), src: image, alt: '', loading: 'lazy' }),
+            m.replyTo && React.createElement('span', { className: bentoClass('renewal-home-chat-reply chat-reply-quote') },
+              React.createElement('strong', { className: bentoClass('chat-reply-quote-author') }, m.replyTo.senderName || participantFor(m.replyTo)?.name || '답장'),
+              React.createElement('span', { className: bentoClass('chat-reply-quote-text') }, m.replyTo.text || '사진')
             ),
-            (m.text || m.content) && React.createElement('span', { className: 'renewal-home-chat-text chat-text' }, String(m.text || m.content).slice(0, 120)),
-            React.createElement('span', { className: 'renewal-home-chat-time chat-meta' }, image ? formatShortDateTime(m.createdAt) : formatTime(m.createdAt))
+            (m.text || m.content) && React.createElement('span', { className: bentoClass('renewal-home-chat-text chat-text') }, String(m.text || m.content).slice(0, 120)),
+            React.createElement('span', { className: bentoClass('renewal-home-chat-time chat-meta') }, image ? formatShortDateTime(m.timestamp ?? m.createdAt) : formatTime(m.timestamp ?? m.createdAt))
           )
         );
-      })) : React.createElement('p', { className: 'renewal-home-empty' }, '최근 대화가 없습니다.')
+      })) : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '최근 대화가 없습니다.')
     ),
-    React.createElement(Section, { title: '메모', kind: 'memo', delay: '0.12s', onMore: () => onChangeView?.('records') },
-      memos.length ? React.createElement('div', { className: 'renewal-home-memo-list' }, memos.map((memo, i) => {
+    React.createElement(Section, { title: '메모', kind: 'memo', delay: '0.12s', onMore: () => onChangeView?.('memo') },
+      memos.length ? React.createElement('div', { className: bentoClass('renewal-home-memo-list') }, memos.map((memo, i) => {
         const preview = memo.linkPreview || (Array.isArray(memo.linkPreviews) && memo.linkPreviews[0]);
         const tags = Array.isArray(memo.tags) ? memo.tags.slice(0, 3) : [];
-        return React.createElement('button', { type: 'button', className: 'renewal-home-memo-card memo-card', key: memo.id || i, style: { '--renewal-memo-author': displayColor(memo), '--memo-author-color': displayColor(memo) }, onClick: () => onChangeView?.('records') },
-          React.createElement('strong', { className: 'renewal-home-memo-title memo-card-title' }, memo.title || '메모'),
-          React.createElement('span', { className: 'renewal-home-memo-summary memo-summary' }, String(memo.text || memo.content || memo.description || '').slice(0, 170)),
-          preview && React.createElement('span', { className: 'renewal-home-memo-preview memo-link-card' },
-            preview.image && React.createElement('img', { className: 'memo-link-thumb', src: preview.image, alt: '', loading: 'lazy' }),
-            React.createElement('span', null, React.createElement('strong', { className: 'memo-link-title' }, preview.title || '링크 미리보기'), React.createElement('small', { className: 'memo-link-desc' }, preview.description || preview.url || ''))
+        return React.createElement('button', { type: 'button', className: bentoClass('renewal-home-memo-card memo-card'), key: memo.id || i, style: { '--renewal-memo-author': displayColor(memo), '--memo-author-color': displayColor(memo) }, onClick: () => onChangeView?.('memo') },
+          React.createElement('strong', { className: bentoClass('renewal-home-memo-title memo-card-title') }, memo.title || '메모'),
+          React.createElement('span', { className: bentoClass('renewal-home-memo-summary memo-summary') }, String(memo.text || memo.content || memo.description || '').slice(0, 170)),
+          preview && React.createElement('span', { className: bentoClass('renewal-home-memo-preview memo-link-card') },
+            preview.image && React.createElement('img', { className: bentoClass('memo-link-thumb'), src: preview.image, alt: '', loading: 'lazy' }),
+            React.createElement('span', null, React.createElement('strong', { className: bentoClass('memo-link-title') }, preview.title || '링크 미리보기'), React.createElement('small', { className: bentoClass('memo-link-desc') }, preview.description || preview.url || ''))
           ),
-          React.createElement('span', { className: 'renewal-home-memo-meta memo-tags-row' },
-            React.createElement('b', { className: 'chat-name-pill', style: { backgroundColor: displayColor(memo) } }, displayName(memo)),
-            tags.map(tag => React.createElement('em', { className: 'memo-tag', key: tag }, `#${String(tag).replace(/^#/, '')}`))
+          React.createElement('span', { className: bentoClass('renewal-home-memo-meta memo-tags-row') },
+            React.createElement('b', { className: bentoClass('chat-name-pill'), style: { backgroundColor: displayColor(memo) } }, displayName(memo)),
+            tags.map(tag => React.createElement('em', { className: bentoClass('memo-tag'), key: tag }, `#${String(tag).replace(/^#/, '')}`))
           )
         );
-      })) : React.createElement('p', { className: 'renewal-home-empty' }, '최근 메모가 없습니다.')
+      })) : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '최근 메모가 없습니다.')
     ),
     React.createElement(Section, { title: '갤러리', kind: 'gallery', delay: '0.16s', onMore: () => onChangeView?.('gallery') },
-      photos.length ? React.createElement('div', { className: 'renewal-home-photo-strip thumb-grid' }, photos.map((photo, i) => React.createElement('button', {
+      photos.length ? React.createElement('div', { className: bentoClass('renewal-home-photo-strip thumb-grid') }, photos.map((photo, i) => React.createElement('button', {
         type: 'button',
-        className: `thumb ${i === 0 ? 'gallery-comment-heartbeat' : ''}`.trim(),
+        className: bentoClass(`thumb ${photo.commentCount > 0 ? 'gallery-comment-heartbeat' : ''}`.trim()),
         key: photo.id || photo.mediaKey || i,
-        onClick: () => calendarContext.setActiveLightbox?.(photo),
+        onClick: () => calendarContext.setActiveLightbox?.(photoLightbox(photo, photos)),
         'aria-label': `사진 ${i + 1} 크게 보기`
       },
         React.createElement('img', { src: photo.thumb || photo.thumbnailUrl || photo.thumbUrl || photo.full || photo.url || photo.imageUrl || photo.downloadURL, alt: '', loading: 'lazy' }),
-        (photo.commentCount || i === 0) ? React.createElement('span', { className: 'comment-badge' }, photo.commentCount || 1) : null
-      ))) : React.createElement('p', { className: 'renewal-home-empty' }, '등록된 사진이 없습니다.')
+        photo.commentCount > 0 ? React.createElement('span', { className: bentoClass('comment-badge') }, photo.commentCount) : null
+      ))) : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '등록된 사진이 없습니다.')
     ),
-    React.createElement(Section, { title: '장소', kind: 'places', delay: '0.20s', onMore: () => onChangeView?.('records') },
-      places.length ? React.createElement('div', { className: 'renewal-home-place-list' }, places.map((place, i) => React.createElement('button', { type: 'button', className: 'renewal-home-place-card place-row', key: place.id || i, onClick: () => onChangeView?.('records') },
-        React.createElement('span', { className: 'renewal-home-place-copy' },
-          React.createElement('span', { className: 'renewal-home-place-tags place-tags' },
-            React.createElement('em', { className: 'place-tag', style: { background: '#F1F5F9', color: 'var(--text-muted)' } }, place.categoryName || place.categoryId || '기타'),
+    React.createElement(Section, { title: '장소', kind: 'places', delay: '0.20s', onMore: () => onChangeView?.('places') },
+      places.length ? React.createElement('div', { className: bentoClass('renewal-home-place-list') }, places.map((place, i) => React.createElement('button', { type: 'button', className: bentoClass('renewal-home-place-card place-row'), key: place.id || i, onClick: () => onChangeView?.('places') },
+        React.createElement('span', { className: bentoClass('renewal-home-place-copy') },
+          React.createElement('span', { className: bentoClass('renewal-home-place-tags place-tags') },
+            React.createElement('em', { className: bentoClass('place-tag'), style: { background: '#F1F5F9', color: 'var(--text-muted)' } }, place.categoryName || ({ restaurant: '식당', food: '식당', cafe: '카페', play: '놀이', lodging: '숙박', shopping: '쇼핑', other: '기타' }[place.categoryId]) || '기타'),
             React.createElement('em', {
-              className: `place-tag ${place.visitStatus === 'planned' ? 'is-planned' : 'is-visited'}`,
+              className: bentoClass(`place-tag ${place.visitStatus === 'planned' ? 'is-planned' : 'is-visited'}`),
               style: place.visitStatus === 'planned'
                 ? { background: 'var(--brand-soft)', color: 'var(--brand)' }
                 : { background: '#ECFDF5', color: 'var(--status-green)' }
             }, place.visitStatus === 'planned' ? '방문예정' : '방문')
           ),
-          React.createElement('strong', { className: 'place-name' }, place.name || place.title || '저장한 장소'),
-          React.createElement('small', { className: 'place-addr' }, place.address || place.description || ''),
-          place.memo && React.createElement('small', { className: 'renewal-home-place-note place-note' }, String(place.memo).split('\n')[0].slice(0, 90))
+          React.createElement('strong', { className: bentoClass('place-name') }, place.name || place.title || '저장한 장소'),
+          React.createElement('small', { className: bentoClass('place-addr') }, place.address || place.description || ''),
+          place.memo && React.createElement('small', { className: bentoClass('renewal-home-place-note place-note') }, String(place.memo).split('\n')[0].slice(0, 90))
         )
-      ))) : React.createElement('p', { className: 'renewal-home-empty' }, '저장한 장소가 없습니다.')
+      ))) : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '저장한 장소가 없습니다.')
     )
   );
 }
@@ -721,13 +741,13 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
  * the exact same instance instead of each tab duplicating it (WP-03 originally nested this inside
  * `CalendarPane` alone; lifted out once 정산 needed the same "click a date, see its detail" flow).
  */
-function SharedDateModal({ calendarContext, dateModalDate, onClose, onSelectDate, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource }) {
+function SharedDateModal({ calendarContext, dateModalDate, initialTab = null, onClose, onSelectDate, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource }) {
   const React = window.React;
   const { DateModal } = bindUiComponentAliases(React);
   return React.createElement(DateModal, {
     ...calendarContext.dateModalProps,
     dateStr: dateModalDate,
-    initialTab: null,
+    initialTab,
     onClose,
     onParticipantClick: (name, dateStr) => { if (dateStr) onSelectDate(dateStr); },
     onEditAnniversary,
@@ -764,12 +784,12 @@ export function buildRenewalChatContext(calendar, deps) {
     fontScalePercent, setFontScalePercent, mainNotifPermission, mainChatNotifyEnabled, handleMainToggleNotifications,
     stickyVideo, handleActivateChatVideo, handleJumpToChatMessage, handleJumpToMemo, handleJumpToMeetingDate,
     handleGetChatMessageOrdinal, handleGetGalleryPhotoOrdinal, showConfirmDialog, syncStatus, externalFocusMsgId,
-    isChatShareOpen, setIsChatShareOpen,
+    setIsChatShareOpen,
   } = deps || {};
   return {
     calendar: activeCal,
     showToast,
-    isChatShareOpen: !!isChatShareOpen,
+    isChatShareOpen: false,
     onOpenChatShare: () => setIsChatShareOpen(true),
     onCloseChatShare: () => setIsChatShareOpen(false),
     chatRoomProps: {
@@ -824,6 +844,7 @@ function ChatPane({ chatContext, onChangeView, onOpenAppSettings }) {
   return React.createElement(React.Fragment, null,
     React.createElement(ChatRoomView, {
       ...chatContext.chatRoomProps,
+      renderV2: renderChatScreen,
       onBack: () => onChangeView('calendar'),
       onOpenGallery: () => onChangeView('gallery'),
       onChangeView,
@@ -850,7 +871,7 @@ export function buildRenewalSettlementContext(calendar, deps) {
   const {
     activeCal, canUseSettlement, showToast, showConfirmDialog,
     handleToggleSettlementCardStatus, handleDeleteSettlementCard, handleSaveSettlementCard,
-    editingSettlementCard, setEditingSettlementCard, isShareOpen, setIsShareOpen,
+    editingSettlementCard, setEditingSettlementCard, setIsShareOpen,
   } = deps || {};
   const requireLoadedCalendar = (message) => {
     if (activeCal) return true;
@@ -869,7 +890,7 @@ export function buildRenewalSettlementContext(calendar, deps) {
       onOpenSettlementEditor: (card) => setEditingSettlementCard(card ? { ...card } : null),
       showToast, onRequestConfirm: showConfirmDialog,
     },
-    isShareOpen: !!isShareOpen,
+    isShareOpen: false,
     onOpenShare: () => { if (requireLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsShareOpen(true); },
     onCloseShare: () => setIsShareOpen(false),
     editingSettlementCard,
@@ -907,20 +928,14 @@ function SettlementPane({ settlementContext, onChangeView, onOpenAppSettings, on
   return React.createElement(React.Fragment, null,
     React.createElement(SettlementSummaryModal, {
       ...settlementContext.summaryProps,
+      renderV2: renderSettlementScreen,
       onBack: () => onChangeView('calendar'),
       onSelectDate: onOpenDate,
       onOpenShare: settlementContext.onOpenShare,
       onOpenAppSettings,
       onChangeView,
     }),
-    React.createElement('button', {
-      type: 'button',
-      className: 'fab',
-      'aria-label': '지출 추가',
-      onClick: () => settlementContext.summaryProps.onOpenSettlementEditor(null),
-    }, React.createElement('svg', { width: 22, height: 22, viewBox: '0 0 24 24', fill: 'none', stroke: '#fff', strokeWidth: 2.4, strokeLinecap: 'round', strokeLinejoin: 'round' },
-      React.createElement('path', { d: 'M12 5v14M5 12h14' })
-    )),
+
     settlementContext.isShareOpen && React.createElement(ShareModal, {
       calendar: settlementContext.calendar, shareType: 'settlement', showToast: settlementContext.showToast,
       onClose: settlementContext.onCloseShare,
@@ -1282,6 +1297,7 @@ function PlacesPane({ recordsContext, calendarContext, onChangeView, onOpenAppSe
   return React.createElement(React.Fragment, null,
     React.createElement(PlacesView, {
       ...recordsContext.placesProps,
+      renderV2: renderPlacesScreen,
       onBack: () => onChangeView('calendar'),
       onSelectDate: (dateStr) => {
         const canonicalDate = normalizePlaceDateForSort(dateStr);
@@ -1290,17 +1306,7 @@ function PlacesPane({ recordsContext, calendarContext, onChangeView, onOpenAppSe
       onSharePlaces: recordsContext.onOpenPlacesShare,
       onOpenAppSettings,
     }),
-    React.createElement('button', {
-      type: 'button',
-      className: 'fab',
-      'aria-label': '장소 등록',
-      onClick: () => {
-        const addBtn = document.querySelector('.renewal-shell-main.is-records button[aria-label="장소 추가"]');
-        if (addBtn) addBtn.click();
-      },
-    }, React.createElement('svg', { width: 22, height: 22, viewBox: '0 0 24 24', fill: 'none', stroke: '#fff', strokeWidth: 2.4, strokeLinecap: 'round', strokeLinejoin: 'round' },
-      React.createElement('path', { d: 'M12 5v14M5 12h14' })
-    )),
+
     recordsContext.isPlacesShareOpen && React.createElement(ShareModal, {
       calendar: recordsContext.calendar, shareType: 'places', showToast: recordsContext.showToast,
       onClose: recordsContext.onClosePlacesShare,
@@ -1343,24 +1349,12 @@ function MemoPane({ recordsContext, onChangeView, onOpenAppSettings }) {
   return React.createElement(React.Fragment, null,
     React.createElement(MemoView, {
       ...recordsContext.memoProps,
+      renderV2: renderMemoScreen,
       onBack: () => onChangeView('calendar'),
       onOpenShare: recordsContext.onOpenMemoShare,
       onOpenAppSettings,
     }),
-    React.createElement('button', {
-      type: 'button',
-      className: 'fab',
-      'aria-label': '메모 작성',
-      onClick: () => {
-        const composer = document.querySelector('.renewal-shell-main.is-records textarea, .renewal-shell-main.is-records [style*="newColor"]');
-        if (composer) {
-          composer.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          composer.click();
-        }
-      },
-    }, React.createElement('svg', { width: 22, height: 22, viewBox: '0 0 24 24', fill: 'none', stroke: '#fff', strokeWidth: 2.4, strokeLinecap: 'round', strokeLinejoin: 'round' },
-      React.createElement('path', { d: 'M12 5v14M5 12h14' })
-    )),
+
     recordsContext.isMemoShareOpen && React.createElement(ShareModal, {
       calendar: recordsContext.calendar, shareType: 'memo', showToast: recordsContext.showToast,
       onClose: recordsContext.onCloseMemoShare,
@@ -1371,7 +1365,7 @@ function MemoPane({ recordsContext, onChangeView, onOpenAppSettings }) {
 function RecordsPane({ subTab, onSelectSubTab, calendarName, recordsContext, calendarContext, onChangeView, onOpenAppSettings, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource }) {
   const React = window.React;
   return React.createElement(React.Fragment, null,
-    React.createElement('div', { className: 'renewal-shell-subtab-row', role: 'tablist', 'aria-label': '기록 필터' },
+    !['memo', 'places'].includes(subTab) && React.createElement('div', { className: 'renewal-shell-subtab-row', role: 'tablist', 'aria-label': '기록 필터' },
       RECORDS_SUBTABS.map(t => React.createElement('button', {
         key: t.id,
         type: 'button',
@@ -1827,7 +1821,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   // in this shell, so this just maps the old view id to the equivalent tab/subtab instead of
   // reimplementing navigation. `onBack`/`onOpenGallery` (ChatPane) reuse this same mapping.
   const onChangeView = (view) => {
-    if (view === 'chat') return; // already there
+    if (view === 'chat') { setActiveTab('chat'); return; }
     if (view === 'settlement') { setActiveTab('settlement'); return; }
     const recordsSubTabByView = { memo: 'memo', places: 'places', gallery: 'media', history: 'archive', content: 'content' };
     if (recordsSubTabByView[view]) {
@@ -1944,148 +1938,130 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   const sideSubById = { gallery: 'media', places: 'places', memo: 'memo', content: 'content', archive: 'archive' };
   const isSideItemActive = (id) => id === activeTab || (activeTab === 'records' && sideSubById[id] === recordsSubTab);
 
-  const navButtons = (extraClass) => TABS.map(tab =>
-    React.createElement('button', {
-      key: tab.id,
-      type: 'button',
-      className: `renewal-shell-nav-item ${extraClass || ''} ${activeTab === tab.id ? 'is-active' : ''}`.trim(),
-      onClick: () => setActiveTab(tab.id),
-      'aria-current': activeTab === tab.id ? 'page' : undefined,
-    },
-      React.createElement('span', { className: 'renewal-shell-nav-icon' }, React.createElement(TabIcon, { id: tab.id })),
-      React.createElement('span', { className: 'renewal-shell-nav-label' }, tab.label)
-    )
-  );
-
   const allChat = Array.isArray(calendarContext?.displayChatMessages) ? calendarContext.displayChatMessages : (recordsContext?.mediaProps?.chatMessages || []);
-  const lastChatMsg = allChat.length ? allChat[allChat.length - 1] : null;
-  const lastChatAuthor = lastChatMsg ? (lastChatMsg.senderName || '박영우') : '박영우';
+  const lastChatMsg = latestRows(allChat)[0];
+  const lastChatAuthor = lastChatMsg ? authorFor(lastChatMsg, calendar?.participants).name : '';
+  const lastMemo = latestRows(recordsContext?.memoProps?.memos || [])[0];
+  const lastPlace = latestRows(recordsContext?.placesProps?.calendar?.places || [])[0];
+  const lastPhoto = recordsContext?.mediaProps?.indexedPhotos?.[0];
+  const settlementCards = calendar?.settlementCards || [];
+  const shortDate = value => { const ms = timestampMs(value); return ms ? new Date(ms).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' }).replace(/\. /g, '.').replace(/\.$/, '') : ''; };
+  const sideMeta = { chat: lastChatAuthor, memo: lastMemo?.title || '', places: lastPlace?.alias || lastPlace?.name || '', gallery: shortDate(lastPhoto?.timestamp), settlement: shortDate(latestRows(settlementCards)[0]?.updatedAt || latestRows(settlementCards)[0]?.createdAt) };
+  const settlementCount = settlementCards.filter(card => !card.deletedAt && card.status !== 'closed').length;
   const participants = Array.isArray(calendarContext?.calendar?.participants) ? calendarContext.calendar.participants : [];
   const chatAuthorPart = participants.find(p => p && (p.id === lastChatMsg?.participantId || p.name === lastChatAuthor));
   const chatPillColor = chatAuthorPart?.color ? `${chatAuthorPart.color}33` : '#FEE2E2';
   const chatPillTextColor = chatAuthorPart?.color || '#DC2626';
 
+  const hasFullScreen = activeTab === 'chat' || activeTab === 'settlement' || (activeTab === 'records' && ['memo', 'places'].includes(recordsSubTab));
   const bentoSideNav = React.createElement(React.Fragment, null,
-    React.createElement('div', { className: 'side-nav-head' },
-      React.createElement('div', { className: 'side-nav-brand' },
+    React.createElement('div', { className: bentoClass('side-nav-head') },
+      React.createElement('div', { className: bentoClass('side-nav-brand') },
         React.createElement(TabIcon, { id: 'calendar' }),
-        React.createElement('span', { className: 'side-nav-brand-text' }, calendarName || '모아엘가')
+        React.createElement('span', { className: bentoClass('side-nav-brand-text') }, String(calendarName || '모여라 캘린더').replace(/^[^\p{L}\p{N}]+/u, '').trim())
       ),
-      React.createElement('button', { type: 'button', className: 'side-nav-close-btn', 'aria-label': '메뉴 닫기', onClick: () => setIsSideNavOpen(false) },
+      React.createElement('button', { type: 'button', className: bentoClass('side-nav-close-btn'), 'aria-label': '메뉴 닫기', onClick: () => setIsSideNavOpen(false) },
         React.createElement(TabIcon, { id: 'close' })
       )
     ),
-    React.createElement('div', { className: 'side-nav-group renewal-shell-side-nav-group is-settings' },
-      React.createElement('button', { type: 'button', className: 'side-nav-manual-banner renewal-shell-manual-card', title: '사용자 매뉴얼', onClick: () => { setIsSideNavOpen(false); openMoreModalById('manual'); } },
-        React.createElement('span', { className: 'side-nav-manual-banner-icon-wrap renewal-shell-manual-icon' }, React.createElement(TabIcon, { id: 'manual' })),
-        React.createElement('span', { className: 'side-nav-manual-banner-text renewal-shell-manual-copy' },
-          React.createElement('strong', { className: 'side-nav-manual-banner-title' }, '사용자 매뉴얼'),
-          React.createElement('small', { className: 'side-nav-manual-banner-sub' }, '사용 방법 한눈에 보기')
+    React.createElement('div', { className: bentoClass('side-nav-group renewal-shell-side-nav-group is-settings') },
+      React.createElement('button', { type: 'button', className: bentoClass('side-nav-manual-banner renewal-shell-manual-card'), title: '사용자 매뉴얼', onClick: () => { setIsSideNavOpen(false); openMoreModalById('manual'); } },
+        React.createElement('span', { className: bentoClass('side-nav-manual-banner-icon-wrap renewal-shell-manual-icon') }, React.createElement(TabIcon, { id: 'manual' })),
+        React.createElement('span', { className: bentoClass('side-nav-manual-banner-text renewal-shell-manual-copy') },
+          React.createElement('strong', { className: bentoClass('side-nav-manual-banner-title') }, '사용자 매뉴얼'),
+          React.createElement('small', { className: bentoClass('side-nav-manual-banner-sub') }, '사용 방법 한눈에 보기')
         ),
-        React.createElement('span', { className: 'side-nav-manual-banner-chevron renewal-shell-manual-chevron' }, React.createElement(TabIcon, { id: 'chevronRight' }))
+        React.createElement('span', { className: bentoClass('side-nav-manual-banner-chevron renewal-shell-manual-chevron') }, React.createElement(TabIcon, { id: 'chevronRight' }))
       ),
-      React.createElement('button', { type: 'button', className: 'side-nav-item renewal-shell-side-nav-quick-item', title: '캘린더 설정', onClick: () => openMoreModalById('calendar-settings') },
-        React.createElement('span', { className: 'side-nav-item-icon' }, React.createElement(TabIcon, { id: 'calendar' })),
-        React.createElement('span', { className: 'side-nav-item-title' }, '캘린더 설정')
+      React.createElement('button', { type: 'button', className: bentoClass('side-nav-item renewal-shell-side-nav-quick-item'), title: '캘린더 설정', onClick: () => openMoreModalById('calendar-settings') },
+        React.createElement('span', { className: bentoClass('side-nav-item-icon') }, React.createElement(TabIcon, { id: 'calendar' })),
+        React.createElement('span', { className: bentoClass('side-nav-item-title') }, '캘린더 설정')
       ),
-      React.createElement('button', { type: 'button', className: 'side-nav-item renewal-shell-side-nav-quick-item', title: '기념일 설정', onClick: () => openMoreModalById('anniversaries') },
-        React.createElement('span', { className: 'side-nav-item-icon' }, React.createElement(TabIcon, { id: 'gift' })),
-        React.createElement('span', { className: 'side-nav-item-title' }, '기념일 설정')
+      React.createElement('button', { type: 'button', className: bentoClass('side-nav-item renewal-shell-side-nav-quick-item'), title: '기념일 설정', onClick: () => openMoreModalById('anniversaries') },
+        React.createElement('span', { className: bentoClass('side-nav-item-icon') }, React.createElement(TabIcon, { id: 'gift' })),
+        React.createElement('span', { className: bentoClass('side-nav-item-title') }, '기념일 설정')
       )
     ),
-    React.createElement('div', { className: 'side-nav-group renewal-shell-side-nav-group is-main' },
+    React.createElement('div', { className: bentoClass('side-nav-group renewal-shell-side-nav-group is-main') },
       BENTO_MAIN_ITEMS.map(item => {
         const active = isSideItemActive(item.id);
-        const metaVal = item.id === 'chat' ? lastChatAuthor : item.meta;
+        const metaVal = sideMeta[item.id];
         return React.createElement('button', {
           key: item.id,
           type: 'button',
-          className: `side-nav-item renewal-shell-side-nav-item ${active ? 'is-active' : ''}`.trim(),
+          className: bentoClass(`side-nav-item renewal-shell-side-nav-item ${active ? 'is-active' : ''}`.trim()),
           title: item.label,
           onClick: () => selectSideItem(item.id)
         },
-          React.createElement('span', { className: 'side-nav-item-icon renewal-shell-nav-icon' }, React.createElement(TabIcon, { id: item.icon })),
-          React.createElement('span', { className: 'side-nav-item-title renewal-shell-nav-label' },
+          React.createElement('span', { className: bentoClass('side-nav-item-icon renewal-shell-nav-icon') }, React.createElement(TabIcon, { id: item.icon })),
+          React.createElement('span', { className: bentoClass('side-nav-item-title renewal-shell-nav-label') },
             item.label,
-            item.badge && React.createElement('span', { className: 'side-nav-item-badge' }, item.badge)
+            item.id === 'settlement' && settlementCount > 0 && React.createElement('span', { className: bentoClass('side-nav-item-badge') }, settlementCount)
           ),
           metaVal && (
             item.isPill
-              ? React.createElement('span', { className: 'side-nav-item-meta chat-name-pill', style: { backgroundColor: chatPillColor, color: chatPillTextColor } }, metaVal)
-              : React.createElement('span', { className: 'side-nav-item-meta renewal-shell-side-nav-meta' }, metaVal)
+              ? React.createElement('span', { className: bentoClass('side-nav-item-meta chat-name-pill'), style: { backgroundColor: chatPillColor, color: chatPillTextColor } }, metaVal)
+              : React.createElement('span', { className: bentoClass('side-nav-item-meta renewal-shell-side-nav-meta') }, metaVal)
           )
         );
       })
     ),
-    React.createElement('div', { className: 'side-nav-group renewal-shell-side-nav-group is-sub' },
+    React.createElement('div', { className: bentoClass('side-nav-group renewal-shell-side-nav-group is-sub') },
       BENTO_SUB_ITEMS.map(item => {
         const active = isSideItemActive(item.id);
         return React.createElement('button', {
           key: item.id,
           type: 'button',
-          className: `side-nav-item renewal-shell-side-nav-item ${active ? 'is-active' : ''}`.trim(),
+          className: bentoClass(`side-nav-item renewal-shell-side-nav-item ${active ? 'is-active' : ''}`.trim()),
           title: item.label,
           onClick: () => selectSideItem(item.id)
         },
-          React.createElement('span', { className: 'side-nav-item-icon renewal-shell-nav-icon' }, React.createElement(TabIcon, { id: item.icon })),
-          React.createElement('span', { className: 'side-nav-item-title renewal-shell-nav-label' }, item.label)
+          React.createElement('span', { className: bentoClass('side-nav-item-icon renewal-shell-nav-icon') }, React.createElement(TabIcon, { id: item.icon })),
+          React.createElement('span', { className: bentoClass('side-nav-item-title renewal-shell-nav-label') }, item.label)
         );
       })
     ),
-    React.createElement('div', { className: 'side-nav-footer renewal-shell-side-nav-footer' },
-      React.createElement('button', { type: 'button', className: 'side-nav-item renewal-shell-side-nav-quick-item', title: '공유', onClick: () => openMoreModalById('share') },
-        React.createElement('span', { className: 'side-nav-item-icon' }, React.createElement(TabIcon, { id: 'share' })),
-        React.createElement('span', { className: 'side-nav-item-title' }, '공유')
+    React.createElement('div', { className: bentoClass('side-nav-footer renewal-shell-side-nav-footer') },
+      React.createElement('button', { type: 'button', className: bentoClass('side-nav-item renewal-shell-side-nav-quick-item'), title: '공유', onClick: () => openMoreModalById('share') },
+        React.createElement('span', { className: bentoClass('side-nav-item-icon') }, React.createElement(TabIcon, { id: 'share' })),
+        React.createElement('span', { className: bentoClass('side-nav-item-title') }, '공유')
       ),
-      React.createElement('button', { type: 'button', className: 'side-nav-item renewal-shell-side-nav-quick-item', title: '설정', onClick: () => openMoreModalById('app-settings') },
-        React.createElement('span', { className: 'side-nav-item-icon' }, React.createElement(TabIcon, { id: 'settings' })),
-        React.createElement('span', { className: 'side-nav-item-title' }, '설정')
+      React.createElement('button', { type: 'button', className: bentoClass('side-nav-item renewal-shell-side-nav-quick-item'), title: '설정', onClick: () => openMoreModalById('app-settings') },
+        React.createElement('span', { className: bentoClass('side-nav-item-icon') }, React.createElement(TabIcon, { id: 'settings' })),
+        React.createElement('span', { className: bentoClass('side-nav-item-title') }, '설정')
       ),
-      React.createElement('button', { type: 'button', className: 'side-nav-collapse-btn renewal-shell-side-collapse', title: isSideNavCollapsed ? '메뉴 펼치기' : '메뉴 접기', 'aria-label': isSideNavCollapsed ? '메뉴 펼치기' : '메뉴 접기', onClick: () => setIsSideNavCollapsed(v => !v) },
+      React.createElement('button', { type: 'button', className: bentoClass('side-nav-collapse-btn renewal-shell-side-collapse'), title: isSideNavCollapsed ? '메뉴 펼치기' : '메뉴 접기', 'aria-label': isSideNavCollapsed ? '메뉴 펼치기' : '메뉴 접기', onClick: () => setIsSideNavCollapsed(v => !v) },
         React.createElement(TabIcon, { id: isSideNavCollapsed ? 'chevronRight' : 'chevronLeft' }),
-        React.createElement('span', { className: 'side-nav-collapse-label' }, isSideNavCollapsed ? '펼치기' : '접기')
+        React.createElement('span', { className: bentoClass('side-nav-collapse-label') }, isSideNavCollapsed ? '펼치기' : '접기')
       )
     )
   );
 
   return React.createElement(React.Fragment, null,
-    React.createElement('div', { className: `renewal-shell ${isSideNavCollapsed ? 'is-side-collapsed' : ''}`.trim() },
-      React.createElement('button', { type: 'button', className: `renewal-shell-side-backdrop side-nav-backdrop ${isSideNavOpen ? 'is-open' : ''}`.trim(), onClick: () => setIsSideNavOpen(false), 'aria-label': '메뉴 닫기' }),
-      React.createElement('nav', { className: `renewal-shell-side-nav side-nav ${isSideNavOpen ? 'is-open' : ''} ${isSideNavCollapsed ? 'is-collapsed' : ''}`.trim(), 'aria-label': '주 메뉴' }, bentoSideNav),
-      React.createElement('main', { className: `renewal-shell-main is-${activeTab}` },
-        (function renderShellMain() {
-          const headerEl = React.createElement(TopHeader, {
-            calendarName,
-            onOpenSearch: () => handleSelectMoreItem('search'),
-            onOpenMore: () => setIsSideNavOpen(true),
-          });
-          if (activeTab === 'calendar') {
-            return React.createElement(CalendarPane, {
-              calendarContext, recordsContext, onOpenDate: setDateModalDate, onChangeView, header: headerEl
-            });
-          }
-          return React.createElement(React.Fragment, null,
-            headerEl,
-            activeTab === 'chat'
-              ? React.createElement(ChatPane, { chatContext, onChangeView, onOpenAppSettings })
-              : activeTab === 'settlement'
-              ? React.createElement(SettlementPane, { settlementContext, onChangeView, onOpenAppSettings, onOpenDate: setDateModalDate })
-              : activeTab === 'records'
-              ? React.createElement(RecordsPane, { subTab: recordsSubTab, onSelectSubTab: setRecordsSubTab, calendarName, recordsContext, calendarContext, onChangeView, onOpenAppSettings, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource })
-              : activeTab === 'more'
-              ? React.createElement(MorePane, { calendarName, selectedItem: selectedMoreItem, onSelectItem: handleSelectMoreItem })
-              : React.createElement(PlaceholderPane, { tabId: activeTab, calendarName })
-          );
-        })(),
+
+    React.createElement('div', { className: `renewal-shell v2-design ${hasFullScreen ? 'v2-has-detail' : ''} ${isSideNavCollapsed ? 'is-side-collapsed' : ''}`.trim() },
+      React.createElement('button', { type: 'button', className: bentoClass(`side-nav-backdrop ${isSideNavOpen ? 'is-open' : ''}`), onClick: () => setIsSideNavOpen(false), 'aria-label': '메뉴 닫기' }),
+      React.createElement('nav', { className: bentoClass(`side-nav ${isSideNavOpen ? 'is-open' : ''} ${isSideNavCollapsed ? 'is-collapsed' : ''}`), 'aria-label': '주 메뉴' }, bentoSideNav),
+      React.createElement('main', { className: activeTab === 'calendar' ? 'bp-app-shell is-bento-home' : `renewal-shell-main v2-destination ${hasFullScreen ? `v2-${activeTab}` : `is-${activeTab}`}` },
+
+        activeTab === 'calendar'
+          ? React.createElement(CalendarPane, { calendarContext, recordsContext, onOpenDate: setDateModalDate, onChangeView, calendarName, onOpenSearch: () => handleSelectMoreItem('search'), onOpenMore: () => setIsSideNavOpen(true) })
+          : activeTab === 'chat'
+          ? React.createElement(ChatPane, { chatContext, onChangeView, onOpenAppSettings })
+          : activeTab === 'settlement'
+          ? React.createElement(SettlementPane, { settlementContext, onChangeView, onOpenAppSettings, onOpenDate: setDateModalDate })
+          : activeTab === 'records'
+          ? React.createElement(RecordsPane, { subTab: recordsSubTab, onSelectSubTab: setRecordsSubTab, calendarName, recordsContext, calendarContext, onChangeView, onOpenAppSettings, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource })
+          : activeTab === 'more'
+          ? React.createElement(MorePane, { calendarName, selectedItem: selectedMoreItem, onSelectItem: handleSelectMoreItem })
+          : React.createElement(PlaceholderPane, { tabId: activeTab, calendarName }),
+
         dateModalDate && React.createElement(SharedDateModal, {
-          calendarContext, dateModalDate,
+          calendarContext, dateModalDate, initialTab: activeTab === 'settlement' ? 'settlement' : null,
           onClose: () => setDateModalDate(null),
           onSelectDate: setDateModalDate,
           onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource,
         })
-      ),
-      React.createElement('nav', { className: 'renewal-shell-bottom-nav', 'aria-label': '주 메뉴' },
-        ...navButtons('renewal-shell-bottom-nav-item')
       )
     ),
     React.createElement(MoreModalsHost, {
