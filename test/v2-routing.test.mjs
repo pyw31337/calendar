@@ -47,3 +47,15 @@ test('timestamps normalize without turning Firestore seconds into 1970 dates', (
   for (const input of [ms, String(ms), { seconds: ms / 1000 }, { toMillis: () => ms }, { toDate: () => new Date(ms) }, new Date(ms).toISOString()]) assert.equal(timestampMs(input), ms);
   assert.equal(timestampMs(null), 0);
 });
+
+test('V2 date modal opts into bento sheet chrome without changing default export signature defaults', async () => {
+  const { readFileSync } = await import('node:fs');
+  const modal = readFileSync(new URL('../src/ui/ui-date-modal.js', import.meta.url), 'utf8');
+  const shell = readFileSync(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
+  assert.match(modal, /shellChrome\s*=\s*null/);
+  assert.match(modal, /shellChrome === 'bento'/);
+  assert.match(modal, /bp-event-sheet bp-is-open/);
+  assert.match(modal, /\.renewal-shell\.v2-design/);
+  assert.match(shell, /shellChrome:\s*'bento'/);
+  assert.equal((shell.match(/shellChrome:\s*'bento'/g) || []).length >= 3, true);
+});
