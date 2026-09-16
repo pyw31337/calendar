@@ -1,0 +1,48 @@
+{
+  "base": "http://127.0.0.1:5189/",
+  "capturedAt": "2026-09-16T11:10:38.861Z",
+  "shots": {
+    "pc": {
+      "kind": "pc",
+      "hasAuroraSpan": true,
+      "heroBg": "linear-gradient(-45deg, rgb(124, 47, 229), rgb(162, 28, 175), rgb(231, 60, 126), rgb(35, 166, 213), rgb(35, 213, 171))",
+      "heroBgSize": "400% 400%",
+      "heroAnim": "bp-hero-codepen-gradient",
+      "heroAnimDuration": "15s",
+      "heroBgPos": "0px 0px",
+      "beforeContent": "none",
+      "auroraAnim": "none",
+      "prefix": "[모임확정]",
+      "titleColor": "rgb(255, 255, 255)",
+      "compactColor": "rgb(255, 255, 255)"
+    },
+    "mobile": {
+      "kind": "mobile",
+      "hasAuroraSpan": true,
+      "heroBg": "linear-gradient(-45deg, rgb(124, 47, 229), rgb(162, 28, 175), rgb(231, 60, 126), rgb(35, 166, 213), rgb(35, 213, 171))",
+      "heroBgSize": "400% 400%",
+      "heroAnim": "bp-hero-codepen-gradient",
+      "heroAnimDuration": "15s",
+      "heroBgPos": "0px 0px",
+      "beforeContent": "none",
+      "auroraAnim": "none",
+      "prefix": "[모임확정]",
+      "titleColor": "rgb(255, 255, 255)",
+      "compactColor": "rgb(255, 255, 255)"
+    },
+    "reducedMotion": {
+      "kind": "reducedMotion",
+      "hasAuroraSpan": true,
+      "heroBg": "linear-gradient(-45deg, rgb(124, 47, 229), rgb(162, 28, 175), rgb(231, 60, 126), rgb(35, 166, 213), rgb(35, 213, 171))",
+      "heroBgSize": "400% 400%",
+      "heroAnim": "none",
+      "heroAnimDuration": "0s",
+      "heroBgPos": "0% 50%",
+      "beforeContent": "none",
+      "auroraAnim": "none",
+      "prefix": "[모임확정]",
+      "titleColor": "rgb(255, 255, 255)",
+      "compactColor": "rgb(255, 255, 255)"
+    }
+  }
+}
