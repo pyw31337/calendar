@@ -163,6 +163,38 @@
   font-style: normal;
 }
 
+/* Newest comment surfaces right on the home card -- "지금 여기서 대화가 이어지고 있다"는 걸
+   전체보기 없이도 바로 알 수 있어야 그 자리에서 바로 반응/피드백을 달 수 있다는 요구사항. */
+.v2-design .v2-home-memo-bubble .v2-bubble-comment-preview {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: var(--brand-soft, #F3EEFF);
+  font-size: 0.7rem;
+}
+.v2-design .v2-home-memo-bubble .v2-bubble-comment-author {
+  flex-shrink: 0;
+  font-size: 0.62rem;
+}
+.v2-design .v2-home-memo-bubble .v2-bubble-comment-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-main);
+}
+.v2-design .v2-home-memo-bubble .v2-bubble-comment-count {
+  flex-shrink: 0;
+  font-style: normal;
+  font-weight: 700;
+  font-size: 0.6rem;
+  color: var(--brand);
+}
+
 /* Memo screen cards wrapped as chat bubbles */
 .v2-memo .v2-memo-card-wrap.v2-bubble-frame {
   display: flex;
