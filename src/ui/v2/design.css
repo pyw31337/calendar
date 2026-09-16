@@ -34,7 +34,10 @@
   --v2-primary-glow-sm: 0 3px 10px rgba(124, 47, 229, 0.32);
   /* Apple-like card chrome */
   --v2-card-border: #eceaf5;
-  --v2-card-shadow: 0 1px 3px rgba(30, 27, 46, 0.04), 0 4px 12px rgba(30, 27, 46, 0.03);
+  /* Ambient depth stays soft (Apple card, not a heavy drop shadow) but the outer layer is now
+   * tinted toward brand purple instead of neutral gray + given real spread, so glass surfaces
+   * read as lifted off the page rather than merely outlined. */
+  --v2-card-shadow: 0 1px 2px rgba(30, 27, 46, 0.05), 0 10px 28px rgba(76, 29, 149, 0.09);
   padding: 0 !important;
   padding-bottom: 0 !important;
   min-height: 100dvh;
@@ -91,11 +94,21 @@
 .v2-design .bp-renewal-home-hero { margin: 0; padding: 0; }
 .v2-design .bp-empty-hero { color: rgba(255, 255, 255, 0.92); padding: 14px; font-size: 0.8rem; }
 
-/* Hero CodePen animated gradient + vivid glass — reinforces reference-home under .v2-design */
+/* Hero: fluid "AI thinking"-style gradient (Gemini/Siri-glow reference), NOT a rainbow hue
+ * sweep — every stop stays inside the original mock's violet→purple→teal family
+ * (#4C1D95 / #7C3AED / #22D3B8, see designv2/BentoPinkFinal-html). Technique: 3 soft blurred
+ * radial-gradient "blobs" layered over the mock's static linear-gradient base, each drifting
+ * along its own path inside ONE keyframes block so the blobs move out of phase with each other
+ * (that asynchrony is what reads as organic/fluid instead of a mechanical pan). */
 .v2-design .bp-hero-zone {
-  background: linear-gradient(-45deg, #7C2FE5, #A21CAF, #e73c7e, #23a6d5, #23d5ab) !important;
-  background-size: 400% 400% !important;
-  animation: bp-hero-codepen-gradient 15s ease infinite !important;
+  background:
+    radial-gradient(circle at 22% 24%, rgba(124, 58, 237, 0.85) 0%, rgba(124, 58, 237, 0) 58%),
+    radial-gradient(circle at 78% 30%, rgba(34, 211, 184, 0.65) 0%, rgba(34, 211, 184, 0) 55%),
+    radial-gradient(circle at 46% 88%, rgba(76, 29, 149, 0.85) 0%, rgba(76, 29, 149, 0) 62%),
+    linear-gradient(135deg, #4C1D95 0%, #7C3AED 58%, #22D3B8 100%) !important;
+  background-repeat: no-repeat !important;
+  background-size: 160% 160%, 170% 170%, 180% 180%, 100% 100% !important;
+  animation: bp-hero-fluid-gradient 26s ease-in-out infinite !important;
   isolation: isolate;
 }
 .v2-design .bp-hero-zone::before,
@@ -114,10 +127,12 @@
   animation: none !important;
 }
 .v2-design .bp-hero-zone > :not(.bp-hero-aurora) { position: relative; z-index: 1; }
-@keyframes bp-hero-codepen-gradient {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+@keyframes bp-hero-fluid-gradient {
+  0%   { background-position: 22% 24%, 78% 30%, 46% 88%, 0% 0%; }
+  25%  { background-position: 40% 55%, 55% 62%, 70% 34%, 0% 0%; }
+  50%  { background-position: 66% 30%, 28% 70%, 34% 58%, 0% 0%; }
+  75%  { background-position: 34% 68%, 64% 42%, 62% 76%, 0% 0%; }
+  100% { background-position: 22% 24%, 78% 30%, 46% 88%, 0% 0%; }
 }
 .v2-design .bp-hero-zone .bp-icon-btn,
 .v2-design .bp-hero-zone .bp-renewal-shell-header-icon-btn {
@@ -355,10 +370,10 @@
 
 @media (prefers-reduced-motion: reduce) {
   .v2-design *, .v2-design *::before, .v2-design *::after { animation: none !important; scroll-behavior: auto !important; }
-  /* Hero CodePen gradient uses !important animation — pin static mid-frame stops */
+  /* Hero fluid gradient uses !important animation — pin the resting frame (matches 0%/100%) */
   .v2-design .bp-hero-zone {
     animation: none !important;
-    background-position: 0% 50% !important;
+    background-position: 22% 24%, 78% 30%, 46% 88%, 0% 0% !important;
   }
 }
 
@@ -735,13 +750,18 @@
 /* Type scale: BentoPinkFinal mock denseness + ~5–10% only (NOT bloated #634/#635).
  * Source: reference-home.css / pc-mock-scale-baseline.png. Remap --font-size-* for screens. */
 .v2-design {
-  --v2-fs-2xs: 0.60rem;   /* mock meta/pill ~0.56–0.60 */
-  --v2-fs-xs: 0.66rem;    /* mock weekday/corner ~0.60–0.66 */
-  --v2-fs-sm: 0.74rem;    /* mock memo summary 0.72 + ~3% */
-  --v2-fs-md: 0.82rem;    /* mock chat body 0.76 + ~8% */
-  --v2-fs-base: 0.88rem;  /* mock nav item 0.82 + ~7% */
-  --v2-fs-lg: 0.94rem;    /* mock memo title 0.86 + ~9% */
-  --v2-fs-title: 1.12rem; /* mock bento title 1.05 + ~7% */
+  /* Re-anchored to the side-nav's hand-tuned mock-parity sizes (item label 14px/700,
+   * icon 18px, meta 11px/600 — see the "Side-nav mock parity" block below): body copy
+   * across the rest of the shell was still reading a full tier smaller than the nav,
+   * so every step here shifts up ~1 tier instead of chasing the mock's original sub-px
+   * values literally. */
+  --v2-fs-2xs: 0.64rem;   /* micro meta/pill — was 0.60 */
+  --v2-fs-xs: 0.72rem;    /* weekday/corner/meta — was 0.66, ~= side-nav meta 11px */
+  --v2-fs-sm: 0.82rem;    /* card summaries/labels — was 0.74 */
+  --v2-fs-md: 0.90rem;    /* primary read copy (chat/memo body) — was 0.82, ~ side-nav item 14px */
+  --v2-fs-base: 0.94rem;  /* nav-equivalent body text — was 0.88 */
+  --v2-fs-lg: 1.02rem;    /* card/section titles — was 0.94 */
+  --v2-fs-title: 1.2rem;  /* page/bento titles — was 1.12 */
   --font-size-2xs: var(--v2-fs-2xs);
   --font-size-xs: var(--v2-fs-xs);
   --font-size-sm: var(--v2-fs-sm);
@@ -1332,11 +1352,31 @@
 /* Vivid primary FAB / circle action */
 .v2-design .bp-fab,
 .v2-design .v2-fab-vivid {
+  position: relative;
   background: var(--v2-primary, var(--brand, #7C2FE5)) !important;
   color: #fff !important;
   border: 1px solid rgba(255, 255, 255, 0.28) !important;
   box-shadow: var(--v2-primary-glow), inset 0 1px 0 rgba(255, 255, 255, 0.28) !important;
 }
+/* Edge-light sheen: a slow, quiet light travelling around the rim (not the fast rainbow
+ * "gamified" spin above — same mask-exclude ring technique, single soft-white hue, ~7x
+ * slower) so the FAB's glass edge reads as lit rather than merely outlined. */
+.v2-design .bp-fab::before,
+.v2-design .v2-fab-vivid::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1.5px;
+  pointer-events: none;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  background: conic-gradient(from 0deg, transparent 0deg, transparent 260deg, rgba(255,255,255,0.9) 300deg, rgba(196,181,253,0.7) 330deg, transparent 360deg);
+  animation: bp-edge-sheen-spin 9s linear infinite;
+}
+@keyframes bp-edge-sheen-spin { to { transform: rotate(360deg); } }
 
 /* Chips / author pills / settlement badges — more chroma, crisp edge */
 .v2-design .bp-tag-chip,
