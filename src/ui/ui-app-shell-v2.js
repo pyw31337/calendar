@@ -273,10 +273,10 @@ export function buildRenewalCalendarContext(calendar, deps) {
 /** Compact hero zone from the approved BentoPink reference: one primary D-day plus
  * horizontally-scannable upcoming chips. It is presentation-only and reuses the same
  * confirmed meeting selector as the list below. */
-function RenewalHero({ meetings, onSelectDate }) {
+function RenewalHero({ meetings, onSelectDate, header }) {
   const React = window.React;
-  if (!meetings || meetings.length === 0) return null;
-  const [primary] = meetings;
+  const list = Array.isArray(meetings) ? meetings : [];
+  const primary = list[0] || null;
   const [isOpen, setIsOpen] = React.useState(false);
   const labelFor = (meeting) => {
     const base = formatConfirmedMeetingLabel(meeting.date);
@@ -291,8 +291,9 @@ function RenewalHero({ meetings, onSelectDate }) {
       day: ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'][date.getDay()],
     };
   };
-  return React.createElement('section', { className: 'renewal-home-hero', 'aria-label': '가까운 확정 일정' },
-    React.createElement('div', { className: `dday-toggle-wrap ${isOpen ? 'is-open' : ''}`.trim() },
+  return React.createElement('section', { className: 'renewal-home-hero hero-zone', 'aria-label': '가까운 확정 일정' },
+    header || null,
+    !primary ? null : React.createElement('div', { className: `dday-toggle-wrap ${isOpen ? 'is-open' : ''}`.trim() },
       React.createElement('button', { type: 'button', className: 'dday-compact', onClick: () => setIsOpen(true), 'aria-expanded': isOpen },
         React.createElement('span', { className: 'dday-compact-badge' }, formatDDayLabel(primary.date)),
         React.createElement('span', { className: 'dday-compact-text' }, labelFor(primary)),
@@ -316,7 +317,7 @@ function RenewalHero({ meetings, onSelectDate }) {
         )
       )
     ),
-    React.createElement('div', { className: 'dday-strip renewal-home-hero-chips' }, meetings.map(meeting => {
+    !list.length ? null : React.createElement('div', { className: 'dday-strip renewal-home-hero-chips' }, list.map(meeting => {
       const chipDate = chipDateFor(meeting.date);
       return React.createElement('button', {
         key: meeting.date, type: 'button', className: 'dday-chip renewal-home-hero-chip', onClick: () => onSelectDate(meeting.date), title: labelFor(meeting)
@@ -573,10 +574,10 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
   );
 }
 
-function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeView }) {
+function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeView, header }) {
   const React = window.React;
   return React.createElement(React.Fragment, null,
-    React.createElement(RenewalHero, { meetings: calendarContext.upcomingMeetings, onSelectDate: onOpenDate }),
+    React.createElement(RenewalHero, { meetings: calendarContext.upcomingMeetings, onSelectDate: onOpenDate, header }),
     React.createElement(HomeActivitySummary, {
       calendarContext: {
         ...calendarContext,
@@ -2052,22 +2053,30 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
       React.createElement('button', { type: 'button', className: `renewal-shell-side-backdrop side-nav-backdrop ${isSideNavOpen ? 'is-open' : ''}`.trim(), onClick: () => setIsSideNavOpen(false), 'aria-label': '메뉴 닫기' }),
       React.createElement('nav', { className: `renewal-shell-side-nav side-nav ${isSideNavOpen ? 'is-open' : ''} ${isSideNavCollapsed ? 'is-collapsed' : ''}`.trim(), 'aria-label': '주 메뉴' }, bentoSideNav),
       React.createElement('main', { className: `renewal-shell-main is-${activeTab}` },
-        React.createElement(TopHeader, {
-          calendarName,
-          onOpenSearch: () => handleSelectMoreItem('search'),
-          onOpenMore: () => setIsSideNavOpen(true),
-        }),
-        activeTab === 'calendar'
-          ? React.createElement(CalendarPane, { calendarContext, recordsContext, onOpenDate: setDateModalDate, onChangeView })
-          : activeTab === 'chat'
-          ? React.createElement(ChatPane, { chatContext, onChangeView, onOpenAppSettings })
-          : activeTab === 'settlement'
-          ? React.createElement(SettlementPane, { settlementContext, onChangeView, onOpenAppSettings, onOpenDate: setDateModalDate })
-          : activeTab === 'records'
-          ? React.createElement(RecordsPane, { subTab: recordsSubTab, onSelectSubTab: setRecordsSubTab, calendarName, recordsContext, calendarContext, onChangeView, onOpenAppSettings, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource })
-          : activeTab === 'more'
-          ? React.createElement(MorePane, { calendarName, selectedItem: selectedMoreItem, onSelectItem: handleSelectMoreItem })
-          : React.createElement(PlaceholderPane, { tabId: activeTab, calendarName }),
+        (function renderShellMain() {
+          const headerEl = React.createElement(TopHeader, {
+            calendarName,
+            onOpenSearch: () => handleSelectMoreItem('search'),
+            onOpenMore: () => setIsSideNavOpen(true),
+          });
+          if (activeTab === 'calendar') {
+            return React.createElement(CalendarPane, {
+              calendarContext, recordsContext, onOpenDate: setDateModalDate, onChangeView, header: headerEl
+            });
+          }
+          return React.createElement(React.Fragment, null,
+            headerEl,
+            activeTab === 'chat'
+              ? React.createElement(ChatPane, { chatContext, onChangeView, onOpenAppSettings })
+              : activeTab === 'settlement'
+              ? React.createElement(SettlementPane, { settlementContext, onChangeView, onOpenAppSettings, onOpenDate: setDateModalDate })
+              : activeTab === 'records'
+              ? React.createElement(RecordsPane, { subTab: recordsSubTab, onSelectSubTab: setRecordsSubTab, calendarName, recordsContext, calendarContext, onChangeView, onOpenAppSettings, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource })
+              : activeTab === 'more'
+              ? React.createElement(MorePane, { calendarName, selectedItem: selectedMoreItem, onSelectItem: handleSelectMoreItem })
+              : React.createElement(PlaceholderPane, { tabId: activeTab, calendarName })
+          );
+        })(),
         dateModalDate && React.createElement(SharedDateModal, {
           calendarContext, dateModalDate,
           onClose: () => setDateModalDate(null),
