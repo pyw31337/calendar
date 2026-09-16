@@ -260,6 +260,12 @@ async function checkRenewalShellRoutes(browser, baseUrl) {
     ['', '캘린더'], ['&tab=chat', '대화'], ['&tab=records', '기록'],
     ['&tab=settlement', '정산'], ['&tab=more', '더보기']
   ];
+  // Chip-row subtabs keep role=tablist visible. memo/places intentionally hide that row for
+  // Bento full-chrome (RecordsPane: !['memo','places'].includes(subTab)), so they must not be
+  // clicked mid-loop — otherwise the next getByRole('tab') times out and the catch used to
+  // mislabel the failure as "V2 목적지".
+  const chipSubtabs = [['사진·영상', 'media'], ['보관함', 'archive'], ['콘텐츠', 'content']];
+  const fullChromeSubs = [['places', '장소'], ['memo', '메모']];
   for (const viewport of VIEWPORTS) {
     const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height }, hasTouch: viewport.hasTouch });
     const page = await context.newPage();
@@ -272,7 +278,16 @@ async function checkRenewalShellRoutes(browser, baseUrl) {
         pass(`[${viewport.name}] V2 ${label}`);
       }
       await gotoBootReady(page, `${baseUrl}?id=cw&shell=v2&tab=records`);
-      for (const [label, expected] of [['사진·영상', 'media'], ['장소', 'places'], ['보관함', 'archive'], ['콘텐츠', 'content']]) {
+      for (const [label, expected] of chipSubtabs) {
+        // Always land on 전체 first so the chip row is present even if a prior full-chrome
+        // navigation left it hidden.
+        const allTab = page.getByRole('tab', { name: '전체', exact: true });
+        if (await allTab.count()) {
+          await allTab.dispatchEvent('click');
+          await page.waitForTimeout(150);
+        } else {
+          await gotoBootReady(page, `${baseUrl}?id=cw&shell=v2&tab=records`);
+        }
         // The records panes intentionally overlap the tab strip while settling; dispatch the
         // semantic click so this state-transition assertion is not dependent on hit-testing.
         await page.getByRole('tab', { name: label, exact: true }).dispatchEvent('click');
@@ -280,8 +295,19 @@ async function checkRenewalShellRoutes(browser, baseUrl) {
         if (!new URL(page.url()).searchParams.get('sub')?.includes(expected)) throw new Error(`기록 ${label} 클릭 후 sub=${new URL(page.url()).searchParams.get('sub') || '(없음)'}`);
       }
       pass(`[${viewport.name}] V2 기록 서브탭 클릭 전환`);
+
+      for (const [sub, label] of fullChromeSubs) {
+        await gotoBootReady(page, `${baseUrl}?id=cw&shell=v2&tab=records&sub=${sub}`);
+        await page.locator('.renewal-shell').waitFor({ state: 'visible', timeout: 10000 });
+        if (new URL(page.url()).searchParams.get('sub') !== sub) {
+          throw new Error(`기록 full-chrome ${label} URL 진입 후 sub=${new URL(page.url()).searchParams.get('sub') || '(없음)'}`);
+        }
+        const tablistCount = await page.locator('.renewal-shell-subtab-row[role="tablist"]').count();
+        if (tablistCount !== 0) throw new Error(`기록 full-chrome ${label} 에서 서브탭 행이 숨겨져야 함 (count=${tablistCount})`);
+      }
+      pass(`[${viewport.name}] V2 기록 full-chrome (장소/메모)`);
     } catch (err) {
-      fail(`[${viewport.name}] V2 목적지`, err.message);
+      fail(`[${viewport.name}] V2 기록 라우트`, err.message);
     } finally {
       await context.close();
     }
