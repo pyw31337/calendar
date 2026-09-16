@@ -2,7 +2,8 @@
 /* Only the opt-in V2 root is affected. app.css remains byte-for-byte unchanged. */
 .renewal-shell.v2-design {
   --font-sans: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Noto Sans KR', sans-serif;
-  --renewal-page-max: 1180px;
+  --renewal-page-max: 1600px;
+  --v2-side-nav-width: 280px;
   padding: 0 !important;
   padding-bottom: 0 !important;
   min-height: 100dvh;
@@ -227,10 +228,28 @@
 }
 
 @media (min-width: 1200px) {
-  .renewal-shell.v2-design { padding-left: 232px !important; }
+  .renewal-shell.v2-design {
+    --v2-side-nav-width: 280px;
+    --v2-content-max: 1600px;
+    /* At ~1920px: content ~1600 with balanced gutters; grows on wider screens. */
+    --v2-page-pad: clamp(20px, calc((100vw - var(--v2-side-nav-width) - var(--v2-content-max)) / 2), 72px);
+    padding-left: var(--v2-side-nav-width) !important;
+  }
   .renewal-shell.v2-design.is-side-collapsed { padding-left: 76px !important; }
   .renewal-shell.v2-design > .bp-app-shell.is-bento-home,
-  .renewal-shell.v2-design .bp-app-shell.is-bento-home { max-width: 1180px; padding: 0 32px; }
+  .renewal-shell.v2-design .bp-app-shell.is-bento-home {
+    max-width: min(var(--v2-content-max), calc(100vw - var(--v2-side-nav-width)));
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    padding: var(--v2-page-pad);
+    box-sizing: border-box;
+  }
+}
+@media (min-width: 1921px) {
+  .renewal-shell.v2-design {
+    --v2-content-max: min(1880px, calc(100vw - var(--v2-side-nav-width) - 80px));
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -391,4 +410,226 @@
 .v2-design .v2-places-legacy > .inline-search-bar,
 .v2-design .v2-settlement-legacy > .inline-search-bar {
   display: none !important;
+}
+
+
+/* --------------------------------------------------------------------------
+ * PC polish (shell=v2 only): wider side-nav, fluid content, 3×3 gallery,
+ * larger type hierarchy, today/anniversary day-cell fit.
+ * -------------------------------------------------------------------------- */
+
+/* Side-nav width on desktop rail */
+@media (min-width: 1200px) {
+  .v2-design .bp-side-nav {
+    width: var(--v2-side-nav-width, 280px) !important;
+  }
+  .v2-design {
+    padding-left: var(--v2-side-nav-width, 280px) !important;
+  }
+  .v2-design:has(.bp-side-nav.bp-is-collapsed) {
+    padding-left: 76px !important;
+  }
+  .v2-design .bp-side-nav.bp-is-collapsed {
+    width: 76px !important;
+  }
+  .v2-design .bp-app-shell {
+    max-width: min(var(--v2-content-max, 1600px), calc(100vw - var(--v2-side-nav-width, 280px))) !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    padding: var(--v2-page-pad, 24px) !important;
+    box-sizing: border-box !important;
+  }
+}
+
+/* Gallery: 3×3 with larger thumbs on tablet/PC */
+@media (min-width: 640px) {
+  .v2-design .bp-thumb-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 8px !important;
+  }
+  .v2-design .bp-bento-card.bp-gallery-bleed .bp-thumb-grid {
+    gap: 8px !important;
+  }
+  .v2-design .bp-thumb {
+    border-radius: 12px !important;
+    min-height: 0;
+  }
+}
+@media (min-width: 1200px) {
+  .v2-design .bp-thumb-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 12px !important;
+  }
+}
+
+/* Today badge: size with the day-num font so digits never clip */
+.v2-design .bp-day-cell.bp-today .bp-day-num {
+  width: auto !important;
+  height: auto !important;
+  min-width: 1.7em !important;
+  min-height: 1.7em !important;
+  padding: 0.22em 0.35em !important;
+  box-sizing: border-box !important;
+  line-height: 1 !important;
+  font-size: inherit !important;
+  border-radius: 999px !important;
+}
+.v2-design .bp-day-cell.bp-today .bp-day-num::after {
+  inset: -4px !important;
+}
+
+/* Day cells: room for today badge + stacked anniversary bars */
+@media (min-width: 768px) {
+  .v2-design .bp-day-cell {
+    min-height: 72px !important;
+    padding: 6px 3px 18px !important;
+    gap: 3px !important;
+  }
+}
+@media (min-width: 1200px) {
+  .v2-design .bp-day-cell {
+    min-height: 92px !important;
+    padding: 8px 4px 22px !important;
+  }
+}
+
+/* Anniversary stacking — avoid overlap with meeting bar / each other */
+.v2-design .bp-day-anniversary {
+  bottom: 3px !important;
+  z-index: 2;
+}
+.v2-design .bp-day-anniversary.bp-lvl-1 { bottom: 17px !important; }
+.v2-design .bp-day-anniversary.bp-lvl-2 { bottom: 31px !important; }
+.v2-design .bp-day-anniversary.bp-lvl-3 { bottom: 45px !important; }
+.v2-design .bp-day-bar {
+  z-index: 1;
+}
+.v2-design .bp-day-bar.bp-lvl-1 { bottom: 17px !important; }
+.v2-design .bp-day-bar.bp-lvl-2 { bottom: 31px !important; }
+.v2-design .bp-day-bar.bp-lvl-3 { bottom: 45px !important; }
+.v2-design .bp-day-bar.bp-lvl-4 { bottom: 59px !important; }
+@media (min-width: 768px) {
+  .v2-design .bp-day-anniversary:has(.bp-day-anniversary-label) {
+    height: 14px !important;
+  }
+  .v2-design .bp-day-anniversary-label {
+    font-size: 0.58rem !important;
+    font-weight: 800 !important;
+  }
+}
+
+/* Type scale: larger than default Gather tokens; clear title/body/meta hierarchy */
+.v2-design {
+  --v2-fs-2xs: 0.7rem;
+  --v2-fs-xs: 0.78rem;
+  --v2-fs-sm: 0.86rem;
+  --v2-fs-md: 0.94rem;
+  --v2-fs-base: 1.02rem;
+  --v2-fs-lg: 1.12rem;
+  --v2-fs-title: 1.28rem;
+  font-size: var(--v2-fs-base);
+}
+.v2-design .bp-bento-title { font-size: var(--v2-fs-title) !important; font-weight: 800 !important; }
+.v2-design .bp-bento-card-title {
+  font-size: var(--v2-fs-sm) !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.04em;
+  color: var(--text-muted, #6b6580) !important;
+}
+.v2-design .bp-bento-card .bp-more-link,
+.v2-design .bp-more-link { font-size: var(--v2-fs-sm) !important; font-weight: 700 !important; }
+.v2-design .bp-weekday-label { font-size: var(--v2-fs-xs) !important; font-weight: 700 !important; }
+.v2-design .bp-day-num { font-size: var(--v2-fs-md) !important; font-weight: 800 !important; }
+.v2-design .bp-cal-legend { font-size: var(--v2-fs-xs) !important; }
+.v2-design .bp-day-corner-label { font-size: var(--v2-fs-2xs) !important; }
+.v2-design .bp-day-event-title { font-size: var(--v2-fs-2xs) !important; font-weight: 800 !important; }
+.v2-design .bp-day-anniversary-label { font-size: var(--v2-fs-2xs) !important; }
+
+.v2-design .bp-dday-compact-badge { font-size: 1.2rem !important; font-weight: 900 !important; }
+.v2-design .bp-dday-compact-text { font-size: var(--v2-fs-md) !important; font-weight: 700 !important; }
+.v2-design .bp-dday-expanded-title { font-size: var(--v2-fs-lg) !important; font-weight: 800 !important; }
+.v2-design .bp-dday-expanded-tag,
+.v2-design .bp-dday-expanded-badge { font-size: var(--v2-fs-xs) !important; }
+.v2-design .bp-dday-view-btn { font-size: var(--v2-fs-sm) !important; font-weight: 800 !important; }
+.v2-design .bp-dday-date { font-size: var(--v2-fs-sm) !important; font-weight: 800 !important; }
+.v2-design .bp-dday-dow,
+.v2-design .bp-dday-pill { font-size: var(--v2-fs-2xs) !important; }
+
+.v2-design .bp-chat-text,
+.v2-design .bp-renewal-home-chat-text { font-size: var(--v2-fs-md) !important; line-height: 1.45 !important; }
+.v2-design .bp-chat-name-pill,
+.v2-design .bp-chat-meta,
+.v2-design .bp-chat-hover-note,
+.v2-design .bp-chat-reply-quote-author { font-size: var(--v2-fs-2xs) !important; }
+.v2-design .bp-chat-reply-quote-text { font-size: var(--v2-fs-xs) !important; }
+
+.v2-design .bp-memo-card-title,
+.v2-design .bp-renewal-home-memo-title { font-size: var(--v2-fs-lg) !important; font-weight: 800 !important; }
+.v2-design .bp-memo-summary,
+.v2-design .bp-renewal-home-memo-summary { font-size: var(--v2-fs-sm) !important; line-height: 1.45 !important; }
+.v2-design .bp-memo-link-title { font-size: var(--v2-fs-md) !important; font-weight: 800 !important; }
+.v2-design .bp-memo-link-desc { font-size: var(--v2-fs-xs) !important; }
+.v2-design .bp-memo-tag,
+.v2-design .bp-memo-subtag,
+.v2-design .bp-memo-comment-count,
+.v2-design .bp-memo-link-domain { font-size: var(--v2-fs-2xs) !important; }
+.v2-design .bp-memo-comment-author,
+.v2-design .bp-memo-comment-text { font-size: var(--v2-fs-xs) !important; }
+
+.v2-design .bp-place-name { font-size: var(--v2-fs-md) !important; font-weight: 800 !important; }
+.v2-design .bp-place-addr { font-size: var(--v2-fs-xs) !important; }
+.v2-design .bp-place-note,
+.v2-design .bp-place-tag { font-size: var(--v2-fs-2xs) !important; }
+
+.v2-design .bp-side-nav-brand { font-size: var(--v2-fs-lg) !important; font-weight: 800 !important; }
+.v2-design .bp-side-nav-item { font-size: var(--v2-fs-base) !important; }
+.v2-design .bp-side-nav-item-meta,
+.v2-design .bp-side-nav-item-sub,
+.v2-design .bp-side-nav-manual-banner-sub { font-size: var(--v2-fs-xs) !important; }
+.v2-design .bp-side-nav-item-badge { font-size: var(--v2-fs-2xs) !important; }
+.v2-design .bp-side-nav-manual-banner-title { font-size: var(--v2-fs-base) !important; font-weight: 800 !important; }
+.v2-design .bp-side-nav-collapse-btn { font-size: var(--v2-fs-sm) !important; }
+
+.v2-design .v2-page-header .bp-header-title { font-size: var(--v2-fs-title) !important; }
+.v2-design .v2-page-header .bp-header-sub,
+.v2-design .v2-page-header .bp-header-count { font-size: var(--v2-fs-xs) !important; }
+.v2-design .bp-search-input { font-size: var(--v2-fs-md) !important; }
+.v2-design .bp-attend-row-name { font-size: var(--v2-fs-md) !important; font-weight: 800 !important; }
+.v2-design .bp-attend-row-note { font-size: var(--v2-fs-xs) !important; }
+
+/* Hero participant memo capsules */
+.v2-design .bp-dday-participant-memos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.v2-design .bp-dday-participant-memo {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #fff;
+  font-size: var(--v2-fs-xs);
+  font-weight: 700;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.v2-design .bp-dday-participant-memo-name {
+  opacity: 0.85;
+  margin-right: 4px;
+  font-weight: 800;
+}
+
+@media (min-width: 768px) {
+  .v2-design .bp-bento-title { font-size: 1.38rem !important; }
+  .v2-design .bp-day-num { font-size: 1rem !important; }
+}
+@media (min-width: 1200px) {
+  .v2-design .bp-day-num { font-size: 1.05rem !important; }
 }

@@ -688,7 +688,7 @@
       .v2-design .bp-bento-card.bp-gallery-bleed .bp-bento-card-head { padding: 0 !important; }
       .v2-design .bp-bento-card.bp-gallery-bleed .bp-thumb-grid { border-radius: 10px; overflow: hidden; }
       .v2-design .bp-day-cell { min-height: 60px; }
-      .v2-design .bp-thumb-grid { grid-template-columns: repeat(5, 1fr); }
+      .v2-design .bp-thumb-grid { grid-template-columns: repeat(3, 1fr); }
       .v2-design .bp-dot-row { gap: 3px; }
       .v2-design .bp-p-dot {
         width: auto; height: auto; border-radius: var(--radius-full); box-shadow: none;
@@ -715,11 +715,11 @@
       .v2-design .bp-side-nav-toggle-btn { display: none; }
       .v2-design .bp-side-nav {
         left: 0; right: auto; border-left: none; border-right: 1px solid var(--border-subtle);
-        transform: none; box-shadow: none; width: 232px; transition: width 0.22s ease;
+        transform: none; box-shadow: none; width: 280px; transition: width 0.22s ease;
       }
       .v2-design .bp-side-nav-close-btn { display: none; }
       .v2-design .bp-side-nav-collapse-btn { display: flex; }
-      .v2-design { padding-left: 232px; transition: padding-left 0.22s ease; }
+      .v2-design { padding-left: 280px; transition: padding-left 0.22s ease; }
       .v2-design:has(.bp-side-nav.bp-is-collapsed) { padding-left: 76px; }
       .v2-design .bp-side-nav.bp-is-collapsed { width: 76px; }
       .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-text,
@@ -733,7 +733,7 @@
       .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item { justify-content: center; padding: 10px 6px; }
       .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-manual-banner { justify-content: center; padding: 8px; }
       .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-head { justify-content: center; }
-      .v2-design .bp-app-shell { max-width: 1180px; margin: 0 auto; padding: 0 32px; }
+      .v2-design .bp-app-shell { max-width: 1600px; margin: 0 auto; padding: 24px; }
       .v2-design .bp-bento-title-brand { display: none !important; }
       .v2-design .bp-hero-zone { border-radius: 20px; margin: 28px 0 0; }
       .v2-design .bp-bento-grid { grid-template-columns: 1.4fr 1fr 1fr; padding: 24px 0 !important; gap: 20px; }
@@ -742,7 +742,7 @@
       .v2-design .bp-day-cell { min-height: 76px; padding: 5px 3px; }
       .v2-design .bp-day-num { font-size: 0.8rem; }
       .v2-design .bp-day-event-title { font-size: 0.6rem; }
-      .v2-design .bp-thumb-grid { grid-template-columns: repeat(4, 1fr); gap: 7px; }
+      .v2-design .bp-thumb-grid { grid-template-columns: repeat(3, 1fr); gap: 12px; }
       .v2-design .bp-bento-card.bp-gallery-bleed { padding: 24px !important; }
     }
 
