@@ -9,6 +9,15 @@
   --brand-soft: #F3EEFF;
   --cal-schedule: #7C2FE5;
   --cal-anniversary: #F76AAD;
+  /* Every legacy component this shell reuses (chat/gallery/places/event modals/date modal/etc.)
+   * reads --accent-primary for its own active/selected/link color -- app.css's own definition
+   * (#4F46E5, a distinctly bluer indigo) never gets touched, but leaving it un-redefined here
+   * meant every one of those reused components rendered its accents in that indigo while the v2
+   * hero/nav/brand chrome around it used this shell's own purple, reading as two different
+   * "brand" colors on the same screen (most visibly: Content's category chips). Redefining it
+   * to this shell's --brand, scoped to .renewal-shell.v2-design only, unifies every reused
+   * component's accent color without touching app.css or the default shell's own rendering. */
+  --accent-primary: var(--brand);
   /* --- V2 glass / vivid system (see designv2/V2-GLASS-SYSTEM.md) --- */
   --v2-glass-blur: blur(20px) saturate(180%);
   --v2-glass-blur-strong: blur(24px) saturate(180%);
