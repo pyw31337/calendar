@@ -10,6 +10,7 @@ import './reference-chat.css';
 import './screens.css';
 import { calculateSettlementRows } from '../../core/settlement-calculator.js';
 import { authorFor } from './view-data.js';
+import { ChatBubbleFrame } from './chat-bubble-modules.js';
 import {
   extractChatSlots, extractMemoSlots, extractPlacesSlots, extractSettlementSlots,
 } from './shell-nav.js';
@@ -318,17 +319,32 @@ export function MemoScreen(p) {
       h(
         'div',
         { className: 'bp-memo-grid' },
-        (p.memos || []).map(memo =>
-          h(
-            'div',
+        (p.memos || []).map(memo => {
+          const author = authorFor(memo, p.calendar.participants);
+          const metaMs = memo.updatedAt ?? memo.createdAt;
+          let meta = '';
+          if (metaMs) {
+            const d = new Date(typeof metaMs === 'number' ? metaMs : metaMs);
+            if (!Number.isNaN(d.getTime())) {
+              meta = d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+            }
+          }
+          return h(
+            ChatBubbleFrame,
             {
               key: memo.id,
+              name: author.name,
+              color: author.color,
+              meta,
               className: 'v2-memo-card-wrap',
-              style: { '--memo-author-color': authorFor(memo, p.calendar.participants).color },
+              surfaceClassName: 'v2-memo-bubble-surface',
+              surfaceProps: {
+                style: { '--memo-author-color': author.color },
+              },
             },
             p.renderCard(memo)
-          )
-        )
+          );
+        })
       ),
       !(p.memos || []).length && h(Empty, null, '검색 조건에 맞는 메모가 없습니다.'),
       p.hasMoreMemos &&

@@ -113,10 +113,16 @@ test('V2 PC polish keeps wider rail, fluid content, 3x3 gallery, and participant
   assert.match(shell, /participantMemosFor/);
   assert.match(shell, /day-bar-stack/);
   assert.match(shell, /anns\.slice\(0, 4\)\.map/);
-  assert.match(shell, /day-bar-label/);
-  assert.match(shell, /day-bar solo has-label/);
+  assert.match(shell, /day-head-row/);
+  assert.match(shell, /day-meeting-pill/);
   assert.match(shell, /anniversarySpanRole/);
   assert.match(shell, /day-anniversary \$\{anniversarySpanRole/);
+  assert.match(shell, /chat-bubble-modules/);
+  assert.match(shell, /ChatBubbleFrame/);
+  // V2 badge colors: 모임확정/일정·여행 = brand purple; 기념일 = status-green
+  assert.match(design, /bp-day-meeting-pill/);
+  assert.match(design, /status-green/);
   assert.match(design, /background:\s*var\(--brand/);
-  assert.match(design, /#F472B6/);
+  assert.match(design, /background:\s*var\(--status-green/);
+  assert.doesNotMatch(design, /#F472B6/);
 });

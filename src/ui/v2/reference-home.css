@@ -177,7 +177,7 @@
     .v2-design .bp-day-bar.bp-lvl-1 { bottom: 9px; }
     .v2-design .bp-day-anniversary {
       position: absolute; bottom: 3px; left: 4px; right: 4px; height: 4px; border-radius: var(--radius-full);
-      background: #F472B6; display: flex; align-items: center; justify-content: center; overflow: hidden;
+      background: var(--status-green, #16A34A); display: flex; align-items: center; justify-content: center; overflow: hidden;
     }
     .v2-design .bp-day-anniversary.bp-lvl-1 { bottom: 9px; }
     .v2-design .bp-day-anniversary-label { display: none; }
