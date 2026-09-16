@@ -645,7 +645,7 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
             }))
           ) : null,
           (anns.length > 0 || hasMeeting) ? React.createElement('div', { className: bentoClass('day-bar-stack') },
-            // Flex stack (gap) — never absolute-overlap. Meeting strip last (= bottom).
+            // Flex stack (gap) — never absolute-overlap. Anniversary (purple+title) then meeting (pink+title).
             anns.slice(0, 4).map((ann, annIdx) => React.createElement('div', {
               key: ann.id || `${dateStr}_ann_${annIdx}`,
               className: bentoClass('day-anniversary'),
@@ -653,7 +653,13 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
             },
               React.createElement('span', { className: bentoClass('day-anniversary-label') }, ann.title || '기념일')
             )),
-            hasMeeting ? React.createElement('div', { key: `${dateStr}_meeting_bar`, className: bentoClass('day-bar solo') }) : null
+            hasMeeting ? React.createElement('div', {
+              key: `${dateStr}_meeting_bar`,
+              className: bentoClass('day-bar solo has-label'),
+              title: meeting.title || meeting.note || '모임확정',
+            },
+              React.createElement('span', { className: bentoClass('day-bar-label') }, meeting.title || meeting.note || '모임확정')
+            ) : null
           ) : null
         );
       })
@@ -666,11 +672,11 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
         p.name
       )),
       React.createElement('span', null,
-        React.createElement('span', { className: bentoClass('dot'), style: { background: 'var(--brand)', borderRadius: 'var(--radius-full)', width: '12px', height: '5px' } }),
+        React.createElement('span', { className: bentoClass('dot'), style: { background: '#F472B6', borderRadius: 'var(--radius-full)', width: '12px', height: '5px' } }),
         '일정·여행'
       ),
       React.createElement('span', null,
-        React.createElement('span', { className: bentoClass('dot'), style: { background: '#F472B6', borderRadius: 'var(--radius-full)', width: '12px', height: '5px' } }),
+        React.createElement('span', { className: bentoClass('dot'), style: { background: 'var(--brand)', borderRadius: 'var(--radius-full)', width: '12px', height: '5px' } }),
         '기념일'
       )
     )
