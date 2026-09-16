@@ -19,7 +19,7 @@
 | Gallery / Content / Archive | `calendarName` from shell (same cleaned calendar title) |
 
 ### B. Side-nav
-- Brand: **모여라 캘린더** + purple pill **calendar name** (`bp-side-nav-cal-badge`)
+- Brand: **모여라 캘린더** + purple pill **calendar name** (`bp-side-nav-cal-badge`, leading emoji/symbols stripped like header subtitle)
 - Active: light purple bg + purple text/icon
 - Chat meta: solid author color pill (white text)
 - Settlement: red balance badge + date chip (`bp-side-nav-date-chip`)

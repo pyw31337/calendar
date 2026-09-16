@@ -1,0 +1,44 @@
+{
+  "base": "https://pyw31337.github.io/calendar",
+  "mergeSha": "94ce65be",
+  "capturedAt": "2026-09-16T08:10:07.410Z",
+  "shots": {
+    "chat-pc": {
+      "kind": "chat-pc",
+      "headerTitle": "채팅",
+      "headerSub": "모아엘가 · 4명",
+      "brandText": "모여라 캘린더 🍺 모아엘가",
+      "calBadge": "🍺 모아엘가",
+      "hasComposer": true,
+      "searchAria": [
+        "대화 검색",
+        "채팅 메뉴"
+      ]
+    },
+    "chat-mobile": {
+      "kind": "chat-mobile",
+      "headerTitle": "채팅",
+      "headerSub": "모아엘가 · 4명",
+      "brandText": "모여라 캘린더 🍺 모아엘가",
+      "calBadge": "🍺 모아엘가",
+      "hasComposer": true,
+      "searchAria": [
+        "대화 검색",
+        "채팅 메뉴"
+      ]
+    },
+    "memo-header": {
+      "kind": "memo-header",
+      "headerTitle": "메모",
+      "headerSub": "모아엘가",
+      "brandText": "모여라 캘린더 🍺 모아엘가",
+      "calBadge": "🍺 모아엘가",
+      "hasComposer": false,
+      "searchAria": [
+        "메모 공유",
+        "메모 메뉴"
+      ]
+    }
+  },
+  "note": "Captured after #653 deploy. Side-nav badge briefly showed leading emoji until follow-up clean; header subtitle already cleaned (모아엘가 · 4명)."
+}
