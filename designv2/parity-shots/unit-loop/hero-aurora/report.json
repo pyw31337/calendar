@@ -1,0 +1,42 @@
+{
+  "base": "http://127.0.0.1:5189/",
+  "capturedAt": "2026-09-16T09:46:48.895Z",
+  "shots": {
+    "pc": {
+      "kind": "pc",
+      "hasAuroraSpan": true,
+      "heroBg": "linear-gradient(rgba(24, 8, 48, 0.12) 0%, rgba(15, 5, 40, 0.42) 100%), linear-gradient(135deg, rgb(59, 7, 100) 0%, rgb(91, 33, 182) 42%, rgb(109, 40, 217) 68%, rgb(14, 116, 144) 100%)",
+      "beforeAnim": "bp-hero-aurora-drift-a",
+      "afterAnim": "bp-hero-aurora-drift-b",
+      "auroraAnim": "bp-hero-aurora-pulse",
+      "beforeContent": "\"\"",
+      "prefix": "[모임확정]",
+      "titleColor": "rgb(255, 255, 255)",
+      "compactColor": "rgb(255, 255, 255)"
+    },
+    "mobile": {
+      "kind": "mobile",
+      "hasAuroraSpan": true,
+      "heroBg": "linear-gradient(rgba(24, 8, 48, 0.12) 0%, rgba(15, 5, 40, 0.42) 100%), linear-gradient(135deg, rgb(59, 7, 100) 0%, rgb(91, 33, 182) 42%, rgb(109, 40, 217) 68%, rgb(14, 116, 144) 100%)",
+      "beforeAnim": "bp-hero-aurora-drift-a",
+      "afterAnim": "bp-hero-aurora-drift-b",
+      "auroraAnim": "bp-hero-aurora-pulse",
+      "beforeContent": "\"\"",
+      "prefix": "[모임확정]",
+      "titleColor": "rgb(255, 255, 255)",
+      "compactColor": "rgb(255, 255, 255)"
+    },
+    "reducedMotion": {
+      "kind": "reducedMotion",
+      "hasAuroraSpan": true,
+      "heroBg": "linear-gradient(rgba(24, 8, 48, 0.12) 0%, rgba(15, 5, 40, 0.42) 100%), linear-gradient(135deg, rgb(59, 7, 100) 0%, rgb(91, 33, 182) 42%, rgb(109, 40, 217) 68%, rgb(14, 116, 144) 100%)",
+      "beforeAnim": "none",
+      "afterAnim": "none",
+      "auroraAnim": "none",
+      "beforeContent": "\"\"",
+      "prefix": "[모임확정]",
+      "titleColor": "rgb(255, 255, 255)",
+      "compactColor": "rgb(255, 255, 255)"
+    }
+  }
+}
