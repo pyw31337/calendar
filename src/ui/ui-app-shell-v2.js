@@ -2112,7 +2112,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
     React.createElement('div', { className: `renewal-shell v2-design ${hasFullScreen ? 'v2-has-detail' : ''} ${isSideNavCollapsed ? 'is-side-collapsed' : ''}`.trim() },
       React.createElement('button', { type: 'button', className: bentoClass(`side-nav-backdrop ${isSideNavOpen ? 'is-open' : ''}`), onClick: () => setIsSideNavOpen(false), 'aria-label': '메뉴 닫기' }),
       React.createElement('nav', { className: bentoClass(`side-nav ${isSideNavOpen ? 'is-open' : ''} ${isSideNavCollapsed ? 'is-collapsed' : ''}`), 'aria-label': '주 메뉴' }, bentoSideNav),
-      React.createElement('main', { className: activeTab === 'calendar' ? 'bp-app-shell is-bento-home' : `renewal-shell-main v2-destination ${hasFullScreen ? `v2-${activeTab}` : `is-${activeTab}`}` },
+      React.createElement('main', { className: activeTab === 'calendar' ? 'bp-app-shell is-bento-home' : `renewal-shell-main v2-destination ${hasFullScreen ? (activeTab === 'records' ? `v2-${recordsSubTab}` : `v2-${activeTab}`) : `is-${activeTab}`}` },
 
         activeTab === 'calendar'
           ? React.createElement(CalendarPane, { calendarContext, recordsContext, onOpenDate: setDateModalDate, onChangeView, calendarName, onOpenSearch: () => handleSelectMoreItem('search'), onOpenMore: () => setIsSideNavOpen(true) })

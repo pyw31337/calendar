@@ -241,7 +241,7 @@ function enqueueMemoMediaSave(...args) {
   const f = __gatherUiDeps().enqueueMemoMediaSave || GATHER_APP_UTILS.enqueueMemoMediaSave;
   return typeof f === 'function' ? f(...args) : enqueueWriteOperation(...args);
 }
-export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMemos, onBack, showToast, isDarkTheme, onRequestConfirm, sharedMemo, onDismissSharedMemo, chatMessages, setActiveLightbox, onOpenShare, onOpenAppSettings, onChangeView, onUpdateMemo, onUpsertMemo, onDeleteMemo, memoInitialTag, setMemoInitialTag, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, historyCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null }) {
+export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMemos, onBack, showToast, isDarkTheme, onRequestConfirm, sharedMemo, onDismissSharedMemo, chatMessages, setActiveLightbox, onOpenShare, onOpenAppSettings, onChangeView, onUpdateMemo, onUpsertMemo, onDeleteMemo, memoInitialTag, setMemoInitialTag, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, historyCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null, renderV2 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -1060,7 +1060,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
     cardRectsRef.current = nextRects;
   }, [memoSectionOrderKey]);
 
-  return /*#__PURE__*/React.createElement("div", {
+  const __memoLegacyTree = /*#__PURE__*/React.createElement("div", {
     className: "memo-view-container",
     style: {
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -2094,6 +2094,24 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       showToast: showToast
     })
   );
+
+  if (typeof renderV2 === 'function') {
+    return renderV2({
+      legacyView: __memoLegacyTree,
+      calendar,
+      allMemos: memos || [],
+      searchQuery,
+      selectedTag,
+      onBack,
+      onShare: onOpenShare,
+      onMenu: () => setIsMemoMenuOpen(true),
+      onSearch: (value) => { setSearchQuery(value); setIsSearchOpen(!!value || isSearchOpen); },
+      onSelectTag: (tag) => { setSelectedTag(tag); if (tag) setIsSearchOpen(true); },
+      onCompose: () => setIsComposerExpanded(true),
+      slots: {},
+    });
+  }
+  return __memoLegacyTree;
 }
 
   if (typeof window !== 'undefined') {
