@@ -169,6 +169,9 @@
 }
 
 .v2-design .bp-day-cell { font-family: inherit; }
+/* Mock ships a 1px gap between day-num / meeting-pill / dots / anniversary bars — reads as
+ * everything glued together edge-to-edge. Give the stack real breathing room at every tier. */
+.v2-design .bp-day-cell { gap: 4px !important; }
 .v2-design .bp-dday-chip {
   display: flex;
   flex-direction: column;
@@ -609,13 +612,14 @@
   .v2-design .bp-day-cell {
     min-height: 66px !important;
     padding: 4px 2px 3px !important;
-    gap: 2px !important;
+    gap: 5px !important;
   }
 }
 @media (min-width: 1200px) {
   .v2-design .bp-day-cell {
     min-height: 84px !important;
     padding: 5px 3px 4px !important;
+    gap: 6px !important;
   }
 }
 
@@ -912,7 +916,7 @@
   .v2-design .bp-day-cell {
     min-height: 84px !important;
     padding: 5px 3px 4px !important;
-    gap: 2px !important;
+    gap: 6px !important;
     border-radius: 10px !important;
   }
   .v2-design .bp-day-num {
