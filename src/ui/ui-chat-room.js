@@ -165,7 +165,8 @@ export function ChatRoomView({
   settlementLastDate = null,
   galleryLastDate = null,
   placeLastName = null,
-  memoLastTitleWord = null
+  memoLastTitleWord = null,
+  renderV2
 }) {
   const React = window.React;
   const { typingParticipantIds, announceTyping, stopTyping } = useChatTypingPresence({
@@ -1165,7 +1166,7 @@ export function ChatRoomView({
         }
       }, timeStr))]));
   });
-  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  const __chatLegacyTree = /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "chat-room-container",
     style: {
       position: 'fixed',
@@ -2103,6 +2104,20 @@ export function ChatRoomView({
       }, "닫기")
     )
   }));
+
+  if (typeof renderV2 === 'function') {
+    return renderV2({
+      legacyView: __chatLegacyTree,
+      calendar,
+      onBack,
+      onMenu: () => setIsChatSideMenuOpen(true),
+      onSearch: () => { setIsSearchOpen(true); setSearchQuery(''); },
+      onOpenGallery,
+      isSearchOpen,
+      slots: {},
+    });
+  }
+  return __chatLegacyTree;
 }
 
   if (typeof window !== 'undefined') {
