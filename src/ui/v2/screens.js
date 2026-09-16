@@ -832,9 +832,9 @@ export function ChatScreen(p) {
           className: 'bp-composer-input',
           style: {
             ...slots.textarea.props.style,
-            minHeight: '38px',
-            height: '38px',
-            padding: '9px 14px',
+            minHeight: '36px',
+            height: '36px',
+            padding: '8px 14px',
             borderRadius: '9999px',
             resize: 'none',
           },

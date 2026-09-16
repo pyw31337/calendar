@@ -1,0 +1,258 @@
+{
+  "base": "https://pyw31337.github.io/calendar",
+  "phase": "pre",
+  "capturedAt": "2026-09-16T07:38:45.696Z",
+  "chat": {
+    "v2": true,
+    "header": "채팅 모아엘가 · 4명",
+    "scrollPadding": "8px 14px 100px",
+    "scrollRect": {
+      "x": 0,
+      "y": 0,
+      "w": 390,
+      "h": 844
+    },
+    "composerPadding": "10px 12px",
+    "composerHeight": 101,
+    "composerRect": {
+      "x": 0,
+      "y": 54,
+      "w": 390,
+      "h": 101
+    },
+    "textareaPadding": "0px",
+    "textareaFont": "13.3333px",
+    "toolsPadding": "6px 2px 2px",
+    "toolsHeight": 42,
+    "rowCount": 60,
+    "bubbles": [
+      {
+        "rowMarginBottom": "12px",
+        "rowGap": "3px 6px",
+        "rowRect": {
+          "x": 14,
+          "y": -7688,
+          "w": 362,
+          "h": 104.9
+        },
+        "bubblePadding": "8px 12px",
+        "bubbleFont": "13.76px",
+        "bubbleRadius": "0px 14px 14px",
+        "bubbleRect": {
+          "x": 57.7,
+          "y": -7688,
+          "w": 226.2,
+          "h": 77.9
+        }
+      },
+      {
+        "rowMarginBottom": "12px",
+        "rowGap": "3px 6px",
+        "rowRect": {
+          "x": 14,
+          "y": -7571.1,
+          "w": 362,
+          "h": 101.8
+        },
+        "bubblePadding": "8px 12px",
+        "bubbleFont": "13.76px",
+        "bubbleRadius": "14px 0px 14px 14px",
+        "bubbleRect": {
+          "x": 149.8,
+          "y": -7571.1,
+          "w": 226.2,
+          "h": 57.9
+        }
+      },
+      {
+        "rowMarginBottom": "12px",
+        "rowGap": "3px 6px",
+        "rowRect": {
+          "x": 14,
+          "y": -7457.3,
+          "w": 362,
+          "h": 101.8
+        },
+        "bubblePadding": "8px 12px",
+        "bubbleFont": "13.76px",
+        "bubbleRadius": "14px 0px 14px 14px",
+        "bubbleRect": {
+          "x": 149.8,
+          "y": -7457.3,
+          "w": 226.2,
+          "h": 57.9
+        }
+      },
+      {
+        "rowMarginBottom": "12px",
+        "rowGap": "3px 6px",
+        "rowRect": {
+          "x": 14,
+          "y": -7343.5,
+          "w": 362,
+          "h": 65
+        },
+        "bubblePadding": "8px 12px",
+        "bubbleFont": "13.76px",
+        "bubbleRadius": "0px 14px 14px",
+        "bubbleRect": {
+          "x": 57.7,
+          "y": -7343.5,
+          "w": 211.3,
+          "h": 38
+        }
+      },
+      {
+        "rowMarginBottom": "12px",
+        "rowGap": "3px 6px",
+        "rowRect": {
+          "x": 14,
+          "y": -7266.6,
+          "w": 362,
+          "h": 81.8
+        },
+        "bubblePadding": "8px 12px",
+        "bubbleFont": "13.76px",
+        "bubbleRadius": "14px 0px 14px 14px",
+        "bubbleRect": {
+          "x": 278.6,
+          "y": -7266.6,
+          "w": 97.4,
+          "h": 38
+        }
+      },
+      {
+        "rowMarginBottom": "12px",
+        "rowGap": "3px 6px",
+        "rowRect": {
+          "x": 14,
+          "y": -7172.8,
+          "w": 362,
+          "h": 84.9
+        },
+        "bubblePadding": "8px 12px",
+        "bubbleFont": "13.76px",
+        "bubbleRadius": "0px 14px 14px",
+        "bubbleRect": {
+          "x": 57.7,
+          "y": -7172.8,
+          "w": 226.2,
+          "h": 57.9
+        }
+      }
+    ],
+    "composerY": 54,
+    "scrollY": 0
+  },
+  "memo": {
+    "v2": true,
+    "header": "메모",
+    "listPadding": "8px 16px 16px",
+    "listGap": "20px",
+    "listRect": {
+      "x": 0,
+      "y": 112,
+      "w": 390,
+      "h": 6332.3
+    },
+    "composerPadding": "12px",
+    "composerGap": "8px",
+    "composerHeight": 46,
+    "composerRect": {
+      "x": 16,
+      "y": 120,
+      "w": 358,
+      "h": 46
+    },
+    "searchToComposer": 31,
+    "composerToFirst": 20,
+    "sectionLabels": [
+      {
+        "text": "최근 활동",
+        "font": "11.84px",
+        "margin": "0px",
+        "rect": {
+          "x": 16,
+          "y": 186,
+          "w": 358,
+          "h": 14
+        }
+      },
+      {
+        "text": "메모 목록",
+        "font": "11.84px",
+        "margin": "0px",
+        "rect": {
+          "x": 16,
+          "y": 551,
+          "w": 358,
+          "h": 14
+        }
+      }
+    ],
+    "cards": [
+      {
+        "padding": "12px",
+        "margin": "0px",
+        "borderRadius": "12px",
+        "rect": {
+          "x": 16,
+          "y": 208,
+          "w": 358,
+          "h": 311
+        },
+        "class": "memo-card-hover"
+      },
+      {
+        "padding": "12px",
+        "margin": "0px",
+        "borderRadius": "12px",
+        "rect": {
+          "x": 16,
+          "y": 573,
+          "w": 358,
+          "h": 409
+        },
+        "class": "memo-card-hover"
+      },
+      {
+        "padding": "12px",
+        "margin": "0px",
+        "borderRadius": "12px",
+        "rect": {
+          "x": 16,
+          "y": 994,
+          "w": 358,
+          "h": 386.5
+        },
+        "class": "memo-card-hover"
+      },
+      {
+        "padding": "12px",
+        "margin": "0px",
+        "borderRadius": "12px",
+        "rect": {
+          "x": 16,
+          "y": 1392.5,
+          "w": 358,
+          "h": 329.1
+        },
+        "class": "memo-card-hover"
+      }
+    ],
+    "tagChipCount": 0,
+    "fab": {
+      "aria": "메모 작성",
+      "rect": {
+        "x": 318,
+        "y": 772,
+        "w": 52,
+        "h": 52
+      },
+      "display": "flex"
+    }
+  },
+  "home": {
+    "v2": true
+  }
+}
