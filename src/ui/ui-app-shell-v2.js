@@ -1378,7 +1378,7 @@ function MediaPane({ recordsContext, onChangeView, onOpenAppSettings, onOpenSide
         onBack: () => onChangeView('calendar'),
         onShare: recordsContext.onOpenGalleryShare,
         onMenu: onOpenSideNav || onOpenAppSettings,
-        onSearch: undefined,
+        onSearch: () => clickLegacyAriaButton('갤러리 검색', '.v2-gallery'),
         slots: {},
       })
     ),
@@ -1391,10 +1391,12 @@ function MediaPane({ recordsContext, onChangeView, onOpenAppSettings, onOpenSide
 
 
 /** Click still-mounted legacy header search (parent may be display:none under V2 PageHeader).
- * Scope to .places-view-header so we do not re-click the V2 PageHeader IconButton (same aria-label). */
+ * Scope to legacy page headers so we do not re-click the V2 PageHeader IconButton (same aria-label).
+ * Content/Archive use .places-view-header; Gallery uses .gallery-page-header. */
 function clickLegacyAriaButton(ariaLabel, scopeSelector) {
   const scope = (scopeSelector && document.querySelector(scopeSelector)) || document;
-  const btn = scope.querySelector(`.places-view-header button[aria-label="${ariaLabel}"]`);
+  const btn = scope.querySelector(`.places-view-header button[aria-label="${ariaLabel}"]`)
+    || scope.querySelector(`.gallery-page-header button[aria-label="${ariaLabel}"]`);
   if (btn) btn.click();
 }
 
