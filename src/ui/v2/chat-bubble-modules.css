@@ -1,0 +1,191 @@
+/* Shared ChatFull-style bubble modules — usable by home chat/memo and memo/chat screens.
+ * Every selector is rooted under .v2-design | .v2-chat | .v2-memo (style isolation).
+ */
+
+.v2-design .v2-bubble-frame,
+.v2-chat .v2-bubble-frame,
+.v2-memo .v2-bubble-frame {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  text-align: left;
+}
+
+.v2-design .v2-name-pill,
+.v2-chat .v2-name-pill,
+.v2-memo .v2-name-pill {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 999px;
+  line-height: 1.35;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v2-design .v2-bubble-surface,
+.v2-chat .v2-bubble-surface,
+.v2-memo .v2-bubble-surface {
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid rgba(30, 27, 46, 0.06);
+  box-shadow: 0 4px 14px rgba(30, 27, 46, 0.07);
+  padding: 12px 14px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  color: var(--text-main, #1E1B2E);
+}
+
+.v2-design button.v2-bubble-surface,
+.v2-chat button.v2-bubble-surface,
+.v2-memo button.v2-bubble-surface {
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.v2-design .v2-bubble-surface:focus-visible,
+.v2-chat .v2-bubble-surface:focus-visible,
+.v2-memo .v2-bubble-surface:focus-visible {
+  outline: 2px solid var(--brand, #7C3AED);
+  outline-offset: 2px;
+}
+
+.v2-design .v2-reply-quote,
+.v2-chat .v2-reply-quote,
+.v2-memo .v2-reply-quote {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border-left: 2.5px solid var(--brand, #7C3AED);
+  background: var(--brand-soft, #F3EEFF);
+  border-radius: 0 8px 8px 0;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  max-width: 100%;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.v2-design .v2-reply-quote-author,
+.v2-chat .v2-reply-quote-author,
+.v2-memo .v2-reply-quote-author {
+  font-size: 0.6rem;
+  font-weight: 800;
+  color: var(--brand, #7C3AED);
+}
+
+.v2-design .v2-reply-quote-text,
+.v2-chat .v2-reply-quote-text,
+.v2-memo .v2-reply-quote-text {
+  font-size: 0.66rem;
+  color: var(--text-muted, #6B7280);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v2-design .v2-bubble-meta,
+.v2-chat .v2-bubble-meta,
+.v2-memo .v2-bubble-meta {
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: var(--text-light, #9CA3AF);
+  line-height: 1.3;
+  padding-left: 2px;
+}
+
+/* Home memo list using bubble modules */
+.v2-design .v2-bubble-memo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.v2-design .v2-bubble-memo-list > .v2-bubble-frame {
+  width: 100%;
+}
+
+.v2-design .v2-home-memo-bubble .v2-bubble-title {
+  display: block;
+  font-weight: 800;
+  font-size: 0.86rem;
+  color: var(--text-main);
+  margin-bottom: 4px;
+}
+
+.v2-design .v2-home-memo-bubble .v2-bubble-summary {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+  margin-bottom: 8px;
+}
+
+.v2-design .v2-home-memo-bubble .v2-bubble-preview {
+  display: flex;
+  gap: 10px;
+  background: var(--bg-primary, #F8F7FC);
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 8px;
+}
+
+.v2-design .v2-home-memo-bubble .v2-bubble-preview img {
+  width: 52px;
+  height: 52px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.v2-design .v2-home-memo-bubble .v2-bubble-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.v2-design .v2-home-memo-bubble .v2-bubble-tag {
+  color: var(--brand);
+  font-weight: 700;
+  font-size: 0.64rem;
+  font-style: normal;
+}
+
+/* Memo screen cards wrapped as chat bubbles */
+.v2-memo .v2-memo-card-wrap.v2-bubble-frame {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.v2-memo .v2-memo-card-wrap .v2-bubble-surface {
+  /* Live MemoCard keeps its handlers; surface is the visual shell */
+  padding: 0;
+  overflow: hidden;
+}
+
+.v2-memo .v2-memo-card-wrap .v2-bubble-surface > .memo-card-hover,
+.v2-memo .v2-memo-card-wrap .v2-bubble-surface > [class*="memo-card"] {
+  box-shadow: none !important;
+  border-radius: 14px !important;
+  border-left: none !important;
+}
+
+.v2-memo .bp-memo-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}

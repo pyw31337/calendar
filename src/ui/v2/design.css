@@ -520,7 +520,7 @@
   flex-shrink: 0;
   box-sizing: border-box;
 }
-/* Purple anniversary badge with title text inside (mock: brand purple pill) */
+/* Green anniversary badge with title text inside (V2: 기념일 = green) */
 .v2-design .bp-day-bar-stack .bp-day-anniversary {
   height: auto !important;
   min-height: 1.05rem !important;
@@ -529,7 +529,7 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  background: var(--brand, #7C3AED) !important;
+  background: var(--status-green, #16A34A) !important;
   border-radius: 999px !important; /* single-day / solo default */
 }
 /* Multi-day (연일) connected segments — square the joining edges */
@@ -566,12 +566,12 @@
   max-width: 100%;
   padding: 0 !important;
 }
-/* Pink schedule/travel bars with title text (mock) */
+/* Purple confirmed-meeting bars (V2: 모임확정 / 일정·여행 = brand purple) */
 .v2-design .bp-day-bar-stack .bp-day-bar {
   height: auto !important;
   min-height: 0.28rem !important;
   border-radius: 999px !important;
-  background: #F472B6 !important;
+  background: var(--brand, #7C3AED) !important;
   display: flex !important;
   align-items: center;
   justify-content: center;
@@ -854,7 +854,64 @@
   .v2-design .bp-thumb { border-radius: 12px !important; }
 }
 
-/* Always show anniversary title inside purple badge (override mobile display:none) */
+
+
+/* Month-grid anniversary: color bar only (no title/memo text in cell body) */
+.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-bar-only {
+  min-height: 0.34rem !important;
+  height: 0.34rem !important;
+  padding: 0 !important;
+}
+.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-bar-only .bp-day-anniversary-label {
+  display: none !important;
+}
+
+/* Holiday + 모임확정 on one row (e.g. 추석 연휴 | 모임확정) */
+.v2-design .bp-day-head-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 2px 4px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  line-height: 1.15;
+}
+.v2-design .bp-day-head-row .bp-day-corner-label {
+  display: block !important;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.v2-design .bp-day-head-row .bp-day-meeting-pill {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  min-height: 1.05rem;
+  padding: 0.08rem 0.32rem;
+  border-radius: 999px;
+  background: var(--brand, #7C3AED);
+  color: #fff !important;
+  font-size: 0.56rem !important;
+  font-weight: 800 !important;
+  line-height: 1.15 !important;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Hide legacy free-text meeting/note body on month grid (participant schedule memos) */
+.v2-design .bp-day-event-title {
+  display: none !important;
+}
+
+/* Always show anniversary title inside green badge (override mobile display:none) */
 .v2-design .bp-day-anniversary .bp-day-anniversary-label {
   display: block !important;
 }

@@ -8,6 +8,7 @@ import './v2/reference-home.css';
 import './v2/design.css';
 import { renderMemoScreen, renderPlacesScreen, renderSettlementScreen, renderChatScreen } from './v2/screens.js';
 import { authorFor, latestRows, timestampMs, photoLightbox } from './v2/view-data.js';
+import { ChatBubbleFrame, NameColorPill, ReplyQuote } from './v2/chat-bubble-modules.js';
 import {
   V2_PRIMARY, V2_SECONDARY, V2_DESTINATION_TABS, resolveV2Destination,
 } from './v2/shell-nav.js';
@@ -666,8 +667,15 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
           'aria-label': `${dateStr} 일정 상세`,
         },
           React.createElement('span', { className: bentoClass('day-num') }, dayNum),
-          cornerLabel ? React.createElement('div', { className: bentoClass(`day-corner-label ${isHolidayCorner ? 'is-holiday' : ''}`.trim()) }, cornerLabel) : null,
-          hasMeeting ? React.createElement('span', { className: bentoClass('day-event-title') }, meeting.title || meeting.note || '모임확정') : null,
+          // Holiday + 모임확정 share one row (no stacked lines). Never render participant
+          // schedule memos / meeting.note as free cell-body text under v2.
+          (cornerLabel || hasMeeting) ? React.createElement('div', { className: bentoClass('day-head-row') },
+            cornerLabel ? React.createElement('div', { className: bentoClass(`day-corner-label ${isHolidayCorner ? 'is-holiday' : ''}`.trim()) }, cornerLabel) : null,
+            hasMeeting ? React.createElement('span', {
+              className: bentoClass('day-meeting-pill'),
+              title: meeting.title || meeting.note || '모임확정',
+            }, '모임확정') : null
+          ) : null,
           dots.length > 0 ? React.createElement('div', { className: bentoClass('dot-row') },
             dots.map(p => React.createElement('span', {
               key: p.id,
@@ -676,23 +684,17 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
               style: { background: p.color || 'var(--brand)' },
             }))
           ) : null,
-          (anns.length > 0 || hasMeeting) ? React.createElement('div', { className: bentoClass('day-bar-stack') },
-            // Flex stack (gap) — never absolute-overlap. Anniversary (purple+title) then meeting (pink+title).
-            // Range (연일) gets start/mid/end radius classes so per-cell segments read as one bar.
+          // Anniversary bars only in the stack (green). Meeting pill lives in day-head-row.
+          // Range (연일) keeps start/mid/end radius classes from #636/#637.
+          anns.length > 0 ? React.createElement('div', { className: bentoClass('day-bar-stack') },
+            // Green color bars only — no anniversary/trip/participant note strings in cell body.
+            // Titles remain on title= + date modal; multi-day start/mid/end radii preserved.
             anns.slice(0, 4).map((ann, annIdx) => React.createElement('div', {
               key: ann.id || `${dateStr}_ann_${annIdx}`,
-              className: bentoClass(`day-anniversary ${anniversarySpanRole(ann, dateStr)}`),
+              className: bentoClass(`day-anniversary ${anniversarySpanRole(ann, dateStr)} bar-only`),
               title: ann.title || '기념일',
-            },
-              React.createElement('span', { className: bentoClass('day-anniversary-label') }, ann.title || '기념일')
-            )),
-            hasMeeting ? React.createElement('div', {
-              key: `${dateStr}_meeting_bar`,
-              className: bentoClass('day-bar solo has-label'),
-              title: meeting.title || meeting.note || '모임확정',
-            },
-              React.createElement('span', { className: bentoClass('day-bar-label') }, meeting.title || meeting.note || '모임확정')
-            ) : null
+              'aria-label': ann.title || '기념일',
+            }))
           ) : null
         );
       })
@@ -705,11 +707,11 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
         p.name
       )),
       React.createElement('span', null,
-        React.createElement('span', { className: bentoClass('dot'), style: { background: '#F472B6', borderRadius: 'var(--radius-full)', width: '12px', height: '5px' } }),
+        React.createElement('span', { className: bentoClass('dot'), style: { background: 'var(--brand, #7C3AED)', borderRadius: 'var(--radius-full)', width: '12px', height: '5px' } }),
         '일정·여행'
       ),
       React.createElement('span', null,
-        React.createElement('span', { className: bentoClass('dot'), style: { background: 'var(--brand)', borderRadius: 'var(--radius-full)', width: '12px', height: '5px' } }),
+        React.createElement('span', { className: bentoClass('dot'), style: { background: 'var(--status-green, #16A34A)', borderRadius: 'var(--radius-full)', width: '12px', height: '5px' } }),
         '기념일'
       )
     )
@@ -809,34 +811,51 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
       messages.length ? React.createElement('div', { className: bentoClass('renewal-home-chat-list') }, messages.map((m, i) => {
         const image = m.thumbUrl || (Array.isArray(m.thumbUrls) && m.thumbUrls[0]) || m.imageUrl || (Array.isArray(m.imageUrls) && m.imageUrls[0]);
         return React.createElement('button', { type: 'button', className: bentoClass(`renewal-home-chat-item chat-row${image ? ' has-image' : ''}`), key: m.id || i, onClick: () => onChangeView?.('chat') },
-          React.createElement('span', { className: bentoClass('renewal-home-chat-name chat-name-pill'), style: { backgroundColor: displayColor(m) } }, displayName(m)),
+          React.createElement(NameColorPill, { className: bentoClass('renewal-home-chat-name chat-name-pill'), name: displayName(m), color: displayColor(m) }),
           React.createElement('span', { className: bentoClass('renewal-home-chat-content chat-content') },
             image && React.createElement('img', { className: bentoClass('renewal-home-chat-image chat-img'), src: image, alt: '', loading: 'lazy' }),
-            m.replyTo && React.createElement('span', { className: bentoClass('renewal-home-chat-reply chat-reply-quote') },
-              React.createElement('strong', { className: bentoClass('chat-reply-quote-author') }, m.replyTo.senderName || participantFor(m.replyTo)?.name || '답장'),
-              React.createElement('span', { className: bentoClass('chat-reply-quote-text') }, m.replyTo.text || '사진')
-            ),
+            m.replyTo && React.createElement(ReplyQuote, {
+              className: bentoClass('renewal-home-chat-reply chat-reply-quote'),
+              author: m.replyTo.senderName || participantFor(m.replyTo)?.name || '답장',
+              text: m.replyTo.text || '사진',
+            }),
             (m.text || m.content) && React.createElement('span', { className: bentoClass('renewal-home-chat-text chat-text') }, String(m.text || m.content).slice(0, 120)),
             React.createElement('span', { className: bentoClass('renewal-home-chat-time chat-meta') }, image ? formatShortDateTime(m.timestamp ?? m.createdAt) : formatTime(m.timestamp ?? m.createdAt))
           )
         );
       })) : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '최근 대화가 없습니다.')
     ),
-    React.createElement(HomeSummarySection, { title: '메모', kind: 'memo', delay: '0.12s', onMore: () => onChangeView?.('memo') },
-      memos.length ? React.createElement('div', { className: bentoClass('renewal-home-memo-list') }, memos.map((memo, i) => {
+        React.createElement(HomeSummarySection, { title: '메모', kind: 'memo', delay: '0.12s', onMore: () => onChangeView?.('memo') },
+      memos.length ? React.createElement('div', { className: `${bentoClass('renewal-home-memo-list')} v2-bubble-memo-list` }, memos.map((memo, i) => {
         const preview = memo.linkPreview || (Array.isArray(memo.linkPreviews) && memo.linkPreviews[0]);
         const tags = Array.isArray(memo.tags) ? memo.tags.slice(0, 3) : [];
-        return React.createElement('button', { type: 'button', className: bentoClass('renewal-home-memo-card memo-card'), key: memo.id || i, style: { '--renewal-memo-author': displayColor(memo), '--memo-author-color': displayColor(memo) }, onClick: () => onChangeView?.('memo') },
-          React.createElement('strong', { className: bentoClass('renewal-home-memo-title memo-card-title') }, memo.title || '메모'),
-          React.createElement('span', { className: bentoClass('renewal-home-memo-summary memo-summary') }, String(memo.text || memo.content || memo.description || '').slice(0, 170)),
-          preview && React.createElement('span', { className: bentoClass('renewal-home-memo-preview memo-link-card') },
-            preview.image && React.createElement('img', { className: bentoClass('memo-link-thumb'), src: preview.image, alt: '', loading: 'lazy' }),
-            React.createElement('span', null, React.createElement('strong', { className: bentoClass('memo-link-title') }, preview.title || '링크 미리보기'), React.createElement('small', { className: bentoClass('memo-link-desc') }, preview.description || preview.url || ''))
+        const memoMeta = formatShortDateTime(memo.updatedAt ?? memo.createdAt);
+        return React.createElement(ChatBubbleFrame, {
+          key: memo.id || i,
+          name: displayName(memo),
+          color: displayColor(memo),
+          meta: memoMeta,
+          className: 'v2-home-memo-bubble',
+          surfaceAs: 'button',
+          surfaceProps: {
+            type: 'button',
+            className: 'v2-home-memo-bubble-surface',
+            style: { '--renewal-memo-author': displayColor(memo), '--memo-author-color': displayColor(memo) },
+            onClick: () => onChangeView?.('memo'),
+          },
+        },
+          React.createElement('strong', { className: 'v2-bubble-title' }, memo.title || '메모'),
+          React.createElement('span', { className: 'v2-bubble-summary' }, String(memo.text || memo.content || memo.description || '').slice(0, 170)),
+          preview && React.createElement('span', { className: 'v2-bubble-preview' },
+            preview.image && React.createElement('img', { src: preview.image, alt: '', loading: 'lazy' }),
+            React.createElement('span', null,
+              React.createElement('strong', { className: bentoClass('memo-link-title') }, preview.title || '링크 미리보기'),
+              React.createElement('small', { className: bentoClass('memo-link-desc') }, preview.description || preview.url || '')
+            )
           ),
-          React.createElement('span', { className: bentoClass('renewal-home-memo-meta memo-tags-row') },
-            React.createElement('b', { className: bentoClass('chat-name-pill'), style: { backgroundColor: displayColor(memo) } }, displayName(memo)),
-            tags.map(tag => React.createElement('em', { className: bentoClass('memo-tag'), key: tag }, `#${String(tag).replace(/^#/, '')}`))
-          )
+          tags.length ? React.createElement('span', { className: 'v2-bubble-tags' },
+            tags.map(tag => React.createElement('em', { className: 'v2-bubble-tag', key: tag }, `#${String(tag).replace(/^#/, '')}`))
+          ) : null
         );
       })) : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '최근 메모가 없습니다.')
     ),
