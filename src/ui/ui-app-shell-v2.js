@@ -2193,12 +2193,15 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
           decoding: 'async',
         }),
         React.createElement('span', { className: bentoClass('side-nav-brand-text') }, '모여라 캘린더'),
-        calendarName
-          ? React.createElement('span', {
-              className: bentoClass('side-nav-cal-badge'),
-              title: calendarName,
-            }, calendarName)
-          : null
+        (() => {
+          const calBadge = String(calendarName || '').replace(/^[^\p{L}\p{N}]+/u, '').trim();
+          return calBadge
+            ? React.createElement('span', {
+                className: bentoClass('side-nav-cal-badge'),
+                title: calBadge,
+              }, calBadge)
+            : null;
+        })()
       ),
       React.createElement('button', { type: 'button', className: bentoClass('side-nav-close-btn'), 'aria-label': '메뉴 닫기', onClick: () => setIsSideNavOpen(false) },
         React.createElement(TabIcon, { id: 'close' })
