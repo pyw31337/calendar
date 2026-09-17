@@ -168,7 +168,6 @@ export function PageHeader({ title, subtitle, count, onBack, onSearch, searchLab
         { className: 'bp-header-actions' },
         extra,
         onSearch && h(IconButton, { label: searchLabel || `${title} 검색`, icon: 'search', onClick: onSearch }),
-        onShare && h(IconButton, { label: `${title} 공유`, icon: 'share', onClick: onShare }),
         onMenu && h(IconButton, { label: `${title} 메뉴`, icon: 'menu', onClick: onMenu })
       )
     ),

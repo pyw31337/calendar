@@ -391,46 +391,6 @@
 .v2-design .bp-event-sheet [class*="resize"] {
   display: none !important;
 }
-/* Standard tab treatment: match the gallery's 사진|링크|파일 underline tabs across every
-   destination and the date sheet. Keep equal-width segments and a single active underline. */
-.v2-design .bp-event-sheet .underline-tabs,
-.v2-design .bp-event-sheet .underline-tabs--flush,
-.v2-design .bp-event-sheet [role="tablist"] {
-  display: flex !important;
-  gap: 0 !important;
-  background: var(--bg-card, #fff) !important;
-  border-radius: 0 !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  border: 0 !important;
-  border-bottom: 1px solid var(--border-subtle, #eceaf5) !important;
-  width: 100% !important;
-  box-sizing: border-box !important;
-}
-.v2-design .bp-event-sheet .underline-tabs button,
-.v2-design .bp-event-sheet .underline-tabs [role="tab"],
-.v2-design .bp-event-sheet [role="tab"] {
-  flex: 1 !important;
-  border: none !important;
-  border-bottom: none !important;
-  border-radius: 9999px !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  color: var(--text-muted, #6b6580) !important;
-  font-weight: 800 !important;
-  font-size: 0.7rem !important;
-  padding: 8px 2px !important;
-  margin-bottom: 0 !important;
-  opacity: 1 !important;
-}
-.v2-design .bp-event-sheet .underline-tabs button[aria-selected="true"],
-.v2-design .bp-event-sheet [role="tab"][aria-selected="true"] {
-  background: var(--bg-card, #fff) !important;
-  color: var(--brand, #7C2FE5) !important;
-  box-shadow: 0 2px 6px rgba(30, 27, 46, 0.1) !important;
-  border-bottom: none !important;
-}
-
 @media (min-width: 768px) {
   /* Full-width, not a fluid-but-still-capped column: `min(94vw, 1100px)` still left a real
    * unused gutter on either side at tablet widths (~23px/side at 768px, ~31px/side at 1024px)
@@ -1314,6 +1274,8 @@
 /* Shared PageHeader — stacked title/subtitle denser (mock + slight bump) */
 .v2-design .v2-page-header {
   padding: 11px 14px 9px !important;
+  min-height: 60px;
+  box-sizing: border-box;
   background: #fff !important;
   border-bottom: 1px solid #eceaf5 !important;
 }
@@ -1370,19 +1332,19 @@
 }
 /* Light glass icon buttons on white PageHeader (shared token language) */
 .v2-design .v2-page-header .bp-icon-btn {
-  background: var(--v2-glass-light-fill, rgba(255,255,255,0.88)) !important;
-  border: 1px solid var(--v2-glass-light-border, #eceaf5) !important;
-  color: #6b6580 !important;
-  padding: 7px !important;
-  border-radius: 9999px !important;
-  backdrop-filter: var(--v2-glass-blur, blur(20px) saturate(180%)) !important;
-  -webkit-backdrop-filter: var(--v2-glass-blur, blur(20px) saturate(180%)) !important;
-  box-shadow: var(--v2-glass-light-inset, inset 0 1px 0 rgba(255,255,255,0.95)), var(--v2-glass-light-shadow, 0 1px 2px rgba(30,27,46,0.04)) !important;
+  background: transparent;
+  border: 0;
+  color: #6b6580;
+  padding: 7px;
+  border-radius: 0;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
 }
 .v2-design .v2-page-header .bp-icon-btn:hover {
-  background: var(--v2-glass-light-hover-fill, rgba(243,238,255,0.78)) !important;
-  border-color: var(--v2-glass-light-hover-border, #e0d4ff) !important;
-  color: var(--brand, #7C2FE5) !important;
+  background: transparent;
+  border-color: transparent;
+  color: var(--brand, #7C2FE5);
 }
 
 /* --------------------------------------------------------------------------

@@ -11,8 +11,17 @@
   width: 100%; max-width: none; padding: 0 0 90px; margin: 0; min-height: 100%;
   background: #fafafc; position: relative;
 }
-.v2-design .v2-page-header { display: block; }
+.v2-design .v2-page-header {
+  display: block;
+  min-height: 60px;
+  box-sizing: border-box;
+}
 .v2-design .v2-page-header .bp-header-row { display: flex; align-items: center; gap: 8px; }
+.v2-design .underline-tabs,
+.v2-design .gallery-page-tabs {
+  min-height: 50px;
+  box-sizing: border-box;
+}
 .v2-design .v2-header-title-block { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .v2-design .v2-page-header .bp-header-count { font-size: var(--font-size-2xs); color: #83798f; font-weight: 700; margin-left: 4px; }
 .v2-design .v2-page-header .bp-header-sub { font-size: var(--font-size-2xs); color: #83798f; font-weight: 700; }
@@ -1659,10 +1668,6 @@
   border-radius: 14px !important;
   margin-bottom: 10px !important;
 }
-.v2-design .v2-settlement .settlement-page-tabs {
-  padding: 6px 12px !important;
-}
-
 /* ========== Unit 2: Content / Archive density (single coherent set) ========== */
 .v2-design .v2-content .culture-items-grid,
 .v2-design .v2-archive .history-bento-grid {
@@ -1680,63 +1685,6 @@
   border-radius: 12px !important;
   box-shadow: 0 2px 8px rgba(30, 27, 46, 0.05) !important;
   overflow: hidden;
-}
-/* All destination tabs use the gallery's standard underline treatment. */
-.v2-design .v2-content .underline-tabs,
-.v2-design .v2-archive .underline-tabs {
-  display: flex !important;
-  gap: 0 !important;
-  background: var(--bg-card, #fff) !important;
-  border-radius: 0 !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  border: 0 !important;
-  border-bottom: 1px solid #eceaf5 !important;
-  width: 100% !important;
-  box-sizing: border-box !important;
-}
-.v2-design .v2-content .underline-tabs button,
-.v2-design .v2-archive .underline-tabs button {
-  flex: 1 !important;
-  border: none !important;
-  border-bottom: 2px solid transparent !important;
-  border-radius: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  color: var(--text-muted, #6b6580) !important;
-  font-weight: 800 !important;
-  font-size: 0.74rem !important;
-  padding: 12px 4px !important;
-  margin-bottom: -1px !important;
-  opacity: 1 !important;
-}
-.v2-design .v2-content .underline-tabs button[aria-selected="true"],
-.v2-design .v2-archive .underline-tabs button[aria-selected="true"] {
-  background: transparent !important;
-  color: var(--brand, #7C2FE5) !important;
-  box-shadow: none !important;
-  border-bottom: 2px solid var(--brand, #7C2FE5) !important;
-}
-
-/* Settlement's 누적보기/월별보기 row is the same standard tab bar, not a floating pill. */
-.v2-design .v2-settlement .settlement-page-tabs .underline-tabs,
-.v2-design .v2-settlement-legacy .settlement-page-tabs .underline-tabs {
-  border-radius: 0 !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  background: var(--bg-card, #fff) !important;
-  border-bottom: 1px solid #eceaf5 !important;
-}
-
-/* Places category tabs keep the same spacing/underline rhythm while retaining category colors. */
-.v2-design .v2-places .places-category-sticky-tabs .place-category-tabs-desktop-only > div {
-  border-radius: 0 !important;
-  border-bottom: 1px solid #eceaf5 !important;
-}
-.v2-design .v2-places .places-category-sticky-tabs .place-category-tabs-desktop-only button {
-  min-height: 44px !important;
-  padding: 12px 4px !important;
-  margin-bottom: -1px !important;
 }
 /* Genre / category chips: portal into a classless slot, then an inner classless row */
 .v2-design .v2-content .history-header-stack > div:not([class]),
