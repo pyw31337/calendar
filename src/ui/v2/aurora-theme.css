@@ -271,6 +271,14 @@
     font-weight: 800 !important;
   }
 }
+
+/* The home gallery preview is a fixed 3×3 contact sheet at every breakpoint.
+ * HomeActivitySummary already limits the source list to the nine newest
+ * user-uploaded photos, so no fourth column or extra row can appear. */
+.v2-design .bp-renewal-home-photo-strip.bp-thumb-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: 1fr;
+}
 @media (max-width: 767px) {
   .v2-design .bp-day-bar-stack .bp-day-anniversary-label {
     display: none !important;
