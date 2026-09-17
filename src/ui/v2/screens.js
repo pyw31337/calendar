@@ -152,7 +152,7 @@ function pageSubtitle(calendar, trailing) {
   return name || extra || undefined;
 }
 
-export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, searchLabel, onShare, onMenu, extra, centerSubtitle = true, children }) {
+export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, searchLabel, onShare, onMenu, extra, centerSubtitle = true, showSearch = false, children }) {
   const centerBrand = brand || (subtitle ? { mark: '🍺', name: String(subtitle).split(' · ')[0].trim() } : null);
   return h(
     'header',
@@ -187,7 +187,7 @@ export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, se
         'div',
         { className: 'bp-header-actions' },
         extra,
-        onSearch && h(IconButton, { label: searchLabel || `${title} 검색`, icon: 'search', size: 20, onClick: onSearch }),
+        showSearch && onSearch && h(IconButton, { label: searchLabel || `${title} 검색`, icon: 'search', size: 20, onClick: onSearch }),
         onMenu && h(IconButton, { label: `${title} 메뉴`, icon: 'menu', size: 20, onClick: onMenu })
       )
     ),

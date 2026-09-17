@@ -392,6 +392,40 @@
   }
 }
 
+/* Calendar rhythm module: one scale for the month control, weekday rail and
+ * event stack. Keep the existing responsive cell sizing, but give the labels
+ * enough breathing room to remain legible at the reference density. */
+.v2-design .bp-cal-month-nav-row { margin-bottom: 16px !important; }
+.v2-design .bp-cal-month-nav-row .bp-cal-month-title,
+.v2-design .bp-cal-month-label { font-size: 1.14rem !important; line-height: 1.2; }
+.v2-design .bp-cal-month-nav-row .bp-cal-today-btn { font-size: 0.86rem !important; padding: 8px 12px; }
+.v2-design .bp-cal-month-nav-row .bp-cal-nav-btn { width: 30px; height: 30px; }
+.v2-design .bp-cal-weekdays { margin-bottom: 8px !important; }
+.v2-design .bp-cal-weekdays .bp-weekday-label { font-size: 0.78rem !important; font-weight: 800; }
+.v2-design .bp-cal-days-grid { row-gap: 5px !important; }
+.v2-design .bp-day-cell { gap: 4px; }
+.v2-design .bp-day-head-row { gap: 5px 6px; }
+.v2-design .bp-dot-row { gap: 4px !important; align-items: center; justify-content: center; }
+.v2-design .bp-p-dot { display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; }
+.v2-design .bp-p-dot::after { display: inline-flex; align-items: center; justify-content: center; }
+
+/* Anniversary color semantics: desktop uses a readable tinted surface and
+ * dark category text; narrow layouts intentionally collapse to a solid bar. */
+@media (min-width: 768px) {
+  .v2-design .bp-day-bar-stack .bp-day-anniversary:not(.bp-bar-only) {
+    background: color-mix(in srgb, var(--anniversary-color, var(--cal-anniversary)) 15%, #fff) !important;
+    color: var(--anniversary-color, var(--cal-anniversary));
+  }
+  .v2-design .bp-day-bar-stack .bp-day-anniversary:not(.bp-bar-only) > .bp-day-anniversary-label {
+    color: var(--anniversary-color, var(--cal-anniversary)) !important;
+  }
+}
+@media (max-width: 767px) {
+  .v2-design .bp-day-bar-stack .bp-day-anniversary {
+    background: var(--anniversary-color, var(--cal-anniversary)) !important;
+  }
+}
+
 /* --------------------------------------------------------------------------
  * Gather type-scale remap for shell=v2 only.
  * Claude mock CSS ships sub-token sizes (0.52–0.66rem). Map chrome/body copy
@@ -1099,6 +1133,63 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* One search entry for the whole calendar. Destination screens keep their
+ * content chrome focused on navigation; all cross-surface search starts here. */
+.v2-design .bp-side-nav-global-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: calc(100% - 20px);
+  min-height: 36px;
+  margin: 4px 10px 12px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--brand, #7C2FE5);
+  color: #fff;
+  font: inherit;
+  font-size: var(--font-size-sm, 0.74rem);
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+}
+.v2-design .bp-side-nav-global-search:hover { background: #6d28d9; }
+.v2-design .bp-side-nav-global-search-icon { display: inline-flex; flex: 0 0 auto; }
+.v2-design .bp-side-nav-global-search-icon svg { width: 18px; height: 18px; }
+.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search {
+  width: 36px;
+  justify-content: center;
+  padding: 8px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search-label { display: none; }
+
+/* Integrated search is a first-class destination, not a drawer overlay. Keep the
+ * existing search/result component and give it the same content gutters as the
+ * other V2 destinations. */
+.v2-design .global-search-page {
+  min-height: 100%;
+  display: flex;
+  justify-content: center;
+  padding: 32px clamp(16px, 4vw, 64px);
+  background: var(--surface, #f8f8fc);
+}
+.v2-design .global-search-page-card {
+  width: min(760px, 100%);
+  align-self: flex-start;
+  max-height: none;
+  overflow: visible;
+  background: var(--bg-card, #fff);
+  border: 1px solid var(--border, #e8e7f0);
+  border-radius: 18px;
+  box-shadow: 0 12px 36px rgba(46, 27, 88, .08);
+}
+@media (max-width: 767px) {
+  .v2-design .global-search-page { padding: 16px 12px 28px; }
+  .v2-design .global-search-page-card { border-radius: 14px; }
 }
 
 

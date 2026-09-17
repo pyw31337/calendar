@@ -2397,7 +2397,8 @@ export function GlobalSearchModal({
   onOpenChatMessage,
   onOpenImage,
   onOpenMemo,
-  initialQuery = ''
+  initialQuery = '',
+  inline = false
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -2556,13 +2557,13 @@ export function GlobalSearchModal({
   }, [matches, contentMatches, onClose, onOpenChatMessage, onOpenMemo, onSelectDate]);
 
   return /*#__PURE__*/React.createElement("div", {
-    className: "modal-overlay",
-    onClick: onClose,
-    style: { zIndex: 11000 }
+    className: inline ? "global-search-page" : "modal-overlay",
+    onClick: inline ? undefined : onClose,
+    style: inline ? undefined : { zIndex: 11000 }
   }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
-    className: "modal-container",
+    className: inline ? "global-search-page-card" : "modal-container",
     onClick: e => e.stopPropagation(),
-    style: { maxWidth: '520px' }
+    style: inline ? undefined : { maxWidth: '520px' }
   },
     /*#__PURE__*/React.createElement("div", { className: "modal-header" },
       /*#__PURE__*/React.createElement("h3", { style: { fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' } },

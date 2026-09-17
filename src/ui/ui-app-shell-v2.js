@@ -42,7 +42,7 @@ import {
   getMessageDirectMediaEntry, getMessageImageEntries,
   normalizePlaceDateForSort,
   getTrulyConfirmedMeetings, getActiveAvailabilities, getActiveParticipants,
-  calculateSettlementBalance, formatBalanceBadge,
+  calculateSettlementBalance, formatBalanceBadge, getAnniversaryDisplayColor,
 } from '../core/app-domain-helpers.js';
 import { getMeetingOwnedPhotoMessageIds, isChatRenderableMessage, isMemeKeyboardPhotoEntry } from '../core/gallery-data.js';
 import { computeKoreanHolidaysForYear, getKoreanSolarTermsForYear } from '../core/app-calendar-holidays.js';
@@ -92,7 +92,7 @@ function readTabFromLocation() {
       const sub = params.get('sub');
       if (sub === 'memo' || sub === 'places') raw = sub;
     }
-    return TAB_IDS.includes(raw) ? raw : DEFAULT_TAB;
+    return raw === 'search' || TAB_IDS.includes(raw) ? raw : DEFAULT_TAB;
   } catch (_) {
     return DEFAULT_TAB;
   }
@@ -594,7 +594,7 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
 
   return React.createElement('div', { className: bentoClass('cal-card') },
     // Month nav
-    React.createElement('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', position: 'relative' } },
+    React.createElement('div', { className: bentoClass('cal-month-nav-row'), style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', position: 'relative' } },
       React.createElement('button', {
         onClick: () => setMonthPickerOpen(value => !value),
         'aria-expanded': monthPickerOpen,
@@ -652,7 +652,7 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
     ),
 
     // Days grid
-    React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', rowGap: '1px' } },
+      React.createElement('div', { className: bentoClass('cal-days-grid'), style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', rowGap: '1px' } },
       days.map(day => {
         const { dayNum, dateStr, isCurrentMonth } = day;
         const cellDate = new Date(dateStr);
@@ -716,14 +716,16 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
             anns.slice(0, 4).map((ann, annIdx) => {
               const role = anniversarySpanRole(ann, dateStr);
               const title = ann.title || '기념일';
+              const displayColor = getAnniversaryDisplayColor(ann, calendar) || 'var(--cal-anniversary)';
               return React.createElement('div', {
                 key: ann.id || `${dateStr}_ann_${annIdx}`,
                 className: bentoClass(`day-anniversary ${role} ${ann.category ? `cat-${String(ann.category).toLowerCase()}` : ''} ${ann.genre ? `genre-${String(ann.genre).toLowerCase()}` : ''}`.trim()),
                 title,
                 'aria-label': title,
-              }, React.createElement('span', {
+                style: { '--anniversary-color': displayColor },
+              }, role === 'start' || role === 'solo' ? React.createElement('span', {
                 className: bentoClass('day-anniversary-label'),
-              }, title));
+              }, title) : null);
             })
           ) : null
         );
@@ -1963,6 +1965,17 @@ function MoreModalsHost({ openModal, onClose, modalProps, anniversaryOverride, c
   return null;
 }
 
+function SearchPage({ modalProps, searchExtra, onClose }) {
+  const React = window.React;
+  const { GlobalSearchModal } = bindUiComponentAliases(React);
+  return React.createElement(GlobalSearchModal, {
+    ...modalProps,
+    ...searchExtra,
+    inline: true,
+    onClose,
+  });
+}
+
 /**
  * The date-detail modal GlobalSearchModal's "이 날짜 보기" results open (WP-08) -- its own local
  * instance for the same reason `PlacesPane`'s is (see that component's doc comment): WP-07's
@@ -2289,7 +2302,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   const chatPillColor = chatAuthorPart?.color || '#EF4444';
   const chatPillTextColor = '#FFFFFF';
 
-  const hasFullScreen = activeTab === 'chat' || activeTab === 'settlement' || activeTab === 'memo' || activeTab === 'places';
+  const hasFullScreen = activeTab === 'chat' || activeTab === 'settlement' || activeTab === 'memo' || activeTab === 'places' || activeTab === 'search';
   const cleanCalBadge = (value) => String(value || '')
     .replace(/[\p{Extended_Pictographic}\p{Emoji_Presentation}\uFE0F\u200D]/gu, '')
     .replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '')
@@ -2307,33 +2320,25 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
       { key: 'manual', label: '사용자 매뉴얼', icon: 'manual', onClick: () => { setIsSideNavOpen(false); openMoreModalById('manual'); } },
     ],
     chat: [
-      { key: 'chat-search', label: '대화검색', icon: 'search', action: 'search' },
       { key: 'chat-notice', label: '공지사항', icon: 'more', action: 'notice' },
     ],
     settlement: [
-      { key: 'settlement-search', label: '정산 검색', icon: 'search', action: 'search' },
       { key: 'settlement-create', label: '정산 생성', icon: 'plus', action: 'create' },
       { key: 'settlement-list', label: '정산 목록', icon: 'receipt', action: 'list' },
     ],
     gallery: [
-      { key: 'gallery-search', label: '갤러리 검색', icon: 'search', action: 'search' },
       { key: 'gallery-upload-image', label: '이미지 업로드', icon: 'gallery', action: 'uploadImage' },
       { key: 'gallery-upload-file', label: '파일 업로드', icon: 'fileUpload', action: 'uploadFile' },
       { key: 'gallery-upload-link', label: '링크 업로드', icon: 'link', action: 'uploadLink' },
     ],
     places: [
-      { key: 'places-search', label: '장소 검색', icon: 'search', action: 'search' },
       { key: 'places-register', label: '장소 등록', icon: 'mapPinPlus', action: 'register' },
     ],
-    memo: [
-      { key: 'memo-search', label: '메모 검색', icon: 'search', action: 'search' },
-    ],
+    memo: [],
     content: [
       { key: 'content-register', label: '컨텐츠 등록', icon: 'plus', action: 'register' },
     ],
-    archive: [
-      { key: 'archive-search', label: '보관함 검색', icon: 'search', action: 'search' },
-    ],
+    archive: [],
   };
 
   const bentoSideNav = React.createElement(React.Fragment, null,
@@ -2357,6 +2362,15 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
       React.createElement('button', { type: 'button', className: bentoClass('side-nav-close-btn'), 'aria-label': '메뉴 닫기', onClick: () => setIsSideNavOpen(false) },
         React.createElement(TabIcon, { id: 'x' })
       )
+    ),
+    React.createElement('button', {
+      type: 'button',
+      className: bentoClass('side-nav-global-search'),
+      'aria-label': '통합검색',
+      onClick: () => { setIsSideNavOpen(false); setActiveTab('search'); },
+    },
+      React.createElement('span', { className: bentoClass('side-nav-global-search-icon'), 'aria-hidden': 'true' }, React.createElement(TabIcon, { id: 'search' })),
+      React.createElement('span', { className: bentoClass('side-nav-global-search-label') }, '통합검색')
     ),
     React.createElement('div', { className: bentoClass('side-nav-group renewal-shell-side-nav-group is-main') },
       BENTO_MAIN_ITEMS.map(item => {
@@ -2458,7 +2472,9 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
       React.createElement('main', { className: activeTab === 'calendar' ? 'bp-app-shell is-bento-home' : `renewal-shell-main v2-destination ${hasFullScreen ? `v2-${activeTab}` : (activeTab === 'records' ? `is-records v2-records-${recordsSubTab}` : `is-${activeTab}`)}` },
 
         activeTab === 'calendar'
-          ? React.createElement(CalendarPane, { calendarContext, recordsContext, onOpenDate: setDateModalDate, onChangeView, calendarName, onOpenSearch: () => handleSelectMoreItem('search'), onOpenMore: () => setIsSideNavOpen(true) })
+          ? React.createElement(CalendarPane, { calendarContext, recordsContext, onOpenDate: setDateModalDate, onChangeView, calendarName, onOpenSearch: () => setActiveTab('search'), onOpenMore: () => setIsSideNavOpen(true) })
+          : activeTab === 'search'
+          ? React.createElement(SearchPage, { modalProps: moreContext.modalProps.search, searchExtra, onClose: () => setActiveTab('calendar') })
           : activeTab === 'chat'
           ? React.createElement(ChatPane, { chatContext, onChangeView, onOpenAppSettings, onOpenSideNav: () => setIsSideNavOpen(true), onRegisterMenuActions: getMenuActionsRegistrar('chat') })
           : activeTab === 'memo'

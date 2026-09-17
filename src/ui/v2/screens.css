@@ -2117,3 +2117,8 @@
 @media (min-width: 768px) {
   .v2-design .v2-page-header { padding-left: 24px; padding-right: 24px; }
 }
+@media (min-width: 1200px) {
+  /* The side rail is permanently visible on desktop, so the drawer toggle is
+   * intentionally omitted from the page header. */
+  .v2-design .v2-page-header .bp-header-actions .bp-icon-btn[aria-label$=" 메뉴"] { display: none; }
+}
