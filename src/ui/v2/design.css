@@ -1501,6 +1501,19 @@
   }
 }
 
+/* Each tab's own extra menu (previously reachable only via that tab's mobile-only
+ * "메뉴" hamburger, e.g. chat's 공지사항) surfaces at the bottom of the side-nav instead,
+ * but only once the side-nav itself is a persistent PC rail (>=1200px) -- below that it
+ * stays hidden so the mobile drawer isn't cluttered with a group it never had before. */
+.v2-design .bp-side-nav-group.bp-is-tab-menu {
+  display: none;
+}
+@media (min-width: 1200px) {
+  .v2-design .bp-side-nav-group.bp-is-tab-menu {
+    display: block;
+  }
+}
+
 /* --------------------------------------------------------------------------
  * V2 glass system — shared utilities + chrome surfaces
  * Concept: vivid + glassy (Apple-like). Future V2 polish must stay vivid+glassy.

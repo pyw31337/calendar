@@ -121,6 +121,7 @@ export function ChatRoomView({
   onEditMessage,
   onAddPinnedNotice,
   onRemovePinnedNotice,
+  onRegisterNoticeOpener,
   onBack,
   isHeaderVisible,
   handleChatScroll,
@@ -305,6 +306,27 @@ export function ChatRoomView({
 
   const pinnedNotices = getPinnedNotices(calendar);
   const revealedMsgId = useTapRevealedMsgId();
+
+  // v2 shell (PC): the side-nav is always visible, so it has nowhere to route a "메뉴" button
+  // click the way the mobile drawer does -- instead it wants to call this room's own 공지사항
+  // (pinned notice) panel directly from a bottom-of-sidebar item. That panel's open/closed state
+  // is local to this component (noticePanelMode above), so hand the opener out via a plain
+  // callback-ref registration instead of threading a new "open" prop through every render (this
+  // component re-renders on every message; a stable registration effect is cheaper and simpler
+  // than a boolean/counter prop). onRegisterNoticeOpener is optional -- the default (non-v2)
+  // shell never passes it.
+  React.useEffect(() => {
+    if (typeof onRegisterNoticeOpener !== 'function') return undefined;
+    onRegisterNoticeOpener(() => {
+      if (pinnedNotices.length > 0) {
+        setNoticePanelMode('list');
+      } else {
+        setNoticeInput('');
+        setNoticePanelMode('add');
+      }
+    });
+    return () => onRegisterNoticeOpener(null);
+  }, [onRegisterNoticeOpener, pinnedNotices.length]);
 
   // Read-up-to-here marker: capture the read timestamp as it was BEFORE this view marks
   // everything read, so the marker can be placed at the right spot in the message list.

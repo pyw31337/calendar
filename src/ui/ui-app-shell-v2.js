@@ -1028,7 +1028,7 @@ export function buildRenewalChatContext(calendar, deps) {
  * uses) rather than the main bundle, so this needs the same "wait for the chunk, then render"
  * step the 더보기 tab's share/manual/anniversaries entries needed (`buildRenewalMoreContext`).
  */
-function ChatPane({ chatContext, onChangeView, onOpenAppSettings, onOpenSideNav }) {
+function ChatPane({ chatContext, onChangeView, onOpenAppSettings, onOpenSideNav, onRegisterNoticeOpener }) {
   const React = window.React;
   const [loaded, setLoaded] = React.useState(() => !!(window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChatRoomView));
   React.useEffect(() => {
@@ -1054,6 +1054,7 @@ function ChatPane({ chatContext, onChangeView, onOpenAppSettings, onOpenSideNav 
       onChangeView,
       onShare: chatContext.onOpenChatShare,
       onOpenAppSettings,
+      onRegisterNoticeOpener,
     }),
     chatContext.isChatShareOpen && React.createElement(ShareModal, {
       calendar: chatContext.calendar, shareType: 'chat', showToast: chatContext.showToast,
@@ -2027,6 +2028,14 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   const [selectedMoreItem, setSelectedMoreItem] = React.useState(null);
   const [isSideNavOpen, setIsSideNavOpen] = React.useState(false);
   const [isSideNavCollapsed, setIsSideNavCollapsed] = React.useState(false);
+  // PC (>=1200px): the side-nav is always visible, so its own bottom section is where each tab's
+  // "메뉴" content that used to live behind a mobile-only hamburger now lives instead. Chat is the
+  // one tab with content unique to it (공지사항/pinned notice) -- ChatRoomView registers its own
+  // opener here via onRegisterNoticeOpener (ui-chat-room.js) since that panel's state is local to
+  // it. A ref (not state) because the side-nav button just needs to call whatever's current when
+  // clicked; re-rendering the whole shell on every chat message (which changes the opener's
+  // closure) would be wasteful.
+  const chatNoticeOpenerRef = React.useRef(null);
   // Which of the 4 real 더보기 modals (share/anniversaries/manual/app-settings) is open, if any -- local to
   // this shell (see buildRenewalMoreContext's doc comment for why this doesn't reuse
   // CalendarApp's own isShareOpen/isAnniversariesOpen/isGuideOpen state).
@@ -2324,6 +2333,22 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
         React.createElement('span', { className: bentoClass('side-nav-item-title') }, '사용자 매뉴얼')
       )
     ),
+    // PC-only (hidden on the mobile drawer via CSS, see .bp-side-nav-group.bp-is-tab-menu):
+    // the side-nav is always visible on PC, so this is where each tab's own extra menu content
+    // (previously reachable only through that tab's mobile-only "메뉴" hamburger) lives instead.
+    // Chat is the only tab with content unique to it right now (공지사항) -- Settlement/Gallery's
+    // own "메뉴" buttons only ever opened the generic 앱 설정 modal, already covered by 설정 below.
+    activeTab === 'chat' && React.createElement('div', { className: bentoClass('side-nav-group renewal-shell-side-nav-group is-tab-menu') },
+      React.createElement('button', {
+        type: 'button',
+        className: bentoClass('side-nav-item renewal-shell-side-nav-quick-item'),
+        title: '공지사항',
+        onClick: () => chatNoticeOpenerRef.current?.(),
+      },
+        React.createElement('span', { className: bentoClass('side-nav-item-icon') }, React.createElement(TabIcon, { id: 'more' })),
+        React.createElement('span', { className: bentoClass('side-nav-item-title') }, '공지사항')
+      )
+    ),
     React.createElement('div', { className: bentoClass('side-nav-footer renewal-shell-side-nav-footer') },
       React.createElement('button', { type: 'button', className: bentoClass('side-nav-item renewal-shell-side-nav-quick-item'), title: '공유', onClick: () => openMoreModalById('share') },
         React.createElement('span', { className: bentoClass('side-nav-item-icon') }, React.createElement(TabIcon, { id: 'share' })),
@@ -2350,7 +2375,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
         activeTab === 'calendar'
           ? React.createElement(CalendarPane, { calendarContext, recordsContext, onOpenDate: setDateModalDate, onChangeView, calendarName, onOpenSearch: () => handleSelectMoreItem('search'), onOpenMore: () => setIsSideNavOpen(true) })
           : activeTab === 'chat'
-          ? React.createElement(ChatPane, { chatContext, onChangeView, onOpenAppSettings, onOpenSideNav: () => setIsSideNavOpen(true) })
+          ? React.createElement(ChatPane, { chatContext, onChangeView, onOpenAppSettings, onOpenSideNav: () => setIsSideNavOpen(true), onRegisterNoticeOpener: fn => { chatNoticeOpenerRef.current = fn; } })
           : activeTab === 'memo'
           ? React.createElement(MemoPane, { recordsContext, onChangeView, onOpenAppSettings, onOpenSideNav: () => setIsSideNavOpen(true) })
           : activeTab === 'places'
