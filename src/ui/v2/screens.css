@@ -1139,6 +1139,13 @@
   background: #fff !important;
   border-bottom: 1px solid #eceaf5 !important;
 }
+/* Content page's category row ("전체 개별등록 클래식/전통 ...") still scrolls horizontally by
+ * touch/drag -- only the visible scrollbar track is hidden (scrollbar-width:none is set inline
+ * for Firefox; ::-webkit-scrollbar needs a real stylesheet rule, not an inline style). */
+.v2-design .v2-content .bp-cat-scroll-row::-webkit-scrollbar,
+.v2-design .v2-archive .bp-cat-scroll-row::-webkit-scrollbar {
+  display: none;
+}
 .v2-design .v2-content .content-card,
 .v2-design .v2-content [class*="culture-card"],
 .v2-design .v2-archive .history-card,

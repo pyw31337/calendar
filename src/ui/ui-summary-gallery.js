@@ -4377,7 +4377,11 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
   // 자리가 계속 있어야 하며, 개수만 보고 매번 나타났다 사라지는 건 "전체 / 개별등록 / 장르..."
   // 로 항상 구성해 달라던 요청과 어긋난다.
   const categoryChipRow = /*#__PURE__*/React.createElement("div", {
-    style: { display: 'flex', gap: '6px', padding: '0 16px 12px', overflowX: 'auto', flexShrink: 0, alignItems: 'center' }
+    // className only for the ::-webkit-scrollbar hide rule (inline style/scrollbarWidth
+    // can't reach pseudo-elements) -- the row still scrolls by touch swipe or drag, the
+    // scrollbar itself is just visually hidden, per the v2 design system request.
+    className: "bp-cat-scroll-row",
+    style: { display: 'flex', gap: '6px', padding: '0 16px 12px', overflowX: 'auto', flexShrink: 0, alignItems: 'center', scrollbarWidth: 'none', msOverflowStyle: 'none' }
   },
     [
       { value: '', label: '전체', count: searchFilteredItems.length },
