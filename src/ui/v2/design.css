@@ -1060,6 +1060,37 @@
   }
 }
 
+/* Range (연일 다일) festival bars: one spanning grid child per week row (see
+ * computeFestivalBars/festivalBars in ui-app-shell-v2.js), NOT nested inside .bp-day-bar-stack.
+ * The general "hide by default, show only inside .bp-day-bar-stack" progressive-disclosure
+ * rule above (.v2-design .bp-day-anniversary .bp-day-anniversary-label { display: none }) would
+ * otherwise also match this label and never get un-hidden -- give it its own always-applicable
+ * visibility instead of relying on that container-scoped toggle. */
+.v2-design .festival-bar-desktop .bp-day-anniversary-label {
+  display: block !important;
+  font-size: 0.56rem !important;
+  font-weight: 800 !important;
+  line-height: 1.15 !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+@media (min-width: 1200px) {
+  .v2-design .festival-bar-desktop .bp-day-anniversary-label { font-size: 0.58rem !important; }
+}
+/* Keep the festival-bar desktop/mobile split on the same breakpoint as every other v2
+ * anniversary badge (768px) instead of app.css's default-shell breakpoint (640px), which would
+ * otherwise show the PC banner between 641-767px while solo badges already show the mobile bar. */
+@media (max-width: 767px) {
+  .v2-design .festival-bar-desktop { display: none !important; }
+  .v2-design .festival-bar-mobile { display: flex !important; }
+}
+@media (min-width: 768px) {
+  .v2-design .festival-bar-desktop { display: flex !important; }
+  .v2-design .festival-bar-mobile { display: none !important; }
+}
+
 /* Holiday + 모임확정 on one row (e.g. 추석 연휴 | 모임확정) */
 .v2-design .bp-day-head-row {
   display: flex;

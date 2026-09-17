@@ -98,12 +98,7 @@ test('V2 PC polish keeps wider rail, fluid content, 3x3 gallery, and participant
   assert.match(design, /min-width:\s*1\.85em/);
   assert.match(design, /bp-day-bar-stack/);
   assert.match(design, /\.bp-p-dot::after[\s\S]*font-size:\s*0\.6rem/);
-  assert.match(design, /bp-day-anniversary\.bp-start/);
-  assert.match(design, /bp-day-anniversary\.bp-mid/);
-  assert.match(design, /bp-day-anniversary\.bp-end/);
-  assert.match(design, /bp-day-anniversary\.bp-solo/);
-  assert.match(design, /border-radius:\s*999px 0 0 999px/);
-  assert.match(design, /border-radius:\s*0 999px 999px 0/);
+  assert.match(design, /\.festival-bar-desktop \.bp-day-anniversary-label/);
   assert.match(design, /--v2-fs-base:\s*0\.94rem/);
   assert.match(design, /--v2-fs-md:\s*0\.90rem/);
   assert.match(design, /--v2-fs-title:\s*1\.2rem/);
@@ -115,8 +110,9 @@ test('V2 PC polish keeps wider rail, fluid content, 3x3 gallery, and participant
   assert.match(shell, /anns\.slice\(0, 4\)\.map/);
   assert.match(shell, /day-head-row/);
   assert.match(shell, /day-meeting-pill/);
-  assert.match(shell, /anniversarySpanRole/);
-  assert.match(shell, /day-anniversary \$\{role\}/);
+  assert.match(shell, /computeFestivalBars/);
+  assert.match(shell, /festival-bar-desktop/);
+  assert.match(shell, /festival-bar-mobile/);
   assert.match(shell, /chat-bubble-modules/);
   assert.match(shell, /ChatBubbleFrame/);
   // V2 badge colors: 모임확정/일정·여행 = --cal-schedule; 기념일 = --cal-anniversary (pink)
