@@ -18,6 +18,19 @@ const bentoClass = value => String(value || '').split(/\s+/).filter(Boolean).map
 
 const BULK_NO_PARTICIPANT_ID = '__none__';
 
+// Keep comment animation staggered across renders without using Math.random(), which would
+// reshuffle the gallery every state update. A stable key gives each thumbnail its own phase and
+// cadence while still making the effect feel asynchronous.
+function galleryCommentMotion(photo, index) {
+  const key = String(photo?.id || photo?.mediaKey || photo?.full || photo?.thumb || index);
+  let hash = 17;
+  for (let i = 0; i < key.length; i += 1) hash = (hash * 31 + key.charCodeAt(i)) % 997;
+  return {
+    '--gallery-comment-delay': `${-((hash % 230) / 100).toFixed(2)}s`,
+    '--gallery-comment-duration': `${(2.7 + (hash % 160) / 100).toFixed(2)}s`,
+  };
+}
+
 import { getInitialAppView } from '../core/app-routing-state.js';
 import { isRenewalShellEnabled } from '../core/app-feature-flags.js';
 import { bindUiComponentAliases } from '../core/app-ui-wrappers.js';
@@ -30,7 +43,7 @@ import {
   getTrulyConfirmedMeetings, getActiveAvailabilities, getActiveParticipants,
   calculateSettlementBalance, formatBalanceBadge,
 } from '../core/app-domain-helpers.js';
-import { getMeetingOwnedPhotoMessageIds, isChatRenderableMessage } from '../core/gallery-data.js';
+import { getMeetingOwnedPhotoMessageIds, isChatRenderableMessage, isMemeKeyboardPhotoEntry } from '../core/gallery-data.js';
 import { computeKoreanHolidaysForYear, getKoreanSolarTermsForYear } from '../core/app-calendar-holidays.js';
 import { getAnniversariesForDate } from '../core/app-anniversary-dates.js';
 import { buildMainCalendarScreenState } from '../core/app-calendar-screen-state.js';
@@ -846,7 +859,17 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
   const visibleMessages = allMessages.filter(message => isChatRenderableMessage(message, meetingPhotoMessageIds));
   const messages = visibleMessages.slice(-3);
   const memos = Array.isArray(calendarContext?.memos) ? latestRows(calendarContext.memos).slice(0, 2) : [];
-  const photos = Array.isArray(calendarContext?.galleryPhotoIndex?.items) ? calendarContext.galleryPhotoIndex.items.slice(0, 9) : [];
+  const photos = Array.isArray(calendarContext?.galleryPhotoIndex?.items)
+    ? calendarContext.galleryPhotoIndex.items
+      .filter(photo => !isMemeKeyboardPhotoEntry(photo))
+      .slice()
+      .sort((a, b) => {
+        const aTime = timestampMs(a?.timestamp ?? a?.createdAt ?? a?.updatedAt ?? a?.uploadedAt ?? a?.messageTimestamp);
+        const bTime = timestampMs(b?.timestamp ?? b?.createdAt ?? b?.updatedAt ?? b?.uploadedAt ?? b?.messageTimestamp);
+        return bTime - aTime || String(b?.id || b?.mediaKey || '').localeCompare(String(a?.id || a?.mediaKey || ''));
+      })
+      .slice(0, 9)
+    : [];
   const places = Array.isArray(calendarContext?.places) ? latestRows(calendarContext.places).slice(0, 2) : [];
   const participants = Array.isArray(calendarContext?.calendar?.participants) ? calendarContext.calendar.participants : [];
   const participantFor = row => participants.find(p => p && (p.id === row?.participantId || p.name === row?.senderName || p.name === row?.author));
@@ -933,6 +956,7 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
         className: bentoClass(`thumb ${photo.commentCount > 0 ? 'gallery-comment-heartbeat' : ''}`.trim()),
         key: photo.id || photo.mediaKey || i,
         onClick: () => calendarContext.setActiveLightbox?.(photoLightbox(photo, photos)),
+        style: photo.commentCount > 0 ? galleryCommentMotion(photo, i) : undefined,
         'aria-label': `사진 ${i + 1} 크게 보기`
       },
         React.createElement('img', { src: photo.thumb || photo.thumbnailUrl || photo.thumbUrl || photo.full || photo.url || photo.imageUrl || photo.downloadURL, alt: '', loading: 'lazy' }),

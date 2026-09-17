@@ -433,7 +433,9 @@ function isMemeKeyboardMessage(msg) {
 export function isMemeKeyboardPhotoEntry(photo) {
   if (!photo) return false;
   if (photo.uploadSource === 'meme') return true;
-  return isMemePoolAssetUrl(photo.full) || isMemePoolAssetUrl(photo.thumb);
+  const directUrls = [photo.full, photo.thumb, photo.thumbnailUrl, photo.thumbUrl, photo.url, photo.imageUrl, photo.downloadURL];
+  if (directUrls.some(isMemePoolAssetUrl)) return true;
+  return [photo.imageUrls, photo.thumbUrls].some(urls => Array.isArray(urls) && urls.some(isMemePoolAssetUrl));
 }
 
 export function composeGalleryPhotos({
