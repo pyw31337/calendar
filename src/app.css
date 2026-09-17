@@ -5351,6 +5351,22 @@ select.form-select {
   border-radius: var(--radius-md) var(--radius-md) 0 0 !important;
 }
 
+/* The same layer module on desktop: picker sheets become centered dialogs;
+ * narrow viewports keep the bottom-attached sheet treatment above. */
+@media (min-width: 768px) {
+  .bottom-sheet-overlay {
+    align-items: center !important;
+    padding: 16px;
+  }
+  .bottom-sheet {
+    width: min(520px, calc(100vw - 48px));
+    max-height: min(86vh, 760px);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 24px 64px rgba(36, 22, 68, .24);
+    animation: motion-modal-pop var(--motion-base) var(--motion-ease-spring) both;
+  }
+}
+
 
 
 
