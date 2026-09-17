@@ -17,6 +17,11 @@
  * `<path d="M0 0h24v24H0z" fill="none"/>` background/hit-area rect every source icon carried
  * stripped out (it paints nothing and just adds DOM weight).
  *
+ * IMPORTANT when rendering `on`: the filled variant is already a solid shape, so any consumer
+ * must set `strokeWidth: 0` (and `fill: 'currentColor'`) whenever it renders `def.on` -- keeping
+ * the usual 2px stroke on top of a filled path blurs/thickens its edges. Only the `off` (outline)
+ * variant uses `strokeWidth: 2, fill: 'none'`. See TabIcon in ui-app-shell-v2.js for the pattern.
+ *
  * Keep this registry the single place new icons get added -- many of these are not wired up to
  * any UI yet (kept in reserve per explicit request: "당장 사용하지 않는 아이콘도 잘 보관해뒀다가
  * 필요한 상황에 잘 꺼내서 활용해줘"). See TABLER_ICONS_MISSING at the bottom for icons this pass
