@@ -6,6 +6,7 @@
 
 import './v2/reference-home.css';
 import './v2/design.css';
+import './v2/aurora-theme.css';
 import { renderMemoScreen, renderPlacesScreen, renderSettlementScreen, renderChatScreen, renderGalleryScreen, renderContentScreen, renderArchiveScreen, PageHeader } from './v2/screens.js';
 import { authorFor, latestRows, timestampMs, photoLightbox } from './v2/view-data.js';
 import { ChatBubbleFrame, NameColorPill, ReplyQuote } from './v2/chat-bubble-modules.js';
