@@ -4159,6 +4159,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
       legacyView: __settlementLegacyTree,
       calendar,
       onBack,
+      onSearch: () => setIsSettlementSearchOpen(value => !value),
       onShare: onOpenShare,
       onMenu: () => setIsSettlementMenuOpen(true),
       onCompose: () => {

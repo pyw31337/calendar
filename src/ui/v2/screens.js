@@ -144,10 +144,10 @@ function pageSubtitle(calendar, trailing) {
   return name || extra || undefined;
 }
 
-export function PageHeader({ title, subtitle, count, onBack, onSearch, searchLabel, onShare, onMenu, extra, centerSubtitle = false, children }) {
+export function PageHeader({ title, subtitle, count, onBack, onSearch, searchLabel, onShare, onMenu, extra, centerSubtitle = true, children }) {
   return h(
     'header',
-    { className: `bp-header v2-page-header${centerSubtitle ? ' v2-page-header--archive' : ''}` },
+    { className: `bp-header v2-page-header${centerSubtitle ? ' v2-page-header--centered' : ''}` },
     h(
       'div',
       { className: 'bp-header-row' },
@@ -160,10 +160,11 @@ export function PageHeader({ title, subtitle, count, onBack, onSearch, searchLab
         'div',
         { className: `v2-header-title-block${centerSubtitle ? ' v2-header-title-left' : ''}` },
         h('div', { className: 'bp-header-title' }, title),
+        centerSubtitle && count ? h('span', { className: 'bp-header-count' }, count) : null,
         !centerSubtitle && subtitle ? h('div', { className: 'bp-header-sub' }, subtitle) : null
       ),
       centerSubtitle && subtitle ? h('div', { className: 'bp-header-center-sub' }, subtitle) : null,
-      count && h('span', { className: 'bp-header-count' }, count),
+      !centerSubtitle && count && h('span', { className: 'bp-header-count' }, count),
       h(
         'div',
         { className: 'bp-header-actions' },
@@ -631,6 +632,8 @@ export function SettlementScreen(p) {
             title: '정산',
             subtitle: p.subtitle || pageSubtitle(p.calendar),
             onBack: p.onBack,
+            onSearch: p.onSearch,
+            searchLabel: '정산 검색',
             onShare: p.onShare,
             onMenu: p.onMenu,
           }),
@@ -651,6 +654,8 @@ export function SettlementScreen(p) {
           title: '정산',
           subtitle: p.subtitle || pageSubtitle(p.calendar),
           onBack: p.onBack,
+          onSearch: p.onSearch,
+          searchLabel: '정산 검색',
           onShare: p.onShare,
           onMenu: p.onMenu,
         }),
@@ -675,8 +680,10 @@ export function SettlementScreen(p) {
       h(PageHeader, {
         title: '정산',
         subtitle: p.subtitle || pageSubtitle(p.calendar),
-        onBack: p.onBack,
-        onShare: p.onShare,
+      onBack: p.onBack,
+      onSearch: p.onSearch,
+      searchLabel: '정산 검색',
+      onShare: p.onShare,
         onMenu: p.onMenu,
       }),
       h(
