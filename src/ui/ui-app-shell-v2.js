@@ -892,8 +892,9 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
   const visibleMessages = allMessages.filter(message => isChatRenderableMessage(message, meetingPhotoMessageIds));
   const messages = visibleMessages.slice(-3);
   const memos = Array.isArray(calendarContext?.memos) ? latestRows(calendarContext.memos).slice(0, 2) : [];
-  const photos = Array.isArray(calendarContext?.galleryPhotoIndex?.items)
-    ? calendarContext.galleryPhotoIndex.items
+  const photoItems = calendarContext?.galleryPhotoIndex?.items;
+  const photos = React.useMemo(() => (Array.isArray(photoItems)
+    ? photoItems
       .filter(photo => !isMemeKeyboardPhotoEntry(photo))
       .slice()
       .sort((a, b) => {
@@ -902,7 +903,7 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
         return bTime - aTime || String(b?.id || b?.mediaKey || '').localeCompare(String(a?.id || a?.mediaKey || ''));
       })
       .slice(0, 9)
-    : [];
+    : []), [photoItems]);
   const places = Array.isArray(calendarContext?.places) ? latestRows(calendarContext.places).slice(0, 2) : [];
   const participants = Array.isArray(calendarContext?.calendar?.participants) ? calendarContext.calendar.participants : [];
   const participantFor = row => participants.find(p => p && (p.id === row?.participantId || p.name === row?.senderName || p.name === row?.author));

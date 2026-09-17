@@ -314,25 +314,27 @@ export function useGalleryPhotoIndex({ React, calendarId, activeView, projectId,
   const loadPage = React.useCallback(async (page = 1, options = {}) => {
     if (!calendarId) return false;
     const requestedPage = Math.max(1, Number(page) || 1);
+    const includeTotal = options.includeTotal !== false;
     setState(previous => ({ ...previous, loading: true }));
     try {
       if (options.force) invalidatePhotoIndexCache(calendarId);
       const [items, total] = await Promise.all([
         fetchPhotoIndexPage({ calendarId, projectId, page: requestedPage, decodeDocument, force: Boolean(options.force) }),
-        fetchPhotoIndexCount({ calendarId, projectId })
+        includeTotal ? fetchPhotoIndexCount({ calendarId, projectId }) : Promise.resolve(null)
       ]);
       setState(previous => {
         const merged = reconcilePhotoIndexTagItems(calendarId, previous.items, items);
+        const resolvedTotal = includeTotal ? Math.max(0, Number(total) || 0) : Math.max(previous.total || 0, merged.length);
         return {
-          status: total > 0 ? 'ready' : 'fallback',
+          status: (includeTotal ? total > 0 : merged.length > 0) ? 'ready' : 'fallback',
           items: merged,
-          total: Math.max(0, Number(total) || 0),
+          total: resolvedTotal,
           page: requestedPage,
           loading: false,
           complete: false
         };
       });
-      return total > 0;
+      return includeTotal ? total > 0 : items.length > 0;
     } catch (error) {
       console.warn('photo index page load failed:', error);
       // A network/read failure is not evidence that this calendar has no canonical index.
@@ -410,9 +412,24 @@ export function useGalleryPhotoIndex({ React, calendarId, activeView, projectId,
       setState({ status: 'idle', items: [], total: 0, page: 1, loading: false, complete: false });
       return undefined;
     }
-    if (activeView === 'history') void loadAll();
-    else void loadPage(1);
-    return undefined;
+    // Let the calendar paint first. The home strip is supplementary content, and its preview
+    // only needs one page; deferring it avoids competing with the initial calendar/chat data.
+    const run = () => {
+      if (activeView === 'history') void loadAll();
+      else void loadPage(1, { includeTotal: !shouldLoadPreview });
+    };
+    if (!shouldLoadPreview) {
+      run();
+      return undefined;
+    }
+    let cancelled = false;
+    const start = () => { if (!cancelled) run(); };
+    if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
+      const idleId = window.requestIdleCallback(start, { timeout: 900 });
+      return () => { cancelled = true; window.cancelIdleCallback?.(idleId); };
+    }
+    const timerId = setTimeout(start, 350);
+    return () => { cancelled = true; clearTimeout(timerId); };
   }, [calendarId, activeView, loadPage, loadAll]);
   return { ...state, loadPage, loadAll, patchItems };
 }
