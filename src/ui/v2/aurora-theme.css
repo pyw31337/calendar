@@ -37,7 +37,7 @@
     radial-gradient(ellipse 58% 42% at 18% 72%, rgba(128, 25, 224, 0.9) 0%, transparent 64%),
     radial-gradient(ellipse 52% 46% at 82% 24%, rgba(18, 205, 240, 0.92) 0%, transparent 62%),
     radial-gradient(ellipse 40% 38% at 56% 54%, rgba(54, 4, 253, 0.8) 0%, transparent 68%) !important;
-  mix-blend-mode: screen !important;
+  mix-blend-mode: screen;
   animation: bp-reactbits-aurora-flow 6.1s ease-in-out infinite alternate !important;
   /* No will-change here (unlike the ::before/::after drift layers) -- transform/opacity already
      get their own compositing layer once animated, and pairing `will-change: transform` with
@@ -63,7 +63,7 @@
 }
 .v2-design .bp-dday-compact-badge {
   border: 0 !important;
-  box-shadow: none !important;
+  box-shadow: none;
 }
 .v2-design .bp-dday-compact::before,
 .v2-design .bp-dday-chip::before {
@@ -92,7 +92,7 @@
 .v2-design .bp-hero-zone .bp-renewal-shell-header-icon-btn {
   background: rgba(255,255,255,0.16) !important;
   border: 1px solid rgba(255,255,255,0.55) !important;
-  color: #fff !important;
+  color: #fff;
   backdrop-filter: blur(16px) saturate(160%) !important;
   -webkit-backdrop-filter: blur(16px) saturate(160%) !important;
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.52), 0 5px 16px rgba(20, 7, 74, 0.22) !important;
@@ -141,30 +141,30 @@
 
 /* V2 calendar readability: larger navigation and weekday rhythm. */
 .v2-design .bp-cal-month-title {
-  font-size: clamp(1.05rem, 1.4vw, 1.32rem) !important;
-  line-height: 1.35 !important;
+  font-size: clamp(1.05rem, 1.4vw, 1.32rem);
+  line-height: 1.35;
   letter-spacing: -0.02em;
-  padding: 0.2rem 0 !important;
+  padding: 0.2rem 0;
 }
 .v2-design .bp-cal-month-nav {
-  gap: 0.18rem !important;
+  gap: 0.18rem;
   align-items: center;
 }
 .v2-design .bp-cal-nav-btn,
 .v2-design .bp-cal-today-btn {
   min-width: 2.15rem;
   min-height: 2.15rem;
-  padding: 0.42rem 0.62rem !important;
-  font-size: 0.86rem !important;
-  line-height: 1 !important;
+  padding: 0.42rem 0.62rem;
+  font-size: 0.86rem;
+  line-height: 1;
 }
 .v2-design .bp-cal-today-btn {
   min-width: 3.55rem;
-  font-weight: 800 !important;
+  font-weight: 800;
 }
 .v2-design .bp-cal-weekdays {
   margin-top: 0.25rem;
-  margin-bottom: 0.5rem !important;
+  margin-bottom: 0.5rem;
 }
 .v2-design .bp-weekday-label {
   font-size: clamp(0.78rem, 1vw, 0.94rem) !important;
@@ -177,7 +177,7 @@
 .v2-design .bp-day-bar-stack .bp-day-anniversary {
   background: #fce7f3 !important;
   color: #ec4899 !important;
-  border-color: transparent !important;
+  border-color: transparent;
 }
 .v2-design .bp-day-bar-stack .bp-day-anniversary .bp-day-anniversary-label {
   color: inherit !important;
@@ -208,12 +208,12 @@
 }
 .v2-design .bp-day-bar-stack .bp-day-bar,
 .v2-design .bp-day-bar-stack .bp-day-schedule {
-  background: #dff7ee !important;
-  color: #059669 !important;
+  background: #dff7ee;
+  color: #059669;
 }
 .v2-design .bp-day-bar-stack .bp-day-bar-label,
 .v2-design .bp-day-bar-stack .bp-day-schedule-label {
-  color: #059669 !important;
+  color: #059669;
 }
 .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-birthday .bp-day-anniversary-label {
   color: #ec4899 !important;
@@ -255,7 +255,7 @@
 @media (min-width: 560px) {
   .v2-design .bp-dot-row { gap: 4px !important; }
   .v2-design .bp-p-dot {
-    min-height: 1.25rem !important;
+    min-height: 1.25rem;
     padding: 0.12rem 0.48rem !important;
     font-size: 0.66rem !important;
     line-height: 1.2 !important;
@@ -286,14 +286,14 @@
   .v2-design .bp-dday-toggle-wrap { padding: 18px 20px !important; }
   .v2-design .bp-dday-strip { padding: 0 20px 18px !important; }
   .v2-design .bp-bento-grid {
-    display: grid !important;
-    grid-template-columns: 1fr 1fr !important;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 16px !important;
     padding: 20px !important;
   }
   .v2-design .bp-bento-card {
     border-radius: 16px !important;
-    box-shadow: 0 1px 4px rgba(30,27,46,0.07) !important;
+    box-shadow: 0 1px 4px rgba(30,27,46,0.07);
     padding: 18px !important;
   }
   .v2-design .bp-bento-card:first-of-type.bp-wide { grid-column: 1 / -1; }
@@ -318,6 +318,6 @@
     max-width: none !important;
     margin: 0 !important;
   }
-  .v2-design .bp-hero-zone { margin-left: 0 !important; margin-right: 0 !important; border-radius: 0 !important; }
-  .v2-design .bp-bento-grid { padding-left: 0 !important; padding-right: 0 !important; }
+  .v2-design .bp-hero-zone { margin-left: 0; margin-right: 0; border-radius: 0 !important; }
+  .v2-design .bp-bento-grid { padding-left: 0; padding-right: 0; }
 }
