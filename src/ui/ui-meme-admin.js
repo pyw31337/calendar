@@ -9,6 +9,29 @@
 import { uploadMemePoolAssets, generateMemePoolId, parseHashtagInput, describeMemeUploadError } from '../core/meme-pool.js';
 import { formatChatFileSize } from '../core/chat-file-attachments.js';
 import { ImageUploadOverlay } from './ui-overlays.js';
+import { TABLER_ICONS } from './v2/tabler-icons.js';
+
+/**
+ * Icon unification pass (2026-09-17): see the matching comment in ui-admin-dashboard.js -- same
+ * local, admin-scoped swap onto the single-source-of-truth TABLER_ICONS registry, leaving the
+ * shared ui-icons.js exports (used by non-admin screens too) untouched.
+ */
+function makeAdminTablerIcon(iconKey, defaultSize) {
+  return function AdminTablerIconInstance(props) {
+    const React = window.React;
+    const def = TABLER_ICONS[iconKey];
+    if (!def) return null;
+    const size = (props && props.size) || defaultSize;
+    return /*#__PURE__*/React.createElement('svg', {
+      xmlns: 'http://www.w3.org/2000/svg', width: size, height: size, viewBox: '0 0 24 24',
+      fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round',
+      'aria-hidden': true,
+      dangerouslySetInnerHTML: { __html: def.off },
+    });
+  };
+}
+const AdminSmallXIcon = makeAdminTablerIcon('x', 24);
+const AdminTrashIcon = makeAdminTablerIcon('trash', 24);
 
 // 브라우저당 동시 연결 제한(HTTP/1.1 기준 6개)은 Firebase Storage가 HTTP/2로 응답해 실제로는
 // 훨씬 많이 동시에 보낼 수 있다. 이전 "5장씩"은 700장을 올리는 데 140번의 대기 라운드가
@@ -58,8 +81,8 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
   const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
   const upsertRemote = __deps.memePoolUpsertRemote || GATHER_APP_UTILS.memePoolUpsertRemote;
   const deleteRemote = __deps.memePoolDeleteRemote || GATHER_APP_UTILS.memePoolDeleteRemote;
-  const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
-  const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
+  const TrashIcon = AdminTrashIcon;
+  const SmallXIcon = AdminSmallXIcon;
   const ConfirmDialog = __comp.ConfirmDialog || __deps.ConfirmDialog;
   const fileInputRef = React.useRef(null);
   const [uploadProgress, setUploadProgress] = React.useState(null); // { done, total } | null
@@ -485,6 +508,7 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
         /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
           /*#__PURE__*/React.createElement("button", {
             type: "button", className: "btn btn-danger", onClick: handleDelete, disabled: isDeleting,
+            title: "이미지 삭제", "aria-label": "이미지 삭제",
             style: { height: '44px', width: '44px', padding: 0, flexShrink: 0 }
           }, TrashIcon ? /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }) : "삭제"),
           /*#__PURE__*/React.createElement("button", {
