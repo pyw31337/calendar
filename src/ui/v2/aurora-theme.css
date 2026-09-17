@@ -20,6 +20,22 @@
     radial-gradient(ellipse 28% 26% at 12% 70%, rgba(18, 205, 240, 0.58) 0%, transparent 48%),
     radial-gradient(ellipse 70% 64% at 90% 28%, rgba(54, 4, 253, 0.84) 0%, transparent 54%) !important;
 }
+.v2-design .bp-hero-zone > .bp-hero-aurora {
+  inset: -42% !important;
+  opacity: 0.92 !important;
+  background:
+    radial-gradient(ellipse 58% 42% at 18% 72%, rgba(18, 205, 240, 0.9) 0%, transparent 64%),
+    radial-gradient(ellipse 52% 46% at 82% 24%, rgba(128, 25, 224, 0.92) 0%, transparent 62%),
+    radial-gradient(ellipse 40% 38% at 56% 54%, rgba(54, 4, 253, 0.8) 0%, transparent 68%) !important;
+  mix-blend-mode: screen !important;
+  animation: bp-reactbits-aurora-flow 6.1s ease-in-out infinite alternate !important;
+  will-change: transform, opacity;
+}
+@keyframes bp-reactbits-aurora-flow {
+  0% { transform: translate3d(-12%, 8%, 0) scale(1); opacity: 0.72; }
+  50% { transform: translate3d(10%, -10%, 0) scale(1.16); opacity: 0.98; }
+  100% { transform: translate3d(18%, 12%, 0) scale(1.04); opacity: 0.8; }
+}
 .v2-design .bp-dday-compact {
   background: rgba(255, 255, 255, 0.16) !important;
   border: 1px solid rgba(255, 255, 255, 0.52) !important;
