@@ -391,20 +391,20 @@
 .v2-design .bp-event-sheet [class*="resize"] {
   display: none !important;
 }
-/* Pill tabs (참석|장소|정산|사진) approximating .bp-sheet-tabs.
-   UnderlineTabs ships heavy inline styles — override with !important. */
+/* Standard tab treatment: match the gallery's 사진|링크|파일 underline tabs across every
+   destination and the date sheet. Keep equal-width segments and a single active underline. */
 .v2-design .bp-event-sheet .underline-tabs,
 .v2-design .bp-event-sheet .underline-tabs--flush,
 .v2-design .bp-event-sheet [role="tablist"] {
   display: flex !important;
   gap: 0 !important;
-  background: var(--bg-primary, #fafafc) !important;
-  border-radius: 9999px !important;
-  padding: 3px !important;
-  margin: 8px 16px 4px !important;
-  border: none !important;
-  border-bottom: none !important;
-  width: auto !important;
+  background: var(--bg-card, #fff) !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--border-subtle, #eceaf5) !important;
+  width: 100% !important;
   box-sizing: border-box !important;
 }
 .v2-design .bp-event-sheet .underline-tabs button,
