@@ -458,12 +458,12 @@ export function PlacesScreen(p) {
               title: '장소',
               subtitle: p.subtitle || pageSubtitle(p.calendar),
               brand: pageBrand(p.calendar),
-              count: p.countLabel,
               onBack: p.onBack,
               onSearch: toggleSearch,
               searchLabel: '장소 검색',
               onShare: p.onShare,
               onMenu: p.onMenu,
+              extra: mapToggle,
             },
             isSearchOpen && h(Search, {
               value: p.searchQuery || '',
@@ -471,7 +471,6 @@ export function PlacesScreen(p) {
               placeholder: '장소 검색',
             })
           ),
-          h('div', { className: 'v2-places-map-toggle' }, mapToggle),
           mapOpen && slots.map && h('div', { className: 'v2-map-panel' }, slots.map),
           slots.filters,
           slots.toolbar,
@@ -493,12 +492,12 @@ export function PlacesScreen(p) {
             title: '장소',
             subtitle: p.subtitle || pageSubtitle(p.calendar),
             brand: pageBrand(p.calendar),
-            count: p.countLabel,
             onBack: p.onBack,
             onSearch: toggleSearch,
             searchLabel: '장소 검색',
             onShare: p.onShare,
             onMenu: p.onMenu,
+            extra: mapToggle,
           },
           isSearchOpen && h(Search, {
             value: p.searchQuery || '',
@@ -506,7 +505,6 @@ export function PlacesScreen(p) {
             placeholder: '장소 검색',
           })
         ),
-        h('div', { className: 'v2-places-map-toggle' }, mapToggle),
         wrapLegacy(p.legacyView, 'v2-legacy-body v2-places-legacy'),
         h(Fab, { label: '장소 등록', onClick: p.onCompose })
       ),
@@ -526,12 +524,12 @@ export function PlacesScreen(p) {
           title: '장소',
           subtitle: p.subtitle || pageSubtitle(p.calendar),
           brand: pageBrand(p.calendar),
-          count: `등록 ${(p.places || []).length}곳`,
           onBack: p.onBack,
           onSearch: toggleSearch,
           searchLabel: '장소 검색',
           onShare: p.onShare,
           onMenu: p.onMenu,
+          extra: mapToggle,
         },
         isSearchOpen && h(Search, {
           value: p.searchQuery,
@@ -557,7 +555,6 @@ export function PlacesScreen(p) {
           )
         )
       ),
-      h('div', { className: 'v2-places-map-toggle' }, mapToggle),
       mapOpen && h('div', { className: 'v2-map-panel' }, p.slots && p.slots.map),
       p.isBulkShareMode
         ? h('div', { className: 'v2-bulk-places' }, p.slots && p.slots.toolbar, p.slots && p.slots.list)

@@ -2174,7 +2174,6 @@ export function PlacesView({
       legacyView: __placesLegacyTree,
       calendar,
       searchQuery: listSearchQuery,
-      countLabel: `등록 ${(typeof filteredPlaces !== 'undefined' ? filteredPlaces : places).length}곳`,
       onBack,
       onShare: onSharePlaces,
       onMenu: () => setIsPlacesMenuOpen(true),
