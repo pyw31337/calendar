@@ -84,6 +84,10 @@ function formatChatHeaderTitle(...args) {
   const f = __gatherUiDeps().formatChatHeaderTitle || GATHER_APP_UTILS.formatChatHeaderTitle;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+function compactParticipantName(name) {
+  const value = String(name || '').trim();
+  return /^[가-힣]{3,4}$/.test(value) ? value.slice(1) : value;
+}
 function isEmojiOnlyChatText(...args) {
   const f = __gatherUiDeps().isEmojiOnlyChatText || GATHER_APP_UTILS.isEmojiOnlyChatText;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -1474,7 +1478,7 @@ export function ChatRoomView({
     }, /*#__PURE__*/React.createElement("span", {
       className: "chat-typing-name",
       style: { backgroundColor: participant.color || '#94A3B8' }
-    }, participant.name || '알수없음'), /*#__PURE__*/React.createElement("span", {
+    }, compactParticipantName(participant.name) || '알수없음'), /*#__PURE__*/React.createElement("span", {
       className: "chat-typing-bubble",
       "aria-hidden": "true"
     }, [0, 1, 2].map(index => /*#__PURE__*/React.createElement("span", {
@@ -1679,7 +1683,7 @@ export function ChatRoomView({
         },
           /*#__PURE__*/React.createElement("span", {
             style: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--reply-accent)' }
-          }, `${participantsMap[chatReplyTarget.participantId]?.name || '알수없음'}님에게 답장`),
+          }, `${compactParticipantName(participantsMap[chatReplyTarget.participantId]?.name) || '알수없음'}님에게 답장`),
           /*#__PURE__*/React.createElement("span", {
             style: {
               fontSize: 'var(--font-size-md)',
@@ -1742,6 +1746,10 @@ export function ChatRoomView({
           setChatInput(e.target.value);
           announceTyping(e.target.value);
           autoGrowTextarea(e.target, MAX_COMPOSER_INPUT_HEIGHT);
+          requestAnimationFrame(() => {
+            const nextHeight = Math.max(44, Math.min(MAX_COMPOSER_INPUT_HEIGHT, e.target.scrollHeight + 4));
+            setComposerInputHeight(height => Math.max(height, nextHeight));
+          });
         },
         onPaste: handlePasteImagesChat,
         onKeyDown: e => {
