@@ -352,31 +352,49 @@
   .v2-design .bp-bento-grid { padding-left: 0; padding-right: 0; }
 }
 
-/* Home layout contract: the calendar is always a single full-width row.
- * Only the four summary sections below it change density: 4 columns on PC,
- * 2 on tablet, and 1 on mobile. This is intentionally last because the
- * reference mock CSS contains older 3-column/2-column bento rules. */
+/* Home layout contract: the calendar is always a single full-width row. The
+ * remaining cards use auto-fit on PC (naturally 4 or 2 columns as width
+ * permits), then collapse to one column on mobile. */
 .v2-design .bp-bento-grid {
   display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 20px;
 }
 .v2-design .bp-bento-grid > .bp-renewal-home-summary-section:first-child {
   grid-column: 1 / -1;
 }
-@media (min-width: 1200px) {
-  .v2-design .bp-bento-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+@media (min-width: 768px) {
+  /* PC: the rail is present; the content grid itself fluidly resolves to 4
+   * columns on wide screens and 2 on narrower PC/tablet widths. */
+  .v2-design {
+    padding-left: 280px;
   }
-}
-@media (min-width: 768px) and (max-width: 1199px) {
-  .v2-design .bp-bento-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
+  .v2-design .bp-side-nav {
+    display: flex;
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: 280px;
+    transform: none;
   }
+  .v2-design .bp-side-nav-backdrop,
+  .v2-design .bp-side-nav-toggle-btn,
+  .v2-design .bp-side-nav-close-btn { display: none; }
 }
 @media (max-width: 767px) {
+  /* Mobile: no rail; every home section is a vertical stack and the hero
+   * consumes the full available width. */
+  .v2-design { padding-left: 0; }
+  .v2-design .bp-side-nav {
+    display: none;
+  }
   .v2-design .bp-bento-grid {
     grid-template-columns: minmax(0, 1fr);
     gap: 16px;
+  }
+  .v2-design .bp-hero-zone {
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+    border-radius: 0;
   }
 }
