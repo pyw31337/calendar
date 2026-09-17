@@ -874,38 +874,17 @@ export function ChatScreen(p) {
       h(
         'div',
         { className: 'v2-chat-compose-row' },
-        slots.attach,
         clone(slots.textarea, {
           className: 'bp-composer-input',
           placeholder: slots.textarea.props.placeholder || '메시지를 입력하세요...',
           style: {
             ...slots.textarea.props.style,
-            minHeight: '36px',
-            height: '36px',
+            minHeight: '44px',
             padding: '8px 14px',
-            borderRadius: '9999px',
+            borderRadius: 'var(--radius-md)',
             resize: 'none',
           },
         }),
-        slots.emoji
-          ? clone(slots.emoji, {
-              className: 'v2-tool-icon-btn',
-              'aria-label': '이모티콘',
-              title: '이모티콘',
-            }, h(DesignIcon, { name: 'emoji', size: 18 }))
-          : null,
-        h(
-          'button',
-          {
-            type: 'button',
-            className: `v2-tool-icon-btn${toolsOpen ? ' is-active' : ''}`,
-            'aria-label': '밈',
-            'aria-pressed': toolsOpen,
-            title: '밈',
-            onClick: () => setToolsOpen(value => !value),
-          },
-          h(DesignIcon, { name: 'meme', size: 18 })
-        ),
         clone(
           slots.send,
           { 'aria-label': '메시지 전송', className: 'bp-composer-send' },
@@ -922,6 +901,26 @@ export function ChatScreen(p) {
         h(
           'div',
           { className: 'v2-chat-tool-icons', role: 'toolbar', 'aria-label': '채팅 입력 도구' },
+          slots.emoji
+            ? clone(slots.emoji, {
+                className: 'v2-tool-icon-btn',
+                'aria-label': '이모티콘',
+                title: '이모티콘',
+              }, h(DesignIcon, { name: 'emoji', size: 18 }))
+            : null,
+          h('button', {
+            type: 'button',
+            className: `v2-tool-icon-btn${toolsOpen ? ' is-active' : ''}`,
+            'aria-label': '밈', 'aria-pressed': toolsOpen, title: '밈',
+            onClick: () => setToolsOpen(value => !value),
+          }, h(DesignIcon, { name: 'meme', size: 18 })),
+          slots.attach
+            ? clone(slots.attach, {
+                className: 'v2-tool-icon-btn',
+                'aria-label': '사진 또는 파일 첨부',
+                title: '사진 또는 파일 첨부',
+              }, h(DesignIcon, { name: 'paperclip', size: 18 }))
+            : null,
           slots.paste
             ? clone(slots.paste, {
                 className: 'v2-tool-icon-btn',
@@ -929,19 +928,10 @@ export function ChatScreen(p) {
                 title: '붙여넣기',
               }, h(DesignIcon, { name: 'paste', size: 18 }))
             : null,
-          p.onOpenGallery
-            ? h(
-                'button',
-                {
-                  type: 'button',
-                  className: 'v2-tool-icon-btn',
-                  'aria-label': '사진첨부',
-                  title: '사진첨부',
-                  onClick: p.onOpenGallery,
-                },
-                h(DesignIcon, { name: 'photo', size: 18 })
-              )
-            : null
+          slots.attach ? null : (p.onOpenGallery
+            ? h('button', { type: 'button', className: 'v2-tool-icon-btn',
+                'aria-label': '사진 또는 파일 첨부', title: '사진 또는 파일 첨부', onClick: p.onOpenGallery },
+              h(DesignIcon, { name: 'paperclip', size: 18 })) : null)
         )
       ),
       toolsOpen && slots.memes
