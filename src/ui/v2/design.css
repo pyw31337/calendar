@@ -1118,6 +1118,30 @@
   display: none !important;
 }
 
+/* Collapsed PC rail (76px, see @media (min-width: 1200px) above): icon-only, per the user's
+ * "모바일 같이 화면이 축소됨에 따라 아이콘만 남겨주는 형식" request applied to the manual collapse
+ * toggle too -- text labels, metadata pills/badges, and the tab-specific submenu group (which
+ * needs label text to make sense) all hide, leaving just the centered icon rail. */
+.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item-title,
+.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item-meta,
+.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item-badge,
+.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item-sub,
+.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-text,
+.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-collapse-label,
+.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-group.bp-is-tab-menu {
+  display: none !important;
+}
+.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item {
+  justify-content: center !important;
+  gap: 0 !important;
+}
+.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand {
+  justify-content: center !important;
+}
+.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-collapse-btn {
+  justify-content: center !important;
+}
+
 /* No highlighted background/border on the active item -- the bolder title weight below (vs. the
  * lighter default weight on every other item) plus the brand-color text/icon is the only
  * distinction, so the active state reads as "this label is heavier", not "this row has a card
@@ -1435,4 +1459,56 @@
 .v2-design .bp-side-nav-item {
   border: 1px solid transparent;
   box-sizing: border-box !important;
+}
+
+/* -----------------------------------------------------------------------------------------------
+ * Custom checkbox/radio controls (Tabler icon set) -- v2-only, CSS-only substitution.
+ * The user's icon request explicitly said native browser checkbox/radio UI should never appear
+ * once the matching Tabler icons exist. The only 2 native <input type="checkbox"/"radio"> left in
+ * the app (src/ui/ui-event-modals.js: settlement expense picker checkbox, D-Day mode radio) live
+ * in a component shared with the default (pre-v2) shell, so we can't just delete/replace the JSX
+ * with a wrapper (default shell must render byte-identical to its pre-v2 rollback). Instead this
+ * repaints them purely via CSS, scoped to .v2-design so the default shell is completely untouched:
+ * `-webkit-mask-image`/`mask-image` uses the icon's own outline (off)/filled (on) shape as an alpha
+ * mask, and `background-color` (not the SVG's own color) paints it -- so checked vs unchecked state
+ * swaps mask AND color together via the :checked selector, matching TabIcon's off=muted/on=brand-
+ * purple convention exactly, with zero extra encoded-color SVG variants needed.
+ * ----------------------------------------------------------------------------------------------- */
+.v2-design .settlement-expense-checkbox,
+.v2-design .gather-native-radio {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background-color: var(--text-muted, #8A8798);
+  cursor: pointer;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+.v2-design .settlement-expense-checkbox {
+  -webkit-mask-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJibGFjayIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik05IDEybDIgMmw0IC00IiAvPjxwYXRoIGQ9Ik0xMiAzYzcuMiAwIDkgMS44IDkgOWMwIDcuMiAtMS44IDkgLTkgOWMtNy4yIDAgLTkgLTEuOCAtOSAtOWMwIC03LjIgMS44IC05IDkgLTkiIC8+PC9zdmc+");
+  mask-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJibGFjayIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik05IDEybDIgMmw0IC00IiAvPjxwYXRoIGQ9Ik0xMiAzYzcuMiAwIDkgMS44IDkgOWMwIDcuMiAtMS44IDkgLTkgOWMtNy4yIDAgLTkgLTEuOCAtOSAtOWMwIC03LjIgMS44IC05IDkgLTkiIC8+PC9zdmc+");
+}
+.v2-design .settlement-expense-checkbox:checked {
+  background-color: var(--brand, #7C2FE5);
+  -webkit-mask-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iYmxhY2siIHN0cm9rZT0ibm9uZSI+PHBhdGggZD0iTTEyIDJjLS4yMTggMCAtLjQzMiAuMDAyIC0uNjQyIC4wMDVsLS42MTYgLjAxN2wtLjI5OSAuMDEzbC0uNTc5IC4wMzRsLS41NTMgLjA0NmMtNC43ODUgLjQ2NCAtNi43MzIgMi40MTEgLTcuMTk2IDcuMTk2bC0uMDQ2IC41NTNsLS4wMzQgLjU3OWMtLjAwNSAuMDk4IC0uMDEgLjE5OCAtLjAxMyAuMjk5bC0uMDE3IC42MTZsLS4wMDQgLjMxOGwtLjAwMSAuMzI0YzAgLjIxOCAuMDAyIC40MzIgLjAwNSAuNjQybC4wMTcgLjYxNmwuMDEzIC4yOTlsLjAzNCAuNTc5bC4wNDYgLjU1M2MuNDY0IDQuNzg1IDIuNDExIDYuNzMyIDcuMTk2IDcuMTk2bC41NTMgLjA0NmwuNTc5IC4wMzRjLjA5OCAuMDA1IC4xOTggLjAxIC4yOTkgLjAxM2wuNjE2IC4wMTdsLjY0MiAuMDA1bC42NDIgLS4wMDVsLjYxNiAtLjAxN2wuMjk5IC0uMDEzbC41NzkgLS4wMzRsLjU1MyAtLjA0NmM0Ljc4NSAtLjQ2NCA2LjczMiAtMi40MTEgNy4xOTYgLTcuMTk2bC4wNDYgLS41NTNsLjAzNCAtLjU3OWMuMDA1IC0uMDk4IC4wMSAtLjE5OCAuMDEzIC0uMjk5bC4wMTcgLS42MTZsLjAwNSAtLjY0MmwtLjAwNSAtLjY0MmwtLjAxNyAtLjYxNmwtLjAxMyAtLjI5OWwtLjAzNCAtLjU3OWwtLjA0NiAtLjU1M2MtLjQ2NCAtNC43ODUgLTIuNDExIC02LjczMiAtNy4xOTYgLTcuMTk2bC0uNTUzIC0uMDQ2bC0uNTc5IC0uMDM0YTI4LjA1OCAyOC4wNTggMCAwIDAgLS4yOTkgLS4wMTNsLS42MTYgLS4wMTdsLS4zMTggLS4wMDRsLS4zMjQgLS4wMDF6bTIuMjkzIDcuMjkzYTEgMSAwIDAgMSAxLjQ5NyAxLjMybC0uMDgzIC4wOTRsLTQgNGExIDEgMCAwIDEgLTEuMzIgLjA4M2wtLjA5NCAtLjA4M2wtMiAtMmExIDEgMCAwIDEgMS4zMiAtMS40OTdsLjA5NCAuMDgzbDEuMjkzIDEuMjkybDMuMjkzIC0zLjI5MnoiIC8+PC9zdmc+");
+  mask-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iYmxhY2siIHN0cm9rZT0ibm9uZSI+PHBhdGggZD0iTTEyIDJjLS4yMTggMCAtLjQzMiAuMDAyIC0uNjQyIC4wMDVsLS42MTYgLjAxN2wtLjI5OSAuMDEzbC0uNTc5IC4wMzRsLS41NTMgLjA0NmMtNC43ODUgLjQ2NCAtNi43MzIgMi40MTEgLTcuMTk2IDcuMTk2bC0uMDQ2IC41NTNsLS4wMzQgLjU3OWMtLjAwNSAuMDk4IC0uMDEgLjE5OCAtLjAxMyAuMjk5bC0uMDE3IC42MTZsLS4wMDQgLjMxOGwtLjAwMSAuMzI0YzAgLjIxOCAuMDAyIC40MzIgLjAwNSAuNjQybC4wMTcgLjYxNmwuMDEzIC4yOTlsLjAzNCAuNTc5bC4wNDYgLjU1M2MuNDY0IDQuNzg1IDIuNDExIDYuNzMyIDcuMTk2IDcuMTk2bC41NTMgLjA0NmwuNTc5IC4wMzRjLjA5OCAuMDA1IC4xOTggLjAxIC4yOTkgLjAxM2wuNjE2IC4wMTdsLjY0MiAuMDA1bC42NDIgLS4wMDVsLjYxNiAtLjAxN2wuMjk5IC0uMDEzbC41NzkgLS4wMzRsLjU1MyAtLjA0NmM0Ljc4NSAtLjQ2NCA2LjczMiAtMi40MTEgNy4xOTYgLTcuMTk2bC4wNDYgLS41NTNsLjAzNCAtLjU3OWMuMDA1IC0uMDk4IC4wMSAtLjE5OCAuMDEzIC0uMjk5bC4wMTcgLS42MTZsLjAwNSAtLjY0MmwtLjAwNSAtLjY0MmwtLjAxNyAtLjYxNmwtLjAxMyAtLjI5OWwtLjAzNCAtLjU3OWwtLjA0NiAtLjU1M2MtLjQ2NCAtNC43ODUgLTIuNDExIC02LjczMiAtNy4xOTYgLTcuMTk2bC0uNTUzIC0uMDQ2bC0uNTc5IC0uMDM0YTI4LjA1OCAyOC4wNTggMCAwIDAgLS4yOTkgLS4wMTNsLS42MTYgLS4wMTdsLS4zMTggLS4wMDRsLS4zMjQgLS4wMDF6bTIuMjkzIDcuMjkzYTEgMSAwIDAgMSAxLjQ5NyAxLjMybC0uMDgzIC4wOTRsLTQgNGExIDEgMCAwIDEgLTEuMzIgLjA4M2wtLjA5NCAtLjA4M2wtMiAtMmExIDEgMCAwIDEgMS4zMiAtMS40OTdsLjA5NCAuMDgzbDEuMjkzIDEuMjkybDMuMjkzIC0zLjI5MnoiIC8+PC9zdmc+");
+}
+.v2-design .gather-native-radio {
+  -webkit-mask-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJibGFjayIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik0xNSAxMWwtMyAzbC0zIC0zIiAvPjxwYXRoIGQ9Ik0xMiAzYTkgOSAwIDEgMCAwIDE4YTkgOSAwIDEgMCAwIC0xOCIgLz48L3N2Zz4=");
+  mask-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJibGFjayIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik0xNSAxMWwtMyAzbC0zIC0zIiAvPjxwYXRoIGQ9Ik0xMiAzYTkgOSAwIDEgMCAwIDE4YTkgOSAwIDEgMCAwIC0xOCIgLz48L3N2Zz4=");
+}
+.v2-design .gather-native-radio:checked {
+  background-color: var(--brand, #7C2FE5);
+  -webkit-mask-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iYmxhY2siIHN0cm9rZT0ibm9uZSI+PHBhdGggZD0iTTEyIDJjNS41MjMgMCAxMCA0LjQ3NyAxMCAxMHMtNC40NzcgMTAgLTEwIDEwYTEwIDEwIDAgMSAxIDAgLTIwbS0yLjI5MyA4LjI5M2ExIDEgMCAwIDAgLTEuNDE0IDEuNDE0bDMgM2ExIDEgMCAwIDAgMS40MTQgMGwzIC0zYTEgMSAwIDAgMCAwIC0xLjQxNGwtLjA5NCAtLjA4M2ExIDEgMCAwIDAgLTEuMzIgLjA4M2wtMi4yOTQgMi4yOTJ6IiAvPjwvc3ZnPg==");
+  mask-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iYmxhY2siIHN0cm9rZT0ibm9uZSI+PHBhdGggZD0iTTEyIDJjNS41MjMgMCAxMCA0LjQ3NyAxMCAxMHMtNC40NzcgMTAgLTEwIDEwYTEwIDEwIDAgMSAxIDAgLTIwbS0yLjI5MyA4LjI5M2ExIDEgMCAwIDAgLTEuNDE0IDEuNDE0bDMgM2ExIDEgMCAwIDAgMS40MTQgMGwzIC0zYTEgMSAwIDAgMCAwIC0xLjQxNGwtLjA5NCAtLjA4M2ExIDEgMCAwIDAgLTEuMzIgLjA4M2wtMi4yOTQgMi4yOTJ6IiAvPjwvc3ZnPg==");
 }

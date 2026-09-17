@@ -170,12 +170,15 @@ function TabIcon({ id, active }) {
   const React = window.React;
   const def = TABLER_ICONS[id];
   if (def) {
+    const isFilled = active && def.on;
     return React.createElement('svg', {
       width: 16, height: 16, viewBox: '0 0 24 24', 'aria-hidden': 'true',
-      fill: active && def.on ? 'currentColor' : 'none', stroke: 'currentColor',
-      strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round',
+      fill: isFilled ? 'currentColor' : 'none', stroke: 'currentColor',
+      // Filled (on) glyphs are solid shapes already -- keeping a 2px stroke on top of the fill
+      // blurs/thickens the edges, so drop the stroke to 0 whenever we render the filled variant.
+      strokeWidth: isFilled ? 0 : 2, strokeLinecap: 'round', strokeLinejoin: 'round',
       style: { display: 'block', shapeRendering: 'geometricPrecision' },
-      dangerouslySetInnerHTML: { __html: active && def.on ? def.on : def.off },
+      dangerouslySetInnerHTML: { __html: isFilled ? def.on : def.off },
     });
   }
   const nodes = TAB_ICON_NODES[id] || [];

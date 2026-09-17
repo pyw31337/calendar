@@ -1215,6 +1215,10 @@ export function AnniversaryModal({
                     value: modeVal,
                     checked: ddayMode === modeVal,
                     onChange: () => setDdayMode(modeVal),
+                    // className-only hook: v2 shell (.renewal-shell.v2-design, design.css) repaints
+                    // this with the custom Tabler radio icon via CSS; default shell leaves it as a
+                    // native radio since no rule there targets this class.
+                    className: 'gather-native-radio',
                     style: { margin: 0 }
                   }),
                   /*#__PURE__*/React.createElement("span", { style: { lineHeight: '1.25' } }, modeLabel, /*#__PURE__*/React.createElement("br"), modeSub)
