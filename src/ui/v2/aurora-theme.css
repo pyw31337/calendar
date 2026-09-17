@@ -351,3 +351,32 @@
   .v2-design .bp-hero-zone { margin-left: 0; margin-right: 0; border-radius: 0 !important; }
   .v2-design .bp-bento-grid { padding-left: 0; padding-right: 0; }
 }
+
+/* Home layout contract: the calendar is always a single full-width row.
+ * Only the four summary sections below it change density: 4 columns on PC,
+ * 2 on tablet, and 1 on mobile. This is intentionally last because the
+ * reference mock CSS contains older 3-column/2-column bento rules. */
+.v2-design .bp-bento-grid {
+  display: grid;
+  gap: 20px;
+}
+.v2-design .bp-bento-grid > .bp-renewal-home-summary-section:first-child {
+  grid-column: 1 / -1;
+}
+@media (min-width: 1200px) {
+  .v2-design .bp-bento-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+@media (min-width: 768px) and (max-width: 1199px) {
+  .v2-design .bp-bento-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+}
+@media (max-width: 767px) {
+  .v2-design .bp-bento-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+}
