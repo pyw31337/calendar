@@ -1253,10 +1253,11 @@
   font-size: 0.62rem !important;
   font-weight: 800;
   line-height: 1.3;
-  color: var(--brand, #7C2FE5);
-  background: var(--brand-soft, #F3EEFF);
-  border: 1px solid var(--v2-glass-purple-border, rgba(124, 47, 229, 0.26));
-  box-shadow: var(--v2-glass-purple-inset, inset 0 1px 0 rgba(255,255,255,0.72));
+  /* Simple solid capsule — no border/inset highlight, matching the other name-style pills. */
+  color: #fff;
+  background: var(--brand, #7C2FE5);
+  border: none;
+  box-shadow: none;
   padding: 2px 8px;
   border-radius: 9999px;
   margin-left: 2px;
@@ -1267,18 +1268,24 @@
   display: none !important;
 }
 
+/* No highlighted background/border on the active item -- the bolder title weight below (vs. the
+ * lighter default weight on every other item) plus the brand-color text/icon is the only
+ * distinction, so the active state reads as "this label is heavier", not "this row has a card
+ * behind it". */
 .v2-design .bp-side-nav-item.bp-is-active {
-  background: var(--v2-glass-purple-fill, rgba(124, 47, 229, 0.10)) !important;
-  color: var(--brand, #7C2FE5) !important;
-  border: 1px solid var(--v2-glass-purple-border, rgba(124, 47, 229, 0.26)) !important;
-  box-shadow: var(--v2-glass-purple-inset, inset 0 1px 0 rgba(255,255,255,0.72)) !important;
-  backdrop-filter: blur(12px) saturate(160%);
-  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 .v2-design .bp-side-nav-item.bp-is-active .bp-side-nav-item-icon,
 .v2-design .bp-side-nav-item.bp-is-active .bp-side-nav-item-title {
   color: var(--brand, #7C2FE5) !important;
+}
+.v2-design .bp-side-nav-item.bp-is-active .bp-side-nav-item-title {
+  font-weight: 800 !important;
 }
 
 /* Chat author pill in side-nav — solid color + white text (mock) */
@@ -1293,13 +1300,14 @@
 }
 
 .v2-design .bp-side-nav-date-chip {
-  background: #f5f2fb !important;
+  /* Plain text, no capsule -- this is a metadata label (다음 정산 예정일 등), not a name/count
+   * badge, so it shouldn't compete visually with the ones that are. */
+  background: none !important;
+  border: none !important;
   color: #6b6580 !important;
-  border: 1px solid var(--v2-card-border, #eceaf5) !important;
   font-size: 0.6rem !important;
   font-weight: 700 !important;
-  padding: 2px 7px !important;
-  border-radius: 9999px !important;
+  padding: 2px 2px !important;
   max-width: none;
 }
 
@@ -1396,15 +1404,19 @@
   font-weight: 800 !important;
   line-height: 1.3 !important;
   padding: 2px 8px !important;
-  color: var(--brand, #7C2FE5) !important;
-  background: var(--brand-soft, #F3EEFF) !important;
+  /* Simple solid capsule (matches the other name-style pills, e.g. chat-name-pill) instead of a
+   * light tinted fill + border + inset highlight. */
+  color: #fff !important;
+  background: var(--brand, #7C2FE5) !important;
 }
 .v2-design .bp-side-nav-group {
   padding: 6px 10px !important;
 }
 .v2-design .bp-side-nav-item {
   font-size: 14px !important;
-  font-weight: 700 !important;
+  /* Lighter than the active item's 800 (above) on purpose -- with the highlighted background
+   * removed, the weight contrast is what now carries "this is the current page". */
+  font-weight: 500 !important;
   line-height: 1.25 !important;
   padding: 11px 12px !important;
   margin: 3px 0 !important;
@@ -1429,10 +1441,13 @@
   font-size: 11px !important;
   font-weight: 600 !important;
 }
+/* Same spec as the name-style pills (cal-badge / chat-name-pill) -- was slightly smaller
+ * (1px 6px vs 2px 7px), which read as an unrelated, differently-designed badge. */
 .v2-design .bp-side-nav-item-badge {
   font-size: 10px !important;
   font-weight: 800 !important;
-  padding: 1px 6px !important;
+  padding: 2px 7px !important;
+  border-radius: 9999px !important;
 }
 .v2-design .bp-side-nav-item-meta.bp-chat-name-pill,
 .v2-design .bp-side-nav-item-meta.chat-name-pill {
@@ -1441,7 +1456,7 @@
 }
 .v2-design .bp-side-nav-date-chip {
   font-size: 10px !important;
-  padding: 2px 7px !important;
+  padding: 2px 2px !important;
 }
 .v2-design .bp-side-nav-footer {
   padding: 10px 10px 16px !important;
