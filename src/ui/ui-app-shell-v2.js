@@ -134,41 +134,66 @@ function writeLocationState(tabId, subTabId, { push } = { push: true }) {
   window.dispatchEvent(new PopStateEvent('popstate'));
 }
 
+// The 8 nav-category icons (캘린더/채팅/정산/갤러리/장소/메모/컨텐츠/보관함) each have a
+// distinct OFF (inactive) and ON (active) glyph, unlike every other TAB_ICON_NODES entry below
+// (which is a single outline reused for both states, recolored by CSS). Stored as raw inner-SVG
+// markup strings (rendered via dangerouslySetInnerHTML in TabIcon) rather than as [tag, props]
+// node arrays, since these come from several different icon families with their own viewBoxes,
+// fill-rules and even one stroke-based icon (장소/off) -- transcribing them into node arrays by
+// hand would risk silently corrupting the path data. Each path already carries fill="currentColor"
+// (or the 장소/off icon's own stroke="currentColor"), so CSS `color` still recolors normally --
+// ON state gets the brand purple via .bp-side-nav-item.bp-is-active's existing color rule.
+const CATEGORY_ICON_DEFS = {
+  calendar: {
+    viewBox: '0 0 1024 1024',
+    off: '<path fill="currentColor" d="M880 184H712v-64c0-4.4-3.6-8-8-8h-56c-4.4 0-8 3.6-8 8v64H384v-64c0-4.4-3.6-8-8-8h-56c-4.4 0-8 3.6-8 8v64H144c-17.7 0-32 14.3-32 32v664c0 17.7 14.3 32 32 32h736c17.7 0 32-14.3 32-32V216c0-17.7-14.3-32-32-32m-40 656H184V460h656zM184 392V256h128v48c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8v-48h256v48c0 4.4 3.6 8 8 8h56c4.4 0 8-3.6 8-8v-48h128v136z"/>',
+    on: '<path fill="currentColor" d="M112 880c0 17.7 14.3 32 32 32h736c17.7 0 32-14.3 32-32V460H112zm768-696H712v-64c0-4.4-3.6-8-8-8h-56c-4.4 0-8 3.6-8 8v64H384v-64c0-4.4-3.6-8-8-8h-56c-4.4 0-8 3.6-8 8v64H144c-17.7 0-32 14.3-32 32v176h800V216c0-17.7-14.3-32-32-32"/>',
+  },
+  chat: {
+    viewBox: '0 0 16 16',
+    off: '<path fill="currentColor" d="M2 1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h9.586a2 2 0 0 1 1.414.586l2 2V2a1 1 0 0 0-1-1zm12-1a2 2 0 0 1 2 2v12.793a.5.5 0 0 1-.854.353l-2.853-2.853a1 1 0 0 0-.707-.293H2a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2z"/>',
+    on: '<path fill="currentColor" d="M14 0a2 2 0 0 1 2 2v12.793a.5.5 0 0 1-.854.353l-2.853-2.853a1 1 0 0 0-.707-.293H2a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2z"/>',
+  },
+  settlement: {
+    viewBox: '0 0 36 36',
+    off: '<path fill="currentColor" d="M19.72 10.47a11.65 11.65 0 0 0-6.31.52a.8.8 0 1 0 .59 1.49a10.1 10.1 0 0 1 5.44-.48a.8.8 0 1 0 .28-1.57Z"/><circle cx="25.38" cy="16.71" r="1.36" fill="currentColor"/><path fill="currentColor" d="M35.51 18.63a1 1 0 0 0-.84-.44a3.42 3.42 0 0 1-2.09-1.12a17.4 17.4 0 0 1-2.63-3.78l2.88-4.5A1.89 1.89 0 0 0 33 7a1.77 1.77 0 0 0-1.33-1a10.1 10.1 0 0 0-5.39.75a12.7 12.7 0 0 0-2.72 1.63a17 17 0 0 0-5.16-1.39C11.31 6.3 4.83 10.9 4 17a2.56 2.56 0 0 1-1.38-1.53a1.8 1.8 0 0 1 .14-1.4a1.2 1.2 0 0 1 .43-.43a1.08 1.08 0 0 0-1.12-1.85A3.3 3.3 0 0 0 .91 13a4 4 0 0 0-.33 3.08A4.76 4.76 0 0 0 3 18.95l.92.46a17.6 17.6 0 0 0 1.82 7l.17.38a23 23 0 0 0 3.29 5.09a1 1 0 0 0 .75.34h4.52a1 1 0 0 0 .92-1.38l-.39-.9l1.18.13a20.3 20.3 0 0 0 4 0c.37.6.77 1.2 1.21 1.79a1 1 0 0 0 .8.41h4.34a1 1 0 0 0 .92-1.39c-.17-.4-.34-.83-.47-1.2c-.18-.53-.32-1-.43-1.45A13.2 13.2 0 0 0 29.56 26a12.5 12.5 0 0 0 3 0a1 1 0 0 0 .78-.62l2.26-5.81a1 1 0 0 0-.09-.94m-3.78 5.44a11.4 11.4 0 0 1-2.35-.11a8.2 8.2 0 0 1-2.53-.87a1 1 0 0 0-.93 1.77a12 12 0 0 0 1.29.58a8 8 0 0 1-1.8 1.16l-1.06.48s.49 2.19.82 3.16h-2.38c-.24-.34-1.45-2.36-1.45-2.36l-.67.09a18.5 18.5 0 0 1-4.25.12c-.66-.06-1.76-.2-2.62-.35l-1.55-.27s.63 2.43.75 2.74h-2.58A20.6 20.6 0 0 1 7.76 26l-.18-.39A14.6 14.6 0 0 1 6 17.48c.54-5.19 6.12-9.11 12.19-8.54a15.5 15.5 0 0 1 5.08 1.48l.62.29l.5-.47A10.3 10.3 0 0 1 27 8.54a8.25 8.25 0 0 1 4-.65l-3.38 5.29l.25.5a21.2 21.2 0 0 0 3.31 4.84a6.5 6.5 0 0 0 2.14 1.39Z"/>',
+    on: '<path fill="currentColor" d="M35 18.87a5.8 5.8 0 0 1-2-1.26a21.6 21.6 0 0 1-3.29-4.84l3.39-5.29a.9.9 0 0 0-.54-1.38a9.67 9.67 0 0 0-5.13.72a12 12 0 0 0-3.13 2a17.4 17.4 0 0 0-5.7-1.67C11.8 6.52 5.27 10.9 4.54 17l-.14-.07a2.76 2.76 0 0 1-1.5-1.64a2 2 0 0 1 .15-1.55a1.3 1.3 0 0 1 .47-.48a1.08 1.08 0 1 0-1.12-1.85a3.45 3.45 0 0 0-1.23 1.25a4.16 4.16 0 0 0-.33 3.24a5 5 0 0 0 2.57 3l1 .54a18.6 18.6 0 0 0 2 7.3a23 23 0 0 0 3 4.79a1 1 0 0 0 .8.38h3.61a.52.52 0 0 0 .4-.75l-.22-.78a11 11 0 0 1-.33-1.18c.91.16 2.08.31 2.87.38a20 20 0 0 0 3.12 0c.39.7.79 1.33 1.15 1.85a.93.93 0 0 0 .77.41h3.11a.65.65 0 0 0 .61-.85c-.23-.74-.53-1.75-.71-2.37a16 16 0 0 0 3.75-1.76c.16-.11.32-.26.48-.39a14 14 0 0 1-2.42-1a.8.8 0 0 1 .74-1.42a11.6 11.6 0 0 0 3.18 1.1a13.3 13.3 0 0 0 2.68.12a1 1 0 0 0 .9-.66l1.73-4.44a1 1 0 0 0-.63-1.3m-21.21-7.28a.9.9 0 0 1-.3.05a.85.85 0 0 1-.3-1.64a12.4 12.4 0 0 1 6.69-.55a.85.85 0 1 1-.3 1.67a10.75 10.75 0 0 0-5.79.47m12.52 6.12a1.44 1.44 0 1 1 1.44-1.44a1.44 1.44 0 0 1-1.43 1.45Z"/>',
+  },
+  gallery: {
+    viewBox: '0 0 24 24',
+    off: '<path fill="currentColor" d="M14 9a1.5 1.5 0 1 1 3 0a1.5 1.5 0 0 1-3 0"/><path fill="currentColor" fill-rule="evenodd" d="M7.268 4.658a54.7 54.7 0 0 1 9.465 0l1.51.132a3.14 3.14 0 0 1 2.831 2.66a30.6 30.6 0 0 1 0 9.1a3.14 3.14 0 0 1-2.831 2.66l-1.51.131c-3.15.274-6.316.274-9.465 0l-1.51-.131a3.14 3.14 0 0 1-2.832-2.66a30.6 30.6 0 0 1 0-9.1a3.14 3.14 0 0 1 2.831-2.66zm9.335 1.495a53 53 0 0 0-9.206 0l-1.51.131A1.64 1.64 0 0 0 4.41 7.672a29 29 0 0 0-.311 5.17L7.97 8.97a.75.75 0 0 1 1.09.032l3.672 4.13l2.53-.844a.75.75 0 0 1 .796.21l3.519 3.91l.014-.08a29.1 29.1 0 0 0 0-8.656a1.64 1.64 0 0 0-1.478-1.388zm2.017 11.435l-3.349-3.721l-2.534.844a.75.75 0 0 1-.798-.213l-3.471-3.905l-4.244 4.243q.073.748.185 1.491a1.64 1.64 0 0 0 1.478 1.389l1.51.131c3.063.266 6.143.266 9.206 0l1.51-.131c.178-.016.35-.06.507-.128" clip-rule="evenodd"/>',
+    on: '<path fill="currentColor" fill-rule="evenodd" d="M7.268 4.658a54.7 54.7 0 0 1 9.465 0l1.51.132a3.14 3.14 0 0 1 2.831 2.66a30.6 30.6 0 0 1 0 9.1q-.061.397-.212.754c-.066.157-.27.181-.386.055l-4.421-4.864a.75.75 0 0 0-.792-.207l-2.531.844l-3.671-4.13A.75.75 0 0 0 7.97 8.97l-4.914 4.914a.246.246 0 0 1-.422-.159a30.6 30.6 0 0 1 .292-6.276a3.14 3.14 0 0 1 2.831-2.66zM14 9a1.5 1.5 0 1 1 3 0a1.5 1.5 0 0 1-3 0" clip-rule="evenodd"/><path fill="currentColor" d="M2.961 16.1a.25.25 0 0 0-.07.21l.035.24a3.14 3.14 0 0 0 2.831 2.66l1.51.131c3.15.274 6.316.274 9.466 0l1.51-.131a3.1 3.1 0 0 0 1.185-.347c.137-.071.16-.252.056-.366l-4.1-4.51a.25.25 0 0 0-.265-.07l-2.382.794a.75.75 0 0 1-.798-.213l-3.295-3.707a.25.25 0 0 0-.364-.01z"/>',
+  },
+  places: {
+    viewBox: '0 0 24 24',
+    off: '<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M12 13a3 3 0 1 0 0-6a3 3 0 0 0 0 6"/><path d="M17.8 13.938h-.011a7 7 0 1 0-11.464.144h-.016l.14.171q.15.19.3.371L12 21l5.13-6.248q.291-.314.54-.659z"/></g>',
+    on: '<path fill="currentColor" fill-rule="evenodd" d="M11.906 1.994a8 8 0 0 1 8.09 8.421a8 8 0 0 1-1.297 3.957a1 1 0 0 1-.133.204l-.108.129q-.268.365-.573.699l-5.112 6.224a1 1 0 0 1-1.545 0L5.982 15.26l-.002-.002a18 18 0 0 1-.309-.38l-.133-.163a1 1 0 0 1-.13-.202a7.995 7.995 0 0 1 6.498-12.518ZM15 9.997a3 3 0 1 1-5.999 0a3 3 0 0 1 5.999 0" clip-rule="evenodd"/>',
+  },
+  memo: {
+    viewBox: '0 0 24 24',
+    off: '<path fill="currentColor" d="M8 15.25a.75.75 0 0 0 0 1.5h8a.75.75 0 0 0 0-1.5zM7.25 12a.75.75 0 0 1 .75-.75h8a.75.75 0 0 1 0 1.5H8a.75.75 0 0 1-.75-.75M8 7.25a.75.75 0 0 0 0 1.5h4a.75.75 0 0 0 0-1.5z"/><path fill="currentColor" fill-rule="evenodd" d="M14.933 1.25H9.067c-.952 0-1.713 0-2.327.05c-.63.052-1.172.16-1.67.413a4.25 4.25 0 0 0-1.857 1.858c-.253.497-.361 1.04-.413 1.67c-.05.613-.05 1.374-.05 2.326v8.866c0 .952 0 1.713.05 2.327c.052.63.16 1.172.413 1.67a4.25 4.25 0 0 0 1.858 1.857c.497.253 1.04.361 1.67.413c.613.05 1.374.05 2.326.05h5.865c.953 0 1.714 0 2.328-.05c.63-.052 1.172-.16 1.67-.413a4.25 4.25 0 0 0 1.857-1.857c.253-.498.361-1.04.413-1.67c.05-.614.05-1.375.05-2.327V7.567c0-.952 0-1.713-.05-2.327c-.052-.63-.16-1.172-.413-1.67a4.25 4.25 0 0 0-1.857-1.857c-.498-.253-1.04-.361-1.67-.413c-.614-.05-1.375-.05-2.327-.05m-9.181 1.8c.25-.128.573-.21 1.11-.255c.546-.044 1.246-.045 2.238-.045h5.8c.992 0 1.692 0 2.238.045c.537.044.86.127 1.11.255a2.75 2.75 0 0 1 1.202 1.202c.128.25.21.573.255 1.11c.044.546.045 1.246.045 2.238v8.8c0 .992 0 1.692-.045 2.238c-.044.537-.127.86-.255 1.11a2.75 2.75 0 0 1-1.201 1.202c-.252.128-.574.21-1.111.255c-.546.044-1.246.045-2.238.045H9.1c-.992 0-1.692 0-2.238-.045c-.537-.044-.86-.127-1.11-.255a2.75 2.75 0 0 1-1.202-1.2c-.128-.252-.21-.574-.255-1.111c-.044-.546-.045-1.246-.045-2.238V7.6c0-.992 0-1.692.045-2.238c.044-.537.127-.86.255-1.11A2.75 2.75 0 0 1 5.752 3.05" clip-rule="evenodd"/>',
+    on: '<path fill="currentColor" fill-rule="evenodd" d="M9.067 1.25h5.866c.952 0 1.713 0 2.327.05c.63.052 1.172.16 1.67.413a4.25 4.25 0 0 1 1.857 1.858c.253.497.361 1.04.413 1.67c.05.613.05 1.374.05 2.326v8.866c0 .952 0 1.713-.05 2.327c-.052.63-.16 1.172-.413 1.67a4.25 4.25 0 0 1-1.857 1.857c-.498.253-1.04.361-1.67.413c-.614.05-1.375.05-2.327.05H9.067c-.952 0-1.713 0-2.327-.05c-.63-.052-1.172-.16-1.67-.413a4.25 4.25 0 0 1-1.857-1.857c-.253-.498-.361-1.04-.413-1.67c-.05-.614-.05-1.375-.05-2.327V7.567c0-.952 0-1.713.05-2.327c.052-.63.16-1.172.413-1.67a4.25 4.25 0 0 1 1.858-1.857c.497-.253 1.04-.361 1.67-.413c.613-.05 1.374-.05 2.326-.05M8 7.25a.75.75 0 0 0 0 1.5h4a.75.75 0 0 0 0-1.5zM7.25 12a.75.75 0 0 1 .75-.75h8a.75.75 0 0 1 0 1.5H8a.75.75 0 0 1-.75-.75M8 15.25a.75.75 0 0 0 0 1.5h8a.75.75 0 0 0 0-1.5z" clip-rule="evenodd"/>',
+  },
+  content: {
+    viewBox: '0 0 24 24',
+    off: '<path fill="currentColor" d="M2 6.75A2.75 2.75 0 0 1 4.75 4h14.5A2.75 2.75 0 0 1 22 6.75v10.5A2.75 2.75 0 0 1 19.25 20H4.75A2.75 2.75 0 0 1 2 17.25zM4.75 5.5c-.69 0-1.25.56-1.25 1.25v10.5c0 .69.56 1.25 1.25 1.25h14.5c.69 0 1.25-.56 1.25-1.25V6.75c0-.69-.56-1.25-1.25-1.25zM5 9.25C5 8.56 5.56 8 6.25 8h5.5c.69 0 1.25.56 1.25 1.25v5.5c0 .69-.56 1.25-1.25 1.25h-5.5C5.56 16 5 15.44 5 14.75zm9-.5a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 0 1.5h-3.5a.75.75 0 0 1-.75-.75m.75 2.25a.75.75 0 0 0 0 1.5h3.5a.75.75 0 0 0 0-1.5zM14 14.75a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 0 1.5h-3.5a.75.75 0 0 1-.75-.75"/>',
+    on: '<path fill="currentColor" d="M2 6.75A2.75 2.75 0 0 1 4.75 4h14.5A2.75 2.75 0 0 1 22 6.75v10.5A2.75 2.75 0 0 1 19.25 20H4.75A2.75 2.75 0 0 1 2 17.25zM6.25 8C5.56 8 5 8.56 5 9.25v5.5c0 .69.56 1.25 1.25 1.25h5.5c.69 0 1.25-.56 1.25-1.25v-5.5C13 8.56 12.44 8 11.75 8zm7.75.75c0 .414.336.75.75.75h3.5a.75.75 0 0 0 0-1.5h-3.5a.75.75 0 0 0-.75.75m.75 2.25a.75.75 0 0 0 0 1.5h3.5a.75.75 0 0 0 0-1.5zM14 14.75c0 .414.336.75.75.75h3.5a.75.75 0 0 0 0-1.5h-3.5a.75.75 0 0 0-.75.75"/>',
+  },
+  archive: {
+    viewBox: '0 0 24 24',
+    off: '<path fill="currentColor" d="M20 3H4a2 2 0 0 0-2 2v2a2 2 0 0 0 1 1.72V19a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.72A2 2 0 0 0 22 7V5a2 2 0 0 0-2-2M4 5h16v2H4zm1 14V9h14v10z"/><path fill="currentColor" d="M8 11h8v2H8z"/>',
+    on: '<path fill="currentColor" d="M2 3h20v4H2zm17 5H3v11a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8zm-3 6H8v-2h8z"/>',
+  },
+};
+
 // Multi-element icon defs matching designv2/BentoPinkFinal (crisp 16px / stroke 2).
 // Single-path approximations (esp. share circles as one path) looked soft/wrong when CSS
 // scaled a 20x1.8 SVG down to 16px.
 const TAB_ICON_NODES = {
-  calendar: [
-    ['rect', { x: 3, y: 4, width: 18, height: 18, rx: 2 }],
-    ['path', { d: 'M8 2v4M16 2v4M3 10h18' }],
-  ],
-  chat: [['path', { d: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z' }]],
+  // calendar/chat/settlement/gallery/places/memo/content/archive moved to CATEGORY_ICON_DEFS
+  // above (each needs a distinct on/off glyph, not just a recolor of one shared outline).
   records: [['path', { d: 'M4 19.5A2.5 2.5 0 0 1 6.5 17H20V2H6.5A2.5 2.5 0 0 0 4 4.5v15Z' }]],
-  settlement: [
-    ['rect', { x: 2, y: 6, width: 20, height: 12, rx: 2 }],
-    ['path', { d: 'M6 12h.01M18 12h.01' }],
-  ],
   more: [['path', { d: 'M4 7h16M4 12h16M4 17h16' }]],
-  gallery: [
-    ['rect', { x: 3, y: 3, width: 18, height: 18, rx: 2 }],
-    ['circle', { cx: 9, cy: 9, r: 2 }],
-    ['path', { d: 'm21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21' }],
-  ],
-  places: [
-    ['path', { d: 'M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z' }],
-    ['circle', { cx: 12, cy: 10, r: 3 }],
-  ],
-  memo: [['path', { d: 'M4 4h16v12H8l-4 4z' }]],
-  content: [
-    ['path', { d: 'm12 3-8.5 4.5L12 12l8.5-4.5L12 3Z' }],
-    ['path', { d: 'm3.5 12 8.5 4.5 8.5-4.5' }],
-    ['path', { d: 'm3.5 16.5 8.5 4.5 8.5-4.5' }],
-  ],
-  archive: [
-    ['path', { d: 'M22 12v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6' }],
-    ['path', { d: 'M2 7h20v5H2z' }],
-    ['path', { d: 'M12 12v3' }],
-  ],
   close: [['path', { d: 'M18 6 6 18M6 6l12 12' }]],
   gift: [
     ['rect', { x: 3, y: 8, width: 18, height: 13, rx: 2 }],
@@ -218,8 +243,16 @@ const TAB_ICON_NODES = {
   ],
 };
 
-function TabIcon({ id }) {
+function TabIcon({ id, active }) {
   const React = window.React;
+  const catDef = CATEGORY_ICON_DEFS[id];
+  if (catDef) {
+    return React.createElement('svg', {
+      width: 16, height: 16, viewBox: catDef.viewBox, 'aria-hidden': 'true',
+      style: { display: 'block', shapeRendering: 'geometricPrecision' },
+      dangerouslySetInnerHTML: { __html: active ? catDef.on : catDef.off },
+    });
+  }
   const nodes = TAB_ICON_NODES[id] || [];
   return React.createElement(
     'svg', {
@@ -2385,7 +2418,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
           title: item.label,
           onClick: () => selectSideItem(item.id)
         },
-          React.createElement('span', { className: bentoClass('side-nav-item-icon renewal-shell-nav-icon') }, React.createElement(TabIcon, { id: item.icon })),
+          React.createElement('span', { className: bentoClass('side-nav-item-icon renewal-shell-nav-icon') }, React.createElement(TabIcon, { id: item.icon, active })),
           React.createElement('span', { className: bentoClass('side-nav-item-title renewal-shell-nav-label') },
             item.label,
             item.id === 'settlement' && settlementBalanceBadge?.text && React.createElement('span', {
@@ -2418,7 +2451,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
           title: item.label,
           onClick: () => selectSideItem(item.id)
         },
-          React.createElement('span', { className: bentoClass('side-nav-item-icon renewal-shell-nav-icon') }, React.createElement(TabIcon, { id: item.icon })),
+          React.createElement('span', { className: bentoClass('side-nav-item-icon renewal-shell-nav-icon') }, React.createElement(TabIcon, { id: item.icon, active })),
           React.createElement('span', { className: bentoClass('side-nav-item-title renewal-shell-nav-label') }, item.label)
         );
       })
