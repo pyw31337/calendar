@@ -40,7 +40,7 @@
 .v2-design .v2-page-header .bp-header-count { font-size: var(--font-size-2xs); color: #83798f; font-weight: 700; margin-left: 4px; }
 .v2-design .v2-page-header .bp-header-sub { font-size: var(--font-size-2xs); color: #83798f; font-weight: 700; }
 .v2-design .v2-page-header button { flex-shrink: 0; }
-.bp-floating-back-btn { display: none; }
+.v2-design .bp-floating-back-btn { display: none; }
 @media (max-width: 767px) {
   .v2-design .v2-page-header { transition: transform 180ms ease, opacity 180ms ease; }
   .v2-design .v2-page-header.is-scroll-hidden { transform: translateY(-100%); opacity: 0; pointer-events: none; }
