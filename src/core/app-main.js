@@ -1278,7 +1278,7 @@ function CalendarApp() {
   React.useEffect(() => {
     if (activeCal) {
       const calTitle = `${activeCal.title} 캘린더`;
-      const calDesc = activeCal.description || `${activeCal.title} 사모임 멤버들의 참석 가능 날짜 조율 캘린더입니다.`;
+      const calDesc = `${activeCal.title} 캘린더`;
       const currentShareUrl = getCalendarShareUrl(activeCal.id);
       // Just the calendar's own name here, not calTitle (+ " 캘린더") -- iOS Safari's "홈 화면에
       // 추가" pre-fills its editable name field from document.title, and whatever is in that

@@ -3,10 +3,10 @@ import path from 'node:path';
 
 const PROJECT_ID = 'metro-live-2918e';
 const BASE_URL = 'https://pyw31337.github.io/calendar';
-const OG_IMAGE_URL = `${BASE_URL}/og-thumb.jpg?v=20260804`;
+const OG_IMAGE_URL = `${BASE_URL}/og-thumb-v2.jpg?v=20260917`;
 const OUT_DIR = path.resolve('share');
-const FALLBACK_TITLE = '모여라 캘린더';
-const FALLBACK_DESCRIPTION = '사모임 참여자들의 가능 날짜를 캘린더에 표기하고 전원 모임 가능한 날짜를 한눈에 파악해보세요.';
+const FALLBACK_TITLE = '소모임 올인원 캘린더';
+const FALLBACK_DESCRIPTION = '만남의 처음부터 끝까지. 약속일정 조율 / 정산 / 추억 공유 까지 한번에.';
 
 function escapeHtml(value) {
   return String(value || '')
@@ -96,7 +96,7 @@ function createShareHtml(calendar, { title, description, calendarUrl, shareUrl, 
 function createCalendarShareHtml(calendar) {
   return createShareHtml(calendar, {
     title: `${calendar.title} 캘린더`,
-    description: calendar.description || FALLBACK_DESCRIPTION,
+    description: `${calendar.title} 캘린더`,
     calendarUrl: `${BASE_URL}/?id=${encodeURIComponent(calendar.id)}`,
     shareUrl: `${BASE_URL}/share/${encodeURIComponent(calendar.id)}/`
   });
@@ -182,9 +182,13 @@ async function main() {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${FALLBACK_TITLE}</title>
   <meta name="description" content="${FALLBACK_DESCRIPTION}">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="모여라 캘린더">
   <meta property="og:title" content="${FALLBACK_TITLE}">
   <meta property="og:description" content="${FALLBACK_DESCRIPTION}">
   <meta property="og:image" content="${OG_IMAGE_URL}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
 </head>
 <body>
   <script>window.location.replace('${BASE_URL}/');</script>

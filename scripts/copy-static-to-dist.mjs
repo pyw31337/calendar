@@ -18,7 +18,7 @@ function copyDir(src, dest) {
 
 copyDir(path.join(root, 'share'), path.join(dist, 'share'));
 copyDir(path.join(root, 'icons'), path.join(dist, 'icons'));
-for (const f of ['og-thumb.jpg', 'sw.js', 'favicon.ico', 'manifest.json', 'manifest-kkot.json', 'manifest-cw.json', 'manifest-jhair.json']) {
+for (const f of ['og-thumb.jpg', 'og-thumb-v2.jpg', 'sw.js', 'favicon.ico', 'manifest.json', 'manifest-kkot.json', 'manifest-cw.json', 'manifest-jhair.json']) {
   const s = path.join(root, f);
   if (!fs.existsSync(s)) continue;
   if (f === 'sw.js') {
