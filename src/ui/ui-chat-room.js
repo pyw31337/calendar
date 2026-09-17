@@ -941,7 +941,7 @@ export function ChatRoomView({
         alignSelf: 'flex-start',
         marginTop: '2px'
       }
-    }, p?.name || '알수없음'), isMe ? [/*#__PURE__*/React.createElement("div", {
+    }, compactParticipantName(p?.name) || '알수없음'), isMe ? [/*#__PURE__*/React.createElement("div", {
       key: "meta",
       style: {
         display: 'flex',

@@ -279,6 +279,22 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   grid-auto-rows: 1fr;
 }
+
+/* Mobile holiday labels are deliberately constrained to five Korean
+ * characters per line: "대체공휴일(광복절)" therefore reads as two clear
+ * lines instead of colliding with the meeting pill. Desktop keeps the normal
+ * single-line presentation. */
+@media (max-width: 767px) {
+  .v2-design .bp-day-head-row .bp-day-corner-label.is-holiday {
+    width: 5ch;
+    max-width: 5ch;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-all;
+    line-height: 1.15;
+    text-align: center;
+  }
+}
 @media (max-width: 767px) {
   .v2-design .bp-day-bar-stack .bp-day-anniversary-label {
     display: none !important;

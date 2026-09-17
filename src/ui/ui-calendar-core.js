@@ -1010,7 +1010,7 @@ export function CalendarGrid({
           title: e.note ? `${p.name}: ${e.note}` : p.name
         }, /*#__PURE__*/React.createElement("span", {
           className: "badge-name"
-        }, p.name));
+        }, /^[가-힣]{3,4}$/.test(String(p.name || '').trim()) ? String(p.name).trim().slice(1) : p.name));
       })),
 
       /* PC Anniversary Badge (desktop-only, soft banner cards at the bottom of schedules) */
