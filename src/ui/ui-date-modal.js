@@ -368,7 +368,7 @@ export function DateModal({
       const firebaseConfig = __deps.firebaseConfig || window.firebaseConfig;
   const KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY = __deps.KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY || {};
 
-  const [activeTab, setActiveTab] = React.useState(initialTab || 'participant'); // 'participant' | 'meeting' | 'settlement' | 'photo'
+  const [activeTab, setActiveTab] = React.useState(initialTab || 'participant'); // 'participant' | 'meeting' | 'settlement' | 'photo' | 'memo'
   const [participantId, setParticipantId] = React.useState('');
   const [note, setNote] = React.useState('');
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
@@ -1225,6 +1225,22 @@ export function DateModal({
   );
   const visibleMeetingVideos = visibleMeetingPhotos.filter(photo => photo.directMediaUrl);
   const visibleMeetingImages = visibleMeetingPhotos.filter(photo => !photo.directMediaUrl);
+  // Memos tagged with this date are fetched independently of the memo-page window, then
+  // merged with any already-loaded memos. Keep this list separate from photo extraction so the
+  // dedicated 메모 tab can show the original text (and attached images) immediately.
+  const dateTaggedMemos = React.useMemo(() => {
+    const targetTag = typeof dateStrToHashtag === 'function' ? dateStrToHashtag(dateStr) : '';
+    const byId = new Map();
+    [...(Array.isArray(memos) ? memos : []), ...(Array.isArray(fetchedTaggedMemos) ? fetchedTaggedMemos : [])]
+      .forEach(memo => { if (memo?.id) byId.set(String(memo.id), memo); });
+    return Array.from(byId.values()).filter(memo => {
+      if (!memo || isTombstone(memo)) return false;
+      const raw = [memo.tags, memo.text, memo.title, memo.note, memo.memo, memo.description, memo.content, memo.body]
+        .flatMap(value => Array.isArray(value) ? value : [value]).filter(Boolean).join(' ');
+      const parsedDates = typeof parseFlexibleDateTokens === 'function' ? parseFlexibleDateTokens(raw) : [];
+      return (targetTag && raw.includes(targetTag)) || parsedDates.includes(dateStr);
+    }).sort((a, b) => Number(b.updatedAt || b.createdAt || 0) - Number(a.updatedAt || a.createdAt || 0));
+  }, [memos, fetchedTaggedMemos, dateStr, dateStrToHashtag]);
   const handleBrokenMeetingPhoto = (photo, brokenInfo = {}) => {
     markBrokenMeetingPhoto(photo, brokenInfo);
   };
@@ -2035,7 +2051,8 @@ export function DateModal({
       { value: 'participant', label: /*#__PURE__*/React.createElement(React.Fragment, null, "참석", /*#__PURE__*/React.createElement(SectionCountBadge, { count: dateEntries.length })) },
       { value: 'meeting', label: /*#__PURE__*/React.createElement(React.Fragment, null, "장소", /*#__PURE__*/React.createElement(SectionCountBadge, { count: registeredPlaces.length })) },
       { value: 'settlement', label: /*#__PURE__*/React.createElement(React.Fragment, null, "정산", /*#__PURE__*/React.createElement(SectionCountBadge, { count: expenses.length })) },
-      { value: 'photo', label: /*#__PURE__*/React.createElement(React.Fragment, null, "사진", /*#__PURE__*/React.createElement(SectionCountBadge, { count: visibleMeetingPhotos.length })) }
+      { value: 'photo', label: /*#__PURE__*/React.createElement(React.Fragment, null, "사진", /*#__PURE__*/React.createElement(SectionCountBadge, { count: visibleMeetingPhotos.length })) },
+      { value: 'memo', label: /*#__PURE__*/React.createElement(React.Fragment, null, "메모", /*#__PURE__*/React.createElement(SectionCountBadge, { count: dateTaggedMemos.length })) }
     ]
   })), /*#__PURE__*/React.createElement("form", {
     onSubmit: e => {
@@ -3204,6 +3221,47 @@ export function DateModal({
           style: { height: '28px', minHeight: '28px', width: '100%', flexShrink: 0, clear: 'both' }
         })
       )
+    ),
+
+    /* Tab 5 Content: 메모 — date hashtag matches such as #260928 */
+    activeTab === 'memo' && /*#__PURE__*/React.createElement(React.Fragment, null,
+      /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }
+      }, /*#__PURE__*/React.createElement("label", {
+        style: { fontSize: 'var(--font-size-md)', fontWeight: 800, color: 'var(--text-muted)' }
+      }, `날짜 태그 메모 (${dateTaggedMemos.length}개)`)),
+      dateTaggedMemos.length === 0 ? /*#__PURE__*/React.createElement("div", {
+        style: { textAlign: 'center', color: 'var(--text-muted)', padding: '24px 12px', fontSize: 'var(--font-size-md)', border: '1px dashed var(--border-subtle)', borderRadius: 'var(--radius-md)' }
+      }, "이 날짜에 연결된 메모가 없습니다.") : /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', flexDirection: 'column', gap: '10px' }
+      }, dateTaggedMemos.map((memo, index) => {
+        const body = memo.text || memo.content || memo.body || memo.note || memo.memo || memo.description || '';
+        const title = memo.title || '';
+        const imageEntries = typeof getMessageImageEntries === 'function'
+          ? getMessageImageEntries({ id: memo.id, text: body, imageUrl: memo.imageUrl, imageUrls: memo.imageUrls, thumbUrl: memo.thumbUrl, thumbUrls: memo.thumbUrls })
+          : [];
+        return /*#__PURE__*/React.createElement("article", {
+          key: memo.id || index,
+          style: { border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '12px', backgroundColor: 'var(--bg-card)' }
+        },
+          title && /*#__PURE__*/React.createElement("div", { style: { fontWeight: 800, marginBottom: '6px', color: 'var(--text-main)' } }, title),
+          body && /*#__PURE__*/React.createElement("div", { style: { whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.5, color: 'var(--text-main)' } }, body),
+          imageEntries.length > 0 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px' } }, imageEntries.map((entry, imageIndex) => /*#__PURE__*/React.createElement(MediaThumb, {
+            key: `${memo.id || index}-${imageIndex}`,
+            src: entry.thumb || entry.full || entry.imageUrl,
+            fallbackSrc: entry.full || entry.imageUrl,
+            alt: '메모 첨부 이미지',
+            loading: 'lazy',
+            decoding: 'async',
+            style: { width: '72px', height: '72px', objectFit: 'cover', borderRadius: 'var(--radius-sm)' },
+            onClick: () => {
+              if (typeof setActiveLightbox !== 'function') return;
+              const urls = imageEntries.map(item => item.full || item.thumb || item.imageUrl).filter(Boolean);
+              if (urls.length) setActiveLightbox({ urls, index: imageIndex, meta: urls.map(() => ({ source: 'date-memo', memoId: memo.id })) });
+            }
+          })))
+        );
+      }))
     ),
 
     /* Tab 4 Content: 사진 */
