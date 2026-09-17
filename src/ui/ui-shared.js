@@ -392,7 +392,7 @@ export function UnderlineTabs({ options = [], value, onChange, ariaLabel, classN
     'aria-label': ariaLabel || undefined,
     style: {
       display: 'flex',
-      width: '100%',
+      width: isFlush ? undefined : '100%',
       borderBottom: '1px solid var(--border-subtle)',
       backgroundColor: 'var(--bg-card)',
       flexShrink: 0,

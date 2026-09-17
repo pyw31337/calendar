@@ -2405,6 +2405,7 @@ export function GlobalSearchModal({
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer || (function Shell(p) { return React.createElement('div', p, p.children); });
   const SearchCategoryTabs = __comp.SearchCategoryTabs || __deps.SearchCategoryTabs;
+  const UnderlineTabs = __comp.UnderlineTabs || __deps.UnderlineTabs;
   const SearchIcon = __comp.SearchIcon || __deps.SearchIcon;
   const SearchResultLogRow = __comp.SearchResultLogRow || __deps.SearchResultLogRow;
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
@@ -2565,17 +2566,26 @@ export function GlobalSearchModal({
     onClick: e => e.stopPropagation(),
     style: inline ? undefined : { maxWidth: '520px' }
   },
-    /*#__PURE__*/React.createElement("div", { className: "modal-header" },
+    /*#__PURE__*/React.createElement("div", { className: inline ? "modal-header global-search-header" : "modal-header" },
       /*#__PURE__*/React.createElement("h3", { style: { fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' } },
         /*#__PURE__*/React.createElement(SearchIcon, null), "검색"
       ),
+      inline && /*#__PURE__*/React.createElement("input", {
+        ref: inputRef,
+        type: "text",
+        className: "global-search-header-input",
+        placeholder: "검색어를 입력해 주세요.",
+        value: query,
+        onChange: e => setQuery(e.target.value)
+      }),
       /*#__PURE__*/React.createElement("button", {
-        onClick: onClose,
+        onClick: inline ? () => setQuery('') : onClose,
+        'aria-label': inline ? '검색어 지우기' : '검색 닫기',
         style: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }
       }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))
     ),
     /*#__PURE__*/React.createElement("div", { className: "modal-body" },
-      /*#__PURE__*/React.createElement("input", {
+      !inline && /*#__PURE__*/React.createElement("input", {
         ref: inputRef,
         type: "text",
         className: "form-input",
@@ -2610,7 +2620,14 @@ export function GlobalSearchModal({
           };
         }),
         onSelect: setActiveTab
-      }) : /*#__PURE__*/React.createElement(SearchCategoryTabs, { tabs: tabDefs, activeKey: activeTab, onSelect: setActiveTab, containerStyle: { width: '100%' } })),
+      }) : (UnderlineTabs ? /*#__PURE__*/React.createElement(UnderlineTabs, {
+        options: tabDefs.map(t => ({ value: t.key, label: t.label, badge: t.count })),
+        value: activeTab,
+        onChange: setActiveTab,
+        activeColor: '#7C3AED',
+        variant: 'flush',
+        className: 'global-search-tabs'
+      }) : /*#__PURE__*/React.createElement(SearchCategoryTabs, { tabs: tabDefs, activeKey: activeTab, onSelect: setActiveTab, containerStyle: { width: '100%' } }))),
 
       !q && /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: 'var(--text-muted)', fontSize: 'var(--font-size-base)', textAlign: 'center' } }, "검색어를 입력해 주세요."),
       q && !hasResults && /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: 'var(--text-muted)', fontSize: 'var(--font-size-base)', textAlign: 'center' } }, "검색 결과가 없습니다."),
