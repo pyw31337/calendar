@@ -47,7 +47,7 @@ function arePlacesSameLocation(a, b) {
 }
 // Stable component type so opening/closing a video does not reset when DateModal refreshes its
 // live date-tag queries. It intentionally mirrors MemoCard's preview + toggle + inline player.
-function DateModalVideoCard({ video }) {
+function _DateModalVideoCard({ video }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -1230,7 +1230,7 @@ export function DateModal({
     }),
     [meetingPhotos, brokenMeetingPhotoRevision]
   );
-  const visibleMeetingVideos = visibleMeetingPhotos.filter(photo => photo.directMediaUrl);
+  const _visibleMeetingVideos = visibleMeetingPhotos.filter(photo => photo.directMediaUrl);
   const visibleMeetingImages = visibleMeetingPhotos.filter(photo => !photo.directMediaUrl);
   // Memos tagged with this date are fetched independently of the memo-page window, then
   // merged with any already-loaded memos. Keep this list separate from photo extraction so the
