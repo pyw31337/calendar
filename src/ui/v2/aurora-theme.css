@@ -205,36 +205,36 @@
 
 /* Keep compact, textless bars on phones; expose readable pale labels on PC. */
 .v2-design .bp-day-bar-stack .bp-day-anniversary {
-  background: #fce7f3 !important;
-  color: #ec4899 !important;
+  background: #fce7f3;
+  color: #ec4899;
   border-color: transparent;
 }
 .v2-design .bp-day-bar-stack .bp-day-anniversary .bp-day-anniversary-label {
-  color: inherit !important;
+  color: inherit;
 }
 .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-birthday {
-  background: #fce7f3 !important;
-  color: #ec4899 !important;
+  background: #fce7f3;
+  color: #ec4899;
 }
 .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-travel,
 .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-trip {
-  background: #dff7ee !important;
-  color: #059669 !important;
+  background: #dff7ee;
+  color: #059669;
 }
 .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-event {
-  background: #dbeafe !important; color: #2563eb !important;
+  background: #dbeafe; color: #2563eb;
 }
 .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-festival {
-  background: #fef3c7 !important; color: #d97706 !important;
+  background: #fef3c7; color: #d97706;
 }
 .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-sports {
-  background: #e0f2fe !important; color: #0284c7 !important;
+  background: #e0f2fe; color: #0284c7;
 }
 .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-movie {
-  background: #ede9fe !important; color: #7c3aed !important;
+  background: #ede9fe; color: #7c3aed;
 }
 .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-other {
-  background: #f1f5f9 !important; color: #64748b !important;
+  background: #f1f5f9; color: #64748b;
 }
 .v2-design .bp-day-bar-stack .bp-day-bar,
 .v2-design .bp-day-bar-stack .bp-day-schedule {
@@ -246,17 +246,17 @@
   color: #059669;
 }
 .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-birthday .bp-day-anniversary-label {
-  color: #ec4899 !important;
+  color: #ec4899;
 }
 .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-travel .bp-day-anniversary-label,
 .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-trip .bp-day-anniversary-label {
-  color: #059669 !important;
+  color: #059669;
 }
-.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-event .bp-day-anniversary-label { color: #2563eb !important; }
-.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-festival .bp-day-anniversary-label { color: #d97706 !important; }
-.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-sports .bp-day-anniversary-label { color: #0284c7 !important; }
-.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-movie .bp-day-anniversary-label { color: #7c3aed !important; }
-.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-other .bp-day-anniversary-label { color: #64748b !important; }
+.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-event .bp-day-anniversary-label { color: #2563eb; }
+.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-festival .bp-day-anniversary-label { color: #d97706; }
+.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-sports .bp-day-anniversary-label { color: #0284c7; }
+.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-movie .bp-day-anniversary-label { color: #7c3aed; }
+.v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-other .bp-day-anniversary-label { color: #64748b; }
 @media (min-width: 768px) {
   .v2-design .bp-day-bar-stack .bp-day-anniversary {
     min-height: 1.05rem !important;

@@ -1211,38 +1211,6 @@
   .v2-design .global-search-page-card { border-radius: 14px; }
 }
 
-/* Final anniversary contract. This block intentionally lives after the
- * legacy calendar density rules so older white-text/pink-background
- * declarations cannot win the cascade. */
-@media (min-width: 768px) {
-  .v2-design .bp-day-bar-stack .bp-day-anniversary {
-    background: color-mix(in srgb, var(--anniversary-color, var(--cal-anniversary)) 16%, #fff) !important;
-    color: var(--anniversary-color, var(--cal-anniversary)) !important;
-  }
-  .v2-design .bp-day-bar-stack .bp-day-anniversary > .bp-day-anniversary-label {
-    color: var(--anniversary-color, var(--cal-anniversary)) !important;
-    display: block !important;
-    font-size: 0.56rem !important;
-    font-weight: 800 !important;
-    line-height: 1.15 !important;
-    padding: 0 3px !important;
-  }
-  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-mid > .bp-day-anniversary-label,
-  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-bar-only > .bp-day-anniversary-label {
-    display: none !important;
-  }
-}
-@media (max-width: 767px) {
-  .v2-design .bp-day-bar-stack .bp-day-anniversary {
-    background: var(--anniversary-color, var(--cal-anniversary)) !important;
-    color: #fff !important;
-  }
-  .v2-design .bp-day-bar-stack .bp-day-anniversary > .bp-day-anniversary-label {
-    display: none !important;
-  }
-}
-
-
 /* --------------------------------------------------------------------------
  * Header module + side-nav brand badge (PC mock chat-header-side)
  * -------------------------------------------------------------------------- */
@@ -1675,4 +1643,92 @@
 @media (max-width: 767px) {
   .v2-design .bp-day-bar-stack .bp-day-anniversary { background: var(--anniversary-color, var(--cal-anniversary)) !important; color: #fff !important; }
   .v2-design .bp-day-bar-stack .bp-day-anniversary > .bp-day-anniversary-label { display: none !important; }
+}
+
+/* --------------------------------------------------------------------------
+ * Home summary heading module
+ * --------------------------------------------------------------------------
+ * Chat, memo, gallery and places are instances of the same summary-card
+ * component. Keep the heading box itself fixed so icon, title and action do
+ * not jump when a card's content or gallery bleed changes.
+ */
+.v2-design .bp-renewal-home-summary-heading {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: 32px;
+  min-height: 32px;
+  margin: 0 0 14px;
+  padding: 0;
+  gap: 8px;
+  color: var(--text-main, #1e1b2e);
+}
+.v2-design .bp-renewal-home-summary-heading-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  color: var(--brand, #7c2fe5);
+  line-height: 1;
+}
+.v2-design .bp-renewal-home-summary-heading .bp-bento-card-title {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  margin: 0;
+  color: var(--text-main, #1e1b2e);
+  font-size: .72rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0;
+}
+.v2-design .bp-renewal-home-summary-heading .bp-more-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 0 0 auto;
+  height: 32px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted, #8a8798);
+  font-size: .68rem;
+  font-weight: 700;
+  line-height: 1;
+}
+.v2-design .bp-renewal-home-summary-section.gallery-bleed .bp-renewal-home-summary-heading {
+  padding: 0;
+}
+
+@media (max-width: 767px) {
+  .v2-design .bp-renewal-home-summary-heading {
+    height: 30px;
+    min-height: 30px;
+    margin-bottom: 12px;
+    gap: 7px;
+  }
+  .v2-design .bp-renewal-home-summary-heading-icon {
+    flex-basis: 17px;
+    width: 17px;
+    height: 17px;
+  }
+  .v2-design .bp-renewal-home-summary-heading .bp-bento-card-title {
+    font-size: .7rem;
+  }
+  .v2-design .bp-renewal-home-summary-heading .bp-more-link {
+    height: 30px;
+    font-size: .66rem;
+  }
+}
+
+.v2-design .renewal-shell-loading-surface {
+  min-height: 100%;
+  width: 100%;
+  background: transparent;
 }

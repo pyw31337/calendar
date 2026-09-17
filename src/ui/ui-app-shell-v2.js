@@ -1069,7 +1069,11 @@ function ChatPane({ chatContext, onChangeView, onOpenAppSettings, onOpenSideNav,
     return () => { cancelled = true; };
   }, [loaded]);
   if (!loaded) {
-    return React.createElement(EmptyState, { title: '채팅 불러오는 중', subtitle: '잠시만 기다려 주세요.' });
+    // The chat chunk is loaded lazily, but this is a route transition rather than a
+    // data-loading state. Showing a full-page Korean loading message here made every
+    // visit from another subpage look stalled (and differed from v1). Keep the shell
+    // visually quiet while the chunk mounts; errors are still surfaced by the toast.
+    return React.createElement('div', { className: 'renewal-shell-loading-surface', 'aria-busy': 'true' });
   }
   const { ChatRoomView, ShareModal } = bindUiComponentAliases(React);
   return React.createElement(React.Fragment, null,
