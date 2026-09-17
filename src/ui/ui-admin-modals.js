@@ -2,6 +2,33 @@
  * Admin sub-modals (P4-20)
  */
 
+import { TABLER_ICONS } from './v2/tabler-icons.js';
+
+/**
+ * Icon unification pass (2026-09-17): see the matching comment in ui-admin-dashboard.js -- same
+ * local, admin-scoped swap onto the single-source-of-truth TABLER_ICONS registry, leaving the
+ * shared ui-icons.js exports (used by non-admin screens too) untouched.
+ */
+function makeAdminTablerIcon(iconKey, defaultSize) {
+  return function AdminTablerIconInstance(props) {
+    const React = window.React;
+    const def = TABLER_ICONS[iconKey];
+    if (!def) return null;
+    const size = (props && props.size) || defaultSize;
+    return /*#__PURE__*/React.createElement('svg', {
+      xmlns: 'http://www.w3.org/2000/svg', width: size, height: size, viewBox: '0 0 24 24',
+      fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round',
+      'aria-hidden': true,
+      dangerouslySetInnerHTML: { __html: def.off },
+    });
+  };
+}
+const AdminCalendarCogIcon = makeAdminTablerIcon('calendarSettings', 20);
+const AdminHourglassIcon = makeAdminTablerIcon('restore', 16);
+const AdminSettingsIcon = makeAdminTablerIcon('settings', 18);
+const AdminSmallXIcon = makeAdminTablerIcon('x', 24);
+const AdminTrashIcon = makeAdminTablerIcon('trash', 24);
+
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
@@ -151,18 +178,18 @@ export function AdminModal({
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const AlertTriangleIcon = __comp.AlertTriangleIcon || __deps.AlertTriangleIcon;
-  const CalendarCogIcon = __comp.CalendarCogIcon || __deps.CalendarCogIcon;
+  const CalendarCogIcon = AdminCalendarCogIcon;
   const CalendarExportIcon = __comp.CalendarExportIcon || __deps.CalendarExportIcon;
     const ColorSwatchPicker = __comp.ColorSwatchPicker || __deps.ColorSwatchPicker;
   const ParticipantBadge = __comp.ParticipantBadge || __deps.ParticipantBadge;
-    const HourglassIcon = __comp.HourglassIcon || __deps.HourglassIcon;
+    const HourglassIcon = AdminHourglassIcon;
   const LogIcon = __comp.LogIcon || __deps.LogIcon;
     const PollModal = __comp.PollModal || __deps.PollModal;
   const PollSectionIcon = __comp.PollSectionIcon || __deps.PollSectionIcon;
   const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer || (function Shell(p) { return React.createElement('div', p, p.children); });
-  const SettingsIcon = __comp.SettingsIcon || __deps.SettingsIcon;
-  const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
-  const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
+  const SettingsIcon = AdminSettingsIcon;
+  const SmallXIcon = AdminSmallXIcon;
+  const TrashIcon = AdminTrashIcon;
   const getActiveParticipants = typeof __deps.getActiveParticipants === 'function'
     ? __deps.getActiveParticipants
     : (typeof GATHER_APP_UTILS !== 'undefined' && typeof GATHER_APP_UTILS.getActiveParticipants === 'function'
@@ -1414,7 +1441,7 @@ export function AdminUnifiedSearchModal({ onClose, onSearch }) {
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer || (function Shell(p) { return React.createElement('div', p, p.children); });
   const SearchIcon = __comp.SearchIcon || __deps.SearchIcon;
-  const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
+  const SmallXIcon = AdminSmallXIcon;
 
   const [query, setQuery] = React.useState('');
   const inputRef = React.useRef(null);

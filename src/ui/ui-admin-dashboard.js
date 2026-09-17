@@ -3,6 +3,40 @@
  */
 
 import { MemeAdminPanel } from './ui-meme-admin.js';
+import { TABLER_ICONS } from './v2/tabler-icons.js';
+
+/**
+ * Icon unification pass (2026-09-17): a handful of admin icons that used to come from the
+ * shared, mixed-family ui-icons.js exports (some Tabler, some Lucide) are swapped here for the
+ * single-source-of-truth TABLER_ICONS registry (src/ui/v2/tabler-icons.js), matching the pattern
+ * `TabIcon` uses in ui-app-shell-v2.js. This is scoped to this admin file only -- the shared
+ * ui-icons.js components (ChatSectionIcon, LockIcon, etc.) are left untouched since they're also
+ * consumed by non-admin screens (chat room, gallery, side menu, ...) that are outside this pass.
+ * Only `off` (outline) markup is used -- none of the swapped admin icons have an active/toggle
+ * state, so `on` is never needed here. Rendering size matches what each original icon component
+ * defaulted to at its call sites, so no layout changes.
+ */
+function makeAdminTablerIcon(iconKey, defaultSize) {
+  return function AdminTablerIconInstance(props) {
+    const React = window.React;
+    const def = TABLER_ICONS[iconKey];
+    if (!def) return null;
+    const size = (props && props.size) || defaultSize;
+    return /*#__PURE__*/React.createElement('svg', {
+      xmlns: 'http://www.w3.org/2000/svg', width: size, height: size, viewBox: '0 0 24 24',
+      fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round',
+      'aria-hidden': true,
+      dangerouslySetInnerHTML: { __html: def.off },
+    });
+  };
+}
+const AdminChatSectionIcon = makeAdminTablerIcon('chat', 20);
+const AdminCalendarCogIcon = makeAdminTablerIcon('calendarSettings', 20);
+const AdminHourglassIcon = makeAdminTablerIcon('restore', 16);
+const AdminLockIcon = makeAdminTablerIcon('lock', 20);
+const AdminSettingsIcon = makeAdminTablerIcon('settings', 18);
+const AdminSmallXIcon = makeAdminTablerIcon('x', 24);
+const AdminTrashIcon = makeAdminTablerIcon('trash', 24);
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_CHAT_DATA = window.GATHER_APP_CHAT_DATA || {};
@@ -274,11 +308,11 @@ export function AdminDashboard({ initialCalendars }) {
   const AdminUnifiedSearchModal = __comp.AdminUnifiedSearchModal || __deps.AdminUnifiedSearchModal;
   const AdminUnifiedSearchResultsView = __comp.AdminUnifiedSearchResultsView || __deps.AdminUnifiedSearchResultsView;
   const AlertTriangleIcon = __comp.AlertTriangleIcon || __deps.AlertTriangleIcon;
-  const CalendarCogIcon = __comp.CalendarCogIcon || __deps.CalendarCogIcon;
+  const CalendarCogIcon = AdminCalendarCogIcon;
   const ParticipantBadge = __comp.ParticipantBadge || __deps.ParticipantBadge;
   const ChartBarIcon = __comp.ChartBarIcon || __deps.ChartBarIcon;
   const ChartPieIcon = __comp.ChartPieIcon || __deps.ChartPieIcon;
-  const ChatSectionIcon = __comp.ChatSectionIcon || __deps.ChatSectionIcon;
+  const ChatSectionIcon = AdminChatSectionIcon;
   const KeyboardIcon = __comp.KeyboardIcon || __deps.KeyboardIcon;
   const DatabaseIcon = __comp.DatabaseIcon || __deps.DatabaseIcon;
   const CloudDataConnectionIcon = __comp.CloudDataConnectionIcon || __deps.CloudDataConnectionIcon;
@@ -286,8 +320,8 @@ export function AdminDashboard({ initialCalendars }) {
   const ConfirmDialog = __comp.ConfirmDialog || __deps.ConfirmDialog;
   const DonutChart = __comp.DonutChart || __deps.DonutChart;
   const ExternalLinkIcon = __comp.ExternalLinkIcon || __deps.ExternalLinkIcon;
-  const HourglassIcon = __comp.HourglassIcon || __deps.HourglassIcon;
-  const LockIcon = __comp.LockIcon || __deps.LockIcon;
+  const HourglassIcon = AdminHourglassIcon;
+  const LockIcon = AdminLockIcon;
   const LogoutIcon = __comp.LogoutIcon || __deps.LogoutIcon;
   const PodiumIcon = __comp.PodiumIcon || __deps.PodiumIcon;
   const PollModal = __comp.PollModal || __deps.PollModal;
@@ -295,9 +329,9 @@ export function AdminDashboard({ initialCalendars }) {
   const RefreshIcon = __comp.RefreshIcon || __deps.RefreshIcon;
   const SearchIcon = __comp.SearchIcon || __deps.SearchIcon;
   const SectionCountBadge = __comp.SectionCountBadge || __deps.SectionCountBadge;
-  const SettingsIcon = __comp.SettingsIcon || __deps.SettingsIcon;
-  const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
-  const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
+  const SettingsIcon = AdminSettingsIcon;
+  const SmallXIcon = AdminSmallXIcon;
+  const TrashIcon = AdminTrashIcon;
   const TrophyIcon = __comp.TrophyIcon || __deps.TrophyIcon;
   const fetchSubcollectionCount = __deps.fetchSubcollectionCount;
   const sanitizeText = __deps.sanitizeText;
@@ -2654,7 +2688,7 @@ export function AdminDashboard({ initialCalendars }) {
                 }),
                 /* Remove trigger */
                 /*#__PURE__*/React.createElement("button", {
-                  type: "button", className: "btn btn-danger", style: { width: '44px', minWidth: '44px', height: '44px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxSizing: 'border-box' },
+                  type: "button", className: "btn btn-danger", title: "참여자 삭제", "aria-label": "참여자 삭제", style: { width: '44px', minWidth: '44px', height: '44px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxSizing: 'border-box' },
                   onClick: () => requestConfirm('참여자 삭제', `"${p.name}" 참여자를 삭제하시겠습니까?`, () => handleUpdatePart(p.id, { removedAt: Date.now() }))
                 }, /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }))
               ))
@@ -2709,6 +2743,8 @@ export function AdminDashboard({ initialCalendars }) {
 	                /*#__PURE__*/React.createElement("button", {
 	                  type: "button",
 	                  className: "btn btn-danger",
+	                  title: "지출 카테고리 삭제",
+	                  "aria-label": "지출 카테고리 삭제",
 	                  style: { width: '44px', minWidth: '44px', height: '44px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxSizing: 'border-box' },
 	                  onClick: () => handleRemoveExpenseCategory(category.id)
                 }, /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }))
@@ -2764,6 +2800,8 @@ export function AdminDashboard({ initialCalendars }) {
 	                /*#__PURE__*/React.createElement("button", {
 	                  type: "button",
 	                  className: "btn btn-danger",
+	                  title: "장소 카테고리 삭제",
+	                  "aria-label": "장소 카테고리 삭제",
 	                  style: { width: '44px', minWidth: '44px', height: '44px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxSizing: 'border-box' },
 	                  onClick: () => handleRemovePlaceCategory(category.id)
                 }, /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }))
