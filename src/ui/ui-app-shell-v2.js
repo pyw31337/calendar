@@ -203,7 +203,10 @@ function TabIcon({ id, active }) {
  */
 function TopHeader({ calendarName, onOpenSearch, onOpenMore }) {
   const React = window.React;
-  const brandName = String(calendarName || '모여라 캘린더').replace(/^[^\p{L}\p{N}]+/u, '').trim();
+  const brandName = String(calendarName || '모여라 캘린더')
+    .replace(/^[^\p{L}\p{N}]+/u, '')
+    .replace(/\s*캘린더\s*$/u, '')
+    .trim();
   return React.createElement('div', { className: bentoClass('bento-title v2-title-row') },
     React.createElement('div', { className: bentoClass('bento-title-brand') },
       React.createElement('svg', { width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' },

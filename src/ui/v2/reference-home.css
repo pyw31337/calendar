@@ -791,7 +791,6 @@
       .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-manual-banner { justify-content: center; padding: 8px; }
       .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-head { justify-content: center; }
       .v2-design .bp-app-shell { max-width: 1600px; margin: 0 auto; padding: 24px; }
-      .v2-design .bp-bento-title-brand { display: none !important; }
       .v2-design .bp-hero-zone { border-radius: 20px; margin: 28px 0 0; }
       .v2-design .bp-bento-grid { grid-template-columns: 1.4fr 1fr 1fr; padding: 24px 0 !important; gap: 20px; }
       .v2-design .bp-bento-card.bp-wide { grid-column: auto; }
