@@ -107,3 +107,87 @@
     background: rgba(61, 20, 155, 0.82) !important;
   }
 }
+
+/* V2 calendar readability: larger navigation and weekday rhythm. */
+.v2-design .bp-cal-month-title {
+  font-size: clamp(1.05rem, 1.4vw, 1.32rem) !important;
+  line-height: 1.35 !important;
+  letter-spacing: -0.02em;
+  padding: 0.2rem 0 !important;
+}
+.v2-design .bp-cal-month-nav {
+  gap: 0.18rem !important;
+  align-items: center;
+}
+.v2-design .bp-cal-nav-btn,
+.v2-design .bp-cal-today-btn {
+  min-width: 2.15rem;
+  min-height: 2.15rem;
+  padding: 0.42rem 0.62rem !important;
+  font-size: 0.86rem !important;
+  line-height: 1 !important;
+}
+.v2-design .bp-cal-today-btn {
+  min-width: 3.55rem;
+  font-weight: 800 !important;
+}
+.v2-design .bp-cal-weekdays {
+  margin-top: 0.25rem;
+  margin-bottom: 0.5rem !important;
+}
+.v2-design .bp-weekday-label {
+  font-size: clamp(0.78rem, 1vw, 0.94rem) !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.04em;
+  padding: 0.2rem 0 !important;
+}
+
+/* Keep compact, textless bars on phones; expose readable pale labels on PC. */
+.v2-design .bp-day-bar-stack .bp-day-anniversary {
+  background: #fce7f3 !important;
+  color: #ec4899 !important;
+  border-color: transparent !important;
+}
+.v2-design .bp-day-bar-stack .bp-day-anniversary .bp-day-anniversary-label {
+  color: inherit !important;
+}
+.v2-design .bp-day-bar-stack .bp-day-anniversary.cat-birthday {
+  background: #fce7f3 !important;
+  color: #ec4899 !important;
+}
+.v2-design .bp-day-bar-stack .bp-day-anniversary.cat-travel,
+.v2-design .bp-day-bar-stack .bp-day-anniversary.cat-trip {
+  background: #dff7ee !important;
+  color: #059669 !important;
+}
+.v2-design .bp-day-bar-stack .bp-day-bar,
+.v2-design .bp-day-bar-stack .bp-day-schedule {
+  background: #dff7ee !important;
+  color: #059669 !important;
+}
+.v2-design .bp-day-bar-stack .bp-day-bar-label,
+.v2-design .bp-day-bar-stack .bp-day-schedule-label {
+  color: #059669 !important;
+}
+@media (min-width: 768px) {
+  .v2-design .bp-day-bar-stack .bp-day-anniversary {
+    min-height: 1.05rem !important;
+    padding: 0.1rem 0.42rem !important;
+  }
+  .v2-design .bp-day-bar-stack .bp-day-anniversary-label {
+    display: block !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.68rem !important;
+    font-weight: 800 !important;
+  }
+}
+@media (max-width: 767px) {
+  .v2-design .bp-day-bar-stack .bp-day-anniversary-label {
+    display: none !important;
+  }
+  .v2-design .bp-day-bar-stack .bp-day-anniversary {
+    min-height: 0.34rem !important;
+  }
+}

@@ -600,7 +600,7 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
       React.createElement('button', {
         onClick: () => setMonthPickerOpen(value => !value),
         'aria-expanded': monthPickerOpen,
-        className: bentoClass('ghost-btn'),
+        className: bentoClass('ghost-btn cal-month-title'),
         style: { gap: '4px', fontWeight: 800, fontSize: '0.92rem', color: 'var(--text-main)', padding: '2px 0' },
         type: 'button',
       },
@@ -612,9 +612,9 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
       monthPickerOpen && React.createElement('div', { className: 'bp-month-picker' },
         React.createElement('input', { type: 'month', 'aria-label': '이동할 연월', value: `${year}-${String(month + 1).padStart(2, '0')}`, onChange: event => { const [y, m] = event.target.value.split('-').map(Number); if (y && m) { setMonthDate(new Date(y, m - 1, 1)); setMonthPickerOpen(false); } } })
       ),
-      React.createElement('div', { style: { display: 'flex', gap: '0px' } },
+      React.createElement('div', { className: bentoClass('cal-month-nav'), style: { display: 'flex', gap: '0px' } },
         React.createElement('button', {
-          className: bentoClass('ghost-btn'),
+          className: bentoClass('ghost-btn cal-nav-btn'),
           'aria-label': '이전달',
           type: 'button',
           onClick: () => setMonthDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1)),
@@ -624,13 +624,13 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
           )
         ),
         React.createElement('button', {
-          className: bentoClass('ghost-btn'),
+          className: bentoClass('ghost-btn cal-today-btn'),
           style: { fontWeight: 700, fontSize: '0.72rem', padding: '6px 8px' },
           type: 'button',
           onClick: () => setMonthDate(new Date()),
         }, '오늘'),
         React.createElement('button', {
-          className: bentoClass('ghost-btn'),
+          className: bentoClass('ghost-btn cal-nav-btn'),
           'aria-label': '다음달',
           type: 'button',
           onClick: () => setMonthDate(d => new Date(d.getFullYear(), d.getMonth() + 1, 1)),
@@ -643,7 +643,7 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
     ),
 
     // Weekdays
-    React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', marginBottom: '2px' } },
+    React.createElement('div', { className: bentoClass('cal-weekdays'), style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', marginBottom: '2px' } },
       React.createElement('div', { className: bentoClass('weekday-label'), style: { color: '#EF4444' } }, '일'),
       React.createElement('div', { className: bentoClass('weekday-label') }, '월'),
       React.createElement('div', { className: bentoClass('weekday-label') }, '화'),
@@ -720,7 +720,7 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
               const title = ann.title || '기념일';
               return React.createElement('div', {
                 key: ann.id || `${dateStr}_ann_${annIdx}`,
-                className: bentoClass(`day-anniversary ${role}`),
+                className: bentoClass(`day-anniversary ${role} ${ann.category ? `cat-${String(ann.category).toLowerCase()}` : ''} ${ann.genre ? `genre-${String(ann.genre).toLowerCase()}` : ''}`.trim()),
                 title,
                 'aria-label': title,
               }, React.createElement('span', {
