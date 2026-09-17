@@ -897,7 +897,7 @@ function HomeSectionIcon({ kind }) {
   const React = window.React;
   const def = TABLER_ICONS[kind] || TABLER_ICONS.chat;
   return React.createElement('svg', {
-    width: 15, height: 15, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
+    width: 22, height: 22, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
     strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': 'true',
     style: { display: 'block', shapeRendering: 'geometricPrecision' },
     dangerouslySetInnerHTML: { __html: def.off },
