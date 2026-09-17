@@ -11,19 +11,27 @@
   animation: bp-hero-mesh-shift 8.6s ease-in-out infinite !important;
 }
 .v2-design .bp-hero-zone::before {
+  inset: -85%;
+  filter: blur(46px);
+  will-change: auto;
   background:
     radial-gradient(ellipse 85% 78% at 20% 30%, rgba(128, 25, 224, 0.92) 0%, transparent 58%),
     radial-gradient(ellipse 80% 72% at 78% 18%, rgba(18, 205, 240, 0.9) 0%, transparent 55%),
     radial-gradient(ellipse 74% 80% at 42% 88%, rgba(54, 4, 253, 0.92) 0%, transparent 60%) !important;
 }
 .v2-design .bp-hero-zone::after {
+  inset: -85%;
+  filter: blur(46px);
+  will-change: auto;
   background:
     radial-gradient(ellipse 82% 74% at 76% 74%, rgba(18, 205, 240, 0.86) 0%, transparent 56%),
     radial-gradient(ellipse 28% 26% at 12% 70%, rgba(128, 25, 224, 0.58) 0%, transparent 48%),
     radial-gradient(ellipse 70% 64% at 90% 28%, rgba(54, 4, 253, 0.84) 0%, transparent 54%) !important;
 }
 .v2-design .bp-hero-zone > .bp-hero-aurora {
-  inset: -42% !important;
+  inset: -85% !important;
+  filter: blur(58px);
+  will-change: auto !important;
   opacity: 0.92 !important;
   background:
     radial-gradient(ellipse 58% 42% at 18% 72%, rgba(128, 25, 224, 0.9) 0%, transparent 64%),
