@@ -57,32 +57,7 @@
 }
 .v2-design .v2-dialog-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
 
-/* Page chrome icons: light glass on white destinations (hero keeps dark glass) */
-.v2-design .v2-fullscreen .bp-icon-btn,
-.v2-design .v2-chat .bp-icon-btn,
-.v2-design .v2-dest-page .bp-icon-btn,
-.v2-design .v2-memo .bp-icon-btn,
-.v2-design .v2-places .bp-icon-btn,
-.v2-design .v2-settlement .bp-icon-btn {
-  background: var(--v2-glass-light-fill, rgba(255,255,255,0.88)) !important;
-  border: 1px solid var(--v2-glass-light-border, #eceaf5) !important;
-  color: #6b6580 !important;
-  padding: 7px !important;
-  border-radius: 9999px !important;
-  box-shadow: var(--v2-glass-light-inset, inset 0 1px 0 rgba(255,255,255,0.95)), var(--v2-glass-light-shadow, 0 1px 2px rgba(30,27,46,0.04)) !important;
-  backdrop-filter: var(--v2-glass-blur, blur(20px) saturate(180%)) !important;
-  -webkit-backdrop-filter: var(--v2-glass-blur, blur(20px) saturate(180%)) !important;
-}
-.v2-design .v2-fullscreen .bp-icon-btn:hover,
-.v2-design .v2-chat .bp-icon-btn:hover,
-.v2-design .v2-dest-page .bp-icon-btn:hover,
-.v2-design .v2-memo .bp-icon-btn:hover,
-.v2-design .v2-places .bp-icon-btn:hover,
-.v2-design .v2-settlement .bp-icon-btn:hover {
-  background: var(--v2-glass-light-hover-fill, rgba(243,238,255,0.78)) !important;
-  border-color: var(--v2-glass-light-hover-border, #e0d4ff) !important;
-  color: var(--brand, #7C2FE5) !important;
-}
+/* PageHeader owns the shared icon language; destination-specific buttons stay local. */
 .v2-design .v2-fullscreen .bp-fab,
 .v2-design .v2-chat .bp-fab {
   position: fixed; right: max(20px, calc(50% - 240px + 20px)); bottom: calc(24px + env(safe-area-inset-bottom, 0px));
@@ -2032,4 +2007,107 @@
   border: 1px solid #eceaf5 !important;
   color: #1e1b2e !important;
   box-shadow: none !important;
+}
+
+/* Canonical subpage header module — identical chrome for Chat, Settlement, Gallery,
+   Places, Memo, Content, and Archive. */
+.v2-design .v2-page-header {
+  height: 60px;
+  min-height: 60px;
+  padding: 0 16px;
+  box-sizing: border-box;
+  background: #fff;
+  border-bottom: 1px solid #eceaf5;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+.v2-design .v2-page-header .bp-header-row {
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+}
+.v2-design .v2-page-header .v2-header-title-block {
+  min-width: 0;
+  justify-self: start;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.v2-design .v2-page-header .bp-back-btn {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #6b6580;
+  cursor: pointer;
+}
+.v2-design .v2-page-header .bp-back-btn svg { width: 18px; height: 18px; }
+.v2-design .v2-page-header .bp-header-title {
+  color: #6b6580;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+.v2-design .v2-page-header .bp-header-center-brand {
+  min-width: 0;
+  justify-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: #1e1b2e;
+  white-space: nowrap;
+}
+.v2-design .v2-page-header .bp-header-brand-mark {
+  font-size: 16px;
+  line-height: 1;
+}
+.v2-design .v2-page-header .bp-header-brand-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1;
+}
+.v2-design .v2-page-header .bp-header-actions {
+  min-width: 56px;
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-left: 0;
+}
+.v2-design .v2-page-header .bp-icon-btn {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #6b6580;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  cursor: pointer;
+}
+.v2-design .v2-page-header .bp-icon-btn svg { width: 20px; height: 20px; }
+.v2-design .v2-page-header .bp-icon-btn:hover,
+.v2-design .v2-page-header .bp-back-btn:hover {
+  color: #7c2fe5;
+  background: transparent;
+}
+@media (min-width: 768px) {
+  .v2-design .v2-page-header { padding-left: 24px; padding-right: 24px; }
 }

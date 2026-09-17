@@ -133,7 +133,15 @@ function IconButton({ label, icon, onClick, size = 18 }) {
 function cleanCalendarName(calendar) {
   return String(calendar?.title || calendar?.name || '')
     .replace(/^[^\p{L}\p{N}]+/u, '')
+    .replace(/\s*캘린더\s*$/u, '')
     .trim();
+}
+
+/** Shared header brand: preserve the calendar's leading emoji as the visual mark. */
+function pageBrand(calendar) {
+  const raw = String(calendar?.title || calendar?.name || '').trim();
+  const mark = raw.match(/^[^\p{L}\p{N}\s]+/u)?.[0] || '🍺';
+  return { mark, name: cleanCalendarName(calendar) };
 }
 
 /** Shared subtitle: calendar name, optionally with a real trailing fragment (e.g. member count). */
@@ -144,7 +152,8 @@ function pageSubtitle(calendar, trailing) {
   return name || extra || undefined;
 }
 
-export function PageHeader({ title, subtitle, count, onBack, onSearch, searchLabel, onShare, onMenu, extra, centerSubtitle = true, children }) {
+export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, searchLabel, onShare, onMenu, extra, centerSubtitle = true, children }) {
+  const centerBrand = brand || (subtitle ? { mark: '🍺', name: String(subtitle).split(' · ')[0].trim() } : null);
   return h(
     'header',
     { className: `bp-header v2-page-header${centerSubtitle ? ' v2-page-header--centered' : ''}` },
@@ -163,7 +172,12 @@ export function PageHeader({ title, subtitle, count, onBack, onSearch, searchLab
         centerSubtitle && count ? h('span', { className: 'bp-header-count' }, count) : null,
         !centerSubtitle && subtitle ? h('div', { className: 'bp-header-sub' }, subtitle) : null
       ),
-      centerSubtitle && subtitle ? h('div', { className: 'bp-header-center-sub' }, subtitle) : null,
+      centerSubtitle && centerBrand ? h(
+        'div',
+        { className: 'bp-header-center-brand', 'aria-label': centerBrand.name },
+        h('span', { className: 'bp-header-brand-mark', 'aria-hidden': 'true' }, centerBrand.mark),
+        h('span', { className: 'bp-header-brand-name' }, centerBrand.name)
+      ) : null,
       !centerSubtitle && count && h('span', { className: 'bp-header-count' }, count),
       h(
         'div',
@@ -250,6 +264,7 @@ export function MemoScreen(p) {
             {
               title: '메모',
               subtitle: p.subtitle || pageSubtitle(p.calendar),
+              brand: pageBrand(p.calendar),
               onBack: p.onBack,
               onSearch: toggleSearch,
               searchLabel: '메모 검색',
@@ -279,6 +294,7 @@ export function MemoScreen(p) {
           {
             title: '메모',
             subtitle: p.subtitle || pageSubtitle(p.calendar),
+            brand: pageBrand(p.calendar),
             onBack: p.onBack,
             onSearch: toggleSearch,
             searchLabel: '메모 검색',
@@ -309,6 +325,7 @@ export function MemoScreen(p) {
         {
           title: '메모',
           subtitle: p.subtitle || pageSubtitle(p.calendar),
+          brand: pageBrand(p.calendar),
           onBack: p.onBack,
           onSearch: toggleSearch,
           searchLabel: '메모 검색',
@@ -405,20 +422,13 @@ export function PlacesScreen(p) {
             {
               title: '장소',
               subtitle: p.subtitle || pageSubtitle(p.calendar),
+              brand: pageBrand(p.calendar),
               count: p.countLabel,
               onBack: p.onBack,
               onSearch: toggleSearch,
               searchLabel: '장소 검색',
               onShare: p.onShare,
               onMenu: p.onMenu,
-              extra: h(IconButton, {
-                label: mapOpen ? '지도 닫기' : '지도로 보기',
-                icon: 'map',
-                onClick: () => {
-                  setMapOpen(v => !v);
-                  if (p.onToggleMap) p.onToggleMap();
-                },
-              }),
             },
             isSearchOpen && h(Search, {
               value: p.searchQuery || '',
@@ -446,20 +456,13 @@ export function PlacesScreen(p) {
           {
             title: '장소',
             subtitle: p.subtitle || pageSubtitle(p.calendar),
+            brand: pageBrand(p.calendar),
             count: p.countLabel,
             onBack: p.onBack,
             onSearch: toggleSearch,
             searchLabel: '장소 검색',
             onShare: p.onShare,
             onMenu: p.onMenu,
-            extra: h(IconButton, {
-              label: mapOpen ? '지도 닫기' : '지도로 보기',
-              icon: 'map',
-              onClick: () => {
-                setMapOpen(v => !v);
-                if (p.onToggleMap) p.onToggleMap();
-              },
-            }),
           },
           isSearchOpen && h(Search, {
             value: p.searchQuery || '',
@@ -485,17 +488,13 @@ export function PlacesScreen(p) {
         {
           title: '장소',
           subtitle: p.subtitle || pageSubtitle(p.calendar),
+          brand: pageBrand(p.calendar),
           count: `등록 ${(p.places || []).length}곳`,
           onBack: p.onBack,
           onSearch: toggleSearch,
           searchLabel: '장소 검색',
           onShare: p.onShare,
           onMenu: p.onMenu,
-          extra: h(IconButton, {
-            label: mapOpen ? '지도 닫기' : '지도로 보기',
-            icon: 'map',
-            onClick: () => setMapOpen(value => !value),
-          }),
         },
         isSearchOpen && h(Search, {
           value: p.searchQuery,
@@ -631,6 +630,7 @@ export function SettlementScreen(p) {
           h(PageHeader, {
             title: '정산',
             subtitle: p.subtitle || pageSubtitle(p.calendar),
+            brand: pageBrand(p.calendar),
             onBack: p.onBack,
             onSearch: p.onSearch,
             searchLabel: '정산 검색',
@@ -653,6 +653,7 @@ export function SettlementScreen(p) {
         h(PageHeader, {
           title: '정산',
           subtitle: p.subtitle || pageSubtitle(p.calendar),
+          brand: pageBrand(p.calendar),
           onBack: p.onBack,
           onSearch: p.onSearch,
           searchLabel: '정산 검색',
@@ -680,6 +681,7 @@ export function SettlementScreen(p) {
       h(PageHeader, {
         title: '정산',
         subtitle: p.subtitle || pageSubtitle(p.calendar),
+        brand: pageBrand(p.calendar),
       onBack: p.onBack,
       onSearch: p.onSearch,
       searchLabel: '정산 검색',
@@ -967,6 +969,7 @@ export function ChatScreen(p) {
         h(PageHeader, {
           title: '채팅',
           subtitle,
+          brand: pageBrand(p.calendar),
           onBack: p.onBack,
           onSearch: p.onSearch,
           searchLabel: '대화 검색',
@@ -994,6 +997,7 @@ export function ChatScreen(p) {
       h(PageHeader, {
         title: '채팅',
         subtitle,
+        brand: pageBrand(p.calendar),
         onBack: p.onBack,
         onSearch: p.onSearch,
         searchLabel: '대화 검색',
@@ -1023,6 +1027,7 @@ export function GalleryScreen(p) {
     h(PageHeader, {
       title: '갤러리',
       subtitle: p.subtitle || pageSubtitle(p.calendar),
+      brand: pageBrand(p.calendar),
       onBack: p.onBack,
       onSearch: p.onSearch,
       searchLabel: '갤러리 검색',
@@ -1041,6 +1046,7 @@ export function ContentScreen(p) {
     h(PageHeader, {
       title: '컨텐츠',
       subtitle: p.subtitle || pageSubtitle(p.calendar),
+      brand: pageBrand(p.calendar),
       onBack: p.onBack,
       onSearch: p.onSearch,
       searchLabel: '컨텐츠 검색',
@@ -1059,6 +1065,7 @@ export function ArchiveScreen(p) {
     h(PageHeader, {
       title: '보관함',
       subtitle: p.subtitle || pageSubtitle(p.calendar),
+      brand: pageBrand(p.calendar),
       onBack: p.onBack,
       onSearch: p.onSearch,
       searchLabel: '보관함 검색',
