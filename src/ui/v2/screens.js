@@ -3,10 +3,6 @@
  * Real feature views keep data + handlers; this layer supplies Full-mock chrome (header,
  * filters shell, FAB) and scopes reference CSS. Default shell never imports this module.
  */
-import './reference-memo.css';
-import './reference-places.css';
-import './reference-settlement.css';
-import './reference-chat.css';
 import './dest-layout.css';
 import './screens.css';
 import { calculateSettlementRows } from '../../core/settlement-calculator.js';
@@ -17,6 +13,24 @@ import {
 } from './shell-nav.js';
 
 const h = (...args) => window.React.createElement(...args);
+
+// Destination-only CSS is loaded when its tab is first rendered, instead of competing with the
+// calendar home for the initial CSS download. Vite caches each dynamic CSS import after loading.
+const destinationStyleLoaders = {
+  memo: () => import('./reference-memo.css'),
+  places: () => import('./reference-places.css'),
+  settlement: () => import('./reference-settlement.css'),
+  chat: () => import('./reference-chat.css'),
+};
+const destinationStylePromises = new Map();
+function ensureDestinationStyles(kind) {
+  if (!destinationStylePromises.has(kind) && destinationStyleLoaders[kind]) {
+    destinationStylePromises.set(kind, destinationStyleLoaders[kind]().catch(error => {
+      destinationStylePromises.delete(kind);
+      console.warn(`V2 ${kind} styles failed to load`, error);
+    }));
+  }
+}
 
 /** Multi-element icons at mock stroke/size (same bar as home side-nav). */
 const ICON_NODES = {
@@ -984,10 +998,10 @@ export function ChatScreen(p) {
   );
 }
 
-export const renderMemoScreen = props => h(MemoScreen, props);
-export const renderPlacesScreen = props => h(PlacesScreen, props);
-export const renderSettlementScreen = props => h(SettlementScreen, props);
-export const renderChatScreen = props => h(ChatScreen, props);
+export const renderMemoScreen = props => { ensureDestinationStyles('memo'); return h(MemoScreen, props); };
+export const renderPlacesScreen = props => { ensureDestinationStyles('places'); return h(PlacesScreen, props); };
+export const renderSettlementScreen = props => { ensureDestinationStyles('settlement'); return h(SettlementScreen, props); };
+export const renderChatScreen = props => { ensureDestinationStyles('chat'); return h(ChatScreen, props); };
 
 /* -------------------------------------------------------------------------- */
 /* Gallery / Content / Archive — V2 page frames (restyle legacy chrome in place) */

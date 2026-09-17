@@ -1019,7 +1019,7 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
         style: photo.commentCount > 0 ? galleryCommentMotion(photo, i) : undefined,
         'aria-label': `사진 ${i + 1} 크게 보기`
       },
-        React.createElement('img', { src: photo.thumb || photo.thumbnailUrl || photo.thumbUrl || photo.full || photo.url || photo.imageUrl || photo.downloadURL, alt: '', loading: 'lazy' }),
+        React.createElement('img', { src: photo.thumb || photo.thumbnailUrl || photo.thumbUrl || photo.full || photo.url || photo.imageUrl || photo.downloadURL, alt: '', loading: 'lazy', decoding: 'async' }),
         photo.commentCount > 0 ? React.createElement('span', { className: bentoClass('comment-badge') }, photo.commentCount) : null
       ))) : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '등록된 사진이 없습니다.')
     ),

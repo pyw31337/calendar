@@ -1,6 +1,9 @@
 const PAGE_SIZE = 100;
 const pageCache = new Map();
+const countCache = new Map();
+const countRequests = new Map();
 const REQUEST_TIMEOUT_MS = 8000;
+const CACHE_TTL_MS = 2 * 60 * 1000;
 
 function cacheId(calendarId, page) {
   return `${calendarId}:${page}`;
@@ -63,12 +66,26 @@ async function fetchPhotoIndexAggregationCount({ calendarId, projectId, sourceEq
 }
 
 export async function fetchPhotoIndexCount({ calendarId, projectId }) {
-  // Movie/sports content posters are indexed as source=anniversary; gallery 사진 must omit them.
-  const [total, anniversaryTotal] = await Promise.all([
-    fetchPhotoIndexAggregationCount({ calendarId, projectId }),
-    fetchPhotoIndexAggregationCount({ calendarId, projectId, sourceEquals: 'anniversary' })
-  ]);
-  return Math.max(0, total - anniversaryTotal);
+  const key = `${projectId}:${calendarId}`;
+  const cached = countCache.get(key);
+  if (cached && Date.now() - cached.savedAt < CACHE_TTL_MS) return cached.value;
+  if (countRequests.has(key)) return countRequests.get(key);
+  const request = (async () => {
+    // Movie/sports content posters are indexed as source=anniversary; gallery 사진 must omit them.
+    const [total, anniversaryTotal] = await Promise.all([
+      fetchPhotoIndexAggregationCount({ calendarId, projectId }),
+      fetchPhotoIndexAggregationCount({ calendarId, projectId, sourceEquals: 'anniversary' })
+    ]);
+    const value = Math.max(0, total - anniversaryTotal);
+    countCache.set(key, { savedAt: Date.now(), value });
+    return value;
+  })();
+  countRequests.set(key, request);
+  try {
+    return await request;
+  } finally {
+    countRequests.delete(key);
+  }
 }
 
 // Client-safe read-only verification for gallery totals. Compares the live photoIndex
