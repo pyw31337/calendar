@@ -241,7 +241,7 @@ function enqueueMemoMediaSave(...args) {
   const f = __gatherUiDeps().enqueueMemoMediaSave || GATHER_APP_UTILS.enqueueMemoMediaSave;
   return typeof f === 'function' ? f(...args) : enqueueWriteOperation(...args);
 }
-export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMemos, onBack, showToast, isDarkTheme, onRequestConfirm, sharedMemo, onDismissSharedMemo, chatMessages, setActiveLightbox, onOpenShare, onOpenAppSettings, onChangeView, onUpdateMemo, onUpsertMemo, onDeleteMemo, memoInitialTag, setMemoInitialTag, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, historyCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null, renderV2 }) {
+export function MemoView({ calendar, memos, hasMoreMemos, totalMemoCount, onLoadMoreMemos, onBack, showToast, isDarkTheme, onRequestConfirm, sharedMemo, onDismissSharedMemo, chatMessages, setActiveLightbox, onOpenShare, onOpenAppSettings, onChangeView, onUpdateMemo, onUpsertMemo, onDeleteMemo, memoInitialTag, setMemoInitialTag, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, historyCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null, renderV2, onRegisterMenuActions = null }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -368,6 +368,12 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   React.useEffect(() => {
     if (isSearchOpen) memoSearchInputRef.current?.focus();
   }, [isSearchOpen]);
+  // v2 shell (PC): side-nav's per-tab submenu needs 메모 검색 -- otherwise local to this component.
+  React.useEffect(() => {
+    if (typeof onRegisterMenuActions !== 'function') return undefined;
+    onRegisterMenuActions({ search: () => setIsSearchOpen(true) });
+    return () => onRegisterMenuActions(null);
+  }, [onRegisterMenuActions]);
   const [isComposerExpanded, setIsComposerExpanded] = React.useState(false);
   const newTitleInputRef = React.useRef(null);
   React.useEffect(() => {

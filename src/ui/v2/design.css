@@ -1504,13 +1504,23 @@
 /* Each tab's own extra menu (previously reachable only via that tab's mobile-only
  * "메뉴" hamburger, e.g. chat's 공지사항) surfaces at the bottom of the side-nav instead,
  * but only once the side-nav itself is a persistent PC rail (>=1200px) -- below that it
- * stays hidden so the mobile drawer isn't cluttered with a group it never had before. */
+ * stays hidden so the mobile drawer isn't cluttered with a group it never had before.
+ * Wrapped in its own tinted, rounded box (like a distinct panel) so it visually reads as
+ * "this tab's menu", not just another plain nav row group. */
 .v2-design .bp-side-nav-group.bp-is-tab-menu {
   display: none;
 }
 @media (min-width: 1200px) {
   .v2-design .bp-side-nav-group.bp-is-tab-menu {
     display: block;
+    margin: 8px 10px;
+    padding: 6px !important;
+    border-radius: 14px;
+    background: var(--bg-primary, rgba(124, 47, 229, 0.06));
+    border-top: none !important;
+  }
+  .v2-design .bp-side-nav-group.bp-is-tab-menu .bp-side-nav-item {
+    margin: 2px 0 !important;
   }
 }
 

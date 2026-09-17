@@ -1183,7 +1183,7 @@ export function HistoryView({
   onRemovePhotoFromMemory = null, onRemovePhotosFromMemory = null, onFetchPhotoComments = null, onSavePhotoComments = null,
   onHideMemoryGroup = null, onRestoreMemoryGroup = null, onAddPhotosBackToMemory = null,
   onFetchMeetingPhotoIndex = null, indexedPhotos = null, indexedPhotoComplete = false, onIndexedPhotoLoadAll = null,
-  photoCommentCounts = {}
+  photoCommentCounts = {}, onRegisterMenuActions = null
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -1296,6 +1296,12 @@ export function HistoryView({
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState('');
+  // v2 shell (PC): side-nav's per-tab submenu needs 보관함 검색 -- otherwise local to this component.
+  React.useEffect(() => {
+    if (typeof onRegisterMenuActions !== 'function') return undefined;
+    onRegisterMenuActions({ search: () => setIsSearchOpen(true) });
+    return () => onRegisterMenuActions(null);
+  }, [onRegisterMenuActions]);
   const VALID_HISTORY_TABS = ['meetings', 'memories', 'people'];
   // 기록 페이지는 매번 새로 마운트되며(activeView==='history'일 때만 렌더), 언제 들어오든
   // 항상 추억 탭이 첫화면이어야 한다 -- 예전에는 localStorage에 마지막으로 보던 탭을 저장해
@@ -2615,7 +2621,8 @@ export function ContentView({
   showSettlement = true, onOpenCreateSettlement,
   anniversaries = [], onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo = null,
   memos = [],
-  customCultureItems = [], onSaveCustomCultureItem = null, showToast = null
+  customCultureItems = [], onSaveCustomCultureItem = null, showToast = null,
+  onRegisterMenuActions = null
 }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -2649,6 +2656,13 @@ export function ContentView({
   const [searchQuery, setSearchQuery] = React.useState('');
   const [isContentRegisterOpen, setIsContentRegisterOpen] = React.useState(false);
   const [editingContentItem, setEditingContentItem] = React.useState(null);
+  // v2 shell (PC): side-nav's per-tab submenu needs 컨텐츠 등록 -- otherwise only reachable via
+  // this component's own asPage 메뉴 overlay, which v2 always redirects to the side-nav drawer.
+  React.useEffect(() => {
+    if (typeof onRegisterMenuActions !== 'function') return undefined;
+    onRegisterMenuActions({ register: () => { setEditingContentItem(null); setIsContentRegisterOpen(true); } });
+    return () => onRegisterMenuActions(null);
+  }, [onRegisterMenuActions]);
   const CONTENT_TAB_STORAGE_KEY = 'gather_content_tab';
   const VALID_CONTENT_TABS = ['festival', 'culture', 'sports', 'movies'];
   const [contentTab, setContentTab] = React.useState(() => {
