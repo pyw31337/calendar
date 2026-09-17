@@ -75,14 +75,14 @@
 /* Hero brand row — white on gradient (reference .bp-bento-title defaults to --text-main). */
 .v2-design .bp-hero-zone .bp-bento-title,
 .v2-design .bp-hero-zone .bp-bento-title.bp-v2-title-row {
-  padding: 12px 12px 2px;
+  padding: 14px 16px 8px;
   color: #fff;
   min-width: 0;
 }
 .v2-design .bp-hero-zone .bp-bento-title-brand {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
   color: #fff;
 }
@@ -395,16 +395,16 @@
 /* Calendar rhythm module: one scale for the month control, weekday rail and
  * event stack. Keep the existing responsive cell sizing, but give the labels
  * enough breathing room to remain legible at the reference density. */
-.v2-design .bp-cal-month-nav-row { margin-bottom: 16px !important; }
+.v2-design .bp-cal-month-nav-row { margin-bottom: 18px !important; }
 .v2-design .bp-cal-month-nav-row .bp-cal-month-title,
-.v2-design .bp-cal-month-label { font-size: 1.14rem !important; line-height: 1.2; }
-.v2-design .bp-cal-month-nav-row .bp-cal-today-btn { font-size: 0.86rem !important; padding: 8px 12px; }
-.v2-design .bp-cal-month-nav-row .bp-cal-nav-btn { width: 30px; height: 30px; }
+.v2-design .bp-cal-month-label { font-size: 1.3rem !important; font-weight: 800 !important; line-height: 1.2; }
+.v2-design .bp-cal-month-nav-row .bp-cal-today-btn { font-size: 0.92rem !important; font-weight: 800 !important; padding: 8px 14px; }
+.v2-design .bp-cal-month-nav-row .bp-cal-nav-btn { width: 32px; height: 32px; }
 .v2-design .bp-cal-weekdays { margin-bottom: 8px !important; }
 .v2-design .bp-cal-weekdays .bp-weekday-label { font-size: 0.78rem !important; font-weight: 800; }
-.v2-design .bp-cal-days-grid { row-gap: 5px !important; }
-.v2-design .bp-day-cell { gap: 4px; }
-.v2-design .bp-day-head-row { gap: 5px 6px; }
+.v2-design .bp-cal-days-grid { row-gap: 7px !important; }
+.v2-design .bp-day-cell { gap: 6px; }
+.v2-design .bp-day-head-row { gap: 6px 6px; }
 .v2-design .bp-dot-row { gap: 4px !important; align-items: center; justify-content: center; }
 /* Name-badge text centering: reference-home.css's own rule sets line-height:1.4 on the
  * ::after text and 1px 6px padding, and that fractional multiplier on top of a rem-based
