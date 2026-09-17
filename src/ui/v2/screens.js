@@ -161,16 +161,20 @@ export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, se
       'div',
       { className: 'bp-header-row' },
       h(
-        'button',
-        { className: 'bp-back-btn', type: 'button', 'aria-label': '뒤로가기', onClick: onBack },
-        h(DesignIcon, { name: 'back', size: 18 })
-      ),
-      h(
         'div',
-        { className: `v2-header-title-block${centerSubtitle ? ' v2-header-title-left' : ''}` },
-        h('div', { className: 'bp-header-title' }, title),
-        centerSubtitle && count ? h('span', { className: 'bp-header-count' }, count) : null,
-        !centerSubtitle && subtitle ? h('div', { className: 'bp-header-sub' }, subtitle) : null
+        { className: 'bp-header-leading' },
+        h(
+          'button',
+          { className: 'bp-back-btn', type: 'button', 'aria-label': '뒤로가기', onClick: onBack },
+          h(DesignIcon, { name: 'back', size: 18 })
+        ),
+        h(
+          'div',
+          { className: `v2-header-title-block${centerSubtitle ? ' v2-header-title-left' : ''}` },
+          h('div', { className: 'bp-header-title' }, title),
+          centerSubtitle && count ? h('span', { className: 'bp-header-count' }, count) : null,
+          !centerSubtitle && subtitle ? h('div', { className: 'bp-header-sub' }, subtitle) : null
+        )
       ),
       centerSubtitle && centerBrand ? h(
         'div',

@@ -2029,9 +2029,15 @@
   align-items: center;
   gap: 16px;
 }
-.v2-design .v2-page-header .v2-header-title-block {
+.v2-design .v2-page-header .bp-header-leading {
   min-width: 0;
   justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.v2-design .v2-page-header .v2-header-title-block {
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 8px;
