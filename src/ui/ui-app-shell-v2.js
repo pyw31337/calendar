@@ -2335,14 +2335,18 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   };
 
   const allChat = Array.isArray(calendarContext?.displayChatMessages) ? calendarContext.displayChatMessages : (recordsContext?.mediaProps?.chatMessages || []);
-  const lastChatMsg = latestRows(allChat)[0];
+  const recentChat = React.useMemo(() => latestRows(allChat), [allChat]);
+  const lastChatMsg = recentChat[0];
   const lastChatAuthor = lastChatMsg ? authorFor(lastChatMsg, calendar?.participants).name : '';
-  const lastMemo = latestRows(recordsContext?.memoProps?.memos || [])[0];
-  const lastPlace = latestRows(recordsContext?.placesProps?.calendar?.places || [])[0];
-  const lastPhoto = recordsContext?.mediaProps?.indexedPhotos?.[0];
+  const memoRows = recordsContext?.memoProps?.memos || [];
+  const placeRows = recordsContext?.placesProps?.calendar?.places || [];
   const settlementCards = calendar?.settlementCards || [];
+  const lastMemo = React.useMemo(() => latestRows(memoRows)[0], [memoRows]);
+  const lastPlace = React.useMemo(() => latestRows(placeRows)[0], [placeRows]);
+  const lastPhoto = recordsContext?.mediaProps?.indexedPhotos?.[0];
+  const recentSettlementCards = React.useMemo(() => latestRows(settlementCards), [settlementCards]);
   const shortDate = value => { const ms = timestampMs(value); return ms ? new Date(ms).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' }).replace(/\. /g, '.').replace(/\.$/, '') : ''; };
-  const sideMeta = { chat: lastChatAuthor, memo: lastMemo?.title || '', places: lastPlace?.alias || lastPlace?.name || '', gallery: shortDate(lastPhoto?.timestamp), settlement: shortDate(latestRows(settlementCards)[0]?.updatedAt || latestRows(settlementCards)[0]?.createdAt) };
+  const sideMeta = { chat: lastChatAuthor, memo: lastMemo?.title || '', places: lastPlace?.alias || lastPlace?.name || '', gallery: shortDate(lastPhoto?.timestamp), settlement: shortDate(recentSettlementCards[0]?.updatedAt || recentSettlementCards[0]?.createdAt) };
   // Same 잔액 source as default-shell side menu / settlement summary (공금 running balance).
   const settlementBalanceBadge = calendar
     ? formatBalanceBadge(calculateSettlementBalance(calendar))
