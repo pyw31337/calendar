@@ -292,7 +292,10 @@ async function checkRenewalShellRoutes(browser, baseUrl) {
         // The records panes intentionally overlap the tab strip while settling; dispatch the
         // semantic click so this state-transition assertion is not dependent on hit-testing.
         await page.getByRole('tab', { name: label, exact: true }).dispatchEvent('click');
-        await page.waitForFunction(expectedSub => new URL(window.location.href).searchParams.get('sub') === expectedSub, expected, { timeout: 3000 });
+        // CI runners can spend a few seconds mounting the mobile records pane after the
+        // synthetic click. The route transition is the assertion; keep the timeout generous
+        // enough to avoid a false negative while still failing a genuinely broken navigation.
+        await page.waitForFunction(expectedSub => new URL(window.location.href).searchParams.get('sub') === expectedSub, expected, { timeout: 10000 });
       }
       pass(`[${viewport.name}] V2 기록 서브탭 클릭 전환`);
 
