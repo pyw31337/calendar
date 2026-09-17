@@ -153,10 +153,28 @@ function pageSubtitle(calendar, trailing) {
 }
 
 export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, searchLabel, onShare, onMenu, extra, centerSubtitle = true, showSearch = false, children }) {
+  const React = window.React;
+  const [isVisible, setIsVisible] = React.useState(true);
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    let lastTop = 0;
+    const onScroll = event => {
+      if (!window.matchMedia?.('(max-width: 767px)').matches) return;
+      const target = event.target;
+      if (!target || typeof target.scrollTop !== 'number' || target.scrollHeight <= target.clientHeight) return;
+      const top = target.scrollTop;
+      if (top < 12) setIsVisible(true);
+      else if (top - lastTop > 4 && top > 56) setIsVisible(false);
+      else if (lastTop - top > 4) setIsVisible(true);
+      lastTop = top;
+    };
+    document.addEventListener('scroll', onScroll, true);
+    return () => document.removeEventListener('scroll', onScroll, true);
+  }, []);
   const centerBrand = brand || (subtitle ? { mark: '🍺', name: String(subtitle).split(' · ')[0].trim() } : null);
   return h(
     'header',
-    { className: `bp-header v2-page-header${centerSubtitle ? ' v2-page-header--centered' : ''}` },
+    { className: `bp-header v2-page-header${centerSubtitle ? ' v2-page-header--centered' : ''}${isVisible ? '' : ' is-scroll-hidden'}` },
     h(
       'div',
       { className: 'bp-header-row' },
@@ -191,7 +209,10 @@ export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, se
         onMenu && h(IconButton, { label: `${title} 메뉴`, icon: 'menu', size: 20, onClick: onMenu })
       )
     ),
-    children
+    children,
+    !isVisible && onBack ? h('button', {
+      type: 'button', className: 'bp-floating-back-btn', 'aria-label': '뒤로가기', onClick: onBack,
+    }, h(DesignIcon, { name: 'back', size: 18 })) : null
   );
 }
 
