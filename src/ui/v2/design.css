@@ -1211,6 +1211,37 @@
   .v2-design .global-search-page-card { border-radius: 14px; }
 }
 
+/* Final anniversary contract. This block intentionally lives after the
+ * legacy calendar density rules so older white-text/pink-background
+ * declarations cannot win the cascade. */
+@media (min-width: 768px) {
+  .v2-design .bp-day-bar-stack .bp-day-anniversary {
+    background: color-mix(in srgb, var(--anniversary-color, var(--cal-anniversary)) 16%, #fff) !important;
+    color: var(--anniversary-color, var(--cal-anniversary)) !important;
+  }
+  .v2-design .bp-day-bar-stack .bp-day-anniversary > .bp-day-anniversary-label {
+    color: var(--anniversary-color, var(--cal-anniversary)) !important;
+    display: block !important;
+    font-size: 0.56rem !important;
+    font-weight: 800 !important;
+    line-height: 1.15 !important;
+    padding: 0 3px !important;
+  }
+  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-mid > .bp-day-anniversary-label,
+  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-bar-only > .bp-day-anniversary-label {
+    display: none !important;
+  }
+}
+@media (max-width: 767px) {
+  .v2-design .bp-day-bar-stack .bp-day-anniversary {
+    background: var(--anniversary-color, var(--cal-anniversary)) !important;
+    color: #fff !important;
+  }
+  .v2-design .bp-day-bar-stack .bp-day-anniversary > .bp-day-anniversary-label {
+    display: none !important;
+  }
+}
+
 
 /* --------------------------------------------------------------------------
  * Header module + side-nav brand badge (PC mock chat-header-side)
@@ -1632,4 +1663,16 @@
   background-color: var(--brand, #7C2FE5);
   -webkit-mask-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iYmxhY2siIHN0cm9rZT0ibm9uZSI+PHBhdGggZD0iTTEyIDJjNS41MjMgMCAxMCA0LjQ3NyAxMCAxMHMtNC40NzcgMTAgLTEwIDEwYTEwIDEwIDAgMSAxIDAgLTIwbS0yLjI5MyA4LjI5M2ExIDEgMCAwIDAgLTEuNDE0IDEuNDE0bDMgM2ExIDEgMCAwIDAgMS40MTQgMGwzIC0zYTEgMSAwIDAgMCAwIC0xLjQxNGwtLjA5NCAtLjA4M2ExIDEgMCAwIDAgLTEuMzIgLjA4M2wtMi4yOTQgMi4yOTJ6IiAvPjwvc3ZnPg==");
   mask-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iYmxhY2siIHN0cm9rZT0ibm9uZSI+PHBhdGggZD0iTTEyIDJjNS41MjMgMCAxMCA0LjQ3NyAxMCAxMHMtNC40NzcgMTAgLTEwIDEwYTEwIDEwIDAgMSAxIDAgLTIwbS0yLjI5MyA4LjI5M2ExIDEgMCAwIDAgLTEuNDE0IDEuNDE0bDMgM2ExIDEgMCAwIDAgMS40MTQgMGwzIC0zYTEgMSAwIDAgMCAwIC0xLjQxNGwtLjA5NCAtLjA4M2ExIDEgMCAwIDAgLTEuMzIgLjA4M2wtMi4yOTQgMi4yOTJ6IiAvPjwvc3ZnPg==");
+}
+
+/* Final anniversary readability override: keep this last in the cascade. */
+@media (min-width: 768px) {
+  .v2-design .bp-day-bar-stack .bp-day-anniversary { background: color-mix(in srgb, var(--anniversary-color, var(--cal-anniversary)) 16%, #fff) !important; color: var(--anniversary-color, var(--cal-anniversary)) !important; }
+  .v2-design .bp-day-bar-stack .bp-day-anniversary > .bp-day-anniversary-label { display: block !important; color: var(--anniversary-color, var(--cal-anniversary)) !important; font-size: .56rem !important; font-weight: 800 !important; line-height: 1.15 !important; padding: 0 3px !important; }
+  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-mid > .bp-day-anniversary-label,
+  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-bar-only > .bp-day-anniversary-label { display: none !important; }
+}
+@media (max-width: 767px) {
+  .v2-design .bp-day-bar-stack .bp-day-anniversary { background: var(--anniversary-color, var(--cal-anniversary)) !important; color: #fff !important; }
+  .v2-design .bp-day-bar-stack .bp-day-anniversary > .bp-day-anniversary-label { display: none !important; }
 }
