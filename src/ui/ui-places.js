@@ -1158,7 +1158,7 @@ export function PlacesView({
       style: {
         height: '100%', boxSizing: 'border-box', padding: '0 12px', fontSize: 'var(--font-size-md)', fontWeight: 900,
         borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer',
-        backgroundColor: visitFilter === tab.key ? '#4F46E5' : 'transparent',
+        backgroundColor: visitFilter === tab.key ? 'var(--accent-primary)' : 'transparent',
         color: visitFilter === tab.key ? '#FFFFFF' : 'var(--text-muted)'
       }
     }, tab.label))
