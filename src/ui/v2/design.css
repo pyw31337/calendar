@@ -43,10 +43,7 @@
   --v2-primary-glow-sm: 0 3px 10px rgba(124, 47, 229, 0.32);
   /* Apple-like card chrome */
   --v2-card-border: #eceaf5;
-  /* Ambient depth stays soft (Apple card, not a heavy drop shadow) but the outer layer is now
-   * tinted toward brand purple instead of neutral gray + given real spread, so glass surfaces
-   * read as lifted off the page rather than merely outlined. */
-  --v2-card-shadow: 0 1px 2px rgba(30, 27, 46, 0.05), 0 10px 28px rgba(76, 29, 149, 0.09);
+  --v2-card-shadow: 0 1px 3px rgba(30, 27, 46, 0.04), 0 4px 12px rgba(30, 27, 46, 0.03);
   padding: 0 !important;
   padding-bottom: 0 !important;
   min-height: 100dvh;
@@ -83,25 +80,17 @@
   min-width: 0;
 }
 .v2-design .bp-hero-zone .bp-bento-title-brand {
-  display: inline-flex !important;
-  visibility: visible !important;
-  opacity: 1 !important;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
-  /* flex: 1 (not the default 0 1 auto) so this claims the row's free space instead of shrinking
-   * toward its own min-content the moment .bp-bento-title-actions's flex-shrink:0 icons compete
-   * for room — a title row must never squeeze the brand down to near-zero width. */
-  flex: 1 1 auto;
-  min-width: 28px;
+  min-width: 0;
   color: #fff;
 }
 .v2-design .bp-hero-zone .bp-brand-name {
-  display: inline-block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   min-width: 0;
-  max-width: 100%;
   font-weight: 800;
 }
 .v2-design .bp-hero-zone .bp-bento-title-actions { flex-shrink: 0; }
@@ -111,84 +100,80 @@
 .v2-design .bp-renewal-home-hero { margin: 0; padding: 0; }
 .v2-design .bp-empty-hero { color: rgba(255, 255, 255, 0.92); padding: 14px; font-size: 0.8rem; }
 
-/* Hero: fluid "liquid glass" gradient (Gemini/Siri-glow reference), NOT a rainbow hue sweep —
- * every stop stays inside the original mock's violet→purple→teal family (#4C1D95 / #7C3AED /
- * #22D3B8, see designv2/BentoPinkFinal-html). Technique: 3 saturated radial-gradient "blobs"
- * layered over the mock's static linear-gradient base, each traveling a WIDE, asymmetric path
- * (not a mirrored back-and-forth) inside ONE keyframes block so the blobs move out of phase with
- * each other and never visually "park" at a repeated-looking position — that's what reads as
- * organic/fluid instead of a mechanical pan. `filter` rides its own faster, independent keyframe
- * loop (saturate/contrast/hue-rotate breathing) so the color itself keeps shifting even during
- * the slow position travel — this is what makes the motion legible at a glance, not just on
- * close inspection. Blob opacity/saturation are pushed hard (0.9+, saturated hex, no muddy
- * mid-tones) so the panel reads 쨍한/비비드 rather than a soft muted wash. */
+/* Hero vivid purple mesh + dramatic aurora blobs — reinforces reference-home under .v2-design */
 .v2-design .bp-hero-zone {
-  /* 6 smaller blobs instead of 3 big ones, each on `screen` blend so overlaps optically MIX into
-   * new in-between hues (a real mesh gradient) rather than one blob simply painting over the
-   * last. Two of the six (mint + sky-blue) keep a right-anchored travel range in the keyframes
-   * below so the mock's teal corner reads as a stable color family on the right, not something
-   * the animation pans away from — the magenta/purple blobs get the wide, free-roaming travel. */
   background:
-    radial-gradient(circle at 14% 18%, rgba(217, 70, 239, 0.4) 0%, rgba(217, 70, 239, 0) 46%),
-    radial-gradient(circle at 30% 62%, rgba(139, 76, 247, 0.72) 0%, rgba(139, 76, 247, 0) 52%),
-    radial-gradient(circle at 88% 20%, rgba(56, 189, 248, 0.46) 0%, rgba(56, 189, 248, 0) 48%),
-    radial-gradient(circle at 92% 58%, rgba(45, 226, 196, 0.7) 0%, rgba(45, 226, 196, 0) 50%),
-    radial-gradient(circle at 55% 88%, rgba(88, 28, 165, 0.9) 0%, rgba(88, 28, 165, 0) 55%),
-    radial-gradient(circle at 45% 30%, rgba(124, 58, 237, 0.55) 0%, rgba(124, 58, 237, 0) 50%),
-    linear-gradient(135deg, #3B1670 0%, #6B2FD6 58%, #189E8E 100%) !important;
-  background-repeat: no-repeat !important;
-  background-size:
-    150% 150%, 160% 160%, 130% 130%, 140% 140%, 155% 155%, 145% 145%, 100% 100% !important;
-  background-blend-mode: screen, screen, screen, screen, screen, screen, normal !important;
-  animation: bp-hero-fluid-gradient 16s ease-in-out infinite, bp-hero-fluid-tone 7s ease-in-out infinite !important;
+    linear-gradient(180deg, rgba(10, 7, 38, 0.12) 0%, rgba(9, 4, 31, 0.42) 100%),
+    linear-gradient(-45deg, #12CDF0 0%, #3604FD 42%, #8019E0 76%, #3604FD 100%) !important;
+  background-size: auto, 300% 300% !important;
+  animation: bp-hero-mesh-shift 8.6s ease-in-out infinite !important;
   isolation: isolate;
 }
-.v2-design .bp-hero-zone::before,
+.v2-design .bp-hero-zone::before {
+  content: "" !important;
+  display: block !important;
+  position: absolute !important;
+  inset: -55% !important;
+  z-index: 0 !important;
+  pointer-events: none !important;
+  background:
+    radial-gradient(ellipse 85% 78% at 20% 30%, rgba(18, 205, 240, 0.92) 0%, transparent 58%),
+    radial-gradient(ellipse 80% 72% at 78% 18%, rgba(128, 25, 224, 0.9) 0%, transparent 55%),
+    radial-gradient(ellipse 74% 80% at 42% 88%, rgba(54, 4, 253, 0.92) 0%, transparent 60%) !important;
+  background-repeat: no-repeat !important;
+  mix-blend-mode: normal !important;
+  opacity: 0.9 !important;
+  animation: bp-hero-aurora-drift-a 10s ease-in-out infinite alternate !important;
+  will-change: transform, opacity;
+}
 .v2-design .bp-hero-zone::after {
-  content: none !important;
-  display: none !important;
-  animation: none !important;
+  content: "" !important;
+  display: block !important;
+  position: absolute !important;
+  inset: -58% !important;
+  z-index: 0 !important;
+  pointer-events: none !important;
+  background:
+    radial-gradient(ellipse 82% 74% at 76% 74%, rgba(128, 25, 224, 0.86) 0%, transparent 56%),
+    radial-gradient(ellipse 28% 26% at 12% 70%, rgba(18, 205, 240, 0.58) 0%, transparent 48%),
+    radial-gradient(ellipse 70% 64% at 90% 28%, rgba(54, 4, 253, 0.84) 0%, transparent 54%) !important;
+  background-repeat: no-repeat !important;
+  mix-blend-mode: soft-light !important;
+  opacity: 0.85 !important;
+  animation: bp-hero-aurora-drift-b 13s ease-in-out infinite alternate !important;
+  will-change: transform, opacity;
 }
 .v2-design .bp-hero-zone > .bp-hero-aurora {
   position: absolute !important;
-  inset: 0 !important;
+  inset: -22% !important;
   z-index: 0 !important;
   pointer-events: none !important;
-  /* Uniform dark wash (rgba(10,4,28,0.22) flat, no gradient) sits under everything else so text
-   * stays readable against the mesh no matter which bright blob happens to be under it at a given
-   * animation frame -- the vertical vignette alone (next layer) only protected the bottom third,
-   * leaving the title/D-day row at the top exposed to the screen-blended blobs at full brightness. */
   background:
-    linear-gradient(115deg, transparent 32%, rgba(255, 255, 255, 0.16) 45%, rgba(255, 255, 255, 0.32) 50%, rgba(255, 255, 255, 0.16) 55%, transparent 68%),
-    linear-gradient(180deg, rgba(15, 5, 36, 0.2) 0%, rgba(20, 6, 42, 0.16) 38%, rgba(24, 8, 48, 0.32) 78%, rgba(15, 5, 40, 0.56) 100%),
-    rgba(10, 4, 28, 0.22) !important;
-  background-repeat: no-repeat !important;
-  background-size: 260% 260%, 100% 100%, 100% 100% !important;
-  background-position: 0% 0%, 0 0, 0 0 !important;
-  animation: bp-hero-glass-sheen 6.5s ease-in-out infinite !important;
-  opacity: 1 !important;
+    radial-gradient(ellipse 88% 70% at 50% 8%, rgba(192, 132, 252, 0.45) 0%, transparent 58%),
+    linear-gradient(180deg, transparent 50%, rgba(24, 8, 48, 0.26) 80%, rgba(15, 5, 40, 0.5) 100%) !important;
+  opacity: 0.95 !important;
+  animation: bp-hero-aurora-pulse 8s ease-in-out infinite alternate !important;
+  will-change: opacity, transform;
 }
 .v2-design .bp-hero-zone > :not(.bp-hero-aurora) { position: relative; z-index: 1; }
-@keyframes bp-hero-fluid-gradient {
-  /* Layer order: magenta, purple, sky-blue(right), mint(right), violet, purple-core, [base]. */
-  0%   { background-position: 14% 18%, 30% 62%, 88% 20%, 92% 58%, 55% 88%, 45% 30%, 0% 0%; }
-  20%  { background-position: 40% 45%, 55% 20%, 78% 42%, 80% 30%, 25% 60%, 65% 65%, 0% 0%; }
-  40%  { background-position: 60% 70%, 15% 35%, 92% 65%, 70% 78%, 40% 22%, 30% 50%, 0% 0%; }
-  60%  { background-position: 25% 30%, 45% 80%, 70% 30%, 88% 40%, 65% 55%, 55% 15%, 0% 0%; }
-  80%  { background-position: 45% 60%, 20% 15%, 82% 55%, 78% 68%, 30% 80%, 40% 40%, 0% 0%; }
-  100% { background-position: 14% 18%, 30% 62%, 88% 20%, 92% 58%, 55% 88%, 45% 30%, 0% 0%; }
+@keyframes bp-hero-mesh-shift {
+  0% { background-position: 0 0, 0% 50%; }
+  50% { background-position: 0 0, 100% 50%; }
+  100% { background-position: 0 0, 0% 50%; }
 }
-/* Independent, faster loop so the panel keeps visibly changing even while a position keyframe
- * above is mid-transition — a screenshot taken at any moment still shows movement in progress. */
-@keyframes bp-hero-fluid-tone {
-  0%   { filter: saturate(1.2) contrast(1.06) brightness(0.94) hue-rotate(0deg); }
-  50%  { filter: saturate(1.45) contrast(1.12) brightness(0.98) hue-rotate(6deg); }
-  100% { filter: saturate(1.2) contrast(1.06) brightness(0.94) hue-rotate(0deg); }
+@keyframes bp-hero-aurora-drift-a {
+  0% { transform: translate3d(-32%, -24%, 0) scale(1); opacity: 0.78; }
+  50% { transform: translate3d(36%, 28%, 0) scale(1.2); opacity: 1; }
+  100% { transform: translate3d(22%, -34%, 0) scale(1.08); opacity: 0.86; }
 }
-@keyframes bp-hero-glass-sheen {
-  0%   { background-position: -40% -20%, 0 0; }
-  50%  { background-position: 60% 60%, 0 0; }
-  100% { background-position: -40% -20%, 0 0; }
+@keyframes bp-hero-aurora-drift-b {
+  0% { transform: translate3d(30%, 26%, 0) scale(1.12); opacity: 0.7; }
+  50% { transform: translate3d(-34%, -28%, 0) scale(1); opacity: 0.95; }
+  100% { transform: translate3d(-22%, 36%, 0) scale(1.18); opacity: 0.78; }
+}
+@keyframes bp-hero-aurora-pulse {
+  0% { opacity: 0.75; transform: translate3d(-18%, 10%, 0) scale(1); }
+  100% { opacity: 1; transform: translate3d(16%, -22%, 0) scale(1.12); }
 }
 .v2-design .bp-hero-zone .bp-icon-btn,
 .v2-design .bp-hero-zone .bp-renewal-shell-header-icon-btn {
@@ -199,20 +184,11 @@
   box-shadow: var(--v2-glass-dark-inset), 0 0 0 1px rgba(255,255,255,0.12), var(--v2-glass-dark-glow) !important;
 }
 .v2-design .bp-dday-compact {
-  position: relative !important;
-  overflow: hidden !important;
-  /* Diagonal sheen layer on top of the frosted fill — the same "light hitting curved glass"
-   * highlight the hero's aurora sheen uses, scaled down for a small card. */
-  background:
-    linear-gradient(125deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0.1) 28%, rgba(255, 255, 255, 0) 52%),
-    var(--v2-glass-dark-fill) !important;
-  border: 1px solid var(--v2-glass-dark-border) !important;
-  backdrop-filter: blur(28px) saturate(220%) !important;
-  -webkit-backdrop-filter: blur(28px) saturate(220%) !important;
-  box-shadow:
-    var(--v2-glass-dark-inset),
-    0 0 0 1px rgba(255, 255, 255, 0.14),
-    0 10px 28px rgba(59, 7, 100, 0.26) !important;
+  background: rgba(255, 255, 255, 0.16) !important;
+  border: 1px solid rgba(255, 255, 255, 0.52) !important;
+  backdrop-filter: var(--v2-glass-blur-strong) !important;
+  -webkit-backdrop-filter: var(--v2-glass-blur-strong) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.58), 0 8px 24px rgba(25, 8, 85, 0.24) !important;
 }
 .v2-design .bp-dday-compact-badge {
   background: linear-gradient(135deg, #7C2FE5 0%, #4F46E5 55%, #2563EB 100%) !important;
@@ -234,9 +210,6 @@
 }
 
 .v2-design .bp-day-cell { font-family: inherit; }
-/* Mock ships a 1px gap between day-num / meeting-pill / dots / anniversary bars — reads as
- * everything glued together edge-to-edge. Give the stack real breathing room at every tier. */
-.v2-design .bp-day-cell { gap: 4px !important; }
 .v2-design .bp-dday-chip {
   display: flex;
   flex-direction: column;
@@ -249,45 +222,6 @@
 .v2-design .bp-dday-strip::-webkit-scrollbar { display: none; }
 
 /* Home feed cards */
-/* Richer per-kind identity on the home summary cards — a plain white card with a thin outline
- * icon read as flat/empty even when it had content. Each kind gets its own filled, tinted icon
- * badge (chat=indigo, memo=purple, gallery=pink, places=green) plus a matching top accent bar,
- * so someone glancing at the home screen can immediately see WHICH surface has fresh activity
- * without opening it — the whole point of surfacing this on the home screen at all. */
-.v2-design .bp-bento-card.bp-is-chat,
-.v2-design .bp-bento-card.bp-is-memo,
-.v2-design .bp-bento-card.bp-is-gallery,
-.v2-design .bp-bento-card.bp-is-places {
-  position: relative;
-  overflow: hidden;
-}
-.v2-design .bp-bento-card.bp-is-chat::before,
-.v2-design .bp-bento-card.bp-is-memo::before,
-.v2-design .bp-bento-card.bp-is-gallery::before,
-.v2-design .bp-bento-card.bp-is-places::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 3px;
-}
-.v2-design .bp-bento-card.bp-is-chat::before { background: linear-gradient(90deg, #4F46E5, #818CF8); }
-.v2-design .bp-bento-card.bp-is-memo::before { background: linear-gradient(90deg, #7C2FE5, #A78BFA); }
-.v2-design .bp-bento-card.bp-is-gallery::before { background: linear-gradient(90deg, #DB2777, #F9A8D4); }
-.v2-design .bp-bento-card.bp-is-places::before { background: linear-gradient(90deg, #059669, #34D399); }
-.v2-design .bp-bento-card.bp-is-chat .bp-bento-card-icon,
-.v2-design .bp-bento-card.bp-is-memo .bp-bento-card-icon,
-.v2-design .bp-bento-card.bp-is-gallery .bp-bento-card-icon,
-.v2-design .bp-bento-card.bp-is-places .bp-bento-card-icon {
-  width: 24px !important;
-  height: 24px !important;
-  border-radius: 8px;
-  opacity: 1 !important;
-  color: #fff !important;
-}
-.v2-design .bp-bento-card.bp-is-chat .bp-bento-card-icon { background: linear-gradient(135deg, #4F46E5, #818CF8); }
-.v2-design .bp-bento-card.bp-is-memo .bp-bento-card-icon { background: linear-gradient(135deg, #7C2FE5, #A78BFA); }
-.v2-design .bp-bento-card.bp-is-gallery .bp-bento-card-icon { background: linear-gradient(135deg, #DB2777, #F9A8D4); }
-.v2-design .bp-bento-card.bp-is-places .bp-bento-card-icon { background: linear-gradient(135deg, #059669, #34D399); }
 .v2-design .bp-renewal-home-chat-item { width: 100%; padding: 0; border: 0; background: none; text-align: left; cursor: pointer; }
 .v2-design .bp-renewal-home-chat-content { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
 .v2-design .bp-chat-img { object-fit: cover; display: block; }
@@ -392,30 +326,8 @@
   display: none !important;
 }
 @media (min-width: 768px) {
-  /* Full-width, not a fluid-but-still-capped column: `min(94vw, 1100px)` still left a real
-   * unused gutter on either side at tablet widths (~23px/side at 768px, ~31px/side at 1024px)
-   * that read as an accidental empty margin rather than intentional whitespace. The tablet tier
-   * has no persistent side rail (that only starts at 1200px), so there is nothing to make room
-   * for — let the shell claim the full viewport width up to the 1100px cap and use real padding
-   * (below) for breathing room instead of a shrink-and-center margin. */
   .renewal-shell.v2-design > .bp-app-shell.is-bento-home,
-  .renewal-shell.v2-design .bp-app-shell.is-bento-home { max-width: min(100%, 1100px); }
-
-  /* reference-home.css's 20px side gutter reads cramped once the shell is full-width — widen it
-   * so tablet keeps real breathing room instead of trading "wasted outer margin" for "content
-   * flush against the edge". */
-  .v2-design .bp-hero-zone { margin-left: 28px !important; margin-right: 28px !important; }
-  .v2-design .bp-bento-title { padding-left: 28px !important; padding-right: 28px !important; }
-  .v2-design .bp-dday-toggle-wrap { padding-left: 28px !important; padding-right: 28px !important; }
-  .v2-design .bp-dday-strip { padding-left: 28px !important; padding-right: 28px !important; }
-  .v2-design .bp-bento-grid { padding: 28px !important; }
-
-  /* reference-home.css gives bento cards a near-invisible neutral shadow at this tier
-   * (0 1px 4px rgba(...,0.07)) — swap in the same purple-tinted --v2-card-shadow every other
-   * glass surface uses so the home cards read as lifted too, not just the destination cards. */
-  .v2-design .bp-bento-card {
-    box-shadow: var(--v2-card-shadow) !important;
-  }
+  .renewal-shell.v2-design .bp-app-shell.is-bento-home { max-width: 760px; }
 
   .v2-design .bp-sheet-backdrop.modal-overlay {
     align-items: center !important;
@@ -459,16 +371,18 @@
 
 @media (prefers-reduced-motion: reduce) {
   .v2-design *, .v2-design *::before, .v2-design *::after { animation: none !important; scroll-behavior: auto !important; }
-  /* Hero fluid gradient + glass sheen use !important animations — pin the resting frame (matches
-   * each keyframe's 0%/100%) and drop the tone-breathing filter entirely. */
+  /* Hero mesh + aurora use !important animation — freeze as static vivid purple */
   .v2-design .bp-hero-zone {
     animation: none !important;
-    filter: none !important;
-    background-position: 14% 18%, 30% 62%, 88% 20%, 92% 58%, 55% 88%, 45% 30%, 0% 0% !important;
+    background-size: auto, 100% 100% !important;
+    background-position: 0 0, 0% 50% !important;
   }
+  .v2-design .bp-hero-zone::before,
+  .v2-design .bp-hero-zone::after,
   .v2-design .bp-hero-zone > .bp-hero-aurora {
     animation: none !important;
-    background-position: -40% -20%, 0 0 !important;
+    transform: none !important;
+    opacity: 0.9 !important;
   }
 }
 
@@ -668,15 +582,6 @@
   }
 }
 
-/* Home activity cards (채팅/메모/갤러리/장소): 1 column on phone, 2 on tablet (reference-home.css
- * 768px tier), 4 side by side once there's room for all of them on one row -- reference-home.css's
- * 1200px tier used an asymmetric 3-column split (1.4fr 1fr 1fr) that wrapped the 4th card onto its
- * own row. The calendar card itself stays full-width via the existing `.bp-wide` grid-column
- * span, unaffected by the column count here. */
-@media (min-width: 1200px) {
-  .v2-design .bp-bento-grid { grid-template-columns: repeat(4, 1fr) !important; }
-}
-
 /* Today badge: mock-dense circle with slight inset for 2-digit days */
 .v2-design .bp-day-cell.bp-today .bp-day-num {
   width: auto !important;
@@ -699,14 +604,13 @@
   .v2-design .bp-day-cell {
     min-height: 66px !important;
     padding: 4px 2px 3px !important;
-    gap: 5px !important;
+    gap: 2px !important;
   }
 }
 @media (min-width: 1200px) {
   .v2-design .bp-day-cell {
     min-height: 84px !important;
     padding: 5px 3px 4px !important;
-    gap: 6px !important;
   }
 }
 
@@ -855,18 +759,13 @@
 /* Type scale: BentoPinkFinal mock denseness + ~5–10% only (NOT bloated #634/#635).
  * Source: reference-home.css / pc-mock-scale-baseline.png. Remap --font-size-* for screens. */
 .v2-design {
-  /* Re-anchored to the side-nav's hand-tuned mock-parity sizes (item label 14px/700,
-   * icon 18px, meta 11px/600 — see the "Side-nav mock parity" block below): body copy
-   * across the rest of the shell was still reading a full tier smaller than the nav,
-   * so every step here shifts up ~1 tier instead of chasing the mock's original sub-px
-   * values literally. */
-  --v2-fs-2xs: 0.64rem;   /* micro meta/pill — was 0.60 */
-  --v2-fs-xs: 0.72rem;    /* weekday/corner/meta — was 0.66, ~= side-nav meta 11px */
-  --v2-fs-sm: 0.82rem;    /* card summaries/labels — was 0.74 */
-  --v2-fs-md: 0.90rem;    /* primary read copy (chat/memo body) — was 0.82, ~ side-nav item 14px */
-  --v2-fs-base: 0.94rem;  /* nav-equivalent body text — was 0.88 */
-  --v2-fs-lg: 1.02rem;    /* card/section titles — was 0.94 */
-  --v2-fs-title: 1.2rem;  /* page/bento titles — was 1.12 */
+  --v2-fs-2xs: 0.60rem;   /* mock meta/pill ~0.56–0.60 */
+  --v2-fs-xs: 0.66rem;    /* mock weekday/corner ~0.60–0.66 */
+  --v2-fs-sm: 0.74rem;    /* mock memo summary 0.72 + ~3% */
+  --v2-fs-md: 0.90rem;    /* tested V2 chat body scale */
+  --v2-fs-base: 0.94rem;  /* mock nav item 0.82 + ~15%; keep the tested V2 type scale */
+  --v2-fs-lg: 0.94rem;    /* mock memo title 0.86 + ~9% */
+  --v2-fs-title: 1.2rem; /* tested V2 title scale */
   --font-size-2xs: var(--v2-fs-2xs);
   --font-size-xs: var(--v2-fs-xs);
   --font-size-sm: var(--v2-fs-sm);
@@ -1003,7 +902,7 @@
   .v2-design .bp-day-cell {
     min-height: 84px !important;
     padding: 5px 3px 4px !important;
-    gap: 6px !important;
+    gap: 2px !important;
     border-radius: 10px !important;
   }
   .v2-design .bp-day-num {
@@ -1079,20 +978,13 @@
 }
 
 @media (min-width: 768px) {
-  /* .bp-end keeps the same full height as .bp-start/.bp-solo (below) so a same-row run still
-   * reads as one unbroken capsule — only the LABEL is restricted to .bp-start/.bp-solo so the
-   * title never prints twice inside a single connected run. A run that gets cut by a week-row
-   * wrap legitimately starts a new .bp-start segment on the next row, which is exactly where the
-   * title should reappear — that's a different capsule, not a duplicate of this one. */
   .v2-design .bp-day-bar-stack .bp-day-anniversary:not(.bp-mid):not(.bp-bar-only) {
     height: auto !important;
     min-height: 1.05rem !important;
     padding: 0.08rem 0.32rem !important;
   }
-  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-start > .bp-day-anniversary-label,
-  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-solo > .bp-day-anniversary-label,
-  .v2-design .bp-day-anniversary.bp-start > .bp-day-anniversary-label,
-  .v2-design .bp-day-anniversary.bp-solo > .bp-day-anniversary-label {
+  .v2-design .bp-day-bar-stack .bp-day-anniversary:not(.bp-mid):not(.bp-bar-only) > .bp-day-anniversary-label,
+  .v2-design .bp-day-anniversary:not(.bp-mid):not(.bp-bar-only) > .bp-day-anniversary-label {
     display: block !important;
     font-size: 0.5rem !important;
     font-weight: 800 !important;
@@ -1109,8 +1001,7 @@
     min-height: 0.34rem !important;
     padding: 0 !important;
   }
-  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-mid > .bp-day-anniversary-label,
-  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-end > .bp-day-anniversary-label {
+  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-mid > .bp-day-anniversary-label {
     display: none !important;
   }
 }
@@ -1119,8 +1010,7 @@
   .v2-design .bp-day-bar-stack .bp-day-anniversary:not(.bp-mid):not(.bp-bar-only) {
     min-height: 1.1rem !important;
   }
-  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-start > .bp-day-anniversary-label,
-  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-solo > .bp-day-anniversary-label {
+  .v2-design .bp-day-bar-stack .bp-day-anniversary:not(.bp-mid):not(.bp-bar-only) > .bp-day-anniversary-label {
     font-size: 0.56rem !important;
   }
 }
@@ -1273,11 +1163,11 @@
 
 /* Shared PageHeader — stacked title/subtitle denser (mock + slight bump) */
 .v2-design .v2-page-header {
-  padding: 11px 14px 9px !important;
+  padding: 0 14px;
   min-height: 60px;
   box-sizing: border-box;
-  background: #fff !important;
-  border-bottom: 1px solid #eceaf5 !important;
+  background: #fff;
+  border-bottom: 1px solid #eceaf5;
 }
 .v2-design .v2-page-header .bp-header-row {
   align-items: center !important;
@@ -1296,16 +1186,6 @@
   font-weight: 800 !important;
   color: #1e1b2e !important;
   line-height: 1.25 !important;
-}
-.v2-design .v2-page-header .bp-header-title,
-.v2-design .v2-page-header .bp-header-sub {
-  /* At 320px a subtitle like "캘린더 불러오는 중..." plus the count label and 3-4 header icons
-   * left no room, and it wrapped onto a second line instead of the header staying one row --
-   * truncate instead. */
-  white-space: nowrap !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  max-width: 100%;
 }
 .v2-design .v2-page-header .bp-header-sub {
   font-size: 0.66rem !important;
@@ -1516,60 +1396,10 @@
 /* Vivid primary FAB / circle action */
 .v2-design .bp-fab,
 .v2-design .v2-fab-vivid {
-  position: relative;
   background: var(--v2-primary, var(--brand, #7C2FE5)) !important;
   color: #fff !important;
   border: 1px solid rgba(255, 255, 255, 0.28) !important;
   box-shadow: var(--v2-primary-glow), inset 0 1px 0 rgba(255, 255, 255, 0.28) !important;
-}
-/* Edge-light sheen: a slow, quiet light travelling around the rim (not the fast rainbow
- * "gamified" spin above — same mask-exclude ring technique, single soft-white hue, ~7x
- * slower) so the FAB's glass edge reads as lit rather than merely outlined. */
-.v2-design .bp-fab::before,
-.v2-design .v2-fab-vivid::before {
-  content: '';
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  padding: 1.5px;
-  pointer-events: none;
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  background: conic-gradient(from 0deg, transparent 0deg, transparent 260deg, rgba(255,255,255,0.9) 300deg, rgba(196,181,253,0.7) 330deg, transparent 360deg);
-  animation: bp-edge-sheen-spin 9s linear infinite;
-}
-@keyframes bp-edge-sheen-spin { to { transform: rotate(360deg); } }
-
-/* Legacy .btn-action-dark/.btn-action-outline (src/app.css, shared with the default shell --
- * left byte-for-byte unchanged there) render as a near-black #0F172A square button wherever a
- * wrapped legacy view (gallery/archive/content toolbars) supplies its own "추가"/"편집" action.
- * That flat black button breaks the vivid+glassy purple identity everywhere else in v2, so
- * recolor it here, scoped to .v2-design only. */
-.v2-design .btn-action-dark,
-.v2-design .btn.btn-action-dark {
-  background: var(--v2-primary, #7C2FE5) !important;
-  border-color: var(--v2-primary, #7C2FE5) !important;
-  color: #fff !important;
-  box-shadow: var(--v2-primary-glow-sm) !important;
-}
-.v2-design .btn-action-dark:hover,
-.v2-design .btn.btn-action-dark:hover {
-  background: #6D28D9 !important;
-  border-color: #6D28D9 !important;
-}
-.v2-design .btn-action-outline,
-.v2-design .btn.btn-action-outline {
-  background: var(--v2-glass-light-fill, rgba(255,255,255,0.88)) !important;
-  border: 1px solid var(--v2-glass-light-border, #eceaf5) !important;
-  color: var(--brand, #7C2FE5) !important;
-  box-shadow: var(--v2-glass-light-inset, inset 0 1px 0 rgba(255,255,255,0.95)), var(--v2-glass-light-shadow, 0 1px 2px rgba(30,27,46,0.04)) !important;
-}
-.v2-design .btn-action-outline:hover,
-.v2-design .btn.btn-action-outline:hover {
-  background: var(--v2-glass-light-hover-fill, rgba(243,238,255,0.78)) !important;
-  border-color: var(--v2-glass-light-hover-border, #e0d4ff) !important;
 }
 
 /* Chips / author pills / settlement badges — more chroma, crisp edge */
@@ -1605,63 +1435,4 @@
 .v2-design .bp-side-nav-item {
   border: 1px solid transparent;
   box-sizing: border-box !important;
-}
-
-/* --------------------------------------------------------------------------
- * 더보기 (More) tab -- the one Pane with no legacy view underneath, so it never
- * picked up the v2 PageHeader/glass-card chrome the rest of the shell has (see
- * MorePane's doc comment, src/ui/ui-app-shell-v2.js). Glass list-card rows using
- * the same tokens as everywhere else, not a new visual language.
- * -------------------------------------------------------------------------- */
-.v2-design .v2-more-list {
-  list-style: none;
-  margin: 0;
-  padding: var(--v2-dest-content-pad-y, 12px) var(--v2-dest-content-pad-x, 14px) 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.v2-design .v2-more-item {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 13px 14px;
-  border-radius: var(--radius-md, 12px);
-  background: var(--v2-glass-light-fill, rgba(255,255,255,0.88));
-  border: 1px solid var(--v2-glass-light-border, #eceaf5);
-  box-shadow: var(--v2-glass-light-inset, inset 0 1px 0 rgba(255,255,255,0.95)), var(--v2-glass-light-shadow, 0 1px 2px rgba(30,27,46,0.04));
-  color: var(--text-main, #1e1b2e);
-  font-size: var(--v2-fs-md);
-  font-weight: 700;
-  text-align: left;
-  cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
-}
-.v2-design .v2-more-item:hover {
-  background: var(--v2-glass-light-hover-fill, rgba(243,238,255,0.78));
-  border-color: var(--v2-glass-light-hover-border, #e0d4ff);
-}
-.v2-design .v2-more-item.is-active {
-  color: var(--brand, #7C2FE5);
-  border-color: var(--v2-glass-purple-border, rgba(124,47,229,0.26));
-  background: var(--brand-soft, #F3EEFF);
-}
-.v2-design .v2-more-item-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  color: var(--brand, #7C2FE5);
-  flex-shrink: 0;
-}
-.v2-design .v2-more-item-icon svg { width: 18px; height: 18px; }
-.v2-design .v2-more-item-label { flex: 1; }
-.v2-design .v2-more-item-chevron { color: var(--text-light, #83798f); flex-shrink: 0; }
-.v2-design .v2-more-note {
-  text-align: center;
-  padding: 4px 20px 20px;
-  font-size: var(--v2-fs-xs);
-  color: var(--text-muted, #6b6580);
 }

@@ -3424,7 +3424,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     /*#__PURE__*/React.createElement("div", {
     className: "settlement-page-header",
     style: {
-      position: 'fixed', top: 'env(safe-area-inset-top, 0px)', left: 0, right: 0, height: '56px',
+      position: 'fixed', top: 'env(safe-area-inset-top, 0px)', left: 0, right: 0, height: '60px',
       display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px',
       backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)',
       zIndex: 1010, transition: 'transform 0.3s ease',
@@ -3457,10 +3457,10 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   UnderlineTabs && /*#__PURE__*/React.createElement("div", {
     className: "settlement-page-tabs",
     style: {
-      position: 'fixed', top: `calc(${isSettlementSearchOpen ? 104 : 56}px + env(safe-area-inset-top, 0px))`, left: 0, right: 0, zIndex: 1009,
+      position: 'fixed', top: `calc(${isSettlementSearchOpen ? 108 : 60}px + env(safe-area-inset-top, 0px))`, left: 0, right: 0, zIndex: 1009,
       width: '100%', backgroundColor: 'var(--bg-card)',
       transition: 'transform 0.3s ease, top 0.3s ease',
-      transform: isHeaderVisible ? 'translateY(0)' : 'translateY(calc(-100% - 56px))'
+      transform: isHeaderVisible ? 'translateY(0)' : 'translateY(calc(-100% - 60px))'
     }
   }, /*#__PURE__*/React.createElement(UnderlineTabs, {
     className: "settlement-view-tabs",
@@ -3474,7 +3474,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   /*#__PURE__*/React.createElement("div", {
     className: "settlement-page-body",
     onScroll: handleSettlementScroll,
-    style: { flex: '1 1 auto', overflowY: 'auto', padding: `calc(${isSettlementSearchOpen ? 152 : 104}px + env(safe-area-inset-top, 0px)) 16px 16px`, display: 'flex', flexDirection: 'column', gap: '14px', minHeight: 0, overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }
+    style: { flex: '1 1 auto', overflowY: 'auto', padding: `calc(${isSettlementSearchOpen ? 156 : 108}px + env(safe-area-inset-top, 0px)) 16px 16px`, display: 'flex', flexDirection: 'column', gap: '14px', minHeight: 0, overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }
   },
     /* 1. Settlement Cards (Positioned ABOVE metrics grid) -- no cards means no section at all,
        not an empty-state placeholder; the 정산 목록 modal already covers "no settlement cards

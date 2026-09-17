@@ -541,9 +541,9 @@ export const PAGE_HEADER_ICON_BTN_STYLE = {
 };
 
 export const PAGE_HEADER_BACK_BTN_STYLE = {
-  width: '36px',
-  height: '36px',
-  borderRadius: '50%',
+  width: '28px',
+  height: '28px',
+  borderRadius: 0,
   backgroundColor: 'transparent',
   border: 'none',
   display: 'flex',
@@ -557,14 +557,13 @@ export const PAGE_HEADER_BACK_BTN_STYLE = {
 export const PAGE_HEADER_ACTIONS_WRAP_STYLE = {
   display: 'flex',
   alignItems: 'center',
-  gap: '8px',
+  justifyContent: 'flex-end',
+  gap: '4px',
+  minWidth: '56px',
   flexShrink: 0
 };
 
 export const PAGE_HEADER_TITLE_STYLE = {
-  position: 'absolute',
-  left: '50%',
-  transform: 'translateX(-50%)',
   display: 'flex',
   alignItems: 'center',
   fontWeight: 800,
@@ -573,8 +572,8 @@ export const PAGE_HEADER_TITLE_STYLE = {
   whiteSpace: 'nowrap',
   overflow: 'hidden',
   textOverflow: 'ellipsis',
-  maxWidth: 'calc(100vw - 120px)',
-  pointerEvents: 'none'
+  minWidth: 0,
+  flex: '1 1 auto'
 };
 
 export function SegmentedToggle({ options, value, onChange, disabled, style, ariaLabel }) {

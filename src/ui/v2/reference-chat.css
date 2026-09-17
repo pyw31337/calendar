@@ -14,16 +14,14 @@
 
     .v2-chat .bp-app-shell { width: 100%; max-width: 480px; margin: 0 auto; background: var(--bg-primary); min-height: 100%; }
 
-    .v2-chat .bp-header {
-      position: sticky; top: 0; background: var(--bg-card); z-index: 5; padding: 12px 14px 10px;
-      border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; gap: 8px;
-    }
-    .v2-chat .bp-back-btn { background: none; border: none; color: var(--text-main); cursor: pointer; padding: 4px; display: inline-flex; }
+    .v2-chat .bp-header { position: sticky; top: 0; height: 60px; box-sizing: border-box; background: var(--bg-card); z-index: 5; padding: 0 14px; border-bottom: 1px solid var(--border-subtle); }
+    .v2-chat .bp-header-row { height: 100%; display: flex; align-items: center; gap: 8px; }
+    .v2-chat .bp-back-btn { width: 28px; height: 28px; justify-content: center; background: none; border: none; color: var(--text-main); cursor: pointer; padding: 4px; display: inline-flex; }
     .v2-chat .bp-header-title { font-weight: 800; font-size: 0.96rem; color: var(--text-main); }
     .v2-chat .bp-header-sub { font-size: 0.64rem; color: var(--text-light); font-weight: 700; }
     .v2-chat .bp-header-actions { margin-left: auto; display: flex; gap: 4px; }
-    .v2-chat .bp-icon-btn { background: none; border: none; color: var(--text-muted); padding: 7px; display: inline-flex; cursor: pointer; border-radius: var(--radius-full); }
-    .v2-chat .bp-icon-btn:hover { background: var(--bg-primary); color: var(--brand); }
+    .v2-chat .bp-icon-btn { width: 28px; height: 28px; justify-content: center; background: transparent; border: 0; color: var(--text-muted); padding: 5px; display: inline-flex; cursor: pointer; border-radius: 0; }
+    .v2-chat .bp-icon-btn:hover { background: transparent; color: var(--brand); }
     .v2-chat .bp-date-divider { text-align: center; padding: 14px 0 10px; }
     .v2-chat .bp-date-divider span { display: inline-block; background: var(--bg-primary); color: var(--text-light); font-size: 0.66rem; font-weight: 700; padding: 4px 12px; border-radius: var(--radius-full); }
 
