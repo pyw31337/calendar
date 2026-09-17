@@ -1558,6 +1558,7 @@ function MediaPane({ recordsContext, calendarName, onChangeView, onOpenAppSettin
     React.createElement('div', { className: 'v2-records-media' },
       renderGalleryScreen({
         legacyView: galleryView,
+        calendar: recordsContext.calendar,
         subtitle: calendarName || undefined,
         onBack: () => onChangeView('calendar'),
         onShare: recordsContext.onOpenGalleryShare,
@@ -1597,6 +1598,7 @@ function ContentPane({ recordsContext, calendarName, onChangeView, onOpenAppSett
   });
   return renderContentScreen({
     legacyView: contentView,
+    calendar: recordsContext.calendar,
     subtitle: calendarName || undefined,
     onBack: () => onChangeView('calendar'),
     onMenu: onOpenSideNav || onOpenAppSettings,
@@ -1632,6 +1634,7 @@ function HistoryPane({ recordsContext, calendarContext, calendarName, onChangeVi
   return React.createElement(React.Fragment, null,
     renderArchiveScreen({
       legacyView: historyView,
+      calendar: recordsContext.calendar,
       subtitle: calendarName || undefined,
       onBack: () => onChangeView('calendar'),
       onShare: recordsContext.onOpenHistoryShare,
