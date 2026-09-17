@@ -1167,6 +1167,25 @@
 }
 .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search-label { display: none; }
 
+/* Home summary module: calendar stays as the full-width lead card, while its
+ * four lower sections form a predictable responsive matrix. */
+.v2-design .bp-bento-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+}
+.v2-design .bp-bento-grid > .bp-bento-card:first-child.bp-wide {
+  grid-column: 1 / -1;
+}
+@media (min-width: 768px) and (max-width: 1199px) {
+  .v2-design .bp-bento-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .v2-design .bp-bento-grid > .bp-bento-card:first-child.bp-wide { grid-column: 1 / -1; }
+}
+@media (max-width: 767px) {
+  .v2-design .bp-bento-grid { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .v2-design .bp-bento-grid > .bp-bento-card:first-child.bp-wide { grid-column: 1; }
+}
+
 /* Integrated search is a first-class destination, not a drawer overlay. Keep the
  * existing search/result component and give it the same content gutters as the
  * other V2 destinations. */
