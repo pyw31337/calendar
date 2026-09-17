@@ -182,6 +182,27 @@ const TAB_ICON_NODES = {
   ],
   chevronRight: [['path', { d: 'm9 18 6-6-6-6' }]],
   chevronLeft: [['path', { d: 'm15 18-6-6 6-6' }]],
+  search: [
+    ['circle', { cx: 11, cy: 11, r: 8 }],
+    ['path', { d: 'm21 21-4.3-4.3' }],
+  ],
+  plus: [
+    ['path', { d: 'M12 5v14' }],
+    ['path', { d: 'M5 12h14' }],
+  ],
+  list: [
+    ['rect', { x: 4, y: 4, width: 16, height: 16, rx: 2 }],
+    ['path', { d: 'M8 9h8M8 13h8M8 17h5' }],
+  ],
+  link: [
+    ['path', { d: 'M9 17H7A5 5 0 0 1 7 7h2' }],
+    ['path', { d: 'M15 7h2a5 5 0 1 1 0 10h-2' }],
+    ['path', { d: 'M8 12h8' }],
+  ],
+  file: [
+    ['path', { d: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z' }],
+    ['path', { d: 'M14 2v6h6' }],
+  ],
 };
 
 function TabIcon({ id }) {
@@ -1028,7 +1049,7 @@ export function buildRenewalChatContext(calendar, deps) {
  * uses) rather than the main bundle, so this needs the same "wait for the chunk, then render"
  * step the 더보기 tab's share/manual/anniversaries entries needed (`buildRenewalMoreContext`).
  */
-function ChatPane({ chatContext, onChangeView, onOpenAppSettings, onOpenSideNav, onRegisterNoticeOpener }) {
+function ChatPane({ chatContext, onChangeView, onOpenAppSettings, onOpenSideNav, onRegisterMenuActions }) {
   const React = window.React;
   const [loaded, setLoaded] = React.useState(() => !!(window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChatRoomView));
   React.useEffect(() => {
@@ -1054,7 +1075,7 @@ function ChatPane({ chatContext, onChangeView, onOpenAppSettings, onOpenSideNav,
       onChangeView,
       onShare: chatContext.onOpenChatShare,
       onOpenAppSettings,
-      onRegisterNoticeOpener,
+      onRegisterMenuActions,
     }),
     chatContext.isChatShareOpen && React.createElement(ShareModal, {
       calendar: chatContext.calendar, shareType: 'chat', showToast: chatContext.showToast,
@@ -1113,7 +1134,7 @@ export function buildRenewalSettlementContext(calendar, deps) {
  * lazy-loaded chunk as `PollModal`/`AnniversaryModal` (`window.__gatherLoadEventUi`), so this
  * needs the same "wait for the chunk" step.
  */
-function SettlementPane({ settlementContext, onChangeView, onOpenAppSettings, onOpenDate, onOpenSideNav }) {
+function SettlementPane({ settlementContext, onChangeView, onOpenAppSettings, onOpenDate, onOpenSideNav, onRegisterMenuActions }) {
   const React = window.React;
   const [loaded, setLoaded] = React.useState(() => !!(window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SettlementSummaryModal));
   React.useEffect(() => {
@@ -1139,6 +1160,7 @@ function SettlementPane({ settlementContext, onChangeView, onOpenAppSettings, on
       onOpenShare: settlementContext.onOpenShare,
       onOpenAppSettings,
       onChangeView,
+      onRegisterMenuActions,
     }),
 
     settlementContext.isShareOpen && React.createElement(ShareModal, {
@@ -1390,7 +1412,7 @@ export function buildRenewalRecordsContext(calendar, deps) {
  * chunk as `ChatRoomView` (`window.__gatherLoadChatUi`), so this waits for that chunk before
  * rendering -- identical "wait-then-open" step `ChatPane` already uses.
  */
-function MediaPane({ recordsContext, calendarName, onChangeView, onOpenAppSettings, onOpenSideNav }) {
+function MediaPane({ recordsContext, calendarName, onChangeView, onOpenAppSettings, onOpenSideNav, onRegisterMenuActions }) {
   const React = window.React;
   const [loaded, setLoaded] = React.useState(() => !!(window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChatGalleryModal));
   React.useEffect(() => {
@@ -1413,6 +1435,7 @@ function MediaPane({ recordsContext, calendarName, onChangeView, onOpenAppSettin
     onOpenShare: recordsContext.onOpenGalleryShare,
     onOpenAppSettings,
     v2Embed: true,
+    onRegisterMenuActions,
   });
   return React.createElement(React.Fragment, null,
     React.createElement('div', { className: 'v2-records-media' },
@@ -1445,7 +1468,7 @@ function clickLegacyAriaButton(ariaLabel, scopeSelector) {
 }
 
 /** 콘텐츠 subtab body (WP-06 continuation): the existing ContentView with unchanged app-main props. */
-function ContentPane({ recordsContext, calendarName, onChangeView, onOpenAppSettings, onOpenSideNav }) {
+function ContentPane({ recordsContext, calendarName, onChangeView, onOpenAppSettings, onOpenSideNav, onRegisterMenuActions }) {
   const React = window.React;
   const { ContentView } = bindUiComponentAliases(React);
   const contentView = React.createElement(ContentView, {
@@ -1453,6 +1476,7 @@ function ContentPane({ recordsContext, calendarName, onChangeView, onOpenAppSett
     onBack: () => onChangeView('calendar'),
     onOpenAppSettings,
     v2Embed: true,
+    onRegisterMenuActions,
   });
   return renderContentScreen({
     legacyView: contentView,
@@ -1475,7 +1499,7 @@ function ContentPane({ recordsContext, calendarName, onChangeView, onOpenAppSett
  * reasoning. `calendarContext` is threaded down through `RecordsPane` just for
  * `dateModalProps`'s data/handlers.
  */
-function HistoryPane({ recordsContext, calendarContext, calendarName, onChangeView, onOpenAppSettings, onOpenSideNav, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource }) {
+function HistoryPane({ recordsContext, calendarContext, calendarName, onChangeView, onOpenAppSettings, onOpenSideNav, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource, onRegisterMenuActions }) {
   const React = window.React;
   const [historyDateModalDate, setHistoryDateModalDate] = React.useState(null);
   const { HistoryView, ShareModal, DateModal } = bindUiComponentAliases(React);
@@ -1486,6 +1510,7 @@ function HistoryPane({ recordsContext, calendarContext, calendarName, onChangeVi
     onOpenShare: recordsContext.onOpenHistoryShare,
     onOpenAppSettings,
     v2Embed: true,
+    onRegisterMenuActions,
   });
   return React.createElement(React.Fragment, null,
     renderArchiveScreen({
@@ -1527,7 +1552,7 @@ function HistoryPane({ recordsContext, calendarContext, calendarName, onChangeVi
  * `calendarContext.dateModalProps` (already built at `RenewalAppShell` level) for the modal's
  * data/handlers, since those don't depend on which component owns the "which date is open" state.
  */
-function PlacesPane({ recordsContext, calendarContext, onChangeView, onOpenAppSettings, onOpenSideNav, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource }) {
+function PlacesPane({ recordsContext, calendarContext, onChangeView, onOpenAppSettings, onOpenSideNav, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource, onRegisterMenuActions }) {
   const React = window.React;
   const [loaded, setLoaded] = React.useState(() => !!(window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlacesView));
   React.useEffect(() => {
@@ -1557,6 +1582,7 @@ function PlacesPane({ recordsContext, calendarContext, onChangeView, onOpenAppSe
       },
       onSharePlaces: recordsContext.onOpenPlacesShare,
       onOpenAppSettings,
+      onRegisterMenuActions,
     }),
 
     recordsContext.isPlacesShareOpen && React.createElement(ShareModal, {
@@ -1582,7 +1608,7 @@ function PlacesPane({ recordsContext, calendarContext, onChangeView, onOpenAppSe
  * `ChatPane`/`SettlementPane`. `MemoView` ships in its own lazy-loaded chunk
  * (`window.__gatherLoadViewUi('memo')`), so this waits for that chunk before rendering.
  */
-function MemoPane({ recordsContext, onChangeView, onOpenAppSettings, onOpenSideNav }) {
+function MemoPane({ recordsContext, onChangeView, onOpenAppSettings, onOpenSideNav, onRegisterMenuActions }) {
   const React = window.React;
   const [loaded, setLoaded] = React.useState(() => !!(window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MemoView));
   React.useEffect(() => {
@@ -1606,6 +1632,7 @@ function MemoPane({ recordsContext, onChangeView, onOpenAppSettings, onOpenSideN
       onBack: () => onChangeView('calendar'),
       onOpenShare: recordsContext.onOpenMemoShare,
       onOpenAppSettings,
+      onRegisterMenuActions,
     }),
 
     recordsContext.isMemoShareOpen && React.createElement(ShareModal, {
@@ -1615,7 +1642,7 @@ function MemoPane({ recordsContext, onChangeView, onOpenAppSettings, onOpenSideN
   );
 }
 
-function RecordsPane({ subTab, onSelectSubTab, calendarName, recordsContext, calendarContext, onChangeView, onOpenAppSettings, onOpenSideNav, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource }) {
+function RecordsPane({ subTab, onSelectSubTab, calendarName, recordsContext, calendarContext, onChangeView, onOpenAppSettings, onOpenSideNav, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource, onRegisterMenuActions }) {
   const React = window.React;
   // Memo/Places are first-class destinations — never show renewal-shell-subtab chrome for them.
   React.useEffect(() => {
@@ -1641,13 +1668,13 @@ function RecordsPane({ subTab, onSelectSubTab, calendarName, recordsContext, cal
         ),
     React.createElement('div', { className: 'v2-records-body' },
     subTab === 'media'
-      ? React.createElement(MediaPane, { recordsContext, calendarName, onChangeView, onOpenAppSettings, onOpenSideNav })
+      ? React.createElement(MediaPane, { recordsContext, calendarName, onChangeView, onOpenAppSettings, onOpenSideNav, onRegisterMenuActions })
       : subTab === 'content'
-      ? React.createElement(ContentPane, { recordsContext, calendarName, onChangeView, onOpenAppSettings, onOpenSideNav })
+      ? React.createElement(ContentPane, { recordsContext, calendarName, onChangeView, onOpenAppSettings, onOpenSideNav, onRegisterMenuActions })
       : subTab === 'all'
       ? React.createElement(RecordsOverviewPane, { recordsContext, calendarName, onSelectSubTab, onChangeView })
       : subTab === 'archive'
-      ? React.createElement(HistoryPane, { recordsContext, calendarContext, calendarName, onChangeView, onOpenAppSettings, onOpenSideNav, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource })
+      ? React.createElement(HistoryPane, { recordsContext, calendarContext, calendarName, onChangeView, onOpenAppSettings, onOpenSideNav, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource, onRegisterMenuActions })
       : React.createElement(EmptyState, {
         title: `${RECORDS_SUBTABS.find(t => t.id === subTab)?.label || subTab} (준비 중)`,
         subtitle: withCalendarPrefix(calendarName, '갤러리·보관함·콘텐츠는 기록 허브에 남아 있습니다. 메모·장소는 사이드 메뉴의 독립 페이지입니다.'),
@@ -2029,13 +2056,26 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   const [isSideNavOpen, setIsSideNavOpen] = React.useState(false);
   const [isSideNavCollapsed, setIsSideNavCollapsed] = React.useState(false);
   // PC (>=1200px): the side-nav is always visible, so its own bottom section is where each tab's
-  // "메뉴" content that used to live behind a mobile-only hamburger now lives instead. Chat is the
-  // one tab with content unique to it (공지사항/pinned notice) -- ChatRoomView registers its own
-  // opener here via onRegisterNoticeOpener (ui-chat-room.js) since that panel's state is local to
-  // it. A ref (not state) because the side-nav button just needs to call whatever's current when
-  // clicked; re-rendering the whole shell on every chat message (which changes the opener's
-  // closure) would be wasteful.
-  const chatNoticeOpenerRef = React.useRef(null);
+  // "메뉴" content that used to live behind a mobile-only hamburger now lives instead. Every
+  // per-tab screen component (ChatRoomView, SettlementSummaryModal, ChatGalleryModal, PlacesView,
+  // MemoView, ContentView, HistoryView) registers its own named actions here via an
+  // onRegisterMenuActions prop, since that state (search-open flags, upload/compose triggers,
+  // etc.) is local to each of those components. A ref (not state) because the side-nav buttons
+  // only need to call whatever's current when clicked; re-rendering the whole shell on every
+  // registration (e.g. every chat message, which changes the closure) would be wasteful.
+  const tabMenuActionsRef = React.useRef({});
+  // Stable per-tab registrar functions (a fresh closure every render would make each screen's
+  // registration effect re-run every render too, since its dependency array includes this prop).
+  const menuActionRegistrarsRef = React.useRef({});
+  const getMenuActionsRegistrar = (tabId) => {
+    if (!menuActionRegistrarsRef.current[tabId]) {
+      menuActionRegistrarsRef.current[tabId] = (actions) => {
+        if (actions) tabMenuActionsRef.current[tabId] = actions;
+        else delete tabMenuActionsRef.current[tabId];
+      };
+    }
+    return menuActionRegistrarsRef.current[tabId];
+  };
   // Which of the 4 real 더보기 modals (share/anniversaries/manual/app-settings) is open, if any -- local to
   // this shell (see buildRenewalMoreContext's doc comment for why this doesn't reuse
   // CalendarApp's own isShareOpen/isAnniversariesOpen/isGuideOpen state).
@@ -2248,6 +2288,46 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
     .replace(/\s+/g, ' ')
     .trim();
 
+  // Per-tab side-nav submenu content (see the `is-tab-menu` group inside `bentoSideNav` below).
+  // 캘린더's three items are static (openMoreModalById covers them directly); every other tab's
+  // items dispatch through tabMenuActionsRef, keyed by `action`, since that tab's own screen
+  // component registers the actual handler (search toggle, upload trigger, etc.) itself.
+  const TAB_MENU_ITEM_CONFIGS = {
+    calendar: [
+      { key: 'calendar-settings', label: '캘린더 설정', icon: 'calendar', onClick: () => openMoreModalById('calendar-settings') },
+      { key: 'anniversaries', label: '기념일 설정', icon: 'gift', onClick: () => openMoreModalById('anniversaries') },
+      { key: 'manual', label: '사용자 매뉴얼', icon: 'manual', onClick: () => { setIsSideNavOpen(false); openMoreModalById('manual'); } },
+    ],
+    chat: [
+      { key: 'chat-search', label: '대화검색', icon: 'search', action: 'search' },
+      { key: 'chat-notice', label: '공지사항', icon: 'more', action: 'notice' },
+    ],
+    settlement: [
+      { key: 'settlement-search', label: '정산 검색', icon: 'search', action: 'search' },
+      { key: 'settlement-create', label: '정산 생성', icon: 'plus', action: 'create' },
+      { key: 'settlement-list', label: '정산 목록', icon: 'list', action: 'list' },
+    ],
+    gallery: [
+      { key: 'gallery-search', label: '갤러리 검색', icon: 'search', action: 'search' },
+      { key: 'gallery-upload-image', label: '이미지 업로드', icon: 'gallery', action: 'uploadImage' },
+      { key: 'gallery-upload-file', label: '파일 업로드', icon: 'file', action: 'uploadFile' },
+      { key: 'gallery-upload-link', label: '링크 업로드', icon: 'link', action: 'uploadLink' },
+    ],
+    places: [
+      { key: 'places-search', label: '장소 검색', icon: 'search', action: 'search' },
+      { key: 'places-register', label: '장소 등록', icon: 'places', action: 'register' },
+    ],
+    memo: [
+      { key: 'memo-search', label: '메모 검색', icon: 'search', action: 'search' },
+    ],
+    content: [
+      { key: 'content-register', label: '컨텐츠 등록', icon: 'plus', action: 'register' },
+    ],
+    archive: [
+      { key: 'archive-search', label: '보관함 검색', icon: 'search', action: 'search' },
+    ],
+  };
+
   const bentoSideNav = React.createElement(React.Fragment, null,
     React.createElement('div', { className: bentoClass('side-nav-head') },
       React.createElement('div', { className: bentoClass('side-nav-brand') },
@@ -2319,36 +2399,33 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
         );
       })
     ),
-    React.createElement('div', { className: bentoClass('side-nav-group renewal-shell-side-nav-group is-settings') },
-      React.createElement('button', { type: 'button', className: bentoClass('side-nav-item renewal-shell-side-nav-quick-item'), title: '캘린더 설정', onClick: () => openMoreModalById('calendar-settings') },
-        React.createElement('span', { className: bentoClass('side-nav-item-icon') }, React.createElement(TabIcon, { id: 'calendar' })),
-        React.createElement('span', { className: bentoClass('side-nav-item-title') }, '캘린더 설정')
-      ),
-      React.createElement('button', { type: 'button', className: bentoClass('side-nav-item renewal-shell-side-nav-quick-item'), title: '기념일 설정', onClick: () => openMoreModalById('anniversaries') },
-        React.createElement('span', { className: bentoClass('side-nav-item-icon') }, React.createElement(TabIcon, { id: 'gift' })),
-        React.createElement('span', { className: bentoClass('side-nav-item-title') }, '기념일 설정')
-      ),
-      React.createElement('button', { type: 'button', className: bentoClass('side-nav-item renewal-shell-side-nav-quick-item'), title: '사용자 매뉴얼', onClick: () => { setIsSideNavOpen(false); openMoreModalById('manual'); } },
-        React.createElement('span', { className: bentoClass('side-nav-item-icon') }, React.createElement(TabIcon, { id: 'manual' })),
-        React.createElement('span', { className: bentoClass('side-nav-item-title') }, '사용자 매뉴얼')
-      )
-    ),
-    // PC-only (hidden on the mobile drawer via CSS, see .bp-side-nav-group.bp-is-tab-menu):
-    // the side-nav is always visible on PC, so this is where each tab's own extra menu content
-    // (previously reachable only through that tab's mobile-only "메뉴" hamburger) lives instead.
-    // Chat is the only tab with content unique to it right now (공지사항) -- Settlement/Gallery's
-    // own "메뉴" buttons only ever opened the generic 앱 설정 modal, already covered by 설정 below.
-    activeTab === 'chat' && React.createElement('div', { className: bentoClass('side-nav-group renewal-shell-side-nav-group is-tab-menu') },
-      React.createElement('button', {
-        type: 'button',
-        className: bentoClass('side-nav-item renewal-shell-side-nav-quick-item'),
-        title: '공지사항',
-        onClick: () => chatNoticeOpenerRef.current?.(),
-      },
-        React.createElement('span', { className: bentoClass('side-nav-item-icon') }, React.createElement(TabIcon, { id: 'more' })),
-        React.createElement('span', { className: bentoClass('side-nav-item-title') }, '공지사항')
-      )
-    ),
+    // PC-only (hidden on the mobile drawer via CSS, see .bp-side-nav-group.bp-is-tab-menu): the
+    // side-nav is always visible on PC, so this is where each tab's own extra menu content
+    // (previously reachable only through that tab's mobile-only "메뉴" hamburger) lives instead --
+    // a single dynamic group whose items change with the active tab, replacing what used to be a
+    // static "캘린더 설정/기념일 설정/사용자 매뉴얼" block (that's simply 캘린더 탭's own entry
+    // below now) plus a chat-only 공지사항 item. Actions for tabs other than 캘린더 come from
+    // each screen's own onRegisterMenuActions registration (tabMenuActionsRef, above) since that
+    // state (search-open flags, upload/compose triggers) is local to each of those components.
+    (() => {
+      const groupKey = activeTab === 'records'
+        ? (recordsSubTab === 'media' ? 'gallery' : recordsSubTab === 'archive' ? 'archive' : recordsSubTab === 'content' ? 'content' : null)
+        : activeTab;
+      const items = TAB_MENU_ITEM_CONFIGS[groupKey];
+      if (!items) return null;
+      return React.createElement('div', { className: bentoClass('side-nav-group renewal-shell-side-nav-group is-tab-menu') },
+        items.map(item => React.createElement('button', {
+          key: item.key,
+          type: 'button',
+          className: bentoClass('side-nav-item renewal-shell-side-nav-quick-item'),
+          title: item.label,
+          onClick: typeof item.onClick === 'function' ? item.onClick : () => tabMenuActionsRef.current[groupKey]?.[item.action]?.(),
+        },
+          React.createElement('span', { className: bentoClass('side-nav-item-icon') }, React.createElement(TabIcon, { id: item.icon })),
+          React.createElement('span', { className: bentoClass('side-nav-item-title') }, item.label)
+        ))
+      );
+    })(),
     React.createElement('div', { className: bentoClass('side-nav-footer renewal-shell-side-nav-footer') },
       React.createElement('button', { type: 'button', className: bentoClass('side-nav-item renewal-shell-side-nav-quick-item'), title: '공유', onClick: () => openMoreModalById('share') },
         React.createElement('span', { className: bentoClass('side-nav-item-icon') }, React.createElement(TabIcon, { id: 'share' })),
@@ -2375,15 +2452,15 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
         activeTab === 'calendar'
           ? React.createElement(CalendarPane, { calendarContext, recordsContext, onOpenDate: setDateModalDate, onChangeView, calendarName, onOpenSearch: () => handleSelectMoreItem('search'), onOpenMore: () => setIsSideNavOpen(true) })
           : activeTab === 'chat'
-          ? React.createElement(ChatPane, { chatContext, onChangeView, onOpenAppSettings, onOpenSideNav: () => setIsSideNavOpen(true), onRegisterNoticeOpener: fn => { chatNoticeOpenerRef.current = fn; } })
+          ? React.createElement(ChatPane, { chatContext, onChangeView, onOpenAppSettings, onOpenSideNav: () => setIsSideNavOpen(true), onRegisterMenuActions: getMenuActionsRegistrar('chat') })
           : activeTab === 'memo'
-          ? React.createElement(MemoPane, { recordsContext, onChangeView, onOpenAppSettings, onOpenSideNav: () => setIsSideNavOpen(true) })
+          ? React.createElement(MemoPane, { recordsContext, onChangeView, onOpenAppSettings, onOpenSideNav: () => setIsSideNavOpen(true), onRegisterMenuActions: getMenuActionsRegistrar('memo') })
           : activeTab === 'places'
-          ? React.createElement(PlacesPane, { recordsContext, calendarContext, onChangeView, onOpenAppSettings, onOpenSideNav: () => setIsSideNavOpen(true), onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource })
+          ? React.createElement(PlacesPane, { recordsContext, calendarContext, onChangeView, onOpenAppSettings, onOpenSideNav: () => setIsSideNavOpen(true), onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource, onRegisterMenuActions: getMenuActionsRegistrar('places') })
           : activeTab === 'settlement'
-          ? React.createElement(SettlementPane, { settlementContext, onChangeView, onOpenAppSettings, onOpenDate: setDateModalDate, onOpenSideNav: () => setIsSideNavOpen(true) })
+          ? React.createElement(SettlementPane, { settlementContext, onChangeView, onOpenAppSettings, onOpenDate: setDateModalDate, onOpenSideNav: () => setIsSideNavOpen(true), onRegisterMenuActions: getMenuActionsRegistrar('settlement') })
           : activeTab === 'records'
-          ? React.createElement(RecordsPane, { subTab: recordsSubTab, onSelectSubTab: setRecordsSubTab, calendarName, recordsContext, calendarContext, onChangeView, onOpenAppSettings, onOpenSideNav: () => setIsSideNavOpen(true), onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource })
+          ? React.createElement(RecordsPane, { subTab: recordsSubTab, onSelectSubTab: setRecordsSubTab, calendarName, recordsContext, calendarContext, onChangeView, onOpenAppSettings, onOpenSideNav: () => setIsSideNavOpen(true), onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource, onRegisterMenuActions: getMenuActionsRegistrar(recordsSubTab === 'media' ? 'gallery' : recordsSubTab === 'archive' ? 'archive' : recordsSubTab) })
           : activeTab === 'more'
           ? React.createElement(MorePane, { calendarName, selectedItem: selectedMoreItem, onSelectItem: handleSelectMoreItem, onOpenSideNav: () => setIsSideNavOpen(true) })
           : React.createElement(PlaceholderPane, { tabId: activeTab, calendarName }),

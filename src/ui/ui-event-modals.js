@@ -2960,7 +2960,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
   )));
 }
 
-export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenShare, onOpenAppSettings, onChangeView, onOpenCreateSettlement, onOpenSettlementEditor, onToggleSettlementCardStatus, onDeleteSettlementCard, onSaveSettlementCard, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, historyCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null, showToast, onRequestConfirm, renderV2 }) {
+export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenShare, onOpenAppSettings, onChangeView, onOpenCreateSettlement, onOpenSettlementEditor, onToggleSettlementCardStatus, onDeleteSettlementCard, onSaveSettlementCard, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, historyCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null, showToast, onRequestConfirm, renderV2, onRegisterMenuActions = null }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -3046,6 +3046,18 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   const [settlementSearchQuery, setSettlementSearchQuery] = React.useState('');
   const [isSettlementSearchOpen, setIsSettlementSearchOpen] = React.useState(false);
   const [openMenuCardId, setOpenMenuCardId] = React.useState(null);
+  // v2 shell (PC): the side-nav's per-tab submenu needs these three actions -- previously only
+  // reachable via this component's own asPage 메뉴 overlay (isSettlementMenuOpen), which v2
+  // always redirects to the shared side-nav drawer instead (see ui-app-shell-v2.js SettlementPane).
+  React.useEffect(() => {
+    if (typeof onRegisterMenuActions !== 'function') return undefined;
+    onRegisterMenuActions({
+      search: () => setIsSettlementSearchOpen(true),
+      create: handleOpenCreateSettlement,
+      list: () => setIsSettlementListOpen(true),
+    });
+    return () => onRegisterMenuActions(null);
+  }, [onRegisterMenuActions]);
   const [collapsedDailyRows, setCollapsedDailyRows] = React.useState({});
   const categories = getExpenseCategories(calendar);
   const baseBudget = Number.isFinite(Number(calendar?.settlementBaseBudget)) ? Math.max(0, Math.round(Number(calendar.settlementBaseBudget))) : 0;

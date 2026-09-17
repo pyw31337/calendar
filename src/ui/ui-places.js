@@ -810,7 +810,7 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
 }
 
 export function PlacesView({
-  onOpenAppSettings, onChangeView, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, historyCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null, calendar, onBack, onSavePlace, onDeletePlace, showToast, onRequestConfirm, placesInitialQuery, setPlacesInitialQuery, placesInitialFocusId, setPlacesInitialFocusId, isDarkTheme, onToggleTheme, fontScalePercent, onDecreaseFont, onIncreaseFont, isChatNotifyEnabled, onToggleChatNotifications, onSharePlaces, onSelectDate, syncStatus = null, renderV2 }) {
+  onOpenAppSettings, onChangeView, chatCount = 0, settlementBadge = null, galleryCount = 0, placeCount = 0, memoCount = 0, historyCount = 0, chatLastAuthor = null, settlementLastDate = null, galleryLastDate = null, placeLastName = null, memoLastTitleWord = null, calendar, onBack, onSavePlace, onDeletePlace, showToast, onRequestConfirm, placesInitialQuery, setPlacesInitialQuery, placesInitialFocusId, setPlacesInitialFocusId, isDarkTheme, onToggleTheme, fontScalePercent, onDecreaseFont, onIncreaseFont, isChatNotifyEnabled, onToggleChatNotifications, onSharePlaces, onSelectDate, syncStatus = null, renderV2, onRegisterMenuActions = null }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -903,6 +903,17 @@ export function PlacesView({
   const [listSearchQuery, setListSearchQuery] = React.useState('');
   const [isPlacesMenuOpen, setIsPlacesMenuOpen] = React.useState(false);
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
+  // v2 shell (PC): side-nav's per-tab submenu needs 장소 검색/장소 등록 -- 장소 등록 already has
+  // a FAB (onCompose, see renderV2 usage below) but the search toggle above is otherwise local
+  // to this component.
+  React.useEffect(() => {
+    if (typeof onRegisterMenuActions !== 'function') return undefined;
+    onRegisterMenuActions({
+      search: () => setIsSearchOpen(true),
+      register: () => { setEditingPlace(null); setIsRegisterOpen(true); },
+    });
+    return () => onRegisterMenuActions(null);
+  }, [onRegisterMenuActions]);
   // Per-date memo entry being edited inline (comment-style), keyed `${placeId}::${entry.date}` so
   // only one entry across all place cards is in edit mode at a time.
   const [editingMemoEntryKey, setEditingMemoEntryKey] = React.useState(null);

@@ -429,7 +429,8 @@ export function ChatGalleryModal({
   onIndexedPhotoLoadAll = null,
   onPasteGatherPhoto = null,
   onPasteGatherPhotos = null,
-  syncStatus = null
+  syncStatus = null,
+  onRegisterMenuActions = null
 }) {
   const React = window.React;
   // The full-page gallery owns scrolling through .gallery-page-scroll.  Lock the document
@@ -1412,6 +1413,21 @@ export function ChatGalleryModal({
     setIsAddingLink(prev => !prev);
     setLinkUrlInput('');
   };
+  // v2 shell (PC): the side-nav's per-tab submenu needs to reach this gallery's own
+  // 검색/업로드 actions (previously only reachable via this component's own asPage 메뉴
+  // overlay, which v2 always redirects elsewhere -- see ui-app-shell-v2.js MediaPane). Each
+  // upload action switches to the tab it belongs to first since the "추가" control for
+  // links/files only renders while that tab is active.
+  React.useEffect(() => {
+    if (typeof onRegisterMenuActions !== 'function') return undefined;
+    onRegisterMenuActions({
+      search: () => setIsSearchOpen(true),
+      uploadImage: () => { setActiveTab('photos'); handleUploadClick(); },
+      uploadFile: () => { setActiveTab('files'); handleUploadClick(); },
+      uploadLink: () => { setActiveTab('links'); setIsAddingLink(true); },
+    });
+    return () => onRegisterMenuActions(null);
+  }, [onRegisterMenuActions]);
   const handleSubmitLinkInput = async () => {
     if (typeof onAddLink !== 'function' || isSavingLink) return;
     const url = extractFirstUrl(linkUrlInput);
