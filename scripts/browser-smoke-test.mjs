@@ -292,8 +292,7 @@ async function checkRenewalShellRoutes(browser, baseUrl) {
         // The records panes intentionally overlap the tab strip while settling; dispatch the
         // semantic click so this state-transition assertion is not dependent on hit-testing.
         await page.getByRole('tab', { name: label, exact: true }).dispatchEvent('click');
-        await page.waitForTimeout(250);
-        if (!new URL(page.url()).searchParams.get('sub')?.includes(expected)) throw new Error(`기록 ${label} 클릭 후 sub=${new URL(page.url()).searchParams.get('sub') || '(없음)'}`);
+        await page.waitForFunction(expectedSub => new URL(window.location.href).searchParams.get('sub') === expectedSub, expected, { timeout: 3000 });
       }
       pass(`[${viewport.name}] V2 기록 서브탭 클릭 전환`);
 
