@@ -888,10 +888,19 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
   // gallery/meeting upload documents, then show the latest three rows. The previous V2
   // implementation promoted whichever image happened to be newest, which could surface a
   // gallery image instead of the same text/image/text sequence as the original.
-  const meetingPhotoMessageIds = getMeetingOwnedPhotoMessageIds(calendarContext?.calendar);
-  const visibleMessages = allMessages.filter(message => isChatRenderableMessage(message, meetingPhotoMessageIds));
-  const messages = visibleMessages.slice(-3);
-  const memos = Array.isArray(calendarContext?.memos) ? latestRows(calendarContext.memos).slice(0, 2) : [];
+  const meetingPhotoMessageIds = React.useMemo(
+    () => getMeetingOwnedPhotoMessageIds(calendarContext?.calendar),
+    [calendarContext?.calendar]
+  );
+  const messages = React.useMemo(() => {
+    const visibleMessages = allMessages.filter(message => isChatRenderableMessage(message, meetingPhotoMessageIds));
+    return visibleMessages.slice(-3);
+  }, [allMessages, meetingPhotoMessageIds]);
+  const memoItems = calendarContext?.memos;
+  const memos = React.useMemo(
+    () => (Array.isArray(memoItems) ? latestRows(memoItems).slice(0, 2) : []),
+    [memoItems]
+  );
   const photoItems = calendarContext?.galleryPhotoIndex?.items;
   const photos = React.useMemo(() => (Array.isArray(photoItems)
     ? photoItems
@@ -904,7 +913,11 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
       })
       .slice(0, 9)
     : []), [photoItems]);
-  const places = Array.isArray(calendarContext?.places) ? latestRows(calendarContext.places).slice(0, 2) : [];
+  const placeItems = calendarContext?.places;
+  const places = React.useMemo(
+    () => (Array.isArray(placeItems) ? latestRows(placeItems).slice(0, 2) : []),
+    [placeItems]
+  );
   const participants = Array.isArray(calendarContext?.calendar?.participants) ? calendarContext.calendar.participants : [];
   const participantFor = row => participants.find(p => p && (p.id === row?.participantId || p.name === row?.senderName || p.name === row?.author));
   const displayName = row => authorFor(row, participants).name;
