@@ -283,6 +283,23 @@
   padding: 0;
   backdrop-filter: none;
 }
+
+/* ---- Settings modal (사이드메뉴 > 설정): backdrop-sheet treatment, same pattern as the
+ * date/event sheet above -- PC unchanged (centered), mobile becomes a full-width bottom sheet.
+ * "app-settings-*" are extra modifier classes on top of the shared .modal-overlay/
+ * .modal-container (used by ~15 other modals) so only this modal is affected. */
+@media (max-width: 767px) {
+  .v2-design .app-settings-overlay {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+  .v2-design .app-settings-modal-container {
+    width: 100% !important;
+    max-width: none !important;
+    border-radius: 20px 20px 0 0 !important;
+    margin: 0 !important;
+  }
+}
 .v2-design .bp-event-sheet.modal-container {
   position: fixed;
   left: 50%;
