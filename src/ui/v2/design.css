@@ -1708,20 +1708,20 @@
   display: flex;
   align-items: center;
   box-sizing: border-box;
-  height: 32px;
-  min-height: 32px;
-  margin: 0 0 14px;
+  height: 40px;
+  min-height: 40px;
+  margin: 0 0 16px;
   padding: 0;
-  gap: 8px;
+  gap: 10px;
   color: var(--text-main, #1e1b2e);
 }
 .v2-design .bp-renewal-home-summary-heading-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex: 0 0 18px;
-  width: 18px;
-  height: 18px;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
   margin: 0;
   color: var(--brand, #7c2fe5);
   line-height: 1;
@@ -1734,8 +1734,12 @@
   height: 100%;
   margin: 0;
   color: var(--text-main, #1e1b2e);
-  font-size: .72rem;
-  font-weight: 800;
+  /* Match the calendar month title ("2026년 9월") size so 채팅/메모/갤러리/장소 read as
+   * the same weight of heading as the calendar card right above them. !important needed:
+   * the generic .bp-bento-card-title rules elsewhere in this file set font-size !important,
+   * which always wins over a non-important declaration regardless of selector specificity. */
+  font-size: 1.3rem !important;
+  font-weight: 800 !important;
   line-height: 1;
   letter-spacing: 0;
 }
@@ -1759,20 +1763,8 @@
 }
 
 @media (max-width: 767px) {
-  .v2-design .bp-renewal-home-summary-heading {
-    height: 30px;
-    min-height: 30px;
-    margin-bottom: 12px;
-    gap: 7px;
-  }
-  .v2-design .bp-renewal-home-summary-heading-icon {
-    flex-basis: 17px;
-    width: 17px;
-    height: 17px;
-  }
-  .v2-design .bp-renewal-home-summary-heading .bp-bento-card-title {
-    font-size: .7rem;
-  }
+  /* Heading/icon/title stay the same size as desktop here (matching the calendar month
+   * title's own flat, non-responsive 1.3rem) -- only the "전체보기" link stays compact. */
   .v2-design .bp-renewal-home-summary-heading .bp-more-link {
     height: 30px;
     font-size: .66rem;
