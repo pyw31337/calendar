@@ -2729,6 +2729,7 @@ export function EditMessageModal({
   message,
   calendar,
   onSave,
+  onDeleteMessage,
   onClose,
   onRequestConfirm,
   showToast
@@ -2744,6 +2745,7 @@ export function EditMessageModal({
   const ParticipantPickerButton = __comp.ParticipantPickerButton || __deps.ParticipantPickerButton;
   const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer || (function Shell(p) { return React.createElement('div', p, p.children); });
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
+  const TrashIcon = __comp.TrashIcon || __deps.TrashIcon;
   const autoGrowTextarea = __deps.autoGrowTextarea;
   const appendChatImageFiles = __deps.appendChatImageFiles;
   const classifyChatComposerFiles = __deps.classifyChatComposerFiles
@@ -2875,6 +2877,12 @@ export function EditMessageModal({
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleDeleteFromEdit = () => {
+    if (isSubmitting || typeof onDeleteMessage !== 'function') return;
+    onDeleteMessage(message);
+    onClose();
   };
 
   const insertEmojiIntoEditInput = (emoji) => {
@@ -3153,6 +3161,19 @@ export function EditMessageModal({
       onClick: () => setIsPartSheetOpen(true)
     }),
     /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "btn",
+        disabled: isSubmitting,
+        onClick: handleDeleteFromEdit,
+        title: "삭제",
+        style: {
+          height: '44px', minHeight: '44px', fontSize: 'var(--font-size-base)', padding: '0 14px',
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+          border: '1px solid #EF4444', color: '#EF4444', background: 'var(--bg-card)',
+          borderRadius: 'var(--radius-sm)', cursor: isSubmitting ? 'not-allowed' : 'pointer'
+        }
+      }, TrashIcon ? /*#__PURE__*/React.createElement(TrashIcon, { size: 16 }) : '삭제'),
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "btn btn-secondary",

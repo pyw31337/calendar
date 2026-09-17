@@ -886,7 +886,9 @@ export function ChatRoomView({
     // link -- see focusChatMessage in app-main.js) -- both render identically, the same purple
     // border + up/down shake as the in-chat search feature has always used.
     const isSearchFocused = (isSearchMatch && rowId === focusedMsgId) || (!!externalFocusMessageId && rowId === externalFocusMessageId);
-    const showOwnNamePill = typeof renderV2 === 'function' && isMe;
+    // V2 follows the reference chat: the sender's own bubble is right-aligned without a
+    // duplicate name badge. Incoming bubbles keep their participant badge.
+    const showOwnNamePill = false;
     renderedMessages.push(/*#__PURE__*/React.createElement("div", {
       key: rowId,
       className: `msg-row-hover ${revealedMsgId === rowId ? 'msg-actions-revealed' : ''}${showOwnNamePill ? ' msg-row-own-with-pill' : ''}`,
@@ -914,7 +916,7 @@ export function ChatRoomView({
       key: "meta",
       style: {
         display: 'flex',
-        flexDirection: 'column',
+        flexDirection: 'row',
         justifyContent: 'flex-end',
         alignItems: 'flex-end',
         alignSelf: 'flex-end',
@@ -925,7 +927,7 @@ export function ChatRoomView({
         padding: '2px 0'
       }
     },
-      /* Top: Reply + Delete buttons */
+      /* Top: Reply button (delete is available from the edit view) */
       /*#__PURE__*/React.createElement("div", {
         style: { display: 'flex', alignItems: 'center', gap: '4px' }
       },
@@ -937,40 +939,23 @@ export function ChatRoomView({
           style: {
             width: '24px',
             height: '24px',
-            border: 'none',
-            background: 'none',
+            border: '1px solid var(--border-subtle)',
+            backgroundColor: 'var(--bg-card)',
+            borderRadius: 'var(--radius-sm)',
             padding: 0,
             cursor: 'pointer',
-            color: 'var(--text-light)',
+            color: 'var(--text-muted)',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'flex-end'
+            justifyContent: 'center'
           }
-        }, /*#__PURE__*/React.createElement(ReplyIcon, { size: 15 })),
-        /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          className: "msg-actions-group",
-          onClick: () => onDeleteMessage && onDeleteMessage(msg),
-          title: "삭제",
-          style: {
-            width: '24px',
-            height: '24px',
-            border: 'none',
-            background: 'none',
-            padding: 0,
-            cursor: 'pointer',
-            color: 'var(--text-light)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'flex-end'
-          }
-        }, /*#__PURE__*/React.createElement(TrashIcon, { size: 13 }))
+        }, /*#__PURE__*/React.createElement(ReplyIcon, { size: 15 }))
       ),
       /* Bottom: Edit button + Timestamp */
       /*#__PURE__*/React.createElement("div", {
         style: {
           display: 'flex',
-          flexDirection: 'column',
+          flexDirection: 'row',
           alignItems: 'flex-end',
           gap: '4px'
         }

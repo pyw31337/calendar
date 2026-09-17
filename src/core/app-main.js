@@ -6535,6 +6535,7 @@ function CalendarApp() {
       message: editingMessage,
       calendar: activeCal,
       onSave: handleSaveEditMessage,
+      onDeleteMessage: handleDeleteMessage,
       onClose: () => setEditingMessage(null),
       onRequestConfirm: showConfirmDialog,
       showToast: showToast
