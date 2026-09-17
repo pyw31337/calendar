@@ -406,8 +406,14 @@
 .v2-design .bp-day-cell { gap: 4px; }
 .v2-design .bp-day-head-row { gap: 5px 6px; }
 .v2-design .bp-dot-row { gap: 4px !important; align-items: center; justify-content: center; }
-.v2-design .bp-p-dot { display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; }
-.v2-design .bp-p-dot::after { display: inline-flex; align-items: center; justify-content: center; }
+/* Name-badge text centering: reference-home.css's own rule sets line-height:1.4 on the
+ * ::after text and 1px 6px padding, and that fractional multiplier on top of a rem-based
+ * font-size produces a non-integer line-box height, which the browser then has to round
+ * asymmetrically between top/bottom -- the pixel-off vertical (and, combined with letter
+ * spacing, horizontal) centering reported for the name pills. line-height:1 removes that
+ * fractional multiplier entirely; flex centering on both the pill and its text handles the rest. */
+.v2-design .bp-p-dot { display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; line-height: 1; }
+.v2-design .bp-p-dot::after { display: inline-flex; align-items: center; justify-content: center; line-height: 1 !important; }
 
 /* Anniversary color semantics: desktop uses a readable tinted surface and
  * dark category text; narrow layouts intentionally collapse to a solid bar. */
@@ -627,13 +633,17 @@
   }
 }
 
-/* Today badge: mock-dense circle with slight inset for 2-digit days */
+/* Today badge: fixed whole-pixel width/height per breakpoint (not em-based) so the circle's
+ * own box is never a fractional pixel size -- an em value here inherits the cell's rem-based
+ * font-size, and a fractional container width forces the browser to round its two edges
+ * independently, which is what actually put the numeral visibly off-center, not the flex
+ * centering itself (already correct). Padding stays 0 since width/height alone size the pill. */
 .v2-design .bp-day-cell.bp-today .bp-day-num {
-  width: auto;
-  height: auto;
-  min-width: 1.85em;
-  min-height: 1.85em;
-  padding: 0.18em 0.35em;
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  min-height: 22px;
+  padding: 0;
   box-sizing: border-box;
   line-height: 1;
   font-size: inherit !important;
@@ -642,6 +652,16 @@
 }
 .v2-design .bp-day-cell.bp-today .bp-day-num::after {
   inset: -3px;
+}
+@media (min-width: 768px) {
+  .v2-design .bp-day-cell.bp-today .bp-day-num {
+    width: 24px; height: 24px; min-width: 24px; min-height: 24px;
+  }
+}
+@media (min-width: 1200px) {
+  .v2-design .bp-day-cell.bp-today .bp-day-num {
+    width: 27px; height: 27px; min-width: 27px; min-height: 27px;
+  }
 }
 
 /* Day cells: mock denseness (ref 60/76px) + ~8–10% for bar stack */
@@ -764,14 +784,14 @@
 /* Name pills — mock 0.56rem + ~7% */
 @media (min-width: 768px) {
   .v2-design .bp-p-dot {
-    padding: 1px 6px !important;
+    padding: 2px 7px !important;
   }
   .v2-design .bp-p-dot::after {
     font-size: 0.6rem !important;
     font-weight: 800 !important;
-    line-height: 1.35 !important;
+    line-height: 1 !important;
   }
-  .v2-design .bp-dot-row { gap: 3px !important; }
+  .v2-design .bp-dot-row { gap: 5px !important; }
 }
 
 /* Calendar cell type hierarchy — mock denseness + ~8% */
@@ -962,12 +982,13 @@
     -webkit-line-clamp: 2;
   }
   .v2-design .bp-p-dot {
-    padding: 1px 6px !important;
+    padding: 2px 7px !important;
   }
   .v2-design .bp-p-dot::after {
     font-size: 0.6rem !important;
+    line-height: 1 !important;
   }
-  .v2-design .bp-dot-row { gap: 3px !important; }
+  .v2-design .bp-dot-row { gap: 5px !important; }
   .v2-design .bp-day-bar-stack {
     gap: 0.16rem;
   }
@@ -1058,6 +1079,37 @@
   .v2-design .bp-day-bar-stack .bp-day-anniversary:not(.bp-mid):not(.bp-bar-only) > .bp-day-anniversary-label {
     font-size: 0.56rem !important;
   }
+}
+
+/* Range (연일 다일) festival bars: one spanning grid child per week row (see
+ * computeFestivalBars/festivalBars in ui-app-shell-v2.js), NOT nested inside .bp-day-bar-stack.
+ * The general "hide by default, show only inside .bp-day-bar-stack" progressive-disclosure
+ * rule above (.v2-design .bp-day-anniversary .bp-day-anniversary-label { display: none }) would
+ * otherwise also match this label and never get un-hidden -- give it its own always-applicable
+ * visibility instead of relying on that container-scoped toggle. */
+.v2-design .festival-bar-desktop .bp-day-anniversary-label {
+  display: block !important;
+  font-size: 0.56rem !important;
+  font-weight: 800 !important;
+  line-height: 1.15 !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+@media (min-width: 1200px) {
+  .v2-design .festival-bar-desktop .bp-day-anniversary-label { font-size: 0.58rem !important; }
+}
+/* Keep the festival-bar desktop/mobile split on the same breakpoint as every other v2
+ * anniversary badge (768px) instead of app.css's default-shell breakpoint (640px), which would
+ * otherwise show the PC banner between 641-767px while solo badges already show the mobile bar. */
+@media (max-width: 767px) {
+  .v2-design .festival-bar-desktop { display: none !important; }
+  .v2-design .festival-bar-mobile { display: flex !important; }
+}
+@media (min-width: 768px) {
+  .v2-design .festival-bar-desktop { display: flex !important; }
+  .v2-design .festival-bar-mobile { display: none !important; }
 }
 
 /* Holiday + 모임확정 on one row (e.g. 추석 연휴 | 모임확정) */

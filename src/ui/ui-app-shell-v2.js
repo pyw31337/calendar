@@ -463,35 +463,63 @@ function RenewalHero({ meetings, calendar, onSelectDate }) {
  */
 
 
-/** YYYY-MM-DD ± n days (local noon to avoid DST edge). */
-function shiftDateStr(dateStr, deltaDays) {
-  const d = new Date(`${dateStr}T12:00:00`);
-  if (Number.isNaN(d.getTime())) return null;
-  d.setDate(d.getDate() + deltaDays);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
 /**
- * Multi-day (연일) range anniversary → start / mid / end / solo for connected bar radii.
- * Week-row aware: Sunday never continues left, Saturday never continues right (grid wraps).
+ * Multi-day (연일) range anniversaries can't visually cross a week-row boundary in a 7-col
+ * grid, so — same approach as the default-shell calendar (ui-calendar-core.js festivalBars) —
+ * each week row gets its own spanning bar segment, placed as an explicit grid child (gridRow/
+ * gridColumn) rather than glued together from separate per-cell divs with negative margins.
+ * That per-cell approach is what caused the reported bug: a 2-day range with no "mid" segment
+ * rendered a label in BOTH its start and end cell (both "not mid"), reading as duplicated,
+ * visually-cut text. One spanning bar per row row fixes both the duplication and the seam.
  */
-function anniversarySpanRole(ann, dateStr) {
-  const start = ann && ann.startDate;
-  const end = ann && ann.endDate;
-  const isMulti = ann && ann.type === 'range' && start && end && start < end
-    && dateStr >= start && dateStr <= end;
-  if (!isMulti) return 'solo';
-  const d = new Date(`${dateStr}T12:00:00`);
-  if (Number.isNaN(d.getTime())) return 'solo';
-  const dow = d.getDay(); // 0 Sun … 6 Sat
-  const prevStr = shiftDateStr(dateStr, -1);
-  const nextStr = shiftDateStr(dateStr, 1);
-  const contLeft = dateStr !== start && prevStr && prevStr >= start && dow !== 0;
-  const contRight = dateStr !== end && nextStr && nextStr <= end && dow !== 6;
-  if (!contLeft && contRight) return 'start';
-  if (contLeft && !contRight) return 'end';
-  if (contLeft && contRight) return 'mid';
-  return 'solo';
+function computeFestivalBars(days, anniversariesList) {
+  const bars = [];
+  const rowCount = Math.ceil(days.length / 7);
+  for (let row = 0; row < rowCount; row++) {
+    const rowDays = days.slice(row * 7, row * 7 + 7);
+    const byId = new Map();
+    rowDays.forEach((day, col) => {
+      getAnniversariesForDate(day.dateStr, anniversariesList).forEach(ann => {
+        if (ann.type !== 'range') return;
+        if (!byId.has(ann.id)) byId.set(ann.id, { ...ann, row, startCol: col, endCol: col });
+        else byId.get(ann.id).endCol = col;
+      });
+    });
+    byId.forEach(bar => bars.push(bar));
+  }
+  // A festival spanning multiple week rows produces one segment per row above — number them in
+  // row order per festival id so only the true start/end edge (not a row-wrap seam) gets rounded.
+  const spanIndexById = new Map();
+  bars.forEach(bar => {
+    const nextIndex = spanIndexById.has(bar.id) ? spanIndexById.get(bar.id) + 1 : 0;
+    spanIndexById.set(bar.id, nextIndex);
+    bar.spanIndex = nextIndex;
+  });
+  const totalSegmentsById = new Map();
+  bars.forEach(bar => totalSegmentsById.set(bar.id, (totalSegmentsById.get(bar.id) || 0) + 1));
+  bars.forEach(bar => {
+    bar.totalSegments = totalSegmentsById.get(bar.id);
+    bar.isFirstSegment = bar.spanIndex === 0;
+    bar.isLastSegment = bar.spanIndex === bar.totalSegments - 1;
+  });
+  // Greedy interval-graph coloring so overlapping festivals in the same row stack instead of
+  // painting on top of each other (same idea a day-grid calendar like FullCalendar uses).
+  const barsByRow = new Map();
+  bars.forEach(bar => {
+    if (!barsByRow.has(bar.row)) barsByRow.set(bar.row, []);
+    barsByRow.get(bar.row).push(bar);
+  });
+  barsByRow.forEach(rowBars => {
+    rowBars.sort((a, b) => a.startCol - b.startCol);
+    const levelEnds = [];
+    rowBars.forEach(bar => {
+      let level = levelEnds.findIndex(endCol => endCol < bar.startCol);
+      if (level === -1) level = levelEnds.length;
+      levelEnds[level] = bar.endCol;
+      bar.level = level;
+    });
+  });
+  return bars;
 }
 
 function BentoCalendarCard({ calendarContext, onSelectDate }) {
@@ -592,6 +620,11 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
   const now = new Date();
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
+  const festivalBars = React.useMemo(
+    () => computeFestivalBars(days, anniversariesList),
+    [days.map(d => d.dateStr).join('|'), anniversariesList]
+  );
+
   return React.createElement('div', { className: bentoClass('cal-card') },
     // Month nav
     React.createElement('div', { className: bentoClass('cal-month-nav-row'), style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', position: 'relative' } },
@@ -653,7 +686,7 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
 
     // Days grid
       React.createElement('div', { className: bentoClass('cal-days-grid'), style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', rowGap: '1px' } },
-      days.map(day => {
+      days.map((day, dayIdx) => {
         const { dayNum, dateStr, isCurrentMonth } = day;
         const cellDate = new Date(dateStr);
         const dayOfWeek = cellDate.getDay();
@@ -675,7 +708,9 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
             dots.push(p);
           }
         });
-        const anns = getAnniversariesForDate(dateStr, anniversariesList);
+        // Range (연일 다일) anniversaries render once per week row as a spanning grid bar
+        // (see festivalBars below) instead of per-cell — only solo/single-day ones live here.
+        const anns = getAnniversariesForDate(dateStr, anniversariesList).filter(ann => ann.type !== 'range');
         const cellClasses = [
           'day-cell',
           !isCurrentMonth ? 'other-month' : '',
@@ -688,6 +723,11 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
           key: dateStr,
           className: bentoClass(cellClasses),
           type: 'button',
+          // Explicit grid placement (not auto-flow): the festival-bar grid children below are
+          // also explicitly placed, and CSS Grid places every explicitly-positioned item BEFORE
+          // auto-placing the rest regardless of DOM order — without this, a festival bar would
+          // claim day6/day7's auto-placement slot first and bump those day cells to the next row.
+          style: { gridRowStart: Math.floor(dayIdx / 7) + 1, gridColumnStart: (dayIdx % 7) + 1 },
           onClick: () => onSelectDate?.(dateStr),
           'aria-label': `${dateStr} 일정 상세`,
         },
@@ -709,26 +749,93 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
               style: { background: p.color || 'var(--brand)' },
             }))
           ) : null,
-          // Anniversary bars only in the stack (pink --cal-anniversary). Meeting pill lives in day-head-row.
-          // Range (연일) keeps start/mid/end radius classes from #636/#637.
+          // Solo (single-day) anniversary bars only. Meeting pill lives in day-head-row.
           anns.length > 0 ? React.createElement('div', { className: bentoClass('day-bar-stack') },
-            // Progressive disclosure: label in DOM; CSS shows on PC/wide, hides on mobile/narrow.
             anns.slice(0, 4).map((ann, annIdx) => {
-              const role = anniversarySpanRole(ann, dateStr);
               const title = ann.title || '기념일';
               const displayColor = getAnniversaryDisplayColor(ann, calendar) || 'var(--cal-anniversary)';
               return React.createElement('div', {
                 key: ann.id || `${dateStr}_ann_${annIdx}`,
-                className: bentoClass(`day-anniversary ${role} ${ann.category ? `cat-${String(ann.category).toLowerCase()}` : ''} ${ann.genre ? `genre-${String(ann.genre).toLowerCase()}` : ''}`.trim()),
+                className: bentoClass(`day-anniversary solo ${ann.category ? `cat-${String(ann.category).toLowerCase()}` : ''} ${ann.genre ? `genre-${String(ann.genre).toLowerCase()}` : ''}`.trim()),
                 title,
                 'aria-label': title,
                 style: { '--anniversary-color': displayColor },
-              }, role === 'start' || role === 'solo' ? React.createElement('span', {
+              }, React.createElement('span', {
                 className: bentoClass('day-anniversary-label'),
-              }, title) : null);
+              }, title));
             })
           ) : null
         );
+      }),
+
+      // Range (연일 다일) anniversaries: one connected bar per week row, placed as an explicit
+      // grid child spanning startCol..endCol on that row (see computeFestivalBars above) —
+      // mirrors ui-calendar-core.js's festivalBars so a multi-day badge never looks cut in half
+      // or repeats its title, and reuses app.css's .festival-bar-desktop/-mobile display toggle
+      // (PC = translucent fill + solid title text; mobile = solid color line, no text).
+      festivalBars.flatMap(bar => {
+        const displayColor = getAnniversaryDisplayColor(bar, calendar) || '#F76AAD';
+        const gridPlacementStyle = {
+          gridRowStart: bar.row + 1,
+          gridColumnStart: bar.startCol + 1,
+          gridColumnEnd: bar.endCol + 2,
+          alignItems: 'flex-end',
+          pointerEvents: 'none',
+          boxSizing: 'border-box',
+          position: 'relative',
+          zIndex: 2,
+          minWidth: 0,
+        };
+        const barRadius = bar.totalSegments === 1
+          ? 'var(--radius-sm, 6px)'
+          : bar.isFirstSegment
+            ? '999px 0 0 999px'
+            : bar.isLastSegment
+              ? '0 999px 999px 0'
+              : '0';
+        return [
+          React.createElement('div', {
+            key: `festival-bar-desktop-${bar.id}-${bar.row}`,
+            className: 'festival-bar-desktop',
+            style: { ...gridPlacementStyle, display: 'flex' },
+          }, React.createElement('div', {
+            className: bentoClass('day-anniversary'),
+            title: bar.title,
+            'aria-label': bar.title,
+            style: {
+              width: '100%',
+              height: '1.1rem',
+              minHeight: '1.1rem',
+              marginBottom: bar.level > 0 ? `calc((1.1rem + 2px) * ${bar.level})` : undefined,
+              background: `color-mix(in srgb, ${displayColor} 15%, #fff)`,
+              borderRadius: barRadius,
+              padding: '0.08rem 0.32rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-start',
+              boxSizing: 'border-box',
+              color: displayColor,
+            },
+          }, React.createElement('span', {
+            className: bentoClass('day-anniversary-label'),
+            style: { color: displayColor, opacity: 1 },
+          }, bar.title))),
+          React.createElement('div', {
+            key: `festival-bar-mobile-${bar.id}-${bar.row}`,
+            className: 'festival-bar-mobile',
+            style: { ...gridPlacementStyle, display: 'none' },
+          }, React.createElement('div', {
+            style: {
+              width: '100%',
+              height: '0.34rem',
+              minHeight: '0.34rem',
+              marginBottom: bar.level > 0 ? `calc((0.34rem + 2px) * ${bar.level})` : undefined,
+              background: displayColor,
+              borderRadius: barRadius,
+              boxSizing: 'border-box',
+            },
+          })),
+        ];
       })
     ),
 
