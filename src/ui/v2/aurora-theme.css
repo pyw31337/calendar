@@ -31,7 +31,12 @@
     radial-gradient(ellipse 40% 38% at 56% 54%, rgba(54, 4, 253, 0.8) 0%, transparent 68%) !important;
   mix-blend-mode: screen !important;
   animation: bp-reactbits-aurora-flow 6.1s ease-in-out infinite alternate !important;
-  will-change: transform, opacity;
+  /* No will-change here (unlike the ::before/::after drift layers) -- transform/opacity already
+     get their own compositing layer once animated, and pairing `will-change: transform` with
+     `mix-blend-mode: screen` on this specific layer produces a hard, non-looping vertical seam
+     in Chromium (reproduced in isolation: the bar disappears the instant either will-change or
+     the screen blend mode is removed, and reappears with both back). Root cause is a browser
+     compositing quirk, not our animation math, so dropping the now-redundant hint is the fix. */
 }
 @keyframes bp-reactbits-aurora-flow {
   0% { transform: translate3d(-12%, 8%, 0) scale(1); opacity: 0.72; }
