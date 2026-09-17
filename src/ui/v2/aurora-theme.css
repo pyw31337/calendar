@@ -139,6 +139,36 @@
   }
 }
 
+/* Mobile performance/containment guard. Large animated, blurred layers are
+ * expensive to repaint on narrow devices and their negative inset can escape
+ * the rounded card's paint area in Chromium. Keep the same aurora palette but
+ * render one stable, clipped composition on phones. */
+@media (max-width: 767px) {
+  .v2-design .bp-hero-zone {
+    overflow: hidden;
+    isolation: isolate;
+    contain: paint;
+    clip-path: inset(0 round 16px);
+    border-radius: 16px !important;
+    background-size: auto, 100% 100% !important;
+    background-position: 0 0, 50% 50% !important;
+    animation: none !important;
+  }
+  .v2-design .bp-hero-zone::before,
+  .v2-design .bp-hero-zone::after,
+  .v2-design .bp-hero-zone > .bp-hero-aurora {
+    inset: 0 !important;
+    filter: blur(24px);
+    transform: none !important;
+    animation: none !important;
+    will-change: auto !important;
+    mix-blend-mode: normal;
+  }
+  .v2-design .bp-hero-zone::before,
+  .v2-design .bp-hero-zone::after { opacity: .78 !important; }
+  .v2-design .bp-hero-zone > .bp-hero-aurora { opacity: .62 !important; }
+}
+
 /* V2 calendar readability: larger navigation and weekday rhythm. */
 .v2-design .bp-cal-month-title {
   font-size: clamp(1.05rem, 1.4vw, 1.32rem);
