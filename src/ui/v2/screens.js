@@ -144,10 +144,10 @@ function pageSubtitle(calendar, trailing) {
   return name || extra || undefined;
 }
 
-export function PageHeader({ title, subtitle, count, onBack, onSearch, searchLabel, onShare, onMenu, extra, children }) {
+export function PageHeader({ title, subtitle, count, onBack, onSearch, searchLabel, onShare, onMenu, extra, centerSubtitle = false, children }) {
   return h(
     'header',
-    { className: 'bp-header v2-page-header' },
+    { className: `bp-header v2-page-header${centerSubtitle ? ' v2-page-header--archive' : ''}` },
     h(
       'div',
       { className: 'bp-header-row' },
@@ -158,17 +158,18 @@ export function PageHeader({ title, subtitle, count, onBack, onSearch, searchLab
       ),
       h(
         'div',
-        { className: 'v2-header-title-block' },
+        { className: `v2-header-title-block${centerSubtitle ? ' v2-header-title-left' : ''}` },
         h('div', { className: 'bp-header-title' }, title),
-        subtitle ? h('div', { className: 'bp-header-sub' }, subtitle) : null
+        !centerSubtitle && subtitle ? h('div', { className: 'bp-header-sub' }, subtitle) : null
       ),
+      centerSubtitle && subtitle ? h('div', { className: 'bp-header-center-sub' }, subtitle) : null,
       count && h('span', { className: 'bp-header-count' }, count),
       h(
         'div',
         { className: 'bp-header-actions' },
         extra,
-        onSearch && h(IconButton, { label: searchLabel || `${title} 검색`, icon: 'search', onClick: onSearch }),
-        onMenu && h(IconButton, { label: `${title} 메뉴`, icon: 'menu', onClick: onMenu })
+        onSearch && h(IconButton, { label: searchLabel || `${title} 검색`, icon: 'search', size: 20, onClick: onSearch }),
+        onMenu && h(IconButton, { label: `${title} 메뉴`, icon: 'menu', size: 20, onClick: onMenu })
       )
     ),
     children
@@ -1054,6 +1055,7 @@ export function ArchiveScreen(p) {
       onBack: p.onBack,
       onSearch: p.onSearch,
       searchLabel: '보관함 검색',
+      centerSubtitle: true,
       onShare: p.onShare,
       onMenu: p.onMenu,
     }),
