@@ -6,28 +6,28 @@
     linear-gradient(180deg, rgba(10, 7, 38, 0.12) 0%, rgba(9, 4, 31, 0.42) 100%),
     /* Mirrored back left-to-right: cyan now blooms from the opposite edge while the
        glass controls and all foreground content stay fixed. */
-    linear-gradient(-45deg, #12CDF0 0%, #3604FD 42%, #8019E0 76%, #3604FD 100%) !important;
+    linear-gradient(90deg, #8019E0 0%, #3604FD 44%, #12CDF0 100%) !important;
   background-size: auto, 300% 300% !important;
   animation: bp-hero-mesh-shift 8.6s ease-in-out infinite !important;
 }
 .v2-design .bp-hero-zone::before {
   background:
-    radial-gradient(ellipse 85% 78% at 20% 30%, rgba(18, 205, 240, 0.92) 0%, transparent 58%),
-    radial-gradient(ellipse 80% 72% at 78% 18%, rgba(128, 25, 224, 0.9) 0%, transparent 55%),
+    radial-gradient(ellipse 85% 78% at 20% 30%, rgba(128, 25, 224, 0.92) 0%, transparent 58%),
+    radial-gradient(ellipse 80% 72% at 78% 18%, rgba(18, 205, 240, 0.9) 0%, transparent 55%),
     radial-gradient(ellipse 74% 80% at 42% 88%, rgba(54, 4, 253, 0.92) 0%, transparent 60%) !important;
 }
 .v2-design .bp-hero-zone::after {
   background:
-    radial-gradient(ellipse 82% 74% at 76% 74%, rgba(128, 25, 224, 0.86) 0%, transparent 56%),
-    radial-gradient(ellipse 28% 26% at 12% 70%, rgba(18, 205, 240, 0.58) 0%, transparent 48%),
+    radial-gradient(ellipse 82% 74% at 76% 74%, rgba(18, 205, 240, 0.86) 0%, transparent 56%),
+    radial-gradient(ellipse 28% 26% at 12% 70%, rgba(128, 25, 224, 0.58) 0%, transparent 48%),
     radial-gradient(ellipse 70% 64% at 90% 28%, rgba(54, 4, 253, 0.84) 0%, transparent 54%) !important;
 }
 .v2-design .bp-hero-zone > .bp-hero-aurora {
   inset: -42% !important;
   opacity: 0.92 !important;
   background:
-    radial-gradient(ellipse 58% 42% at 18% 72%, rgba(18, 205, 240, 0.9) 0%, transparent 64%),
-    radial-gradient(ellipse 52% 46% at 82% 24%, rgba(128, 25, 224, 0.92) 0%, transparent 62%),
+    radial-gradient(ellipse 58% 42% at 18% 72%, rgba(128, 25, 224, 0.9) 0%, transparent 64%),
+    radial-gradient(ellipse 52% 46% at 82% 24%, rgba(18, 205, 240, 0.92) 0%, transparent 62%),
     radial-gradient(ellipse 40% 38% at 56% 54%, rgba(54, 4, 253, 0.8) 0%, transparent 68%) !important;
   mix-blend-mode: screen !important;
   animation: bp-reactbits-aurora-flow 6.1s ease-in-out infinite alternate !important;
@@ -190,4 +190,60 @@
   .v2-design .bp-day-bar-stack .bp-day-anniversary {
     min-height: 0.34rem !important;
   }
+}
+
+/* Keep the tablet calendar treatment until two participant pills per row no
+   longer fit. The old 768px cut-over made a 3+1 arrangement jump to the
+   narrow mobile layout too early. */
+@media (min-width: 560px) and (max-width: 767px) {
+  .v2-design .bp-app-shell {
+    width: 100% !important;
+    max-width: 760px !important;
+    margin: 0 auto !important;
+  }
+  .v2-design .bp-hero-zone {
+    margin: 16px 20px 0 !important;
+    border-radius: 20px !important;
+  }
+  .v2-design .bp-bento-title {
+    padding-left: 20px !important;
+    padding-right: 20px !important;
+  }
+  .v2-design .bp-dday-toggle-wrap { padding: 18px 20px !important; }
+  .v2-design .bp-dday-strip { padding: 0 20px 18px !important; }
+  .v2-design .bp-bento-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 16px !important;
+    padding: 20px !important;
+  }
+  .v2-design .bp-bento-card {
+    border-radius: 16px !important;
+    box-shadow: 0 1px 4px rgba(30,27,46,0.07) !important;
+    padding: 18px !important;
+  }
+  .v2-design .bp-bento-card:first-of-type.bp-wide { grid-column: 1 / -1; }
+  .v2-design .bp-day-cell { min-height: 60px !important; padding: 3px 2px !important; }
+  .v2-design .bp-day-num { font-size: 0.74rem !important; }
+  .v2-design .bp-dot-row { gap: 3px !important; }
+  .v2-design .bp-p-dot {
+    width: auto; height: auto; border-radius: var(--radius-full);
+    display: inline-flex; align-items: center; padding: 1px 6px;
+  }
+  .v2-design .bp-p-dot::after {
+    content: attr(data-name); display: inline; color: #fff;
+    font-size: 0.56rem; font-weight: 800; line-height: 1.4; white-space: nowrap;
+  }
+  .v2-design .bp-day-anniversary-label { display: block !important; }
+}
+
+/* On genuinely narrow phones the home canvas should use every available pixel. */
+@media (max-width: 559px) {
+  .v2-design .bp-app-shell {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+  }
+  .v2-design .bp-hero-zone { margin-left: 0 !important; margin-right: 0 !important; border-radius: 0 !important; }
+  .v2-design .bp-bento-grid { padding-left: 0 !important; padding-right: 0 !important; }
 }
