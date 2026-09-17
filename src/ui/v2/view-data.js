@@ -9,6 +9,14 @@ export function timestampMs(value) {
   return Date.parse(value) || 0;
 }
 
+// Participant records keep the full name (for example 박영우), while compact name
+// badges use the given name only (영우). Keep this presentation rule centralized.
+export function shortParticipantName(name) {
+  const value = String(name || '').trim();
+  if (/^[가-힣]{3,4}$/.test(value)) return value.slice(1);
+  return value;
+}
+
 export function authorFor(row, participants = []) {
   const participant = participants.find(p => p.id === row?.participantId || p.id === row?.authorId || p.name === row?.senderName || p.name === row?.author);
   return { name: row?.senderName || participant?.name || row?.author || '알 수 없음', color: participant?.color || '#A78BFA' };

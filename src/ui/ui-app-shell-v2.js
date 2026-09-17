@@ -8,7 +8,7 @@ import './v2/reference-home.css';
 import './v2/design.css';
 import './v2/aurora-theme.css';
 import { renderMemoScreen, renderPlacesScreen, renderSettlementScreen, renderChatScreen, renderGalleryScreen, renderContentScreen, renderArchiveScreen, PageHeader } from './v2/screens.js';
-import { authorFor, latestRows, timestampMs, photoLightbox } from './v2/view-data.js';
+import { authorFor, latestRows, timestampMs, photoLightbox, shortParticipantName } from './v2/view-data.js';
 import { ChatBubbleFrame, NameColorPill, ReplyQuote } from './v2/chat-bubble-modules.js';
 import {
   V2_PRIMARY, V2_SECONDARY, V2_DESTINATION_TABS, resolveV2Destination,
@@ -30,6 +30,7 @@ import {
   getTrulyConfirmedMeetings, getActiveAvailabilities, getActiveParticipants,
   calculateSettlementBalance, formatBalanceBadge,
 } from '../core/app-domain-helpers.js';
+import { getMeetingOwnedPhotoMessageIds, isChatRenderableMessage } from '../core/gallery-data.js';
 import { computeKoreanHolidaysForYear, getKoreanSolarTermsForYear } from '../core/app-calendar-holidays.js';
 import { getAnniversariesForDate } from '../core/app-anniversary-dates.js';
 import { buildMainCalendarScreenState } from '../core/app-calendar-screen-state.js';
@@ -816,9 +817,13 @@ function HomeSummarySection({ title, kind, children, onMore, delay }) {
 function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
   const React = window.React;
   const allMessages = Array.isArray(calendarContext?.displayChatMessages) ? calendarContext.displayChatMessages : [];
-  const newestMessages = latestRows(allMessages);
-  const imageMessage = newestMessages.find(m => getMessageImageEntries(m).length);
-  const messages = [imageMessage, ...newestMessages.filter(m => m !== imageMessage && (m.text || m.content)).slice(0, 2)].filter(Boolean);
+  // Match the legacy main-screen CommentsSection: preserve the live feed order, remove
+  // gallery/meeting upload documents, then show the latest three rows. The previous V2
+  // implementation promoted whichever image happened to be newest, which could surface a
+  // gallery image instead of the same text/image/text sequence as the original.
+  const meetingPhotoMessageIds = getMeetingOwnedPhotoMessageIds(calendarContext?.calendar);
+  const visibleMessages = allMessages.filter(message => isChatRenderableMessage(message, meetingPhotoMessageIds));
+  const messages = visibleMessages.slice(-3);
   const memos = Array.isArray(calendarContext?.memos) ? latestRows(calendarContext.memos).slice(0, 2) : [];
   const photos = Array.isArray(calendarContext?.galleryPhotoIndex?.items) ? calendarContext.galleryPhotoIndex.items.slice(0, 9) : [];
   const places = Array.isArray(calendarContext?.places) ? latestRows(calendarContext.places).slice(0, 2) : [];
@@ -848,7 +853,7 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
             image && React.createElement('img', { className: bentoClass('renewal-home-chat-image chat-img'), src: image, alt: '', loading: 'lazy' }),
             m.replyTo && React.createElement(ReplyQuote, {
               className: bentoClass('renewal-home-chat-reply chat-reply-quote'),
-              author: m.replyTo.senderName || participantFor(m.replyTo)?.name || '답장',
+              author: shortParticipantName(m.replyTo.senderName || participantFor(m.replyTo)?.name || '답장'),
               text: m.replyTo.text || '사진',
             }),
             (m.text || m.content) && React.createElement('span', { className: bentoClass('renewal-home-chat-text chat-text') }, String(m.text || m.content).slice(0, 120)),
@@ -2259,7 +2264,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
     React.createElement('div', { className: bentoClass('side-nav-group renewal-shell-side-nav-group is-main') },
       BENTO_MAIN_ITEMS.map(item => {
         const active = isSideItemActive(item.id);
-        const metaVal = sideMeta[item.id];
+        const metaVal = item.id === 'chat' ? shortParticipantName(sideMeta[item.id]) : sideMeta[item.id];
         return React.createElement('button', {
           key: item.id,
           type: 'button',

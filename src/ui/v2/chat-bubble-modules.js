@@ -3,6 +3,7 @@
  * Presentation only — callers keep real data/handlers.
  */
 import './chat-bubble-modules.css';
+import { shortParticipantName } from './view-data.js';
 
 function h(type, props, ...children) {
   const React = window.React;
@@ -19,7 +20,7 @@ export function NameColorPill({ name, color, className = '', style, ...rest }) {
       style: { backgroundColor: color || '#A78BFA', ...style },
       ...rest,
     },
-    name
+    shortParticipantName(name)
   );
 }
 

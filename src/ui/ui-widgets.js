@@ -228,11 +228,13 @@ export function ParticipantPickerButton({ participant, onClick, placeholder = '�
 export function ParticipantBadge({ participant, style, className = '', children, ...rest }) {
   const React = window.React;
   if (!participant) return null;
+  const participantName = String(participant.name || '').trim();
+  const badgeName = /^[가-힣]{3,4}$/.test(participantName) ? participantName.slice(1) : participantName;
   return /*#__PURE__*/React.createElement("span", {
     className: `participant-badge${className ? ' ' + className : ''}`,
     style: { backgroundColor: participant.color || '#94A3B8', color: '#FFFFFF', ...style },
     ...rest
-  }, children || participant.name);
+  }, children || badgeName);
 }
 
 export function DateCapsuleBadge({ date, style = null }) {
