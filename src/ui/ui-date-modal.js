@@ -250,6 +250,12 @@ export function DateModal({
   onFindChatMessageById,
   onFetchDateTaggedMessages,
   onFetchDateTaggedMemos,
+  onOpenEditMemo,
+  onToggleMemoPin,
+  onShareMemo,
+  onSelectMemoTag,
+  onMemoCommentsChange,
+  getMemoBorderColor,
   onFetchMeetingPhotoIndex,
   onFetchMeetingAlbum,
   onLoadOlderChat,
@@ -287,6 +293,7 @@ export function DateModal({
   const SimpleBottomSheetPicker = __comp.SimpleBottomSheetPicker || __deps.SimpleBottomSheetPicker;
   const MediaThumb = __comp.MediaThumb || __deps.MediaThumb;
   const PhotoCommentCountBadge = __comp.PhotoCommentCountBadge || __deps.PhotoCommentCountBadge;
+  const MemoCard = __comp.MemoCard || __deps.MemoCard;
   const PencilIcon = __comp.PencilIcon || __deps.PencilIcon;
   const PlusIcon = __comp.PlusIcon || __deps.PlusIcon;
   const CakeIcon = __comp.CakeIcon || __deps.CakeIcon;
@@ -2051,7 +2058,7 @@ export function DateModal({
       { value: 'participant', label: /*#__PURE__*/React.createElement(React.Fragment, null, "참석", /*#__PURE__*/React.createElement(SectionCountBadge, { count: dateEntries.length })) },
       { value: 'meeting', label: /*#__PURE__*/React.createElement(React.Fragment, null, "장소", /*#__PURE__*/React.createElement(SectionCountBadge, { count: registeredPlaces.length })) },
       { value: 'settlement', label: /*#__PURE__*/React.createElement(React.Fragment, null, "정산", /*#__PURE__*/React.createElement(SectionCountBadge, { count: expenses.length })) },
-      { value: 'photo', label: /*#__PURE__*/React.createElement(React.Fragment, null, "사진", /*#__PURE__*/React.createElement(SectionCountBadge, { count: visibleMeetingPhotos.length })) },
+      { value: 'photo', label: /*#__PURE__*/React.createElement(React.Fragment, null, "사진", /*#__PURE__*/React.createElement(SectionCountBadge, { count: visibleMeetingImages.length })) },
       { value: 'memo', label: /*#__PURE__*/React.createElement(React.Fragment, null, "메모", /*#__PURE__*/React.createElement(SectionCountBadge, { count: dateTaggedMemos.length })) }
     ]
   })), /*#__PURE__*/React.createElement("form", {
@@ -3232,7 +3239,23 @@ export function DateModal({
       }, `날짜 태그 메모 (${dateTaggedMemos.length}개)`)),
       dateTaggedMemos.length === 0 ? /*#__PURE__*/React.createElement("div", {
         style: { textAlign: 'center', color: 'var(--text-muted)', padding: '24px 12px', fontSize: 'var(--font-size-md)', border: '1px dashed var(--border-subtle)', borderRadius: 'var(--radius-md)' }
-      }, "이 날짜에 연결된 메모가 없습니다.") : /*#__PURE__*/React.createElement("div", {
+      }, "이 날짜에 연결된 메모가 없습니다.") : MemoCard ? /*#__PURE__*/React.createElement("div", {
+        style: { display: 'flex', flexDirection: 'column', gap: '10px' }
+      }, dateTaggedMemos.map(memo => /*#__PURE__*/React.createElement(MemoCard, {
+        key: memo.id,
+        memo,
+        calendar,
+        onOpenEdit: typeof onOpenEditMemo === 'function' ? () => onOpenEditMemo(memo) : undefined,
+        onTogglePin: typeof onToggleMemoPin === 'function' ? () => onToggleMemoPin(memo) : () => {},
+        onShare: typeof onShareMemo === 'function' ? () => onShareMemo(memo) : () => {},
+        onSelectTag: typeof onSelectMemoTag === 'function' ? onSelectMemoTag : () => {},
+        onCommentsChange: typeof onMemoCommentsChange === 'function' ? next => onMemoCommentsChange(memo, next) : () => {},
+        getBorderColor: typeof getMemoBorderColor === 'function' ? getMemoBorderColor : undefined,
+        onRequestConfirm,
+        showToast,
+        setActiveLightbox,
+        effectivePinned: !!memo.isPinned
+      }))) : /*#__PURE__*/React.createElement("div", {
         style: { display: 'flex', flexDirection: 'column', gap: '10px' }
       }, dateTaggedMemos.map((memo, index) => {
         const body = memo.text || memo.content || memo.body || memo.note || memo.memo || memo.description || '';
@@ -3319,7 +3342,7 @@ export function DateModal({
         )
       ),
       /* Empty State or Photo Grid */
-      visibleMeetingPhotos.length === 0 ? /*#__PURE__*/React.createElement("div", {
+      visibleMeetingImages.length === 0 ? /*#__PURE__*/React.createElement("div", {
         style: { textAlign: 'center', color: 'var(--text-muted)', padding: '24px 0', fontSize: 'var(--font-size-md)', border: '1px dashed var(--border-subtle)', borderRadius: 'var(--radius-md)' }
       }, "등록된 사진이 없습니다.") : /*#__PURE__*/React.createElement(React.Fragment, null,
         visibleMeetingImages.length === 0 ? null : /*#__PURE__*/React.createElement("div", {
@@ -3392,9 +3415,7 @@ export function DateModal({
         PhotoCommentCountBadge && /*#__PURE__*/React.createElement(PhotoCommentCountBadge, { count: commentCount })
         );
       })),
-        visibleMeetingVideos.length > 0 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '14px' } },
-          visibleMeetingVideos.map(video => /*#__PURE__*/React.createElement(DateModalVideoCard, { key: video.id, video }))
-        )
+        /* Video link memos are rendered in the 메모 tab alongside their source text. */
       )
     )
   ))));
