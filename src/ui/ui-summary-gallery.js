@@ -445,6 +445,7 @@ export function MemoPreviewSection({ memos = [], calendar = null, onViewAll, onO
       setActiveLightbox: setActiveLightbox,
       effectivePinned: !!memo.isPinned,
       hidePinButton: true,
+      showAllComments: true,
       variant: 'preview'
     })) : null)
   );

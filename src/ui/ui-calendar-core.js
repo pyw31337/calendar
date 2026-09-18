@@ -1519,7 +1519,7 @@ export function CommentsSection({
   }) : null));
 }
 
-export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onSelectTag, onCommentsChange, getBorderColor, onRequestConfirm, showToast, effectivePinned, hidePinButton = false, variant = 'page', setActiveLightbox = null, searchQuery = '' }) {
+export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onSelectTag, onCommentsChange, getBorderColor, onRequestConfirm, showToast, effectivePinned, hidePinButton = false, variant = 'page', setActiveLightbox = null, searchQuery = '', showAllComments = false }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -1609,7 +1609,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
   const COMMENT_COLLAPSE_LIMIT = 3;
   const [isCommentsExpanded, setIsCommentsExpanded] = React.useState(false);
   const hasMoreComments = comments.length > COMMENT_COLLAPSE_LIMIT;
-  const visibleComments = (!hasMoreComments || isCommentsExpanded) ? comments : comments.slice(-COMMENT_COLLAPSE_LIMIT);
+  const visibleComments = (showAllComments || !hasMoreComments || isCommentsExpanded) ? comments : comments.slice(-COMMENT_COLLAPSE_LIMIT);
 
   const handleSaveComment = async (e) => {
     e.stopPropagation();
@@ -2010,6 +2010,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         },
         title: "댓글",
         "aria-label": "댓글",
+        className: "memo-card-comment-toggle",
         style: {
           marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', padding: '2px',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
