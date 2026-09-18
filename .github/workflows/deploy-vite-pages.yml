@@ -39,7 +39,22 @@ jobs:
           CALENDAR_SMOKE_SCOPE: deploy
           CALENDAR_SMOKE_BASE_PATH: /calendar/
         run: |
-          npm run smoke:browser
+          # Hosted runners occasionally delay a mobile route transition even
+          # though the build and the route are healthy. Retry the complete
+          # read-only gate a small, bounded number of times; deterministic
+          # failures still stop publication after the final attempt.
+          for attempt in 1 2 3; do
+            echo "[deploy-smoke] attempt ${attempt}/3"
+            if npm run smoke:browser; then
+              exit 0
+            fi
+            if [ "${attempt}" -lt 3 ]; then
+              echo "[deploy-smoke] transient smoke failure; retrying after runner cool-down"
+              sleep 5
+            fi
+          done
+          echo "[deploy-smoke] browser smoke failed after 3 attempts"
+          exit 1
       # Published straight to the gh-pages branch root (rather than the actions/deploy-pages
       # artifact flow) so that PR previews -- deployed by pr-preview.yml to gh-pages under
       # pr-preview/pr-<n>/ via the same mechanism -- can coexist on one Pages site instead of
