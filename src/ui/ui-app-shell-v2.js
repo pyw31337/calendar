@@ -926,9 +926,15 @@ function HomeSummarySection({ title, kind, children, onMore, delay }) {
 /** 클로드 목업의 홈 요약 흐름을 기존 로드 상태로 구현한다. 전체 목록을 추가 조회하지 않는다. */
 function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
   const React = window.React;
+  const __deps = window.GATHER_UI_DEPS || {};
+  const __comp = window.GATHER_UI_COMPONENTS || {};
+  const AutoGrowTextarea = __comp.AutoGrowTextarea || __deps.AutoGrowTextarea;
+  const ParticipantPickerButton = __comp.ParticipantPickerButton || __deps.ParticipantPickerButton;
+  const ChatParticipantSheet = __comp.ChatParticipantSheet || __deps.ChatParticipantSheet;
   const [commentOpenId, setCommentOpenId] = React.useState(null);
   const [commentDraft, setCommentDraft] = React.useState('');
   const [commentParticipantId, setCommentParticipantId] = React.useState('');
+  const [commentParticipantOpen, setCommentParticipantOpen] = React.useState(false);
   const [commentSaving, setCommentSaving] = React.useState(false);
   const allMessages = Array.isArray(calendarContext?.displayChatMessages) ? calendarContext.displayChatMessages : [];
   // Match the legacy main-screen CommentsSection: preserve the live feed order, remove
@@ -995,6 +1001,7 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
   );
   const participants = Array.isArray(calendarContext?.calendar?.participants) ? calendarContext.calendar.participants : [];
   const onMemoCommentsChange = calendarContext?.onMemoCommentsChange || window.__gatherV2MemoCommentsChange;
+  const commentParticipant = participants.find(participant => participant.id === commentParticipantId) || participants[0] || null;
   const participantFor = row => participants.find(p => p && (p.id === row?.participantId || p.name === row?.senderName || p.name === row?.author));
   const displayName = row => authorFor(row, participants).name;
   const displayColor = row => authorFor(row, participants).color;
@@ -1099,7 +1106,7 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
             ),
           ),
           commentOpenId === memo.id && React.createElement('form', {
-            className: 'v2-bubble-comment-composer',
+            className: 'comment-composer',
             onSubmit: async event => {
               event.preventDefault();
               event.stopPropagation();
@@ -1124,25 +1131,36 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
               }
             },
           },
-            React.createElement('textarea', {
-              className: 'v2-bubble-comment-input',
+            AutoGrowTextarea && React.createElement(AutoGrowTextarea, {
+              className: 'comment-composer-input',
               value: commentDraft,
               onChange: event => setCommentDraft(event.target.value),
               onClick: event => event.stopPropagation(),
               placeholder: '댓글을 입력하세요...',
-              rows: 2,
-              disabled: commentSaving,
+              rows: 1,
+              minHeight: 30,
+              maxHeight: 200,
             }),
-            React.createElement('div', { className: 'v2-bubble-comment-composer-actions' },
-              participants.length > 1 && React.createElement('select', {
-                value: commentParticipantId || participants[0]?.id || '',
-                onChange: event => setCommentParticipantId(event.target.value),
-                onClick: event => event.stopPropagation(),
-                'aria-label': '댓글 작성자',
-              }, participants.map(participant => React.createElement('option', { key: participant.id, value: participant.id }, shortParticipantName(participant.name)))),
-              React.createElement('button', { type: 'submit', disabled: commentSaving || !commentDraft.trim() }, commentSaving ? '저장 중' : '저장')
+            React.createElement('div', { className: 'comment-composer-footer' },
+              ParticipantPickerButton && React.createElement(ParticipantPickerButton, {
+                participant: commentParticipant,
+                onClick: () => setCommentParticipantOpen(true),
+              }),
+              React.createElement('div', { className: 'comment-composer-buttons' },
+                React.createElement('button', {
+                  type: 'button',
+                  onClick: event => { event.stopPropagation(); setCommentDraft(''); setCommentOpenId(null); },
+                }, '취소'),
+                React.createElement('button', { type: 'submit', disabled: commentSaving || !commentDraft.trim() || !commentParticipant }, commentSaving ? '저장 중…' : '저장')
+              )
             )
-          )
+          ),
+          commentParticipantOpen && ChatParticipantSheet && React.createElement(ChatParticipantSheet, {
+            calendar: calendarContext?.calendar,
+            selectedId: commentParticipant?.id,
+            onSelect: id => { setCommentParticipantId(id); setCommentParticipantOpen(false); },
+            onClose: () => setCommentParticipantOpen(false),
+          })
         );
       })) : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '최근 메모가 없습니다.')
     ),
