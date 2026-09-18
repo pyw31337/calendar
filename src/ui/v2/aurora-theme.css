@@ -272,6 +272,72 @@
   }
 }
 
+/* Collapsed rail reference state + polished expand/collapse transitions. */
+@media (min-width: 768px) {
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-head {
+    width: 64px;
+    height: 64px;
+    box-sizing: border-box;
+    padding: 12px 16px 12px !important;
+    background: linear-gradient(-45deg, #12cdf0 0%, #3604fd 42%, #8019e0 76%, #3604fd 100%) 0 0 / 300% 300%;
+    animation: bp-hero-mesh-shift 8.6s ease-in-out infinite;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand {
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
+    background: transparent;
+  }
+  .renewal-shell.v2-design .bp-side-nav-global-search {
+    transition: width .28s ease, height .28s ease, margin .28s ease, border-radius .28s ease,
+      padding .28s ease, background-color .2s ease;
+  }
+  .renewal-shell.v2-design .bp-side-nav-global-search-label {
+    display: inline-flex !important;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    opacity: 1;
+    transform: translateX(0);
+    transition: opacity .22s ease, transform .28s ease, max-width .28s ease;
+    max-width: 120px;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search {
+    margin: 18px auto 16px;
+    transition: width .28s ease, height .28s ease, margin .28s ease, border-radius .28s ease,
+      padding .28s ease, background-color .2s ease;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search-label {
+    display: inline-flex !important;
+    max-width: 0;
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+  .renewal-shell.v2-design .bp-side-nav-item-title,
+  .renewal-shell.v2-design .bp-side-nav-item-meta {
+    transition: opacity .2s ease, transform .28s ease, max-width .28s ease;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item-title {
+    display: inline-flex !important;
+    max-width: 0;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateX(-6px);
+    white-space: nowrap;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item-meta {
+    max-width: 0;
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+  .renewal-shell.v2-design .bp-side-nav-item-icon {
+    transition: transform .28s ease;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item-icon {
+    transform: translateX(0);
+  }
+}
+
 /* Shared side-nav alignment module. The collapsed rail is the reference
  * coordinate system: its 48px item lane centers a 20px icon at x=22px. The
  * expanded rail reuses the same lane start and only reveals the text/meta
@@ -355,12 +421,18 @@
   }
   .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-head {
     justify-content: center;
-    padding: 16px 8px 12px;
+    width: 64px;
+    height: 64px;
+    box-sizing: border-box;
+    padding: 12px 16px 12px !important;
+    background: linear-gradient(-45deg, #12cdf0 0%, #3604fd 42%, #8019e0 76%, #3604fd 100%) 0 0 / 300% 300%;
+    animation: bp-hero-mesh-shift 8.6s ease-in-out infinite;
   }
   .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand {
     width: 40px;
     height: 40px;
     justify-content: center;
+    flex: 0 0 40px;
     gap: 0;
     border-radius: 10px;
     /* Use the same vivid aurora palette as the calendar hero card so the
@@ -381,7 +453,7 @@
     height: 40px;
     min-height: 40px;
     justify-content: center;
-    margin: 8px auto 16px;
+    margin: 18px auto 16px;
     padding: 8px;
     border-radius: 50%;
   }
