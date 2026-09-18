@@ -29,11 +29,11 @@
 /* ---- Shared destination page shell (Memo / Places / Settlement / Gallery /
       Content / Archive / Chat) ---- */
 .v2-design .v2-dest-page {
-  width: 100% !important;
-  max-width: none !important;
-  margin: 0 !important;
-  padding: var(--v2-dest-pad-y) var(--v2-dest-pad-x) !important;
-  box-sizing: border-box !important;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: var(--v2-dest-pad-y) var(--v2-dest-pad-x);
+  box-sizing: border-box;
   background: #fafafc;
 }
 
@@ -45,18 +45,18 @@
 .v2-design .v2-memo > .bp-app-shell,
 .v2-design .v2-places > .bp-app-shell,
 .v2-design .v2-settlement > .bp-app-shell {
-  width: 100% !important;
-  max-width: none !important;
-  margin: 0 !important;
+  width: 100%;
+  max-width: none;
+  margin: 0;
   /* Defeat design.css --v2-page-pad and reference-* 20px side pads on dest shells */
-  padding: var(--v2-dest-pad-y) var(--v2-dest-pad-x) !important;
-  box-sizing: border-box !important;
+  padding: var(--v2-dest-pad-y) var(--v2-dest-pad-x);
+  box-sizing: border-box;
 }
 
 /* Sticky PageHeader flush to pane top (no shell pad above it) */
 .v2-design .v2-dest-page > .bp-app-shell > .v2-page-header,
 .v2-design .v2-dest-page > .v2-page-header {
-  margin: 0 !important;
+  margin: 0;
 }
 
 /* Body / legacy fill under sticky PageHeader — no outer inset */
@@ -64,27 +64,27 @@
 .v2-design .v2-dest-page .v2-legacy-body,
 .v2-design .v2-wrap-legacy > .v2-legacy-body,
 .v2-design .v2-embed-frame > .v2-legacy-body {
-  width: 100% !important;
-  max-width: none !important;
-  margin-left: 0 !important;
-  margin-right: 0 !important;
-  box-sizing: border-box !important;
+  width: 100%;
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
+  box-sizing: border-box;
 }
 
 /* Kill floating “card in a frame” outer gutters on map / sticky map shells.
    Internal list padding may still use --v2-dest-content-pad-x. */
 .v2-design .v2-dest-page .v2-map-panel,
 .v2-design .v2-map-panel {
-  margin: var(--v2-dest-pad-y) var(--v2-dest-pad-x) 0 !important;
+  margin: var(--v2-dest-pad-y) var(--v2-dest-pad-x) 0;
 }
 
 .v2-design .v2-dest-page .places-map-sticky-area,
 .v2-design .v2-places-legacy .places-map-sticky-area,
 .v2-design .v2-map-panel .places-map-sticky-area {
-  margin-left: var(--v2-dest-pad-x) !important;
-  margin-right: var(--v2-dest-pad-x) !important;
-  width: 100% !important;
-  box-sizing: border-box !important;
+  margin-left: var(--v2-dest-pad-x);
+  margin-right: var(--v2-dest-pad-x);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* Optional helper: apply content-column pad without reintroducing outer gutters */
@@ -102,9 +102,9 @@
   .v2-design .v2-memo.v2-dest-page > .bp-app-shell,
   .v2-design .v2-places.v2-dest-page > .bp-app-shell,
   .v2-design .v2-settlement.v2-dest-page > .bp-app-shell {
-    max-width: none !important;
-    width: 100% !important;
-    margin: 0 !important;
-    padding: var(--v2-dest-pad-y, 0px) var(--v2-dest-pad-x, 0px) !important;
+    max-width: none;
+    width: 100%;
+    margin: 0;
+    padding: var(--v2-dest-pad-y, 0px) var(--v2-dest-pad-x, 0px);
   }
 }

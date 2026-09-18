@@ -339,12 +339,12 @@
   font-weight: 700;
 }
 .v2-design .v2-home-memo-bubble .comment-composer .participant-picker-button {
-  height: auto !important;
-  padding: 6px 10px !important;
-  font-size: .7rem !important;
+  height: auto;
+  padding: 6px 10px;
+  font-size: .7rem;
 }
 .v2-design .v2-home-memo-bubble .comment-composer-buttons button {
-  font-size: .7rem !important;
+  font-size: .7rem;
 }
 
 /* Memo screen cards wrapped as chat bubbles */
@@ -363,9 +363,9 @@
 
 .v2-memo .v2-memo-card-wrap .v2-bubble-surface > .memo-card-hover,
 .v2-memo .v2-memo-card-wrap .v2-bubble-surface > [class*="memo-card"] {
-  box-shadow: 1px 1px 4px #1e1b2e12 !important;
-  border-radius: 14px !important;
-  border-left: none !important;
+  box-shadow: 1px 1px 4px #1e1b2e12;
+  border-radius: 14px;
+  border-left: none;
 }
 
 /* Shared memo-card contract. The live MemoCard keeps its behaviour and inline handlers;
@@ -373,18 +373,18 @@
 .v2-memo .v2-memo-card-wrap > .v2-name-pill { display: none; }
 .v2-memo .v2-memo-card-wrap > .v2-bubble-meta { display: none; }
 .v2-memo .v2-memo-card-wrap .v2-memo-card-contract {
-  background: #fff !important;
-  border: 1px solid #1e1b2e0f !important;
-  border-left: 1px solid #1e1b2e0f !important;
-  border-radius: 14px !important;
-  box-shadow: 1px 1px 4px #1e1b2e12 !important;
-  padding: 20px 26px !important;
+  background: #fff;
+  border: 1px solid #1e1b2e0f;
+  border-left: 1px solid #1e1b2e0f;
+  border-radius: 14px;
+  box-shadow: 1px 1px 4px #1e1b2e12;
+  padding: 20px 26px;
 }
 .v2-memo .v2-memo-card-wrap .v2-memo-card-title {
-  font-size: 1rem !important;
-  line-height: 1.25 !important;
-  margin-bottom: 3px !important;
-  padding-right: 30px !important;
+  font-size: 1rem;
+  line-height: 1.25;
+  margin-bottom: 3px;
+  padding-right: 30px;
 }
 .v2-memo .v2-memo-card-wrap .v2-memo-card-meta {
   display: block;
@@ -397,14 +397,14 @@
   line-height: 1.2;
 }
 .v2-memo .v2-memo-card-wrap .v2-memo-card-body {
-  font-size: .76rem !important;
-  color: #6b6580 !important;
-  line-height: 1.5 !important;
-  margin-bottom: 10px !important;
+  font-size: .76rem;
+  color: #6b6580;
+  line-height: 1.5;
+  margin-bottom: 10px;
 }
 .v2-memo .v2-memo-card-wrap .v2-memo-card-tags {
-  gap: 5px !important;
-  margin-top: 4px !important;
+  gap: 5px;
+  margin-top: 4px;
 }
 .v2-design .v2-memo-tag,
 .v2-memo .v2-memo-tag {
@@ -424,41 +424,41 @@
   gap: 16px;
 }
 .v2-memo .v2-memo-card-wrap .v2-memo-card-tags > .memo-card-comment-toggle {
-  display: none !important;
+  display: none;
 }
 .v2-design .v2-memo .v2-memo-card-wrap .memo-card-comment-footer > .memo-card-comment-toggle {
-  border: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  padding: 3px 2px !important;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 3px 2px;
 }
 .v2-design .v2-memo .comment-composer .participant-picker-button {
-  height: auto !important;
-  padding: 6px 10px !important;
-  font-size: .7rem !important;
+  height: auto;
+  padding: 6px 10px;
+  font-size: .7rem;
 }
 .v2-design .v2-memo .comment-composer-buttons button {
-  font-size: .7rem !important;
+  font-size: .7rem;
 }
 .v2-memo .v2-memo-card-wrap .v2-memo-card-tags > button:not(.memo-card-comment-toggle) {
   border-radius: 999px;
-  background: var(--brand-soft, #f3eeff) !important;
-  color: var(--brand, #7c2fe5) !important;
-  padding: 3px 8px !important;
-  font-size: .62rem !important;
-  font-weight: 700 !important;
+  background: var(--brand-soft, #f3eeff);
+  color: var(--brand, #7c2fe5);
+  padding: 3px 8px;
+  font-size: .62rem;
+  font-weight: 700;
 }
 .v2-memo .v2-memo-card-wrap .v2-memo-author-pill { display: none; }
 .v2-memo .v2-memo-card-wrap .v2-memo-card-comments {
-  margin-top: 8px !important;
-  padding-top: 0 !important;
-  border-top: 0 !important;
+  margin-top: 8px;
+  padding-top: 0;
+  border-top: 0;
 }
 .v2-memo .v2-memo-card-wrap .v2-memo-card-comments > div {
   background: var(--brand-soft, #f3eeff);
-  border-radius: 10px !important;
-  border-top: 0 !important;
-  padding: 7px 10px !important;
+  border-radius: 10px;
+  border-top: 0;
+  padding: 7px 10px;
 }
 @media (max-width: 1240px) {
   .v2-design .v2-memo .bp-memo-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }

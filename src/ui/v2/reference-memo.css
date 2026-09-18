@@ -73,17 +73,17 @@
     .v2-memo .v2-memo-legacy .memo-card-hover,
     .v2-memo .v2-memo-card-wrap .memo-card-hover,
     .v2-memo .v2-memo-card-wrap .v2-memo-card-contract {
-      background: #fff !important;
-      border: 1px solid #1e1b2e0f !important;
-      border-left: 1px solid #1e1b2e0f !important;
-      border-radius: 14px !important;
-      box-shadow: 1px 1px 4px #1e1b2e12 !important;
-      padding: 20px 26px !important;
+      background: #fff;
+      border: 1px solid #1e1b2e0f;
+      border-left: 1px solid #1e1b2e0f;
+      border-radius: 14px;
+      box-shadow: 1px 1px 4px #1e1b2e12;
+      padding: 20px 26px;
     }
     .v2-memo .v2-memo-legacy .memo-card-hover > .memo-card-share-btn,
     .v2-memo .v2-memo-legacy .memo-card-hover > .memo-card-pin-btn { top: 12px; }
     .v2-memo .v2-memo-legacy .memo-card-hover .v2-memo-card-title,
-    .v2-memo .v2-memo-card-wrap .v2-memo-card-title { font-size: 1rem !important; line-height: 1.25 !important; }
+    .v2-memo .v2-memo-card-wrap .v2-memo-card-title { font-size: 1rem; line-height: 1.25; }
     .v2-memo .v2-memo-legacy .memo-card-hover .v2-memo-card-meta,
     .v2-memo .v2-memo-card-wrap .v2-memo-card-meta {
       display: block; margin-bottom: 9px; padding-bottom: 8px;
@@ -92,7 +92,7 @@
     }
     .v2-memo .v2-memo-legacy .memo-card-hover .v2-memo-card-body,
     .v2-memo .v2-memo-card-wrap .v2-memo-card-body {
-      color: var(--text-muted) !important; font-size: .76rem !important; line-height: 1.5 !important;
+      color: var(--text-muted); font-size: .76rem; line-height: 1.5;
     }
     .v2-memo .v2-memo-legacy .memo-card-hover .v2-memo-card-comments > div,
     .v2-memo .v2-memo-card-wrap .v2-memo-card-comments > div {
@@ -100,11 +100,11 @@
     }
     .v2-memo .memo-card-hover img.media-thumb,
     .v2-memo .v2-memo-card-wrap img.media-thumb {
-      width: 100% !important;
-      height: auto !important;
-      max-height: none !important;
-      aspect-ratio: 1 / 1 !important;
-      object-fit: cover !important;
+      width: 100%;
+      height: auto;
+      max-height: none;
+      aspect-ratio: 1 / 1;
+      object-fit: cover;
     }
     .v2-memo .v2-memo-legacy .memo-composer-card { max-width: 520px; }
     @media (min-width: 768px) {
