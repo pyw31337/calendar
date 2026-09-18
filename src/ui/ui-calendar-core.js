@@ -1715,7 +1715,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         decoding: 'async',
         "data-stop-card-open": true,
         onClick: (e) => { if (e) { e.stopPropagation(); e.preventDefault(); } openMemoLightbox(0); },
-        style: { width: '100%', maxHeight: '140px', objectFit: 'cover', borderRadius: 'var(--radius-sm)', marginBottom: '8px', cursor: setActiveLightbox ? 'pointer' : undefined }
+        style: { display: 'block', width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: 'var(--radius-sm)', marginBottom: '8px', cursor: setActiveLightbox ? 'pointer' : undefined }
       });
     }
 
