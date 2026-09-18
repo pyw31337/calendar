@@ -530,7 +530,11 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
   const month = monthDate.getMonth();
 
   const calendar = calendarContext?.calendar || {};
-  const participants = Array.isArray(calendar.participants) ? calendar.participants : [];
+  // Use the same normalized active participant list for both calendar dots and
+  // the legend.  The raw calendar array can contain archived/stale color
+  // values, which made the bottom category swatches disagree with the badges
+  // rendered from participantsMap.
+  const participants = getActiveParticipants(calendar);
   const anniversariesList = Array.isArray(calendarContext?.anniversaries) ? calendarContext.anniversaries : [];
 
   const participantsMap = React.useMemo(() => {
