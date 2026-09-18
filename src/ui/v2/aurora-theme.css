@@ -403,6 +403,59 @@
   }
 }
 
+/* Shared responsive modal module. ResizableModalContainer adds the opt-in
+ * marker; shell-specific modifiers (event/share/settings) may refine size,
+ * while all other feature modals inherit the same placement contract. */
+.v2-design .modal-overlay:has(.v2-responsive-modal) {
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.v2-design .v2-responsive-modal {
+  position: relative;
+  width: min(560px, calc(100vw - 48px));
+  max-width: 560px;
+  max-height: min(86dvh, var(--gather-vv-modal-max, 860px));
+  margin: 0;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: auto;
+  border-radius: 24px;
+  transform: translate3d(0, 0, 0);
+  transition: transform .28s cubic-bezier(.22, 1, .36, 1), border-radius .28s ease,
+    width .28s ease, max-height .28s ease;
+  will-change: transform;
+}
+@media (max-width: 767px) {
+  .v2-design .modal-overlay:has(.v2-responsive-modal) {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .v2-design .v2-responsive-modal {
+    width: 100%;
+    max-width: none;
+    max-height: min(90dvh, var(--gather-vv-modal-max, 860px));
+    border-radius: 24px 24px 0 0;
+    animation: bp-responsive-sheet-in .28s cubic-bezier(.22, 1, .36, 1);
+  }
+  .v2-design .modal-overlay:has(.confirm-dialog-modal) {
+    align-items: center;
+    padding: 16px;
+  }
+  .v2-design .v2-responsive-modal.confirm-dialog-modal {
+    width: min(420px, calc(100vw - 32px));
+    max-width: 420px;
+    border-radius: 18px;
+  }
+}
+@keyframes bp-responsive-sheet-in {
+  from { opacity: .72; transform: translate3d(0, 16px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .v2-design .v2-responsive-modal { animation: none; transition: none; }
+}
+
 /* Collapsed rail reference state + polished expand/collapse transitions. */
 @media (min-width: 768px) {
   .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-head {

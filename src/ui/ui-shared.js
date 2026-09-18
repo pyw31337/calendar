@@ -218,7 +218,11 @@ export function ResizableModalContainer({ className, style, children, ...props }
 
   return /*#__PURE__*/React.createElement("div", {
     ref: containerRef,
-    className: className || "modal-container",
+    // Every resizable modal opts into the shared V2 responsive overlay module.
+    // The class is inert in the legacy shell and lets the V2 stylesheet provide
+    // one predictable PC-center/mobile-bottom-sheet contract without rewriting
+    // each modal implementation.
+    className: ["modal-container", "v2-responsive-modal", className].filter(Boolean).join(" "),
     style: mergedStyle,
     ...props
   },
