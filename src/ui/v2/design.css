@@ -783,7 +783,7 @@
   font-size: 0.56rem !important;
   font-weight: 800 !important;
   line-height: 1.15 !important;
-  color: #fff !important;
+  color: var(--anniversary-color, #4c1d95) !important;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1091,7 +1091,7 @@
     font-size: 0.5rem !important;
     font-weight: 800 !important;
     line-height: 1.15 !important;
-    color: #fff !important;
+    color: var(--anniversary-color, #4c1d95) !important;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
