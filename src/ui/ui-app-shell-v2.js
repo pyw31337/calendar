@@ -939,10 +939,31 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
     return visibleMessages.slice(-3);
   }, [allMessages, meetingPhotoMessageIds]);
   const memoItems = calendarContext?.memos;
-  const memos = React.useMemo(
-    () => (Array.isArray(memoItems) ? latestRows(memoItems).slice(0, 2) : []),
-    [memoItems]
-  );
+  const memos = React.useMemo(() => {
+    if (!Array.isArray(memoItems)) return [];
+    const rows = memoItems.filter(Boolean);
+    const memoUpdatedAt = memo => timestampMs(memo?.updatedAt ?? memo?.createdAt);
+    const latestCommentAt = memo => (Array.isArray(memo?.comments)
+      ? memo.comments.reduce((latest, comment) => Math.max(latest, timestampMs(comment?.updatedAt ?? comment?.createdAt)), 0)
+      : 0);
+    const recentFirst = (a, b) => memoUpdatedAt(b) - memoUpdatedAt(a) || String(b?.id || '').localeCompare(String(a?.id || ''));
+    const pinned = rows.filter(memo => memo.isPinned).sort(recentFirst);
+    const selected = pinned.slice(0, 2);
+    if (selected.length >= 2) return selected;
+
+    const remaining = rows.filter(memo => !selected.includes(memo));
+    const commented = remaining
+      .filter(memo => latestCommentAt(memo) > 0)
+      .sort((a, b) => latestCommentAt(b) - latestCommentAt(a) || recentFirst(a, b));
+    selected.push(...commented.slice(0, 2 - selected.length));
+
+    // Preserve a recent-memo fallback when there are fewer commented memos than slots.
+    if (selected.length < 2) {
+      const fallback = latestRows(remaining.filter(memo => !selected.includes(memo)));
+      selected.push(...fallback.slice(0, 2 - selected.length));
+    }
+    return selected;
+  }, [memoItems]);
   const photoItems = calendarContext?.galleryPhotoIndex?.items;
   const photos = React.useMemo(() => (Array.isArray(photoItems)
     ? photoItems
