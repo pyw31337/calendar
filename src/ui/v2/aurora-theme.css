@@ -1023,6 +1023,18 @@
   .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-sports > .bp-day-anniversary-label { color: #0369a1 !important; }
   .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-movie > .bp-day-anniversary-label { color: #6d28d9 !important; }
   .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-other > .bp-day-anniversary-label { color: #475569 !important; }
+
+  /* Keep the in-flow anniversary stack below participant name pills.  The
+   * generic tablet cell height (60px) is enough for names alone but not for
+   * names plus a labelled anniversary, so those cells need a dedicated
+   * vertical budget instead of allowing flex items to crowd each other. */
+  .v2-design .bp-day-cell:has(.bp-day-bar-stack) {
+    min-height: 84px !important;
+  }
+  .v2-design .bp-day-cell .bp-day-bar-stack {
+    margin-top: 4px !important;
+    gap: 3px !important;
+  }
 }
 @media (max-width: 767px) {
   .renewal-shell.v2-design .bp-app-shell.is-bento-home
