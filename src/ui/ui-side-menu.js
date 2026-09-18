@@ -123,9 +123,9 @@ export function AppSettingsModal({
     if (typeof showToast === 'function') showToast((normalized.name || '지역') + ' 날씨로 설정했습니다.', 'success');
   };
 
-  return /*#__PURE__*/React.createElement("div", { className: "modal-overlay", onClick: onClose, style: { zIndex: 12000 } },
+  return /*#__PURE__*/React.createElement("div", { className: "modal-overlay app-settings-overlay", onClick: onClose, style: { zIndex: 12000 } },
     /*#__PURE__*/React.createElement("div", {
-      className: "modal-container", onClick: e => e.stopPropagation(),
+      className: "modal-container app-settings-modal-container", onClick: e => e.stopPropagation(),
       style: { maxWidth: '400px', width: '92%', backgroundColor: 'var(--bg-card)', borderRadius: '16px', border: '1px solid var(--border-subtle)', overflow: 'hidden' }
     },
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border-subtle)' } },
