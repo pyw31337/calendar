@@ -272,6 +272,116 @@
   }
 }
 
+/* Side rail parity: the search entry is an outlined action in the open rail,
+ * while the collapsed rail keeps only the centered magnifier. */
+.renewal-shell.v2-design .bp-side-nav-global-search {
+  background: none;
+  color: var(--brand, #7c2fe5);
+  width: calc(100% - 20px);
+  min-height: 36px;
+  font: inherit;
+  font-size: var(--font-size-sm, .74rem);
+  text-align: left;
+  cursor: pointer;
+  border: 1px solid var(--brand, #7c2fe5);
+  border-radius: 999px;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 10px 12px;
+  padding: 8px 12px;
+  font-weight: 800;
+  display: flex;
+  box-sizing: border-box;
+}
+.renewal-shell.v2-design .bp-side-nav-global-search:hover {
+  background: var(--brand-soft, #f3eeff);
+}
+.renewal-shell.v2-design .bp-side-nav-group.bp-is-main {
+  padding-top: 0 !important;
+}
+
+/* The collapsed rail is a compact icon dock: square brand mark, icon-only
+ * navigation, visible quick-menu panel and a true circular expand control. */
+@media (min-width: 768px) {
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed {
+    width: 64px;
+  }
+  .renewal-shell.v2-design:has(.bp-side-nav.bp-is-collapsed) {
+    padding-left: 64px;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-head {
+    justify-content: center;
+    padding: 16px 8px 12px;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand {
+    width: 40px;
+    height: 40px;
+    justify-content: center;
+    gap: 0;
+    border-radius: 10px;
+    background: var(--brand, #7c2fe5);
+    color: #fff;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-icon,
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-icon svg {
+    width: 26px !important;
+    height: 26px !important;
+    color: #fff;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search {
+    width: 40px;
+    height: 40px;
+    min-height: 40px;
+    justify-content: center;
+    margin: 8px auto 16px;
+    padding: 8px;
+    border-radius: 50%;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search-icon svg {
+    width: 22px;
+    height: 22px;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-group.bp-is-main {
+    padding-top: 0 !important;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item {
+    width: 48px;
+    min-height: 42px;
+    margin: 3px auto !important;
+    padding: 10px 6px !important;
+    justify-content: center;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item-icon,
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item-icon svg {
+    width: 20px !important;
+    height: 20px !important;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-group.bp-is-tab-menu {
+    display: block;
+    margin: 8px 10px;
+    padding: 6px 0 !important;
+    border-radius: 14px;
+    background: var(--bg-primary, #f8f7fb);
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-group.bp-is-tab-menu .bp-side-nav-item {
+    width: 40px;
+    min-height: 40px;
+    margin: 2px auto !important;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-footer {
+    padding: 10px 8px 16px;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-collapse-btn {
+    width: 36px;
+    height: 36px;
+    min-height: 36px;
+    padding: 0;
+    margin: 8px auto 0;
+    border-radius: 50%;
+    justify-content: center;
+  }
+}
+
 /* Home summary width contract: the lead calendar card and the four supporting
  * cards must share one grid canvas. Legacy breakpoint rules applied a narrower
  * intrinsic width/padding to the summary grid, leaving an empty rail on the

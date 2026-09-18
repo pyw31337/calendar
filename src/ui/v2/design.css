@@ -394,7 +394,7 @@
     --v2-page-pad: clamp(20px, calc((100vw - var(--v2-side-nav-width) - var(--v2-content-max)) / 2), 72px);
     padding-left: var(--v2-side-nav-width) !important;
   }
-  .renewal-shell.v2-design.is-side-collapsed { padding-left: 76px !important; }
+  .renewal-shell.v2-design.is-side-collapsed { padding-left: 64px !important; }
   .renewal-shell.v2-design > .bp-app-shell.is-bento-home,
   .renewal-shell.v2-design .bp-app-shell.is-bento-home {
     max-width: min(var(--v2-content-max), calc(100vw - var(--v2-side-nav-width)));
@@ -634,10 +634,10 @@
        declaration regardless of specificity -- verified by hand (my selector-shape parser can't
        build a :has() probe) via a direct browser check with a collapsed side-nav: without
        !important here this stays at 280px instead of shrinking to the icon rail's 76px. */
-    padding-left: 76px !important;
+    padding-left: 64px !important;
   }
   .v2-design .bp-side-nav.bp-is-collapsed {
-    width: 76px !important;
+    width: 64px !important;
   }
   .v2-design .bp-app-shell {
     max-width: min(var(--v2-content-max, 1600px), calc(100vw - var(--v2-side-nav-width, 280px))) !important;
@@ -1581,7 +1581,6 @@
     min-height: 42px !important;
   }
   .v2-design .bp-side-nav-group.bp-is-main {
-    padding-top: 28px !important;
     border-top: none !important;
   }
 }
