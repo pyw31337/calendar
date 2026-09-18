@@ -272,6 +272,52 @@
   }
 }
 
+/* Home summary width contract: the lead calendar card and the four supporting
+ * cards must share one grid canvas. Legacy breakpoint rules applied a narrower
+ * intrinsic width/padding to the summary grid, leaving an empty rail on the
+ * right at desktop widths. Keep every track stretchable and let the PC matrix
+ * switch cleanly between four and two columns while the calendar remains a
+ * single full-width row. */
+.renewal-shell.v2-design .bp-app-shell.is-bento-home
+  .bp-renewal-home-summary.bp-bento-grid {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  box-sizing: border-box;
+  margin-left: 0;
+  margin-right: 0;
+  justify-items: stretch;
+  align-items: stretch;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+.renewal-shell.v2-design .bp-app-shell.is-bento-home
+  .bp-renewal-home-summary.bp-bento-grid
+  > .bp-renewal-home-summary-section {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  box-sizing: border-box;
+}
+@media (min-width: 1200px) {
+  .renewal-shell.v2-design .bp-app-shell.is-bento-home
+    .bp-renewal-home-summary.bp-bento-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+@media (min-width: 768px) and (max-width: 1199px) {
+  .renewal-shell.v2-design .bp-app-shell.is-bento-home
+    .bp-renewal-home-summary.bp-bento-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 767px) {
+  .renewal-shell.v2-design .bp-app-shell.is-bento-home
+    .bp-renewal-home-summary.bp-bento-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 /* The home gallery preview is a fixed 3×3 contact sheet at every breakpoint.
  * HomeActivitySummary already limits the source list to the nine newest
  * user-uploaded photos, so no fourth column or extra row can appear. */
