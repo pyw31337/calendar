@@ -2115,7 +2115,9 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         },
         title: "댓글 입력",
         "aria-label": "댓글 입력"
-      }, /*#__PURE__*/React.createElement(MessageCommentIcon, { size: 16 }), "댓글")
+      }, variant === 'v2-page'
+        ? /*#__PURE__*/React.createElement("svg", { width: 14, height: 14, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true" }, /*#__PURE__*/React.createElement("path", { d: "M20 11.5a7.5 7.5 0 0 1-8 7.45 8.4 8.4 0 0 1-3.4-.7L4 19.5l1.25-3.2A7.3 7.3 0 0 1 4.5 12 7.5 7.5 0 0 1 12 4.5a7.5 7.5 0 0 1 8 7Z" }))
+        : /*#__PURE__*/React.createElement(MessageCommentIcon, { size: 16 }), "댓글")
     ),
 
     /* Comment composer -- always column (input, then picker left / cancel+save right).
@@ -2158,7 +2160,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       }),
       /*#__PURE__*/React.createElement("div", { className: "comment-composer-footer" },
         /*#__PURE__*/React.createElement(ParticipantPickerButton, {
-          participant: commentPart && variant !== 'preview'
+          participant: commentPart && variant === 'v2-page'
             ? { ...commentPart, name: shortParticipantName(commentPart.name) }
             : commentPart,
           onClick: () => setIsCommentPartOpen(true)

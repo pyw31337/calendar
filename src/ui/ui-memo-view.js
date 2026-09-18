@@ -2124,6 +2124,7 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
         setActiveLightbox,
         searchQuery,
         effectivePinned: !!memo.isPinned,
+        variant: 'v2-page',
       }),
       searchQuery,
       selectedTag,
