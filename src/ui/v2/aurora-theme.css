@@ -1003,6 +1003,27 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Anniversary text must remain readable on the translucent desktop badges.
+ * Some stored anniversary records carry a white badgeColor; using that value
+ * directly made the title disappear against the pale tint.  Keep the V2
+ * desktop label dark (with category-specific dark accents) regardless of the
+ * legacy record color. */
+@media (min-width: 768px) {
+  .v2-design .bp-day-bar-stack .bp-day-anniversary > .bp-day-anniversary-label,
+  .v2-design .festival-bar-desktop .bp-day-anniversary-label,
+  .v2-design .bp-day-anniversary > .bp-day-anniversary-label {
+    color: #4c1d95 !important;
+  }
+  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-birthday > .bp-day-anniversary-label { color: #be185d !important; }
+  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-travel > .bp-day-anniversary-label,
+  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-trip > .bp-day-anniversary-label { color: #047857 !important; }
+  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-event > .bp-day-anniversary-label { color: #1d4ed8 !important; }
+  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-festival > .bp-day-anniversary-label { color: #b45309 !important; }
+  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-sports > .bp-day-anniversary-label { color: #0369a1 !important; }
+  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-movie > .bp-day-anniversary-label { color: #6d28d9 !important; }
+  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-other > .bp-day-anniversary-label { color: #475569 !important; }
+}
 @media (max-width: 767px) {
   .renewal-shell.v2-design .bp-app-shell.is-bento-home
     .bp-renewal-home-summary.bp-bento-grid {
