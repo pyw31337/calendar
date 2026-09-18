@@ -169,6 +169,73 @@
   .v2-design .bp-hero-zone > .bp-hero-aurora { opacity: .62 !important; }
 }
 
+/* Final rail motion/geometry overrides (kept last so legacy V2 rules cannot
+ * reintroduce a vertical jump). */
+@media (min-width: 768px) {
+  .renewal-shell.v2-design .bp-side-nav-head {
+    position: relative;
+    isolation: isolate;
+    background: var(--bg-surface, #fff);
+  }
+  .renewal-shell.v2-design .bp-side-nav-head::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background: linear-gradient(-45deg, #12cdf0 0%, #3604fd 42%, #8019e0 76%, #3604fd 100%) 0 0 / 300% 300%;
+    opacity: 0;
+    transform: translate3d(-100%, 0, 0);
+    transition: opacity .18s ease, transform .42s cubic-bezier(.22,.61,.36,1);
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-head::after {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+  .renewal-shell.v2-design .bp-side-nav-head > * {
+    position: relative;
+    z-index: 1;
+  }
+  .renewal-shell.v2-design .bp-side-nav-group.bp-is-main {
+    padding: 0 10px !important;
+  }
+  .renewal-shell.v2-design .bp-side-nav:not(.bp-is-collapsed) .bp-side-nav-item {
+    height: 42px;
+    min-height: 42px !important;
+    margin: 3px 0 !important;
+    padding: 10px 12px !important;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item {
+    height: 42px;
+    min-height: 42px !important;
+    margin: 3px auto !important;
+    padding: 10px 0 !important;
+  }
+  .renewal-shell.v2-design .bp-side-nav-global-search {
+    height: 36px;
+    min-height: 36px;
+    margin: 18px auto 16px;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search {
+    width: 36px;
+    height: 36px;
+    min-height: 36px;
+    padding: 8px;
+    border-radius: 50%;
+    justify-content: center;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-icon,
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-icon svg {
+    color: #fff !important;
+    fill: currentColor;
+    stroke: currentColor;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item-icon,
+  .renewal-shell.v2-design .bp-side-nav:not(.bp-is-collapsed) .bp-side-nav-item-icon {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
 /* V2 calendar readability: larger navigation and weekday rhythm. */
 .v2-design .bp-cal-month-title {
   font-size: clamp(1.05rem, 1.4vw, 1.32rem);
@@ -269,6 +336,106 @@
     white-space: nowrap;
     font-size: 0.68rem !important;
     font-weight: 800 !important;
+  }
+}
+
+/* Side-nav coordinate contract: the collapsed rail is the vertical reference.
+ * Both states use the same head/search/item heights and vertical rhythm; only
+ * width, opacity and horizontal alignment are animated. This prevents the
+ * expanded state from drifting downward while the rail opens. */
+@media (min-width: 768px) {
+  .renewal-shell.v2-design .bp-side-nav {
+    --v2-side-head-size: 64px;
+    --v2-side-item-size: 42px;
+    overflow-x: hidden;
+  }
+  .renewal-shell.v2-design .bp-side-nav-head,
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-head {
+    height: var(--v2-side-head-size);
+    min-height: var(--v2-side-head-size);
+    box-sizing: border-box;
+    padding: 12px 16px !important;
+    overflow: hidden;
+    transition: background-position .42s cubic-bezier(.22,.61,.36,1),
+      width .32s cubic-bezier(.22,.61,.36,1);
+  }
+  .renewal-shell.v2-design .bp-side-nav-brand {
+    height: 40px;
+    min-height: 40px;
+    align-items: center;
+    transform: translateX(0);
+    transition: transform .32s cubic-bezier(.22,.61,.36,1);
+  }
+  .renewal-shell.v2-design .bp-side-nav-brand-icon,
+  .renewal-shell.v2-design .bp-side-nav-brand-icon svg {
+    transition: color .2s ease, fill .2s ease, stroke .2s ease;
+  }
+  .renewal-shell.v2-design .bp-side-nav-group.bp-is-main {
+    padding-top: 0 !important;
+  }
+  .renewal-shell.v2-design .bp-side-nav-global-search,
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search {
+    margin: 18px auto 16px;
+    box-sizing: border-box;
+    transform: translateX(0);
+    transition: width .32s cubic-bezier(.22,.61,.36,1),
+      height .32s cubic-bezier(.22,.61,.36,1),
+      border-radius .32s cubic-bezier(.22,.61,.36,1),
+      margin .32s cubic-bezier(.22,.61,.36,1),
+      padding .32s cubic-bezier(.22,.61,.36,1);
+  }
+  .renewal-shell.v2-design .bp-side-nav-global-search-icon {
+    width: 18px;
+    height: 18px;
+    min-width: 18px;
+    min-height: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 0;
+  }
+  .renewal-shell.v2-design .bp-side-nav-global-search-icon svg {
+    display: block;
+    width: 18px !important;
+    height: 18px !important;
+  }
+  .renewal-shell.v2-design .bp-side-nav-item {
+    height: var(--v2-side-item-size);
+    min-height: var(--v2-side-item-size) !important;
+    margin: 3px var(--v2-side-item-gutter) !important;
+    padding: 10px 12px !important;
+    box-sizing: border-box;
+    transform: translateX(0);
+  }
+  .renewal-shell.v2-design .bp-side-nav-item-icon {
+    transform: translateX(0);
+    align-self: center;
+    transition: transform .32s cubic-bezier(.22,.61,.36,1);
+  }
+  .renewal-shell.v2-design .bp-side-nav-item-icon svg {
+    display: block;
+  }
+  .renewal-shell.v2-design .bp-side-nav-item-title,
+  .renewal-shell.v2-design .bp-side-nav-item-meta,
+  .renewal-shell.v2-design .bp-side-nav-brand-text {
+    transition: opacity .16s ease, max-width .24s cubic-bezier(.22,.61,.36,1), transform .24s ease;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-icon,
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-icon svg {
+    color: #fff;
+    stroke: currentColor;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item {
+    width: var(--v2-side-item-lane);
+    margin-left: auto !important;
+    margin-right: auto !important;
+    padding: 10px 0 !important;
+    justify-content: center;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search-icon,
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search-icon svg {
+    width: 18px !important;
+    height: 18px !important;
   }
 }
 
