@@ -95,14 +95,11 @@ function getDeps() { return window.GATHER_UI_DEPS || {}; }
     }, [shareUrl]);
 
     return React.createElement('div', {
-      // "share-modal-overlay"/"-container" are extra modifier classes (ResizableModalContainer/
-      // .modal-overlay are shared by ~15 other modals) so the v2 backdrop-sheet treatment below
-      // targets only the share modal, not every other .modal-overlay in the app.
-      className: 'modal-overlay share-modal-overlay',
+      className: 'modal-overlay',
       onClick: onClose,
       style: { zIndex: 11000 }
     }, React.createElement(ResizableModalContainer, {
-      className: 'modal-container share-modal-container',
+      className: 'modal-container',
       onClick: function (e) { e.stopPropagation(); }
     }, React.createElement('div', {
       className: 'modal-header',

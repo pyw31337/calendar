@@ -323,35 +323,27 @@
   backdrop-filter: none;
 }
 
-/* ---- Share modal: backdrop-sheet treatment ----
- * PC/tablet: .modal-overlay's own default (align-items:center) already centers it, so no
- * change there. Mobile only: anchor to the bottom like a bottom sheet, matching the same
- * pattern as the date/event sheet above. "share-modal-*" are extra modifier classes added
- * alongside the shared .modal-overlay/.modal-container (used by ~15 other modals) so this
- * only touches the share modal, not every other modal in the app. */
+/* ---- Backdrop-sheet module: every remaining "layer popup" in v2 ----
+ * The v1 app has ~15 different modals sharing plain .modal-overlay/.modal-container (share,
+ * settings, weather picker, place register, chat sheets, edit forms, etc). Rather than opt
+ * each one in with its own modifier classes one at a time, this is the shared module: PC/
+ * tablet keeps .modal-overlay's own default (align-items:center, already centered -- no
+ * change needed there), and mobile turns every one of them into a full-width bottom sheet
+ * with more usable vertical height, matching the date/event sheet's own pattern above.
+ * Excluded on purpose (each already has its own dedicated, more specific treatment that this
+ * would otherwise fight with, or is intentionally small and centered rather than sheet-like):
+ *   .bp-sheet-backdrop / .bp-event-sheet  -- DateModal, styled just above
+ *   .confirm-dialog-modal                 -- Yes/No confirm dialogs (app.css keeps these a
+ *                                             small centered box; full-width would waste space
+ *                                             around two short buttons)
+ *   .meme-preview-overlay / .meme-preview-modal -- full-screen image preview, own sizing */
 @media (max-width: 767px) {
-  .v2-design .share-modal-overlay {
+  .v2-design .modal-overlay:not(.bp-sheet-backdrop):not(.meme-preview-overlay) {
     align-items: flex-end !important;
     padding: 0 !important;
   }
-  .v2-design .share-modal-container {
-    width: 100% !important;
-    max-width: none !important;
-    border-radius: 20px 20px 0 0 !important;
-    margin: 0 !important;
-  }
-
-
-/* ---- Settings modal (사이드메뉴 > 설정): backdrop-sheet treatment, same pattern as the
- * date/event sheet above -- PC unchanged (centered), mobile becomes a full-width bottom sheet.
- * "app-settings-*" are extra modifier classes on top of the shared .modal-overlay/
- * .modal-container (used by ~15 other modals) so only this modal is affected. */
-
-  .v2-design .app-settings-overlay {
-    align-items: flex-end !important;
-    padding: 0 !important;
-  }
-  .v2-design .app-settings-modal-container {
+  .v2-design .modal-container:not(.bp-event-sheet):not(.confirm-dialog-modal):not(.meme-preview-modal),
+  .v2-design .modal:not(.bp-event-sheet):not(.confirm-dialog-modal):not(.meme-preview-modal) {
     width: 100% !important;
     max-width: none !important;
     border-radius: 20px 20px 0 0 !important;
