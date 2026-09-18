@@ -1067,7 +1067,7 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
         },
           React.createElement('strong', { className: 'v2-bubble-title' }, memo.title || '메모'),
           React.createElement('span', { className: 'v2-memo-card-meta' }, memoMeta),
-          React.createElement('span', { className: 'v2-bubble-summary' }, String(memo.text || memo.content || memo.description || '').slice(0, 170)),
+          React.createElement('span', { className: 'v2-bubble-summary' }, String(memo.text || memo.content || memo.description || '')),
           preview && React.createElement('span', { className: 'v2-bubble-preview' },
             preview.image && React.createElement('img', { src: preview.image, alt: '', loading: 'lazy' }),
             React.createElement('span', null,
@@ -1081,7 +1081,7 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
           visibleComments.length ? React.createElement('div', { className: 'v2-bubble-comment-list' },
             visibleComments.map((comment, commentIndex) => React.createElement('div', { className: 'v2-bubble-comment-preview', key: comment.id || commentIndex },
               React.createElement(NameColorPill, { className: 'v2-bubble-comment-author', name: shortParticipantName(participantFor(comment)?.name || '댓글'), color: participantFor(comment)?.color }),
-              React.createElement('span', { className: 'v2-bubble-comment-text' }, String(comment.text || '').slice(0, 90))
+              React.createElement('span', { className: 'v2-bubble-comment-text' }, String(comment.text || ''))
             )),
           ) : null,
           React.createElement('div', { className: 'v2-bubble-comment-footer' },

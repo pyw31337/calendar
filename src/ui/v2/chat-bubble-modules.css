@@ -150,6 +150,10 @@
   line-height: 1.5;
   margin-bottom: 10px;
   white-space: pre-line;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
 }
 
 .v2-design .v2-home-memo-bubble .v2-bubble-preview {
@@ -217,8 +221,10 @@
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-height: 1.35;
   color: var(--text-main);
 }
 .v2-design .v2-home-memo-bubble .v2-bubble-comment-count {
