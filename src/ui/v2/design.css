@@ -1257,6 +1257,17 @@
   .v2-design .bp-bento-grid > .bp-bento-card:first-child.bp-wide { grid-column: 1; }
 }
 
+/* Tablet (no fixed side rail yet, hamburger-only): the hero card goes edge-to-edge like
+ * mobile instead of the rounded/margined card it becomes on PC (>=1200px, see the
+ * .bp-hero-zone rule in the PC block above) -- reference-home.css's own >=768px rule gives
+ * it rounded corners + side margins unconditionally, so override specifically for this range. */
+@media (min-width: 768px) and (max-width: 1199px) {
+  .v2-design .bp-hero-zone {
+    border-radius: 0 !important;
+    margin: 0 0 16px !important;
+  }
+}
+
 /* Integrated search is a first-class destination, not a drawer overlay. Keep the
  * existing search/result component and give it the same content gutters as the
  * other V2 destinations. */
