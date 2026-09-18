@@ -1091,7 +1091,12 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
                 });
               },
               'aria-expanded': commentOpenId === memo.id,
-            }, '댓글'),
+            },
+              React.createElement('svg', { width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': 'true' },
+                React.createElement('path', { d: 'M20 11.5a7.5 7.5 0 0 1-8 7.45 8.4 8.4 0 0 1-3.4-.7L4 19.5l1.25-3.2A7.3 7.3 0 0 1 4.5 12 7.5 7.5 0 0 1 12 4.5a7.5 7.5 0 0 1 8 7Z' })
+              ),
+              '댓글'
+            ),
           ),
           commentOpenId === memo.id && React.createElement('form', {
             className: 'v2-bubble-comment-composer',
