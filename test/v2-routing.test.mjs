@@ -155,3 +155,14 @@ test('V2 destination screens keep live feature entry points', async () => {
   assert.match(styles, /chat-reply-quote-card/);
   assert.match(styles, /v2-records-media/);
 });
+
+test('V1 and V2 memo cards expose one comment action each', async () => {
+  const { readFileSync } = await import('node:fs');
+  const memoCard = readFileSync(new URL('../src/ui/ui-calendar-core.js', import.meta.url), 'utf8');
+  const v2Modules = readFileSync(new URL('../src/ui/v2/chat-bubble-modules.css', import.meta.url), 'utf8');
+  // V1 owns the tag-row control; V2 owns the quiet footer. Neither shell relies on CSS to hide
+  // a duplicate element, which prevents the legacy memo page from exposing the count/action twice.
+  assert.match(memoCard, /V1 keeps its single comment action[\s\S]*?variant !== 'v2-page' &&[\s\S]*?memo-card-comment-toggle/);
+  assert.match(memoCard, /V2 has its own quiet count\/action footer[\s\S]*?variant === 'v2-page' &&[\s\S]*?memo-card-comment-footer/);
+  assert.doesNotMatch(v2Modules, /v2-memo-card-tags > \.memo-card-comment-toggle/);
+});

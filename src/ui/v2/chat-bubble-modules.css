@@ -430,9 +430,6 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
 }
-.v2-memo .v2-memo-card-wrap .v2-memo-card-tags > .memo-card-comment-toggle {
-  display: none;
-}
 .v2-design .v2-memo .v2-memo-card-wrap .memo-card-comment-footer > .memo-card-comment-toggle {
   border: 0;
   background: transparent;

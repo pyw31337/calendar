@@ -2007,8 +2007,8 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         }
       }, highlightKeyword(tag, searchQuery))),
 
-      /* Comment toggle button -- pushed to the far right of the row */
-      /*#__PURE__*/React.createElement("button", {
+      /* V1 keeps its single comment action beside the tags. V2 uses the quiet footer below. */
+      variant !== 'v2-page' && /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: (e) => {
           e.stopPropagation();
@@ -2105,7 +2105,8 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       );
     })),
 
-    variant !== 'preview' && /*#__PURE__*/React.createElement("div", {
+    /* V2 has its own quiet count/action footer; rendering it in V1 duplicated the tag-row control. */
+    variant === 'v2-page' && /*#__PURE__*/React.createElement("div", {
       className: "memo-card-comment-footer",
       onClick: e => e.stopPropagation()
     },
