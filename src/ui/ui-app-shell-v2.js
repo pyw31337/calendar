@@ -2641,7 +2641,20 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   };
 
   const bentoSideNav = React.createElement(React.Fragment, null,
-    React.createElement('div', { className: bentoClass('side-nav-head') },
+    React.createElement('div', {
+      className: bentoClass('side-nav-head'),
+      role: 'button',
+      tabIndex: 0,
+      'aria-label': '캘린더 홈으로 이동',
+      onClick: () => { setIsSideNavOpen(false); setActiveTab('calendar'); },
+      onKeyDown: (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          setIsSideNavOpen(false);
+          setActiveTab('calendar');
+        }
+      },
+    },
       React.createElement('div', { className: bentoClass('side-nav-brand') },
         React.createElement('span', {
           className: bentoClass('side-nav-brand-icon'),
@@ -2658,7 +2671,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
             : null;
         })()
       ),
-      React.createElement('button', { type: 'button', className: bentoClass('side-nav-close-btn'), 'aria-label': '메뉴 닫기', onClick: () => setIsSideNavOpen(false) },
+    React.createElement('button', { type: 'button', className: bentoClass('side-nav-close-btn'), 'aria-label': '메뉴 닫기', onClick: (e) => { e.stopPropagation(); setIsSideNavOpen(false); } },
         React.createElement(TabIcon, { id: 'x' })
       )
     ),
