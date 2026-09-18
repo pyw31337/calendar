@@ -380,6 +380,13 @@
   box-shadow: 1px 1px 4px #1e1b2e12;
   padding: 20px 26px;
 }
+.v2-memo .v2-memo-card-wrap img.media-thumb {
+  width: 100%;
+  height: auto;
+  max-height: none;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+}
 .v2-memo .v2-memo-card-wrap .v2-memo-card-title {
   font-size: 1rem;
   line-height: 1.25;

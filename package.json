@@ -30,6 +30,7 @@
     "smoke:live": "node scripts/live-smoke-check.mjs",
     "smoke:browser": "node scripts/browser-smoke-test.mjs",
     "smoke:browser:all": "npm run smoke:browser && CALENDAR_SMOKE_BROWSER=firefox npm run smoke:browser && CALENDAR_SMOKE_BROWSER=webkit npm run smoke:browser",
+    "check:v2-cutover": "npm run test && npm run build && CALENDAR_SMOKE_SCOPE=deploy npm run smoke:browser",
     "check:required-symbols": "node scripts/check-required-symbols.mjs",
     "check:dead-globals": "node scripts/check-dead-globals.mjs",
     "check:isolation": "node scripts/check-calendar-isolation.mjs",

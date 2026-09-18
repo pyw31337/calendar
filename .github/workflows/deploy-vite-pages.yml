@@ -26,6 +26,9 @@ jobs:
       - name: Build for GitHub Pages
         env:
           VITE_BUILD_SHA: ${{ github.sha }}
+          # Empty by default: production stays on V1 until the approved cutover sets the
+          # repository variable to v2. A V2-default build still has the ?shell=v1 rollback URL.
+          VITE_DEFAULT_SHELL: ${{ vars.VITE_DEFAULT_SHELL }}
         run: GITHUB_PAGES=1 npm run build
       - name: Check Vite build output budget
         run: npm run check:dist-budget
@@ -38,6 +41,8 @@ jobs:
         env:
           CALENDAR_SMOKE_SCOPE: deploy
           CALENDAR_SMOKE_BASE_PATH: /calendar/
+          CALENDAR_EXPECT_DEFAULT_SHELL: ${{ vars.VITE_DEFAULT_SHELL || 'v1' }}
+          VITE_DEFAULT_SHELL: ${{ vars.VITE_DEFAULT_SHELL }}
         run: |
           # Hosted runners occasionally delay a mobile route transition even
           # though the build and the route are healthy. Retry the complete

@@ -9,6 +9,12 @@
 4. Firebase Functions 코드가 바뀐 경우에만 `firebase deploy --only functions`를 수동 실행한다. GitHub Actions는 Functions를 배포하지 않는다. 2026-09-10 기준 `rebuildPhotoIndex`와 photoIndex Firestore 트리거는 프로덕션에 이미 올라가 있다.
 5. 운영 데이터 점검: `npm run ops:audit`, `npm run ops:media-audit`
 
+### V2 기본 화면 전환
+
+- V2를 기본으로 바꾸거나 V1으로 되돌리는 절차는 [V2 기본 화면 전환 런북](./V2-CUTOVER-RUNBOOK.md)을 따른다.
+- 기본 전환은 Firebase 데이터·Storage 이전 작업이 아니며, `VITE_DEFAULT_SHELL` 저장소 변수와 GitHub Pages 재배포만 사용한다.
+- 기본 V2 배포 중에도 `?shell=v1`은 즉시 사용할 수 있는 V1 롤백 URL이다.
+
 ### 지도 보안 (MapLibre)
 - `maplibre-gl`은 **6.9.0+** (GHSA-jrc7-96c5-q579 / CVE-2026-85061, attribution XSS). 5.x는 패치가 없고, `npm audit --force`로 6.9.0만 올리면 Leaflet 브릿지 0.1.3이 깨진다.
 - 장소 지도는 `@maplibre/maplibre-gl-leaflet` **0.1.4** ESM 브릿지 + Vite worker URL(`setWorkerUrl`)을 쓴다. 5.x로 되돌리지 말 것.

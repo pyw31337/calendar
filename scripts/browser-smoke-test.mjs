@@ -36,6 +36,7 @@ const BROWSER_NAME = process.env.CALENDAR_SMOKE_BROWSER || 'chromium';
 const BROWSER_TYPES = { chromium, firefox, webkit };
 const DEPLOY_SCOPE = process.env.CALENDAR_SMOKE_SCOPE === 'deploy';
 const BLOCK_PRODUCTION_DATA = process.env.CALENDAR_SMOKE_BLOCK_PRODUCTION_DATA === '1';
+const EXPECT_DEFAULT_SHELL = process.env.CALENDAR_EXPECT_DEFAULT_SHELL || 'v1';
 const LOCAL_PORT = process.env.CALENDAR_SMOKE_PORT || '4173';
 const LOCAL_BASE_PATH = `/${String(process.env.CALENDAR_SMOKE_BASE_PATH || '').replace(/^\/+|\/+$/g, '')}`;
 const LOCAL_BASE_URL = `http://127.0.0.1:${LOCAL_PORT}${LOCAL_BASE_PATH === '/' ? '/' : `${LOCAL_BASE_PATH}/`}`;
@@ -327,6 +328,123 @@ async function checkRenewalShellRoutes(browser, baseUrl) {
     } finally {
       await context.close();
     }
+  }
+}
+
+/**
+ * The V2 memo page shares live MemoCard markup with the legacy shell. This is a focused
+ * computed-style contract so a future selector, import-order, or inline-style change cannot
+ * silently reintroduce the cross-shell regressions that !important used to mask.
+ */
+async function checkMemoVisualContracts(browser, baseUrl) {
+  const checks = [
+    {
+      label: 'V1 메모 스타일 보존',
+      url: `${baseUrl}?id=cw&shell=v1`,
+      viewport: { width: 1440, height: 900 },
+      expected: { shell: false, cardPadding: '12px', tagPadding: '3px 8px', tagColor: 'rgb(37, 99, 235)', tagBackground: 'rgba(37, 99, 235, 0.08)' }
+    },
+    {
+      label: 'V2 메모 PC 스타일 계약',
+      url: `${baseUrl}?id=cw&shell=v2&tab=memo`,
+      viewport: { width: 1440, height: 900 },
+      expected: { shell: true, cardPadding: '20px 26px', gridPadding: '40px', tagPadding: '0px', tagColor: 'rgb(124, 47, 229)', tagBackground: 'rgba(0, 0, 0, 0)' }
+    },
+    {
+      label: 'V2 메모 모바일 스타일 계약',
+      url: `${baseUrl}?id=cw&shell=v2&tab=memo`,
+      viewport: { width: 390, height: 844 },
+      expected: { shell: true, cardPadding: '20px 26px', gridPadding: '20px', tagPadding: '0px', tagColor: 'rgb(124, 47, 229)', tagBackground: 'rgba(0, 0, 0, 0)' }
+    }
+  ];
+
+  for (const check of checks) {
+    const context = await browser.newContext({ viewport: check.viewport, hasTouch: check.viewport.width < 768 });
+    const page = await context.newPage();
+    try {
+      await gotoBootReady(page, check.url);
+      // Destination reference styles are lazy chunks. Give their stylesheet a moment to attach
+      // after the shell reports boot-ready before measuring the cascade.
+      await page.waitForTimeout(1000);
+      const actual = await page.evaluate(isV2 => {
+        // Smoke blocks Firestore to remain read-only, so create a minimal live-component-shaped
+        // probe rather than depending on production memo records being available. This measures
+        // the real CSS cascade, including V1 inline declarations and V2 scoped declarations.
+        const probe = document.createElement('div');
+        probe.dataset.v2StyleProbe = 'true';
+        probe.innerHTML = isV2
+          ? `<div class="renewal-shell v2-design"><main class="v2-destination v2-memo"><section class="v2-memo v2-dest-page"><div class="bp-app-shell"><div class="bp-memo-grid"><div class="v2-memo-card-wrap"><article class="memo-card-hover v2-memo-card-contract"><span class="v2-memo-tag">#태그</span><img class="media-thumb" alt="스타일 검사 이미지"></article></div></div></div></section></main></div>`
+          : `<article class="memo-card-hover" style="padding:12px"><span class="v2-memo-tag" style="font-size:var(--font-size-xs);font-weight:600;color:#2563EB;background-color:rgba(37, 99, 235, 0.08);padding:3px 8px;border-radius:4px;line-height:1;white-space:nowrap">#태그</span></article>`;
+        document.body.append(probe);
+        const read = selector => {
+          const node = probe.querySelector(selector);
+          if (!node) return null;
+          const style = getComputedStyle(node);
+          return {
+            padding: style.padding,
+            color: style.color,
+            background: style.backgroundColor,
+            wordBreak: style.wordBreak,
+            aspectRatio: style.aspectRatio,
+            objectFit: style.objectFit
+          };
+        };
+        const result = {
+          shell: !!probe.querySelector('.renewal-shell'),
+          card: read('.v2-memo-card-contract, .memo-card-hover'),
+          tag: read('.v2-memo-tag'),
+          grid: read('.bp-memo-grid'),
+          image: read('.v2-memo img.media-thumb')
+        };
+        probe.remove();
+        return result;
+      }, check.expected.shell);
+      if (actual.shell !== check.expected.shell) throw new Error(`V2 셸=${actual.shell} (기대값 ${check.expected.shell})`);
+      if (!actual.card || !actual.tag) throw new Error('메모 카드 또는 태그를 찾지 못함');
+      if (actual.card.padding !== check.expected.cardPadding) throw new Error(`카드 padding=${actual.card.padding}`);
+      if (actual.tag.padding !== check.expected.tagPadding) throw new Error(`태그 padding=${actual.tag.padding}`);
+      if (actual.tag.color !== check.expected.tagColor || actual.tag.background !== check.expected.tagBackground) {
+        throw new Error(`태그 color/background=${actual.tag.color}/${actual.tag.background}`);
+      }
+      if (actual.card.wordBreak !== 'keep-all' || actual.tag.wordBreak !== 'keep-all') {
+        throw new Error(`word-break=${actual.card.wordBreak}/${actual.tag.wordBreak}`);
+      }
+      if (check.expected.gridPadding && actual.grid?.padding !== check.expected.gridPadding) {
+        throw new Error(`그리드 padding=${actual.grid?.padding || '없음'}`);
+      }
+      if (actual.image && (actual.image.aspectRatio !== '1 / 1' || actual.image.objectFit !== 'cover')) {
+        throw new Error(`메모 이미지 aspect-ratio/object-fit=${actual.image.aspectRatio}/${actual.image.objectFit}`);
+      }
+      pass(check.label);
+    } catch (err) {
+      fail(check.label, err.message);
+    } finally {
+      await context.close();
+    }
+  }
+}
+
+/** Verifies the build-time default and both URL overrides used for a V2 cutover/rollback. */
+async function checkShellCutoverOverrides(browser, baseUrl) {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  const expectedDefaultV2 = EXPECT_DEFAULT_SHELL === 'v2';
+  const checks = [
+    ['기본 URL', `${baseUrl}?id=cw`, expectedDefaultV2],
+    ['V1 강제 롤백 URL', `${baseUrl}?id=cw&shell=v1`, false],
+    ['V2 강제 확인 URL', `${baseUrl}?id=cw&shell=v2`, true]
+  ];
+  try {
+    for (const [label, url, expectedV2] of checks) {
+      await gotoBootReady(page, url);
+      const isV2 = await page.locator('.renewal-shell').count() > 0;
+      if (isV2 !== expectedV2) throw new Error(`${label}: ${isV2 ? 'V2' : 'V1'} 렌더됨 (기대값 ${expectedV2 ? 'V2' : 'V1'})`);
+    }
+    pass(`기본 셸/URL 롤백 계약 (${expectedDefaultV2 ? 'V2 기본' : 'V1 기본'})`);
+  } catch (err) {
+    fail('기본 셸/URL 롤백 계약', err.message);
+  } finally {
+    await context.close();
   }
 }
 
@@ -696,6 +814,10 @@ async function main() {
 
     console.log('\n-- V2 renewal shell routes --');
     await checkRenewalShellRoutes(browser, baseUrl);
+
+    console.log('\n-- V1/V2 메모 계산 스타일 계약 --');
+    await checkMemoVisualContracts(browser, baseUrl);
+    await checkShellCutoverOverrides(browser, baseUrl);
 
     console.log('\n-- 상호작용 스모크 (읽기 전용) --');
     await checkEmojiCategories(browser, baseUrl);
