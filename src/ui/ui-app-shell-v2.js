@@ -1142,7 +1142,7 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
               minHeight: 30,
               maxHeight: 200,
               style: {
-                width: '100%', fontSize: '0.8rem', border: '1px solid var(--border-subtle)',
+                width: '100%', fontSize: '0.8rem', border: '1px solid #1e1b2e0f',
                 borderRadius: 'var(--radius-sm)', padding: '6px 8px', backgroundColor: '#fff',
                 color: 'var(--text-main)', outline: 'none', boxSizing: 'border-box'
               },
@@ -1158,7 +1158,7 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
                   onClick: event => { event.stopPropagation(); setCommentDraft(''); setCommentOpenId(null); },
                   style: {
                     flexShrink: 0, height: '30px', padding: '0 12px', borderRadius: 'var(--radius-sm)',
-                    border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)',
+                    border: '1px solid #1e1b2e0f', backgroundColor: 'var(--bg-card)',
                     color: 'var(--text-muted)', fontSize: 'var(--font-size-md)', fontWeight: 'bold', cursor: 'pointer'
                   }
                 }, '취소'),

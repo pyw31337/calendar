@@ -127,7 +127,7 @@
 .v2-design .v2-home-memo-bubble > .v2-name-pill { display: none; }
 .v2-design .v2-home-memo-bubble > .v2-bubble-meta { display: none; }
 .v2-design .v2-home-memo-bubble .v2-bubble-surface {
-  border: 1px solid #e6e3eb;
+  border: 1px solid #1e1b2e0f;
   border-radius: 14px;
   box-shadow: none;
   padding: 14px 16px;
@@ -136,7 +136,7 @@
   display: block;
   margin-bottom: 9px;
   padding-bottom: 8px;
-  border-bottom: 1px solid #ece9f0;
+  border-bottom: 1px solid #1e1b2e0f;
   color: #8a8798;
   font-size: .62rem;
   font-weight: 600;
@@ -307,8 +307,8 @@
 .v2-memo .v2-memo-card-wrap > .v2-bubble-meta { display: none; }
 .v2-memo .v2-memo-card-wrap .v2-memo-card-contract {
   background: #fff !important;
-  border: 1px solid #e6e3eb !important;
-  border-left: 1px solid #e6e3eb !important;
+  border: 1px solid #1e1b2e0f !important;
+  border-left: 1px solid #1e1b2e0f !important;
   border-radius: 14px !important;
   box-shadow: none !important;
   padding: 14px 16px !important;
@@ -323,7 +323,7 @@
   display: block;
   margin-bottom: 9px;
   padding-bottom: 8px;
-  border-bottom: 1px solid #ece9f0;
+  border-bottom: 1px solid #1e1b2e0f;
   color: #8a8798;
   font-size: .62rem;
   font-weight: 600;
