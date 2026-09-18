@@ -1,3 +1,5 @@
+import { shortParticipantName } from './v2/view-data.js';
+
 /**
  * Calendar grid, comments, memo card, polls, search (P4-19)
  */
@@ -2156,7 +2158,9 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       }),
       /*#__PURE__*/React.createElement("div", { className: "comment-composer-footer" },
         /*#__PURE__*/React.createElement(ParticipantPickerButton, {
-          participant: commentPart,
+          participant: commentPart && variant !== 'preview'
+            ? { ...commentPart, name: shortParticipantName(commentPart.name) }
+            : commentPart,
           onClick: () => setIsCommentPartOpen(true)
         }),
         /*#__PURE__*/React.createElement("div", { className: "comment-composer-buttons" },

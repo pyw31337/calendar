@@ -375,13 +375,27 @@
   gap: 5px !important;
   margin-top: 4px !important;
 }
-.v2-memo .bp-memo-grid {
+.v2-design .v2-memo .bp-memo-grid {
   padding: 40px !important;
   grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
   gap: 16px !important;
 }
 .v2-memo .v2-memo-card-wrap .v2-memo-card-tags > .memo-card-comment-toggle {
   display: none !important;
+}
+.v2-design .v2-memo .v2-memo-card-wrap .memo-card-comment-footer > .memo-card-comment-toggle {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 3px 2px !important;
+}
+.v2-design .v2-memo .comment-composer .participant-picker-button {
+  height: auto !important;
+  padding: 6px 10px !important;
+  font-size: .7rem !important;
+}
+.v2-design .v2-memo .comment-composer-buttons button {
+  font-size: .7rem !important;
 }
 .v2-memo .v2-memo-card-wrap .v2-memo-card-tags > button:not(.memo-card-comment-toggle) {
   border-radius: 999px;
@@ -404,13 +418,13 @@
   padding: 7px 10px !important;
 }
 @media (max-width: 1240px) {
-  .v2-memo .bp-memo-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+  .v2-design .v2-memo .bp-memo-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
 }
 @media (max-width: 960px) {
-  .v2-memo .bp-memo-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .v2-design .v2-memo .bp-memo-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
 }
 @media (max-width: 640px) {
-  .v2-memo .bp-memo-grid {
+  .v2-design .v2-memo .bp-memo-grid {
     padding: 40px !important;
     grid-template-columns: minmax(0, 1fr) !important;
   }
