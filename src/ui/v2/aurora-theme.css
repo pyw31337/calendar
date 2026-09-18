@@ -1067,7 +1067,9 @@
     width: 100% !important;
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     gap: 16px !important;
-    padding: 0 !important;
+    /* Supporting cards keep a small page gutter and their existing rounded
+     * surfaces; only the lead calendar below is allowed to bleed outward. */
+    padding: 0 16px 24px !important;
   }
   .renewal-shell.v2-design .bp-app-shell.is-bento-home
     .bp-renewal-home-summary.bp-bento-grid
@@ -1076,6 +1078,9 @@
     width: 100% !important;
     max-width: none !important;
     border-radius: 0 !important;
+    margin-left: -16px !important;
+    margin-right: -16px !important;
+    width: calc(100% + 32px) !important;
   }
 }
 
