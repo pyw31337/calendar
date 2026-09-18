@@ -129,7 +129,7 @@
 .v2-design .v2-home-memo-bubble .v2-bubble-surface {
   border: 1px solid #1e1b2e0f;
   border-radius: 14px;
-  box-shadow: none;
+  box-shadow: 1px 1px 4px #1e1b2e12;
   padding: 14px 16px;
 }
 .v2-design .v2-home-memo-bubble .v2-memo-card-meta {
@@ -296,7 +296,7 @@
 
 .v2-memo .v2-memo-card-wrap .v2-bubble-surface > .memo-card-hover,
 .v2-memo .v2-memo-card-wrap .v2-bubble-surface > [class*="memo-card"] {
-  box-shadow: none !important;
+  box-shadow: 1px 1px 4px #1e1b2e12 !important;
   border-radius: 14px !important;
   border-left: none !important;
 }
