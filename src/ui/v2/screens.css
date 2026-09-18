@@ -2236,3 +2236,33 @@
 .v2-design .v2-page-header .bp-header-center-brand { min-width: 0; justify-self: center; display: inline-flex; align-items: center; justify-content: center; white-space: nowrap; }
 .v2-design .v2-page-header .bp-header-actions { min-width: 56px; justify-self: end; display: inline-flex; align-items: center; justify-content: flex-end; flex-wrap: nowrap; white-space: nowrap; margin-left: 0; }
 .v2-design .v2-page-header .v2-header-title-block { min-width: 0; display: inline-flex; align-items: center; flex-wrap: nowrap; white-space: nowrap; }
+
+/* V2 memo page layout contract. This is intentionally the final rule in this
+ * stylesheet: older memo-density rules use auto-fill and otherwise turn the
+ * requested 4/3/2/1 responsive matrix into five columns at wide widths. */
+.v2-design .renewal-shell-main .v2-memo .bp-memo-grid,
+.v2-design .v2-memo .bp-memo-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 16px !important;
+  padding: 40px !important;
+  box-sizing: border-box !important;
+}
+@media (max-width: 1240px) {
+  .v2-design .renewal-shell-main .v2-memo .bp-memo-grid,
+  .v2-design .v2-memo .bp-memo-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+@media (max-width: 960px) {
+  .v2-design .renewal-shell-main .v2-memo .bp-memo-grid,
+  .v2-design .v2-memo .bp-memo-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+@media (max-width: 640px) {
+  .v2-design .renewal-shell-main .v2-memo .bp-memo-grid,
+  .v2-design .v2-memo .bp-memo-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}

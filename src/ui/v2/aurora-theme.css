@@ -1018,6 +1018,34 @@
   grid-auto-rows: 1fr;
 }
 
+/* Fold/tablet home contract (768–1199px): the hero and calendar are the two
+ * full-bleed, single-column lead surfaces.  Supporting modules remain a
+ * two-column matrix.  Keep this contract last so the generic >=768 card
+ * rounding and desktop grid rules cannot re-introduce gutters or radii. */
+@media (min-width: 768px) and (max-width: 1199px) {
+  .renewal-shell.v2-design .bp-app-shell.is-bento-home .bp-hero-zone {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 0 16px !important;
+    border-radius: 0 !important;
+  }
+  .renewal-shell.v2-design .bp-app-shell.is-bento-home
+    .bp-renewal-home-summary.bp-bento-grid {
+    width: 100% !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 16px !important;
+    padding: 0 !important;
+  }
+  .renewal-shell.v2-design .bp-app-shell.is-bento-home
+    .bp-renewal-home-summary.bp-bento-grid
+    > .bp-renewal-home-summary-section:first-child {
+    grid-column: 1 / -1 !important;
+    width: 100% !important;
+    max-width: none !important;
+    border-radius: 0 !important;
+  }
+}
+
 /* Mobile holiday labels are deliberately constrained to five Korean
  * characters per line: "대체공휴일(광복절)" therefore reads as two clear
  * lines instead of colliding with the meeting pill. Desktop keeps the normal
