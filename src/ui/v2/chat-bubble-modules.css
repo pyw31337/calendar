@@ -131,7 +131,38 @@
   border-radius: 14px;
   box-shadow: 1px 1px 4px #1e1b2e12;
   padding: 14px 16px;
+  position: relative;
 }
+.v2-design .v2-home-memo-bubble .v2-home-memo-actions {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.v2-design .v2-home-memo-bubble .v2-home-memo-action {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  opacity: .72;
+  cursor: pointer;
+}
+.v2-design .v2-home-memo-bubble .v2-home-memo-action:hover,
+.v2-design .v2-home-memo-bubble .v2-home-memo-action:focus-visible {
+  color: var(--brand);
+  background: var(--brand-soft);
+  opacity: 1;
+}
+.v2-design .v2-home-memo-bubble .v2-bubble-title { padding-right: 46px; }
 .v2-design .v2-home-memo-bubble .v2-memo-card-meta {
   display: block;
   margin-bottom: 9px;

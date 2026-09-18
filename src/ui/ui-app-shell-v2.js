@@ -880,6 +880,8 @@ function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeVie
         galleryPhotoIndex: recordsContext?.mediaProps?.indexedPhotos ? { items: recordsContext.mediaProps.indexedPhotos } : null,
         setActiveLightbox: recordsContext?.mediaProps?.setActiveLightbox,
         onMemoCommentsChange: recordsContext?.memoProps?.onMemoCommentsChange,
+        onToggleMemoPin: recordsContext?.memoProps?.onToggleMemoPin,
+        onOpenMemoShare: recordsContext?.onOpenMemoShare,
       },
       onOpenDate,
       onChangeView
@@ -1084,6 +1086,26 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
             },
           },
         },
+          React.createElement('div', { className: 'v2-home-memo-actions', 'aria-label': '메모 액션' },
+            React.createElement('button', {
+              type: 'button', className: 'v2-home-memo-action',
+              title: memo.isPinned ? '고정 해제' : '메모 고정',
+              'aria-label': memo.isPinned ? '고정 해제' : '메모 고정',
+              onClick: event => {
+                event.stopPropagation();
+                calendarContext.onToggleMemoPin?.(memo);
+              },
+            }, React.createElement(TabIcon, { id: 'pin', active: !!memo.isPinned })),
+            React.createElement('button', {
+              type: 'button', className: 'v2-home-memo-action',
+              title: '메모 공유', 'aria-label': '메모 공유',
+              onClick: event => {
+                event.stopPropagation();
+                if (typeof calendarContext.onOpenMemoShare === 'function') calendarContext.onOpenMemoShare(memo);
+                else onChangeView?.('memo');
+              },
+            }, React.createElement(TabIcon, { id: 'share' }))
+          ),
           React.createElement('strong', { className: 'v2-bubble-title' }, memo.title || '메모'),
           React.createElement('span', { className: 'v2-memo-card-meta' }, memoMeta),
           memoDisplayText && React.createElement('span', { className: 'v2-bubble-summary' }, memoDisplayText),
@@ -1699,6 +1721,7 @@ export function buildRenewalRecordsContext(calendar, deps) {
         window.history.replaceState({}, '', url);
       },
       onUpdateMemo: patchLocalMemo, onUpsertMemo: upsertLocalMemo, onDeleteMemo: removeLocalMemo,
+      onToggleMemoPin: handleToggleMemoPin,
       onMemoCommentsChange,
       memoInitialTag, setMemoInitialTag,
     },
