@@ -1576,6 +1576,16 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
   })();
   const memoTextLineCount = displayMemoText ? displayMemoText.split(/\r?\n/).length : 0;
   const hasLongMemoText = displayMemoText.length > 280 || memoTextLineCount > 8;
+  const memoMeta = (() => {
+    const value = memo.updatedAt ?? memo.createdAt;
+    if (!value) return '';
+    const rawValue = value && typeof value.toDate === 'function' ? value.toDate() : value;
+    const date = new Date(rawValue);
+    if (Number.isNaN(date.getTime())) return '';
+    const weekday = ['일', '월', '화', '수', '목', '금', '토'][date.getDay()];
+    const pad = value => String(value).padStart(2, '0');
+    return `${pad(date.getMonth() + 1)}.${pad(date.getDate())}(${weekday}) ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  })();
   const [isMemoTextExpanded, setIsMemoTextExpanded] = React.useState(false);
   const [openVideoByUrl, setOpenVideoByUrl] = React.useState({});
 
@@ -1774,7 +1784,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       transition: 'box-shadow 0.2s ease',
       boxSizing: 'border-box'
     },
-    className: "memo-card-hover"
+    className: "memo-card-hover v2-memo-card-contract"
   },
     /* Share button -- sits immediately left of the pin toggle (when the pin is shown), same
        absolute-positioned/unstyled-button pattern, same 16px icon size, stroke weight and color
@@ -1823,8 +1833,12 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
 
     /* Title if exists -- paddingRight clears the share icon (and pin icon, when shown) */
     memo.title && /*#__PURE__*/React.createElement("div", {
+      className: "v2-memo-card-title",
       style: { fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-main)', marginBottom: '8px', paddingRight: hidePinButton ? '30px' : '44px', wordBreak: 'break-all' }
     }, highlightKeyword(memo.title, searchQuery)),
+    memoMeta && /*#__PURE__*/React.createElement("div", {
+      className: "v2-memo-card-meta",
+    }, memoMeta),
 
     /* Images */
     renderMemoCardImages(),
@@ -1834,6 +1848,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
        memo.linkPreview is the source of truth for whether the preview actually has content
        (same field LinkPreviewCard's cachedData reads), so this stays in sync with it. */
     displayMemoText && /*#__PURE__*/React.createElement("div", {
+      className: "v2-memo-card-body",
       style: {
         fontSize: 'var(--font-size-md)',
         color: 'var(--text-main)',
@@ -1946,6 +1961,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
 
     /* Tags container if exists */
     /*#__PURE__*/React.createElement("div", {
+      className: "v2-memo-card-tags",
       style: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px', marginTop: '10px' }
     },
       /* Writer badge (capsule with participant's color and white text) */
@@ -1953,6 +1969,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         const writer = (calendar?.participants || []).find(p => p.id === memo.participantId);
         if (!writer) return null;
         return /*#__PURE__*/React.createElement("span", {
+          className: "v2-memo-author-pill",
           style: {
             backgroundColor: writer.color || '#94A3B8',
             color: '#FFFFFF',
@@ -2024,6 +2041,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
 
     /* Comment list -- no background, thin divider line between rows instead */
     comments.length > 0 && /*#__PURE__*/React.createElement("div", {
+      className: "v2-memo-card-comments",
       style: { display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '8px' }
     },
       hasMoreComments && /*#__PURE__*/React.createElement("button", {

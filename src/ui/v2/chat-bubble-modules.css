@@ -119,17 +119,37 @@
 .v2-design .v2-home-memo-bubble .v2-bubble-title {
   display: block;
   font-weight: 800;
-  font-size: 0.86rem;
+  font-size: 1rem;
+  line-height: 1.25;
   color: var(--text-main);
   margin-bottom: 4px;
+}
+.v2-design .v2-home-memo-bubble > .v2-name-pill { display: none; }
+.v2-design .v2-home-memo-bubble > .v2-bubble-meta { display: none; }
+.v2-design .v2-home-memo-bubble .v2-bubble-surface {
+  border: 1px solid #e6e3eb;
+  border-radius: 14px;
+  box-shadow: none;
+  padding: 14px 16px;
+}
+.v2-design .v2-home-memo-bubble .v2-memo-card-meta {
+  display: block;
+  margin-bottom: 9px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #ece9f0;
+  color: #8a8798;
+  font-size: .62rem;
+  font-weight: 600;
+  line-height: 1.2;
 }
 
 .v2-design .v2-home-memo-bubble .v2-bubble-summary {
   display: block;
-  font-size: 0.72rem;
+  font-size: 0.76rem;
   color: var(--text-muted);
-  line-height: 1.45;
-  margin-bottom: 8px;
+  line-height: 1.5;
+  margin-bottom: 10px;
+  white-space: pre-line;
 }
 
 .v2-design .v2-home-memo-bubble .v2-bubble-preview {
@@ -152,14 +172,15 @@
 .v2-design .v2-home-memo-bubble .v2-bubble-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 5px;
   align-items: center;
+  margin-top: 4px;
 }
 
 .v2-design .v2-home-memo-bubble .v2-bubble-tag {
   color: var(--brand);
   font-weight: 700;
-  font-size: 0.64rem;
+  font-size: 0.62rem;
   font-style: normal;
 }
 
@@ -169,11 +190,24 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 8px;
+  margin-top: 0;
   padding: 7px 10px;
   border-radius: 10px;
   background: var(--brand-soft, #F3EEFF);
   font-size: 0.7rem;
+}
+.v2-design .v2-home-memo-bubble .v2-bubble-comment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 8px;
+}
+.v2-design .v2-home-memo-bubble .v2-bubble-comment-list > .v2-bubble-comment-count {
+  align-self: flex-start;
+  padding-left: 2px;
+  color: #8a8798;
+  font-size: .62rem;
+  font-weight: 600;
 }
 .v2-design .v2-home-memo-bubble .v2-bubble-comment-author {
   flex-shrink: 0;
@@ -214,6 +248,57 @@
   box-shadow: none !important;
   border-radius: 14px !important;
   border-left: none !important;
+}
+
+/* Shared memo-card contract. The live MemoCard keeps its behaviour and inline handlers;
+   this module owns the visual rhythm used by both the home preview and the memo page. */
+.v2-memo .v2-memo-card-wrap > .v2-name-pill { display: none; }
+.v2-memo .v2-memo-card-wrap > .v2-bubble-meta { display: none; }
+.v2-memo .v2-memo-card-wrap .v2-memo-card-contract {
+  background: #fff !important;
+  border: 1px solid #e6e3eb !important;
+  border-left: 1px solid #e6e3eb !important;
+  border-radius: 14px !important;
+  box-shadow: none !important;
+  padding: 14px 16px !important;
+}
+.v2-memo .v2-memo-card-wrap .v2-memo-card-title {
+  font-size: 1rem !important;
+  line-height: 1.25 !important;
+  margin-bottom: 3px !important;
+  padding-right: 30px !important;
+}
+.v2-memo .v2-memo-card-wrap .v2-memo-card-meta {
+  display: block;
+  margin-bottom: 9px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #ece9f0;
+  color: #8a8798;
+  font-size: .62rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.v2-memo .v2-memo-card-wrap .v2-memo-card-body {
+  font-size: .76rem !important;
+  color: #6b6580 !important;
+  line-height: 1.5 !important;
+  margin-bottom: 10px !important;
+}
+.v2-memo .v2-memo-card-wrap .v2-memo-card-tags {
+  gap: 5px !important;
+  margin-top: 4px !important;
+}
+.v2-memo .v2-memo-card-wrap .v2-memo-author-pill { display: none; }
+.v2-memo .v2-memo-card-wrap .v2-memo-card-comments {
+  margin-top: 8px !important;
+  padding-top: 0 !important;
+  border-top: 0 !important;
+}
+.v2-memo .v2-memo-card-wrap .v2-memo-card-comments > div {
+  background: var(--brand-soft, #f3eeff);
+  border-radius: 10px !important;
+  border-top: 0 !important;
+  padding: 7px 10px !important;
 }
 
 .v2-memo .bp-memo-grid {

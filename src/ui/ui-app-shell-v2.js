@@ -1004,12 +1004,15 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
         // 요구사항 -- 메모에 댓글이 달리면 최신 댓글을 미리보기로 바로 노출한다(전체보기 없이도
         // 반응이 왔다는 걸 즉시 알 수 있게).
         const memoComments = Array.isArray(memo.comments) ? memo.comments : [];
-        const latestComment = memoComments.length ? memoComments[memoComments.length - 1] : null;
+        const visibleComments = memoComments.slice(-2);
         return React.createElement(ChatBubbleFrame, {
           key: memo.id || i,
           name: displayName(memo),
           color: displayColor(memo),
-          meta: memoMeta,
+          /* The home memo card follows the memo-page card contract: author is
+             not a separate chat pill; timestamp belongs directly beneath the
+             title inside the memo surface. */
+          meta: null,
           className: 'v2-home-memo-bubble',
           surfaceAs: 'button',
           surfaceProps: {
@@ -1020,6 +1023,7 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
           },
         },
           React.createElement('strong', { className: 'v2-bubble-title' }, memo.title || '메모'),
+          React.createElement('span', { className: 'v2-memo-card-meta' }, memoMeta),
           React.createElement('span', { className: 'v2-bubble-summary' }, String(memo.text || memo.content || memo.description || '').slice(0, 170)),
           preview && React.createElement('span', { className: 'v2-bubble-preview' },
             preview.image && React.createElement('img', { src: preview.image, alt: '', loading: 'lazy' }),
@@ -1031,11 +1035,13 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
           tags.length ? React.createElement('span', { className: 'v2-bubble-tags' },
             tags.map(tag => React.createElement('em', { className: 'v2-bubble-tag', key: tag }, `#${String(tag).replace(/^#/, '')}`))
           ) : null,
-          latestComment && React.createElement('span', { className: 'v2-bubble-comment-preview' },
-            React.createElement(NameColorPill, { className: 'v2-bubble-comment-author', name: participantFor(latestComment)?.name || '댓글', color: participantFor(latestComment)?.color }),
-            React.createElement('span', { className: 'v2-bubble-comment-text' }, String(latestComment.text || '').slice(0, 90)),
-            memoComments.length > 1 ? React.createElement('em', { className: 'v2-bubble-comment-count' }, `댓글 ${memoComments.length}개`) : null
-          )
+          visibleComments.length ? React.createElement('div', { className: 'v2-bubble-comment-list' },
+            visibleComments.map((comment, commentIndex) => React.createElement('div', { className: 'v2-bubble-comment-preview', key: comment.id || commentIndex },
+              React.createElement(NameColorPill, { className: 'v2-bubble-comment-author', name: shortParticipantName(participantFor(comment)?.name || '댓글'), color: participantFor(comment)?.color }),
+              React.createElement('span', { className: 'v2-bubble-comment-text' }, String(comment.text || '').slice(0, 90))
+            )),
+            memoComments.length > 0 ? React.createElement('span', { className: 'v2-bubble-comment-count' }, `댓글 ${memoComments.length}개`) : null
+          ) : null
         );
       })) : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '최근 메모가 없습니다.')
     ),
