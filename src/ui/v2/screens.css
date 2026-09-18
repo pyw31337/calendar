@@ -296,6 +296,51 @@
   .v2-design .v2-chat .inline-search-bar { max-width: min(1100px, 100%); }
   .v2-design .v2-fullscreen .bp-fab { right: 28px; }
 }
+
+/* Canonical three-zone header. Destination reference sheets historically
+ * changed .bp-header-row to flex, which allowed the action buttons to wrap
+ * under the title. Keep every V2 subpage on one immutable row instead:
+ * back/title | calendar brand | search/menu. */
+.v2-design .v2-page-header .bp-header-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  height: 100%;
+  min-width: 0;
+  gap: 16px;
+}
+.v2-design .v2-page-header .bp-header-leading {
+  min-width: 0;
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.v2-design .v2-page-header .bp-header-center-brand {
+  min-width: 0;
+  justify-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}
+.v2-design .v2-page-header .bp-header-actions {
+  min-width: 56px;
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  margin-left: 0;
+}
+.v2-design .v2-page-header .v2-header-title-block {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
 @media (max-width: 767px) {
   .v2-design .bp-search-input { font-size: 16px; }
 }
@@ -2136,8 +2181,58 @@
 @media (min-width: 768px) {
   .v2-design .v2-page-header { padding-left: 24px; padding-right: 24px; }
 }
+
+/* Keep this contract last: destination reference CSS is loaded independently
+ * and must never turn the shared header row back into a wrapping flex row. */
+.v2-design .v2-page-header .bp-header-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  height: 100%;
+  min-width: 0;
+  gap: 16px;
+}
+.v2-design .v2-page-header .bp-header-leading {
+  min-width: 0;
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.v2-design .v2-page-header .bp-header-center-brand {
+  min-width: 0;
+  justify-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}
+.v2-design .v2-page-header .bp-header-actions {
+  min-width: 56px;
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  margin-left: 0;
+}
+.v2-design .v2-page-header .v2-header-title-block {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
 @media (min-width: 1200px) {
   /* The side rail is permanently visible on desktop, so the drawer toggle is
    * intentionally omitted from the page header. */
   .v2-design .v2-page-header .bp-header-actions .bp-icon-btn[aria-label$=" 메뉴"] { display: none; }
 }
+
+/* Final shared-header contract. */
+.v2-design .v2-page-header .bp-header-row { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; height: 100%; min-width: 0; gap: 16px; }
+.v2-design .v2-page-header .bp-header-leading { min-width: 0; justify-self: start; display: inline-flex; align-items: center; gap: 8px; }
+.v2-design .v2-page-header .bp-header-center-brand { min-width: 0; justify-self: center; display: inline-flex; align-items: center; justify-content: center; white-space: nowrap; }
+.v2-design .v2-page-header .bp-header-actions { min-width: 56px; justify-self: end; display: inline-flex; align-items: center; justify-content: flex-end; flex-wrap: nowrap; white-space: nowrap; margin-left: 0; }
+.v2-design .v2-page-header .v2-header-title-block { min-width: 0; display: inline-flex; align-items: center; flex-wrap: nowrap; white-space: nowrap; }

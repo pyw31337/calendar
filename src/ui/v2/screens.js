@@ -190,17 +190,16 @@ export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, se
           'div',
           { className: `v2-header-title-block${centerSubtitle ? ' v2-header-title-left' : ''}` },
           h('div', { className: 'bp-header-title' }, title),
-          centerSubtitle && count ? h('span', { className: 'bp-header-count' }, count) : null,
+          count ? h('span', { className: 'bp-header-count' }, count) : null,
           !centerSubtitle && subtitle ? h('div', { className: 'bp-header-sub' }, subtitle) : null
         )
       ),
-      centerSubtitle && centerBrand ? h(
+      centerBrand ? h(
         'div',
         { className: 'bp-header-center-brand', 'aria-label': centerBrand.name },
         h('span', { className: 'bp-header-brand-mark', 'aria-hidden': 'true' }, centerBrand.mark),
         h('span', { className: 'bp-header-brand-name' }, centerBrand.name)
       ) : null,
-      !centerSubtitle && count && h('span', { className: 'bp-header-count' }, count),
       h(
         'div',
         { className: 'bp-header-actions' },
