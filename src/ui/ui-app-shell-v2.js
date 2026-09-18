@@ -1046,7 +1046,6 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
         const memoMeta = formatShortDateTime(memo.updatedAt ?? memo.createdAt);
         const extractFirstUrl = __deps.extractFirstUrl;
         const extractAllUrlInfosLoose = __deps.extractAllUrlInfosLoose || __deps.extractAllUrlInfos;
-        const removeFirstUrl = __deps.removeFirstUrl || (value => value);
         const memoFirstUrl = typeof extractFirstUrl === 'function' ? extractFirstUrl(memo.text || '') : '';
         const memoPreviewUrls = memoFirstUrl ? [memoFirstUrl] : [];
         if (typeof extractAllUrlInfosLoose === 'function') {
