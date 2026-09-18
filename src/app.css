@@ -688,7 +688,7 @@ button.confirmed-meeting-icon-btn.confirmed-meeting-surface.is-heartbeat {
   gap: 10px;
   flex-wrap: wrap;
   text-align: center;
-  word-break: break-all;
+  word-break: keep-all;
   white-space: pre-wrap;
   max-width: 380px;
   width: 90%;
@@ -2376,7 +2376,7 @@ select.form-select {
   font-weight: 400;
   letter-spacing: -0.02em;
   line-height: 1.25;
-  word-break: break-word;
+  word-break: keep-all;
   overflow-wrap: anywhere;
   cursor: pointer;
 }
@@ -2767,7 +2767,7 @@ select.form-select {
 .comment-composer-input {
   background-color: #fff !important;
   white-space: pre-wrap;
-  word-break: break-word;
+  word-break: keep-all;
   overflow-wrap: anywhere;
 }
 /* Lightbox comment composer sits on a dark overlay, not the light card background the shared
@@ -4540,7 +4540,7 @@ select.form-select {
   font-size: 0.84rem;
   font-weight: 400;
   min-width: 0;
-  word-break: break-word;
+  word-break: keep-all;
   overflow-wrap: anywhere;
 }
 .recent-log-time {
@@ -4902,7 +4902,7 @@ select.form-select {
 .admin-chat-footer { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 @media (max-width: 640px) {
   .admin-chat-row { flex-direction: column; align-items: stretch; }
-  .admin-chat-text { white-space: normal; overflow: visible; text-overflow: clip; word-break: break-word; }
+  .admin-chat-text { white-space: normal; overflow: visible; text-overflow: clip; word-break: keep-all; }
   .admin-chat-footer { justify-content: space-between; }
   /* 복구탭 타임라인 리스트: '이 시점으로 복구' 버튼을 타임스탬프와 같은 줄에 욱여넣지 않고
      아랫줄에 전체 너비로 표시 */
@@ -6310,6 +6310,12 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 @media (min-width: 1200px) {
   .renewal-home-hero { border-radius: 20px; margin: 24px auto 0; max-width: var(--renewal-page-max); }
   .renewal-shell .day-cell { min-height: 76px; padding: 5px 3px !important; }
+}
+
+/* Global text contract: keep Korean and other natural-language words intact.
+   Long URLs can still use their own overflow-wrap rules where needed. */
+body * {
+  word-break: keep-all;
 }
 
 

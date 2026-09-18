@@ -1094,7 +1094,7 @@
     max-width: 5ch;
     white-space: normal;
     overflow-wrap: anywhere;
-    word-break: break-all;
+    word-break: keep-all;
     line-height: 1.15;
     text-align: center;
   }

@@ -1523,6 +1523,7 @@ export function CommentsSection({
 
 export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onSelectTag, onCommentsChange, getBorderColor, onRequestConfirm, showToast, effectivePinned, hidePinButton = false, variant = 'page', setActiveLightbox = null, searchQuery = '' }) {
   const React = window.React;
+  const useV2TagStyle = variant === 'v2-page' || variant === 'preview';
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const ChatParticipantSheet = __comp.ChatParticipantSheet || __deps.ChatParticipantSheet;
@@ -1993,8 +1994,14 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
           e.stopPropagation();
           onSelectTag(tag);
         },
-        style: {
+        style: useV2TagStyle ? {
           cursor: 'pointer', whiteSpace: 'nowrap'
+        } : {
+          fontSize: 'var(--font-size-xs)', fontWeight: '600',
+          color: '#2563EB', backgroundColor: 'rgba(37, 99, 235, 0.08)',
+          padding: '3px 8px', borderRadius: '4px',
+          cursor: 'pointer', lineHeight: 1,
+          whiteSpace: 'nowrap'
         }
       }, highlightKeyword(tag, searchQuery))),
 
