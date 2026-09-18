@@ -468,71 +468,14 @@
   }
 }
 
-/* --------------------------------------------------------------------------
- * Gather type-scale remap for shell=v2 only.
- * Claude mock CSS ships sub-token sizes (0.52–0.66rem). Map chrome/body copy
- * onto the existing app.css tokens so V2 matches the live Gather system
- * without inventing a second scale. Default shell is untouched.
- *
- * Tokens (from :root in app.css):
- *   --font-size-2xs: 0.62rem
- *   --font-size-xs:  0.68rem
- *   --font-size-sm:  0.72rem
- *   --font-size-md:  0.8rem
- *   --font-size-base: 0.85rem
- * -------------------------------------------------------------------------- */
-.v2-design {
-  /* Prefer Plus Jakarta / Noto stack already set on :root; keep Pretendard as fallback only. */
-  font-size: var(--font-size-base);
-}
-
-/* Home / bento chrome */
-.v2-design .bp-bento-title { font-size: 1.05rem !important; }
-.v2-design .bp-bento-card-title { font-size: var(--font-size-xs) !important; letter-spacing: 0.06em; }
-.v2-design .bp-bento-card .bp-more-link,
-.v2-design .bp-more-link { font-size: var(--font-size-sm) !important; }
-.v2-design .bp-weekday-label { font-size: 0.64rem !important; }
-.v2-design .bp-day-num { font-size: var(--font-size-sm) !important; }
-.v2-design .bp-cal-legend { font-size: var(--font-size-xs) !important; }
-.v2-design .bp-day-corner-label { font-size: var(--font-size-2xs) !important; }
-.v2-design .bp-day-event-title { font-size: var(--font-size-2xs) !important; }
-.v2-design .bp-day-anniversary-label { font-size: var(--font-size-2xs) !important; }
-
-/* D-day / hero */
-.v2-design .bp-dday-compact-badge { font-size: 1.05rem !important; }
-.v2-design .bp-dday-compact-text { font-size: var(--font-size-sm) !important; }
-.v2-design .bp-dday-expanded-title { font-size: var(--font-size-md) !important; }
-.v2-design .bp-dday-expanded-tag,
-.v2-design .bp-dday-expanded-badge { font-size: var(--font-size-2xs) !important; }
-.v2-design .bp-dday-view-btn { font-size: var(--font-size-sm) !important; }
-.v2-design .bp-dday-date { font-size: var(--font-size-sm) !important; }
-.v2-design .bp-dday-dow,
-.v2-design .bp-dday-pill { font-size: var(--font-size-2xs) !important; }
-
-/* Home activity sections */
-.v2-design .bp-chat-text,
-.v2-design .bp-renewal-home-chat-text { font-size: var(--font-size-md) !important; }
-.v2-design .bp-chat-name-pill,
-.v2-design .bp-chat-meta,
-.v2-design .bp-chat-hover-note,
-.v2-design .bp-chat-reply-quote-author { font-size: var(--font-size-2xs) !important; }
-.v2-design .bp-chat-reply-quote-text { font-size: var(--font-size-xs) !important; }
-.v2-design .bp-memo-card-title,
-.v2-design .bp-renewal-home-memo-title { font-size: var(--font-size-base) !important; }
-.v2-design .bp-memo-summary,
-.v2-design .bp-renewal-home-memo-summary { font-size: var(--font-size-sm) !important; }
-.v2-design .bp-memo-link-title { font-size: var(--font-size-md) !important; }
-.v2-design .bp-memo-link-desc { font-size: var(--font-size-xs) !important; }
-.v2-design .bp-memo-tag,
-.v2-design .bp-memo-subtag,
-.v2-design .bp-memo-comment-count,
-.v2-design .bp-memo-link-domain { font-size: var(--font-size-2xs) !important; }
-.v2-design .bp-memo-comment-author,
-.v2-design .bp-memo-comment-text { font-size: var(--font-size-xs) !important; }
-.v2-design .bp-place-name { font-size: var(--font-size-md) !important; }
-.v2-design .bp-place-addr { font-size: var(--font-size-xs) !important; }
-.v2-design .bp-place-note,
-.v2-design .bp-place-tag { font-size: var(--font-size-2xs) !important; }
+/* NOTE: an earlier "Gather type-scale remap" pass lived here (home/bento chrome,
+ * D-day/hero, chat/memo/place summary text on --font-size-* app.css tokens). Every
+ * one of those selectors is now redeclared below under the --v2-fs-* token block
+ * ("Type scale: BentoPinkFinal mock denseness...") with equal-or-greater importance,
+ * so the old block never painted anything and was removed instead of left as dead
+ * !important noise. --font-size-* itself is still redefined (aliased to --v2-fs-*)
+ * by that later block, so any selector below that still reads --font-size-* directly
+ * (settlement/expense/place-visit — no BentoPinkFinal mock reference yet) is unaffected. */
 .v2-design .bp-renewal-home-empty { font-size: var(--font-size-sm) !important; }
 .v2-design .bp-footer,
 .v2-design .bp-renewal-home-footer { font-size: var(--font-size-2xs); }
@@ -582,10 +525,9 @@
  * Destination screen type remap (Chat / Memo / Places / Settlement).
  * Same Gather tokens as home (#630). Scoped to .v2-design only.
  * -------------------------------------------------------------------------- */
-.v2-design .v2-page-header .bp-header-title { font-size: 1.05rem !important; font-weight: 800; }
-.v2-design .v2-page-header .bp-header-sub,
-.v2-design .v2-page-header .bp-header-count { font-size: var(--font-size-2xs) !important; }
-.v2-design .bp-search-input { font-size: var(--font-size-md) !important; }
+/* .bp-header-title / .bp-header-sub / .bp-header-count / .bp-search-input font-size
+ * rules used to live here too — redeclared with equal-or-greater importance under
+ * the --v2-fs-* block below, so removed as dead weight (see note above). */
 .v2-design .bp-tag-chip,
 .v2-design .bp-cat-chip { font-size: var(--font-size-xs) !important; }
 .v2-design .bp-month-label { font-size: var(--font-size-base) !important; }

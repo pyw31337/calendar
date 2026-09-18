@@ -2,6 +2,30 @@
 
 이 문서는 V2 화면 리뉴얼의 진행 상태와 검증 결과를 누적 기록한다.
 
+## 2026-09-18 15:58 KST
+
+- 전수조사 착수: v2 CSS(`design.css` 438 / `screens.css` 874 / `aurora-theme.css` 165 /
+  `chat-bubble-modules.css` 50 / `dest-layout.css` 25) + 레거시 `app.css` 1016개, 총 1500개+
+  `!important` 및 구버전/신버전 디자인 혼용 지점을 전수조사(사용자 요청). 원본(`?id=cw`, `shell=v2`
+  없는 URL)에 영향 주는 미스코프 v2 규칙은 없음을 확인(모든 v2 CSS 규칙이 `.v2-design`/`.bp-`/
+  `.renewal-shell` 아래로 스코프됨 — 스크립트로 전수 검증).
+- 첫 안전한 정리 커밋(`fix(v2): remove dead pre-v2-fs-token type-scale rules`): `design.css`에
+  같은 파일 안에서 이미 완전히 덮어써지는(정확히 같은 선택자·같은 이상의 importance로 후속
+  `--v2-fs-*` 토큰 블록이 재선언) "Gather type-scale remap" 구간(구 `--font-size-*` 토큰 기반,
+  #630/#634/#635 시절 잔재)을 삭제. 파이썬으로 선택자별 전체 occurrence를 비교해 (a) 완전히
+  가려지는 선언만, (b) importance가 later >= earlier인 경우만 추려서 골랐고, 컴파일된
+  `dist/assets/app-main-*.css`에서 삭제 전후 승자 선언 값이 완전히 동일함을 직접 확인함(시각
+  변화 없음, 순수 dead code 제거). `!important` 50개 제거(438→388).
+- 검증: `npm run lint`, `npm run check:all`(lint+test+isolation+design-rules+design-system+
+  architecture-budget 등 전체), `npm run safety:test`, `npm run regression:test`(build 포함)
+  전부 통과.
+- 남은 작업: 나머지 !important(레거시 컴포넌트 재사용으로 실제 필요한 것 다수 포함, 예:
+  `.comment-composer`/`.festival-bar-*`/`.renewal-records-overview` 등 app.css 클래스 재사용
+  케이스는 override를 위해 !important가 실제로 필요함) 및 `screens.css`/`aurora-theme.css`의
+  동일 패턴(같은 파일 내 완전 가려진 선언) 추가 조사가 남아 있음. PC/모바일 웨일·삼성인터넷
+  실기기 크로스브라우저 확인은 이 세션에서 불가(헤드리스 Chromium 근사만 가능) — 배포 후 사용자
+  직접 확인 필요.
+
 ## 현재 상태 (2026-09-14 14:20 KST)
 
 - 진행 중: 없음 (최신 안정화 유닛 및 Pages 배포 완료)
