@@ -407,9 +407,9 @@
   margin-top: 4px !important;
 }
 .v2-design .v2-memo .bp-memo-grid {
-  padding: 40px !important;
-  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-  gap: 16px !important;
+  padding: 40px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
 }
 .v2-memo .v2-memo-card-wrap .v2-memo-card-tags > .memo-card-comment-toggle {
   display: none !important;
@@ -449,15 +449,15 @@
   padding: 7px 10px !important;
 }
 @media (max-width: 1240px) {
-  .v2-design .v2-memo .bp-memo-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+  .v2-design .v2-memo .bp-memo-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 960px) {
-  .v2-design .v2-memo .bp-memo-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .v2-design .v2-memo .bp-memo-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 640px) {
   .v2-design .v2-memo .bp-memo-grid {
-    padding: 40px !important;
-    grid-template-columns: minmax(0, 1fr) !important;
+    padding: 20px;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
