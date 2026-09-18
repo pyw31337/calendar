@@ -1273,3 +1273,17 @@
     height: 26px !important;
   }
 }
+
+/* Fold inner display contract (the browser reports roughly 560–767 CSS px):
+ * the home hero must not inherit the narrow-tablet inset card treatment.
+ * Keep this after every generic/mobile/tablet rule so the shell's responsive
+ * width is the only source of horizontal sizing. */
+@media (max-width: 1199px) {
+  .renewal-shell.v2-design .bp-app-shell.is-bento-home .bp-hero-zone {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 0 16px !important;
+    border-radius: 0 !important;
+    clip-path: none !important;
+  }
+}
