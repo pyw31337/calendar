@@ -181,6 +181,105 @@
   }
 }
 
+/* Last cascade layer for the side rail coordinate contract. */
+@media (min-width: 768px) {
+  .v2-design .bp-side-nav-head { height: 64px; min-height: 64px; box-sizing: border-box; padding: 12px 16px; }
+  .v2-design .bp-side-nav-group.bp-is-main { padding: 0 10px; }
+  .v2-design .bp-side-nav-global-search { height: 36px; min-height: 36px; margin: 18px auto 16px; box-sizing: border-box; }
+  .v2-design .bp-side-nav-global-search-icon { width: 18px; height: 18px; min-width: 18px; min-height: 18px; display: inline-flex; align-items: center; justify-content: center; line-height: 0; }
+  .v2-design .bp-side-nav-global-search-icon svg { display: block; width: 18px; height: 18px; }
+  .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search { width: 40px; height: 40px; min-height: 40px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; line-height: 0; }
+  .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search-icon,
+  .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search-icon svg { width: 18px; height: 18px; }
+  .v2-design .bp-side-nav-item { height: 42px; min-height: 42px; margin-top: 3px; margin-bottom: 3px; box-sizing: border-box; transform: translate3d(0,0,0); }
+  .v2-design .bp-side-nav-item-icon, .v2-design .bp-side-nav-item-icon svg { transform: translate3d(0,0,0); align-self: center; }
+  .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item { width: 48px; margin-left: auto; margin-right: auto; padding: 10px 0; justify-content: center; }
+  .v2-design .bp-side-nav-brand-icon, .v2-design .bp-side-nav-brand-icon svg { fill: none; stroke: currentColor; }
+  .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-icon, .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-icon svg { color: #fff; fill: none; stroke: currentColor; }
+}
+
+/* The V2 shell can be mounted without the legacy .renewal-shell class. Keep
+ * the coordinate contract on the V2 root itself so both mounted variants use
+ * exactly the same y positions. */
+@media (min-width: 768px) {
+  .v2-design .bp-side-nav { overflow-x: hidden; }
+  .v2-design .bp-side-nav-head {
+    height: 64px;
+    min-height: 64px;
+    box-sizing: border-box;
+    padding: 12px 16px;
+  }
+  .v2-design .bp-side-nav-group.bp-is-main { padding: 0 10px; }
+  .v2-design .bp-side-nav-global-search {
+    height: 36px;
+    min-height: 36px;
+    margin: 18px auto 16px;
+    box-sizing: border-box;
+  }
+  .v2-design .bp-side-nav-global-search-icon {
+    width: 18px;
+    height: 18px;
+    min-width: 18px;
+    min-height: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 0;
+  }
+  .v2-design .bp-side-nav-global-search-icon svg {
+    display: block;
+    width: 18px !important;
+    height: 18px !important;
+  }
+  .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search {
+    width: 40px;
+    height: 40px;
+    min-height: 40px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    line-height: 0;
+  }
+  .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search-icon,
+  .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search-icon svg {
+    width: 18px !important;
+    height: 18px !important;
+  }
+  .v2-design .bp-side-nav-item {
+    height: 42px;
+    min-height: 42px;
+    margin-top: 3px;
+    margin-bottom: 3px;
+    box-sizing: border-box;
+    transform: translate3d(0, 0, 0);
+  }
+  .v2-design .bp-side-nav-item-icon,
+  .v2-design .bp-side-nav-item-icon svg {
+    transform: translate3d(0, 0, 0);
+    align-self: center;
+  }
+  .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item {
+    width: 48px;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 10px 0;
+    justify-content: center;
+  }
+  .v2-design .bp-side-nav-brand-icon,
+  .v2-design .bp-side-nav-brand-icon svg {
+    fill: none !important;
+    stroke: currentColor;
+  }
+  .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-icon,
+  .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-icon svg {
+    color: #fff;
+    fill: none !important;
+    stroke: currentColor;
+  }
+}
+
 /* Final rail motion/geometry overrides (kept last so legacy V2 rules cannot
  * reintroduce a vertical jump). */
 @media (min-width: 768px) {
@@ -1070,4 +1169,21 @@
     margin-right: 0;
     border-radius: 0 !important;
   }
+}
+
+/* Final rail coordinate contract (must remain after all responsive rules). */
+@media (min-width: 768px) {
+  .v2-design .bp-side-nav-head { height: 64px; min-height: 64px; box-sizing: border-box; padding: 12px 16px; }
+  .v2-design .bp-side-nav-group.bp-is-main { padding: 0 10px; }
+  .v2-design .bp-side-nav-global-search { height: 36px; min-height: 36px; margin: 18px auto 16px; box-sizing: border-box; }
+  .v2-design .bp-side-nav-global-search-icon { width: 18px; height: 18px; min-width: 18px; min-height: 18px; display: inline-flex; align-items: center; justify-content: center; line-height: 0; }
+  .v2-design .bp-side-nav-global-search-icon svg { display: block; width: 18px; height: 18px; }
+  .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search { width: 40px; height: 40px; min-height: 40px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; line-height: 0; }
+  .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search-icon,
+  .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search-icon svg { width: 18px; height: 18px; }
+  .v2-design .bp-side-nav-item { height: 42px; min-height: 42px; margin-top: 3px; margin-bottom: 3px; box-sizing: border-box; transform: translate3d(0,0,0); }
+  .v2-design .bp-side-nav-item-icon, .v2-design .bp-side-nav-item-icon svg { transform: translate3d(0,0,0); align-self: center; }
+  .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item { width: 48px; margin-left: auto; margin-right: auto; padding: 10px 0; justify-content: center; }
+  .v2-design .bp-side-nav-brand-icon, .v2-design .bp-side-nav-brand-icon svg { fill: none; stroke: currentColor; }
+  .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-icon, .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-icon svg { color: #fff; fill: none; stroke: currentColor; }
 }
