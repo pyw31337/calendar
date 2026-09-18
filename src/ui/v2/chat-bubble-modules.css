@@ -279,6 +279,14 @@
   font-size: .68rem;
   font-weight: 700;
 }
+.v2-design .v2-home-memo-bubble .comment-composer .participant-picker-button {
+  height: auto !important;
+  padding: 6px 10px !important;
+  font-size: .7rem !important;
+}
+.v2-design .v2-home-memo-bubble .comment-composer-buttons button {
+  font-size: .7rem !important;
+}
 
 /* Memo screen cards wrapped as chat bubbles */
 .v2-memo .v2-memo-card-wrap.v2-bubble-frame {

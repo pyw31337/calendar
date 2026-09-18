@@ -1149,7 +1149,10 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
             }),
             React.createElement('div', { className: 'comment-composer-footer' },
               ParticipantPickerButton && React.createElement(ParticipantPickerButton, {
-                participant: commentParticipant,
+                participant: commentParticipant && {
+                  ...commentParticipant,
+                  name: shortParticipantName(commentParticipant.name),
+                },
                 onClick: () => setCommentParticipantOpen(true),
               }),
               React.createElement('div', { className: 'comment-composer-buttons' },
