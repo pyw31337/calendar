@@ -2371,7 +2371,10 @@ function CalendarApp() {
   // memo collection (e.g. calendar -> chat -> settlement) never tears down and recreates these
   // three memo listeners -- only crossing into/out of memo|gallery|search actually should.
   const needsMemoCollection = React.useMemo(
-    () => activeView === 'memo' || activeView === 'gallery' || isGlobalSearchOpen,
+    // The calendar home preview also needs the server-backed pinned and recent-comment
+    // queries; otherwise an old pinned memo falls outside the small createdAt window and
+    // the preview silently shows unrelated recent cards.
+    () => activeView === 'calendar' || activeView === 'memo' || activeView === 'gallery' || isGlobalSearchOpen,
     [activeView, isGlobalSearchOpen]
   );
   // 보관함 인물/추억 탭의 사진 목록용 memo 스냅샷 -- 위 needsMemoCollection에 'history'를 넣어 실시간
