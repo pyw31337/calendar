@@ -9,7 +9,7 @@ import { calculateSettlementRows } from '../../core/settlement-calculator.js';
 import { authorFor } from './view-data.js';
 import { ChatBubbleFrame } from './chat-bubble-modules.js';
 import {
-  extractChatSlots, extractMemoSlots, extractPlacesSlots, extractSettlementSlots,
+  extractChatSlots, extractMemoSlots, extractSettlementSlots,
 } from './shell-nav.js';
 
 const h = (...args) => window.React.createElement(...args);
@@ -245,8 +245,16 @@ function Empty({ children }) {
 
 function overlays(slots, except = []) {
   if (!slots) return null;
+  const skip = new Set(except);
+  const seen = new Set();
   return Object.entries(slots)
-    .filter(([key]) => !except.includes(key))
+    .filter(([key, value]) => {
+      if (skip.has(key) || value == null) return false;
+      // Same React element in two parents → removeChild: node is not a child.
+      if (seen.has(value)) return false;
+      seen.add(value);
+      return true;
+    })
     .map(([key, value]) => h(window.React.Fragment, { key }, value));
 }
 
@@ -341,8 +349,7 @@ export function MemoScreen(p) {
         ),
         wrapLegacy(p.legacyView, 'v2-legacy-body v2-memo-legacy'),
         h(Fab, { label: '메모 작성', onClick: p.onCompose })
-      ),
-      overlays(slots)
+      )
     );
   }
 
@@ -460,48 +467,10 @@ export function PlacesScreen(p) {
   });
 
   if (!Array.isArray(p.places) && p.legacyView) {
-    const slots = { ...extractPlacesSlots(p.legacyView), ...(p.slots || {}) };
-    if (slots.list || slots.map) {
-      return h(
-        'section',
-        { className: 'v2-places v2-dest-page' },
-        h(
-          'div',
-          { className: 'bp-app-shell' },
-          h(
-            PageHeader,
-            {
-              title: '장소',
-              subtitle: p.subtitle || pageSubtitle(p.calendar),
-              brand: pageBrand(p.calendar),
-              onBack: p.onBack,
-              onSearch: toggleSearch,
-              searchLabel: '장소 검색',
-              onShare: p.onShare,
-              onMenu: p.onMenu,
-              extra: mapToggle,
-            },
-            isSearchOpen && h(Search, {
-              value: p.searchQuery || '',
-              onChange: p.onSearch || (() => {}),
-              placeholder: '장소 검색',
-            })
-          ),
-          mapOpen && slots.map && h('div', { className: 'v2-map-panel' }, slots.map),
-          slots.filters,
-          // toolbar (전체/방문/예정 필터 + 편집 버튼) rides the same scroll as the list instead of
-          // sitting fixed above it -- moved inside .v2-dest-body, right before the list, and given
-          // the list's own side padding (v2-toolbar-inset below) so its left/right edges line up
-          // with the place cards under it.
-          h('div', { className: 'v2-dest-body v2-places-body' },
-            slots.toolbar && h('div', { className: 'v2-toolbar-inset' }, slots.toolbar),
-            slots.list || slots.map
-          ),
-          h(Fab, { label: '장소 등록', onClick: p.onCompose })
-        ),
-        overlays(slots, ['map', 'toolbar', 'list', 'filters'])
-      );
-    }
+    // Do not steal Leaflet map / list nodes out of the live PlacesView tree.
+    // Reparenting PlaceMapView (Leaflet mutates the container's children) and/or
+    // rendering the same slot in two parents throws:
+    // "Failed to execute 'removeChild' on 'Node': The node to be removed is not a child of this node."
     return h(
       'section',
       { className: 'v2-places v2-dest-page v2-wrap-legacy' },
@@ -529,8 +498,7 @@ export function PlacesScreen(p) {
         ),
         wrapLegacy(p.legacyView, 'v2-legacy-body v2-places-legacy'),
         h(Fab, { label: '장소 등록', onClick: p.onCompose })
-      ),
-      overlays(slots)
+      )
     );
   }
 
@@ -719,8 +687,7 @@ export function SettlementScreen(p) {
         }),
         wrapLegacy(p.legacyView, 'v2-legacy-body v2-settlement-legacy'),
         h(Fab, { label: '지출 추가', onClick: p.onCompose })
-      ),
-      overlays(slots)
+      )
     );
   }
 
@@ -1061,8 +1028,7 @@ export function ChatScreen(p) {
         onMenu: p.onMenu,
       }),
       wrapLegacy(p.legacyView, 'v2-legacy-body v2-chat-legacy')
-    ),
-    overlays(slots)
+    )
   );
 }
 

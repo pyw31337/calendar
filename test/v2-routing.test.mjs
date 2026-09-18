@@ -69,6 +69,14 @@ test('timestamps normalize without turning Firestore seconds into 1970 dates', (
   assert.equal(timestampMs(null), 0);
 });
 
+test('V2 places screen does not reparent Leaflet map slots (removeChild crash)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const screens = readFileSync(new URL('../src/ui/v2/screens.js', import.meta.url), 'utf8');
+  assert.match(screens, /v2-places-legacy/);
+  assert.doesNotMatch(screens, /slots\.list \|\| slots\.map/);
+  assert.match(screens, /Same React element in two parents/);
+});
+
 test('V2 date modal opts into bento sheet chrome without changing default export signature defaults', async () => {
   const { readFileSync } = await import('node:fs');
   const modal = readFileSync(new URL('../src/ui/ui-date-modal.js', import.meta.url), 'utf8');
