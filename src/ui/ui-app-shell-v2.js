@@ -874,7 +874,8 @@ function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeVie
         memos: recordsContext?.memoProps?.memos,
         places: recordsContext?.placesProps?.calendar?.places,
         galleryPhotoIndex: recordsContext?.mediaProps?.indexedPhotos ? { items: recordsContext.mediaProps.indexedPhotos } : null,
-        setActiveLightbox: recordsContext?.mediaProps?.setActiveLightbox
+        setActiveLightbox: recordsContext?.mediaProps?.setActiveLightbox,
+        onMemoCommentsChange: recordsContext?.memoProps?.onMemoCommentsChange,
       },
       onOpenDate,
       onChangeView
@@ -925,6 +926,10 @@ function HomeSummarySection({ title, kind, children, onMore, delay }) {
 /** 클로드 목업의 홈 요약 흐름을 기존 로드 상태로 구현한다. 전체 목록을 추가 조회하지 않는다. */
 function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
   const React = window.React;
+  const [commentOpenId, setCommentOpenId] = React.useState(null);
+  const [commentDraft, setCommentDraft] = React.useState('');
+  const [commentParticipantId, setCommentParticipantId] = React.useState('');
+  const [commentSaving, setCommentSaving] = React.useState(false);
   const allMessages = Array.isArray(calendarContext?.displayChatMessages) ? calendarContext.displayChatMessages : [];
   // Match the legacy main-screen CommentsSection: preserve the live feed order, remove
   // gallery/meeting upload documents, then show the latest three rows. The previous V2
@@ -989,6 +994,7 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
     [placeItems]
   );
   const participants = Array.isArray(calendarContext?.calendar?.participants) ? calendarContext.calendar.participants : [];
+  const onMemoCommentsChange = calendarContext?.onMemoCommentsChange || window.__gatherV2MemoCommentsChange;
   const participantFor = row => participants.find(p => p && (p.id === row?.participantId || p.name === row?.senderName || p.name === row?.author));
   const displayName = row => authorFor(row, participants).name;
   const displayColor = row => authorFor(row, participants).color;
@@ -1042,12 +1048,14 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
              title inside the memo surface. */
           meta: null,
           className: 'v2-home-memo-bubble',
-          surfaceAs: 'button',
+          surfaceAs: 'div',
           surfaceProps: {
-            type: 'button',
             className: 'v2-home-memo-bubble-surface',
             style: { '--renewal-memo-author': displayColor(memo), '--memo-author-color': displayColor(memo) },
-            onClick: () => onChangeView?.('memo'),
+            onClick: event => {
+              if (event.target.closest?.('button,textarea,input,select')) return;
+              onChangeView?.('memo');
+            },
           },
         },
           React.createElement('strong', { className: 'v2-bubble-title' }, memo.title || '메모'),
@@ -1069,7 +1077,68 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
               React.createElement('span', { className: 'v2-bubble-comment-text' }, String(comment.text || '').slice(0, 90))
             )),
             memoComments.length > 0 ? React.createElement('span', { className: 'v2-bubble-comment-count' }, `댓글 ${memoComments.length}개`) : null
-          ) : null
+          ) : null,
+          React.createElement('div', { className: 'v2-bubble-comment-footer' },
+            React.createElement('span', { className: 'v2-bubble-comment-count' }, `댓글 ${memoComments.length}개`),
+            React.createElement('button', {
+              type: 'button',
+              className: 'v2-bubble-comment-action',
+              onClick: event => {
+                event.stopPropagation();
+                setCommentOpenId(prev => {
+                  const next = prev === memo.id ? null : memo.id;
+                  if (next !== memo.id) { setCommentDraft(''); setCommentParticipantId(''); }
+                  return next;
+                });
+              },
+              'aria-expanded': commentOpenId === memo.id,
+            }, '댓글'),
+          ),
+          commentOpenId === memo.id && React.createElement('form', {
+            className: 'v2-bubble-comment-composer',
+            onSubmit: async event => {
+              event.preventDefault();
+              event.stopPropagation();
+              const text = commentDraft.trim();
+              if (!text || typeof onMemoCommentsChange !== 'function' || commentSaving) return;
+              const participantId = commentParticipantId || participants[0]?.id || '';
+              const nextComments = [...memoComments, {
+                id: `memo_comment_${Date.now()}`,
+                participantId,
+                text,
+                createdAt: Date.now(),
+              }];
+              setCommentSaving(true);
+              try {
+                const result = await onMemoCommentsChange(memo, nextComments);
+                if (result !== false) {
+                  setCommentDraft('');
+                  setCommentOpenId(null);
+                }
+              } finally {
+                setCommentSaving(false);
+              }
+            },
+          },
+            React.createElement('textarea', {
+              className: 'v2-bubble-comment-input',
+              value: commentDraft,
+              onChange: event => setCommentDraft(event.target.value),
+              onClick: event => event.stopPropagation(),
+              placeholder: '댓글을 입력하세요...',
+              rows: 2,
+              disabled: commentSaving,
+            }),
+            React.createElement('div', { className: 'v2-bubble-comment-composer-actions' },
+              participants.length > 1 && React.createElement('select', {
+                value: commentParticipantId || participants[0]?.id || '',
+                onChange: event => setCommentParticipantId(event.target.value),
+                onClick: event => event.stopPropagation(),
+                'aria-label': '댓글 작성자',
+              }, participants.map(participant => React.createElement('option', { key: participant.id, value: participant.id }, shortParticipantName(participant.name)))),
+              React.createElement('button', { type: 'submit', disabled: commentSaving || !commentDraft.trim() }, commentSaving ? '저장 중' : '저장')
+            )
+          )
         );
       })) : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '최근 메모가 없습니다.')
     ),
@@ -1444,6 +1513,7 @@ export function buildRenewalRecordsContext(calendar, deps) {
     isPlacesShareOpen, setIsPlacesShareOpen,
     memos, totalMemoCount, onLoadMoreMemos, sharedMemo, setSharedMemo, chatMessages,
     patchLocalMemo, upsertLocalMemo, removeLocalMemo, memoInitialTag, setMemoInitialTag,
+    onMemoCommentsChange,
     isMemoShareOpen, setIsMemoShareOpen,
   } = deps || {};
   const requireLoadedCalendar = (message) => {
@@ -1549,6 +1619,7 @@ export function buildRenewalRecordsContext(calendar, deps) {
         window.history.replaceState({}, '', url);
       },
       onUpdateMemo: patchLocalMemo, onUpsertMemo: upsertLocalMemo, onDeleteMemo: removeLocalMemo,
+      onMemoCommentsChange,
       memoInitialTag, setMemoInitialTag,
     },
     isMemoShareOpen: !!isMemoShareOpen,
