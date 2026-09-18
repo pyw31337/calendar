@@ -1738,6 +1738,17 @@
   .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-mid > .bp-day-anniversary-label,
   .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-bar-only > .bp-day-anniversary-label { display: none !important; }
 }
+@media (min-width: 768px) {
+  /* Range anniversaries use the same desktop contract as solo badges: a
+     translucent tint with the category color as readable text. */
+  .v2-design .festival-bar-desktop .bp-day-anniversary {
+    background: color-mix(in srgb, var(--anniversary-color, var(--cal-anniversary)) 16%, #fff) !important;
+    color: var(--anniversary-color, var(--cal-anniversary)) !important;
+  }
+  .v2-design .festival-bar-desktop .bp-day-anniversary-label {
+    color: var(--anniversary-color, var(--cal-anniversary)) !important;
+  }
+}
 @media (max-width: 767px) {
   .v2-design .bp-day-bar-stack .bp-day-anniversary { background: var(--anniversary-color, var(--cal-anniversary)) !important; color: #fff !important; }
   .v2-design .bp-day-bar-stack .bp-day-anniversary > .bp-day-anniversary-label { display: none !important; }

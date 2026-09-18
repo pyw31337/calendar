@@ -169,6 +169,18 @@
   .v2-design .bp-hero-zone > .bp-hero-aurora { opacity: .62 !important; }
 }
 
+/* Full-bleed hero contract: whenever the side rail is absent (tablet and
+ * mobile), the aurora card touches the viewport edges and has no rounded
+ * corners. The PC rail layout (>=1201px) retains the card radius. */
+@media (max-width: 1200px) {
+  .v2-design .bp-hero-zone {
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+    border-radius: 0 !important;
+  }
+}
+
 /* Final rail motion/geometry overrides (kept last so legacy V2 rules cannot
  * reintroduce a vertical jump). */
 @media (min-width: 768px) {
@@ -1047,5 +1059,15 @@
     margin-left: 0;
     margin-right: 0;
     border-radius: 0;
+  }
+}
+
+/* Final full-bleed hero rule for tablet/mobile. */
+@media (max-width: 1200px) {
+  .v2-design .bp-hero-zone {
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+    border-radius: 0 !important;
   }
 }
