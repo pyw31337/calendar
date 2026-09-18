@@ -160,13 +160,24 @@ async function gotoBootReady(page, url, timeoutMs = 35000) {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       await page.goto(`${url}${attempt ? `${url.includes('?') ? '&' : '?'}_smokeRetry=1` : ''}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
-      await page.waitForFunction(() => window.__GATHER_BOOT_READY__ === true, { timeout: timeoutMs });
+      await page.waitForFunction(() => window.__GATHER_BOOT_READY__ === true, undefined, { timeout: timeoutMs });
       return;
     } catch (error) {
       lastError = error;
     }
   }
   throw lastError || new Error('boot-ready timeout');
+}
+
+// Legacy interaction fixtures intentionally exercise the reversible V1 path. Once V2 becomes
+// the build default, the same selectors cannot be inferred from a bare URL: V2 has its own
+// destination chrome and is covered separately by the V2 route/visual contracts above.
+function v1Url(baseUrl, params) {
+  const url = new URL(baseUrl);
+  const search = new URLSearchParams(params);
+  search.set('shell', 'v1');
+  url.search = search.toString();
+  return url.toString();
 }
 
 async function checkPage(browser, baseUrl, viewport, calId, view) {
@@ -363,19 +374,32 @@ async function checkMemoVisualContracts(browser, baseUrl) {
     const page = await context.newPage();
     try {
       await gotoBootReady(page, check.url);
-      // Destination reference styles are lazy chunks. Give their stylesheet a moment to attach
-      // after the shell reports boot-ready before measuring the cascade.
-      await page.waitForTimeout(1000);
-      const actual = await page.evaluate(isV2 => {
+      await page.evaluate(isV2 => {
         // Smoke blocks Firestore to remain read-only, so create a minimal live-component-shaped
         // probe rather than depending on production memo records being available. This measures
         // the real CSS cascade, including V1 inline declarations and V2 scoped declarations.
         const probe = document.createElement('div');
         probe.dataset.v2StyleProbe = 'true';
         probe.innerHTML = isV2
-          ? `<div class="renewal-shell v2-design"><main class="v2-destination v2-memo"><section class="v2-memo v2-dest-page"><div class="bp-app-shell"><div class="bp-memo-grid"><div class="v2-memo-card-wrap"><article class="memo-card-hover v2-memo-card-contract"><span class="v2-memo-tag">#태그</span><img class="media-thumb" alt="스타일 검사 이미지"></article></div></div></div></section></main></div>`
+          ? `<div class="renewal-shell v2-design"><main class="v2-destination v2-memo"><section class="v2-memo v2-dest-page"><div class="bp-app-shell"><div class="bp-memo-grid"><div class="v2-memo-card-wrap"><article class="memo-card-hover v2-memo-card-contract"><span class="v2-memo-tag">#태그</span><img class="media-thumb" alt="스타일 검사 이미지" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=="></article></div></div></div></section></main></div>`
           : `<article class="memo-card-hover" style="padding:12px"><span class="v2-memo-tag" style="font-size:var(--font-size-xs);font-weight:600;color:#2563EB;background-color:rgba(37, 99, 235, 0.08);padding:3px 8px;border-radius:4px;line-height:1;white-space:nowrap">#태그</span></article>`;
         document.body.append(probe);
+      }, check.expected.shell);
+
+      if (check.expected.shell) {
+        // V2 destination CSS is code-split. Wait for the real 1:1 image contract to arrive
+        // instead of treating a timing-dependent initial cascade as a passing result.
+        await page.waitForFunction(() => {
+          const image = document.querySelector('[data-v2-style-probe="true"] .v2-memo img.media-thumb');
+          if (!image) return false;
+          const style = getComputedStyle(image);
+          return style.aspectRatio === '1 / 1' && style.objectFit === 'cover';
+        }, undefined, { timeout: 5000 });
+      }
+
+      const actual = await page.evaluate(() => {
+        const probe = document.querySelector('[data-v2-style-probe="true"]');
+        if (!probe) throw new Error('스타일 검사 프로브를 찾지 못함');
         const read = selector => {
           const node = probe.querySelector(selector);
           if (!node) return null;
@@ -398,7 +422,7 @@ async function checkMemoVisualContracts(browser, baseUrl) {
         };
         probe.remove();
         return result;
-      }, check.expected.shell);
+      });
       if (actual.shell !== check.expected.shell) throw new Error(`V2 셸=${actual.shell} (기대값 ${check.expected.shell})`);
       if (!actual.card || !actual.tag) throw new Error('메모 카드 또는 태그를 찾지 못함');
       if (actual.card.padding !== check.expected.cardPadding) throw new Error(`카드 padding=${actual.card.padding}`);
@@ -453,8 +477,8 @@ async function checkEmojiCategories(browser, baseUrl) {
   const context = await browser.newContext(mobileContextOptions());
   const page = await context.newPage();
   try {
-    await page.goto(`${baseUrl}?id=kkot&view=chat`, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await page.waitForFunction(() => window.__GATHER_BOOT_READY__ === true, { timeout: 25000 });
+    await page.goto(v1Url(baseUrl, 'id=kkot&view=chat'), { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForFunction(() => window.__GATHER_BOOT_READY__ === true, undefined, { timeout: 25000 });
     const emojiButton = page.locator('button[title="이모티콘"]').first();
     await emojiButton.waitFor({ state: 'visible', timeout: 10000 });
     await emojiButton.dispatchEvent('click');
@@ -477,8 +501,8 @@ async function checkLightboxZoomControls(browser, baseUrl) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
   try {
-    await page.goto(`${baseUrl}?id=kkot`, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await page.waitForFunction(() => window.__GATHER_BOOT_READY__ === true, { timeout: 25000 });
+    await page.goto(v1Url(baseUrl, 'id=kkot'), { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForFunction(() => window.__GATHER_BOOT_READY__ === true, undefined, { timeout: 25000 });
     const thumb = page.locator('img[alt="채팅에 첨부된 사진"]').first();
     const hasThumb = await thumb.count();
     if (!hasThumb) { console.log(`  (skip) ${label} -- 메인 갤러리에 사진이 없어 검사 생략`); await context.close(); return; }
@@ -503,7 +527,7 @@ async function checkPhotoCommentIsolation(browser, baseUrl) {
   const context = await browser.newContext(mobileContextOptions());
   const page = await context.newPage();
   try {
-    await gotoBootReady(page, `${baseUrl}?id=cw&view=gallery`);
+    await gotoBootReady(page, v1Url(baseUrl, 'id=cw&view=gallery'));
     const result = await page.evaluate(() => {
       const getIdentity = window.GATHER_UI_DEPS?.getPhotoCommentIdentity;
       if (typeof getIdentity !== 'function') return { error: '댓글 식별 헬퍼가 번들에 연결되지 않음' };
@@ -534,8 +558,8 @@ async function checkDeferredManual(browser, baseUrl) {
   const context = await browser.newContext(mobileContextOptions());
   const page = await context.newPage();
   try {
-    await page.goto(`${baseUrl}?id=kkot`, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await page.waitForFunction(() => window.__GATHER_BOOT_READY__ === true, { timeout: 35000 });
+    await page.goto(v1Url(baseUrl, 'id=kkot'), { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForFunction(() => window.__GATHER_BOOT_READY__ === true, undefined, { timeout: 35000 });
     const menuButton = page.locator('button[aria-label$="메뉴 열기"]:visible').first();
     await menuButton.waitFor({ state: 'visible', timeout: 8000 });
     await menuButton.dispatchEvent('click');
@@ -556,7 +580,7 @@ async function checkMemoTagInput(browser, baseUrl) {
   const context = await browser.newContext(mobileContextOptions());
   const page = await context.newPage();
   try {
-    await gotoBootReady(page, `${baseUrl}?id=kkot&view=memo`);
+    await gotoBootReady(page, v1Url(baseUrl, 'id=kkot&view=memo'));
     await page.getByText('새로운 메모를 남겨보세요...', { exact: true }).click();
 
     const participantButton = page.getByRole('button', { name: '작성자 선택' });
@@ -603,7 +627,7 @@ async function checkSettlementModalEntryPoints(browser, baseUrl) {
       else errors.push(err.message);
     });
     try {
-      await gotoBootReady(page, `${baseUrl}?id=kkot&view=settlement`);
+      await gotoBootReady(page, v1Url(baseUrl, 'id=kkot&view=settlement'));
 
       const editButton = page.locator('[data-settlement-edit-button="true"]').first();
       // Hosted runners may intentionally have no production settlement fixture. This is a
@@ -686,7 +710,7 @@ async function checkSideMenuNavigation(browser, baseUrl) {
         page.on('requestfailed', request => failedRequests.push(`${request.url()} (${request.failure()?.errorText || 'failed'})`));
         page.on('response', response => collectSameOriginAsset404(response, baseUrl, asset404s));
         try {
-          await gotoBootReady(page, `${baseUrl}?id=${calId}${suffix}`);
+          await gotoBootReady(page, v1Url(baseUrl, `id=${calId}${suffix}`));
           const menuButton = page.locator('button[aria-label$="메뉴 열기"]:visible, button[aria-label="메뉴"]:visible').first();
           await menuButton.waitFor({ state: 'visible', timeout: 8000 });
           // Mobile headers can still be settling after a view transition; dispatch the semantic
@@ -729,8 +753,8 @@ async function checkThrottledBoot(browser, baseUrl) {
       uploadThroughput: (100 * 1024) / 8
     });
     const start = Date.now();
-    await page.goto(`${baseUrl}?id=kkot`, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await page.waitForFunction(() => window.__GATHER_BOOT_READY__ === true, { timeout: 55000 });
+    await page.goto(v1Url(baseUrl, 'id=kkot'), { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await page.waitForFunction(() => window.__GATHER_BOOT_READY__ === true, undefined, { timeout: 55000 });
     pass(`${label} (${Date.now() - start}ms)`);
   } catch (err) {
     fail(label, `저속 회선에서 부팅 실패/타임아웃: ${err.message}`);
