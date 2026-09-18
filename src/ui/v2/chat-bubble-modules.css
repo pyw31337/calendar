@@ -172,6 +172,28 @@
   object-fit: cover;
   flex-shrink: 0;
 }
+.v2-design .v2-home-memo-bubble .v2-bubble-preview-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.v2-design .v2-home-memo-bubble .v2-memo-video-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 30px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: #f5f3f8;
+  color: var(--brand);
+  font: inherit;
+  font-size: .7rem;
+  font-weight: 700;
+  cursor: pointer;
+}
 
 .v2-design .v2-home-memo-bubble .v2-bubble-tags {
   display: flex;

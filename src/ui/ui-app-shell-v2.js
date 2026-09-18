@@ -931,11 +931,14 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
   const AutoGrowTextarea = __comp.AutoGrowTextarea || __deps.AutoGrowTextarea;
   const ParticipantPickerButton = __comp.ParticipantPickerButton || __deps.ParticipantPickerButton;
   const ChatParticipantSheet = __comp.ChatParticipantSheet || __deps.ChatParticipantSheet;
+  const LinkPreviewCard = __comp.LinkPreviewCard || __deps.LinkPreviewCard;
+  const ClickToPlayVideoCard = __comp.ClickToPlayVideoCard || __deps.ClickToPlayVideoCard;
   const [commentOpenId, setCommentOpenId] = React.useState(null);
   const [commentDraft, setCommentDraft] = React.useState('');
   const [commentParticipantId, setCommentParticipantId] = React.useState('');
   const [commentParticipantOpen, setCommentParticipantOpen] = React.useState(false);
   const [commentSaving, setCommentSaving] = React.useState(false);
+  const [openVideoByUrl, setOpenVideoByUrl] = React.useState({});
   const allMessages = Array.isArray(calendarContext?.displayChatMessages) ? calendarContext.displayChatMessages : [];
   // Match the legacy main-screen CommentsSection: preserve the live feed order, remove
   // gallery/meeting upload documents, then show the latest three rows. The previous V2
@@ -1041,6 +1044,19 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
         const preview = memo.linkPreview || (Array.isArray(memo.linkPreviews) && memo.linkPreviews[0]);
         const tags = Array.isArray(memo.tags) ? memo.tags.slice(0, 3) : [];
         const memoMeta = formatShortDateTime(memo.updatedAt ?? memo.createdAt);
+        const extractFirstUrl = __deps.extractFirstUrl;
+        const extractAllUrlInfosLoose = __deps.extractAllUrlInfosLoose || __deps.extractAllUrlInfos;
+        const removeFirstUrl = __deps.removeFirstUrl || (value => value);
+        const memoFirstUrl = typeof extractFirstUrl === 'function' ? extractFirstUrl(memo.text || '') : '';
+        const memoPreviewUrls = memoFirstUrl ? [memoFirstUrl] : [];
+        if (typeof extractAllUrlInfosLoose === 'function') {
+          extractAllUrlInfosLoose(memo.text || '').forEach(info => {
+            if (info?.url && !memoPreviewUrls.includes(info.url)) memoPreviewUrls.push(info.url);
+          });
+        }
+        const memoDisplayText = memo.text && memoPreviewUrls.length
+          ? String(memo.text).replace(memoPreviewUrls[0], '').replace(/\s+$/, '').trim()
+          : String(memo.text || memo.content || memo.description || '');
         // 홈 화면에서 "지금 어디서 활동이 일어나는지" 바로 보여야 바로 피드백을 달아줄 수 있다는
         // 요구사항 -- 메모에 댓글이 달리면 최신 댓글을 미리보기로 바로 노출한다(전체보기 없이도
         // 반응이 왔다는 걸 즉시 알 수 있게).
@@ -1067,13 +1083,31 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
         },
           React.createElement('strong', { className: 'v2-bubble-title' }, memo.title || '메모'),
           React.createElement('span', { className: 'v2-memo-card-meta' }, memoMeta),
-          React.createElement('span', { className: 'v2-bubble-summary' }, String(memo.text || memo.content || memo.description || '')),
-          preview && React.createElement('span', { className: 'v2-bubble-preview' },
-            preview.image && React.createElement('img', { src: preview.image, alt: '', loading: 'lazy' }),
-            React.createElement('span', null,
-              React.createElement('strong', { className: bentoClass('memo-link-title') }, preview.title || '링크 미리보기'),
-              React.createElement('small', { className: bentoClass('memo-link-desc') }, preview.description || preview.url || '')
-            )
+          memoDisplayText && React.createElement('span', { className: 'v2-bubble-summary' }, memoDisplayText),
+          memoPreviewUrls.length > 0 && React.createElement('div', { className: 'v2-bubble-preview-list', onClick: event => event.stopPropagation() },
+            memoPreviewUrls.map((url, urlIndex) => {
+              const cachedData = (Array.isArray(memo.linkPreviews) && memo.linkPreviews.find(item => item?.url === url))
+                || (memo.linkPreview && (memo.linkPreview.url === url || urlIndex === 0) ? memo.linkPreview : null);
+              const mediaInfo = typeof __deps.getDirectChatMediaInfo === 'function' ? __deps.getDirectChatMediaInfo(url) : null;
+              const isVideo = !!(mediaInfo?.playsInline);
+              const isOpen = !!openVideoByUrl[url];
+              return React.createElement(React.Fragment, { key: url },
+                LinkPreviewCard ? React.createElement(LinkPreviewCard, {
+                  url, cachedData, stretch: true, noBorder: true,
+                  fallbackTitle: urlIndex === 0 ? (memo.title || '') : ''
+                }) : preview && React.createElement('span', { className: 'v2-bubble-preview' },
+                  preview.image && React.createElement('img', { src: preview.image, alt: '', loading: 'lazy' }),
+                  React.createElement('span', null, React.createElement('strong', { className: bentoClass('memo-link-title') }, preview.title || '링크 미리보기'))
+                ),
+                isVideo && React.createElement('button', {
+                  type: 'button', className: 'v2-memo-video-toggle',
+                  onClick: () => setOpenVideoByUrl(prev => ({ ...prev, [url]: !prev[url] }))
+                }, isOpen ? '영상 닫기' : '▶ 영상 바로보기'),
+                isVideo && isOpen && ClickToPlayVideoCard && React.createElement(ClickToPlayVideoCard, {
+                  url, mediaInfo, cachedData
+                })
+              );
+            })
           ),
           tags.length ? React.createElement('span', { className: 'v2-bubble-tags' },
             tags.map(tag => React.createElement('em', { className: 'v2-bubble-tag', key: tag }, `#${String(tag).replace(/^#/, '')}`))
