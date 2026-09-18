@@ -366,7 +366,13 @@ export function MemoScreen(p) {
       h(
         'div',
         { className: 'bp-memo-grid' },
-        (p.memos || []).map(memo => {
+        [...(p.memos || [])].sort((a, b) => {
+          // Pinned memos are the user's intentional priority and must occupy the first
+          // grid cells. Keep the incoming order stable within each group so equal-priority
+          // cards do not jump around when comments or live updates arrive.
+          const pinnedDelta = Number(!!b?.isPinned) - Number(!!a?.isPinned);
+          return pinnedDelta;
+        }).map(memo => {
           const author = authorFor(memo, p.calendar.participants);
           const metaMs = memo.updatedAt ?? memo.createdAt;
           let meta = '';
