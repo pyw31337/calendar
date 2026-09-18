@@ -1186,4 +1186,24 @@
   .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item { width: 48px; margin-left: auto; margin-right: auto; padding: 10px 0; justify-content: center; }
   .v2-design .bp-side-nav-brand-icon, .v2-design .bp-side-nav-brand-icon svg { fill: none; stroke: currentColor; }
   .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-icon, .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-icon svg { color: #fff; fill: none; stroke: currentColor; }
+
+  /* Measured reference: collapsed search icon y=93 and first main icon y=152.
+     The open rail's natural groups start 16/22px too high, so compensate only
+     the open top groups. This is a static state offset, never an animated y
+     transform; rail transitions therefore remain horizontal-only. */
+  .v2-design .bp-side-nav:not(.bp-is-collapsed) .bp-side-nav-global-search {
+    transform: translate3d(0, 16px, 0);
+    transition: width .32s cubic-bezier(.22,.61,.36,1), height .32s cubic-bezier(.22,.61,.36,1), border-radius .32s cubic-bezier(.22,.61,.36,1), margin .32s cubic-bezier(.22,.61,.36,1), padding .32s cubic-bezier(.22,.61,.36,1);
+  }
+  .v2-design .bp-side-nav:not(.bp-is-collapsed) .bp-side-nav-group.bp-is-main,
+  .v2-design .bp-side-nav:not(.bp-is-collapsed) .bp-side-nav-group.bp-is-sub,
+  .v2-design .bp-side-nav:not(.bp-is-collapsed) .bp-side-nav-group.bp-is-tab-menu {
+    transform: translate3d(0, 22px, 0);
+    transition: none;
+  }
+  .v2-design .bp-side-nav-brand-icon,
+  .v2-design .bp-side-nav-brand-icon svg {
+    width: 26px !important;
+    height: 26px !important;
+  }
 }
