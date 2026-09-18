@@ -272,6 +272,50 @@
   }
 }
 
+/* Shared side-nav alignment module. The collapsed rail is the reference
+ * coordinate system: its 48px item lane centers a 20px icon at x=22px. The
+ * expanded rail reuses the same lane start and only reveals the text/meta
+ * columns to the right, so toggling collapse never makes icons jump. */
+.renewal-shell.v2-design .bp-side-nav {
+  --v2-side-item-lane: 48px;
+  --v2-side-item-gutter: 10px;
+  --v2-side-item-icon: 20px;
+}
+@media (min-width: 768px) {
+  .renewal-shell.v2-design .bp-side-nav:not(.bp-is-collapsed) .bp-side-nav-item {
+    width: calc(100% - (var(--v2-side-item-gutter) * 2));
+    margin: 3px var(--v2-side-item-gutter) !important;
+    padding: 10px 12px !important;
+    gap: 12px !important;
+    box-sizing: border-box;
+  }
+  .renewal-shell.v2-design .bp-side-nav:not(.bp-is-collapsed) .bp-side-nav-item-icon {
+    flex: 0 0 var(--v2-side-item-icon);
+    width: var(--v2-side-item-icon);
+    height: var(--v2-side-item-icon);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .renewal-shell.v2-design .bp-side-nav:not(.bp-is-collapsed) .bp-side-nav-item-icon svg {
+    width: var(--v2-side-item-icon) !important;
+    height: var(--v2-side-item-icon) !important;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item {
+    width: var(--v2-side-item-lane);
+    margin: 3px auto !important;
+    padding: 10px 0 !important;
+    gap: 0 !important;
+    justify-content: center;
+    box-sizing: border-box;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item-icon {
+    flex: 0 0 var(--v2-side-item-icon);
+    width: var(--v2-side-item-icon);
+    height: var(--v2-side-item-icon);
+  }
+}
+
 /* Side rail parity: the search entry is an outlined action in the open rail,
  * while the collapsed rail keeps only the centered magnifier. */
 .renewal-shell.v2-design .bp-side-nav-global-search {
@@ -345,10 +389,10 @@
     padding-top: 0 !important;
   }
   .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item {
-    width: 48px;
+    width: var(--v2-side-item-lane);
     min-height: 42px;
     margin: 3px auto !important;
-    padding: 10px 6px !important;
+    padding: 10px 0 !important;
     justify-content: center;
   }
   .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item-icon,
