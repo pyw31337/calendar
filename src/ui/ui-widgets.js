@@ -260,6 +260,50 @@ export function DateCapsuleBadge({ date, style = null }) {
   }, label);
 }
 
+/** Shared ns-resize grip used above the chat composer and under the places map. */
+export function PanelResizeHandle({
+  label = '높이 조절',
+  className = '',
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+  onPointerCancel,
+  onKeyDown,
+}) {
+  const React = window.React;
+  return /*#__PURE__*/React.createElement("div", {
+    className: `panel-resize-handle chat-composer-resize-handle${className ? ` ${className}` : ''}`,
+    role: "separator",
+    "aria-label": label,
+    "aria-orientation": "horizontal",
+    tabIndex: 0,
+    onPointerDown,
+    onPointerMove,
+    onPointerUp,
+    onPointerCancel,
+    onKeyDown
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "14",
+    height: "14",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    className: "lucide lucide-grip-horizontal",
+    "aria-hidden": "true"
+  },
+    /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "9", r: "1" }),
+    /*#__PURE__*/React.createElement("circle", { cx: "19", cy: "9", r: "1" }),
+    /*#__PURE__*/React.createElement("circle", { cx: "5", cy: "9", r: "1" }),
+    /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "15", r: "1" }),
+    /*#__PURE__*/React.createElement("circle", { cx: "19", cy: "15", r: "1" }),
+    /*#__PURE__*/React.createElement("circle", { cx: "5", cy: "15", r: "1" })
+  ));
+}
+
   if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
     SearchResultLogRow: SearchResultLogRow,
@@ -270,5 +314,6 @@ export function DateCapsuleBadge({ date, style = null }) {
     ParticipantPickerButton: ParticipantPickerButton,
     ParticipantBadge: ParticipantBadge,
     DateCapsuleBadge: DateCapsuleBadge,
+    PanelResizeHandle: PanelResizeHandle,
   });
 }

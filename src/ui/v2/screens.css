@@ -1159,8 +1159,10 @@
 .v2-design .v2-places-legacy button.btn-action-dark[aria-label="장소 추가"] {
   display: none !important;
 }
-.v2-design .v2-places .places-category-sticky-tabs {
-  padding: 6px 10px !important;
+.v2-design .v2-places .places-category-sticky-tabs,
+.v2-design .v2-places-legacy .places-category-sticky-tabs {
+  padding: 0 !important;
+  border-bottom: none !important;
   gap: 4px !important;
 }
 
@@ -2010,17 +2012,25 @@
   padding: 0 10px !important;
 }
 
-/* Drag handle above composer — light restyle */
+/* Drag handle above composer — light restyle (shared with places map) */
 .v2-design .v2-chat .chat-composer-resize-handle,
-.v2-design .v2-chat-composer > .chat-composer-resize-handle {
+.v2-design .v2-chat-composer > .chat-composer-resize-handle,
+.v2-design .v2-chat .panel-resize-handle,
+.v2-design .panel-resize-bar .panel-resize-handle,
+.v2-design .panel-resize-bar .chat-composer-resize-handle {
   position: relative !important;
   margin: 0 auto 1px !important;
   top: auto !important;
   right: auto !important;
   left: auto !important;
+  transform: none !important;
   width: 36px !important;
   height: 14px !important;
   opacity: 0.55;
+}
+.v2-design .places-map-sticky-area .panel-resize-bar {
+  background: #fafafc !important;
+  border: 0 !important;
 }
 
 /* Message list light gray (mock) */
