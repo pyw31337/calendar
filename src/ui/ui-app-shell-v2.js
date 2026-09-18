@@ -7,7 +7,7 @@
 import './v2/reference-home.css';
 import './v2/design.css';
 import './v2/aurora-theme.css';
-import { renderMemoScreen, renderPlacesScreen, renderSettlementScreen, renderChatScreen, renderGalleryScreen, renderContentScreen, renderArchiveScreen, PageHeader } from './v2/screens.js';
+import { renderMemoScreen, renderPlacesScreen, renderSettlementScreen, renderChatScreen, renderGalleryScreen, renderContentScreen, renderArchiveScreen, PageHeader, prefetchDestinationStyles } from './v2/screens.js';
 import { authorFor, latestRows, timestampMs, photoLightbox, shortParticipantName } from './v2/view-data.js';
 import { ChatBubbleFrame, NameColorPill, ReplyQuote } from './v2/chat-bubble-modules.js';
 import {
@@ -961,6 +961,87 @@ function HomeSummarySection({ title, kind, children, onMore, delay }) {
     ), children);
 }
 
+const PLACE_CATEGORY_FALLBACK = { restaurant: '식당', food: '식당', cafe: '카페', play: '놀이', lodging: '숙박', shopping: '쇼핑', other: '기타' };
+
+function homePlaceCategory(place, calendar) {
+  const cats = (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.getPlaceCategories)
+    ? window.GATHER_APP_UTILS.getPlaceCategories(calendar)
+    : [];
+  const cat = Array.isArray(cats) ? cats.find(c => c && c.id === place.categoryId) : null;
+  return {
+    name: place.categoryName || cat?.name || PLACE_CATEGORY_FALLBACK[place.categoryId] || '기타',
+    color: cat?.color || '#6b6580',
+  };
+}
+
+function homePlaceVisitLine(place) {
+  const utils = window.GATHER_APP_UTILS || {};
+  const entries = typeof utils.parsePlaceMemoEntries === 'function' ? utils.parsePlaceMemoEntries(place?.memo) : [];
+  const dated = typeof utils.sortVisitEntriesRecentFirst === 'function'
+    ? utils.sortVisitEntriesRecentFirst(entries.filter(entry => entry && entry.date))
+    : entries.filter(entry => entry && entry.date);
+  const latest = dated[0];
+  if (!latest) return '';
+  const iso = typeof utils.normalizePlaceDateForSort === 'function'
+    ? utils.normalizePlaceDateForSort(latest.date)
+    : latest.date;
+  const match = String(iso || latest.date || '').match(/(\d{2,4})[-.](\d{2})[-.](\d{2})/);
+  const short = match ? `${String(match[1]).slice(-2)}.${match[2]}.${match[3]}` : String(latest.date || '');
+  const note = String(latest.note || '').replace(/\s+/g, ' ').trim();
+  return note ? `${short} ${note}` : short;
+}
+
+function HomePlaceCard({ place, calendar, onOpen }) {
+  const React = window.React;
+  const category = homePlaceCategory(place, calendar);
+  const planned = (window.GATHER_APP_UTILS?.derivePlaceVisitStatus
+    ? window.GATHER_APP_UTILS.derivePlaceVisitStatus(place)
+    : place.visitStatus) === 'planned';
+  const visitLine = homePlaceVisitLine(place);
+  const mapUrl = typeof window.GATHER_APP_UTILS?.getPlaceExternalMapUrl === 'function'
+    ? window.GATHER_APP_UTILS.getPlaceExternalMapUrl(place)
+    : '';
+  const shareIcon = TABLER_ICONS.externalLink || TABLER_ICONS.share;
+  return React.createElement('div', { className: bentoClass('renewal-home-place-card place-row') },
+    React.createElement('button', {
+      type: 'button',
+      className: bentoClass('renewal-home-place-copy'),
+      onClick: onOpen,
+    },
+      React.createElement('span', { className: bentoClass('renewal-home-place-tags place-tags') },
+        React.createElement('em', {
+          className: bentoClass('place-tag'),
+          style: { background: `${category.color}18`, color: category.color },
+        }, category.name),
+        React.createElement('em', {
+          className: bentoClass(`place-tag ${planned ? 'is-planned' : 'is-visited'}`),
+          style: planned
+            ? { background: 'var(--brand-soft)', color: 'var(--brand)' }
+            : { background: '#ECFDF5', color: 'var(--status-green)' },
+        }, planned ? '방문예정' : '방문')
+      ),
+      React.createElement('strong', { className: bentoClass('place-name') }, place.alias || place.name || place.title || '저장한 장소'),
+      React.createElement('small', { className: bentoClass('place-addr') }, place.address || place.description || ''),
+      visitLine ? React.createElement('small', { className: bentoClass('renewal-home-place-note place-note') }, visitLine) : null
+    ),
+    mapUrl ? React.createElement('button', {
+      type: 'button',
+      className: bentoClass('renewal-home-place-share'),
+      title: '업체보기',
+      'aria-label': `${place.alias || place.name || '장소'} 업체보기`,
+      onClick: event => {
+        event.preventDefault();
+        event.stopPropagation();
+        window.open(mapUrl, '_blank', 'noopener,noreferrer');
+      },
+    }, React.createElement('svg', {
+      width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
+      strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true,
+      dangerouslySetInnerHTML: { __html: shareIcon.off },
+    })) : null
+  );
+}
+
 /** 클로드 목업의 홈 요약 흐름을 기존 로드 상태로 구현한다. 전체 목록을 추가 조회하지 않는다. */
 function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
   const React = window.React;
@@ -1270,22 +1351,12 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
       ))) : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '등록된 사진이 없습니다.')
     ),
     React.createElement(HomeSummarySection, { title: '장소', kind: 'places', delay: '0.20s', onMore: () => onChangeView?.('places') },
-      places.length ? React.createElement('div', { className: bentoClass('renewal-home-place-list') }, places.map((place, i) => React.createElement('button', { type: 'button', className: bentoClass('renewal-home-place-card place-row'), key: place.id || i, onClick: () => onChangeView?.('places') },
-        React.createElement('span', { className: bentoClass('renewal-home-place-copy') },
-          React.createElement('span', { className: bentoClass('renewal-home-place-tags place-tags') },
-            React.createElement('em', { className: bentoClass('place-tag'), style: { background: '#F1F5F9', color: 'var(--text-muted)' } }, place.categoryName || ({ restaurant: '식당', food: '식당', cafe: '카페', play: '놀이', lodging: '숙박', shopping: '쇼핑', other: '기타' }[place.categoryId]) || '기타'),
-            React.createElement('em', {
-              className: bentoClass(`place-tag ${place.visitStatus === 'planned' ? 'is-planned' : 'is-visited'}`),
-              style: place.visitStatus === 'planned'
-                ? { background: 'var(--brand-soft)', color: 'var(--brand)' }
-                : { background: '#ECFDF5', color: 'var(--status-green)' }
-            }, place.visitStatus === 'planned' ? '방문예정' : '방문')
-          ),
-          React.createElement('strong', { className: bentoClass('place-name') }, place.name || place.title || '저장한 장소'),
-          React.createElement('small', { className: bentoClass('place-addr') }, place.address || place.description || ''),
-          place.memo && React.createElement('small', { className: bentoClass('renewal-home-place-note place-note') }, String(place.memo).split('\n')[0].slice(0, 90))
-        )
-      ))) : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '저장한 장소가 없습니다.')
+      places.length ? React.createElement('div', { className: bentoClass('renewal-home-place-list') }, places.map((place, i) => React.createElement(HomePlaceCard, {
+        key: place.id || i,
+        place,
+        calendar: calendarContext?.calendar,
+        onOpen: () => onChangeView?.('places'),
+      }))) : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '저장한 장소가 없습니다.')
     )
   );
 }
@@ -1381,25 +1452,17 @@ export function buildRenewalChatContext(calendar, deps) {
  */
 function ChatPane({ chatContext, onChangeView, onOpenAppSettings, onOpenSideNav, onRegisterMenuActions }) {
   const React = window.React;
-  const [loaded, setLoaded] = React.useState(() => !!(window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChatRoomView));
-  React.useEffect(() => {
-    if (loaded) return undefined;
-    if (typeof window.__gatherLoadChatUi !== 'function') { setLoaded(true); return undefined; }
-    let cancelled = false;
-    window.__gatherLoadChatUi().then(() => { if (!cancelled) setLoaded(true); }).catch(err => {
-      console.error('Chat UI load failed:', err);
-      if (typeof chatContext.showToast === 'function') chatContext.showToast('채팅 화면을 불러오지 못했습니다. 다시 시도해 주세요.', 'error');
-    });
-    return () => { cancelled = true; };
-  }, [loaded]);
-  if (!loaded) {
-    // The chat chunk is loaded lazily, but this is a route transition rather than a
-    // data-loading state. Showing a full-page Korean loading message here made every
-    // visit from another subpage look stalled (and differed from v1). Keep the shell
-    // visually quiet while the chunk mounts; errors are still surfaced by the toast.
-    return React.createElement('div', { className: 'renewal-shell-loading-surface', 'aria-busy': 'true' });
-  }
+  const loaded = useLazyUi(
+    'chat',
+    () => !!(window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChatRoomView),
+    () => window.__gatherLoadChatUi?.(),
+    () => chatContext.showToast?.('채팅 화면을 불러오지 못했습니다. 다시 시도해 주세요.', 'error')
+  );
+  if (!loaded) return React.createElement(DestinationLoadingSurface);
   const { ChatRoomView, ShareModal } = bindUiComponentAliases(React);
+  if (typeof ChatRoomView !== 'function') {
+    return React.createElement(EmptyState, { title: '채팅 화면을 불러오지 못했습니다.', subtitle: '새로고침 후 다시 시도해 주세요.' });
+  }
   return React.createElement(React.Fragment, null,
     React.createElement(ChatRoomView, {
       ...chatContext.chatRoomProps,
@@ -1470,21 +1533,17 @@ export function buildRenewalSettlementContext(calendar, deps) {
  */
 function SettlementPane({ settlementContext, onChangeView, onOpenAppSettings, onOpenDate, onOpenSideNav, onRegisterMenuActions }) {
   const React = window.React;
-  const [loaded, setLoaded] = React.useState(() => !!(window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SettlementSummaryModal));
-  React.useEffect(() => {
-    if (loaded) return undefined;
-    if (typeof window.__gatherLoadEventUi !== 'function') { setLoaded(true); return undefined; }
-    let cancelled = false;
-    window.__gatherLoadEventUi().then(() => { if (!cancelled) setLoaded(true); }).catch(err => {
-      console.error('Settlement UI load failed:', err);
-      if (typeof settlementContext.showToast === 'function') settlementContext.showToast('정산 화면을 불러오지 못했습니다. 다시 시도해 주세요.', 'error');
-    });
-    return () => { cancelled = true; };
-  }, [loaded]);
-  if (!loaded) {
-    return React.createElement(EmptyState, { title: '정산 화면 불러오는 중', subtitle: '잠시만 기다려 주세요.' });
-  }
+  const loaded = useLazyUi(
+    'settlement',
+    () => !!(window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.SettlementSummaryModal),
+    () => window.__gatherLoadEventUi?.(),
+    () => settlementContext.showToast?.('정산 화면을 불러오지 못했습니다. 다시 시도해 주세요.', 'error')
+  );
+  if (!loaded) return React.createElement(DestinationLoadingSurface);
   const { SettlementSummaryModal, ShareModal, CreateSettlementModal } = bindUiComponentAliases(React);
+  if (typeof SettlementSummaryModal !== 'function') {
+    return React.createElement(EmptyState, { title: '정산 화면을 불러오지 못했습니다.', subtitle: '새로고침 후 다시 시도해 주세요.' });
+  }
   return React.createElement(React.Fragment, null,
     React.createElement(SettlementSummaryModal, {
       ...settlementContext.summaryProps,
@@ -1531,6 +1590,59 @@ function EmptyState({ icon, title, subtitle }) {
     React.createElement('div', { className: 'renewal-shell-placeholder-title' }, title),
     React.createElement('div', { className: 'renewal-shell-placeholder-sub' }, subtitle)
   );
+}
+
+const lazyUiReady = Object.create(null);
+
+function DestinationLoadingSurface() {
+  const React = window.React;
+  return React.createElement('div', {
+    className: 'renewal-shell-loading-surface',
+    'aria-busy': 'true',
+    'aria-label': '화면 준비 중',
+  });
+}
+
+function useLazyUi(key, isReadyFn, loadFn, onError) {
+  const React = window.React;
+  const [ready, setReady] = React.useState(() => !!(lazyUiReady[key] || (typeof isReadyFn === 'function' && isReadyFn())));
+  React.useEffect(() => {
+    if (lazyUiReady[key] || (typeof isReadyFn === 'function' && isReadyFn())) {
+      lazyUiReady[key] = true;
+      if (!ready) setReady(true);
+      return undefined;
+    }
+    if (typeof loadFn !== 'function') {
+      lazyUiReady[key] = true;
+      setReady(true);
+      return undefined;
+    }
+    let alive = true;
+    Promise.resolve()
+      .then(() => loadFn())
+      .catch(error => {
+        console.error(`${key} UI load failed:`, error);
+        if (typeof onError === 'function') onError(error);
+      })
+      .finally(() => {
+        if (typeof isReadyFn !== 'function' || isReadyFn()) lazyUiReady[key] = true;
+        if (alive) setReady(true);
+      });
+    return () => { alive = false; };
+  }, [key, ready]);
+  return ready || !!lazyUiReady[key];
+}
+
+function prefetchDestinationUi() {
+  const run = () => {
+    try { window.__gatherLoadViewUi?.('memo'); } catch (e) {}
+    try { window.__gatherLoadViewUi?.('places'); } catch (e) {}
+    try { window.__gatherLoadChatUi?.(); } catch (e) {}
+    try { window.__gatherLoadEventUi?.(); } catch (e) {}
+    try { prefetchDestinationStyles(); } catch (e) {}
+  };
+  if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(run, { timeout: 1800 });
+  else setTimeout(run, 200);
 }
 
 /** Builds EmptyState's subtitle: "<캘린더명> · <설명>" once a calendar is loaded, else just <설명>. */
@@ -1750,21 +1862,17 @@ export function buildRenewalRecordsContext(calendar, deps) {
  */
 function MediaPane({ recordsContext, calendarName, onChangeView, onOpenAppSettings, onOpenSideNav, onRegisterMenuActions }) {
   const React = window.React;
-  const [loaded, setLoaded] = React.useState(() => !!(window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChatGalleryModal));
-  React.useEffect(() => {
-    if (loaded) return undefined;
-    if (typeof window.__gatherLoadChatUi !== 'function') { setLoaded(true); return undefined; }
-    let cancelled = false;
-    window.__gatherLoadChatUi().then(() => { if (!cancelled) setLoaded(true); }).catch(err => {
-      console.error('Gallery UI load failed:', err);
-      if (typeof recordsContext.showToast === 'function') recordsContext.showToast('갤러리 화면을 불러오지 못했습니다. 다시 시도해 주세요.', 'error');
-    });
-    return () => { cancelled = true; };
-  }, [loaded]);
-  if (!loaded) {
-    return React.createElement(EmptyState, { title: '사진·영상 불러오는 중', subtitle: '잠시만 기다려 주세요.' });
-  }
+  const loaded = useLazyUi(
+    'gallery',
+    () => !!(window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChatGalleryModal),
+    () => window.__gatherLoadChatUi?.(),
+    () => recordsContext.showToast?.('갤러리 화면을 불러오지 못했습니다. 다시 시도해 주세요.', 'error')
+  );
+  if (!loaded) return React.createElement(DestinationLoadingSurface);
   const { ChatGalleryModal, ShareModal } = bindUiComponentAliases(React);
+  if (typeof ChatGalleryModal !== 'function') {
+    return React.createElement(EmptyState, { title: '갤러리 화면을 불러오지 못했습니다.', subtitle: '새로고침 후 다시 시도해 주세요.' });
+  }
   const galleryView = React.createElement(ChatGalleryModal, {
     ...recordsContext.mediaProps,
     onClose: () => onChangeView('calendar'),
@@ -1893,22 +2001,18 @@ function HistoryPane({ recordsContext, calendarContext, calendarName, onChangeVi
  */
 function PlacesPane({ recordsContext, calendarContext, onChangeView, onOpenAppSettings, onOpenSideNav, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource, onRegisterMenuActions }) {
   const React = window.React;
-  const [loaded, setLoaded] = React.useState(() => !!(window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlacesView));
-  React.useEffect(() => {
-    if (loaded) return undefined;
-    if (typeof window.__gatherLoadViewUi !== 'function') { setLoaded(true); return undefined; }
-    let cancelled = false;
-    window.__gatherLoadViewUi('places').then(() => { if (!cancelled) setLoaded(true); }).catch(err => {
-      console.error('Places UI load failed:', err);
-      if (typeof recordsContext.showToast === 'function') recordsContext.showToast('장소 화면을 불러오지 못했습니다. 다시 시도해 주세요.', 'error');
-    });
-    return () => { cancelled = true; };
-  }, [loaded]);
+  const loaded = useLazyUi(
+    'places',
+    () => !!(window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.PlacesView),
+    () => window.__gatherLoadViewUi?.('places'),
+    () => recordsContext.showToast?.('장소 화면을 불러오지 못했습니다. 다시 시도해 주세요.', 'error')
+  );
   const [placeDateModalDate, setPlaceDateModalDate] = React.useState(null);
-  if (!loaded) {
-    return React.createElement(EmptyState, { title: '장소 불러오는 중', subtitle: '잠시만 기다려 주세요.' });
-  }
+  if (!loaded) return React.createElement(DestinationLoadingSurface);
   const { PlacesView, ShareModal, DateModal } = bindUiComponentAliases(React);
+  if (typeof PlacesView !== 'function') {
+    return React.createElement(EmptyState, { title: '장소 화면을 불러오지 못했습니다.', subtitle: '새로고침 후 다시 시도해 주세요.' });
+  }
   const onParticipantClick = (name, dateStr) => { if (dateStr) setPlaceDateModalDate(dateStr); };
   return React.createElement(React.Fragment, null,
     React.createElement(PlacesView, {
@@ -1949,21 +2053,17 @@ function PlacesPane({ recordsContext, calendarContext, onChangeView, onOpenAppSe
  */
 function MemoPane({ recordsContext, onChangeView, onOpenAppSettings, onOpenSideNav, onRegisterMenuActions }) {
   const React = window.React;
-  const [loaded, setLoaded] = React.useState(() => !!(window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MemoView));
-  React.useEffect(() => {
-    if (loaded) return undefined;
-    if (typeof window.__gatherLoadViewUi !== 'function') { setLoaded(true); return undefined; }
-    let cancelled = false;
-    window.__gatherLoadViewUi('memo').then(() => { if (!cancelled) setLoaded(true); }).catch(err => {
-      console.error('Memo UI load failed:', err);
-      if (typeof recordsContext.showToast === 'function') recordsContext.showToast('메모 화면을 불러오지 못했습니다. 다시 시도해 주세요.', 'error');
-    });
-    return () => { cancelled = true; };
-  }, [loaded]);
-  if (!loaded) {
-    return React.createElement(EmptyState, { title: '메모 불러오는 중', subtitle: '잠시만 기다려 주세요.' });
-  }
+  const loaded = useLazyUi(
+    'memo',
+    () => !!(window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.MemoView),
+    () => window.__gatherLoadViewUi?.('memo'),
+    () => recordsContext.showToast?.('메모 화면을 불러오지 못했습니다. 다시 시도해 주세요.', 'error')
+  );
+  if (!loaded) return React.createElement(DestinationLoadingSurface);
   const { MemoView, ShareModal } = bindUiComponentAliases(React);
+  if (typeof MemoView !== 'function') {
+    return React.createElement(EmptyState, { title: '메모 화면을 불러오지 못했습니다.', subtitle: '새로고침 후 다시 시도해 주세요.' });
+  }
   return React.createElement(React.Fragment, null,
     React.createElement(MemoView, {
       ...recordsContext.memoProps,
@@ -2576,6 +2676,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   // listen for the back/forward buttons for the rest of this shell's lifetime.
   React.useEffect(() => {
     writeLocationState(activeTab, recordsSubTab, { push: false });
+    prefetchDestinationUi();
     const onPopState = () => {
       setActiveTabState(readTabFromLocation());
       setRecordsSubTabState(readRecordsSubTabFromLocation());

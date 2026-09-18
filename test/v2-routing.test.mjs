@@ -77,6 +77,20 @@ test('V2 places screen does not reparent Leaflet map slots (removeChild crash)',
   assert.match(screens, /Same React element in two parents/);
 });
 
+test('V2 destination panes prefetch lazy UI and never stall on 불러오는 중 copy', async () => {
+  const { readFileSync } = await import('node:fs');
+  const shell = readFileSync(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
+  const screens = readFileSync(new URL('../src/ui/v2/screens.js', import.meta.url), 'utf8');
+  assert.match(shell, /function useLazyUi/);
+  assert.match(shell, /prefetchDestinationUi/);
+  assert.match(shell, /function HomePlaceCard/);
+  assert.match(shell, /homePlaceVisitLine/);
+  assert.match(shell, /TABLER_ICONS\.externalLink/);
+  assert.doesNotMatch(shell, /title: '메모 불러오는 중'/);
+  assert.doesNotMatch(shell, /title: '장소 불러오는 중'/);
+  assert.match(screens, /export function prefetchDestinationStyles/);
+});
+
 test('places map reuses the shared chat composer resize handle', async () => {
   const { readFileSync } = await import('node:fs');
   const places = readFileSync(new URL('../src/ui/ui-places.js', import.meta.url), 'utf8');

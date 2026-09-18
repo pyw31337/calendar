@@ -32,6 +32,10 @@ function ensureDestinationStyles(kind) {
   }
 }
 
+export function prefetchDestinationStyles() {
+  Object.keys(destinationStyleLoaders).forEach(ensureDestinationStyles);
+}
+
 /** Multi-element icons at mock stroke/size (same bar as home side-nav). */
 const ICON_NODES = {
   back: [['path', { d: 'M15 18l-6-6 6-6' }]],
