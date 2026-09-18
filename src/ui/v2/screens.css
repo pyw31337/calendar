@@ -747,10 +747,10 @@
   .v2-design .v2-chat .chat-messages-scroll {
     padding: 8px 16px 110px !important;
   }
-}
+
 
 /* Memo PC: full-bleed under rail; keep dense tags */
-@media (min-width: 1200px) {
+
   .v2-design .v2-memo.v2-dest-page .bp-app-shell,
   .v2-design .renewal-shell-main.v2-memo .bp-app-shell {
     max-width: none !important;
@@ -763,10 +763,10 @@
   .v2-design .v2-memo .v2-memo-body {
     padding: var(--v2-dest-content-pad-y, 0) var(--v2-dest-content-pad-x, 14px) 96px !important;
   }
-}
+
 
 /* Settlement PC: full-bleed under rail */
-@media (min-width: 1200px) {
+
   .v2-design .v2-settlement.v2-dest-page .bp-app-shell,
   .v2-design .renewal-shell-main.v2-settlement .bp-app-shell {
     max-width: none !important;
@@ -807,10 +807,10 @@
   .v2-design .v2-records-media .gallery-page-inner {
     max-width: none !important;
   }
-}
+
 
 /* Places PC: full-bleed under rail */
-@media (min-width: 1200px) {
+
   .v2-design .v2-places.v2-dest-page .bp-app-shell {
     max-width: none !important;
     margin: 0 !important;
@@ -1525,10 +1525,10 @@
   .v2-design .v2-chat .inline-search-bar {
     max-width: min(1100px, 100%) !important;
   }
-}
+
 
 /* Also raise the earlier loop7/8 caps that still clamp at 380–420 */
-@media (min-width: 1200px) {
+
   .v2-design .v2-chat .msg-row-hover:not([style*="flex-end"]) > div:nth-child(2) {
     max-width: min(72vw, 620px) !important;
   }

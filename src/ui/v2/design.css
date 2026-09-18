@@ -100,6 +100,38 @@
 .v2-design .bp-renewal-home-hero { margin: 0; padding: 0; }
 .v2-design .bp-empty-hero { color: rgba(255, 255, 255, 0.92); padding: 14px; font-size: 0.8rem; }
 
+/* Mobile-only quick-nav row (채팅/정산/메모/갤러리) between the hero header and the D-day
+ * badge -- lets those four destinations stay one tap away when there is no persistent side
+ * rail to reach them from (see aurora-theme.css "Mobile: no rail", <768px). >=768px already has
+ * the rail for the same destinations, so this row must stay hidden there -- never show both. Each
+ * button reuses .bp-icon-btn (circular glass button, reference-home.css) unchanged, so it needs
+ * no button-shape CSS of its own; only the row layout and settlement badge overlay are new. */
+.v2-design .bp-hero-quick-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 2px 16px 10px;
+}
+.v2-design .bp-hero-quick-nav-item { position: relative; }
+.v2-design .bp-hero-quick-nav-badge {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1;
+  padding: 2px 5px;
+  border-radius: var(--radius-full);
+  box-shadow: 0 0 0 2px rgba(124, 47, 229, 0.55);
+  white-space: nowrap;
+}
+@media (min-width: 768px) {
+  /* Side rail already covers 채팅/정산/메모/갤러리 from here up -- never show both navs. */
+  .v2-design .bp-hero-quick-nav { display: none; }
+}
+
 /* Hero vivid purple mesh + dramatic aurora blobs — reinforces reference-home under .v2-design */
 .v2-design .bp-hero-zone {
   background:
@@ -301,13 +333,13 @@
     border-radius: 20px 20px 0 0 !important;
     margin: 0 !important;
   }
-}
+
 
 /* ---- Settings modal (사이드메뉴 > 설정): backdrop-sheet treatment, same pattern as the
  * date/event sheet above -- PC unchanged (centered), mobile becomes a full-width bottom sheet.
  * "app-settings-*" are extra modifier classes on top of the shared .modal-overlay/
  * .modal-container (used by ~15 other modals) so only this modal is affected. */
-@media (max-width: 767px) {
+
   .v2-design .app-settings-overlay {
     align-items: flex-end !important;
     padding: 0 !important;
@@ -1666,8 +1698,8 @@
   .v2-design .bp-day-bar-stack .bp-day-anniversary > .bp-day-anniversary-label { display: block !important; color: var(--anniversary-color, var(--cal-anniversary)) !important; font-size: .56rem !important; font-weight: 800 !important; line-height: 1.15 !important; padding: 0 3px !important; }
   .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-mid > .bp-day-anniversary-label,
   .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-bar-only > .bp-day-anniversary-label { display: none !important; }
-}
-@media (min-width: 768px) {
+
+
   /* Range anniversaries use the same desktop contract as solo badges: a
      translucent tint with the category color as readable text. */
   .v2-design .festival-bar-desktop .bp-day-anniversary {

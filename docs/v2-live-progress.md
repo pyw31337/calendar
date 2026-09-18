@@ -2,6 +2,38 @@
 
 이 문서는 V2 화면 리뉴얼의 진행 상태와 검증 결과를 누적 기록한다.
 
+## 2026-09-18 16:34 KST
+
+- 사용자 피드백(스크린샷 2장) 반영: 모바일 히어로 카드가 여전히 둥근 모서리로 보이는 원인을
+  찾음 — `border-radius`는 이미 다른 곳의 `!important` 규칙(0)이 이기고 있었지만,
+  `aurora-theme.css`의 모바일 성능/컨테인먼트 가드가 독립적으로 `clip-path: inset(0 round 16px)`
+  를 걸어놔서 실제 렌더링은 계속 16px 라운드로 보이고 있었다(진짜 원인은 border-radius 충돌이
+  아니라 clip-path). `clip-path: inset(0)`로 수정하고, 같은 값(`border-radius:0`)을 중복
+  선언하던 또 다른 죽은 규칙도 제거.
+- 모바일(<768px, 사이드메뉴 없는 화면) 전용 "채팅 정산 메모 갤러리" 퀵네비 아이콘 행을 히어로
+  헤더와 D-day 배지 사이에 추가(`HeroQuickNav`, `ui-app-shell-v2.js`). 사이드 레일이 있는
+  ≥768px에서는 `.bp-hero-quick-nav { display: none }`로 완전히 숨김(같은 목적지를 두 번
+  노출하지 않음). 정산 아이콘에는 기존 사이드메뉴와 동일한 `settlementBalanceBadge`(예: "-32만")
+  뱃지를 재사용. 버튼은 기존 `.bp-icon-btn`(원형 글래스 버튼) 클래스를 그대로 재사용해 새 버튼
+  모양 CSS를 추가하지 않음.
+- 미디어쿼리 통폐합: 같은 파일 안에서 조건이 완전히 동일하고 그 사이에 공백/주석 외에 아무 것도
+  없는 인접 `@media` 블록만 안전하게 병합(design.css 2쌍/screens.css 4쌍/aurora-theme.css 5쌍,
+  총 11쌍). **1차 시도에서 정규식(`\s*(/\*.*?\*/\s*)*` + `fullmatch`)이 역추적(backtracking)
+  때문에 실제 CSS 규칙이 낀 비인접 블록까지 "공백/주석만 있음"으로 잘못 판정해 `.bp-fab`
+  위치 규칙과 채팅 레거시 타이틀바 숨김 규칙(`display:none!important`)이 엉뚱하게
+  `@media(min-width:1200px)` 안에 갇히는 실제 회귀를 만들 뻔했다 — 커밋 전에 diff를 직접 읽다가
+  발견해서 전체 되돌리고, 역추적 없는 수동 스캐너로 다시 작성 후 재적용.**
+- 검증: 병합 전/후 컴파일된 `dist/assets/app-main-*.css`의 규칙(선택자+선언) 전체를 멀티셋으로
+  비교해 위 두 기능 변경(hero corner fix, quick-nav 5개 규칙)을 제외하면 단 한 규칙도 추가/제거/
+  변경되지 않았음을 확인(진짜 no-op). `npm run lint`, `npm run check:all`, `npm run safety:test`,
+  `npm run regression:test` 전부 통과. Playwright 헤드리스로 390×844(모바일: 정사각 모서리 +
+  퀵네비 확인)/820×1024/1440×900(PC: 퀵네비 숨김, 사이드 레일 유지 확인)에서 직접 스크린샷.
+- 남은 작업: 같은 파일 내에서 조건은 같지만 사이에 다른 선택자 규칙이 끼어있어 "인접"하지 않은
+  `@media` 블록들(더 많이 남아있음, 예: `design.css`의 흩어진 `min-width:1200px` 블록들)을
+  안전하게 재정렬해서 합치려면 각 블록 사이에 있는 모든 선택자를 대조해 순서를 바꿔도 캐스케이드
+  결과가 같은지 하나씩 증명해야 해서 이번 세션 범위 밖으로 남겨둠 — 리스크가 커서 별도 세션으로
+  넘기는 것을 권장.
+
 ## 2026-09-18 15:58 KST
 
 - 전수조사 착수: v2 CSS(`design.css` 438 / `screens.css` 874 / `aurora-theme.css` 165 /

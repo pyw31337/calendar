@@ -148,8 +148,11 @@
     overflow: hidden;
     isolation: isolate;
     contain: paint;
-    clip-path: inset(0 round 16px);
-    border-radius: 16px !important;
+    /* Square corners on mobile (no rounding) -- border-radius itself is the
+       single source of truth further down ("Final full-bleed hero rule",
+       border-radius: 0 !important); clip-path only needs to match that same
+       square shape for the containment fix below, not reintroduce rounding. */
+    clip-path: inset(0);
     background-size: auto, 100% 100% !important;
     background-position: 0 0, 50% 50% !important;
     animation: none !important;
@@ -191,12 +194,12 @@
   .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item { width: 48px; margin-left: auto; margin-right: auto; padding: 10px 0; justify-content: center; }
   .v2-design .bp-side-nav-brand-icon, .v2-design .bp-side-nav-brand-icon svg { fill: none; stroke: currentColor; }
   .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-icon, .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-icon svg { color: #fff; fill: none; stroke: currentColor; }
-}
+
 
 /* The V2 shell can be mounted without the legacy .renewal-shell class. Keep
  * the coordinate contract on the V2 root itself so both mounted variants use
  * exactly the same y positions. */
-@media (min-width: 768px) {
+
   .v2-design .bp-side-nav { overflow-x: hidden; }
   .v2-design .bp-side-nav-head {
     height: 64px;
@@ -273,11 +276,11 @@
     fill: none !important;
     stroke: currentColor;
   }
-}
+
 
 /* Final rail motion/geometry overrides (kept last so legacy V2 rules cannot
  * reintroduce a vertical jump). */
-@media (min-width: 768px) {
+
   .renewal-shell.v2-design .bp-side-nav-head {
     position: relative;
     isolation: isolate;
@@ -443,13 +446,13 @@
     font-size: 0.68rem !important;
     font-weight: 800 !important;
   }
-}
+
 
 /* Side-nav coordinate contract: the collapsed rail is the vertical reference.
  * Both states use the same head/search/item heights and vertical rhythm; only
  * width, opacity and horizontal alignment are animated. This prevents the
  * expanded state from drifting downward while the rail opens. */
-@media (min-width: 768px) {
+
   .renewal-shell.v2-design .bp-side-nav {
     --v2-side-head-size: 64px;
     --v2-side-item-size: 42px;
@@ -543,11 +546,11 @@
     width: 18px !important;
     height: 18px !important;
   }
-}
+
 
 /* Side-nav motion contract: collapse changes only the horizontal rail width;
  * vertical metrics stay identical in both states. */
-@media (min-width: 768px) {
+
   .renewal-shell.v2-design .bp-side-nav {
     overflow-x: hidden;
     overscroll-behavior-x: none;
@@ -1088,8 +1091,8 @@
     line-height: 1.15;
     text-align: center;
   }
-}
-@media (max-width: 767px) {
+
+
   .v2-design .bp-day-bar-stack .bp-day-anniversary-label {
     display: none !important;
   }
@@ -1209,12 +1212,10 @@
     grid-template-columns: minmax(0, 1fr);
     gap: 16px;
   }
-  .v2-design .bp-hero-zone {
-    width: 100%;
-    margin-left: 0;
-    margin-right: 0;
-    border-radius: 0;
-  }
+  /* .bp-hero-zone width/margin/border-radius: already covered by the "Final
+   * full-bleed hero rule" below (max-width: 1200px, which mobile also
+   * matches) with equal-or-greater importance -- removed the duplicate that
+   * used to be here. */
 }
 
 /* Final full-bleed hero rule for tablet/mobile. */

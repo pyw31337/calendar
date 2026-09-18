@@ -862,12 +862,46 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
 }
 
 
-function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeView, calendarName, onOpenSearch, onOpenMore }) {
+/** Destinations for the mobile-only hero quick-nav row (see HeroQuickNav) -- the four
+ * screens a hidden side rail would otherwise reach in one tap on <768px, where there is no
+ * persistent rail (aurora-theme.css "Mobile: no rail"). Desktop/tablet (>=768px) already has
+ * the side rail for these, so this row is hidden there via .bp-hero-quick-nav's own media query
+ * -- never duplicate the same destinations as a second always-visible nav on wider screens. */
+const HERO_QUICK_NAV_ITEMS = [
+  { id: 'chat', label: '채팅', icon: 'chat' },
+  { id: 'settlement', label: '정산', icon: 'settlement' },
+  { id: 'memo', label: '메모', icon: 'memo' },
+  { id: 'gallery', label: '갤러리', icon: 'gallery' },
+];
+
+function HeroQuickNav({ onChangeView, settlementBalanceBadge }) {
+  const React = window.React;
+  return React.createElement('div', { className: bentoClass('hero-quick-nav'), role: 'navigation', 'aria-label': '빠른 이동' },
+    HERO_QUICK_NAV_ITEMS.map(item => React.createElement('button', {
+      type: 'button',
+      key: item.id,
+      className: bentoClass('hero-quick-nav-item icon-btn'),
+      'aria-label': item.label,
+      title: item.label,
+      onClick: () => onChangeView?.(item.id),
+    },
+      React.createElement(TabIcon, { id: item.icon }),
+      item.id === 'settlement' && settlementBalanceBadge?.text && React.createElement('span', {
+        className: bentoClass('hero-quick-nav-badge'),
+        style: { backgroundColor: settlementBalanceBadge.bgColor || '#EF4444' },
+        title: '정산 잔액',
+      }, settlementBalanceBadge.text)
+    ))
+  );
+}
+
+function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeView, calendarName, onOpenSearch, onOpenMore, settlementBalanceBadge }) {
   const React = window.React;
   return React.createElement(React.Fragment, null,
     React.createElement('div', { className: 'bp-hero-zone' },
       React.createElement('span', { className: 'bp-hero-aurora', 'aria-hidden': 'true' }),
       React.createElement(TopHeader, { calendarName, onOpenSearch, onOpenMore }),
+      React.createElement(HeroQuickNav, { onChangeView, settlementBalanceBadge }),
       React.createElement(RenewalHero, { meetings: calendarContext.upcomingMeetings, calendar: calendarContext.calendar, onSelectDate: onOpenDate })
     ),
 
@@ -2771,7 +2805,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
       React.createElement('main', { className: activeTab === 'calendar' ? 'bp-app-shell is-bento-home' : `renewal-shell-main v2-destination ${hasFullScreen ? `v2-${activeTab}` : (activeTab === 'records' ? `is-records v2-records-${recordsSubTab}` : `is-${activeTab}`)}` },
 
         activeTab === 'calendar'
-          ? React.createElement(CalendarPane, { calendarContext, recordsContext, onOpenDate: setDateModalDate, onChangeView, calendarName, onOpenSearch: () => setActiveTab('search'), onOpenMore: () => setIsSideNavOpen(true) })
+          ? React.createElement(CalendarPane, { calendarContext, recordsContext, onOpenDate: setDateModalDate, onChangeView, calendarName, onOpenSearch: () => setActiveTab('search'), onOpenMore: () => setIsSideNavOpen(true), settlementBalanceBadge })
           : activeTab === 'search'
           ? React.createElement(SearchPage, { modalProps: moreContext.modalProps.search, searchExtra, onClose: () => setActiveTab('calendar') })
           : activeTab === 'chat'
