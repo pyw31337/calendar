@@ -1107,6 +1107,7 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
           ),
           commentOpenId === memo.id && React.createElement('form', {
             className: 'comment-composer',
+            style: { marginTop: '8px' },
             onSubmit: async event => {
               event.preventDefault();
               event.stopPropagation();
@@ -1140,6 +1141,11 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
               rows: 1,
               minHeight: 30,
               maxHeight: 200,
+              style: {
+                width: '100%', fontSize: '0.8rem', border: '1px solid var(--border-subtle)',
+                borderRadius: 'var(--radius-sm)', padding: '6px 8px', backgroundColor: '#fff',
+                color: 'var(--text-main)', outline: 'none', boxSizing: 'border-box'
+              },
             }),
             React.createElement('div', { className: 'comment-composer-footer' },
               ParticipantPickerButton && React.createElement(ParticipantPickerButton, {
@@ -1150,8 +1156,20 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
                 React.createElement('button', {
                   type: 'button',
                   onClick: event => { event.stopPropagation(); setCommentDraft(''); setCommentOpenId(null); },
+                  style: {
+                    flexShrink: 0, height: '30px', padding: '0 12px', borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)',
+                    color: 'var(--text-muted)', fontSize: 'var(--font-size-md)', fontWeight: 'bold', cursor: 'pointer'
+                  }
                 }, '취소'),
-                React.createElement('button', { type: 'submit', disabled: commentSaving || !commentDraft.trim() || !commentParticipant }, commentSaving ? '저장 중…' : '저장')
+                React.createElement('button', {
+                  type: 'submit', disabled: commentSaving || !commentDraft.trim() || !commentParticipant,
+                  style: {
+                    flexShrink: 0, height: '30px', padding: '0 12px', borderRadius: 'var(--radius-sm)', border: 'none',
+                    backgroundColor: 'var(--accent-primary)', color: '#FFFFFF', fontSize: 'var(--font-size-md)', fontWeight: 'bold',
+                    cursor: commentSaving ? 'wait' : 'pointer', opacity: (commentDraft.trim() && commentParticipant && !commentSaving) ? 1 : 0.5
+                  }
+                }, commentSaving ? '저장 중…' : '저장')
               )
             )
           ),
