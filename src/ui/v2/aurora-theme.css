@@ -272,6 +272,57 @@
   }
 }
 
+/* Side-nav motion contract: collapse changes only the horizontal rail width;
+ * vertical metrics stay identical in both states. */
+@media (min-width: 768px) {
+  .renewal-shell.v2-design .bp-side-nav {
+    overflow-x: hidden;
+    overscroll-behavior-x: none;
+    will-change: transform, width;
+    transition: transform .28s cubic-bezier(.22, 1, .36, 1), width .28s cubic-bezier(.22, 1, .36, 1);
+  }
+  .renewal-shell.v2-design .bp-side-nav-head {
+    height: 64px;
+    min-height: 64px;
+    box-sizing: border-box;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-head {
+    height: 64px;
+    min-height: 64px;
+  }
+  .renewal-shell.v2-design .bp-side-nav-global-search,
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search {
+    height: 36px;
+    min-height: 36px;
+    margin-top: 18px;
+    margin-bottom: 16px;
+    box-sizing: border-box;
+  }
+  .renewal-shell.v2-design .bp-side-nav-global-search-icon,
+  .renewal-shell.v2-design .bp-side-nav-global-search-icon svg,
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search-icon,
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search-icon svg {
+    width: 18px;
+    height: 18px;
+    flex: 0 0 18px;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search {
+    width: 36px;
+    padding: 8px;
+    border-radius: 50%;
+    justify-content: center;
+  }
+  .renewal-shell.v2-design .bp-side-nav-item {
+    min-height: 42px;
+    box-sizing: border-box;
+  }
+  .renewal-shell.v2-design .bp-side-nav-item-icon {
+    transform: translate3d(0, 0, 0);
+    will-change: transform;
+    transition: transform .28s cubic-bezier(.22, 1, .36, 1);
+  }
+}
+
 /* Responsive shell contract:
  * - 1201px+: persistent PC rail and four-card lower matrix.
  * - 768–1200px: no persistent rail; use the header menu drawer and a
