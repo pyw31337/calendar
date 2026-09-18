@@ -1778,7 +1778,9 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       backgroundColor: (memo.color && memo.color !== 'var(--bg-card)' && memo.color !== '#fff' && memo.color !== '#FFFFFF') ? memo.color : (isPreview ? 'var(--bg-primary)' : '#fff'),
       border: '0',
       borderRadius: 'var(--radius-md)',
-      padding: '12px',
+      // Let the scoped V2 contract win without !important. The legacy card keeps its
+      // original inline rhythm; V2 cards receive their spacing from the V2 stylesheet.
+      padding: useV2TagStyle ? undefined : '12px',
       cursor: 'pointer',
       boxShadow: '0 2px 5px rgba(0,0,0,0.03)',
       display: 'flex',
@@ -1787,7 +1789,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       transition: 'box-shadow 0.2s ease',
       boxSizing: 'border-box'
     },
-    className: "memo-card-hover v2-memo-card-contract"
+    className: `memo-card-hover${useV2TagStyle ? ' v2-memo-card-contract' : ''}`
   },
     /* Share button -- sits immediately left of the pin toggle (when the pin is shown), same
        absolute-positioned/unstyled-button pattern, same 16px icon size, stroke weight and color

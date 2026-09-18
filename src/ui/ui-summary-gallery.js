@@ -393,6 +393,8 @@ export function MemoPreviewSection({ memos = [], calendar = null, onViewAll, onO
   if (sortedMemos.length === 0) return null;
 
   const displayedMemos = sortedMemos.slice(0, collapsed ? 2 : 3);
+  const isV2Shell = typeof window !== 'undefined'
+    && new URLSearchParams(window.location.search).get('shell') === 'v2';
   const openMemoPage = () => { if (typeof onViewAll === 'function') onViewAll(); };
   const handleTitleKeyDown = event => handleSectionHeaderKeyDown(event, () => setCollapsed(prev => !prev));
 
@@ -436,7 +438,7 @@ export function MemoPreviewSection({ memos = [], calendar = null, onViewAll, onO
       setActiveLightbox: setActiveLightbox,
       effectivePinned: !!memo.isPinned,
       hidePinButton: true,
-      variant: 'preview'
+      variant: isV2Shell ? 'preview' : 'page'
     })) : null)
   );
 }

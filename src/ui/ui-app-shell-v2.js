@@ -270,7 +270,10 @@ export function buildRenewalCalendarContext(calendar, deps) {
     handleSaveAvailability, handleDeleteAvailability, handleReorderAvailability, handleDeleteAllForDate,
     handleConfirmMeeting, handleSaveExpense, handleDeleteExpense, handleReorderExpenses,
     handleAddMeetingPhotos, handleDeletePhoto, handleDeleteMeetingPhoto, findChatMessageById,
-    handleFetchDateTaggedMessages, handleFetchDateTaggedMemos, handleOpenEditMemo, handleToggleMemoPin, handleMemoCommentsChange, handleFetchMeetingPhotoIndex,
+    handleFetchDateTaggedMessages, handleFetchDateTaggedMemos,
+    handleOpenEditMemo = () => {},
+    handleToggleMemoPin = (...args) => window.__gatherV2MemoPinToggle?.(...args),
+    handleMemoCommentsChange = (...args) => window.__gatherV2MemoCommentsChange?.(...args), handleFetchMeetingPhotoIndex,
     handleFetchMeetingAlbum, loadOlderChatMessages, hasMoreOlderChat, loadingOlderChat, fullChatMessages,
     handleSavePlace, handleDeletePlace, handleReorderPlaces,
     showToast, showConfirmDialog, syncStatus, photoCommentCounts, setActiveLightbox, galleryPhotoIndex,
@@ -1615,7 +1618,8 @@ export function buildRenewalRecordsContext(calendar, deps) {
     isPlacesShareOpen, setIsPlacesShareOpen,
     memos, totalMemoCount, onLoadMoreMemos, sharedMemo, setSharedMemo, chatMessages,
     patchLocalMemo, upsertLocalMemo, removeLocalMemo, memoInitialTag, setMemoInitialTag,
-    onMemoCommentsChange,
+    handleToggleMemoPin = (...args) => window.__gatherV2MemoPinToggle?.(...args),
+    onMemoCommentsChange = (...args) => window.__gatherV2MemoCommentsChange?.(...args),
     isMemoShareOpen, setIsMemoShareOpen,
   } = deps || {};
   const requireLoadedCalendar = (message) => {
