@@ -943,9 +943,16 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
     if (!Array.isArray(memoItems)) return [];
     const rows = memoItems.filter(Boolean);
     const memoUpdatedAt = memo => timestampMs(memo?.updatedAt ?? memo?.createdAt);
-    const latestCommentAt = memo => (Array.isArray(memo?.comments)
-      ? memo.comments.reduce((latest, comment) => Math.max(latest, timestampMs(comment?.updatedAt ?? comment?.createdAt)), 0)
-      : 0);
+    const latestCommentAt = memo => {
+      // lastCommentAt is denormalized with every server comment write, so the home
+      // ranking remains consistent across users even when older comment objects lack
+      // createdAt/updatedAt fields.
+      const denormalized = timestampMs(memo?.lastCommentAt);
+      if (denormalized > 0) return denormalized;
+      return Array.isArray(memo?.comments)
+        ? memo.comments.reduce((latest, comment) => Math.max(latest, timestampMs(comment?.updatedAt ?? comment?.createdAt)), 0)
+        : 0;
+    };
     const recentFirst = (a, b) => memoUpdatedAt(b) - memoUpdatedAt(a) || String(b?.id || '').localeCompare(String(a?.id || ''));
     const pinned = rows.filter(memo => memo.isPinned).sort(recentFirst);
     const selected = pinned.slice(0, 2);
