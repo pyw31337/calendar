@@ -2097,6 +2097,25 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       );
     })),
 
+    /*#__PURE__*/React.createElement("div", {
+      className: "memo-card-comment-footer",
+      onClick: e => e.stopPropagation()
+    },
+      /*#__PURE__*/React.createElement("span", { className: "memo-card-comment-count" }, `댓글 ${comments.length}개`),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        className: "memo-card-comment-toggle",
+        onClick: e => {
+          e.stopPropagation();
+          setEditingCommentId(null);
+          setCommentText('');
+          setIsCommentComposerOpen(v => !v);
+        },
+        title: "댓글 입력",
+        "aria-label": "댓글 입력"
+      }, /*#__PURE__*/React.createElement(MessageCommentIcon, { size: 16 }), "댓글")
+    ),
+
     /* Comment composer -- always column (input, then picker left / cancel+save right).
        See .comment-composer rules in app.css. */
     isCommentComposerOpen && /*#__PURE__*/React.createElement("div", {

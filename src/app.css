@@ -2569,6 +2569,40 @@ select.form-select {
 .summary-card .memo-card-comment-toggle:focus-visible {
   color: var(--brand, #7c2fe5);
 }
+.summary-card .v2-memo-card-tags > .memo-card-comment-toggle {
+  display: none;
+}
+.summary-card .memo-card-comment-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  color: var(--text-light);
+  font-size: .68rem;
+}
+.summary-card .memo-card-comment-count {
+  color: var(--text-light);
+  font-size: .68rem;
+}
+.summary-card .memo-card-comment-footer > .memo-card-comment-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-height: 24px;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.summary-card .memo-card-comment-footer > .memo-card-comment-toggle:hover,
+.summary-card .memo-card-comment-footer > .memo-card-comment-toggle:focus-visible {
+  color: var(--brand, #7c2fe5);
+}
 @media (min-width: 640px) {
   .summary-card { padding: 24px; margin-bottom: 28px; }
 }
