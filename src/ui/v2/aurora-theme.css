@@ -171,15 +171,10 @@
 
 /* Full-bleed hero contract: whenever the side rail is absent (tablet and
  * mobile), the aurora card touches the viewport edges and has no rounded
- * corners. The PC rail layout (>=1201px) retains the card radius. */
-@media (max-width: 1200px) {
-  .v2-design .bp-hero-zone {
-    width: 100%;
-    margin-left: 0;
-    margin-right: 0;
-    border-radius: 0 !important;
-  }
-}
+ * corners. The PC rail layout (>=1201px) retains the card radius. Restated
+ * verbatim further down ("Final full-bleed hero rule for tablet/mobile") --
+ * an earlier byte-identical copy of that rule here was removed as dead
+ * weight (same selector, same media query, same importance: later wins). */
 
 /* Last cascade layer for the side rail coordinate contract. */
 @media (min-width: 768px) {
@@ -734,16 +729,11 @@
   .v2-design .v2-responsive-modal { animation: none; transition: none; }
 }
 
-/* Collapsed rail reference state + polished expand/collapse transitions. */
+/* Collapsed rail reference state + polished expand/collapse transitions.
+ * .bp-side-nav.bp-is-collapsed .bp-side-nav-head itself is fully restated
+ * further down (adds justify-content: center) with equal-or-greater
+ * importance, so a duplicate of it here was removed as dead weight. */
 @media (min-width: 768px) {
-  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-head {
-    width: 64px;
-    height: 64px;
-    box-sizing: border-box;
-    padding: 12px 16px 12px !important;
-    background: linear-gradient(-45deg, #12cdf0 0%, #3604fd 42%, #8019e0 76%, #3604fd 100%) 0 0 / 300% 300%;
-    animation: bp-hero-mesh-shift 8.6s ease-in-out infinite;
-  }
   .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand {
     width: 40px;
     height: 40px;

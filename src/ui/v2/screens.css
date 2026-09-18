@@ -687,9 +687,11 @@
   padding: 10px 14px 8px;
 }
 
-/* Chat density: slightly wider bubbles on PC, keep mock scale */
+/* Chat density: slightly wider bubbles on PC, keep mock scale. Message
+ * bubble max-width itself is redeclared further down (min(72vw, 620px)) with
+ * equal importance in this same media query, so a stale 460px duplicate that
+ * used to live here was removed. */
 @media (min-width: 1200px) {
-  .v2-design .v2-chat .v2-chat-message-content { max-width: 460px !important; }
   .v2-design .renewal-shell-main .v2-memo .bp-memo-grid,
   .v2-design .v2-memo .bp-memo-grid {
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -1050,10 +1052,9 @@
   z-index: 6 !important;
 }
 
-/* ========== SettlementFull denser card chrome (loop7) ========== */
-.v2-design .v2-settlement .settlement-person-grid {
-  gap: 6px !important;
-}
+/* ========== SettlementFull denser card chrome (loop7) ==========
+ * .settlement-person-grid gap is redeclared further down with a tighter
+ * value and equal importance, so an earlier duplicate here was removed. */
 .v2-design .v2-settlement .settlement-person-card {
   padding: 8px 8px 7px !important;
   border-radius: 12px !important;
@@ -1283,16 +1284,11 @@
   display: none !important;
 }
 
-/* Chat composer tool icons (replace plain-text 이모티콘 · 밈 · 붙여넣기) */
-.v2-design .v2-chat-compose-tools {
-  display: flex !important;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 6px 2px 2px !important;
-  width: 100%;
-  box-sizing: border-box;
-}
+/* Chat composer tool icons (replace plain-text 이모티콘 · 밈 · 붙여넣기).
+ * .v2-chat-compose-tools layout itself is declared further down (see "Author
+ * picker sits under the input row"), which fully re-declares every property
+ * set here with equal-or-greater importance -- an earlier duplicate of this
+ * block was removed as dead weight. */
 .v2-design .v2-chat-tool-icons {
   display: inline-flex;
   align-items: center;
@@ -1327,10 +1323,6 @@
   background: #fef2f2;
   border-radius: 999px;
   padding: 4px 10px;
-}
-.v2-design .v2-chat-compose-tools .participant-picker-button {
-  height: 32px !important;
-  font-size: 0.78rem !important;
 }
 .v2-design .v2-tools-toggle { display: none !important; }
 
@@ -1428,9 +1420,6 @@
   font-size: 0.68rem !important;
   color: #6b6580 !important;
   font-weight: 700 !important;
-}
-.v2-design .v2-settlement .settlement-metric-card-value {
-  font-size: 0.92rem !important;
 }
 .v2-design .v2-settlement .settlement-ledger-row {
   padding: 10px 12px !important;
@@ -1783,10 +1772,6 @@
   padding: 0 12px 8px !important;
   gap: 6px !important;
 }
-.v2-design .v2-memo .bp-memo-grid {
-  gap: 10px !important;
-  padding: 10px 14px 24px !important;
-}
 @media (min-width: 1200px) {
   .v2-design .v2-memo .bp-memo-grid {
     grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)) !important;
@@ -1883,20 +1868,9 @@
   height: 34px !important;
 }
 
-.v2-design .v2-chat-compose-tools {
-  padding: 4px 2px 0 !important;
-  gap: 6px !important;
-}
-
 .v2-design .v2-tool-icon-btn {
   width: 30px !important;
   height: 30px !important;
-}
-
-.v2-design .v2-chat-compose-tools .participant-picker-button {
-  height: 28px !important;
-  font-size: 0.72rem !important;
-  padding: 0 8px !important;
 }
 
 /* --- Memo: search→composer spacing, list gap, card/composer padding --- */

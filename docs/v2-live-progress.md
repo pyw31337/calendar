@@ -26,6 +26,21 @@
   실기기 크로스브라우저 확인은 이 세션에서 불가(헤드리스 Chromium 근사만 가능) — 배포 후 사용자
   직접 확인 필요.
 
+## 2026-09-18 16:xx KST (이어서)
+
+- 같은 방법론(파일 내 선택자별 occurrence 비교, importance가 later >= earlier인 완전 가려짐만
+  선별)을 `screens.css`/`aurora-theme.css`에도 적용해 2차 정리 커밋
+  (`fix(v2): remove same-file shadowed !important duplicates`).
+- 삭제한 8개 죽은 규칙: `.v2-chat-compose-tools`(2개 중복), `.participant-picker-button`(2개
+  중복), `.settlement-person-grid`, `.settlement-metric-card-value`, `.bp-memo-grid`(값까지
+  완전히 동일한 순수 복붙), `.v2-chat-message-content`(1200px 미디어쿼리 내 460px 잔재),
+  `.bp-hero-zone`(풀블리드 규칙 완전 중복), `.bp-side-nav-head`(collapsed 상태 완전 중복).
+  `screens.css` !important 라인 수 791→777, `aurora-theme.css` 164→162.
+- 컴파일된 `dist/assets/app-main-*.css`를 수정 전/후로 각각 빌드해 대상 선택자 8개 전부의 최종
+  승자 선언이 byte-identical함을 직접 diff로 확인(시각 변화 0).
+- 검증: `npm run lint`, `npm run check:all`, `npm run safety:test`, `npm run regression:test`
+  전부 통과.
+
 ## 현재 상태 (2026-09-14 14:20 KST)
 
 - 진행 중: 없음 (최신 안정화 유닛 및 Pages 배포 완료)
