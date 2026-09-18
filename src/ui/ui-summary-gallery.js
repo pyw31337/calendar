@@ -4394,10 +4394,14 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
         type: "button",
         onClick: () => setCategoryFilter(opt.value),
         style: {
-          flexShrink: 0, border: 'none', borderRadius: 'var(--radius-full)', padding: '6px 12px',
+          // padding/font-size read the shared 2뎁스 서브메뉴 칩 토큰(v2/design.css
+          // --v2-subnav-chip-*) so Places' .bp-cat-chip and this row stay in sync from one
+          // definition; the var() fallback keeps the original default-shell look wherever
+          // those tokens aren't defined (outside .v2-design).
+          flexShrink: 0, border: 'none', borderRadius: 'var(--radius-full)', padding: 'var(--v2-subnav-chip-pad, 6px 12px)',
           background: isActive ? 'var(--accent-primary)' : 'var(--bg-primary)',
           color: isActive ? '#FFFFFF' : 'var(--text-muted)',
-          fontWeight: 700, fontSize: 'var(--font-size-sm)', cursor: 'pointer', whiteSpace: 'nowrap',
+          fontWeight: 700, fontSize: 'var(--v2-subnav-chip-font-size, var(--font-size-sm))', cursor: 'pointer', whiteSpace: 'nowrap',
           display: 'inline-flex', alignItems: 'center', gap: '6px'
         }
       }, opt.label, /*#__PURE__*/React.createElement(SectionCountBadge, { count: opt.count }));

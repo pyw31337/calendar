@@ -2,6 +2,159 @@
 
 이 문서는 V2 화면 리뉴얼의 진행 상태와 검증 결과를 누적 기록한다.
 
+## 2026-09-18 17:12 KST
+
+**기념일 뱃지**: 라벨 폰트를 요청대로 `font-size: 0.7rem !important; font-weight: 600 !important;`로
+전 구간(단일 기념일 solo/PC min-width:768/1200 단계, festival-bar-desktop 연일 뱃지, "Final
+anniversary readability override" 최종 구간) 통일했다 — 기존엔 0.56rem/0.5rem/0.58rem이
+파일 여기저기서 제각각이었다. 배경-텍스트 동색(반투명 tint + 같은 색 텍스트, PC) / 모바일 텍스트
+없이 진한 배경만은 코드 확인 결과 이미 `--anniversary-color` CSS 변수를 배경·텍스트가 공유하는
+구조로 구현되어 있었다(`getAnniversaryDisplayColor()` → 인라인 스타일/CSS 변수로 주입). 카테고리별
+색상 매핑(생일 빨강/행사 파랑/축제 주황/스포츠 하늘/영화 보라/여행 초록/기타 회색,
+`app-anniversary-dates.js`)도 코드상 존재를 확인했다. **9/29류 연일 뱃지가 셀 배경 밖으로
+벗어나는 문제는 이번 세션에서 재현하지 못했다** — festival bar는 `.bp-day-bar-stack` 밖의 별도
+grid 오버레이라 스태킹 레벨이 겹칠 때만 발생 가능한데, 합성 데이터로 재현 시도했지만 grid
+auto-row가 정상적으로 늘어나는 것만 확인했다. 실제 라이브 데이터 없이는 정확한 원인 특정이
+어려워 보류 — 문제가 계속되면 해당 날짜의 실제 겹침 기념일 개수(스택 레벨)를 알려주면 좋겠다.
+
+**2뎁스 서브메뉴 모듈화(사용자 선택: CSS 토큰만 통일)**: 1단(UnderlineTabs)은 이미 공용
+컴포넌트였고, 2단(전체/개별등록/카테고리 칩)은 Places는 `.bp-cat-chip` 클래스, Content/보관함은
+`ui-summary-gallery.js`의 인라인 style로 서로 다르게 구현되어 있어 패딩/폰트가 어긋나 있었다.
+`design.css`의 `.renewal-shell.v2-design` 루트에 `--v2-subnav-chip-pad`/`--v2-subnav-chip-font-size`
+토큰 2개를 새로 정의하고, Places(`screens.css` `.bp-cat-chip`)와 Content/보관함(칩 버튼 인라인
+style + `screens.css`의 `history-header-stack` 칩 오버라이드, 총 3곳)이 전부 이 토큰을
+참조하도록 수정 — 실측(헤드리스)으로 Content 칩이 새 토큰값(5px 12px / 0.74rem)을 실제로
+반영함을 확인했다. 이제 이 토큰 2개만 바꾸면 두 화면 모두 같이 바뀐다.
+**범위 밖으로 미룬 것**(사용자가 "CSS 토큰만" 범위로 확정): 2단 칩 행 자체를 하나의 React
+컴포넌트로 완전히 통합하는 것(현재는 두 개의 서로 다른 구현이 같은 토큰을 참조하는 정도),
+컨텐츠 페이지의 "지역설정/그리드뷰" 버튼 행을 리스트와 함께 스크롤되게 만드는 것(레거시
+`ui-summary-gallery.js`의 고정 헤더스택 구조를 건드려야 해서 별도 검증 시간이 필요해 보류).
+
+검증: `npm run lint`, `npm run check:all`, `npm run safety:test`, `npm run regression:test`
+전부 통과. Content/Places 칩 CSS 변수 적용은 헤드리스로 computed style 직접 확인.
+
+## 2026-09-18 16:51 KST
+
+사용자 스크린샷 5건 기반 버그 리포트 5건 처리:
+
+1. **채팅 사이드메뉴 마지막 발신자 오표시**: `ui-app-shell-v2.js`의 `allChat` 기반 미리보기가
+   `ChatRoomView`의 실제 `visibleChatMessages` 필터(`uploadSource !== 'meeting'/'gallery'` —
+   모임 확정 사진은 채팅 메시지이지만 대화창엔 안 보임, docs §3.5/3.9)를 적용하지 않아, 채팅창엔
+   안 보이는 모임 사진 메시지가 실제 마지막 대화보다 나중 타임스탬프면 그 업로더가 미리보기에
+   뜨는 버그. 같은 필터를 추가해 수정.
+2. **메모 페이지 세로 스크롤 완전 불가**: 오늘 이른 세션의 커밋(`51523097 fix(v2): reuse home
+   memo card presentation on memo page`)이 `MemoScreen`을 `useDedicatedCards` 경로로 바꾸면서,
+   `screens.css`가 스크롤 가능하게 만드는 대상인 `.v2-dest-body`/`.v2-memo-body` 래퍼 클래스를
+   빠뜨렸다 — 나머지 flex 체인은 전부 `overflow:hidden`이라 메모 리스트가 정확히 한 화면
+   높이에서 잘리고 스크롤 자체가 안 됨(스크롤바도, 휠도, 터치도 전부 무반응 — 실측:
+   `scrollHeight === clientHeight`). 그 래퍼로 감싸서 해결.
+3. **메모 등록(작성) 섹션 소실**: 같은 커밋으로 `useDedicatedCards` 경로가 되면서 legacyView의
+   `.memo-composer-card`("새로운 메모를 남겨보세요...")를 추출해서 보여주던 로직이 완전히
+   빠졌음(`slots: {}`). `extractMemoSlots(p.legacyView).composer`를 다시 뽑아 리스트 최상단에
+   렌더링하도록 복구.
+4. **장소 페이지 "전체/방문/예정" 필터 + 편집 버튼이 리스트와 함께 안 스크롤됨, 여백도 다름**:
+   `PlacesScreen`이 `slots.toolbar`를 스크롤 컨테이너(`.v2-dest-body`) 밖, 헤더 아래 고정 위치에
+   렌더링하고 있었음. 스크롤 컨테이너 안, 리스트 바로 위로 이동시켜 리스트와 함께 스크롤되도록
+   수정(좌우 여백은 `.places-list-toolbar`/`.places-list-body`가 이미 같은 12px 패딩을 쓰고
+   있어서 위치만 옮기면 자동으로 맞춰짐).
+5. **모바일에서 헤더 더보기(≡) 버튼이 사이드메뉴를 안 엶**: `aurora-theme.css`의 오프캔버스
+   드로어(열기/닫기 transform, 백드롭, 닫기 버튼)가 `@media (min-width: 768px) and (max-width:
+   1200px)`(태블릿 전용)로만 걸려 있었고, `<768px`(진짜 모바일)는 별도 "Mobile: no rail" 블록이
+   `.bp-side-nav { display: none }`을 무조건 적용해서 드로어 자체가 렌더링될 수 없었음 — 이번
+   세션 이전부터 있던 버그로 보이며, 오늘 앞서 추가된 모바일 퀵네비(채팅/정산/메모/갤러리)가
+   바로 이 문제의 우회책이었던 것으로 보임. 드로어 조건을 `@media (max-width: 1200px)`로 넓히고
+   `display:none`을 제거해 모바일에도 태블릿과 동일한 동작하는 드로어를 적용.
+
+검증: 5건 전부 Playwright 헤드리스(390×844 등)로 실제 동작 확인(가짜 데이터 주입 포함) —
+드로어 열림(`nav` bounding box가 화면 안으로 들어옴), 메모 스크롤(`scrollTop` 실제 이동),
+메모 작성 섹션 텍스트 렌더링, 장소 툴바가 스크롤에 딸려 화면 밖으로 이동. `npm run lint`,
+`npm run check:all`, `npm run safety:test`, `npm run regression:test` 전부 통과.
+
+## 2026-09-18 16:34 KST
+
+- 사용자 피드백(스크린샷 2장) 반영: 모바일 히어로 카드가 여전히 둥근 모서리로 보이는 원인을
+  찾음 — `border-radius`는 이미 다른 곳의 `!important` 규칙(0)이 이기고 있었지만,
+  `aurora-theme.css`의 모바일 성능/컨테인먼트 가드가 독립적으로 `clip-path: inset(0 round 16px)`
+  를 걸어놔서 실제 렌더링은 계속 16px 라운드로 보이고 있었다(진짜 원인은 border-radius 충돌이
+  아니라 clip-path). `clip-path: inset(0)`로 수정하고, 같은 값(`border-radius:0`)을 중복
+  선언하던 또 다른 죽은 규칙도 제거.
+- 모바일(<768px, 사이드메뉴 없는 화면) 전용 "채팅 정산 메모 갤러리" 퀵네비 아이콘 행을 히어로
+  헤더와 D-day 배지 사이에 추가(`HeroQuickNav`, `ui-app-shell-v2.js`). 사이드 레일이 있는
+  ≥768px에서는 `.bp-hero-quick-nav { display: none }`로 완전히 숨김(같은 목적지를 두 번
+  노출하지 않음). 정산 아이콘에는 기존 사이드메뉴와 동일한 `settlementBalanceBadge`(예: "-32만")
+  뱃지를 재사용. 버튼은 기존 `.bp-icon-btn`(원형 글래스 버튼) 클래스를 그대로 재사용해 새 버튼
+  모양 CSS를 추가하지 않음.
+- 미디어쿼리 통폐합: 같은 파일 안에서 조건이 완전히 동일하고 그 사이에 공백/주석 외에 아무 것도
+  없는 인접 `@media` 블록만 안전하게 병합(design.css 2쌍/screens.css 4쌍/aurora-theme.css 5쌍,
+  총 11쌍). **1차 시도에서 정규식(`\s*(/\*.*?\*/\s*)*` + `fullmatch`)이 역추적(backtracking)
+  때문에 실제 CSS 규칙이 낀 비인접 블록까지 "공백/주석만 있음"으로 잘못 판정해 `.bp-fab`
+  위치 규칙과 채팅 레거시 타이틀바 숨김 규칙(`display:none!important`)이 엉뚱하게
+  `@media(min-width:1200px)` 안에 갇히는 실제 회귀를 만들 뻔했다 — 커밋 전에 diff를 직접 읽다가
+  발견해서 전체 되돌리고, 역추적 없는 수동 스캐너로 다시 작성 후 재적용.**
+- 검증: 병합 전/후 컴파일된 `dist/assets/app-main-*.css`의 규칙(선택자+선언) 전체를 멀티셋으로
+  비교해 위 두 기능 변경(hero corner fix, quick-nav 5개 규칙)을 제외하면 단 한 규칙도 추가/제거/
+  변경되지 않았음을 확인(진짜 no-op). `npm run lint`, `npm run check:all`, `npm run safety:test`,
+  `npm run regression:test` 전부 통과. Playwright 헤드리스로 390×844(모바일: 정사각 모서리 +
+  퀵네비 확인)/820×1024/1440×900(PC: 퀵네비 숨김, 사이드 레일 유지 확인)에서 직접 스크린샷.
+- 남은 작업: 같은 파일 내에서 조건은 같지만 사이에 다른 선택자 규칙이 끼어있어 "인접"하지 않은
+  `@media` 블록들(더 많이 남아있음, 예: `design.css`의 흩어진 `min-width:1200px` 블록들)을
+  안전하게 재정렬해서 합치려면 각 블록 사이에 있는 모든 선택자를 대조해 순서를 바꿔도 캐스케이드
+  결과가 같은지 하나씩 증명해야 해서 이번 세션 범위 밖으로 남겨둠 — 리스크가 커서 별도 세션으로
+  넘기는 것을 권장.
+
+## 2026-09-18 15:58 KST
+
+- 전수조사 착수: v2 CSS(`design.css` 438 / `screens.css` 874 / `aurora-theme.css` 165 /
+  `chat-bubble-modules.css` 50 / `dest-layout.css` 25) + 레거시 `app.css` 1016개, 총 1500개+
+  `!important` 및 구버전/신버전 디자인 혼용 지점을 전수조사(사용자 요청). 원본(`?id=cw`, `shell=v2`
+  없는 URL)에 영향 주는 미스코프 v2 규칙은 없음을 확인(모든 v2 CSS 규칙이 `.v2-design`/`.bp-`/
+  `.renewal-shell` 아래로 스코프됨 — 스크립트로 전수 검증).
+- 첫 안전한 정리 커밋(`fix(v2): remove dead pre-v2-fs-token type-scale rules`): `design.css`에
+  같은 파일 안에서 이미 완전히 덮어써지는(정확히 같은 선택자·같은 이상의 importance로 후속
+  `--v2-fs-*` 토큰 블록이 재선언) "Gather type-scale remap" 구간(구 `--font-size-*` 토큰 기반,
+  #630/#634/#635 시절 잔재)을 삭제. 파이썬으로 선택자별 전체 occurrence를 비교해 (a) 완전히
+  가려지는 선언만, (b) importance가 later >= earlier인 경우만 추려서 골랐고, 컴파일된
+  `dist/assets/app-main-*.css`에서 삭제 전후 승자 선언 값이 완전히 동일함을 직접 확인함(시각
+  변화 없음, 순수 dead code 제거). `!important` 50개 제거(438→388).
+- 검증: `npm run lint`, `npm run check:all`(lint+test+isolation+design-rules+design-system+
+  architecture-budget 등 전체), `npm run safety:test`, `npm run regression:test`(build 포함)
+  전부 통과.
+- 남은 작업: 나머지 !important(레거시 컴포넌트 재사용으로 실제 필요한 것 다수 포함, 예:
+  `.comment-composer`/`.festival-bar-*`/`.renewal-records-overview` 등 app.css 클래스 재사용
+  케이스는 override를 위해 !important가 실제로 필요함) 및 `screens.css`/`aurora-theme.css`의
+  동일 패턴(같은 파일 내 완전 가려진 선언) 추가 조사가 남아 있음. PC/모바일 웨일·삼성인터넷
+  실기기 크로스브라우저 확인은 이 세션에서 불가(헤드리스 Chromium 근사만 가능) — 배포 후 사용자
+  직접 확인 필요.
+
+## 2026-09-18 16:xx KST (이어서)
+
+- 같은 방법론(파일 내 선택자별 occurrence 비교, importance가 later >= earlier인 완전 가려짐만
+  선별)을 `screens.css`/`aurora-theme.css`에도 적용해 2차 정리 커밋
+  (`fix(v2): remove same-file shadowed !important duplicates`).
+- 삭제한 8개 죽은 규칙: `.v2-chat-compose-tools`(2개 중복), `.participant-picker-button`(2개
+  중복), `.settlement-person-grid`, `.settlement-metric-card-value`, `.bp-memo-grid`(값까지
+  완전히 동일한 순수 복붙), `.v2-chat-message-content`(1200px 미디어쿼리 내 460px 잔재),
+  `.bp-hero-zone`(풀블리드 규칙 완전 중복), `.bp-side-nav-head`(collapsed 상태 완전 중복).
+  `screens.css` !important 라인 수 791→777, `aurora-theme.css` 164→162.
+- 컴파일된 `dist/assets/app-main-*.css`를 수정 전/후로 각각 빌드해 대상 선택자 8개 전부의 최종
+  승자 선언이 byte-identical함을 직접 diff로 확인(시각 변화 0).
+- 검증: `npm run lint`, `npm run check:all`, `npm run safety:test`, `npm run regression:test`
+  전부 통과.
+- 3차 커밋(`fix(v2): remove remaining shadowed !important duplicates in design.css`):
+  같은 파일 내 완전 가려짐 스크립트를 design.css에 재적용해 11개 추가 죽은 규칙 제거
+  (`.bp-day-bar-stack .bp-day-anniversary`(767px), `.bp-side-nav-collapse-btn`(2겹),
+  `.bp-attend-row-name`/`-note`, `.bp-day-num`(768/1200px 중복 2곳 + 베이스 1곳),
+  `.bp-side-nav`(1200px width), `.bp-day-cell`(1200px), `.v2-page-header .bp-header-title`).
+  `design.css` !important 388→374. 컴파일된 CSS diff로 제거된 라인 외에는 추가/변경 없음을 확인.
+- **미해결로 남긴 진짜 충돌 1건(문서화만, 수정 안 함)**: `aurora-theme.css`의
+  `@media (max-width: 767px)` 안에서 `.bp-hero-zone { border-radius: 16px !important; }`
+  (142번째 줄 부근, Chromium 모바일 리페인트 성능 때문에 의도적으로 라운드 유지)가, 같은
+  미디어쿼리 안의 또 다른 `.bp-hero-zone { border-radius: 0; }`(non-important, "full-bleed"
+  의도로 보임)를 항상 이긴다. 이건 단순 죽은 코드가 아니라 실제로 화면에 영향을 주는 진짜
+  충돌이라(모바일 히어로 카드가 지금 16px 라운드로 렌더링 중 — 0으로 바뀌어야 하는지는 디자인
+  의도 확인 필요) 이번 세션에서는 임의로 고치지 않고 기록만 남김. 다음 작업자가 실제 모바일
+  화면을 보고 의도를 확인한 뒤 결정할 것.
+
 ## 현재 상태 (2026-09-14 14:20 KST)
 
 - 진행 중: 없음 (최신 안정화 유닛 및 Pages 배포 완료)

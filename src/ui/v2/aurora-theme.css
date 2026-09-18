@@ -148,8 +148,11 @@
     overflow: hidden;
     isolation: isolate;
     contain: paint;
-    clip-path: inset(0 round 16px);
-    border-radius: 16px !important;
+    /* Square corners on mobile (no rounding) -- border-radius itself is the
+       single source of truth further down ("Final full-bleed hero rule",
+       border-radius: 0 !important); clip-path only needs to match that same
+       square shape for the containment fix below, not reintroduce rounding. */
+    clip-path: inset(0);
     background-size: auto, 100% 100% !important;
     background-position: 0 0, 50% 50% !important;
     animation: none !important;
@@ -171,15 +174,10 @@
 
 /* Full-bleed hero contract: whenever the side rail is absent (tablet and
  * mobile), the aurora card touches the viewport edges and has no rounded
- * corners. The PC rail layout (>=1201px) retains the card radius. */
-@media (max-width: 1200px) {
-  .v2-design .bp-hero-zone {
-    width: 100%;
-    margin-left: 0;
-    margin-right: 0;
-    border-radius: 0 !important;
-  }
-}
+ * corners. The PC rail layout (>=1201px) retains the card radius. Restated
+ * verbatim further down ("Final full-bleed hero rule for tablet/mobile") --
+ * an earlier byte-identical copy of that rule here was removed as dead
+ * weight (same selector, same media query, same importance: later wins). */
 
 /* Last cascade layer for the side rail coordinate contract. */
 @media (min-width: 768px) {
@@ -196,12 +194,12 @@
   .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item { width: 48px; margin-left: auto; margin-right: auto; padding: 10px 0; justify-content: center; }
   .v2-design .bp-side-nav-brand-icon, .v2-design .bp-side-nav-brand-icon svg { fill: none; stroke: currentColor; }
   .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-icon, .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-icon svg { color: #fff; fill: none; stroke: currentColor; }
-}
+
 
 /* The V2 shell can be mounted without the legacy .renewal-shell class. Keep
  * the coordinate contract on the V2 root itself so both mounted variants use
  * exactly the same y positions. */
-@media (min-width: 768px) {
+
   .v2-design .bp-side-nav { overflow-x: hidden; }
   .v2-design .bp-side-nav-head {
     height: 64px;
@@ -278,11 +276,11 @@
     fill: none !important;
     stroke: currentColor;
   }
-}
+
 
 /* Final rail motion/geometry overrides (kept last so legacy V2 rules cannot
  * reintroduce a vertical jump). */
-@media (min-width: 768px) {
+
   .renewal-shell.v2-design .bp-side-nav-head {
     position: relative;
     isolation: isolate;
@@ -448,13 +446,13 @@
     font-size: 0.68rem !important;
     font-weight: 800 !important;
   }
-}
+
 
 /* Side-nav coordinate contract: the collapsed rail is the vertical reference.
  * Both states use the same head/search/item heights and vertical rhythm; only
  * width, opacity and horizontal alignment are animated. This prevents the
  * expanded state from drifting downward while the rail opens. */
-@media (min-width: 768px) {
+
   .renewal-shell.v2-design .bp-side-nav {
     --v2-side-head-size: 64px;
     --v2-side-item-size: 42px;
@@ -548,11 +546,11 @@
     width: 18px !important;
     height: 18px !important;
   }
-}
+
 
 /* Side-nav motion contract: collapse changes only the horizontal rail width;
  * vertical metrics stay identical in both states. */
-@media (min-width: 768px) {
+
   .renewal-shell.v2-design .bp-side-nav {
     overflow-x: hidden;
     overscroll-behavior-x: none;
@@ -623,7 +621,15 @@
     display: none;
   }
 }
-@media (min-width: 768px) and (max-width: 1200px) {
+@media (max-width: 1200px) {
+  /* Off-canvas drawer for every width without a persistent rail (mobile AND
+   * tablet, <=1200px) -- was tablet-only (768-1200px); mobile (<768px) fell
+   * through to a hard "no rail" block further down that set .bp-side-nav to
+   * display:none unconditionally, so the header's 더보기 button opened a
+   * drawer that could never actually become visible on a phone. Widening
+   * this block's own condition to also cover <768px, and removing that
+   * conflicting display:none, gives mobile the exact same working drawer
+   * tablet already had. */
   .renewal-shell.v2-design {
     padding-left: 0;
   }
@@ -734,16 +740,11 @@
   .v2-design .v2-responsive-modal { animation: none; transition: none; }
 }
 
-/* Collapsed rail reference state + polished expand/collapse transitions. */
+/* Collapsed rail reference state + polished expand/collapse transitions.
+ * .bp-side-nav.bp-is-collapsed .bp-side-nav-head itself is fully restated
+ * further down (adds justify-content: center) with equal-or-greater
+ * importance, so a duplicate of it here was removed as dead weight. */
 @media (min-width: 768px) {
-  .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-head {
-    width: 64px;
-    height: 64px;
-    box-sizing: border-box;
-    padding: 12px 16px 12px !important;
-    background: linear-gradient(-45deg, #12cdf0 0%, #3604fd 42%, #8019e0 76%, #3604fd 100%) 0 0 / 300% 300%;
-    animation: bp-hero-mesh-shift 8.6s ease-in-out infinite;
-  }
   .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand {
     width: 40px;
     height: 40px;
@@ -1098,8 +1099,8 @@
     line-height: 1.15;
     text-align: center;
   }
-}
-@media (max-width: 767px) {
+
+
   .v2-design .bp-day-bar-stack .bp-day-anniversary-label {
     display: none !important;
   }
@@ -1209,22 +1210,20 @@
   .v2-design .bp-side-nav-close-btn { display: none; }
 }
 @media (max-width: 767px) {
-  /* Mobile: no rail; every home section is a vertical stack and the hero
-   * consumes the full available width. */
+  /* Mobile: no persistent rail; every home section is a vertical stack and
+   * the hero consumes the full available width. .bp-side-nav itself now
+   * stays an off-canvas drawer here too (see the widened <=1200px drawer
+   * block above) instead of display:none, so the header's 더보기 button
+   * has something to open. */
   .v2-design { padding-left: 0; }
-  .v2-design .bp-side-nav {
-    display: none;
-  }
   .v2-design .bp-bento-grid {
     grid-template-columns: minmax(0, 1fr);
     gap: 16px;
   }
-  .v2-design .bp-hero-zone {
-    width: 100%;
-    margin-left: 0;
-    margin-right: 0;
-    border-radius: 0;
-  }
+  /* .bp-hero-zone width/margin/border-radius: already covered by the "Final
+   * full-bleed hero rule" below (max-width: 1200px, which mobile also
+   * matches) with equal-or-greater importance -- removed the duplicate that
+   * used to be here. */
 }
 
 /* Final full-bleed hero rule for tablet/mobile. */
