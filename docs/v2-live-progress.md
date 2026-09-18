@@ -40,6 +40,20 @@
   승자 선언이 byte-identical함을 직접 diff로 확인(시각 변화 0).
 - 검증: `npm run lint`, `npm run check:all`, `npm run safety:test`, `npm run regression:test`
   전부 통과.
+- 3차 커밋(`fix(v2): remove remaining shadowed !important duplicates in design.css`):
+  같은 파일 내 완전 가려짐 스크립트를 design.css에 재적용해 11개 추가 죽은 규칙 제거
+  (`.bp-day-bar-stack .bp-day-anniversary`(767px), `.bp-side-nav-collapse-btn`(2겹),
+  `.bp-attend-row-name`/`-note`, `.bp-day-num`(768/1200px 중복 2곳 + 베이스 1곳),
+  `.bp-side-nav`(1200px width), `.bp-day-cell`(1200px), `.v2-page-header .bp-header-title`).
+  `design.css` !important 388→374. 컴파일된 CSS diff로 제거된 라인 외에는 추가/변경 없음을 확인.
+- **미해결로 남긴 진짜 충돌 1건(문서화만, 수정 안 함)**: `aurora-theme.css`의
+  `@media (max-width: 767px)` 안에서 `.bp-hero-zone { border-radius: 16px !important; }`
+  (142번째 줄 부근, Chromium 모바일 리페인트 성능 때문에 의도적으로 라운드 유지)가, 같은
+  미디어쿼리 안의 또 다른 `.bp-hero-zone { border-radius: 0; }`(non-important, "full-bleed"
+  의도로 보임)를 항상 이긴다. 이건 단순 죽은 코드가 아니라 실제로 화면에 영향을 주는 진짜
+  충돌이라(모바일 히어로 카드가 지금 16px 라운드로 렌더링 중 — 0으로 바뀌어야 하는지는 디자인
+  의도 확인 필요) 이번 세션에서는 임의로 고치지 않고 기록만 남김. 다음 작업자가 실제 모바일
+  화면을 보고 의도를 확인한 뒤 결정할 것.
 
 ## 현재 상태 (2026-09-14 14:20 KST)
 

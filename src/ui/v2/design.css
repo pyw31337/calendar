@@ -462,11 +462,9 @@
     color: var(--anniversary-color, var(--cal-anniversary)) !important;
   }
 }
-@media (max-width: 767px) {
-  .v2-design .bp-day-bar-stack .bp-day-anniversary {
-    background: var(--anniversary-color, var(--cal-anniversary)) !important;
-  }
-}
+/* mobile .bp-day-bar-stack .bp-day-anniversary background is redeclared
+ * further down (with an added narrow-layout text color) with equal
+ * importance, so a duplicate of it here was removed as dead weight. */
 
 /* NOTE: an earlier "Gather type-scale remap" pass lived here (home/bento chrome,
  * D-day/hero, chat/memo/place summary text on --font-size-* app.css tokens). Every
@@ -482,17 +480,17 @@
 .v2-design .bp-footer .bp-links,
 .v2-design .bp-renewal-home-footer-links { font-size: var(--font-size-2xs); }
 
-/* Side menu — rem sizes deferred; mock-parity px tokens at file end win on PC */
-.v2-design .bp-side-nav-collapse-btn { font-size: var(--font-size-sm) !important; }
+/* Side menu — rem sizes deferred; mock-parity px tokens at file end win on PC
+ * (.bp-side-nav-collapse-btn font-size itself is redeclared twice more below;
+ * removed the dead copy that used to sit here). */
 
-/* Date event sheet chrome */
+/* Date event sheet chrome (.bp-attend-row-name/-note font-size redeclared
+ * below with equal-or-greater importance; removed the dead copies here). */
 .v2-design .bp-sheet-title { font-size: 1.1rem; }
 .v2-design .bp-sheet-eyebrow { font-size: var(--font-size-2xs); }
 .v2-design .bp-sheet-meta-row { font-size: var(--font-size-sm); }
 .v2-design .bp-sheet-section-label { font-size: var(--font-size-xs); }
 .v2-design .bp-sheet-tab-item { font-size: var(--font-size-sm); }
-.v2-design .bp-attend-row-name { font-size: var(--font-size-md) !important; }
-.v2-design .bp-attend-row-note { font-size: var(--font-size-xs) !important; }
 
 /* Side-nav icons: explicit 18px (mock ~18–20); stroke stays 2 on 24 viewBox */
 .v2-design .bp-side-nav-item-icon svg,
@@ -513,12 +511,9 @@
 @media (min-width: 640px) {
   .v2-design .bp-day-num { font-size: 0.74rem !important; }
 }
-@media (min-width: 768px) {
-  .v2-design .bp-day-num { font-size: 0.78rem !important; }
-}
-@media (min-width: 1200px) {
-  .v2-design .bp-day-num { font-size: 0.86rem !important; }
-}
+/* .bp-day-num font-size at 768px/1200px is redeclared further down with
+ * equal-or-greater importance; removed the dead copies that used to be
+ * here (they never painted anything). */
 
 
 /* --------------------------------------------------------------------------
@@ -562,11 +557,9 @@
  * larger type hierarchy, today/anniversary day-cell fit.
  * -------------------------------------------------------------------------- */
 
-/* Side-nav width on desktop rail */
+/* Side-nav width on desktop rail (.bp-side-nav width redeclared further
+ * down with the same value; removed the dead duplicate that was here). */
 @media (min-width: 1200px) {
-  .v2-design .bp-side-nav {
-    width: var(--v2-side-nav-width, 280px) !important;
-  }
   .v2-design {
     padding-left: var(--v2-side-nav-width, 280px) !important;
   }
@@ -650,12 +643,9 @@
     gap: 2px !important;
   }
 }
-@media (min-width: 1200px) {
-  .v2-design .bp-day-cell {
-    min-height: 84px !important;
-    padding: 5px 3px 4px !important;
-  }
-}
+/* .bp-day-cell min-height/padding at 1200px is redeclared further down
+ * (adds gap + border-radius) with equal-or-greater importance; removed the
+ * dead duplicate that was here. */
 
 /* Flex stack — never absolute-overlap bars (fixes day-20 pink-on-purple) */
 .v2-design .bp-day-bar-stack {
@@ -788,15 +778,12 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.v2-design .bp-day-num {
-  font-size: 0.72rem !important;
-  font-weight: 800 !important;
-}
+/* base .bp-day-num font-size/weight redeclared just below the --v2-fs-*
+ * token block with equal importance; removed the dead duplicate that was
+ * here. 1200px variant also redeclared further down (adds font-weight);
+ * only the 768px rule below has no later duplicate and stays. */
 @media (min-width: 768px) {
   .v2-design .bp-day-num { font-size: 0.78rem !important; }
-}
-@media (min-width: 1200px) {
-  .v2-design .bp-day-num { font-size: 0.86rem !important; }
 }
 
 /* Type scale: BentoPinkFinal mock denseness + ~5–10% only (NOT bloated #634/#635).
@@ -868,10 +855,10 @@
 .v2-design .bp-place-note,
 .v2-design .bp-place-tag { font-size: var(--v2-fs-2xs) !important; }
 
-/* Side-nav type: see mock-parity block (explicit px under .v2-design) */
-.v2-design .bp-side-nav-collapse-btn { font-size: var(--v2-fs-sm) !important; }
-
-.v2-design .v2-page-header .bp-header-title { font-size: var(--v2-fs-title) !important; }
+/* Side-nav type: see mock-parity block (explicit px under .v2-design) --
+ * both .bp-side-nav-collapse-btn and .bp-header-title font-size are
+ * redeclared further down with equal-or-greater importance; removed the
+ * dead duplicates that were here. */
 .v2-design .v2-page-header .bp-header-sub,
 .v2-design .v2-page-header .bp-header-count { font-size: var(--v2-fs-xs) !important; }
 .v2-design .bp-search-input { font-size: var(--v2-fs-md) !important; }
