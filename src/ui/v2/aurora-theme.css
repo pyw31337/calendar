@@ -363,7 +363,11 @@
     justify-content: center;
     gap: 0;
     border-radius: 10px;
-    background: var(--brand, #7c2fe5);
+    /* Use the same vivid aurora palette as the calendar hero card so the
+     * collapsed brand tile remains a true continuation of the main canvas. */
+    background: linear-gradient(-45deg, #12cdf0 0%, #3604fd 42%, #8019e0 76%, #3604fd 100%);
+    background-size: 300% 300%;
+    animation: bp-hero-mesh-shift 8.6s ease-in-out infinite;
     color: #fff;
   }
   .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-icon,
