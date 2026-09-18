@@ -1988,16 +1988,13 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       /* Tags */
       memo.tags && memo.tags.length > 0 && memo.tags.map(tag => /*#__PURE__*/React.createElement("span", {
         key: tag,
+        className: "v2-memo-tag",
         onClick: (e) => {
           e.stopPropagation();
           onSelectTag(tag);
         },
         style: {
-          fontSize: 'var(--font-size-xs)', fontWeight: '600',
-          color: '#2563EB', backgroundColor: 'rgba(37, 99, 235, 0.08)',
-          padding: '3px 8px', borderRadius: '4px',
-          cursor: 'pointer', lineHeight: 1,
-          whiteSpace: 'nowrap'
+          cursor: 'pointer', whiteSpace: 'nowrap'
         }
       }, highlightKeyword(tag, searchQuery))),
 

@@ -406,6 +406,18 @@
   gap: 5px !important;
   margin-top: 4px !important;
 }
+.v2-design .v2-memo-tag,
+.v2-memo .v2-memo-tag {
+  color: var(--brand, #7c2fe5);
+  background: none;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  font-size: .62rem;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
 .v2-design .v2-memo .bp-memo-grid {
   padding: 40px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
