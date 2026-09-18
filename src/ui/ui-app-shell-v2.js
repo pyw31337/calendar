@@ -1076,7 +1076,6 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
               React.createElement(NameColorPill, { className: 'v2-bubble-comment-author', name: shortParticipantName(participantFor(comment)?.name || '댓글'), color: participantFor(comment)?.color }),
               React.createElement('span', { className: 'v2-bubble-comment-text' }, String(comment.text || '').slice(0, 90))
             )),
-            memoComments.length > 0 ? React.createElement('span', { className: 'v2-bubble-comment-count' }, `댓글 ${memoComments.length}개`) : null
           ) : null,
           React.createElement('div', { className: 'v2-bubble-comment-footer' },
             React.createElement('span', { className: 'v2-bubble-comment-count' }, `댓글 ${memoComments.length}개`),
