@@ -312,6 +312,29 @@
   cursor: not-allowed;
 }
 
+/* The full V2 memo page uses the same quiet count/action footer without changing V1. */
+.v2-design .v2-memo .memo-card-comment-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  color: #9793a3;
+  font-size: .62rem;
+  font-weight: 500;
+}
+.v2-design .v2-memo .memo-card-comment-count { margin-right: auto; color: #9793a3; font-weight: 500; }
+.v2-design .v2-memo .memo-card-comment-footer .memo-card-comment-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 0;
+  padding: 3px 2px;
+  color: var(--brand);
+  font-size: .68rem;
+  font-weight: 700;
+}
+
 /* Memo screen cards wrapped as chat bubbles */
 .v2-memo .v2-memo-card-wrap.v2-bubble-frame {
   display: flex;
