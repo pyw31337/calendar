@@ -272,6 +272,86 @@
   }
 }
 
+/* Responsive shell contract:
+ * - 1201px+: persistent PC rail and four-card lower matrix.
+ * - 768–1200px: no persistent rail; use the header menu drawer and a
+ *   full-bleed hero, with calendar on one row and summaries in two columns.
+ * - <=419px: edge-to-edge, square section surfaces. */
+@media (min-width: 1201px) {
+  .renewal-shell.v2-design {
+    padding-left: 280px;
+  }
+  .renewal-shell.v2-design .bp-side-nav {
+    display: flex;
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: 280px;
+    transform: none;
+  }
+  .renewal-shell.v2-design .bp-side-nav-toggle-btn,
+  .renewal-shell.v2-design .bp-side-nav-backdrop,
+  .renewal-shell.v2-design .bp-side-nav-close-btn {
+    display: none;
+  }
+}
+@media (min-width: 768px) and (max-width: 1200px) {
+  .renewal-shell.v2-design {
+    padding-left: 0;
+  }
+  .renewal-shell.v2-design .bp-app-shell.is-bento-home {
+    width: 100%;
+    max-width: none;
+    padding: 0;
+  }
+  .renewal-shell.v2-design .bp-side-nav {
+    display: flex;
+    position: fixed;
+    inset: 0 0 0 auto;
+    width: 274px;
+    transform: translateX(100%);
+    z-index: 150;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-open {
+    transform: translateX(0);
+  }
+  .renewal-shell.v2-design .bp-side-nav-toggle-btn {
+    display: inline-flex;
+  }
+  .renewal-shell.v2-design .bp-side-nav-close-btn {
+    display: inline-flex;
+  }
+  .renewal-shell.v2-design .bp-side-nav-backdrop {
+    display: block;
+  }
+  .renewal-shell.v2-design .bp-hero-zone {
+    width: 100%;
+    margin: 0;
+    border-radius: 0;
+  }
+  .renewal-shell.v2-design .bp-bento-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .renewal-shell.v2-design .bp-bento-grid > .bp-renewal-home-summary-section:first-child {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 419px) {
+  .renewal-shell.v2-design .bp-app-shell.is-bento-home {
+    width: 100%;
+    max-width: none;
+    padding: 0;
+  }
+  .renewal-shell.v2-design .bp-hero-zone,
+  .renewal-shell.v2-design .bp-bento-card,
+  .renewal-shell.v2-design .bp-renewal-home-summary-section {
+    border-radius: 0;
+  }
+  .renewal-shell.v2-design .bp-bento-grid {
+    width: 100%;
+    gap: 0;
+  }
+}
+
 /* Collapsed rail reference state + polished expand/collapse transitions. */
 @media (min-width: 768px) {
   .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-head {
