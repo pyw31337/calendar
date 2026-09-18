@@ -62,4 +62,45 @@
       .v2-memo .bp-app-shell { max-width: 1080px; padding: 0 20px; }
       .v2-memo .bp-memo-grid { grid-template-columns: 1fr 1fr 1fr; }
     }
+
+    /* Keep the full memo page on the same visual contract as the home memo section.
+       This is intentionally last: the legacy MemoView still carries older inline/layout
+       classes, while the home card is the source of truth for the shared presentation. */
+    .v2-memo .v2-memo-legacy,
+    .v2-memo .v2-memo-body { background: var(--bg-primary); }
+    .v2-memo .v2-memo-legacy { padding: 14px; }
+    .v2-memo .v2-memo-legacy > * { max-width: 520px; margin-left: auto; margin-right: auto; }
+    .v2-memo .v2-memo-legacy .memo-card-hover,
+    .v2-memo .v2-memo-card-wrap .memo-card-hover,
+    .v2-memo .v2-memo-card-wrap .v2-memo-card-contract {
+      background: #fff !important;
+      border: 1px solid #1e1b2e0f !important;
+      border-left: 1px solid #1e1b2e0f !important;
+      border-radius: 14px !important;
+      box-shadow: 1px 1px 4px #1e1b2e12 !important;
+      padding: 14px 16px !important;
+    }
+    .v2-memo .v2-memo-legacy .memo-card-hover > .memo-card-share-btn,
+    .v2-memo .v2-memo-legacy .memo-card-hover > .memo-card-pin-btn { top: 12px; }
+    .v2-memo .v2-memo-legacy .memo-card-hover .v2-memo-card-title,
+    .v2-memo .v2-memo-card-wrap .v2-memo-card-title { font-size: 1rem !important; line-height: 1.25 !important; }
+    .v2-memo .v2-memo-legacy .memo-card-hover .v2-memo-card-meta,
+    .v2-memo .v2-memo-card-wrap .v2-memo-card-meta {
+      display: block; margin-bottom: 9px; padding-bottom: 8px;
+      border-bottom: 1px solid #1e1b2e0f; color: #8a8798;
+      font-size: .62rem; font-weight: 600; line-height: 1.2;
+    }
+    .v2-memo .v2-memo-legacy .memo-card-hover .v2-memo-card-body,
+    .v2-memo .v2-memo-card-wrap .v2-memo-card-body {
+      color: var(--text-muted) !important; font-size: .76rem !important; line-height: 1.5 !important;
+    }
+    .v2-memo .v2-memo-legacy .memo-card-hover .v2-memo-card-comments > div,
+    .v2-memo .v2-memo-card-wrap .v2-memo-card-comments > div {
+      background: var(--brand-soft); border-radius: 10px; padding: 7px 10px;
+    }
+    .v2-memo .v2-memo-legacy .memo-composer-card { max-width: 520px; }
+    @media (min-width: 768px) {
+      .v2-memo .v2-memo-legacy { padding: 20px; }
+      .v2-memo .v2-memo-legacy > * { max-width: 720px; }
+    }
   
