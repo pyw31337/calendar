@@ -2502,6 +2502,11 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   const React = window.React;
   const [activeTab, setActiveTabState] = React.useState(readTabFromLocation);
   const [recordsSubTab, setRecordsSubTabState] = React.useState(readRecordsSubTabFromLocation);
+  // CalendarApp normally owns a single Lightbox host after its view switch. The V2 shell
+  // returns before that host, so use one local host and route every V2 feature tree to it.
+  // This keeps the existing Lightbox component/behaviour instead of maintaining another popup.
+  const [activeV2Lightbox, setActiveV2Lightbox] = React.useState(null);
+  const openV2Lightbox = React.useCallback(payload => setActiveV2Lightbox(payload || null), []);
   const [selectedMoreItem, setSelectedMoreItem] = React.useState(null);
   const [isSideNavOpen, setIsSideNavOpen] = React.useState(false);
   const [isSideNavCollapsed, setIsSideNavCollapsed] = React.useState(false);
@@ -2542,6 +2547,30 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   // Prefer the canonical title so the renewal shell reflects the active calendar identity
   // (e.g. cw → 모아엘가) instead of silently falling back to the generic brand.
   const calendarName = calendar?.title || calendar?.name || null;
+  const v2RecordsContext = {
+    ...recordsContext,
+    mediaProps: { ...recordsContext?.mediaProps, setActiveLightbox: openV2Lightbox },
+    memoProps: { ...recordsContext?.memoProps, setActiveLightbox: openV2Lightbox },
+    historyProps: { ...recordsContext?.historyProps, setActiveLightbox: openV2Lightbox },
+  };
+  const v2CalendarContext = {
+    ...calendarContext,
+    setActiveLightbox: openV2Lightbox,
+    dateModalProps: { ...calendarContext?.dateModalProps, setActiveLightbox: openV2Lightbox },
+  };
+  const v2ChatContext = {
+    ...chatContext,
+    chatRoomProps: { ...chatContext?.chatRoomProps, setActiveLightbox: openV2Lightbox },
+  };
+  const v2MoreContext = {
+    ...moreContext,
+    setActiveLightbox: openV2Lightbox,
+    modalProps: {
+      ...moreContext?.modalProps,
+      anniversaries: { ...moreContext?.modalProps?.anniversaries, setActiveLightbox: openV2Lightbox },
+    },
+  };
+  const V2Lightbox = bindUiComponentAliases(React).Lightbox;
 
   // Shared by the 더보기 list AND any other pane (e.g. ChatPane's "앱 설정" entry) that needs to
   // open one of the 4 real 더보기 modals directly, without going through the 더보기 tab's own list.
@@ -2624,10 +2653,10 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
       onChangeView('chat');
       setTimeout(() => {
         const msg = (moreContext.chatMessages || []).find(m => m.id === messageId);
-        if (!msg || typeof moreContext.setActiveLightbox !== 'function') return;
+        if (!msg) return;
         const directEntry = getMessageDirectMediaEntry(msg);
         const entries = directMediaUrl && directEntry ? [directEntry] : getMessageImageEntries(msg);
-        moreContext.setActiveLightbox({
+        openV2Lightbox({
           urls: entries.map(e => e.full),
           meta: entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, directMediaUrl: e.directMediaUrl, source: e.source, uploadSource: e.uploadSource, assetKey: e.assetKey, mediaKey: e.mediaKey, refKey: e.refKey })),
           index: directMediaUrl ? 0 : imageIndex,
@@ -2655,10 +2684,10 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
     onChangeView('chat');
     setTimeout(() => {
       const msg = (moreContext.chatMessages || []).find(m => m.id === messageId);
-      if (!msg || typeof moreContext.setActiveLightbox !== 'function') return;
+      if (!msg) return;
       const directEntry = getMessageDirectMediaEntry(msg);
       const entries = directMediaUrl && directEntry ? [directEntry] : getMessageImageEntries(msg);
-      moreContext.setActiveLightbox({
+      openV2Lightbox({
         urls: entries.map(e => e.full),
         meta: entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, directMediaUrl: e.directMediaUrl, source: e.source, uploadSource: e.uploadSource, assetKey: e.assetKey, mediaKey: e.mediaKey, refKey: e.refKey })),
         index: directMediaUrl ? 0 : imageIndex,
@@ -2915,25 +2944,25 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
       React.createElement('main', { className: activeTab === 'calendar' ? 'bp-app-shell is-bento-home' : `renewal-shell-main v2-destination ${hasFullScreen ? `v2-${activeTab}` : (activeTab === 'records' ? `is-records v2-records-${recordsSubTab}` : `is-${activeTab}`)}` },
 
         activeTab === 'calendar'
-          ? React.createElement(CalendarPane, { calendarContext, recordsContext, onOpenDate: setDateModalDate, onChangeView, calendarName, onOpenSearch: () => setActiveTab('search'), onOpenMore: () => setIsSideNavOpen(true), settlementBalanceBadge })
+          ? React.createElement(CalendarPane, { calendarContext: v2CalendarContext, recordsContext: v2RecordsContext, onOpenDate: setDateModalDate, onChangeView, calendarName, onOpenSearch: () => setActiveTab('search'), onOpenMore: () => setIsSideNavOpen(true), settlementBalanceBadge })
           : activeTab === 'search'
           ? React.createElement(SearchPage, { modalProps: moreContext.modalProps.search, searchExtra, onClose: () => setActiveTab('calendar') })
           : activeTab === 'chat'
-          ? React.createElement(ChatPane, { chatContext, onChangeView, onOpenAppSettings, onOpenSideNav: () => setIsSideNavOpen(true), onRegisterMenuActions: getMenuActionsRegistrar('chat') })
+          ? React.createElement(ChatPane, { chatContext: v2ChatContext, onChangeView, onOpenAppSettings, onOpenSideNav: () => setIsSideNavOpen(true), onRegisterMenuActions: getMenuActionsRegistrar('chat') })
           : activeTab === 'memo'
-          ? React.createElement(MemoPane, { recordsContext, onChangeView, onOpenAppSettings, onOpenSideNav: () => setIsSideNavOpen(true), onRegisterMenuActions: getMenuActionsRegistrar('memo') })
+          ? React.createElement(MemoPane, { recordsContext: v2RecordsContext, onChangeView, onOpenAppSettings, onOpenSideNav: () => setIsSideNavOpen(true), onRegisterMenuActions: getMenuActionsRegistrar('memo') })
           : activeTab === 'places'
-          ? React.createElement(PlacesPane, { recordsContext, calendarContext, onChangeView, onOpenAppSettings, onOpenSideNav: () => setIsSideNavOpen(true), onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource, onRegisterMenuActions: getMenuActionsRegistrar('places') })
+          ? React.createElement(PlacesPane, { recordsContext: v2RecordsContext, calendarContext: v2CalendarContext, onChangeView, onOpenAppSettings, onOpenSideNav: () => setIsSideNavOpen(true), onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource, onRegisterMenuActions: getMenuActionsRegistrar('places') })
           : activeTab === 'settlement'
           ? React.createElement(SettlementPane, { settlementContext, onChangeView, onOpenAppSettings, onOpenDate: setDateModalDate, onOpenSideNav: () => setIsSideNavOpen(true), onRegisterMenuActions: getMenuActionsRegistrar('settlement') })
           : activeTab === 'records'
-          ? React.createElement(RecordsPane, { subTab: recordsSubTab, onSelectSubTab: setRecordsSubTab, calendarName, recordsContext, calendarContext, onChangeView, onOpenAppSettings, onOpenSideNav: () => setIsSideNavOpen(true), onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource, onRegisterMenuActions: getMenuActionsRegistrar(recordsSubTab === 'media' ? 'gallery' : recordsSubTab === 'archive' ? 'archive' : recordsSubTab) })
+          ? React.createElement(RecordsPane, { subTab: recordsSubTab, onSelectSubTab: setRecordsSubTab, calendarName, recordsContext: v2RecordsContext, calendarContext: v2CalendarContext, onChangeView, onOpenAppSettings, onOpenSideNav: () => setIsSideNavOpen(true), onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource, onRegisterMenuActions: getMenuActionsRegistrar(recordsSubTab === 'media' ? 'gallery' : recordsSubTab === 'archive' ? 'archive' : recordsSubTab) })
           : activeTab === 'more'
           ? React.createElement(MorePane, { calendarName, selectedItem: selectedMoreItem, onSelectItem: handleSelectMoreItem, onOpenSideNav: () => setIsSideNavOpen(true) })
           : React.createElement(PlaceholderPane, { tabId: activeTab, calendarName }),
 
         dateModalDate && React.createElement(SharedDateModal, {
-          calendarContext, dateModalDate, initialTab: activeTab === 'settlement' ? 'settlement' : null,
+          calendarContext: v2CalendarContext, dateModalDate, initialTab: activeTab === 'settlement' ? 'settlement' : null,
           onClose: () => setDateModalDate(null),
           onSelectDate: setDateModalDate,
           onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource,
@@ -2942,10 +2971,33 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
     ),
     React.createElement(MoreModalsHost, {
       openModal: openMoreModal, onClose: () => setOpenMoreModal(null),
-      modalProps: moreContext.modalProps, anniversaryOverride, calendarSettingsExtra, searchExtra,
+      modalProps: v2MoreContext.modalProps, anniversaryOverride, calendarSettingsExtra, searchExtra,
+    }),
+    activeV2Lightbox && React.createElement(V2Lightbox, {
+      urls: activeV2Lightbox.urls,
+      index: activeV2Lightbox.index,
+      meta: activeV2Lightbox.meta,
+      calendar: calendar || v2RecordsContext.calendar,
+      onClose: () => setActiveV2Lightbox(null),
+      onNavigate: index => setActiveV2Lightbox(current => current ? { ...current, index } : current),
+      showToast: v2RecordsContext.showToast,
+      onPromoteImageUrl: v2RecordsContext.historyProps?.onPromoteImageUrl,
+      onSaveImageTags: v2RecordsContext.historyProps?.onSaveImageTags,
+      onSearchTag: v2RecordsContext.historyProps?.onSearchTag,
+      onDeletePhoto: v2RecordsContext.historyProps?.onDeletePhoto,
+      onReplacePhoto: v2RecordsContext.historyProps?.onReplacePhoto,
+      onJumpToChatMessage: v2RecordsContext.historyProps?.onJumpToChatMessage,
+      onJumpToMemo: v2RecordsContext.historyProps?.onJumpToMemo,
+      onJumpToMeetingDate: v2RecordsContext.historyProps?.onJumpToMeetingDate,
+      onJumpToGallery: () => { setActiveTab('records'); setRecordsSubTab('media'); },
+      onGetChatMessageOrdinal: v2RecordsContext.historyProps?.onGetChatMessageOrdinal,
+      onGetGalleryPhotoOrdinal: v2RecordsContext.historyProps?.onGetGalleryPhotoOrdinal,
+      onRequestConfirm: v2RecordsContext.historyProps?.onRequestConfirm,
+      onFetchPhotoComments: v2RecordsContext.historyProps?.onFetchPhotoComments,
+      onSavePhotoComments: v2RecordsContext.historyProps?.onSavePhotoComments,
     }),
     calendarSettingsDateModalDate && React.createElement(bindUiComponentAliases(React).DateModal, {
-      ...calendarContext.dateModalProps,
+      ...v2CalendarContext.dateModalProps,
       dateStr: calendarSettingsDateModalDate,
       initialTab: null,
       onClose: () => setCalendarSettingsDateModalDate(null),
@@ -2955,7 +3007,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
       onFocusCultureSource,
     }),
     moreDateModalDate && React.createElement(SearchDateModal, {
-      calendarContext, dateStr: moreDateModalDate,
+      calendarContext: v2CalendarContext, dateStr: moreDateModalDate,
       onClose: () => setMoreDateModalDate(null),
       onEditAnniversary, onAddAnniversaryForDate: (d) => { setMoreDateModalDate(null); onAddAnniversaryForDate(d); },
       onFocusCultureSource,

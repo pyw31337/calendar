@@ -16,13 +16,13 @@
    * flush against the device edge on real phones — widened so every dest page keeps genuine
    * breathing room on all four sides without giving back the flush shell/header baseline above. */
   --v2-dest-content-pad-x: 20px;
-  --v2-dest-content-pad-y: 14px;
+  --v2-dest-content-pad-y: 20px;
 }
 
 @media (min-width: 768px) {
   .v2-design {
-    --v2-dest-content-pad-x: 28px;
-    --v2-dest-content-pad-y: 18px;
+    --v2-dest-content-pad-x: 40px;
+    --v2-dest-content-pad-y: 40px;
   }
 }
 
@@ -92,6 +92,73 @@
   padding-left: var(--v2-dest-content-pad-x);
   padding-right: var(--v2-dest-content-pad-x);
   box-sizing: border-box;
+}
+
+/*
+ * V2 destination layout contract
+ * ------------------------------
+ * Legacy feature views are deliberately kept intact for behaviour. This final, scoped
+ * layer owns only their frame so no destination inherits a page-specific gutter, viewport
+ * box, or clipped scroll chain from an old screen. 40 / 20 is the common body rhythm.
+ */
+.v2-design .renewal-shell-main.v2-destination,
+.v2-design .renewal-shell-main.is-records {
+  min-width: 0 !important;
+  min-height: 100dvh !important;
+  background: #fafafc !important;
+}
+
+.v2-design .v2-dest-page .v2-dest-body,
+.v2-design .v2-dest-page .v2-legacy-body > .memo-view-body,
+.v2-design .v2-dest-page .v2-legacy-body > .places-list-body,
+.v2-design .v2-dest-page .v2-legacy-body > .settlement-page-body,
+.v2-design .v2-dest-page .gallery-page-scroll,
+.v2-design .v2-dest-page .history-page-scroll {
+  padding-left: var(--v2-dest-content-pad-x) !important;
+  padding-right: var(--v2-dest-content-pad-x) !important;
+  box-sizing: border-box !important;
+}
+
+/* Filter/register/edit controls belong to the scrollable body, never sticky header chrome. */
+.v2-design .v2-dest-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  padding: var(--v2-dest-content-pad-y) var(--v2-dest-content-pad-x) 10px !important;
+  box-sizing: border-box;
+}
+
+/* Keep feature bodies independently scrollable inside the viewport-bound destination pane. */
+.v2-design .v2-dest-page .v2-dest-body,
+.v2-design .v2-dest-page .v2-legacy-body,
+.v2-design .v2-dest-page .gallery-page-scroll,
+.v2-design .v2-dest-page .history-page-scroll {
+  min-height: 0 !important;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Legacy controls remain in document flow under the shared header. */
+.v2-design .v2-wrap-legacy .places-list-toolbar,
+.v2-design .v2-wrap-legacy .places-category-sticky-tabs,
+.v2-design .v2-wrap-legacy .memo-view-composer,
+.v2-design .v2-wrap-legacy .memo-composer-card,
+.v2-design .v2-wrap-legacy .settlement-page-actions {
+  position: relative !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+/* Places keeps its own toolbar and category strip outside the list body. They are body
+   controls too, so they must use the same 40 / 20 gutter instead of legacy 12px padding. */
+.v2-design .v2-wrap-legacy .places-list-toolbar,
+.v2-design .v2-wrap-legacy .places-category-sticky-tabs {
+  padding-left: var(--v2-dest-content-pad-x) !important;
+  padding-right: var(--v2-dest-content-pad-x) !important;
 }
 
 

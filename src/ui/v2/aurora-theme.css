@@ -1272,3 +1272,23 @@
     height: 26px !important;
   }
 }
+
+/* Must be last: reference-home.css contains a 560–767px floating-card rule.
+   The V2 mobile hero owns the viewport edge at every phone width. */
+@media (max-width: 767px) {
+  .renewal-shell.v2-design,
+  .renewal-shell.v2-design > .bp-app-shell.is-bento-home,
+  .renewal-shell.v2-design .bp-app-shell.is-bento-home {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .renewal-shell.v2-design .bp-hero-zone {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    clip-path: none !important;
+  }
+}

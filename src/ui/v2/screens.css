@@ -1151,7 +1151,7 @@
   color: #1e1b2e !important;
 }
 .v2-design .v2-places .places-list-toolbar {
-  padding: 8px 12px !important;
+  padding: 8px var(--v2-dest-content-pad-x) !important;
   gap: 6px !important;
 }
 /* Unit 1: single create surface — hide legacy toolbar + when V2 FAB is present */
@@ -1164,6 +1164,12 @@
   padding: 0 !important;
   border-bottom: none !important;
   gap: 4px !important;
+}
+/* Preserve the component's vertical reset while the V2 shell supplies the shared side gutter. */
+.v2-design .v2-places .places-category-sticky-tabs,
+.v2-design .v2-places-legacy .places-category-sticky-tabs {
+  padding-left: var(--v2-dest-content-pad-x) !important;
+  padding-right: var(--v2-dest-content-pad-x) !important;
 }
 
 /* ========== Content + Archive Bento page chrome (loop7) ========== */
@@ -2252,4 +2258,21 @@
   .v2-design .v2-memo .bp-memo-grid {
     grid-template-columns: minmax(0, 1fr) !important;
   }
+}
+
+/* Places uses the intact V1 view for Leaflet lifecycle safety. Its root is therefore the
+   scroll owner in V2 (rather than a synthetic extracted list slot). Without this, the root
+   retained `overflow:hidden` at pane height and every card below the first viewport existed
+   but was unreachable. */
+.v2-design .v2-places.v2-wrap-legacy .v2-places-legacy {
+  height: 100% !important;
+  min-height: 0 !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.v2-design .v2-places.v2-wrap-legacy .places-list-body {
+  min-height: min-content !important;
+  padding-bottom: 96px !important;
 }

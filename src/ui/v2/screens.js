@@ -529,23 +529,25 @@ export function PlacesScreen(p) {
           value: p.searchQuery,
           onChange: p.onSearch,
           placeholder: '장소 검색',
-        }),
-        h(
-          'div',
-          { className: 'bp-cat-filter-row', 'aria-label': '장소 분류' },
-          [{ id: 'all', name: '전체', color: '#1e1b2e' }, ...(p.categories || [])].map(category =>
-            h(
-              'button',
-              {
-                type: 'button',
-                key: category.id,
-                className: `bp-cat-chip${p.categoryFilter === category.id ? ' bp-is-selected' : ''}`,
-                'aria-pressed': p.categoryFilter === category.id,
-                onClick: () => p.onCategory(category.id),
-                style: { color: category.color || '#6b6580' },
-              },
-              category.name
-            )
+        })
+      ),
+      // Filters are body content. They share the page gutter and scroll with the list;
+      // the header itself remains only the back/action chrome.
+      h(
+        'div',
+        { className: 'v2-dest-controls bp-cat-filter-row', 'aria-label': '장소 분류' },
+        [{ id: 'all', name: '전체', color: '#1e1b2e' }, ...(p.categories || [])].map(category =>
+          h(
+            'button',
+            {
+              type: 'button',
+              key: category.id,
+              className: `bp-cat-chip${p.categoryFilter === category.id ? ' bp-is-selected' : ''}`,
+              'aria-pressed': p.categoryFilter === category.id,
+              onClick: () => p.onCategory(category.id),
+              style: { color: category.color || '#6b6580' },
+            },
+            category.name
           )
         )
       ),

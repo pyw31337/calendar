@@ -388,6 +388,13 @@
  *   .meme-preview-overlay / .meme-preview-modal -- full-screen image preview, own sizing */
 @media (max-width: 767px) {
   .v2-design .modal-overlay:not(.bp-sheet-backdrop):not(.meme-preview-overlay) {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    margin: 0 !important;
+    transform: none !important;
     align-items: flex-end !important;
     padding: 0 !important;
   }
@@ -397,6 +404,36 @@
     max-width: none !important;
     border-radius: 20px 20px 0 0 !important;
     margin: 0 !important;
+  }
+}
+
+/* Portal-backed overlays can open while a destination pane is scrolled or transformed.
+   Always anchor the backdrop to the viewport, not the pane, so desktop centres and mobile
+   spans the full visual width. */
+.renewal-shell.v2-design ~ .modal-overlay,
+.renewal-shell.v2-design .modal-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  margin: 0 !important;
+  transform: none !important;
+  box-sizing: border-box !important;
+  justify-content: center !important;
+}
+@media (min-width: 768px) {
+  .renewal-shell.v2-design .modal-overlay,
+  .renewal-shell.v2-design ~ .modal-overlay {
+    align-items: center !important;
+    padding: 24px !important;
+  }
+}
+@media (max-width: 767px) {
+  .renewal-shell.v2-design .modal-overlay,
+  .renewal-shell.v2-design ~ .modal-overlay {
+    align-items: flex-end !important;
+    padding: 0 !important;
   }
 }
 .v2-design .bp-event-sheet.modal-container {
