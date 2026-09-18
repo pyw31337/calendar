@@ -621,7 +621,15 @@
     display: none;
   }
 }
-@media (min-width: 768px) and (max-width: 1200px) {
+@media (max-width: 1200px) {
+  /* Off-canvas drawer for every width without a persistent rail (mobile AND
+   * tablet, <=1200px) -- was tablet-only (768-1200px); mobile (<768px) fell
+   * through to a hard "no rail" block further down that set .bp-side-nav to
+   * display:none unconditionally, so the header's 더보기 button opened a
+   * drawer that could never actually become visible on a phone. Widening
+   * this block's own condition to also cover <768px, and removing that
+   * conflicting display:none, gives mobile the exact same working drawer
+   * tablet already had. */
   .renewal-shell.v2-design {
     padding-left: 0;
   }
@@ -1202,12 +1210,12 @@
   .v2-design .bp-side-nav-close-btn { display: none; }
 }
 @media (max-width: 767px) {
-  /* Mobile: no rail; every home section is a vertical stack and the hero
-   * consumes the full available width. */
+  /* Mobile: no persistent rail; every home section is a vertical stack and
+   * the hero consumes the full available width. .bp-side-nav itself now
+   * stays an off-canvas drawer here too (see the widened <=1200px drawer
+   * block above) instead of display:none, so the header's 더보기 button
+   * has something to open. */
   .v2-design { padding-left: 0; }
-  .v2-design .bp-side-nav {
-    display: none;
-  }
   .v2-design .bp-bento-grid {
     grid-template-columns: minmax(0, 1fr);
     gap: 16px;

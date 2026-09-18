@@ -2,6 +2,43 @@
 
 이 문서는 V2 화면 리뉴얼의 진행 상태와 검증 결과를 누적 기록한다.
 
+## 2026-09-18 16:51 KST
+
+사용자 스크린샷 5건 기반 버그 리포트 5건 처리:
+
+1. **채팅 사이드메뉴 마지막 발신자 오표시**: `ui-app-shell-v2.js`의 `allChat` 기반 미리보기가
+   `ChatRoomView`의 실제 `visibleChatMessages` 필터(`uploadSource !== 'meeting'/'gallery'` —
+   모임 확정 사진은 채팅 메시지이지만 대화창엔 안 보임, docs §3.5/3.9)를 적용하지 않아, 채팅창엔
+   안 보이는 모임 사진 메시지가 실제 마지막 대화보다 나중 타임스탬프면 그 업로더가 미리보기에
+   뜨는 버그. 같은 필터를 추가해 수정.
+2. **메모 페이지 세로 스크롤 완전 불가**: 오늘 이른 세션의 커밋(`51523097 fix(v2): reuse home
+   memo card presentation on memo page`)이 `MemoScreen`을 `useDedicatedCards` 경로로 바꾸면서,
+   `screens.css`가 스크롤 가능하게 만드는 대상인 `.v2-dest-body`/`.v2-memo-body` 래퍼 클래스를
+   빠뜨렸다 — 나머지 flex 체인은 전부 `overflow:hidden`이라 메모 리스트가 정확히 한 화면
+   높이에서 잘리고 스크롤 자체가 안 됨(스크롤바도, 휠도, 터치도 전부 무반응 — 실측:
+   `scrollHeight === clientHeight`). 그 래퍼로 감싸서 해결.
+3. **메모 등록(작성) 섹션 소실**: 같은 커밋으로 `useDedicatedCards` 경로가 되면서 legacyView의
+   `.memo-composer-card`("새로운 메모를 남겨보세요...")를 추출해서 보여주던 로직이 완전히
+   빠졌음(`slots: {}`). `extractMemoSlots(p.legacyView).composer`를 다시 뽑아 리스트 최상단에
+   렌더링하도록 복구.
+4. **장소 페이지 "전체/방문/예정" 필터 + 편집 버튼이 리스트와 함께 안 스크롤됨, 여백도 다름**:
+   `PlacesScreen`이 `slots.toolbar`를 스크롤 컨테이너(`.v2-dest-body`) 밖, 헤더 아래 고정 위치에
+   렌더링하고 있었음. 스크롤 컨테이너 안, 리스트 바로 위로 이동시켜 리스트와 함께 스크롤되도록
+   수정(좌우 여백은 `.places-list-toolbar`/`.places-list-body`가 이미 같은 12px 패딩을 쓰고
+   있어서 위치만 옮기면 자동으로 맞춰짐).
+5. **모바일에서 헤더 더보기(≡) 버튼이 사이드메뉴를 안 엶**: `aurora-theme.css`의 오프캔버스
+   드로어(열기/닫기 transform, 백드롭, 닫기 버튼)가 `@media (min-width: 768px) and (max-width:
+   1200px)`(태블릿 전용)로만 걸려 있었고, `<768px`(진짜 모바일)는 별도 "Mobile: no rail" 블록이
+   `.bp-side-nav { display: none }`을 무조건 적용해서 드로어 자체가 렌더링될 수 없었음 — 이번
+   세션 이전부터 있던 버그로 보이며, 오늘 앞서 추가된 모바일 퀵네비(채팅/정산/메모/갤러리)가
+   바로 이 문제의 우회책이었던 것으로 보임. 드로어 조건을 `@media (max-width: 1200px)`로 넓히고
+   `display:none`을 제거해 모바일에도 태블릿과 동일한 동작하는 드로어를 적용.
+
+검증: 5건 전부 Playwright 헤드리스(390×844 등)로 실제 동작 확인(가짜 데이터 주입 포함) —
+드로어 열림(`nav` bounding box가 화면 안으로 들어옴), 메모 스크롤(`scrollTop` 실제 이동),
+메모 작성 섹션 텍스트 렌더링, 장소 툴바가 스크롤에 딸려 화면 밖으로 이동. `npm run lint`,
+`npm run check:all`, `npm run safety:test`, `npm run regression:test` 전부 통과.
+
 ## 2026-09-18 16:34 KST
 
 - 사용자 피드백(스크린샷 2장) 반영: 모바일 히어로 카드가 여전히 둥근 모서리로 보이는 원인을

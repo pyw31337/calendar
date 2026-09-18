@@ -2614,7 +2614,16 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   };
 
   const allChat = Array.isArray(calendarContext?.displayChatMessages) ? calendarContext.displayChatMessages : (recordsContext?.mediaProps?.chatMessages || []);
-  const recentChat = React.useMemo(() => latestRows(allChat), [allChat]);
+  // Match ChatRoomView's own visibleChatMessages filter (uploadSource meeting/gallery photos
+  // are stored as chat messages but never rendered in the chat transcript -- see docs section
+  // 3.5/3.9 "사진은 채팅 메시지와 이중 역할") -- otherwise this preview can pick a meeting/gallery
+  // photo as "last message" and show its uploader here while the chat screen itself is still
+  // showing an earlier, unrelated text message as the true last visible line.
+  const visibleChat = React.useMemo(
+    () => allChat.filter(msg => msg && msg.uploadSource !== 'meeting' && msg.uploadSource !== 'gallery'),
+    [allChat]
+  );
+  const recentChat = React.useMemo(() => latestRows(visibleChat), [visibleChat]);
   const lastChatMsg = recentChat[0];
   const lastChatAuthor = lastChatMsg ? authorFor(lastChatMsg, calendar?.participants).name : '';
   const memoRows = recordsContext?.memoProps?.memos || [];

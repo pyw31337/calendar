@@ -272,6 +272,14 @@ export function MemoScreen(p) {
   // into view instead of it sitting open by default on every page load.
   const [isSearchOpen, setIsSearchOpen] = window.React.useState(false);
   const toggleSearch = () => setIsSearchOpen(v => !v);
+  // Dedicated-cards mode still receives the real MemoView's full legacy tree via p.legacyView
+  // (only used for slot extraction here, never rendered directly) -- pull the "새로운 메모를
+  // 남겨보세요..." composer card out of it the same way the legacyView+slots.body branch below
+  // already does, so the inline top-of-list compose section isn't silently dropped just because
+  // this page renders its own card list instead of wrapping the legacy body.
+  const dedicatedComposerSlot = useDedicatedCards && p.legacyView
+    ? extractMemoSlots(p.legacyView).composer
+    : null;
 
   if (!useDedicatedCards && p.legacyView) {
     const slots = { ...extractMemoSlots(p.legacyView), ...(p.slots || {}) };
@@ -362,40 +370,49 @@ export function MemoScreen(p) {
           placeholder: '메모 검색',
         })
       ),
-      p.slots && p.slots.shared,
+      // screens.css's flex/overflow chain for .v2-memo only makes .v2-dest-body /
+      // .v2-memo-body scrollable (the rest of the pane is overflow:hidden by design, matching
+      // .v2-page-header's flex:0 0 auto sibling rule) -- the legacyView+slots.body branch above
+      // already wraps its content in this class; the dedicated-cards branch here needs the same
+      // wrapper or its list silently clips at one screen height with no way to reach the rest.
       h(
         'div',
-        { className: 'bp-memo-grid' },
-        (p.memos || []).map(memo => {
-          const author = authorFor(memo, p.calendar.participants);
-          const metaMs = memo.updatedAt ?? memo.createdAt;
-          let meta = '';
-          if (metaMs) {
-            const d = new Date(typeof metaMs === 'number' ? metaMs : metaMs);
-            if (!Number.isNaN(d.getTime())) {
-              meta = d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+        { className: 'v2-dest-body v2-memo-body' },
+        (p.slots && p.slots.shared) || dedicatedComposerSlot,
+        h(
+          'div',
+          { className: 'bp-memo-grid' },
+          (p.memos || []).map(memo => {
+            const author = authorFor(memo, p.calendar.participants);
+            const metaMs = memo.updatedAt ?? memo.createdAt;
+            let meta = '';
+            if (metaMs) {
+              const d = new Date(typeof metaMs === 'number' ? metaMs : metaMs);
+              if (!Number.isNaN(d.getTime())) {
+                meta = d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+              }
             }
-          }
-          return h(
-            ChatBubbleFrame,
-            {
-              key: memo.id,
-              name: author.name,
-              color: author.color,
-              meta,
-              className: 'v2-memo-card-wrap',
-              surfaceClassName: 'v2-memo-bubble-surface',
-              surfaceProps: {
-                style: { '--memo-author-color': author.color },
+            return h(
+              ChatBubbleFrame,
+              {
+                key: memo.id,
+                name: author.name,
+                color: author.color,
+                meta,
+                className: 'v2-memo-card-wrap',
+                surfaceClassName: 'v2-memo-bubble-surface',
+                surfaceProps: {
+                  style: { '--memo-author-color': author.color },
+                },
               },
-            },
-            p.renderCard(memo)
-          );
-        })
+              p.renderCard(memo)
+            );
+          })
+        ),
+        !(p.memos || []).length && h(Empty, null, '검색 조건에 맞는 메모가 없습니다.'),
+        p.hasMoreMemos &&
+          h('button', { type: 'button', className: 'v2-load-more', onClick: p.onLoadMoreMemos }, '메모 더 보기')
       ),
-      !(p.memos || []).length && h(Empty, null, '검색 조건에 맞는 메모가 없습니다.'),
-      p.hasMoreMemos &&
-        h('button', { type: 'button', className: 'v2-load-more', onClick: p.onLoadMoreMemos }, '메모 더 보기'),
       h(Fab, { label: '메모 작성', onClick: p.onCompose })
     ),
     p.isComposerExpanded &&
@@ -472,8 +489,14 @@ export function PlacesScreen(p) {
           ),
           mapOpen && slots.map && h('div', { className: 'v2-map-panel' }, slots.map),
           slots.filters,
-          slots.toolbar,
-          h('div', { className: 'v2-dest-body v2-places-body' }, slots.list || slots.map),
+          // toolbar (전체/방문/예정 필터 + 편집 버튼) rides the same scroll as the list instead of
+          // sitting fixed above it -- moved inside .v2-dest-body, right before the list, and given
+          // the list's own side padding (v2-toolbar-inset below) so its left/right edges line up
+          // with the place cards under it.
+          h('div', { className: 'v2-dest-body v2-places-body' },
+            slots.toolbar && h('div', { className: 'v2-toolbar-inset' }, slots.toolbar),
+            slots.list || slots.map
+          ),
           h(Fab, { label: '장소 등록', onClick: p.onCompose })
         ),
         overlays(slots, ['map', 'toolbar', 'list', 'filters'])
