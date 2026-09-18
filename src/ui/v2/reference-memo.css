@@ -98,6 +98,14 @@
     .v2-memo .v2-memo-card-wrap .v2-memo-card-comments > div {
       background: var(--brand-soft); border-radius: 10px; padding: 7px 10px;
     }
+    .v2-memo .memo-card-hover img.media-thumb,
+    .v2-memo .v2-memo-card-wrap img.media-thumb {
+      width: 100% !important;
+      height: auto !important;
+      max-height: none !important;
+      aspect-ratio: 1 / 1 !important;
+      object-fit: cover !important;
+    }
     .v2-memo .v2-memo-legacy .memo-composer-card { max-width: 520px; }
     @media (min-width: 768px) {
       .v2-memo .v2-memo-legacy { padding: 20px; }
