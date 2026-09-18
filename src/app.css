@@ -2594,7 +2594,8 @@ select.form-select {
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--text-muted);
+  color: var(--brand, #7c2fe5);
+  background: var(--brand-soft, #f3eeff);
   font: inherit;
   font-weight: 700;
   cursor: pointer;
