@@ -1519,7 +1519,7 @@ export function CommentsSection({
   }) : null));
 }
 
-export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onSelectTag, onCommentsChange, getBorderColor, onRequestConfirm, showToast, effectivePinned, hidePinButton = false, variant = 'page', setActiveLightbox = null, searchQuery = '', showAllComments = false }) {
+export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onSelectTag, onCommentsChange, getBorderColor, onRequestConfirm, showToast, effectivePinned, hidePinButton = false, variant = 'page', setActiveLightbox = null, searchQuery = '' }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -1609,7 +1609,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
   const COMMENT_COLLAPSE_LIMIT = 3;
   const [isCommentsExpanded, setIsCommentsExpanded] = React.useState(false);
   const hasMoreComments = comments.length > COMMENT_COLLAPSE_LIMIT;
-  const visibleComments = (showAllComments || !hasMoreComments || isCommentsExpanded) ? comments : comments.slice(-COMMENT_COLLAPSE_LIMIT);
+  const visibleComments = (!hasMoreComments || isCommentsExpanded) ? comments : comments.slice(-COMMENT_COLLAPSE_LIMIT);
 
   const handleSaveComment = async (e) => {
     e.stopPropagation();
@@ -1836,7 +1836,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       className: "v2-memo-card-title",
       style: { fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-main)', marginBottom: '8px', paddingRight: hidePinButton ? '30px' : '44px', wordBreak: 'break-all' }
     }, highlightKeyword(memo.title, searchQuery)),
-    memoMeta && /*#__PURE__*/React.createElement("div", {
+    variant !== 'preview' && memoMeta && /*#__PURE__*/React.createElement("div", {
       className: "v2-memo-card-meta",
     }, memoMeta),
 
@@ -2097,7 +2097,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       );
     })),
 
-    /*#__PURE__*/React.createElement("div", {
+    variant !== 'preview' && /*#__PURE__*/React.createElement("div", {
       className: "memo-card-comment-footer",
       onClick: e => e.stopPropagation()
     },

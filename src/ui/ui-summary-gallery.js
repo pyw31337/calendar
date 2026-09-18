@@ -5,7 +5,6 @@
 import { composeGalleryPhotos, collectMemoryPhotoIdentityKeys, isMemoryPhotoExcluded, expandMemoryPhotoExclusionKeys, dedupeMemoryPhotoEntries, photoBelongsToMemory, isMemeKeyboardPhotoEntry } from '../core/gallery-data.js';
 import { resolveGalleryLightboxTags } from '../core/photo-index.js';
 import { useScrollHideHeader } from '../core/use-scroll-hide-header.js';
-import { timestampMs } from './v2/view-data.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -336,12 +335,10 @@ export function SimpleBottomSheetPicker({ title, value, options, onSelect, place
 // denormalized memo.lastCommentAt field, which has known gaps for memos outside the page's
 // currently-loaded window (see ui-memo-view.js's own comment on RECENT_MEMO_ACTIVITY_WINDOW_MS).
 function getLatestMemoPreviewCommentTimestamp(memo) {
-  const denormalized = timestampMs(memo?.lastCommentAt);
-  if (denormalized > 0) return denormalized;
   const comments = memo?.comments || [];
   let latest = 0;
   for (const c of comments) {
-    const t = timestampMs(c?.updatedAt ?? c?.createdAt);
+    const t = Number(c?.createdAt) || 0;
     if (t > latest) latest = t;
   }
   return latest;
@@ -383,20 +380,14 @@ export function MemoPreviewSection({ memos = [], calendar = null, onViewAll, onO
 
   const sortedMemos = React.useMemo(() => {
     const list = (memos || []).filter(m => m && !isTombstone(m));
-    const recentFirst = (a, b) => timestampMs(b?.updatedAt ?? b?.createdAt) - timestampMs(a?.updatedAt ?? a?.createdAt)
-      || String(b?.id || '').localeCompare(String(a?.id || ''));
-    const pinned = list.filter(memo => memo.isPinned).sort(recentFirst);
-    const selected = pinned.slice(0, 2);
-    if (selected.length >= 2) return selected;
-    const remaining = list.filter(memo => !selected.includes(memo));
-    const commented = remaining
-      .filter(memo => getLatestMemoPreviewCommentTimestamp(memo) > 0)
-      .sort((a, b) => getLatestMemoPreviewCommentTimestamp(b) - getLatestMemoPreviewCommentTimestamp(a) || recentFirst(a, b));
-    selected.push(...commented.slice(0, 2 - selected.length));
-    if (selected.length < 2) {
-      selected.push(...remaining.filter(memo => !selected.includes(memo)).sort(recentFirst).slice(0, 2 - selected.length));
-    }
-    return selected;
+    return list.slice().sort((a, b) => {
+      const aComment = getLatestMemoPreviewCommentTimestamp(a);
+      const bComment = getLatestMemoPreviewCommentTimestamp(b);
+      if (aComment !== bComment) return bComment - aComment;
+      const aCreated = a.updatedAt || a.createdAt || 0;
+      const bCreated = b.updatedAt || b.createdAt || 0;
+      return bCreated - aCreated;
+    });
   }, [memos]);
 
   if (sortedMemos.length === 0) return null;
@@ -445,7 +436,6 @@ export function MemoPreviewSection({ memos = [], calendar = null, onViewAll, onO
       setActiveLightbox: setActiveLightbox,
       effectivePinned: !!memo.isPinned,
       hidePinButton: true,
-      showAllComments: true,
       variant: 'preview'
     })) : null)
   );
