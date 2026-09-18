@@ -18,6 +18,13 @@
    * to this shell's --brand, scoped to .renewal-shell.v2-design only, unifies every reused
    * component's accent color without touching app.css or the default shell's own rendering. */
   --accent-primary: var(--brand);
+  /* 2뎁스 서브메뉴 모듈 — 1단(UnderlineTabs, 지역축제/문화행사/스포츠/영화류)은 이미 공용
+   * 컴포넌트라 별도 토큰이 필요 없지만, 2단(전체/개별등록/클래식·전통류 카테고리 칩)은 화면마다
+   * (Places는 .bp-cat-chip 클래스, Content/보관함은 ui-summary-gallery.js의 인라인 style)
+   * 구현 방식이 달라 패딩/폰트가 따로 놀았다. 여기 두 토큰만 바꾸면 두 구현 모두에 반영된다 --
+   * 새 2단 메뉴를 추가할 때도 하드코딩 대신 이 토큰을 참조할 것. */
+  --v2-subnav-chip-pad: 5px 12px;
+  --v2-subnav-chip-font-size: var(--font-size-sm);
   /* --- V2 glass / vivid system (see designv2/V2-GLASS-SYSTEM.md) --- */
   --v2-glass-blur: blur(20px) saturate(180%);
   --v2-glass-blur-strong: blur(24px) saturate(180%);
@@ -744,8 +751,8 @@
 .v2-design .bp-day-anniversary-label,
 .v2-design .bp-day-bar-stack .bp-day-anniversary-label {
   /* visibility controlled by progressive media queries */
-  font-size: 0.56rem !important;
-  font-weight: 800 !important;
+  font-size: 0.7rem !important;
+  font-weight: 600 !important;
   line-height: 1.15 !important;
   color: var(--anniversary-color, #4c1d95) !important;
   white-space: nowrap;
@@ -849,7 +856,7 @@
 .v2-design .bp-cal-legend { font-size: var(--v2-fs-xs) !important; }
 .v2-design .bp-day-corner-label { font-size: 0.56rem !important; font-weight: 800 !important; }
 .v2-design .bp-day-event-title { font-size: 0.62rem !important; font-weight: 800 !important; }
-.v2-design .bp-day-anniversary-label { font-size: 0.56rem !important; font-weight: 800 !important; }
+.v2-design .bp-day-anniversary-label { font-size: 0.7rem !important; font-weight: 600 !important; }
 
 .v2-design .bp-dday-compact-badge { font-size: 1.05rem !important; font-weight: 900; }
 .v2-design .bp-dday-compact-text { font-size: var(--v2-fs-md) !important; font-weight: 700 !important; }
@@ -1049,8 +1056,8 @@
   .v2-design .bp-day-bar-stack .bp-day-anniversary:not(.bp-mid):not(.bp-bar-only) > .bp-day-anniversary-label,
   .v2-design .bp-day-anniversary:not(.bp-mid):not(.bp-bar-only) > .bp-day-anniversary-label {
     display: block !important;
-    font-size: 0.5rem !important;
-    font-weight: 800 !important;
+    font-size: 0.7rem !important;
+    font-weight: 600 !important;
     line-height: 1.15 !important;
     color: var(--anniversary-color, #4c1d95) !important;
     white-space: nowrap;
@@ -1074,7 +1081,7 @@
     min-height: 1.1rem !important;
   }
   .v2-design .bp-day-bar-stack .bp-day-anniversary:not(.bp-mid):not(.bp-bar-only) > .bp-day-anniversary-label {
-    font-size: 0.56rem !important;
+    font-size: 0.7rem !important;
   }
 }
 
@@ -1086,16 +1093,13 @@
  * visibility instead of relying on that container-scoped toggle. */
 .v2-design .festival-bar-desktop .bp-day-anniversary-label {
   display: block !important;
-  font-size: 0.56rem !important;
-  font-weight: 800 !important;
+  font-size: 0.7rem !important;
+  font-weight: 600 !important;
   line-height: 1.15 !important;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
-}
-@media (min-width: 1200px) {
-  .v2-design .festival-bar-desktop .bp-day-anniversary-label { font-size: 0.58rem !important; }
 }
 /* Keep the festival-bar desktop/mobile split on the same breakpoint as every other v2
  * anniversary badge (768px) instead of app.css's default-shell breakpoint (640px), which would
@@ -1695,7 +1699,7 @@
 /* Final anniversary readability override: keep this last in the cascade. */
 @media (min-width: 768px) {
   .v2-design .bp-day-bar-stack .bp-day-anniversary { background: color-mix(in srgb, var(--anniversary-color, var(--cal-anniversary)) 16%, #fff) !important; color: var(--anniversary-color, var(--cal-anniversary)) !important; }
-  .v2-design .bp-day-bar-stack .bp-day-anniversary > .bp-day-anniversary-label { display: block !important; color: var(--anniversary-color, var(--cal-anniversary)) !important; font-size: .56rem !important; font-weight: 800 !important; line-height: 1.15 !important; padding: 0 3px !important; }
+  .v2-design .bp-day-bar-stack .bp-day-anniversary > .bp-day-anniversary-label { display: block !important; color: var(--anniversary-color, var(--cal-anniversary)) !important; font-size: .7rem !important; font-weight: 600 !important; line-height: 1.15 !important; padding: 0 3px !important; }
   .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-mid > .bp-day-anniversary-label,
   .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-bar-only > .bp-day-anniversary-label { display: none !important; }
 

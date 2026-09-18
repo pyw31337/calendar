@@ -2,6 +2,37 @@
 
 이 문서는 V2 화면 리뉴얼의 진행 상태와 검증 결과를 누적 기록한다.
 
+## 2026-09-18 17:12 KST
+
+**기념일 뱃지**: 라벨 폰트를 요청대로 `font-size: 0.7rem !important; font-weight: 600 !important;`로
+전 구간(단일 기념일 solo/PC min-width:768/1200 단계, festival-bar-desktop 연일 뱃지, "Final
+anniversary readability override" 최종 구간) 통일했다 — 기존엔 0.56rem/0.5rem/0.58rem이
+파일 여기저기서 제각각이었다. 배경-텍스트 동색(반투명 tint + 같은 색 텍스트, PC) / 모바일 텍스트
+없이 진한 배경만은 코드 확인 결과 이미 `--anniversary-color` CSS 변수를 배경·텍스트가 공유하는
+구조로 구현되어 있었다(`getAnniversaryDisplayColor()` → 인라인 스타일/CSS 변수로 주입). 카테고리별
+색상 매핑(생일 빨강/행사 파랑/축제 주황/스포츠 하늘/영화 보라/여행 초록/기타 회색,
+`app-anniversary-dates.js`)도 코드상 존재를 확인했다. **9/29류 연일 뱃지가 셀 배경 밖으로
+벗어나는 문제는 이번 세션에서 재현하지 못했다** — festival bar는 `.bp-day-bar-stack` 밖의 별도
+grid 오버레이라 스태킹 레벨이 겹칠 때만 발생 가능한데, 합성 데이터로 재현 시도했지만 grid
+auto-row가 정상적으로 늘어나는 것만 확인했다. 실제 라이브 데이터 없이는 정확한 원인 특정이
+어려워 보류 — 문제가 계속되면 해당 날짜의 실제 겹침 기념일 개수(스택 레벨)를 알려주면 좋겠다.
+
+**2뎁스 서브메뉴 모듈화(사용자 선택: CSS 토큰만 통일)**: 1단(UnderlineTabs)은 이미 공용
+컴포넌트였고, 2단(전체/개별등록/카테고리 칩)은 Places는 `.bp-cat-chip` 클래스, Content/보관함은
+`ui-summary-gallery.js`의 인라인 style로 서로 다르게 구현되어 있어 패딩/폰트가 어긋나 있었다.
+`design.css`의 `.renewal-shell.v2-design` 루트에 `--v2-subnav-chip-pad`/`--v2-subnav-chip-font-size`
+토큰 2개를 새로 정의하고, Places(`screens.css` `.bp-cat-chip`)와 Content/보관함(칩 버튼 인라인
+style + `screens.css`의 `history-header-stack` 칩 오버라이드, 총 3곳)이 전부 이 토큰을
+참조하도록 수정 — 실측(헤드리스)으로 Content 칩이 새 토큰값(5px 12px / 0.74rem)을 실제로
+반영함을 확인했다. 이제 이 토큰 2개만 바꾸면 두 화면 모두 같이 바뀐다.
+**범위 밖으로 미룬 것**(사용자가 "CSS 토큰만" 범위로 확정): 2단 칩 행 자체를 하나의 React
+컴포넌트로 완전히 통합하는 것(현재는 두 개의 서로 다른 구현이 같은 토큰을 참조하는 정도),
+컨텐츠 페이지의 "지역설정/그리드뷰" 버튼 행을 리스트와 함께 스크롤되게 만드는 것(레거시
+`ui-summary-gallery.js`의 고정 헤더스택 구조를 건드려야 해서 별도 검증 시간이 필요해 보류).
+
+검증: `npm run lint`, `npm run check:all`, `npm run safety:test`, `npm run regression:test`
+전부 통과. Content/Places 칩 CSS 변수 적용은 헤드리스로 computed style 직접 확인.
+
 ## 2026-09-18 16:51 KST
 
 사용자 스크린샷 5건 기반 버그 리포트 5건 처리:

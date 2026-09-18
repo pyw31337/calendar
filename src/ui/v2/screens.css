@@ -487,7 +487,8 @@
 .v2-design .v2-places .bp-cat-chip {
   border-radius: 999px !important;
   font-weight: 700 !important;
-  font-size: 0.68rem !important;
+  font-size: var(--v2-subnav-chip-font-size) !important;
+  padding: var(--v2-subnav-chip-pad) !important;
 }
 
 /* Settlement cards — SettlementFull */
@@ -1735,14 +1736,16 @@
   padding: 0 12px 8px !important;
 }
 .v2-design .v2-content .history-header-stack > div:not([class]) button {
-  padding: 4px 8px !important;
-  font-size: 0.68rem !important;
+  /* 2뎁스 서브메뉴 칩 공용 토큰 (design.css --v2-subnav-chip-*) -- Places의 .bp-cat-chip과
+     같은 값을 공유한다. */
+  padding: var(--v2-subnav-chip-pad) !important;
+  font-size: var(--v2-subnav-chip-font-size) !important;
   gap: 4px !important;
 }
 .v2-design .v2-content [class*="category-chip"],
 .v2-design .v2-archive [class*="category-chip"] {
-  font-size: 0.68rem !important;
-  padding: 4px 8px !important;
+  font-size: var(--v2-subnav-chip-font-size) !important;
+  padding: var(--v2-subnav-chip-pad) !important;
 }
 /* Region / view toolbar — match Places toolbar density; keep ≥16px type for iOS */
 .v2-design .v2-content .region-filter-trigger-row {
