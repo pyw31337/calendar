@@ -5,6 +5,10 @@
  */
 import './dest-layout.css';
 import './screens.css';
+// Keep the responsive contract last: screens.css contains historical
+// destination-specific density rules, while this layer normalizes their
+// breakpoint result across the shell.
+import './responsive-audit.css';
 import { calculateSettlementRows } from '../../core/settlement-calculator.js';
 import { authorFor } from './view-data.js';
 import { ChatBubbleFrame } from './chat-bubble-modules.js';
@@ -284,6 +288,30 @@ export function MemoScreen(p) {
   // into view instead of it sitting open by default on every page load.
   const [isSearchOpen, setIsSearchOpen] = window.React.useState(false);
   const toggleSearch = () => setIsSearchOpen(v => !v);
+  // `memoFocus` is written by the V2 home card before its local tab handoff.
+  // It keeps the destination deterministic even if an outer legacy context
+  // rerender arrives between the click and MemoView mounting.
+  const focusIdFromLocation = typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.search).get('memoFocus') || ''
+    : '';
+  const focusedMemoId = p.focusedMemo?.id || focusIdFromLocation;
+  // A home-card click should land the reader on the matching card, not merely
+  // switch tabs.  The target can be an older shared memo outside the current
+  // page window, so add it once when necessary before scrolling to it.
+  const visibleMemos = window.React.useMemo(() => {
+    const rows = Array.isArray(p.memos) ? p.memos.filter(Boolean) : [];
+    if (!p.focusedMemo?.id || rows.some(memo => memo?.id === p.focusedMemo.id)) return rows;
+    return [p.focusedMemo, ...rows];
+  }, [p.memos, p.focusedMemo]);
+  window.React.useEffect(() => {
+    if (!focusedMemoId || typeof document === 'undefined') return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      const target = [...document.querySelectorAll('[data-v2-memo-id]')]
+        .find(element => element.getAttribute('data-v2-memo-id') === String(focusedMemoId));
+      target?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [focusedMemoId]);
   // Dedicated-cards mode still receives the real MemoView's full legacy tree via p.legacyView
   // (only used for slot extraction here, never rendered directly) -- pull the "새로운 메모를
   // 남겨보세요..." composer card out of it the same way the legacyView+slots.body branch below
@@ -393,7 +421,7 @@ export function MemoScreen(p) {
         h(
           'div',
           { className: 'bp-memo-grid' },
-          (p.memos || []).map(memo => {
+          visibleMemos.map(memo => {
             const author = authorFor(memo, p.calendar.participants);
             const metaMs = memo.updatedAt ?? memo.createdAt;
             let meta = '';
@@ -410,7 +438,8 @@ export function MemoScreen(p) {
                 name: author.name,
                 color: author.color,
                 meta,
-                className: 'v2-memo-card-wrap',
+                className: `v2-memo-card-wrap${memo.id === focusedMemoId ? ' v2-memo-card-is-focused' : ''}`,
+                'data-v2-memo-id': memo.id,
                 surfaceClassName: 'v2-memo-bubble-surface',
                 surfaceProps: {
                   style: { '--memo-author-color': author.color },
@@ -420,7 +449,7 @@ export function MemoScreen(p) {
             );
           })
         ),
-        !(p.memos || []).length && h(Empty, null, '검색 조건에 맞는 메모가 없습니다.'),
+        !visibleMemos.length && h(Empty, null, '검색 조건에 맞는 메모가 없습니다.'),
         p.hasMoreMemos &&
           h('button', { type: 'button', className: 'v2-load-more', onClick: p.onLoadMoreMemos }, '메모 더 보기')
       ),

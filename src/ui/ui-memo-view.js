@@ -2110,6 +2110,11 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       calendar,
       allMemos: memos || [],
       memos: memos || [],
+      // V2 renders the live cards through its own grid, so pass the existing
+      // share/jump target through explicitly instead of losing it with the
+      // legacy sharedMemo slot.  MemoScreen turns this into the same focused
+      // card treatment used by navigation from the home summary.
+      focusedMemo: sharedMemo || null,
       renderCard: (memo) => /*#__PURE__*/React.createElement(MemoCard, {
         memo,
         calendar,

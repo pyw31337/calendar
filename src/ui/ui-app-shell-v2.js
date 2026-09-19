@@ -128,6 +128,9 @@ function writeLocationState(tabId, subTabId, { push } = { push: true }) {
   // Only gallery/content/archive (records) keep ?sub=; memo/places are first-class tabs.
   if (tabId !== 'records' || !subTabId || subTabId === DEFAULT_RECORDS_SUBTAB) url.searchParams.delete('sub');
   else url.searchParams.set('sub', subTabId);
+  // A home-card focus is meaningful only on the memo destination.  Do not let
+  // it follow the user into unrelated screens or a later fresh memo visit.
+  if (tabId !== 'memo') url.searchParams.delete('memoFocus');
   url.searchParams.delete('view');
   const method = push ? 'pushState' : 'replaceState';
   window.history[method](window.history.state, '', url);
@@ -895,7 +898,7 @@ function HeroQuickNav({ onChangeView, settlementBalanceBadge }) {
   );
 }
 
-function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeView, calendarName, onOpenSearch, onOpenMore, settlementBalanceBadge }) {
+function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeView, onOpenMemo, calendarName, onOpenSearch, onOpenMore, settlementBalanceBadge }) {
   const React = window.React;
   return React.createElement(React.Fragment, null,
     React.createElement('div', { className: 'bp-hero-zone' },
@@ -914,6 +917,10 @@ function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeVie
         galleryPhotoIndex: recordsContext?.mediaProps?.indexedPhotos ? { items: recordsContext.mediaProps.indexedPhotos } : null,
         setActiveLightbox: recordsContext?.mediaProps?.setActiveLightbox,
         onMemoCommentsChange: recordsContext?.memoProps?.onMemoCommentsChange,
+        // HomeActivitySummary always passes the complete memo record.  Keep
+        // the legacy callback compatible by converting it back to an id only
+        // when the V2 shell has not supplied its focused-navigation handler.
+        onOpenMemo: onOpenMemo || (memo => recordsContext?.memoProps?.onOpenMemo?.(memo?.id || memo)),
       },
       onOpenDate,
       onChangeView
@@ -1195,7 +1202,11 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
             style: { '--renewal-memo-author': displayColor(memo), '--memo-author-color': displayColor(memo) },
             onClick: event => {
               if (event.target.closest?.('button,textarea,input,select')) return;
-              onChangeView?.('memo');
+              // Use the app's existing jump helper rather than merely changing
+              // tabs: it carries the memo id through to MemoView and applies
+              // the established focused-card treatment there.
+              if (typeof calendarContext?.onOpenMemo === 'function') calendarContext.onOpenMemo(memo);
+              else onChangeView?.('memo');
             },
           },
         },
@@ -1838,6 +1849,11 @@ export function buildRenewalRecordsContext(calendar, deps) {
       calendar: activeCal, memos, hasMoreMemos, totalMemoCount, onLoadMoreMemos,
       showToast, isDarkTheme, onRequestConfirm: showConfirmDialog,
       sharedMemo, chatMessages, setActiveLightbox,
+      onOpenMemo: handleJumpToMemo,
+      // The V2 shell owns tab state, so a home-card click must set this local
+      // focus source first and let the shell switch views. Calling the legacy
+      // jump helper alone only mutates the URL after V2 has mounted.
+      onFocusMemo: memo => { if (memo?.id && typeof setSharedMemo === 'function') setSharedMemo(memo); },
       onDismissSharedMemo: () => {
         if (typeof setSharedMemo === 'function') setSharedMemo(null);
         const url = new URL(window.location.href);
@@ -2502,6 +2518,41 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   const React = window.React;
   const [activeTab, setActiveTabState] = React.useState(readTabFromLocation);
   const [recordsSubTab, setRecordsSubTabState] = React.useState(readRecordsSubTabFromLocation);
+  // Local to the V2 shell because the V1 `changeView` listener is deliberately
+  // bypassed here.  It preserves the exact home memo selected during the tab
+  // handoff, even before the outer app has a chance to rebuild its contexts.
+  const [homeFocusedMemo, setHomeFocusedMemo] = React.useState(null);
+  // The shared Lightbox is a portal child of <body>, outside the V2 CSS root.
+  // Keep its mobile viewport sizing local to this mounted shell, then restore
+  // its inline declarations on unmount so the original V1 page is untouched.
+  React.useEffect(() => {
+    const fitted = new Map();
+    const fitLightbox = () => {
+      document.body.querySelectorAll(':scope > .lightbox-overlay').forEach(overlay => {
+        if (!fitted.has(overlay)) {
+          fitted.set(overlay, ['width', 'max-width', 'height', 'min-height'].map(name => ({
+            name,
+            value: overlay.style.getPropertyValue(name),
+            priority: overlay.style.getPropertyPriority(name),
+          })));
+        }
+        overlay.style.setProperty('width', '100vw', 'important');
+        overlay.style.setProperty('max-width', 'none', 'important');
+        overlay.style.setProperty('height', '100dvh', 'important');
+        overlay.style.setProperty('min-height', '100dvh', 'important');
+      });
+    };
+    const observer = new MutationObserver(fitLightbox);
+    observer.observe(document.body, { childList: true });
+    fitLightbox();
+    return () => {
+      observer.disconnect();
+      fitted.forEach((declarations, overlay) => declarations.forEach(({ name, value, priority }) => {
+        if (value) overlay.style.setProperty(name, value, priority);
+        else overlay.style.removeProperty(name);
+      }));
+    };
+  }, []);
   // CalendarApp normally owns a single Lightbox host after its view switch. The V2 shell
   // returns before that host, so use one local host and route every V2 feature tree to it.
   // This keeps the existing Lightbox component/behaviour instead of maintaining another popup.
@@ -2550,7 +2601,15 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   const v2RecordsContext = {
     ...recordsContext,
     mediaProps: { ...recordsContext?.mediaProps, setActiveLightbox: openV2Lightbox },
-    memoProps: { ...recordsContext?.memoProps, setActiveLightbox: openV2Lightbox },
+    memoProps: {
+      ...recordsContext?.memoProps,
+      sharedMemo: homeFocusedMemo || recordsContext?.memoProps?.sharedMemo || null,
+      onDismissSharedMemo: () => {
+        setHomeFocusedMemo(null);
+        recordsContext?.memoProps?.onDismissSharedMemo?.();
+      },
+      setActiveLightbox: openV2Lightbox,
+    },
     historyProps: { ...recordsContext?.historyProps, setActiveLightbox: openV2Lightbox },
   };
   const v2CalendarContext = {
@@ -2725,6 +2784,16 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
     if (subTabId === recordsSubTab) return;
     writeLocationState('records', subTabId, { push: true });
     setRecordsSubTabState(subTabId);
+  };
+
+  const onOpenMemoFromHome = (memo) => {
+    if (memo?.id) {
+      setHomeFocusedMemo(memo);
+      const url = new URL(window.location.href);
+      url.searchParams.set('memoFocus', memo.id);
+      window.history.replaceState(window.history.state, '', url);
+    }
+    setActiveTab('memo');
   };
 
   const selectSideItem = (id) => {
@@ -2944,7 +3013,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
       React.createElement('main', { className: activeTab === 'calendar' ? 'bp-app-shell is-bento-home' : `renewal-shell-main v2-destination ${hasFullScreen ? `v2-${activeTab}` : (activeTab === 'records' ? `is-records v2-records-${recordsSubTab}` : `is-${activeTab}`)}` },
 
         activeTab === 'calendar'
-          ? React.createElement(CalendarPane, { calendarContext: v2CalendarContext, recordsContext: v2RecordsContext, onOpenDate: setDateModalDate, onChangeView, calendarName, onOpenSearch: () => setActiveTab('search'), onOpenMore: () => setIsSideNavOpen(true), settlementBalanceBadge })
+          ? React.createElement(CalendarPane, { calendarContext: v2CalendarContext, recordsContext: v2RecordsContext, onOpenDate: setDateModalDate, onChangeView, onOpenMemo: onOpenMemoFromHome, calendarName, onOpenSearch: () => setActiveTab('search'), onOpenMore: () => setIsSideNavOpen(true), settlementBalanceBadge })
           : activeTab === 'search'
           ? React.createElement(SearchPage, { modalProps: moreContext.modalProps.search, searchExtra, onClose: () => setActiveTab('calendar') })
           : activeTab === 'chat'
