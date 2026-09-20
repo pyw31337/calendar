@@ -3161,6 +3161,7 @@ export function DateModal({
             /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '4px', minWidth: 0 } },
               /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' } },
                 /*#__PURE__*/React.createElement("span", {
+                  className: "expense-category-badge",
                   style: {
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -3174,6 +3175,7 @@ export function DateModal({
                   }
                 }, getExpenseCategoryIcon(expenseCategory), getExpenseCategoryIcon(expenseCategory) ? '\u00A0' : '', categoryName),
                 expenseTime && /*#__PURE__*/React.createElement("span", {
+                  className: "expense-time-badge",
                   style: {
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -3186,6 +3188,7 @@ export function DateModal({
                   }
                 }, expenseTime),
                 expense.payerId && /*#__PURE__*/React.createElement("span", {
+                  className: "expense-payer-badge",
                   style: {
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -3198,6 +3201,7 @@ export function DateModal({
                   }
                 }, expense.isSelfPay ? expense.payerId : `${expense.payerId} 선결제`),
                 expense.isSelfPay && /*#__PURE__*/React.createElement("span", {
+                  className: "expense-self-pay-badge",
                   style: {
                     display: 'inline-flex',
                     alignItems: 'center',

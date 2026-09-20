@@ -302,3 +302,250 @@
 @media (min-width: 1200px) {
   .v2-design { --v2-dest-content-pad-x: 40px; --v2-dest-content-pad-y: 40px; }
 }
+
+/* --------------------------------------------------------------------------
+ * V2 finish pass: reusable badge, destination and overlay contract
+ * --------------------------------------------------------------------------
+ * Legacy destination modules use different markup, but their labels refer to
+ * the same concepts.  Keep one compact badge geometry so a person's name,
+ * a settlement label and an expense category never look like three unrelated
+ * controls.  Background and foreground colours remain semantic per feature.
+ */
+.renewal-shell.v2-design {
+  --v2-badge-min-height: 20px;
+  --v2-badge-pad: 3px 8px;
+  --v2-badge-font-size: 0.7rem;
+  --v2-badge-radius: 9999px;
+}
+
+.renewal-shell.v2-design .participant-badge,
+.renewal-shell.v2-design .participant-picker-button,
+.renewal-shell.v2-design .v2-name-pill,
+.renewal-shell.v2-design .bp-chat-name-pill,
+.renewal-shell.v2-design .chat-name-pill,
+.renewal-shell.v2-design .bp-side-nav-item-badge,
+.renewal-shell.v2-design .bp-settlement-card-badge,
+.renewal-shell.v2-design .settlement-person-settlement-badge,
+.renewal-shell.v2-design .expense-category-badge,
+.renewal-shell.v2-design .expense-time-badge,
+.renewal-shell.v2-design .expense-payer-badge,
+.renewal-shell.v2-design .expense-self-pay-badge,
+.renewal-shell.v2-design .section-count-badge,
+.renewal-shell.v2-design ~ .modal-overlay .settlement-person-settlement-badge,
+.renewal-shell.v2-design ~ .modal-overlay .expense-category-badge,
+.renewal-shell.v2-design ~ .modal-overlay .expense-time-badge,
+.renewal-shell.v2-design ~ .modal-overlay .expense-payer-badge,
+.renewal-shell.v2-design ~ .modal-overlay .expense-self-pay-badge {
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  min-height: var(--v2-badge-min-height, 20px) !important;
+  padding: var(--v2-badge-pad, 3px 8px) !important;
+  border-radius: var(--v2-badge-radius, 9999px) !important;
+  font-size: var(--v2-badge-font-size, 0.7rem) !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+  white-space: nowrap;
+}
+
+/* Participant/name badges must be flat colour tokens.  The old inset shine
+ * changed perceived height and made identically-sized name badges look uneven. */
+.renewal-shell.v2-design .participant-badge,
+.renewal-shell.v2-design .participant-picker-button,
+.renewal-shell.v2-design .v2-name-pill,
+.renewal-shell.v2-design .bp-chat-name-pill,
+.renewal-shell.v2-design .chat-name-pill,
+.renewal-shell.v2-design .bp-side-nav-item-meta.bp-chat-name-pill,
+.renewal-shell.v2-design .bp-side-nav-item-meta.chat-name-pill {
+  box-shadow: none !important;
+}
+
+/* Some participant controls arrive from the V1 composer with a fixed 32px
+ * inline height. Keep their interaction intact while allowing the shared
+ * badge padding to determine the same visual height as every other name. */
+.renewal-shell.v2-design .participant-picker-button {
+  height: auto !important;
+}
+
+.renewal-shell.v2-design .section-count-badge {
+  width: var(--v2-badge-min-height, 20px) !important;
+  min-width: var(--v2-badge-min-height, 20px) !important;
+  height: var(--v2-badge-min-height, 20px) !important;
+  padding: 0 !important;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* An active category owns its count badge; inactive counts retain a neutral,
+ * centered capsule. This is the same third-level menu pattern in Content and
+ * Places, independent of their legacy source component. */
+.renewal-shell.v2-design .bp-cat-scroll-row > button[style*="background: var(--accent-primary)"] .section-count-badge {
+  background: rgba(255, 255, 255, 0.2) !important;
+  color: #fff !important;
+}
+
+.renewal-shell.v2-design .v2-places .places-category-sticky-tabs,
+.renewal-shell.v2-design .v2-places-legacy .places-category-sticky-tabs {
+  /* Category navigation is edge-to-edge within the page; only the list body
+   * itself receives the destination gutter. */
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+.renewal-shell.v2-design .v2-places .places-category-sticky-tabs .section-count-badge,
+.renewal-shell.v2-design .v2-places-legacy .places-category-sticky-tabs .section-count-badge {
+  align-self: center !important;
+  flex: 0 0 var(--v2-badge-min-height, 20px) !important;
+}
+
+/* The memo composer is a separate creation task, not the first list card.
+ * Leave a clear 28px hand-off before the saved-memo grid begins. */
+.renewal-shell.v2-design .v2-memo .memo-composer-card {
+  margin: 0 0 28px !important;
+}
+
+/* Content: 2nd-level equal tabs are full-bleed header chrome. The filters,
+ * third-level chips and cards below them share the explicit 40px / 20px body
+ * gutter so the right grid-switcher no longer drifts away from the content. */
+.renewal-shell.v2-design .v2-content .history-header-stack {
+  background: #fff !important;
+  border-bottom: 1px solid #1e1b2e0f;
+}
+
+.renewal-shell.v2-design .v2-content .underline-tabs {
+  min-height: 50px;
+  background: #fff !important;
+  border-bottom: 1px solid #1e1b2e0f !important;
+}
+
+.renewal-shell.v2-design .v2-content .underline-tabs [role="tab"] {
+  min-height: 50px;
+  padding: 0 !important;
+  color: #6b6580 !important;
+  font-size: 0.8rem !important;
+  font-weight: 800 !important;
+  border-bottom-color: transparent !important;
+}
+
+.renewal-shell.v2-design .v2-content .underline-tabs [role="tab"][aria-selected="true"] {
+  color: var(--brand, #7c2fe5) !important;
+  border-bottom: 2px solid var(--brand, #7c2fe5) !important;
+}
+
+.renewal-shell.v2-design .v2-content .region-filter-trigger-row,
+.renewal-shell.v2-design .v2-content .history-header-stack > div:not([class]) > .bp-cat-scroll-row,
+.renewal-shell.v2-design .v2-content .culture-items-grid {
+  padding-left: var(--v2-dest-content-pad-x) !important;
+  padding-right: var(--v2-dest-content-pad-x) !important;
+}
+
+.renewal-shell.v2-design .v2-content .history-header-stack > div:not([class]) {
+  padding: 0 !important;
+  background: #fff !important;
+}
+
+.renewal-shell.v2-design .v2-content .history-header-stack > div:not([class]) > .bp-cat-scroll-row {
+  padding-top: 6px !important;
+  padding-bottom: 10px !important;
+  background: #fff !important;
+  gap: 6px !important;
+}
+
+.renewal-shell.v2-design .v2-content .bp-cat-scroll-row > button {
+  min-height: 32px;
+  padding: 6px 12px !important;
+  background: #f7f6fa !important;
+  color: #6b6580 !important;
+  font-size: 0.72rem !important;
+  font-weight: 800 !important;
+}
+
+.renewal-shell.v2-design .v2-content .bp-cat-scroll-row > button[style*="background: var(--accent-primary)"] {
+  background: var(--brand, #7c2fe5) !important;
+  color: #fff !important;
+}
+
+.renewal-shell.v2-design .v2-content .culture-grid-cols-toggle {
+  border-color: #dcd6eb !important;
+  background: #f7f6fa !important;
+  padding: 3px !important;
+}
+
+.renewal-shell.v2-design .v2-content .culture-grid-cols-btn {
+  color: #6b6580 !important;
+  border-radius: 7px !important;
+}
+
+.renewal-shell.v2-design .v2-content .culture-grid-cols-btn.is-active {
+  color: #fff !important;
+  background: var(--brand, #7c2fe5) !important;
+  box-shadow: none !important;
+}
+
+/* Archive/people/past-meetings had a 56px blank top inset after their second
+ * tab row. Keep the controls close enough to read as the same page module. */
+.renewal-shell.v2-design .v2-archive .history-page-scroll {
+  padding-top: 20px !important;
+  padding-right: var(--v2-dest-content-pad-x) !important;
+  padding-left: var(--v2-dest-content-pad-x) !important;
+}
+
+.renewal-shell.v2-design .v2-archive .history-bento-grid,
+.renewal-shell.v2-design .v2-content .culture-items-grid,
+.renewal-shell.v2-design .v2-places .places-list-body {
+  padding-left: var(--v2-dest-content-pad-x) !important;
+  padding-right: var(--v2-dest-content-pad-x) !important;
+}
+
+/* V2 overlays are often portal siblings of the shell instead of descendants.
+ * Cover both trees so Share/Settings stay viewport-centred on desktop and use
+ * the same polished backdrop/sheet on mobile. */
+.renewal-shell.v2-design .modal-overlay:has(.v2-responsive-modal),
+.renewal-shell.v2-design ~ .modal-overlay:has(.v2-responsive-modal) {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  margin: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 24px !important;
+  background: rgba(30, 27, 46, 0.52) !important;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+.renewal-shell.v2-design .modal-overlay .v2-responsive-modal,
+.renewal-shell.v2-design ~ .modal-overlay .v2-responsive-modal {
+  width: min(560px, calc(100vw - 48px)) !important;
+  max-width: 560px !important;
+  max-height: min(86dvh, var(--gather-vv-modal-max, 860px)) !important;
+  margin: 0 !important;
+  border: 1px solid #1e1b2e0f !important;
+  border-radius: 24px !important;
+  box-shadow: 0 24px 72px rgba(30, 27, 46, 0.26) !important;
+  overflow: hidden auto !important;
+}
+
+.renewal-shell.v2-design .modal-overlay .v2-responsive-modal .modal-header,
+.renewal-shell.v2-design ~ .modal-overlay .v2-responsive-modal .modal-header {
+  padding: 18px 20px !important;
+  border-bottom: 1px solid #1e1b2e0f !important;
+}
+
+@media (max-width: 767px) {
+  .renewal-shell.v2-design .modal-overlay:has(.v2-responsive-modal),
+  .renewal-shell.v2-design ~ .modal-overlay:has(.v2-responsive-modal) {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+
+  .renewal-shell.v2-design .modal-overlay .v2-responsive-modal,
+  .renewal-shell.v2-design ~ .modal-overlay .v2-responsive-modal {
+    width: 100vw !important;
+    max-width: none !important;
+    max-height: min(90dvh, var(--gather-vv-modal-max, 860px)) !important;
+    border-radius: 24px 24px 0 0 !important;
+  }
+}

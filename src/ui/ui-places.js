@@ -1588,6 +1588,7 @@ export function PlacesView({
             {
               value: 'all',
               label: /*#__PURE__*/React.createElement(React.Fragment, null, "전체 ", /*#__PURE__*/React.createElement("span", {
+                className: "section-count-badge",
                 style: {
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '20px', height: '18px',
                   borderRadius: 'var(--radius-full)',
@@ -1604,6 +1605,7 @@ export function PlacesView({
                 label: /*#__PURE__*/React.createElement(React.Fragment, null,
                   `${getPlaceCategoryIcon(category)} ${category.name} `,
                   /*#__PURE__*/React.createElement("span", {
+                    className: "section-count-badge",
                     style: {
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '20px', height: '18px',
                       borderRadius: 'var(--radius-full)',

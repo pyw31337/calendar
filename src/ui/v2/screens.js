@@ -929,7 +929,6 @@ export function SettlementScreen(p) {
 
 export function ChatScreen(p) {
   const React = window.React;
-  const [toolsOpen, setToolsOpen] = React.useState(false);
   const slots = { ...(p.legacyView ? extractChatSlots(p.legacyView) : {}), ...(p.slots || {}) };
   const memberCount = (p.calendar?.participants || []).filter(person => !person.deletedAt).length;
   const subtitle = p.subtitle
@@ -990,12 +989,6 @@ export function ChatScreen(p) {
                 title: '이모티콘',
               }, h(DesignIcon, { name: 'emoji', size: 18 }))
             : null,
-          h('button', {
-            type: 'button',
-            className: `v2-tool-icon-btn${toolsOpen ? ' is-active' : ''}`,
-            'aria-label': '밈', 'aria-pressed': toolsOpen, title: '밈',
-            onClick: () => setToolsOpen(value => !value),
-          }, h(DesignIcon, { name: 'meme', size: 18 })),
           slots.attach
             ? clone(slots.attach, {
                 className: 'v2-tool-icon-btn',
@@ -1003,20 +996,12 @@ export function ChatScreen(p) {
                 title: '사진 또는 파일 첨부',
               }, h(DesignIcon, { name: 'paperclip', size: 18 }))
             : null,
-          slots.paste
-            ? clone(slots.paste, {
-                className: 'v2-tool-icon-btn',
-                'aria-label': '붙여넣기',
-                title: '붙여넣기',
-              }, h(DesignIcon, { name: 'paste', size: 18 }))
-            : null,
           slots.attach ? null : (p.onOpenGallery
             ? h('button', { type: 'button', className: 'v2-tool-icon-btn',
                 'aria-label': '사진 또는 파일 첨부', title: '사진 또는 파일 첨부', onClick: p.onOpenGallery },
               h(DesignIcon, { name: 'paperclip', size: 18 })) : null)
         )
-      ),
-      toolsOpen && slots.memes
+      )
     );
 
     return h(
