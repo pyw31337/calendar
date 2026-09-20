@@ -2069,7 +2069,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       visibleComments.map((comment, commentIdx) => {
       const author = (calendar?.participants || []).find(p => p.id === comment.participantId);
       return /*#__PURE__*/React.createElement("div", {
-        key: comment.id,
+        key: comment.id || `${comment.participantId || 'comment'}-${comment.createdAt || 'undated'}-${commentIdx}`,
         onClick: e => e.stopPropagation(),
         style: {
           display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 2px',
