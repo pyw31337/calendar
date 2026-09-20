@@ -2,7 +2,7 @@
  * Anniversary / Settlement / Poll modals (P4-18)
  */
 
-import { calculateSettlementRows } from '../core/settlement-calculator.js';
+import { calculateSettlementRows, calculateSettlementTransfers } from '../core/settlement-calculator.js';
 import { preserveAnniversaryCurationFields } from '../core/gallery-data.js';
 import { useScrollHideHeader } from '../core/use-scroll-hide-header.js';
 
@@ -3146,6 +3146,10 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
             category: getExpenseCategory(calendar, expense.categoryId),
             label: getExpenseLabel(expense) || '정산 항목',
             url: getExpenseUrl(expense),
+            // CreateSettlementModal persists this exact identity in
+            // checkedItemKeys. Keep it with the summary item so a saved
+            // payerId can be counted as that participant's real prepayment.
+            settlementCardItemKey: `${meeting.date}_${expense.id || index}_${expense.amount || 0}`,
             ledgerKey: `${meeting.date}|${expense.id || index}|${expense.createdAt || ''}|${amount}`
           };
         }));
@@ -3157,6 +3161,32 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     .map(filterSettlementRow)
     .filter(row => row.items.length > 0);
   const allTimeItems = allTimeRows.flatMap(row => row.items.map(item => ({ ...item, date: row.meeting.date, meetingNote: row.meeting.note || '' })));
+  // A settlement card can have both manually registered personal spending and
+  // selected shared expenses whose payerId says who fronted them. The editor
+  // already treats the latter as automatic personal prepayments; apply the
+  // same rule to the top-card summary so its numbers do not diverge.
+  const getCardPersonalTotals = card => {
+    const totals = new Map();
+    (Array.isArray(card?.personalExpenses) ? card.personalExpenses : []).forEach(item => {
+      const name = String(item?.participantId || '').trim();
+      if (!name) return;
+      const signedAmount = item?.signedAmount
+        ? (Number(item.amount) || 0)
+        : -Math.abs(Number(item?.amount) || 0);
+      totals.set(name, (totals.get(name) || 0) + signedAmount);
+    });
+    const selectedKeys = new Set([
+      ...(Array.isArray(card?.checkedItemKeys) ? card.checkedItemKeys : []),
+      ...Object.keys(card?.checkedItems || {})
+    ]);
+    if (selectedKeys.size === 0) return totals;
+    allTimeItems.forEach(item => {
+      const payerName = String(item?.payerId || '').trim();
+      if (!payerName || item.isIncome || item.isSelfPay || !selectedKeys.has(item.settlementCardItemKey)) return;
+      totals.set(payerName, (totals.get(payerName) || 0) - Math.abs(Number(item.amount) || 0));
+    });
+    return totals;
+  };
   const settlementBalanceByKey = new Map();
   let runningSettlementBalance = baseBudget;
   // 자비부담(isSelfPay) stays visible in the ledger but never moves 공금 running balance.
@@ -3255,6 +3285,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     { label: activeTab === 'total' ? '총 지출' : `${monthLabelPrefix} 지출`, value: displayExpense, color: '#DC2626', icon: React.createElement(BanknoteArrowDownIcon, { size: 16 }) },
     { label: activeTab === 'total' ? '현재 잔액' : `${monthLabelPrefix} 잔액`, value: displayBalance, color: 'var(--text-main)', icon: React.createElement(PiggyBankIcon, { size: 16 }) }
   ];
+  const isV2SettlementSurface = typeof renderV2 === 'function';
 
   // Shareable result card -- rendered client-side onto an offscreen canvas so it can be saved
   // as a plain image and pasted into KakaoTalk/문자 without anyone needing app access. Shown in
@@ -3505,18 +3536,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                 ? card.participants
                 : activeParticipants.map(participant => participant.name)).filter(Boolean)
           ));
-          const cardPersonalTotals = new Map();
-          (Array.isArray(card.personalExpenses) ? card.personalExpenses : []).forEach(item => {
-            const name = item?.participantId || '참여자';
-            // New records persist the explicit sign; legacy records represented every personal
-            // expense as a positive amount and therefore remain a subtraction. Keep this exact
-            // convention aligned with the settlement editor's personalExpenseTotals calculation
-            // so the card and popup cannot show different balances.
-            const signedAmount = item?.signedAmount
-              ? (Number(item.amount) || 0)
-              : -Math.abs(Number(item?.amount) || 0);
-            cardPersonalTotals.set(name, (cardPersonalTotals.get(name) || 0) + signedAmount);
-          });
+          const cardPersonalTotals = getCardPersonalTotals(card);
           const cardParticipantMemos = new Map();
           (Array.isArray(card.participantRows) ? card.participantRows : []).forEach(row => {
             const memo = String(row?.memo || '').trim();
@@ -3528,6 +3548,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
             cardPersonalTotals,
             card.depositorName
           );
+          const settlementTransfers = calculateSettlementTransfers(cardParticipantRows);
 
           return React.createElement("div", {
             key: card.id,
@@ -3664,6 +3685,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                 const personalTotal = cardPersonalTotals.get(row.name) || 0;
                 const personalMemo = cardParticipantMemos.get(row.name) || '';
                 const personalColor = (activeParticipants.find(p => (typeof p === 'string' ? p : (p?.name || p?.id)) === row.name)?.color) || '#3B82F6';
+                const settlementLabel = row.amount < 0 ? '환급금' : row.amount > 0 ? (isV2SettlementSurface ? '정산금' : '분담금') : '정산 없음';
                 return React.createElement("div", {
                 key: `${card.id}_${row.name}_${index}`,
                 className: "settlement-person-card"
@@ -3674,15 +3696,31 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                     style: { backgroundColor: personalColor }
                   }),
                   React.createElement("span", { className: "settlement-person-name-text" }, row.name),
-                  React.createElement('span', { className: `settlement-person-settlement-badge settlement-person-mobile-badge${row.amount < 0 ? ' is-refund' : ''}` }, row.amount < 0 ? '환급금' : row.amount > 0 ? '분담금' : '정산 없음')
+                  React.createElement('span', { className: `settlement-person-settlement-badge settlement-person-mobile-badge${row.amount < 0 ? ' is-refund' : ''}` }, settlementLabel)
                 ),
                 React.createElement("strong", { className: `settlement-person-amount${row.amount < 0 ? ' is-refund' : ''}`, title: row.amount < 0 ? '공금에서 받을 환급금' : row.amount > 0 ? '공금에 납부할 분담금' : '정산할 금액 없음' },
                   row.amount !== 0 && React.createElement('span', null, `${row.amount < 0 ? '+' : '-'}${Math.abs(row.amount).toLocaleString()}원`)
                 ),
-                personalTotal !== 0 && React.createElement('span', { className: 'settlement-person-detail-capsule' }, `개인지출 ${Math.abs(personalTotal).toLocaleString()}원`),
+                isV2SettlementSurface
+                  ? React.createElement('span', { className: 'settlement-person-actual-paid' },
+                    '실제 지출 ',
+                    React.createElement('b', null, `${Math.max(0, Number(row.actualPaid) || 0).toLocaleString()}원`)
+                  )
+                  : personalTotal !== 0 && React.createElement('span', { className: 'settlement-person-detail-capsule' }, `개인지출 ${Math.abs(personalTotal).toLocaleString()}원`),
                 personalMemo && React.createElement('span', { className: 'settlement-person-detail-capsule settlement-person-memo-capsule', title: personalMemo }, personalMemo)
                 );
-              }))
+              })),
+            isV2SettlementSurface && settlementTransfers.length > 0 && React.createElement(
+              'div',
+              { className: 'settlement-transfer-guide', 'aria-label': '정산 송금 안내' },
+              settlementTransfers.map((transfer, index) => React.createElement(
+                'span',
+                { key: `${transfer.from}_${transfer.to}_${index}` },
+                `${transfer.from} → ${transfer.to} `,
+                React.createElement('b', null, `${transfer.amount.toLocaleString()}원`),
+                ' 지급'
+              ))
+            )
 
           );
         })

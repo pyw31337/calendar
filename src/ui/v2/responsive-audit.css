@@ -76,6 +76,47 @@
   padding-right: var(--v2-dest-content-pad-x) !important;
 }
 
+/* Settlement cards explain the full reconciliation, not only the equal
+ * split. The personal amount is the actual advance (manual plus a checked
+ * expense's payer), while the guide names the person-to-person transfer that
+ * settles the remaining difference. These nodes are rendered only by V2. */
+.v2-design .v2-settlement .settlement-person-actual-paid {
+  align-self: flex-start;
+  color: var(--settlement-hero-surface-muted);
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.v2-design .v2-settlement .settlement-person-actual-paid b {
+  color: var(--settlement-hero-surface-text);
+  font-weight: 850;
+  font-variant-numeric: tabular-nums;
+}
+
+.v2-design .v2-settlement .settlement-transfer-guide {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.16);
+  color: var(--settlement-hero-text);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.v2-design .v2-settlement .settlement-transfer-guide b {
+  color: #fff;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Tablet: the lead hero/calendar occupy their own full-width rows, while the
  * four supporting modules remain a comfortable two-column grid.  Do not show
  * a permanent rail until the true desktop breakpoint. */
