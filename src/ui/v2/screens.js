@@ -999,7 +999,18 @@ export function ChatScreen(p) {
           slots.attach ? null : (p.onOpenGallery
             ? h('button', { type: 'button', className: 'v2-tool-icon-btn',
                 'aria-label': '사진 또는 파일 첨부', title: '사진 또는 파일 첨부', onClick: p.onOpenGallery },
-              h(DesignIcon, { name: 'paperclip', size: 18 })) : null)
+              h(DesignIcon, { name: 'paperclip', size: 18 })) : null),
+          /* Keep the live paste control rather than synthesising a new clipboard flow.
+             ChatRoom owns both the click-to-paste handler and textarea onPaste handler:
+             text keeps the browser's Ctrl/Cmd+V behaviour, while pasted images become
+             the same thumbnail attachments as the legacy composer. */
+          slots.paste
+            ? clone(slots.paste, {
+                className: 'v2-tool-icon-btn',
+                'aria-label': '붙여넣기',
+                title: '붙여넣기',
+              }, h(DesignIcon, { name: 'paste', size: 18 }))
+            : null
         )
       )
     );

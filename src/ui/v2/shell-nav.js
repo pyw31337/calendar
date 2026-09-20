@@ -92,6 +92,17 @@ export function extractChatSlots(legacyTree) {
       const typeName = typeof type === 'function'
         ? String(type.displayName || type.name || '')
         : (type && type.$$typeof ? String(type.displayName || '') : '');
+      // PanelResizeHandle is a component element, so its rendered
+      // `chat-composer-resize-handle` class is not present on this source
+      // node. Capture the live element by its component/label and move it
+      // above the V2 textarea without replacing its pointer/key handlers.
+      if (!bag.resize && (
+        cls.includes('chat-composer-resize-handle')
+        || /PanelResizeHandle/i.test(typeName)
+        || /입력창 높이 조절/.test(String(props.label || props['aria-label'] || ''))
+      )) {
+        bag.resize = node;
+      }
       if (!bag.participant && (
         cls.split(/\s+/).includes('participant-picker-button')
         || cls.includes('participant-picker')

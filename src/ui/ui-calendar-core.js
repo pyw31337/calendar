@@ -2076,15 +2076,32 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
           borderTop: commentIdx > 0 ? '1px solid color-mix(in srgb, var(--bg-primary) 96%, black)' : 'none'
         }
       },
-        /*#__PURE__*/React.createElement("span", {
-          className: "memo-comment-author-dot",
-          role: "img",
-          tabIndex: 0,
-          "aria-label": `${author?.name || '알 수 없는 작성자'} 작성자`,
-          "data-author-name": author?.name || '알 수 없는 작성자',
-          title: author?.name || '알 수 없는 작성자',
-          style: { width: '8px', height: '8px', borderRadius: '50%', backgroundColor: author?.color || '#94A3B8', flexShrink: 0 }
-        }),
+        /* The V2 memo page follows the same named colour badge as the V2 home
+           memo card. Keep V1's compact dot untouched in its own variant. */
+        variant === 'v2-page'
+          ? /*#__PURE__*/React.createElement("span", {
+              className: "v2-memo-comment-author",
+              role: "img",
+              tabIndex: 0,
+              "aria-label": `${author?.name || '알 수 없는 작성자'} 작성자`,
+              "data-author-name": author?.name || '알 수 없는 작성자',
+              title: author?.name || '알 수 없는 작성자',
+              style: {
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0, minWidth: '30px', padding: '0 6px', height: '18px',
+                borderRadius: '999px', backgroundColor: author?.color || '#94A3B8', color: '#fff',
+                fontSize: '0.62rem', fontWeight: 800, lineHeight: 1, whiteSpace: 'nowrap', boxSizing: 'border-box'
+              }
+            }, shortParticipantName(author?.name || '댓글'))
+          : /*#__PURE__*/React.createElement("span", {
+              className: "memo-comment-author-dot",
+              role: "img",
+              tabIndex: 0,
+              "aria-label": `${author?.name || '알 수 없는 작성자'} 작성자`,
+              "data-author-name": author?.name || '알 수 없는 작성자',
+              title: author?.name || '알 수 없는 작성자',
+              style: { width: '8px', height: '8px', borderRadius: '50%', backgroundColor: author?.color || '#94A3B8', flexShrink: 0 }
+            }),
         /*#__PURE__*/React.createElement("span", {
           style: { flex: 1, minWidth: 0, fontSize: 'var(--font-size-md)', color: 'var(--text-main)', wordBreak: 'break-word' }
         }, comment.text),
