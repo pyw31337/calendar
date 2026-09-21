@@ -238,3 +238,20 @@ test('V2 shell renders the same app-wide toast as v1', async () => {
   assert.match(shell, /className:\s*`toast \$\{/, 'RenewalAppShell must render the same .toast markup v1 uses');
   assert.match(appMain, /renderRenewalShellIfEnabled\([\s\S]*?\btoast,\s*dismissToast\s*\}/, 'CalendarApp must pass its live toast/dismissToast state into the v2 shell');
 });
+
+// Regression: BentoCalendarCard (the V2 캘린더 home tab) reimplements the whole month grid from
+// scratch instead of reusing ui-calendar-core.js's CalendarGrid (see the module doc comment
+// above it), so features CalendarGrid has never automatically carried over. One of those --
+// dragging a participant's availability dot onto a different date to move it, both via desktop
+// HTML5 drag-and-drop and a touch long-press-then-drag equivalent (native DnD never fires from
+// touch input) -- had no V2 equivalent at all: the dots were plain non-interactive <span>s and
+// the day-cell button had no onDragOver/onDrop, so the only way to move an availability entry
+// under ?shell=v2 was opening the date's detail modal and re-registering it by hand.
+test('V2 calendar home supports drag-to-move availability like v1\'s CalendarGrid', async () => {
+  const { readFileSync } = await import('node:fs');
+  const shell = readFileSync(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
+  assert.match(shell, /handleMoveAvailability/, 'BentoCalendarCard must reach calendarContext.handleMoveAvailability, the same handler CalendarGrid uses');
+  assert.match(shell, /draggable:\s*!isNone/, 'availability dots must be draggable, same as CalendarGrid\'s ParticipantBadge');
+  assert.match(shell, /onDrop:\s*event\s*=>/, 'day cells must accept a drop to complete the move');
+  assert.match(shell, /handleBadgeTouchStart/, 'a touch long-press-then-drag equivalent must exist for mobile, where native HTML5 DnD never fires');
+});
