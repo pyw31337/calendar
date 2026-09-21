@@ -2823,7 +2823,7 @@ export function GlobalSearchModal({
       }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))
     ),
     inline && tabBar,
-    /*#__PURE__*/React.createElement("div", { className: `modal-body${!q ? ' is-empty' : ''}` },
+    /*#__PURE__*/React.createElement("div", { className: `modal-body${!q || !hasResults ? ' is-empty' : ''}` },
       !inline && /*#__PURE__*/React.createElement("input", {
         ref: inputRef,
         type: "text",
@@ -2841,12 +2841,10 @@ export function GlobalSearchModal({
       !inline && tabBar,
 
       !q && /*#__PURE__*/React.createElement("div", {
-        className: "global-search-empty",
-        style: { padding: '30px', color: 'var(--text-muted)', fontSize: 'var(--font-size-base)', textAlign: 'center' }
+        className: "global-search-empty"
       }, "검색어를 입력해 주세요."),
       q && !hasResults && !isLoadingFullHistory && /*#__PURE__*/React.createElement("div", {
-        className: "global-search-empty",
-        style: { padding: '30px', color: 'var(--text-muted)', fontSize: 'var(--font-size-base)', textAlign: 'center' }
+        className: "global-search-empty"
       }, "검색 결과가 없습니다."),
 
       q && hasResults && activeTab === 'tags' && /*#__PURE__*/React.createElement("div", {

@@ -1414,19 +1414,20 @@ html:has(.renewal-shell.v2-design) .modal-overlay input.form-input {
  * -------------------------------------------------------------------------- */
 .renewal-shell.v2-design .renewal-shell-main.v2-search,
 .renewal-shell.v2-design .v2-destination.v2-search {
-  height: 100% !important;
-  min-height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 100dvh !important;
   padding: 0 !important;
   overflow: auto !important;
-  background: var(--bg-card, #fff) !important;
+  background: #f4f3f8 !important;
 }
 .renewal-shell.v2-design .global-search-page {
   display: flex !important;
   flex-direction: column !important;
+  flex: 1 1 auto !important;
   min-height: 100% !important;
-  height: 100% !important;
   padding: 0 !important;
-  background: var(--bg-card, #fff) !important;
+  background: #f4f3f8 !important;
 }
 .renewal-shell.v2-design .global-search-page-card {
   display: flex !important;
@@ -1439,7 +1440,7 @@ html:has(.renewal-shell.v2-design) .modal-overlay input.form-input {
   border: 0 !important;
   border-radius: 0 !important;
   box-shadow: none !important;
-  background: var(--bg-card, #fff) !important;
+  background: #f4f3f8 !important;
   position: relative !important;
 }
 .renewal-shell.v2-design .global-search-page-card .global-search-header,
@@ -1496,6 +1497,7 @@ html:has(.renewal-shell.v2-design) .modal-overlay input.form-input {
   width: 100% !important;
   margin: 0 !important;
   min-height: 48px !important;
+  background: #fff !important;
 }
 .renewal-shell.v2-design .global-search-page-card .global-search-tabs button,
 .renewal-shell.v2-design .global-search-page-card > .underline-tabs button {
@@ -1504,22 +1506,29 @@ html:has(.renewal-shell.v2-design) .modal-overlay input.form-input {
 }
 .renewal-shell.v2-design .global-search-page-card .modal-body {
   flex: 1 1 auto !important;
-  min-height: 0 !important;
+  min-height: calc(100dvh - 64px - 48px) !important;
+  overflow: visible !important;
   padding: 16px var(--v2-dest-content-pad-x, 20px) 32px !important;
-  background: var(--bg-card, #fff) !important;
+  background: #f4f3f8 !important;
 }
 .renewal-shell.v2-design .global-search-page-card .modal-body.is-empty {
   display: flex !important;
+  flex-direction: column !important;
   align-items: center !important;
-  justify-content: center !important;
-  padding: 0 !important;
+  justify-content: flex-start !important;
+  min-height: calc(100dvh - 64px) !important;
+  padding: max(140px, 18vh) 24px 80px !important;
+  background: #f4f3f8 !important;
 }
 .renewal-shell.v2-design .global-search-empty {
   width: 100% !important;
   padding: 0 !important;
+  margin: 0 !important;
+  background: transparent !important;
   color: var(--text-muted, #8a8798) !important;
   font-size: 0.92rem !important;
   text-align: center !important;
+  box-shadow: none !important;
 }
 .renewal-shell.v2-design .global-search-result-list {
   display: flex !important;
@@ -1529,7 +1538,7 @@ html:has(.renewal-shell.v2-design) .modal-overlay input.form-input {
 .renewal-shell.v2-design .global-search-result {
   padding: 14px 16px !important;
   border-radius: 14px !important;
-  background: #F7F6FB !important;
+  background: #fff !important;
   border: 1px solid var(--border-subtle, #ebe8f3) !important;
 }
 .renewal-shell.v2-design .global-search-result-kind {
@@ -1570,7 +1579,7 @@ html:has(.renewal-shell.v2-design) .modal-overlay input.form-input {
     padding: 12px 16px 28px !important;
   }
   .renewal-shell.v2-design .global-search-page-card .modal-body.is-empty {
-    padding: 0 !important;
+    padding: max(88px, 12vh) 16px 64px !important;
   }
 }
 

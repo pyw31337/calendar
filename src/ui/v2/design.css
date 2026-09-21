@@ -1912,7 +1912,7 @@
 .v2-design .global-search-page {
   display: block;
   padding: 0;
-  background: var(--surface, #f8f8fc);
+  background: #f4f3f8;
 }
 .v2-design .global-search-page-card {
   width: 100%;
@@ -1922,7 +1922,7 @@
   border: 0;
   border-radius: 0;
   box-shadow: none;
-  background: var(--bg-card, #fff);
+  background: #f4f3f8;
 }
 .v2-design .global-search-page-card .global-search-header {
   display: flex;
@@ -1965,7 +1965,7 @@
 }
 .v2-design .global-search-page-card .modal-body {
   padding: 0 20px 28px;
-  background: var(--bg-card, #fff);
+  background: #f4f3f8;
 }
 .v2-design .global-search-page-card .global-search-tabs {
   width: calc(100% + 40px);
