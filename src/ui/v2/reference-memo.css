@@ -43,7 +43,7 @@
     .v2-memo .bp-memo-link-desc { font-size: 0.68rem; color: var(--text-muted); margin-bottom: 3px; }
     .v2-memo .bp-memo-link-domain { font-size: 0.62rem; color: var(--text-light); }
     .v2-memo .bp-memo-tags-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }
-    .v2-memo .bp-chat-name-pill { font-size: 0.6rem; font-weight: 800; color: #fff; padding: 2px 6px; border-radius: var(--radius-full); }
+    .v2-memo .bp-chat-name-pill { display: inline-flex; align-items: center; line-height: 1; font-size: 0.6rem; font-weight: 800; color: #fff; padding: 2px 6px; border-radius: var(--radius-full); }
     .v2-memo .bp-memo-tag { color: var(--brand); font-weight: 700; font-size: 0.66rem; }
     .v2-memo .bp-memo-comments { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--v2-card-border, #eceaf5); }
     .v2-memo .bp-memo-comment-item { display: flex; gap: 6px; align-items: flex-start; }
