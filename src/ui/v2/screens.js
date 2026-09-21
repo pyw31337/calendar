@@ -5,10 +5,10 @@
  */
 import './dest-layout.css';
 import './screens.css';
-// Keep the responsive contract last: screens.css contains historical
-// destination-specific density rules, while this layer normalizes their
-// breakpoint result across the shell.
+// Keep the responsive contract last among destination sheets, then dest-chrome-late
+// so badge/tab/popup polish still wins the cascade.
 import './responsive-audit.css';
+import './dest-chrome-late.css';
 import { calculateSettlementRows } from '../../core/settlement-calculator.js';
 import { authorFor } from './view-data.js';
 import { ChatBubbleFrame } from './chat-bubble-modules.js';
@@ -21,10 +21,13 @@ const h = (...args) => window.React.createElement(...args);
 // Destination-only CSS is loaded when its tab is first rendered, instead of competing with the
 // calendar home for the initial CSS download. Vite caches each dynamic CSS import after loading.
 const destinationStyleLoaders = {
-  memo: () => import('./reference-memo.css'),
-  places: () => import('./reference-places.css'),
-  settlement: () => import('./reference-settlement.css'),
-  chat: () => import('./reference-chat.css'),
+  memo: () => import('./reference-memo.css').then(() => import('./dest-chrome-late.css')),
+  places: () => import('./reference-places.css').then(() => import('./dest-chrome-late.css')),
+  settlement: () => import('./reference-settlement.css').then(() => import('./dest-chrome-late.css')),
+  chat: () => import('./reference-chat.css').then(() => import('./dest-chrome-late.css')),
+  gallery: () => import('./dest-chrome-late.css'),
+  content: () => import('./dest-chrome-late.css'),
+  archive: () => import('./dest-chrome-late.css'),
 };
 const destinationStylePromises = new Map();
 function ensureDestinationStyles(kind) {
@@ -88,7 +91,12 @@ const ICON_NODES = {
     ['path', { d: 'M6 12h12' }],
     ['path', { d: 'M10 18h4' }],
   ],
-  attach: [['path', { d: 'M21.4 11.6 12.9 20a5 5 0 0 1-7-7l8-8a3.5 3.5 0 0 1 5 5l-8 8a2 2 0 0 1-2.8-2.8l7.1-7.1' }]],
+  paperclip: [
+    ['path', { d: 'M21.4 11.6 12.9 20a5 5 0 0 1-7-7l8-8a3.5 3.5 0 0 1 5 5l-8 8a2 2 0 0 1-2.8-2.8l7.1-7.1' }],
+  ],
+  attach: [
+    ['path', { d: 'M21.4 11.6 12.9 20a5 5 0 0 1-7-7l8-8a3.5 3.5 0 0 1 5 5l-8 8a2 2 0 0 1-2.8-2.8l7.1-7.1' }],
+  ],
   emoji: [
     ['circle', { cx: 12, cy: 12, r: 10 }],
     ['path', { d: 'M8 14s1.5 2 4 2 4-2 4-2' }],
@@ -160,7 +168,7 @@ function pageSubtitle(calendar, trailing) {
   return name || extra || undefined;
 }
 
-export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, searchLabel, onShare, onMenu, extra, centerSubtitle = true, showSearch = false, children }) {
+export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, searchLabel, onShare, onMenu, extra, centerSubtitle = true, children }) {
   const React = window.React;
   const [isVisible, setIsVisible] = React.useState(true);
   React.useEffect(() => {
@@ -212,7 +220,8 @@ export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, se
         'div',
         { className: 'bp-header-actions' },
         extra,
-        showSearch && onSearch && h(IconButton, { label: searchLabel || `${title} 검색`, icon: 'search', size: 20, onClick: onSearch }),
+        onSearch && h(IconButton, { label: searchLabel || `${title} 검색`, icon: 'search', size: 20, onClick: onSearch }),
+        onShare && h(IconButton, { label: '공유', icon: 'share', size: 20, onClick: onShare }),
         onMenu && h(IconButton, { label: `${title} 메뉴`, icon: 'menu', size: 20, onClick: onMenu })
       )
     ),
@@ -248,7 +257,9 @@ function Fab({ label, onClick }) {
 }
 
 function Empty({ children }) {
-  return h('p', { className: 'v2-empty' }, children);
+  return h('div', { className: 'v2-empty', role: 'status' },
+    h('p', { className: 'v2-empty-copy' }, children)
+  );
 }
 
 function overlays(slots, except = []) {
@@ -681,6 +692,33 @@ export function SettlementScreen(p) {
   if (p.legacyView && !Array.isArray(p.cards)) {
     const slots = { ...extractSettlementSlots(p.legacyView), ...(p.slots || {}) };
     if (slots.body) {
+      const flushTabs = slots.tabs && window.React.isValidElement(slots.tabs)
+        ? window.React.cloneElement(slots.tabs, {
+            style: {
+              ...(slots.tabs.props.style || {}),
+              position: 'relative',
+              top: 0,
+              left: 'auto',
+              right: 'auto',
+              transform: 'none',
+              zIndex: 4,
+              width: '100%',
+            },
+          })
+        : slots.tabs;
+      const flushBody = window.React.isValidElement(slots.body)
+        ? window.React.cloneElement(slots.body, {
+            style: {
+              ...(slots.body.props.style || {}),
+              position: 'relative',
+              top: 'auto',
+              left: 'auto',
+              right: 'auto',
+              transform: 'none',
+              padding: '8px 16px 96px',
+            },
+          })
+        : slots.body;
       return h(
         'section',
         { className: 'v2-settlement v2-dest-page' },
@@ -697,11 +735,11 @@ export function SettlementScreen(p) {
             onShare: p.onShare,
             onMenu: p.onMenu,
           }),
-          slots.tabs,
-          h('div', { className: 'v2-dest-body v2-settlement-body' }, slots.body),
+          flushTabs,
+          h('div', { className: 'v2-dest-body v2-settlement-body' }, flushBody),
           h(Fab, { label: '지출 추가', onClick: p.onCompose })
         ),
-        overlays(slots, ['body', 'tabs'])
+        overlays({ ...slots, tabs: flushTabs, body: flushBody }, ['body', 'tabs'])
       );
     }
     return h(
@@ -938,9 +976,33 @@ export function ChatScreen(p) {
   // Require textarea+send so we can rebuild the composer row; otherwise fall back to wrap.
   if (slots.body && slots.composer && slots.textarea && slots.send && p.legacyView && React.isValidElement(p.legacyView)) {
     const clone = React.cloneElement;
-    const originalRoot = Array.isArray(p.legacyView.props.children)
-      ? p.legacyView.props.children[0]
-      : p.legacyView.props.children;
+    const legacyKids = React.Children.toArray(p.legacyView.props.children);
+    const selfIsContainer = String(p.legacyView.props?.className || '').includes('chat-room-container');
+    const originalRoot = selfIsContainer
+      ? p.legacyView
+      : (legacyKids.find(node =>
+          React.isValidElement(node) && String(node.props?.className || '').includes('chat-room-container')
+        ) || (Array.isArray(p.legacyView.props.children)
+          ? p.legacyView.props.children[0]
+          : p.legacyView.props.children));
+    const passthrough = selfIsContainer
+      ? []
+      : legacyKids.filter(node => {
+          if (node === originalRoot) return false;
+          if (React.isValidElement(node) && String(node.props?.className || '').includes('chat-composer')) return false;
+          return true;
+        });
+    const rootKids = React.isValidElement(originalRoot)
+      ? React.Children.toArray(originalRoot.props.children)
+      : [];
+    const keptRootKids = rootKids.filter(node => {
+      if (!node || node === slots.composer || node === slots.body || node === slots.notice) return false;
+      const cls = String(node.props?.className || '');
+      if (cls.includes('chat-room-header')) return false;
+      if (cls.includes('chat-composer')) return false;
+      if (node.props?.['aria-label'] === '뒤로가기') return false;
+      return true;
+    });
     const composer = clone(
       slots.composer,
       {
@@ -985,6 +1047,7 @@ export function ChatScreen(p) {
           slots.emoji
             ? clone(slots.emoji, {
                 className: 'v2-tool-icon-btn',
+                type: 'button',
                 'aria-label': '이모티콘',
                 title: '이모티콘',
               }, h(DesignIcon, { name: 'emoji', size: 18 }))
@@ -992,6 +1055,7 @@ export function ChatScreen(p) {
           slots.attach
             ? clone(slots.attach, {
                 className: 'v2-tool-icon-btn',
+                type: 'button',
                 'aria-label': '사진 또는 파일 첨부',
                 title: '사진 또는 파일 첨부',
               }, h(DesignIcon, { name: 'paperclip', size: 18 }))
@@ -1007,12 +1071,14 @@ export function ChatScreen(p) {
           slots.paste
             ? clone(slots.paste, {
                 className: 'v2-tool-icon-btn',
+                type: 'button',
                 'aria-label': '붙여넣기',
                 title: '붙여넣기',
               }, h(DesignIcon, { name: 'paste', size: 18 }))
             : null
         )
-      )
+      ),
+      slots.memes
     );
 
     return h(
@@ -1031,10 +1097,17 @@ export function ChatScreen(p) {
           onMenu: p.onMenu,
         }),
         slots.notice,
-        clone(slots.body, { className: 'v2-chat-scroll' }),
+        clone(slots.body, {
+          className: 'v2-chat-scroll',
+          style: {
+            ...(slots.body.props.style || {}),
+            paddingTop: 8,
+          },
+        }),
         composer,
-        slots.lightbox
+        ...keptRootKids
       ),
+      ...passthrough,
       overlays(slots, [
         'notice', 'body', 'composer', 'lightbox', 'resize', 'memes', 'reply', 'textarea',
         'photos', 'files', 'fileInput', 'participant', 'emoji', 'attach', 'paste', 'send',
@@ -1075,6 +1148,7 @@ export const renderChatScreen = props => { ensureDestinationStyles('chat'); retu
 /* -------------------------------------------------------------------------- */
 
 export function GalleryScreen(p) {
+  ensureDestinationStyles('gallery');
   return h(
     'section',
     { className: 'v2-gallery v2-dest-page v2-embed-frame v2-records-media v2-has-page-header' },
@@ -1094,6 +1168,7 @@ export function GalleryScreen(p) {
 }
 
 export function ContentScreen(p) {
+  ensureDestinationStyles('content');
   return h(
     'section',
     { className: 'v2-content v2-dest-page v2-embed-frame v2-has-page-header' },
@@ -1113,6 +1188,7 @@ export function ContentScreen(p) {
 }
 
 export function ArchiveScreen(p) {
+  ensureDestinationStyles('archive');
   return h(
     'section',
     { className: 'v2-archive v2-dest-page v2-embed-frame v2-has-page-header' },

@@ -2017,6 +2017,7 @@ export function DateModal({
     }
   }, onAddAnniversaryForDate && /*#__PURE__*/React.createElement("button", {
     type: "button",
+    className: isBentoSheet ? "bp-sheet-anniv-btn" : undefined,
     onClick: () => { if (!isSubmitting) onAddAnniversaryForDate(dateStr); },
     style: {
       background: 'none',
@@ -2029,11 +2030,14 @@ export function DateModal({
       padding: '5px 10px',
       display: 'flex',
       alignItems: 'center',
-      whiteSpace: 'nowrap'
+      whiteSpace: 'nowrap',
+      minHeight: 44,
+      boxSizing: 'border-box'
     },
     title: "이 날짜로 기념일 등록"
   }, "+ 기념일 등록"), /*#__PURE__*/React.createElement("button", {
     type: "button",
+    className: isBentoSheet ? "bp-sheet-close" : undefined,
     onClick: () => {
       if (!isSubmitting) requestClose();
     },
@@ -2045,9 +2049,14 @@ export function DateModal({
       cursor: 'pointer',
       display: 'flex',
       alignItems: 'center',
-      padding: '2px 4px'
+      justifyContent: 'center',
+      padding: '2px 4px',
+      minWidth: 44,
+      minHeight: 44,
+      boxSizing: 'border-box'
     },
-    title: "닫기"
+    title: "닫기",
+    "aria-label": "닫기"
   }, "✕"))), UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
     ariaLabel: "일정 탭",
     variant: "flush",

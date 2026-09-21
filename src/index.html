@@ -6,6 +6,7 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="build-sha" content="%VITE_BUILD_SHA%" />
+    <meta name="v2-polish" content="2026-09-21-badge-tabs-popup" />
     <title>모여라 캘린더</title>
     <!-- PWA manifest + icons. Previously present only in the legacy root index.html (not the
          Vite entry actually served by dist/), so the deployed site never linked a manifest at
@@ -22,6 +23,20 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="모여라 캘린더" />
+    <script>
+      (function () {
+        try {
+          if (location.hostname === 'pyw31337.github.io') return;
+          var params = new URLSearchParams(location.search);
+          var missingId = !params.get('id') && !params.get('cal');
+          var missingShell = params.get('shell') !== 'v2';
+          if (!missingId && !missingShell) return;
+          if (missingId) params.set('id', 'cw');
+          params.set('shell', 'v2');
+          location.replace(location.pathname + '?' + params.toString() + location.hash);
+        } catch (_) {}
+      })();
+    </script>
     <script>
       // The <link rel="manifest"> tag is created here, in JS, instead of sitting in the HTML
       // source and having its href mutated afterward (the previous approach). That mutation

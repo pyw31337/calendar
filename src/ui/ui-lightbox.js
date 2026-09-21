@@ -1870,6 +1870,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     style: { display: 'none' }
   }), /*#__PURE__*/React.createElement("button", {
     type: "button",
+    className: "lightbox-close-btn",
     onClick: e => { e.stopPropagation(); closeLightbox(); },
     "aria-label": "닫기",
     style: {
@@ -1877,7 +1878,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
       // target below the safe-area inset instead of letting the battery/network UI swallow it.
       position: 'absolute', top: 'max(16px, calc(env(safe-area-inset-top, 0px) + 12px))', right: 'max(16px, env(safe-area-inset-right, 0px) + 12px)',
       background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.25)',
-      borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer',
+      borderRadius: '50%', width: '44px', height: '44px', cursor: 'pointer',
       display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFFFFF', zIndex: 9001
     }
   }, /*#__PURE__*/React.createElement("svg", {

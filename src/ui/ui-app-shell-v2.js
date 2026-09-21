@@ -8,6 +8,7 @@ import './v2/reference-home.css';
 import './v2/design.css';
 import './v2/aurora-theme.css';
 import { renderMemoScreen, renderPlacesScreen, renderSettlementScreen, renderChatScreen, renderGalleryScreen, renderContentScreen, renderArchiveScreen, PageHeader, prefetchDestinationStyles } from './v2/screens.js';
+import './v2/dest-chrome-late.css';
 import { authorFor, latestRows, timestampMs, photoLightbox, shortParticipantName } from './v2/view-data.js';
 import { ChatBubbleFrame, NameColorPill, ReplyQuote } from './v2/chat-bubble-modules.js';
 import {
@@ -169,13 +170,13 @@ const TAB_ICON_NODES = {
   ],
 };
 
-function TabIcon({ id, active }) {
+function TabIcon({ id, active, size = 16 }) {
   const React = window.React;
   const def = TABLER_ICONS[id];
   if (def) {
     const isFilled = active && def.on;
     return React.createElement('svg', {
-      width: 16, height: 16, viewBox: '0 0 24 24', 'aria-hidden': 'true',
+      width: size, height: size, viewBox: '0 0 24 24', 'aria-hidden': 'true',
       fill: isFilled ? 'currentColor' : 'none', stroke: 'currentColor',
       // Filled (on) glyphs are solid shapes already -- keeping a 2px stroke on top of the fill
       // blurs/thickens the edges, so drop the stroke to 0 whenever we render the filled variant.
@@ -187,7 +188,7 @@ function TabIcon({ id, active }) {
   const nodes = TAB_ICON_NODES[id] || [];
   return React.createElement(
     'svg', {
-      width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
+      width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
       strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': 'true',
       // Keep vectors on pixel grid when CSS sizes the icon; avoids soft antialias from 20→16 downscale.
       style: { display: 'block', shapeRendering: 'geometricPrecision' },
@@ -631,6 +632,18 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
     () => computeFestivalBars(days, anniversariesList),
     [days.map(d => d.dateStr).join('|'), anniversariesList]
   );
+  const festivalCoveredDates = React.useMemo(() => {
+    const map = new Map();
+    festivalBars.forEach(bar => {
+      const depth = (bar.level || 0) + 1;
+      for (let col = bar.startCol; col <= bar.endCol; col += 1) {
+        const day = days[bar.row * 7 + col];
+        if (!day) continue;
+        map.set(day.dateStr, Math.max(map.get(day.dateStr) || 0, depth));
+      }
+    });
+    return map;
+  }, [festivalBars, days]);
 
   return React.createElement('div', { className: bentoClass('cal-card') },
     // Month nav
@@ -718,6 +731,7 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
         // Range (연일 다일) anniversaries render once per week row as a spanning grid bar
         // (see festivalBars below) instead of per-cell — only solo/single-day ones live here.
         const anns = getAnniversariesForDate(dateStr, anniversariesList).filter(ann => ann.type !== 'range');
+        const festivalStackDepth = festivalCoveredDates.get(dateStr) || 0;
         const cellClasses = [
           'day-cell',
           !isCurrentMonth ? 'other-month' : '',
@@ -760,10 +774,10 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
           anns.length > 0 ? React.createElement('div', { className: bentoClass('day-bar-stack') },
             anns.slice(0, 4).map((ann, annIdx) => {
               const title = ann.title || '기념일';
-              const displayColor = getAnniversaryDisplayColor(ann, calendar) || 'var(--cal-anniversary)';
+              const displayColor = 'var(--cal-anniversary, #F76AAD)';
               return React.createElement('div', {
                 key: ann.id || `${dateStr}_ann_${annIdx}`,
-                className: bentoClass(`day-anniversary solo ${ann.category ? `cat-${String(ann.category).toLowerCase()}` : ''} ${ann.genre ? `genre-${String(ann.genre).toLowerCase()}` : ''}`.trim()),
+                className: bentoClass('day-anniversary solo'),
                 title,
                 'aria-label': title,
                 style: { '--anniversary-color': displayColor },
@@ -771,7 +785,11 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
                 className: bentoClass('day-anniversary-label'),
               }, title));
             })
-          ) : null
+          ) : null,
+          festivalStackDepth > 0 ? React.createElement('div', {
+            className: 'festival-bar-spacer',
+            style: { '--festival-stack-depth': festivalStackDepth, flexShrink: 0, width: '100%' },
+          }) : null
         );
       }),
 
@@ -781,7 +799,7 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
       // or repeats its title, and reuses app.css's .festival-bar-desktop/-mobile display toggle
       // (PC = translucent fill + solid title text; mobile = solid color line, no text).
       festivalBars.flatMap(bar => {
-        const displayColor = getAnniversaryDisplayColor(bar, calendar) || '#F76AAD';
+        const displayColor = 'var(--cal-anniversary, #F76AAD)';
         const gridPlacementStyle = {
           gridRowStart: bar.row + 1,
           gridColumnStart: bar.startCol + 1,
@@ -865,11 +883,9 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
 }
 
 
-/** Destinations for the mobile-only hero quick-nav row (see HeroQuickNav) -- the four
- * screens a hidden side rail would otherwise reach in one tap on <768px, where there is no
- * persistent rail (aurora-theme.css "Mobile: no rail"). Desktop/tablet (>=768px) already has
- * the side rail for these, so this row is hidden there via .bp-hero-quick-nav's own media query
- * -- never duplicate the same destinations as a second always-visible nav on wider screens. */
+/** Destinations for the hero quick-nav row above the D-day badge.
+ * Mobile (<768): icon stacked over label. Tablet (768–1199): icon + label in a row.
+ * Desktop (>=1200) keeps the persistent side rail, so the row is hidden there. */
 const HERO_QUICK_NAV_ITEMS = [
   { id: 'chat', label: '채팅', icon: 'chat' },
   { id: 'settlement', label: '정산', icon: 'settlement' },
@@ -883,12 +899,15 @@ function HeroQuickNav({ onChangeView, settlementBalanceBadge }) {
     HERO_QUICK_NAV_ITEMS.map(item => React.createElement('button', {
       type: 'button',
       key: item.id,
-      className: bentoClass('hero-quick-nav-item icon-btn'),
+      className: bentoClass('hero-quick-nav-item'),
       'aria-label': item.label,
       title: item.label,
       onClick: () => onChangeView?.(item.id),
     },
-      React.createElement(TabIcon, { id: item.icon }),
+      React.createElement('span', { className: bentoClass('hero-quick-nav-icon'), 'aria-hidden': 'true' },
+        React.createElement(TabIcon, { id: item.icon, size: 24 })
+      ),
+      React.createElement('span', { className: bentoClass('hero-quick-nav-label') }, item.label),
       item.id === 'settlement' && settlementBalanceBadge?.text && React.createElement('span', {
         className: bentoClass('hero-quick-nav-badge'),
         style: { backgroundColor: settlementBalanceBadge.bgColor || '#EF4444' },
@@ -1150,17 +1169,60 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
     React.createElement(HomeSummarySection, { title: '채팅', kind: 'chat', delay: '0.08s', onMore: () => onChangeView?.('chat') },
       messages.length ? React.createElement('div', { className: bentoClass('renewal-home-chat-list') }, messages.map((m, i) => {
         const image = m.thumbUrl || (Array.isArray(m.thumbUrls) && m.thumbUrls[0]) || m.imageUrl || (Array.isArray(m.imageUrls) && m.imageUrls[0]);
-        return React.createElement('button', { type: 'button', className: bentoClass(`renewal-home-chat-item chat-row${image ? ' has-image' : ''}`), key: m.id || i, onClick: () => onChangeView?.('chat') },
-          React.createElement(NameColorPill, { className: bentoClass('renewal-home-chat-name chat-name-pill'), name: displayName(m), color: displayColor(m) }),
-          React.createElement('span', { className: bentoClass('renewal-home-chat-content chat-content') },
-            image && React.createElement('img', { className: bentoClass('renewal-home-chat-image chat-img'), src: image, alt: '', loading: 'lazy' }),
-            m.replyTo && React.createElement(ReplyQuote, {
-              className: bentoClass('renewal-home-chat-reply chat-reply-quote'),
-              author: shortParticipantName(m.replyTo.senderName || participantFor(m.replyTo)?.name || '답장'),
-              text: m.replyTo.text || '사진',
-            }),
-            (m.text || m.content) && React.createElement('span', { className: bentoClass('renewal-home-chat-text chat-text') }, String(m.text || m.content).slice(0, 120)),
-            React.createElement('span', { className: bentoClass('renewal-home-chat-time chat-meta') }, image ? formatShortDateTime(m.timestamp ?? m.createdAt) : formatTime(m.timestamp ?? m.createdAt))
+        const goChat = event => {
+          event?.stopPropagation?.();
+          onChangeView?.('chat');
+        };
+        return React.createElement('button', {
+          type: 'button',
+          className: 'v2-home-chat-row',
+          key: m.id || i,
+          onClick: goChat,
+        },
+          React.createElement(NameColorPill, { name: displayName(m), color: displayColor(m) }),
+          React.createElement('div', { className: 'v2-home-chat-bubble-wrap' },
+            React.createElement('div', { className: 'v2-home-chat-bubble' },
+              m.replyTo && React.createElement(ReplyQuote, {
+                author: shortParticipantName(m.replyTo.senderName || participantFor(m.replyTo)?.name || '답장'),
+                text: m.replyTo.text || '사진',
+              }),
+              image && React.createElement('img', {
+                className: 'v2-home-chat-image',
+                src: image,
+                alt: '',
+                loading: 'lazy',
+                onClick: (event) => {
+                  event.stopPropagation();
+                  const urls = (Array.isArray(m.imageUrls) && m.imageUrls.length)
+                    ? m.imageUrls
+                    : [m.imageUrl || image].filter(Boolean);
+                  if (!urls.length || typeof calendarContext.setActiveLightbox !== 'function') return;
+                  calendarContext.setActiveLightbox({
+                    urls,
+                    index: 0,
+                    meta: urls.map(() => ({ timestamp: m.timestamp, messageId: m.id, source: 'chat' })),
+                  });
+                },
+              }),
+              (m.text || m.content) && React.createElement('span', { className: 'v2-home-chat-text' }, String(m.text || m.content))
+            )
+          ),
+          React.createElement('div', { className: 'v2-home-chat-meta' },
+            React.createElement('span', {
+              className: 'v2-home-chat-reply-btn',
+              role: 'img',
+              'aria-label': '답장',
+              title: '답장',
+            },
+              React.createElement('svg', {
+                width: 15, height: 15, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
+                strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': 'true',
+              },
+                React.createElement('path', { d: 'M9 13l-4 -4l4 -4' }),
+                React.createElement('path', { d: 'M5 9h7a4 4 0 1 1 0 8h-1' })
+              )
+            ),
+            React.createElement('span', { className: 'v2-home-chat-time' }, formatTime(m.timestamp ?? m.createdAt))
           )
         );
       })) : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '최근 대화가 없습니다.')
@@ -1186,14 +1248,13 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
         // 요구사항 -- 메모에 댓글이 달리면 최신 댓글을 미리보기로 바로 노출한다(전체보기 없이도
         // 반응이 왔다는 걸 즉시 알 수 있게).
         const memoComments = Array.isArray(memo.comments) ? memo.comments : [];
-        const visibleComments = memoComments.slice(-2);
+        const visibleComments = memoComments;
         return React.createElement(ChatBubbleFrame, {
           key: memo.id || i,
           name: displayName(memo),
           color: displayColor(memo),
           /* The home memo card follows the memo-page card contract: author is
-             not a separate chat pill; timestamp belongs directly beneath the
-             title inside the memo surface. */
+             not a separate chat pill; timestamp lives in the footer next to 댓글. */
           meta: null,
           className: 'v2-home-memo-bubble',
           surfaceAs: 'div',
@@ -1211,7 +1272,6 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
           },
         },
           React.createElement('strong', { className: 'v2-bubble-title' }, memo.title || '메모'),
-          React.createElement('span', { className: 'v2-memo-card-meta' }, memoMeta),
           memoDisplayText && React.createElement('span', { className: 'v2-bubble-summary' }, memoDisplayText),
           memoPreviewUrls.length > 0 && React.createElement('div', { className: 'v2-bubble-preview-list', onClick: event => event.stopPropagation() },
             memoPreviewUrls.map((url, urlIndex) => {
@@ -1248,7 +1308,7 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
             )),
           ) : null,
           React.createElement('div', { className: 'v2-bubble-comment-footer' },
-            React.createElement('span', { className: 'v2-bubble-comment-count' }, `댓글 ${memoComments.length}개`),
+            React.createElement('span', { className: 'v2-bubble-comment-count' }, memoMeta || ''),
             React.createElement('button', {
               type: 'button',
               className: 'v2-bubble-comment-action',
@@ -1261,11 +1321,13 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
                 });
               },
               'aria-expanded': commentOpenId === memo.id,
+              'aria-label': memoComments.length ? `댓글 ${memoComments.length}개` : '댓글',
             },
               React.createElement('svg', { width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': 'true' },
                 React.createElement('path', { d: 'M20 11.5a7.5 7.5 0 0 1-8 7.45 8.4 8.4 0 0 1-3.4-.7L4 19.5l1.25-3.2A7.3 7.3 0 0 1 4.5 12 7.5 7.5 0 0 1 12 4.5a7.5 7.5 0 0 1 8 7Z' })
               ),
-              '댓글'
+              '댓글',
+              memoComments.length > 0 ? React.createElement('span', { className: 'v2-bubble-comment-badge' }, String(memoComments.length)) : null
             ),
           ),
           commentOpenId === memo.id && React.createElement('form', {
@@ -1729,7 +1791,7 @@ export function buildRenewalRecordsContext(calendar, deps) {
     activeCal, galleryChatMessages, galleryMemos, showToast, showConfirmDialog,
     handleUploadGalleryImages, handleAddGalleryLink, handleAddGalleryFiles, handleDeleteGalleryFiles,
     handleDeleteGalleryLinks, handlePasteGatherPhoto, handlePasteGatherPhotos,
-    setActiveLightbox, handleDeletePhoto, photoCommentCounts, galleryPhotoIndex,
+    activeLightbox, setActiveLightbox, handleDeletePhoto, photoCommentCounts, galleryPhotoIndex,
     hasMoreOlderChat, fullChatMessages, loadingOlderChat, loadOlderChatMessages,
     hasMoreMemos, setMemosLimit, MEMOS_PAGE_SIZE,
     isDarkTheme, toggleTheme, fontScalePercent, setFontScalePercent,
@@ -1740,7 +1802,7 @@ export function buildRenewalRecordsContext(calendar, deps) {
     anniversaries, historyMemosSnapshot,
     handlePromoteInlineChatImage, handleSaveImageTags, handleSearchTag,
     handleReplacePhoto,
-    handleJumpToChatMessage, handleJumpToMemo, handleJumpToMeetingDate,
+    handleJumpToChatMessage, handleJumpToMemo, handleJumpToMeetingDate, handleJumpToGallery,
     handleGetChatMessageOrdinal, handleGetGalleryPhotoOrdinal,
     handleRemovePhotoFromTravelMemory, handleRemovePhotosFromTravelMemory,
     handleHideMemoryGroup, handleRestoreMemoryGroup, handleAddPhotosBackToTravelMemory,
@@ -1752,6 +1814,7 @@ export function buildRenewalRecordsContext(calendar, deps) {
     patchLocalMemo, upsertLocalMemo, removeLocalMemo, memoInitialTag, setMemoInitialTag,
     onMemoCommentsChange,
     isMemoShareOpen, setIsMemoShareOpen,
+    preloadedPhotoComments, preloadedPhotoCommentsReady,
   } = deps || {};
   const requireLoadedCalendar = (message) => {
     if (activeCal) return true;
@@ -1867,6 +1930,25 @@ export function buildRenewalRecordsContext(calendar, deps) {
     isMemoShareOpen: !!isMemoShareOpen,
     onOpenMemoShare: () => { if (requireLoadedCalendar('Firebase 데이터를 불러온 뒤 공유 정보를 확인해 주세요.')) setIsMemoShareOpen(true); },
     onCloseMemoShare: () => setIsMemoShareOpen(false),
+    lightboxProps: {
+      activeLightbox, setActiveLightbox, showToast,
+      onPromoteImageUrl: handlePromoteInlineChatImage,
+      onSaveImageTags: handleSaveImageTags,
+      onSearchTag: handleSearchTag,
+      onDeletePhoto: handleDeletePhoto,
+      onReplacePhoto: handleReplacePhoto,
+      onJumpToChatMessage: handleJumpToChatMessage,
+      onJumpToMemo: handleJumpToMemo,
+      onJumpToMeetingDate: handleJumpToMeetingDate,
+      onJumpToGallery: handleJumpToGallery,
+      onGetChatMessageOrdinal: handleGetChatMessageOrdinal,
+      onGetGalleryPhotoOrdinal: handleGetGalleryPhotoOrdinal,
+      onRequestConfirm: showConfirmDialog,
+      onFetchPhotoComments: handleFetchPhotoComments,
+      onSavePhotoComments: handleSavePhotoComments,
+      preloadedPhotoComments: preloadedPhotoComments || {},
+      preloadedPhotoCommentsReady: !!preloadedPhotoCommentsReady,
+    },
   };
 }
 
@@ -2401,6 +2483,38 @@ export function buildRenewalMoreContext(calendar, deps) {
  * `onOpenChatMessage`/`onOpenImage`) `RenewalAppShell` composes for GlobalSearchModal -- see its
  * call site for why those can't be built inside `buildRenewalMoreContext`.
  */
+function SharedLightboxHost({ calendar, lightboxProps, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, onJumpToGallery }) {
+  const React = window.React;
+  if (!lightboxProps?.activeLightbox) return null;
+  const { Lightbox } = bindUiComponentAliases(React);
+  const lb = lightboxProps.activeLightbox;
+  return React.createElement(Lightbox, {
+    urls: lb.urls,
+    index: lb.index,
+    meta: lb.meta,
+    calendar: calendar || null,
+    onClose: () => lightboxProps.setActiveLightbox?.(null),
+    onNavigate: (i) => lightboxProps.setActiveLightbox?.(prev => prev ? { ...prev, index: i } : prev),
+    showToast: lightboxProps.showToast,
+    onPromoteImageUrl: lightboxProps.onPromoteImageUrl,
+    onSaveImageTags: lightboxProps.onSaveImageTags,
+    onSearchTag: lightboxProps.onSearchTag,
+    onDeletePhoto: lightboxProps.onDeletePhoto,
+    onReplacePhoto: lightboxProps.onReplacePhoto,
+    onJumpToChatMessage,
+    onJumpToMemo,
+    onJumpToMeetingDate,
+    onJumpToGallery,
+    onGetChatMessageOrdinal: lightboxProps.onGetChatMessageOrdinal,
+    onGetGalleryPhotoOrdinal: lightboxProps.onGetGalleryPhotoOrdinal,
+    onRequestConfirm: lightboxProps.onRequestConfirm,
+    onFetchPhotoComments: lightboxProps.onFetchPhotoComments,
+    onSavePhotoComments: lightboxProps.onSavePhotoComments,
+    preloadedPhotoComments: lightboxProps.preloadedPhotoComments,
+    preloadedPhotoCommentsReady: lightboxProps.preloadedPhotoCommentsReady,
+  });
+}
+
 function MoreModalsHost({ openModal, onClose, modalProps, anniversaryOverride, calendarSettingsExtra, searchExtra }) {
   const React = window.React;
   if (!openModal) return null;
@@ -2594,6 +2708,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   // `selectedDate`/`isModalOpen` drive JSX this shell's early return never reaches, same reasoning
   // as `openMoreModal`.
   const [dateModalDate, setDateModalDate] = React.useState(null);
+  const [dateModalTab, setDateModalTab] = React.useState(null);
   // Firestore calendar records use `title`; a few legacy callers still provide `name`.
   // Prefer the canonical title so the renewal shell reflects the active calendar identity
   // (e.g. cw → 모아엘가) instead of silently falling back to the generic brand.
@@ -2962,14 +3077,9 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
         );
       })
     ),
-    // PC-only (hidden on the mobile drawer via CSS, see .bp-side-nav-group.bp-is-tab-menu): the
-    // side-nav is always visible on PC, so this is where each tab's own extra menu content
-    // (previously reachable only through that tab's mobile-only "메뉴" hamburger) lives instead --
-    // a single dynamic group whose items change with the active tab, replacing what used to be a
-    // static "캘린더 설정/기념일 설정/사용자 매뉴얼" block (that's simply 캘린더 탭's own entry
-    // below now) plus a chat-only 공지사항 item. Actions for tabs other than 캘린더 come from
-    // each screen's own onRegisterMenuActions registration (tabMenuActionsRef, above) since that
-    // state (search-open flags, upload/compose triggers) is local to each of those components.
+    // Side-nav extra menu (chat 공지사항, gallery uploads, places register, …). Visible on the
+    // PC rail (>=1200px) and inside the mobile drawer (.bp-is-open). Each screen registers
+    // actions via onRegisterMenuActions; calendar items open 더보기 modals directly.
     (() => {
       const groupKey = activeTab === 'records'
         ? (recordsSubTab === 'media' ? 'gallery' : recordsSubTab === 'archive' ? 'archive' : recordsSubTab === 'content' ? 'content' : null)
@@ -2982,7 +3092,11 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
           type: 'button',
           className: bentoClass('side-nav-item renewal-shell-side-nav-quick-item'),
           title: item.label,
-          onClick: typeof item.onClick === 'function' ? item.onClick : () => tabMenuActionsRef.current[groupKey]?.[item.action]?.(),
+          onClick: () => {
+            setIsSideNavOpen(false);
+            if (typeof item.onClick === 'function') item.onClick();
+            else tabMenuActionsRef.current[groupKey]?.[item.action]?.();
+          },
         },
           React.createElement('span', { className: bentoClass('side-nav-item-icon') }, React.createElement(TabIcon, { id: item.icon })),
           React.createElement('span', { className: bentoClass('side-nav-item-title') }, item.label)
@@ -3013,7 +3127,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
       React.createElement('main', { className: activeTab === 'calendar' ? 'bp-app-shell is-bento-home' : `renewal-shell-main v2-destination ${hasFullScreen ? `v2-${activeTab}` : (activeTab === 'records' ? `is-records v2-records-${recordsSubTab}` : `is-${activeTab}`)}` },
 
         activeTab === 'calendar'
-          ? React.createElement(CalendarPane, { calendarContext: v2CalendarContext, recordsContext: v2RecordsContext, onOpenDate: setDateModalDate, onChangeView, onOpenMemo: onOpenMemoFromHome, calendarName, onOpenSearch: () => setActiveTab('search'), onOpenMore: () => setIsSideNavOpen(true), settlementBalanceBadge })
+          ? React.createElement(CalendarPane, { calendarContext: v2CalendarContext, recordsContext: v2RecordsContext, onOpenDate: (d) => { setDateModalTab(null); setDateModalDate(d); }, onChangeView, onOpenMemo: onOpenMemoFromHome, calendarName, onOpenSearch: () => setActiveTab('search'), onOpenMore: () => setIsSideNavOpen(true), settlementBalanceBadge })
           : activeTab === 'search'
           ? React.createElement(SearchPage, { modalProps: moreContext.modalProps.search, searchExtra, onClose: () => setActiveTab('calendar') })
           : activeTab === 'chat'
@@ -3031,9 +3145,9 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
           : React.createElement(PlaceholderPane, { tabId: activeTab, calendarName }),
 
         dateModalDate && React.createElement(SharedDateModal, {
-          calendarContext: v2CalendarContext, dateModalDate, initialTab: activeTab === 'settlement' ? 'settlement' : null,
-          onClose: () => setDateModalDate(null),
-          onSelectDate: setDateModalDate,
+          calendarContext: v2CalendarContext, dateModalDate, initialTab: activeTab === 'settlement' ? 'settlement' : dateModalTab,
+          onClose: () => { setDateModalDate(null); setDateModalTab(null); },
+          onSelectDate: (d) => { setDateModalTab(null); setDateModalDate(d); },
           onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource,
         })
       )
@@ -3069,6 +3183,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
       ...v2CalendarContext.dateModalProps,
       dateStr: calendarSettingsDateModalDate,
       initialTab: null,
+      shellChrome: 'bento',
       onClose: () => setCalendarSettingsDateModalDate(null),
       onParticipantClick: (name, dateStr) => { if (dateStr) setCalendarSettingsDateModalDate(dateStr); },
       onEditAnniversary,

@@ -252,7 +252,8 @@ export function SearchCategoryTabs({ tabs, activeKey, onSelect, containerStyle, 
 export function ParticipantBackdrop({ participant, name, dotSize = 10, style = {}, className }) {
   const React = window.React;
   const color = participant?.color || '#94A3B8';
-  const label = name || participant?.name || '참여자';
+  const raw = name || participant?.name || '참여자';
+  const label = /^[가-힣]{3,4}$/.test(String(raw).trim()) ? String(raw).trim().slice(1) : raw;
   return React.createElement('span', {
     className,
     style: { display: 'inline-flex', alignItems: 'center', gap: '8px', color, fontWeight: 700, ...style }
@@ -1451,9 +1452,11 @@ export function HistoryView({
   }, []);
   // 갤러리 페이지(ContentView/PhotoGallery)와 동일하게 헤더 실측 높이만 예약한다 -- 여기만 별도
   // 여유를 더하면 탭 페이지마다 헤더 아래 여백이 달라 보인다(문제로 지적됨).
-  const historyScrollPadTop = isHeaderVisible
-    ? `calc(${Math.max(headerStackHeight, 56)}px + env(safe-area-inset-top, 0px))`
-    : 'calc(12px + env(safe-area-inset-top, 0px))';
+  const historyScrollPadTop = v2Embed
+    ? '0px'
+    : (isHeaderVisible
+      ? `calc(${Math.max(headerStackHeight, 56)}px + env(safe-area-inset-top, 0px))`
+      : 'calc(12px + env(safe-area-inset-top, 0px))');
   const historyScrollStyle = {
     flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain',
     WebkitOverflowScrolling: 'touch', padding: `${historyScrollPadTop} 16px 16px`
@@ -2087,7 +2090,7 @@ export function HistoryView({
       style: {
         position: 'relative', height: '56px',
         backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        display: v2Embed ? 'none' : 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '0 16px', flexShrink: 0
       }
     },
@@ -2119,6 +2122,7 @@ export function HistoryView({
       ariaLabel: "보관함 탭",
       value: historyTab,
       onChange: changeHistoryTab,
+      activeColor: v2Embed ? '#7C2FE5' : undefined,
       options: [
         { value: 'memories', label: '추억', badge: travelMemoryGroups.length },
         { value: 'people', label: '인물', badge: personTagChips.length },
@@ -2222,7 +2226,7 @@ export function HistoryView({
       style: historyScrollStyle
     }, /*#__PURE__*/React.createElement(React.Fragment, null,
       /*#__PURE__*/React.createElement("div", {
-        style: { ...LIST_TOOLBAR_ROW_STYLE, gap: isMobile ? '6px' : '8px' }
+        style: { ...LIST_TOOLBAR_ROW_STYLE, gap: isMobile ? '6px' : '8px', ...(v2Embed ? { padding: '4px 0 2px' } : {}) }
       },
         (!isMemoryListEditMode || !isMobile) && renderMemoryAllDateToggle(),
         /*#__PURE__*/React.createElement("div", {
@@ -2369,7 +2373,7 @@ export function HistoryView({
       className: "history-page-scroll",
       onScroll: handleHistoryScroll,
       style: historyScrollStyle
-    }, /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '16px' } },
+    }, /*#__PURE__*/React.createElement("div", { className: "v2-archive-people-stack", style: { display: 'flex', flexDirection: 'column', gap: v2Embed ? '8px' : '16px' } },
       // 새 인물 태그 추가 -- 벤또 그리드 위로 이동(추가 즉시 그리드에 반영되는 걸 바로 보기
       // 쉽도록). 기존 .form-input/.btn-primary만으로는 패딩/높이/모서리가 다른 입력·버튼과
       // 달라 보였어서, 이 화면에서 직접 크기/스타일을 지정해 나머지 디자인과 맞춘다.
@@ -2452,7 +2456,7 @@ export function HistoryView({
       className: "history-page-scroll",
       onScroll: handleHistoryScroll,
       style: historyScrollStyle
-    }, /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '12px' } },
+    }, /*#__PURE__*/React.createElement("div", { className: "v2-archive-people-detail", style: { display: 'flex', flexDirection: 'column', gap: v2Embed ? '8px' : '12px' } },
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
         /*#__PURE__*/React.createElement("button", {
           type: "button", onClick: () => setSelectedPersonTag(null), "aria-label": "인물 목록으로",
@@ -2930,9 +2934,11 @@ export function ContentView({
     return () => ro.disconnect();
   }, []);
   const [chipRowSlot, setChipRowSlot] = React.useState(null);
-  const contentPaddingTop = isHeaderVisible
-    ? `calc(${headerStackHeight}px + env(safe-area-inset-top, 0px))`
-    : `calc(12px + env(safe-area-inset-top, 0px))`;
+  const contentPaddingTop = v2Embed
+    ? 0
+    : (isHeaderVisible
+      ? `calc(${headerStackHeight}px + env(safe-area-inset-top, 0px))`
+      : `calc(12px + env(safe-area-inset-top, 0px))`);
 
   return /*#__PURE__*/React.createElement("div", {
     className: "places-view-container",
@@ -2965,7 +2971,7 @@ export function ContentView({
       style: {
         position: 'relative', height: '56px',
         backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        display: v2Embed ? 'none' : 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '0 16px', flexShrink: 0
       }
     },
@@ -2997,8 +3003,10 @@ export function ContentView({
       ariaLabel: "컨텐츠 탭",
       value: contentTab,
       onChange: changeContentTab,
+      activeColor: v2Embed ? '#7C2FE5' : undefined,
       options: contentTabOptions
     }),
+    /*#__PURE__*/React.createElement("div", { ref: setChipRowSlot, className: "v2-content-subcat-slot" }),
     /*#__PURE__*/React.createElement("div", {
       className: "region-filter-trigger-row"
     },
@@ -3071,8 +3079,7 @@ export function ContentView({
         className: "region-filter-reset-btn",
         onClick: resetRegionSelections
       }, "초기화")
-    ),
-    /*#__PURE__*/React.createElement("div", { ref: setChipRowSlot })
+    )
     ), // end history-header-stack
     /*#__PURE__*/React.createElement(RegionFilterBackdrop, {
       isOpen: isRegionFilterOpen,
@@ -4381,7 +4388,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
     // can't reach pseudo-elements) -- the row still scrolls by touch swipe or drag, the
     // scrollbar itself is just visually hidden, per the v2 design system request.
     className: "bp-cat-scroll-row",
-    style: { display: 'flex', gap: '6px', padding: '0 16px 12px', overflowX: 'auto', flexShrink: 0, alignItems: 'center', scrollbarWidth: 'none', msOverflowStyle: 'none' }
+    style: { display: 'flex', gap: '6px', padding: '0', overflowX: 'auto', flexShrink: 0, alignItems: 'center', scrollbarWidth: 'none', msOverflowStyle: 'none' }
   },
     [
       { value: '', label: '전체', count: searchFilteredItems.length },
@@ -4393,6 +4400,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
         key: opt.value || 'all',
         type: "button",
         onClick: () => setCategoryFilter(opt.value),
+        className: isActive ? 'bp-cat-chip bp-is-selected' : 'bp-cat-chip',
         style: {
           // padding/font-size read the shared 2뎁스 서브메뉴 칩 토큰(v2/design.css
           // --v2-subnav-chip-*) so Places' .bp-cat-chip and this row stay in sync from one
@@ -4412,9 +4420,12 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
   // chip row slides away together with the rest of the header on scroll, instead of scrolling
   // with the poster grid underneath it. Falls back to rendering inline (its pre-existing spot,
   // right above the grid) on the rare render where the slot ref hasn't attached yet.
+  // Always portal into the header-stack slot under 1st-level tabs. Never fall
+  // back to an inline row in the poster grid — that made 2nd-level chips look
+  // like a list toolbar instead of a subnav.
   const renderedCategoryChipRow = chipRowSlot
-    ? (categoryChipRow ? ReactDOM.createPortal(categoryChipRow, chipRowSlot) : null)
-    : categoryChipRow;
+    ? ReactDOM.createPortal(categoryChipRow, chipRowSlot)
+    : null;
 
   if (filteredItems.length === 0) {
     return /*#__PURE__*/React.createElement(React.Fragment, null,
@@ -4489,7 +4500,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
     /*#__PURE__*/React.createElement("div", {
       className: "culture-items-grid is-cols-" + (gridCols === '1' ? '1' : '2'),
       onScroll: handleGridScroll,
-      style: { flex: 1, overflowY: 'auto', padding: '16px', paddingTop: contentPaddingTop, alignContent: 'start', gridAutoRows: 'max-content' }
+      style: { flex: 1, overflowY: 'auto', padding: '8px 16px 96px', paddingTop: contentPaddingTop || 8, alignContent: 'start', gridAutoRows: 'max-content' }
     },
       visibleItems.map(item => {
         const registered = !!findRegisteredAnniversary(item.id, item.title);

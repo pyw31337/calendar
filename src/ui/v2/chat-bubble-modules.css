@@ -133,14 +133,7 @@
   padding: 14px 16px;
 }
 .v2-design .v2-home-memo-bubble .v2-memo-card-meta {
-  display: block;
-  margin-bottom: 9px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #1e1b2e0f;
-  color: #8a8798;
-  font-size: .62rem;
-  font-weight: 600;
-  line-height: 1.2;
+  display: none;
 }
 
 .v2-design .v2-home-memo-bubble .v2-bubble-summary {
@@ -149,11 +142,9 @@
   color: var(--text-muted);
   line-height: 1.5;
   margin-bottom: 10px;
-  white-space: pre-line;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  overflow: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .v2-design .v2-home-memo-bubble .v2-bubble-preview {
@@ -214,7 +205,7 @@
    전체보기 없이도 바로 알 수 있어야 그 자리에서 바로 반응/피드백을 달 수 있다는 요구사항. */
 .v2-design .v2-home-memo-bubble .v2-bubble-comment-preview {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   margin-top: 0;
   padding: 7px 10px;
@@ -242,10 +233,9 @@
 .v2-design .v2-home-memo-bubble .v2-bubble-comment-text {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   line-height: 1.35;
   color: var(--text-main);
 }
@@ -271,6 +261,7 @@
   font-size: .62rem;
   font-weight: 500;
 }
+.v2-design .v2-memo .memo-card-comment-count { margin-right: auto; color: #9793a3; font-weight: 500; }
 .v2-design .v2-home-memo-bubble .v2-bubble-comment-action {
   display: inline-flex;
   align-items: center;
@@ -356,14 +347,7 @@
   padding-right: 30px !important;
 }
 .v2-memo .v2-memo-card-wrap .v2-memo-card-meta {
-  display: block;
-  margin-bottom: 9px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #1e1b2e0f;
-  color: #8a8798;
-  font-size: .62rem;
-  font-weight: 600;
-  line-height: 1.2;
+  display: none;
 }
 .v2-memo .v2-memo-card-wrap .v2-memo-card-body {
   font-size: .76rem !important;
@@ -376,7 +360,7 @@
   margin-top: 4px !important;
 }
 .v2-design .v2-memo .bp-memo-grid {
-  padding: 40px !important;
+  padding: var(--v2-dest-content-pad-y, 8px) var(--v2-dest-content-pad-x, 16px) 96px !important;
   grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
   gap: 16px !important;
 }
@@ -425,7 +409,7 @@
 }
 @media (max-width: 640px) {
   .v2-design .v2-memo .bp-memo-grid {
-    padding: 40px !important;
+    padding: var(--v2-dest-content-pad-y, 8px) var(--v2-dest-content-pad-x, 16px) 96px !important;
     grid-template-columns: minmax(0, 1fr) !important;
   }
 }

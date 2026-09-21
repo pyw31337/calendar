@@ -1577,7 +1577,9 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     return text.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
   })();
   const memoTextLineCount = displayMemoText ? displayMemoText.split(/\r?\n/).length : 0;
-  const hasLongMemoText = displayMemoText.length > 280 || memoTextLineCount > 8;
+  const hasLongMemoText = (variant === 'v2-page' || variant === 'preview')
+    ? false
+    : (displayMemoText.length > 280 || memoTextLineCount > 8);
   const memoMeta = (() => {
     const value = memo.updatedAt ?? memo.createdAt;
     if (!value) return '';
@@ -1609,7 +1611,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
   // Long comment threads otherwise push the composer far below the fold -- collapse to the most
   // recent COMMENT_COLLAPSE_LIMIT by default, with a toggle above the list to see the rest.
   const COMMENT_COLLAPSE_LIMIT = 3;
-  const [isCommentsExpanded, setIsCommentsExpanded] = React.useState(false);
+  const [isCommentsExpanded, setIsCommentsExpanded] = React.useState(variant === 'v2-page');
   const hasMoreComments = comments.length > COMMENT_COLLAPSE_LIMIT;
   const visibleComments = (!hasMoreComments || isCommentsExpanded) ? comments : comments.slice(-COMMENT_COLLAPSE_LIMIT);
 
@@ -1838,7 +1840,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       className: "v2-memo-card-title",
       style: { fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-main)', marginBottom: '8px', paddingRight: hidePinButton ? '30px' : '44px', wordBreak: 'break-all' }
     }, highlightKeyword(memo.title, searchQuery)),
-    variant !== 'preview' && memoMeta && /*#__PURE__*/React.createElement("div", {
+    variant !== 'preview' && variant !== 'v2-page' && memoMeta && /*#__PURE__*/React.createElement("div", {
       className: "v2-memo-card-meta",
     }, memoMeta),
 
@@ -2072,7 +2074,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         key: comment.id || `${comment.participantId || 'comment'}-${comment.createdAt || 'undated'}-${commentIdx}`,
         onClick: e => e.stopPropagation(),
         style: {
-          display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 2px',
+          display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '6px 2px',
           borderTop: commentIdx > 0 ? '1px solid color-mix(in srgb, var(--bg-primary) 96%, black)' : 'none'
         }
       },
@@ -2103,7 +2105,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
               style: { width: '8px', height: '8px', borderRadius: '50%', backgroundColor: author?.color || '#94A3B8', flexShrink: 0 }
             }),
         /*#__PURE__*/React.createElement("span", {
-          style: { flex: 1, minWidth: 0, fontSize: 'var(--font-size-md)', color: 'var(--text-main)', wordBreak: 'break-word' }
+          style: { flex: 1, minWidth: 0, fontSize: 'var(--font-size-md)', color: 'var(--text-main)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', wordBreak: 'break-word' }
         }, comment.text),
         /*#__PURE__*/React.createElement("button", {
           type: "button", onClick: e => handleStartEditComment(e, comment), title: "편집", "aria-label": "댓글 편집",
@@ -2120,7 +2122,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       className: "memo-card-comment-footer",
       onClick: e => e.stopPropagation()
     },
-      /*#__PURE__*/React.createElement("span", { className: "memo-card-comment-count" }, `댓글 ${comments.length}개`),
+      /*#__PURE__*/React.createElement("span", { className: "memo-card-comment-count" }, variant === 'v2-page' ? (memoMeta || '') : `댓글 ${comments.length}개`),
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "memo-card-comment-toggle",
@@ -2131,10 +2133,13 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
           setIsCommentComposerOpen(v => !v);
         },
         title: "댓글 입력",
-        "aria-label": "댓글 입력"
+        "aria-label": comments.length ? `댓글 ${comments.length}개` : "댓글 입력"
       }, variant === 'v2-page'
         ? /*#__PURE__*/React.createElement("svg", { width: 14, height: 14, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true" }, /*#__PURE__*/React.createElement("path", { d: "M20 11.5a7.5 7.5 0 0 1-8 7.45 8.4 8.4 0 0 1-3.4-.7L4 19.5l1.25-3.2A7.3 7.3 0 0 1 4.5 12 7.5 7.5 0 0 1 12 4.5a7.5 7.5 0 0 1 8 7Z" }))
-        : /*#__PURE__*/React.createElement(MessageCommentIcon, { size: 16 }), "댓글")
+        : /*#__PURE__*/React.createElement(MessageCommentIcon, { size: 16 }), "댓글", (variant === 'v2-page' && comments.length > 0) ? /*#__PURE__*/React.createElement("span", {
+        className: "memo-card-comment-badge",
+        "aria-hidden": "true"
+      }, String(comments.length)) : null)
     ),
 
     /* Comment composer -- always column (input, then picker left / cancel+save right).

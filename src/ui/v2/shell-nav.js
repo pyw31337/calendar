@@ -78,7 +78,12 @@ export function extractChatSlots(legacyTree) {
     const inner = extractSlotsByClass(top.composer, {
       resize: 'chat-composer-resize-handle',
       memes: 'chat-composer-meme-area',
+      photos: 'chat-composer-photos',
+      files: 'chat-composer-files',
     });
+    if (!inner.resize) {
+      Object.assign(inner, extractSlotsByClass(top.composer, { resize: 'panel-resize-handle' }));
+    }
     Object.assign(top, inner);
     const walk = (node, bag) => {
       if (!node || bag._done) return;
@@ -119,7 +124,9 @@ export function extractChatSlots(legacyTree) {
             ? props.children.filter(c => typeof c === 'string').join('')
             : '';
         const hay = `${label} ${childText}`;
-        if (!bag.attach && /첨부|파일|사진|attach/i.test(hay)) bag.attach = node;
+        if (!bag.attach && /파일 업로드|사진 또는 파일|사진 첨부|파일 첨부|paperclip|attach/i.test(hay) && !/제거|remove/i.test(hay)) {
+          bag.attach = node;
+        }
         if (!bag.send && /전송|보내|send/i.test(hay)) bag.send = node;
         if (!bag.paste && /붙여넣기|paste/i.test(hay)) bag.paste = node;
         if (!bag.emoji && /이모티콘|emoji/i.test(hay)) bag.emoji = node;

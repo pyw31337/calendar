@@ -224,7 +224,7 @@
     .v2-design .bp-day-cell.bp-confirmed { background: var(--surface-confirmed); }
     .v2-design .bp-day-cell.bp-holiday .bp-day-num { color: #EF4444; }
     .v2-design .bp-dot-row { display: flex; gap: 2px; flex-wrap: wrap; justify-content: center; max-width: 100%; }
-    .v2-design .bp-p-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 0 1px rgba(30,27,46,0.08); }
+    .v2-design .bp-p-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; box-shadow: none; border: 0; }
     .v2-design .bp-p-dot::after { content: none; }
 
     .v2-design .bp-day-bar { position: absolute; bottom: 3px; height: 4px; background: var(--cal-schedule, #7C2FE5); transition: opacity 0.15s ease; }
@@ -734,7 +734,7 @@
 
     @media (min-width: 768px) {
       .v2-design .bp-app-shell { max-width: 760px; }
-      .v2-design .bp-hero-zone { border-radius: 20px; margin: 16px 20px 0; }
+      .v2-design .bp-hero-zone { border-radius: 0; margin: 0; }
       .v2-design .bp-bento-title { padding-left: 20px !important; padding-right: 20px !important; }
       .v2-design .bp-dday-toggle-wrap { padding: 18px 20px !important; }
       .v2-design .bp-dday-strip { padding: 0 20px 18px !important; }
@@ -748,12 +748,12 @@
       .v2-design .bp-thumb-grid { grid-template-columns: repeat(3, 1fr); }
       .v2-design .bp-dot-row { gap: 3px; }
       .v2-design .bp-p-dot {
-        width: auto; height: auto; border-radius: var(--radius-full); box-shadow: none;
-        display: inline-flex; align-items: center; padding: 1px 6px;
+        width: 7px; height: 7px; min-width: 7px; min-height: 7px; padding: 0;
+        border-radius: 50%; box-shadow: none; border: 0;
+        display: inline-block;
       }
       .v2-design .bp-p-dot::after {
-        content: attr(data-name); display: inline; color: #fff; font-size: 0.56rem; font-weight: 800;
-        line-height: 1.4; white-space: nowrap;
+        content: none; display: none;
       }
       .v2-design .bp-day-anniversary:has(.bp-day-anniversary-label) { height: 13px; bottom: 3px; }
       .v2-design .bp-day-anniversary.bp-lvl-1:has(.bp-day-anniversary-label) { bottom: 20px; }
@@ -790,8 +790,8 @@
       .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item { justify-content: center; padding: 10px 6px; }
       .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-manual-banner { justify-content: center; padding: 8px; }
       .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-head { justify-content: center; }
-      .v2-design .bp-app-shell { max-width: 1600px; margin: 0 auto; padding: 24px; }
-      .v2-design .bp-hero-zone { border-radius: 20px; margin: 28px 0 0; }
+      .v2-design .bp-app-shell { max-width: 1600px; margin: 0 auto; padding: 0; }
+      .v2-design .bp-hero-zone { border-radius: 0; margin: 0; }
       .v2-design .bp-bento-grid { grid-template-columns: 1.4fr 1fr 1fr; padding: 24px 0 !important; gap: 20px; }
       .v2-design .bp-bento-card.bp-wide { grid-column: auto; }
       .v2-design .bp-bento-card:first-of-type.bp-wide { grid-column: 1 / -1; }
