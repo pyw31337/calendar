@@ -1256,19 +1256,21 @@ html:has(.renewal-shell.v2-design) .modal-overlay input.form-input {
     max-height: var(--v2-side-search-h) !important;
     margin-top: var(--v2-side-search-my) !important;
     margin-bottom: var(--v2-side-search-my) !important;
+    margin-left: 12px !important;
     padding-top: 0 !important;
     padding-bottom: 0 !important;
     box-sizing: border-box !important;
     line-height: 0 !important;
     transform: none !important;
-    transition: width .28s ease, border-radius .28s ease, padding-left .28s ease, padding-right .28s ease, background-color .2s ease !important;
+    transition: width .28s ease, border-radius .28s ease, padding-right .28s ease, background-color .2s ease !important;
   }
   .renewal-shell.v2-design .bp-side-nav:not(.bp-is-collapsed) .bp-side-nav-global-search {
     display: flex !important;
-    width: calc(100% - 20px) !important;
-    margin-left: 10px !important;
-    margin-right: 10px !important;
-    padding-left: 14px !important;
+    width: calc(100% - 24px) !important;
+    margin-right: 12px !important;
+    /* 1px border + 9px pad centers the 20px glyph in the same 40px slot
+     * the collapsed circle uses: 12 + 1 + 9 = 22. */
+    padding-left: 9px !important;
     padding-right: 14px !important;
     justify-content: flex-start !important;
     align-items: center !important;
@@ -1276,17 +1278,12 @@ html:has(.renewal-shell.v2-design) .modal-overlay input.form-input {
     border-radius: 999px !important;
   }
   .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search {
-    display: grid !important;
-    place-items: center !important;
-    grid-template-columns: 1fr !important;
-    grid-template-rows: 1fr !important;
-    width: var(--v2-side-search-h) !important;
-    margin-left: auto !important;
-    margin-right: auto !important;
-    padding: 0 !important;
-    justify-content: center !important;
+    display: flex !important;
     align-items: center !important;
-    justify-items: center !important;
+    justify-content: center !important;
+    width: var(--v2-side-search-h) !important;
+    margin-right: 12px !important;
+    padding: 0 !important;
     gap: 0 !important;
     border-radius: 50% !important;
     overflow: hidden !important;
@@ -1306,18 +1303,18 @@ html:has(.renewal-shell.v2-design) .modal-overlay input.form-input {
   .renewal-shell.v2-design .bp-side-nav-global-search-icon,
   .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search-icon,
   .renewal-shell.v2-design .bp-side-nav:not(.bp-is-collapsed) .bp-side-nav-global-search-icon {
-    width: var(--v2-side-icon) !important;
-    height: var(--v2-side-icon) !important;
-    min-width: var(--v2-side-icon) !important;
-    min-height: var(--v2-side-icon) !important;
-    max-width: var(--v2-side-icon) !important;
-    max-height: var(--v2-side-icon) !important;
+    width: 20px !important;
+    height: 20px !important;
+    min-width: 20px !important;
+    min-height: 20px !important;
+    max-width: 20px !important;
+    max-height: 20px !important;
     margin: 0 !important;
     padding: 0 !important;
-    display: flex !important;
+    display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    flex: 0 0 var(--v2-side-icon) !important;
+    flex: 0 0 20px !important;
     line-height: 0 !important;
     transform: none !important;
   }
@@ -1342,6 +1339,8 @@ html:has(.renewal-shell.v2-design) .modal-overlay input.form-input {
     align-items: center !important;
     line-height: 1 !important;
     height: var(--v2-side-icon) !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
   /* Column flex + gap: pitch is 44 + 2 in BOTH states. Vertical margins stay 0
