@@ -1689,11 +1689,12 @@ function SharedDateModal({ calendarContext, dateModalDate, initialTab = null, se
  * `RenewalAppShell` owns, so `ChatPane` composes them from the `onChangeView`/`onOpenAppSettings`
  * props it receives instead.
  *
- * Deliberately deferred: the cross-tab "sticky video keeps floating after you leave 대화"
- * behavior (`withStickyVideo` in app-main.js) isn't wrapped around this shell -- `stickyVideoKey`/
- * `onActivateVideo` still make a tapped video actually play inline in the chat feed (that's a
- * pure pass-through of existing state), but it won't keep floating as a mini-player after
- * switching tabs. That's a nice-to-have on top of a working 대화 tab, not required for one.
+ * The cross-tab "sticky video keeps floating after you leave 대화" behavior (`withStickyVideo`
+ * in app-main.js) IS wrapped around this shell -- see `stickyVideo`/`onCloseStickyVideo` below,
+ * rendered once at the `RenewalAppShell` level (outside any single tab's pane) so it survives
+ * `activeTab` switches the same way V1's always-mounted `StickyVideoBox` survives `changeView`.
+ * `stickyVideoKey`/`onActivateVideo` (in `chatRoomProps`) remain the separate pure pass-through
+ * that makes a tapped video actually start playing inline in the chat feed.
  */
 export function buildRenewalChatContext(calendar, deps) {
   const {
@@ -1704,7 +1705,7 @@ export function buildRenewalChatContext(calendar, deps) {
     isHeaderVisible, setIsHeaderVisible, handleChatScroll, toggleChatInputPin, chatMessagesContainerRef, showToast,
     handlePromoteInlineChatImage, handleSaveImageTags, handleSearchTag, isDarkTheme, toggleTheme,
     fontScalePercent, setFontScalePercent, mainNotifPermission, mainChatNotifyEnabled, handleMainToggleNotifications,
-    stickyVideo, handleActivateChatVideo, handleJumpToChatMessage, handleJumpToMemo, handleJumpToMeetingDate,
+    stickyVideo, setStickyVideo, handleActivateChatVideo, handleJumpToChatMessage, handleJumpToMemo, handleJumpToMeetingDate,
     handleGetChatMessageOrdinal, handleGetGalleryPhotoOrdinal, showConfirmDialog, syncStatus, externalFocusMsgId,
     setIsChatShareOpen,
   } = deps || {};
@@ -1714,6 +1715,11 @@ export function buildRenewalChatContext(calendar, deps) {
     isChatShareOpen: false,
     onOpenChatShare: () => setIsChatShareOpen(true),
     onCloseChatShare: () => setIsChatShareOpen(false),
+    // Read by RenewalAppShell to render the always-mounted StickyVideoBox and to build its
+    // "go to chat" handler (which needs setActiveTab, only RenewalAppShell owns that).
+    stickyVideo,
+    onCloseStickyVideo: () => setStickyVideo?.(null),
+    onJumpToChatMessage: handleJumpToChatMessage,
     chatRoomProps: {
       calendar: activeCal, memePool, onSendMemeImage: handleSendMemeImage,
       chatMessages: displayChatMessages, loadingOlderChat, hasMoreOlderChat, onLoadOlderChat: loadOlderChatMessages,
@@ -3433,13 +3439,27 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
       onEditAnniversary, onAddAnniversaryForDate: (d) => { setMoreDateModalDate(null); onAddAnniversaryForDate(d); },
       onFocusCultureSource,
     }),
-    // CalendarApp's own render normally reaches these two overlays via withStickyVideo(), which
+    // CalendarApp's own render normally reaches these overlays via withStickyVideo(), which
     // this shell returns before (see renderRenewalShellIfEnabled's early return in app-main.js).
     // Without this, a v2 upload had zero visual progress feedback -- the upload itself still ran
     // (shared code path with v1), it just looked stalled/failed with nothing on screen to show
     // otherwise, which is indistinguishable from a real failure to someone watching it.
     operationProgress && !chatUploadProgress && React.createElement(bindUiComponentAliases(React).OperationProgressOverlay, operationProgress),
     chatUploadProgress && React.createElement(bindUiComponentAliases(React).ImageUploadOverlay, chatUploadProgress),
+    // Same reason: a video activated in 대화 used to just vanish on switching tabs, since this
+    // shell never reached V1's always-mounted StickyVideoBox. Rendered once here (outside any
+    // per-tab pane) so it survives `activeTab` changes exactly like V1's does across `changeView`.
+    chatContext?.stickyVideo && React.createElement(bindUiComponentAliases(React).StickyVideoBox, {
+      stickyVideo: chatContext.stickyVideo,
+      onClose: chatContext.onCloseStickyVideo,
+      onGoToChat: () => {
+        const messageId = chatContext.stickyVideo ? chatContext.stickyVideo.key : null;
+        setActiveTab('chat');
+        if (messageId && typeof chatContext.onJumpToChatMessage === 'function') {
+          setTimeout(() => { chatContext.onJumpToChatMessage(messageId); }, 350);
+        }
+      },
+    }),
     // Same reason as the two overlays above: v1's single showToast()/toast state renders here
     // (app-main.js's withStickyVideo, position:fixed so it's independent of where it's mounted)
     // and this shell never reaches that tree. Every showToast() call already made across v2
