@@ -2832,6 +2832,8 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
     onSelectDate: (d) => setMoreDateModalDate(d),
     onOpenChatMessage: onOpenChatMessageFromMore,
     onOpenImage: onOpenImageFromMore,
+    onOpenPlaces: () => onChangeView('places'),
+    onOpenContent: () => onChangeView('content'),
   };
 
   // Correct an invalid/stale ?tab=/?sub= on first mount without adding a history entry, then

@@ -13,31 +13,66 @@ function __fb() {
   return (typeof window !== 'undefined' && window.__gatherFirebaseDb) || null;
 }
 
-export function SearchResultLogRow({ badgeName, badgeColor, timeStr, calendarLabel, onClick, children }) {
+export function SearchResultLogRow({ kindLabel, kindColor, badgeName, badgeColor, title, timeStr, calendarLabel, onClick, children }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
 
   const Tag = onClick ? "button" : "div";
+  const hasTitle = title != null && title !== '';
   return /*#__PURE__*/React.createElement(Tag, {
     type: onClick ? "button" : undefined,
     onClick,
+    className: "global-search-result",
     style: {
       display: 'block', width: '100%', boxSizing: 'border-box', textAlign: 'left',
-      padding: '10px 12px', borderRadius: 'var(--radius-md)', backgroundColor: '#F8FAFC', border: '1px solid var(--border-subtle)',
+      padding: '14px 16px', borderRadius: '14px', backgroundColor: '#F8FAFC', border: '1px solid var(--border-subtle)',
       cursor: onClick ? 'pointer' : 'default', font: 'inherit'
     }
   },
-    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', flexWrap: 'wrap' } },
+    /*#__PURE__*/React.createElement("div", {
+      className: "global-search-result-top",
+      style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: hasTitle || children ? '8px' : 0, flexWrap: 'wrap' }
+    },
+      kindLabel && /*#__PURE__*/React.createElement("span", {
+        className: "global-search-result-kind",
+        style: {
+          backgroundColor: kindColor || badgeColor || '#94A3B8', color: '#FFFFFF',
+          padding: '2px 8px', borderRadius: 'var(--radius-full)',
+          fontSize: 'var(--font-size-xs)', fontWeight: 800, lineHeight: '18px', whiteSpace: 'nowrap'
+        }
+      }, kindLabel),
       badgeName && /*#__PURE__*/React.createElement("span", {
-        style: { backgroundColor: badgeColor || '#94A3B8', color: '#FFFFFF', padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 'bold', whiteSpace: 'nowrap' }
+        className: kindLabel ? "global-search-result-path" : "global-search-result-kind",
+        style: kindLabel ? {
+          fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', fontWeight: 700, lineHeight: '18px'
+        } : {
+          backgroundColor: badgeColor || '#94A3B8', color: '#FFFFFF',
+          padding: '2px 8px', borderRadius: 'var(--radius-full)',
+          fontSize: 'var(--font-size-xs)', fontWeight: 800, lineHeight: '18px', whiteSpace: 'nowrap'
+        }
       }, badgeName),
       calendarLabel && /*#__PURE__*/React.createElement("span", {
         style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-light)', fontWeight: 700 }
       }, calendarLabel)
     ),
-    /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-base)', color: 'var(--text-main)', lineHeight: 1.45, wordBreak: 'break-word' } }, children),
-    timeStr && /*#__PURE__*/React.createElement("div", { style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: '6px' } }, timeStr)
+    hasTitle && /*#__PURE__*/React.createElement("div", {
+      className: "global-search-result-title",
+      style: { fontSize: 'var(--font-size-base)', fontWeight: 800, color: 'var(--text-main)', lineHeight: 1.45, wordBreak: 'break-word' }
+    }, title),
+    children ? /*#__PURE__*/React.createElement("div", {
+      className: "global-search-result-meta",
+      style: {
+        fontSize: hasTitle ? 'var(--font-size-sm)' : 'var(--font-size-base)',
+        color: hasTitle ? 'var(--text-muted)' : 'var(--text-main)',
+        lineHeight: 1.45, wordBreak: 'break-word',
+        marginTop: hasTitle ? '4px' : 0
+      }
+    }, children) : null,
+    timeStr && /*#__PURE__*/React.createElement("div", {
+      className: "global-search-result-time",
+      style: { fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', marginTop: '8px' }
+    }, timeStr)
   );
 }
 
