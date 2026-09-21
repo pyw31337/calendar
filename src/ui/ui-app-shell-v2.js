@@ -3158,7 +3158,12 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
 
   const bentoSideNav = React.createElement(React.Fragment, null,
     React.createElement('div', { className: bentoClass('side-nav-head') },
-      React.createElement('div', { className: bentoClass('side-nav-brand') },
+      React.createElement('button', {
+        type: 'button',
+        className: bentoClass('side-nav-brand'),
+        'aria-label': '캘린더 홈으로 이동',
+        onClick: () => selectSideItem('calendar'),
+      },
         React.createElement('span', {
           className: bentoClass('side-nav-brand-icon'),
           'aria-hidden': 'true',
