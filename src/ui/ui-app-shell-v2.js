@@ -1372,21 +1372,13 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
               (m.text || m.content) && React.createElement('span', { className: 'v2-home-chat-text' }, String(m.text || m.content))
             )
           ),
+          // Real ChatRoomView bubbles show only the timestamp by default -- the reply/edit
+          // buttons next to it are hover/tap-revealed (.msg-actions-group, opacity:0 until
+          // .msg-row-hover:hover). This preview had no such reveal state and no click handler
+          // on its own reply glyph (decorative only), so it just sat there permanently, making
+          // the meta column taller and the time sit lower than in the real chat room. Dropping
+          // it matches the real bubble's default (icons hidden) appearance exactly.
           React.createElement('div', { className: 'v2-home-chat-meta' },
-            React.createElement('span', {
-              className: 'v2-home-chat-reply-btn',
-              role: 'img',
-              'aria-label': '답장',
-              title: '답장',
-            },
-              React.createElement('svg', {
-                width: 15, height: 15, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
-                strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': 'true',
-              },
-                React.createElement('path', { d: 'M9 13l-4 -4l4 -4' }),
-                React.createElement('path', { d: 'M5 9h7a4 4 0 1 1 0 8h-1' })
-              )
-            ),
             React.createElement('span', { className: 'v2-home-chat-time' }, formatTime(m.timestamp ?? m.createdAt))
           )
         );
