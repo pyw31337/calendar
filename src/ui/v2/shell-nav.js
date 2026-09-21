@@ -116,6 +116,13 @@ export function extractChatSlots(legacyTree) {
       )) {
         bag.participant = node;
       }
+      // The "OO님에게 답장" preview card (ui-chat-room.js) carries no className -- it's
+      // styled entirely via an inline --reply-accent custom property -- so it's invisible
+      // to the className-based extraction above and gets silently dropped when composer's
+      // children are replaced by the V2 layout unless captured here.
+      if (!bag.reply && props.style && Object.prototype.hasOwnProperty.call(props.style, '--reply-accent')) {
+        bag.reply = node;
+      }
       if (type === 'textarea' && !bag.textarea) bag.textarea = node;
       if (type === 'button') {
         const label = String(props['aria-label'] || props.title || '');

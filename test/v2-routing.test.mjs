@@ -213,6 +213,23 @@ test('V2 shell renders the same upload/operation progress overlays as v1', async
 // withStickyVideo() tree as the overlays above (app-main.js: `toast && <div className="toast...">`).
 // v2 never reached it either, so every showToast() call already made from v2 screens was updating
 // state with nothing on screen to show it -- indistinguishable from the action silently no-oping.
+// Regression: ui-chat-room.js's "OO님에게 답장" reply-preview card (rendered as a plain child
+// of .chat-composer when chatReplyTarget is set) carries no className -- it's styled purely via
+// an inline --reply-accent custom property. extractChatSlots's className-based walk never
+// matched it, so slots.reply was always undefined; ChatScreen's composer clone() then replaced
+// the composer's children wholesale (resize, slots.reply, photos, files, ...), silently dropping
+// the reply banner and its cancel button even though chatReplyTarget/setChatReplyTarget kept
+// working and the reply still attached to the sent message. Users under ?shell=v2 had no way to
+// see or cancel a pending reply.
+test('extractChatSlots captures the reply-preview card by its --reply-accent marker', async () => {
+  const { readFileSync } = await import('node:fs');
+  const shellNav = readFileSync(new URL('../src/ui/v2/shell-nav.js', import.meta.url), 'utf8');
+  const screens = readFileSync(new URL('../src/ui/v2/screens.js', import.meta.url), 'utf8');
+  assert.match(shellNav, /--reply-accent/, 'extractChatSlots must detect the reply card by its --reply-accent style marker (it has no className)');
+  assert.match(shellNav, /bag\.reply\s*=\s*node/, 'a matched reply card must be assigned to bag.reply');
+  assert.match(screens, /slots\.reply/, 'ChatScreen must place the captured reply slot back into the rebuilt composer');
+});
+
 test('V2 shell renders the same app-wide toast as v1', async () => {
   const { readFileSync } = await import('node:fs');
   const shell = readFileSync(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
