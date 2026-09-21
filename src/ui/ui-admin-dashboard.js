@@ -4,6 +4,7 @@
 
 import { MemeAdminPanel } from './ui-meme-admin.js';
 import { TABLER_ICONS } from './v2/tabler-icons.js';
+import { findDuplicatePhotoGroups, chooseDedupWinner } from '../core/gallery-dedup.js';
 
 /**
  * Icon unification pass (2026-09-17): a handful of admin icons that used to come from the
@@ -227,6 +228,10 @@ function listUntaggedPhotoIndexEntriesRemote(...args) {
 function adminBulkTagPhotosRemote(...args) {
   const f = __gatherUiDeps().adminBulkTagPhotosRemote || GATHER_APP_UTILS.adminBulkTagPhotosRemote;
   return typeof f === 'function' ? f(...args) : Promise.resolve([]);
+}
+function listPhotoIndexEntriesForDedupRemote(...args) {
+  const f = __gatherUiDeps().listPhotoIndexEntriesForDedupRemote || GATHER_APP_UTILS.listPhotoIndexEntriesForDedupRemote;
+  return typeof f === 'function' ? f(...args) : Promise.resolve({ items: [], nextCursor: null });
 }
 function listSharedDataPoolRemote(...args) {
   const f = __gatherUiDeps().listSharedDataPoolRemote || GATHER_APP_UTILS.listSharedDataPoolRemote;
@@ -479,6 +484,55 @@ export function AdminDashboard({ initialCalendars }) {
       setBulkTagSaving(false);
     }
   };
+
+  // 데이터풀 > 사진 "중복사진 검사" -- 전체 캘린더의 photoIndex를 훑어 gallery-dedup.js의 기준
+  // (확장자+용량+같은 초 = "exact", 확장자+용량+같은 업로더+15분 이내 = "retry")으로 중복 그룹을
+  // 찾아 보고서만 보여준다. 사용자가 선택한 방식(먼저 검사만 해서 발견 건수를 보고서로 보여줌)에
+  // 따라 이 화면은 읽기 전용이며 병합/삭제는 실행하지 않는다.
+  const [dedupScanning, setDedupScanning] = React.useState(false);
+  const [dedupScanned, setDedupScanned] = React.useState(false);
+  const [dedupScannedCount, setDedupScannedCount] = React.useState(0);
+  const [dedupGroups, setDedupGroups] = React.useState([]);
+  const runDedupScan = React.useCallback(async () => {
+    const session = getAdminSession();
+    if (!session?.password) return;
+    setDedupScanning(true);
+    setDedupScanned(false);
+    try {
+      const all = [];
+      let cursor = null;
+      for (let i = 0; i < 50; i += 1) { // hard cap, same guard as loadSharedDataPool above
+        const { items, nextCursor } = await listPhotoIndexEntriesForDedupRemote(session.password, { cursor, limit: 200 });
+        all.push(...items);
+        setDedupScannedCount(all.length);
+        if (!nextCursor) break;
+        cursor = nextCursor;
+      }
+      // Duplicates only matter within the same calendar -- two different calendars can
+      // legitimately share an identical-looking upload (same photo shared twice), and
+      // calendars never share Storage/data, so group per calendar before running dedup.
+      const byCalendar = new Map();
+      all.forEach(item => {
+        const list = byCalendar.get(item.calendarId) || [];
+        list.push(item);
+        byCalendar.set(item.calendarId, list);
+      });
+      const groups = [];
+      byCalendar.forEach((photos, calendarId) => {
+        findDuplicatePhotoGroups(photos).forEach(group => {
+          const decision = chooseDedupWinner(group);
+          if (decision) groups.push({ calendarId, kind: group.kind, winner: decision.winner, losers: decision.losers });
+        });
+      });
+      setDedupGroups(groups);
+      setDedupScanned(true);
+    } catch (err) {
+      showAdminToast(`중복사진 검사 실패: ${err.message || '오류'}`, 'error');
+    } finally {
+      setDedupScanning(false);
+    }
+  }, []);
+  const dedupDuplicatePhotoCount = dedupGroups.reduce((sum, g) => sum + g.losers.length, 0);
 
   // 데이터풀 탭의 카테고리 선택 (사진/파일/링크/기타) + "미태그만 보기" -- 태그 기반으로 관리하는
   // 공유 데이터 어디서나 재사용할 수 있도록 category-agnostic 하게 둔다.
@@ -2233,6 +2287,63 @@ export function AdminDashboard({ initialCalendars }) {
                         disabled: bulkTagSaving || !bulkTagInput.trim() || selectedUntaggedKeys.length === 0,
                         style: { height: '40px', padding: '0 16px', fontWeight: 800, fontSize: 'var(--font-size-sm)' }
                       }, bulkTagSaving ? "적용 중..." : "일괄 태그 적용")
+                    )
+                  )
+          ),
+          /*#__PURE__*/React.createElement("div", { style: { marginTop: '24px', paddingTop: '20px', borderTop: '1px solid var(--border-subtle)' } },
+            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '10px' } },
+              /*#__PURE__*/React.createElement("div", null,
+                /*#__PURE__*/React.createElement("p", { style: { margin: 0, fontWeight: 800, fontSize: 'var(--font-size-md)' } }, "중복사진 검사"),
+                /*#__PURE__*/React.createElement("p", { style: { margin: '2px 0 0', fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } }, "같은 캘린더 안에서 확장자·용량·업로드 시간이 같은 사진을 찾아 보여줍니다. 조회만 하며, 병합·삭제는 실행하지 않습니다.")
+              ),
+              /*#__PURE__*/React.createElement("button", {
+                type: "button", className: "btn btn-secondary",
+                onClick: runDedupScan,
+                disabled: dedupScanning,
+                style: { height: '36px', padding: '0 12px', fontWeight: 800, fontSize: 'var(--font-size-sm)' }
+              }, dedupScanning ? `검사 중... (${dedupScannedCount}장)` : (dedupScanned ? "다시 검사" : "검사 시작"))
+            ),
+            !dedupScanned
+              ? /*#__PURE__*/React.createElement("div", { style: { padding: '20px', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', textAlign: 'center' } }, "\"검사 시작\"을 눌러 중복 사진을 조회하세요.")
+              : dedupGroups.length === 0
+                ? /*#__PURE__*/React.createElement("div", { style: { padding: '20px', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)', textAlign: 'center' } }, `${dedupScannedCount}장을 검사했고, 중복이 발견되지 않았습니다.`)
+                : /*#__PURE__*/React.createElement(React.Fragment, null,
+                    /*#__PURE__*/React.createElement("p", { style: { margin: '0 0 12px', fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } },
+                      `${dedupScannedCount}장 중 ${dedupGroups.length}개 그룹, 총 ${dedupDuplicatePhotoCount}장의 중복 후보를 발견했습니다. (태그 있음 > 댓글 많음 > 먼저 올라간 순으로 "유지"를 제안합니다)`),
+                    /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '10px' } },
+                      dedupGroups.map((group, gi) => /*#__PURE__*/React.createElement("div", {
+                        key: `${group.calendarId}:${group.winner.photo.assetKey || gi}`,
+                        style: { padding: '10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }
+                      },
+                        /*#__PURE__*/React.createElement("p", { style: { margin: '0 0 8px', fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' } },
+                          `${group.calendarId} · ${group.kind === 'exact' ? '동일 업로드(파일명 일치)' : '재전송 추정(같은 업로더, 시간 근접)'}`),
+                        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
+                          [{ candidate: group.winner, isWinner: true }, ...group.losers.map(candidate => ({ candidate, isWinner: false }))]
+                            .map(({ candidate, isWinner }, ci) => /*#__PURE__*/React.createElement("div", {
+                              key: candidate.photo.assetKey || ci,
+                              style: { position: 'relative', width: '84px' }
+                            },
+                              /*#__PURE__*/React.createElement("div", {
+                                style: { position: 'relative', borderRadius: 'var(--radius-sm)', overflow: 'hidden', aspectRatio: '1 / 1', backgroundColor: 'var(--bg-primary)' }
+                              },
+                                /*#__PURE__*/React.createElement("img", {
+                                  src: candidate.photo.thumb || candidate.photo.full, alt: "", loading: "lazy",
+                                  style: { width: '100%', height: '100%', objectFit: 'cover' }
+                                }),
+                                /*#__PURE__*/React.createElement("span", {
+                                  "aria-hidden": true,
+                                  style: {
+                                    position: 'absolute', top: '4px', left: '4px', padding: '1px 6px', borderRadius: 'var(--radius-full)',
+                                    backgroundColor: isWinner ? 'rgba(22,163,74,0.9)' : 'rgba(107,114,128,0.9)', color: '#fff',
+                                    fontSize: 'var(--font-size-2xs)', fontWeight: 800
+                                  }
+                                }, isWinner ? "유지" : "병합 대상")
+                              ),
+                              /*#__PURE__*/React.createElement("p", { style: { margin: '2px 0 0', fontSize: 'var(--font-size-2xs)', color: 'var(--text-muted)', textAlign: 'center' } },
+                                `태그 ${candidate.tags ? '있음' : '없음'} · 댓글 ${candidate.commentCount}`)
+                            ))
+                        )
+                      ))
                     )
                   )
           )
