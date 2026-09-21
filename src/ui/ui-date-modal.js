@@ -237,6 +237,7 @@ export function DateModal({
   memos = [],
   setActiveLightbox,
   initialTab = null,
+  searchFocus = null,
   adminMode = false,
   onSave,
   onConfirmMeeting,
@@ -375,11 +376,30 @@ export function DateModal({
       const firebaseConfig = __deps.firebaseConfig || window.firebaseConfig;
   const KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY = __deps.KAKAO_CATEGORY_GROUP_TO_PLACE_CATEGORY || {};
 
-  const [activeTab, setActiveTab] = React.useState(initialTab || 'participant'); // 'participant' | 'meeting' | 'settlement' | 'photo' | 'memo'
+  const [activeTab, setActiveTab] = React.useState(searchFocus?.tab || initialTab || 'participant'); // 'participant' | 'meeting' | 'settlement' | 'photo' | 'memo'
   const [participantId, setParticipantId] = React.useState('');
   const [note, setNote] = React.useState('');
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  React.useEffect(() => {
+    const nextTab = searchFocus?.tab || initialTab;
+    if (nextTab) setActiveTab(nextTab);
+  }, [dateStr, searchFocus?.tab, initialTab]);
+  React.useEffect(() => {
+    const participantId = searchFocus?.participantId;
+    const expenseId = searchFocus?.expenseId;
+    if (!participantId && !expenseId) return undefined;
+    const timer = setTimeout(() => {
+      const sel = participantId
+        ? `.date-modal-attendance-row[data-participant-id="${String(participantId).replace(/"/g, '')}"]`
+        : `.expense-sortable-row[data-expense-id="${String(expenseId).replace(/"/g, '')}"]`;
+      const el = document.querySelector(sel);
+      if (!el) return;
+      el.classList.add('search-result-focus');
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 120);
+    return () => clearTimeout(timer);
+  }, [dateStr, activeTab, searchFocus?.participantId, searchFocus?.expenseId]);
   const noteInputRef = React.useRef(null);
   const brokenMeetingPhotoKeysRef = React.useRef(new Set());
   const brokenMeetingPhotoUrlsRef = React.useRef(new Set());
@@ -2458,7 +2478,7 @@ export function DateModal({
           return /*#__PURE__*/React.createElement("div", {
             key: entry.id || `${entry.participantId || 'participant'}_${entryIndex}`,
             "data-participant-id": entry.participantId,
-            className: `date-modal-attendance-row attendance-sortable-row poll-sortable-row${canReorder ? ' date-modal-attendance-row--reorderable' : ''}${draggingParticipantId === entry.participantId ? ' is-dragging' : ''}${dragOverParticipantId === entry.participantId ? ' is-drop-target' : ''}`,
+            className: `date-modal-attendance-row attendance-sortable-row poll-sortable-row${canReorder ? ' date-modal-attendance-row--reorderable' : ''}${draggingParticipantId === entry.participantId ? ' is-dragging' : ''}${dragOverParticipantId === entry.participantId ? ' is-drop-target' : ''}${searchFocus?.participantId && searchFocus.participantId === entry.participantId ? ' search-result-focus' : ''}`,
             style: {
               display: 'flex',
               flexDirection: 'column',
@@ -3090,7 +3110,7 @@ export function DateModal({
           return /*#__PURE__*/React.createElement("div", {
             key: expense.id,
             "data-expense-id": expense.id,
-            className: `expense-sortable-row poll-sortable-row${draggingExpenseId === expense.id ? ' is-dragging' : ''}${dragOverExpenseId === expense.id ? ' is-drop-target' : ''}`,
+            className: `expense-sortable-row poll-sortable-row${draggingExpenseId === expense.id ? ' is-dragging' : ''}${dragOverExpenseId === expense.id ? ' is-drop-target' : ''}${searchFocus?.expenseId && searchFocus.expenseId === expense.id ? ' search-result-focus' : ''}`,
             onClick: () => handleExpenseItemClick(expense),
             onDragOver: event => {
               event.preventDefault();

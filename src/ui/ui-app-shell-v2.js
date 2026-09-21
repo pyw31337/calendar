@@ -1439,20 +1439,19 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
  * the exact same instance instead of each tab duplicating it (WP-03 originally nested this inside
  * `CalendarPane` alone; lifted out once 정산 needed the same "click a date, see its detail" flow).
  */
-function SharedDateModal({ calendarContext, dateModalDate, initialTab = null, onClose, onSelectDate, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource }) {
+function SharedDateModal({ calendarContext, dateModalDate, initialTab = null, searchFocus = null, onClose, onSelectDate, onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource }) {
   const React = window.React;
   const { DateModal } = bindUiComponentAliases(React);
   return React.createElement(DateModal, {
     ...calendarContext.dateModalProps,
     dateStr: dateModalDate,
     initialTab,
+    searchFocus,
     shellChrome: 'bento',
     onClose,
     onParticipantClick: (name, dateStr) => { if (dateStr) onSelectDate(dateStr); },
     onEditAnniversary,
     onAddAnniversaryForDate: (d) => { onClose(); onAddAnniversaryForDate(d); },
-    // 컨텐츠 원본 포커스는 아직 실제 컨텐츠 화면(WP-06)이 없어 기록 탭 콘텐츠 서브탭으로만
-    // 이동시킨다 -- localStorage 포커스 힌트는 그 화면이 실제로 연결될 때 함께 넣는다.
     onFocusCultureSource: () => onFocusCultureSource(),
   });
 }
@@ -2670,6 +2669,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   // as `openMoreModal`.
   const [dateModalDate, setDateModalDate] = React.useState(null);
   const [dateModalTab, setDateModalTab] = React.useState(null);
+  const [dateModalSearchFocus, setDateModalSearchFocus] = React.useState(null);
   // Firestore calendar records use `title`; a few legacy callers still provide `name`.
   // Prefer the canonical title so the renewal shell reflects the active calendar identity
   // (e.g. cw → 모아엘가) instead of silently falling back to the generic brand.
@@ -2830,12 +2830,41 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
     }, 350);
   };
   const searchExtra = {
-    onOpenMemo: () => onChangeView('memo'),
-    onSelectDate: (d) => setMoreDateModalDate(d),
+    onOpenMemo: (memoId) => {
+      const id = typeof memoId === 'string' ? memoId : memoId?.id;
+      const list = recordsContext?.memoProps?.memos || [];
+      const memo = id ? list.find(m => m.id === id) : null;
+      if (memo) {
+        setHomeFocusedMemo(memo);
+        if (typeof recordsContext?.memoProps?.onFocusMemo === 'function') recordsContext.memoProps.onFocusMemo(memo);
+      } else if (id && typeof recordsContext?.memoProps?.onOpenMemo === 'function') {
+        recordsContext.memoProps.onOpenMemo(id);
+      }
+      onChangeView('memo');
+    },
+    onSelectDate: (d, focus) => {
+      onChangeView('calendar');
+      setDateModalTab(focus?.tab || null);
+      setDateModalSearchFocus(focus || null);
+      setDateModalDate(d);
+    },
     onOpenChatMessage: onOpenChatMessageFromMore,
     onOpenImage: onOpenImageFromMore,
-    onOpenPlaces: () => onChangeView('places'),
-    onOpenContent: () => onChangeView('content'),
+    onOpenPlaces: (placeId) => {
+      if (placeId && typeof recordsContext?.placesProps?.setPlacesInitialFocusId === 'function') {
+        recordsContext.placesProps.setPlacesInitialFocusId(placeId);
+      }
+      onChangeView('places');
+    },
+    onOpenContent: (item) => {
+      const tab = item?.contentTab || 'festival';
+      try {
+        if (item?.id) localStorage.setItem('gather_content_focus_item_id', String(item.id));
+        if (item?.title) localStorage.setItem('gather_content_focus_title', String(item.title));
+        localStorage.setItem('gather_content_tab', tab);
+      } catch (_) { /* ignore */ }
+      onChangeView('content');
+    },
   };
 
   // Correct an invalid/stale ?tab=/?sub= on first mount without adding a history entry, then
@@ -3109,8 +3138,9 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
 
         dateModalDate && React.createElement(SharedDateModal, {
           calendarContext: v2CalendarContext, dateModalDate, initialTab: activeTab === 'settlement' ? 'settlement' : dateModalTab,
-          onClose: () => { setDateModalDate(null); setDateModalTab(null); },
-          onSelectDate: (d) => { setDateModalTab(null); setDateModalDate(d); },
+          searchFocus: dateModalSearchFocus,
+          onClose: () => { setDateModalDate(null); setDateModalTab(null); setDateModalSearchFocus(null); },
+          onSelectDate: (d) => { setDateModalTab(null); setDateModalSearchFocus(null); setDateModalDate(d); },
           onEditAnniversary, onAddAnniversaryForDate, onFocusCultureSource,
         })
       )

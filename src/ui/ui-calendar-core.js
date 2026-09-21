@@ -2613,7 +2613,6 @@ export function GlobalSearchModal({
   const isMobile = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 640px)').matches;
 
   const tabDefs = [
-    { key: 'all', label: '전체', count: Object.values(matches || {}).reduce((total, items) => total + (Array.isArray(items) ? items.length : 0), 0) + contentMatches.length },
     { key: 'schedules', label: '일정', count: (matches.schedules || []).length },
     { key: 'chat', label: '채팅', count: (matches.chat || []).length },
     { key: 'photos', label: '사진', count: (matches.photos || []).length },
@@ -2623,9 +2622,9 @@ export function GlobalSearchModal({
     { key: 'memos', label: '메모', count: (matches.memos || []).length },
     { key: 'content', label: '콘텐츠', count: contentMatches.length }
   ];
-  const hasResults = tabDefs.some(t => t.key !== 'all' ? t.count > 0 : false);
+  const hasResults = tabDefs.some(t => t.count > 0);
 
-  const [activeTab, setActiveTab] = React.useState('all');
+  const [activeTab, setActiveTab] = React.useState('schedules');
   // Whenever the query (or its results) changes, jump to the first category that actually has
   // matches instead of leaving the user staring at an empty tab.
   React.useEffect(() => {
@@ -2666,7 +2665,7 @@ export function GlobalSearchModal({
       title: item.note || item.participantName || '일정',
       meta: '',
       timeStr: formatDateWithDayName(item.date),
-      onClick: () => finishPick(() => onSelectDate?.(item.date)),
+      onClick: () => finishPick(() => onSelectDate?.(item.date, { tab: 'participant', participantId: item.participantId })),
       sortStamp: item.date
     }));
     (matches.chat || []).forEach(item => rows.push({
@@ -2686,7 +2685,7 @@ export function GlobalSearchModal({
       title: item.tags || '일정 사진',
       meta: '',
       timeStr: item.date ? formatDateWithDayName(item.date) : '',
-      onClick: () => finishPick(() => { if (item.date) onSelectDate?.(item.date); }),
+      onClick: () => finishPick(() => { if (item.date) onSelectDate?.(item.date, { tab: 'photo' }); }),
       sortStamp: item.date || ''
     }));
     (matches.places || []).forEach(item => rows.push({
@@ -2696,7 +2695,7 @@ export function GlobalSearchModal({
       title: item.name || item.alias || '장소',
       meta: item.memo || item.address || '',
       timeStr: item.address || '',
-      onClick: () => finishPick(() => onOpenPlaces?.()),
+      onClick: () => finishPick(() => onOpenPlaces?.(item.id)),
       sortStamp: item.visitDate || ''
     }));
     (matches.expenses || []).forEach(item => rows.push({
@@ -2706,7 +2705,7 @@ export function GlobalSearchModal({
       title: item.label || item.url || '정산 항목',
       meta: `${item.amount < 0 ? '+' : '-'}${Math.abs(Number(item.amount)).toLocaleString()}원`,
       timeStr: formatDateWithDayName(item.date),
-      onClick: () => finishPick(() => onSelectDate?.(item.date)),
+      onClick: () => finishPick(() => onSelectDate?.(item.date, { tab: 'settlement', expenseId: item.id })),
       sortStamp: item.date || ''
     }));
     (matches.memos || []).forEach(item => rows.push({
@@ -2741,9 +2740,11 @@ export function GlobalSearchModal({
         meta: venue || address,
         timeStr: item.dateLabel || item.startDate || item.releaseDate || '',
         onClick: () => finishPick(() => {
-          const url = String(item.link || item.website || item.url || '').trim();
-          if (url) window.open(url, '_blank', 'noopener,noreferrer');
-          else if (typeof onOpenContent === 'function') onOpenContent(item);
+          if (typeof onOpenContent === 'function') {
+            const cultureKind = inferSearchCultureKind(item);
+            const tabMap = { festival: 'festival', performance: 'culture', sports: 'sports', movie: 'movies' };
+            onOpenContent({ ...item, contentTab: tabMap[cultureKind] || 'festival' });
+          }
         }),
         sortStamp: String(item.startDate || item.releaseDate || item.createdAt || '')
       });
@@ -2751,9 +2752,7 @@ export function GlobalSearchModal({
     return rows.sort((a, b) => String(b.sortStamp || '').localeCompare(String(a.sortStamp || '')));
   }, [matches, contentMatches, finishPick, onOpenChatMessage, onOpenMemo, onOpenPlaces, onOpenContent, onOpenImage, onSelectDate]);
 
-  const visibleResults = activeTab === 'all'
-    ? allResults.slice(0, 100)
-    : allResults.filter(item => item.kind === activeTab);
+  const visibleResults = allResults.filter(item => item.kind === activeTab);
 
   const renderResultRow = (item) => /*#__PURE__*/React.createElement(SearchResultLogRow, {
     key: item.id,

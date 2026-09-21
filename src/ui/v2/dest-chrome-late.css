@@ -1653,4 +1653,161 @@ html:has(.renewal-shell.v2-design) .modal-overlay input.form-input {
   }
 }
 
+/* --------------------------------------------------------------------------
+ * Search-result focus: the item the user just picked from 통합검색.
+ * -------------------------------------------------------------------------- */
+html:has(.renewal-shell.v2-design) .search-result-focus,
+html:has(.renewal-shell.v2-design) .chat-search-focused-bubble,
+html:has(.renewal-shell.v2-design) .place-card-row.is-focused,
+html:has(.renewal-shell.v2-design) .v2-memo-card-is-focused > .v2-bubble-surface,
+html:has(.renewal-shell.v2-design) .v2-memo-card-is-focused > .v2-memo-card-contract {
+  border: 2px solid #7C2FE5 !important;
+  background: rgba(124, 47, 229, 0.14) !important;
+  box-shadow: 0 0 0 4px rgba(124, 47, 229, 0.18) !important;
+}
+
+/* --------------------------------------------------------------------------
+ * Backdrop popups: PC centered, tablet bottom-centered, mobile full-bleed.
+ * Overlay is portaled inside .renewal-shell so these rules must beat both
+ * inline ResizableModalContainer position:relative and leftover sheet docks.
+ * -------------------------------------------------------------------------- */
+html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay),
+html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overlay) {
+  position: fixed !important;
+  inset: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  max-width: none !important;
+  margin: 0 !important;
+  display: flex !important;
+  justify-content: center !important;
+  background: rgba(30, 27, 46, 0.48) !important;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  box-sizing: border-box !important;
+}
+
+@media (min-width: 1200px) {
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay),
+  html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overlay) {
+    align-items: center !important;
+    padding: 24px !important;
+  }
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .modal-container,
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .v2-responsive-modal,
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .modal,
+  html:has(.renewal-shell.v2-design) .bp-event-sheet,
+  html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overlay) > .bottom-sheet {
+    position: relative !important;
+    left: auto !important;
+    right: auto !important;
+    top: auto !important;
+    bottom: auto !important;
+    transform: none !important;
+    width: min(560px, calc(100vw - 48px)) !important;
+    max-width: 560px !important;
+    max-height: 86dvh !important;
+    margin: 0 !important;
+    border-radius: 20px !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-event-sheet.is-sheet-moved,
+  html:has(.renewal-shell.v2-design) .v2-responsive-modal.is-sheet-moved {
+    position: fixed !important;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1199px) {
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay),
+  html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overlay) {
+    align-items: flex-end !important;
+    padding: 0 16px !important;
+  }
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .modal-container,
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .v2-responsive-modal,
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .modal,
+  html:has(.renewal-shell.v2-design) .bp-event-sheet,
+  html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overlay) > .bottom-sheet {
+    position: relative !important;
+    left: auto !important;
+    right: auto !important;
+    top: auto !important;
+    bottom: auto !important;
+    transform: none !important;
+    width: min(560px, calc(100vw - 32px)) !important;
+    max-width: 560px !important;
+    max-height: 88dvh !important;
+    margin: 0 auto !important;
+    border-radius: 20px 20px 0 0 !important;
+  }
+}
+
+@media (max-width: 767px) {
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay),
+  html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overlay) {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .modal-container,
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .v2-responsive-modal,
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .modal,
+  html:has(.renewal-shell.v2-design) .bp-event-sheet,
+  html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overlay) > .bottom-sheet {
+    position: relative !important;
+    left: auto !important;
+    right: auto !important;
+    top: auto !important;
+    bottom: auto !important;
+    transform: none !important;
+    width: 100% !important;
+    max-width: none !important;
+    max-height: 92dvh !important;
+    margin: 0 !important;
+    border-radius: 20px 20px 0 0 !important;
+  }
+}
+
+html:has(.renewal-shell.v2-design) .bp-sheet-handle,
+html:has(.renewal-shell.v2-design) .v2-modal-drag-handle {
+  width: 100% !important;
+  height: 28px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  background: transparent !important;
+  touch-action: none;
+  user-select: none;
+}
+html:has(.renewal-shell.v2-design) .bp-sheet-handle::before,
+html:has(.renewal-shell.v2-design) .v2-modal-drag-handle::before {
+  content: "" !important;
+  width: 40px !important;
+  height: 4px !important;
+  border-radius: 999px !important;
+  background: #d4d0de !important;
+}
+@media (min-width: 1200px) {
+  html:has(.renewal-shell.v2-design) .bp-sheet-handle,
+  html:has(.renewal-shell.v2-design) .v2-modal-drag-handle {
+    cursor: grab !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-sheet-handle:active,
+  html:has(.renewal-shell.v2-design) .v2-modal-drag-handle:active {
+    cursor: grabbing !important;
+  }
+}
+@media (max-width: 1199px) {
+  html:has(.renewal-shell.v2-design) .bp-sheet-handle,
+  html:has(.renewal-shell.v2-design) .v2-modal-drag-handle {
+    cursor: ns-resize !important;
+  }
+}
+
+
 

@@ -4318,7 +4318,13 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
     focusAttemptedRef.current = true;
     const match = mergedItems.find(i => i && i.id === focusItemId)
       || (focusTitle ? mergedItems.find(i => i && String(i.title || '').trim() === focusTitle.trim()) : null);
-    if (match) setSelected(match);
+    if (match) {
+      setSelected(match);
+      setTimeout(() => {
+        const el = document.querySelector(`[data-content-id="${String(match.id).replace(/"/g, '')}"]`);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 80);
+    }
   }, [focusItemId, focusTitle, mergedItems]);
 
   if (mergedItems === null) {
@@ -4435,7 +4441,16 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
     );
   }
 
-  const visibleItems = filteredItems.slice(0, renderLimit);
+  const focusedItem = (focusItemId || focusTitle)
+    ? (filteredItems.find(i => i && (i.id === focusItemId || (focusTitle && String(i.title || '').trim() === String(focusTitle).trim())))
+      || (mergedItems || []).find(i => i && (i.id === focusItemId || (focusTitle && String(i.title || '').trim() === String(focusTitle).trim())))
+      || null)
+    : null;
+  const visibleItems = (() => {
+    const sliced = filteredItems.slice(0, renderLimit);
+    if (!focusedItem) return sliced;
+    return [focusedItem, ...sliced.filter(i => i.id !== focusedItem.id)];
+  })();
   const hasMoreToRender = filteredItems.length > visibleItems.length;
   // 스크롤이 하단 근처(300px 이내)에 닿으면 "더 보기"를 누른 것과 동일하게 다음 60개를 이어
   // 붙인다. 이 그리드는 HistoryView가 헤더 접힘 효과에 쓰는 자기 onScroll도 받고 있어서, 그걸
@@ -4513,6 +4528,10 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
         return /*#__PURE__*/React.createElement("button", {
           key: item.id,
           type: "button",
+          "data-content-id": item.id,
+          className: (focusItemId && item.id === focusItemId) || (focusTitle && String(item.title || '').trim() === String(focusTitle || '').trim())
+            ? 'search-result-focus'
+            : undefined,
           onClick: () => setSelected(item),
           style: {
             display: 'flex', flexDirection: 'column', gap: '6px', padding: 0,

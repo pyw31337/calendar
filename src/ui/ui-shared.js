@@ -95,13 +95,36 @@ export function ResizableModalContainer({ className, style, children, ...props }
 
   const containerRef = React.useRef(null);
   const [dimensions, setDimensions] = React.useState(null); // { width, height }
+  const [moved, setMoved] = React.useState(null); // { left, top } after PC drag
   const isDraggingRef = React.useRef(false);
+  const dragModeRef = React.useRef(null); // 'se' | 'move' | 'resize-y'
   const startPosRef = React.useRef({ x: 0, y: 0 });
-  const startDimRef = React.useRef({ w: 0, h: 0 });
+  const startDimRef = React.useRef({ w: 0, h: 0, left: 0, top: 0 });
+
+  const isPcSheet = () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1200px)').matches;
+
+  const applyMovedStyle = (left, top) => {
+    const el = containerRef.current;
+    if (!el) return;
+    el.style.setProperty('position', 'fixed', 'important');
+    el.style.setProperty('left', `${left}px`, 'important');
+    el.style.setProperty('top', `${top}px`, 'important');
+    el.style.setProperty('right', 'auto', 'important');
+    el.style.setProperty('bottom', 'auto', 'important');
+    el.style.setProperty('transform', 'none', 'important');
+    el.style.setProperty('margin', '0', 'important');
+  };
+  const applyHeightStyle = (height) => {
+    const el = containerRef.current;
+    if (!el) return;
+    el.style.setProperty('height', `${height}px`, 'important');
+    el.style.setProperty('max-height', 'none', 'important');
+  };
 
   const handleMouseDown = e => {
     if (e.button !== 0) return; // Only left-click
     isDraggingRef.current = true;
+    dragModeRef.current = 'se';
     startPosRef.current = { x: e.clientX, y: e.clientY };
     const rect = containerRef.current.getBoundingClientRect();
     startDimRef.current = { w: rect.width, h: rect.height };
@@ -122,6 +145,15 @@ export function ResizableModalContainer({ className, style, children, ...props }
     if (!isDraggingRef.current) return;
     const deltaX = e.clientX - startPosRef.current.x;
     const deltaY = e.clientY - startPosRef.current.y;
+    if (dragModeRef.current === 'move') {
+      applyMovedStyle(startDimRef.current.left + deltaX, startDimRef.current.top + deltaY);
+      return;
+    }
+    if (dragModeRef.current === 'resize-y') {
+      const nextH = Math.max(220, Math.min(window.innerHeight - 16, startDimRef.current.h - deltaY));
+      applyHeightStyle(nextH);
+      return;
+    }
     setDimensions({
       width: Math.max(280, startDimRef.current.w + deltaX),
       height: Math.max(150, startDimRef.current.h + deltaY)
@@ -133,6 +165,15 @@ export function ResizableModalContainer({ className, style, children, ...props }
     if (e.cancelable) e.preventDefault();
     const deltaX = e.touches[0].clientX - startPosRef.current.x;
     const deltaY = e.touches[0].clientY - startPosRef.current.y;
+    if (dragModeRef.current === 'move') {
+      applyMovedStyle(startDimRef.current.left + deltaX, startDimRef.current.top + deltaY);
+      return;
+    }
+    if (dragModeRef.current === 'resize-y') {
+      const nextH = Math.max(220, Math.min(window.innerHeight - 16, startDimRef.current.h - deltaY));
+      applyHeightStyle(nextH);
+      return;
+    }
     setDimensions({
       width: Math.max(280, startDimRef.current.w + deltaX),
       height: Math.max(150, startDimRef.current.h + deltaY)
@@ -140,7 +181,18 @@ export function ResizableModalContainer({ className, style, children, ...props }
   };
 
   const handleMouseUp = () => {
+    if (dragModeRef.current === 'move' && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      setMoved({ left: rect.left, top: rect.top });
+    }
+    if (dragModeRef.current === 'resize-y' && containerRef.current) {
+      setDimensions(prev => ({
+        width: (prev && prev.width) || containerRef.current.getBoundingClientRect().width,
+        height: containerRef.current.getBoundingClientRect().height
+      }));
+    }
     isDraggingRef.current = false;
+    dragModeRef.current = null;
     document.removeEventListener('mousemove', handleMouseMove);
     document.removeEventListener('mouseup', handleMouseUp);
     const blockClick = ev => {
@@ -153,7 +205,18 @@ export function ResizableModalContainer({ className, style, children, ...props }
   };
 
   const handleTouchEnd = () => {
+    if (dragModeRef.current === 'move' && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      setMoved({ left: rect.left, top: rect.top });
+    }
+    if (dragModeRef.current === 'resize-y' && containerRef.current) {
+      setDimensions(prev => ({
+        width: (prev && prev.width) || containerRef.current.getBoundingClientRect().width,
+        height: containerRef.current.getBoundingClientRect().height
+      }));
+    }
     isDraggingRef.current = false;
+    dragModeRef.current = null;
     document.removeEventListener('touchmove', handleTouchMove);
     document.removeEventListener('touchend', handleTouchEnd);
     const blockClick = ev => {
@@ -164,6 +227,53 @@ export function ResizableModalContainer({ className, style, children, ...props }
     document.addEventListener('click', blockClick, true);
     setTimeout(() => document.removeEventListener('click', blockClick, true), 0);
   };
+
+  const startHandleDrag = (clientX, clientY) => {
+    const el = containerRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    isDraggingRef.current = true;
+    startPosRef.current = { x: clientX, y: clientY };
+    startDimRef.current = { w: rect.width, h: rect.height, left: rect.left, top: rect.top };
+    if (isPcSheet()) {
+      dragModeRef.current = 'move';
+      applyMovedStyle(rect.left, rect.top);
+    } else {
+      dragModeRef.current = 'resize-y';
+    }
+  };
+  const onHandleMouseDown = e => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    startHandleDrag(e.clientX, e.clientY);
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+  const onHandleTouchStart = e => {
+    e.stopPropagation();
+    const t = e.touches && e.touches[0];
+    if (!t) return;
+    startHandleDrag(t.clientX, t.clientY);
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
+    document.addEventListener('touchend', handleTouchEnd);
+  };
+
+  React.useEffect(() => {
+    const root = containerRef.current;
+    if (!root) return undefined;
+    const handles = root.querySelectorAll('.bp-sheet-handle, .v2-modal-drag-handle');
+    handles.forEach(handle => {
+      handle.addEventListener('mousedown', onHandleMouseDown);
+      handle.addEventListener('touchstart', onHandleTouchStart, { passive: false });
+    });
+    return () => {
+      handles.forEach(handle => {
+        handle.removeEventListener('mousedown', onHandleMouseDown);
+        handle.removeEventListener('touchstart', onHandleTouchStart);
+      });
+    };
+  }, []);
 
   React.useEffect(() => {
     return () => {
@@ -212,9 +322,14 @@ export function ResizableModalContainer({ className, style, children, ...props }
 
   const mergedStyle = {
     ...style,
-    position: 'relative',
+    position: moved ? 'fixed' : 'relative',
+    ...(moved ? { left: `${moved.left}px`, top: `${moved.top}px`, right: 'auto', bottom: 'auto', margin: 0, transform: 'none' } : {}),
     ...(dimensions ? { width: `${dimensions.width}px`, height: `${dimensions.height}px`, maxWidth: 'none', maxHeight: 'none' } : {})
   };
+
+  const hasOwnHandle = React.Children.toArray(children).some(child =>
+    child && child.props && typeof child.props.className === 'string' && child.props.className.includes('bp-sheet-handle')
+  );
 
   return /*#__PURE__*/React.createElement("div", {
     ref: containerRef,
@@ -222,10 +337,14 @@ export function ResizableModalContainer({ className, style, children, ...props }
     // The class is inert in the legacy shell and lets the V2 stylesheet provide
     // one predictable PC-center/mobile-bottom-sheet contract without rewriting
     // each modal implementation.
-    className: ["modal-container", "v2-responsive-modal", className].filter(Boolean).join(" "),
+    className: ["modal-container", "v2-responsive-modal", moved ? "is-sheet-moved" : "", className].filter(Boolean).join(" "),
     style: mergedStyle,
     ...props
   },
+    hasOwnHandle ? null : /*#__PURE__*/React.createElement("div", {
+      className: "bp-sheet-handle v2-modal-drag-handle",
+      "aria-hidden": true
+    }),
     children,
     /* Resize handle at bottom right */
     /*#__PURE__*/React.createElement("div", {

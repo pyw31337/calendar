@@ -982,7 +982,7 @@ function CalendarApp() {
     setExternalFocusMsgId(null);
     requestAnimationFrame(() => {
       setExternalFocusMsgId(messageId);
-      externalFocusTimeoutRef.current = setTimeout(() => setExternalFocusMsgId(null), 1700);
+      externalFocusTimeoutRef.current = setTimeout(() => setExternalFocusMsgId(null), 8000);
     });
     return true;
   };
@@ -5680,7 +5680,7 @@ function CalendarApp() {
     el.classList.add('chat-search-focused-bubble');
     setTimeout(() => {
       el.classList.remove('chat-search-focused-bubble');
-    }, 2200);
+    }, 8000);
     return true;
   };
 
