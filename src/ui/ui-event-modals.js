@@ -1457,6 +1457,7 @@ export function AnniversaryModal({
         onClick: e => e.stopPropagation()
       },
         /*#__PURE__*/React.createElement("div", {
+          className: "modal-header",
           style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border-subtle)' }
         },
           /*#__PURE__*/React.createElement("span", {
@@ -1465,8 +1466,8 @@ export function AnniversaryModal({
             xmlns: "http://www.w3.org/2000/svg", width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
           }, /*#__PURE__*/React.createElement("path", { d: "M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8" }), /*#__PURE__*/React.createElement("path", { d: "M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1" }), /*#__PURE__*/React.createElement("path", { d: "M2 21h20" }), /*#__PURE__*/React.createElement("path", { d: "M7 8v3" }), /*#__PURE__*/React.createElement("path", { d: "M12 8v3" }), /*#__PURE__*/React.createElement("path", { d: "M17 8v3" }), /*#__PURE__*/React.createElement("path", { d: "M7 4h.01" }), /*#__PURE__*/React.createElement("path", { d: "M12 4h.01" }), /*#__PURE__*/React.createElement("path", { d: "M17 4h.01" })), "기념일 & 반복 일정 설정"),
           /*#__PURE__*/React.createElement("button", {
-            type: "button", onClick: requestClose,
-            style: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }
+            type: "button", onClick: requestClose, className: "modal-close-btn", "aria-label": "닫기",
+            style: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', padding: '4px' }
           }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))
         ),
         anniversaryPanelInner

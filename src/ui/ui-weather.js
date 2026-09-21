@@ -335,18 +335,21 @@ export function WeatherLocationModal({ onClose, onSelectLocation, onDeleteRecent
   },
     /* Header */
     /*#__PURE__*/React.createElement("div", {
+      className: "modal-header",
       style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border-subtle)' }
     },
       /* Title */
       /*#__PURE__*/React.createElement("span", {
-        style: { fontSize: '0.92rem', fontWeight: '900', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }
+        style: { fontSize: '0.96rem', fontWeight: '800', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }
       }, /*#__PURE__*/React.createElement(SettingsIcon, { size: 16 }), "날씨 정보 지역 설정"),
       /* Close */
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: onClose,
-        style: { width: '28px', height: '28px', borderRadius: '50%', border: 'none', background: 'var(--border-subtle)', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }
-      }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 14 }))
+        className: "modal-close-btn",
+        "aria-label": "닫기",
+        style: { width: '32px', height: '32px', border: 'none', background: 'transparent', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: '4px' }
+      }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))
     ),
 
     /* Body */

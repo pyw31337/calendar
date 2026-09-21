@@ -291,6 +291,7 @@ export function DateModal({
   const LineHeightIcon = __deps.LineHeightIcon;
   const SegmentedToggle = __deps.SegmentedToggle;
   const UnderlineTabs = __comp.UnderlineTabs || __deps.UnderlineTabs;
+  const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
   const SimpleBottomSheetPicker = __comp.SimpleBottomSheetPicker || __deps.SimpleBottomSheetPicker;
   const MediaThumb = __comp.MediaThumb || __deps.MediaThumb;
   const PhotoCommentCountBadge = __comp.PhotoCommentCountBadge || __deps.PhotoCommentCountBadge;
@@ -2057,7 +2058,7 @@ export function DateModal({
     title: "이 날짜로 기념일 등록"
   }, "+ 기념일 등록"), /*#__PURE__*/React.createElement("button", {
     type: "button",
-    className: isBentoSheet ? "bp-sheet-close" : undefined,
+    className: isBentoSheet ? "bp-sheet-close modal-close-btn" : "modal-close-btn",
     onClick: () => {
       if (!isSubmitting) requestClose();
     },
@@ -2070,14 +2071,14 @@ export function DateModal({
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: '2px 4px',
-      minWidth: 44,
-      minHeight: 44,
+      padding: '4px',
+      width: '32px',
+      height: '32px',
       boxSizing: 'border-box'
     },
     title: "닫기",
     "aria-label": "닫기"
-  }, "✕"))), UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
+  }, SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }) : "✕"))), UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
     ariaLabel: "일정 탭",
     variant: "flush",
     value: activeTab,

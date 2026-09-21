@@ -36,6 +36,7 @@ export function AppSettingsModal({
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const SmallXIcon = __deps.SmallXIcon;
+  const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer || (({ children, ...p }) => React.createElement('div', p, children));
   const ToggleSwitch = __deps.ToggleSwitch;
   const ConfirmDialog = __comp.ConfirmDialog || __deps.ConfirmDialog;
   const MoonStarsIcon = __deps.MoonStarsIcon;
@@ -124,7 +125,7 @@ export function AppSettingsModal({
   };
 
   return /*#__PURE__*/React.createElement("div", { className: "modal-overlay", onClick: onClose, style: { zIndex: 12000 } },
-    /*#__PURE__*/React.createElement("div", {
+    /*#__PURE__*/React.createElement(ResizableModalContainer, {
       // The V2 shell scopes the responsive modal treatment; V1 keeps this
       // component's existing presentation because its stylesheet is inert
       // outside `.renewal-shell.v2-design`.

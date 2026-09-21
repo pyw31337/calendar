@@ -1036,20 +1036,33 @@ html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay):not
   box-shadow: 0 24px 64px rgba(30, 27, 46, 0.22) !important;
   overflow: hidden !important;
 }
-html:has(.renewal-shell.v2-design) .modal-overlay .modal-header {
-  padding: 16px 18px 12px !important;
+html:has(.renewal-shell.v2-design) .modal-overlay .modal-header,
+html:has(.renewal-shell.v2-design) .bottom-sheet-header {
+  padding: 14px 16px !important;
   border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
   background: #fff !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  min-height: 52px !important;
+  box-sizing: border-box !important;
 }
 html:has(.renewal-shell.v2-design) .modal-overlay .modal-header h3,
-html:has(.renewal-shell.v2-design) .modal-overlay .modal-header h2 {
-  font-size: 1.05rem !important;
+html:has(.renewal-shell.v2-design) .modal-overlay .modal-header h2,
+html:has(.renewal-shell.v2-design) .modal-overlay .modal-header > span:first-child,
+html:has(.renewal-shell.v2-design) .bottom-sheet-header h4 {
+  font-size: 0.96rem !important;
   font-weight: 800 !important;
   color: #1e1b2e !important;
   line-height: 1.2 !important;
+  margin: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
 }
 html:has(.renewal-shell.v2-design) .modal-overlay .modal-body {
-  padding: 16px 18px 20px !important;
+  padding: 16px !important;
+  box-sizing: border-box !important;
 }
 html:has(.renewal-shell.v2-design) .modal-overlay .btn-primary,
 html:has(.renewal-shell.v2-design) .modal-overlay button.btn-primary {
@@ -1060,17 +1073,95 @@ html:has(.renewal-shell.v2-design) .modal-overlay button.btn-primary {
   border-radius: 12px !important;
   font-weight: 800 !important;
 }
-html:has(.renewal-shell.v2-design) .modal-overlay .modal-header button {
-  min-width: 44px !important;
-  min-height: 44px !important;
-  display: inline-flex !important;
+/* Modularized close button across all V2 backdrop popups (matching Image 1) */
+html:has(.renewal-shell.v2-design) .modal-overlay .modal-header button:last-child,
+html:has(.renewal-shell.v2-design) .modal-overlay .modal-close-btn,
+html:has(.renewal-shell.v2-design) .modal-overlay .bp-sheet-close,
+html:has(.renewal-shell.v2-design) .bottom-sheet-header button:last-child {
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+  min-height: 32px !important;
+  max-width: 32px !important;
+  max-height: 32px !important;
+  padding: 4px !important;
+  margin: 0 !important;
+  border: none !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+  color: var(--text-muted, #64748B) !important;
+  cursor: pointer !important;
+  display: flex !important;
   align-items: center !important;
   justify-content: center !important;
+  font-size: 1.2rem !important;
+  line-height: 1 !important;
+  box-shadow: none !important;
+  transition: background-color 0.15s ease, color 0.15s ease !important;
+  flex-shrink: 0 !important;
+}
+html:has(.renewal-shell.v2-design) .modal-overlay .modal-header button:last-child:hover,
+html:has(.renewal-shell.v2-design) .modal-overlay .modal-close-btn:hover,
+html:has(.renewal-shell.v2-design) .modal-overlay .bp-sheet-close:hover,
+html:has(.renewal-shell.v2-design) .bottom-sheet-header button:last-child:hover {
+  background-color: rgba(30, 27, 46, 0.06) !important;
+  color: #1e1b2e !important;
+}
+html:has(.renewal-shell.v2-design) .modal-overlay .modal-header button:last-child svg,
+html:has(.renewal-shell.v2-design) .modal-overlay .modal-close-btn svg,
+html:has(.renewal-shell.v2-design) .modal-overlay .bp-sheet-close svg,
+html:has(.renewal-shell.v2-design) .bottom-sheet-header button:last-child svg {
+  width: 20px !important;
+  height: 20px !important;
+  stroke: currentColor !important;
+}
+/* Admin settings modal inner styling - remove double borders, purple V2 tabs, clean layout */
+html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay):not(.bp-sheet-backdrop) > .modal-container.admin-settings-modal {
+  height: auto !important;
+  max-height: min(92dvh, 780px) !important;
+}
+html:has(.renewal-shell.v2-design) .admin-settings-modal > div:has(> button:nth-child(4)) {
+  background: #fff !important;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
+}
+html:has(.renewal-shell.v2-design) .admin-settings-modal > div:has(> button:nth-child(4)) button {
+  font-size: 0.92rem !important;
+  font-weight: 800 !important;
+  color: var(--text-muted, #64748b) !important;
+  border-bottom: 2px solid transparent !important;
+  padding: 10px 8px !important;
+  transition: color 0.15s ease, border-color 0.15s ease !important;
+}
+html:has(.renewal-shell.v2-design) .admin-settings-modal > div:has(> button:nth-child(4)) button[style*="2563EB"],
+html:has(.renewal-shell.v2-design) .admin-settings-modal > div:has(> button:nth-child(4)) button[style*="rgb(37, 99, 235)"] {
+  color: var(--v2-primary, #7C3AED) !important;
+  border-bottom: 2px solid var(--v2-primary, #7C3AED) !important;
+}
+html:has(.renewal-shell.v2-design) .admin-settings-modal .modal-body {
+  max-height: calc(92dvh - 140px) !important;
+  padding: 16px 16px 28px !important;
+}
+html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay):not(.bp-sheet-backdrop) > .modal-container.v2-settings-modal {
+  height: auto !important;
+  max-height: min(92dvh, 780px) !important;
+}
+html:has(.renewal-shell.v2-design) .v2-settings-modal .modal-body {
+  max-height: calc(92dvh - 120px) !important;
+  padding: 14px 16px 28px !important;
+}
+html:has(.renewal-shell.v2-design) .admin-settings-modal .modal-body > div > div {
+  border: 1px solid var(--v2-card-border, #eceaf5) !important;
+  border-radius: 16px !important;
+  background: #fff !important;
+  box-shadow: 0 2px 8px rgba(30, 27, 46, 0.04) !important;
 }
 @media (min-width: 1200px) {
   html:has(.renewal-shell.v2-design:not(.is-side-collapsed)) .modal-overlay:not(.meme-preview-overlay):not(.bp-sheet-backdrop) {
-    left: 280px !important;
-    width: auto !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100vw !important;
+    padding-left: 280px !important;
+    box-sizing: border-box !important;
   }
 }
 @media (max-width: 767px) {
@@ -1114,8 +1205,11 @@ html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overla
     box-shadow: 0 24px 64px rgba(30, 27, 46, 0.22) !important;
   }
   html:has(.renewal-shell.v2-design:not(.is-side-collapsed)) .bottom-sheet-overlay:not(.emoji-sheet-overlay) {
-    left: 280px !important;
-    width: auto !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100vw !important;
+    padding-left: 280px !important;
+    box-sizing: border-box !important;
   }
 }
 html:has(.renewal-shell.v2-design) .bottom-sheet-header {

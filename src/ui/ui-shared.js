@@ -103,6 +103,28 @@ export function ResizableModalContainer({ className, style, children, ...props }
 
   const isPcSheet = () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1200px)').matches;
 
+  const getContainingBlockOffset = el => {
+    let parent = el ? (el.offsetParent || el.parentElement) : null;
+    while (parent && parent !== document.documentElement && parent !== document.body) {
+      const cs = window.getComputedStyle(parent);
+      if (
+        cs.transform !== 'none' ||
+        cs.perspective !== 'none' ||
+        cs.filter !== 'none' ||
+        cs.backdropFilter !== 'none' ||
+        cs.webkitBackdropFilter !== 'none' ||
+        cs.contain === 'paint' ||
+        cs.contain === 'strict' ||
+        cs.contain === 'layout'
+      ) {
+        const pRect = parent.getBoundingClientRect();
+        return { left: pRect.left, top: pRect.top };
+      }
+      parent = parent.parentElement;
+    }
+    return { left: 0, top: 0 };
+  };
+
   const applyMovedStyle = (left, top) => {
     const el = containerRef.current;
     if (!el) return;
@@ -183,7 +205,8 @@ export function ResizableModalContainer({ className, style, children, ...props }
   const handleMouseUp = () => {
     if (dragModeRef.current === 'move' && containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
-      setMoved({ left: rect.left, top: rect.top });
+      const cb = getContainingBlockOffset(containerRef.current);
+      setMoved({ left: rect.left - cb.left, top: rect.top - cb.top });
     }
     if (dragModeRef.current === 'resize-y' && containerRef.current) {
       setDimensions(prev => ({
@@ -207,7 +230,8 @@ export function ResizableModalContainer({ className, style, children, ...props }
   const handleTouchEnd = () => {
     if (dragModeRef.current === 'move' && containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
-      setMoved({ left: rect.left, top: rect.top });
+      const cb = getContainingBlockOffset(containerRef.current);
+      setMoved({ left: rect.left - cb.left, top: rect.top - cb.top });
     }
     if (dragModeRef.current === 'resize-y' && containerRef.current) {
       setDimensions(prev => ({
@@ -232,12 +256,15 @@ export function ResizableModalContainer({ className, style, children, ...props }
     const el = containerRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
+    const cb = getContainingBlockOffset(el);
+    const initialLeft = rect.left - cb.left;
+    const initialTop = rect.top - cb.top;
     isDraggingRef.current = true;
     startPosRef.current = { x: clientX, y: clientY };
-    startDimRef.current = { w: rect.width, h: rect.height, left: rect.left, top: rect.top };
+    startDimRef.current = { w: rect.width, h: rect.height, left: initialLeft, top: initialTop };
     if (isPcSheet()) {
       dragModeRef.current = 'move';
-      applyMovedStyle(rect.left, rect.top);
+      applyMovedStyle(initialLeft, initialTop);
     } else {
       dragModeRef.current = 'resize-y';
     }
