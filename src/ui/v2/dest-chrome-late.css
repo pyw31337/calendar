@@ -1079,6 +1079,47 @@ html:has(.renewal-shell.v2-design) .modal-overlay .modal-header button {
   }
 }
 
+/* ---- Backdrop popups, sheet family: the many `.bottom-sheet-overlay` pickers
+ * (bulk-edit/category/weekday/participant/poll-voter sheets, gallery date
+ * picker, ...) stayed bottom-docked at every viewport width even under v2,
+ * unlike `.modal-overlay` above. Give them the identical v2 treatment: a
+ * centered blurred-glass card on wide screens, true bottom sheet only on
+ * narrow ones -- so every backdrop popup in v2 follows one rule, not two.
+ * `.emoji-sheet-overlay` keeps its own existing handling (dest-chrome-late.css
+ * emoji rule above) and is excluded here so the two don't fight. */
+html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overlay) {
+  background: rgba(30, 27, 46, 0.48) !important;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+@media (min-width: 768px) {
+  html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overlay) {
+    align-items: center !important;
+    padding: 24px !important;
+    box-sizing: border-box !important;
+  }
+  html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overlay) > .bottom-sheet {
+    width: min(440px, calc(100vw - 48px)) !important;
+    max-width: 440px !important;
+    border-radius: 20px !important;
+    border: 1px solid #eceaf5 !important;
+    box-shadow: 0 24px 64px rgba(30, 27, 46, 0.22) !important;
+  }
+  html:has(.renewal-shell.v2-design:not(.is-side-collapsed)) .bottom-sheet-overlay:not(.emoji-sheet-overlay) {
+    left: 280px !important;
+    width: auto !important;
+  }
+}
+html:has(.renewal-shell.v2-design) .bottom-sheet-header {
+  border-bottom: 1px solid #eceaf5 !important;
+  background: #fff !important;
+}
+html:has(.renewal-shell.v2-design) .bottom-sheet-header h4 {
+  font-size: 1.05rem !important;
+  font-weight: 800 !important;
+  color: #1e1b2e !important;
+}
+
 /* Extra labelled pills that share the same 22px geometry. */
 .v2-design .main-menu-badge,
 .v2-design .side-menu-meta-pill,
