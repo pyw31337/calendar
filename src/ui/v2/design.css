@@ -1286,9 +1286,10 @@
   align-items: center;
   gap: 10px;
   width: calc(100% - 20px);
-  min-height: 36px;
-  margin: 4px 10px 12px;
-  padding: 8px 12px;
+  min-height: 40px;
+  height: 40px;
+  margin: 12px 10px;
+  padding: 0 14px;
   border: 0;
   border-radius: 999px;
   background: var(--brand, #7C2FE5);
@@ -1301,13 +1302,15 @@
 }
 .v2-design .bp-side-nav-global-search:hover { background: #6d28d9; }
 .v2-design .bp-side-nav-global-search-icon { display: inline-flex; flex: 0 0 auto; }
-.v2-design .bp-side-nav-global-search-icon svg { width: 18px; height: 18px; }
+.v2-design .bp-side-nav-global-search-icon svg { width: 20px; height: 20px; }
 .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search {
-  width: 36px;
+  width: 40px;
+  height: 40px;
   justify-content: center;
-  padding: 8px;
+  padding: 0;
   margin-left: auto;
   margin-right: auto;
+  gap: 0;
 }
 .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search-label { display: none; }
 
@@ -1402,8 +1405,7 @@
 .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item-badge,
 .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item-sub,
 .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-text,
-.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-collapse-label,
-.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-group.bp-is-tab-menu {
+.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-collapse-label {
   display: none;
 }
 .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item {
@@ -1551,7 +1553,7 @@
   background: var(--brand, #7C2FE5) !important;
 }
 .v2-design .bp-side-nav-group {
-  padding: 6px 10px !important;
+  padding: 4px 10px !important;
 }
 .v2-design .bp-side-nav-item {
   font-size: 14px !important;
@@ -1559,11 +1561,11 @@
    * removed, the weight contrast is what now carries "this is the current page". */
   font-weight: 500;
   line-height: 1.25;
-  padding: 11px 12px !important;
-  margin: 3px 0 !important;
+  padding: 0 12px !important;
+  margin: 0 !important;
   gap: 12px !important;
   border-radius: 10px;
-  min-height: 40px !important;
+  min-height: 44px !important;
   box-sizing: border-box !important;
 }
 .v2-design .bp-side-nav-item-icon {
@@ -1622,7 +1624,7 @@
 
 @media (min-width: 1200px) {
   .v2-design .bp-side-nav-head {
-    padding: 28px 16px 18px !important;
+    padding: 12px 14px !important;
   }
   .v2-design .bp-side-nav-brand {
     gap: 8px !important;
@@ -1632,9 +1634,9 @@
   }
   .v2-design .bp-side-nav-item {
     font-size: 14px !important;
-    padding: 11px 12px !important;
-    margin: 4px 0 !important;
-    min-height: 42px !important;
+    padding: 0 12px !important;
+    margin: 0 !important;
+    min-height: 44px !important;
   }
   .v2-design .bp-side-nav-group.bp-is-main {
     border-top: none !important;
@@ -1660,7 +1662,7 @@
     border-top: none !important;
   }
   .v2-design .bp-side-nav-group.bp-is-tab-menu .bp-side-nav-item {
-    margin: 2px 0 !important;
+    margin: 0 !important;
   }
 }
 

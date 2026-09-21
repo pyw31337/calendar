@@ -160,8 +160,8 @@ const TAB_ICON_NODES = {
   // No generic magnifier / hyperlink-chain glyph in the user's Tabler set (see
   // TABLER_ICONS_MISSING in tabler-icons.js) -- kept as bespoke outline nodes until sourced.
   search: [
-    ['circle', { cx: 11, cy: 11, r: 8 }],
-    ['path', { d: 'm21 21-4.3-4.3' }],
+    ['circle', { cx: 12, cy: 12, r: 7 }],
+    ['path', { d: 'm21 21-4.35-4.35' }],
   ],
   link: [
     ['path', { d: 'M9 17H7A5 5 0 0 1 7 7h2' }],
@@ -3025,7 +3025,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
       'aria-label': '통합검색',
       onClick: () => { setIsSideNavOpen(false); setActiveTab('search'); },
     },
-      React.createElement('span', { className: bentoClass('side-nav-global-search-icon'), 'aria-hidden': 'true' }, React.createElement(TabIcon, { id: 'search' })),
+      React.createElement('span', { className: bentoClass('side-nav-global-search-icon'), 'aria-hidden': 'true' }, React.createElement(TabIcon, { id: 'search', size: 20 })),
       React.createElement('span', { className: bentoClass('side-nav-global-search-label') }, '통합검색')
     ),
     React.createElement('div', { className: bentoClass('side-nav-group renewal-shell-side-nav-group is-main') },
