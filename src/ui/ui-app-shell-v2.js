@@ -3249,7 +3249,9 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
         ? (recordsSubTab === 'media' ? 'gallery' : recordsSubTab === 'archive' ? 'archive' : recordsSubTab === 'content' ? 'content' : null)
         : activeTab;
       const items = TAB_MENU_ITEM_CONFIGS[groupKey];
-      if (!items) return null;
+      // memo/archive register no quick actions (empty array, not missing) -- render nothing
+      // rather than an empty bordered/backgrounded group with zero rows inside it.
+      if (!items || !items.length) return null;
       return React.createElement('div', { className: bentoClass('side-nav-group renewal-shell-side-nav-group is-tab-menu') },
         items.map(item => React.createElement('button', {
           key: item.key,

@@ -1451,12 +1451,10 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   justify-content: center;
 }
 
-/* No highlighted background/border on the active item -- the bolder title weight below (vs. the
- * lighter default weight on every other item) plus the brand-color text/icon is the only
- * distinction, so the active state reads as "this label is heavier", not "this row has a card
- * behind it". */
+/* Translucent brand-purple background marks the active item -- both collapsed (icon rail)
+ * and expanded rail share this rule, so the highlight stays consistent when the rail toggles. */
 .v2-design .bp-side-nav-item.bp-is-active {
-  background: none;
+  background: rgba(124, 47, 229, 0.12);
   border: none !important;
   box-shadow: none;
   backdrop-filter: none;
@@ -1589,8 +1587,8 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 }
 .v2-design .bp-side-nav-item {
   font-size: 14px !important;
-  /* Lighter than the active item's 800 (above) on purpose -- with the highlighted background
-   * removed, the weight contrast is what now carries "this is the current page". */
+  /* Lighter than the active item's 800 (above) on purpose, so the active row reads as
+   * both heavier text and a highlighted background. */
   font-weight: 500;
   line-height: 1.25;
   padding: 0 12px !important;
