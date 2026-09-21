@@ -295,7 +295,7 @@
   gap: 8px;
   width: 100%;
   padding: 12px 12px 12px 14px;
-  border: 1px solid #eceaf5;
+  border: 1px solid var(--v2-card-border, #eceaf5);
   border-radius: 14px;
   background: #fff;
   box-shadow: 0 1px 2px rgba(30, 27, 46, 0.04);
@@ -341,7 +341,7 @@
 .v2-design .bp-renewal-home-footer { text-align: center; color: var(--text-light, #83798f); font-size: 0.62rem; padding: 18px 14px 28px; }
 .v2-design .bp-renewal-home-footer-links { display: flex; gap: 12px; justify-content: center; margin-top: 8px; flex-wrap: wrap; }
 .v2-design .bp-renewal-home-empty { color: var(--text-muted); font-size: 0.75rem; }
-.v2-design .bp-month-picker { position: absolute; z-index: 10; top: 36px; left: 0; padding: 12px; border: 1px solid var(--border-subtle); border-radius: 12px; background: white; box-shadow: 0 8px 24px #1e1b2e20; }
+.v2-design .bp-month-picker { position: absolute; z-index: 10; top: 36px; left: 0; padding: 12px; border: 1px solid var(--v2-card-border, #eceaf5); border-radius: 12px; background: white; box-shadow: 0 8px 24px #1e1b2e20; }
 .v2-design .bp-month-picker input { font: inherit; padding: 6px; max-width: 180px; }
 .v2-design .v2-destination { padding: 0; min-height: 100dvh; }
 .v2-design .renewal-shell-subtab-row { position: relative; z-index: 1; }
@@ -1509,7 +1509,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   min-height: 60px;
   box-sizing: border-box;
   background: #fff;
-  border-bottom: 1px solid #eceaf5;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5);
 }
 .v2-design .v2-page-header .bp-header-row {
   align-items: center !important;

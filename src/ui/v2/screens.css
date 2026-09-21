@@ -56,7 +56,7 @@
 .v2-design .v2-fullscreen button { font-family: inherit; }
 .v2-design .v2-empty { font-size: var(--font-size-md); color: #83798f; padding: 24px 14px; text-align: center; }
 .v2-design .v2-load-more {
-  display: block; border: 1px solid #eceaf5; border-radius: 9999px; background: #fff;
+  display: block; border: 1px solid var(--v2-card-border, #eceaf5); border-radius: 9999px; background: #fff;
   color: var(--brand, #7C2FE5); font-size: var(--font-size-sm); font-weight: 700; margin: 12px auto; padding: 10px 18px; cursor: pointer;
 }
 .v2-design .v2-compose-backdrop {
@@ -123,7 +123,7 @@
 .v2-design .v2-memo-card-wrap .memo-card-hover {
   background: #fff !important; border-left: 4px solid var(--memo-author-color) !important;
   border-radius: 0 14px 14px 0 !important; padding: 14px !important;
-  box-shadow: 0 4px 14px #1e1b2e12 !important; min-height: 100%;
+  box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important; min-height: 100%;
 }
 .v2-design .v2-memo-card-wrap .v2-memo-title { font-size: var(--font-size-base) !important; font-weight: 800 !important; margin-bottom: 4px !important; }
 .v2-design .v2-memo-card-wrap .v2-memo-text { font-size: var(--font-size-sm) !important; color: #6b6580 !important; line-height: 1.5 !important; margin-bottom: 10px; }
@@ -131,11 +131,11 @@
 .v2-design .v2-memo-card-wrap .v2-memo-tags > span:not(:first-child) { background: none !important; color: var(--brand, #7C2FE5) !important; padding: 0 !important; }
 .v2-design .v2-memo-card-wrap .memo-card-pin-btn { color: var(--brand, #7C2FE5) !important; }
 .v2-design .v2-memo-card-wrap .memo-comment-author-dot { width: 16px !important; height: 16px !important; }
-.v2-design .v2-memo-card-wrap .v2-memo-comments { border-top: 1px solid #eceaf5; padding-top: 10px; }
+.v2-design .v2-memo-card-wrap .v2-memo-comments { border-top: 1px solid var(--v2-card-border, #eceaf5); padding-top: 10px; }
 .v2-design .v2-memo-legacy .memo-card-hover,
 .v2-design .v2-memo-legacy [class*="memo-card"] {
   border-radius: 0 14px 14px 0 !important;
-  box-shadow: 0 4px 14px rgba(30,27,46,0.07) !important;
+  box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important;
 }
 
 /* Places */
@@ -161,7 +161,7 @@
 
 /* Settlement */
 .v2-design .v2-period-toggle {
-  font-size: var(--font-size-2xs); padding: 4px 8px; border: 1px solid #eceaf5;
+  font-size: var(--font-size-2xs); padding: 4px 8px; border: 1px solid var(--v2-card-border, #eceaf5);
   background: white; color: var(--brand, #7C2FE5); border-radius: 999px; cursor: pointer; margin-left: 8px;
 }
 .v2-design .v2-settlement .bp-expense-row { width: 100%; text-align: left; cursor: pointer; font-family: inherit; }
@@ -171,8 +171,8 @@
 .v2-design .v2-settlement-legacy .settlement-person-card,
 .v2-design .v2-settlement-legacy .settlement-running-balance,
 .v2-design .v2-settlement-legacy [class*="settlement-card"] {
-  border: 1px solid #eceaf5 !important; border-radius: 18px !important;
-  box-shadow: 0 2px 8px rgba(30,27,46,0.05) !important; background: #fff !important;
+  border: 1px solid var(--v2-card-border, #eceaf5) !important; border-radius: 18px !important;
+  box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important; background: #fff !important;
 }
 
 /* Chat */
@@ -208,7 +208,7 @@
 .v2-design .v2-chat-compose-row { display: flex; align-items: center; gap: 8px; }
 .v2-design .v2-chat-compose-row > textarea {
   min-width: 0; flex: 1; box-shadow: none !important; background: #fafafc !important;
-  border: 1px solid #eceaf5 !important; overflow-y: auto !important; scrollbar-width: none;
+  border: 1px solid var(--v2-card-border, #eceaf5) !important; overflow-y: auto !important; scrollbar-width: none;
   border-radius: var(--radius-md) !important;
 }
 .v2-design .v2-chat-compose-row > textarea::-webkit-scrollbar { display: none; }
@@ -232,11 +232,11 @@
 .v2-design .v2-chat-legacy .chat-composer {
   position: relative !important; left: auto !important; right: auto !important; bottom: auto !important;
   transform: none !important; max-width: none !important; width: 100% !important;
-  background: #fff !important; border-top: 1px solid #eceaf5 !important;
+  background: #fff !important; border-top: 1px solid var(--v2-card-border, #eceaf5) !important;
   padding: 10px 12px !important; flex-shrink: 0;
 }
 .v2-design .v2-chat-legacy .chat-composer textarea {
-  border: 1px solid #eceaf5 !important; border-radius: var(--radius-md) !important;
+  border: 1px solid var(--v2-card-border, #eceaf5) !important; border-radius: var(--radius-md) !important;
   background: #fafafc !important; font-size: var(--font-size-md) !important;
   padding: 9px 14px !important; box-shadow: none !important;
 }
@@ -253,7 +253,7 @@
 .v2-design .v2-chat-legacy .msg-row-hover [style*="background-color: var(--bg-card)"] {
   font-size: var(--font-size-md) !important; line-height: 1.45 !important;
   border-radius: 0 12px 12px 12px !important; padding: 8px 11px !important;
-  box-shadow: none !important; border: 1px solid #eceaf5 !important; background: #fff !important;
+  box-shadow: none !important; border: 1px solid var(--v2-card-border, #eceaf5) !important; background: #fff !important;
   max-width: 260px !important;
 }
 .v2-design .v2-chat-legacy .msg-row-hover [style*="backgroundColor: 'var(--brand)'"],
@@ -471,8 +471,8 @@
 /* Places cards — PlacesFull density while keeping map/search/FAB/edit */
 .v2-design .v2-places .bp-place-card {
   border-radius: 16px !important;
-  border: 1px solid #eceaf5 !important;
-  box-shadow: 0 4px 14px rgba(30, 27, 46, 0.06) !important;
+  border: 1px solid var(--v2-card-border, #eceaf5) !important;
+  box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important;
   background: #fff !important;
 }
 .v2-design .v2-places .bp-place-name {
@@ -527,8 +527,8 @@
 }
 .v2-design .v2-records-overview .renewal-records-overview-card {
   border-radius: 16px;
-  border-color: #eceaf5;
-  box-shadow: 0 4px 14px rgba(30, 27, 46, 0.06);
+  border-color: var(--v2-card-border, #eceaf5);
+  box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03));
   background: #fff;
 }
 .v2-design .v2-records-overview .renewal-records-overview-icon {
@@ -626,7 +626,7 @@
   height: 52px !important;
   padding: 0 14px !important;
   background: #fff !important;
-  border-bottom: 1px solid #eceaf5 !important;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
   box-shadow: none !important;
 }
 .v2-design .v2-gallery-legacy .gallery-page-header [style*="fontWeight"],
@@ -653,7 +653,7 @@
   top: 0;
   z-index: 6;
   background: #fafafc;
-  border-bottom: 1px solid #eceaf5;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5);
   padding: 8px 12px;
   display: flex;
   gap: 6px;
@@ -684,7 +684,7 @@
 .v2-design .v2-content .bp-header,
 .v2-design .v2-archive .bp-header {
   background: #fff;
-  border-bottom: 1px solid #eceaf5;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5);
   padding: 10px 14px 8px;
 }
 
@@ -994,9 +994,9 @@
 .v2-design .v2-chat .msg-row-hover > div > div[style*="backgroundColor"],
 .v2-design .v2-chat .msg-row-hover > div > div[style*="background-color"] {
   background: #fff !important;
-  border: 1px solid #eceaf5 !important;
+  border: 1px solid var(--v2-card-border, #eceaf5) !important;
   border-radius: 14px !important;
-  box-shadow: 0 2px 8px rgba(30, 27, 46, 0.05) !important;
+  box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important;
   color: #1e1b2e !important;
   font-size: 0.86rem !important;
   line-height: 1.45 !important;
@@ -1021,7 +1021,7 @@
 .v2-design .v2-records-frame > .renewal-shell-subtab-row {
   padding: 4px 10px !important;
   gap: 4px !important;
-  border-bottom: 1px solid #eceaf5;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5);
   background: #fff;
 }
 .v2-design .v2-records-frame .renewal-shell-subtab-item {
@@ -1030,7 +1030,7 @@
   border-radius: 999px !important;
 }
 .v2-design .v2-gallery .gallery-page-header {
-  border-bottom: 1px solid #eceaf5 !important;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
 }
 
 /* Gallery tabs must not be viewport-fixed under the side rail */
@@ -1060,7 +1060,7 @@
   padding: 8px 8px 7px !important;
   border-radius: 12px !important;
   gap: 6px !important;
-  box-shadow: 0 2px 8px rgba(30, 27, 46, 0.05) !important;
+  box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important;
 }
 .v2-design .v2-settlement .settlement-person-name {
   font-size: 0.72rem !important;
@@ -1076,7 +1076,7 @@
 .v2-design .v2-settlement .settlement-ledger-row {
   gap: 2px !important;
   padding: 7px 10px !important;
-  border: 1px solid #eceaf5 !important;
+  border: 1px solid var(--v2-card-border, #eceaf5) !important;
   border-radius: 10px !important;
   box-shadow: none !important;
   margin: 0 !important;
@@ -1119,8 +1119,8 @@
   padding: 8px 10px !important;
   gap: 2px !important;
   border-radius: 12px !important;
-  border: 1px solid #eceaf5 !important;
-  box-shadow: 0 1px 4px rgba(30, 27, 46, 0.04) !important;
+  border: 1px solid var(--v2-card-border, #eceaf5) !important;
+  box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important;
   background: #fff !important;
   margin-bottom: 6px !important;
 }
@@ -1180,7 +1180,7 @@
   height: 52px !important;
   padding: 0 14px !important;
   background: #fff !important;
-  border-bottom: 1px solid #eceaf5 !important;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
   box-shadow: none !important;
 }
 .v2-design .v2-content .places-view-container,
@@ -1192,7 +1192,7 @@
 .v2-design .v2-content .underline-tabs,
 .v2-design .v2-archive .underline-tabs {
   background: #fff !important;
-  border-bottom: 1px solid #eceaf5 !important;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
 }
 /* Content page's category row ("전체 개별등록 클래식/전통 ...") still scrolls horizontally by
  * touch/drag -- only the visible scrollbar track is hidden (scrollbar-width:none is set inline
@@ -1206,8 +1206,8 @@
 .v2-design .v2-archive .history-card,
 .v2-design .v2-archive [class*="memory-card"] {
   border-radius: 14px !important;
-  border: 1px solid #eceaf5 !important;
-  box-shadow: 0 2px 8px rgba(30, 27, 46, 0.05) !important;
+  border: 1px solid var(--v2-card-border, #eceaf5) !important;
+  box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important;
   background: #fff !important;
 }
 .v2-design .v2-records-no-subtab .v2-records-body {
@@ -1272,7 +1272,7 @@
   top: 0;
   z-index: 20;
   background: #fff;
-  border-bottom: 1px solid #eceaf5;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5);
   padding: 10px 14px 8px;
 }
 .v2-design .v2-page-header .bp-header-row { gap: 8px; }
@@ -1381,7 +1381,7 @@
   border-radius: 0;
   overflow: hidden;
   border: none;
-  border-bottom: 1px solid #eceaf5;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5);
   background: #f3eeff;
 }
 .v2-design .v2-places .v2-map-panel .places-map-sticky-area {
@@ -1404,8 +1404,8 @@
 .v2-design .v2-places .place-card-row {
   padding: 10px 12px !important;
   border-radius: 14px !important;
-  border: 1px solid #eceaf5 !important;
-  box-shadow: 0 2px 8px rgba(30, 27, 46, 0.05) !important;
+  border: 1px solid var(--v2-card-border, #eceaf5) !important;
+  box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important;
   margin-bottom: 8px !important;
 }
 
@@ -1418,11 +1418,11 @@
   margin-top: 8px !important;
 }
 .v2-design .v2-settlement .settlement-metric-card {
-  border: 1px solid #eceaf5 !important;
+  border: 1px solid var(--v2-card-border, #eceaf5) !important;
   border-radius: 14px !important;
-  border-right: 1px solid #eceaf5 !important;
+  border-right: 1px solid var(--v2-card-border, #eceaf5) !important;
   background: #fff !important;
-  box-shadow: 0 2px 8px rgba(30, 27, 46, 0.05) !important;
+  box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important;
   padding: 12px 10px !important;
 }
 .v2-design .v2-settlement .settlement-metric-card-label {
@@ -1433,17 +1433,17 @@
 .v2-design .v2-settlement .settlement-ledger-row {
   padding: 10px 12px !important;
   border-radius: 12px !important;
-  border: 1px solid #eceaf5 !important;
+  border: 1px solid var(--v2-card-border, #eceaf5) !important;
   background: #fff !important;
-  box-shadow: 0 1px 4px rgba(30, 27, 46, 0.04) !important;
+  box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important;
   margin-bottom: 6px !important;
 }
 .v2-design .v2-settlement .settlement-page-body section {
   background: #fff !important;
-  border: 1px solid #eceaf5 !important;
+  border: 1px solid var(--v2-card-border, #eceaf5) !important;
   border-radius: 16px !important;
   padding: 12px !important;
-  box-shadow: 0 2px 8px rgba(30, 27, 46, 0.05) !important;
+  box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important;
 }
 
 /* Memo composer / cards full-bleed (kill 520px float) */
@@ -1727,14 +1727,14 @@
 }
 .v2-design .v2-content .culture-items-grid > * {
   border-radius: 12px !important;
-  border: 1px solid #eceaf5 !important;
-  box-shadow: 0 2px 8px rgba(30, 27, 46, 0.05) !important;
+  border: 1px solid var(--v2-card-border, #eceaf5) !important;
+  box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important;
   overflow: hidden;
   background: #fff !important;
 }
 .v2-design .v2-archive .history-bento-grid > * {
   border-radius: 12px !important;
-  box-shadow: 0 2px 8px rgba(30, 27, 46, 0.05) !important;
+  box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important;
   overflow: hidden;
 }
 /* Genre / category chips: portal into a classless slot, then an inner classless row */
@@ -2061,7 +2061,7 @@
 .v2-design .v2-chat .msg-row-hover > div > div[style*="backgroundColor"],
 .v2-design .v2-chat .msg-row-hover > div > div[style*="background-color"] {
   background: #fff !important;
-  border: 1px solid #eceaf5 !important;
+  border: 1px solid var(--v2-card-border, #eceaf5) !important;
   color: #1e1b2e !important;
   box-shadow: none !important;
 }
@@ -2074,7 +2074,7 @@
   padding: 0 16px;
   box-sizing: border-box;
   background: #fff;
-  border-bottom: 1px solid #eceaf5;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5);
   position: sticky;
   top: 0;
   z-index: 20;
