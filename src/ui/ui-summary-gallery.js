@@ -3857,21 +3857,18 @@ function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind =
   if (typeof document === 'undefined' || !ReactDOM) return null;
   return ReactDOM.createPortal(
     /*#__PURE__*/React.createElement("div", {
+      className: "modal-overlay",
       onClick: () => !saving && onClose && onClose(),
-      style: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 14000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }
+      style: { zIndex: 14000 }
     },
       /*#__PURE__*/React.createElement("div", {
+        className: "modal-container",
         onClick: e => e.stopPropagation(),
         role: "dialog",
-        "aria-label": "컨텐츠 등록",
-        style: {
-          width: '100%', maxWidth: '480px', maxHeight: '90vh', overflowY: 'auto',
-          backgroundColor: 'var(--bg-card)', borderRadius: '16px 16px 0 0', padding: '16px 16px 20px',
-          display: 'flex', flexDirection: 'column', gap: '12px', boxSizing: 'border-box'
-        }
+        "aria-label": "컨텐츠 등록"
       },
-        /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' } },
-          /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)' } }, initialItem ? "컨텐츠 수정" : "컨텐츠 등록"),
+        /*#__PURE__*/React.createElement("div", { className: "modal-header" },
+          /*#__PURE__*/React.createElement("h3", null, initialItem ? "컨텐츠 수정" : "컨텐츠 등록"),
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '4px' } },
             !initialItem && /*#__PURE__*/React.createElement("button", {
               type: "button", onClick: handlePasteContentClick, disabled: saving,
@@ -3887,6 +3884,7 @@ function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind =
             }, SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }) : "✕")
           )
         ),
+        /*#__PURE__*/React.createElement("div", { className: "modal-body" },
         UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
           ariaLabel: "컨텐츠 종류",
           value: kind,
@@ -3971,6 +3969,7 @@ function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind =
           type: "button", className: "btn btn-primary btn-action", disabled: saving, onClick: handleSave,
           style: { width: '100%', marginTop: '4px', height: '44px', minHeight: '44px', opacity: saving ? 0.7 : 1 }
         }, saving ? "저장 중..." : "저장")
+        )
       )
     ),
     document.body
@@ -4651,10 +4650,12 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
     ),
     selected && ReactDOM.createPortal(
       /*#__PURE__*/React.createElement("div", {
+        className: "modal-overlay",
         onClick: () => setSelected(null),
         style: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 13000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }
       },
         /*#__PURE__*/React.createElement("div", {
+          className: "modal-container",
           onClick: e => e.stopPropagation(),
           style: {
             position: 'relative', width: '100%', maxWidth: '480px', maxHeight: '85vh',
@@ -4909,9 +4910,11 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
     ),
     contentShareUrl && ReactDOM.createPortal(
       /*#__PURE__*/React.createElement("div", {
+        className: "modal-overlay",
         onClick: () => setContentShareUrl(''),
         style: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 30000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }
       }, /*#__PURE__*/React.createElement("div", {
+        className: "modal-container",
         onClick: e => e.stopPropagation(),
         style: { width: '100%', maxWidth: '400px', backgroundColor: 'var(--bg-card)', borderRadius: 'var(--radius-md)', padding: '20px', boxSizing: 'border-box' }
       },
@@ -4953,10 +4956,12 @@ function SharedContentPreviewModal({ item, onClose }) {
   if (!item || typeof document === 'undefined' || !ReactDOM) return null;
   return ReactDOM.createPortal(
     /*#__PURE__*/React.createElement("div", {
+      className: "modal-overlay",
       onClick: onClose,
       style: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 40000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }
     },
       /*#__PURE__*/React.createElement("div", {
+        className: "modal-container",
         onClick: e => e.stopPropagation(),
         style: {
           position: 'relative', width: '100%', maxWidth: '480px', maxHeight: '85vh',

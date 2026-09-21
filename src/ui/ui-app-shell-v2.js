@@ -43,7 +43,7 @@ import {
   getMessageDirectMediaEntry, getMessageImageEntries,
   normalizePlaceDateForSort,
   getTrulyConfirmedMeetings, getActiveAvailabilities, getActiveParticipants,
-  calculateSettlementBalance, formatBalanceBadge, getAnniversaryDisplayColor,
+  calculateSettlementBalance, formatBalanceBadge,
 } from '../core/app-domain-helpers.js';
 import { getMeetingOwnedPhotoMessageIds, isChatRenderableMessage, isMemeKeyboardPhotoEntry } from '../core/gallery-data.js';
 import { computeKoreanHolidaysForYear, getKoreanSolarTermsForYear } from '../core/app-calendar-holidays.js';
@@ -2472,47 +2472,6 @@ export function buildRenewalMoreContext(calendar, deps) {
       window.open(adminUrl.toString(), '_blank', 'noopener,noreferrer');
     },
   };
-}
-
-/**
- * Renders whichever of the 5 real 더보기 modals (share/anniversaries/manual/app-settings/search,
- * see REAL_MORE_MODAL_IDS above) is currently open, using the SAME `window.GATHER_UI_COMPONENTS`
- * pass-through aliases app-main.js itself uses (`bindUiComponentAliases`) -- so this reuses the
- * exact lazy-loaded chunk/component app-main.js already has, no separate copy bundled here.
- * `searchExtra` carries the tab-navigation callbacks (`onOpenMemo`/`onSelectDate`/
- * `onOpenChatMessage`/`onOpenImage`) `RenewalAppShell` composes for GlobalSearchModal -- see its
- * call site for why those can't be built inside `buildRenewalMoreContext`.
- */
-function SharedLightboxHost({ calendar, lightboxProps, onJumpToChatMessage, onJumpToMemo, onJumpToMeetingDate, onJumpToGallery }) {
-  const React = window.React;
-  if (!lightboxProps?.activeLightbox) return null;
-  const { Lightbox } = bindUiComponentAliases(React);
-  const lb = lightboxProps.activeLightbox;
-  return React.createElement(Lightbox, {
-    urls: lb.urls,
-    index: lb.index,
-    meta: lb.meta,
-    calendar: calendar || null,
-    onClose: () => lightboxProps.setActiveLightbox?.(null),
-    onNavigate: (i) => lightboxProps.setActiveLightbox?.(prev => prev ? { ...prev, index: i } : prev),
-    showToast: lightboxProps.showToast,
-    onPromoteImageUrl: lightboxProps.onPromoteImageUrl,
-    onSaveImageTags: lightboxProps.onSaveImageTags,
-    onSearchTag: lightboxProps.onSearchTag,
-    onDeletePhoto: lightboxProps.onDeletePhoto,
-    onReplacePhoto: lightboxProps.onReplacePhoto,
-    onJumpToChatMessage,
-    onJumpToMemo,
-    onJumpToMeetingDate,
-    onJumpToGallery,
-    onGetChatMessageOrdinal: lightboxProps.onGetChatMessageOrdinal,
-    onGetGalleryPhotoOrdinal: lightboxProps.onGetGalleryPhotoOrdinal,
-    onRequestConfirm: lightboxProps.onRequestConfirm,
-    onFetchPhotoComments: lightboxProps.onFetchPhotoComments,
-    onSavePhotoComments: lightboxProps.onSavePhotoComments,
-    preloadedPhotoComments: lightboxProps.preloadedPhotoComments,
-    preloadedPhotoCommentsReady: lightboxProps.preloadedPhotoCommentsReady,
-  });
 }
 
 function MoreModalsHost({ openModal, onClose, modalProps, anniversaryOverride, calendarSettingsExtra, searchExtra }) {
