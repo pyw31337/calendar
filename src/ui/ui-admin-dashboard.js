@@ -233,6 +233,10 @@ function listPhotoIndexEntriesForDedupRemote(...args) {
   const f = __gatherUiDeps().listPhotoIndexEntriesForDedupRemote || GATHER_APP_UTILS.listPhotoIndexEntriesForDedupRemote;
   return typeof f === 'function' ? f(...args) : Promise.resolve({ items: [], nextCursor: null });
 }
+function mergeDedupPhotosRemote(...args) {
+  const f = __gatherUiDeps().mergeDedupPhotosRemote || GATHER_APP_UTILS.mergeDedupPhotosRemote;
+  return typeof f === 'function' ? f(...args) : Promise.resolve({ ok: false, reason: 'unavailable' });
+}
 function listSharedDataPoolRemote(...args) {
   const f = __gatherUiDeps().listSharedDataPoolRemote || GATHER_APP_UTILS.listSharedDataPoolRemote;
   return typeof f === 'function' ? f(...args) : Promise.resolve({ items: [], nextCursor: null });
@@ -511,8 +515,11 @@ export function AdminDashboard({ initialCalendars }) {
       // Duplicates only matter within the same calendar -- two different calendars can
       // legitimately share an identical-looking upload (same photo shared twice), and
       // calendars never share Storage/data, so group per calendar before running dedup.
+      // A photo already merged (its data moved to a winner, mergeDedupPhotos above) is still
+      // physically present until an admin deletes it via the lightbox, so it must not be
+      // reported as a fresh duplicate on a re-scan.
       const byCalendar = new Map();
-      all.forEach(item => {
+      all.filter(item => !item.mergedInto).forEach(item => {
         const list = byCalendar.get(item.calendarId) || [];
         list.push(item);
         byCalendar.set(item.calendarId, list);
@@ -533,6 +540,38 @@ export function AdminDashboard({ initialCalendars }) {
     }
   }, []);
   const dedupDuplicatePhotoCount = dedupGroups.reduce((sum, g) => sum + g.losers.length, 0);
+
+  // 병합 실행 -- 태그/댓글만 승자 쪽으로 합친다 (패자 사진 자체는 지우지 않음, mergeDedupPhotos의
+  // 서버 쪽 주석 참고). 완료된 항목은 assetKey로 기억해 같은 세션 안에서 버튼이 다시 눌려도
+  // 중복 호출되지 않게 하고, 카드에 "이제 삭제해도 데이터 유실 없음" 안내와 해당 캘린더를 여는
+  // 링크를 보여준다.
+  const [dedupMergingKey, setDedupMergingKey] = React.useState('');
+  const [dedupMergedKeys, setDedupMergedKeys] = React.useState({});
+  const runMergeDedupPair = async (calendarId, winnerAssetKey, loserAssetKey) => {
+    const session = getAdminSession();
+    if (!session?.password || dedupMergingKey) return;
+    setDedupMergingKey(loserAssetKey);
+    try {
+      const result = await mergeDedupPhotosRemote(session.password, { calendarId, winnerAssetKey, loserAssetKey });
+      if (result.ok) {
+        setDedupMergedKeys(prev => ({ ...prev, [loserAssetKey]: true }));
+        showAdminToast(`병합 완료 (댓글 ${result.mergedCommentCount}개). 이제 이 캘린더를 열어 중복 사진을 삭제하세요.`, 'success', 6000);
+      } else {
+        showAdminToast(`병합 실패: ${result.reason || '오류'}`, 'error');
+      }
+    } catch (err) {
+      showAdminToast(`병합 실패: ${err.message || '오류'}`, 'error');
+    } finally {
+      setDedupMergingKey('');
+    }
+  };
+  const confirmMergeDedupPair = (calendarId, winnerAssetKey, loserAssetKey) => {
+    requestConfirm(
+      '중복사진 병합',
+      '태그와 댓글을 유지할 사진 쪽으로 합칩니다. 사진 자체는 지워지지 않으며, 삭제는 이후 해당 캘린더에서 직접 진행해야 합니다. 계속할까요?',
+      () => runMergeDedupPair(calendarId, winnerAssetKey, loserAssetKey)
+    );
+  };
 
   // 데이터풀 탭의 카테고리 선택 (사진/파일/링크/기타) + "미태그만 보기" -- 태그 기반으로 관리하는
   // 공유 데이터 어디서나 재사용할 수 있도록 category-agnostic 하게 둔다.
@@ -2340,9 +2379,26 @@ export function AdminDashboard({ initialCalendars }) {
                                 }, isWinner ? "유지" : "병합 대상")
                               ),
                               /*#__PURE__*/React.createElement("p", { style: { margin: '2px 0 0', fontSize: 'var(--font-size-2xs)', color: 'var(--text-muted)', textAlign: 'center' } },
-                                `태그 ${candidate.tags ? '있음' : '없음'} · 댓글 ${candidate.commentCount}`)
+                                `태그 ${candidate.tags ? '있음' : '없음'} · 댓글 ${candidate.commentCount}`),
+                              !isWinner && (dedupMergedKeys[candidate.photo.assetKey]
+                                ? /*#__PURE__*/React.createElement("p", { style: { margin: '4px 0 0', fontSize: 'var(--font-size-2xs)', color: 'var(--status-green)', textAlign: 'center', fontWeight: 800 } }, "병합됨 -- 삭제 가능")
+                                : /*#__PURE__*/React.createElement("button", {
+                                    type: "button",
+                                    onClick: () => confirmMergeDedupPair(group.calendarId, group.winner.photo.assetKey, candidate.photo.assetKey),
+                                    disabled: !!dedupMergingKey,
+                                    style: {
+                                      marginTop: '4px', width: '100%', height: '22px', padding: 0, borderRadius: 'var(--radius-sm)',
+                                      border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)',
+                                      fontSize: 'var(--font-size-2xs)', fontWeight: 800, cursor: dedupMergingKey ? 'default' : 'pointer'
+                                    }
+                                  }, dedupMergingKey === candidate.photo.assetKey ? "병합 중..." : "병합"))
                             ))
-                        )
+                        ),
+                        group.losers.some(l => dedupMergedKeys[l.photo.assetKey]) && /*#__PURE__*/React.createElement("button", {
+                          type: "button", className: "btn btn-secondary",
+                          onClick: () => window.open(`${window.location.pathname}?id=${group.calendarId}`, '_blank', 'noopener,noreferrer'),
+                          style: { marginTop: '8px', height: '30px', padding: '0 10px', fontWeight: 800, fontSize: 'var(--font-size-xs)' }
+                        }, `${group.calendarId} 캘린더 열어서 중복 사진 삭제하기 →`)
                       ))
                     )
                   )
