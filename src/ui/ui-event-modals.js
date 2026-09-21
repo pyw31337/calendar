@@ -3571,7 +3571,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
               handleOpenSettlementEditor(card);
             },
             style: {
-              background: 'linear-gradient(90deg, var(--settlement-hero-start), var(--settlement-hero-end))',
+              background: 'linear-gradient(90deg, var(--settlement-hero-start), var(--settlement-hero-mid), var(--settlement-hero-end))',
               border: 'none',
               borderRadius: '18px',
               padding: '14px 14px 12px',

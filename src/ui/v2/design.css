@@ -1279,6 +1279,17 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   align-items: center;
   gap: 8px;
   min-width: 0;
+  /* Now a <button> (click navigates home) -- reset the UA button chrome it would
+     otherwise pick up (border/background/padding/font), and keep it visually a
+     plain inline label same as before. */
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 .v2-design .bp-side-nav-brand-icon {
   display: inline-flex !important;

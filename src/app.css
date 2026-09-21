@@ -3532,8 +3532,12 @@ select.form-select {
   flex: 0 0 auto;
 }
 :root {
-  --settlement-hero-start: #5B4BEB;
-  --settlement-hero-end: #EC4899;
+  /* Matches the V2 캘린더 home hero's aurora gradient (design.css .bp-hero-zone,
+     #12CDF0 -> #3604FD -> #8019E0) so 정산's summary card and 보관함's confirmed-meeting
+     cards read as the same brand gradient across v1 and v2 shells. */
+  --settlement-hero-start: #12CDF0;
+  --settlement-hero-mid: #3604FD;
+  --settlement-hero-end: #8019E0;
   --settlement-hero-text: #FFFFFF;
   --settlement-hero-muted: rgba(255, 255, 255, 0.84);
   --settlement-hero-surface: rgba(255, 255, 255, 0.94);
@@ -3546,8 +3550,11 @@ select.form-select {
   --settlement-person-capsule-text: #64748B;
 }
 :root[data-theme="dark"] {
-  --settlement-hero-start: #23235E;
-  --settlement-hero-end: #7C3AED;
+  /* Same hero gradient as the light theme (the V2 home hero itself has no dark-mode
+     variant either -- it's a fixed brand gradient regardless of theme). */
+  --settlement-hero-start: #12CDF0;
+  --settlement-hero-mid: #3604FD;
+  --settlement-hero-end: #8019E0;
   --settlement-hero-text: #F8FAFC;
   --settlement-hero-muted: rgba(226, 232, 240, 0.82);
   --settlement-hero-surface: rgba(15, 23, 42, 0.88);
@@ -4242,7 +4249,9 @@ select.form-select {
   overflow: hidden;
   isolation: isolate;
   border: none;
-  background: linear-gradient(90deg, #5B4BEB 0%, #8B3BDE 54%, #EC4899 100%);
+  /* Same brand gradient tokens as 정산's hero card (--settlement-hero-*), which in turn
+     matches the V2 캘린더 home hero's gradient -- see that variable's own comment. */
+  background: linear-gradient(90deg, var(--settlement-hero-start) 0%, var(--settlement-hero-mid) 54%, var(--settlement-hero-end) 100%);
   color: #FFFFFF;
   box-shadow: none;
 }
@@ -4255,7 +4264,7 @@ select.form-select {
   opacity: 0.65;
 }
 .date-item-btn.confirmed-meeting-card:hover {
-  background: linear-gradient(90deg, #624DEB 0%, #9333EA 52%, #F43F5E 100%);
+  filter: brightness(1.08) saturate(1.05);
   transform: none !important;
   box-shadow: none;
 }
@@ -4271,14 +4280,6 @@ select.form-select {
   color: #475569;
   box-shadow: none;
   opacity: 0.92;
-}
-:root[data-theme="dark"] .date-item-btn.confirmed-meeting-card {
-  background: linear-gradient(90deg, #5B4BEB 0%, #8B3BDE 54%, #EC4899 100%);
-  border: none;
-  box-shadow: none;
-}
-:root[data-theme="dark"] .date-item-btn.confirmed-meeting-card:hover {
-  background: linear-gradient(90deg, #624DEB 0%, #9333EA 52%, #F43F5E 100%);
 }
 :root[data-theme="dark"] .date-item-btn.confirmed-meeting-card.is-past {
   background: linear-gradient(90deg, #1B2540 0%, #22304F 100%) !important;
