@@ -781,7 +781,7 @@ assert(/fileAttachments/.test(chatFileModule) && /uploadChatFileAttachment/.test
 assert(/classifyChatComposerFiles/.test(chatFileModule) && /isChatDocumentFile/.test(chatFileModule), 'composer must classify images vs documents');
 const chatRoomSource = fs.readFileSync('src/ui/ui-chat-room.js', 'utf8');
 const chatTypingPresenceSource = fs.readFileSync('src/core/chat-typing-presence.js', 'utf8');
-assert(chatRoomSource.includes('파일 업로드') && chatRoomSource.includes('lucide-paperclip'), 'chat composer must expose a file upload paperclip control');
+assert(chatRoomSource.includes('사진 또는 파일 첨부') && chatRoomSource.includes('lucide-paperclip'), 'chat composer must expose a file upload paperclip control');
 assert(chatRoomSource.includes('handleDocFileChangeChat') && chatRoomSource.includes('classifyChatComposerFiles'), 'file button must classify and route images through the photo pipeline');
 assert(chatRoomSource.includes('useChatTypingPresence') && chatRoomSource.includes('chat-typing-dot'), 'chat must render shared typing presence in both shells');
 assert(chatTypingPresenceSource.includes("collection('typingPresence')"), 'typing presence must stay isolated from permanent message history');
