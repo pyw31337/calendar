@@ -27,7 +27,7 @@
 
     .v2-chat .bp-chat-list { padding: 4px 14px 90px; }
     .v2-chat .bp-chat-row { display: flex; gap: 6px; margin-bottom: 14px; align-items: flex-start; }
-    .v2-chat .bp-chat-name-pill { flex-shrink: 0; font-size: 0.62rem; font-weight: 800; color: #fff; padding: 2px 6px; border-radius: var(--radius-full); height: fit-content; margin-top: 1px; }
+    .v2-chat .bp-chat-name-pill { flex-shrink: 0; display: inline-flex; align-items: center; line-height: 1; font-size: 0.62rem; font-weight: 800; color: #fff; padding: 2px 6px; border-radius: var(--radius-full); height: fit-content; margin-top: 1px; }
     .v2-chat .bp-chat-body { min-width: 0; }
     .v2-chat .bp-chat-text { font-size: 0.8rem; color: var(--text-main); line-height: 1.45; background: var(--bg-card); border: 1px solid var(--v2-card-border, #eceaf5); border-radius: 0 var(--radius-md) var(--radius-md) var(--radius-md); padding: 8px 11px; display: inline-block; max-width: 260px; }
     .v2-chat .bp-chat-meta-row { display: flex; align-items: center; gap: 6px; margin-top: 3px; }
