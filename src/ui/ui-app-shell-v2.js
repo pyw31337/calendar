@@ -2574,6 +2574,8 @@ export function renderRenewalShellIfEnabled(activeCalId, calendar, moreContextDe
     recordsContext: buildRenewalRecordsContext(calendar, recordsContextDeps),
     chatUploadProgress: globalOverlays?.chatUploadProgress || null,
     operationProgress: globalOverlays?.operationProgress || null,
+    toast: globalOverlays?.toast || null,
+    dismissToast: globalOverlays?.dismissToast || null,
   });
 }
 
@@ -2588,7 +2590,7 @@ export function renderRenewalShellIfEnabled(activeCalId, calendar, moreContextDe
  *   `buildRenewalSettlementContext`) is the 정산 tab's; `recordsContext` (see
  *   `buildRenewalRecordsContext`) is the 기록 탭's -- all built the same way.
  */
-export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarContext, chatContext, settlementContext, recordsContext, chatUploadProgress, operationProgress }) {
+export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarContext, chatContext, settlementContext, recordsContext, chatUploadProgress, operationProgress, toast, dismissToast }) {
   const React = window.React;
   const [activeTab, setActiveTabState] = React.useState(readTabFromLocation);
   const [recordsSubTab, setRecordsSubTabState] = React.useState(readRecordsSubTabFromLocation);
@@ -3195,6 +3197,23 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
     // (shared code path with v1), it just looked stalled/failed with nothing on screen to show
     // otherwise, which is indistinguishable from a real failure to someone watching it.
     operationProgress && !chatUploadProgress && React.createElement(bindUiComponentAliases(React).OperationProgressOverlay, operationProgress),
-    chatUploadProgress && React.createElement(bindUiComponentAliases(React).ImageUploadOverlay, chatUploadProgress)
+    chatUploadProgress && React.createElement(bindUiComponentAliases(React).ImageUploadOverlay, chatUploadProgress),
+    // Same reason as the two overlays above: v1's single showToast()/toast state renders here
+    // (app-main.js's withStickyVideo, position:fixed so it's independent of where it's mounted)
+    // and this shell never reaches that tree. Every showToast() call already made across v2
+    // (upload results, deletes, tag saves, network status, ...) was updating state with nothing
+    // on screen to show it -- reproducing the exact same markup v1 uses so it looks identical.
+    toast && React.createElement('div', {
+      className: `toast ${(toast.type === 'delete' || toast.type === 'error') ? 'is-delete' : 'is-success'} ${toast.isExiting ? 'is-exiting' : ''}`
+    }, React.createElement('span', { className: 'toast-message' }, toast.message),
+      toast.onAction && React.createElement('button', {
+        type: 'button',
+        onClick: () => {
+          const action = toast.onAction;
+          if (typeof dismissToast === 'function') dismissToast();
+          Promise.resolve(action()).catch(console.warn);
+        },
+        className: 'toast-action'
+      }, toast.actionLabel || '되돌리기'))
   );
 }

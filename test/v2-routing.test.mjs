@@ -205,5 +205,36 @@ test('V2 shell renders the same upload/operation progress overlays as v1', async
   assert.match(shell, /chatUploadProgress/, 'RenewalAppShell must accept chatUploadProgress as a prop');
   assert.match(shell, /ImageUploadOverlay/, 'RenewalAppShell must render ImageUploadOverlay when uploading');
   assert.match(shell, /OperationProgressOverlay/, 'RenewalAppShell must render OperationProgressOverlay too');
-  assert.match(appMain, /renderRenewalShellIfEnabled\([\s\S]*?\{\s*chatUploadProgress,\s*operationProgress\s*\}/, 'CalendarApp must pass its live chatUploadProgress/operationProgress state into the v2 shell');
+  assert.match(appMain, /renderRenewalShellIfEnabled\([\s\S]*?\{\s*chatUploadProgress,\s*operationProgress/, 'CalendarApp must pass its live chatUploadProgress/operationProgress state into the v2 shell');
+});
+
+// Regression: the app-wide toast (success/error banner from showToast(), used by nearly every
+// action -- uploads, deletes, tag saves, shares, network status) renders via the SAME
+// withStickyVideo() tree as the overlays above (app-main.js: `toast && <div className="toast...">`).
+// v2 never reached it either, so every showToast() call already made from v2 screens was updating
+// state with nothing on screen to show it -- indistinguishable from the action silently no-oping.
+// Regression: ui-chat-room.js's "OO님에게 답장" reply-preview card (rendered as a plain child
+// of .chat-composer when chatReplyTarget is set) carries no className -- it's styled purely via
+// an inline --reply-accent custom property. extractChatSlots's className-based walk never
+// matched it, so slots.reply was always undefined; ChatScreen's composer clone() then replaced
+// the composer's children wholesale (resize, slots.reply, photos, files, ...), silently dropping
+// the reply banner and its cancel button even though chatReplyTarget/setChatReplyTarget kept
+// working and the reply still attached to the sent message. Users under ?shell=v2 had no way to
+// see or cancel a pending reply.
+test('extractChatSlots captures the reply-preview card by its --reply-accent marker', async () => {
+  const { readFileSync } = await import('node:fs');
+  const shellNav = readFileSync(new URL('../src/ui/v2/shell-nav.js', import.meta.url), 'utf8');
+  const screens = readFileSync(new URL('../src/ui/v2/screens.js', import.meta.url), 'utf8');
+  assert.match(shellNav, /--reply-accent/, 'extractChatSlots must detect the reply card by its --reply-accent style marker (it has no className)');
+  assert.match(shellNav, /bag\.reply\s*=\s*node/, 'a matched reply card must be assigned to bag.reply');
+  assert.match(screens, /slots\.reply/, 'ChatScreen must place the captured reply slot back into the rebuilt composer');
+});
+
+test('V2 shell renders the same app-wide toast as v1', async () => {
+  const { readFileSync } = await import('node:fs');
+  const shell = readFileSync(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
+  const appMain = readFileSync(new URL('../src/core/app-main.js', import.meta.url), 'utf8');
+  assert.match(shell, /\btoast\b[\s\S]{0,40}dismissToast|dismissToast[\s\S]{0,40}\btoast\b/, 'RenewalAppShell must accept toast + dismissToast as props');
+  assert.match(shell, /className:\s*`toast \$\{/, 'RenewalAppShell must render the same .toast markup v1 uses');
+  assert.match(appMain, /renderRenewalShellIfEnabled\([\s\S]*?\btoast,\s*dismissToast\s*\}/, 'CalendarApp must pass its live toast/dismissToast state into the v2 shell');
 });
