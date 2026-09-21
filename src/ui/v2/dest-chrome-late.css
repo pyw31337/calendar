@@ -14,10 +14,10 @@
 .v2-design .v2-gallery .v2-page-header,
 .v2-design .v2-content .v2-page-header,
 .v2-design .v2-archive .v2-page-header,
-.v2-memo .bp-header.v2-page-header,
-.v2-chat .bp-header.v2-page-header,
-.v2-settlement .bp-header.v2-page-header,
-.v2-places .bp-header.v2-page-header {
+.v2-design .v2-memo .v2-page-header.bp-header,
+.v2-design .v2-chat .v2-page-header.bp-header,
+.v2-design .v2-settlement .v2-page-header.bp-header,
+.v2-design .v2-places .v2-page-header.bp-header {
   display: block !important;
   height: auto !important;
   max-height: none !important;
@@ -1808,6 +1808,5 @@ html:has(.renewal-shell.v2-design) .v2-modal-drag-handle::before {
     cursor: ns-resize !important;
   }
 }
-
 
 

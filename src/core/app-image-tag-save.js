@@ -178,7 +178,13 @@ export function createImageTagSaveHandler(context) {
       patchLocalChatMessage(messageId, verified || { ...message, ...data, id: messageId });
       const identity = getMediaIdentityKeys({ messageId, imageIndex: direct ? 0 : targetIndex, directMediaUrl: direct ? meta.directMediaUrl : '', source: 'chat' }, { source: 'chat', messageId });
       const resource = { resourceType: 'photo-tag', resourceId: identity.mediaKey, source: 'chat', sourceMessageId: messageId, imageIndex: direct ? 0 : targetIndex, before: previousTokens.join(' '), after: tags };
-      const logs = [...nextTokens.filter(token => !previousTokens.includes(token)).map((token, index) => createActivityLog(activeCalId, 'tag_add', '', '', Date.now() + index, `#${token}`, resource)), ...previousTokens.filter(token => !nextTokens.includes(token)).map((token, index) => createActivityLog(activeCalId, 'tag_remove', '', '', Date.now() + index, `#${token}`, resource))].filter(Boolean);
+      const addedTokens = nextTokens.filter(token => !previousTokens.includes(token));
+      const removedTokens = previousTokens.filter(token => !nextTokens.includes(token));
+      const activityTimestamp = Date.now();
+      const logs = [
+        ...addedTokens.map((token, index) => createActivityLog(activeCalId, 'tag_add', '', '', activityTimestamp + index, `#${token}`, resource)),
+        ...removedTokens.map((token, index) => createActivityLog(activeCalId, 'tag_remove', '', '', activityTimestamp + addedTokens.length + index, `#${token}`, resource))
+      ].filter(Boolean);
       if (logs.length) try { await writeActivityLogsToFirestore(activeCalId, logs); } catch (err) { console.warn('Image tag activity log write skipped:', err); }
     } catch (err) {
       console.error('Image tag save failed:', err);
