@@ -54,7 +54,7 @@ function getLegacyMeetingMediaKey(...args) {
 // CommentThread가 아예 없어 조용히 렌더링을 건너뛰었다 -- 라이트박스를 열어도 댓글 UI 자체가
 // 통째로 안 보이는 버그였다. Lightbox와 항상 같은 청크에 있도록 이 파일로 옮겨서 그 문제를
 // 원천적으로 없앴다.
-function CommentThread({ comments = [], onCommentsChange, calendar, showToast, onRequestConfirm }) {
+function CommentThread({ comments: commentsProp = [], onCommentsChange, calendar, showToast, onRequestConfirm }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
@@ -65,6 +65,12 @@ function CommentThread({ comments = [], onCommentsChange, calendar, showToast, o
   const AutoGrowTextarea = __comp.AutoGrowTextarea || __deps.AutoGrowTextarea;
   const sanitizeText = __deps.sanitizeText;
 
+  // Optimistic UI for add/edit, mirroring LightboxTagPanel's optimisticTags: `null` means
+  // "trust the prop". handleDeleteComment below already applied this pattern (plus an undo
+  // toast); add/edit previously waited for the server round trip before the new/edited comment
+  // appeared at all, which is the slow, inconsistent half this makes consistent with delete.
+  const [optimisticComments, setOptimisticComments] = React.useState(null);
+  const comments = optimisticComments != null ? optimisticComments : commentsProp;
   const [commentText, setCommentText] = React.useState('');
   const [commentParticipantId, setCommentParticipantId] = React.useState(() => getStoredChatParticipantId(calendar?.id, calendar));
   const [isCommentPartOpen, setIsCommentPartOpen] = React.useState(false);
@@ -89,16 +95,33 @@ function CommentThread({ comments = [], onCommentsChange, calendar, showToast, o
     const nextComments = editingCommentId
       ? comments.map(c => c.id === editingCommentId ? { ...c, text, participantId: commentParticipantId, updatedAt: now } : c)
       : [...comments, { id: `cmt_${now}_${Math.random().toString(36).slice(2, 8)}`, participantId: commentParticipantId, text, createdAt: now }];
+    // Optimistic: show the new/edited comment and clear the composer immediately, before the
+    // server round trip. A failure rolls back to the last confirmed list (see optimisticComments'
+    // declaration) and leaves the composer text in place so the user can retry.
+    setOptimisticComments(nextComments);
+    setCommentText('');
+    setEditingCommentId(null);
+    refocusComposerField(commentInputRef);
+    if (typeof showToast === 'function') {
+      showToast(wasEditing ? '댓글이 수정되었습니다' : '댓글이 등록되었습니다', 'success');
+    }
     setIsSavingComment(true);
     try {
       const saved = await Promise.resolve(onCommentsChange(nextComments));
-      if (saved === false) return;
-      setCommentText('');
-      setEditingCommentId(null);
-      if (typeof showToast === 'function') {
-        showToast(wasEditing ? '댓글이 수정되었습니다' : '댓글이 등록되었습니다', 'success');
+      if (saved === false) {
+        setOptimisticComments(null);
+        setCommentText(text);
+        if (wasEditing) setEditingCommentId(editingCommentId);
+        if (typeof showToast === 'function') showToast('댓글 저장 실패', 'error');
+        return;
       }
-      refocusComposerField(commentInputRef);
+      setOptimisticComments(null);
+    } catch (err) {
+      setOptimisticComments(null);
+      setCommentText(text);
+      if (wasEditing) setEditingCommentId(editingCommentId);
+      console.error('Lightbox comment save failed:', err);
+      if (typeof showToast === 'function') showToast('댓글 저장 실패', 'error');
     } finally {
       setIsSavingComment(false);
     }
@@ -371,7 +394,14 @@ export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast
   const TrashIcon = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.TrashIcon) || __deps.TrashIcon;
   const ConfirmDialog = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ConfirmDialog) || __deps.ConfirmDialog;
 
-  const tagTokens = String(tags || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean);
+  // Optimistic UI: while a save/delete is in flight (or has just resolved but the parent hasn't
+  // re-rendered with the confirmed `tags` prop yet), show the locally-computed result instead of
+  // waiting for the round trip. `null` means "trust the prop" -- the normal, at-rest state.
+  // Cleared on success (the prop will already carry the new value by then, since onSaveTags's
+  // handlers patch local state synchronously before resolving) and on failure (reverts the chip
+  // list to the last confirmed value, matching the toast that already reports the failure).
+  const [optimisticTags, setOptimisticTags] = React.useState(null);
+  const tagTokens = String(optimisticTags != null ? optimisticTags : (tags || '')).split(/[,\s#]+/).map(t => t.trim()).filter(Boolean);
   const [tagInput, setTagInput] = React.useState('');
   const [isSavingTags, setIsSavingTags] = React.useState(false);
   const [confirmDeleteTag, setConfirmDeleteTag] = React.useState(null);
@@ -422,17 +452,24 @@ export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast
       }
     }
     const finalTags = merged.slice(0, MAX_TAGS);
+    // Optimistic: show the new chip and clear the input immediately, before the server round
+    // trip. A failure rolls back to the last confirmed value (see optimisticTags' declaration).
+    const finalTagsStr = finalTags.join(' ');
+    setOptimisticTags(finalTagsStr);
+    setTagInput('');
+    keepTagFocusRef.current = true;
+    refocusComposerField(tagInputRef);
     setIsSavingTags(true);
     try {
-      const saved = await onSaveTags(finalTags.join(' '));
+      const saved = await onSaveTags(finalTagsStr);
       if (saved === false) {
+        setOptimisticTags(null);
         if (typeof showToast === 'function') showToast('태그 저장 실패', 'error');
         return;
       }
-      setTagInput('');
-      keepTagFocusRef.current = true;
-      refocusComposerField(tagInputRef);
+      setOptimisticTags(null);
     } catch (err) {
+      setOptimisticTags(null);
       console.error('Lightbox tag save failed:', err);
       if (typeof showToast === 'function') showToast('태그 저장 실패', 'error');
     } finally {
@@ -441,11 +478,18 @@ export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast
   };
   const handleConfirmDeleteTag = async () => {
     if (!onSaveTags || !confirmDeleteTag || isDeletingTag) return;
+    const nextTagsStr = tagTokens.filter(t => t !== confirmDeleteTag).join(' ');
+    // Optimistic: the chip and its confirm dialog disappear immediately; roll back (chip
+    // reappears) only if the server rejects the delete.
+    setOptimisticTags(nextTagsStr);
+    setConfirmDeleteTag(null);
     setIsDeletingTag(true);
     try {
-      const saved = await onSaveTags(tagTokens.filter(t => t !== confirmDeleteTag).join(' '));
-      if (saved !== false) setConfirmDeleteTag(null);
+      const saved = await onSaveTags(nextTagsStr);
+      setOptimisticTags(null);
+      if (saved === false && typeof showToast === 'function') showToast('태그 삭제 실패', 'error');
     } catch (err) {
+      setOptimisticTags(null);
       console.error('Lightbox tag delete failed:', err);
       if (typeof showToast === 'function') showToast('태그 삭제 실패', 'error');
     } finally {
