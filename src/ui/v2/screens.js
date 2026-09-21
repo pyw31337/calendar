@@ -446,7 +446,7 @@ export function MemoScreen(p) {
               ChatBubbleFrame,
               {
                 key: memo.id,
-                name: author.name,
+                name: null,
                 color: author.color,
                 meta,
                 className: `v2-memo-card-wrap${memo.id === focusedMemoId ? ' v2-memo-card-is-focused' : ''}`,

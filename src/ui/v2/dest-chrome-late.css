@@ -785,6 +785,12 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   border: 0 !important;
 }
 
+/* Memo card containers suppress the external name pill; author dot is rendered inside the card before tags */
+.v2-design .v2-home-memo-bubble > .v2-name-pill,
+.v2-design .v2-memo .v2-memo-card-wrap > .v2-name-pill {
+  display: none !important;
+}
+
 /* Calendar name dots: circle, no text offset. */
 .v2-design .bp-p-dot,
 .v2-design .bp-dot-row .bp-p-dot,
@@ -1225,7 +1231,6 @@ html:has(.renewal-shell.v2-design) .bottom-sheet-header h4 {
 /* Extra labelled pills that share the same 22px geometry. */
 .v2-design .main-menu-badge,
 .v2-design .side-menu-meta-pill,
-.v2-design .v2-memo-author-pill,
 .v2-design .memo-card-comment-badge,
 .v2-design .photo-comment-count-badge,
 .v2-design .bp-comment-badge,
@@ -1252,6 +1257,31 @@ html:has(.renewal-shell.v2-design) .bottom-sheet-header h4 {
   border-radius: 999px !important;
   text-align: center;
   vertical-align: middle;
+}
+
+/* V2 Memo author circle indicator (8px x 8px personal color circle, strictly no shadow or border) */
+.v2-design .v2-memo-author-dot,
+.v2-design .v2-memo-author-pill {
+  display: inline-block !important;
+  width: 8px !important;
+  height: 8px !important;
+  min-width: 8px !important;
+  min-height: 8px !important;
+  max-width: 8px !important;
+  max-height: 8px !important;
+  border-radius: 50% !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  color: transparent !important;
+  overflow: hidden !important;
+  flex-shrink: 0 !important;
+  vertical-align: middle !important;
+  box-sizing: border-box !important;
 }
 
 html:has(.renewal-shell.v2-design) .modal-overlay .form-input,

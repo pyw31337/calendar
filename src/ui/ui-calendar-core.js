@@ -1968,10 +1968,37 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       className: "v2-memo-card-tags",
       style: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px', marginTop: '10px' }
     },
-      /* Writer badge (capsule with participant's color and white text) */
+      /* Writer badge:
+         In V2 (variant === 'v2-page' or V2 shell active): 8px x 8px circle, no text, no shadow/border.
+         In V1 (legacy): original capsule badge with writer's name. */
       (() => {
         const writer = (calendar?.participants || []).find(p => p.id === memo.participantId);
         if (!writer) return null;
+        const isV2Shell = variant === 'v2-page' || (typeof document !== 'undefined' && !!document.querySelector('.renewal-shell.v2-design'));
+        if (isV2Shell) {
+          return /*#__PURE__*/React.createElement("span", {
+            className: "v2-memo-author-dot v2-memo-author-pill",
+            role: "img",
+            "aria-label": `${writer.name || '작성자'} 작성자`,
+            title: writer.name || '작성자',
+            style: {
+              display: 'inline-block',
+              width: '8px',
+              height: '8px',
+              minWidth: '8px',
+              minHeight: '8px',
+              maxWidth: '8px',
+              maxHeight: '8px',
+              borderRadius: '50%',
+              backgroundColor: writer.color || '#94A3B8',
+              flexShrink: 0,
+              border: 'none',
+              boxShadow: 'none',
+              outline: 'none',
+              boxSizing: 'border-box'
+            }
+          });
+        }
         return /*#__PURE__*/React.createElement("span", {
           className: "v2-memo-author-pill",
           style: {

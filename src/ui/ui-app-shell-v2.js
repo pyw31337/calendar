@@ -1500,7 +1500,29 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
               );
             })
           ),
-          tags.length ? React.createElement('span', { className: 'v2-bubble-tags' },
+          (tags.length > 0 || displayColor(memo)) ? React.createElement('span', { className: 'v2-bubble-tags' },
+            displayColor(memo) ? React.createElement('span', {
+              className: 'v2-memo-author-dot',
+              role: 'img',
+              'aria-label': `${displayName(memo) || '작성자'} 작성자`,
+              title: displayName(memo) || '작성자',
+              style: {
+                display: 'inline-block',
+                width: '8px',
+                height: '8px',
+                minWidth: '8px',
+                minHeight: '8px',
+                maxWidth: '8px',
+                maxHeight: '8px',
+                borderRadius: '50%',
+                backgroundColor: displayColor(memo),
+                flexShrink: 0,
+                border: 'none',
+                boxShadow: 'none',
+                outline: 'none',
+                boxSizing: 'border-box'
+              }
+            }) : null,
             tags.map(tag => React.createElement('em', { className: 'v2-bubble-tag', key: tag }, `#${String(tag).replace(/^#/, '')}`))
           ) : null,
           visibleComments.length ? React.createElement('div', { className: 'v2-bubble-comment-list' },
