@@ -26,7 +26,10 @@
     <script>
       (function () {
         try {
-          if (location.hostname === 'pyw31337.github.io') return;
+          // Production github.io stays v1 unless ?shell=v2. Local/preview smoke
+          // (127.0.0.1, localhost) must also stay on the requested shell.
+          var host = String(location.hostname || '');
+          if (host === 'pyw31337.github.io' || host === 'localhost' || host === '127.0.0.1' || host === '::1') return;
           var params = new URLSearchParams(location.search);
           var missingId = !params.get('id') && !params.get('cal');
           var missingShell = params.get('shell') !== 'v2';
