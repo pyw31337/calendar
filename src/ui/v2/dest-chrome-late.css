@@ -193,7 +193,7 @@
 }
 
 .v2-design .bottom-sheet-overlay.emoji-sheet-overlay,
-body > .bottom-sheet-overlay.emoji-sheet-overlay {
+body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   z-index: 40000 !important;
   pointer-events: auto !important;
 }
