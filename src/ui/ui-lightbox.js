@@ -424,20 +424,15 @@ export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast
     const finalTags = merged.slice(0, MAX_TAGS);
     setIsSavingTags(true);
     try {
-      // Every onSaveTags implementation (handleSaveImageTags and its anniversary/meeting/memo
-      // branches) already shows its own specific toast on failure -- a queued-for-retry network
-      // state, a verification hiccup, a missing source photo, etc. all read differently and
-      // matter to the user differently. Toasting a second, generic "태그 저장 실패" here on top
-      // of that -- as this used to do -- doesn't add information; it *replaces* the specific
-      // message with a less useful one, since only one toast shows at a time.
       const saved = await onSaveTags(finalTags.join(' '));
-      if (saved === false) return;
+      if (saved === false) {
+        if (typeof showToast === 'function') showToast('태그 저장 실패', 'error');
+        return;
+      }
       setTagInput('');
       keepTagFocusRef.current = true;
       refocusComposerField(tagInputRef);
     } catch (err) {
-      // A thrown error means the failure never reached a handler's own toast -- this is the one
-      // case where the fallback message here is the only feedback the user gets.
       console.error('Lightbox tag save failed:', err);
       if (typeof showToast === 'function') showToast('태그 저장 실패', 'error');
     } finally {

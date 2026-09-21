@@ -3150,7 +3150,6 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   const participants = Array.isArray(calendarContext?.calendar?.participants) ? calendarContext.calendar.participants : [];
   const chatAuthorPart = participants.find(p => p && (p.id === lastChatMsg?.participantId || p.name === lastChatAuthor));
   const chatPillColor = chatAuthorPart?.color || '#EF4444';
-  const chatPillTextColor = '#FFFFFF';
 
   const hasFullScreen = activeTab === 'chat' || activeTab === 'settlement' || activeTab === 'memo' || activeTab === 'places' || activeTab === 'search';
   const cleanCalBadge = (value) => String(value || '')

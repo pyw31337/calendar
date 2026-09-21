@@ -4046,24 +4046,15 @@ function CalendarApp() {
     // Confirm the subcollection write before reporting success. The calendar document and its
     // confirmedMeetings mirror can briefly diverge when a fallback request races a realtime
     // snapshot; silently keeping the optimistic local tag makes it disappear on re-entry.
-    // That divergence is usually just propagation lag (milliseconds to low seconds), not a real
-    // failure -- checking once, immediately after the write, was catching that lag itself and
-    // reporting a save that had actually succeeded as "태그 저장 확인에 실패했습니다", which is
-    // exactly the false-failure users kept re-triggering by retrying (each retry racing the same
-    // lag again). Retry the confirmation read a couple of times with a short delay before
-    // concluding the write genuinely didn't land.
-    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-    const confirmDelaysMs = [0, 800, 1500];
-    for (let attempt = 0; attempt < confirmDelaysMs.length; attempt += 1) {
-      if (confirmDelaysMs[attempt]) await wait(confirmDelaysMs[attempt]);
-      const serverMeetings = await fetchConfirmedMeetingsFromFirestore(activeCal.id).catch(() => null);
-      const serverPhoto = Array.isArray(serverMeetings)
-        ? (serverMeetings.find(m => m.date === meetingDate)?.photos || []).find(p => p?.id === photoId || p?.refKey === photoId || p?.mediaKey === photoId)
-        : null;
-      if (serverPhoto && String(serverPhoto.tags || '') === cleanTags) return true;
+    const serverMeetings = await fetchConfirmedMeetingsFromFirestore(activeCal.id).catch(() => null);
+    const serverPhoto = Array.isArray(serverMeetings)
+      ? (serverMeetings.find(m => m.date === meetingDate)?.photos || []).find(p => p?.id === photoId || p?.refKey === photoId || p?.mediaKey === photoId)
+      : null;
+    if (!serverPhoto || String(serverPhoto.tags || '') !== cleanTags) {
+      showToast('태그 저장 확인에 실패했습니다. 다시 시도해 주세요.', 'error', 5000);
+      return false;
     }
-    showToast('태그 저장 확인에 실패했습니다. 다시 시도해 주세요.', 'error', 5000);
-    return false;
+    return true;
   };
 
   // Persist hashtags onto anniversary.photos[i].tags (anniversary docs live in the

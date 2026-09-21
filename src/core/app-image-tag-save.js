@@ -160,24 +160,9 @@ export function createImageTagSaveHandler(context) {
     })();
     try {
       const saved = await writeCollectionDocumentWithFallback('messages', activeCalId, messageId, data, 'update', '이미지 태그 저장', { requirePersisted: true });
-      // A write that was queued for retry (flaky/offline network) is not a failure -- the data
-      // is not lost, it will sync automatically once connectivity returns. Reporting it as a
-      // hard "실패" here (the old behavior) is misleading, especially since it can repeat on
-      // every save attempt while the network stays degraded. Tell the user what is actually
-      // happening instead, and still return false so the lightbox does not optimistically apply
-      // an unconfirmed change to local state (a refresh before the queue flushes would otherwise
-      // make it look like the tag silently reverted).
-      if (saved?.queued) {
-        showToast('네트워크 상태가 불안정해 태그 저장이 대기 중입니다. 연결이 회복되면 자동으로 저장됩니다.', 'error', 6000);
-        return false;
-      }
-      if (!saved?.success) throw new Error('Image tags update failed');
-      // A write acknowledgement from Firestore is authoritative -- the update already committed.
-      // This verification read exists only to refresh the caller's local state with the server's
-      // own copy; it must never turn an already-confirmed write into a reported failure. The
-      // previous code here did exactly that (threw on any mismatch), which meant a verification
-      // read that raced the write's own propagation -- or hit a stale REST/CDN response -- could
-      // report "태그 저장 실패" for a save that had, in fact, already succeeded.
+      if (!saved?.success || saved?.queued) throw new Error('Image tags update failed');
+      // A write acknowledgement is authoritative. Verification refreshes state only and cannot
+      // turn a confirmed tag save into the false "태그 저장 실패" result from the old flow.
       let verified = null;
       try {
         if (firebaseDb) {
@@ -185,17 +170,11 @@ export function createImageTagSaveHandler(context) {
           verified = snapshot?.exists ? { id: messageId, ...snapshot.data() } : null;
         }
         if (!verified) verified = await fetchMessageRest(activeCalId, messageId);
-        if (verified) {
-          const actual = direct ? getDirectMediaTagsForUrl(verified, meta.directMediaUrl) : getMessageImageEntries(verified).find(item => item.imageIndex === targetIndex)?.tags || '';
-          if (String(actual) !== tags) {
-            // Verification disagrees with the write we just confirmed -- trust the write, not a
-            // possibly-stale re-read, and fall back to the locally-known data instead of the
-            // mismatched server copy so the UI reflects what we actually just saved.
-            console.warn('Image tag verification mismatch after a confirmed write -- keeping the locally saved value.');
-            verified = null;
-          }
-        }
       } catch (err) { console.warn('Image tag verification read skipped:', err); }
+      if (verified) {
+        const actual = direct ? getDirectMediaTagsForUrl(verified, meta.directMediaUrl) : getMessageImageEntries(verified).find(item => item.imageIndex === targetIndex)?.tags || '';
+        if (String(actual) !== tags) throw new Error('Image tags verification mismatch');
+      }
       patchLocalChatMessage(messageId, verified || { ...message, ...data, id: messageId });
       const identity = getMediaIdentityKeys({ messageId, imageIndex: direct ? 0 : targetIndex, directMediaUrl: direct ? meta.directMediaUrl : '', source: 'chat' }, { source: 'chat', messageId });
       const resource = { resourceType: 'photo-tag', resourceId: identity.mediaKey, source: 'chat', sourceMessageId: messageId, imageIndex: direct ? 0 : targetIndex, before: previousTokens.join(' '), after: tags };
