@@ -580,13 +580,38 @@ function sanitizeMessageForFirestore(messageData) {
   const tooBig = (v) => typeof v === 'string' && v.startsWith('data:') && v.length > MAX_FIRESTORE_DATA_URL_CHARS;
   if (tooBig(out.imageUrl)) delete out.imageUrl;
   if (tooBig(out.thumbUrl)) delete out.thumbUrl;
-  if (Array.isArray(out.imageUrls)) {
-    out.imageUrls = out.imageUrls.filter(u => typeof u === 'string' && !tooBig(u));
-    if (out.imageUrls.length === 0) delete out.imageUrls;
-  }
-  if (Array.isArray(out.thumbUrls)) {
-    out.thumbUrls = out.thumbUrls.filter(u => typeof u === 'string' && !tooBig(u));
-    if (out.thumbUrls.length === 0) delete out.thumbUrls;
+  if (Array.isArray(out.imageUrls) || Array.isArray(out.thumbUrls)) {
+    // imageTags is positionally parallel to imageUrls/thumbUrls (see getMessageImageEntries'
+    // note on this in app-domain-helpers.js). Filtering imageUrls/thumbUrls independently here
+    // used to compact each array on its own, permanently shifting imageTags out of alignment
+    // with the photo it was meant for the moment an oversized entry was dropped -- this drops
+    // the SAME index from all three together so a save can never write already-misaligned data.
+    const urlsArr = Array.isArray(out.imageUrls) ? out.imageUrls : [];
+    const thumbsArr = Array.isArray(out.thumbUrls) ? out.thumbUrls : [];
+    const tagsArr = Array.isArray(out.imageTags) ? out.imageTags : null;
+    const len = Math.max(urlsArr.length, thumbsArr.length);
+    const nextUrls = [];
+    const nextThumbs = [];
+    const nextTags = tagsArr ? [] : null;
+    for (let i = 0; i < len; i++) {
+      const u = urlsArr[i];
+      const t = thumbsArr[i];
+      const urlBad = i < urlsArr.length && !(typeof u === 'string' && !tooBig(u));
+      const thumbBad = i < thumbsArr.length && !(typeof t === 'string' && !tooBig(t));
+      if (urlBad || thumbBad) continue;
+      if (i < urlsArr.length) nextUrls.push(u);
+      if (i < thumbsArr.length) nextThumbs.push(t);
+      if (nextTags) nextTags.push(tagsArr[i] || '');
+    }
+    if (Array.isArray(out.imageUrls)) {
+      out.imageUrls = nextUrls;
+      if (out.imageUrls.length === 0) delete out.imageUrls;
+    }
+    if (Array.isArray(out.thumbUrls)) {
+      out.thumbUrls = nextThumbs;
+      if (out.thumbUrls.length === 0) delete out.thumbUrls;
+    }
+    if (nextTags) out.imageTags = nextTags;
   }
   if (out.linkPreview && typeof out.linkPreview === 'object') {
     const lp = { ...out.linkPreview };
@@ -2336,19 +2361,28 @@ function getMessageImageEntries(msg) {
   const sourceHint = ['chat', 'gallery', 'meeting', 'memo'].includes(declaredSource)
     ? declaredSource
     : 'chat';
+  // IMPORTANT: keep these as the raw, unfiltered arrays -- imageTags is positionally parallel
+  // to imageUrls/thumbUrls by array index (see the "parallel-indexed... not by the image's
+  // identity" note where imageTags is rebuilt on message edit). Array#filter() here used to drop
+  // malformed entries, which COMPACTS the array and shifts every later index left -- so any
+  // single bad/legacy URL permanently misaligned every tag after it with the wrong photo (e.g. a
+  // food photo inheriting a person's name tag). Validity is now checked per-index inside the
+  // loop below instead, so a skipped entry never shifts the positions tags/imageIndex rely on.
   const urls = Array.isArray(msg.imageUrls) && msg.imageUrls.length > 0
-    ? msg.imageUrls.filter(u => typeof u === 'string' && u)
+    ? msg.imageUrls
     : (typeof msg.imageUrl === 'string' && msg.imageUrl ? [msg.imageUrl] : []);
   const thumbs = Array.isArray(msg.thumbUrls) && msg.thumbUrls.length > 0
-    ? msg.thumbUrls.filter(u => typeof u === 'string' && u)
+    ? msg.thumbUrls
     : (typeof msg.thumbUrl === 'string' && msg.thumbUrl ? [msg.thumbUrl] : []);
   const tags = Array.isArray(msg.imageTags) ? msg.imageTags : [];
   const count = Math.max(urls.length, thumbs.length);
   if (count === 0) return [];
   const entries = [];
   for (let i = 0; i < count; i++) {
-    const fullCandidate = urls[i] || thumbs[i];
-    const thumbCandidate = thumbs[i] || urls[i];
+    const urlAt = typeof urls[i] === 'string' ? urls[i] : '';
+    const thumbAt = typeof thumbs[i] === 'string' ? thumbs[i] : '';
+    const fullCandidate = urlAt || thumbAt;
+    const thumbCandidate = thumbAt || urlAt;
     // Legacy records can contain an empty, relative, or otherwise malformed value. Never pass
     // those through to <img src>; Chromium treats some of them as navigation requests and can
     // fail the whole page's boot/smoke check. Keep valid data/http URLs only and let the caller

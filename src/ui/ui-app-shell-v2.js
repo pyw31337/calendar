@@ -2563,7 +2563,7 @@ function MorePane({ calendarName, onSelectItem, selectedItem, onOpenSideNav }) {
  * the shell element when `?shell=v2` is set, otherwise null so the caller falls through to the
  * existing return unchanged.
  */
-export function renderRenewalShellIfEnabled(activeCalId, calendar, moreContextDeps, calendarContextDeps, chatContextDeps, settlementContextDeps, recordsContextDeps) {
+export function renderRenewalShellIfEnabled(activeCalId, calendar, moreContextDeps, calendarContextDeps, chatContextDeps, settlementContextDeps, recordsContextDeps, globalOverlays) {
   const React = window.React;
   if (!isRenewalShellEnabled()) return null;
   return React.createElement(RenewalAppShell, {
@@ -2573,6 +2573,8 @@ export function renderRenewalShellIfEnabled(activeCalId, calendar, moreContextDe
     chatContext: buildRenewalChatContext(calendar, chatContextDeps),
     settlementContext: buildRenewalSettlementContext(calendar, settlementContextDeps),
     recordsContext: buildRenewalRecordsContext(calendar, recordsContextDeps),
+    chatUploadProgress: globalOverlays?.chatUploadProgress || null,
+    operationProgress: globalOverlays?.operationProgress || null,
   });
 }
 
@@ -2587,7 +2589,7 @@ export function renderRenewalShellIfEnabled(activeCalId, calendar, moreContextDe
  *   `buildRenewalSettlementContext`) is the 정산 tab's; `recordsContext` (see
  *   `buildRenewalRecordsContext`) is the 기록 탭's -- all built the same way.
  */
-export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarContext, chatContext, settlementContext, recordsContext }) {
+export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarContext, chatContext, settlementContext, recordsContext, chatUploadProgress, operationProgress }) {
   const React = window.React;
   const [activeTab, setActiveTabState] = React.useState(readTabFromLocation);
   const [recordsSubTab, setRecordsSubTabState] = React.useState(readRecordsSubTabFromLocation);
@@ -3156,6 +3158,13 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
       onClose: () => setMoreDateModalDate(null),
       onEditAnniversary, onAddAnniversaryForDate: (d) => { setMoreDateModalDate(null); onAddAnniversaryForDate(d); },
       onFocusCultureSource,
-    })
+    }),
+    // CalendarApp's own render normally reaches these two overlays via withStickyVideo(), which
+    // this shell returns before (see renderRenewalShellIfEnabled's early return in app-main.js).
+    // Without this, a v2 upload had zero visual progress feedback -- the upload itself still ran
+    // (shared code path with v1), it just looked stalled/failed with nothing on screen to show
+    // otherwise, which is indistinguishable from a real failure to someone watching it.
+    operationProgress && !chatUploadProgress && React.createElement(bindUiComponentAliases(React).OperationProgressOverlay, operationProgress),
+    chatUploadProgress && React.createElement(bindUiComponentAliases(React).ImageUploadOverlay, chatUploadProgress)
   );
 }
