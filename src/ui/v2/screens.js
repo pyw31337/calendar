@@ -5,11 +5,15 @@
  */
 import './dest-layout.css';
 import './screens.css';
+// Keep the responsive contract last among destination sheets, then dest-chrome-late
+// so badge/tab/popup polish still wins the cascade.
+import './responsive-audit.css';
+import './dest-chrome-late.css';
 import { calculateSettlementRows } from '../../core/settlement-calculator.js';
 import { authorFor } from './view-data.js';
 import { ChatBubbleFrame } from './chat-bubble-modules.js';
 import {
-  extractChatSlots, extractMemoSlots, extractPlacesSlots, extractSettlementSlots,
+  extractChatSlots, extractMemoSlots, extractSettlementSlots,
 } from './shell-nav.js';
 
 const h = (...args) => window.React.createElement(...args);
@@ -17,10 +21,13 @@ const h = (...args) => window.React.createElement(...args);
 // Destination-only CSS is loaded when its tab is first rendered, instead of competing with the
 // calendar home for the initial CSS download. Vite caches each dynamic CSS import after loading.
 const destinationStyleLoaders = {
-  memo: () => import('./reference-memo.css'),
-  places: () => import('./reference-places.css'),
-  settlement: () => import('./reference-settlement.css'),
-  chat: () => import('./reference-chat.css'),
+  memo: () => import('./reference-memo.css').then(() => import('./dest-chrome-late.css')),
+  places: () => import('./reference-places.css').then(() => import('./dest-chrome-late.css')),
+  settlement: () => import('./reference-settlement.css').then(() => import('./dest-chrome-late.css')),
+  chat: () => import('./reference-chat.css').then(() => import('./dest-chrome-late.css')),
+  gallery: () => import('./dest-chrome-late.css'),
+  content: () => import('./dest-chrome-late.css'),
+  archive: () => import('./dest-chrome-late.css'),
 };
 const destinationStylePromises = new Map();
 function ensureDestinationStyles(kind) {
@@ -30,6 +37,10 @@ function ensureDestinationStyles(kind) {
       console.warn(`V2 ${kind} styles failed to load`, error);
     }));
   }
+}
+
+export function prefetchDestinationStyles() {
+  Object.keys(destinationStyleLoaders).forEach(ensureDestinationStyles);
 }
 
 /** Multi-element icons at mock stroke/size (same bar as home side-nav). */
@@ -80,7 +91,12 @@ const ICON_NODES = {
     ['path', { d: 'M6 12h12' }],
     ['path', { d: 'M10 18h4' }],
   ],
-  attach: [['path', { d: 'M21.4 11.6 12.9 20a5 5 0 0 1-7-7l8-8a3.5 3.5 0 0 1 5 5l-8 8a2 2 0 0 1-2.8-2.8l7.1-7.1' }]],
+  paperclip: [
+    ['path', { d: 'M21.4 11.6 12.9 20a5 5 0 0 1-7-7l8-8a3.5 3.5 0 0 1 5 5l-8 8a2 2 0 0 1-2.8-2.8l7.1-7.1' }],
+  ],
+  attach: [
+    ['path', { d: 'M21.4 11.6 12.9 20a5 5 0 0 1-7-7l8-8a3.5 3.5 0 0 1 5 5l-8 8a2 2 0 0 1-2.8-2.8l7.1-7.1' }],
+  ],
   emoji: [
     ['circle', { cx: 12, cy: 12, r: 10 }],
     ['path', { d: 'M8 14s1.5 2 4 2 4-2 4-2' }],
@@ -152,7 +168,7 @@ function pageSubtitle(calendar, trailing) {
   return name || extra || undefined;
 }
 
-export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, searchLabel, onShare, onMenu, extra, centerSubtitle = true, showSearch = false, children }) {
+export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, searchLabel, onShare, onMenu, extra, centerSubtitle = true, children }) {
   const React = window.React;
   const [isVisible, setIsVisible] = React.useState(true);
   React.useEffect(() => {
@@ -204,7 +220,8 @@ export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, se
         'div',
         { className: 'bp-header-actions' },
         extra,
-        showSearch && onSearch && h(IconButton, { label: searchLabel || `${title} 검색`, icon: 'search', size: 20, onClick: onSearch }),
+        onSearch && h(IconButton, { label: searchLabel || `${title} 검색`, icon: 'search', size: 20, onClick: onSearch }),
+        onShare && h(IconButton, { label: '공유', icon: 'share', size: 20, onClick: onShare }),
         onMenu && h(IconButton, { label: `${title} 메뉴`, icon: 'menu', size: 20, onClick: onMenu })
       )
     ),
@@ -240,13 +257,23 @@ function Fab({ label, onClick }) {
 }
 
 function Empty({ children }) {
-  return h('p', { className: 'v2-empty' }, children);
+  return h('div', { className: 'v2-empty', role: 'status' },
+    h('p', { className: 'v2-empty-copy' }, children)
+  );
 }
 
 function overlays(slots, except = []) {
   if (!slots) return null;
+  const skip = new Set(except);
+  const seen = new Set();
   return Object.entries(slots)
-    .filter(([key]) => !except.includes(key))
+    .filter(([key, value]) => {
+      if (skip.has(key) || value == null) return false;
+      // Same React element in two parents → removeChild: node is not a child.
+      if (seen.has(value)) return false;
+      seen.add(value);
+      return true;
+    })
     .map(([key, value]) => h(window.React.Fragment, { key }, value));
 }
 
@@ -272,6 +299,30 @@ export function MemoScreen(p) {
   // into view instead of it sitting open by default on every page load.
   const [isSearchOpen, setIsSearchOpen] = window.React.useState(false);
   const toggleSearch = () => setIsSearchOpen(v => !v);
+  // `memoFocus` is written by the V2 home card before its local tab handoff.
+  // It keeps the destination deterministic even if an outer legacy context
+  // rerender arrives between the click and MemoView mounting.
+  const focusIdFromLocation = typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.search).get('memoFocus') || ''
+    : '';
+  const focusedMemoId = p.focusedMemo?.id || focusIdFromLocation;
+  // A home-card click should land the reader on the matching card, not merely
+  // switch tabs.  The target can be an older shared memo outside the current
+  // page window, so add it once when necessary before scrolling to it.
+  const visibleMemos = window.React.useMemo(() => {
+    const rows = Array.isArray(p.memos) ? p.memos.filter(Boolean) : [];
+    if (!p.focusedMemo?.id || rows.some(memo => memo?.id === p.focusedMemo.id)) return rows;
+    return [p.focusedMemo, ...rows];
+  }, [p.memos, p.focusedMemo]);
+  window.React.useEffect(() => {
+    if (!focusedMemoId || typeof document === 'undefined') return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      const target = [...document.querySelectorAll('[data-v2-memo-id]')]
+        .find(element => element.getAttribute('data-v2-memo-id') === String(focusedMemoId));
+      target?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [focusedMemoId]);
   // Dedicated-cards mode still receives the real MemoView's full legacy tree via p.legacyView
   // (only used for slot extraction here, never rendered directly) -- pull the "새로운 메모를
   // 남겨보세요..." composer card out of it the same way the legacyView+slots.body branch below
@@ -341,8 +392,7 @@ export function MemoScreen(p) {
         ),
         wrapLegacy(p.legacyView, 'v2-legacy-body v2-memo-legacy'),
         h(Fab, { label: '메모 작성', onClick: p.onCompose })
-      ),
-      overlays(slots)
+      )
     );
   }
 
@@ -382,7 +432,7 @@ export function MemoScreen(p) {
         h(
           'div',
           { className: 'bp-memo-grid' },
-          (p.memos || []).map(memo => {
+          visibleMemos.map(memo => {
             const author = authorFor(memo, p.calendar.participants);
             const metaMs = memo.updatedAt ?? memo.createdAt;
             let meta = '';
@@ -399,7 +449,8 @@ export function MemoScreen(p) {
                 name: author.name,
                 color: author.color,
                 meta,
-                className: 'v2-memo-card-wrap',
+                className: `v2-memo-card-wrap${memo.id === focusedMemoId ? ' v2-memo-card-is-focused' : ''}`,
+                'data-v2-memo-id': memo.id,
                 surfaceClassName: 'v2-memo-bubble-surface',
                 surfaceProps: {
                   style: { '--memo-author-color': author.color },
@@ -409,7 +460,7 @@ export function MemoScreen(p) {
             );
           })
         ),
-        !(p.memos || []).length && h(Empty, null, '검색 조건에 맞는 메모가 없습니다.'),
+        !visibleMemos.length && h(Empty, null, '검색 조건에 맞는 메모가 없습니다.'),
         p.hasMoreMemos &&
           h('button', { type: 'button', className: 'v2-load-more', onClick: p.onLoadMoreMemos }, '메모 더 보기')
       ),
@@ -460,48 +511,10 @@ export function PlacesScreen(p) {
   });
 
   if (!Array.isArray(p.places) && p.legacyView) {
-    const slots = { ...extractPlacesSlots(p.legacyView), ...(p.slots || {}) };
-    if (slots.list || slots.map) {
-      return h(
-        'section',
-        { className: 'v2-places v2-dest-page' },
-        h(
-          'div',
-          { className: 'bp-app-shell' },
-          h(
-            PageHeader,
-            {
-              title: '장소',
-              subtitle: p.subtitle || pageSubtitle(p.calendar),
-              brand: pageBrand(p.calendar),
-              onBack: p.onBack,
-              onSearch: toggleSearch,
-              searchLabel: '장소 검색',
-              onShare: p.onShare,
-              onMenu: p.onMenu,
-              extra: mapToggle,
-            },
-            isSearchOpen && h(Search, {
-              value: p.searchQuery || '',
-              onChange: p.onSearch || (() => {}),
-              placeholder: '장소 검색',
-            })
-          ),
-          mapOpen && slots.map && h('div', { className: 'v2-map-panel' }, slots.map),
-          slots.filters,
-          // toolbar (전체/방문/예정 필터 + 편집 버튼) rides the same scroll as the list instead of
-          // sitting fixed above it -- moved inside .v2-dest-body, right before the list, and given
-          // the list's own side padding (v2-toolbar-inset below) so its left/right edges line up
-          // with the place cards under it.
-          h('div', { className: 'v2-dest-body v2-places-body' },
-            slots.toolbar && h('div', { className: 'v2-toolbar-inset' }, slots.toolbar),
-            slots.list || slots.map
-          ),
-          h(Fab, { label: '장소 등록', onClick: p.onCompose })
-        ),
-        overlays(slots, ['map', 'toolbar', 'list', 'filters'])
-      );
-    }
+    // Do not steal Leaflet map / list nodes out of the live PlacesView tree.
+    // Reparenting PlaceMapView (Leaflet mutates the container's children) and/or
+    // rendering the same slot in two parents throws:
+    // "Failed to execute 'removeChild' on 'Node': The node to be removed is not a child of this node."
     return h(
       'section',
       { className: 'v2-places v2-dest-page v2-wrap-legacy' },
@@ -529,8 +542,7 @@ export function PlacesScreen(p) {
         ),
         wrapLegacy(p.legacyView, 'v2-legacy-body v2-places-legacy'),
         h(Fab, { label: '장소 등록', onClick: p.onCompose })
-      ),
-      overlays(slots)
+      )
     );
   }
 
@@ -557,23 +569,25 @@ export function PlacesScreen(p) {
           value: p.searchQuery,
           onChange: p.onSearch,
           placeholder: '장소 검색',
-        }),
-        h(
-          'div',
-          { className: 'bp-cat-filter-row', 'aria-label': '장소 분류' },
-          [{ id: 'all', name: '전체', color: '#1e1b2e' }, ...(p.categories || [])].map(category =>
-            h(
-              'button',
-              {
-                type: 'button',
-                key: category.id,
-                className: `bp-cat-chip${p.categoryFilter === category.id ? ' bp-is-selected' : ''}`,
-                'aria-pressed': p.categoryFilter === category.id,
-                onClick: () => p.onCategory(category.id),
-                style: { color: category.color || '#6b6580' },
-              },
-              category.name
-            )
+        })
+      ),
+      // Filters are body content. They share the page gutter and scroll with the list;
+      // the header itself remains only the back/action chrome.
+      h(
+        'div',
+        { className: 'v2-dest-controls bp-cat-filter-row', 'aria-label': '장소 분류' },
+        [{ id: 'all', name: '전체', color: '#1e1b2e' }, ...(p.categories || [])].map(category =>
+          h(
+            'button',
+            {
+              type: 'button',
+              key: category.id,
+              className: `bp-cat-chip${p.categoryFilter === category.id ? ' bp-is-selected' : ''}`,
+              'aria-pressed': p.categoryFilter === category.id,
+              onClick: () => p.onCategory(category.id),
+              style: { color: category.color || '#6b6580' },
+            },
+            category.name
           )
         )
       ),
@@ -678,6 +692,33 @@ export function SettlementScreen(p) {
   if (p.legacyView && !Array.isArray(p.cards)) {
     const slots = { ...extractSettlementSlots(p.legacyView), ...(p.slots || {}) };
     if (slots.body) {
+      const flushTabs = slots.tabs && window.React.isValidElement(slots.tabs)
+        ? window.React.cloneElement(slots.tabs, {
+            style: {
+              ...(slots.tabs.props.style || {}),
+              position: 'relative',
+              top: 0,
+              left: 'auto',
+              right: 'auto',
+              transform: 'none',
+              zIndex: 4,
+              width: '100%',
+            },
+          })
+        : slots.tabs;
+      const flushBody = window.React.isValidElement(slots.body)
+        ? window.React.cloneElement(slots.body, {
+            style: {
+              ...(slots.body.props.style || {}),
+              position: 'relative',
+              top: 'auto',
+              left: 'auto',
+              right: 'auto',
+              transform: 'none',
+              padding: '8px 16px 96px',
+            },
+          })
+        : slots.body;
       return h(
         'section',
         { className: 'v2-settlement v2-dest-page' },
@@ -694,11 +735,11 @@ export function SettlementScreen(p) {
             onShare: p.onShare,
             onMenu: p.onMenu,
           }),
-          slots.tabs,
-          h('div', { className: 'v2-dest-body v2-settlement-body' }, slots.body),
+          flushTabs,
+          h('div', { className: 'v2-dest-body v2-settlement-body' }, flushBody),
           h(Fab, { label: '지출 추가', onClick: p.onCompose })
         ),
-        overlays(slots, ['body', 'tabs'])
+        overlays({ ...slots, tabs: flushTabs, body: flushBody }, ['body', 'tabs'])
       );
     }
     return h(
@@ -719,8 +760,7 @@ export function SettlementScreen(p) {
         }),
         wrapLegacy(p.legacyView, 'v2-legacy-body v2-settlement-legacy'),
         h(Fab, { label: '지출 추가', onClick: p.onCompose })
-      ),
-      overlays(slots)
+      )
     );
   }
 
@@ -927,7 +967,6 @@ export function SettlementScreen(p) {
 
 export function ChatScreen(p) {
   const React = window.React;
-  const [toolsOpen, setToolsOpen] = React.useState(false);
   const slots = { ...(p.legacyView ? extractChatSlots(p.legacyView) : {}), ...(p.slots || {}) };
   const memberCount = (p.calendar?.participants || []).filter(person => !person.deletedAt).length;
   const subtitle = p.subtitle
@@ -937,9 +976,33 @@ export function ChatScreen(p) {
   // Require textarea+send so we can rebuild the composer row; otherwise fall back to wrap.
   if (slots.body && slots.composer && slots.textarea && slots.send && p.legacyView && React.isValidElement(p.legacyView)) {
     const clone = React.cloneElement;
-    const originalRoot = Array.isArray(p.legacyView.props.children)
-      ? p.legacyView.props.children[0]
-      : p.legacyView.props.children;
+    const legacyKids = React.Children.toArray(p.legacyView.props.children);
+    const selfIsContainer = String(p.legacyView.props?.className || '').includes('chat-room-container');
+    const originalRoot = selfIsContainer
+      ? p.legacyView
+      : (legacyKids.find(node =>
+          React.isValidElement(node) && String(node.props?.className || '').includes('chat-room-container')
+        ) || (Array.isArray(p.legacyView.props.children)
+          ? p.legacyView.props.children[0]
+          : p.legacyView.props.children));
+    const passthrough = selfIsContainer
+      ? []
+      : legacyKids.filter(node => {
+          if (node === originalRoot) return false;
+          if (React.isValidElement(node) && String(node.props?.className || '').includes('chat-composer')) return false;
+          return true;
+        });
+    const rootKids = React.isValidElement(originalRoot)
+      ? React.Children.toArray(originalRoot.props.children)
+      : [];
+    const keptRootKids = rootKids.filter(node => {
+      if (!node || node === slots.composer || node === slots.body || node === slots.notice) return false;
+      const cls = String(node.props?.className || '');
+      if (cls.includes('chat-room-header')) return false;
+      if (cls.includes('chat-composer')) return false;
+      if (node.props?.['aria-label'] === '뒤로가기') return false;
+      return true;
+    });
     const composer = clone(
       slots.composer,
       {
@@ -984,37 +1047,38 @@ export function ChatScreen(p) {
           slots.emoji
             ? clone(slots.emoji, {
                 className: 'v2-tool-icon-btn',
+                type: 'button',
                 'aria-label': '이모티콘',
                 title: '이모티콘',
               }, h(DesignIcon, { name: 'emoji', size: 18 }))
             : null,
-          h('button', {
-            type: 'button',
-            className: `v2-tool-icon-btn${toolsOpen ? ' is-active' : ''}`,
-            'aria-label': '밈', 'aria-pressed': toolsOpen, title: '밈',
-            onClick: () => setToolsOpen(value => !value),
-          }, h(DesignIcon, { name: 'meme', size: 18 })),
           slots.attach
             ? clone(slots.attach, {
                 className: 'v2-tool-icon-btn',
+                type: 'button',
                 'aria-label': '사진 또는 파일 첨부',
                 title: '사진 또는 파일 첨부',
               }, h(DesignIcon, { name: 'paperclip', size: 18 }))
             : null,
-          slots.paste
-            ? clone(slots.paste, {
-                className: 'v2-tool-icon-btn',
-                'aria-label': '붙여넣기',
-                title: '붙여넣기',
-              }, h(DesignIcon, { name: 'paste', size: 18 }))
-            : null,
           slots.attach ? null : (p.onOpenGallery
             ? h('button', { type: 'button', className: 'v2-tool-icon-btn',
                 'aria-label': '사진 또는 파일 첨부', title: '사진 또는 파일 첨부', onClick: p.onOpenGallery },
-              h(DesignIcon, { name: 'paperclip', size: 18 })) : null)
+              h(DesignIcon, { name: 'paperclip', size: 18 })) : null),
+          /* Keep the live paste control rather than synthesising a new clipboard flow.
+             ChatRoom owns both the click-to-paste handler and textarea onPaste handler:
+             text keeps the browser's Ctrl/Cmd+V behaviour, while pasted images become
+             the same thumbnail attachments as the legacy composer. */
+          slots.paste
+            ? clone(slots.paste, {
+                className: 'v2-tool-icon-btn',
+                type: 'button',
+                'aria-label': '붙여넣기',
+                title: '붙여넣기',
+              }, h(DesignIcon, { name: 'paste', size: 18 }))
+            : null
         )
       ),
-      toolsOpen && slots.memes
+      slots.memes
     );
 
     return h(
@@ -1033,10 +1097,17 @@ export function ChatScreen(p) {
           onMenu: p.onMenu,
         }),
         slots.notice,
-        clone(slots.body, { className: 'v2-chat-scroll' }),
+        clone(slots.body, {
+          className: 'v2-chat-scroll',
+          style: {
+            ...(slots.body.props.style || {}),
+            paddingTop: 8,
+          },
+        }),
         composer,
-        slots.lightbox
+        ...keptRootKids
       ),
+      ...passthrough,
       overlays(slots, [
         'notice', 'body', 'composer', 'lightbox', 'resize', 'memes', 'reply', 'textarea',
         'photos', 'files', 'fileInput', 'participant', 'emoji', 'attach', 'paste', 'send',
@@ -1061,8 +1132,7 @@ export function ChatScreen(p) {
         onMenu: p.onMenu,
       }),
       wrapLegacy(p.legacyView, 'v2-legacy-body v2-chat-legacy')
-    ),
-    overlays(slots)
+    )
   );
 }
 
@@ -1078,6 +1148,7 @@ export const renderChatScreen = props => { ensureDestinationStyles('chat'); retu
 /* -------------------------------------------------------------------------- */
 
 export function GalleryScreen(p) {
+  ensureDestinationStyles('gallery');
   return h(
     'section',
     { className: 'v2-gallery v2-dest-page v2-embed-frame v2-records-media v2-has-page-header' },
@@ -1097,6 +1168,7 @@ export function GalleryScreen(p) {
 }
 
 export function ContentScreen(p) {
+  ensureDestinationStyles('content');
   return h(
     'section',
     { className: 'v2-content v2-dest-page v2-embed-frame v2-has-page-header' },
@@ -1116,6 +1188,7 @@ export function ContentScreen(p) {
 }
 
 export function ArchiveScreen(p) {
+  ensureDestinationStyles('archive');
   return h(
     'section',
     { className: 'v2-archive v2-dest-page v2-embed-frame v2-has-page-header' },

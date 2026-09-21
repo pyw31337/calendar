@@ -69,6 +69,43 @@ test('timestamps normalize without turning Firestore seconds into 1970 dates', (
   assert.equal(timestampMs(null), 0);
 });
 
+test('V2 places screen does not reparent Leaflet map slots (removeChild crash)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const screens = readFileSync(new URL('../src/ui/v2/screens.js', import.meta.url), 'utf8');
+  assert.match(screens, /v2-places-legacy/);
+  assert.doesNotMatch(screens, /slots\.list \|\| slots\.map/);
+  assert.match(screens, /Same React element in two parents/);
+});
+
+test('V2 destination panes prefetch lazy UI and never stall on 불러오는 중 copy', async () => {
+  const { readFileSync } = await import('node:fs');
+  const shell = readFileSync(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
+  const screens = readFileSync(new URL('../src/ui/v2/screens.js', import.meta.url), 'utf8');
+  assert.match(shell, /function useLazyUi/);
+  assert.match(shell, /prefetchDestinationUi/);
+  assert.match(shell, /function HomePlaceCard/);
+  assert.match(shell, /homePlaceVisitLine/);
+  assert.match(shell, /TABLER_ICONS\.externalLink/);
+  assert.doesNotMatch(shell, /title: '메모 불러오는 중'/);
+  assert.doesNotMatch(shell, /title: '장소 불러오는 중'/);
+  assert.match(screens, /export function prefetchDestinationStyles/);
+});
+
+test('places map reuses the shared chat composer resize handle', async () => {
+  const { readFileSync } = await import('node:fs');
+  const places = readFileSync(new URL('../src/ui/ui-places.js', import.meta.url), 'utf8');
+  const widgets = readFileSync(new URL('../src/ui/ui-widgets.js', import.meta.url), 'utf8');
+  const chat = readFileSync(new URL('../src/ui/ui-chat-room.js', import.meta.url), 'utf8');
+  const css = readFileSync(new URL('../src/ui/v2/screens.css', import.meta.url), 'utf8');
+  assert.match(widgets, /export function PanelResizeHandle/);
+  assert.match(chat, /import \{ PanelResizeHandle \} from '\.\/ui-widgets\.js'/);
+  assert.match(places, /import \{ PanelResizeHandle \} from '\.\/ui-widgets\.js'/);
+  assert.match(places, /PanelResizeHandle/);
+  assert.match(places, /panel-resize-bar/);
+  assert.match(css, /\.places-category-sticky-tabs[\s\S]{0,160}padding:\s*0 !important/);
+  assert.match(css, /\.places-category-sticky-tabs[\s\S]{0,220}border-bottom:\s*none !important/);
+});
+
 test('V2 date modal opts into bento sheet chrome without changing default export signature defaults', async () => {
   const { readFileSync } = await import('node:fs');
   const modal = readFileSync(new URL('../src/ui/ui-date-modal.js', import.meta.url), 'utf8');

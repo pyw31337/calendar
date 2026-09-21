@@ -12,8 +12,8 @@
     .v2-settlement button, .v2-settlement input { font-family: inherit; }
 
     .v2-settlement .bp-app-shell { width: 100%; max-width: 480px; margin: 0 auto; background: var(--bg-primary); min-height: 100%; }
-    .v2-settlement .bp-header { position: sticky; top: 0; height: 60px; box-sizing: border-box; background: var(--bg-card); z-index: 5; padding: 0 14px; border-bottom: 1px solid var(--border-subtle); }
-    .v2-settlement .bp-header-row { height: 100%; display: flex; align-items: center; gap: 8px; }
+    .v2-settlement .bp-header { position: sticky; top: 0; height: auto; min-height: 60px; box-sizing: border-box; background: var(--bg-card); z-index: 5; padding: 0 14px; border-bottom: 1px solid var(--border-subtle); overflow: visible; }
+    .v2-settlement .bp-header-row { height: auto; min-height: 44px; display: flex; align-items: center; gap: 8px; }
     .v2-settlement .bp-back-btn { width: 28px; height: 28px; justify-content: center; background: none; border: none; color: var(--text-main); cursor: pointer; padding: 4px; display: inline-flex; }
     .v2-settlement .bp-header-title { font-weight: 800; font-size: 0.96rem; color: var(--text-main); }
     .v2-settlement .bp-header-actions { margin-left: auto; display: flex; gap: 4px; }
@@ -21,8 +21,8 @@
     .v2-settlement .bp-icon-btn:hover { background: transparent; color: var(--brand); }
     .v2-settlement .bp-fab { position: fixed; right: 20px; bottom: 24px; width: 52px; height: 52px; border-radius: 50%; background: var(--brand); color: #fff; border: 1px solid rgba(255,255,255,0.28); box-shadow: 0 6px 18px rgba(124,47,229,0.40), inset 0 1px 0 rgba(255,255,255,0.28); display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 6; }
 
-    .v2-settlement .bp-content { padding: 14px; }
-    .v2-settlement .bp-month-nav { display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 14px; }
+    .v2-settlement .bp-content { padding: 8px 16px 96px; }
+    .v2-settlement .bp-month-nav { display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 8px; }
     .v2-settlement .bp-month-nav-btn { background: none; border: none; color: var(--text-muted); padding: 4px; cursor: pointer; display: inline-flex; }
     .v2-settlement .bp-month-label { font-weight: 800; font-size: 0.92rem; color: var(--text-main); }
 

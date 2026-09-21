@@ -1,0 +1,706 @@
+/*
+ * V2 responsive audit layer
+ * -------------------------
+ * This file is deliberately imported after every V2 reference/design layer.
+ * Older mock CSS has overlapping 560px, 640px, 768px and 1200px breakpoints;
+ * keeping the live contract here makes the viewport behaviour deterministic
+ * without changing the V1 shell.
+ */
+
+.renewal-shell.v2-design,
+.renewal-shell.v2-design *,
+.renewal-shell.v2-design *::before,
+.renewal-shell.v2-design *::after {
+  box-sizing: border-box;
+}
+
+.renewal-shell.v2-design,
+.renewal-shell.v2-design .renewal-shell-main,
+.renewal-shell.v2-design .v2-dest-page,
+.renewal-shell.v2-design .v2-dest-body,
+.renewal-shell.v2-design .v2-legacy-body {
+  min-width: 0;
+}
+
+.renewal-shell.v2-design {
+  overflow-x: clip;
+}
+
+.renewal-shell.v2-design img,
+.renewal-shell.v2-design video,
+.renewal-shell.v2-design canvas,
+.renewal-shell.v2-design svg {
+  max-width: 100%;
+}
+
+/* Home memo cards are a reading surface, not a teaser.  Keep every newline
+ * and every line of text visible; link previews/comments retain their own
+ * intentional layout. */
+.v2-design .v2-home-memo-bubble .v2-bubble-summary {
+  display: block !important;
+  max-height: none !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  -webkit-line-clamp: unset !important;
+  -webkit-box-orient: initial !important;
+  white-space: pre-wrap !important;
+  overflow-wrap: anywhere;
+}
+
+/* The existing sharedMemo card is used for both deep links and home-card
+ * navigation.  Make the destination unambiguous without inventing a second
+ * memo detail component. */
+.v2-design .v2-memo .chat-search-focused-bubble,
+.v2-design .v2-memo .v2-memo-card-is-focused > .v2-bubble-surface {
+  border: 2px solid rgba(124, 47, 229, 0.72) !important;
+  background: rgba(124, 47, 229, 0.075) !important;
+  box-shadow: 0 0 0 4px rgba(124, 47, 229, 0.12), 1px 1px 4px #1e1b2e12 !important;
+  scroll-margin: 24px;
+}
+
+/* MemoScreen's scroll body already owns the common 40px/20px content gutter.
+ * The historical grid also added its own 40px padding, which compounded that
+ * inset to 80px on desktop and 60px on phone. Keep one authoritative gutter:
+ * cards start at the same edge as the composer and every other body surface. */
+.v2-design .renewal-shell-main.v2-memo .v2-memo .bp-memo-grid {
+  padding: 0 !important;
+}
+
+/* Chat's message scroller and composer are body content, not header chrome.
+ * Use the same destination gutter token as memo, places and settlement rather
+ * than the legacy 14px/16px offsets that made this page look misaligned. */
+.v2-design .renewal-shell-main.v2-chat .chat-messages-scroll,
+.v2-design .renewal-shell-main.v2-chat .v2-chat-scroll,
+.v2-design .renewal-shell-main.v2-chat .v2-chat-composer {
+  padding-left: var(--v2-dest-content-pad-x) !important;
+  padding-right: var(--v2-dest-content-pad-x) !important;
+}
+
+/* Settlement cards explain the full reconciliation, not only the equal
+ * split. The personal amount is the actual advance (manual plus a checked
+ * expense's payer), while the guide names the person-to-person transfer that
+ * settles the remaining difference. These nodes are rendered only by V2. */
+.v2-design .v2-settlement .settlement-person-actual-paid {
+  align-self: flex-start;
+  color: var(--settlement-hero-surface-muted);
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.v2-design .v2-settlement .settlement-person-actual-paid b {
+  color: var(--settlement-hero-surface-text);
+  font-weight: 850;
+  font-variant-numeric: tabular-nums;
+}
+
+.v2-design .v2-settlement .settlement-transfer-guide {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.16);
+  color: var(--settlement-hero-text);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.v2-design .v2-settlement .settlement-transfer-guide b {
+  color: #fff;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Tablet: the lead hero/calendar occupy their own full-width rows, while the
+ * four supporting modules remain a comfortable two-column grid.  Do not show
+ * a permanent rail until the true desktop breakpoint. */
+@media (min-width: 768px) and (max-width: 1199px) {
+  .renewal-shell.v2-design {
+    width: 100% !important;
+    max-width: none !important;
+    padding-left: 0 !important;
+  }
+  .renewal-shell.v2-design .bp-side-nav {
+    display: flex;
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: min(320px, 86vw) !important;
+    transform: translateX(-105%);
+    z-index: 500;
+  }
+  .renewal-shell.v2-design .bp-side-nav.bp-is-open { transform: translateX(0); }
+  .renewal-shell.v2-design .bp-side-nav-backdrop.bp-is-open { display: block; }
+  .renewal-shell.v2-design .bp-side-nav-toggle-btn,
+  .renewal-shell.v2-design .bp-side-nav-close-btn { display: inline-flex; }
+
+  .renewal-shell.v2-design .bp-app-shell.is-bento-home {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .renewal-shell.v2-design .bp-hero-zone {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 0 20px !important;
+    border-radius: 0 !important;
+  }
+  .renewal-shell.v2-design .bp-app-shell.is-bento-home
+    .bp-renewal-home-summary.bp-bento-grid {
+    display: grid !important;
+    width: 100% !important;
+    max-width: none !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 20px !important;
+    padding: 0 20px 24px !important;
+  }
+  .renewal-shell.v2-design .bp-app-shell.is-bento-home
+    .bp-renewal-home-summary.bp-bento-grid
+    > .bp-renewal-home-summary-section:first-child {
+    grid-column: 1 / -1 !important;
+    width: calc(100% + 40px) !important;
+    margin: 0 -20px !important;
+    border-radius: 0 !important;
+  }
+  .renewal-shell.v2-design .bp-app-shell.is-bento-home
+    .bp-renewal-home-summary.bp-bento-grid
+    > .bp-renewal-home-summary-section:not(:first-child) {
+    border-radius: 16px !important;
+  }
+
+  /* Tablet calendar: anniversary text is readable inside a pale badge, while
+   * participant availability remains a color-only dot so the two data types
+   * cannot compete for the same cell. */
+  .v2-design .bp-day-cell {
+    min-height: 96px !important;
+    padding: 5px 3px 4px !important;
+  }
+  .v2-design .bp-dot-row {
+    gap: 4px !important;
+    min-height: 12px;
+  }
+  .v2-design .bp-p-dot {
+    width: 10px !important;
+    min-width: 10px !important;
+    height: 10px !important;
+    min-height: 10px !important;
+    padding: 0 !important;
+    border-radius: 50% !important;
+  }
+  .v2-design .bp-p-dot::after {
+    content: none !important;
+    display: none !important;
+  }
+  .v2-design .bp-day-cell:has(.bp-day-bar-stack) { min-height: 104px !important; }
+  .v2-design .bp-day-cell .bp-day-bar-stack {
+    margin-top: 5px !important;
+    gap: 3px !important;
+  }
+}
+
+/* Text is never white on the V2 calendar's pale anniversary fill.  The
+ * category-specific colours are intentionally explicit so legacy records
+ * containing a white custom badgeColor cannot make the title disappear. */
+@media (min-width: 768px) {
+  .v2-design .bp-day-bar-stack .bp-day-anniversary,
+  .v2-design .festival-bar-desktop .bp-day-anniversary {
+    background: color-mix(in srgb, var(--anniversary-color, #a855f7) 16%, #fff) !important;
+  }
+  .v2-design .bp-day-bar-stack .bp-day-anniversary > .bp-day-anniversary-label,
+  .v2-design .festival-bar-desktop .bp-day-anniversary-label {
+    display: block !important;
+    color: #4c1d95 !important;
+    font-weight: 800 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-birthday > .bp-day-anniversary-label { color: #be185d !important; }
+  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-travel > .bp-day-anniversary-label,
+  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-trip > .bp-day-anniversary-label { color: #047857 !important; }
+  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-event > .bp-day-anniversary-label { color: #1d4ed8 !important; }
+  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-festival > .bp-day-anniversary-label { color: #b45309 !important; }
+  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-sports > .bp-day-anniversary-label { color: #0369a1 !important; }
+  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-movie > .bp-day-anniversary-label { color: #6d28d9 !important; }
+  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-cat-other > .bp-day-anniversary-label { color: #475569 !important; }
+}
+
+/* Phones: no floating 560–767px canvas.  The hero and calendar intentionally
+ * bleed to the viewport edge; supporting cards keep exactly 20px side space. */
+@media (max-width: 767px) {
+  .renewal-shell.v2-design,
+  .renewal-shell.v2-design > .bp-app-shell.is-bento-home,
+  .renewal-shell.v2-design .bp-app-shell.is-bento-home,
+  .renewal-shell.v2-design .renewal-shell-main {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .renewal-shell.v2-design .bp-hero-zone {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 0 20px !important;
+    border-radius: 0 !important;
+  }
+  .renewal-shell.v2-design .bp-app-shell.is-bento-home
+    .bp-renewal-home-summary.bp-bento-grid {
+    display: grid !important;
+    width: 100% !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 20px !important;
+    padding: 0 20px 24px !important;
+  }
+  .renewal-shell.v2-design .bp-app-shell.is-bento-home
+    .bp-renewal-home-summary.bp-bento-grid
+    > .bp-renewal-home-summary-section:first-child {
+    grid-column: 1 !important;
+    width: calc(100% + 40px) !important;
+    margin: 0 -20px !important;
+    border-radius: 0 !important;
+  }
+  .renewal-shell.v2-design .bp-app-shell.is-bento-home
+    .bp-renewal-home-summary.bp-bento-grid
+    > .bp-renewal-home-summary-section:not(:first-child) {
+    width: 100% !important;
+    margin: 0 !important;
+    border-radius: 16px !important;
+  }
+
+  /* Destination body rhythm is one mobile value across every V2 screen. */
+  .v2-design {
+    --v2-dest-content-pad-x: 20px;
+    --v2-dest-content-pad-y: 20px;
+  }
+  .v2-design .v2-dest-page,
+  .v2-design .v2-dest-page > .bp-app-shell,
+  .v2-design .v2-dest-page .v2-dest-body,
+  .v2-design .v2-dest-page .v2-legacy-body {
+    max-width: 100% !important;
+    overflow-x: clip !important;
+  }
+  /* A backdrop belongs to the viewport, never to a horizontally shifted page
+   * shell.  Individual modal containers retain their existing sheet styling. */
+  .v2-design .modal-overlay {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    max-width: none !important;
+    height: 100dvh !important;
+    margin: 0 !important;
+  }
+}
+
+/* The desktop-only rail begins at 1200px; body content follows the common
+ * 40px desktop rhythm. */
+@media (min-width: 1200px) {
+  .v2-design { --v2-dest-content-pad-x: 40px; --v2-dest-content-pad-y: 40px; }
+}
+
+/* --------------------------------------------------------------------------
+ * V2 finish pass: reusable badge, destination and overlay contract
+ * --------------------------------------------------------------------------
+ * Legacy destination modules use different markup, but their labels refer to
+ * the same concepts.  Keep one compact badge geometry so a person's name,
+ * a settlement label and an expense category never look like three unrelated
+ * controls.  Background and foreground colours remain semantic per feature.
+ */
+.renewal-shell.v2-design {
+  --v2-badge-min-height: 20px;
+  --v2-badge-pad: 3px 8px;
+  --v2-badge-font-size: 0.7rem;
+  --v2-badge-radius: 9999px;
+}
+
+.renewal-shell.v2-design .participant-badge,
+.renewal-shell.v2-design .participant-picker-button,
+.renewal-shell.v2-design .v2-name-pill,
+.renewal-shell.v2-design .bp-chat-name-pill,
+.renewal-shell.v2-design .chat-name-pill,
+.renewal-shell.v2-design .bp-side-nav-item-badge,
+.renewal-shell.v2-design .bp-settlement-card-badge,
+.renewal-shell.v2-design .settlement-person-settlement-badge,
+.renewal-shell.v2-design .expense-category-badge,
+.renewal-shell.v2-design .expense-time-badge,
+.renewal-shell.v2-design .expense-payer-badge,
+.renewal-shell.v2-design .expense-self-pay-badge,
+.renewal-shell.v2-design .section-count-badge,
+.renewal-shell.v2-design ~ .modal-overlay .settlement-person-settlement-badge,
+.renewal-shell.v2-design ~ .modal-overlay .expense-category-badge,
+.renewal-shell.v2-design ~ .modal-overlay .expense-time-badge,
+.renewal-shell.v2-design ~ .modal-overlay .expense-payer-badge,
+.renewal-shell.v2-design ~ .modal-overlay .expense-self-pay-badge {
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  min-height: var(--v2-badge-min-height, 20px) !important;
+  padding: var(--v2-badge-pad, 3px 8px) !important;
+  border-radius: var(--v2-badge-radius, 9999px) !important;
+  font-size: var(--v2-badge-font-size, 0.7rem) !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+  white-space: nowrap;
+}
+
+/* Participant/name badges must be flat colour tokens.  The old inset shine
+ * changed perceived height and made identically-sized name badges look uneven. */
+.renewal-shell.v2-design .participant-badge,
+.renewal-shell.v2-design .participant-picker-button,
+.renewal-shell.v2-design .v2-name-pill,
+.renewal-shell.v2-design .bp-chat-name-pill,
+.renewal-shell.v2-design .chat-name-pill,
+.renewal-shell.v2-design .bp-side-nav-item-meta.bp-chat-name-pill,
+.renewal-shell.v2-design .bp-side-nav-item-meta.chat-name-pill {
+  box-shadow: none !important;
+}
+
+/* Some participant controls arrive from the V1 composer with a fixed 32px
+ * inline height. Keep their interaction intact while allowing the shared
+ * badge padding to determine the same visual height as every other name. */
+.renewal-shell.v2-design .participant-picker-button {
+  height: auto !important;
+}
+
+.renewal-shell.v2-design .section-count-badge {
+  width: var(--v2-badge-min-height, 20px) !important;
+  min-width: var(--v2-badge-min-height, 20px) !important;
+  height: var(--v2-badge-min-height, 20px) !important;
+  padding: 0 !important;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* An active category owns its count badge; inactive counts retain a neutral,
+ * centered capsule. This is the same third-level menu pattern in Content and
+ * Places, independent of their legacy source component. */
+.renewal-shell.v2-design .bp-cat-scroll-row > button[style*="background: var(--accent-primary)"] .section-count-badge {
+  background: rgba(255, 255, 255, 0.2) !important;
+  color: #fff !important;
+}
+
+.renewal-shell.v2-design .v2-places .places-category-sticky-tabs,
+.renewal-shell.v2-design .v2-places-legacy .places-category-sticky-tabs {
+  /* Category navigation is edge-to-edge within the page; only the list body
+   * itself receives the destination gutter. */
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+.renewal-shell.v2-design .v2-places .places-category-sticky-tabs .section-count-badge,
+.renewal-shell.v2-design .v2-places-legacy .places-category-sticky-tabs .section-count-badge {
+  align-self: center !important;
+  flex: 0 0 var(--v2-badge-min-height, 20px) !important;
+}
+
+/* The memo composer is a separate creation task, not the first list card.
+ * Leave a clear 28px hand-off before the saved-memo grid begins. */
+.renewal-shell.v2-design .v2-memo .memo-composer-card {
+  margin: 0 0 28px !important;
+}
+
+/* Content: 2nd-level equal tabs are full-bleed header chrome. The filters,
+ * third-level chips and cards below them share the explicit 40px / 20px body
+ * gutter so the right grid-switcher no longer drifts away from the content. */
+.renewal-shell.v2-design .v2-content .history-header-stack {
+  background: #fff !important;
+  border-bottom: 1px solid #1e1b2e0f;
+}
+
+.renewal-shell.v2-design .v2-content .underline-tabs {
+  min-height: 50px;
+  background: #fff !important;
+  border-bottom: 1px solid #1e1b2e0f !important;
+}
+
+.renewal-shell.v2-design .v2-content .underline-tabs [role="tab"] {
+  min-height: 50px;
+  padding: 0 !important;
+  color: #6b6580 !important;
+  font-size: 0.8rem !important;
+  font-weight: 800 !important;
+  border-bottom-color: transparent !important;
+}
+
+.renewal-shell.v2-design .v2-content .underline-tabs [role="tab"][aria-selected="true"] {
+  color: var(--brand, #7c2fe5) !important;
+  border-bottom: 2px solid var(--brand, #7c2fe5) !important;
+}
+
+.renewal-shell.v2-design .v2-content .region-filter-trigger-row,
+.renewal-shell.v2-design .v2-content .history-header-stack > div:not([class]) > .bp-cat-scroll-row,
+.renewal-shell.v2-design .v2-content .culture-items-grid {
+  padding-left: var(--v2-dest-content-pad-x) !important;
+  padding-right: var(--v2-dest-content-pad-x) !important;
+}
+
+.renewal-shell.v2-design .v2-content .history-header-stack > div:not([class]) {
+  padding: 0 !important;
+  background: #fff !important;
+}
+
+.renewal-shell.v2-design .v2-content .history-header-stack > div:not([class]) > .bp-cat-scroll-row {
+  padding-top: 6px !important;
+  padding-bottom: 10px !important;
+  background: #fff !important;
+  gap: 6px !important;
+}
+
+.renewal-shell.v2-design .v2-content .bp-cat-scroll-row > button {
+  min-height: 32px;
+  padding: 6px 12px !important;
+  background: #f7f6fa !important;
+  color: #6b6580 !important;
+  font-size: 0.72rem !important;
+  font-weight: 800 !important;
+}
+
+.renewal-shell.v2-design .v2-content .bp-cat-scroll-row > button[style*="background: var(--accent-primary)"] {
+  background: var(--brand, #7c2fe5) !important;
+  color: #fff !important;
+}
+
+.renewal-shell.v2-design .v2-content .culture-grid-cols-toggle {
+  border-color: #dcd6eb !important;
+  background: #f7f6fa !important;
+  padding: 3px !important;
+}
+
+.renewal-shell.v2-design .v2-content .culture-grid-cols-btn {
+  color: #6b6580 !important;
+  border-radius: 7px !important;
+}
+
+.renewal-shell.v2-design .v2-content .culture-grid-cols-btn.is-active {
+  color: #fff !important;
+  background: var(--brand, #7c2fe5) !important;
+  box-shadow: none !important;
+}
+
+/* Archive/people/past-meetings had a 56px blank top inset after their second
+ * tab row. Keep the controls close enough to read as the same page module. */
+.renewal-shell.v2-design .v2-archive .history-page-scroll {
+  padding-top: 20px !important;
+  padding-right: var(--v2-dest-content-pad-x) !important;
+  padding-left: var(--v2-dest-content-pad-x) !important;
+}
+
+.renewal-shell.v2-design .v2-archive .history-bento-grid,
+.renewal-shell.v2-design .v2-content .culture-items-grid,
+.renewal-shell.v2-design .v2-places .places-list-body {
+  padding-left: var(--v2-dest-content-pad-x) !important;
+  padding-right: var(--v2-dest-content-pad-x) !important;
+}
+
+/* V2 overlays are often portal siblings of the shell instead of descendants.
+ * Cover both trees so Share/Settings stay viewport-centred on desktop and use
+ * the same polished backdrop/sheet on mobile. */
+.renewal-shell.v2-design .modal-overlay:has(.v2-responsive-modal),
+.renewal-shell.v2-design ~ .modal-overlay:has(.v2-responsive-modal) {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  margin: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 24px !important;
+  background: rgba(30, 27, 46, 0.52) !important;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+.renewal-shell.v2-design .modal-overlay .v2-responsive-modal,
+.renewal-shell.v2-design ~ .modal-overlay .v2-responsive-modal {
+  width: min(560px, calc(100vw - 48px)) !important;
+  max-width: 560px !important;
+  max-height: min(86dvh, var(--gather-vv-modal-max, 860px)) !important;
+  margin: 0 !important;
+  border: 1px solid #1e1b2e0f !important;
+  border-radius: 24px !important;
+  box-shadow: 0 24px 72px rgba(30, 27, 46, 0.26) !important;
+  overflow: hidden auto !important;
+}
+
+.renewal-shell.v2-design .modal-overlay .v2-responsive-modal .modal-header,
+.renewal-shell.v2-design ~ .modal-overlay .v2-responsive-modal .modal-header {
+  padding: 18px 20px !important;
+  border-bottom: 1px solid #1e1b2e0f !important;
+}
+
+@media (max-width: 767px) {
+  .renewal-shell.v2-design .modal-overlay:has(.v2-responsive-modal),
+  .renewal-shell.v2-design ~ .modal-overlay:has(.v2-responsive-modal) {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+
+  .renewal-shell.v2-design .modal-overlay .v2-responsive-modal,
+  .renewal-shell.v2-design ~ .modal-overlay .v2-responsive-modal {
+    width: 100vw !important;
+    max-width: none !important;
+    max-height: min(90dvh, var(--gather-vv-modal-max, 860px)) !important;
+    border-radius: 24px 24px 0 0 !important;
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* V2 interaction parity: chat composer, settlement tabs, and memo cards.    */
+/* This file is loaded after the screen modules, so these are the final V2    */
+/* contracts and cannot leak into the untouched V1 shell.                    */
+/* -------------------------------------------------------------------------- */
+
+/* Keep the original live resize handle immediately above the textarea. The
+ * handle retains ChatRoom's pointer and keyboard handlers; this only supplies
+ * the V2 layout and a clear, compact hit target. */
+.renewal-shell.v2-design .v2-chat .v2-chat-composer > .chat-composer-resize-handle,
+.renewal-shell.v2-design .v2-chat .v2-chat-composer > .panel-resize-handle {
+  display: flex !important;
+  position: relative !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 36px !important;
+  height: 16px !important;
+  min-height: 16px !important;
+  margin: 0 auto 3px !important;
+  inset: auto !important;
+  transform: none !important;
+  cursor: ns-resize !important;
+  touch-action: none !important;
+  opacity: .72 !important;
+}
+
+/* Emoji → one attachment control (images and files) → paste, at the lower
+ * right of the composer. The controls themselves are cloned from ChatRoom,
+ * preserving every original click/keyboard behaviour. */
+.renewal-shell.v2-design .v2-chat .v2-chat-tool-icons {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  margin-left: auto !important;
+}
+
+.renewal-shell.v2-design .v2-chat .v2-chat-tool-icons > .v2-tool-icon-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 30px !important;
+  height: 30px !important;
+  min-width: 30px !important;
+  min-height: 30px !important;
+  padding: 0 !important;
+  border: 1px solid #1e1b2e0f !important;
+  border-radius: 999px !important;
+  background: #fff !important;
+  color: #6b6580 !important;
+  box-shadow: none !important;
+}
+
+.renewal-shell.v2-design .v2-chat .v2-chat-tool-icons > .v2-tool-icon-btn:hover,
+.renewal-shell.v2-design .v2-chat .v2-chat-tool-icons > .v2-tool-icon-btn:focus-visible {
+  color: var(--brand, #7c2fe5) !important;
+  border-color: color-mix(in srgb, var(--brand, #7c2fe5) 35%, #fff) !important;
+  outline: none !important;
+}
+
+/* The tabs are header chrome; its two equal controls use the same vertical
+ * rhythm at every breakpoint. The settlement content itself begins flush in
+ * the destination body, as requested. */
+.renewal-shell.v2-design .v2-settlement .settlement-page-tabs button {
+  padding: 14px 0 !important;
+}
+
+.renewal-shell.v2-design .v2-settlement .v2-dest-body.v2-settlement-body > div {
+  padding: 0 !important;
+}
+
+/* Memo-page cards use the home memo card's visual contract exactly: same
+ * surface, title/meta rhythm, plain purple tags, hidden writer capsule, and
+ * compact soft-purple comment rows. Interactivity remains on live MemoCard. */
+.renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-bubble-surface,
+.renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-card-contract {
+  background: #fff !important;
+  border: 1px solid #1e1b2e0f !important;
+  border-radius: 14px !important;
+  box-shadow: 1px 1px 4px #1e1b2e12 !important;
+}
+
+.renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-bubble-surface {
+  padding: 0 !important;
+  overflow: visible !important;
+}
+
+.renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-card-contract {
+  padding: 14px 16px !important;
+}
+
+.renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-card-title {
+  color: #1e1b2e !important;
+  font-size: 1rem !important;
+  font-weight: 800 !important;
+  line-height: 1.25 !important;
+  margin-bottom: 3px !important;
+}
+
+.renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-card-meta {
+  display: block !important;
+  margin-bottom: 9px !important;
+  padding-bottom: 8px !important;
+  border-bottom: 1px solid #1e1b2e0f !important;
+  color: #8a8798 !important;
+  font-size: .62rem !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+}
+
+.renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-card-body {
+  color: #6b6580 !important;
+  font-size: .76rem !important;
+  line-height: 1.5 !important;
+  margin-bottom: 10px !important;
+}
+
+.renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-author-pill {
+  display: none !important;
+}
+
+.renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-card-tags {
+  gap: 5px !important;
+  margin-top: 4px !important;
+}
+
+.renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-card-tags > span:not(.v2-memo-author-pill) {
+  display: inline !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--brand, #7c2fe5) !important;
+  font-size: .62rem !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
+}
+
+.renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-card-comments {
+  gap: 4px !important;
+  margin-top: 8px !important;
+}
+
+.renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-card-comments > div {
+  gap: 8px !important;
+  padding: 7px 10px !important;
+  border: 0 !important;
+  border-radius: 10px !important;
+  background: var(--brand-soft, #f3eeff) !important;
+}
+
+.renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .memo-card-comment-footer {
+  margin-top: 8px !important;
+  padding-top: 0 !important;
+}

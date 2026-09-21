@@ -183,6 +183,11 @@ export function UrlCapsuleBadge({ url, style = null }) {
   }, href);
 }
 
+export function shortParticipantName(name) {
+  const value = String(name || '').trim();
+  return /^[가-힣]{3,4}$/.test(value) ? value.slice(1) : value;
+}
+
 // The single shared participant-select control -- solid color pill (participant's own color as
 // background, white bold name, small ▼) that opens ChatParticipantSheet. This is the chat
 // composer's original look; memo composer/edit, the chat edit modal, and the comment composer
@@ -190,6 +195,7 @@ export function UrlCapsuleBadge({ url, style = null }) {
 // happen here. Never re-implement this button inline at a call site -- import and use this.
 export function ParticipantPickerButton({ participant, onClick, placeholder = '작성자 선택' }) {
   const React = window.React;
+  const label = shortParticipantName(participant?.name) || placeholder;
 
   return /*#__PURE__*/React.createElement("button", {
     type: "button",
@@ -212,7 +218,7 @@ export function ParticipantPickerButton({ participant, onClick, placeholder = '�
       boxSizing: 'border-box',
       flexShrink: 0
     }
-  }, participant?.name || placeholder, /*#__PURE__*/React.createElement("span", {
+  }, label, /*#__PURE__*/React.createElement("span", {
     style: { fontSize: 'var(--font-size-2xs)' }
   }, "▼"));
 }
@@ -228,8 +234,7 @@ export function ParticipantPickerButton({ participant, onClick, placeholder = '�
 export function ParticipantBadge({ participant, style, className = '', children, ...rest }) {
   const React = window.React;
   if (!participant) return null;
-  const participantName = String(participant.name || '').trim();
-  const badgeName = /^[가-힣]{3,4}$/.test(participantName) ? participantName.slice(1) : participantName;
+  const badgeName = shortParticipantName(participant.name);
   return /*#__PURE__*/React.createElement("span", {
     className: `participant-badge${className ? ' ' + className : ''}`,
     style: { backgroundColor: participant.color || '#94A3B8', color: '#FFFFFF', ...style },
@@ -260,6 +265,50 @@ export function DateCapsuleBadge({ date, style = null }) {
   }, label);
 }
 
+/** Shared ns-resize grip used above the chat composer and under the places map. */
+export function PanelResizeHandle({
+  label = '높이 조절',
+  className = '',
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+  onPointerCancel,
+  onKeyDown,
+}) {
+  const React = window.React;
+  return /*#__PURE__*/React.createElement("div", {
+    className: `panel-resize-handle chat-composer-resize-handle${className ? ` ${className}` : ''}`,
+    role: "separator",
+    "aria-label": label,
+    "aria-orientation": "horizontal",
+    tabIndex: 0,
+    onPointerDown,
+    onPointerMove,
+    onPointerUp,
+    onPointerCancel,
+    onKeyDown
+  }, /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: "22",
+    height: "14",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    className: "lucide lucide-grip-horizontal",
+    "aria-hidden": "true"
+  },
+    /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "9", r: "1" }),
+    /*#__PURE__*/React.createElement("circle", { cx: "19", cy: "9", r: "1" }),
+    /*#__PURE__*/React.createElement("circle", { cx: "5", cy: "9", r: "1" }),
+    /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "15", r: "1" }),
+    /*#__PURE__*/React.createElement("circle", { cx: "19", cy: "15", r: "1" }),
+    /*#__PURE__*/React.createElement("circle", { cx: "5", cy: "15", r: "1" })
+  ));
+}
+
   if (typeof window !== 'undefined') {
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
     SearchResultLogRow: SearchResultLogRow,
@@ -270,5 +319,7 @@ export function DateCapsuleBadge({ date, style = null }) {
     ParticipantPickerButton: ParticipantPickerButton,
     ParticipantBadge: ParticipantBadge,
     DateCapsuleBadge: DateCapsuleBadge,
+    PanelResizeHandle: PanelResizeHandle,
+    shortParticipantName: shortParticipantName,
   });
 }

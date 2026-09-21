@@ -134,8 +134,8 @@
   box-shadow: 0 0 0 2px rgba(124, 47, 229, 0.55);
   white-space: nowrap;
 }
-@media (min-width: 768px) {
-  /* Side rail already covers 채팅/정산/메모/갤러리 from here up -- never show both navs. */
+@media (min-width: 1200px) {
+  /* Persistent side rail covers 채팅/정산/메모/갤러리 — hide the hero row on desktop only. */
   .v2-design .bp-hero-quick-nav { display: none; }
 }
 
@@ -275,9 +275,58 @@
 .v2-design .bp-memo-tag, .v2-design .bp-place-tag { font-style: normal; }
 .v2-design .bp-thumb { padding: 0; border: 0; width: 100%; position: relative; overflow: hidden; }
 .v2-design .bp-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.v2-design .bp-renewal-home-place-card { width: 100%; text-align: left; cursor: pointer; border: 0; background: none; }
-.v2-design .bp-renewal-home-place-copy { display: block; min-width: 0; }
+.v2-design .bp-renewal-home-place-list { display: flex; flex-direction: column; gap: 8px; }
+.v2-design .bp-renewal-home-place-list .bp-place-row + .bp-place-row { margin-top: 0; }
+.v2-design .bp-renewal-home-place-card,
+.v2-design .bp-renewal-home-place-card.bp-place-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 12px 12px 14px;
+  border: 1px solid #eceaf5;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(30, 27, 46, 0.04);
+  box-sizing: border-box;
+}
+.v2-design .bp-renewal-home-place-copy {
+  display: block;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.v2-design .bp-renewal-home-place-share {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  margin-top: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #b4aec4;
+  cursor: pointer;
+}
+.v2-design .bp-renewal-home-place-share:hover,
+.v2-design .bp-renewal-home-place-share:focus-visible {
+  color: var(--brand, #7C2FE5);
+}
 .v2-design .bp-place-name, .v2-design .bp-place-addr, .v2-design .bp-place-note { display: block; }
+.v2-design .bp-renewal-home-place-note {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #f0eef5;
+  color: #8b8499;
+}
 .v2-design .bp-renewal-home-footer { text-align: center; color: var(--text-light, #83798f); font-size: 0.62rem; padding: 18px 14px 28px; }
 .v2-design .bp-renewal-home-footer-links { display: flex; gap: 12px; justify-content: center; margin-top: 8px; flex-wrap: wrap; }
 .v2-design .bp-renewal-home-empty { color: var(--text-muted); font-size: 0.75rem; }
@@ -339,6 +388,13 @@
  *   .meme-preview-overlay / .meme-preview-modal -- full-screen image preview, own sizing */
 @media (max-width: 767px) {
   .v2-design .modal-overlay:not(.bp-sheet-backdrop):not(.meme-preview-overlay) {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    margin: 0 !important;
+    transform: none !important;
     align-items: flex-end !important;
     padding: 0 !important;
   }
@@ -348,6 +404,36 @@
     max-width: none !important;
     border-radius: 20px 20px 0 0 !important;
     margin: 0 !important;
+  }
+}
+
+/* Portal-backed overlays can open while a destination pane is scrolled or transformed.
+   Always anchor the backdrop to the viewport, not the pane, so desktop centres and mobile
+   spans the full visual width. */
+.renewal-shell.v2-design ~ .modal-overlay,
+.renewal-shell.v2-design .modal-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  margin: 0 !important;
+  transform: none !important;
+  box-sizing: border-box !important;
+  justify-content: center !important;
+}
+@media (min-width: 768px) {
+  .renewal-shell.v2-design .modal-overlay,
+  .renewal-shell.v2-design ~ .modal-overlay {
+    align-items: center !important;
+    padding: 24px !important;
+  }
+}
+@media (max-width: 767px) {
+  .renewal-shell.v2-design .modal-overlay,
+  .renewal-shell.v2-design ~ .modal-overlay {
+    align-items: flex-end !important;
+    padding: 0 !important;
   }
 }
 .v2-design .bp-event-sheet.modal-container {
@@ -486,11 +572,11 @@
  * dark category text; narrow layouts intentionally collapse to a solid bar. */
 @media (min-width: 768px) {
   .v2-design .bp-day-bar-stack .bp-day-anniversary:not(.bp-bar-only) {
-    background: color-mix(in srgb, var(--anniversary-color, var(--cal-anniversary)) 15%, #fff) !important;
-    color: var(--anniversary-color, var(--cal-anniversary));
+    background: color-mix(in srgb, var(--cal-anniversary, #F76AAD) 15%, #fff) !important;
+    color: var(--cal-anniversary, #F76AAD);
   }
   .v2-design .bp-day-bar-stack .bp-day-anniversary:not(.bp-bar-only) > .bp-day-anniversary-label {
-    color: var(--anniversary-color, var(--cal-anniversary)) !important;
+    color: var(--cal-anniversary, #F76AAD) !important;
   }
 }
 /* mobile .bp-day-bar-stack .bp-day-anniversary background is redeclared
@@ -639,16 +725,16 @@
  * own box is never a fractional pixel size -- an em value here inherits the cell's rem-based
  * font-size, and a fractional container width forces the browser to round its two edges
  * independently, which is what actually put the numeral visibly off-center, not the flex
- * centering itself (already correct). Padding stays 0 since width/height alone size the pill. */
+ * centering itself (already correct). Extra padding keeps the numeral from sitting flush. */
 .v2-design .bp-day-cell.bp-today .bp-day-num {
-  width: 22px;
-  height: 22px;
-  min-width: 22px;
-  min-height: 22px;
-  padding: 0;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 4px;
   box-sizing: border-box;
   line-height: 1;
-  font-size: inherit !important;
+  font-size: 0.7rem !important;
   border-radius: 999px;
   letter-spacing: -0.02em;
 }
@@ -657,12 +743,16 @@
 }
 @media (min-width: 768px) {
   .v2-design .bp-day-cell.bp-today .bp-day-num {
-    width: 24px; height: 24px; min-width: 24px; min-height: 24px;
+    width: 32px; height: 32px; min-width: 32px; min-height: 32px;
+    padding: 5px;
+    font-size: 0.74rem !important;
   }
 }
 @media (min-width: 1200px) {
   .v2-design .bp-day-cell.bp-today .bp-day-num {
-    width: 27px; height: 27px; min-width: 27px; min-height: 27px;
+    width: 36px; height: 36px; min-width: 36px; min-height: 36px;
+    padding: 6px;
+    font-size: 0.78rem !important;
   }
 }
 
@@ -687,7 +777,7 @@
   bottom: auto;
   display: flex;
   flex-direction: column;
-  gap: 0.16rem;
+  gap: 6px;
   z-index: 2;
   width: 100%;
   margin-top: auto;
@@ -712,12 +802,13 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  background: var(--cal-anniversary, #F76AAD) !important;
+  background: color-mix(in srgb, var(--cal-anniversary, #F76AAD) 16%, #fff) !important;
+  color: var(--cal-anniversary, #F76AAD) !important;
   border-radius: 999px !important; /* single-day / solo default */
-  /* Mobile / narrow default: compact color bar */
-  height: 0.34rem !important;
-  min-height: 0.34rem !important;
-  padding: 0 !important;
+  /* Mobile / narrow default: labelled color badge (title shown through tablet). */
+  height: auto !important;
+  min-height: 1.05rem !important;
+  padding: 0.12rem 0.36rem !important;
 }
 /* Multi-day (연일) connected segments — square the joining edges */
 .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-solo {
@@ -746,7 +837,7 @@
   font-size: 0.7rem !important;
   font-weight: 600 !important;
   line-height: 1.15 !important;
-  color: var(--anniversary-color, #4c1d95) !important;
+  color: var(--cal-anniversary, #F76AAD) !important;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -780,17 +871,21 @@
   max-width: 100%;
 }
 
-/* Name pills — mock 0.56rem + ~7% */
+/* Name pills — dots from tablet up; given-name text only on 560–767 phones. */
 @media (min-width: 768px) {
   .v2-design .bp-p-dot {
-    padding: 2px 7px !important;
+    width: 7px !important;
+    height: 7px !important;
+    min-width: 7px !important;
+    min-height: 7px !important;
+    padding: 0 !important;
+    border-radius: 50% !important;
   }
   .v2-design .bp-p-dot::after {
-    font-size: 0.6rem !important;
-    font-weight: 800 !important;
-    line-height: 1 !important;
+    content: none !important;
+    display: none !important;
   }
-  .v2-design .bp-dot-row { gap: 5px !important; }
+  .v2-design .bp-dot-row { gap: 4px !important; }
 }
 
 /* Calendar cell type hierarchy — mock denseness + ~8% */
@@ -932,10 +1027,10 @@
 @media (min-width: 1200px) {
   .v2-design .bp-app-shell.is-bento-home {
     max-width: min(var(--v2-content-max, 1600px), calc(100vw - var(--v2-side-nav-width, 280px))) !important;
-    padding: 24px !important;
+    padding: 0 !important;
   }
   .v2-design .bp-hero-zone {
-    border-radius: 20px !important;
+    border-radius: 0 !important;
     margin: 0 0 16px !important;
   }
   .v2-design .bp-dday-compact-text {
@@ -978,15 +1073,20 @@
     -webkit-line-clamp: 2;
   }
   .v2-design .bp-p-dot {
-    padding: 2px 7px !important;
+    width: 7px !important;
+    height: 7px !important;
+    min-width: 7px !important;
+    min-height: 7px !important;
+    padding: 0 !important;
+    border-radius: 50% !important;
   }
   .v2-design .bp-p-dot::after {
-    font-size: 0.6rem !important;
-    line-height: 1 !important;
+    content: none !important;
+    display: none !important;
   }
   .v2-design .bp-dot-row { gap: 5px !important; }
   .v2-design .bp-day-bar-stack {
-    gap: 0.16rem;
+    gap: 6px;
   }
   .v2-design .bp-day-bar-stack .bp-day-anniversary:not(.bp-mid):not(.bp-bar-only),
   .v2-design .bp-day-bar-stack .bp-day-bar.bp-has-label {
@@ -1024,11 +1124,10 @@
 
 
 
-/* Progressive disclosure: hide anniversary title on narrow; show inside badge on PC/wide.
-   Multi-day mid segments stay bar-only so the range reads as one continuous strip. */
+/* Progressive disclosure: mid/bar-only segments stay a thin strip; solo badges show the title. */
 .v2-design .bp-day-bar-stack .bp-day-anniversary-label,
 .v2-design .bp-day-anniversary .bp-day-anniversary-label {
-  display: none !important;
+  display: block !important;
 }
 .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-bar-only {
   min-height: 0.34rem !important;
@@ -1051,7 +1150,7 @@
     font-size: 0.7rem !important;
     font-weight: 600 !important;
     line-height: 1.15 !important;
-    color: var(--anniversary-color, #4c1d95) !important;
+    color: var(--cal-anniversary, #F76AAD) !important;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1187,9 +1286,10 @@
   align-items: center;
   gap: 10px;
   width: calc(100% - 20px);
-  min-height: 36px;
-  margin: 4px 10px 12px;
-  padding: 8px 12px;
+  min-height: 40px;
+  height: 40px;
+  margin: 12px 10px;
+  padding: 0 14px;
   border: 0;
   border-radius: 999px;
   background: var(--brand, #7C2FE5);
@@ -1202,13 +1302,15 @@
 }
 .v2-design .bp-side-nav-global-search:hover { background: #6d28d9; }
 .v2-design .bp-side-nav-global-search-icon { display: inline-flex; flex: 0 0 auto; }
-.v2-design .bp-side-nav-global-search-icon svg { width: 18px; height: 18px; }
+.v2-design .bp-side-nav-global-search-icon svg { width: 20px; height: 20px; }
 .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search {
-  width: 36px;
+  width: 40px;
+  height: 40px;
   justify-content: center;
-  padding: 8px;
+  padding: 0;
   margin-left: auto;
   margin-right: auto;
+  gap: 0;
 }
 .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search-label { display: none; }
 
@@ -1303,8 +1405,7 @@
 .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item-badge,
 .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item-sub,
 .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-text,
-.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-collapse-label,
-.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-group.bp-is-tab-menu {
+.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-collapse-label {
   display: none;
 }
 .v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-item {
@@ -1452,7 +1553,7 @@
   background: var(--brand, #7C2FE5) !important;
 }
 .v2-design .bp-side-nav-group {
-  padding: 6px 10px !important;
+  padding: 4px 10px !important;
 }
 .v2-design .bp-side-nav-item {
   font-size: 14px !important;
@@ -1460,11 +1561,11 @@
    * removed, the weight contrast is what now carries "this is the current page". */
   font-weight: 500;
   line-height: 1.25;
-  padding: 11px 12px !important;
-  margin: 3px 0 !important;
+  padding: 0 12px !important;
+  margin: 0 !important;
   gap: 12px !important;
   border-radius: 10px;
-  min-height: 40px !important;
+  min-height: 44px !important;
   box-sizing: border-box !important;
 }
 .v2-design .bp-side-nav-item-icon {
@@ -1523,7 +1624,7 @@
 
 @media (min-width: 1200px) {
   .v2-design .bp-side-nav-head {
-    padding: 28px 16px 18px !important;
+    padding: 12px 14px !important;
   }
   .v2-design .bp-side-nav-brand {
     gap: 8px !important;
@@ -1533,9 +1634,9 @@
   }
   .v2-design .bp-side-nav-item {
     font-size: 14px !important;
-    padding: 11px 12px !important;
-    margin: 4px 0 !important;
-    min-height: 42px !important;
+    padding: 0 12px !important;
+    margin: 0 !important;
+    min-height: 44px !important;
   }
   .v2-design .bp-side-nav-group.bp-is-main {
     border-top: none !important;
@@ -1561,7 +1662,7 @@
     border-top: none !important;
   }
   .v2-design .bp-side-nav-group.bp-is-tab-menu .bp-side-nav-item {
-    margin: 2px 0 !important;
+    margin: 0 !important;
   }
 }
 
@@ -1688,27 +1789,41 @@
   mask-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iYmxhY2siIHN0cm9rZT0ibm9uZSI+PHBhdGggZD0iTTEyIDJjNS41MjMgMCAxMCA0LjQ3NyAxMCAxMHMtNC40NzcgMTAgLTEwIDEwYTEwIDEwIDAgMSAxIDAgLTIwbS0yLjI5MyA4LjI5M2ExIDEgMCAwIDAgLTEuNDE0IDEuNDE0bDMgM2ExIDEgMCAwIDAgMS40MTQgMGwzIC0zYTEgMSAwIDAgMCAwIC0xLjQxNGwtLjA5NCAtLjA4M2ExIDEgMCAwIDAgLTEuMzIgLjA4M2wtMi4yOTQgMi4yOTJ6IiAvPjwvc3ZnPg==");
 }
 
-/* Final anniversary readability override: keep this last in the cascade. */
+/* Final anniversary readability override: keep this last in the cascade.
+   Split is viewport-only: labeled translucent badges from tablet up, solid
+   line badges on phones. Never treat 1-day vs range as a color mode. */
 @media (min-width: 768px) {
-  .v2-design .bp-day-bar-stack .bp-day-anniversary { background: color-mix(in srgb, var(--anniversary-color, var(--cal-anniversary)) 16%, #fff) !important; color: var(--anniversary-color, var(--cal-anniversary)) !important; }
-  .v2-design .bp-day-bar-stack .bp-day-anniversary > .bp-day-anniversary-label { display: block !important; color: var(--anniversary-color, var(--cal-anniversary)) !important; font-size: .7rem !important; font-weight: 600 !important; line-height: 1.15 !important; padding: 0 3px !important; }
+  .v2-design .bp-day-bar-stack .bp-day-anniversary,
+  .v2-design .festival-bar-desktop .bp-day-anniversary {
+    background: color-mix(in srgb, var(--cal-anniversary, #F76AAD) 16%, #fff) !important;
+    color: var(--cal-anniversary, #F76AAD) !important;
+  }
+  .v2-design .bp-day-bar-stack .bp-day-anniversary > .bp-day-anniversary-label,
+  .v2-design .festival-bar-desktop .bp-day-anniversary-label {
+    display: block !important;
+    color: var(--cal-anniversary, #F76AAD) !important;
+    font-size: .7rem !important;
+    font-weight: 600 !important;
+    line-height: 1.15 !important;
+    padding: 0 3px !important;
+  }
   .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-mid > .bp-day-anniversary-label,
   .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-bar-only > .bp-day-anniversary-label { display: none !important; }
-
-
-  /* Range anniversaries use the same desktop contract as solo badges: a
-     translucent tint with the category color as readable text. */
-  .v2-design .festival-bar-desktop .bp-day-anniversary {
-    background: color-mix(in srgb, var(--anniversary-color, var(--cal-anniversary)) 16%, #fff) !important;
-    color: var(--anniversary-color, var(--cal-anniversary)) !important;
-  }
-  .v2-design .festival-bar-desktop .bp-day-anniversary-label {
-    color: var(--anniversary-color, var(--cal-anniversary)) !important;
-  }
 }
 @media (max-width: 767px) {
-  .v2-design .bp-day-bar-stack .bp-day-anniversary { background: var(--anniversary-color, var(--cal-anniversary)) !important; color: #fff !important; }
-  .v2-design .bp-day-bar-stack .bp-day-anniversary > .bp-day-anniversary-label { display: none !important; }
+  .v2-design .bp-day-bar-stack .bp-day-anniversary,
+  .v2-design .bp-day-bar-stack .bp-day-anniversary[class*="cat-"] {
+    background: var(--cal-anniversary, #F76AAD) !important;
+    color: transparent !important;
+    height: 0.34rem !important;
+    min-height: 0.34rem !important;
+    padding: 0 !important;
+  }
+  .v2-design .bp-day-bar-stack .bp-day-anniversary > .bp-day-anniversary-label {
+    display: none !important;
+  }
+  .v2-design .festival-bar-desktop { display: none !important; }
+  .v2-design .festival-bar-mobile { display: flex !important; }
 }
 
 /* --------------------------------------------------------------------------

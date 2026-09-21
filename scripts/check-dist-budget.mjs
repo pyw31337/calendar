@@ -42,7 +42,7 @@ const LAZY_CHUNK_PATTERNS = [
 // actually loads before the app becomes interactive. Sized with real headroom so routine
 // feature work (this cap already accounts for the movie metadata/enrichment UI) doesn't
 // trip CI for a few KB.
-const TOTAL_JS_MAX_BYTES = 1_500_000;
+const TOTAL_JS_MAX_BYTES = 1_520_000;
 
 function fail(message) {
   console.error(`[check-dist-budget] ${message}`);

@@ -125,15 +125,18 @@ export function AppSettingsModal({
 
   return /*#__PURE__*/React.createElement("div", { className: "modal-overlay", onClick: onClose, style: { zIndex: 12000 } },
     /*#__PURE__*/React.createElement("div", {
-      className: "modal-container", onClick: e => e.stopPropagation(),
+      // The V2 shell scopes the responsive modal treatment; V1 keeps this
+      // component's existing presentation because its stylesheet is inert
+      // outside `.renewal-shell.v2-design`.
+      className: "modal-container v2-responsive-modal v2-settings-modal", onClick: e => e.stopPropagation(),
       style: { maxWidth: '400px', width: '92%', backgroundColor: 'var(--bg-card)', borderRadius: '16px', border: '1px solid var(--border-subtle)', overflow: 'hidden' }
     },
-      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border-subtle)' } },
+      /*#__PURE__*/React.createElement("div", { className: "modal-header", style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border-subtle)' } },
         /*#__PURE__*/React.createElement("span", { style: { fontWeight: 900, fontSize: '0.98rem' } }, "설정"),
-        /*#__PURE__*/React.createElement("button", { type: "button", onClick: onClose, style: { background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' } },
+        /*#__PURE__*/React.createElement("button", { type: "button", onClick: onClose, className: "modal-close-btn", "aria-label": "설정 닫기", style: { background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' } },
           SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }) : "✕")
       ),
-      /*#__PURE__*/React.createElement("div", { style: { padding: '12px 16px 20px', display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '70vh', overflowY: 'auto' } },
+      /*#__PURE__*/React.createElement("div", { className: "modal-body", style: { padding: '12px 16px 20px', display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '70vh', overflowY: 'auto' } },
         /* Weather region — above dark mode */
         /*#__PURE__*/React.createElement("div", { style: { padding: '6px 0 12px', display: 'flex', flexDirection: 'column', gap: '8px' } },
           /*#__PURE__*/React.createElement("div", {

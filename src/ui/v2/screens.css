@@ -1151,7 +1151,7 @@
   color: #1e1b2e !important;
 }
 .v2-design .v2-places .places-list-toolbar {
-  padding: 8px 12px !important;
+  padding: 8px var(--v2-dest-content-pad-x) !important;
   gap: 6px !important;
 }
 /* Unit 1: single create surface — hide legacy toolbar + when V2 FAB is present */
@@ -1159,9 +1159,17 @@
 .v2-design .v2-places-legacy button.btn-action-dark[aria-label="장소 추가"] {
   display: none !important;
 }
-.v2-design .v2-places .places-category-sticky-tabs {
-  padding: 6px 10px !important;
+.v2-design .v2-places .places-category-sticky-tabs,
+.v2-design .v2-places-legacy .places-category-sticky-tabs {
+  padding: 0 !important;
+  border-bottom: none !important;
   gap: 4px !important;
+}
+/* Preserve the component's vertical reset while the V2 shell supplies the shared side gutter. */
+.v2-design .v2-places .places-category-sticky-tabs,
+.v2-design .v2-places-legacy .places-category-sticky-tabs {
+  padding-left: var(--v2-dest-content-pad-x) !important;
+  padding-right: var(--v2-dest-content-pad-x) !important;
 }
 
 /* ========== Content + Archive Bento page chrome (loop7) ========== */
@@ -2010,17 +2018,25 @@
   padding: 0 10px !important;
 }
 
-/* Drag handle above composer — light restyle */
+/* Drag handle above composer — light restyle (shared with places map) */
 .v2-design .v2-chat .chat-composer-resize-handle,
-.v2-design .v2-chat-composer > .chat-composer-resize-handle {
+.v2-design .v2-chat-composer > .chat-composer-resize-handle,
+.v2-design .v2-chat .panel-resize-handle,
+.v2-design .panel-resize-bar .panel-resize-handle,
+.v2-design .panel-resize-bar .chat-composer-resize-handle {
   position: relative !important;
   margin: 0 auto 1px !important;
   top: auto !important;
   right: auto !important;
   left: auto !important;
+  transform: none !important;
   width: 36px !important;
   height: 14px !important;
   opacity: 0.55;
+}
+.v2-design .places-map-sticky-area .panel-resize-bar {
+  background: #fafafc !important;
+  border: 0 !important;
 }
 
 /* Message list light gray (mock) */
@@ -2208,7 +2224,7 @@
 }
 
 /* Final shared-header contract. */
-.v2-design .v2-page-header .bp-header-row { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; height: 100%; min-width: 0; gap: 16px; }
+.v2-design .v2-page-header .bp-header-row { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; height: auto !important; min-height: 60px; min-width: 0; gap: 16px; overflow: visible; }
 .v2-design .v2-page-header .bp-header-leading { min-width: 0; justify-self: start; display: inline-flex; align-items: center; gap: 8px; }
 .v2-design .v2-page-header .bp-header-center-brand { min-width: 0; justify-self: center; display: inline-flex; align-items: center; justify-content: center; white-space: nowrap; }
 .v2-design .v2-page-header .bp-header-actions { min-width: 56px; justify-self: end; display: inline-flex; align-items: center; justify-content: flex-end; flex-wrap: nowrap; white-space: nowrap; margin-left: 0; }
@@ -2222,7 +2238,7 @@
   display: grid !important;
   grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
   gap: 16px !important;
-  padding: 40px !important;
+  padding: var(--v2-dest-content-pad-y, 8px) var(--v2-dest-content-pad-x, 16px) 96px !important;
   box-sizing: border-box !important;
 }
 @media (max-width: 1240px) {
@@ -2242,4 +2258,21 @@
   .v2-design .v2-memo .bp-memo-grid {
     grid-template-columns: minmax(0, 1fr) !important;
   }
+}
+
+/* Places uses the intact V1 view for Leaflet lifecycle safety. Its root is therefore the
+   scroll owner in V2 (rather than a synthetic extracted list slot). Without this, the root
+   retained `overflow:hidden` at pane height and every card below the first viewport existed
+   but was unreachable. */
+.v2-design .v2-places.v2-wrap-legacy .v2-places-legacy {
+  height: 100% !important;
+  min-height: 0 !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.v2-design .v2-places.v2-wrap-legacy .places-list-body {
+  min-height: min-content !important;
+  padding-bottom: 96px !important;
 }

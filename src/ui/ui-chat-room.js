@@ -4,6 +4,7 @@
 
 import { matchMemePoolByKeyword } from '../core/meme-pool.js';
 import { useChatTypingPresence } from '../core/chat-typing-presence.js';
+import { PanelResizeHandle } from './ui-widgets.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -1591,12 +1592,8 @@ export function ChatRoomView({
     },
       /* 밈 키보드: 입력창 바로 위, 이모지 피커와 같은 자리 개념. 매칭된 해시태그가 있을 때만
          보인다 -- 평소엔 아무 자리도 차지하지 않는다. */
-      /*#__PURE__*/React.createElement("div", {
-        className: "chat-composer-resize-handle",
-        role: "separator",
-        "aria-label": "대화 입력창 높이 조절",
-        "aria-orientation": "horizontal",
-        tabIndex: 0,
+      /*#__PURE__*/React.createElement(PanelResizeHandle, {
+        label: "대화 입력창 높이 조절",
         onPointerDown: beginComposerResize,
         onPointerMove: moveComposerResize,
         onPointerUp: endComposerResize,
@@ -1606,17 +1603,7 @@ export function ChatRoomView({
           event.preventDefault();
           setComposerInputHeight(height => Math.max(44, Math.min(MAX_COMPOSER_INPUT_HEIGHT, height + (event.key === 'ArrowUp' ? 12 : -12))));
         }
-      }, /*#__PURE__*/React.createElement("svg", {
-        xmlns: "http://www.w3.org/2000/svg", width: "14", height: "14", viewBox: "0 0 24 24",
-        fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round",
-        className: "lucide lucide-grip-horizontal",
-        "aria-hidden": "true"
-      }, /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "9", r: "1" }),
-      /*#__PURE__*/React.createElement("circle", { cx: "19", cy: "9", r: "1" }),
-      /*#__PURE__*/React.createElement("circle", { cx: "5", cy: "9", r: "1" }),
-      /*#__PURE__*/React.createElement("circle", { cx: "12", cy: "15", r: "1" }),
-      /*#__PURE__*/React.createElement("circle", { cx: "19", cy: "15", r: "1" }),
-      /*#__PURE__*/React.createElement("circle", { cx: "5", cy: "15", r: "1" }))),
+      }),
       memeMatches.length > 0 && /*#__PURE__*/React.createElement("div", {
         className: "chat-composer-meme-area",
         style: { display: 'flex', flexDirection: 'column', gap: '8px' }
@@ -1782,6 +1769,7 @@ export function ChatRoomView({
 
       /* Attached Images Preview (between Textarea and Action Row) */
       chatImages.length > 0 ? /*#__PURE__*/React.createElement("div", {
+        className: "chat-composer-photos",
         style: { display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '4px', alignSelf: 'flex-start' }
       }, chatImages.map((img, index) => /*#__PURE__*/React.createElement("div", {
         key: index,
@@ -1802,6 +1790,7 @@ export function ChatRoomView({
       })))) : null,
 
       chatFileAttachments && chatFileAttachments.length > 0 ? /*#__PURE__*/React.createElement("div", {
+        className: "chat-composer-files",
         style: { display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px', width: '100%' }
       }, chatFileAttachments.map((file, index) => /*#__PURE__*/React.createElement("div", {
         key: file.id || index,
@@ -1865,6 +1854,7 @@ export function ChatRoomView({
             type: "button",
             onClick: () => setIsEmojiPickerOpen(true),
             title: "이모티콘",
+            "aria-label": "이모티콘",
             style: {
               width: '32px',
               height: '32px',
@@ -1884,8 +1874,8 @@ export function ChatRoomView({
           /*#__PURE__*/React.createElement("button", {
             type: "button",
             onClick: () => docFileInputRefChat.current && docFileInputRefChat.current.click(),
-            title: "파일 업로드",
-            "aria-label": "파일 업로드",
+            title: "사진 또는 파일 첨부",
+            "aria-label": "사진 또는 파일 첨부",
             style: {
               width: '32px',
               height: '32px',
@@ -1966,6 +1956,7 @@ export function ChatRoomView({
             type: "button",
             onClick: handleClickPasteImagesChat,
             title: "붙여넣기",
+            "aria-label": "붙여넣기",
             style: {
               width: '32px',
               height: '32px',
@@ -1998,6 +1989,8 @@ export function ChatRoomView({
             disabled: isChatSubmitting || (!chatInput.trim() && chatImages.length === 0 && !(chatFileAttachments && chatFileAttachments.length)),
             onPointerDown: handleSendPointerDown,
             onClick: handleSendClick,
+            "aria-label": "전송",
+            title: "전송",
             style: {
               height: '32px',
               padding: '0 16px',

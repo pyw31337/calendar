@@ -2,6 +2,8 @@
  * Places map + places view (P4-10)
  */
 
+import { PanelResizeHandle } from './ui-widgets.js';
+
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 function __gatherUiDeps() { return window.GATHER_UI_DEPS || {}; }
@@ -938,6 +940,7 @@ export function PlacesView({
   const [mapHeight, setMapHeight] = React.useState(Math.round(window.innerHeight * 0.4));
   
   const isDraggingRef = React.useRef(false);
+  const mapResizeMovedRef = React.useRef(false);
   const startYRef = React.useRef(0);
   const startHeightRef = React.useRef(mapHeight);
   const mapHeightRef = React.useRef(mapHeight);
@@ -946,43 +949,27 @@ export function PlacesView({
     mapHeightRef.current = mapHeight;
   }, [mapHeight]);
 
-  const handleDragStart = e => {
+  const beginMapResize = event => {
+    event.preventDefault();
     isDraggingRef.current = true;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    startYRef.current = clientY;
+    mapResizeMovedRef.current = false;
+    startYRef.current = event.clientY;
     startHeightRef.current = mapHeightRef.current;
-    
-    document.addEventListener('mousemove', handleDragMove);
-    document.addEventListener('mouseup', handleDragEnd);
-    document.addEventListener('touchmove', handleDragMove, { passive: false });
-    document.addEventListener('touchend', handleDragEnd);
+    if (event.currentTarget.setPointerCapture) event.currentTarget.setPointerCapture(event.pointerId);
   };
-
-  const handleDragMove = e => {
+  const moveMapResize = event => {
     if (!isDraggingRef.current) return;
-    if (e.cancelable) e.preventDefault();
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    const deltaY = clientY - startYRef.current;
+    const deltaY = event.clientY - startYRef.current;
+    if (Math.abs(deltaY) > 4) mapResizeMovedRef.current = true;
     const nextHeight = Math.max(160, Math.min(window.innerHeight - 220, startHeightRef.current + deltaY));
     setMapHeight(nextHeight);
   };
-
-  const handleDragEnd = () => {
+  const endMapResize = () => {
+    if (isDraggingRef.current && !mapResizeMovedRef.current) {
+      setMapExpanded(prev => !prev);
+    }
     isDraggingRef.current = false;
-    document.removeEventListener('mousemove', handleDragMove);
-    document.removeEventListener('mouseup', handleDragEnd);
-    document.removeEventListener('touchmove', handleDragMove);
-    document.removeEventListener('touchend', handleDragEnd);
   };
-
-  React.useEffect(() => {
-    return () => {
-      document.removeEventListener('mousemove', handleDragMove);
-      document.removeEventListener('mouseup', handleDragEnd);
-      document.removeEventListener('touchmove', handleDragMove);
-      document.removeEventListener('touchend', handleDragEnd);
-    };
-  }, []);
 
   const places = getCalendarPlaces(calendar);
   const categories = getPlaceCategories(calendar);
@@ -1534,101 +1521,40 @@ export function PlacesView({
         onSelectDate: onSelectDate
       }),
       
-      /* Centered Grip Handle + Right Resizer Handle Control Bar */
+      /* Shared ns-resize grip — same PanelResizeHandle as the chat composer. */
       /*#__PURE__*/React.createElement("div", {
+        className: "panel-resize-bar",
         style: {
-          position: 'absolute', left: 0, right: 0, bottom: 0, height: '32px',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '0 12px', borderTop: '1px solid var(--border-subtle)',
+          position: 'absolute', left: 0, right: 0, bottom: 0, height: '22px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
           backgroundColor: 'var(--bg-card)', zIndex: 6, boxSizing: 'border-box'
         }
       },
-        /* Left Spacer */
-        /*#__PURE__*/React.createElement("div", { style: { width: '32px' } }),
-        
-        /* Centered expand/collapse button */
-        /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          onClick: () => setMapExpanded(prev => !prev),
-          "aria-label": mapExpanded ? '지도 축소' : '지도 확대',
-          title: mapExpanded ? '지도 축소' : '지도 확대',
-          style: {
-            background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-light)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px'
+        /*#__PURE__*/React.createElement(PanelResizeHandle, {
+          label: mapExpanded ? '지도 축소' : '지도 높이 조절',
+          onPointerDown: beginMapResize,
+          onPointerMove: moveMapResize,
+          onPointerUp: endMapResize,
+          onPointerCancel: endMapResize,
+          onKeyDown: event => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              setMapExpanded(prev => !prev);
+              return;
+            }
+            if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+            event.preventDefault();
+            const delta = event.key === 'ArrowDown' ? 24 : -24;
+            setMapHeight(height => Math.max(160, Math.min(window.innerHeight - 220, height + delta)));
           }
-        }, mapExpanded ? /*#__PURE__*/React.createElement("svg", {
-          xmlns: "http://www.w3.org/2000/svg",
-          width: "20",
-          height: "20",
-          viewBox: "0 0 24 24",
-          fill: "none",
-          stroke: "currentColor",
-          strokeWidth: "2",
-          strokeLinecap: "round",
-          strokeLinejoin: "round",
-          className: "icon icon-tabler icons-tabler-outline icon-tabler-fold-up"
-        },
-          /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
-          /*#__PURE__*/React.createElement("path", { d: "M12 13v-8l-3 3m6 0l-3 -3" }),
-          /*#__PURE__*/React.createElement("path", { d: "M9 17l1 0" }),
-          /*#__PURE__*/React.createElement("path", { d: "M14 17l1 0" }),
-          /*#__PURE__*/React.createElement("path", { d: "M19 17l1 0" }),
-          /*#__PURE__*/React.createElement("path", { d: "M4 17l1 0" })
-        ) : /*#__PURE__*/React.createElement("svg", {
-          xmlns: "http://www.w3.org/2000/svg",
-          width: "20",
-          height: "20",
-          viewBox: "0 0 24 24",
-          fill: "none",
-          stroke: "currentColor",
-          strokeWidth: "2",
-          strokeLinecap: "round",
-          strokeLinejoin: "round",
-          className: "icon icon-tabler icons-tabler-outline icon-tabler-fold-down"
-        },
-          /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
-          /*#__PURE__*/React.createElement("path", { d: "M12 11v8l3 -3m-6 0l3 3" }),
-          /*#__PURE__*/React.createElement("path", { d: "M9 7l1 0" }),
-          /*#__PURE__*/React.createElement("path", { d: "M14 7l1 0" }),
-          /*#__PURE__*/React.createElement("path", { d: "M19 7l1 0" }),
-          /*#__PURE__*/React.createElement("path", { d: "M4 7l1 0" })
-        )),
-        
-        /* Right drag resizer handle (only shown when map is not fullscreen expanded) */
-        !mapExpanded ? /*#__PURE__*/React.createElement("div", {
-          onMouseDown: handleDragStart,
-          onTouchStart: handleDragStart,
-          title: "드래그하여 지도 높이 조절",
-          style: {
-            width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'ns-resize', color: 'var(--text-light)', userSelect: 'none', touchAction: 'none'
-          }
-        },
-          /* Lucide-style split diagonal resizing arrows */
-          /*#__PURE__*/React.createElement("svg", {
-            xmlns: "http://www.w3.org/2000/svg",
-            width: "20",
-            height: "20",
-            viewBox: "0 0 24 24",
-            fill: "none",
-            stroke: "currentColor",
-            strokeWidth: "2",
-            strokeLinecap: "round",
-            strokeLinejoin: "round",
-            className: "icon icon-tabler icons-tabler-outline icon-tabler-selector"
-          },
-            /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }),
-            /*#__PURE__*/React.createElement("path", { d: "M8 9l4 -4l4 4" }),
-            /*#__PURE__*/React.createElement("path", { d: "M16 15l-4 4l-4 -4" })
-          )
-        ) : /*#__PURE__*/React.createElement("div", { style: { width: '32px' } })
+        })
       )
     ),
 
     /* Sticky Category Tabs */
     !mapExpanded && categories.length > 0 && /*#__PURE__*/React.createElement("div", {
       className: "places-category-sticky-tabs",
-      style: { flexShrink: 0, zIndex: 9, backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)' }
+      style: { flexShrink: 0, zIndex: 9, backgroundColor: 'var(--bg-card)' }
     },
       /* Desktop Category Bar (Only on PC) */
       !isMobile && /*#__PURE__*/React.createElement("div", { className: "place-category-tabs-desktop-only" },
@@ -1662,6 +1588,7 @@ export function PlacesView({
             {
               value: 'all',
               label: /*#__PURE__*/React.createElement(React.Fragment, null, "전체 ", /*#__PURE__*/React.createElement("span", {
+                className: "section-count-badge",
                 style: {
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '20px', height: '18px',
                   borderRadius: 'var(--radius-full)',
@@ -1678,6 +1605,7 @@ export function PlacesView({
                 label: /*#__PURE__*/React.createElement(React.Fragment, null,
                   `${getPlaceCategoryIcon(category)} ${category.name} `,
                   /*#__PURE__*/React.createElement("span", {
+                    className: "section-count-badge",
                     style: {
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '20px', height: '18px',
                       borderRadius: 'var(--radius-full)',
