@@ -2453,6 +2453,55 @@ export function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCan
   })));
 }
 
+const SEARCH_CULTURE_GENRE_LABELS = {
+  classic_tradition: '클래식/전통',
+  play: '연극',
+  musical: '뮤지컬',
+  concert: '콘서트',
+  exhibition: '전시',
+  activity: '체험',
+  museum: '박물관',
+  baseball: '야구',
+  basketball: '농구',
+  volleyball: '배구',
+  soccer: '축구',
+  handball: '핸드볼',
+  movie: '영화'
+};
+const SEARCH_CULTURE_KIND_LABELS = {
+  performance: '문화행사',
+  festival: '지역축제',
+  sports: '스포츠',
+  movie: '영화'
+};
+function searchCultureGenreLabel(code) {
+  const raw = String(code || '').trim();
+  if (!raw) return '';
+  if (SEARCH_CULTURE_GENRE_LABELS[raw]) return SEARCH_CULTURE_GENRE_LABELS[raw];
+  if (/^[a-z0-9_]+$/i.test(raw)) return '';
+  return raw;
+}
+function searchCultureKindLabel(kind) {
+  return SEARCH_CULTURE_KIND_LABELS[kind] || '';
+}
+function inferSearchCultureKind(item) {
+  if (!item) return '';
+  if (item.searchKind) return item.searchKind;
+  if (item.kind && SEARCH_CULTURE_KIND_LABELS[item.kind]) return item.kind;
+  const byCategory = { festival: 'festival', event: 'performance', performance: 'performance', sports: 'sports', movie: 'movie' };
+  if (byCategory[item.category] || byCategory[item.anniversaryCategory]) {
+    return byCategory[item.category] || byCategory[item.anniversaryCategory];
+  }
+  if (item.genre === 'movie') return 'movie';
+  if (['baseball', 'basketball', 'volleyball', 'soccer', 'handball'].includes(item.genre)) return 'sports';
+  return 'performance';
+}
+function searchCultureSourcePath(item) {
+  const kind = searchCultureKindLabel(inferSearchCultureKind(item)) || '콘텐츠';
+  const sub = searchCultureGenreLabel(item?.subGenre) || searchCultureGenreLabel(item?.genre);
+  return sub && sub !== kind ? `${kind} · ${sub}` : kind;
+}
+
 export function GlobalSearchModal({
   calendar,
   chatMessages,
@@ -2463,6 +2512,8 @@ export function GlobalSearchModal({
   onOpenChatMessage,
   onOpenImage,
   onOpenMemo,
+  onOpenPlaces,
+  onOpenContent,
   initialQuery = '',
   inline = false
 }) {
@@ -2523,9 +2574,11 @@ export function GlobalSearchModal({
     Promise.all(['culture-performances', 'culture-festivals', 'culture-sports', 'culture-movies'].map(name =>
       fetch(`${base}data/${name}.json`, { cache: 'no-store' }).then(res => res.ok ? res.json() : { items: [] }).catch(() => ({ items: [] }))
     )).then(payloads => {
+      const feedKinds = ['performance', 'festival', 'sports', 'movie'];
       const byId = new Map();
-      payloads.forEach(payload => (Array.isArray(payload?.items) ? payload.items : []).forEach(item => {
-        if (item?.id) byId.set(item.id, item);
+      payloads.forEach((payload, index) => (Array.isArray(payload?.items) ? payload.items : []).forEach(item => {
+        if (!item?.id || byId.has(item.id)) return;
+        byId.set(item.id, { ...item, searchKind: item.kind || feedKinds[index] });
       }));
       setCatalogContent(Array.from(byId.values()));
     });
@@ -2541,8 +2594,12 @@ export function GlobalSearchModal({
   const contentMatches = React.useMemo(() => {
     if (!q) return [];
     return contentSearchItems.filter(item => {
-      const haystack = [item?.title, item?.description, item?.genre, item?.subGenre, item?.venue, item?.address]
-        .filter(Boolean).join(' ').toLowerCase();
+      const kind = inferSearchCultureKind(item);
+      const haystack = [
+        item?.title, item?.description, item?.genre, item?.subGenre, item?.venue, item?.address,
+        searchCultureGenreLabel(item?.genre), searchCultureGenreLabel(item?.subGenre),
+        searchCultureKindLabel(kind), '콘텐츠', '컨텐츠'
+      ].filter(Boolean).join(' ').toLowerCase();
       return haystack.includes(q);
     });
   }, [contentSearchItems, q]);
@@ -2556,7 +2613,7 @@ export function GlobalSearchModal({
   const isMobile = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 640px)').matches;
 
   const tabDefs = [
-    { key: 'all', label: '전체', count: Object.values(matches).reduce((total, items) => total + (Array.isArray(items) ? items.length : 0), 0) },
+    { key: 'all', label: '전체', count: Object.values(matches || {}).reduce((total, items) => total + (Array.isArray(items) ? items.length : 0), 0) + contentMatches.length },
     { key: 'schedules', label: '일정', count: (matches.schedules || []).length },
     { key: 'chat', label: '채팅', count: (matches.chat || []).length },
     { key: 'photos', label: '사진', count: (matches.photos || []).length },
@@ -2566,7 +2623,7 @@ export function GlobalSearchModal({
     { key: 'memos', label: '메모', count: (matches.memos || []).length },
     { key: 'content', label: '콘텐츠', count: contentMatches.length }
   ];
-  const hasResults = tabDefs.some(t => t.count > 0);
+  const hasResults = tabDefs.some(t => t.key !== 'all' ? t.count > 0 : false);
 
   const [activeTab, setActiveTab] = React.useState('all');
   // Whenever the query (or its results) changes, jump to the first category that actually has
@@ -2581,53 +2638,167 @@ export function GlobalSearchModal({
     });
   }, [q, matches.schedules.length, matches.chat.length, (matches.photos || []).length, (matches.places || []).length, (matches.tags || []).length, matches.expenses.length, matches.memos.length, contentMatches.length]);
 
+  const finishPick = React.useCallback((next) => {
+    if (typeof next === 'function') next();
+    if (!inline && typeof onClose === 'function') onClose();
+  }, [inline, onClose]);
+
+  const SEARCH_KIND = {
+    schedules: { label: '일정', color: '#7C2FE5' },
+    chat: { label: '채팅', color: '#2563EB' },
+    photos: { label: '사진', color: '#8B5CF6' },
+    places: { label: '장소', color: '#0D9488' },
+    tags: { label: '사진 태그', color: '#7C3AED' },
+    expenses: { label: '정산', color: '#DC2626' },
+    memos: { label: '메모', color: '#CA8A04' },
+    content: { label: '콘텐츠', color: '#EA580C' }
+  };
+
   // The default view is a single chronological result stream. Category tabs remain
   // available for drilling down, but users no longer need to guess which tab contains
   // a matching record. This is intentionally deterministic text search, not AI.
   const allResults = React.useMemo(() => {
     const rows = [];
     (matches.schedules || []).forEach(item => rows.push({
-      id: `schedule_${item.date}_${item.participantId}`, badgeName: `일정 · ${item.participantName}`, badgeColor: item.participantColor,
-      timeStr: formatDateWithDayName(item.date), content: item.note || item.participantName,
-      onClick: () => { onSelectDate(item.date); onClose(); }, sortStamp: item.date
+      id: `schedule_${item.date}_${item.participantId}`,
+      kind: 'schedules',
+      pathLabel: item.participantName || '',
+      title: item.note || item.participantName || '일정',
+      meta: '',
+      timeStr: formatDateWithDayName(item.date),
+      onClick: () => finishPick(() => onSelectDate?.(item.date)),
+      sortStamp: item.date
     }));
     (matches.chat || []).forEach(item => rows.push({
-      id: `chat_${item.id}`, badgeName: `채팅 · ${item.participantName}`, badgeColor: item.participantColor,
-      timeStr: formatLogTimestamp(item.timestamp), content: item.text || '사진/미디어',
-      onClick: () => { onOpenChatMessage?.(item.id); onClose(); }, sortStamp: String(item.timestamp || 0).padStart(14, '0')
+      id: `chat_${item.id}`,
+      kind: 'chat',
+      pathLabel: item.participantName || '',
+      title: item.text || '사진/미디어',
+      meta: '',
+      timeStr: formatLogTimestamp(item.timestamp),
+      onClick: () => finishPick(() => onOpenChatMessage?.(item.id)),
+      sortStamp: String(item.timestamp || 0).padStart(14, '0')
     }));
     (matches.photos || []).forEach((item, idx) => rows.push({
-      id: `photo_${item.id || idx}`, badgeName: '사진', badgeColor: '#8B5CF6',
-      timeStr: item.date ? formatDateWithDayName(item.date) : '', content: item.tags || '일정 사진',
-      onClick: () => { if (item.date) onSelectDate(item.date); onClose(); }, sortStamp: item.date || ''
+      id: `photo_${item.id || idx}`,
+      kind: 'photos',
+      pathLabel: '캘린더 사진',
+      title: item.tags || '일정 사진',
+      meta: '',
+      timeStr: item.date ? formatDateWithDayName(item.date) : '',
+      onClick: () => finishPick(() => { if (item.date) onSelectDate?.(item.date); }),
+      sortStamp: item.date || ''
     }));
     (matches.places || []).forEach(item => rows.push({
-      id: `place_${item.id}`, badgeName: `장소 · ${item.alias || item.name}`, badgeColor: '#06B6D4',
-      timeStr: item.address || '', content: item.memo || item.name || '', onClick: () => onClose(), sortStamp: item.visitDate || ''
+      id: `place_${item.id}`,
+      kind: 'places',
+      pathLabel: item.alias || item.name || '장소',
+      title: item.name || item.alias || '장소',
+      meta: item.memo || item.address || '',
+      timeStr: item.address || '',
+      onClick: () => finishPick(() => onOpenPlaces?.()),
+      sortStamp: item.visitDate || ''
     }));
     (matches.expenses || []).forEach(item => rows.push({
-      id: `expense_${item.id}`, badgeName: item.categoryName, badgeColor: item.categoryColor,
-      timeStr: formatDateWithDayName(item.date), content: `${item.label || item.url || ''} · ${item.amount < 0 ? '+' : '-'}${Math.abs(Number(item.amount)).toLocaleString()}원`,
-      onClick: () => { onSelectDate(item.date); onClose(); }, sortStamp: item.date || ''
+      id: `expense_${item.id}`,
+      kind: 'expenses',
+      pathLabel: item.categoryName || '정산',
+      title: item.label || item.url || '정산 항목',
+      meta: `${item.amount < 0 ? '+' : '-'}${Math.abs(Number(item.amount)).toLocaleString()}원`,
+      timeStr: formatDateWithDayName(item.date),
+      onClick: () => finishPick(() => onSelectDate?.(item.date)),
+      sortStamp: item.date || ''
     }));
     (matches.memos || []).forEach(item => rows.push({
-      id: `memo_${item.id}`, badgeName: `메모 · ${item.participantName}`, badgeColor: item.participantColor,
-      timeStr: formatLogTimestamp(item.createdAt), content: [item.title, item.text].filter(Boolean).join(' · '),
-      onClick: () => { onOpenMemo?.(item.id); onClose(); }, sortStamp: String(item.createdAt || 0).padStart(14, '0')
+      id: `memo_${item.id}`,
+      kind: 'memos',
+      pathLabel: item.participantName || '',
+      title: item.title || '메모',
+      meta: item.text ? (item.text.length > 80 ? item.text.slice(0, 80) + '…' : item.text) : '',
+      timeStr: formatLogTimestamp(item.createdAt),
+      onClick: () => finishPick(() => onOpenMemo?.(item.id)),
+      sortStamp: String(item.createdAt || 0).padStart(14, '0')
     }));
-    contentMatches.forEach(item => rows.push({
-      id: `content_${item.id}`, badgeName: `콘텐츠 · ${item.title || '제목 없음'}`, badgeColor: '#F97316',
-      timeStr: item.dateLabel || item.startDate || item.releaseDate || '', content: [item.subGenre || item.genre, item.venue || item.address].filter(Boolean).join(' · '),
-      onClick: () => onClose(), sortStamp: String(item.startDate || item.releaseDate || item.createdAt || '')
+    (matches.tags || []).forEach(item => rows.push({
+      id: `tag_${item.messageId}_${item.directMediaUrl ? 'direct' : item.imageIndex}`,
+      kind: 'tags',
+      pathLabel: '채팅 사진',
+      title: item.tags || '사진 태그',
+      meta: '',
+      timeStr: '',
+      thumb: item.thumb,
+      onClick: () => finishPick(() => onOpenImage?.(item.messageId, item.imageIndex, item.directMediaUrl)),
+      sortStamp: String(item.timestamp || 0).padStart(14, '0')
     }));
+    contentMatches.forEach(item => {
+      const venue = item.venue && item.venue !== '장소 확인 필요' ? item.venue : '';
+      const address = item.address || '';
+      rows.push({
+        id: `content_${item.id}`,
+        kind: 'content',
+        pathLabel: searchCultureSourcePath(item),
+        title: item.title || '제목 없음',
+        meta: venue || address,
+        timeStr: item.dateLabel || item.startDate || item.releaseDate || '',
+        onClick: () => finishPick(() => {
+          const url = String(item.link || item.website || item.url || '').trim();
+          if (url) window.open(url, '_blank', 'noopener,noreferrer');
+          else if (typeof onOpenContent === 'function') onOpenContent(item);
+        }),
+        sortStamp: String(item.startDate || item.releaseDate || item.createdAt || '')
+      });
+    });
     return rows.sort((a, b) => String(b.sortStamp || '').localeCompare(String(a.sortStamp || '')));
-  }, [matches, contentMatches, onClose, onOpenChatMessage, onOpenMemo, onSelectDate]);
+  }, [matches, contentMatches, finishPick, onOpenChatMessage, onOpenMemo, onOpenPlaces, onOpenContent, onOpenImage, onSelectDate]);
+
+  const visibleResults = activeTab === 'all'
+    ? allResults.slice(0, 100)
+    : allResults.filter(item => item.kind === activeTab);
+
+  const renderResultRow = (item) => /*#__PURE__*/React.createElement(SearchResultLogRow, {
+    key: item.id,
+    kindLabel: SEARCH_KIND[item.kind]?.label || '',
+    kindColor: SEARCH_KIND[item.kind]?.color,
+    badgeName: item.pathLabel ? highlightKeyword(item.pathLabel, q) : '',
+    timeStr: item.timeStr,
+    title: highlightKeyword(item.title, q),
+    onClick: item.onClick
+  }, item.meta ? highlightKeyword(item.meta, q) : null);
+
+  const Frame = inline ? 'div' : ResizableModalContainer;
+  const tabBar = q && hasResults ? (isMobile && SimpleBottomSheetPicker ? /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
+    title: "검색 카테고리 선택",
+    value: activeTab,
+    options: tabDefs.map(t => {
+      const hasCount = (t.count || 0) >= 1;
+      return {
+        value: t.key,
+        label: /*#__PURE__*/React.createElement(React.Fragment, null, `${t.label} `, /*#__PURE__*/React.createElement("span", {
+          style: {
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '20px', height: '18px',
+            borderRadius: 'var(--radius-full)',
+            backgroundColor: hasCount ? '#2563EB' : '#E2E8F0',
+            color: hasCount ? '#FFFFFF' : '#475569',
+            fontSize: 'var(--font-size-sm)', fontWeight: 'bold', padding: '0 6px', marginLeft: '4px'
+          }
+        }, t.count))
+      };
+    }),
+    onSelect: setActiveTab
+  }) : (UnderlineTabs ? /*#__PURE__*/React.createElement(UnderlineTabs, {
+    options: tabDefs.map(t => ({ value: t.key, label: t.label, badge: t.count })),
+    value: activeTab,
+    onChange: setActiveTab,
+    activeColor: inline ? '#7C2FE5' : '#7C3AED',
+    variant: 'flush',
+    className: 'global-search-tabs'
+  }) : /*#__PURE__*/React.createElement(SearchCategoryTabs, { tabs: tabDefs, activeKey: activeTab, onSelect: setActiveTab, containerStyle: { width: '100%' } }))) : null;
 
   return /*#__PURE__*/React.createElement("div", {
     className: inline ? "global-search-page" : "modal-overlay",
     onClick: inline ? undefined : onClose,
     style: inline ? undefined : { zIndex: 11000 }
-  }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
+  }, /*#__PURE__*/React.createElement(Frame, {
     className: inline ? "global-search-page-card" : "modal-container",
     onClick: e => e.stopPropagation(),
     style: inline ? undefined : { maxWidth: '520px' }
@@ -2645,12 +2816,14 @@ export function GlobalSearchModal({
         onChange: e => setQuery(e.target.value)
       }),
       /*#__PURE__*/React.createElement("button", {
-        onClick: inline ? () => setQuery('') : onClose,
-        'aria-label': inline ? '검색어 지우기' : '검색 닫기',
+        type: "button",
+        onClick: onClose,
+        'aria-label': '검색 닫기',
         style: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }
       }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))
     ),
-    /*#__PURE__*/React.createElement("div", { className: "modal-body" },
+    inline && tabBar,
+    /*#__PURE__*/React.createElement("div", { className: `modal-body${!q ? ' is-empty' : ''}` },
       !inline && /*#__PURE__*/React.createElement("input", {
         ref: inputRef,
         type: "text",
@@ -2662,100 +2835,29 @@ export function GlobalSearchModal({
       }),
 
       isLoadingFullHistory && /*#__PURE__*/React.createElement("div", {
-        style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginTop: '8px' }
+        style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', marginTop: inline ? 0 : '8px' }
       }, "전체 기록에서 검색 중..."),
 
-      q && hasResults && /*#__PURE__*/React.createElement("div", {
-        style: { position: 'sticky', top: '-18px', backgroundColor: 'var(--bg-card)', zIndex: 10, marginTop: '10px', marginBottom: '12px', width: '100%' }
-      }, isMobile && SimpleBottomSheetPicker ? /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
-        title: "검색 카테고리 선택",
-        value: activeTab,
-        options: tabDefs.map(t => {
-          const hasCount = (t.count || 0) >= 1;
-          return {
-            value: t.key,
-            label: /*#__PURE__*/React.createElement(React.Fragment, null, `${t.label} `, /*#__PURE__*/React.createElement("span", {
-              style: {
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '20px', height: '18px',
-                borderRadius: 'var(--radius-full)',
-                backgroundColor: hasCount ? '#2563EB' : '#E2E8F0',
-                color: hasCount ? '#FFFFFF' : '#475569',
-                fontSize: 'var(--font-size-sm)', fontWeight: 'bold', padding: '0 6px', marginLeft: '4px'
-              }
-            }, t.count))
-          };
-        }),
-        onSelect: setActiveTab
-      }) : (UnderlineTabs ? /*#__PURE__*/React.createElement(UnderlineTabs, {
-        options: tabDefs.map(t => ({ value: t.key, label: t.label, badge: t.count })),
-        value: activeTab,
-        onChange: setActiveTab,
-        activeColor: '#7C3AED',
-        variant: 'flush',
-        className: 'global-search-tabs'
-      }) : /*#__PURE__*/React.createElement(SearchCategoryTabs, { tabs: tabDefs, activeKey: activeTab, onSelect: setActiveTab, containerStyle: { width: '100%' } }))),
+      !inline && tabBar,
 
-      !q && /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: 'var(--text-muted)', fontSize: 'var(--font-size-base)', textAlign: 'center' } }, "검색어를 입력해 주세요."),
-      q && !hasResults && /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: 'var(--text-muted)', fontSize: 'var(--font-size-base)', textAlign: 'center' } }, "검색 결과가 없습니다."),
-
-      q && hasResults && activeTab === 'schedules' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
-        matches.schedules.map(item => /*#__PURE__*/React.createElement(SearchResultLogRow, {
-          key: `${item.date}_${item.participantId}`,
-          badgeName: item.participantName,
-          badgeColor: item.participantColor,
-          timeStr: formatDateWithDayName(item.date),
-          onClick: () => { onSelectDate(item.date); onClose(); }
-        }, highlightKeyword(item.note || '', q)))
-      ),
-
-      q && hasResults && activeTab === 'all' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
-        allResults.slice(0, 100).map(item => /*#__PURE__*/React.createElement(SearchResultLogRow, {
-          key: item.id,
-          badgeName: item.badgeName,
-          badgeColor: item.badgeColor,
-          timeStr: item.timeStr,
-          onClick: item.onClick
-        }, highlightKeyword(item.content, q)))
-      ),
-
-      q && hasResults && activeTab === 'chat' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
-        matches.chat.map(msg => /*#__PURE__*/React.createElement(SearchResultLogRow, {
-          key: msg.id,
-          badgeName: msg.participantName,
-          badgeColor: msg.participantColor,
-          timeStr: formatLogTimestamp(msg.timestamp),
-          onClick: () => { if (typeof onOpenChatMessage === 'function') onOpenChatMessage(msg.id); if (typeof onClose === 'function') onClose(); }
-        }, highlightKeyword(msg.text || '', q)))
-      ),
-
-      q && hasResults && activeTab === 'photos' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
-        (matches.photos || []).map((photo, idx) => /*#__PURE__*/React.createElement(SearchResultLogRow, {
-          key: photo.id || `${photo.imageUrl}_${idx}`,
-          badgeName: "일정 사진",
-          badgeColor: "#8B5CF6",
-          timeStr: photo.date ? formatDateWithDayName(photo.date) : '',
-          onClick: () => { if (photo.date) onSelectDate(photo.date); onClose(); }
-        }, photo.tags || '일정 사진'))
-      ),
-
-      q && hasResults && activeTab === 'places' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
-        (matches.places || []).map(place => /*#__PURE__*/React.createElement(SearchResultLogRow, {
-          key: place.id,
-          badgeName: place.alias || place.name,
-          badgeColor: "#06B6D4",
-          timeStr: place.address || '',
-          onClick: () => { onClose(); }
-        }, highlightKeyword(place.memo || place.name || '', q)))
-      ),
+      !q && /*#__PURE__*/React.createElement("div", {
+        className: "global-search-empty",
+        style: { padding: '30px', color: 'var(--text-muted)', fontSize: 'var(--font-size-base)', textAlign: 'center' }
+      }, "검색어를 입력해 주세요."),
+      q && !hasResults && !isLoadingFullHistory && /*#__PURE__*/React.createElement("div", {
+        className: "global-search-empty",
+        style: { padding: '30px', color: 'var(--text-muted)', fontSize: 'var(--font-size-base)', textAlign: 'center' }
+      }, "검색 결과가 없습니다."),
 
       q && hasResults && activeTab === 'tags' && /*#__PURE__*/React.createElement("div", {
-        style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(72px, 100%), 1fr))', gap: '6px' }
+        className: "global-search-tag-grid",
+        style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(88px, 100%), 1fr))', gap: '10px' }
       },
         matches.tags.map(entry => /*#__PURE__*/React.createElement("button", {
           key: `${entry.messageId}_${entry.directMediaUrl ? 'direct' : entry.imageIndex}`,
           type: "button",
           title: entry.tags,
-          onClick: () => { onOpenImage && onOpenImage(entry.messageId, entry.imageIndex, entry.directMediaUrl); onClose(); },
+          onClick: () => finishPick(() => onOpenImage && onOpenImage(entry.messageId, entry.imageIndex, entry.directMediaUrl)),
           style: { padding: 0, border: 0, background: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '4px' }
         },
           /*#__PURE__*/React.createElement("img", {
@@ -2771,40 +2873,9 @@ export function GlobalSearchModal({
         ))
       ),
 
-      q && hasResults && activeTab === 'expenses' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
-        matches.expenses.map(exp => /*#__PURE__*/React.createElement(SearchResultLogRow, {
-          key: exp.id,
-          badgeName: exp.categoryName,
-          badgeColor: exp.categoryColor,
-          timeStr: formatDateWithDayName(exp.date),
-          onClick: () => { onSelectDate(exp.date); onClose(); }
-        }, highlightKeyword(exp.label || exp.url || '', q), ' · ', /*#__PURE__*/React.createElement("span", {
-          style: { fontWeight: 800, color: exp.amount < 0 ? 'var(--status-green)' : '#DC2626' }
-        }, `${exp.amount < 0 ? '+' : '-'}${Math.abs(Number(exp.amount)).toLocaleString()}원`)))
-      ),
-
-      q && hasResults && activeTab === 'memos' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
-        matches.memos.map(memo => /*#__PURE__*/React.createElement(SearchResultLogRow, {
-          key: memo.id,
-          badgeName: memo.participantName,
-          badgeColor: memo.participantColor,
-          timeStr: formatLogTimestamp(memo.createdAt),
-          onClick: () => { onOpenMemo && onOpenMemo(memo.id); onClose(); }
-        },
-          memo.title && /*#__PURE__*/React.createElement("div", { style: { fontWeight: 800, marginBottom: '2px' } }, highlightKeyword(memo.title, q)),
-          memo.text && highlightKeyword(memo.text.length > 80 ? memo.text.slice(0, 80) + '...' : memo.text, q)
-        ))
-      ),
-
-      q && hasResults && activeTab === 'content' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
-        contentMatches.map(item => /*#__PURE__*/React.createElement(SearchResultLogRow, {
-          key: item.id,
-          badgeName: item.title || '콘텐츠',
-          badgeColor: '#F97316',
-          timeStr: item.dateLabel || item.startDate || item.releaseDate || '',
-          onClick: () => onClose()
-        }, highlightKeyword([item.subGenre || item.genre, item.description || item.venue || item.address].filter(Boolean).join(' · '), q)))
-      )
+      q && hasResults && activeTab !== 'tags' && /*#__PURE__*/React.createElement("div", {
+        className: "global-search-result-list"
+      }, visibleResults.map(renderResultRow))
     )
   ));
 }
