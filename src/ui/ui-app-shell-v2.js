@@ -898,27 +898,27 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
           ) : null,
           dots.length > 0 ? React.createElement('div', { className: bentoClass('dot-row') },
             dots.map(({ p, entry }) => {
-              const isNone = p.id === BULK_NO_PARTICIPANT_ID;
+              // p always comes from participantsMap (real active participants only) -- a
+              // BULK_NO_PARTICIPANT_ID entry has no matching p and is filtered out above, so
+              // every dot reaching here is draggable (unlike CalendarGrid's ported isNone guard).
               return React.createElement('span', {
                 key: p.id,
                 className: bentoClass('p-dot'),
                 'data-name': (p.name || '').slice(-2),
                 style: { background: p.color || 'var(--brand)' },
                 title: entry.note ? `${p.name}: ${entry.note}` : p.name,
-                draggable: !isNone,
-                onDragStart: isNone ? undefined : (event => {
+                draggable: true,
+                onDragStart: event => {
                   event.stopPropagation();
                   event.dataTransfer.setData('text/plain', JSON.stringify({
-                    entryReferId: entry.id,
-                    sourceDate: dateStr,
-                    participantId: entry.participantId,
-                    participantName: p.name,
+                    entryReferId: entry.id, sourceDate: dateStr,
+                    participantId: entry.participantId, participantName: p.name,
                   }));
-                }),
-                onTouchStart: isNone ? undefined : (event => { event.stopPropagation(); handleBadgeTouchStart(event, entry, p, dateStr); }),
-                onTouchMove: isNone ? undefined : (event => { event.stopPropagation(); handleBadgeTouchMove(event); }),
-                onTouchEnd: isNone ? undefined : (event => { event.stopPropagation(); handleBadgeTouchEnd(event); }),
-                onTouchCancel: isNone ? undefined : (event => { event.stopPropagation(); handleBadgeTouchCancel(); }),
+                },
+                onTouchStart: event => { event.stopPropagation(); handleBadgeTouchStart(event, entry, p, dateStr); },
+                onTouchMove: event => { event.stopPropagation(); handleBadgeTouchMove(event); },
+                onTouchEnd: event => { event.stopPropagation(); handleBadgeTouchEnd(event); },
+                onTouchCancel: event => { event.stopPropagation(); handleBadgeTouchCancel(); },
               });
             })
           ) : null,
@@ -1037,22 +1037,8 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
   // so it renders above everything regardless of where this card sits in the DOM.
   const touchDragIndicator = touchDragBadge && typeof document !== 'undefined' && window.ReactDOM?.createPortal
     ? window.ReactDOM.createPortal(React.createElement('div', {
-      style: {
-        position: 'fixed',
-        left: `${touchDragBadge.x}px`,
-        top: `${touchDragBadge.y}px`,
-        transform: 'translate(-50%, -130%)',
-        backgroundColor: touchDragBadge.color,
-        color: '#FFFFFF',
-        padding: '6px 12px',
-        borderRadius: 'var(--radius-full)',
-        fontSize: 'var(--font-size-md)',
-        fontWeight: 800,
-        boxShadow: '0 8px 20px rgba(0,0,0,0.28)',
-        pointerEvents: 'none',
-        zIndex: 100001,
-        whiteSpace: 'nowrap',
-      },
+      className: 'v2-avail-drag-ghost',
+      style: { left: `${touchDragBadge.x}px`, top: `${touchDragBadge.y}px`, backgroundColor: touchDragBadge.color },
     }, touchDragBadge.name), document.body)
     : null;
 

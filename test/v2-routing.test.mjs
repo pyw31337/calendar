@@ -251,7 +251,7 @@ test('V2 calendar home supports drag-to-move availability like v1\'s CalendarGri
   const { readFileSync } = await import('node:fs');
   const shell = readFileSync(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
   assert.match(shell, /handleMoveAvailability/, 'BentoCalendarCard must reach calendarContext.handleMoveAvailability, the same handler CalendarGrid uses');
-  assert.match(shell, /draggable:\s*!isNone/, 'availability dots must be draggable, same as CalendarGrid\'s ParticipantBadge');
+  assert.match(shell, /draggable:\s*true/, 'availability dots must be draggable, same as CalendarGrid\'s ParticipantBadge');
   assert.match(shell, /onDrop:\s*event\s*=>/, 'day cells must accept a drop to complete the move');
   assert.match(shell, /handleBadgeTouchStart/, 'a touch long-press-then-drag equivalent must exist for mobile, where native HTML5 DnD never fires');
 });

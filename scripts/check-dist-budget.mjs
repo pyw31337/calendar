@@ -41,8 +41,10 @@ const LAZY_CHUNK_PATTERNS = [
 // Total EAGER JS across all Vite chunks (excludes LAZY_CHUNK_PATTERNS above) -- this is what
 // actually loads before the app becomes interactive. Sized with real headroom so routine
 // feature work (this cap already accounts for the movie metadata/enrichment UI) doesn't
-// trip CI for a few KB.
-const TOTAL_JS_MAX_BYTES = 1_530_000;
+// trip CI for a few KB. Bumped again for the V2 calendar-home drag-to-move-availability port
+// (~3KB net, after trimming the touch-drag ghost badge's inline styles into a CSS class) --
+// the prior cap left only ~180 bytes of real headroom, well under "a few KB".
+const TOTAL_JS_MAX_BYTES = 1_540_000;
 
 function fail(message) {
   console.error(`[check-dist-budget] ${message}`);
