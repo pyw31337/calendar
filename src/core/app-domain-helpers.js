@@ -580,19 +580,35 @@ function sanitizeMessageForFirestore(messageData) {
   const tooBig = (v) => typeof v === 'string' && v.startsWith('data:') && v.length > MAX_FIRESTORE_DATA_URL_CHARS;
   if (tooBig(out.imageUrl)) delete out.imageUrl;
   if (tooBig(out.thumbUrl)) delete out.thumbUrl;
-  if (Array.isArray(out.imageUrls)) {
-    // Keep the slot even when a legacy oversized data URL must be omitted. imageUrls,
-    // thumbUrls and imageTags are parallel arrays; filtering only this one shifts every later
-    // tag onto the wrong photo.
-    out.imageUrls = out.imageUrls.map(u => typeof u === 'string' && !tooBig(u) ? u : '');
-    if (!out.imageUrls.some(Boolean)) delete out.imageUrls;
-  }
-  if (Array.isArray(out.thumbUrls)) {
-    out.thumbUrls = out.thumbUrls.map(u => typeof u === 'string' && !tooBig(u) ? u : '');
-    if (!out.thumbUrls.some(Boolean)) delete out.thumbUrls;
+  if (Array.isArray(out.imageUrls) || Array.isArray(out.thumbUrls)) {
+    // These arrays describe one physical photo per slot. Remove a rejected base64 photo from
+    // every parallel array in the same pass; filtering only the URL array was what shifted a
+    // later person's tag onto an unrelated food photo.
+    const urls = Array.isArray(out.imageUrls) ? out.imageUrls : [];
+    const thumbs = Array.isArray(out.thumbUrls) ? out.thumbUrls : [];
+    const tags = Array.isArray(out.imageTags) ? out.imageTags : null;
+    const nextUrls = [];
+    const nextThumbs = [];
+    const nextTags = tags ? [] : null;
+    const slots = Math.max(urls.length, thumbs.length);
+    for (let index = 0; index < slots; index += 1) {
+      if (tooBig(urls[index]) || tooBig(thumbs[index])) continue;
+      if (Array.isArray(out.imageUrls)) nextUrls.push(urls[index]);
+      if (Array.isArray(out.thumbUrls)) nextThumbs.push(thumbs[index]);
+      if (nextTags) nextTags.push(tags[index] || '');
+    }
+    if (Array.isArray(out.imageUrls)) {
+      out.imageUrls = nextUrls;
+      if (!out.imageUrls.some(Boolean)) delete out.imageUrls;
+    }
+    if (Array.isArray(out.thumbUrls)) {
+      out.thumbUrls = nextThumbs;
+      if (!out.thumbUrls.some(Boolean)) delete out.thumbUrls;
+    }
+    if (nextTags) out.imageTags = nextTags;
   }
   if (out.imageTagMap && typeof out.imageTagMap === 'object' && !Array.isArray(out.imageTagMap)) {
-    out.imageTagMap = normalizeImageTagMap(out.imageTagMap);
+    out.imageTagMap = reconcileMessageImageTagMap(out, normalizeImageTagMap(out.imageTagMap));
   }
   if (out.linkPreview && typeof out.linkPreview === 'object') {
     const lp = { ...out.linkPreview };
