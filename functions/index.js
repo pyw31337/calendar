@@ -1964,6 +1964,53 @@ exports.listUntaggedPhotoIndexEntries = functions.https.onRequest(async (req, re
   }
 });
 
+// Admin 데이터풀 > "중복사진 검사" -- lists every photoIndex row across every calendar (read-only,
+// no filter) so the client can run gallery-dedup.js's findDuplicatePhotoGroups/chooseDedupWinner
+// against a full snapshot. Same trust model as listUntaggedPhotoIndexEntries above. Intentionally
+// returns a report only; this endpoint never writes anything -- merge/delete stays a follow-up,
+// separate admin-gated write endpoint once the user has reviewed a report from this one.
+exports.listPhotoIndexEntriesForDedup = functions.https.onRequest(async (req, res) => {
+  setAdminCorsHeaders(res);
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  if (req.method !== 'POST') { res.status(405).json({ ok: false }); return; }
+  const { password, cursor, limit } = req.body || {};
+  if (typeof password !== 'string' || !password.trim()) { res.status(400).json({ ok: false }); return; }
+  const rateState = await checkAdminAuthRateLimit(req.ip);
+  if (rateState.blocked) { res.status(429).json({ ok: false }); return; }
+  const matches = sha256Hex(password.trim()) === await getStoredAdminPasswordHash();
+  await recordAdminAuthResult(rateState, matches);
+  if (!matches) { res.status(401).json({ ok: false }); return; }
+  try {
+    const pageSize = Math.min(200, Math.max(1, Number(limit) || 200));
+    let query = admin.firestore().collectionGroup('photoIndex')
+      .orderBy('updatedAt', 'desc')
+      .limit(pageSize);
+    if (typeof cursor === 'number' && Number.isFinite(cursor)) query = query.startAfter(cursor);
+    const snap = await query.get();
+    const items = snap.docs.map(doc => {
+      const data = doc.data() || {};
+      const calendarDocId = doc.ref.parent.parent ? doc.ref.parent.parent.id : '';
+      const calendarId = calendarDocId.startsWith('cal_') ? calendarDocId.slice(4) : calendarDocId;
+      return {
+        calendarId,
+        assetKey: doc.id,
+        full: String(data.full || data.thumb || ''),
+        thumb: String(data.thumb || data.full || ''),
+        timestamp: Number(data.timestamp) || 0,
+        tags: String(data.tags || ''),
+        commentCount: Number(data.commentCount) || 0,
+        participantId: String(data.participantId || ''),
+        source: String(data.source || '')
+      };
+    }).filter(item => item.calendarId && item.assetKey && item.full);
+    const nextCursor = snap.docs.length === pageSize ? Number(snap.docs[snap.docs.length - 1].data()?.updatedAt) || null : null;
+    res.status(200).json({ ok: true, items, nextCursor });
+  } catch (err) {
+    console.error('listPhotoIndexEntriesForDedup failed:', err);
+    res.status(500).json({ ok: false });
+  }
+});
+
 // Admin-gated read of the sharedFiles/linkPreviews collections (both have `list: false` in
 // firestore.rules -- a hash/urlHash is only useful to someone who already has the matching
 // file/URL, so no client can enumerate them) filtered to entries onSharedFileWrite/

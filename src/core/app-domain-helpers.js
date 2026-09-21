@@ -888,6 +888,19 @@ async function adminBulkTagPhotosRemote(password, entries) {
   return Array.isArray(result?.results) ? result.results : [];
 }
 
+// Admin 데이터풀 > "중복사진 검사" -- lists every photoIndex row across every calendar (unfiltered,
+// unlike listUntaggedPhotoIndexEntriesRemote above) so the admin dashboard can run
+// gallery-dedup.js's findDuplicatePhotoGroups/chooseDedupWinner against a full snapshot. Read-only;
+// see listPhotoIndexEntriesForDedup in functions/index.js.
+async function listPhotoIndexEntriesForDedupRemote(password, options = {}) {
+  const result = await callAdminFunction('listPhotoIndexEntriesForDedup', {
+    password,
+    cursor: options.cursor ?? undefined,
+    limit: options.limit || 200
+  });
+  return { items: Array.isArray(result?.items) ? result.items : [], nextCursor: result?.nextCursor ?? null };
+}
+
 // Admin 데이터풀 > 파일/링크 -- lists sharedFiles/linkPreviews docs used by 2+ calendars (see
 // onSharedFileWrite/onLinkPreviewWrite + listSharedDataPool in functions/index.js). Both
 // collections deny client `list` access in firestore.rules, so this always goes through the
@@ -2925,6 +2938,7 @@ export {
   memePoolDeleteRemote,
   listUntaggedPhotoIndexEntriesRemote,
   adminBulkTagPhotosRemote,
+  listPhotoIndexEntriesForDedupRemote,
   listSharedDataPoolRemote,
   findCultureLinkedAnniversary,
   findCultureLinkedMemo,
