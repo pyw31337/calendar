@@ -1251,42 +1251,36 @@ html:has(.renewal-shell.v2-design) .modal-overlay input.form-input {
   .renewal-shell.v2-design .bp-side-nav-global-search,
   .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search,
   .renewal-shell.v2-design .bp-side-nav:not(.bp-is-collapsed) .bp-side-nav-global-search {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
     height: var(--v2-side-search-h) !important;
     min-height: var(--v2-side-search-h) !important;
     max-height: var(--v2-side-search-h) !important;
     margin-top: var(--v2-side-search-my) !important;
     margin-bottom: var(--v2-side-search-my) !important;
     margin-left: 12px !important;
+    margin-right: 12px !important;
     padding-top: 0 !important;
     padding-bottom: 0 !important;
+    padding-left: 9px !important;
     box-sizing: border-box !important;
     line-height: 0 !important;
     transform: none !important;
-    transition: width .28s ease, border-radius .28s ease, padding-right .28s ease, background-color .2s ease !important;
+    overflow: hidden !important;
+    transition: width .28s ease, border-radius .28s ease, background-color .2s ease !important;
   }
   .renewal-shell.v2-design .bp-side-nav:not(.bp-is-collapsed) .bp-side-nav-global-search {
-    display: flex !important;
     width: calc(100% - 24px) !important;
-    margin-right: 12px !important;
-    /* 1px border + 9px pad centers the 20px glyph in the same 40px slot
-     * the collapsed circle uses: 12 + 1 + 9 = 22. */
-    padding-left: 9px !important;
     padding-right: 14px !important;
-    justify-content: flex-start !important;
-    align-items: center !important;
     gap: 10px !important;
     border-radius: 999px !important;
   }
   .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
     width: var(--v2-side-search-h) !important;
-    margin-right: 12px !important;
-    padding: 0 !important;
+    padding-right: 0 !important;
     gap: 0 !important;
     border-radius: 50% !important;
-    overflow: hidden !important;
   }
   .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search-label {
     display: none !important;
