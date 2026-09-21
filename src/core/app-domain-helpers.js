@@ -580,38 +580,19 @@ function sanitizeMessageForFirestore(messageData) {
   const tooBig = (v) => typeof v === 'string' && v.startsWith('data:') && v.length > MAX_FIRESTORE_DATA_URL_CHARS;
   if (tooBig(out.imageUrl)) delete out.imageUrl;
   if (tooBig(out.thumbUrl)) delete out.thumbUrl;
-  if (Array.isArray(out.imageUrls) || Array.isArray(out.thumbUrls)) {
-    // imageTags is positionally parallel to imageUrls/thumbUrls (see getMessageImageEntries'
-    // note on this in app-domain-helpers.js). Filtering imageUrls/thumbUrls independently here
-    // used to compact each array on its own, permanently shifting imageTags out of alignment
-    // with the photo it was meant for the moment an oversized entry was dropped -- this drops
-    // the SAME index from all three together so a save can never write already-misaligned data.
-    const urlsArr = Array.isArray(out.imageUrls) ? out.imageUrls : [];
-    const thumbsArr = Array.isArray(out.thumbUrls) ? out.thumbUrls : [];
-    const tagsArr = Array.isArray(out.imageTags) ? out.imageTags : null;
-    const len = Math.max(urlsArr.length, thumbsArr.length);
-    const nextUrls = [];
-    const nextThumbs = [];
-    const nextTags = tagsArr ? [] : null;
-    for (let i = 0; i < len; i++) {
-      const u = urlsArr[i];
-      const t = thumbsArr[i];
-      const urlBad = i < urlsArr.length && !(typeof u === 'string' && !tooBig(u));
-      const thumbBad = i < thumbsArr.length && !(typeof t === 'string' && !tooBig(t));
-      if (urlBad || thumbBad) continue;
-      if (i < urlsArr.length) nextUrls.push(u);
-      if (i < thumbsArr.length) nextThumbs.push(t);
-      if (nextTags) nextTags.push(tagsArr[i] || '');
-    }
-    if (Array.isArray(out.imageUrls)) {
-      out.imageUrls = nextUrls;
-      if (out.imageUrls.length === 0) delete out.imageUrls;
-    }
-    if (Array.isArray(out.thumbUrls)) {
-      out.thumbUrls = nextThumbs;
-      if (out.thumbUrls.length === 0) delete out.thumbUrls;
-    }
-    if (nextTags) out.imageTags = nextTags;
+  if (Array.isArray(out.imageUrls)) {
+    // Keep the slot even when a legacy oversized data URL must be omitted. imageUrls,
+    // thumbUrls and imageTags are parallel arrays; filtering only this one shifts every later
+    // tag onto the wrong photo.
+    out.imageUrls = out.imageUrls.map(u => typeof u === 'string' && !tooBig(u) ? u : '');
+    if (!out.imageUrls.some(Boolean)) delete out.imageUrls;
+  }
+  if (Array.isArray(out.thumbUrls)) {
+    out.thumbUrls = out.thumbUrls.map(u => typeof u === 'string' && !tooBig(u) ? u : '');
+    if (!out.thumbUrls.some(Boolean)) delete out.thumbUrls;
+  }
+  if (out.imageTagMap && typeof out.imageTagMap === 'object' && !Array.isArray(out.imageTagMap)) {
+    out.imageTagMap = normalizeImageTagMap(out.imageTagMap);
   }
   if (out.linkPreview && typeof out.linkPreview === 'object') {
     const lp = { ...out.linkPreview };
@@ -2361,28 +2342,23 @@ function getMessageImageEntries(msg) {
   const sourceHint = ['chat', 'gallery', 'meeting', 'memo'].includes(declaredSource)
     ? declaredSource
     : 'chat';
-  // IMPORTANT: keep these as the raw, unfiltered arrays -- imageTags is positionally parallel
-  // to imageUrls/thumbUrls by array index (see the "parallel-indexed... not by the image's
-  // identity" note where imageTags is rebuilt on message edit). Array#filter() here used to drop
-  // malformed entries, which COMPACTS the array and shifts every later index left -- so any
-  // single bad/legacy URL permanently misaligned every tag after it with the wrong photo (e.g. a
-  // food photo inheriting a person's name tag). Validity is now checked per-index inside the
-  // loop below instead, so a skipped entry never shifts the positions tags/imageIndex rely on.
+  // These three arrays are a single record: index `i` is the same physical photo in all of
+  // them.  Do not filter either media array independently here.  Filtering a broken/missing
+  // middle thumbnail shifted every later entry left while imageTags[i] stayed in place, which
+  // is how a tag from one photo could appear on a different one after an upload/delete cycle.
+  // Keep the source slot as imageIndex and skip only the individual unrenderable entry below.
   const urls = Array.isArray(msg.imageUrls) && msg.imageUrls.length > 0
     ? msg.imageUrls
     : (typeof msg.imageUrl === 'string' && msg.imageUrl ? [msg.imageUrl] : []);
   const thumbs = Array.isArray(msg.thumbUrls) && msg.thumbUrls.length > 0
     ? msg.thumbUrls
     : (typeof msg.thumbUrl === 'string' && msg.thumbUrl ? [msg.thumbUrl] : []);
-  const tags = Array.isArray(msg.imageTags) ? msg.imageTags : [];
   const count = Math.max(urls.length, thumbs.length);
   if (count === 0) return [];
   const entries = [];
   for (let i = 0; i < count; i++) {
-    const urlAt = typeof urls[i] === 'string' ? urls[i] : '';
-    const thumbAt = typeof thumbs[i] === 'string' ? thumbs[i] : '';
-    const fullCandidate = urlAt || thumbAt;
-    const thumbCandidate = thumbAt || urlAt;
+    const fullCandidate = typeof urls[i] === 'string' ? (urls[i] || thumbs[i]) : thumbs[i];
+    const thumbCandidate = typeof thumbs[i] === 'string' ? (thumbs[i] || urls[i]) : urls[i];
     // Legacy records can contain an empty, relative, or otherwise malformed value. Never pass
     // those through to <img src>; Chromium treats some of them as navigation requests and can
     // fail the whole page's boot/smoke check. Keep valid data/http URLs only and let the caller
@@ -2395,13 +2371,15 @@ function getMessageImageEntries(msg) {
       imageIndex: i,
       source: sourceHint
     }, { source: sourceHint, messageId: msg.id });
+    const tagState = getMessagePhotoTagState(msg, { full: full || thumb, imageUrl: full || thumb, thumb: thumb || full }, i);
     entries.push({
       full: full || thumb,
       thumb: thumb || full,
       imageIndex: i,
       messageId: msg.id,
       timestamp: msg.timestamp,
-      tags: tags[i] || '',
+      tags: tagState.tags,
+      tagAuthority: tagState.authoritative ? 'editable' : '',
       assetKey: keys.assetKey,
       mediaKey: keys.mediaKey,
       refKey: keys.refKey,
@@ -2416,6 +2394,83 @@ function getMessageImageEntries(msg) {
     });
   }
   return entries;
+}
+
+// `imageTags` is retained for compatibility with existing calendar documents, but it is a
+// positional cache and therefore cannot be the durable identity of a photo.  New writes also
+// maintain imageTagMap, keyed by the normalized asset identity used by photo comments and the
+// server-side photo index.  This keeps tags with the image when another image is deleted,
+// deduplicated, or a stale gallery row carries an old array index.
+function normalizeImageTagMap(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const next = {};
+  Object.entries(value).forEach(([key, rawValue]) => {
+    const cleanKey = String(key || '').trim();
+    if (!/^asset:v1:[A-Za-z0-9-]+$/.test(cleanKey)) return;
+    if (Object.keys(next).length >= 50) return;
+    next[cleanKey] = typeof rawValue === 'string' ? rawValue.slice(0, 100) : '';
+  });
+  return next;
+}
+
+function getMessagePhotoTagState(message, photo = {}, imageIndex = null) {
+  const assetKey = getPhotoAssetCommentKey(photo);
+  const tagMap = normalizeImageTagMap(message?.imageTagMap);
+  if (assetKey && Object.prototype.hasOwnProperty.call(tagMap, assetKey)) {
+    return { assetKey, tags: String(tagMap[assetKey] || ''), authoritative: true };
+  }
+  const tags = Array.isArray(message?.imageTags) ? message.imageTags : [];
+  const hasLegacySlot = Number.isInteger(imageIndex) && Object.prototype.hasOwnProperty.call(tags, imageIndex);
+  return {
+    assetKey,
+    tags: hasLegacySlot ? String(tags[imageIndex] || '') : '',
+    authoritative: hasLegacySlot
+  };
+}
+
+// Return the physical source slot, never the render-array position.  `getMessageImageEntries`
+// intentionally omits invalid display entries, so using entries[index] is unsafe for legacy
+// documents with one malformed URL.  Prefer the immutable asset key/URL and only then accept a
+// supplied positional fallback.
+function resolveMessagePhotoImageIndex(message, preferredIndex, identity = {}) {
+  const entries = getMessageImageEntries(message);
+  if (!entries.length) return -1;
+  const targetAssetKeys = new Set([
+    String(identity?.assetKey || ''),
+    getPhotoAssetCommentKey(identity),
+    getPhotoAssetCommentKey({ full: identity?.imageUrl || identity?.full || '', thumb: identity?.thumbUrl || identity?.thumb || '' })
+  ].filter(key => /^asset:v1:[A-Za-z0-9-]+$/.test(key)));
+  if (targetAssetKeys.size) {
+    const byAsset = entries.find(entry => targetAssetKeys.has(getPhotoAssetCommentKey(entry)));
+    if (byAsset) return byAsset.imageIndex;
+  }
+  const urls = [identity?.imageUrl, identity?.full, identity?.thumbUrl, identity?.thumb]
+    .filter(value => typeof value === 'string' && value);
+  if (urls.length) {
+    const byUrl = entries.find(entry => urls.some(url => entry.full === url || entry.thumb === url));
+    if (byUrl) return byUrl.imageIndex;
+  }
+  const fallback = Number.isInteger(preferredIndex)
+    ? preferredIndex
+    : (Number.isInteger(identity?.imageIndex) ? identity.imageIndex : null);
+  return entries.some(entry => entry.imageIndex === fallback) ? fallback : -1;
+}
+
+// Rebuild a compact tag map from the photos that still exist on a document.  In particular this
+// removes a deleted/replaced asset's map entry, while preserving an intentionally empty tag as a
+// real user choice.  A second copy of the same asset keeps the one shared asset key.
+function reconcileMessageImageTagMap(message, tagMap = null) {
+  const source = tagMap == null ? message?.imageTagMap : tagMap;
+  const existing = normalizeImageTagMap(source);
+  const next = {};
+  getMessageImageEntries({ ...(message || {}), imageTagMap: existing }).forEach(entry => {
+    const assetKey = getPhotoAssetCommentKey(entry);
+    if (!assetKey || Object.prototype.hasOwnProperty.call(next, assetKey)) return;
+    const state = getMessagePhotoTagState({ ...(message || {}), imageTagMap: existing }, entry, entry.imageIndex);
+    if (!state.authoritative) return;
+    next[assetKey] = String(state.tags || '').slice(0, 100);
+  });
+  return next;
 }
 
 function getDirectMediaTagKey(url) {
@@ -2979,6 +3034,10 @@ export {
   getDirectChatMediaInfo,
   withTimeout,
   getMessageImageEntries,
+  normalizeImageTagMap,
+  getMessagePhotoTagState,
+  resolveMessagePhotoImageIndex,
+  reconcileMessageImageTagMap,
   getDirectMediaTagKey,
   getDirectMediaTagsForUrl,
   getMediaIdentityKeys,

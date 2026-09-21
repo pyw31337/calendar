@@ -113,7 +113,7 @@ function resolveMeetingPhotoDisplay(photo, chatMessages) {
   }
   const sourceMessage = (Array.isArray(chatMessages) ? chatMessages : []).find(m => m && m.id === photo.sourceMessageId);
   if (!sourceMessage) return { ...fallback, ...fallbackKeys, sourceImageIndex };
-  const entry = getMessageImageEntries(sourceMessage)[sourceImageIndex];
+  const entry = getMessageImageEntries(sourceMessage).find(item => item.imageIndex === sourceImageIndex);
   if (!entry) return { ...fallback, ...fallbackKeys, sourceImageIndex };
   return {
     imageUrl: entry.full,

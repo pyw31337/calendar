@@ -255,7 +255,16 @@ export function hasStickyPhotoIndexTags(calendarId, photo = {}) {
 // in-tab write. Stale in-memory message snapshots (e.g. unpatched galleryLiveMessages) can
 // still expose empty imageTags[] and must not wipe sticky/index. Intentional clears stay in
 // sticky as '' until CF catches up.
-export function resolveGalleryLightboxTags(calendarId, photo = {}, { localTags = null, indexTags = '' } = {}) {
+//
+// `imageTagMap` makes a per-asset tag an explicit source of truth.  Never merge it with a
+// "richer" duplicate owner: those can be different photos that happened to share an old URL,
+// or an obsolete meeting-album copy.  The richer heuristic remains only for legacy records
+// which have no explicit per-image tag state at all.
+export function resolveGalleryLightboxTags(calendarId, photo = {}, {
+  localTags = null,
+  indexTags = '',
+  localTagAuthoritative = false
+} = {}) {
   if (calendarId && hasStickyPhotoIndexTags(calendarId, photo)) {
     return peekStickyPhotoIndexTags(calendarId, photo);
   }
@@ -264,6 +273,9 @@ export function resolveGalleryLightboxTags(calendarId, photo = {}, { localTags =
   const fromLocal = localTags != null ? String(localTags) : null;
   const fromIndex = indexTags != null ? String(indexTags) : '';
   const fromPhoto = String(photo?.tags || '');
+  const photoTagsAreAuthoritative = photo?.tagAuthority === 'editable' || photo?.tagAuthoritative === true;
+  if (localTagAuthoritative && fromLocal != null) return fromLocal;
+  if (photoTagsAreAuthoritative) return fromPhoto;
   if (fromLocal != null) return pickRicherPhotoTags(fromLocal, fromIndex, fromPhoto);
   return pickRicherPhotoTags(fromIndex, fromPhoto);
 }

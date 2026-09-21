@@ -722,22 +722,49 @@ export function ChatGalleryModal({
             const match = owner.match(/^memo:([^:]+):/);
             if (match) messageId = match[1];
           }
-          // Client cannot write photoIndex. CF denorm can lag empty OR partial (e.g. only
-          // #260908 while message.imageTags still has the full save). Session sticky (verified
-          // save this tab) wins over stale in-memory imageTags (unpatched galleryLive) and
-          // empty/partial photoIndex; then the richer of local message/memo/meeting tags + index.
+          // Client cannot write photoIndex. CF denorm can lag, so the source document's
+          // asset-keyed tag state wins.  Do not combine it with a tag from a duplicate photo:
+          // deletion/dedup must never make another photo's tag appear here.
           const indexTags = String(photo.tags || '');
           let localTags = null;
+          let localTagsAreAuthoritative = false;
+          const getAssetMappedTags = row => {
+            const map = row?.imageTagMap;
+            const assetKey = String(photo?.assetKey || getPhotoAssetCommentKey(photo) || '');
+            if (map && typeof map === 'object' && !Array.isArray(map) && assetKey
+              && Object.prototype.hasOwnProperty.call(map, assetKey)) {
+              return { tags: String(map[assetKey] || ''), authoritative: true };
+            }
+            return null;
+          };
           if (messageId) {
             if (source === 'memo') {
               const memo = (memos || []).find(row => row && row.id === messageId);
-              if (memo && Array.isArray(memo.imageTags)) localTags = String(memo.imageTags[imageIndex] || '');
+              if (memo) {
+                const mapped = getAssetMappedTags(memo);
+                if (mapped) {
+                  localTags = mapped.tags;
+                  localTagsAreAuthoritative = mapped.authoritative;
+                } else if (Array.isArray(memo.imageTags) && Object.prototype.hasOwnProperty.call(memo.imageTags, imageIndex)) {
+                  localTags = String(memo.imageTags[imageIndex] || '');
+                  localTagsAreAuthoritative = true;
+                }
+              }
             } else if (photo.directMediaUrl) {
               const msg = (chatMessages || []).find(row => row && row.id === messageId);
               if (msg) localTags = String(getDirectMediaTagsForUrl(msg, photo.directMediaUrl) || '');
             } else {
               const msg = (chatMessages || []).find(row => row && row.id === messageId);
-              if (msg && Array.isArray(msg.imageTags)) localTags = String(msg.imageTags[imageIndex] || '');
+              if (msg) {
+                const mapped = getAssetMappedTags(msg);
+                if (mapped) {
+                  localTags = mapped.tags;
+                  localTagsAreAuthoritative = mapped.authoritative;
+                } else if (Array.isArray(msg.imageTags) && Object.prototype.hasOwnProperty.call(msg.imageTags, imageIndex)) {
+                  localTags = String(msg.imageTags[imageIndex] || '');
+                  localTagsAreAuthoritative = true;
+                }
+              }
             }
           }
           // Meeting album copies store durable tags on confirmedMeetings.photos[].tags. After
@@ -756,13 +783,10 @@ export function ChatGalleryModal({
                 }
                 return false;
               });
-              if (match && match.tags != null && String(match.tags)) {
-                localTags = localTags == null ? String(match.tags) : localTags;
-                // Prefer whichever local string is richer; resolveGalleryLightboxTags also merges
-                // against indexTags, but keep local itself non-empty when the meeting copy is.
-                const localCount = String(localTags || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean).length;
-                const meetingCount = String(match.tags || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean).length;
-                if (meetingCount > localCount) localTags = String(match.tags);
+              if (match && match.tags != null && !localTagsAreAuthoritative && localTags == null) {
+                // An album copy is a legacy fallback only.  Once the original message/memo
+                // owns an explicit map slot (including an empty slot), it must not be replaced.
+                localTags = String(match.tags || '');
                 break;
               }
             }
@@ -772,7 +796,7 @@ export function ChatGalleryModal({
             ...photo,
             messageId: messageId || photo.messageId,
             imageIndex
-          }, { localTags, indexTags });
+          }, { localTags, indexTags, localTagAuthoritative: localTagsAreAuthoritative });
           return {
             ...photo,
             source,

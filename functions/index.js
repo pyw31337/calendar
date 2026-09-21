@@ -48,14 +48,24 @@ function getMessageImageEntriesForIndex(message) {
   const thumbs = Array.isArray(message.thumbUrls) && message.thumbUrls.length
     ? message.thumbUrls : (message.thumbUrl ? [message.thumbUrl] : []);
   const tags = Array.isArray(message.imageTags) ? message.imageTags : [];
+  const tagMap = message?.imageTagMap && typeof message.imageTagMap === 'object' && !Array.isArray(message.imageTagMap)
+    ? message.imageTagMap
+    : {};
   const count = Math.max(urls.length, thumbs.length);
   return Array.from({ length: count }, (_, index) => {
-    const hasEditableTags = Object.prototype.hasOwnProperty.call(tags, index);
+    const imageUrl = urls[index] || thumbs[index] || '';
+    const thumbUrl = thumbs[index] || urls[index] || '';
+    const assetKey = getPhotoAssetKey(imageUrl || thumbUrl);
+    // imageTagMap is keyed by the immutable Storage asset, while imageTags is kept as a
+    // legacy positional mirror. Prefer the former so a deleted sibling can never move a tag
+    // onto this photo during photoIndex rebuild.
+    const hasAssetTag = assetKey && Object.prototype.hasOwnProperty.call(tagMap, assetKey);
+    const hasEditableTags = hasAssetTag || Object.prototype.hasOwnProperty.call(tags, index);
     return {
       index,
-      imageUrl: urls[index] || thumbs[index] || '',
-      thumbUrl: thumbs[index] || urls[index] || '',
-      tags: hasEditableTags ? (tags[index] || '') : (message.tags || ''),
+      imageUrl,
+      thumbUrl,
+      tags: hasAssetTag ? (tagMap[assetKey] || '') : (hasEditableTags ? (tags[index] || '') : (message.tags || '')),
       tagAuthority: hasEditableTags ? 'editable' : ''
     };
   }).filter(entry => entry.imageUrl || entry.thumbUrl);
@@ -158,7 +168,9 @@ function getPhotoIndexEntries(sourceType, sourceId, data) {
       tags: String(Object.prototype.hasOwnProperty.call(photo || {}, 'tags')
         ? (photo.tags || '')
         : ((Array.isArray(data.imageTags) ? data.imageTags[imageIndex] : '') || '')),
-      tagAuthority: String(photo?.tagAuthority || ''),
+      tagAuthority: String(photo?.tagAuthority || (
+        sourceType === 'meeting' && Object.prototype.hasOwnProperty.call(photo || {}, 'tags') ? 'editable' : ''
+      )),
       text: String(data.text || data.content || data.body || context.text || '').slice(0, 1000),
       participantId: String(data.participantId || ''),
       source,
@@ -193,6 +205,25 @@ function getPhotoIndexEntries(sourceType, sourceId, data) {
     return [];
   }
   return entries;
+}
+
+// Keep the new asset-keyed tag map bounded to photos that still exist on this document.  The
+// positional imageTags array remains for legacy clients, but it is only a mirror; this map is
+// what makes a tag survive deletion/reordering of neighbouring photos.
+function reconcileImageTagMapForIndex(message, tagMap = null) {
+  const raw = tagMap == null ? message?.imageTagMap : tagMap;
+  const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  const next = {};
+  getMessageImageEntriesForIndex({ ...(message || {}), imageTagMap: source }).forEach(entry => {
+    const assetKey = getPhotoAssetKey(entry.imageUrl || entry.thumbUrl);
+    if (!assetKey || Object.prototype.hasOwnProperty.call(next, assetKey) || Object.keys(next).length >= 50) return;
+    const hasAssetTag = Object.prototype.hasOwnProperty.call(source, assetKey);
+    const legacyTags = Array.isArray(message?.imageTags) ? message.imageTags : [];
+    const hasLegacyTag = Object.prototype.hasOwnProperty.call(legacyTags, entry.index);
+    if (!hasAssetTag && !hasLegacyTag) return;
+    next[assetKey] = String(hasAssetTag ? source[assetKey] : legacyTags[entry.index] || '').slice(0, 100);
+  });
+  return next;
 }
 
 function photoIndexOwnerRank(owner) {
@@ -2022,10 +2053,24 @@ async function applyPhotoIndexTagWrite(calendarId, assetKey, tags) {
       tx.update(docRef, { directMediaTags });
       return;
     }
+    const entries = getMessageImageEntriesForIndex(data);
+    // photoIndex can be one revision behind a delete/reorder. Find the current source slot by
+    // immutable asset key first; its historical owner index is only a fallback.
+    const target = entries.find(entry => getPhotoAssetKey(entry.imageUrl || entry.thumbUrl) === assetKey)
+      || entries.find(entry => entry.index === imageIndex);
+    if (!target) return;
     const imageTags = Array.isArray(data.imageTags) ? data.imageTags.slice() : [];
-    while (imageTags.length <= imageIndex) imageTags.push('');
-    imageTags[imageIndex] = cleanTags;
-    tx.update(docRef, { imageTags });
+    while (imageTags.length <= target.index) imageTags.push('');
+    imageTags[target.index] = cleanTags;
+    const imageTagMap = data.imageTagMap && typeof data.imageTagMap === 'object' && !Array.isArray(data.imageTagMap)
+      ? { ...data.imageTagMap }
+      : {};
+    const targetAssetKey = getPhotoAssetKey(target.imageUrl || target.thumbUrl);
+    if (targetAssetKey) imageTagMap[targetAssetKey] = cleanTags;
+    tx.update(docRef, {
+      imageTags,
+      imageTagMap: reconcileImageTagMapForIndex({ ...data, imageTags, imageTagMap }, imageTagMap)
+    });
   });
   return { ok: true };
 }

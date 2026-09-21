@@ -241,10 +241,16 @@ export function mergeMemoryPhotoIdentity(preferred, other, getPhotoAssetCommentK
   const merged = { ...(preferred || {}) };
   const donor = other || {};
   if (!merged.meetingDate && donor.meetingDate) merged.meetingDate = donor.meetingDate;
-  const mergedTagCount = String(merged.tags || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean).length;
-  const donorTagCount = String(donor.tags || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean).length;
-  if (donorTagCount > mergedTagCount) merged.tags = donor.tags;
-  else if (!merged.tags && donor.tags) merged.tags = donor.tags;
+  // Never pick tags merely because another duplicate has more tokens. That heuristic could
+  // attach a person's tag from one legacy copy to a different photo. An explicit asset/slot tag
+  // is authoritative even when intentionally empty; otherwise keep the deterministic survivor.
+  const preferredHasExplicitTags = merged.tagAuthority === 'editable' || merged.tagAuthoritative === true;
+  const donorHasExplicitTags = donor.tagAuthority === 'editable' || donor.tagAuthoritative === true;
+  if (!preferredHasExplicitTags && donorHasExplicitTags) {
+    merged.tags = String(donor.tags || '');
+    merged.tagAuthority = donor.tagAuthority || 'editable';
+    merged.tagAuthoritative = donor.tagAuthoritative === true;
+  }
   if (!merged.messageId && donor.messageId) merged.messageId = donor.messageId;
   if (!merged.sourceMessageId && donor.sourceMessageId) merged.sourceMessageId = donor.sourceMessageId;
   if (coerceGalleryImageIndex(merged.imageIndex) == null && coerceGalleryImageIndex(donor.imageIndex) != null) {
@@ -323,12 +329,16 @@ export function dedupeGalleryPhotoEntries(list, getPhotoAssetCommentKey, sourceR
   const mergeIdentity = (preferred, other) => {
     const merged = { ...preferred };
     if (!merged.meetingDate && other.meetingDate) merged.meetingDate = other.meetingDate;
-    // Prefer the fuller tag string when chat/memo/meeting copies of the same asset disagree
-    // (empty message.imageTags must not blank a tagged meeting album copy).
-    const mergedTagCount = String(merged.tags || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean).length;
-    const otherTagCount = String(other.tags || '').split(/[,\s#]+/).map(t => t.trim()).filter(Boolean).length;
-    if (otherTagCount > mergedTagCount) merged.tags = other.tags;
-    else if (!merged.tags && other.tags) merged.tags = other.tags;
+    // Tags belong to the image asset, not to whichever duplicate happens to have a longer
+    // string. Prefer an explicit asset/slot value (including an intentional empty clear) and
+    // otherwise retain the deterministic survivor selected by source rank.
+    const preferredHasExplicitTags = merged.tagAuthority === 'editable' || merged.tagAuthoritative === true;
+    const otherHasExplicitTags = other.tagAuthority === 'editable' || other.tagAuthoritative === true;
+    if (!preferredHasExplicitTags && otherHasExplicitTags) {
+      merged.tags = String(other.tags || '');
+      merged.tagAuthority = other.tagAuthority || 'editable';
+      merged.tagAuthoritative = other.tagAuthoritative === true;
+    }
     if (!merged.messageId && other.messageId) merged.messageId = other.messageId;
     if (coerceGalleryImageIndex(merged.imageIndex) == null && coerceGalleryImageIndex(other.imageIndex) != null) {
       merged.imageIndex = coerceGalleryImageIndex(other.imageIndex);
@@ -526,6 +536,7 @@ export function composeGalleryPhotos({
           const photoCount = photoTags.split(/[,\s#]+/).map(t => t.trim()).filter(Boolean).length;
           return photoCount > resolvedCount ? photoTags : (resolvedTags || photoTags);
         })(),
+        tagAuthority: Object.prototype.hasOwnProperty.call(photo || {}, 'tags') ? 'editable' : '',
         directMediaUrl: '',
         text: `${meeting.date || ''} 일정 사진`,
         participantId: '',

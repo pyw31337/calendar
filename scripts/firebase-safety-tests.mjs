@@ -12,7 +12,13 @@ import { getInitialDataLoadingState, subscribeCalendarBootstrap } from '../src/c
 
 globalThis.window ||= {};
 window.GATHER_APP_UTILS ||= GATHER_APP_UTILS;
-const { getMediaIdentityKeys } = await import('../src/core/app-domain-helpers.js');
+const {
+  getMediaIdentityKeys,
+  getMessageImageEntries: getMessageImageEntriesForTagMap,
+  getPhotoAssetCommentKey: getPhotoAssetCommentKeyForTagMap,
+  resolveMessagePhotoImageIndex: resolveMessagePhotoImageIndexForTagMap,
+  reconcileMessageImageTagMap: reconcileMessageImageTagMapForTagMap
+} = await import('../src/core/app-domain-helpers.js');
 const { buildMainCalendarScreenState } = await import('../src/core/app-calendar-screen-state.js');
 const require = createRequire(import.meta.url);
 const { pickCanonicalPhotoIndexTagState } = require('../functions/photo-index-tag-contract.js');
@@ -24,6 +30,30 @@ function assert(condition, message) {
 const undefinedProbe = omitUndefinedDeep({ description: undefined, nested: { keep: 'ok', drop: undefined }, list: [1, undefined] });
 assert(!('description' in undefinedProbe) && !('drop' in undefinedProbe.nested), 'Firestore payload sanitizer must omit undefined object fields');
 assert(undefinedProbe.list.length === 2 && undefinedProbe.list[1] === null, 'Firestore payload sanitizer must preserve array positions');
+
+{
+  const message = {
+    id: 'tag-slot-contract', uploadSource: 'gallery',
+    imageUrls: ['https://example.test/people.jpg', '', 'https://example.test/food.jpg'],
+    thumbUrls: ['https://example.test/people-thumb.jpg', '', 'https://example.test/food-thumb.jpg'],
+    imageTags: ['인물', '절대-보이면-안됨', '음식']
+  };
+  const entries = getMessageImageEntriesForTagMap(message);
+  assert(entries.map(entry => entry.imageIndex).join(',') === '0,2', 'invalid middle media slots must not shift later image identities');
+  assert(entries[0].tags === '인물' && entries[1].tags === '음식', 'display entries must retain the tags from their physical source slots');
+  const foodAssetKey = getPhotoAssetCommentKeyForTagMap(entries[1]);
+  const assetMapped = { ...message, imageTagMap: { [foodAssetKey]: '볶음밥' } };
+  assert(getMessageImageEntriesForTagMap(assetMapped).find(entry => entry.imageIndex === 2)?.tags === '볶음밥', 'asset-keyed tag must override legacy positional tag for the same photo');
+  const afterDelete = {
+    id: 'tag-slot-contract', uploadSource: 'gallery',
+    imageUrls: ['https://example.test/food.jpg'], thumbUrls: ['https://example.test/food-thumb.jpg'],
+    imageTags: ['음식'], imageTagMap: { [foodAssetKey]: '볶음밥' }
+  };
+  assert(resolveMessagePhotoImageIndexForTagMap(afterDelete, 2, { imageUrl: 'https://example.test/food.jpg' }) === 0, 'a stale gallery index must resolve to the surviving image asset after deletion');
+  assert(getMessageImageEntriesForTagMap(afterDelete)[0]?.tags === '볶음밥', 'surviving photo must retain its own asset tag after a sibling is deleted');
+  const reconciled = reconcileMessageImageTagMapForTagMap(afterDelete, { [foodAssetKey]: '볶음밥', 'asset:v1:stale-1': 'wrong' });
+  assert(Object.keys(reconciled).length === 1 && reconciled[foodAssetKey] === '볶음밥', 'tag maps must discard deleted assets instead of leaking tags to a replacement');
+}
 
 assert(getInitialAppView({ pathname: '/', search: '?view=gallery' }, () => null) === 'gallery', 'route state must initialize from the view query');
 assert(buildAppViewUrl({ pathname: '/calendar/', search: '?id=cw&date=2026-09-08&msg=x' }, 'gallery', new Date(2026, 8, 1)) === '/calendar/?id=cw&year=2026&month=09&view=gallery', 'route changes must retain calendar/month and clear stale deep-link state');
@@ -443,6 +473,7 @@ const writeQueueSource = fs.readFileSync(new URL('../src/core/app-write-queue.js
 assert(writeQueueSource.includes('nextAttemptAt: Number(operation.nextAttemptAt) || 0'), 'queued operations must persist retry backoff metadata');
 assert(writeQueueSource.includes("await deferOperation(operation, new Error('대기 저장이 완료되지 않았습니다.'))"), 'false queue handler results must be deferred with backoff');
 const appMainSource = fs.readFileSync(new URL('../src/core/app-main.js', import.meta.url), 'utf8');
+const imageTagSaveSource = fs.readFileSync(new URL('../src/core/app-image-tag-save.js', import.meta.url), 'utf8');
 const chatRenderSource = fs.readFileSync(new URL('../src/core/app-chat-render.js', import.meta.url), 'utf8');
 const chatGallerySource = fs.readFileSync(new URL('../src/ui/ui-chat-gallery.js', import.meta.url), 'utf8');
 const lightboxSource = fs.readFileSync(new URL('../src/ui/ui-lightbox.js', import.meta.url), 'utf8');
@@ -450,7 +481,7 @@ const summaryGallerySource = fs.readFileSync(new URL('../src/ui/ui-summary-galle
 assert(lightboxSource.includes('isMeetingMessageTagTarget'), 'meeting message uploads must expose per-photo tag controls');
 assert(lightboxSource.includes('toTagImageIndex'), 'lightbox tag save must coerce photo-index imageIndex values');
 assert(lightboxSource.includes('태그를 입력해 주세요'), 'empty lightbox tag save must show a toast instead of no-op');
-assert(appMainSource.includes('coerceTagImageIndex'), 'image tag persistence must coerce non-integer imageIndex values');
+assert(imageTagSaveSource.includes('const toIndex'), 'image tag persistence must coerce non-integer imageIndex values');
 assert(chatGallerySource.includes("source === 'memo'"), 'indexed memo photos must recover messageId for tag save');
 assert(summaryGallerySource.includes('composeGalleryPhotos'), 'main-screen PhotoGallery must compose via shared gallery dedupe');
 assert(summaryGallerySource.includes('renderMemoryAllDateToggle'), 'memories tab must reuse the gallery 전체|일자 toggle');
@@ -465,7 +496,7 @@ assert(chatGallerySource.includes('btn-action-danger'), 'gallery bulk delete mus
 assert(chatRenderSource.includes('coerceIndex') && chatRenderSource.includes('resolveMeetingPhotoDisplay'), 'meeting photo display must coerce sourceImageIndex for gallery identity');
 
 
-assert(appMainSource.includes('resolvedIndex != null && !meta.meetingDate'), 'meeting message tag edits must route to their messages document');
+assert(imageTagSaveSource.includes('requestedIndex != null && !meta.meetingDate'), 'meeting message tag edits must route to their messages document');
 assert(appMainSource.includes("activeView !== 'gallery'"), 'gallery route must hydrate the complete paged message history');
 assert(appMainSource.includes('getPhotoAssetCommentKey: typeof getPhotoAssetCommentKey'), 'gallery UI must receive the source-agnostic photo identity helper');
 assert(chatGallerySource.includes('const itemKey = photoKey'), 'gallery render keys must use the canonical photo identity');
@@ -506,7 +537,7 @@ assert(appMainSource.includes('schedulePhotoIndexTagReload'), 'delayed photoInde
 assert(appMainSource.includes('patchGalleryArchiveMessage'), 'tag saves must patch the gallery full-chat archive snapshot');
 assert(appMainSource.includes('patchGalleryArchiveMemo'), 'memo tag saves must patch the gallery full-memo archive snapshot');
 assert(/setTimeout\([\s\S]*?loadPage\([\s\S]*?force:\s*true/.test(photoIndexSource), 'tag saves must delay photoIndex force reload until CF can catch up');
-assert(chatGallerySource.includes('Session sticky'), 'gallery lightbox must document sticky-first tag preference on reopen');
+assert(chatGallerySource.includes('asset-keyed tag state wins'), 'gallery lightbox must document the per-photo tag authority on reopen');
 assert(chatGallerySource.includes('resolveGalleryLightboxTags'), 'gallery must resolve lightbox tags via sticky/local/index helper');
 assert(photoIndexSource.includes('resolveGalleryLightboxTags'), 'photo-index must export sticky-first lightbox tag resolver');
 assert(appMainSource.includes('setGalleryLiveMessages(prev => prev.map(patchMessage))'), 'tag saves must patch galleryLiveMessages (gallery uploads are not in chat listener)');
@@ -560,13 +591,15 @@ assert(photoIndexSource.includes('pickRicherPhotoTags'), 'lightbox tag resolve m
 assert(chatGallerySource.includes('Meeting album copies store durable tags'), 'gallery must consult confirmedMeetings photo.tags for meeting-sourced lightbox tags');
 assert(lightboxSource.includes('key: `tag-input-${tagTokens.length}`'), 'lightbox tag input must remount when token count changes so iOS refreshes (n/10)');
 const galleryDataSource = fs.readFileSync(new URL('../src/core/gallery-data.js', import.meta.url), 'utf8');
-assert(galleryDataSource.includes('otherTagCount > mergedTagCount'), 'gallery dedupe must keep the richer tag set across chat/meeting copies');
+assert(galleryDataSource.includes('preferredHasExplicitTags'), 'gallery dedupe must preserve the authoritative tag owner instead of borrowing a richer duplicate tag set');
 assert(chatRenderSource.includes('entry.tags, photo?.tags'), 'meeting photo display must not blank album tags when message imageTags are empty');
+assert(imageTagSaveSource.includes('resolveMessagePhotoImageIndex(message'), 'tag saves must resolve the image by asset identity before using a stale gallery slot');
+assert(imageTagSaveSource.includes('imageTagMap: reconcileMessageImageTagMap'), 'tag saves must persist the asset-keyed tag map alongside legacy imageTags');
 const photoCommentsSource = fs.readFileSync(new URL('../src/core/photo-comments.js', import.meta.url), 'utf8');
 assert(photoIndexSource.includes('patchItems'), 'gallery photo index must support local tag patches after save');
 assert(photoCommentsSource.includes('requirePersisted: true'), 'photo comment module must require durable writes');
-assert(appMainSource.includes('invalidatePhotoIndexCache(activeCalId)'), 'tag saves must invalidate the gallery photoIndex cache');
-assert(appMainSource.includes("requirePersisted: true"), 'lightbox tag/comment writes must require durable persistence, not queue success');
+assert(imageTagSaveSource.includes('invalidatePhotoIndexCache(activeCalId)'), 'tag saves must invalidate the gallery photoIndex cache');
+assert(imageTagSaveSource.includes("requirePersisted: true"), 'lightbox tag/comment writes must require durable persistence, not queue success');
 assert(lightboxSource.includes('[photoCommentKey]: previous'), 'failed comment saves must roll back optimistic lightbox state');
 assert(chatGallerySource.includes('requiresCompletePhotoIndex'), 'gallery search/date modes must request the complete photo index');
 assert(appMainSource.includes('memos: galleryMemos'), 'gallery must receive the complete paged memo archive for old photos and links');
@@ -1661,6 +1694,16 @@ console.log('Firebase-only calendar safety tests passed');
   assert(
     resolveGalleryLightboxTags(durableCalId, durablePhoto, { localTags: '25.10.25', indexTags: '#식당 #데이트 #25.10.25 #야외' }) === '#식당 #데이트 #25.10.25 #야외',
     'partial local tags must lose to a fuller photoIndex/meeting tag set'
+  );
+  // Once a source document has an explicit asset-keyed slot, its tag (including an intentional
+  // removal) is authoritative and cannot be replaced by a richer duplicate/index row.
+  assert(
+    resolveGalleryLightboxTags(durableCalId, { ...durablePhoto, tagAuthority: 'editable' }, {
+      localTags: '#원본사진',
+      indexTags: '#식당 #데이트 #25.10.25 #야외',
+      localTagAuthoritative: true
+    }) === '#원본사진',
+    'asset-keyed local tag must not inherit richer tags from another duplicate photo'
   );
   assert(
     pickRicherPhotoTags('', '#a #b #c #d') === '#a #b #c #d',
