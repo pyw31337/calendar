@@ -2662,14 +2662,14 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
       { key: 'manual', label: '사용자 매뉴얼', icon: 'manual', onClick: () => { setIsSideNavOpen(false); openMoreModalById('manual'); } },
     ],
     chat: [
-      { key: 'chat-notice', label: '공지사항', icon: 'more', action: 'notice' },
+      { key: 'chat-notice', label: '공지사항', icon: 'speakerphone', action: 'notice' },
     ],
     settlement: [
-      { key: 'settlement-create', label: '정산 생성', icon: 'plus', action: 'create' },
+      { key: 'settlement-create', label: '정산 생성', icon: 'cashPlus', action: 'create' },
       { key: 'settlement-list', label: '정산 목록', icon: 'receipt', action: 'list' },
     ],
     gallery: [
-      { key: 'gallery-upload-image', label: '이미지 업로드', icon: 'gallery', action: 'uploadImage' },
+      { key: 'gallery-upload-image', label: '이미지 업로드', icon: 'photoUp', action: 'uploadImage' },
       { key: 'gallery-upload-file', label: '파일 업로드', icon: 'fileUpload', action: 'uploadFile' },
       { key: 'gallery-upload-link', label: '링크 업로드', icon: 'link', action: 'uploadLink' },
     ],
@@ -2678,7 +2678,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
     ],
     memo: [],
     content: [
-      { key: 'content-register', label: '컨텐츠 등록', icon: 'plus', action: 'register' },
+      { key: 'content-register', label: '컨텐츠 등록', icon: 'scriptPlus', action: 'register' },
     ],
     archive: [],
   };
