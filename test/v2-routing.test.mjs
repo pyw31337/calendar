@@ -205,5 +205,19 @@ test('V2 shell renders the same upload/operation progress overlays as v1', async
   assert.match(shell, /chatUploadProgress/, 'RenewalAppShell must accept chatUploadProgress as a prop');
   assert.match(shell, /ImageUploadOverlay/, 'RenewalAppShell must render ImageUploadOverlay when uploading');
   assert.match(shell, /OperationProgressOverlay/, 'RenewalAppShell must render OperationProgressOverlay too');
-  assert.match(appMain, /renderRenewalShellIfEnabled\([\s\S]*?\{\s*chatUploadProgress,\s*operationProgress\s*\}/, 'CalendarApp must pass its live chatUploadProgress/operationProgress state into the v2 shell');
+  assert.match(appMain, /renderRenewalShellIfEnabled\([\s\S]*?\{\s*chatUploadProgress,\s*operationProgress/, 'CalendarApp must pass its live chatUploadProgress/operationProgress state into the v2 shell');
+});
+
+// Regression: the app-wide toast (success/error banner from showToast(), used by nearly every
+// action -- uploads, deletes, tag saves, shares, network status) renders via the SAME
+// withStickyVideo() tree as the overlays above (app-main.js: `toast && <div className="toast...">`).
+// v2 never reached it either, so every showToast() call already made from v2 screens was updating
+// state with nothing on screen to show it -- indistinguishable from the action silently no-oping.
+test('V2 shell renders the same app-wide toast as v1', async () => {
+  const { readFileSync } = await import('node:fs');
+  const shell = readFileSync(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
+  const appMain = readFileSync(new URL('../src/core/app-main.js', import.meta.url), 'utf8');
+  assert.match(shell, /\btoast\b[\s\S]{0,40}dismissToast|dismissToast[\s\S]{0,40}\btoast\b/, 'RenewalAppShell must accept toast + dismissToast as props');
+  assert.match(shell, /className:\s*`toast \$\{/, 'RenewalAppShell must render the same .toast markup v1 uses');
+  assert.match(appMain, /renderRenewalShellIfEnabled\([\s\S]*?\btoast,\s*dismissToast\s*\}/, 'CalendarApp must pass its live toast/dismissToast state into the v2 shell');
 });
