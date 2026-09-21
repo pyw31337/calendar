@@ -192,3 +192,18 @@ test('V2 destination screens keep live feature entry points', async () => {
   assert.match(styles, /chat-reply-quote-card/);
   assert.match(styles, /v2-records-media/);
 });
+
+// Regression: RenewalAppShell returns before CalendarApp's own withStickyVideo() wrapper (see
+// app-main.js's `if (renewalShellEl) return renewalShellEl;`), which is where v1 renders
+// ImageUploadOverlay/OperationProgressOverlay. v2 had no equivalent for a long stretch, so an
+// upload was actually running (shared upload code path with v1) with zero visual progress
+// feedback -- indistinguishable from a stalled/failed upload to whoever was watching it.
+test('V2 shell renders the same upload/operation progress overlays as v1', async () => {
+  const { readFileSync } = await import('node:fs');
+  const shell = readFileSync(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
+  const appMain = readFileSync(new URL('../src/core/app-main.js', import.meta.url), 'utf8');
+  assert.match(shell, /chatUploadProgress/, 'RenewalAppShell must accept chatUploadProgress as a prop');
+  assert.match(shell, /ImageUploadOverlay/, 'RenewalAppShell must render ImageUploadOverlay when uploading');
+  assert.match(shell, /OperationProgressOverlay/, 'RenewalAppShell must render OperationProgressOverlay too');
+  assert.match(appMain, /renderRenewalShellIfEnabled\([\s\S]*?\{\s*chatUploadProgress,\s*operationProgress\s*\}/, 'CalendarApp must pass its live chatUploadProgress/operationProgress state into the v2 shell');
+});
