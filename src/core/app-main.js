@@ -3609,6 +3609,32 @@ function CalendarApp() {
     if (!deletingMessage) return;
     const { id, calId } = deletingMessage;
     const sourceSnapshot = JSON.parse(JSON.stringify(deletingMessage));
+    // Optimistic: remove from the chat immediately, matching every other delete flow in the
+    // app (availability, memo, photo comments/tags) -- see docs/lightbox-optimistic-ui-audit.md.
+    // restoreMessage below is reused both for the undo toast's "되돌리기" action and, on a
+    // failed/erroring delete, to roll the optimistic removal back.
+    removeLocalChatMessage(id);
+    const finalizeStorage = () => { deleteAllChatImagesFromStorage(sourceSnapshot); };
+    const restoreMessage = async (options = {}) => {
+      try {
+        const allowed = ['participantId', 'text', 'timestamp', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageTags', 'uploadSource', 'linkPreview', 'fileAttachments', 'replyTo'];
+        const createData = {};
+        for (const key of allowed) {
+          if (sourceSnapshot[key] !== undefined) createData[key] = sourceSnapshot[key];
+        }
+        if (typeof createData.participantId !== 'string') createData.participantId = String(sourceSnapshot.participantId || '');
+        if (typeof createData.timestamp !== 'number') createData.timestamp = Number(sourceSnapshot.timestamp) || Date.now();
+        if (createData.text === undefined) createData.text = String(sourceSnapshot.text || '');
+        const data = sanitizeMessageForFirestore(createData);
+        const restored = await writeCollectionDocumentWithFallback('messages', calId, id, data, 'set', '메시지 복원');
+        if (!restored) throw new Error('Message restore failed');
+        upsertLocalChatMessage({ ...sourceSnapshot, ...data, id });
+        if (!options.silentRestore) showToast('메시지 삭제를 되돌렸습니다.', 'success', 3000);
+      } catch (err) {
+        console.error('handleConfirmDeleteMessage undo failed:', err);
+        showToast('메시지 복원 실패', 'error', 4000);
+      }
+    };
     try {
       const deleted = await writeCollectionDocumentWithFallback('messages', calId, id, null, 'delete', '메시지 삭제');
       const ok = Boolean(deleted);
@@ -3616,32 +3642,10 @@ function CalendarApp() {
         // See handleDeleteChatMessagePhoto's matching comment -- `deleted.queued` means this was
         // only durably saved for a later automatic retry, not actually removed on the server yet.
         const wasQueued = Boolean(deleted?.queued);
-        removeLocalChatMessage(id);
         await unlinkMeetingPhotoReferences(id, null);
         if (!firebaseDb) {
           fetchChatMessagesRest(calId).then(list => setChatMessages(list));
         }
-        const finalizeStorage = () => { deleteAllChatImagesFromStorage(sourceSnapshot); };
-        const restoreMessage = async () => {
-          try {
-            const allowed = ['participantId', 'text', 'timestamp', 'imageUrl', 'thumbUrl', 'imageUrls', 'thumbUrls', 'imageTags', 'uploadSource', 'linkPreview', 'fileAttachments', 'replyTo'];
-            const createData = {};
-            for (const key of allowed) {
-              if (sourceSnapshot[key] !== undefined) createData[key] = sourceSnapshot[key];
-            }
-            if (typeof createData.participantId !== 'string') createData.participantId = String(sourceSnapshot.participantId || '');
-            if (typeof createData.timestamp !== 'number') createData.timestamp = Number(sourceSnapshot.timestamp) || Date.now();
-            if (createData.text === undefined) createData.text = String(sourceSnapshot.text || '');
-            const data = sanitizeMessageForFirestore(createData);
-            const restored = await writeCollectionDocumentWithFallback('messages', calId, id, data, 'set', '메시지 복원');
-            if (!restored) throw new Error('Message restore failed');
-            upsertLocalChatMessage({ ...sourceSnapshot, ...data, id });
-            showToast('메시지 삭제를 되돌렸습니다.', 'success', 3000);
-          } catch (err) {
-            console.error('handleConfirmDeleteMessage undo failed:', err);
-            showToast('메시지 복원 실패', 'error', 4000);
-          }
-        };
         if (wasQueued) {
           showToast('네트워크가 불안정하여 삭제를 대기열에 저장했습니다. 연결되면 자동으로 반영됩니다.', 'info', 6000);
         } else if (firebaseDb) {
@@ -3650,10 +3654,13 @@ function CalendarApp() {
           showToast('삭제완료', 'delete', 3000, null, finalizeStorage);
         }
       } else {
+        // The delete never actually happened server-side -- undo the optimistic removal.
+        await restoreMessage({ silentRestore: true });
         showToast('삭제 실패', 'error', 3000);
       }
     } catch (err) {
       console.error('handleConfirmDeleteMessage failed:', err);
+      await restoreMessage({ silentRestore: true });
       showToast('삭제 실패', 'error', 3000);
     }
   };
@@ -3669,6 +3676,10 @@ function CalendarApp() {
     const hasNewImages = (newImages || []).some(img => !img.isExisting);
     if (hasNewImages) setChatUploadProgress({ pct: 0, remainingSec: null });
     let saved = false;
+    // Declared outside the try block (not just inside it) so the catch handler below can also
+    // see them, to roll back the optimistic patch on a thrown error, not just an `ok === false`.
+    let appliedOptimistically = false;
+    let previousRestore = null;
     try {
       let linkPreview = null;
       const url = extractFirstUrl(newText);
@@ -3741,6 +3752,31 @@ function CalendarApp() {
       };
       data.imageTagMap = reconcileMessageImageTagMap({ ...editingMessage, ...data }, editingMessage.imageTagMap);
       if (resolvedParticipantId !== editingMessage.participantId) data.participantId = resolvedParticipantId;
+
+      previousRestore = {
+        text: editingMessage.text || '',
+        imageUrl: editingMessage.imageUrl || '',
+        thumbUrl: editingMessage.thumbUrl || '',
+        imageUrls: Array.isArray(editingMessage.imageUrls) ? editingMessage.imageUrls : (editingMessage.imageUrl ? [editingMessage.imageUrl] : []),
+        thumbUrls: Array.isArray(editingMessage.thumbUrls) ? editingMessage.thumbUrls : (editingMessage.thumbUrl ? [editingMessage.thumbUrl] : []),
+        imageTags: Array.isArray(editingMessage.imageTags) ? editingMessage.imageTags : [],
+        imageTagMap: editingMessage.imageTagMap && typeof editingMessage.imageTagMap === 'object' && !Array.isArray(editingMessage.imageTagMap) ? editingMessage.imageTagMap : {},
+        linkPreview: editingMessage.linkPreview || null,
+        participantId: editingMessage.participantId
+      };
+
+      // Optimistic fast path: a text-only edit (no new images, nothing left to upload, so no
+      // extraChunks will be produced below) can apply immediately instead of waiting for the
+      // write -- see docs/lightbox-optimistic-ui-audit.md item 2. Image edits keep the existing
+      // wait-then-apply behavior; that path's chunk-splitting and Storage cleanup make an
+      // optimistic rollback meaningfully riskier for comparatively little benefit (the upload
+      // itself already dominates the wait).
+      const isTextOnlyEdit = !hasNewImages && pendingFiles.length === 0;
+      if (isTextOnlyEdit) {
+        patchLocalChatMessage(id, data);
+        appliedOptimistically = true;
+      }
+
       let ok = false;
       const updateResult = await writeCollectionDocumentWithFallback('messages', calId, id, data, 'update', '메시지 수정');
       ok = Boolean(updateResult);
@@ -3772,17 +3808,6 @@ function CalendarApp() {
         }
       }
       if (ok) {
-        const previousRestore = {
-          text: editingMessage.text || '',
-          imageUrl: editingMessage.imageUrl || '',
-          thumbUrl: editingMessage.thumbUrl || '',
-          imageUrls: Array.isArray(editingMessage.imageUrls) ? editingMessage.imageUrls : (editingMessage.imageUrl ? [editingMessage.imageUrl] : []),
-          thumbUrls: Array.isArray(editingMessage.thumbUrls) ? editingMessage.thumbUrls : (editingMessage.thumbUrl ? [editingMessage.thumbUrl] : []),
-          imageTags: Array.isArray(editingMessage.imageTags) ? editingMessage.imageTags : [],
-          imageTagMap: editingMessage.imageTagMap && typeof editingMessage.imageTagMap === 'object' && !Array.isArray(editingMessage.imageTagMap) ? editingMessage.imageTagMap : {},
-          linkPreview: editingMessage.linkPreview || null,
-          participantId: editingMessage.participantId
-        };
         const originalEntries = Array.isArray(editingMessage.imageUrls) && editingMessage.imageUrls.length > 0
           ? editingMessage.imageUrls.map((url, idx) => ({ original: url, thumbnail: (editingMessage.thumbUrls || [])[idx] || url }))
           : (editingMessage.imageUrl ? [{ original: editingMessage.imageUrl, thumbnail: editingMessage.thumbUrl || editingMessage.imageUrl }] : []);
@@ -3818,10 +3843,12 @@ function CalendarApp() {
         }
         saved = true;
       } else {
+        if (appliedOptimistically && previousRestore) patchLocalChatMessage(id, previousRestore);
         showToast('수정 실패', 'error', 3000);
       }
     } catch (err) {
       console.error('handleSaveEditMessage failed:', err);
+      if (appliedOptimistically && previousRestore) patchLocalChatMessage(id, previousRestore);
       showToast(describeFirebaseWriteError(err, '수정 실패'), 'error', 4000);
     } finally {
       setChatUploadProgress(null);
