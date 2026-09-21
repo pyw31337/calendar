@@ -463,6 +463,22 @@ export function ChatRoomView({
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+  // Land on the newest message when this view first mounts, not wherever the message list's
+  // natural (top) scroll position happens to be. The V1 shell's own equivalent
+  // (app-main.js, gated on `activeView === 'chat'`) never fires here because the V2 shell
+  // tracks its own `activeTab` state instead of `activeView` (deliberately -- see
+  // buildRenewalChatContext's docblock) -- V2 chat therefore opened scrolled to the top of
+  // history until this ran. Mount-only (this component unmounts/remounts on every tab/view
+  // switch away from and back to chat, in both shells), so it never fights the "새로운 메시지"
+  // banner logic that intentionally does NOT auto-scroll for a message arriving while the user
+  // is reading older history.
+  React.useEffect(() => {
+    const container = chatMessagesContainerRef.current;
+    if (!container) return;
+    container.scrollTop = container.scrollHeight;
+    const t = setTimeout(() => { container.scrollTop = container.scrollHeight; }, 50);
+    return () => clearTimeout(t);
+  }, []);
   const canSendChatNow = () => !isChatSubmitting && (!!chatInput.trim() || chatImages.length > 0 || (chatFileAttachments && chatFileAttachments.length > 0));
   const triggerChatSend = useChatSendGuard(onSend, canSendChatNow);
   const handleSendPointerDown = (event) => {

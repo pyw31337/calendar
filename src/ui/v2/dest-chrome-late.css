@@ -447,6 +447,13 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   flex-shrink: 0;
   align-self: flex-start;
   margin-top: 2px;
+  /* Match ChatRoomView's real (inline-styled) name badge exactly -- font-size: var(--font-size-md),
+     padding: 3px 8px, font-weight: bold -- instead of the shared .v2-name-pill defaults (0.62rem/
+     2px 6px/800), which is what made this preview's bubble read as a different design from the
+     actual chat room's "v2 new spec" bubble. */
+  font-size: var(--font-size-md, 0.8rem);
+  font-weight: bold;
+  padding: 3px 8px;
 }
 .v2-design .v2-home-chat-row:last-child { margin-bottom: 0; }
 .v2-design .v2-home-chat-bubble-wrap {
