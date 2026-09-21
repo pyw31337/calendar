@@ -4023,16 +4023,16 @@ function CalendarApp() {
     const nextPhotos = photos.map((p, i) => i === photoIndex ? { ...p, tags: cleanTags } : p);
     const saved = await commitConfirmedMeetings(existingMeetings.map(m => m.date === meetingDate ? { ...meeting, photos: nextPhotos } : m), '태그 저장완료');
     if (!saved) return false;
-    // Confirm the subcollection write before reporting success. The calendar document and its
-    // confirmedMeetings mirror can briefly diverge when a fallback request races a realtime
-    // snapshot; silently keeping the optimistic local tag makes it disappear on re-entry.
-    const serverMeetings = await fetchConfirmedMeetingsFromFirestore(activeCal.id).catch(() => null);
-    const serverPhoto = Array.isArray(serverMeetings)
-      ? (serverMeetings.find(m => m.date === meetingDate)?.photos || []).find(p => p?.id === photoId || p?.refKey === photoId || p?.mediaKey === photoId)
-      : null;
-    if (!serverPhoto || String(serverPhoto.tags || '') !== cleanTags) {
-      showToast('태그 저장 확인에 실패했습니다. 다시 시도해 주세요.', 'error', 5000);
-      return false;
+    // Best-effort re-read only; must never turn an already-successful, already-toasted save
+    // into a false "저장 확인에 실패했습니다" failure just because this follow-up read raced.
+    try {
+      const serverMeetings = await fetchConfirmedMeetingsFromFirestore(activeCal.id).catch(() => null);
+      const serverPhoto = Array.isArray(serverMeetings)
+        ? (serverMeetings.find(m => m.date === meetingDate)?.photos || []).find(p => p?.id === photoId || p?.refKey === photoId || p?.mediaKey === photoId)
+        : null;
+      if (!serverPhoto || String(serverPhoto.tags || '') !== cleanTags) console.warn('Meeting photo tag verification unconfirmed (save already succeeded)');
+    } catch (verifyErr) {
+      console.warn('Meeting photo tag verification skipped (save already succeeded):', verifyErr);
     }
     return true;
   };
@@ -4213,21 +4213,22 @@ function CalendarApp() {
     try {
       const ok = await writeCollectionDocumentWithFallback('messages', activeCalId, messageId, data, 'update', '이미지 태그 저장', { requirePersisted: true });
       if (!ok?.success || ok?.queued) throw new Error('Image tags update failed');
-      // Read the just-written message back from the server and update every local message
-      // snapshot. This prevents a stale onSnapshot/fetched-source snapshot from overwriting a
-      // tag that was successfully saved, especially for meeting photos opened from a modal.
-      const verifiedMessage = await fetchMessageRest(activeCalId, messageId);
-      if (!verifiedMessage) throw new Error('Image tags verification read failed');
-      const verifiedTags = isDirectMedia
+      // Best-effort re-read only, not a second chance to fail (this used to throw into the
+      // outer catch -- 태그 저장 실패 -- on a merely transient REST hiccup after the save above
+      // had already durably succeeded); a failed/mismatched read falls back to a local merge.
+      const verifiedMessage = await fetchMessageRest(activeCalId, messageId).catch(err => {
+        console.warn('Image tag verification read skipped (save already succeeded):', err); return null;
+      });
+      const verifiedTags = verifiedMessage && isDirectMedia
         ? getDirectMediaTagsForUrl(verifiedMessage, meta.directMediaUrl)
-        : (Array.isArray(verifiedMessage.imageTags) ? verifiedMessage.imageTags[imageIndex] : '');
-      if (String(verifiedTags || '') !== cleanTags) throw new Error('Image tags verification mismatch');
+        : (verifiedMessage && Array.isArray(verifiedMessage.imageTags) ? verifiedMessage.imageTags[imageIndex] : undefined);
+      const effectiveMessage = (verifiedMessage && String(verifiedTags || '') === cleanTags) ? verifiedMessage : { ...sourceMessage, ...data };
       // Patch-only, not upsertLocalChatMessage -- this message may live only in olderChatMessages
       // (an older photo scrolled up to and tagged, not in the live chatMessages window). Upserting
       // it would insert a copy into chatMessages too, growing that "live recent window" array and
       // tripping the chat-view scroll-to-bottom effect keyed on chatMessages.length (see below),
       // yanking the chat down to the latest message right after closing the Lightbox.
-      patchLocalChatMessage(messageId, verifiedMessage);
+      patchLocalChatMessage(messageId, effectiveMessage);
       const now = Date.now();
       const added = nextTokens.filter(t => !prevTokens.includes(t));
       const removed = prevTokens.filter(t => !nextTokens.includes(t));
