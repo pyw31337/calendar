@@ -54,7 +54,7 @@
 .v2-design .v2-memo .v2-memo-card-is-focused > .v2-bubble-surface {
   border: 2px solid rgba(124, 47, 229, 0.72) !important;
   background: rgba(124, 47, 229, 0.075) !important;
-  box-shadow: 0 0 0 4px rgba(124, 47, 229, 0.12), 1px 1px 4px #1e1b2e12 !important;
+  box-shadow: 0 0 0 4px rgba(124, 47, 229, 0.12), var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important;
   scroll-margin: 24px;
 }
 
@@ -409,13 +409,13 @@
  * gutter so the right grid-switcher no longer drifts away from the content. */
 .renewal-shell.v2-design .v2-content .history-header-stack {
   background: #fff !important;
-  border-bottom: 1px solid #1e1b2e0f;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5);
 }
 
 .renewal-shell.v2-design .v2-content .underline-tabs {
   min-height: 50px;
   background: #fff !important;
-  border-bottom: 1px solid #1e1b2e0f !important;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
 }
 
 .renewal-shell.v2-design .v2-content .underline-tabs [role="tab"] {
@@ -466,7 +466,7 @@
 }
 
 .renewal-shell.v2-design .v2-content .culture-grid-cols-toggle {
-  border-color: #dcd6eb !important;
+  border-color: var(--v2-card-border, #eceaf5) !important;
   background: #f7f6fa !important;
   padding: 3px !important;
 }
@@ -522,7 +522,7 @@
   max-width: 560px !important;
   max-height: min(86dvh, var(--gather-vv-modal-max, 860px)) !important;
   margin: 0 !important;
-  border: 1px solid #1e1b2e0f !important;
+  border: 1px solid var(--v2-card-border, #eceaf5) !important;
   border-radius: 24px !important;
   box-shadow: 0 24px 72px rgba(30, 27, 46, 0.26) !important;
   overflow: hidden auto !important;
@@ -531,7 +531,7 @@
 .renewal-shell.v2-design .modal-overlay .v2-responsive-modal .modal-header,
 .renewal-shell.v2-design ~ .modal-overlay .v2-responsive-modal .modal-header {
   padding: 18px 20px !important;
-  border-bottom: 1px solid #1e1b2e0f !important;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
 }
 
 @media (max-width: 767px) {
@@ -595,7 +595,7 @@
   min-width: 30px !important;
   min-height: 30px !important;
   padding: 0 !important;
-  border: 1px solid #1e1b2e0f !important;
+  border: 1px solid var(--v2-card-border, #eceaf5) !important;
   border-radius: 999px !important;
   background: #fff !important;
   color: #6b6580 !important;
@@ -626,9 +626,9 @@
 .renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-bubble-surface,
 .renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-card-contract {
   background: #fff !important;
-  border: 1px solid #1e1b2e0f !important;
+  border: 1px solid var(--v2-card-border, #eceaf5) !important;
   border-radius: 14px !important;
-  box-shadow: 1px 1px 4px #1e1b2e12 !important;
+  box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important;
 }
 
 .renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-bubble-surface {
@@ -652,7 +652,7 @@
   display: block !important;
   margin-bottom: 9px !important;
   padding-bottom: 8px !important;
-  border-bottom: 1px solid #1e1b2e0f !important;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
   color: #8a8798 !important;
   font-size: .62rem !important;
   font-weight: 600 !important;

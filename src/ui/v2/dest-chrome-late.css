@@ -99,7 +99,7 @@
 
 .v2-design .v2-content .underline-tabs {
   margin-bottom: 0 !important;
-  border-bottom: 1px solid #eceaf5 !important;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
 }
 .v2-design .v2-content .v2-content-subcat-slot,
 .v2-design .v2-content .history-header-stack > .v2-content-subcat-slot {
@@ -109,7 +109,7 @@
   padding: 6px var(--v2-dest-content-pad-x, 16px) !important;
   margin: 0 !important;
   background: #fff !important;
-  border-bottom: 1px solid #eceaf5;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5);
   box-sizing: border-box !important;
 }
 .v2-design .v2-content .v2-content-subcat-slot .bp-cat-scroll-row {
@@ -150,7 +150,7 @@
   margin: 0 !important;
   gap: 8px !important;
   background: #fff !important;
-  border-bottom: 1px solid #eceaf5;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5);
   box-sizing: border-box !important;
 }
 
@@ -831,7 +831,7 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   margin: 0 !important;
   padding: 0 !important;
   background: #fff !important;
-  border-bottom: 1px solid #eceaf5 !important;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
 }
 .v2-design .v2-content .underline-tabs [role="tab"],
 .v2-design .v2-archive .underline-tabs [role="tab"] {
@@ -877,7 +877,7 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   padding: 8px 16px !important;
   margin: 0 !important;
   background: #fff !important;
-  border-bottom: 1px solid #eceaf5 !important;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
 }
 .v2-design .v2-content .v2-content-subcat-slot .bp-cat-scroll-row {
   display: flex !important;
@@ -933,7 +933,7 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   padding: 8px 16px 10px !important;
   margin: 0 !important;
   background: #fff !important;
-  border-bottom: 1px solid #eceaf5;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5);
 }
 .v2-design .v2-content .current-location-btn {
   width: 40px !important;
@@ -950,14 +950,14 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   border-radius: 12px !important;
   background: #fff !important;
   color: var(--text-main, #1e1b2e) !important;
-  border: 1px solid #eceaf5 !important;
+  border: 1px solid var(--v2-card-border, #eceaf5) !important;
   font-weight: 800 !important;
 }
 .v2-design .v2-content .culture-grid-cols-toggle {
   height: 40px !important;
   padding: 3px !important;
   border-radius: 12px !important;
-  border: 1px solid #eceaf5 !important;
+  border: 1px solid var(--v2-card-border, #eceaf5) !important;
   background: #fff !important;
   overflow: hidden;
 }
@@ -1031,14 +1031,14 @@ html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay):not
   max-width: 440px !important;
   max-height: min(86dvh, var(--gather-vv-modal-max, 860px)) !important;
   border-radius: 20px !important;
-  border: 1px solid #eceaf5 !important;
+  border: 1px solid var(--v2-card-border, #eceaf5) !important;
   background: #fff !important;
   box-shadow: 0 24px 64px rgba(30, 27, 46, 0.22) !important;
   overflow: hidden !important;
 }
 html:has(.renewal-shell.v2-design) .modal-overlay .modal-header {
   padding: 16px 18px 12px !important;
-  border-bottom: 1px solid #eceaf5 !important;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
   background: #fff !important;
 }
 html:has(.renewal-shell.v2-design) .modal-overlay .modal-header h3,
@@ -1110,7 +1110,7 @@ html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overla
     width: min(440px, calc(100vw - 48px)) !important;
     max-width: 440px !important;
     border-radius: 20px !important;
-    border: 1px solid #eceaf5 !important;
+    border: 1px solid var(--v2-card-border, #eceaf5) !important;
     box-shadow: 0 24px 64px rgba(30, 27, 46, 0.22) !important;
   }
   html:has(.renewal-shell.v2-design:not(.is-side-collapsed)) .bottom-sheet-overlay:not(.emoji-sheet-overlay) {
@@ -1119,7 +1119,7 @@ html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overla
   }
 }
 html:has(.renewal-shell.v2-design) .bottom-sheet-header {
-  border-bottom: 1px solid #eceaf5 !important;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
   background: #fff !important;
 }
 html:has(.renewal-shell.v2-design) .bottom-sheet-header h4 {
@@ -1165,7 +1165,7 @@ html:has(.renewal-shell.v2-design) .modal-overlay input.form-input {
   height: 44px !important;
   min-height: 44px !important;
   border-radius: 12px !important;
-  border: 1px solid #eceaf5 !important;
+  border: 1px solid var(--v2-card-border, #eceaf5) !important;
   padding: 0 12px !important;
   box-sizing: border-box !important;
 }
