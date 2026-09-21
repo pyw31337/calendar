@@ -304,8 +304,21 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
 .v2-design .festival-bar-mobile {
   z-index: 1;
 }
+/* Reserves room, inside the day-cell's own flow, for the festival-bar-desktop/-mobile stack
+   overlaid on top of it (see the marginBottom formula on those bars in ui-app-shell-v2.js:
+   `(barHeight + 2px) * level`, which packs a constant 2px gap between every adjacent bar). This
+   spacer's per-level height must match that same per-bar footprint (barHeight + 2px) exactly --
+   it previously used a flat 1.4rem here that overshot each bar's real 1.1rem+2px footprint,
+   and that per-level overshoot compounded with stack depth. The visible symptom: the gap between
+   the solo-anniversary stack above (.bp-day-bar-stack, which has no bottom margin of its own --
+   this spacer is the only thing separating it from the range-bar stack below) and the topmost
+   range bar grew with how many range bars were stacked underneath, while the gap *between*
+   those range bars themselves stayed a constant 2px -- so a 3-deep stack (e.g. one solo
+   anniversary sitting above two range trips on the same date) read as a visibly wider gap above
+   the solo item than between the two range bars beneath it, even though both boundaries should
+   look identical. Matching the two formulas exactly makes every such gap the same 2px. */
 .v2-design .festival-bar-spacer {
-  height: calc(var(--festival-stack-depth, 0) * 1.4rem);
+  height: calc(var(--festival-stack-depth, 0) * (1.1rem + 2px));
   flex-shrink: 0;
   width: 100%;
   pointer-events: none;
@@ -369,8 +382,10 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   }
   .v2-design .festival-bar-desktop { display: none !important; }
   .v2-design .festival-bar-mobile { display: flex !important; }
+  /* Same fix as the desktop rule above, scaled to the mobile bar's own 0.34rem height + 2px
+     gap footprint (was a flat 8px/level, a smaller but same-shaped overshoot). */
   .v2-design .festival-bar-spacer {
-    height: calc(var(--festival-stack-depth, 0) * 8px);
+    height: calc(var(--festival-stack-depth, 0) * (0.34rem + 2px));
   }
   .v2-design .bp-day-cell:has(.bp-day-bar-stack),
   .v2-design .bp-day-cell:has(.festival-bar-spacer) {
@@ -447,7 +462,8 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   border: 1px solid var(--border-subtle, rgba(30,27,46,0.08));
   border-radius: var(--radius-md, 10px);
   padding: 8px 12px;
-  font-size: 0.86rem;
+  /* Matches ChatRoomView's own bubble font-size exactly (was 0.86rem, a near-miss). */
+  font-size: 0.9rem;
   line-height: 1.4;
   color: var(--text-main, #1e1b2e);
   word-break: keep-all;
@@ -491,32 +507,24 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   cursor: zoom-in;
 }
 .v2-design .v2-home-chat-text { display: block; }
+/* Same meta-column shape as ChatRoomView's own "다른 사람" message row (flex column,
+ * justify-content:flex-end, align-self:stretch) -- the difference was never the layout, just
+ * that this preview always showed a non-functional reply glyph the real bubble only reveals
+ * on hover, so removing that glyph (above) is what actually lines the two up. */
 .v2-design .v2-home-chat-meta {
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
   align-items: flex-start;
   align-self: stretch;
-  margin-left: 2px;
+  margin-left: 6px;
   flex-shrink: 0;
   min-width: 32px;
   padding: 2px 0;
-  gap: 4px;
-}
-.v2-design .v2-home-chat-reply-btn {
-  width: 24px;
-  height: 24px;
-  border: 0;
-  background: none;
-  padding: 0;
-  cursor: pointer;
-  color: var(--text-light, #9a93a8);
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
 }
 .v2-design .v2-home-chat-time {
-  font-size: 0.62rem;
+  /* Matches ChatRoomView's own timestamp (var(--font-size-xs), 0.68rem) exactly (was 0.62rem). */
+  font-size: var(--font-size-xs, 0.68rem);
   color: var(--text-light, #9a93a8);
   line-height: 1.25;
   white-space: nowrap;

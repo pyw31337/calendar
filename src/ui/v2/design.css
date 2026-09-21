@@ -249,6 +249,17 @@
 }
 
 .v2-design .bp-day-cell { font-family: inherit; }
+/* Confirmed-meeting date cell (BentoCalendarCard's "모임확정" pill days) -- a soft top-down
+ * fade instead of the flat --surface-confirmed tint, matching the calendar home's own
+ * gradient-forward visual language. */
+.v2-design .bp-day-cell.bp-confirmed {
+  background: linear-gradient(180deg, #f3eeff 0%, #fff 80%);
+}
+/* Participant availability dots sit right under the day number / 모임확정 pill row -- a little
+ * more breathing room above them so they don't read as glued to that row. */
+.v2-design .bp-dot-row {
+  margin-top: 4px;
+}
 .v2-design .bp-dday-chip {
   display: flex;
   flex-direction: column;
