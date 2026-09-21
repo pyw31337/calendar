@@ -44,6 +44,7 @@ import {
   normalizePlaceDateForSort,
   getTrulyConfirmedMeetings, getActiveAvailabilities, getActiveParticipants,
   calculateSettlementBalance, formatBalanceBadge,
+  getCalendarPlaces, doesPlaceMatchDate, unionPlaces,
 } from '../core/app-domain-helpers.js';
 import { getMeetingOwnedPhotoMessageIds, isChatRenderableMessage, isMemeKeyboardPhotoEntry } from '../core/gallery-data.js';
 import { computeKoreanHolidaysForYear, getKoreanSolarTermsForYear } from '../core/app-calendar-holidays.js';
@@ -345,18 +346,54 @@ function RenewalHero({ meetings, calendar, onSelectDate }) {
   const React = window.React;
   const list = Array.isArray(meetings) ? meetings : [];
   const [isOpen, setIsOpen] = React.useState(false);
-  if (!list.length) return React.createElement('p', { className: 'bp-empty-hero', 'aria-label': '가까운 확정 일정' }, '다가오는 확정 일정이 없습니다.');
   const primary = list[0];
   const participants = getActiveParticipants(calendar || {});
+
+  const primaryPlaces = React.useMemo(() => {
+    if (!primary?.date) return [];
+    const allPlaces = getCalendarPlaces(calendar);
+    return allPlaces.filter(p => doesPlaceMatchDate(p, primary.date)).slice().sort((a, b) => {
+      const ao = Number.isFinite(Number(a.order)) ? Number(a.order) : Number.POSITIVE_INFINITY;
+      const bo = Number.isFinite(Number(b.order)) ? Number(b.order) : Number.POSITIVE_INFINITY;
+      return ao !== bo ? ao - bo : (a.createdAt || 0) - (b.createdAt || 0);
+    });
+  }, [calendar, primary?.date]);
+
+  const formattedDate = React.useMemo(() => {
+    if (!primary?.date) return '';
+    const formatted = formatConfirmedMeetingLabel(primary?.date) || '';
+    return formatted.replace(/^\[?모임확정\]?\s*/u, '').trim() || String(primary.date);
+  }, [primary?.date]);
+
+  if (!list.length) return React.createElement('p', { className: 'bp-empty-hero', 'aria-label': '가까운 확정 일정' }, '다가오는 확정 일정이 없습니다.');
+
+  const firstPlaceName = primaryPlaces[0]
+    ? String(primaryPlaces[0].name || primaryPlaces[0].alias || '').trim()
+    : (typeof primary?.place === 'string' ? primary.place.trim() : '');
+
+  const collapsedLabel = firstPlaceName ? `${formattedDate} / ${firstPlaceName}` : formattedDate;
+  const expandedPrefix = firstPlaceName ? `[${firstPlaceName}]` : '[모임확정]';
+
   const participantMemosFor = (dateStr) => getActiveAvailabilities(calendar || {})
     .filter(e => e.date === dateStr && e.note && String(e.note).trim() && e.participantId !== BULK_NO_PARTICIPANT_ID)
     .map(e => {
       const p = participants.find(part => part.id === e.participantId);
-      const note = String(e.note).trim().replace(/\s+/g, ' ');
-      if (!note) return null;
-      return { id: e.participantId || e.id, name: p?.name || '참여자', color: p?.color || '#A78BFA', note };
+      const rawNote = String(e.note).trim().replace(/\s+/g, ' ');
+      // Strip URLs from note content
+      const cleanNote = rawNote.replace(/https?:\/\/[^\s]+/gi, '').trim().replace(/\s{2,}/g, ' ');
+      if (!cleanNote) return null;
+      const fullName = p?.name || '참여자';
+      const shortName = shortParticipantName(fullName);
+      return {
+        id: e.participantId || e.id,
+        name: shortName,
+        color: p?.color || '#A78BFA',
+        note: cleanNote,
+        fullNote: rawNote,
+      };
     })
     .filter(Boolean);
+
   /** Always expose a clear 모임확정 prefix; detail (date · note/title) may ellipsis. */
   const meetingLabelParts = (meeting) => {
     const rawTitle = typeof meeting?.title === 'string' ? meeting.title.trim().replace(/\s+/g, ' ') : '';
@@ -375,15 +412,6 @@ function RenewalHero({ meetings, calendar, onSelectDate }) {
     const { prefix, detail } = meetingLabelParts(meeting);
     return detail ? `${prefix} ${detail}` : prefix;
   };
-  const renderMeetingLabel = (meeting, className) => {
-    const { prefix, detail } = meetingLabelParts(meeting);
-    return React.createElement('span', { className },
-      React.createElement('span', { className: bentoClass('dday-compact-prefix') }, prefix),
-      detail
-        ? React.createElement('span', { className: bentoClass('dday-compact-detail') }, detail)
-        : null
-    );
-  };
   const chipDateFor = (dateValue) => {
     const date = new Date(`${dateValue}T00:00:00`);
     if (Number.isNaN(date.getTime())) return { date: String(dateValue || ''), day: '' };
@@ -398,16 +426,20 @@ function RenewalHero({ meetings, calendar, onSelectDate }) {
     React.createElement('div', { className: bentoClass(`dday-toggle-wrap ${isOpen ? 'is-open' : ''}`.trim()), 'aria-label': '가까운 확정 일정' },
       React.createElement('button', { type: 'button', className: bentoClass('dday-compact'), onClick: () => setIsOpen(true), 'aria-expanded': isOpen },
         React.createElement('span', { className: bentoClass('dday-compact-badge') }, formatDDayLabel(primary.date)),
-        renderMeetingLabel(primary, bentoClass('dday-compact-text')),
+        React.createElement('span', { className: bentoClass('dday-compact-text') },
+          React.createElement('span', { className: bentoClass('dday-compact-detail') }, collapsedLabel)
+        ),
         React.createElement('svg', { className: bentoClass('dday-compact-chevron'), width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2.5, strokeLinecap: 'round', strokeLinejoin: 'round' },
           React.createElement('path', { d: 'M6 9l6 6l6 -6' })
-
         )
       ),
       React.createElement('div', { className: bentoClass('dday-expanded') },
         React.createElement('div', { className: bentoClass('dday-expanded-main') },
           React.createElement('div', { className: bentoClass('dday-expanded-title-row') },
-            renderMeetingLabel(primary, bentoClass('dday-expanded-title'))
+            React.createElement('span', { className: bentoClass('dday-expanded-title') },
+              React.createElement('span', { className: bentoClass('dday-compact-prefix') }, expandedPrefix),
+              React.createElement('span', { className: bentoClass('dday-compact-detail') }, formattedDate)
+            )
           ),
           primary.note && React.createElement('div', { className: bentoClass('dday-expanded-tags') },
             React.createElement('span', { className: bentoClass('dday-expanded-tag') }, primary.note.trim())
@@ -419,11 +451,16 @@ function RenewalHero({ meetings, calendar, onSelectDate }) {
               memos.map(m => React.createElement('span', {
                 key: m.id,
                 className: bentoClass('dday-participant-memo'),
-                title: `${m.name}: ${m.note}`,
+                title: `${m.name}: ${m.fullNote || m.note}`,
                 style: { borderColor: m.color },
               },
-                React.createElement('span', { className: bentoClass('dday-participant-memo-name'), style: { color: m.color } }, m.name),
-                m.note
+                React.createElement('span', {
+                  className: bentoClass('dday-participant-memo-name'),
+                  style: { backgroundColor: m.color }
+                }, m.name),
+                React.createElement('span', {
+                  className: bentoClass('dday-participant-memo-text')
+                }, m.note)
               ))
             );
           })()
@@ -1084,12 +1121,20 @@ function HeroQuickNav({ onChangeView, settlementBalanceBadge }) {
 
 function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeView, onOpenMemo, calendarName, onOpenSearch, onOpenMore, settlementBalanceBadge }) {
   const React = window.React;
+  const mergedCalendar = React.useMemo(() => {
+    const base = calendarContext?.calendar || {};
+    const recPlaces = recordsContext?.placesProps?.calendar?.places;
+    if (Array.isArray(recPlaces) && recPlaces.length > 0) {
+      return { ...base, places: unionPlaces(base, recPlaces) };
+    }
+    return base;
+  }, [calendarContext?.calendar, recordsContext?.placesProps?.calendar?.places]);
   return React.createElement(React.Fragment, null,
     React.createElement('div', { className: 'bp-hero-zone' },
       React.createElement('span', { className: 'bp-hero-aurora', 'aria-hidden': 'true' }),
       React.createElement(TopHeader, { calendarName, onOpenSearch, onOpenMore }),
       React.createElement(HeroQuickNav, { onChangeView, settlementBalanceBadge }),
-      React.createElement(RenewalHero, { meetings: calendarContext.upcomingMeetings, calendar: calendarContext.calendar, onSelectDate: onOpenDate })
+      React.createElement(RenewalHero, { meetings: calendarContext.upcomingMeetings, calendar: mergedCalendar, onSelectDate: onOpenDate })
     ),
 
     React.createElement(HomeActivitySummary, {
@@ -3197,7 +3242,25 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
           React.createElement('span', { className: bentoClass('side-nav-item-title renewal-shell-nav-label') }, item.label),
           metaVal && (
             item.isPill
-              ? React.createElement('span', { className: bentoClass('side-nav-item-meta chat-name-pill'), style: { backgroundColor: chatPillColor, color: chatPillTextColor } }, metaVal)
+              ? React.createElement('span', {
+                  className: bentoClass('side-nav-item-meta chat-dot'),
+                  style: {
+                    width: '6px',
+                    height: '6px',
+                    minWidth: '6px',
+                    minHeight: '6px',
+                    borderRadius: '50%',
+                    backgroundColor: chatPillColor,
+                    padding: 0,
+                    margin: 0,
+                    marginLeft: 'auto',
+                    flexShrink: 0,
+                    display: 'inline-block',
+                    boxShadow: '0 0 0 1px rgba(30,27,46,0.08)',
+                  },
+                  title: lastChatAuthor,
+                  'aria-label': lastChatAuthor,
+                })
               : React.createElement('span', {
                   className: bentoClass(
                     item.id === 'settlement'
