@@ -533,6 +533,120 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
   const year = monthDate.getFullYear();
   const month = monthDate.getMonth();
 
+  // Drag-to-move a participant's availability badge onto a different date -- ported from
+  // ui-calendar-core.js's CalendarGrid (HTML5 drag-and-drop for desktop, long-press-then-drag
+  // for touch, since native DnD never fires from touch input on any mobile browser). This card
+  // reimplements the whole grid rather than reusing CalendarGrid (see the module doc comment
+  // above BentoCalendarCard), so without this the move-by-drag gesture v1 users rely on had no
+  // equivalent here at all -- only opening the date's detail modal and re-registering by hand.
+  const onMoveAvailability = calendarContext?.handleMoveAvailability;
+  const TOUCH_LONG_PRESS_MS = 350;
+  const TOUCH_MOVE_CANCEL_PX = 10;
+  const touchDragRef = React.useRef(null);
+  const justTouchDraggedRef = React.useRef(false);
+  const [isTouchDragging, setIsTouchDragging] = React.useState(false);
+  const [touchDragBadge, setTouchDragBadge] = React.useState(null);
+  const [touchDropTargetDate, setTouchDropTargetDate] = React.useState(null);
+
+  React.useEffect(() => {
+    if (!isTouchDragging) return undefined;
+    const originalTouchAction = document.body.style.touchAction;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.touchAction = 'none';
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.touchAction = originalTouchAction;
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isTouchDragging]);
+
+  const findDayCellDateAt = (x, y) => {
+    const el = typeof document.elementFromPoint === 'function' ? document.elementFromPoint(x, y) : null;
+    const cell = el && typeof el.closest === 'function' ? el.closest('.day-cell') : null;
+    return cell ? cell.dataset.dateStr || null : null;
+  };
+
+  const endTouchDrag = (targetDate) => {
+    const state = touchDragRef.current;
+    touchDragRef.current = null;
+    setIsTouchDragging(false);
+    setTouchDragBadge(null);
+    setTouchDropTargetDate(null);
+    if (!state || !state.dragging) return;
+    justTouchDraggedRef.current = true;
+    setTimeout(() => { justTouchDraggedRef.current = false; }, 300);
+    if (targetDate && targetDate !== state.sourceDate && typeof onMoveAvailability === 'function') {
+      onMoveAvailability(state.entryReferId, state.sourceDate, targetDate, state.participantId, state.participantName);
+    }
+  };
+
+  const handleBadgeTouchStart = (event, entry, participant, dateStr) => {
+    if (event.touches.length !== 1) return;
+    const touch = event.touches[0];
+    if (touchDragRef.current) clearTimeout(touchDragRef.current.timer);
+    const dragInfo = {
+      entryReferId: entry.id,
+      sourceDate: dateStr,
+      participantId: entry.participantId,
+      participantName: participant.name,
+      color: participant.color,
+      touchId: touch.identifier,
+      startX: touch.clientX,
+      startY: touch.clientY,
+      dragging: false,
+      timer: null,
+    };
+    dragInfo.timer = setTimeout(() => {
+      if (touchDragRef.current !== dragInfo) return;
+      dragInfo.dragging = true;
+      setIsTouchDragging(true);
+      setTouchDragBadge({ name: dragInfo.participantName, color: dragInfo.color, x: dragInfo.startX, y: dragInfo.startY });
+      setTouchDropTargetDate(dateStr);
+      if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+        try { navigator.vibrate(15); } catch (e) {}
+      }
+    }, TOUCH_LONG_PRESS_MS);
+    touchDragRef.current = dragInfo;
+  };
+
+  const handleBadgeTouchMove = event => {
+    const state = touchDragRef.current;
+    if (!state) return;
+    const touch = Array.from(event.touches).find(t => t.identifier === state.touchId);
+    if (!touch) return;
+    if (!state.dragging) {
+      const dx = Math.abs(touch.clientX - state.startX);
+      const dy = Math.abs(touch.clientY - state.startY);
+      if (dx > TOUCH_MOVE_CANCEL_PX || dy > TOUCH_MOVE_CANCEL_PX) {
+        clearTimeout(state.timer);
+        touchDragRef.current = null;
+      }
+      return;
+    }
+    setTouchDragBadge(prev => (prev ? { ...prev, x: touch.clientX, y: touch.clientY } : prev));
+    setTouchDropTargetDate(findDayCellDateAt(touch.clientX, touch.clientY));
+  };
+
+  const handleBadgeTouchEnd = event => {
+    const state = touchDragRef.current;
+    if (!state) return;
+    clearTimeout(state.timer);
+    if (state.dragging) {
+      const touch = Array.from(event.changedTouches).find(t => t.identifier === state.touchId) || event.changedTouches[0];
+      const targetDate = touch ? findDayCellDateAt(touch.clientX, touch.clientY) : null;
+      event.preventDefault();
+      endTouchDrag(targetDate);
+    } else {
+      touchDragRef.current = null;
+    }
+  };
+
+  const handleBadgeTouchCancel = () => {
+    const state = touchDragRef.current;
+    if (state) clearTimeout(state.timer);
+    endTouchDrag(null);
+  };
+
   const calendar = calendarContext?.calendar || {};
   // Use the same normalized active participant list for both calendar dots and
   // the legend.  The raw calendar array can contain archived/stale color
@@ -645,7 +759,7 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
     return map;
   }, [festivalBars, days]);
 
-  return React.createElement('div', { className: bentoClass('cal-card') },
+  const cardTree = React.createElement('div', { className: bentoClass('cal-card') },
     // Month nav
     React.createElement('div', { className: bentoClass('cal-month-nav-row'), style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', position: 'relative' } },
       React.createElement('button', {
@@ -725,9 +839,10 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
           const p = participantsMap[entry.participantId];
           if (p && !seenPids.has(p.id)) {
             seenPids.add(p.id);
-            dots.push(p);
+            dots.push({ p, entry });
           }
         });
+        const isTouchDropTarget = isTouchDragging && touchDropTargetDate === dateStr;
         // Range (연일 다일) anniversaries render once per week row as a spanning grid bar
         // (see festivalBars below) instead of per-cell — only solo/single-day ones live here.
         const anns = getAnniversariesForDate(dateStr, anniversariesList).filter(ann => ann.type !== 'range');
@@ -744,12 +859,31 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
           key: dateStr,
           className: bentoClass(cellClasses),
           type: 'button',
+          'data-date-str': dateStr,
           // Explicit grid placement (not auto-flow): the festival-bar grid children below are
           // also explicitly placed, and CSS Grid places every explicitly-positioned item BEFORE
           // auto-placing the rest regardless of DOM order — without this, a festival bar would
           // claim day6/day7's auto-placement slot first and bump those day cells to the next row.
-          style: { gridRowStart: Math.floor(dayIdx / 7) + 1, gridColumnStart: (dayIdx % 7) + 1 },
-          onClick: () => onSelectDate?.(dateStr),
+          style: {
+            gridRowStart: Math.floor(dayIdx / 7) + 1, gridColumnStart: (dayIdx % 7) + 1,
+            ...(isTouchDropTarget ? { outline: '2px solid var(--accent-primary)', outlineOffset: '-2px' } : {}),
+          },
+          onClick: () => { if (!justTouchDraggedRef.current) onSelectDate?.(dateStr); },
+          onDragOver: event => { event.preventDefault(); },
+          onDrop: event => {
+            event.preventDefault();
+            try {
+              const rawData = event.dataTransfer.getData('text/plain');
+              if (!rawData) return;
+              const data = JSON.parse(rawData);
+              if (data.sourceDate === dateStr) return;
+              if (typeof onMoveAvailability === 'function') {
+                onMoveAvailability(data.entryReferId, data.sourceDate, dateStr, data.participantId, data.participantName);
+              }
+            } catch (err) {
+              console.error('Drop error:', err);
+            }
+          },
           'aria-label': `${dateStr} 일정 상세`,
         },
           React.createElement('span', { className: bentoClass('day-num') }, dayNum),
@@ -763,12 +897,30 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
             }, '모임확정') : null
           ) : null,
           dots.length > 0 ? React.createElement('div', { className: bentoClass('dot-row') },
-            dots.map(p => React.createElement('span', {
-              key: p.id,
-              className: bentoClass('p-dot'),
-              'data-name': (p.name || '').slice(-2),
-              style: { background: p.color || 'var(--brand)' },
-            }))
+            dots.map(({ p, entry }) => {
+              // p always comes from participantsMap (real active participants only) -- a
+              // BULK_NO_PARTICIPANT_ID entry has no matching p and is filtered out above, so
+              // every dot reaching here is draggable (unlike CalendarGrid's ported isNone guard).
+              return React.createElement('span', {
+                key: p.id,
+                className: bentoClass('p-dot'),
+                'data-name': (p.name || '').slice(-2),
+                style: { background: p.color || 'var(--brand)' },
+                title: entry.note ? `${p.name}: ${entry.note}` : p.name,
+                draggable: true,
+                onDragStart: event => {
+                  event.stopPropagation();
+                  event.dataTransfer.setData('text/plain', JSON.stringify({
+                    entryReferId: entry.id, sourceDate: dateStr,
+                    participantId: entry.participantId, participantName: p.name,
+                  }));
+                },
+                onTouchStart: event => { event.stopPropagation(); handleBadgeTouchStart(event, entry, p, dateStr); },
+                onTouchMove: event => { event.stopPropagation(); handleBadgeTouchMove(event); },
+                onTouchEnd: event => { event.stopPropagation(); handleBadgeTouchEnd(event); },
+                onTouchCancel: event => { event.stopPropagation(); handleBadgeTouchCancel(); },
+              });
+            })
           ) : null,
           // Solo (single-day) anniversary bars only. Meeting pill lives in day-head-row.
           anns.length > 0 ? React.createElement('div', { className: bentoClass('day-bar-stack') },
@@ -880,6 +1032,19 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
       )
     )
   );
+
+  // Floating badge that follows the finger while a touch drag is active -- portaled to <body>
+  // so it renders above everything regardless of where this card sits in the DOM.
+  const touchDragIndicator = touchDragBadge && typeof document !== 'undefined' && window.ReactDOM?.createPortal
+    ? window.ReactDOM.createPortal(React.createElement('div', {
+      className: 'v2-avail-drag-ghost',
+      style: { left: `${touchDragBadge.x}px`, top: `${touchDragBadge.y}px`, backgroundColor: touchDragBadge.color },
+    }, touchDragBadge.name), document.body)
+    : null;
+
+  return touchDragIndicator
+    ? React.createElement(React.Fragment, null, cardTree, touchDragIndicator)
+    : cardTree;
 }
 
 

@@ -568,6 +568,27 @@
 .v2-design .bp-p-dot { display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; line-height: 1; }
 .v2-design .bp-p-dot::after { display: inline-flex; align-items: center; justify-content: center; line-height: 1 !important; }
 
+/* Floating badge that follows the finger while a touch drag-to-move-availability gesture is
+ * active (BentoCalendarCard). Portaled straight to <body> (same reason CalendarGrid's own touch
+ * drag indicator is), so it renders as a sibling of -- not a descendant of -- the .v2-design
+ * root and a plain ".v2-design .v2-avail-drag-ghost" selector could never reach it; scoped via
+ * body:has() instead, same as this codebase's other portaled-to-body V2 rules. Only the
+ * position and the dragged participant's color vary per drag, so those stay inline; everything
+ * else lives here to keep the eager JS bundle lean. */
+body:has(.v2-design) .v2-avail-drag-ghost {
+  position: fixed;
+  transform: translate(-50%, -130%);
+  color: #FFFFFF;
+  padding: 6px 12px;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-md);
+  font-weight: 800;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
+  pointer-events: none;
+  z-index: 100001;
+  white-space: nowrap;
+}
+
 /* Anniversary color semantics: desktop uses a readable tinted surface and
  * dark category text; narrow layouts intentionally collapse to a solid bar. */
 @media (min-width: 768px) {
