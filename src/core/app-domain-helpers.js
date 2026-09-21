@@ -901,6 +901,16 @@ async function listPhotoIndexEntriesForDedupRemote(password, options = {}) {
   return { items: Array.isArray(result?.items) ? result.items : [], nextCursor: result?.nextCursor ?? null };
 }
 
+// Admin "중복사진 검사" 보고서의 병합 실행 -- 태그/댓글만 승자 쪽으로 합치고 패자 사진 자체는
+// 지우지 않는다 (실제 삭제는 기존 라이트박스 삭제 버튼으로, 해당 캘린더를 열어 수행). See the
+// detailed rationale comment on mergeDedupPhotos in functions/index.js.
+async function mergeDedupPhotosRemote(password, { calendarId, winnerAssetKey, loserAssetKey }) {
+  const result = await callAdminFunction('mergeDedupPhotos', { password, calendarId, winnerAssetKey, loserAssetKey });
+  return result?.ok === true
+    ? { ok: true, mergedTags: result.mergedTags, mergedCommentCount: result.mergedCommentCount }
+    : { ok: false, reason: result?.reason || result?.message || 'error' };
+}
+
 // Admin 데이터풀 > 파일/링크 -- lists sharedFiles/linkPreviews docs used by 2+ calendars (see
 // onSharedFileWrite/onLinkPreviewWrite + listSharedDataPool in functions/index.js). Both
 // collections deny client `list` access in firestore.rules, so this always goes through the
@@ -2939,6 +2949,7 @@ export {
   listUntaggedPhotoIndexEntriesRemote,
   adminBulkTagPhotosRemote,
   listPhotoIndexEntriesForDedupRemote,
+  mergeDedupPhotosRemote,
   listSharedDataPoolRemote,
   findCultureLinkedAnniversary,
   findCultureLinkedMemo,

@@ -2000,7 +2000,8 @@ exports.listPhotoIndexEntriesForDedup = functions.https.onRequest(async (req, re
         tags: String(data.tags || ''),
         commentCount: Number(data.commentCount) || 0,
         participantId: String(data.participantId || ''),
-        source: String(data.source || '')
+        source: String(data.source || ''),
+        mergedInto: String(data.mergedInto || '')
       };
     }).filter(item => item.calendarId && item.assetKey && item.full);
     const nextCursor = snap.docs.length === pageSize ? Number(snap.docs[snap.docs.length - 1].data()?.updatedAt) || null : null;
@@ -2151,6 +2152,80 @@ exports.adminBulkTagPhotos = functions.https.onRequest(async (req, res) => {
     }
   }
   res.status(200).json({ ok: true, results });
+});
+
+// Admin "중복사진 검사" 보고서의 병합 실행. 사용자가 요청한 "데이터가 적은 쪽을 많은 쪽으로
+// 합쳐주고 데이터가 적은 사진을 제거해줘" 중 병합 절반만 서버에서 수행한다: 태그(해시태그
+// 토큰의 합집합)와 댓글(합쳐서 시간순 정렬)을 승자 쪽으로 옮긴다. 의도적으로 패자 사진 자체
+// (Storage 객체, 소유 문서의 imageUrls/photos[] 배열 항목)는 여기서 지우지 않는다 -- 그 삭제
+// 로직은 이미 클라이언트에 있고(handleDeleteChatMessagePhoto 등, 이번 세션에서 방금 검증한
+// 경로) 실사용/테스트가 된 코드라, 같은 로직을 서버에서 라이브 검증 없이 새로 복제하는 것은
+// CLAUDE.md의 "데이터 모델을 백업/복구 리허설 없이 바꾸지 않는다" 원칙과 정면으로 부딪힌다.
+// 병합이 끝나면 패자의 photoIndex 행에 mergedInto를 표시해 보고서에서 "삭제해도 데이터 유실
+// 없음"으로 안내하고, 관리자가 그 캘린더를 열어 기존 라이트박스 삭제 버튼으로 마무리한다.
+function mergeTagTokens(...tagStrings) {
+  const seen = new Set();
+  const tokens = [];
+  tagStrings.forEach(str => String(str || '').split(/\s+/).forEach(token => {
+    const clean = token.trim();
+    if (!clean || seen.has(clean)) return;
+    seen.add(clean);
+    tokens.push(clean);
+  }));
+  return tokens.join(' ').slice(0, 160);
+}
+
+exports.mergeDedupPhotos = functions.https.onRequest(async (req, res) => {
+  setAdminCorsHeaders(res);
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  if (req.method !== 'POST') { res.status(405).json({ ok: false }); return; }
+  const { password, calendarId, winnerAssetKey, loserAssetKey } = req.body || {};
+  if (typeof password !== 'string' || !password.trim()) { res.status(400).json({ ok: false }); return; }
+  if (!CALENDAR_ID_RE.test(String(calendarId || '')) || !PHOTO_ASSET_KEY_RE.test(String(winnerAssetKey || '')) || !PHOTO_ASSET_KEY_RE.test(String(loserAssetKey || ''))) {
+    res.status(400).json({ ok: false, message: 'invalid ids' }); return;
+  }
+  if (winnerAssetKey === loserAssetKey) { res.status(400).json({ ok: false, message: 'same asset' }); return; }
+  const rateState = await checkAdminAuthRateLimit(req.ip);
+  if (rateState.blocked) { res.status(429).json({ ok: false }); return; }
+  const matches = sha256Hex(password.trim()) === await getStoredAdminPasswordHash();
+  await recordAdminAuthResult(rateState, matches);
+  if (!matches) { res.status(401).json({ ok: false }); return; }
+  try {
+    const db = admin.firestore();
+    const calendarDocId = `cal_${calendarId}`;
+    const indexColl = db.collection('calendars').doc(calendarDocId).collection('photoIndex');
+    const [winnerSnap, loserSnap] = await Promise.all([indexColl.doc(winnerAssetKey).get(), indexColl.doc(loserAssetKey).get()]);
+    if (!winnerSnap.exists || !loserSnap.exists) { res.status(404).json({ ok: false, message: 'not-found' }); return; }
+    const winnerData = winnerSnap.data() || {};
+    const loserData = loserSnap.data() || {};
+
+    const mergedTags = mergeTagTokens(winnerData.tags, loserData.tags);
+    if (mergedTags !== String(winnerData.tags || '')) {
+      const tagOutcome = await applyPhotoIndexTagWrite(calendarId, winnerAssetKey, mergedTags);
+      if (!tagOutcome.ok) { res.status(200).json({ ok: false, reason: `tag-${tagOutcome.reason || 'failed'}` }); return; }
+    }
+
+    const commentsColl = db.collection('calendars').doc(calendarDocId).collection('photoComments');
+    const [winnerCommentsSnap, loserCommentsSnap] = await Promise.all([commentsColl.doc(winnerAssetKey).get(), commentsColl.doc(loserAssetKey).get()]);
+    const winnerComments = Array.isArray(winnerCommentsSnap.data()?.comments) ? winnerCommentsSnap.data().comments : [];
+    const loserComments = Array.isArray(loserCommentsSnap.data()?.comments) ? loserCommentsSnap.data().comments : [];
+    let mergedCommentCount = winnerComments.length;
+    if (loserComments.length > 0) {
+      const merged = [...winnerComments, ...loserComments]
+        .sort((a, b) => Number(a?.timestamp || 0) - Number(b?.timestamp || 0))
+        .slice(0, 200);
+      await commentsColl.doc(winnerAssetKey).set({ comments: merged }, { merge: true });
+      await commentsColl.doc(loserAssetKey).delete();
+      mergedCommentCount = merged.length;
+    }
+
+    await indexColl.doc(loserAssetKey).set({ mergedInto: winnerAssetKey, mergedAt: Date.now() }, { merge: true });
+
+    res.status(200).json({ ok: true, mergedTags, mergedCommentCount });
+  } catch (err) {
+    console.error('mergeDedupPhotos failed:', err);
+    res.status(500).json({ ok: false });
+  }
 });
 
 // Admin-only aggregate health view for Web Push subscriptions. Endpoints and encryption keys
