@@ -1143,7 +1143,11 @@ export function DateModal({
       const entries = getEntries ? getEntries(msg) : [];
       if (entries.length > 0) {
         entries.forEach((entry, idx) => {
-          const tags = (Array.isArray(msg.imageTags) ? msg.imageTags[idx] : '') || entry.tags || '';
+          // entry.tags is already resolved by getMessageImageEntries via the asset-identity
+          // map (imageTagMap), which survives deletion/reorder; msg.imageTags[idx] is a raw
+          // positional array that can point at the wrong photo once entries shift. Never let
+          // the positional value override the asset-resolved one.
+          const tags = entry.tags || '';
           const parsedDates = typeof parseFlexibleDateTokens === 'function' ? parseFlexibleDateTokens(tags) : [];
           const matchesTag = (targetTag && tags.includes(targetTag)) || parsedDates.includes(dateStr);
           if (matchesTag) {
@@ -1161,7 +1165,13 @@ export function DateModal({
                 createdAt: msg.timestamp || 0,
                 source: 'chat-tag',
                 sourceMessageId: msg.id,
-                sourceImageIndex: idx,
+                // entry.imageIndex is the physical slot, not the forEach position -- entries
+                // omits invalid URL slots, so once one is skipped every later entry's real
+                // imageIndex is greater than its position here. Downstream lookups (e.g.
+                // getMessageImageEntries(...).find(item => item.imageIndex === sourceImageIndex)
+                // in app-chat-render.js) key off the physical slot, so passing the loop index
+                // instead would resolve to the wrong photo.
+                sourceImageIndex: entry.imageIndex,
                 tags: tags,
                 assetKey: entry.assetKey || entry.mediaKey || key,
                 mediaKey: entry.mediaKey || key,
@@ -1223,7 +1233,10 @@ export function DateModal({
         if (full && !alreadyIncluded) {
           directKeys.add(key);
           assetKeys.forEach(assetKey => directKeys.add(assetKey));
-          memoPhotos.push({ id: `memo_photo_${memo.id}_${idx}`, imageUrl: full, thumbUrl: entry.thumb || full, createdAt: memo.updatedAt || memo.createdAt || 0, source: 'memo-tag', sourceMemoId: memo.id, sourceImageIndex: idx, tags, assetKey: key, mediaKey: key, refKey: `memo:${memo.id}:${idx}` });
+          // entry.imageIndex is the physical slot (not the forEach position -- entries can
+          // omit invalid URL slots), and downstream lookups key off the physical slot; see the
+          // matching note on the chat-photo branch above.
+          memoPhotos.push({ id: `memo_photo_${memo.id}_${idx}`, imageUrl: full, thumbUrl: entry.thumb || full, createdAt: memo.updatedAt || memo.createdAt || 0, source: 'memo-tag', sourceMemoId: memo.id, sourceImageIndex: entry.imageIndex, tags, assetKey: key, mediaKey: key, refKey: `memo:${memo.id}:${idx}` });
         }
       });
       const direct = typeof getMessageDirectMediaEntry === 'function' ? getMessageDirectMediaEntry(asMsg, { allowVideo: true }) : null;
