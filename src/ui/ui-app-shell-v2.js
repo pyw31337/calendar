@@ -3093,17 +3093,15 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   const lastChatAuthor = lastChatMsg ? authorFor(lastChatMsg, calendar?.participants).name : '';
   const memoRows = recordsContext?.memoProps?.memos || [];
   const placeRows = recordsContext?.placesProps?.calendar?.places || [];
-  const settlementCards = calendar?.settlementCards || [];
   const lastMemo = React.useMemo(() => latestRows(memoRows)[0], [memoRows]);
   const lastPlace = React.useMemo(() => latestRows(placeRows)[0], [placeRows]);
   const lastPhoto = recordsContext?.mediaProps?.indexedPhotos?.[0];
-  const recentSettlementCards = React.useMemo(() => latestRows(settlementCards), [settlementCards]);
   const shortDate = value => { const ms = timestampMs(value); return ms ? new Date(ms).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' }).replace(/\. /g, '.').replace(/\.$/, '') : ''; };
-  const sideMeta = { chat: lastChatAuthor, memo: lastMemo?.title || '', places: lastPlace?.alias || lastPlace?.name || '', gallery: shortDate(lastPhoto?.timestamp), settlement: shortDate(recentSettlementCards[0]?.updatedAt || recentSettlementCards[0]?.createdAt) };
   // Same 잔액 source as default-shell side menu / settlement summary (공금 running balance).
   const settlementBalanceBadge = calendar
     ? formatBalanceBadge(calculateSettlementBalance(calendar))
     : null;
+  const sideMeta = { chat: lastChatAuthor, memo: lastMemo?.title || '', places: lastPlace?.alias || lastPlace?.name || '', gallery: shortDate(lastPhoto?.timestamp), settlement: settlementBalanceBadge?.text || '' };
   const participants = Array.isArray(calendarContext?.calendar?.participants) ? calendarContext.calendar.participants : [];
   const chatAuthorPart = participants.find(p => p && (p.id === lastChatMsg?.participantId || p.name === lastChatAuthor));
   const chatPillColor = chatAuthorPart?.color || '#EF4444';
@@ -3196,14 +3194,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
           onClick: () => selectSideItem(item.id)
         },
           React.createElement('span', { className: bentoClass('side-nav-item-icon renewal-shell-nav-icon') }, React.createElement(TabIcon, { id: item.icon, active })),
-          React.createElement('span', { className: bentoClass('side-nav-item-title renewal-shell-nav-label') },
-            item.label,
-            item.id === 'settlement' && settlementBalanceBadge?.text && React.createElement('span', {
-              className: bentoClass('side-nav-item-badge'),
-              style: { backgroundColor: settlementBalanceBadge.bgColor || '#EF4444' },
-              title: '정산 잔액'
-            }, settlementBalanceBadge.text)
-          ),
+          React.createElement('span', { className: bentoClass('side-nav-item-title renewal-shell-nav-label') }, item.label),
           metaVal && (
             item.isPill
               ? React.createElement('span', { className: bentoClass('side-nav-item-meta chat-name-pill'), style: { backgroundColor: chatPillColor, color: chatPillTextColor } }, metaVal)
@@ -3213,6 +3204,9 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
                       ? 'side-nav-item-meta side-nav-date-chip renewal-shell-side-nav-meta'
                       : 'side-nav-item-meta renewal-shell-side-nav-meta'
                   ),
+                  style: item.id === 'settlement'
+                    ? { color: settlementBalanceBadge?.bgColor || '#EF4444', fontWeight: 700 }
+                    : undefined,
                 }, metaVal)
           )
         );
