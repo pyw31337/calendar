@@ -178,10 +178,12 @@ export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, se
       const target = event.target;
       if (!target || typeof target.scrollTop !== 'number' || target.scrollHeight <= target.clientHeight) return;
       const top = target.scrollTop;
-      if (top < 12) setIsVisible(true);
-      else if (top - lastTop > 4 && top > 56) setIsVisible(false);
-      else if (lastTop - top > 4) setIsVisible(true);
+      const delta = top - lastTop;
+      if (Math.abs(delta) < 4) return;
       lastTop = top;
+      if (top < 12) setIsVisible(true);
+      else if (delta > 6 && top > 56) setIsVisible(false);
+      else if (delta < -8) setIsVisible(true);
     };
     document.addEventListener('scroll', onScroll, true);
     return () => document.removeEventListener('scroll', onScroll, true);

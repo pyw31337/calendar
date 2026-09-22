@@ -4004,10 +4004,12 @@ select.form-select {
   align-items: flex-start !important;
   justify-content: flex-start !important;
 }
-.history-meetings-grid .date-item-btn.is-past .place-memo-stack {
-  background-color: #d4dce8 !important;
+.history-meetings-grid .date-item-btn .place-memo-stack {
   border-radius: 10px !important;
   border-top: none !important;
+}
+.history-meetings-grid .date-item-btn.is-past .place-memo-stack {
+  background-color: #d4dce8 !important;
 }
 @media (min-width: 640px) and (max-width: 1023px) {
   .history-meetings-grid { grid-template-columns: repeat(2, 1fr); }

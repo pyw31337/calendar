@@ -485,10 +485,17 @@
 /* All 6 destinations unified list/body padding:
  * Desktop: 40px all 4 sides (--v2-dest-content-pad-x/y are 40px on desktop >=768px)
  * Mobile: 20px all 4 sides (--v2-dest-content-pad-x/y are 20px on mobile <768px)
+ * Note: .v2-archive .history-*-scroll / grid have padding-top from the absolute header
+ * height baked in via dest-chrome-late.css, so they are kept here to set L/R/B only.
  */
 .renewal-shell.v2-design .v2-archive .history-page-scroll,
 .renewal-shell.v2-design .v2-archive .history-meetings-grid,
-.renewal-shell.v2-design .v2-archive .history-bento-grid,
+.renewal-shell.v2-design .v2-archive .history-bento-grid {
+  padding-left: var(--v2-dest-content-pad-x) !important;
+  padding-right: var(--v2-dest-content-pad-x) !important;
+  padding-bottom: var(--v2-dest-content-pad-y) !important;
+  box-sizing: border-box !important;
+}
 .renewal-shell.v2-design .v2-settlement .settlement-page-body,
 .renewal-shell.v2-design .v2-settlement-legacy .settlement-page-body,
 .renewal-shell.v2-design .v2-settlement .v2-settlement-body,
