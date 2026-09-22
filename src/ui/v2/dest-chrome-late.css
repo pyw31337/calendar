@@ -790,6 +790,7 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
 .v2-design .v2-archive .v2-page-header {
   min-height: 56px !important;
   padding: 0 !important;
+  border-bottom: none !important;
 }
 .v2-design .v2-archive .v2-page-header .bp-header-row {
   min-height: 56px !important;
