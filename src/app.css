@@ -4372,17 +4372,36 @@ select.form-select {
 /* Capsule Memo Badge */
 .memo-capsule-badge {
   display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px;
-  border-radius: 10px; font-size: 0.75rem; font-weight: 700;
+  border-radius: var(--radius-full, 999px); font-size: 0.75rem; font-weight: 700;
   box-shadow: 0 1px 3px rgba(0,0,0,0.1); line-height: 120%;
+  box-sizing: border-box;
+  max-width: 100%;
   /* Lives inside a <button> (date-item-btn), whose UA default is text-align:center --
      without this, a memo that wraps to 2+ lines centers each line instead of staying
      left-aligned like normal body text. */
   text-align: left;
 }
-.confirmed-meeting-banner .memo-capsule-badge,
-.confirmed-meeting-surface .memo-capsule-badge {
-  padding: 4px 10px !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+.memo-capsule-badge.is-multiline {
+  display: inline-block;
+  text-align: left;
+  padding: 6px 14px;
+  line-height: 130%;
+  border-radius: 10px;
+  word-break: break-word;
+  max-width: 100%;
+}
+.confirmed-meeting-banner .memo-capsule-badge:not(.is-multiline),
+.confirmed-meeting-surface .memo-capsule-badge:not(.is-multiline) {
+  padding: 4px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.confirmed-meeting-banner .memo-capsule-badge.is-multiline,
+.confirmed-meeting-surface .memo-capsule-badge.is-multiline {
+  padding: 6px 14px;
+  line-height: 130%;
+  border-radius: 10px;
+  text-align: left;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 .btn-view-schedule {
   box-shadow: none !important;
@@ -4400,7 +4419,8 @@ select.form-select {
   box-shadow: none;
 }
 @media (min-width: 640px) {
-  .memo-capsule-badge { padding: 4px 12px; font-size: 0.8rem; }
+  .memo-capsule-badge:not(.is-multiline) { padding: 4px 12px; font-size: 0.8rem; }
+  .memo-capsule-badge.is-multiline { font-size: 0.8rem; }
 }
 
 /* D-day capsule on the confirmed-meeting banner */

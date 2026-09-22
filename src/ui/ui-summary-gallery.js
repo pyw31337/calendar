@@ -5,6 +5,7 @@
 import { composeGalleryPhotos, collectMemoryPhotoIdentityKeys, isMemoryPhotoExcluded, expandMemoryPhotoExclusionKeys, dedupeMemoryPhotoEntries, photoBelongsToMemory, isMemeKeyboardPhotoEntry } from '../core/gallery-data.js';
 import { resolveGalleryLightboxTags } from '../core/photo-index.js';
 import { useScrollHideHeader } from '../core/use-scroll-hide-header.js';
+import { CapsuleTextBadge } from './ui-widgets.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -813,8 +814,9 @@ export function SummaryList({
       const memoUrl = extractFirstUrl(e.note);
       const memoText = memoUrl ? removeFirstUrl(e.note) : e.note.trim();
       if (!memoText) return null;
-      return /*#__PURE__*/React.createElement("span", {
+      return /*#__PURE__*/React.createElement(CapsuleTextBadge, {
         key: e.participantId || p.id,
+        text: memoText,
         className: "memo-capsule-badge",
         style: isPast ? {
           backgroundColor: 'transparent',
@@ -928,8 +930,9 @@ export function SummaryList({
       const memoUrl = extractFirstUrl(e.note);
       const memoText = memoUrl ? removeFirstUrl(e.note) : e.note.trim();
       if (!memoText) return null;
-      return /*#__PURE__*/React.createElement("span", {
+      return /*#__PURE__*/React.createElement(CapsuleTextBadge, {
         key: e.participantId || p.id,
+        text: memoText,
         className: "memo-capsule-badge",
         style: isPast ? {
           backgroundColor: 'var(--bg-primary)',
@@ -1046,8 +1049,9 @@ export function SummaryList({
       const memoUrl = extractFirstUrl(e.note);
       const memoText = memoUrl ? removeFirstUrl(e.note) : e.note.trim();
       if (!memoText) return null;
-      return /*#__PURE__*/React.createElement("span", {
+      return /*#__PURE__*/React.createElement(CapsuleTextBadge, {
         key: e.participantId || p.id,
+        text: memoText,
         className: `memo-capsule-badge ${isPast ? 'is-past' : ''}`,
         style: isPast ? {
           backgroundColor: 'transparent',
@@ -2177,8 +2181,9 @@ export function HistoryView({
               const memoUrl = extractFirstUrl(e.note);
               const memoText = memoUrl ? removeFirstUrl(e.note) : e.note.trim();
               if (!memoText) return null;
-              return /*#__PURE__*/React.createElement("span", {
+              return /*#__PURE__*/React.createElement(CapsuleTextBadge, {
                 key: e.participantId || p.id,
+                text: memoText,
                 className: `memo-capsule-badge ${isPast ? 'is-past' : ''}`,
                 style: isPast
                   ? { backgroundColor: 'transparent', background: 'transparent', color: p.color, border: `1px solid ${p.color}`, boxShadow: 'none' }

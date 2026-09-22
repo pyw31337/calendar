@@ -1283,7 +1283,7 @@ html:has(.renewal-shell.v2-design) .bottom-sheet-header h4 {
 .v2-design .bp-dday-compact-badge,
 .v2-design .bp-dday-pill,
 .v2-design .bp-day-meeting-pill,
-.v2-design .memo-capsule-badge,
+.v2-design .memo-capsule-badge:not(.is-multiline),
 .v2-design .calendar-loading-pill {
   display: inline-flex !important;
   align-items: center !important;
@@ -1298,6 +1298,18 @@ html:has(.renewal-shell.v2-design) .bottom-sheet-header h4 {
   border-radius: 999px !important;
   text-align: center;
   vertical-align: middle;
+}
+
+.v2-design .memo-capsule-badge.is-multiline {
+  display: inline-block !important;
+  height: auto !important;
+  min-height: auto !important;
+  padding: 6px 14px !important;
+  line-height: 130% !important;
+  border-radius: 10px !important;
+  text-align: left !important;
+  word-break: break-word;
+  max-width: 100%;
 }
 
 /* V2 Memo author circle indicator (8px x 8px personal color circle, strictly no shadow or border) */

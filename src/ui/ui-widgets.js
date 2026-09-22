@@ -141,7 +141,10 @@ export function TikTokEmbedWidget({ url, videoId, onFailed }) {
 export function useCapsuleAutoRadius(text) {
   const React = window.React;
   const ref = React.useRef(null);
-  const [isMultiline, setIsMultiline] = React.useState(false);
+  const [isMultiline, setIsMultiline] = React.useState(() => {
+    const s = String(text || '').trim();
+    return s.includes('\n') || s.length >= 24;
+  });
   React.useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return undefined;
@@ -149,9 +152,12 @@ export function useCapsuleAutoRadius(text) {
       const cs = window.getComputedStyle(el);
       let lineHeight = parseFloat(cs.lineHeight);
       if (!Number.isFinite(lineHeight) || lineHeight <= 0) {
-        lineHeight = (parseFloat(cs.fontSize) || 14) * 1.3;
+        lineHeight = (parseFloat(cs.fontSize) || 12) * 1.3;
       }
-      setIsMultiline(el.scrollHeight > lineHeight * 1.5);
+      const padTop = parseFloat(cs.paddingTop) || 0;
+      const padBottom = parseFloat(cs.paddingBottom) || 0;
+      const contentHeight = (el.scrollHeight || el.offsetHeight || 0) - padTop - padBottom;
+      setIsMultiline(contentHeight > lineHeight * 1.35 || (typeof el.getClientRects === 'function' && el.getClientRects().length > 1));
     };
     measure();
     if (typeof ResizeObserver === 'function') {
@@ -169,20 +175,34 @@ export function useCapsuleAutoRadius(text) {
 // border-radius: var(--radius-full) inline.
 export function CapsuleTextBadge({ text, title, tag = 'span', style = null, className = '', onClick, children }) {
   const React = window.React;
-  const [ref, isMultiline] = useCapsuleAutoRadius(text);
-  if (!text && !children) return null;
+  const rawText = text != null ? String(text) : (typeof children === 'string' ? children : '');
+  const [ref, isMultiline] = useCapsuleAutoRadius(rawText);
+  if (!rawText && !children) return null;
+  const multilineClass = isMultiline ? 'is-multiline' : '';
+  const combinedClassName = [className, multilineClass].filter(Boolean).join(' ') || undefined;
   return /*#__PURE__*/React.createElement(tag, {
     ref,
-    title: title != null ? title : text,
-    className: className || undefined,
+    title: title != null ? title : (text || (typeof children === 'string' ? children : undefined)),
+    className: combinedClassName,
     onClick,
-    style: {
-      display: 'inline-flex',
-      alignItems: 'center',
-      borderRadius: isMultiline ? '10px' : 'var(--radius-full)',
-      ...(style || {})
-    }
-  }, children || text);
+    style: Object.assign(
+      {
+        display: isMultiline ? 'inline-block' : 'inline-flex',
+        alignItems: isMultiline ? undefined : 'center',
+        borderRadius: isMultiline ? '10px' : 'var(--radius-full, 999px)',
+        boxSizing: 'border-box'
+      },
+      style || {},
+      isMultiline ? {
+        textAlign: 'left',
+        padding: '6px 14px',
+        lineHeight: '130%',
+        borderRadius: '10px',
+        wordBreak: 'break-word',
+        maxWidth: '100%'
+      } : {}
+    )
+  }, children != null ? children : text);
 }
 
 export function UrlCapsuleBadge({ url, style = null }) {
