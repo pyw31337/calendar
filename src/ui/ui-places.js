@@ -920,6 +920,14 @@ export function PlacesView({
   // only one entry across all place cards is in edit mode at a time.
   const [editingMemoEntryKey, setEditingMemoEntryKey] = React.useState(null);
   const [editingMemoEntryText, setEditingMemoEntryText] = React.useState('');
+  // A place card with 2+ visit-memo entries shows only the most recent one by default, with a
+  // "N개 장소 더보기" toggle to reveal the rest -- keyed by place id, independent per card.
+  const [expandedPlaceMemoIds, setExpandedPlaceMemoIds] = React.useState(() => new Set());
+  const togglePlaceMemoExpanded = placeId => setExpandedPlaceMemoIds(prev => {
+    const next = new Set(prev);
+    if (next.has(placeId)) next.delete(placeId); else next.add(placeId);
+    return next;
+  });
   const [isBulkShareMode, setIsBulkShareMode] = React.useState(false);
   const [selectedBulkShareKeys, setSelectedBulkShareKeys] = React.useState(() => new Set());
   const [isGeneratingBulkShareUrl, setIsGeneratingBulkShareUrl] = React.useState(false);
@@ -1559,8 +1567,9 @@ export function PlacesView({
       /* Desktop Category Bar (Only on PC) */
       !isMobile && /*#__PURE__*/React.createElement("div", { className: "place-category-tabs-desktop-only" },
         /*#__PURE__*/React.createElement(SearchCategoryTabs, {
+          activeColor: typeof renderV2 === 'function' ? '#7C2FE5' : undefined,
           tabs: [
-            { key: 'all', label: '전체', count: searchedPlaces.length, color: '#2563EB' },
+            { key: 'all', label: '전체', count: searchedPlaces.length, color: typeof renderV2 === 'function' ? '#7C2FE5' : '#2563EB' },
             ...categories.map(category => ({
               key: category.id,
               label: `${getPlaceCategoryIcon(category)} ${category.name}`,
@@ -1628,7 +1637,7 @@ export function PlacesView({
       className: "places-list-toolbar",
       style: {
         ...LIST_TOOLBAR_ROW_STYLE,
-        padding: '12px 16px 4px',
+        padding: '20px 16px 14px',
         gap: isMobile ? '6px' : '8px',
         backgroundColor: 'var(--bg-primary)'
       }
@@ -1647,20 +1656,15 @@ export function PlacesView({
       }, renderPlacesActionButtons())
     ),
 
-    /* Scrollable Cards List Container (Scrolling independently) */
+    /* Scrollable Cards List Container (Scrolling independently). Cards render directly here --
+       no extra card-styled wrapper div around the whole list (each place-card-row already has
+       its own border/background/radius; wrapping them all in a second card box double-boxed
+       them, per user feedback). */
     !mapExpanded && /*#__PURE__*/React.createElement("div", {
       ref: scrollBodyRef,
       className: "places-list-body",
-      style: { flex: 1, overflowY: 'auto', padding: '8px 16px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }
+      style: { flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }
     },
-      /* Place cards list layout */
-      /*#__PURE__*/React.createElement("div", {
-        style: {
-          display: 'flex', flexDirection: 'column', gap: '6px', padding: '10px',
-          border: 'none', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-card)',
-          boxShadow: '0 1px 4px rgba(0,0,0,0.08)'
-        }
-      },
         filteredPlaces.length === 0 ? /*#__PURE__*/React.createElement("div", {
           style: { padding: '30px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-base)' }
         }, places.length === 0 ? "등록된 장소가 없습니다. 추가 버튼을 눌러 등록해 보세요." : "검색 조건에 맞는 장소가 없습니다.") :
@@ -1799,8 +1803,8 @@ export function PlacesView({
             ),
             
             /* Name & Address -- alias is the list display name when set; official name shown underneath */
-            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 } },
-              /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: 'var(--font-size-base)', color: 'var(--text-main)' } }, highlightKeyword(place.alias || place.name || '이름 없음', listSearchQuery)),
+            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, marginTop: '2px' } },
+              /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: 'var(--font-size-base)', color: 'var(--text-main)', marginBottom: '4px' } }, highlightKeyword(place.alias || place.name || '이름 없음', listSearchQuery)),
               place.alias && place.name && /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } }, highlightKeyword(place.name, listSearchQuery)),
               place.address && /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' } }, highlightKeyword(getDisplayPlaceAddress(place), listSearchQuery))
             ),
@@ -1810,11 +1814,15 @@ export function PlacesView({
                edit/delete, minus the participant dot since a place-memo entry isn't attributed to
                one person. */
                 displayVisitEntries.length > 0
-              ? /*#__PURE__*/React.createElement("div", {
+              ? (() => {
+                  const isMemoExpanded = expandedPlaceMemoIds.has(place.id);
+                  const visibleVisitEntries = isMemoExpanded ? displayVisitEntries : displayVisitEntries.slice(0, 1);
+                  const hiddenCount = displayVisitEntries.length - visibleVisitEntries.length;
+                  return /*#__PURE__*/React.createElement("div", {
                   className: "place-memo-stack",
                   style: { display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '2px' },
                   onClick: e => e.stopPropagation()
-                }, displayVisitEntries.map((entry, idx) => {
+                }, visibleVisitEntries.map((entry, idx) => {
                   const entryKey = `${place.id}::${entry.date}`;
                   const isEditingEntry = editingMemoEntryKey === entryKey;
                   if (isEditingEntry) {
@@ -1914,11 +1922,37 @@ export function PlacesView({
                       style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)', flexShrink: 0 }
                     }, /*#__PURE__*/React.createElement(TrashIcon, { size: 12 }))
                   );
-                }))
+                }),
+                hiddenCount > 0 && /*#__PURE__*/React.createElement("button", {
+                  type: "button",
+                  onClick: e => { e.stopPropagation(); togglePlaceMemoExpanded(place.id); },
+                  style: {
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                    background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0',
+                    fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--text-muted)'
+                  }
+                }, `${hiddenCount}개 장소 더보기`, /*#__PURE__*/React.createElement("svg", {
+                  xmlns: "http://www.w3.org/2000/svg", width: "14", height: "14", viewBox: "0 0 24 24",
+                  fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round"
+                }, /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" }))),
+                isMemoExpanded && displayVisitEntries.length > 1 && /*#__PURE__*/React.createElement("button", {
+                  type: "button",
+                  onClick: e => { e.stopPropagation(); togglePlaceMemoExpanded(place.id); },
+                  style: {
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                    background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0',
+                    fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--text-muted)'
+                  }
+                }, "접기", /*#__PURE__*/React.createElement("svg", {
+                  xmlns: "http://www.w3.org/2000/svg", width: "14", height: "14", viewBox: "0 0 24 24",
+                  fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round",
+                  style: { transform: 'rotate(180deg)' }
+                }, /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" })))
+                );
+                })()
               : memoWithoutDate && /*#__PURE__*/React.createElement("div", { className: "place-memo-stack", style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-main)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px' } }, renderTextWithUrlBadge(memoWithoutDate))
           );
         })
-      )
     ),
 
     isPlacesMenuOpen && typeof document !== 'undefined' && window.ReactDOM && window.ReactDOM.createPortal

@@ -79,9 +79,14 @@
 .v2-design .v2-memo .v2-dest-body,
 .v2-design .v2-settlement .settlement-page-body,
 .v2-design .v2-settlement-legacy .settlement-page-body,
-.v2-design .v2-settlement .v2-settlement-body,
-.v2-design .v2-places .places-list-body {
+.v2-design .v2-settlement .v2-settlement-body {
   padding: var(--v2-dest-content-pad-y, 12px) var(--v2-dest-content-pad-x, 16px) 96px !important;
+  box-sizing: border-box !important;
+}
+/* places-list-body's own padding lives in responsive-audit.css now (20px flat, the highest-
+   specificity rule left standing after removing several conflicting duplicates here and in
+   screens.css/dest-layout.css) -- box-sizing still applies broadly enough to keep here. */
+.v2-design .v2-places .places-list-body {
   box-sizing: border-box !important;
 }
 .v2-design .v2-gallery .gallery-page-scroll,
