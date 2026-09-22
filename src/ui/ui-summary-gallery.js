@@ -825,7 +825,7 @@ export function SummaryList({
           boxShadow: 'none'
         } : {
           backgroundColor: p.color,
-          color: getContrastTextColor(p.color)
+          color: 'var(--text-main, #1e1b2e)'
         },
         title: `${p.name}: ${memoText}`
       }, memoText);
@@ -941,7 +941,7 @@ export function SummaryList({
           boxShadow: 'none'
         } : {
           backgroundColor: p.color,
-          color: getContrastTextColor(p.color)
+          color: 'var(--text-main, #1e1b2e)'
         },
         title: `${p.name}: ${memoText}`
       }, memoText);
@@ -1061,7 +1061,7 @@ export function SummaryList({
           boxShadow: 'none'
         } : {
           backgroundColor: p.color,
-          color: getContrastTextColor(p.color)
+          color: 'var(--text-main, #1e1b2e)'
         },
         title: `${p.name}: ${memoText}`
       }, memoText);
@@ -2187,7 +2187,7 @@ export function HistoryView({
                 className: `memo-capsule-badge ${isPast ? 'is-past' : ''}`,
                 style: isPast
                   ? { backgroundColor: 'transparent', background: 'transparent', color: p.color, border: `1px solid ${p.color}`, boxShadow: 'none' }
-                  : { backgroundColor: p.color, color: getContrastTextColor(p.color) },
+                  : { backgroundColor: p.color, color: 'var(--text-main, #1e1b2e)' },
                 title: `${p.name}: ${memoText}`
               }, highlightKeyword(memoText, searchQuery));
             })

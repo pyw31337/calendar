@@ -79,23 +79,19 @@
 .v2-design .v2-memo .v2-dest-body,
 .v2-design .v2-settlement .settlement-page-body,
 .v2-design .v2-settlement-legacy .settlement-page-body,
-.v2-design .v2-settlement .v2-settlement-body {
-  padding: var(--v2-dest-content-pad-y, 12px) var(--v2-dest-content-pad-x, 16px) 96px !important;
-  box-sizing: border-box !important;
-}
-/* places-list-body's own padding lives in responsive-audit.css now (20px flat, the highest-
-   specificity rule left standing after removing several conflicting duplicates here and in
-   screens.css/dest-layout.css) -- box-sizing still applies broadly enough to keep here. */
-.v2-design .v2-places .places-list-body {
-  box-sizing: border-box !important;
-}
+.v2-design .v2-settlement .v2-settlement-body,
+.v2-design .v2-settlement .bp-content,
+.v2-design .v2-places .places-list-body,
 .v2-design .v2-gallery .gallery-page-scroll,
 .v2-design .v2-content .culture-items-grid,
+.v2-design .v2-content .content-page-scroll,
+.v2-design .v2-memo .memo-list-scroll,
+.v2-design .v2-memo .v2-memo-body,
 .v2-design .v2-archive .history-bento-grid,
 .v2-design .v2-archive .history-page-scroll,
 .v2-design .v2-archive .history-meetings-grid {
-  padding: var(--v2-dest-content-pad-y, 12px) var(--v2-dest-content-pad-x, 16px) 16px !important;
-  box-sizing: border-box !important;
+  padding: var(--v2-dest-content-pad-y) var(--v2-dest-content-pad-x);
+  box-sizing: border-box;
 }
 
 .v2-design .v2-settlement .settlement-page-tabs,
@@ -1026,15 +1022,6 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   padding: 0 !important;
   margin: 0 !important;
   gap: 0 !important;
-}
-.v2-design .v2-archive .history-page-scroll,
-.v2-design .v2-archive .history-bento-grid {
-  padding-top: 0 !important;
-  padding-bottom: 16px !important;
-}
-.v2-design .v2-archive .history-meetings-grid {
-  padding-top: 8px !important;
-  padding-bottom: 16px !important;
 }
 .v2-design .v2-archive .history-page-scroll > div:first-child,
 .v2-design .v2-archive .v2-archive-people-stack,

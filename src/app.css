@@ -4339,6 +4339,9 @@ select.form-select {
   mix-blend-mode: normal !important;
   box-shadow: 0 8px 16px rgba(15, 23, 42, 0.10);
 }
+.date-item-btn.confirmed-meeting-card .memo-capsule-badge:not(.is-past) {
+  color: #1e1b2e;
+}
 /* Place box inside a confirmed-meeting card keeps no drop shadow at all. */
 .date-item-btn.confirmed-meeting-card .place-memo-stack,
 .confirmed-meeting-surface .place-memo-stack,

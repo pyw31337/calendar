@@ -143,26 +143,47 @@ export function useCapsuleAutoRadius(text) {
   const ref = React.useRef(null);
   const [isMultiline, setIsMultiline] = React.useState(() => {
     const s = String(text || '').trim();
-    return s.includes('\n') || s.length >= 24;
+    return s.includes('\n');
   });
   React.useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return undefined;
+    const s = String(text || '').trim();
+    if (s.includes('\n')) {
+      setIsMultiline(true);
+      return undefined;
+    }
     const measure = () => {
-      const cs = window.getComputedStyle(el);
-      let lineHeight = parseFloat(cs.lineHeight);
-      if (!Number.isFinite(lineHeight) || lineHeight <= 0) {
-        lineHeight = (parseFloat(cs.fontSize) || 12) * 1.3;
+      try {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        const rects = range.getClientRects();
+        if (rects.length <= 1) {
+          const isOverflowing = el.scrollWidth > el.clientWidth + 1;
+          setIsMultiline(isOverflowing);
+          return;
+        }
+        const firstTop = rects[0].top;
+        const wrapped = Array.from(rects).some(r => Math.abs(r.top - firstTop) > 6);
+        setIsMultiline(wrapped);
+      } catch (err) {
+        setIsMultiline(el.scrollWidth > el.clientWidth + 1);
       }
-      const padTop = parseFloat(cs.paddingTop) || 0;
-      const padBottom = parseFloat(cs.paddingBottom) || 0;
-      const contentHeight = (el.scrollHeight || el.offsetHeight || 0) - padTop - padBottom;
-      setIsMultiline(contentHeight > lineHeight * 1.35 || (typeof el.getClientRects === 'function' && el.getClientRects().length > 1));
     };
     measure();
+    const targetToObserve = el.parentElement || el;
     if (typeof ResizeObserver === 'function') {
-      const ro = new ResizeObserver(measure);
-      ro.observe(el);
+      let lastWidth = targetToObserve.clientWidth;
+      const ro = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          const newWidth = entry.contentRect ? entry.contentRect.width : targetToObserve.clientWidth;
+          if (Math.abs(newWidth - lastWidth) >= 1) {
+            lastWidth = newWidth;
+            measure();
+          }
+        }
+      });
+      ro.observe(targetToObserve);
       return () => ro.disconnect();
     }
     return undefined;
