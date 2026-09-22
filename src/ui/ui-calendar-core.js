@@ -2391,7 +2391,6 @@ export function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCan
         className: "poll-voter-badges"
       }, voterIds.map(participantId => {
         const participant = participantsMap[participantId];
-        const textColor = '#FFFFFF';
         return /*#__PURE__*/React.createElement("span", {
           key: participantId,
           className: "v2-author-dot",

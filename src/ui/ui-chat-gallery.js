@@ -450,7 +450,7 @@ export function ChatGalleryModal({
       body.style.overflow = previousBodyOverflow;
     };
   }, [asPage]);
-  const [v2GallerySlotTick, setV2GallerySlotTick] = React.useState(0);
+  const [_v2GallerySlotTick, setV2GallerySlotTick] = React.useState(0);
   React.useEffect(() => {
     if (v2Embed && typeof document !== 'undefined') {
       const el = document.getElementById('v2-gallery-header-tabs-slot');

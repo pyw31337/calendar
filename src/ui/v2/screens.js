@@ -187,9 +187,9 @@ export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, se
     let lastTop = 0;
     const onScroll = event => {
       const target = event.target;
-      let top = 0;
-      let scrollHeight = 0;
-      let clientHeight = 0;
+      let top;
+      let scrollHeight;
+      let clientHeight;
       if (!target || target === document || target === document.documentElement || target === window) {
         top = window.scrollY || document.documentElement.scrollTop || (document.body ? document.body.scrollTop : 0) || 0;
         scrollHeight = Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0);
