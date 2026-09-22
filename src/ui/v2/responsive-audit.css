@@ -492,11 +492,16 @@
 .renewal-shell.v2-design .v2-settlement .settlement-page-body,
 .renewal-shell.v2-design .v2-settlement-legacy .settlement-page-body,
 .renewal-shell.v2-design .v2-settlement .v2-settlement-body,
+.renewal-shell.v2-design .v2-settlement .v2-dest-body,
 .renewal-shell.v2-design .v2-settlement .bp-content,
 .renewal-shell.v2-design .v2-gallery .gallery-page-scroll,
+.renewal-shell.v2-design .v2-records-media,
+.renewal-shell.v2-design .v2-records-media .gallery-page-scroll,
 .renewal-shell.v2-design .v2-places .places-list-body,
+.renewal-shell.v2-design .v2-places .v2-places-body,
 .renewal-shell.v2-design .v2-memo .memo-list-scroll,
 .renewal-shell.v2-design .v2-memo .v2-memo-body,
+.renewal-shell.v2-design .v2-memo .v2-dest-body,
 .renewal-shell.v2-design .v2-content .culture-items-grid,
 .renewal-shell.v2-design .v2-content .content-page-scroll {
   padding: var(--v2-dest-content-pad-y) var(--v2-dest-content-pad-x);

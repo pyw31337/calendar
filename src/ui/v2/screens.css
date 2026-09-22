@@ -818,7 +818,7 @@
     max-width: none !important;
     margin: 0 !important;
     width: 100% !important;
-    padding: var(--v2-dest-content-pad-y, 12px) var(--v2-dest-content-pad-x, 14px) 96px !important;
+    padding: var(--v2-dest-content-pad-y) var(--v2-dest-content-pad-x) !important;
   }
   .v2-design .v2-settlement .settlement-page-tabs {
     max-width: none !important;
@@ -1705,7 +1705,6 @@
   margin: 0 !important;
   position: relative !important;
   inset: auto !important;
-  padding-bottom: 96px !important;
   box-sizing: border-box !important;
 }
 /* Nested legacy memo scroll: let outer pane scroll, avoid double scrollbars */
@@ -1766,7 +1765,6 @@
 .v2-design .v2-content .culture-items-grid,
 .v2-design .v2-archive .history-bento-grid {
   gap: 8px !important;
-  padding: 8px 0 88px !important;
 }
 .v2-design .v2-content .culture-items-grid > * {
   border-radius: 12px !important;

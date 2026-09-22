@@ -1665,7 +1665,7 @@ export function PlacesView({
     !mapExpanded && /*#__PURE__*/React.createElement("div", {
       ref: scrollBodyRef,
       className: "places-list-body",
-      style: { flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }
+      style: { flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }
     },
         filteredPlaces.length === 0 ? /*#__PURE__*/React.createElement("div", {
           style: { padding: '30px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-base)' }
