@@ -187,7 +187,6 @@ export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, se
     document.addEventListener('scroll', onScroll, true);
     return () => document.removeEventListener('scroll', onScroll, true);
   }, []);
-  const centerBrand = brand || (subtitle ? { mark: '🍺', name: String(subtitle).split(' · ')[0].trim() } : null);
   return h(
     React.Fragment,
     null,
@@ -213,18 +212,14 @@ export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, se
             !centerSubtitle && subtitle ? h('div', { className: 'bp-header-sub' }, subtitle) : null
           )
         ),
-        centerBrand ? h(
-          'div',
-          { className: 'bp-header-center-brand', 'aria-label': centerBrand.name },
-          h('span', { className: 'bp-header-brand-mark', 'aria-hidden': 'true' }, centerBrand.mark),
-          h('span', { className: 'bp-header-brand-name' }, centerBrand.name)
-        ) : null,
+        // Center brand text (calendar name) and the search/share header icons were removed
+        // (사용자 요청, 전체 페이지 공통): every destination's header now shows only back/title on
+        // the left and the menu button on the right. onSearch/onShare/searchLabel/brand/subtitle
+        // stay accepted props (callers still pass them) but are intentionally no longer rendered.
         h(
           'div',
           { className: 'bp-header-actions' },
           extra,
-          onSearch && h(IconButton, { label: searchLabel || `${title} 검색`, icon: 'search', size: 20, onClick: onSearch }),
-          onShare && h(IconButton, { label: '공유', icon: 'share', size: 20, onClick: onShare }),
           onMenu && h(IconButton, { label: `${title} 메뉴`, icon: 'menu', size: 20, onClick: onMenu })
         )
       ),
