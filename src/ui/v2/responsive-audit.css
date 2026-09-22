@@ -504,8 +504,8 @@
 .renewal-shell.v2-design .v2-memo .v2-dest-body,
 .renewal-shell.v2-design .v2-content .culture-items-grid,
 .renewal-shell.v2-design .v2-content .content-page-scroll {
-  padding: var(--v2-dest-content-pad-y) var(--v2-dest-content-pad-x);
-  box-sizing: border-box;
+  padding: var(--v2-dest-content-pad-y) var(--v2-dest-content-pad-x) !important;
+  box-sizing: border-box !important;
 }
 
 /* V2 overlays are often portal siblings of the shell instead of descendants.
