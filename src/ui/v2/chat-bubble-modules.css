@@ -228,7 +228,11 @@
 }
 .v2-design .v2-home-memo-bubble .v2-bubble-comment-author {
   flex-shrink: 0;
-  font-size: 0.62rem;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-top: 4px;
 }
 .v2-design .v2-home-memo-bubble .v2-bubble-comment-text {
   flex: 1;
@@ -407,7 +411,7 @@
   font-size: 0 !important;
   line-height: 0 !important;
   color: transparent !important;
-  overflow: hidden !important;
+  overflow: visible !important;
   flex-shrink: 0 !important;
 }
 .v2-memo .v2-memo-card-wrap .v2-memo-card-comments {

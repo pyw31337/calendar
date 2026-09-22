@@ -359,3 +359,11 @@ async function boot() {
 }
 
 boot();
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('click', e => {
+    const d = e.target?.closest?.('[data-author-name]'), o = document.querySelector('.is-tooltip-open');
+    if (o && o !== d) o.classList.remove('is-tooltip-open');
+    if (d) d.classList.toggle('is-tooltip-open');
+  }, true);
+}

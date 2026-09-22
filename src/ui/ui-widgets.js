@@ -307,10 +307,21 @@ export function ParticipantPickerButton({ participant, onClick, placeholder = 'ì
 // 0.7rem there, 0.72rem elsewhere, all meant to be the exact same badge). Pass `children` only
 // when the badge needs more than the bare name (e.g. an inline remove button); otherwise it
 // renders participant.name.
-export function ParticipantBadge({ participant, style, className = '', children, ...rest }) {
+export function ParticipantBadge({ participant, style, className = '', asDot = false, children, ...rest }) {
   const React = window.React;
   if (!participant) return null;
   const badgeName = shortParticipantName(participant.name);
+  if (asDot) {
+    return /*#__PURE__*/React.createElement("span", {
+      className: `v2-author-dot participant-dot${className ? ' ' + className : ''}`,
+      role: "img",
+      tabIndex: 0,
+      "data-author-name": participant.name,
+      title: participant.name,
+      style: { backgroundColor: participant.color || '#94A3B8', ...style },
+      ...rest
+    });
+  }
   return /*#__PURE__*/React.createElement("span", {
     className: `participant-badge${className ? ' ' + className : ''}`,
     style: { backgroundColor: participant.color || '#94A3B8', color: '#FFFFFF', ...style },

@@ -4107,8 +4107,20 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
                   const color = typeof participant === 'object' ? participant?.color : null;
                   return React.createElement('span', {
                     key: `${card.id}_participant_${name}_${index}`,
-                    style: { display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 7px', borderRadius: 'var(--radius-full)', backgroundColor: color ? `${color}1A` : 'var(--border-subtle)', color: color || 'var(--text-main)', fontSize: 'var(--font-size-xs)', fontWeight: 700, whiteSpace: 'nowrap' }
-                  }, name);
+                    className: 'v2-author-dot',
+                    role: 'img',
+                    tabIndex: 0,
+                    'data-author-name': name,
+                    title: name,
+                    style: {
+                      display: 'inline-block',
+                      width: '10px',
+                      height: '10px',
+                      borderRadius: '50%',
+                      backgroundColor: color || 'var(--border-subtle)',
+                      flexShrink: 0
+                    }
+                  });
                 })
                 : React.createElement('span', null, '참여자 없음')
             ),

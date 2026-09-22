@@ -941,7 +941,7 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
               return React.createElement('span', {
                 key: p.id,
                 className: bentoClass('p-dot'),
-                'data-name': (p.name || '').slice(-2),
+                'data-author-name': p.name,
                 style: { background: p.color || 'var(--brand)' },
                 title: entry.note ? `${p.name}: ${entry.note}` : p.name,
                 draggable: true,
@@ -956,6 +956,7 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
                 onTouchMove: event => { event.stopPropagation(); handleBadgeTouchMove(event); },
                 onTouchEnd: event => { event.stopPropagation(); handleBadgeTouchEnd(event); },
                 onTouchCancel: event => { event.stopPropagation(); handleBadgeTouchCancel(); },
+                onClick: event => { event.stopPropagation(); },
               });
             })
           ) : null,
@@ -1502,32 +1503,26 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
           ),
           (tags.length > 0 || displayColor(memo)) ? React.createElement('span', { className: 'v2-bubble-tags' },
             displayColor(memo) ? React.createElement('span', {
-              className: 'v2-memo-author-dot',
+              className: 'v2-author-dot v2-memo-author-dot',
               role: 'img',
+              'data-author-name': displayName(memo) || '작성자',
               'aria-label': `${displayName(memo) || '작성자'} 작성자`,
               title: displayName(memo) || '작성자',
-              style: {
-                display: 'inline-block',
-                width: '8px',
-                height: '8px',
-                minWidth: '8px',
-                minHeight: '8px',
-                maxWidth: '8px',
-                maxHeight: '8px',
-                borderRadius: '50%',
-                backgroundColor: displayColor(memo),
-                flexShrink: 0,
-                border: 'none',
-                boxShadow: 'none',
-                outline: 'none',
-                boxSizing: 'border-box'
-              }
+              onClick: e => e.stopPropagation(),
+              style: { backgroundColor: displayColor(memo) }
             }) : null,
             tags.map(tag => React.createElement('em', { className: 'v2-bubble-tag', key: tag }, `#${String(tag).replace(/^#/, '')}`))
           ) : null,
           visibleComments.length ? React.createElement('div', { className: 'v2-bubble-comment-list' },
             visibleComments.map((comment, commentIndex) => React.createElement('div', { className: 'v2-bubble-comment-preview', key: comment.id || commentIndex },
-              React.createElement(NameColorPill, { className: 'v2-bubble-comment-author', name: shortParticipantName(participantFor(comment)?.name || '댓글'), color: participantFor(comment)?.color }),
+              React.createElement('span', {
+                className: 'v2-author-dot v2-bubble-comment-author',
+                role: 'img',
+                'data-author-name': participantFor(comment)?.name || '댓글',
+                title: participantFor(comment)?.name || '댓글',
+                onClick: e => e.stopPropagation(),
+                style: { backgroundColor: participantFor(comment)?.color || '#94A3B8' }
+              }),
               React.createElement('span', { className: 'v2-bubble-comment-text' }, String(comment.text || ''))
             )),
           ) : null,

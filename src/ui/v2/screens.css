@@ -135,7 +135,7 @@
 .v2-design .v2-memo-card-wrap .v2-memo-tags > span { font-size: var(--font-size-2xs) !important; }
 .v2-design .v2-memo-card-wrap .v2-memo-tags > span:not(:first-child) { background: none !important; color: var(--brand, #7C2FE5) !important; padding: 0 !important; }
 .v2-design .v2-memo-card-wrap .memo-card-pin-btn { color: var(--brand, #7C2FE5) !important; }
-.v2-design .v2-memo-card-wrap .memo-comment-author-dot { width: 16px !important; height: 16px !important; }
+.v2-design .v2-memo-card-wrap .memo-comment-author-dot { width: 8px !important; height: 8px !important; margin-top: 4px; }
 .v2-design .v2-memo-card-wrap .v2-memo-comments { border-top: 1px solid var(--v2-card-border, #eceaf5); padding-top: 10px; }
 .v2-design .v2-memo-legacy .memo-card-hover,
 .v2-design .v2-memo-legacy [class*="memo-card"] {

@@ -985,6 +985,7 @@ export function CalendarGrid({
         return /*#__PURE__*/React.createElement(ParticipantBadge, {
           key: p.id + (e.id || e.date || ''),
           participant: p,
+          asDot: true,
           style: { cursor: 'pointer' },
           draggable: !isNone,
           onDragStart: isNone ? undefined : (event => {
@@ -1974,44 +1975,18 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       (() => {
         const writer = (calendar?.participants || []).find(p => p.id === memo.participantId);
         if (!writer) return null;
-        const isV2Shell = variant === 'v2-page' || (typeof document !== 'undefined' && !!document.querySelector('.renewal-shell.v2-design'));
-        if (isV2Shell) {
-          return /*#__PURE__*/React.createElement("span", {
-            className: "v2-memo-author-dot v2-memo-author-pill",
-            role: "img",
-            "aria-label": `${writer.name || '작성자'} 작성자`,
-            title: writer.name || '작성자',
-            style: {
-              display: 'inline-block',
-              width: '8px',
-              height: '8px',
-              minWidth: '8px',
-              minHeight: '8px',
-              maxWidth: '8px',
-              maxHeight: '8px',
-              borderRadius: '50%',
-              backgroundColor: writer.color || '#94A3B8',
-              flexShrink: 0,
-              border: 'none',
-              boxShadow: 'none',
-              outline: 'none',
-              boxSizing: 'border-box'
-            }
-          });
-        }
         return /*#__PURE__*/React.createElement("span", {
-          className: "v2-memo-author-pill",
+          className: "v2-author-dot v2-memo-author-dot",
+          role: "img",
+          tabIndex: 0,
+          "data-author-name": writer.name || '작성자',
+          "aria-label": `${writer.name || '작성자'} 작성자`,
+          title: writer.name || '작성자',
+          onClick: e => e.stopPropagation(),
           style: {
-            backgroundColor: writer.color || '#94A3B8',
-            color: '#FFFFFF',
-            borderRadius: 'var(--radius-full)',
-            padding: '4px 8px',
-            fontSize: 'var(--font-size-xs)',
-            fontWeight: 'bold',
-            lineHeight: 1,
-            whiteSpace: 'nowrap'
+            backgroundColor: writer.color || '#94A3B8'
           }
-        }, writer.name);
+        });
       })(),
       
       /* Tags */
@@ -2086,32 +2061,15 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
           borderTop: commentIdx > 0 ? '1px solid color-mix(in srgb, var(--bg-primary) 96%, black)' : 'none'
         }
       },
-        /* The V2 memo page follows the same named colour badge as the V2 home
-           memo card. Keep V1's compact dot untouched in its own variant. */
-        variant === 'v2-page'
-          ? /*#__PURE__*/React.createElement("span", {
-              className: "v2-memo-comment-author",
-              role: "img",
-              tabIndex: 0,
-              "aria-label": `${author?.name || '알 수 없는 작성자'} 작성자`,
-              "data-author-name": author?.name || '알 수 없는 작성자',
-              title: author?.name || '알 수 없는 작성자',
-              style: {
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                flexShrink: 0, minWidth: '30px', padding: '0 6px', height: '18px',
-                borderRadius: '999px', backgroundColor: author?.color || '#94A3B8', color: '#fff',
-                fontSize: '0.62rem', fontWeight: 800, lineHeight: 1, whiteSpace: 'nowrap', boxSizing: 'border-box'
-              }
-            }, shortParticipantName(author?.name || '댓글'))
-          : /*#__PURE__*/React.createElement("span", {
-              className: "memo-comment-author-dot",
-              role: "img",
-              tabIndex: 0,
-              "aria-label": `${author?.name || '알 수 없는 작성자'} 작성자`,
-              "data-author-name": author?.name || '알 수 없는 작성자',
-              title: author?.name || '알 수 없는 작성자',
-              style: { width: '8px', height: '8px', borderRadius: '50%', backgroundColor: author?.color || '#94A3B8', flexShrink: 0 }
-            }),
+        /*#__PURE__*/React.createElement("span", {
+          className: "memo-comment-author-dot",
+          role: "img",
+          tabIndex: 0,
+          "aria-label": `${author?.name || '알 수 없는 작성자'} 작성자`,
+          "data-author-name": author?.name || '알 수 없는 작성자',
+          title: author?.name || '알 수 없는 작성자',
+          style: { width: '8px', height: '8px', borderRadius: '50%', backgroundColor: author?.color || '#94A3B8', flexShrink: 0 }
+        }),
         /*#__PURE__*/React.createElement("span", {
           style: { flex: 1, minWidth: 0, fontSize: 'var(--font-size-md)', color: 'var(--text-main)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', wordBreak: 'break-word' }
         }, comment.text),
@@ -2342,6 +2300,7 @@ export function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCan
       nonVoters.map(p => /*#__PURE__*/React.createElement(ParticipantBadge, {
         key: p.id,
         participant: p,
+        asDot: true,
         style: { opacity: 0.65 }
       }))
     );
@@ -2435,27 +2394,38 @@ export function PollList({ calendar, onCreatePoll, onEditPoll, onVotePoll, onCan
         const textColor = '#FFFFFF';
         return /*#__PURE__*/React.createElement("span", {
           key: participantId,
-          className: "poll-voter-badge",
+          className: "v2-author-dot",
+          role: "img",
+          tabIndex: 0,
+          "data-author-name": participant.name,
+          title: participant.name,
           style: {
-            backgroundColor: participant.color,
-            color: textColor,
-            // .poll-voter-badge's CSS padding is intentionally right-light (3px 4px 3px 8px) to
-            // make room for the 투표 취소 (X) button below -- once that button stops rendering
-            // (closed poll), the smaller right padding alone made the name text look off-center,
-            // hugging the right edge. Restore symmetric padding here when there's no button.
-            ...(closed ? { padding: '3px 8px' } : null)
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '3px',
+            verticalAlign: 'middle'
           }
-        }, participant.name, !closed && /*#__PURE__*/React.createElement("button", {
-          type: "button",
-          className: "poll-voter-remove",
-          title: `${participant.name} \uD22C\uD45C \uCDE8\uC18C`,
-          onClick: event => {
-            event.stopPropagation();
-            onRequestConfirm('투표 취소', `${participant.name}님 투표를 취소하시겠습니까?`, () => {
-              onCancelVote(poll, option, participant.id);
-            });
-          }
-        }, /*#__PURE__*/React.createElement(SmallXIcon, null)));
+        },
+          /*#__PURE__*/React.createElement("span", {
+            style: {
+              display: 'inline-block',
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              backgroundColor: participant.color
+            }
+          }),
+          !closed && /*#__PURE__*/React.createElement("button", {
+            type: "button",
+            className: "poll-voter-remove",
+            title: `${participant.name} \uD22C\uD45C \uCDE8\uC18C`,
+            onClick: event => {
+              event.stopPropagation();
+              onRequestConfirm('투표 취소', `${participant.name}님 투표를 취소하시겠습니까?`, () => {
+                onCancelVote(poll, option, participant.id);
+              });
+            }
+          }, /*#__PURE__*/React.createElement(SmallXIcon, null)));
       }))));
     })));
   })));

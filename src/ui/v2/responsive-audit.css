@@ -193,7 +193,7 @@
     padding: 0 !important;
     border-radius: 50% !important;
   }
-  .v2-design .bp-p-dot::after {
+  .v2-design .bp-p-dot:not([data-author-name])::after {
     content: none !important;
     display: none !important;
   }
@@ -706,7 +706,7 @@
   font-size: 0 !important;
   line-height: 0 !important;
   color: transparent !important;
-  overflow: hidden !important;
+  overflow: visible !important;
   flex-shrink: 0 !important;
 }
 

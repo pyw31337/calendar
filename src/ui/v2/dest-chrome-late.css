@@ -1006,14 +1006,98 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   padding: 0 !important;
   box-sizing: border-box !important;
 }
-.v2-design .bp-p-dot::after {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  line-height: 1 !important;
-  height: 100%;
-  padding: 0 !important;
-  margin: 0 !important;
+.v2-design .bp-p-dot:not([data-author-name])::after {
+  content: none !important;
+  display: none !important;
+}
+
+.v2-design .v2-author-dot,
+.v2-design .memo-comment-author-dot,
+.v2-design .participant-dot,
+.v2-design .bp-p-dot[data-author-name] {
+  position: relative !important;
+  display: inline-block !important;
+  cursor: pointer;
+  outline: none;
+  overflow: visible !important;
+  -webkit-tap-highlight-color: transparent;
+}
+.v2-design .v2-author-dot:hover,
+.v2-design .v2-author-dot.is-tooltip-open,
+.v2-design .memo-comment-author-dot:hover,
+.v2-design .memo-comment-author-dot.is-tooltip-open,
+.v2-design .participant-dot:hover,
+.v2-design .participant-dot.is-tooltip-open,
+.v2-design .bp-p-dot[data-author-name]:hover,
+.v2-design .bp-p-dot[data-author-name].is-tooltip-open {
+  z-index: 60 !important;
+}
+.v2-design .v2-author-dot::after,
+.v2-design .memo-comment-author-dot::after,
+.v2-design .participant-dot::after,
+.v2-design .bp-p-dot[data-author-name]::after {
+  content: attr(data-author-name) !important;
+  position: absolute !important;
+  left: 50% !important;
+  bottom: calc(100% + 5px) !important;
+  transform: translateX(-50%) translateY(3px) !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  white-space: nowrap !important;
+  z-index: 9999 !important;
+  padding: 5px 8px !important;
+  border-radius: 6px !important;
+  background: #0F172A !important;
+  color: #FFFFFF !important;
+  font-size: 0.7rem !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.22) !important;
+  transition: opacity 0.14s ease, transform 0.14s ease !important;
+  letter-spacing: normal !important;
+  text-indent: 0 !important;
+  width: auto !important;
+  height: auto !important;
+  min-width: 0 !important;
+  display: block !important;
+}
+.v2-design .v2-author-dot::before,
+.v2-design .memo-comment-author-dot::before,
+.v2-design .participant-dot::before,
+.v2-design .bp-p-dot[data-author-name]::before {
+  content: '' !important;
+  position: absolute !important;
+  left: 50% !important;
+  bottom: calc(100% + 1px) !important;
+  transform: translateX(-50%) translateY(3px) !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  z-index: 9999 !important;
+  border: 4px solid transparent !important;
+  border-top-color: #0F172A !important;
+  transition: opacity 0.14s ease, transform 0.14s ease !important;
+  width: 0 !important;
+  height: 0 !important;
+  display: block !important;
+}
+.v2-design .v2-author-dot:hover::after,
+.v2-design .v2-author-dot:hover::before,
+.v2-design .v2-author-dot.is-tooltip-open::after,
+.v2-design .v2-author-dot.is-tooltip-open::before,
+.v2-design .memo-comment-author-dot:hover::after,
+.v2-design .memo-comment-author-dot:hover::before,
+.v2-design .memo-comment-author-dot.is-tooltip-open::after,
+.v2-design .memo-comment-author-dot.is-tooltip-open::before,
+.v2-design .participant-dot:hover::after,
+.v2-design .participant-dot:hover::before,
+.v2-design .participant-dot.is-tooltip-open::after,
+.v2-design .participant-dot.is-tooltip-open::before,
+.v2-design .bp-p-dot[data-author-name]:hover::after,
+.v2-design .bp-p-dot[data-author-name]:hover::before,
+.v2-design .bp-p-dot[data-author-name].is-tooltip-open::after,
+.v2-design .bp-p-dot[data-author-name].is-tooltip-open::before {
+  opacity: 1 !important;
+  transform: translateX(-50%) translateY(0) !important;
 }
 
 /* Anniversary labelled badges: type dead-center in the bar. */
@@ -1490,7 +1574,7 @@ html:has(.renewal-shell.v2-design) .bottom-sheet-header h4 {
   font-size: 0 !important;
   line-height: 0 !important;
   color: transparent !important;
-  overflow: hidden !important;
+  overflow: visible !important;
   flex-shrink: 0 !important;
   vertical-align: middle !important;
   box-sizing: border-box !important;

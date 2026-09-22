@@ -1723,24 +1723,52 @@ select.form-select {
 
 .color-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 
-/* Comment author dots are intentionally compact on memo cards. Keep the author's
-   name discoverable on hover, keyboard focus, and touch (focus) without changing
-   the card's layout. */
-.memo-comment-author-dot {
-  position: relative;
+/* Comment and participant author dots: compact circle on cards/grids/comments.
+   Reveals the participant's name in a v1-style speech bubble with a downward
+   stem pointing accurately at the dot on hover, focus, or touch (.is-tooltip-open). */
+.memo-comment-author-dot,
+.v2-author-dot,
+.participant-dot,
+.p-dot[data-author-name],
+.bp-p-dot[data-author-name] {
+  position: relative !important;
   display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  cursor: pointer;
   outline: none;
+  overflow: visible !important;
+  -webkit-tap-highlight-color: transparent;
 }
-.memo-comment-author-dot::after {
+.memo-comment-author-dot:hover,
+.memo-comment-author-dot.is-tooltip-open,
+.v2-author-dot:hover,
+.v2-author-dot.is-tooltip-open,
+.participant-dot:hover,
+.participant-dot.is-tooltip-open,
+.p-dot[data-author-name]:hover,
+.p-dot[data-author-name].is-tooltip-open,
+.bp-p-dot[data-author-name]:hover,
+.bp-p-dot[data-author-name].is-tooltip-open {
+  z-index: 60 !important;
+}
+.memo-comment-author-dot::after,
+.v2-author-dot::after,
+.participant-dot::after,
+.p-dot[data-author-name]::after,
+.bp-p-dot[data-author-name]::after {
   content: attr(data-author-name);
   position: absolute;
   left: 50%;
-  bottom: calc(100% + 7px);
+  bottom: calc(100% + 5px);
   transform: translateX(-50%) translateY(3px);
   opacity: 0;
   pointer-events: none;
   white-space: nowrap;
-  z-index: 20;
+  z-index: 9999;
   padding: 5px 8px;
   border-radius: 6px;
   background: #0F172A;
@@ -1750,26 +1778,63 @@ select.form-select {
   line-height: 1.2;
   box-shadow: 0 3px 10px rgba(15, 23, 42, 0.22);
   transition: opacity 0.14s ease, transform 0.14s ease;
+  letter-spacing: normal;
+  text-indent: 0;
+  width: auto;
+  height: auto;
+  min-width: 0;
 }
-.memo-comment-author-dot::before {
+.memo-comment-author-dot::before,
+.v2-author-dot::before,
+.participant-dot::before,
+.p-dot[data-author-name]::before,
+.bp-p-dot[data-author-name]::before {
   content: '';
   position: absolute;
   left: 50%;
-  bottom: calc(100% + 2px);
+  bottom: calc(100% + 1px);
   transform: translateX(-50%) translateY(3px);
   opacity: 0;
   pointer-events: none;
-  z-index: 20;
+  z-index: 9999;
   border: 4px solid transparent;
   border-top-color: #0F172A;
   transition: opacity 0.14s ease, transform 0.14s ease;
+  width: 0;
+  height: 0;
 }
 .memo-comment-author-dot:hover::after,
 .memo-comment-author-dot:hover::before,
 .memo-comment-author-dot:focus-visible::after,
-.memo-comment-author-dot:focus-visible::before {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
+.memo-comment-author-dot:focus-visible::before,
+.memo-comment-author-dot.is-tooltip-open::after,
+.memo-comment-author-dot.is-tooltip-open::before,
+.v2-author-dot:hover::after,
+.v2-author-dot:hover::before,
+.v2-author-dot:focus-visible::after,
+.v2-author-dot:focus-visible::before,
+.v2-author-dot.is-tooltip-open::after,
+.v2-author-dot.is-tooltip-open::before,
+.participant-dot:hover::after,
+.participant-dot:hover::before,
+.participant-dot:focus-visible::after,
+.participant-dot:focus-visible::before,
+.participant-dot.is-tooltip-open::after,
+.participant-dot.is-tooltip-open::before,
+.p-dot[data-author-name]:hover::after,
+.p-dot[data-author-name]:hover::before,
+.p-dot[data-author-name]:focus-visible::after,
+.p-dot[data-author-name]:focus-visible::before,
+.p-dot[data-author-name].is-tooltip-open::after,
+.p-dot[data-author-name].is-tooltip-open::before,
+.bp-p-dot[data-author-name]:hover::after,
+.bp-p-dot[data-author-name]:hover::before,
+.bp-p-dot[data-author-name]:focus-visible::after,
+.bp-p-dot[data-author-name]:focus-visible::before,
+.bp-p-dot[data-author-name].is-tooltip-open::after,
+.bp-p-dot[data-author-name].is-tooltip-open::before {
+  opacity: 1 !important;
+  transform: translateX(-50%) translateY(0) !important;
 }
 
 .participant-add-row,
@@ -7633,12 +7698,8 @@ body:has(.renewal-shell) { padding: 0; }
   .renewal-shell-main.is-calendar .day-cell { min-height: 60px !important; }
   .renewal-shell-main.is-calendar .dot-row { gap: 3px; }
   .renewal-shell-main.is-calendar .p-dot {
-    width: auto !important; height: auto !important; border-radius: 9999px !important; box-shadow: none !important;
-    display: inline-flex !important; align-items: center !important; padding: 1px 6px !important;
-  }
-  .renewal-shell-main.is-calendar .p-dot::after {
-    content: attr(data-name) !important; display: inline !important; color: #fff !important; font-size: 0.56rem !important;
-    font-weight: 800 !important; line-height: 1.4 !important; white-space: nowrap !important;
+    width: 8px !important; height: 8px !important; border-radius: 50% !important; box-shadow: none !important;
+    display: inline-block !important; padding: 0 !important;
   }
   .renewal-shell-main.is-calendar .day-anniversary:has(.day-anniversary-label) { height: 13px; bottom: 3px; }
   .renewal-shell-main.is-calendar .day-anniversary.lvl-1:has(.day-anniversary-label) { bottom: 20px; }
@@ -7875,14 +7936,8 @@ body:has(.renewal-shell) { padding: 0; }
   .renewal-shell-main.is-calendar .bento-card.gallery-bleed .thumb { border-radius: 0 !important; }
   .renewal-shell-main.is-calendar .day-cell { min-height: 60px !important; }
   .renewal-shell-main.is-calendar .p-dot {
-    width: auto !important; height: auto !important; border-radius: 9999px !important;
-    box-shadow: none !important; display: inline-flex !important; align-items: center !important;
-    padding: 1px 6px !important; overflow: visible !important; text-indent: 0 !important; font-size: inherit !important;
-  }
-  .renewal-shell-main.is-calendar .p-dot::after {
-    content: attr(data-name) !important; display: inline !important; color: #fff !important;
-    font-size: 0.56rem !important; font-weight: 800 !important; line-height: 1.4 !important;
-    white-space: nowrap !important;
+    width: 8px !important; height: 8px !important; border-radius: 50% !important;
+    box-shadow: none !important; display: inline-block !important; padding: 0 !important;
   }
 }
 
