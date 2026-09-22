@@ -1889,9 +1889,24 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
         flexShrink: 0
       };
 
+  const stageWidthPx = typeof window === 'undefined'
+    ? 640
+    : Math.max(240, Math.round((window.visualViewport?.width || window.innerWidth) * (isLandscape ? 1 : 0.92)));
+
   const renderSlide = (url, slot) => {
-    const wrapperStyle = { width: '33.333333%', flexShrink: 0, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' };
-    if (!url) return /*#__PURE__*/React.createElement("div", { style: wrapperStyle });
+    const wrapperStyle = {
+      flex: `0 0 ${stageWidthPx}px`,
+      width: `${stageWidthPx}px`,
+      maxWidth: `${stageWidthPx}px`,
+      minWidth: 0,
+      height: '100%',
+      overflow: 'hidden',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      boxSizing: 'border-box'
+    };
+    if (!url) return /*#__PURE__*/React.createElement("div", { className: "lightbox-slide", style: wrapperStyle });
     const slideIndex = slot === 'prev' ? index - 1 : (slot === 'next' ? index + 1 : index);
     const slideMeta = Array.isArray(meta) ? (meta[slideIndex] || {}) : (meta || {});
     const slideThumb = String(slideMeta.thumb || slideMeta.thumbUrl || '').trim();
@@ -1901,7 +1916,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
 
     if (slot === 'current') {
       if (imageLoadFailed) {
-        return /*#__PURE__*/React.createElement("div", { style: wrapperStyle }, /*#__PURE__*/React.createElement("div", {
+        return /*#__PURE__*/React.createElement("div", { className: "lightbox-slide", style: wrapperStyle }, /*#__PURE__*/React.createElement("div", {
           style: {
             width: '100%',
             maxWidth: '100%',
@@ -1922,16 +1937,19 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
         }, "이미지를 불러오지 못했습니다."));
       }
 
-      return /*#__PURE__*/React.createElement("div", { style: wrapperStyle }, /*#__PURE__*/React.createElement("div", {
+      return /*#__PURE__*/React.createElement("div", { className: "lightbox-slide", style: wrapperStyle }, /*#__PURE__*/React.createElement("div", {
+        className: "lightbox-slide-frame",
         style: {
           position: 'relative',
-          display: 'inline-flex',
+          display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          width: isLandscape ? '100%' : 'auto',
+          width: '100%',
+          height: '100%',
           maxWidth: '100%',
-          height: isPortrait ? '100%' : 'auto',
-          maxHeight: '100%'
+          maxHeight: '100%',
+          minWidth: 0,
+          overflow: 'hidden'
         },
         onClick: handleImageTap
       }, /*#__PURE__*/React.createElement("img", {
@@ -1966,7 +1984,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
       ));
     }
 
-    return /*#__PURE__*/React.createElement("div", { style: wrapperStyle }, /*#__PURE__*/React.createElement("img", {
+    return /*#__PURE__*/React.createElement("div", { className: "lightbox-slide", style: wrapperStyle }, /*#__PURE__*/React.createElement("img", {
       src: visualUrl,
       alt: "원본 이미지",
       "data-slide": slot,
@@ -2076,6 +2094,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   },
   total > 1 ? /*#__PURE__*/React.createElement("div", {
     ref: imgAreaRef,
+    className: "lightbox-stage",
     onMouseDown: e => handleDragStart(e.clientX),
     onTouchStart: handleTouchStart,
     onTouchMove: handleTouchMove,
@@ -2083,14 +2102,24 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     onTouchCancel: handleTouchEnd,
     style: {
       ...mobileImageStageStyle,
+      width: `${stageWidthPx}px`,
+      maxWidth: `${stageWidthPx}px`,
+      minWidth: 0,
+      overflow: 'hidden',
+      flexShrink: 0,
       cursor: isDragging ? 'grabbing' : 'grab',
       touchAction: 'none'
     }
   }, /*#__PURE__*/React.createElement("div", {
+    className: "lightbox-track",
     onTransitionEnd: handleTrackTransitionEnd,
     style: {
-      display: 'flex', width: '300%', height: '100%', flexShrink: 0,
-      transform: `translateX(calc(-33.333333% + ${dragPx}px))`,
+      display: 'flex',
+      width: `${stageWidthPx * 3}px`,
+      maxWidth: 'none',
+      height: '100%',
+      flexShrink: 0,
+      transform: `translate3d(${-stageWidthPx + dragPx}px, 0, 0)`,
       transition: transitionOn ? `transform ${LIGHTBOX_TRANSITION_MS}ms ${LIGHTBOX_TRANSITION_EASING}` : 'none',
       willChange: 'transform'
     }

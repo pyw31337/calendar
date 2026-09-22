@@ -1077,6 +1077,21 @@ summary.is-pressing,
 .lightbox-nav-arrow.is-pressing {
   transform: translateY(-50%) !important;
 }
+/* Neighbor slides must not paint beside the current photo. Slot width is set in pixels. */
+.lightbox-overlay .lightbox-stage,
+.lightbox-overlay .lightbox-slide,
+.lightbox-overlay .lightbox-slide-frame {
+  overflow: hidden !important;
+  min-width: 0 !important;
+}
+.lightbox-overlay .lightbox-stage {
+  flex-shrink: 0 !important;
+}
+.lightbox-overlay .lightbox-slide img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
 .motion-ripple {
   position: absolute;
   left: var(--ripple-x, 50%);
