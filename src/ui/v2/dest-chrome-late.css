@@ -27,10 +27,37 @@
   flex-shrink: 0 !important;
   position: relative !important;
   top: 0 !important;
-  transform: none !important;
-  opacity: 1 !important;
-  pointer-events: auto !important;
   z-index: 40 !important;
+}
+/* Default (visible) transform/opacity state. Separate from the block above -- without
+   !important here, PageHeader's own scroll-hide transform (screens.css, .is-scroll-hidden)
+   could never win against it, silently disabling hide-on-scroll for every V2 destination page
+   (chat/memo/settlement/places/gallery/content/archive share this one header component). */
+.v2-design .v2-page-header,
+.v2-design .v2-memo .v2-page-header,
+.v2-design .v2-chat .v2-page-header,
+.v2-design .v2-settlement .v2-page-header,
+.v2-design .v2-places .v2-page-header,
+.v2-design .v2-gallery .v2-page-header,
+.v2-design .v2-content .v2-page-header,
+.v2-design .v2-archive .v2-page-header {
+  transform: none;
+  opacity: 1;
+  pointer-events: auto;
+}
+@media (max-width: 767px) {
+  .v2-design .v2-page-header.is-scroll-hidden,
+  .v2-design .v2-memo .v2-page-header.is-scroll-hidden,
+  .v2-design .v2-chat .v2-page-header.is-scroll-hidden,
+  .v2-design .v2-settlement .v2-page-header.is-scroll-hidden,
+  .v2-design .v2-places .v2-page-header.is-scroll-hidden,
+  .v2-design .v2-gallery .v2-page-header.is-scroll-hidden,
+  .v2-design .v2-content .v2-page-header.is-scroll-hidden,
+  .v2-design .v2-archive .v2-page-header.is-scroll-hidden {
+    transform: translateY(-100%) !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
 }
 .v2-design .v2-page-header .bp-header-row,
 .v2-design .v2-memo .v2-page-header .bp-header-row,

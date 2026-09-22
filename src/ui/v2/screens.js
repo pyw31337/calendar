@@ -189,43 +189,52 @@ export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, se
   }, []);
   const centerBrand = brand || (subtitle ? { mark: '🍺', name: String(subtitle).split(' · ')[0].trim() } : null);
   return h(
-    'header',
-    { className: `bp-header v2-page-header${centerSubtitle ? ' v2-page-header--centered' : ''}${isVisible ? '' : ' is-scroll-hidden'}` },
+    React.Fragment,
+    null,
     h(
-      'div',
-      { className: 'bp-header-row' },
+      'header',
+      { className: `bp-header v2-page-header${centerSubtitle ? ' v2-page-header--centered' : ''}${isVisible ? '' : ' is-scroll-hidden'}` },
       h(
         'div',
-        { className: 'bp-header-leading' },
-        h(
-          'button',
-          { className: 'bp-back-btn', type: 'button', 'aria-label': '뒤로가기', onClick: onBack },
-          h(DesignIcon, { name: 'back', size: 18 })
-        ),
+        { className: 'bp-header-row' },
         h(
           'div',
-          { className: `v2-header-title-block${centerSubtitle ? ' v2-header-title-left' : ''}` },
-          h('div', { className: 'bp-header-title' }, title),
-          count ? h('span', { className: 'bp-header-count' }, count) : null,
-          !centerSubtitle && subtitle ? h('div', { className: 'bp-header-sub' }, subtitle) : null
+          { className: 'bp-header-leading' },
+          h(
+            'button',
+            { className: 'bp-back-btn', type: 'button', 'aria-label': '뒤로가기', onClick: onBack },
+            h(DesignIcon, { name: 'back', size: 18 })
+          ),
+          h(
+            'div',
+            { className: `v2-header-title-block${centerSubtitle ? ' v2-header-title-left' : ''}` },
+            h('div', { className: 'bp-header-title' }, title),
+            count ? h('span', { className: 'bp-header-count' }, count) : null,
+            !centerSubtitle && subtitle ? h('div', { className: 'bp-header-sub' }, subtitle) : null
+          )
+        ),
+        centerBrand ? h(
+          'div',
+          { className: 'bp-header-center-brand', 'aria-label': centerBrand.name },
+          h('span', { className: 'bp-header-brand-mark', 'aria-hidden': 'true' }, centerBrand.mark),
+          h('span', { className: 'bp-header-brand-name' }, centerBrand.name)
+        ) : null,
+        h(
+          'div',
+          { className: 'bp-header-actions' },
+          extra,
+          onSearch && h(IconButton, { label: searchLabel || `${title} 검색`, icon: 'search', size: 20, onClick: onSearch }),
+          onShare && h(IconButton, { label: '공유', icon: 'share', size: 20, onClick: onShare }),
+          onMenu && h(IconButton, { label: `${title} 메뉴`, icon: 'menu', size: 20, onClick: onMenu })
         )
       ),
-      centerBrand ? h(
-        'div',
-        { className: 'bp-header-center-brand', 'aria-label': centerBrand.name },
-        h('span', { className: 'bp-header-brand-mark', 'aria-hidden': 'true' }, centerBrand.mark),
-        h('span', { className: 'bp-header-brand-name' }, centerBrand.name)
-      ) : null,
-      h(
-        'div',
-        { className: 'bp-header-actions' },
-        extra,
-        onSearch && h(IconButton, { label: searchLabel || `${title} 검색`, icon: 'search', size: 20, onClick: onSearch }),
-        onShare && h(IconButton, { label: '공유', icon: 'share', size: 20, onClick: onShare }),
-        onMenu && h(IconButton, { label: `${title} 메뉴`, icon: 'menu', size: 20, onClick: onMenu })
-      )
+      children
     ),
-    children,
+    // Rendered as a SIBLING of <header>, not a child: the header itself gets `transform:
+    // translateY(-100%)` while hidden (.is-scroll-hidden), and a transformed ancestor creates a
+    // new containing block for position:fixed descendants -- a fixed child of the hidden header
+    // would anchor to the header's own (now off-screen) box instead of the real viewport, landing
+    // this button at the wrong coordinates instead of the true top-left corner it needs.
     !isVisible && onBack ? h('button', {
       type: 'button', className: 'bp-floating-back-btn', 'aria-label': '뒤로가기', onClick: onBack,
     }, h(DesignIcon, { name: 'back', size: 18 })) : null
@@ -1006,10 +1015,19 @@ export function ChatScreen(p) {
     const composer = clone(
       slots.composer,
       {
+        // Let the legacy composer's own isHeaderVisible-driven transform/opacity/pointerEvents
+        // (ui-chat-room.js) through instead of forcing it always-visible -- V1 hides the composer
+        // together with the header on scroll-down, and V2 sharing the same handleChatScroll state
+        // should do the same instead of only ever hiding the header.
         className: 'chat-composer v2-chat-composer',
-        style: { ...slots.composer.props.style, transform: 'none', opacity: 1, pointerEvents: 'auto' },
+        style: slots.composer.props.style,
       },
       slots.resize,
+      // V1 places the meme-tag row here (before the input row), so the tag chips read as
+      // suggestions sitting above the text field. Ordering it after the input row/tools instead
+      // (as this composer used to) put the chips below the field, which visually reads as
+      // unrelated content trailing the composer rather than an autocomplete-style suggestion.
+      slots.memes,
       slots.reply,
       slots.photos,
       slots.files,
@@ -1077,8 +1095,7 @@ export function ChatScreen(p) {
               }, h(DesignIcon, { name: 'paste', size: 18 }))
             : null
         )
-      ),
-      slots.memes
+      )
     );
 
     return h(

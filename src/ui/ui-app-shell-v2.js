@@ -1698,10 +1698,11 @@ function SharedDateModal({ calendarContext, dateModalDate, initialTab = null, se
  */
 export function buildRenewalChatContext(calendar, deps) {
   const {
-    activeCal, memePool, handleSendMemeImage, displayChatMessages, loadingOlderChat, hasMoreOlderChat, loadOlderChatMessages,
+    activeCal, activeCalId, setStoredChatParticipantId, memePool, handleSendMemeImage, displayChatMessages, loadingOlderChat, hasMoreOlderChat, loadOlderChatMessages,
     chatInput, setChatInput, chatParticipantId, setChatParticipantId, isChatSheetOpen, setIsChatSheetOpen, isChatSubmitting,
     chatTextareaRef, chatImages, setChatImages, chatFileAttachments, setChatFileAttachments, chatReplyTarget, setChatReplyTarget,
-    setActiveLightbox, handleSendChatMessage, handleDeleteMessage, handleEditMessage, handleAddPinnedNotice, handleRemovePinnedNotice,
+    setActiveLightbox, handleSendChatMessage, handleDeleteMessage, handleEditMessage, editingMessage, setEditingMessage,
+    handleSaveEditMessage, handleAddPinnedNotice, handleRemovePinnedNotice,
     isHeaderVisible, setIsHeaderVisible, handleChatScroll, toggleChatInputPin, chatMessagesContainerRef, showToast,
     handlePromoteInlineChatImage, handleSaveImageTags, handleSearchTag, isDarkTheme, toggleTheme,
     fontScalePercent, setFontScalePercent, mainNotifPermission, mainChatNotifyEnabled, handleMainToggleNotifications,
@@ -1720,6 +1721,13 @@ export function buildRenewalChatContext(calendar, deps) {
     stickyVideo,
     onCloseStickyVideo: () => setStickyVideo?.(null),
     onJumpToChatMessage: handleJumpToChatMessage,
+    onSelectChatParticipant: id => {
+      setChatParticipantId?.(id);
+      if (activeCalId) setStoredChatParticipantId?.(activeCalId, id);
+    },
+    editingMessage,
+    onSaveEditMessage: handleSaveEditMessage,
+    onCloseEditMessage: () => setEditingMessage?.(null),
     chatRoomProps: {
       calendar: activeCal, memePool, onSendMemeImage: handleSendMemeImage,
       chatMessages: displayChatMessages, loadingOlderChat, hasMoreOlderChat, onLoadOlderChat: loadOlderChatMessages,
@@ -1765,6 +1773,11 @@ function ChatPane({ chatContext, onChangeView, onOpenAppSettings, onOpenSideNav,
   if (typeof ChatRoomView !== 'function') {
     return React.createElement(EmptyState, { title: '채팅 화면을 불러오지 못했습니다.', subtitle: '새로고침 후 다시 시도해 주세요.' });
   }
+  const __comp = window.GATHER_UI_COMPONENTS || {};
+  const __deps = window.GATHER_UI_DEPS || {};
+  const ChatParticipantSheet = __comp.ChatParticipantSheet || __deps.ChatParticipantSheet;
+  const EditMessageModal = __comp.EditMessageModal || __deps.EditMessageModal;
+  const { chatParticipantId, isChatSheetOpen, setIsChatSheetOpen, onDeleteMessage, onRequestConfirm } = chatContext.chatRoomProps || {};
   return React.createElement(React.Fragment, null,
     React.createElement(ChatRoomView, {
       ...chatContext.chatRoomProps,
@@ -1779,6 +1792,30 @@ function ChatPane({ chatContext, onChangeView, onOpenAppSettings, onOpenSideNav,
     chatContext.isChatShareOpen && React.createElement(ShareModal, {
       calendar: chatContext.calendar, shareType: 'chat', showToast: chatContext.showToast,
       onClose: chatContext.onCloseChatShare,
+    }),
+    // app-main.js's own render (V1) mounts ChatParticipantSheet as a sibling of ChatRoomView
+    // further down the same CalendarApp return -- unreachable code for V2, since
+    // renderRenewalShellIfEnabled short-circuits CalendarApp's render before that point. Without
+    // this, the composer's participant picker button set isChatSheetOpen=true with nothing on
+    // screen ever rendering the sheet -- clicking it looked like it did nothing.
+    isChatSheetOpen && ChatParticipantSheet && React.createElement(ChatParticipantSheet, {
+      calendar: chatContext.calendar,
+      selectedId: chatParticipantId,
+      onSelect: chatContext.onSelectChatParticipant,
+      onClose: () => setIsChatSheetOpen?.(false),
+    }),
+    // Same unreachable-for-V2 pattern as ChatParticipantSheet above: app-main.js mounts
+    // EditMessageModal as a sibling of ChatRoomView further down CalendarApp's own return, past
+    // renderRenewalShellIfEnabled's short-circuit. Without this, the bubble's 편집 button set
+    // editingMessage with nothing on screen ever rendering the modal for it.
+    chatContext.editingMessage && EditMessageModal && React.createElement(EditMessageModal, {
+      message: chatContext.editingMessage,
+      calendar: chatContext.calendar,
+      onSave: chatContext.onSaveEditMessage,
+      onDeleteMessage,
+      onClose: chatContext.onCloseEditMessage,
+      onRequestConfirm,
+      showToast: chatContext.showToast,
     })
   );
 }

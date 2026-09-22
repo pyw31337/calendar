@@ -44,9 +44,12 @@
 @media (max-width: 767px) {
   .v2-design .v2-page-header { transition: transform 180ms ease, opacity 180ms ease; }
   .v2-design .v2-page-header.is-scroll-hidden { transform: translateY(-100%); opacity: 0; pointer-events: none; }
+  /* top/left match the real header's own 44px .bp-back-btn box exactly (56px header row,
+     0 16px padding, dest-chrome-late.css) -- so the icon does not visibly jump position when
+     the header hides and this floating button takes its place. */
   .v2-design .bp-floating-back-btn {
-    display: inline-flex; position: fixed; z-index: 120; top: 10px; left: 12px;
-    width: 36px; height: 36px; align-items: center; justify-content: center;
+    display: inline-flex; position: fixed; z-index: 120; top: 6px; left: 16px;
+    width: 44px; height: 44px; align-items: center; justify-content: center;
     border: 1px solid var(--border, #e7e4ef); border-radius: 50%;
     background: rgba(255,255,255,.94); color: var(--text, #2c2740);
     box-shadow: 0 4px 14px rgba(35, 20, 64, .14);
@@ -617,6 +620,31 @@
   width: 100% !important;
   max-width: none !important;
   z-index: 5 !important;
+}
+/* Chat's own header is the shared PageHeader (chat-room-header is filtered out of its slot
+   extraction in screens.js, unlike memo/places/settlement which still render their own legacy
+   header) -- the sticky-header rule above re-targets .inline-search-bar too, meant for those
+   still-live legacy headers, but it dropped this bar's z-index to 5 (under PageHeader's 40) and
+   its position to sticky/top:0, so it rendered jumbled into the header row instead of floating
+   fixed below it. Reassert fixed positioning + a z-index above PageHeader here, after that rule,
+   so chat wins the cascade without touching the other destinations that need the sticky version. */
+.v2-design .v2-chat .inline-search-bar {
+  position: fixed !important;
+  top: calc(56px + env(safe-area-inset-top, 0px)) !important;
+  z-index: 45 !important;
+}
+@media (max-width: 767px) {
+  /* Below 768px the app-shell itself is already edge-to-edge (no centered column to match), so
+     the desktop centering transform is not just unneeded here but actively wrong: combined with
+     the sticky-header rule's left:auto/right:auto above, translateX(-50%) shifted this bar half
+     its own width off the left edge of the screen instead of keeping it flush full-width. */
+  .v2-design .v2-chat .inline-search-bar {
+    left: 0 !important;
+    right: 0 !important;
+    transform: none !important;
+    width: 100% !important;
+    max-width: none !important;
+  }
 }
 
 /* Restyle legacy page headers to V2 chrome (keep search/share/menu wired) */
@@ -1856,11 +1884,15 @@
   margin: 0 !important;
 }
 
-/* Composer bar density (keep tool icons; shrink chrome around them) */
+/* Composer bar density (keep tool icons; shrink chrome around them).
+   padding-top is smaller than padding-bottom on purpose: the resize handle (first child) already
+   carries its own 3px margin-bottom (responsive-audit.css) before the input row below it, but
+   nothing balanced that on top, so the gap above the handle (composer top border -> handle) read
+   visibly larger than the gap below it (handle -> input field border). 3px here matches that. */
 .v2-design .v2-chat-composer,
 .v2-design .v2-chat .chat-composer,
 .v2-design .v2-chat-legacy .chat-composer {
-  padding: 8px 12px !important;
+  padding: 3px 12px 8px !important;
 }
 
 .v2-design .v2-chat .bp-composer-input,
