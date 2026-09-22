@@ -633,6 +633,17 @@
   top: calc(56px + env(safe-area-inset-top, 0px)) !important;
   z-index: 45 !important;
 }
+/* Gallery also gained its own shared PageHeader (screens.js), but unlike chat it still renders
+   its FULL legacy view underneath it (wrapLegacy, no slot extraction), so its own legacy header
+   (gallery-page-header) is a second, now-redundant header. The sticky-header rule above still
+   pins it to the top of the scroll pane. It is body content now, not header chrome: let it
+   scroll away normally. (Archive/Content's own history-header-stack is the 추억/인물/지난모임
+   tab row, a real still-in-use sticky sub-nav -- not touched here; see the toolbar-specific fix
+   further below for the 전체/일자 + 추가/편집 row underneath it.) */
+.v2-design .v2-gallery .gallery-page-header {
+  position: static !important;
+  z-index: auto !important;
+}
 @media (max-width: 767px) {
   /* Below 768px the app-shell itself is already edge-to-edge (no centered column to match), so
      the desktop centering transform is not just unneeded here but actively wrong: combined with
@@ -1748,10 +1759,16 @@
   margin-bottom: 10px !important;
 }
 /* ========== Unit 2: Content / Archive density (single coherent set) ========== */
+/* Horizontal padding intentionally NOT repeated here: the scrollable body ancestor
+   (.history-page-scroll / .v2-dest-body, dest-layout.css) already applies
+   --v2-dest-content-pad-x on both sides. Adding another 12px here on top of that stacked
+   into a wider inset than the toolbar row above it (.v2-dest-controls, which only carries
+   the ancestor's single padding), making the grid visibly narrower than the "전체/일자 +
+   추가/편집" row instead of lining up with it. */
 .v2-design .v2-content .culture-items-grid,
 .v2-design .v2-archive .history-bento-grid {
   gap: 8px !important;
-  padding: 8px 12px 88px !important;
+  padding: 8px 0 88px !important;
 }
 .v2-design .v2-content .culture-items-grid > * {
   border-radius: 12px !important;
