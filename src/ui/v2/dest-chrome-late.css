@@ -884,7 +884,9 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   height: 48px !important;
   min-width: 0 !important;
   padding: 0 8px !important;
-  margin: 0 !important;
+  /* -1px bottom margin overlaps the container's own 1px border-bottom so the active
+     tab's 2px underline lands flush against the gray hairline instead of leaving a gap. */
+  margin: 0 0 -1px !important;
   border: 0 !important;
   border-bottom: 2px solid transparent !important;
   background: none !important;

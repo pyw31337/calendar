@@ -803,7 +803,7 @@ export function SummaryList({
     }, formattedDateStr), memoEntries.length > 0 && /*#__PURE__*/React.createElement("div", {
       style: {
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         gap: '6px',
         flexWrap: 'wrap'
       }
@@ -918,7 +918,7 @@ export function SummaryList({
     }, isPast ? '지나간 모임' : '전원 가능')), memoEntries.length > 0 && /*#__PURE__*/React.createElement("div", {
       style: {
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         gap: '6px',
         flexWrap: 'wrap'
       }
@@ -1036,7 +1036,7 @@ export function SummaryList({
     }, ddayLabel)), memoEntries.length > 0 && /*#__PURE__*/React.createElement("div", {
       style: {
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         gap: '6px',
         flexWrap: 'wrap'
       }
