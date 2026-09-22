@@ -44,10 +44,12 @@
   opacity: 1;
   pointer-events: auto;
 }
-.v2-design .v2-archive {
+.v2-design .v2-archive,
+.v2-design .v2-content {
   position: relative !important;
 }
-.v2-design .v2-archive .v2-page-header {
+.v2-design .v2-archive .v2-page-header,
+.v2-design .v2-content .v2-page-header {
   position: absolute !important;
   top: 0 !important;
   left: 0 !important;
@@ -57,35 +59,37 @@
   background: #ffffff !important;
   transition: transform 180ms ease, opacity 180ms ease !important;
 }
-.v2-design .v2-archive .v2-page-header.is-scroll-hidden {
+.v2-design .v2-archive .v2-page-header.is-scroll-hidden,
+.v2-design .v2-content .v2-page-header.is-scroll-hidden {
   transform: translateY(-100%) !important;
   margin-bottom: 0 !important;
   opacity: 0 !important;
   pointer-events: none !important;
 }
-@media (max-width: 767px) {
-  .v2-design .v2-page-header.is-scroll-hidden,
-  .v2-design .v2-memo .v2-page-header.is-scroll-hidden,
-  .v2-design .v2-chat .v2-page-header.is-scroll-hidden,
-  .v2-design .v2-settlement .v2-page-header.is-scroll-hidden,
-  .v2-design .v2-places .v2-page-header.is-scroll-hidden,
-  .v2-design .v2-gallery .v2-page-header.is-scroll-hidden,
-  .v2-design .v2-content .v2-page-header.is-scroll-hidden {
-    transform: translateY(-100%) !important;
-    opacity: 0 !important;
-    pointer-events: none !important;
-  }
+.v2-design .v2-page-header.is-scroll-hidden,
+.v2-design .v2-memo .v2-page-header.is-scroll-hidden,
+.v2-design .v2-chat .v2-page-header.is-scroll-hidden,
+.v2-design .v2-settlement .v2-page-header.is-scroll-hidden,
+.v2-design .v2-places .v2-page-header.is-scroll-hidden,
+.v2-design .v2-gallery .v2-page-header.is-scroll-hidden,
+.v2-design .v2-content .v2-page-header.is-scroll-hidden {
+  transform: translateY(-100%) !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 .v2-design .v2-page-header .bp-header-row,
 .v2-design .v2-memo .v2-page-header .bp-header-row,
 .v2-design .v2-chat .v2-page-header .bp-header-row,
 .v2-design .v2-settlement .v2-page-header .bp-header-row,
-.v2-design .v2-places .v2-page-header .bp-header-row {
-  display: grid !important;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) !important;
+.v2-design .v2-places .v2-page-header .bp-header-row,
+.v2-design .v2-content .v2-page-header .bp-header-row,
+.v2-design .v2-gallery .v2-page-header .bp-header-row,
+.v2-design .v2-archive .v2-page-header .bp-header-row {
+  display: flex !important;
   align-items: center !important;
+  justify-content: space-between !important;
   height: auto !important;
-  min-height: 60px !important;
+  min-height: 56px !important;
   max-height: none !important;
   overflow: visible !important;
 }
@@ -148,9 +152,12 @@
 }
 
 .renewal-shell.v2-design .v2-archive .history-page-scroll,
-.renewal-shell.v2-design .v2-archive .history-meetings-grid,
-.renewal-shell.v2-design .v2-archive .history-bento-grid {
+.renewal-shell.v2-design .v2-archive .history-meetings-grid {
   padding-top: calc(104px + var(--v2-dest-content-pad-y)) !important;
+}
+.v2-design .v2-archive .history-bento-grid {
+  padding: 0 !important;
+  margin: 0 !important;
 }
 
 .v2-design .v2-content .underline-tabs {
@@ -162,10 +169,10 @@
   display: flex !important;
   align-items: center !important;
   width: 100% !important;
-  padding: 6px var(--v2-dest-content-pad-x, 16px) !important;
+  padding: 8px 20px !important;
   margin: 0 !important;
   background: #fff !important;
-  border-bottom: 1px solid var(--v2-card-border, #eceaf5);
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
   box-sizing: border-box !important;
 }
 .v2-design .v2-content .v2-content-subcat-slot .bp-cat-scroll-row {
@@ -202,12 +209,16 @@
   border: 0 !important;
 }
 .v2-design .v2-content .region-filter-trigger-row {
-  padding: 10px var(--v2-dest-content-pad-x, 16px) 12px !important;
+  padding: 10px 20px 12px 20px !important;
   margin: 0 !important;
   gap: 8px !important;
   background: #fff !important;
-  border-bottom: 1px solid var(--v2-card-border, #eceaf5);
+  border-top: none !important;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
   box-sizing: border-box !important;
+}
+.v2-design .v2-content .culture-items-grid {
+  padding: 152px 20px 96px 20px !important;
 }
 
 .v2-design .v2-home-memo-bubble,
@@ -454,35 +465,71 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   padding-top: 0 !important;
   padding-left: 0 !important;
 }
-.renewal-shell.v2-design .bp-hero-zone,
-.v2-design .bp-hero-zone,
-.renewal-shell.v2-design .bp-app-shell.is-bento-home .bp-hero-zone {
-  margin-top: 0 !important;
-  margin-left: 0 !important;
-  margin-right: 0 !important;
-  border-radius: 0 !important;
-}
 @media (min-width: 1200px) {
   .renewal-shell.v2-design .bp-app-shell.is-bento-home,
   .v2-design .bp-app-shell.is-bento-home {
     padding: 0 !important;
   }
-  .v2-design .bp-hero-zone {
+  .renewal-shell.v2-design .bp-hero-zone,
+  .v2-design .bp-hero-zone,
+  .renewal-shell.v2-design .bp-app-shell.is-bento-home .bp-hero-zone {
     margin: 0 0 16px !important;
+    border-radius: 20px !important;
+  }
+}
+@media (max-width: 1199px) {
+  .renewal-shell.v2-design .bp-hero-zone,
+  .v2-design .bp-hero-zone,
+  .renewal-shell.v2-design .bp-app-shell.is-bento-home .bp-hero-zone {
+    margin: 0 !important;
     border-radius: 0 !important;
+    padding: 10px !important;
   }
 }
 
-.v2-design .bp-hero-quick-nav-icon {
+.v2-design .bp-hero-quick-nav-item {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  color: #fff !important;
+  font-size: 1.2rem !important;
+  font-weight: 600 !important;
+  gap: 5px !important;
+  cursor: pointer !important;
+  padding: 4px 8px !important;
+}
+.v2-design .bp-hero-quick-nav-item .bp-hero-quick-nav-icon {
   width: 48px !important;
   height: 48px !important;
   border: 0 !important;
   box-shadow: none !important;
-  background: rgba(255,255,255,0.18) !important;
+  background: transparent !important;
+  color: #fff !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+.v2-design .bp-hero-quick-nav-item .bp-hero-quick-nav-label {
+  color: #fff !important;
+  font-size: 1.2rem !important;
+  font-weight: 600 !important;
 }
 .v2-design .bp-hero-quick-nav-icon svg {
   width: 26px !important;
   height: 26px !important;
+}
+@media (min-width: 768px) and (max-width: 1199px) {
+  .v2-design .bp-hero-quick-nav-item {
+    flex-direction: row !important;
+  }
+}
+@media (max-width: 767px) {
+  .v2-design .bp-hero-quick-nav-item {
+    flex-direction: column !important;
+  }
 }
 
 .v2-design .v2-home-chat-row {
@@ -638,6 +685,13 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   min-width: 44px !important;
   min-height: 44px !important;
 }
+/* Standardized V2 header is 56px tall across all destinations.
+ * Floating back btn (position:fixed) must mirror the header back btn's y-position:
+ * (56px row − 44px btn) / 2 = 6px from viewport top → matches header btn exactly. */
+.v2-design .bp-floating-back-btn {
+  top: 6px !important;
+}
+
 
 /* Meeting cards place box in history-meetings-grid (both confirmed & past) */
 .v2-design .history-meetings-grid .date-item-btn .place-memo-stack {
@@ -749,6 +803,72 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   background: color-mix(in srgb, var(--brand, #7C2FE5) 4%, #fff);
   border: 1px dashed color-mix(in srgb, var(--brand, #7C2FE5) 18%, #eceaf5);
   border-radius: 16px;
+}
+
+/* Places layout and card standardization */
+.v2-design .v2-places .place-card-row {
+  padding: 20px 20px 10px 20px !important;
+  margin-bottom: 8px !important;
+}
+.v2-design .v2-places .place-memo-stack > button {
+  margin-top: 4px !important;
+}
+.v2-design .v2-places .places-list-body {
+  padding-top: 0px !important;
+}
+.v2-design .v2-places .v2-map-panel {
+  height: 302px !important;
+}
+.v2-design .v2-places .places-category-sticky-tabs {
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
+}
+
+/* Settlement solid brand purple hero and card spacing */
+.v2-design,
+.v2-settlement {
+  --settlement-hero-start: var(--brand, #7C2FE5) !important;
+  --settlement-hero-mid: var(--brand, #7C2FE5) !important;
+  --settlement-hero-end: var(--brand, #7C2FE5) !important;
+}
+.renewal-shell.v2-design .v2-settlement [data-settlement-edit-button="true"],
+.v2-design .v2-settlement [data-settlement-edit-button="true"] {
+  background: var(--brand, #7C2FE5) !important;
+  color: #fff !important;
+  margin-top: 40px !important;
+}
+@media (max-width: 767px) {
+  .renewal-shell.v2-design .v2-settlement [data-settlement-edit-button="true"],
+  .v2-design .v2-settlement [data-settlement-edit-button="true"] {
+    margin-top: 20px !important;
+  }
+}
+.v2-design .v2-settlement .settlement-person-card {
+  padding: 10px !important;
+}
+
+.v2-design .v2-chat-scroll-wrap {
+  position: relative !important;
+  flex: 1 1 0% !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+.v2-design .v2-chat-scroll-bottom-btn {
+  position: absolute !important;
+  bottom: 16px !important;
+  right: 16px !important;
+  width: 36px !important;
+  height: 36px !important;
+  border-radius: 50% !important;
+  background: #fff !important;
+  border: 1px solid var(--v2-card-border, #eceaf5) !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  color: var(--brand, #7C2FE5) !important;
+  z-index: 50 !important;
 }
 
 /* Date sheet: kill leftover v1 320px mock width so it matches dest chrome. */

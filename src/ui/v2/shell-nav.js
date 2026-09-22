@@ -137,6 +137,7 @@ export function extractChatSlots(legacyTree) {
         if (!bag.send && /전송|보내|send/i.test(hay)) bag.send = node;
         if (!bag.paste && /붙여넣기|paste/i.test(hay)) bag.paste = node;
         if (!bag.emoji && /이모티콘|emoji/i.test(hay)) bag.emoji = node;
+        if (!bag.keyboard && /키보드|keyboard/i.test(hay)) bag.keyboard = node;
       }
       if (type === 'input' && props.type === 'file' && !bag.fileInput) bag.fileInput = node;
       walk(props.children, bag);

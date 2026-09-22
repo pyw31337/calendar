@@ -1952,7 +1952,14 @@ export function HistoryView({
       cover
         ? /*#__PURE__*/React.createElement("img", {
             src: cover.thumb || cover.full, alt: "", loading: "lazy", decoding: "async",
-            style: { width: '100%', height: '100%', objectFit: 'cover' }
+            style: { width: '100%', height: '100%', objectFit: 'cover' },
+            onError: e => {
+              if (cover.full && e.target.src !== cover.full) {
+                e.target.src = cover.full;
+              } else {
+                e.target.style.display = 'none';
+              }
+            }
           })
         : /*#__PURE__*/React.createElement("div", {
             style: {
@@ -2472,7 +2479,14 @@ export function HistoryView({
                 cover
                   ? /*#__PURE__*/React.createElement("img", {
                       src: cover.thumb || cover.full, alt: "", loading: "lazy", decoding: "async",
-                      style: { width: '100%', height: '100%', objectFit: 'cover' }
+                      style: { width: '100%', height: '100%', objectFit: 'cover' },
+                      onError: e => {
+                        if (cover.full && e.target.src !== cover.full) {
+                          e.target.src = cover.full;
+                        } else {
+                          e.target.style.display = 'none';
+                        }
+                      }
                     })
                   : /*#__PURE__*/React.createElement("div", {
                       style: {
@@ -2977,79 +2991,24 @@ export function ContentView({
     return () => ro.disconnect();
   }, []);
   const [chipRowSlot, setChipRowSlot] = React.useState(null);
+  const [, setV2ContentSlotTick] = React.useState(0);
+  React.useEffect(() => {
+    if (v2Embed && typeof document !== 'undefined') {
+      const el = document.getElementById('v2-content-header-tabs-slot');
+      if (el) setV2ContentSlotTick(t => t + 1);
+    }
+  }, [v2Embed]);
+  const v2ContentTabsSlot = v2Embed && typeof document !== 'undefined'
+    ? document.getElementById('v2-content-header-tabs-slot')
+    : null;
+
   const contentPaddingTop = v2Embed
     ? 0
     : (isHeaderVisible
       ? `calc(${headerStackHeight}px + env(safe-area-inset-top, 0px))`
       : `calc(12px + env(safe-area-inset-top, 0px))`);
 
-  return /*#__PURE__*/React.createElement("div", {
-    className: "places-view-container",
-    style: {
-      position: v2Embed ? 'relative' : 'fixed',
-      top: v2Embed ? undefined : 0,
-      left: v2Embed ? undefined : 0,
-      right: v2Embed ? undefined : 0,
-      bottom: v2Embed ? undefined : 0,
-      backgroundColor: 'var(--bg-primary)',
-      display: 'flex', flexDirection: 'column',
-      width: '100%', maxWidth: '100%', overflow: 'hidden',
-      height: v2Embed ? '100%' : undefined,
-      minHeight: v2Embed ? '100%' : undefined,
-      zIndex: v2Embed ? 1 : undefined,
-    }
-  },
-    /*#__PURE__*/React.createElement("div", {
-      ref: headerStackRef,
-      className: "history-header-stack",
-      style: {
-        position: v2Embed ? 'sticky' : 'fixed', top: v2Embed ? 0 : 'env(safe-area-inset-top, 0px)', left: v2Embed ? undefined : 0, right: v2Embed ? undefined : 0, zIndex: v2Embed ? 5 : 1010,
-        backgroundColor: 'var(--bg-primary)',
-        transition: 'transform 0.3s ease',
-        transform: isHeaderVisible ? 'translateY(0)' : 'translateY(-100%)'
-      }
-    },
-    /*#__PURE__*/React.createElement("div", {
-      className: "places-view-header",
-      style: {
-        position: 'relative', height: '56px',
-        backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)',
-        display: v2Embed ? 'none' : 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 16px', flexShrink: 0
-      }
-    },
-      /*#__PURE__*/React.createElement("button", {
-        type: "button", onClick: onBack, "aria-label": "뒤로가기",
-        style: PAGE_HEADER_BACK_BTN_STYLE
-      }, BackArrowIcon ? /*#__PURE__*/React.createElement(BackArrowIcon, { size: 22 }) : "←"),
-      /*#__PURE__*/React.createElement("div", {
-        style: PAGE_HEADER_TITLE_STYLE
-      }, v2Embed ? '컨텐츠' : (calendar.title + " 컨텐츠")),
-      /*#__PURE__*/React.createElement("div", { style: PAGE_HEADER_ACTIONS_WRAP_STYLE },
-        /*#__PURE__*/React.createElement("button", {
-          type: "button", onClick: () => setIsSearchOpen(v => !v), title: "컨텐츠 검색", "aria-label": "컨텐츠 검색",
-          style: PAGE_HEADER_ICON_BTN_STYLE
-        }, SearchIcon ? /*#__PURE__*/React.createElement(SearchIcon, { size: 20 }) : "🔍"),
-        /*#__PURE__*/React.createElement("button", {
-          type: "button", onClick: () => setIsMenuOpen(true), title: "메뉴", "aria-label": "메뉴 열기",
-          style: PAGE_HEADER_ICON_BTN_STYLE
-        }, ThreeLinesIcon ? /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 22 }) : "≡")
-      )
-    ),
-    isSearchOpen && InlineSearchBar && /*#__PURE__*/React.createElement(InlineSearchBar, {
-      value: searchQuery,
-      placeholder: "제목으로 검색...",
-      onChange: e => setSearchQuery(e.target.value),
-      onClose: () => { setIsSearchOpen(false); setSearchQuery(''); }
-    }),
-    UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
-      ariaLabel: "컨텐츠 탭",
-      value: contentTab,
-      onChange: changeContentTab,
-      activeColor: v2Embed ? '#7C2FE5' : undefined,
-      options: contentTabOptions
-    }),
-    /*#__PURE__*/React.createElement("div", { ref: setChipRowSlot, className: "v2-content-subcat-slot" }),
+  const regionFilterToolbar = /*#__PURE__*/React.createElement(React.Fragment, null,
     /*#__PURE__*/React.createElement("div", {
       className: "region-filter-trigger-row"
     },
@@ -3123,7 +3082,81 @@ export function ContentView({
         onClick: resetRegionSelections
       }, "초기화")
     )
-    ), // end history-header-stack
+  );
+
+  const contentHeaderStackEl = /*#__PURE__*/React.createElement("div", {
+    ref: headerStackRef,
+    className: "history-header-stack",
+    style: v2Embed ? undefined : {
+      position: 'fixed', top: 'env(safe-area-inset-top, 0px)', left: 0, right: 0, zIndex: 1010,
+      backgroundColor: 'var(--bg-primary)',
+      transition: 'transform 0.3s ease',
+      transform: isHeaderVisible ? 'translateY(0)' : 'translateY(-100%)'
+    }
+  },
+    !v2Embed && /*#__PURE__*/React.createElement("div", {
+      className: "places-view-header",
+      style: {
+        position: 'relative', height: '56px',
+        backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0 16px', flexShrink: 0
+      }
+    },
+      /*#__PURE__*/React.createElement("button", {
+        type: "button", onClick: onBack, "aria-label": "뒤로가기",
+        style: PAGE_HEADER_BACK_BTN_STYLE
+      }, BackArrowIcon ? /*#__PURE__*/React.createElement(BackArrowIcon, { size: 22 }) : "←"),
+      /*#__PURE__*/React.createElement("div", {
+        style: PAGE_HEADER_TITLE_STYLE
+      }, calendar.title + " 컨텐츠"),
+      /*#__PURE__*/React.createElement("div", { style: PAGE_HEADER_ACTIONS_WRAP_STYLE },
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", onClick: () => setIsSearchOpen(v => !v), title: "컨텐츠 검색", "aria-label": "컨텐츠 검색",
+          style: PAGE_HEADER_ICON_BTN_STYLE
+        }, SearchIcon ? /*#__PURE__*/React.createElement(SearchIcon, { size: 20 }) : "🔍"),
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", onClick: () => setIsMenuOpen(true), title: "메뉴", "aria-label": "메뉴 열기",
+          style: PAGE_HEADER_ICON_BTN_STYLE
+        }, ThreeLinesIcon ? /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 22 }) : "≡")
+      )
+    ),
+    isSearchOpen && InlineSearchBar && /*#__PURE__*/React.createElement(InlineSearchBar, {
+      value: searchQuery,
+      placeholder: "제목으로 검색...",
+      onChange: e => setSearchQuery(e.target.value),
+      onClose: () => { setIsSearchOpen(false); setSearchQuery(''); }
+    }),
+    UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
+      ariaLabel: "컨텐츠 탭",
+      value: contentTab,
+      onChange: changeContentTab,
+      activeColor: v2Embed ? '#7C2FE5' : undefined,
+      options: contentTabOptions
+    }),
+    /*#__PURE__*/React.createElement("div", { ref: setChipRowSlot, className: "v2-content-subcat-slot" }),
+    !v2Embed && regionFilterToolbar
+  );
+
+  return /*#__PURE__*/React.createElement("div", {
+    className: "places-view-container",
+    style: {
+      position: v2Embed ? 'relative' : 'fixed',
+      top: v2Embed ? undefined : 0,
+      left: v2Embed ? undefined : 0,
+      right: v2Embed ? undefined : 0,
+      bottom: v2Embed ? undefined : 0,
+      backgroundColor: 'var(--bg-primary)',
+      display: 'flex', flexDirection: 'column',
+      width: '100%', maxWidth: '100%', overflow: 'hidden',
+      height: v2Embed ? '100%' : undefined,
+      minHeight: v2Embed ? '100%' : undefined,
+      zIndex: v2Embed ? 1 : undefined,
+    }
+  },
+    v2ContentTabsSlot && ReactDOM?.createPortal
+      ? ReactDOM.createPortal(contentHeaderStackEl, v2ContentTabsSlot)
+      : (!v2Embed ? contentHeaderStackEl : null),
     /*#__PURE__*/React.createElement(RegionFilterBackdrop, {
       isOpen: isRegionFilterOpen,
       onClose: () => setIsRegionFilterOpen(false),
@@ -3133,37 +3166,22 @@ export function ContentView({
       onReset: resetRegionSelections,
       items: regionFilterItems
     }),
-    contentTab === 'culture' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
-      calendar, anniversaries, memos, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo, dataUrl: CULTURE_PERFORMANCES_URL,
-      emptyLabel: "상영중이거나 예정된 문화행사가 없습니다.", regionSelections, onItemsLoaded: setRegionFilterItems,
-      anniversaryCategory: "event",
-      extraItems: performanceExtraItems,
-      chipRowSlot, contentPaddingTop, onScroll: handleContentScroll,
-      gridCols, focusItemId, focusTitle, searchQuery, onEditContent: openContentEditor
-    }),
-    contentTab === 'festival' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
-      calendar, anniversaries, memos, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo, dataUrl: CULTURE_FESTIVALS_URL,
-      emptyLabel: "진행중이거나 예정된 지역축제가 없습니다.", regionSelections, onItemsLoaded: setRegionFilterItems,
-      anniversaryCategory: "festival",
-      extraItems: festivalExtraItems,
-      chipRowSlot, contentPaddingTop, onScroll: handleContentScroll,
-      gridCols, focusItemId, focusTitle, searchQuery, onEditContent: openContentEditor
-    }),
-    contentTab === 'sports' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
-      calendar, anniversaries, memos, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo, dataUrl: CULTURE_SPORTS_URL,
-      emptyLabel: "진행중이거나 예정된 스포츠 경기가 없습니다.", regionSelections, onItemsLoaded: setRegionFilterItems,
-      anniversaryCategory: "sports",
-      extraItems: sportsExtraItems,
-      chipRowSlot, contentPaddingTop, onScroll: handleContentScroll,
-      gridCols, focusItemId, focusTitle, searchQuery, onEditContent: openContentEditor
-    }),
-    contentTab === 'movies' && /*#__PURE__*/React.createElement(CulturePerformancesTab, {
-      calendar, anniversaries, memos, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo, dataUrl: CULTURE_MOVIES_URL,
-      emptyLabel: "등록된 영화가 없습니다.", regionSelections, onItemsLoaded: setRegionFilterItems,
-      anniversaryCategory: "movie", extraItems: movieExtraItems,
-      chipRowSlot, contentPaddingTop, onScroll: handleContentScroll,
-      gridCols, focusItemId, focusTitle, searchQuery, onEditContent: openContentEditor
-    }),
+    (() => {
+      const cfg = {
+        culture: { dataUrl: CULTURE_PERFORMANCES_URL, emptyLabel: "상영중이거나 예정된 문화행사가 없습니다.", anniversaryCategory: "event", extraItems: performanceExtraItems },
+        festival: { dataUrl: CULTURE_FESTIVALS_URL, emptyLabel: "진행중이거나 예정된 지역축제가 없습니다.", anniversaryCategory: "festival", extraItems: festivalExtraItems },
+        sports: { dataUrl: CULTURE_SPORTS_URL, emptyLabel: "진행중이거나 예정된 스포츠 경기가 없습니다.", anniversaryCategory: "sports", extraItems: sportsExtraItems },
+        movies: { dataUrl: CULTURE_MOVIES_URL, emptyLabel: "등록된 영화가 없습니다.", anniversaryCategory: "movie", extraItems: movieExtraItems },
+      }[contentTab];
+      return cfg ? /*#__PURE__*/React.createElement(CulturePerformancesTab, {
+        calendar, anniversaries, memos, onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo,
+        regionSelections, onItemsLoaded: setRegionFilterItems,
+        chipRowSlot, contentPaddingTop, onScroll: handleContentScroll,
+        gridCols, focusItemId, focusTitle, searchQuery, onEditContent: openContentEditor,
+        topToolbar: v2Embed ? regionFilterToolbar : null,
+        ...cfg
+      }) : null;
+    })(),
 
     /*#__PURE__*/React.createElement(SideMenuOverlay, {
       isOpen: isMenuOpen,
@@ -4088,7 +4106,7 @@ function buildQuickMemoPlaceholder(item) {
   return '메모를 입력하세요';
 }
 
-export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [], onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo = null, onEditContent = null, dataUrl = CULTURE_PERFORMANCES_URL, emptyLabel = "상영중이거나 예정된 문화공연이 없습니다.", regionSelections = [], onItemsLoaded, anniversaryCategory = 'event', extraItems = [], chipRowSlot = null, contentPaddingTop = 0, onScroll, gridCols = '2', focusItemId = null, focusTitle = '', searchQuery = '' }) {
+export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [], onRegisterCultureEvent, onUnregisterCultureEvent, onQuickSaveMemo = null, onEditContent = null, dataUrl = CULTURE_PERFORMANCES_URL, emptyLabel = "상영중이거나 예정된 문화공연이 없습니다.", regionSelections = [], onItemsLoaded, anniversaryCategory = 'event', extraItems = [], chipRowSlot = null, contentPaddingTop = 0, onScroll, gridCols = '2', focusItemId = null, focusTitle = '', searchQuery = '', topToolbar = null }) {
   const React = window.React;
   const ReactDOM = window.ReactDOM;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -4387,10 +4405,19 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
   const lifecycleItems = filterAndSortCultureItems(mergedItems, anniversaryCategory);
   const regionFilteredItems = filterCultureItemsByRegion(lifecycleItems, regionSelections, anniversaryCategory);
 
+  const renderEmptyGrid = (msg, chips = null) => /*#__PURE__*/React.createElement("div", {
+    className: "culture-items-grid is-cols-1",
+    style: { flex: 1, overflowY: 'auto', padding: contentPaddingTop ? `${contentPaddingTop}px 16px 96px` : undefined, alignContent: 'start' }
+  },
+    chips,
+    topToolbar && /*#__PURE__*/React.createElement("div", { className: "v2-content-scroll-top-slot", style: { gridColumn: '1 / -1', width: '100%' } }, topToolbar),
+    /*#__PURE__*/React.createElement("div", {
+      style: { gridColumn: '1 / -1', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)' }
+    }, msg)
+  );
+
   if (regionFilteredItems.length === 0) {
-    return /*#__PURE__*/React.createElement("div", {
-      style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)', paddingTop: contentPaddingTop }
-    }, "선택한 지역에 해당하는 항목이 없습니다.");
+    return renderEmptyGrid("선택한 지역에 해당하는 항목이 없습니다.");
   }
 
   const searchNeedle = (searchQuery || '').trim().toLowerCase();
@@ -4401,9 +4428,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
     : regionFilteredItems;
 
   if (searchFilteredItems.length === 0) {
-    return /*#__PURE__*/React.createElement("div", {
-      style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)', paddingTop: contentPaddingTop }
-    }, "검색 결과가 없습니다.");
+    return renderEmptyGrid("검색 결과가 없습니다.");
   }
 
   // Counts (and which genres even exist) are computed off the region+search-filtered set, not the
@@ -4476,12 +4501,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
     : null;
 
   if (filteredItems.length === 0) {
-    return /*#__PURE__*/React.createElement(React.Fragment, null,
-      renderedCategoryChipRow,
-      /*#__PURE__*/React.createElement("div", {
-        style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-md)', paddingTop: contentPaddingTop }
-      }, "선택한 카테고리에 해당하는 항목이 없습니다.")
-    );
+    return renderEmptyGrid("선택한 카테고리에 해당하는 항목이 없습니다.", renderedCategoryChipRow);
   }
 
   const focusedItem = (focusItemId || focusTitle)
@@ -4559,6 +4579,10 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
       onScroll: handleGridScroll,
       style: { flex: 1, overflowY: 'auto', padding: contentPaddingTop ? `${contentPaddingTop}px 16px 96px` : undefined, alignContent: 'start', gridAutoRows: 'max-content' }
     },
+      topToolbar && /*#__PURE__*/React.createElement("div", {
+        className: "v2-content-scroll-top-slot",
+        style: { gridColumn: '1 / -1', width: '100%' }
+      }, topToolbar),
       visibleItems.map(item => {
         const registered = !!findRegisteredAnniversary(item.id, item.title);
         const isMovieCard = anniversaryCategory === 'movie' || item.genre === 'movie' || item.kind === 'movie';

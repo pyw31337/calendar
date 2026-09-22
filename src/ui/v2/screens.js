@@ -115,6 +115,7 @@ const ICON_NODES = {
   send: [['path', { d: 'M22 2 11 13M22 2l-7 20-4-9-9-4 20-7Z' }]],
   chevronLeft: [['path', { d: 'm15 18-6-6 6-6' }]],
   chevronRight: [['path', { d: 'm9 18 6-6-6-6' }]],
+  chevronDown: [['path', { d: 'm6 9 6 6 6-6' }]],
 };
 
 export function DesignIcon({ name, size = 18, strokeWidth = 2 }) {
@@ -974,10 +975,19 @@ export function SettlementScreen(p) {
 
 export function ChatScreen(p) {
   const React = window.React;
+  const [showScrollBottom, setShowScrollBottom] = React.useState(false);
   const slots = { ...(p.legacyView ? extractChatSlots(p.legacyView) : {}), ...(p.slots || {}) };
   const memberCount = (p.calendar?.participants || []).filter(person => !person.deletedAt).length;
   const subtitle = p.subtitle
     || pageSubtitle(p.calendar, memberCount ? `${memberCount}명` : '');
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      const el = document.querySelector('.v2-chat-scroll, .chat-messages-scroll');
+      if (el) el.scrollTop = el.scrollHeight;
+    }, 60);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Preferred path: mock header + live message list + composer slots (ChatFull structure).
   // Require textarea+send so we can rebuild the composer row; otherwise fall back to wrap.
@@ -1068,6 +1078,12 @@ export function ChatScreen(p) {
                 title: '이모티콘',
               }, h(DesignIcon, { name: 'emoji', size: 18 }))
             : null,
+          slots.keyboard
+            ? clone(slots.keyboard, {
+                className: 'v2-tool-icon-btn',
+                type: 'button',
+              })
+            : null,
           slots.attach
             ? clone(slots.attach, {
                 className: 'v2-tool-icon-btn',
@@ -1112,20 +1128,39 @@ export function ChatScreen(p) {
           onMenu: p.onMenu,
         }),
         slots.notice,
-        clone(slots.body, {
-          className: 'v2-chat-scroll',
-          style: {
-            ...(slots.body.props.style || {}),
-            paddingTop: 8,
-          },
-        }),
+        h(
+          'div',
+          { className: 'v2-chat-scroll-wrap' },
+          clone(slots.body, {
+            className: 'v2-chat-scroll',
+            style: {
+              ...(slots.body.props.style || {}),
+              paddingTop: 8,
+            },
+            onScroll: (e) => {
+              if (typeof slots.body.props.onScroll === 'function') slots.body.props.onScroll(e);
+              const el = e.currentTarget;
+              if (el) setShowScrollBottom(el.scrollHeight - el.scrollTop - el.clientHeight > 160);
+            }
+          }),
+          showScrollBottom ? h('button', {
+            type: 'button',
+            className: 'v2-chat-scroll-bottom-btn',
+            'aria-label': '최근 대화로 이동',
+            title: '최근 대화로 이동',
+            onClick: () => {
+              const el = document.querySelector('.v2-chat-scroll, .chat-messages-scroll');
+              if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+            },
+          }, h(DesignIcon, { name: 'chevronDown', size: 20 })) : null
+        ),
         composer,
         ...keptRootKids
       ),
       ...passthrough,
       overlays(slots, [
         'notice', 'body', 'composer', 'lightbox', 'resize', 'memes', 'reply', 'textarea',
-        'photos', 'files', 'fileInput', 'participant', 'emoji', 'attach', 'paste', 'send',
+        'photos', 'files', 'fileInput', 'participant', 'emoji', 'keyboard', 'attach', 'paste', 'send',
       ])
     );
   }
@@ -1167,63 +1202,28 @@ export function GalleryScreen(p) {
   return h(
     'section',
     { className: 'v2-gallery v2-dest-page v2-embed-frame v2-records-media v2-has-page-header' },
-    h(PageHeader, {
-      title: '갤러리',
-      subtitle: p.subtitle || pageSubtitle(p.calendar),
-      brand: pageBrand(p.calendar),
-      onBack: p.onBack,
-      onSearch: p.onSearch,
-      searchLabel: '갤러리 검색',
-      onShare: p.onShare,
-      onMenu: p.onMenu,
-    }),
+    h(PageHeader, { title: '갤러리', onBack: p.onBack, onMenu: p.onMenu }),
     wrapLegacy(p.legacyView, 'v2-legacy-body v2-gallery-legacy'),
     overlays(p.slots)
   );
 }
 
-export function ContentScreen(p) {
-  ensureDestinationStyles('content');
-  return h(
-    'section',
-    { className: 'v2-content v2-dest-page v2-embed-frame v2-has-page-header' },
-    h(PageHeader, {
-      title: '컨텐츠',
-      subtitle: p.subtitle || pageSubtitle(p.calendar),
-      brand: pageBrand(p.calendar),
-      onBack: p.onBack,
-      onSearch: p.onSearch,
-      searchLabel: '컨텐츠 검색',
-      onShare: p.onShare,
-      onMenu: p.onMenu,
-    }),
-    wrapLegacy(p.legacyView, 'v2-legacy-body v2-content-legacy'),
-    overlays(p.slots)
-  );
+function makeTabbedScreen(name, title) {
+  return function(p) {
+    ensureDestinationStyles(name);
+    return h(
+      'section',
+      { className: `v2-${name} v2-dest-page v2-embed-frame v2-has-page-header` },
+      h(PageHeader, { title, onBack: p.onBack, onMenu: p.onMenu },
+        h('div', { id: `v2-${name}-header-tabs-slot`, className: `v2-${name}-tabs-slot` })
+      ),
+      wrapLegacy(p.legacyView, `v2-legacy-body v2-${name}-legacy`),
+      overlays(p.slots)
+    );
+  };
 }
-
-export function ArchiveScreen(p) {
-  ensureDestinationStyles('archive');
-  return h(
-    'section',
-    { className: 'v2-archive v2-dest-page v2-embed-frame v2-has-page-header' },
-    h(PageHeader, {
-      title: '보관함',
-      subtitle: p.subtitle || pageSubtitle(p.calendar),
-      brand: pageBrand(p.calendar),
-      onBack: p.onBack,
-      onSearch: p.onSearch,
-      searchLabel: '보관함 검색',
-      centerSubtitle: true,
-      onShare: p.onShare,
-      onMenu: p.onMenu,
-    },
-      h('div', { id: 'v2-archive-header-tabs-slot', className: 'v2-archive-tabs-slot' })
-    ),
-    wrapLegacy(p.legacyView, 'v2-legacy-body v2-archive-legacy'),
-    overlays(p.slots)
-  );
-}
+export const ContentScreen = makeTabbedScreen('content', '컨텐츠');
+export const ArchiveScreen = makeTabbedScreen('archive', '보관함');
 
 export const renderGalleryScreen = props => h(GalleryScreen, props);
 export const renderContentScreen = props => h(ContentScreen, props);

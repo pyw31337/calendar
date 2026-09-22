@@ -489,8 +489,7 @@
  * height baked in via dest-chrome-late.css, so they are kept here to set L/R/B only.
  */
 .renewal-shell.v2-design .v2-archive .history-page-scroll,
-.renewal-shell.v2-design .v2-archive .history-meetings-grid,
-.renewal-shell.v2-design .v2-archive .history-bento-grid {
+.renewal-shell.v2-design .v2-archive .history-meetings-grid {
   padding-left: var(--v2-dest-content-pad-x) !important;
   padding-right: var(--v2-dest-content-pad-x) !important;
   padding-bottom: var(--v2-dest-content-pad-y) !important;
@@ -501,9 +500,6 @@
 .renewal-shell.v2-design .v2-settlement .v2-settlement-body,
 .renewal-shell.v2-design .v2-settlement .v2-dest-body,
 .renewal-shell.v2-design .v2-settlement .bp-content,
-.renewal-shell.v2-design .v2-gallery .gallery-page-scroll,
-.renewal-shell.v2-design .v2-records-media,
-.renewal-shell.v2-design .v2-records-media .gallery-page-scroll,
 .renewal-shell.v2-design .v2-places .places-list-body,
 .renewal-shell.v2-design .v2-places .v2-places-body,
 .renewal-shell.v2-design .v2-memo .memo-list-scroll,
@@ -512,6 +508,12 @@
 .renewal-shell.v2-design .v2-content .culture-items-grid,
 .renewal-shell.v2-design .v2-content .content-page-scroll {
   padding: var(--v2-dest-content-pad-y) var(--v2-dest-content-pad-x) !important;
+  box-sizing: border-box !important;
+}
+.renewal-shell.v2-design .v2-gallery .gallery-page-scroll,
+.renewal-shell.v2-design .v2-records-media,
+.renewal-shell.v2-design .v2-records-media .gallery-page-scroll {
+  padding: var(--v2-dest-content-pad-y) 0 !important;
   box-sizing: border-box !important;
 }
 
@@ -641,7 +643,6 @@
 /* Memo-page cards use the home memo card's visual contract exactly: same
  * surface, title/meta rhythm, plain purple tags, hidden writer capsule, and
  * compact soft-purple comment rows. Interactivity remains on live MemoCard. */
-.renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-bubble-surface,
 .renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-card-contract {
   background: #fff !important;
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
@@ -650,6 +651,9 @@
 }
 
 .renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-bubble-surface {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
   padding: 0 !important;
   overflow: visible !important;
 }
