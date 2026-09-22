@@ -1042,12 +1042,23 @@ export function ChatScreen(p) {
     const rootKids = React.isValidElement(originalRoot)
       ? React.Children.toArray(originalRoot.props.children)
       : [];
+    const containsChatMessages = (node) => {
+      if (!node || !React.isValidElement(node)) return false;
+      if (node === slots.body) return true;
+      const c = String(node.props?.className || '');
+      if (c.includes('chat-messages-scroll')) return true;
+      const ch = React.Children.toArray(node.props?.children);
+      return ch.some(containsChatMessages);
+    };
+
     const keptRootKids = rootKids.filter(node => {
       if (!node || node === slots.composer || node === slots.body || node === slots.notice) return false;
       const cls = String(node.props?.className || '');
       if (cls.includes('chat-room-header')) return false;
       if (cls.includes('chat-composer')) return false;
+      if (cls.includes('chat-keyboard-reopen-btn')) return false;
       if (node.props?.['aria-label'] === '뒤로가기') return false;
+      if (containsChatMessages(node)) return false;
       return true;
     });
     const composer = clone(

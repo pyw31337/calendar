@@ -2017,8 +2017,9 @@ export function DateModal({
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
-      alignItems: 'baseline',
-      gap: '8px'
+      alignItems: 'center',
+      gap: '8px',
+      flexWrap: 'wrap'
     }
   }, /*#__PURE__*/React.createElement("span", {
     style: {
@@ -2031,19 +2032,40 @@ export function DateModal({
       color: isConfirmed ? '#7C3AED' : (isAllAvailable ? 'var(--status-green)' : 'var(--text-muted)'),
       marginLeft: '4px'
     }
-  }, titleParts.rest)), holidayLabelText && /*#__PURE__*/React.createElement("span", {
-    className: "holiday-tag",
-    style: {
-      fontSize: 'var(--font-size-sm)',
-      fontWeight: 'bold',
-      padding: '3px 8px',
-      borderRadius: 'var(--radius-sm)',
-      backgroundColor: '#FEF2F2',
-      color: '#EF4444',
-      border: '1px solid #FEE2E2',
-      verticalAlign: 'middle'
-    }
-  }, holidayLabelText)), /*#__PURE__*/React.createElement("div", {
+  }, titleParts.rest)),
+  holidayLabelText && /*#__PURE__*/React.createElement("span", {
+      className: "holiday-tag",
+      style: {
+        fontSize: 'var(--font-size-sm)',
+        fontWeight: 'bold',
+        padding: '3px 8px',
+        borderRadius: 'var(--radius-sm)',
+        backgroundColor: '#FEF2F2',
+        color: '#EF4444',
+        border: '1px solid #FEE2E2',
+        verticalAlign: 'middle'
+      }
+    }, holidayLabelText),
+    dateAnns.map((ann, aIdx) => {
+      const displayColor = getAnniversaryDisplayColor(ann, calendar);
+      return /*#__PURE__*/React.createElement("span", {
+        key: ann.id || aIdx,
+        className: "anniversary-tag",
+        style: {
+          fontSize: 'var(--font-size-sm)',
+          fontWeight: 'bold',
+          padding: '3px 8px',
+          borderRadius: 'var(--radius-sm)',
+          backgroundColor: `${displayColor}18`,
+          color: displayColor,
+          border: `1px solid ${displayColor}33`,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '4px',
+          verticalAlign: 'middle'
+        }
+      }, renderAnniversaryIcon(ann, 13), ann.title);
+    })), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       alignItems: 'center',
@@ -3287,11 +3309,13 @@ export function DateModal({
       dateTaggedMemos.length === 0 ? /*#__PURE__*/React.createElement("div", {
         style: { textAlign: 'center', color: 'var(--text-muted)', padding: '24px 12px', fontSize: 'var(--font-size-md)', border: '1px dashed var(--border-subtle)', borderRadius: 'var(--radius-md)' }
       }, "이 날짜에 연결된 메모가 없습니다.") : MemoCard ? /*#__PURE__*/React.createElement("div", {
+        className: "date-modal-memo-list",
         style: { display: 'flex', flexDirection: 'column', gap: '10px' }
       }, dateTaggedMemos.map(memo => /*#__PURE__*/React.createElement(MemoCard, {
         key: memo.id,
         memo,
         calendar,
+        variant: "date-modal",
         onOpenEdit: typeof onOpenEditMemo === 'function' ? () => onOpenEditMemo(memo) : undefined,
         onTogglePin: typeof onToggleMemoPin === 'function' ? () => onToggleMemoPin(memo) : () => {},
         onShare: typeof onShareMemo === 'function' ? () => onShareMemo(memo) : () => {},

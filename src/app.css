@@ -1763,7 +1763,7 @@ select.form-select {
   content: attr(data-author-name);
   position: absolute;
   left: 50%;
-  bottom: calc(100% + 5px);
+  bottom: calc(100% + 6px);
   transform: translateX(-50%) translateY(3px);
   opacity: 0;
   pointer-events: none;
@@ -1797,8 +1797,10 @@ select.form-select {
   opacity: 0;
   pointer-events: none;
   z-index: 9999;
-  border: 4px solid transparent;
-  border-top-color: #0F172A;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 5px solid #0F172A;
+  border-bottom: 0;
   transition: opacity 0.14s ease, transform 0.14s ease;
   width: 0;
   height: 0;
@@ -2096,6 +2098,9 @@ select.form-select {
   .festival-bar-spacer {
     height: calc(var(--festival-stack-depth, 0) * 6px);
   }
+}
+.day-anniversary-desktop + .festival-bar-spacer {
+  margin-top: -4px !important;
 }
 
 /* 흔들도시락 cooking-pot jiggle: .day-cell normally clips with overflow:hidden — lift that
@@ -5481,11 +5486,18 @@ select.form-select {
 
 
 .date-modal-settlement-list,
-.date-modal-places-list {
+.date-modal-places-list,
+.date-modal-memo-list {
   flex: 1 1 auto;
   min-height: 80px;
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+.date-modal-memo-list .memo-card-hover {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border-subtle) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: none !important;
 }
 .item-edit-delete-actions button:hover { color: var(--text-main); }
 

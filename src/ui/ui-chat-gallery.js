@@ -91,7 +91,7 @@ function getDirectMediaTagsForUrl(...args) {
 // external image links (see DirectChatMediaText's multi-image grid in ui-remaining.js) needs every
 // one of them to show up here too, not just the first, the same way a real multi-image upload
 // already does via getMessageImageEntries.
-function getAllDirectMediaImageEntries(msgLike) {
+function _getAllDirectMediaImageEntries(msgLike) {
   if (!msgLike?.text) return [];
   const declaredSource = String(msgLike?.uploadSource || '').trim().toLowerCase();
   const sourceHint = ['chat', 'gallery', 'meeting', 'memo'].includes(declaredSource)
@@ -662,15 +662,14 @@ export function ChatGalleryModal({
     // under the stricter extractAllUrlInfos. Only the first URL per message reuses the cached
     // linkPreview (that cache is keyed to the message's first URL); the rest fetch their own
     // preview live the same way a fresh link normally would. Recognized image links are excluded
-    // here -- those belong to the 사진 tab only (see sharedPhotos below), not duplicated as a
-    // generic link card here too.
+    // In the gallery, all shared URLs belong to the 링크 tab.
     const list = [];
     const seen = new Set();
     (chatMessages || []).forEach(msg => {
       if (!msg.text) return;
       let firstUrlSeen = false;
       extractAllUrlInfosLoose(msg.text).forEach(info => {
-        if (!info.url || seen.has(info.url) || getDirectChatMediaInfo(info.url)?.type === 'image') return;
+        if (!info.url || seen.has(info.url)) return;
         seen.add(info.url);
         list.push({ url: info.url, timestamp: msg.timestamp, messageId: msg.id, text: msg.text, linkPreview: !firstUrlSeen ? msg.linkPreview : null, source: 'chat' });
         firstUrlSeen = true;
@@ -682,7 +681,7 @@ export function ChatGalleryModal({
       if (!body || isTombstone(memo)) return;
       let firstUrlSeen = false;
       extractAllUrlInfosLoose(body).forEach(info => {
-        if (!info.url || seen.has(info.url) || getDirectChatMediaInfo(info.url)?.type === 'image') return;
+        if (!info.url || seen.has(info.url)) return;
         seen.add(info.url);
         list.push({ url: info.url, timestamp: memo.updatedAt || memo.createdAt || 0, messageId: memo.id, title: memo.title || '', text: body, linkPreview: !firstUrlSeen ? (memo.linkPreview || null) : null, source: 'memo' });
         firstUrlSeen = true;
@@ -692,7 +691,7 @@ export function ChatGalleryModal({
       const body = [meeting?.note, meeting?.memo, meeting?.description, meeting?.text].filter(Boolean).join('\n');
       if (!body) return;
       extractAllUrlInfosLoose(body).forEach(info => {
-        if (!info.url || seen.has(info.url) || getDirectChatMediaInfo(info.url)?.type === 'image') return;
+        if (!info.url || seen.has(info.url)) return;
         seen.add(info.url);
         list.push({
           url: info.url, timestamp: meeting.updatedAt || meeting.confirmedAt || 0,
@@ -714,11 +713,10 @@ export function ChatGalleryModal({
           if (source === 'anniversary') return false;
           return !String(photo.sourceOwner || '').startsWith('anniversary:');
         })
-        // Meme keyboard stickers: same exclusion as composeGalleryPhotos below, but this branch
-        // reads the server-maintained photoIndex directly instead of going through it, so it
-        // needs its own check (see isMemeKeyboardPhotoEntry's comment for why uploadSource alone
-        // isn't reliable here).
+        // Meme keyboard stickers
         .filter(photo => !isMemeKeyboardPhotoEntry(photo))
+        // Photos tab must only contain real photos, not link URLs
+        .filter(photo => !photo.directMediaUrl)
         .map(photo => {
           const source = photo.source || 'gallery';
           const imageIndex = Number.isInteger(photo.imageIndex)
@@ -819,7 +817,7 @@ export function ChatGalleryModal({
     }
     const composed = composeGalleryPhotos({
       chatMessages, memos, calendar, isTombstone, getMessageImageEntries,
-      getAllDirectMediaImageEntries, getConfirmedMeetings, resolveMeetingPhotoDisplay,
+      getAllDirectMediaImageEntries: () => [], getConfirmedMeetings, resolveMeetingPhotoDisplay,
       isBrokenPhotoValue, getPhotoAssetCommentKey
     });
     const calendarId = calendar && calendar.id ? calendar.id : '';
@@ -879,6 +877,7 @@ export function ChatGalleryModal({
     });
   }, [sharedPhotos, searchQuery]);
   const visiblePhotos = React.useMemo(() => filteredPhotos.filter(photo => {
+    if (photo.directMediaUrl) return false;
     const key = photo.mediaKey || photo.refKey || getPhotoKey(photo);
     if (key && brokenPhotoKeysRef.current.has(key)) return false;
     return !isBrokenPhotoValue(photo.full) && !isBrokenPhotoValue(photo.thumb);

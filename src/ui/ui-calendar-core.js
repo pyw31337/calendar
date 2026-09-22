@@ -1777,12 +1777,12 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       }
     },
     style: {
-      backgroundColor: (memo.color && memo.color !== 'var(--bg-card)' && memo.color !== '#fff' && memo.color !== '#FFFFFF') ? memo.color : (isPreview ? 'var(--bg-primary)' : '#fff'),
-      border: '0',
+      backgroundColor: (memo.color && memo.color !== 'var(--bg-card)' && memo.color !== '#fff' && memo.color !== '#FFFFFF') ? memo.color : (isPreview ? 'var(--bg-primary)' : (variant === 'date-modal' ? 'var(--bg-card)' : '#fff')),
+      border: variant === 'date-modal' ? '1px solid var(--border-subtle)' : '0',
       borderRadius: 'var(--radius-md)',
       padding: '12px',
       cursor: 'pointer',
-      boxShadow: '0 2px 5px rgba(0,0,0,0.03)',
+      boxShadow: variant === 'date-modal' ? 'none' : '0 2px 5px rgba(0,0,0,0.03)',
       display: 'flex',
       flexDirection: 'column',
       position: 'relative',

@@ -1874,27 +1874,23 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     ? {
         width: isLandscape ? '100vw' : '92vw',
         maxWidth: '100vw',
-        height: isPortrait ? `calc(100vh - ${reservedBottomPx}px)` : 'auto',
+        height: `calc(100vh - ${reservedBottomPx}px)`,
         maxHeight: `calc(100vh - ${reservedBottomPx}px)`,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        position: 'relative'
       }
     : {
         width: isLandscape ? '100vw' : '92vw',
         maxWidth: '100vw',
         height: `${mobileStageHeightPx}px`,
         maxHeight: `calc(100dvh - ${reservedBottomPx}px)`,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
         overflow: 'hidden',
+        position: 'relative',
         flexShrink: 0
       };
 
   const renderSlide = (url, slot) => {
-    const wrapperStyle = { width: '33.3333%', flexShrink: 0, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' };
+    const wrapperStyle = { width: '33.333333%', flexShrink: 0, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' };
     if (!url) return /*#__PURE__*/React.createElement("div", { style: wrapperStyle });
     const slideIndex = slot === 'prev' ? index - 1 : (slot === 'next' ? index + 1 : index);
     const slideMeta = Array.isArray(meta) ? (meta[slideIndex] || {}) : (meta || {});
@@ -1932,7 +1928,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
           display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
-          width: isLandscape ? '100vw' : 'auto',
+          width: isLandscape ? '100%' : 'auto',
           maxWidth: '100%',
           height: isPortrait ? '100%' : 'auto',
           maxHeight: '100%'
@@ -1951,7 +1947,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
         onMouseDown: handleZoomedImageMouseDown,
         style: {
           width: isLandscape ? '100%' : 'auto',
-          maxWidth: '100vw',
+          maxWidth: '100%',
           height: isPortrait ? '100%' : 'auto',
           maxHeight: '100%',
           objectFit: 'contain',
@@ -2093,8 +2089,8 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   }, /*#__PURE__*/React.createElement("div", {
     onTransitionEnd: handleTrackTransitionEnd,
     style: {
-      display: 'flex', width: '300%', height: '100%',
-      transform: `translateX(calc(-33.3333% + ${dragPx}px))`,
+      display: 'flex', width: '300%', height: '100%', flexShrink: 0,
+      transform: `translateX(calc(-33.333333% + ${dragPx}px))`,
       transition: transitionOn ? `transform ${LIGHTBOX_TRANSITION_MS}ms ${LIGHTBOX_TRANSITION_EASING}` : 'none',
       willChange: 'transform'
     }
