@@ -4275,14 +4275,15 @@ select.form-select {
   filter: none !important;
 }
 .date-item-btn.confirmed-meeting-card.is-past {
-  background: linear-gradient(90deg, #E2E8F0 0%, #F8FAFC 100%) !important;
+  /* 지난모임은 모임확정의 보라색 그라디언트와 대비되는 회색 단색 배경을 쓴다 (그라디언트 아님). */
+  background: #E2E8F0 !important;
   border: none !important;
   color: #475569;
   box-shadow: none;
   opacity: 0.92;
 }
 :root[data-theme="dark"] .date-item-btn.confirmed-meeting-card.is-past {
-  background: linear-gradient(90deg, #1B2540 0%, #22304F 100%) !important;
+  background: #1B2540 !important;
   border: none !important;
   color: #CBD5E1;
   box-shadow: none;
@@ -4373,6 +4374,10 @@ select.form-select {
   display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px;
   border-radius: 10px; font-size: 0.75rem; font-weight: 700;
   box-shadow: 0 1px 3px rgba(0,0,0,0.1); line-height: 120%;
+  /* Lives inside a <button> (date-item-btn), whose UA default is text-align:center --
+     without this, a memo that wraps to 2+ lines centers each line instead of staying
+     left-aligned like normal body text. */
+  text-align: left;
 }
 .confirmed-meeting-banner .memo-capsule-badge,
 .confirmed-meeting-surface .memo-capsule-badge {

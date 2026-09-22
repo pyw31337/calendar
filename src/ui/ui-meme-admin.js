@@ -54,6 +54,23 @@ async function runWithConcurrency(items, worker, concurrency, onProgress) {
   return results;
 }
 
+// Probes one image URL without ever inserting it into the DOM -- resolves true/false, never
+// throws. Used only by the "깨진 이미지 검사" scan below. A generous timeout: this runs against
+// up to ~1300 real Storage URLs at once, and a slow-but-real response must not be mistaken for
+// a dead one.
+function probeImageUrl(url, timeoutMs = 10000) {
+  return new Promise(resolve => {
+    if (!url) { resolve(false); return; }
+    const img = new Image();
+    let settled = false;
+    const done = ok => { if (settled) return; settled = true; resolve(ok); };
+    const timer = setTimeout(() => done(false), timeoutMs);
+    img.onload = () => { clearTimeout(timer); done(true); };
+    img.onerror = () => { clearTimeout(timer); done(false); };
+    img.src = url;
+  });
+}
+
 // 중복 업로드 판단 키: 파일명 + 포맷(MIME/확장자) + 용량이 전부 같으면 같은 파일로 본다.
 // 기존 풀 항목은 fileSize가 이번 변경 이전에는 저장되지 않았을 수 있어(null), 그 경우엔
 // 이 키가 서로 달라져 매칭되지 않는다 -- 안전한 방향(과거 항목은 중복판정 못 해도 새로 올라간
@@ -88,6 +105,9 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
   const [uploadProgress, setUploadProgress] = React.useState(null); // { done, total } | null
   const [resetProgress, setResetProgress] = React.useState(null); // { done, total } | null
   const [showResetConfirm, setShowResetConfirm] = React.useState(false);
+  const [brokenScanProgress, setBrokenScanProgress] = React.useState(null); // { done, total } | null while scanning
+  const [brokenItems, setBrokenItems] = React.useState(null); // array once a scan finds any, else null
+  const [isDeletingBroken, setIsDeletingBroken] = React.useState(false);
   const [selected, setSelected] = React.useState(null); // one pool item, opened in the lightbox
   const [tagDraft, setTagDraft] = React.useState('');
   const [isDeleting, setIsDeleting] = React.useState(false);
@@ -326,6 +346,53 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
     );
   };
 
+  // 깨진(= Storage에서 실제 파일이 사라진) 항목 찾기: thumbUrl과 fullUrl을 둘 다 <img>로 실제
+  // 로드해 본다. 보수적으로, 둘 중 하나라도 뜨면 "정상"으로 본다 -- 한쪽만 일시적으로 느리거나
+  // 실패한 경우까지 삭제 후보로 잡으면 멀쩡한 이미지를 지울 위험이 있다. 찾기만 하고, 실제
+  // 삭제는 관리자가 아래 확인창에서 한 번 더 승인해야 실행된다 (자동 삭제 없음).
+  const handleScanBroken = async () => {
+    if (brokenScanProgress || pool.length === 0) return;
+    setBrokenItems(null);
+    setBrokenScanProgress({ done: 0, total: pool.length });
+    const found = [];
+    await runWithConcurrency(pool, async item => {
+      const [thumbOk, fullOk] = await Promise.all([
+        probeImageUrl(item.thumbUrl),
+        probeImageUrl(item.fullUrl)
+      ]);
+      if (!thumbOk && !fullOk) found.push(item);
+    }, 16, (done, total) => setBrokenScanProgress({ done, total }));
+    setBrokenScanProgress(null);
+    if (found.length === 0) {
+      notify('깨진 이미지를 찾지 못했습니다.', 'success');
+      return;
+    }
+    setBrokenItems(found);
+  };
+
+  const handleConfirmDeleteBroken = async () => {
+    const targets = brokenItems || [];
+    if (targets.length === 0) { setBrokenItems(null); return; }
+    setIsDeletingBroken(true);
+    const removedIds = new Set();
+    let failCount = 0;
+    await runWithConcurrency(targets, async item => {
+      const ok = await deleteRemote(password, item.id).catch(() => false);
+      if (ok) removedIds.add(item.id); else failCount += 1;
+    }, UPLOAD_CONCURRENCY, () => {});
+    setIsDeletingBroken(false);
+    setBrokenItems(null);
+    if (removedIds.size > 0 && typeof onPoolChange === 'function') {
+      onPoolChange(prev => prev.filter(p => !removedIds.has(p.id)));
+    }
+    notify(
+      failCount > 0
+        ? `${removedIds.size}장 삭제 완료, ${failCount}장 실패 (새로고침 후 다시 시도해 주세요)`
+        : `깨진 이미지 ${removedIds.size}장을 삭제했습니다.`,
+      failCount > 0 ? 'error' : 'success'
+    );
+  };
+
   return /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '14px' } },
     showResetConfirm && ConfirmDialog && /*#__PURE__*/React.createElement(ConfirmDialog, {
       title: "전체 태그 초기화",
@@ -333,11 +400,31 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
       onConfirm: handleResetAllTags,
       onCancel: () => setShowResetConfirm(false)
     }),
+    brokenItems && ConfirmDialog && /*#__PURE__*/React.createElement(ConfirmDialog, {
+      title: "깨진 이미지 삭제",
+      message: `썸네일·원본이 둘 다 로드되지 않는 ${brokenItems.length}장을 찾았습니다`
+        + (brokenItems[0]?.fileName ? ` (예: ${brokenItems.slice(0, 3).map(p => p.fileName || p.id).join(', ')}${brokenItems.length > 3 ? ' 외' : ''})` : '')
+        + '. Storage에서 실제 파일이 사라져 화면에 뜨지 않는 항목만 골랐습니다 (한쪽이라도 뜨는 이미지는 제외). 목록에서 지우고, 되돌릴 수 없습니다. 삭제할까요?',
+      onConfirm: handleConfirmDeleteBroken,
+      onCancel: () => setBrokenItems(null)
+    }),
     resetProgress && /*#__PURE__*/React.createElement(ImageUploadOverlay, {
       label: '태그 초기화 중...',
       pct: resetProgress.total ? Math.round((resetProgress.done / resetProgress.total) * 100) : 0,
       current: resetProgress.done,
       total: resetProgress.total
+    }),
+    brokenScanProgress && /*#__PURE__*/React.createElement(ImageUploadOverlay, {
+      label: '깨진 이미지 검사 중...',
+      pct: brokenScanProgress.total ? Math.round((brokenScanProgress.done / brokenScanProgress.total) * 100) : 0,
+      current: brokenScanProgress.done,
+      total: brokenScanProgress.total
+    }),
+    isDeletingBroken && /*#__PURE__*/React.createElement(ImageUploadOverlay, {
+      label: '깨진 이미지 삭제 중...',
+      pct: 0,
+      current: 0,
+      total: 0
     }),
     uploadProgress && /*#__PURE__*/React.createElement(ImageUploadOverlay, {
       label: '밈 이미지 업로드 중...',
@@ -351,6 +438,13 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
         /*#__PURE__*/React.createElement("p", { style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)', margin: '2px 0 0 0' } }, "여러 장을 한 번에 선택해 올린 뒤, 아래 그리드에서 사진을 눌러 해시태그를 입력하세요. 같은 파일명·포맷·용량의 이미지는 자동으로 건너뜁니다.")
       ),
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px' } },
+        /*#__PURE__*/React.createElement("button", {
+          type: "button", className: "btn btn-secondary",
+          onClick: handleScanBroken,
+          disabled: !!brokenScanProgress || isDeletingBroken || pool.length === 0,
+          title: "썸네일·원본이 모두 로드되지 않는 이미지를 찾습니다. 삭제 전 반드시 확인창에서 다시 확인합니다.",
+          style: { height: '44px', padding: '0 14px', fontWeight: 800 }
+        }, brokenScanProgress ? `검사 중 ${brokenScanProgress.done}/${brokenScanProgress.total}` : "깨진 이미지 검사"),
         /*#__PURE__*/React.createElement("button", {
           type: "button", className: "btn btn-danger",
           onClick: () => setShowResetConfirm(true),
