@@ -1572,7 +1572,9 @@ export function PlacesView({
             { key: 'all', label: '전체', count: searchedPlaces.length, color: typeof renderV2 === 'function' ? '#7C2FE5' : '#2563EB' },
             ...categories.map(category => ({
               key: category.id,
-              label: `${getPlaceCategoryIcon(category)} ${category.name}`,
+              // Desktop tab bar uses plain text labels (V2 reference) -- the emoji icon
+              // belongs to the mobile select box / card badges, not this row.
+              label: category.name,
               count: countsByCategory[category.id] || 0,
               color: category.color
             }))
