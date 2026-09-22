@@ -4249,9 +4249,9 @@ select.form-select {
   overflow: hidden;
   isolation: isolate;
   border: none;
-  /* Same brand gradient tokens as 정산's hero card (--settlement-hero-*), which in turn
-     matches the V2 캘린더 home hero's gradient -- see that variable's own comment. */
-  background: linear-gradient(90deg, var(--settlement-hero-start) 0%, var(--settlement-hero-mid) 54%, var(--settlement-hero-end) 100%);
+  /* Flat brand purple, not the blue/purple/pink 정산 hero gradient -- 모임확정 reads as a
+     solid purple card (V2 reference), distinct from 지난모임's flat gray below. */
+  background: #7C2FE5;
   color: #FFFFFF;
   box-shadow: none;
 }
