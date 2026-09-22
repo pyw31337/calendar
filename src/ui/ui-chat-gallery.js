@@ -2645,7 +2645,7 @@ export function ChatGalleryModal({
       padding: asPage
         ? (
             v2Embed
-              ? '12px 16px 16px 16px'
+              ? undefined
               : (
                   `calc(${(!isHeaderVisible
                     ? '12px'

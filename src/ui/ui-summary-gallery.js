@@ -1463,7 +1463,8 @@ export function HistoryView({
       : 'calc(12px + env(safe-area-inset-top, 0px))');
   const historyScrollStyle = {
     flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain',
-    WebkitOverflowScrolling: 'touch', padding: `${historyScrollPadTop} 16px 16px`
+    WebkitOverflowScrolling: 'touch',
+    ...(v2Embed ? {} : { padding: `${historyScrollPadTop} 16px 16px` })
   };
     const activeParticipants = getActiveParticipants(calendar);
   const participantsMap = activeParticipants.reduce((acc, p) => { acc[p.id] = p; return acc; }, {});
@@ -4556,7 +4557,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
     /*#__PURE__*/React.createElement("div", {
       className: "culture-items-grid is-cols-" + (gridCols === '1' ? '1' : '2'),
       onScroll: handleGridScroll,
-      style: { flex: 1, overflowY: 'auto', padding: '8px 16px 96px', paddingTop: contentPaddingTop || 8, alignContent: 'start', gridAutoRows: 'max-content' }
+      style: { flex: 1, overflowY: 'auto', padding: contentPaddingTop ? `${contentPaddingTop}px 16px 96px` : undefined, alignContent: 'start', gridAutoRows: 'max-content' }
     },
       visibleItems.map(item => {
         const registered = !!findRegisteredAnniversary(item.id, item.title);
