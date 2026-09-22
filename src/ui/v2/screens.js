@@ -1202,7 +1202,7 @@ export function GalleryScreen(p) {
   return h(
     'section',
     { className: 'v2-gallery v2-dest-page v2-embed-frame v2-records-media v2-has-page-header' },
-    h(PageHeader, { title: '갤러리', onBack: p.onBack, onMenu: p.onMenu }),
+    h(PageHeader, { title: '갤러리', searchLabel: '갤러리 검색', onBack: p.onBack, onMenu: p.onMenu, onSearch: p.onSearch }),
     wrapLegacy(p.legacyView, 'v2-legacy-body v2-gallery-legacy'),
     overlays(p.slots)
   );
