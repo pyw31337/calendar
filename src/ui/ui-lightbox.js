@@ -42,6 +42,43 @@ function getLegacyMeetingMediaKey(...args) {
   const f = __gatherUiDeps().getLegacyMeetingMediaKey || GATHER_APP_UTILS.getLegacyMeetingMediaKey;
   return typeof f === 'function' ? f(...args) : undefined;
 }
+
+const BROKEN_THUMB_KEY = 'gather_broken_photo_thumbs_v1';
+function getBrokenThumbSet() {
+  try {
+    const raw = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem(BROKEN_THUMB_KEY) : null;
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch (_) { return new Set(); }
+}
+function markBrokenThumb(url) {
+  if (!url) return;
+  try {
+    const set = getBrokenThumbSet();
+    set.add(url);
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.setItem(BROKEN_THUMB_KEY, JSON.stringify(Array.from(set).slice(-200)));
+    }
+  } catch (_) {}
+}
+function generateClientThumbnail(img, maxDim = 640) {
+  try {
+    const canvas = document.createElement('canvas');
+    let w = img.naturalWidth || img.width;
+    let h = img.naturalHeight || img.height;
+    if (!w || !h) return null;
+    if (w > maxDim || h > maxDim) {
+      if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+      else { w = Math.round((w * maxDim) / h); h = maxDim; }
+    }
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, w, h);
+    return canvas.toDataURL('image/jpeg', 0.82);
+  } catch (_) {
+    return null;
+  }
+}
 // 메모 카드(MemoCard, ui-calendar-core.js)가 쓰는 것과 똑같은 댓글 스레드 UI/로직(참여자
 // 선택 + 입력 + 편집/삭제, 3개 초과 시 접기)을 그대로 재현한 라이트박스 전용 버전. 데이터
 // 모양도 동일하다 -- comments: [{id, participantId, text, createdAt, updatedAt?}],
@@ -496,8 +533,31 @@ export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast
       setIsDeletingTag(false);
     }
   };
+  const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 1024;
   const labelStyle = { opacity: 0.7, flexShrink: 0, minWidth: '52px' };
-  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(LightboxBottomPanel, null,
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "lightbox-tag-panel-card",
+    style: {
+      width: '92vw',
+      maxWidth: '92vw',
+      boxSizing: 'border-box',
+      backgroundColor: 'rgba(15, 23, 42, 0.72)',
+      border: '1px solid rgba(255,255,255,0.12)',
+      borderRadius: 'var(--radius-md)',
+      padding: isDesktop ? '10px 14px' : '8px 10px',
+      color: '#FFFFFF',
+      fontSize: 'var(--font-size-sm)',
+      lineHeight: 1.7,
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '6px',
+      flexShrink: 0,
+      pointerEvents: 'auto'
+    },
+    onClick: e => e.stopPropagation(),
+    onMouseDown: e => e.stopPropagation(),
+    onTouchStart: e => e.stopPropagation()
+  },
     /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', minWidth: 0 } },
       /*#__PURE__*/React.createElement("span", { style: labelStyle }, "해시태그"),
       tagTokens.map(tag => /*#__PURE__*/React.createElement("span", {
@@ -809,15 +869,16 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   const [tagOverrides, setTagOverrides] = React.useState({});
   const currentMeta = Array.isArray(meta) ? (meta[index] || {}) : (meta || {});
   const currentThumbUrl = String(currentMeta?.thumb || currentMeta?.thumbUrl || '').trim();
+  const isThumbKnownBroken = Boolean(currentThumbUrl && getBrokenThumbSet().has(currentThumbUrl));
   const currentVisualUrl = currentThumbUrl && currentThumbUrl !== currentUrl
-    && !loadedOriginalUrls.has(currentUrl) && !failedOriginalUrls.has(currentUrl)
+    && !isThumbKnownBroken && !loadedOriginalUrls.has(currentUrl) && !failedOriginalUrls.has(currentUrl)
     ? currentThumbUrl
     : currentUrl;
   // Paint the already-loaded thumbnail immediately, then swap in the original only after its
   // bytes decode. Date-group lightboxes often point at older Storage objects, so binding the
   // visible <img> directly to the original left a dark blank stage on slow/mobile networks.
   React.useEffect(() => {
-    if (!currentUrl || !currentThumbUrl || currentThumbUrl === currentUrl
+    if (!currentUrl || !currentThumbUrl || currentThumbUrl === currentUrl || isThumbKnownBroken
       || loadedOriginalUrls.has(currentUrl) || failedOriginalUrls.has(currentUrl)) return undefined;
     let cancelled = false;
     const original = new Image();
@@ -831,7 +892,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     };
     original.src = currentUrl;
     return () => { cancelled = true; original.onload = null; };
-  }, [currentUrl, currentThumbUrl, loadedOriginalUrls, failedOriginalUrls]);
+  }, [currentUrl, currentThumbUrl, isThumbKnownBroken, loadedOriginalUrls, failedOriginalUrls]);
   // Never trust a duplicated legacy identity when the rendered assets are different.  A few
   // upload/import paths historically copied the first image's messageId/imageIndex into every
   // metadata row; using that key here made one Firestore comment document appear on the whole
@@ -1297,6 +1358,15 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     const height = img.naturalHeight;
     if (!url || !width || !height) return;
     setImageDimensions(prev => prev[url] ? prev : { ...prev, [url]: { width, height } });
+    if (url === currentUrl && (!currentThumbUrl || isThumbKnownBroken)) {
+      try {
+        const clientThumb = generateClientThumbnail(img);
+        if (clientThumb && typeof window !== 'undefined') {
+          window.GATHER_REPAIRED_THUMBNAILS = window.GATHER_REPAIRED_THUMBNAILS || {};
+          window.GATHER_REPAIRED_THUMBNAILS[currentUrl] = clientThumb;
+        }
+      } catch (_) {}
+    }
   };
   const handleImageTap = e => {
     e.stopPropagation();
@@ -1594,6 +1664,7 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   };
   const handleCurrentImageError = () => {
     if (currentVisualUrl && currentVisualUrl !== currentUrl) {
+      markBrokenThumb(currentVisualUrl);
       setLoadedOriginalUrls(prev => new Set(prev).add(currentUrl));
       return;
     }
@@ -1780,26 +1851,44 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
   // reclaim the space). Size the stage to the fitted image height (capped at 56dvh) so comments
   // sit directly under the photo and a short comment list no longer needs an inner/outer scroll
   // just to bridge empty stage space.
-  const mobileImageMaxPx = !isDesktop && typeof window !== 'undefined'
-    ? Math.max(160, Math.round((window.visualViewport?.height || window.innerHeight) * 0.56) - 8)
-    : null;
+  const currentDim = imageDimensions[currentUrl] || (zoomedImgRef.current && zoomedImgRef.current.naturalWidth && zoomedImgRef.current.naturalHeight ? { width: zoomedImgRef.current.naturalWidth, height: zoomedImgRef.current.naturalHeight } : null);
+  const isLandscape = currentDim?.width && currentDim?.height ? currentDim.width > currentDim.height : false;
+  const isPortrait = currentDim?.width && currentDim?.height ? currentDim.height >= currentDim.width : false;
+
+  const reservedBottomPx = isDesktop ? (showTags ? 220 : 160) : (showTags ? 210 : 145);
+  const availableHeightPx = typeof window !== 'undefined'
+    ? Math.max(160, Math.round((window.visualViewport?.height || window.innerHeight) - reservedBottomPx))
+    : 480;
+
   const mobileStageHeightPx = (() => {
-    if (isDesktop || mobileImageMaxPx == null) return null;
-    const maxW = Math.min(window.innerWidth * 0.92, window.innerWidth);
-    const size = imageDimensions[currentUrl];
-    if (size?.width && size?.height) {
-      const fitted = maxW * (size.height / size.width);
-      return Math.max(1, Math.min(mobileImageMaxPx, Math.round(fitted)));
+    if (isDesktop) return null;
+    if (isPortrait) return availableHeightPx;
+    if (currentDim?.width && currentDim?.height) {
+      const fitted = window.innerWidth * (currentDim.height / currentDim.width);
+      return Math.max(120, Math.min(availableHeightPx, Math.round(fitted)));
     }
-    // Pre-load placeholder: prefer a compact 4:3 guess over a full 56dvh hole that jumps away.
-    return Math.max(1, Math.min(mobileImageMaxPx, Math.round(maxW * 0.75)));
+    return Math.max(120, Math.min(availableHeightPx, Math.round(window.innerWidth * 0.75)));
   })();
+
   const mobileImageStageStyle = isDesktop
-    ? { width: '92vw', height: '82vh', overflow: 'hidden' }
+    ? {
+        width: isLandscape ? '100vw' : '92vw',
+        maxWidth: '100vw',
+        height: isPortrait ? `calc(100vh - ${reservedBottomPx}px)` : 'auto',
+        maxHeight: `calc(100vh - ${reservedBottomPx}px)`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden'
+      }
     : {
-        width: '92vw',
+        width: isLandscape ? '100vw' : '92vw',
+        maxWidth: '100vw',
         height: `${mobileStageHeightPx}px`,
-        maxHeight: '56dvh',
+        maxHeight: `calc(100dvh - ${reservedBottomPx}px)`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
         overflow: 'hidden',
         flexShrink: 0
       };
@@ -1810,7 +1899,8 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     const slideIndex = slot === 'prev' ? index - 1 : (slot === 'next' ? index + 1 : index);
     const slideMeta = Array.isArray(meta) ? (meta[slideIndex] || {}) : (meta || {});
     const slideThumb = String(slideMeta.thumb || slideMeta.thumbUrl || '').trim();
-    const visualUrl = slideThumb && slideThumb !== url
+    const isSlideThumbBroken = slideThumb && getBrokenThumbSet().has(slideThumb);
+    const visualUrl = slideThumb && slideThumb !== url && !isSlideThumbBroken
       && !loadedOriginalUrls.has(url) && !failedOriginalUrls.has(url) ? slideThumb : url;
 
     if (slot === 'current') {
@@ -1837,7 +1927,16 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
       }
 
       return /*#__PURE__*/React.createElement("div", { style: wrapperStyle }, /*#__PURE__*/React.createElement("div", {
-        style: { position: 'relative', display: 'inline-flex', maxWidth: '100%', maxHeight: '100%' },
+        style: {
+          position: 'relative',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: isLandscape ? '100vw' : 'auto',
+          maxWidth: '100%',
+          height: isPortrait ? '100%' : 'auto',
+          maxHeight: '100%'
+        },
         onClick: handleImageTap
       }, /*#__PURE__*/React.createElement("img", {
         ref: zoomedImgRef,
@@ -1851,8 +1950,14 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
         onError: handleCurrentImageError,
         onMouseDown: handleZoomedImageMouseDown,
         style: {
-          maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 'var(--radius-md)',
-          display: 'block', ...zoomImageStyle
+          width: isLandscape ? '100%' : 'auto',
+          maxWidth: '100vw',
+          height: isPortrait ? '100%' : 'auto',
+          maxHeight: '100%',
+          objectFit: 'contain',
+          borderRadius: isLandscape ? 0 : 'var(--radius-md)',
+          display: 'block',
+          ...zoomImageStyle
         }
       }), renderPhotoActions(),
         showInfo && zoomLevel === ZOOM_DEFAULT && /*#__PURE__*/React.createElement(LightboxInfoPanel, {
@@ -1861,17 +1966,8 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
           sourceInfo: sourceInfo,
           onRemoveFromMemory: onRemoveFromMemory ? handleRemoveFromMemoryClick : null,
           isRemovingFromMemory: isRemovingFromMemory
-        }),
-        showTags && zoomLevel === ZOOM_DEFAULT && /*#__PURE__*/React.createElement(LightboxTagPanel, {
-          key: `tags-${tagOverrideKey || String(currentUrl || index)}`,
-          tags: currentTagsWithUploadDate,
-          onSaveTags: saveCurrentTags,
-          onSearchTag: onSearchTag,
-          showToast: showToast,
-          autoFocus: focusTagInputAfterNav,
-          onInputFocus: () => { tagInputFocusRef.current = true; setFocusTagInputAfterNav(false); },
-          onInputBlur: () => { window.setTimeout(() => { tagInputFocusRef.current = false; }, 0); }
-        })));
+        })
+      ));
     }
 
     return /*#__PURE__*/React.createElement("div", { style: wrapperStyle }, /*#__PURE__*/React.createElement("img", {
@@ -2004,7 +2100,17 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     }
   }, renderSlide(index > 0 ? displayUrls[index - 1] : null, 'prev'), renderSlide(currentUrl, 'current'), renderSlide(index < total - 1 ? displayUrls[index + 1] : null, 'next')))
     : /*#__PURE__*/React.createElement("div", {
-    style: { position: 'relative', display: 'inline-flex', maxWidth: '92vw', maxHeight: isDesktop ? '82vh' : '56dvh', touchAction: 'none' },
+    style: {
+      position: 'relative',
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: isLandscape ? '100vw' : 'auto',
+      maxWidth: '100vw',
+      height: isPortrait ? (isDesktop ? `calc(100vh - ${reservedBottomPx}px)` : `${mobileStageHeightPx}px`) : 'auto',
+      maxHeight: isDesktop ? `calc(100vh - ${reservedBottomPx}px)` : `calc(100dvh - ${reservedBottomPx}px)`,
+      touchAction: 'none'
+    },
     onTouchStart: handleTouchStart,
     onTouchMove: handleTouchMove,
     onTouchEnd: handleTouchEnd,
@@ -2018,10 +2124,17 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     decoding: 'async',
     referrerPolicy: 'no-referrer',
     onLoad: e => recordImageDimensions(currentUrl, e),
+    onError: handleCurrentImageError,
     onMouseDown: handleZoomedImageMouseDown,
     style: {
-      maxWidth: '92vw', maxHeight: isDesktop ? '82vh' : '56dvh', borderRadius: 'var(--radius-md)', objectFit: 'contain',
-      display: 'block', ...zoomImageStyle
+      width: isLandscape ? '100%' : 'auto',
+      maxWidth: '100vw',
+      height: isPortrait ? '100%' : 'auto',
+      maxHeight: isDesktop ? `calc(100vh - ${reservedBottomPx}px)` : `calc(100dvh - ${reservedBottomPx}px)`,
+      borderRadius: isLandscape ? 0 : 'var(--radius-md)',
+      objectFit: 'contain',
+      display: 'block',
+      ...zoomImageStyle
     }
   }), renderPhotoActions(),
     showInfo && zoomLevel === ZOOM_DEFAULT && /*#__PURE__*/React.createElement(LightboxInfoPanel, {
@@ -2030,17 +2143,17 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
       sourceInfo: sourceInfo,
       onRemoveFromMemory: onRemoveFromMemory ? handleRemoveFromMemoryClick : null,
       isRemovingFromMemory: isRemovingFromMemory
-    }),
-    showTags && zoomLevel === ZOOM_DEFAULT && /*#__PURE__*/React.createElement(LightboxTagPanel, {
-      key: `tags-${tagOverrideKey || String(currentUrl || index)}`,
-      tags: currentTagsWithUploadDate,
-      onSaveTags: saveCurrentTags,
-      onSearchTag: onSearchTag,
-      showToast: showToast,
-      autoFocus: focusTagInputAfterNav,
-      onInputFocus: () => { tagInputFocusRef.current = true; setFocusTagInputAfterNav(false); },
-      onInputBlur: () => { window.setTimeout(() => { tagInputFocusRef.current = false; }, 0); }
     })),
+  showTags && zoomLevel === ZOOM_DEFAULT && /*#__PURE__*/React.createElement(LightboxTagPanel, {
+    key: `tags-${tagOverrideKey || String(currentUrl || index)}`,
+    tags: currentTagsWithUploadDate,
+    onSaveTags: saveCurrentTags,
+    onSearchTag: onSearchTag,
+    showToast: showToast,
+    autoFocus: focusTagInputAfterNav,
+    onInputFocus: () => { tagInputFocusRef.current = true; setFocusTagInputAfterNav(false); },
+    onInputBlur: () => { window.setTimeout(() => { tagInputFocusRef.current = false; }, 0); }
+  }),
   renderCommentThread(),
   total > 1 && (() => {
     const maxVisibleDots = 10;

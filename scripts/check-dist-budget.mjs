@@ -13,6 +13,7 @@ const BUDGETS = [
   { pattern: /^ui-memo-view-.*\.js$/, maxBytes: 100_000 },
   { pattern: /^ui-event-modals-.*\.js$/, maxBytes: 200_000 },
   { pattern: /^ui-admin-.*\.js$/, maxBytes: 200_000 },
+  { pattern: /^ui-lightbox-.*\.js$/, maxBytes: 80_000 },
   { pattern: /^vendor-react-dom-.*\.js$/, maxBytes: 180_000 },
   { pattern: /^index-.*\.css$/, maxBytes: 240_000 }
 ];
@@ -35,7 +36,8 @@ const LAZY_CHUNK_PATTERNS = [
   /^ui-chat-gallery-.*\.js$/,
   /^ui-places-.*\.js$/,
   /^ui-memo-view-.*\.js$/,
-  /^ui-event-modals-.*\.js$/
+  /^ui-event-modals-.*\.js$/,
+  /^ui-lightbox-.*\.js$/
 ];
 
 // Total EAGER JS across all Vite chunks (excludes LAZY_CHUNK_PATTERNS above) -- this is what
