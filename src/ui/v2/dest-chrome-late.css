@@ -917,6 +917,7 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   display: flex !important;
   width: 100% !important;
   height: 48px !important;
+  min-height: 48px !important;
   margin: 0 !important;
   padding: 0 !important;
   background: #fff !important;
