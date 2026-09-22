@@ -1181,7 +1181,6 @@
   display: flex !important;
   flex-direction: column !important;
   gap: 0 !important;
-  padding: 8px 12px 88px !important;
 }
 .v2-design .v2-places .place-card-row [style*="fontWeight: 900"],
 .v2-design .v2-places .place-card-row strong {
@@ -1190,7 +1189,7 @@
   color: #1e1b2e !important;
 }
 .v2-design .v2-places .places-list-toolbar {
-  padding: 8px var(--v2-dest-content-pad-x) !important;
+  padding: 20px var(--v2-dest-content-pad-x) 14px !important;
   gap: 6px !important;
 }
 /* Unit 1: single create surface — hide legacy toolbar + when V2 FAB is present */
@@ -1438,7 +1437,6 @@
 .v2-design .v2-places .places-list-body {
   height: auto !important;
   overflow: visible !important;
-  padding: var(--v2-dest-content-pad-y, 10px) var(--v2-dest-content-pad-x, 14px) 24px !important;
 }
 .v2-design .v2-places .place-card-row {
   padding: 10px 12px !important;
@@ -2084,8 +2082,9 @@
   opacity: 0.55;
 }
 .v2-design .places-map-sticky-area .panel-resize-bar {
-  background: #fafafc !important;
+  background: #ffffff !important;
   border: 0 !important;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
 }
 
 /* Message list light gray (mock) */
@@ -2323,5 +2322,4 @@
 }
 .v2-design .v2-places.v2-wrap-legacy .places-list-body {
   min-height: min-content !important;
-  padding-bottom: 96px !important;
 }

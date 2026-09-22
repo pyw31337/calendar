@@ -203,7 +203,7 @@ function handleSectionHeaderKeyDown(event, onToggle) {
   onToggle();
 }
 
-export function SearchCategoryTabs({ tabs, activeKey, onSelect, containerStyle, tabPadding, tabTextStyle, countBadgeClassName, countBadgeStyle }) {
+export function SearchCategoryTabs({ tabs, activeKey, onSelect, containerStyle, tabPadding, tabTextStyle, countBadgeClassName, countBadgeStyle, activeColor = '#2563EB' }) {
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("div", {
@@ -219,8 +219,8 @@ export function SearchCategoryTabs({ tabs, activeKey, onSelect, containerStyle, 
         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
         padding: tabPadding || '10px 4px', fontSize: 'var(--font-size-md)', fontWeight: 800,
         background: 'none', border: 'none', cursor: 'pointer',
-        color: activeKey === tab.key ? '#2563EB' : '#64748B',
-        borderBottom: activeKey === tab.key ? '3px solid #2563EB' : '3px solid transparent',
+        color: activeKey === tab.key ? activeColor : '#64748B',
+        borderBottom: activeKey === tab.key ? `3px solid ${activeColor}` : '3px solid transparent',
         marginBottom: '-1px',
         whiteSpace: 'nowrap',
         overflow: 'hidden',
@@ -1626,6 +1626,14 @@ export function HistoryView({
   React.useEffect(() => { setSelectedPersonTag(null); setSelectedMemoryGroupId(null); }, [historyTab]);
   const [memoryViewMode, setMemoryViewMode] = React.useState('all');
   const [collapsedMemoryDates, setCollapsedMemoryDates] = React.useState(() => new Set());
+  // A confirmed-meeting card with 2+ registered places shows only the most recent one by
+  // default, with a "N개 장소 더보기" toggle to reveal the rest -- keyed by meeting date.
+  const [expandedMeetingPlaceDates, setExpandedMeetingPlaceDates] = React.useState(() => new Set());
+  const toggleMeetingPlacesExpanded = date => setExpandedMeetingPlaceDates(prev => {
+    const next = new Set(prev);
+    if (next.has(date)) next.delete(date); else next.add(date);
+    return next;
+  });
   const [isMemoryListEditMode, setIsMemoryListEditMode] = React.useState(false);
   const [selectedMemoryGroupIds, setSelectedMemoryGroupIds] = React.useState(() => new Set());
   const [isMemoryAddModalOpen, setIsMemoryAddModalOpen] = React.useState(false);
@@ -2179,13 +2187,17 @@ export function HistoryView({
               }, highlightKeyword(memoText, searchQuery));
             })
           ),
-          datePlaces.length > 0 && /*#__PURE__*/React.createElement("div", {
+          datePlaces.length > 0 && (() => {
+            const isPlacesExpanded = expandedMeetingPlaceDates.has(d);
+            const visibleDatePlaces = isPlacesExpanded ? datePlaces : datePlaces.slice(0, 1);
+            const hiddenPlaceCount = datePlaces.length - visibleDatePlaces.length;
+            return /*#__PURE__*/React.createElement("div", {
             style: {
               display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '2px', width: '100%',
               ...(isPast ? {} : { mixBlendMode: 'luminosity' })
             }
           },
-            datePlaces.map(place => {
+            visibleDatePlaces.map(place => {
               const mapUrl = getKakaoMapLinkUrl(place);
               const placeName = place.alias || place.name;
               const address = place.address ? getDisplayPlaceAddress(place) : '';
@@ -2212,8 +2224,33 @@ export function HistoryView({
                   address && /*#__PURE__*/React.createElement("span", { style: { fontSize: 'var(--font-size-xs)', color: isPast ? 'var(--text-muted)' : '#fff', wordBreak: 'break-word' } }, highlightKeyword(address, searchQuery))
                 )
               );
-            })
-          )
+            }),
+            // The whole card is a <button> (date-item-btn), so this toggle is a role="button"
+            // span rather than a nested <button> -- nesting interactive buttons is invalid HTML
+            // and browsers will hoist the inner one out of the DOM, corrupting the card layout.
+            (hiddenPlaceCount > 0 || isPlacesExpanded) && /*#__PURE__*/React.createElement("span", {
+              role: "button",
+              tabIndex: 0,
+              onClick: e => { e.stopPropagation(); toggleMeetingPlacesExpanded(d); },
+              onKeyDown: e => {
+                if (e.key !== 'Enter' && e.key !== ' ') return;
+                e.stopPropagation();
+                e.preventDefault();
+                toggleMeetingPlacesExpanded(d);
+              },
+              style: {
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                cursor: 'pointer', padding: '4px 0',
+                fontSize: 'var(--font-size-sm)', fontWeight: 700,
+                color: isPast ? 'var(--text-muted)' : 'rgba(255,255,255,0.8)'
+              }
+            }, hiddenPlaceCount > 0 ? `${hiddenPlaceCount}개 장소 더보기` : '접기', /*#__PURE__*/React.createElement("svg", {
+              xmlns: "http://www.w3.org/2000/svg", width: "14", height: "14", viewBox: "0 0 24 24",
+              fill: "none", stroke: "currentColor", strokeWidth: "2.5", strokeLinecap: "round", strokeLinejoin: "round",
+              style: { transform: hiddenPlaceCount > 0 ? 'none' : 'rotate(180deg)' }
+            }, /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" })))
+          );
+          })()
         );
       })
     ),

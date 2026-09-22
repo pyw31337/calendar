@@ -75,8 +75,8 @@ requireText(picker, /value: 'memories', label: '추억', badge: travelMemoryGrou
 requireText(picker, /value: 'people', label: '인물', badge: personTagChips\.length/, 'history 인물 tab must show a count badge');
 requireText(picker, /value: 'meetings', label: '지난모임', badge: confirmedDates\.length/, 'history 지난모임 tab must show a count badge');
 requireText(picker, /historyScrollPadTop/, 'memories scroll must use measured header height like gallery');
-requireText(placesView, /padding: '12px 16px 4px'/, 'places toolbar must widen top and tighten bottom (12/16/4)');
-requireText(placesView, /padding: '8px 16px 16px'/, 'places list body padding must stay compact under the toolbar');
+requireText(placesView, /padding: '20px 16px 14px'/, 'places toolbar padding must match the V2 reference spacing (20/16/14)');
+requireText(placesView, /padding: '20px'/, 'places list body must use flat 20px padding (V2 reference), not a stacked card-box inset');
 requireText(chatGallery, /PAGE_HEADER_ACTIONS_WRAP_STYLE/, 'gallery page header must use shared header actions wrap');
 requireText(placesView, /PAGE_HEADER_BACK_BTN_STYLE/, 'places header must use shared back button');
 requireText(picker, /PAGE_HEADER_TITLE_STYLE/, '보관함/컨텐츠 header must use shared title token');

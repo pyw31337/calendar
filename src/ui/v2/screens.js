@@ -216,11 +216,13 @@ export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, se
         // (사용자 요청, 전체 페이지 공통): every destination's header now shows only back/title on
         // the left and the menu button on the right. onSearch/onShare/searchLabel/brand/subtitle
         // stay accepted props (callers still pass them) but are intentionally no longer rendered.
+        // `extra` (Places' map-toggle button) renders AFTER the menu button so it lands at the
+        // header's right edge, not between the title and the menu button.
         h(
           'div',
           { className: 'bp-header-actions' },
-          extra,
-          onMenu && h(IconButton, { label: `${title} 메뉴`, icon: 'menu', size: 20, onClick: onMenu })
+          onMenu && h(IconButton, { label: `${title} 메뉴`, icon: 'menu', size: 20, onClick: onMenu }),
+          extra
         )
       ),
       children
