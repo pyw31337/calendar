@@ -450,6 +450,16 @@ export function ChatGalleryModal({
       body.style.overflow = previousBodyOverflow;
     };
   }, [asPage]);
+  const [v2GallerySlotTick, setV2GallerySlotTick] = React.useState(0);
+  React.useEffect(() => {
+    if (v2Embed && typeof document !== 'undefined') {
+      const el = document.getElementById('v2-gallery-header-tabs-slot');
+      if (el) setV2GallerySlotTick(t => t + 1);
+    }
+  }, [v2Embed]);
+  const v2GalleryTabsSlot = v2Embed && typeof document !== 'undefined'
+    ? document.getElementById('v2-gallery-header-tabs-slot')
+    : null;
   const __deps = window.GATHER_UI_DEPS || {};
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const ResizableModalContainer = __comp.ResizableModalContainer || __deps.ResizableModalContainer || (function Shell(p) { return React.createElement('div', p, p.children); });
@@ -2586,51 +2596,40 @@ export function ChatGalleryModal({
       transform: isHeaderVisible ? 'translateY(0)' : 'translateY(-100%)'
     } : { borderBottom: '1px solid var(--border-subtle)' },
     onClose: () => { setIsSearchOpen(false); setSearchQuery(''); }
-  }), asPage && !isMobile && /*#__PURE__*/React.createElement("div", {
-    className: "gallery-page-tabs",
-    style: {
-      display: 'flex', alignItems: 'center', padding: '0',
-      borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)',
-      flexShrink: 0,
-      position: v2Embed ? 'sticky' : 'fixed', top: v2Embed ? 0 : `calc(${isSearchOpen ? '104px' : '56px'} + env(safe-area-inset-top, 0px))`, left: v2Embed ? undefined : 0, right: v2Embed ? undefined : 0, zIndex: v2Embed ? 5 : 1009,
-      transition: 'transform 0.3s ease, top 0.3s ease',
-      transform: isHeaderVisible ? 'translateY(0)' : 'translateY(calc(-100% - 56px))'
+  }), (() => {
+    const tabsNode = asPage && /*#__PURE__*/React.createElement("div", {
+      className: isMobile ? "gallery-page-tabs-mobile" : "gallery-page-tabs",
+      style: {
+        display: 'flex', alignItems: 'center', padding: '0',
+        borderBottom: v2Embed ? 'none' : '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)',
+        flexShrink: 0,
+        width: '100%',
+        position: v2Embed ? 'relative' : 'fixed',
+        top: v2Embed ? 0 : `calc(${isSearchOpen ? '104px' : '56px'} + env(safe-area-inset-top, 0px))`,
+        left: v2Embed ? undefined : 0,
+        right: v2Embed ? undefined : 0,
+        zIndex: v2Embed ? 5 : 1009,
+        transition: v2Embed ? undefined : 'transform 0.3s ease, top 0.3s ease',
+        transform: v2Embed ? 'none' : (isHeaderVisible ? 'translateY(0)' : 'translateY(calc(-100% - 56px))')
+      }
+    },
+      UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
+        ariaLabel: "갤러리 탭",
+        value: activeTab,
+        onChange: v => setGalleryTab(v),
+        style: { backgroundColor: 'var(--bg-card)', flex: 1, borderBottom: 'none' },
+        options: [
+          { value: 'photos', label: '사진', badge: displayPhotoTabCount },
+          { value: 'links', label: '링크', badge: filteredLinks.length },
+          { value: 'files', label: '파일', badge: filteredFiles.length }
+        ]
+      })
+    );
+    if (v2Embed && v2GalleryTabsSlot && window.ReactDOM?.createPortal) {
+      return window.ReactDOM.createPortal(tabsNode, v2GalleryTabsSlot);
     }
-  },
-    UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
-      ariaLabel: "갤러리 탭",
-      value: activeTab,
-      onChange: v => setGalleryTab(v),
-      style: { backgroundColor: 'var(--bg-card)', flex: 1, borderBottom: 'none' },
-      options: [
-        { value: 'photos', label: '사진', badge: displayPhotoTabCount },
-        { value: 'links', label: '링크', badge: filteredLinks.length },
-        { value: 'files', label: '파일', badge: filteredFiles.length }
-      ]
-    })
-  ), asPage && isMobile && /*#__PURE__*/React.createElement("div", {
-    className: "gallery-page-tabs-mobile",
-    style: {
-      display: 'flex', alignItems: 'center', padding: '0',
-      borderBottom: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)',
-      flexShrink: 0,
-      position: v2Embed ? 'sticky' : 'fixed', top: v2Embed ? 0 : `calc(${isSearchOpen ? '104px' : '56px'} + env(safe-area-inset-top, 0px))`, left: v2Embed ? undefined : 0, right: v2Embed ? undefined : 0, zIndex: v2Embed ? 5 : 1009,
-      transition: 'transform 0.3s ease, top 0.3s ease',
-      transform: isHeaderVisible ? 'translateY(0)' : 'translateY(calc(-100% - 56px))'
-    }
-  },
-    UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
-      ariaLabel: "갤러리 탭",
-      value: activeTab,
-      onChange: v => setGalleryTab(v),
-      style: { backgroundColor: 'var(--bg-card)', flex: 1, borderBottom: 'none' },
-      options: [
-        { value: 'photos', label: '사진', badge: displayPhotoTabCount },
-        { value: 'links', label: '링크', badge: filteredLinks.length },
-        { value: 'files', label: '파일', badge: filteredFiles.length }
-      ]
-    })
-  ), /*#__PURE__*/React.createElement("div", {
+    return !v2Embed ? tabsNode : null;
+  })(), /*#__PURE__*/React.createElement("div", {
     ref: gridHostRef,
     className: asPage ? "gallery-page-scroll" : undefined,
     onScroll: asPage ? handleGalleryContentScroll : undefined,

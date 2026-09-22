@@ -1293,6 +1293,17 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.v2-design .meeting-pill-text-short {
+  display: none;
+}
+@media (max-width: 1023px) {
+  .v2-design .meeting-pill-text-full {
+    display: none !important;
+  }
+  .v2-design .meeting-pill-text-short {
+    display: inline !important;
+  }
+}
 /* Hide legacy free-text meeting/note body on month grid (participant schedule memos) */
 .v2-design .bp-day-event-title {
   display: none !important;

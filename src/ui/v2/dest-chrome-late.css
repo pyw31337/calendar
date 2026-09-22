@@ -43,6 +43,15 @@
   transform: none;
   opacity: 1;
   pointer-events: auto;
+  padding-top: max(env(safe-area-inset-top, 0px), 0px) !important;
+}
+.v2-design .v2-gallery-tabs-slot .gallery-page-tabs,
+.v2-design .v2-gallery-tabs-slot .gallery-page-tabs-mobile {
+  position: static !important;
+  width: 100% !important;
+  transform: none !important;
+  border-bottom: none !important;
+  background: transparent !important;
 }
 .v2-design .v2-archive,
 .v2-design .v2-content {
@@ -50,19 +59,18 @@
 }
 .v2-design .v2-archive .v2-page-header,
 .v2-design .v2-content .v2-page-header {
-  position: absolute !important;
+  position: sticky !important;
   top: 0 !important;
   left: 0 !important;
   right: 0 !important;
   z-index: 20 !important;
   padding: 0 !important;
   background: #ffffff !important;
-  transition: transform 180ms ease, opacity 180ms ease !important;
+  transition: transform 200ms ease, opacity 200ms ease, margin-top 200ms ease !important;
 }
 .v2-design .v2-archive .v2-page-header.is-scroll-hidden,
 .v2-design .v2-content .v2-page-header.is-scroll-hidden {
   transform: translateY(-100%) !important;
-  margin-bottom: 0 !important;
   opacity: 0 !important;
   pointer-events: none !important;
 }
@@ -106,13 +114,17 @@
 .v2-design .v2-settlement .bp-content,
 .v2-design .v2-places .places-list-body,
 .v2-design .v2-places .v2-places-body,
-.v2-design .v2-gallery .gallery-page-scroll,
-.v2-design .v2-records-media,
-.v2-design .v2-records-media .gallery-page-scroll,
-.v2-design .v2-content .culture-items-grid,
 .v2-design .v2-content .content-page-scroll {
   padding: var(--v2-dest-content-pad-y) var(--v2-dest-content-pad-x);
   box-sizing: border-box;
+}
+.v2-design .v2-records-media {
+  padding: 0 !important;
+}
+.v2-design .v2-gallery .gallery-page-scroll,
+.v2-design .v2-records-media .gallery-page-scroll {
+  padding: 12px 16px 88px !important;
+  box-sizing: border-box !important;
 }
 
 .v2-design .v2-settlement .settlement-page-tabs,
@@ -218,7 +230,7 @@
   box-sizing: border-box !important;
 }
 .v2-design .v2-content .culture-items-grid {
-  padding: 152px 20px 96px 20px !important;
+  padding: 16px 20px 96px 20px !important;
 }
 
 .v2-design .v2-home-memo-bubble,
@@ -363,32 +375,26 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
 }
 .v2-design .bp-day-bar-stack,
 .v2-design .bp-day-cell .bp-day-bar-stack {
-  gap: 6px !important;
-  margin-top: 6px !important;
+  gap: 2px !important;
+  margin-top: 3px !important;
   z-index: 2;
 }
 .v2-design .festival-bar-desktop,
 .v2-design .festival-bar-mobile {
   z-index: 1;
 }
-/* Reserves room, inside the day-cell's own flow, for the festival-bar-desktop/-mobile stack
-   overlaid on top of it (see the marginBottom formula on those bars in ui-app-shell-v2.js:
-   `(barHeight + 2px) * level`, which packs a constant 2px gap between every adjacent bar). This
-   spacer's per-level height must match that same per-bar footprint (barHeight + 2px) exactly --
-   it previously used a flat 1.4rem here that overshot each bar's real 1.1rem+2px footprint,
-   and that per-level overshoot compounded with stack depth. The visible symptom: the gap between
-   the solo-anniversary stack above (.bp-day-bar-stack, which has no bottom margin of its own --
-   this spacer is the only thing separating it from the range-bar stack below) and the topmost
-   range bar grew with how many range bars were stacked underneath, while the gap *between*
-   those range bars themselves stayed a constant 2px -- so a 3-deep stack (e.g. one solo
-   anniversary sitting above two range trips on the same date) read as a visibly wider gap above
-   the solo item than between the two range bars beneath it, even though both boundaries should
-   look identical. Matching the two formulas exactly makes every such gap the same 2px. */
+/* Reserves room, inside the day-cell's own flow, for the festival-bar-desktop/-mobile stack.
+   Topmost festival bar top is at `depth * (barHeight + 2px) - 2px`.
+   We align spacer height to the topmost bar and set margin-top relative to cell gap
+   so the gap between solo anniversary and range anniversary is exactly 2px. */
 .v2-design .festival-bar-spacer {
-  height: calc(var(--festival-stack-depth, 0) * (1.1rem + 2px));
+  height: calc(var(--festival-stack-depth, 0) * (1.1rem + 2px) - 2px);
   flex-shrink: 0;
   width: 100%;
   pointer-events: none;
+}
+.v2-design .bp-day-bar-stack + .festival-bar-spacer {
+  margin-top: -4px !important; /* cell gap is 6px; 6px - 4px = 2px */
 }
 
 @media (min-width: 768px) {
@@ -449,10 +455,8 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   }
   .v2-design .festival-bar-desktop { display: none !important; }
   .v2-design .festival-bar-mobile { display: flex !important; }
-  /* Same fix as the desktop rule above, scaled to the mobile bar's own 0.34rem height + 2px
-     gap footprint (was a flat 8px/level, a smaller but same-shaped overshoot). */
   .v2-design .festival-bar-spacer {
-    height: calc(var(--festival-stack-depth, 0) * (0.34rem + 2px));
+    height: calc(var(--festival-stack-depth, 0) * (0.34rem + 2px) - 2px);
   }
   .v2-design .bp-day-cell:has(.bp-day-bar-stack),
   .v2-design .bp-day-cell:has(.festival-bar-spacer) {
@@ -1286,9 +1290,6 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
 }
 .v2-design .v2-archive .visit-filter-toggle-mobile {
   height: 36px !important;
-}
-.v2-design .v2-content .culture-items-grid {
-  padding-top: 10px !important;
 }
 
 /* ---- Backdrop popups: glass card, content-centered (not right-docked) ----
@@ -2201,7 +2202,7 @@ html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overla
 html:has(.renewal-shell.v2-design) .bp-sheet-handle,
 html:has(.renewal-shell.v2-design) .v2-modal-drag-handle {
   width: 100% !important;
-  height: 28px !important;
+  height: 16px !important;
   margin: 0 !important;
   padding: 0 !important;
   display: flex !important;
@@ -2211,6 +2212,12 @@ html:has(.renewal-shell.v2-design) .v2-modal-drag-handle {
   background: transparent !important;
   touch-action: none;
   user-select: none;
+}
+.v2-design .bp-event-sheet .underline-tabs {
+  margin: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  width: 100% !important;
 }
 html:has(.renewal-shell.v2-design) .bp-sheet-handle::before,
 html:has(.renewal-shell.v2-design) .v2-modal-drag-handle::before {

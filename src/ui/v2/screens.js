@@ -172,29 +172,60 @@ function pageSubtitle(calendar, trailing) {
 export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, searchLabel, onShare, onMenu, extra, centerSubtitle = true, children }) {
   const React = window.React;
   const [isVisible, setIsVisible] = React.useState(true);
+  const headerRef = React.useRef(null);
+  const [headerHeight, setHeaderHeight] = React.useState(60);
+
+  React.useLayoutEffect(() => {
+    if (headerRef.current) {
+      const h = headerRef.current.offsetHeight;
+      if (h > 0) setHeaderHeight(h);
+    }
+  });
+
   React.useEffect(() => {
     if (typeof window === 'undefined') return undefined;
     let lastTop = 0;
     const onScroll = event => {
       const target = event.target;
-      if (!target || typeof target.scrollTop !== 'number' || target.scrollHeight <= target.clientHeight) return;
-      const top = target.scrollTop;
+      let top = 0;
+      let scrollHeight = 0;
+      let clientHeight = 0;
+      if (!target || target === document || target === document.documentElement || target === window) {
+        top = window.scrollY || document.documentElement.scrollTop || (document.body ? document.body.scrollTop : 0) || 0;
+        scrollHeight = Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0);
+        clientHeight = window.innerHeight || document.documentElement.clientHeight;
+      } else if (typeof target.scrollTop === 'number') {
+        top = target.scrollTop;
+        scrollHeight = target.scrollHeight;
+        clientHeight = target.clientHeight;
+      } else {
+        return;
+      }
+      if (scrollHeight <= clientHeight + 10) return;
       const delta = top - lastTop;
       if (Math.abs(delta) < 4) return;
       lastTop = top;
       if (top < 12) setIsVisible(true);
-      else if (delta > 6 && top > 56) setIsVisible(false);
+      else if (delta > 6 && top > 40) setIsVisible(false);
       else if (delta < -8) setIsVisible(true);
     };
     document.addEventListener('scroll', onScroll, true);
-    return () => document.removeEventListener('scroll', onScroll, true);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      document.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('scroll', onScroll);
+    };
   }, []);
   return h(
     React.Fragment,
     null,
     h(
       'header',
-      { className: `bp-header v2-page-header${centerSubtitle ? ' v2-page-header--centered' : ''}${isVisible ? '' : ' is-scroll-hidden'}` },
+      {
+        ref: headerRef,
+        className: `bp-header v2-page-header${centerSubtitle ? ' v2-page-header--centered' : ''}${isVisible ? '' : ' is-scroll-hidden'}`,
+        style: !isVisible ? { marginTop: `-${headerHeight}px` } : undefined,
+      },
       h(
         'div',
         { className: 'bp-header-row' },
@@ -742,8 +773,7 @@ export function SettlementScreen(p) {
             searchLabel: '정산 검색',
             onShare: p.onShare,
             onMenu: p.onMenu,
-          }),
-          flushTabs,
+          }, flushTabs),
           h('div', { className: 'v2-dest-body v2-settlement-body' }, flushBody),
           h(Fab, { label: '지출 추가', onClick: p.onCompose })
         ),
@@ -1023,12 +1053,14 @@ export function ChatScreen(p) {
     const composer = clone(
       slots.composer,
       {
-        // Let the legacy composer's own isHeaderVisible-driven transform/opacity/pointerEvents
-        // (ui-chat-room.js) through instead of forcing it always-visible -- V1 hides the composer
-        // together with the header on scroll-down, and V2 sharing the same handleChatScroll state
-        // should do the same instead of only ever hiding the header.
+        // Chat composer stays permanently pinned to the bottom during scroll
         className: 'chat-composer v2-chat-composer',
-        style: slots.composer.props.style,
+        style: {
+          ...(slots.composer.props?.style || {}),
+          transform: 'none',
+          opacity: 1,
+          pointerEvents: 'auto',
+        },
       },
       slots.resize,
       // V1 places the meme-tag row here (before the input row), so the tag chips read as
@@ -1202,7 +1234,9 @@ export function GalleryScreen(p) {
   return h(
     'section',
     { className: 'v2-gallery v2-dest-page v2-embed-frame v2-records-media v2-has-page-header' },
-    h(PageHeader, { title: '갤러리', searchLabel: '갤러리 검색', onBack: p.onBack, onMenu: p.onMenu, onSearch: p.onSearch }),
+    h(PageHeader, { title: '갤러리', searchLabel: '갤러리 검색', onBack: p.onBack, onMenu: p.onMenu, onSearch: p.onSearch },
+      h('div', { id: 'v2-gallery-header-tabs-slot', className: 'v2-gallery-tabs-slot' })
+    ),
     wrapLegacy(p.legacyView, 'v2-legacy-body v2-gallery-legacy'),
     overlays(p.slots)
   );

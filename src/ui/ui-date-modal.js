@@ -2011,7 +2011,7 @@ export function DateModal({
       alignItems: 'center',
       justifyContent: 'space-between',
       width: '100%',
-      padding: '14px 16px 12px 16px',
+      padding: '8px 16px 8px 16px',
       boxSizing: 'border-box'
     }
   }, /*#__PURE__*/React.createElement("div", {
@@ -2537,7 +2537,7 @@ export function DateModal({
             entry.note && /*#__PURE__*/React.createElement("div", {
               className: "date-modal-attendance-note",
               style: {
-                fontSize: 'var(--font-size-md)',
+                fontSize: 'var(--font-size-sm)',
                 color: 'var(--text-main)',
                 minWidth: 0,
                 lineHeight: 1.4,
@@ -2875,7 +2875,7 @@ export function DateModal({
               if (!dateNote) return null;
               const memoDate = typeof toMemoDateFormat === 'function' ? toMemoDateFormat(dateStr) : dateStr;
               return /*#__PURE__*/React.createElement("div", {
-                style: { fontSize: 'var(--font-size-md)', color: 'var(--text-main)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.45 }
+                style: { fontSize: 'var(--font-size-sm)', color: 'var(--text-main)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.45 }
               }, renderTextWithUrlBadge(`${memoDate} ${dateNote}`));
             })(),
             !adminMode && /*#__PURE__*/React.createElement("div", {

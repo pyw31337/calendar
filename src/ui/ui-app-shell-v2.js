@@ -931,7 +931,11 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
             hasMeeting ? React.createElement('span', {
               className: bentoClass('day-meeting-pill'),
               title: meeting.title || meeting.note || '모임확정',
-            }, '모임확정') : null
+              style: { background: 'var(--cal-schedule, #7C2FE5)' },
+            },
+              React.createElement('span', { className: 'meeting-pill-text-full' }, '모임확정'),
+              React.createElement('span', { className: 'meeting-pill-text-short' }, '모임')
+            ) : null
           ) : null,
           dots.length > 0 ? React.createElement('div', { className: bentoClass('dot-row') },
             dots.map(({ p, entry }) => {
@@ -1060,10 +1064,6 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
         React.createElement('span', { className: bentoClass('dot'), style: { background: p.color || '#A78BFA' } }),
         p.name
       )),
-      React.createElement('span', null,
-        React.createElement('span', { className: bentoClass('dot'), style: { background: 'var(--cal-schedule, #7C2FE5)', borderRadius: 'var(--radius-full)', width: '12px', height: '5px' } }),
-        '일정·여행'
-      ),
       React.createElement('span', null,
         React.createElement('span', { className: bentoClass('dot'), style: { background: 'var(--cal-anniversary, #F76AAD)', borderRadius: 'var(--radius-full)', width: '12px', height: '5px' } }),
         '기념일'
