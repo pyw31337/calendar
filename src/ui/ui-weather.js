@@ -354,6 +354,7 @@ export function WeatherLocationModal({ onClose, onSelectLocation, onDeleteRecent
 
     /* Body */
     /*#__PURE__*/React.createElement("div", {
+      className: "modal-body",
       style: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }
     },
       /* Recent / Saved Locations */

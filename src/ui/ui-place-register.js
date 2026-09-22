@@ -328,6 +328,7 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
   },
     /* Header */
     /*#__PURE__*/React.createElement("div", {
+      className: "modal-header",
       style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border-subtle)' }
     },
       /*#__PURE__*/React.createElement("span", {
@@ -342,7 +343,8 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
 
     /* Body */
     /*#__PURE__*/React.createElement("div", {
-      style: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '70vh', overflowY: 'auto' }
+      className: "modal-body",
+      style: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto' }
     },
       /* Search field */
       /*#__PURE__*/React.createElement("form", { onSubmit: handleSearch, style: { display: 'flex', gap: '8px' } },
@@ -500,6 +502,7 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
 
     /* Footer — 추가/취소·수정 공통 모듈 (FormAddEditActionButtons) */
     /*#__PURE__*/React.createElement("div", {
+      className: "modal-footer",
       style: { display: 'flex', gap: '8px', padding: '12px 16px', borderTop: '1px solid var(--border-subtle)' }
     },
       editingPlace && /*#__PURE__*/React.createElement("button", {

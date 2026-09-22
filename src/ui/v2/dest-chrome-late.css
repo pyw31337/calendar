@@ -846,13 +846,7 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
 .v2-design .v2-settlement [data-settlement-edit-button="true"] {
   background: var(--brand, #7C2FE5) !important;
   color: #fff !important;
-  margin-top: 40px !important;
-}
-@media (max-width: 767px) {
-  .renewal-shell.v2-design .v2-settlement [data-settlement-edit-button="true"],
-  .v2-design .v2-settlement [data-settlement-edit-button="true"] {
-    margin-top: 20px !important;
-  }
+  margin-top: 0 !important;
 }
 .v2-design .v2-settlement .settlement-person-card {
   padding: 10px !important;
@@ -1333,11 +1327,13 @@ html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay):not
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
   background: #fff !important;
   box-shadow: 0 24px 64px rgba(30, 27, 46, 0.22) !important;
+  display: flex !important;
+  flex-direction: column !important;
   overflow: hidden !important;
 }
 html:has(.renewal-shell.v2-design) .modal-overlay .modal-header,
 html:has(.renewal-shell.v2-design) .bottom-sheet-header {
-  padding: 14px 16px !important;
+  padding: 14px 18px !important;
   border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
   background: #fff !important;
   display: flex !important;

@@ -943,7 +943,7 @@ export function AnniversaryModal({
     /* Modal Scrollable Body */
 
       /* Modal Body */
-      /*#__PURE__*/React.createElement("div", { style: { padding: '16px', maxHeight: '65vh', overflowY: 'auto' } },
+      /*#__PURE__*/React.createElement("div", { className: "modal-body", style: { padding: '16px', overflowY: 'auto' } },
         /* TAB 1: List */
         activeTab === 'list' && /*#__PURE__*/React.createElement("div", {
           style: { display: 'flex', flexDirection: 'column', gap: '8px' }
@@ -2443,6 +2443,8 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
     UnderlineTabs
       ? React.createElement(UnderlineTabs, {
           ariaLabel: '정산 수정 탭',
+          variant: 'flush',
+          activeColor: 'var(--brand, #7C2FE5)',
           value: activeTab,
           onChange: v => setActiveTab(v),
           options: [
@@ -2462,8 +2464,8 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
             'aria-selected': activeTab === tab,
             onClick: () => setActiveTab(tab),
             style: {
-              height: '46px', border: 'none', borderBottom: activeTab === tab ? '2px solid #2563EB' : '2px solid transparent',
-              background: 'transparent', color: activeTab === tab ? '#2563EB' : 'var(--text-muted)',
+              height: '46px', border: 'none', borderBottom: activeTab === tab ? '2px solid var(--brand, #7C2FE5)' : '2px solid transparent',
+              background: 'transparent', color: activeTab === tab ? 'var(--brand, #7C2FE5)' : 'var(--text-muted)',
               fontSize: 'var(--font-size-base)', fontWeight: 800, cursor: 'pointer'
             }
           }, tab === 'general' ? '일반' : '정산'))

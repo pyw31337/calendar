@@ -567,8 +567,14 @@
   backdrop-filter: blur(8px);
 }
 
+/* Standardized layer popup modal container (Settlement Edit Modal standard model) */
 .renewal-shell.v2-design .modal-overlay .v2-responsive-modal,
-.renewal-shell.v2-design ~ .modal-overlay .v2-responsive-modal {
+.renewal-shell.v2-design ~ .modal-overlay .v2-responsive-modal,
+html:has(.renewal-shell.v2-design) .modal-overlay .v2-responsive-modal,
+html:has(.renewal-shell.v2-design) .modal-overlay > .modal-container,
+html:has(.renewal-shell.v2-design) .modal-overlay > .modal {
+  display: flex !important;
+  flex-direction: column !important;
   width: min(560px, calc(100vw - 48px)) !important;
   max-width: 560px !important;
   max-height: min(86dvh, var(--gather-vv-modal-max, 860px)) !important;
@@ -576,24 +582,145 @@
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
   border-radius: 24px !important;
   box-shadow: 0 24px 72px rgba(30, 27, 46, 0.26) !important;
-  overflow: hidden auto !important;
+  background: #fff !important;
+  overflow: hidden !important;
 }
 
+.renewal-shell.v2-design .modal-overlay .v2-responsive-modal > form,
+.renewal-shell.v2-design ~ .modal-overlay .v2-responsive-modal > form,
+html:has(.renewal-shell.v2-design) .modal-overlay .v2-responsive-modal > form,
+html:has(.renewal-shell.v2-design) .modal-overlay > .modal-container > form {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Header: Standardized 14px 18px padding, fixed at top */
 .renewal-shell.v2-design .modal-overlay .v2-responsive-modal .modal-header,
-.renewal-shell.v2-design ~ .modal-overlay .v2-responsive-modal .modal-header {
-  padding: 18px 20px !important;
+.renewal-shell.v2-design ~ .modal-overlay .v2-responsive-modal .modal-header,
+html:has(.renewal-shell.v2-design) .modal-overlay .modal-header {
+  flex-shrink: 0 !important;
+  padding: 14px 18px !important;
   border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
+  background: #fff !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  box-sizing: border-box !important;
+}
+
+.renewal-shell.v2-design .modal-overlay .v2-responsive-modal .modal-header h2,
+.renewal-shell.v2-design ~ .modal-overlay .v2-responsive-modal .modal-header h2,
+.renewal-shell.v2-design .modal-overlay .v2-responsive-modal .modal-header h3,
+.renewal-shell.v2-design ~ .modal-overlay .v2-responsive-modal .modal-header h3,
+html:has(.renewal-shell.v2-design) .modal-overlay .modal-header h2,
+html:has(.renewal-shell.v2-design) .modal-overlay .modal-header h3 {
+  margin: 0 !important;
+  font-size: 1.05rem !important;
+  font-weight: 800 !important;
+  color: var(--text-main, #0F172A) !important;
+  line-height: 1.3 !important;
+}
+
+/* Tabs: Edge-to-edge flush underline tabs (matching '일반 | 정산' tab style) */
+.renewal-shell.v2-design .modal-overlay .v2-responsive-modal .underline-tabs,
+.renewal-shell.v2-design ~ .modal-overlay .v2-responsive-modal .underline-tabs,
+.renewal-shell.v2-design .modal-overlay .v2-responsive-modal [role="tablist"],
+.renewal-shell.v2-design ~ .modal-overlay .v2-responsive-modal [role="tablist"],
+html:has(.renewal-shell.v2-design) .modal-overlay .underline-tabs,
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"] {
+  flex-shrink: 0 !important;
+  display: flex !important;
+  width: 100% !important;
+  background: #fff !important;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
+  box-sizing: border-box !important;
+}
+
+.renewal-shell.v2-design .modal-overlay .v2-responsive-modal .underline-tabs button,
+.renewal-shell.v2-design ~ .modal-overlay .v2-responsive-modal .underline-tabs button,
+.renewal-shell.v2-design .modal-overlay .v2-responsive-modal [role="tablist"] button,
+.renewal-shell.v2-design ~ .modal-overlay .v2-responsive-modal [role="tablist"] button,
+html:has(.renewal-shell.v2-design) .modal-overlay .underline-tabs button,
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"] button {
+  flex: 1 1 0% !important;
+  height: 46px !important;
+  padding: 0 8px !important;
+  font-size: var(--font-size-base, 0.95rem) !important;
+  font-weight: 800 !important;
+  background: transparent !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  cursor: pointer !important;
+  box-sizing: border-box !important;
+  border: none !important;
+  border-bottom: 2px solid transparent !important;
+  color: var(--text-muted, #64748B) !important;
+  transition: color 0.15s ease, border-color 0.15s ease !important;
+}
+
+.renewal-shell.v2-design .modal-overlay .v2-responsive-modal .underline-tabs button[aria-selected="true"],
+.renewal-shell.v2-design ~ .modal-overlay .v2-responsive-modal .underline-tabs button[aria-selected="true"],
+.renewal-shell.v2-design .modal-overlay .v2-responsive-modal [role="tablist"] button[aria-selected="true"],
+.renewal-shell.v2-design ~ .modal-overlay .v2-responsive-modal [role="tablist"] button[aria-selected="true"],
+html:has(.renewal-shell.v2-design) .modal-overlay .underline-tabs button[aria-selected="true"],
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"] button[aria-selected="true"] {
+  color: var(--brand, #7C2FE5) !important;
+  border-bottom: 2px solid var(--brand, #7C2FE5) !important;
+}
+
+/* Middle Content: Only this scrolls internally */
+.renewal-shell.v2-design .modal-overlay .v2-responsive-modal .modal-body,
+.renewal-shell.v2-design ~ .modal-overlay .v2-responsive-modal .modal-body,
+html:has(.renewal-shell.v2-design) .modal-overlay .modal-body,
+html:has(.renewal-shell.v2-design) .modal-overlay .confirm-dialog-body {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  overscroll-behavior: contain !important;
+  -webkit-overflow-scrolling: touch !important;
+  padding: 16px !important;
+  box-sizing: border-box !important;
+}
+
+/* Footer: Fixed at bottom, buttons never scroll away */
+.renewal-shell.v2-design .modal-overlay .v2-responsive-modal .modal-footer,
+.renewal-shell.v2-design ~ .modal-overlay .v2-responsive-modal .modal-footer,
+html:has(.renewal-shell.v2-design) .modal-overlay .modal-footer,
+html:has(.renewal-shell.v2-design) .modal-overlay .confirm-dialog-actions {
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+  position: sticky !important;
+  bottom: 0 !important;
+  border-top: 1px solid var(--v2-card-border, #eceaf5) !important;
+  background: #fff !important;
+  padding: 12px 18px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  box-sizing: border-box !important;
+  z-index: 10 !important;
 }
 
 @media (max-width: 767px) {
   .renewal-shell.v2-design .modal-overlay:has(.v2-responsive-modal),
-  .renewal-shell.v2-design ~ .modal-overlay:has(.v2-responsive-modal) {
+  .renewal-shell.v2-design ~ .modal-overlay:has(.v2-responsive-modal),
+  html:has(.renewal-shell.v2-design) .modal-overlay:has(.v2-responsive-modal) {
     align-items: flex-end !important;
     padding: 0 !important;
   }
 
   .renewal-shell.v2-design .modal-overlay .v2-responsive-modal,
-  .renewal-shell.v2-design ~ .modal-overlay .v2-responsive-modal {
+  .renewal-shell.v2-design ~ .modal-overlay .v2-responsive-modal,
+  html:has(.renewal-shell.v2-design) .modal-overlay .v2-responsive-modal,
+  html:has(.renewal-shell.v2-design) .modal-overlay > .modal-container,
+  html:has(.renewal-shell.v2-design) .modal-overlay > .modal {
     width: 100vw !important;
     max-width: none !important;
     max-height: min(90dvh, var(--gather-vv-modal-max, 860px)) !important;
