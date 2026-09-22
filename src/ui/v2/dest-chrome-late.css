@@ -39,11 +39,23 @@
 .v2-design .v2-settlement .v2-page-header,
 .v2-design .v2-places .v2-page-header,
 .v2-design .v2-gallery .v2-page-header,
-.v2-design .v2-content .v2-page-header,
-.v2-design .v2-archive .v2-page-header {
+.v2-design .v2-content .v2-page-header {
   transform: none;
   opacity: 1;
   pointer-events: auto;
+}
+.v2-design .v2-archive .v2-page-header {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 20 !important;
+  background: var(--bg-primary, #fff) !important;
+  transition: transform 180ms ease, opacity 180ms ease, margin-bottom 180ms ease;
+}
+.v2-design .v2-archive .v2-page-header.is-scroll-hidden {
+  transform: translateY(-100%) !important;
+  margin-bottom: calc(-1 * (56px + 44px + var(--v2-dest-content-pad-x))) !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 @media (max-width: 767px) {
   .v2-design .v2-page-header.is-scroll-hidden,
@@ -52,8 +64,7 @@
   .v2-design .v2-settlement .v2-page-header.is-scroll-hidden,
   .v2-design .v2-places .v2-page-header.is-scroll-hidden,
   .v2-design .v2-gallery .v2-page-header.is-scroll-hidden,
-  .v2-design .v2-content .v2-page-header.is-scroll-hidden,
-  .v2-design .v2-archive .v2-page-header.is-scroll-hidden {
+  .v2-design .v2-content .v2-page-header.is-scroll-hidden {
     transform: translateY(-100%) !important;
     opacity: 0 !important;
     pointer-events: none !important;
@@ -121,10 +132,15 @@
   border: 0 !important;
 }
 
-.v2-design .v2-archive .history-header-stack,
 .v2-design .v2-content .history-header-stack {
   padding: 0 !important;
   margin: 0 !important;
+  gap: 0 !important;
+}
+
+.v2-design .v2-archive .history-header-stack {
+  padding: 0 !important;
+  margin: 0 0 var(--v2-dest-content-pad-x) 0 !important;
   gap: 0 !important;
 }
 
@@ -612,6 +628,13 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   height: 44px !important;
   min-width: 44px !important;
   min-height: 44px !important;
+}
+
+/* Past meeting place card in history-meetings-grid */
+.v2-design .history-meetings-grid .date-item-btn.is-past .place-memo-stack {
+  background-color: #d4dce8 !important;
+  border-radius: 10px !important;
+  border-top: none !important;
 }
 
 /* Chat composer tools + send. */
@@ -1297,6 +1320,8 @@ html:has(.renewal-shell.v2-design) .bottom-sheet-header h4 {
   padding: 6px 14px !important;
   line-height: 130% !important;
   border-radius: 10px !important;
+  font-size: var(--v2-badge-fs, 0.68rem) !important;
+  font-weight: 800 !important;
   text-align: left !important;
   word-break: break-word;
   max-width: 100%;

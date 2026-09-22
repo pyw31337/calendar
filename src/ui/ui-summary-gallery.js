@@ -1454,6 +1454,13 @@ export function HistoryView({
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+  const [, setV2SlotRenderTick] = React.useState(0);
+  React.useEffect(() => {
+    if (v2Embed && typeof document !== 'undefined') {
+      const el = document.getElementById('v2-archive-header-tabs-slot');
+      if (el) setV2SlotRenderTick(t => t + 1);
+    }
+  }, [v2Embed]);
   // 갤러리 페이지(ContentView/PhotoGallery)와 동일하게 헤더 실측 높이만 예약한다 -- 여기만 별도
   // 여유를 더하면 탭 페이지마다 헤더 아래 여백이 달라 보인다(문제로 지적됨).
   const historyScrollPadTop = v2Embed
@@ -2069,80 +2076,76 @@ export function HistoryView({
     }))
   );
 
-  return /*#__PURE__*/React.createElement("div", {
-    className: "places-view-container",
-    style: {
-      position: v2Embed ? 'relative' : 'fixed',
-      top: v2Embed ? undefined : 0,
-      left: v2Embed ? undefined : 0,
-      right: v2Embed ? undefined : 0,
-      bottom: v2Embed ? undefined : 0,
+  const v2ArchiveTabsSlot = v2Embed && typeof document !== 'undefined'
+    ? document.getElementById('v2-archive-header-tabs-slot')
+    : null;
+  const historyHeaderStackEl = /*#__PURE__*/React.createElement("div", {
+    ref: headerStackRef,
+    className: "history-header-stack",
+    style: v2Embed ? undefined : {
+      position: 'fixed', top: 'env(safe-area-inset-top, 0px)', left: 0, right: 0, zIndex: 1010,
       backgroundColor: 'var(--bg-primary)',
-      display: 'flex', flexDirection: 'column',
-      width: '100%', maxWidth: '100%', overflow: 'hidden',
-      height: v2Embed ? '100%' : undefined,
-      minHeight: v2Embed ? '100%' : undefined,
-      zIndex: v2Embed ? 1 : undefined,
+      transition: 'transform 0.3s ease',
+      transform: isHeaderVisible ? 'translateY(0)' : 'translateY(-100%)'
     }
   },
+  !v2Embed && /*#__PURE__*/React.createElement("div", {
+    className: "places-view-header",
+    style: {
+      position: 'relative', height: '56px',
+      backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '0 16px', flexShrink: 0
+    }
+  },
+    /*#__PURE__*/React.createElement("button", {
+      type: "button", onClick: onBack, "aria-label": "뒤로가기",
+      style: PAGE_HEADER_BACK_BTN_STYLE
+    }, BackArrowIcon ? /*#__PURE__*/React.createElement(BackArrowIcon, { size: 22 }) : "←"),
     /*#__PURE__*/React.createElement("div", {
-      ref: headerStackRef,
-      className: "history-header-stack",
-      style: {
-        // iOS 홈화면 설치(standalone) 상태에서는 상태바 영역까지 콘텐츠가 그려지므로, top:0
-        // 대신 env(safe-area-inset-top)만큼 아래로 밀어야 상태바 아이콘과 겹치지 않고 버튼도
-        // 눌린다. 일반 브라우저 탭에서는 이 값이 0이라 동작 변화 없음.
-        position: v2Embed ? 'sticky' : 'fixed', top: v2Embed ? 0 : 'env(safe-area-inset-top, 0px)', left: v2Embed ? undefined : 0, right: v2Embed ? undefined : 0, zIndex: v2Embed ? 5 : 1010,
-        backgroundColor: 'var(--bg-primary)',
-        transition: 'transform 0.3s ease',
-        transform: isHeaderVisible ? 'translateY(0)' : 'translateY(-100%)'
-      }
-    },
-    /*#__PURE__*/React.createElement("div", {
-      className: "places-view-header",
-      style: {
-        position: 'relative', height: '56px',
-        backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)',
-        display: v2Embed ? 'none' : 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 16px', flexShrink: 0
-      }
-    },
+      style: PAGE_HEADER_TITLE_STYLE
+    }, calendar.title + " 보관함"),
+    /*#__PURE__*/React.createElement("div", { style: PAGE_HEADER_ACTIONS_WRAP_STYLE },
       /*#__PURE__*/React.createElement("button", {
-        type: "button", onClick: onBack, "aria-label": "뒤로가기",
-        style: PAGE_HEADER_BACK_BTN_STYLE
-      }, BackArrowIcon ? /*#__PURE__*/React.createElement(BackArrowIcon, { size: 22 }) : "←"),
-      /*#__PURE__*/React.createElement("div", {
-        style: PAGE_HEADER_TITLE_STYLE
-      }, v2Embed ? '보관함' : (calendar.title + " 보관함")),
-      /*#__PURE__*/React.createElement("div", { style: PAGE_HEADER_ACTIONS_WRAP_STYLE },
-        /*#__PURE__*/React.createElement("button", {
-          type: "button", onClick: () => setIsSearchOpen(v => !v), title: "보관함 검색", "aria-label": "보관함 검색",
-          style: PAGE_HEADER_ICON_BTN_STYLE
-        }, SearchIcon ? /*#__PURE__*/React.createElement(SearchIcon, { size: 20 }) : "🔍"),
-        /*#__PURE__*/React.createElement("button", {
-          type: "button", onClick: () => setIsMenuOpen(true), title: "메뉴", "aria-label": "메뉴 열기",
-          style: PAGE_HEADER_ICON_BTN_STYLE
-        }, ThreeLinesIcon ? /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 22 }) : "≡")
-      )
-    ),
-    isSearchOpen && InlineSearchBar && /*#__PURE__*/React.createElement(InlineSearchBar, {
-      value: searchQuery,
-      placeholder: "날짜·참여자·메모·장소 검색...",
-      onChange: e => setSearchQuery(e.target.value),
-      onClose: () => { setIsSearchOpen(false); setSearchQuery(''); }
-    }),
-    UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
-      ariaLabel: "보관함 탭",
-      value: historyTab,
-      onChange: changeHistoryTab,
-      activeColor: v2Embed ? '#7C2FE5' : undefined,
-      options: [
-        { value: 'memories', label: '추억', badge: travelMemoryGroups.length },
-        { value: 'people', label: '인물', badge: personTagChips.length },
-        { value: 'meetings', label: '지난모임', badge: confirmedDates.length }
-      ]
-    })
-    ), // end history-header-stack
+        type: "button", onClick: () => setIsSearchOpen(v => !v), title: "보관함 검색", "aria-label": "보관함 검색",
+        style: PAGE_HEADER_ICON_BTN_STYLE
+      }, SearchIcon ? /*#__PURE__*/React.createElement(SearchIcon, { size: 20 }) : "🔍"),
+      /*#__PURE__*/React.createElement("button", {
+        type: "button", onClick: () => setIsMenuOpen(true), title: "메뉴", "aria-label": "메뉴 열기",
+        style: PAGE_HEADER_ICON_BTN_STYLE
+      }, ThreeLinesIcon ? /*#__PURE__*/React.createElement(ThreeLinesIcon, { size: 22 }) : "≡")
+    )
+  ),
+  isSearchOpen && InlineSearchBar && /*#__PURE__*/React.createElement(InlineSearchBar, {
+    value: searchQuery,
+    placeholder: "날짜·참여자·메모·장소 검색...",
+    onChange: e => setSearchQuery(e.target.value),
+    onClose: () => { setIsSearchOpen(false); setSearchQuery(''); }
+  }),
+  UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
+    ariaLabel: "보관함 탭",
+    value: historyTab,
+    onChange: changeHistoryTab,
+    activeColor: v2Embed ? '#7C2FE5' : undefined,
+    options: [
+      { value: 'memories', label: '추억', badge: travelMemoryGroups.length },
+      { value: 'people', label: '인물', badge: personTagChips.length },
+      { value: 'meetings', label: '지난모임', badge: confirmedDates.length }
+    ]
+  })
+  );
+
+  return /*#__PURE__*/React.createElement("div", {
+    className: "places-view-container",
+    style: v2Embed ? { height: '100%', minHeight: '100%' } : {
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: 'var(--bg-primary)', display: 'flex', flexDirection: 'column',
+      width: '100%', maxWidth: '100%', overflow: 'hidden'
+    }
+  },
+    v2ArchiveTabsSlot && ReactDOM?.createPortal
+      ? ReactDOM.createPortal(historyHeaderStackEl, v2ArchiveTabsSlot)
+      : (!v2Embed ? historyHeaderStackEl : null),
     historyTab === 'meetings' && /*#__PURE__*/React.createElement("div", {
       className: "history-meetings-grid history-page-scroll",
       onScroll: handleHistoryScroll,
@@ -2165,8 +2168,7 @@ export function HistoryView({
         return /*#__PURE__*/React.createElement("button", {
           key: d,
           className: `date-item-btn ${isPast ? 'is-past' : 'is-confirmed'} confirmed-meeting-card confirmed-meeting-surface`,
-          onClick: () => onSelectDate(d),
-          style: { flexDirection: 'column', alignItems: 'flex-start' }
+          onClick: () => onSelectDate(d)
         },
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: '8px' } },
             /*#__PURE__*/React.createElement("span", {
@@ -2187,7 +2189,7 @@ export function HistoryView({
                 text: memoText,
                 className: `memo-capsule-badge ${isPast ? 'is-past' : ''}`,
                 style: isPast
-                  ? { backgroundColor: 'transparent', background: 'transparent', color: p.color, border: `1px solid ${p.color}`, boxShadow: 'none' }
+                  ? { color: p.color }
                   : { backgroundColor: p.color, color: 'var(--text-main, #1e1b2e)' },
                 title: `${p.name}: ${memoText}`
               }, highlightKeyword(memoText, searchQuery));
@@ -2199,7 +2201,7 @@ export function HistoryView({
             const hiddenPlaceCount = datePlaces.length - visibleDatePlaces.length;
             return /*#__PURE__*/React.createElement("div", {
             style: {
-              display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '2px', width: '100%',
+              display: 'flex', flexDirection: 'column', gap: '4px', marginTop: 'auto', paddingTop: '6px', width: '100%',
               ...(isPast ? {} : { mixBlendMode: 'luminosity' })
             }
           },
@@ -2212,9 +2214,7 @@ export function HistoryView({
                 className: "place-memo-stack",
                 style: {
                   display: 'flex', alignItems: 'flex-start', gap: '6px',
-                  backgroundColor: isPast ? 'transparent' : '#333',
-                  borderRadius: isPast ? 0 : 'var(--radius-md)',
-                  borderTop: isPast ? '1px solid rgba(0, 0, 0, 0.05)' : 'none',
+                  backgroundColor: isPast ? '#d4dce8' : '#333',
                   padding: '7px 10px', width: '100%', boxSizing: 'border-box'
                 }
               },

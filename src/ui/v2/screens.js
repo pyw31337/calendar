@@ -175,7 +175,6 @@ export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, se
     if (typeof window === 'undefined') return undefined;
     let lastTop = 0;
     const onScroll = event => {
-      if (!window.matchMedia?.('(max-width: 767px)').matches) return;
       const target = event.target;
       if (!target || typeof target.scrollTop !== 'number' || target.scrollHeight <= target.clientHeight) return;
       const top = target.scrollTop;
@@ -1216,7 +1215,9 @@ export function ArchiveScreen(p) {
       centerSubtitle: true,
       onShare: p.onShare,
       onMenu: p.onMenu,
-    }),
+    },
+      h('div', { id: 'v2-archive-header-tabs-slot', className: 'v2-archive-tabs-slot' })
+    ),
     wrapLegacy(p.legacyView, 'v2-legacy-body v2-archive-legacy'),
     overlays(p.slots)
   );

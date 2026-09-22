@@ -3998,7 +3998,17 @@ select.form-select {
 .history-meetings-grid {
   display: grid; grid-template-columns: 1fr; gap: 10px;
 }
-.history-meetings-grid .date-item-btn { margin-bottom: 0; }
+.history-meetings-grid .date-item-btn {
+  margin-bottom: 0;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
+}
+.history-meetings-grid .date-item-btn.is-past .place-memo-stack {
+  background-color: #d4dce8 !important;
+  border-radius: 10px !important;
+  border-top: none !important;
+}
 @media (min-width: 640px) and (max-width: 1023px) {
   .history-meetings-grid { grid-template-columns: repeat(2, 1fr); }
 }
