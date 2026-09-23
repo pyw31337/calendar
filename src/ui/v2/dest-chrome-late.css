@@ -316,12 +316,12 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   border: 0 !important;
 }
 
-/* Dest header right-end icons: match home mobile gap/edge pad. */
+/* Dest header right-end icons: tight cluster, same gap on every page. */
 @media (max-width: 767px) {
   .v2-design .v2-page-header .bp-header-actions {
-    gap: 12px !important;
-    padding-right: 4px !important;
-    min-width: 72px !important;
+    gap: 4px !important;
+    padding-right: 0 !important;
+    min-width: 0 !important;
   }
 }
 
@@ -2491,7 +2491,8 @@ html:has(.renewal-shell.v2-design) .bp-event-sheet .underline-tabs button[aria-s
   display: block !important;
 }
 @media (min-width: 1200px) {
-  .v2-design .bp-home-menu-fab { display: none !important; }
+  .v2-design .bp-home-menu-fab,
+  .v2-design .bp-menu-fab { display: none !important; }
 }
 
 /* Mobile/tablet drawer uses the PC rail's expanded layout, from the left.
@@ -2733,6 +2734,75 @@ html:has(.renewal-shell.v2-design) .v2-chat .v2-chat-composer.is-scroll-hidden {
   border: 0 !important;
   opacity: 0 !important;
   pointer-events: none !important;
+}
+
+/* Header action icons sit close together on every page (mobile used to force 12px). */
+html:has(.renewal-shell.v2-design) .v2-page-header .bp-header-actions,
+html:has(.renewal-shell.v2-design) .bp-header.v2-page-header .bp-header-actions {
+  gap: 4px !important;
+  min-width: 0 !important;
+}
+
+/* Header hairlines are the pane edge, not an inset of title/icon padding.
+   Reference sheets put padding + border on `.bp-header` itself; that padding
+   is cleared here and kept only on the title row (border-box, so the line
+   still runs edge to edge). Tab bars that live in the header do the same. */
+html:has(.renewal-shell.v2-design) .v2-page-header.bp-header,
+html:has(.renewal-shell.v2-design) .v2-memo .bp-header.v2-page-header,
+html:has(.renewal-shell.v2-design) .v2-chat .bp-header.v2-page-header,
+html:has(.renewal-shell.v2-design) .v2-settlement .bp-header.v2-page-header,
+html:has(.renewal-shell.v2-design) .v2-places .bp-header.v2-page-header,
+html:has(.renewal-shell.v2-design) .v2-gallery .bp-header.v2-page-header,
+html:has(.renewal-shell.v2-design) .v2-content .bp-header.v2-page-header,
+html:has(.renewal-shell.v2-design) .v2-archive .bp-header.v2-page-header,
+html:has(.renewal-shell.v2-design) .v2-more .bp-header.v2-page-header {
+  width: 100% !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  border-bottom: none !important;
+  box-sizing: border-box !important;
+}
+html:has(.renewal-shell.v2-design) .v2-page-header > .bp-header-row {
+  position: relative !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  padding-left: 16px !important;
+  padding-right: 16px !important;
+  box-sizing: border-box !important;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
+}
+html:has(.renewal-shell.v2-design) .v2-page-header .underline-tabs,
+html:has(.renewal-shell.v2-design) .v2-page-header .settlement-page-tabs,
+html:has(.renewal-shell.v2-design) .v2-page-header .gallery-page-tabs,
+html:has(.renewal-shell.v2-design) .v2-page-header .gallery-page-tabs-mobile,
+html:has(.renewal-shell.v2-design) .v2-page-header .history-header-stack,
+html:has(.renewal-shell.v2-design) .v2-page-header .v2-gallery-tabs-slot,
+html:has(.renewal-shell.v2-design) .v2-page-header .v2-content-tabs-slot,
+html:has(.renewal-shell.v2-design) .v2-page-header .v2-archive-tabs-slot,
+html:has(.renewal-shell.v2-design) .v2-page-header .v2-content-subcat-slot,
+html:has(.renewal-shell.v2-design) .global-search-page-card > .underline-tabs,
+html:has(.renewal-shell.v2-design) .global-search-page-card .global-search-header {
+  width: 100% !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  box-sizing: border-box !important;
+}
+html:has(.renewal-shell.v2-design) .v2-page-header .underline-tabs,
+html:has(.renewal-shell.v2-design) .v2-page-header .gallery-page-tabs,
+html:has(.renewal-shell.v2-design) .v2-page-header .gallery-page-tabs-mobile,
+html:has(.renewal-shell.v2-design) .v2-page-header .history-header-stack,
+html:has(.renewal-shell.v2-design) .v2-page-header .v2-gallery-tabs-slot,
+html:has(.renewal-shell.v2-design) .v2-page-header .v2-content-tabs-slot,
+html:has(.renewal-shell.v2-design) .v2-page-header .v2-archive-tabs-slot,
+html:has(.renewal-shell.v2-design) .global-search-page-card > .underline-tabs {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
 }
 
 

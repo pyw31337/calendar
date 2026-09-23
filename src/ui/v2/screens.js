@@ -273,7 +273,7 @@ function pageSubtitle(calendar, trailing) {
   return name || extra || undefined;
 }
 
-export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, searchLabel, onShare, onMenu, extra, centerSubtitle = true, hideOnScroll = true, children }) {
+export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, searchLabel, onShare, onMenu, extra, centerSubtitle = true, hideOnScroll = true, showMenu = false, children }) {
   const React = window.React;
   const headerRef = React.useRef(null);
   const [hidden, setHidden] = React.useState(false);
@@ -338,17 +338,15 @@ export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, se
             !centerSubtitle && subtitle ? h('div', { className: 'bp-header-sub' }, subtitle) : null
           )
         ),
-        // Center brand text (calendar name) and the search/share header icons were removed
-        // (사용자 요청, 전체 페이지 공통): every destination's header now shows only back/title on
-        // the left and the menu button on the right. onSearch/onShare/searchLabel/brand/subtitle
-        // stay accepted props (callers still pass them) but are intentionally no longer rendered.
-        // `extra` (Places' map-toggle button) renders AFTER the menu button so it lands at the
-        // header's right edge, not between the title and the menu button.
+        // Center brand text and search/share icons are not rendered. Destination
+        // pages open the side menu from the purple FAB, so the header menu button
+        // stays off unless `showMenu` is set (chat has no FAB). Chat renders the
+        // notice icon first, then the menu button.
         h(
           'div',
           { className: 'bp-header-actions' },
-          onMenu && h(IconButton, { label: `${title} 메뉴`, icon: 'menu', size: 20, onClick: onMenu }),
-          extra
+          extra,
+          showMenu && onMenu && h(IconButton, { label: `${title} 메뉴`, icon: 'menu', size: 20, onClick: onMenu })
         )
       ),
       children
@@ -371,10 +369,10 @@ function Search({ value, onChange, placeholder }) {
   );
 }
 
-function Fab({ label, onClick, icon = 'plus' }) {
+function Fab({ label, onClick, icon = 'plus', className = '' }) {
   return h(
     'button',
-    { type: 'button', className: 'bp-fab', 'aria-label': label, onClick },
+    { type: 'button', className: `bp-fab${className ? ` ${className}` : ''}`, 'aria-label': label, onClick },
     h(DesignIcon, { name: icon, size: 22, strokeWidth: 2.4 })
   );
 }
@@ -499,7 +497,7 @@ export function MemoScreen(p) {
             })
           ),
           h('div', { className: 'v2-dest-body v2-memo-body' }, slots.body),
-          h(Fab, { label: '메뉴', icon: 'menu', onClick: p.onMenu })
+          h(Fab, { label: '메뉴', icon: 'menu', className: 'bp-menu-fab', onClick: p.onMenu })
         ),
         overlays(slots, ['body', 'composer', 'list'])
       );
@@ -530,7 +528,7 @@ export function MemoScreen(p) {
           })
         ),
         wrapLegacy(p.legacyView, 'v2-legacy-body v2-memo-legacy'),
-        h(Fab, { label: '메뉴', icon: 'menu', onClick: p.onMenu })
+        h(Fab, { label: '메뉴', icon: 'menu', className: 'bp-menu-fab', onClick: p.onMenu })
       )
     );
   }
@@ -604,7 +602,7 @@ export function MemoScreen(p) {
         p.hasMoreMemos &&
           h('button', { type: 'button', className: 'v2-load-more', onClick: p.onLoadMoreMemos }, '메모 더 보기')
       ),
-      h(Fab, { label: '메뉴', icon: 'menu', onClick: p.onMenu })
+      h(Fab, { label: '메뉴', icon: 'menu', className: 'bp-menu-fab', onClick: p.onMenu })
     ),
     memoComposePopup,
     overlays(p.slots, ['composer', 'shared'])
@@ -669,7 +667,7 @@ export function PlacesScreen(p) {
           })
         ),
         wrapLegacy(p.legacyView, 'v2-legacy-body v2-places-legacy'),
-        h(Fab, { label: '장소 등록', onClick: p.onCompose })
+        h(Fab, { label: '메뉴', icon: 'menu', className: 'bp-menu-fab', onClick: p.onMenu })
       )
     );
   }
@@ -789,7 +787,7 @@ export function PlacesScreen(p) {
             })
           ),
       !(p.places || []).length && h(Empty, null, '검색 조건에 맞는 장소가 없습니다.'),
-      h(Fab, { label: '장소 등록', onClick: p.onCompose })
+      h(Fab, { label: '메뉴', icon: 'menu', className: 'bp-menu-fab', onClick: p.onMenu })
     ),
     overlays(p.slots, ['map', 'toolbar', 'list'])
   );
@@ -869,7 +867,7 @@ export function SettlementScreen(p) {
             extra: settlementHeaderExtra,
           }, flushTabs),
           h('div', { className: 'v2-dest-body v2-settlement-body' }, flushBody),
-          h(Fab, { label: '지출 추가', onClick: p.onCompose })
+          h(Fab, { label: '메뉴', icon: 'menu', className: 'bp-menu-fab', onClick: p.onMenu })
         ),
         overlays({ ...slots, tabs: flushTabs, body: flushBody }, ['body', 'tabs'])
       );
@@ -892,7 +890,7 @@ export function SettlementScreen(p) {
           extra: settlementHeaderExtra,
         }),
         wrapLegacy(p.legacyView, 'v2-legacy-body v2-settlement-legacy'),
-        h(Fab, { label: '지출 추가', onClick: p.onCompose })
+        h(Fab, { label: '메뉴', icon: 'menu', className: 'bp-menu-fab', onClick: p.onMenu })
       )
     );
   }
@@ -1089,7 +1087,7 @@ export function SettlementScreen(p) {
           )
         )
       ),
-      h(Fab, { label: '지출 추가', onClick: p.onCompose })
+      h(Fab, { label: '메뉴', icon: 'menu', className: 'bp-menu-fab', onClick: p.onMenu })
     ),
     overlays(p.slots)
   );
@@ -1116,6 +1114,7 @@ export function ChatScreen(p) {
     onSearch: p.onSearch,
     searchLabel: '대화 검색',
     onMenu: p.onMenu,
+    showMenu: true,
     extra: typeof p.onOpenNotice === 'function'
       ? h(IconButton, { label: '공지사항', icon: 'megaphone', size: 20, onClick: p.onOpenNotice })
       : null,
@@ -1397,6 +1396,7 @@ export function GalleryScreen(p) {
       h('div', { id: 'v2-gallery-header-tabs-slot', className: 'v2-gallery-tabs-slot' })
     ),
     wrapLegacy(p.legacyView, 'v2-legacy-body v2-gallery-legacy'),
+    p.onMenu && h(Fab, { label: '메뉴', icon: 'menu', className: 'bp-menu-fab', onClick: p.onMenu }),
     overlays(p.slots)
   );
 }
@@ -1416,6 +1416,7 @@ function makeTabbedScreen(name, title) {
         h('div', { id: `v2-${name}-header-tabs-slot`, className: `v2-${name}-tabs-slot` })
       ),
       wrapLegacy(p.legacyView, `v2-legacy-body v2-${name}-legacy`),
+      p.onMenu && h(Fab, { label: '메뉴', icon: 'menu', className: 'bp-menu-fab', onClick: p.onMenu }),
       overlays(p.slots)
     );
   };

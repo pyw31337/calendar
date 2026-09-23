@@ -2201,7 +2201,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 12px;
+  gap: 4px;
   margin-left: 0;
 }
 .v2-design .v2-page-header .bp-icon-btn {

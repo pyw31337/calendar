@@ -2848,7 +2848,14 @@ function MorePane({ calendarName, onSelectItem, selectedItem, onOpenSideNav }) {
         ))
       ),
       React.createElement('div', { className: 'v2-more-note' },
-        calendarName ? `${calendarName} · 검색과 설정은 위 메뉴에서 바로 열 수 있습니다.` : '검색과 설정은 위 메뉴에서 바로 열 수 있습니다.')
+        calendarName ? `${calendarName} · 검색과 설정은 위 메뉴에서 바로 열 수 있습니다.` : '검색과 설정은 위 메뉴에서 바로 열 수 있습니다.'),
+      React.createElement('button', {
+        type: 'button',
+        className: 'bp-fab bp-menu-fab',
+        'aria-label': '메뉴',
+        title: '메뉴',
+        onClick: onOpenSideNav,
+      }, React.createElement(TabIcon, { id: 'more', size: 22 }))
     )
   );
 }
