@@ -3355,3 +3355,20 @@ html:has(.renewal-shell.v2-design) .bp-dday-participant-memo-text {
   overflow: visible !important;
   text-overflow: unset !important;
 }
+
+/* Phone home: the purple hero stays put. The calendar and the cards below
+   scroll up and paint over it, instead of the whole page moving as one. */
+@media (max-width: 767px) {
+  html:has(.renewal-shell.v2-design) main.bp-app-shell.is-bento-home > .bp-hero-zone {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 1 !important;
+    contain: none !important;
+  }
+  html:has(.renewal-shell.v2-design) main.bp-app-shell.is-bento-home > .bp-renewal-home-summary,
+  html:has(.renewal-shell.v2-design) main.bp-app-shell.is-bento-home > .bp-renewal-home-footer {
+    position: relative !important;
+    z-index: 2 !important;
+    background: var(--bg-primary, #f6f4fb) !important;
+  }
+}
