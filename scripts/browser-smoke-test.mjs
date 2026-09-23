@@ -277,6 +277,12 @@ async function checkRenewalShellRoutes(browser, baseUrl) {
     const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height }, hasTouch: viewport.hasTouch });
     const page = await context.newPage();
     try {
+      // Cutover check: the bare URL with no `shell` param must now render V2 by default
+      // (isRenewalShellEnabled: absent shell = V2, `?shell=v1` is the escape hatch).
+      await gotoBootReady(page, `${baseUrl}?id=cw`);
+      await page.locator('.renewal-shell').waitFor({ state: 'visible', timeout: 10000 });
+      pass(`[${viewport.name}] 기본 URL(shell 파라미터 없음)도 V2 렌더`);
+
       for (const [suffix, label] of routes) {
         await gotoBootReady(page, `${baseUrl}?id=cw&shell=v2${suffix}`);
         await page.locator('.renewal-shell').waitFor({ state: 'visible', timeout: 10000 });

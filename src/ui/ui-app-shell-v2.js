@@ -3362,7 +3362,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
     // so Back from gallery/archive never resurfaces "모아엘가 기록".
     try {
       const params = new URLSearchParams(window.location.search);
-      if (params.get('shell') === 'v2' && params.get('tab') === 'records') {
+      if (params.get('shell') !== 'v1' && params.get('tab') === 'records') {
         const sub = params.get('sub');
         if (!sub || sub === 'all') {
           setActiveTabState(DEFAULT_TAB);
@@ -3384,7 +3384,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
       // Popping onto the hub (legacy history entries) → snap to calendar via replace.
       try {
         const params = new URLSearchParams(window.location.search);
-        if (params.get('shell') === 'v2' && params.get('tab') === 'records') {
+        if (params.get('shell') !== 'v1' && params.get('tab') === 'records') {
           const sub = params.get('sub');
           if (!sub || sub === 'all') {
             setActiveTabState(DEFAULT_TAB);

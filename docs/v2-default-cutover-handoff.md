@@ -1,8 +1,8 @@
 # V2 → 기본 URL(`?id=cw`) 덮어쓰기 핸드오프
 
 **이 문서의 독자:** Grok / Codex / Claude / Gemini / 사람 — 세션 없이 이 저장소만 보고 V2를 기본 셸로 올리는 작업을 이어갈 수 있어야 한다.  
-**최종 갱신:** 2026-09-23 (Claude, 다크 P0 완료 — 남은 블로커는 Safari 실기기 서명 하나뿐)  
-**상태 한 줄:** **아직 기본 주소를 V2로 바꾸지 말 것.** V2는 `?shell=v2` 옵트인. **다크 P0는 끝났다** — Phase1–4(#736/#737/#738/#739/#741) 전부 머지, 근본원인(`.renewal-shell` 변수 재하드코딩) 수정 + 라이브 배포본에서 페이지 8개·Confirm·토스트·ShareModal까지 재QA 완료, 재발 방지 가드 테스트 추가. **남은 P0는 Safari 채팅 VV 단 하나** — 정적 코드 리뷰와 관련 자동 테스트 24개는 전부 통과했지만, 실기기(iPhone Safari) 서명은 이 샌드박스에서 할 수 없어 사람이 해야 한다. 그 서명이 끝나야 컷오버 메커닉스(§5) 착수 가능. 다크 상세: [`docs/v2-dark-mode-handoff.md`](./v2-dark-mode-handoff.md).
+**최종 갱신:** 2026-09-23 (Claude, **컷오버 실행 완료** — 사용자의 명시적 지시로 Safari 실기기 서명 게이트를 건너뛰고 진행)  
+**상태 한 줄:** **V2가 기본 셸이다.** `isRenewalShellEnabled()` = `shell !== 'v1'` (부재 시 V2), `?shell=v1`이 한 릴리스 동안 유지되는 V1 폴백. §5에 사전 조사해둔 7개 파일 diff를 그대로 적용해 완료: `app-feature-flags.js`/`app-routing-state.js`(2곳)/`ui-app-shell-v2.js`(2곳)/`app-main.js`/`index.html`(host auto-force가 `?shell=v1`을 무시하던 버그 포함 수정)/`test/v2-routing.test.mjs`(신규 케이스 2개)/`scripts/browser-smoke-test.mjs`(기본 URL 검증 추가). `scripts/firebase-safety-tests.mjs`의 낡은 기대값 1건도 같이 수정. **Safari 채팅 VV 실기기 서명은 사용자가 추후 직접 진행** — 정적 코드 리뷰·자동 테스트 24개는 이미 통과했고, 문제 발견 시 `?shell=v1`로 즉시 되돌릴 수 있다는 전제로 이 순서를 바꿨다. 다크 상세: [`docs/v2-dark-mode-handoff.md`](./v2-dark-mode-handoff.md).
 
 관련 문서:
 
@@ -19,19 +19,19 @@
 
 라이브 확인 URL:
 
-- V1(기본): `https://pyw31337.github.io/calendar/?id=cw`
-- V2(옵트인): `https://pyw31337.github.io/calendar/?id=cw&shell=v2`
+- V2(기본): `https://pyw31337.github.io/calendar/?id=cw`
+- V1(폴백 탈출구, 한 릴리스 동안 유지): `https://pyw31337.github.io/calendar/?id=cw&shell=v1`
 
 ---
 
 ## 0. TL;DR (다른 에이전트용)
 
 1. V2는 **크롬(셸) 스왑**이다. Firestore/데이터 경로는 V1과 같다. 데이터 포크가 아니다.
-2. 게이트: `isRenewalShellEnabled()` → `shell === 'v2'` 일 때만 `RenewalAppShell` (`src/core/app-feature-flags.js`).
-3. **지금은 `?id=cw`에 V2를 덮으면 안 된다.** 코드 리뷰(2026-09-23) 결론: P0 다크모드는 **완료**, P0 사파리 채팅 VV는 **실기기 서명만 미검증** (정적 리뷰·자동 테스트는 통과), (완화됨) 알림 권한 도움말은 #734로 마운트됨.
-4. 컷오버는 **플래그 한 줄이 아니다.** 플래그 + 라우팅/URL 빌더 + 히스토리 가드 + `index.html` + 테스트/스모크를 같은 predicate로 맞춰야 한다. 탈출구는 한 릴리스 동안 `?shell=v1`.
+2. 게이트: `isRenewalShellEnabled()` → `shell !== 'v1'` 이면(부재 포함) `RenewalAppShell` (`src/core/app-feature-flags.js`). **V2가 기본.**
+3. **컷오버 완료 (2026-09-23).** 다크모드 P0는 끝났고, Safari 채팅 VV 실기기 서명은 사용자의 명시적 지시로 순서를 바꿔 건너뛰었다 — 문제 발견 시 `?shell=v1`로 즉시 되돌릴 수 있다는 전제. 알림 권한 도움말은 #734로 이미 마운트됨.
+4. 컷오버는 플래그 한 줄이 아니었다 — 플래그 + 라우팅/URL 빌더(2곳) + 히스토리 가드(2곳) + `app-main.js` + `index.html` + 테스트/스모크까지 **같은 predicate(`shell !== 'v1'`)** 로 전부 맞췄다 (§5 참고, 실제 적용한 diff 기록됨). 탈출구는 한 릴리스 동안 `?shell=v1`.
 5. **절대 Actions “applicator / push_files / base64 패치 워크플로”로 소스에 외과 수술하지 말 것.** #729–#732(갤러리), #733(알림)에서 CI가 도배됐다. 일반 브랜치 → `gh pr` → 머지만 사용.
-6. 다음 착수 유닛: **Safari 채팅 VV 실기기 서명** (이것만 하면 컷오버 메커닉스 §5 착수 가능). 정적 코드 리뷰는 이미 끝났다 — `src/ui/v2/viewport-shell.css` + `src/ui/v2/visual-viewport-sync.js`에서 로직 결함 못 찾았고 `test/v2-scrollport.test.mjs`/`test/v2-style-isolation.test.mjs`/`test/v2-routing.test.mjs` 24개 전부 통과. 남은 건 진짜 iPhone Safari로 채팅 탭에서 키보드 open/close·스크롤·포커스·라이트박스를 눈으로 보는 것뿐 — 이 샌드박스는 WebKit이 없어서 못 함. 다크 상세는 [`v2-dark-mode-handoff.md`](./v2-dark-mode-handoff.md) (새 토글 금지 — `themeChoice` 유지 원칙은 계속 적용).
+6. 다음 착수 유닛: **Safari 채팅 VV 실기기 서명 (사용자가 직접 진행 예정)** → 문제 없으면 §5 하단 "한 릴리스 후" 정리(V1 트리/`withStickyVideo` 제거)로. 문제 발견 시 원인 파일은 `src/ui/v2/viewport-shell.css` / `src/ui/v2/visual-viewport-sync.js`(정적 리뷰는 이미 통과) 우선 확인. 다크 상세는 [`v2-dark-mode-handoff.md`](./v2-dark-mode-handoff.md) (새 토글 금지 — `themeChoice` 유지 원칙은 계속 적용).
 
 ---
 
@@ -55,11 +55,11 @@
 
 | 심볼 / 파일 | 역할 |
 | --- | --- |
-| `isRenewalShellEnabled()` — `src/core/app-feature-flags.js` | `URLSearchParams.get('shell') === 'v2'` |
-| `renderRenewalShellIfEnabled` / `RenewalAppShell` — `src/ui/ui-app-shell-v2.js` | V2 셸 마운트; 아니면 `null` → V1 트리로 복귀 |
+| `isRenewalShellEnabled()` — `src/core/app-feature-flags.js` | `URLSearchParams.get('shell') !== 'v1'` (**V2가 기본**) |
+| `renderRenewalShellIfEnabled` / `RenewalAppShell` — `src/ui/ui-app-shell-v2.js` | V2 셸 마운트; `shell=v1`이면 `null` → V1 트리로 복귀 |
 | `src/core/app-main.js` (~`renderRenewalShellIfEnabled` 호출부) | contexts + `globalOverlays` 전달 후 early return |
-| `src/core/app-routing-state.js` | `shell === 'v2'` 일 때만 tab/sub 리맵 (`getInitialAppView` / `buildAppViewUrl`) |
-| `src/index.html` 인라인 스크립트 | `pyw31337.github.io` / `localhost` / `127.0.0.1` 은 **요청한 shell 유지**(자동 v2 강제 없음). 그 외 호스트만 예전 프리뷰용으로 `shell=v2` 보정 |
+| `src/core/app-routing-state.js` | `shell !== 'v1'` 이면 tab/sub 리맵 (`getInitialAppView` / `buildAppViewUrl`) |
+| `src/index.html` 인라인 스크립트 | `shell` 파라미터는 전혀 건드리지 않음(더 이상 강제할 필요 없음 — V2가 이미 기본). 비-github.io/localhost 호스트에서 `id` 기본값(`cw`)만 채움 |
 
 ### 2.2 데이터
 
@@ -79,61 +79,64 @@ V2 어댑터(`buildRenewal*Context`)가 CalendarApp 상태 + 기존 뷰(`ChatRoo
 
 ---
 
-## 3. 컷오버 판정 (2026-09-23 코드 리뷰)
+## 3. 컷오버 판정 — **2026-09-23, 사용자 지시로 실행됨**
 
-**Verdict: NO — 기본 URL에 V2 덮지 말 것.**
+이 절의 "NO" 판정은 다크모드가 깨져 있던 시점의 코드 리뷰 결론이었다. 다크모드 P0가 끝난 뒤, 아래 표의 "Safari 채팅 키보드/VV" 행만 실기기 미검증으로 남았는데, 사용자가 "그 부분은 추후 내가 직접 확인할 테니 스킵하고 끝까지 진행해달라"고 명시적으로 지시해 그 게이트를 넘기고 §5를 실행했다. **문제가 발견되면 `?shell=v1`로 즉시 V1로 되돌릴 수 있다는 전제.**
 
 | 주장 | 판정 | 근거 |
 | --- | --- | --- |
-| 기본은 V1, V2는 `?shell=v2` | 확인 | `isRenewalShellEnabled` |
+| 기본은 V2, `?shell=v1`은 탈출구 | 확인 (컷오버 후 상태) | `isRenewalShellEnabled` |
 | 데이터 미포크 | 확인 | V2 어댑터 = CalendarApp |
-| 플래그 한 줄 + `?shell=v1` | **과장** | 라우팅·URL·히스토리·`index.html`·app-main 메모 어댑터 게이트도 동일 predicate 필요 |
+| 플래그 한 줄 + `?shell=v1` | **과장이었음, 지금은 전부 반영됨** | 라우팅·URL·히스토리·`index.html`·app-main 메모 어댑터 게이트 전부 동일 predicate로 갱신 완료 (§5) |
 | toast / confirm / upload / PIP 없음 | **예전 말 (수정됨)** | V2에 이미 remount |
 | 알림 온보딩 구멍 | **과장** | `setIsNotifOnboardingOpen(true)` 호출자 없음 — V1도 사실상 죽은 코드 |
 | 알림 **권한 도움말** 없음 | 확인 → **#734로 수정** | `NotificationPermissionHelpModal`을 `RenewalAppShell`에 ConfirmDialog와 같이 마운트 |
-| 다크모드 깨짐 | **확인 (P0)** | V2가 `data-theme` 무시 + light hardcode + `!important` |
-| Safari 채팅 키보드/VV | **확인 (P0, 기기 미검증)** | fixed shell + VV sync |
-| 브라우저 매트릭스 | 미완 | smoke는 `?shell=v2` 하드코딩; Safari/Whale/Edge 수동 서명 없음 |
+| 다크모드 깨짐 | ~~확인 (P0)~~ → **완료** | Phase1–4 전부 머지 (§6) |
+| Safari 채팅 키보드/VV | **확인, 실기기 미검증 — 사용자가 추후 직접 확인** | fixed shell + VV sync, 정적 리뷰·자동 테스트는 통과 |
+| 브라우저 매트릭스 | 미완 (P2, 컷오버를 막지 않음) | Safari/Whale/Edge 수동 서명 없음 |
 
-### 심각도별 잔여 블로커
+### 심각도별 잔여 블로커 (2026-09-23 갱신)
 
-1. **P0 — 다크모드:** V2를 V1 테마 토큰에 재연결할 때까지 기본 컷오버 금지.
-2. **P0 — Safari 모바일 채팅:** 키보드 open/close, 스크롤, 포커스, 라이트박스 — 실기기.
-3. **P1 — 컷오버 메커닉스 다파일 동기화** (아래 §5).
-4. **P2 — CSS modern features** + 서명된 디바이스 매트릭스.
+1. ~~P0 — 다크모드~~ → **완료.**
+2. **Safari 모바일 채팅 실기기 서명** — 사용자가 추후 직접 진행. `?shell=v1`로 즉시 롤백 가능하다는 전제로 컷오버보다 먼저 막던 게이트는 해제했다.
+3. ~~P1 — 컷오버 메커닉스 다파일 동기화~~ → **완료** (아래 §5).
+4. **P2 — CSS modern features** + 서명된 디바이스 매트릭스 (여전히 미완, P2라 컷오버를 막지 않음).
 5. ~~P1 — NotificationPermissionHelpModal~~ → **완료 (#734)**.
 
 ---
 
-## 4. 합의된 실행 순서 (바꾸지 말 것)
+## 4. 실행 순서 (2026-09-23, 사용자 지시로 순서 변경됨)
 
-1. **다크 토큰 재연결** (아래 §6) — 라이트/다크가 홈·채팅·메모·장소·정산·갤러리·컨텐츠·보관함·모달에서 통과할 때까지.
-2. 페이지별 라이트/다크 QA (스크린샷 유닛 루프 권장).
-3. Safari iPhone 채팅 VV/키보드 검증 + 필요 시 `visual-viewport-sync` / `viewport-shell.css` 조정.
-4. Whale / Edge / Firefox / Android Chrome 스모크 (`?id=cw` **shell 없이**, 컷오버 **후**).
-5. **기본을 V2로** + 한 릴리스 `?shell=v1` 탈출구.
-6. 안정화 후 V1 폴백 제거.
+1. ~~다크 토큰 재연결~~ (§6) → **완료.**
+2. ~~페이지별 라이트/다크 QA~~ → **완료.**
+3. ~~Safari iPhone 채팅 VV/키보드 검증~~ → **사용자가 추후 직접 진행 (컷오버보다 뒤로 미룸).** 원래 계획은 이 항목이 5번보다 먼저였으나, 사용자가 "사파리 확인은 추후에 내가 할테니 그 부분 스킵하고 끝까지 완수해달라"고 명시적으로 지시해 5번을 먼저 진행했다.
+4. Whale / Edge / Firefox / Android Chrome 스모크 (`?id=cw`, 컷오버 **후**) — 아직 미완, 사람이 직접 여러 브라우저에서 확인 필요.
+5. **기본을 V2로** + 한 릴리스 `?shell=v1` 탈출구 → **완료** (§5 참고, 실제 적용한 diff 전부 기록됨).
+6. 안정화 후 V1 폴백 제거 — **아직 하지 말 것.** 최소 3, 4번(Safari 실기기 + 크로스브라우저)이 사람 손으로 확인되기 전까지는 `?shell=v1` 탈출구를 유지한다.
 
 알림 권한 도움말은 #734로 §4 사이드 항목이 끝난 상태. 온보딩 모달은 **되살리지 말 것** (호출자 없음).
 
 ---
 
-## 5. 컷오버 메커닉스 (구현 시 체크리스트 — 지금은 구현하지 말 것)
+## 5. 컷오버 메커닉스 — **적용 완료 (2026-09-23)**
 
-**오늘:** `shell` 없음 → V1. `shell=v2` → V2.  
-**목표 탈출구 설계:** `isRenewalShellEnabled` → `get('shell') !== 'v1'` (또는 동등), **그리고** 라우팅/URL/히스토리/`index.html`/테스트가 **같은 predicate**.
+**이전(2026-09-23 오전):** `shell` 없음 → V1. `shell=v2` → V2.  
+**지금:** `isRenewalShellEnabled()` = `get('shell') !== 'v1'` — `shell` 없으면 V2, `shell=v1`이면 V1. 라우팅/URL 빌더/히스토리 가드/`index.html`/테스트가 전부 이 predicate로 통일됨.
 
-건드릴 파일(최소):
+건드린 파일 (전부 적용 완료, 커밋은 `feat/v2-default-shell-cutover` 브랜치):
 
-1. `src/core/app-feature-flags.js` — 기본 ON, `shell=v1`만 OFF
-2. `src/core/app-routing-state.js` — tab 매핑이 `=== 'v2'` 에만 묶여 있으면 기본 V2에서 탭 회귀
-3. `src/ui/ui-app-shell-v2.js` — history rewrite 가드 (`params.get('shell') === 'v2'` 류)
-4. `src/core/app-main.js` — memo adapter 등 `shell === 'v2'` 게이트
-5. `src/index.html` — 호스트별 auto-force 재검토; `?shell=v1` 문서화
-6. `test/v2-routing.test.mjs` — `shell` 없음 = V2, `shell=v1` = V1 케이스 추가
-7. `scripts/browser-smoke-test.mjs` — 기본 URL이 바뀌면 하드코딩 `?shell=v2` 정리
+1. `src/core/app-feature-flags.js` — `isRenewalShellEnabled()`가 `get('shell') === 'v2'` → `get('shell') !== 'v1'`로. `window` 없을 때 기본 반환값도 `false` → `true`로 (기본이 V2이므로).
+2. `src/core/app-routing-state.js` — `getInitialAppView`(6번째 줄 부근)와 `buildAppViewUrl`(31번째 줄 부근) 2곳 모두 동일하게 predicate 교체.
+3. `src/ui/ui-app-shell-v2.js` — history rewrite 가드 2곳(`records` 허브 스냅 로직) 동일 predicate로 교체.
+4. `src/core/app-main.js` — memo adapter 게이트(`window.__gatherV2MemoCommentsChange` 등록 조건) 동일 predicate로 교체.
+5. `src/index.html` — **실제 버그 발견 + 수정:** host별 auto-force 스크립트가 `missingShell = params.get('shell') !== 'v2'`로 판정해서, 컷오버 후 비-github.io 호스트에서 사용자가 명시적으로 `?shell=v1`을 써도 강제로 다시 `shell=v2`로 리다이렉트해 탈출구를 막는 버그였다. 이제 이 스크립트는 `shell` 파라미터를 **아예 건드리지 않고** (V2가 이미 기본이라 강제할 필요 자체가 없어짐), 여전히 필요한 유일한 역할인 "`id` 파라미터 기본값 채우기"만 한다.
+6. `test/v2-routing.test.mjs` — 기존 `'default routes ignore V2 tab/sub parameters'` 테스트(구 V1 기본 동작 가정)를 새 기본 동작(shell 없음 = V2)으로 갱신하고, `shell=v1` 탈출구가 진짜로 레거시 라우팅으로 돌아가는지 검증하는 신규 테스트를 별도로 추가. 22개 테스트 전부 통과.
+7. `scripts/browser-smoke-test.mjs` — 뷰포트별 루프 맨 앞에 `?id=cw`(shell 파라미터 없음)로 접속해도 `.renewal-shell`이 렌더되는지 확인하는 기본 URL 컷오버 검증 스텝 추가. 기존 `&shell=v2` 하드코딩 케이스들은 명시적 V2 요청이라 그대로 둬도 무해해서 유지.
+8. `scripts/firebase-safety-tests.mjs` — `buildAppViewUrl`의 낡은 기대값 1건(“shell 없으면 V1처럼 tab/sub 없는 URL”)이 새 기본 동작과 어긋나 실패하는 걸 발견해, 새 기본값(tab/sub 포함)을 기대하는 케이스로 교체하고 `shell=v1`일 때는 여전히 tab/sub 없이 나가는지 검증하는 케이스를 추가.
 
-**한 릴리스 동안 `?shell=v1` 유지 후** V1 트리/`withStickyVideo` 경로 제거는 별도 WP.
+검증: `npm run lint`, `npm run check:all`(lint+101 tests+isolation/design/live-source/보안/사이즈/아키텍처 가드), `npm run safety:test`, `npm run regression:test`(프로덕션 빌드) 전부 통과.
+
+**한 릴리스 동안 `?shell=v1` 유지** (사람이 Safari 실기기 + 크로스브라우저 확인 전까지 최소). 그 후 V1 트리/`withStickyVideo` 경로 제거는 별도 WP.
 
 ---
 
@@ -206,22 +209,25 @@ Phase 4는 Phase 1–3이 놓친 **더 근본적인 원인**이었다: `src/app.
    증상: 깨진 YAML이 `push` 이벤트마다 빨간 X. 해결은 파일 삭제 PR뿐 (#732, #733).
 2. **박스 MCP `create_or_update_file` / `push_files`로 대형 `app-main.js` 한 줄 교체 금지** — path 문자열이 본문으로 들어가 원격 브랜치가 오염됨. Mac에서 `git` + `gh`로만 푸시.
 3. **URL/데이터 규칙·캘린더 격리 깨기 금지** (`CLAUDE.md`, `scripts/check-calendar-isolation.mjs`).
-4. **다크 미완 상태에서 기본 shell 플래그 뒤집기 금지.**
+4. ~~다크 미완 상태에서 기본 shell 플래그 뒤집기 금지~~ → 다크 완료 + 사용자 지시로 컷오버 실행됨. **이제부터는 `?shell=v1` 탈출구를 사람이 Safari/크로스브라우저 확인 전까지 실수로 제거하지 말 것.**
 5. **NotificationOnboardingModal 부활 금지** (호출자 없음). 권한 도움말만 유지 (#734).
-6. V2 CSS와 컷오버 플래그를 **한 PR에 섞지 말 것.** 다크 PR은 CSS(+필요 시 최소 토큰 테스트)만.
+6. V2 CSS와 컷오버 플래그를 **한 PR에 섞지 말 것** (이번 컷오버 PR은 플래그·라우팅 로직 전용이고 CSS는 건드리지 않았음 — 이 규칙 유지). 다크/디자인 PR은 CSS(+필요 시 최소 토큰 테스트)만.
 
 ---
 
 ## 9. 다른 에이전트 작업 분담 가이드 (충돌 줄이기)
 
+**A(다크)·C(컷오버 플래그)는 완료됨.** 지금 남은 트랙:
+
 | 트랙 | 주 터치 파일 | 병행 가능? |
 | --- | --- | --- |
-| **A. 다크 재QA·잔여** (다음) | `src/app.css` `.renewal-shell*`, `src/ui/v2/**/*.css`, phase 테스트 | B와 `viewport-shell` 충돌 주의; C와 **절대 동시 금지** |
-| **B. Safari VV/채팅** | `viewport-shell.css`, `visual-viewport-sync.js`, 채팅 셸 JS | A와 `viewport-shell.css` 충돌 주의 — 순차 권장 |
-| **C. 컷오버 플래그** | `app-feature-flags.js`, `app-routing-state.js`, `ui-app-shell-v2.js` history, `app-main.js` 게이트, `index.html`, tests/smoke | **A·B 완료 후만** |
-| **D. 시안 패리티 유닛** | 화면별 `screens.js` / dest chrome (다크 하드코드 건드릴 때 A와 조율) | A 진행 중이면 하드코드 색 변경은 A에 맡길 것 |
+| ~~A. 다크 재QA·잔여~~ | — | **완료** |
+| **B. Safari VV/채팅 실기기 서명** (사람이 진행) | 문제 발견 시 `viewport-shell.css`, `visual-viewport-sync.js`, 채팅 셸 JS | 단독 진행 |
+| ~~C. 컷오버 플래그~~ | — | **완료** — `feat/v2-default-shell-cutover` |
+| **D. 시안 패리티 유닛** | 화면별 `screens.js` / dest chrome | 단독 진행 가능 |
+| **E. 크로스브라우저 스모크** | Whale/Edge/Firefox/Android Chrome 수동 확인, `scripts/browser-smoke-test.mjs` | B와 독립적으로 진행 가능 |
 
-권장 브랜치: `fix/v2-dark-tokens`, `fix/v2-safari-chat-vv`, `fix/v2-default-shell` (컷오버는 마지막).
+컷오버 자체는 끝났으므로, 앞으로 이 저장소를 만지는 에이전트는 **기본적으로 V2 코드(`src/ui/v2/**`, `src/ui/ui-app-shell-v2.js`)가 라이브 트래픽 전체가 보는 화면**임을 기억할 것 — 더 이상 "옵트인 프리뷰"가 아니다.
 
 검증 최소:
 
@@ -242,7 +248,7 @@ npm run check:all
 짧은 요약은 [`docs/V2-STATUS.md`](./V2-STATUS.md)에도 한 블록만 미러링한다.  
 유닛 완료 로그는 [`docs/v2-live-progress.md`](./v2-live-progress.md)에 append.
 
-컷오버가 끝나면 이 문서 상단 상태를 `DONE — default is V2; ?shell=v1` 또는 `DONE — V1 removed` 로 바꾸고, 제거 WP 링크를 남긴다.
+**상태: `DONE — default is V2; ?shell=v1` fallback.** V1 트리 제거(`DONE — V1 removed`)는 Safari 실기기 + 크로스브라우저 확인 후 별도 WP.
 
 ---
 
@@ -251,12 +257,15 @@ npm run check:all
 ```bash
 cd /Users/pyw31337/Developer/calendar   # 사용자 Mac 기준
 git fetch origin && git checkout main && git pull --ff-only
-# V2만:
-open 'https://pyw31337.github.io/calendar/?id=cw&shell=v2'
+# 기본(V2):
+open 'https://pyw31337.github.io/calendar/?id=cw'
+# V1 폴백:
+open 'https://pyw31337.github.io/calendar/?id=cw&shell=v1'
 # 게이트 확인:
-rg -n "isRenewalShellEnabled|shell === 'v2'|shell !== 'v1'" src/core src/ui/ui-app-shell-v2.js src/index.html
+rg -n "isRenewalShellEnabled|shell !== 'v1'" src/core src/ui/ui-app-shell-v2.js src/index.html
+node --test test/v2-routing.test.mjs
 # 다크 가드 + 잔여 라이트 표면:
-node --test test/v2-dark-tokens-phase1.test.mjs test/v2-dark-tokens-phase2.test.mjs test/v2-dark-tokens-phase3.test.mjs
+node --test test/v2-dark-tokens-phase1.test.mjs test/v2-dark-tokens-phase2.test.mjs test/v2-dark-tokens-phase3.test.mjs test/v2-dark-tokens-phase4.test.mjs test/v2-dark-tokens-guard.test.mjs
 grep -nE 'background(-color)?:\s*(#fff|#ffffff|#fafafc|white)\b' src/ui/v2/*.css src/app.css | head
 # 다크 강제: localStorage gather_theme_preference_cw_v1 = dark
 ```

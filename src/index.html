@@ -26,16 +26,19 @@
     <script>
       (function () {
         try {
-          // Production github.io stays v1 unless ?shell=v2. Local/preview smoke
-          // (127.0.0.1, localhost) must also stay on the requested shell.
+          // V2 is the default shell everywhere now (isRenewalShellEnabled: absent shell param
+          // = V2, `?shell=v1` is the escape hatch) -- this script no longer needs to force
+          // `shell=v2` itself, and MUST NOT touch the `shell` param at all, or it would silently
+          // clobber an explicit `?shell=v1` opt-out on non-github.io hosts. Its only remaining
+          // job is defaulting `id` for old bookmarked/shared links on custom domains that predate
+          // the `id`/`cal` param. Production github.io / local preview already carry an explicit
+          // `id`, so this only ever fires for other hosts.
           var host = String(location.hostname || '');
           if (host === 'pyw31337.github.io' || host === 'localhost' || host === '127.0.0.1' || host === '::1') return;
           var params = new URLSearchParams(location.search);
           var missingId = !params.get('id') && !params.get('cal');
-          var missingShell = params.get('shell') !== 'v2';
-          if (!missingId && !missingShell) return;
-          if (missingId) params.set('id', 'cw');
-          params.set('shell', 'v2');
+          if (!missingId) return;
+          params.set('id', 'cw');
           location.replace(location.pathname + '?' + params.toString() + location.hash);
         } catch (_) {}
       })();
