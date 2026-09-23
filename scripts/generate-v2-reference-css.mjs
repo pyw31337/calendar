@@ -31,5 +31,16 @@ for (const [name, scope, output] of [
       decl.value = decl.value.replace(/[a-zA-Z][\w-]*/g, word => animations.get(word) || word);
     }
   });
-  writeFileSync(`src/ui/v2/${output}`, `/* Generated from ${name}.dc.html. Run node scripts/generate-v2-reference-css.mjs. */\n${css.toString()}\n`);
+  let cssText = css.toString();
+  // Phase1 dark tokens: do not re-literal V1 theme surface/text tokens under .v2-*.
+  cssText = cssText.replace(
+    /(--(?:bg-primary|bg-card|border-subtle|text-main|text-muted|text-light|surface-success|surface-confirmed))\s*:\s*#[0-9A-Fa-f]+\s*;?/g,
+    '',
+  );
+  writeFileSync(
+    `src/ui/v2/${output}`,
+    `/* Generated from ${name}.dc.html. Run node scripts/generate-v2-reference-css.mjs. */\n` +
+      `/* Phase1 dark tokens: surface/text vars inherit from V1 :root[data-theme] — do not re-literal light resets. */\n` +
+      `${cssText}\n`,
+  );
 }

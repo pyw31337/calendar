@@ -9,7 +9,7 @@ html:has(.v2-design) body {
   max-height: 100%;
   overflow: hidden;
   overscroll-behavior: none;
-  background: #fafafc;
+  background: var(--bg-primary);
 }
 html:has(.v2-design) #root {
   height: 100%;
@@ -52,7 +52,7 @@ html:has(.v2-design) #root {
   min-height: 100% !important;
 }
 
-/* Calendar / bento home is <main class="bp-app-shell is-bento-home"> — NOT
+/* Calendar / bento home is <main class=\"bp-app-shell is-bento-home\"> — NOT
  * .renewal-shell-main. Document + shell overflow are locked for chat VV pinning,
  * so home must own a viewport-bounded scrollport or content below the fold is clipped.
  */
