@@ -1,0 +1,85 @@
+         setActiveLightbox: recordsContext?.mediaProps?.setActiveLightbox,
+         onMemoCommentsChange: recordsContext?.memoProps?.onMemoCommentsChange,
+         // HomeActivitySummary always passes the complete memo record.  Keep
+@@ -1355,17 +1396,46 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
+     return selected;
+   }, [memoItems]);
+   const photoItems = calendarContext?.galleryPhotoIndex?.items;
+-  const photos = React.useMemo(() => (Array.isArray(photoItems)
+-    ? photoItems
+-      .filter(photo => !isMemeKeyboardPhotoEntry(photo))
+-      .slice()
+-      .sort((a, b) => {
+-        const aTime = timestampMs(a?.timestamp ?? a?.createdAt ?? a?.updatedAt ?? a?.uploadedAt ?? a?.messageTimestamp);
+-        const bTime = timestampMs(b?.timestamp ?? b?.createdAt ?? b?.updatedAt ?? b?.uploadedAt ?? b?.messageTimestamp);
+-        return bTime - aTime || String(b?.id || b?.mediaKey || '').localeCompare(String(a?.id || a?.mediaKey || ''));
+-      })
+-      .slice(0, 9)
+-    : []), [photoItems]);
++  const photoIndexStatus = calendarContext?.galleryPhotoIndex?.status;
++  const photoIndexLoading = !!calendarContext?.galleryPhotoIndex?.loading;
++  const [brokenThumbUrls, setBrokenThumbUrls] = React.useState(() => new Set());
++  const markBrokenThumb = React.useCallback((...urls) => {
++    setBrokenThumbUrls(prev => {
++      let changed = false;
++      const next = new Set(prev);
++      urls.flat().forEach(url => {
++        const key = String(url || '').trim();
++        if (!key || next.has(key)) return;
++        next.add(key);
++        changed = true;
++        try {
++          window.GATHER_APP_UTILS?.savePersistentBrokenPhotoUrl?.(key);
++        } catch (_) { /* ignore */ }
++      });
++      return changed ? next : prev;
++    });
++  }, []);
++  const isBrokenThumb = React.useCallback(url => {
++    const key = String(url || '').trim();
++    if (!key) return true;
++    if (brokenThumbUrls.has(key)) return true;
++    try {
++      const persistent = window.GATHER_APP_UTILS?.getPersistentBrokenPhotoUrls?.();
++      if (persistent && typeof persistent.has === 'function' && persistent.has(key)) return true;
++    } catch (_) { /* ignore */ }
++    return false;
++  }, [brokenThumbUrls]);
++  const homeGalleryStrip = React.useMemo(
++    () => resolveHomeGalleryStripState({
++      items: photoItems,
++      status: photoIndexStatus,
++      loading: photoIndexLoading,
++      limit: 9,
++      isBroken: isBrokenThumb,
++    }),
++    [photoItems, photoIndexStatus, photoIndexLoading, isBrokenThumb]
++  );
++  const photos = homeGalleryStrip.photos;
+   const placeItems = calendarContext?.places;
+   const places = React.useMemo(
+     () => (Array.isArray(placeItems) ? latestRows(placeItems).slice(0, 2) : []),
+@@ -1642,30 +1712,56 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
+       })) : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '최근 메모가 없습니다.')
+     ),
+     React.createElement(HomeSummarySection, { title: '갤러리', kind: 'gallery', delay: '0.16s', onMore: () => onChangeView?.('gallery') },
+-      photos.length ? React.createElement('div', { className: bentoClass('renewal-home-photo-strip thumb-grid') }, photos.map((photo, i) => React.createElement('button', {
+-        type: 'button',
+-        className: bentoClass(`thumb ${photo.commentCount > 0 ? 'gallery-comment-heartbeat' : ''}`.trim()),
+-        key: photo.id || photo.mediaKey || i,
+-        onClick: () => calendarContext.setActiveLightbox?.(photoLightbox(photo, photos)),
+-        style: photo.commentCount > 0 ? galleryCommentMotion(photo, i) : undefined,
+-        'aria-label': `사진 ${i + 1} 크게 보기`
+-      },
+-        React.createElement('img', {
+-          src: photo.thumb || photo.thumbnailUrl || photo.thumbUrl || photo.full || photo.url || photo.imageUrl || photo.downloadURL,
+-          alt: '',
+-          loading: 'lazy',
+-          decoding: 'async',
+-          onError: e => {
+-            const fb = photo.full || photo.url || photo.imageUrl || photo.downloadURL;
+-            if (fb && e.currentTarget.src !== fb) {
+-              e.currentTarget.src = fb;
+-            } else {
+-              e.currentTarget.style.opacity = '0';
+-            }
