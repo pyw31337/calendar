@@ -819,7 +819,7 @@ export function PlacesScreen(p) {
                   planned &&
                     h(
                       'span',
-                      { className: 'bp-place-tag', style: { background: '#f3eeff', color: '#7c3aed' } },
+                      { className: 'bp-place-tag', style: { background: 'var(--brand-soft, #f3eeff)', color: 'var(--brand, #7c3aed)' } },
                       '방문예정'
                     )
                 ),
