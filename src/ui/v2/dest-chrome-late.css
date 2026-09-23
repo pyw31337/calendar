@@ -3960,8 +3960,8 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .
 }
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-dday-compact,
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-dday-chip,
-html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-icon-btn,
-html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-renewal-shell-header-icon-btn {
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-icon-btn:not(.bp-hero-plain-icon-btn),
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-renewal-shell-header-icon-btn:not(.bp-hero-plain-icon-btn) {
   background: rgba(0, 0, 0, 0.28) !important;
   border-color: rgba(34, 197, 94, 0.38) !important;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 6px 18px rgba(0, 0, 0, 0.35) !important;
