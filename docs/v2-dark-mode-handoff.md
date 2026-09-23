@@ -1,8 +1,8 @@
 # V2 다크모드 토큰 핸드오프
 
 **독자:** Grok / Codex / Claude / Gemini / 사람  
-**최종 갱신:** 2026-09-23 (Claude, `main` @ `7dd6d374` 기준, Phase 4 픽스 완료 — PR 대기)  
-**상태 한 줄:** 라이브 다크 재QA로 **핵심 원인 1건 발견·수정**: `src/app.css`의 `.renewal-shell` "V2 reference parity" 블록이 `--renewal-bg/card/text/muted`를 하드코딩 라이트 값으로 재정의해 모든 V2 페이지(채팅/메모/장소/정산/갤러리/컨텐츠/보관함) 헤더 타이틀·카드 제목·라벨 텍스트가 다크에서 거의 안 보였음 → 테마 토큰으로 되돌림(Phase 4). 로컬 빌드로 8개 화면 전부 재확인 완료. **기본 URL 컷오버 여전히 금지** — 이 PR 머지·라이브 배포 후 다시 한 번 최종 재QA 권장.
+**최종 갱신:** 2026-09-23 (Claude, PR #741, 로컬+라이브 프리뷰 재QA 완료)  
+**상태 한 줄:** 라이브 다크 재QA로 **핵심 원인 1건 발견·수정**: `src/app.css`의 `.renewal-shell` "V2 reference parity" 블록이 `--renewal-bg/card/text/muted`를 하드코딩 라이트 값으로 재정의해 모든 V2 페이지(채팅/메모/장소/정산/갤러리/컨텐츠/보관함) 헤더 타이틀·카드 제목·라벨 텍스트가 다크에서 거의 안 보였음 → 테마 토큰으로 되돌림(Phase 4, PR #741). 로컬 빌드 + **PR #741의 GitHub Pages 프리뷰 라이브 배포본** 양쪽에서 8개 화면 전부 재확인 완료 (정산 "카테고리별 지출" 라벨 computed color `rgb(241,245,249)` 확인). PR은 ready-for-review 상태, 머지 대기. **기본 URL 컷오버 여전히 금지** — 머지 후 남은 건 Confirm/토스트/알림헬프 모달 다크 QA와 Safari 채팅 VV.
 
 컷오버 전체 계획: [`docs/v2-default-cutover-handoff.md`](./v2-default-cutover-handoff.md)  
 짧은 현황: [`docs/V2-STATUS.md`](./V2-STATUS.md)
@@ -71,20 +71,21 @@
 
 ## 3. 지금 할 일 (우선순위)
 
-### P0 — Phase 4 PR 머지 + 라이브 재QA (다음 에이전트가 시작할 지점)
+### P0 — PR #741 머지 확인 + 남은 잔여 QA (다음 에이전트가 시작할 지점)
 
-Phase 4는 로컬 빌드로만 검증됨 (이 샌드박스는 라이브 Firestore 접근이 간헐적으로만 되어 `?id=cw&shell=v2` 라이브 배포본 재QA를 끝까지 못 함). 다음 순서:
+Phase 4는 로컬 빌드와 PR #741의 GitHub Pages 프리뷰(라이브 배포본) 양쪽에서 8개 화면 재확인까지 끝났다. 남은 건:
 
-1. Phase 4 PR 머지 → GitHub Pages 배포 대기.
-2. `?id=cw&shell=v2` + localStorage dark + reload로 8개 화면 재스크린샷, Phase 4 수정이 라이브에도 반영됐는지 확인 (§2 표와 대조).
-3. 아직 밝은 게 남아있으면 DevTools로 **이긴 규칙** 찾기. 흔한 범인 (Phase 4로 가장 큰 원인은 잡았지만 남아있을 수 있는 것):
+1. PR #741이 머지됐는지, `main` 기준 라이브(`https://pyw31337.github.io/calendar/?id=cw&shell=v2`)에 반영됐는지 확인.
+2. Confirm·토스트·알림헬프 모달도 다크에서 스크린샷 확인 (Phase 4 QA에서는 8개 페이지 본문만 보고 이건 아직 못 봄).
+3. 홈 화면 "모임확정" 플로팅 카드 등, Phase 1–3 이전 기록(§2 하단 과거 기록 표)에 있던 항목이 실제로 다 해결됐는지 한 번 더 눈으로 확인.
+4. 그래도 아직 밝은 표면이 남아있으면 DevTools로 **이긴 규칙** 찾기. 흔한 범인 (Phase 4로 가장 큰 원인은 잡았지만 남아있을 수 있는 것):
    - `src/app.css`에 `--renewal-*` 처럼 **다른 CSS 변수를 재정의하는 블록**이 소스 순서상 늦게 나오면서 앞선 테마 인식 정의를 덮는 패턴 (Phase 4가 잡은 것과 동일 유형) — `grep -n "^\s*--[a-z-]*:\s*#" src/app.css` 로 훑어볼 것
    - 인라인 `style={{ backgroundColor: '#fff' }}` / `background: white`
    - `var(--bg-card, #fff)` 폴백 (토큰 미정의 시)
    - `color-mix(..., #fff)` / `background: white` 키워드
    - V1 컴포넌트 하드코드 (`confirmed-meeting-card` 등 — 일부는 `:root[data-theme="dark"]` 오버라이드 있음)
-4. Confirm·토스트·알림헬프 모달도 다크에서 스크린샷 확인 (이번 Phase 4 QA에서는 못 봄).
 5. 픽스는 **작은 PR**, CSS(+가드 테스트)만. 컷오버 플래그 금지.
+6. 다크 P0가 다 끝나면 **Safari 모바일 채팅** P0로 넘어갈 것 (아래).
 
 ### P0 — Safari 모바일 채팅 (다크와 병행 가능하나 viewport 파일 충돌 주의)
 
