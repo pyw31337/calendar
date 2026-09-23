@@ -2790,7 +2790,7 @@ export function ContentView({
         // 쓰지만, AnniversaryModal에서 직접 첨부한 사진은 a.photos 배열(url/thumbUrl)에 저장되어
         // a.image는 항상 비어 있다. a.image가 없을 때는 첫 번째 첨부 사진으로 대체해야
         // 사용자가 직접 올린 사진이 있는데도 "포스터 없음"으로 나오는 걸 막을 수 있다.
-        image: a.image || (Array.isArray(a.photos) && a.photos[0] ? (a.photos[0].thumbUrl || a.photos[0].url || '') : '')
+        image: culturePosterUrl(a)
       }));
   }, [anniversaries]);
 
@@ -2804,19 +2804,31 @@ export function ContentView({
   // "Maximum update depth exceeded" and continuous CPU/battery drain with no other visible symptom,
   // which is exactly why it went unnoticed).
   const performanceExtraItems = React.useMemo(
-    () => [...selfAuthoredCultureItems.filter(i => getCultureItemKind(i) === 'performance'), ...(customCultureItems || []).filter(i => getCultureItemKind(i) === 'performance')],
+    () => dedupeCultureExtras([
+      ...selfAuthoredCultureItems.filter(i => getCultureItemKind(i) === 'performance'),
+      ...(customCultureItems || []).filter(i => getCultureItemKind(i) === 'performance')
+    ]),
     [selfAuthoredCultureItems, customCultureItems]
   );
   const festivalExtraItems = React.useMemo(
-    () => [...selfAuthoredCultureItems.filter(i => getCultureItemKind(i) === 'festival'), ...(customCultureItems || []).filter(i => getCultureItemKind(i) === 'festival')],
+    () => dedupeCultureExtras([
+      ...selfAuthoredCultureItems.filter(i => getCultureItemKind(i) === 'festival'),
+      ...(customCultureItems || []).filter(i => getCultureItemKind(i) === 'festival')
+    ]),
     [selfAuthoredCultureItems, customCultureItems]
   );
   const sportsExtraItems = React.useMemo(
-    () => [...selfAuthoredCultureItems.filter(i => getCultureItemKind(i) === 'sports'), ...(customCultureItems || []).filter(i => getCultureItemKind(i) === 'sports')],
+    () => dedupeCultureExtras([
+      ...selfAuthoredCultureItems.filter(i => getCultureItemKind(i) === 'sports'),
+      ...(customCultureItems || []).filter(i => getCultureItemKind(i) === 'sports')
+    ]),
     [selfAuthoredCultureItems, customCultureItems]
   );
   const movieExtraItems = React.useMemo(
-    () => [...selfAuthoredCultureItems.filter(i => getCultureItemKind(i) === 'movie'), ...(customCultureItems || []).filter(i => getCultureItemKind(i) === 'movie')],
+    () => dedupeCultureExtras([
+      ...selfAuthoredCultureItems.filter(i => getCultureItemKind(i) === 'movie'),
+      ...(customCultureItems || []).filter(i => getCultureItemKind(i) === 'movie')
+    ]),
     [selfAuthoredCultureItems, customCultureItems]
   );
 
@@ -3593,12 +3605,73 @@ function filterCultureItemsByRegion(items, regionSelections, category) {
   }));
 }
 
+function culturePosterUrl(item) {
+  if (!item || typeof item !== 'object') return '';
+  const photos = Array.isArray(item.photos) ? item.photos : [];
+  const photo = photos.find(entry => entry && (entry.thumbUrl || entry.url || entry.imageUrl || entry.image)) || null;
+  const candidates = [
+    item.thumbUrl,
+    item.image,
+    item.imageUrl,
+    item.posterUrl,
+    item.poster,
+    item.thumbnailUrl,
+    photo && (photo.thumbUrl || photo.url || photo.imageUrl || photo.image)
+  ];
+  for (const value of candidates) {
+    const url = String(value || '').trim();
+    if (url && url !== 'undefined' && url !== 'null') return url;
+  }
+  return '';
+}
+
+function mergeCultureItemPreferPoster(base, overlay) {
+  const poster = culturePosterUrl(overlay) || culturePosterUrl(base);
+  const merged = { ...(base || {}), ...(overlay || {}) };
+  if (poster) {
+    merged.image = poster;
+    if (!merged.imageUrl) merged.imageUrl = poster;
+    if (!merged.thumbUrl) merged.thumbUrl = poster;
+  }
+  return merged;
+}
+
+// Anniversary-derived cards and a later custom save of the same event used to
+// both render. The anniversary card has no poster, so it covered the upload.
+function dedupeCultureExtras(items) {
+  const records = [];
+  const idIndex = new Map();
+  const titleIndex = new Map();
+  (Array.isArray(items) ? items : []).forEach(item => {
+    if (!item) return;
+    const title = String(item.title || '').trim();
+    const id = item.id ? String(item.id) : '';
+    const index = (id && idIndex.has(id)) ? idIndex.get(id)
+      : (title && titleIndex.has(title) ? titleIndex.get(title) : -1);
+    if (index < 0) {
+      const next = records.length;
+      const poster = culturePosterUrl(item);
+      records.push(poster ? { ...item, image: poster } : item);
+      if (id) idIndex.set(id, next);
+      if (title) titleIndex.set(title, next);
+      return;
+    }
+    const merged = mergeCultureItemPreferPoster(records[index], item);
+    records[index] = merged;
+    const mergedId = merged && merged.id ? String(merged.id) : '';
+    if (id) idIndex.set(id, index);
+    if (mergedId) idIndex.set(mergedId, index);
+    if (title) titleIndex.set(title, index);
+  });
+  return records;
+}
+
 // Crawled snapshot + same-titled extras de-dupe (orphans omitted -- they only exist after the
 // active tab has loaded anniversaries against that feed). Used for cross-tab search badges so
 // ContentView can score every tab without mounting four CulturePerformancesTab instances.
 function mergeCultureCrawledWithExtras(crawledItems, extraItems) {
   const crawled = Array.isArray(crawledItems) ? crawledItems.filter(Boolean) : [];
-  const extrasRaw = (Array.isArray(extraItems) ? extraItems.filter(Boolean) : []);
+  const extrasRaw = dedupeCultureExtras(Array.isArray(extraItems) ? extraItems.filter(Boolean) : []);
   const extrasById = new Map();
   const extrasByTitle = new Map();
   extrasRaw.forEach(e => {
@@ -3622,13 +3695,7 @@ function mergeCultureCrawledWithExtras(crawledItems, extraItems) {
     const custom = extrasById.get(i.id) || (title ? extrasByTitle.get(title) : null);
     if (custom) {
       if (custom.id) usedExtraIds.add(custom.id);
-      result.push({
-        ...i,
-        ...custom,
-        id: custom.id || i.id,
-        image: custom.image || i.image || '',
-        isCustomRegistered: true
-      });
+      result.push(mergeCultureItemPreferPoster({ ...i, isCustomRegistered: true }, custom));
     } else {
       result.push(i);
     }
@@ -3860,7 +3927,7 @@ function ContentRegisterModal({ calendar = null, onClose, onSave, showToast = nu
     setKind(['festival', 'sports', 'movie'].includes(nextKind) ? nextKind : 'performance');
     setTitle(initialItem.title || ''); setStartDate(initialItem.releaseDate || initialItem.startDate || '');
     setEndDate(initialItem.endDate || ''); setVenue(initialItem.venue || ''); setAddress(initialItem.address || '');
-    setLink(initialItem.link || ''); setDescription(initialItem.description || ''); setImage(initialItem.image || '');
+    setLink(initialItem.link || ''); setDescription(initialItem.description || ''); setImage(culturePosterUrl(initialItem));
     setPrice(initialItem.price || ''); setContact(initialItem.contact || ''); setDirector(initialItem.director || '');
     setCast(Array.isArray(initialItem.cast) ? initialItem.cast.join(', ') : (initialItem.cast || ''));
     setRating(initialItem.ageRating || ''); setAudience(initialItem.audienceCount || ''); setBookingRate(initialItem.bookingRate || '');
@@ -3879,7 +3946,7 @@ function ContentRegisterModal({ calendar = null, onClose, onSave, showToast = nu
     setAddress(item.address || '');
     setLink(item.link || '');
     setDescription(item.description || '');
-    setImage(item.image || '');
+    setImage(culturePosterUrl(item));
     setPrice(item.price || '');
     setContact(item.contact || '');
     setDirector(item.director || '');
@@ -4075,6 +4142,7 @@ function ContentRegisterModal({ calendar = null, onClose, onSave, showToast = nu
     const stamp = Date.now();
     const idPrefixByKind = { festival: 'custom_fest_', sports: 'custom_sport_', movie: 'custom_movie_' };
     const prefix = idPrefixByKind[kind] || 'custom_perf_';
+    const poster = String(image || '').trim();
     const id = initialItem?.id || (prefix + stamp + '_' + Math.random().toString(36).slice(2, 8));
     const normalizedKind = ['festival', 'sports', 'movie'].includes(kind) ? kind : 'performance';
     const item = {
@@ -4088,7 +4156,9 @@ function ContentRegisterModal({ calendar = null, onClose, onSave, showToast = nu
       address: (address || '').trim(),
       link: (link || '').trim(),
       description: (description || '').trim(),
-      image: (image || '').trim(),
+      image: poster,
+      imageUrl: poster,
+      thumbUrl: poster,
       price: (price || '').trim(),
       contact: (contact || '').trim(),
       source: initialItem?.source || 'custom',
@@ -4328,7 +4398,7 @@ function ContentRegisterModal({ calendar = null, onClose, onSave, showToast = nu
         )),
         field("이미지 URL (선택)", /*#__PURE__*/React.createElement("input", {
           className: "form-input", type: "url", value: image, onChange: e => setImage(e.target.value),
-          placeholder: "https://", maxLength: 2000
+          placeholder: "https://", maxLength: 8000
         })),
         /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' } },
           field("가격 / 요금", /*#__PURE__*/React.createElement("input", {
@@ -4685,7 +4755,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
   // render one card per real-world event.
   const mergedItems = React.useMemo(() => {
     if (items === null) return null;
-    const extrasRaw = (Array.isArray(extraItems) ? extraItems.filter(Boolean) : []);
+    const extrasRaw = dedupeCultureExtras(Array.isArray(extraItems) ? extraItems.filter(Boolean) : []);
     const extrasById = new Map();
     const extrasByTitle = new Map();
     extrasRaw.forEach(e => {
@@ -4710,7 +4780,13 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
       if (!o || !o.id || usedExtraIds.has(o.id)) return;
       const title = String(o.title || '').trim();
       if (title && (items || []).some(i => i && String(i.title || '').trim() === title)) return;
-      result.push({ ...o, isCustomRegistered: true });
+      const existingIdx = title ? result.findIndex(entry => String(entry && entry.title || '').trim() === title) : -1;
+      if (existingIdx >= 0) {
+        result[existingIdx] = mergeCultureItemPreferPoster(result[existingIdx], o);
+        usedExtraIds.add(o.id);
+        return;
+      }
+      result.push({ ...o, image: culturePosterUrl(o), isCustomRegistered: true });
       usedExtraIds.add(o.id);
     });
 
@@ -4720,13 +4796,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
       const custom = extrasById.get(i.id) || (title ? extrasByTitle.get(title) : null);
       if (custom) {
         if (custom.id) usedExtraIds.add(custom.id);
-        result.push({
-          ...i,
-          ...custom,
-          id: custom.id || i.id,
-          image: custom.image || i.image || '',
-          isCustomRegistered: true
-        });
+        result.push(mergeCultureItemPreferPoster({ ...i, isCustomRegistered: true }, custom));
       } else {
         result.push(i);
       }
@@ -4965,6 +5035,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
           && cultureItemDay(item) <= todayIsoLocal()
           && (!item.endDate || item.endDate >= todayIsoLocal());
         const posterDateText = item.dateLabel || formatCultureDateLabel(item.startDate, item.endDate) || (item.releaseDate ? `${item.releaseDate} 개봉` : CULTURE_MISSING_LABEL);
+        const posterUrl = culturePosterUrl(item);
         const posterDateParts = !isMovieCard && String(posterDateText).match(/^(.*?\([^)]*\))\s*[·•]?\s*(\d{1,2}:\d{2})\s*$/);
         return /*#__PURE__*/React.createElement("button", {
           key: item.id,
@@ -4989,10 +5060,25 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
             // so every one 404s -- reveals this placeholder underneath once onError hides the
             // <img>, instead of leaving a blank box with nothing in it.
             /*#__PURE__*/React.createElement("div", { style: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 'var(--font-size-sm)' } }, "포스터 없음"),
-            item.image && /*#__PURE__*/React.createElement("img", {
-              src: item.image, alt: item.title, loading: 'lazy', decoding: 'async',
+            posterUrl && /*#__PURE__*/React.createElement("img", {
+              src: posterUrl, alt: item.title, loading: 'lazy', decoding: 'async',
               style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' },
-              onError: e => { e.currentTarget.style.display = 'none'; }
+              onError: e => {
+                const img = e.currentTarget;
+                if (!img || img.dataset.posterFallback === '1') {
+                  if (img) img.style.display = 'none';
+                  return;
+                }
+                const next = [item.imageUrl, item.thumbUrl, item.image]
+                  .map(value => String(value || '').trim())
+                  .find(value => value && value !== img.src);
+                if (next) {
+                  img.dataset.posterFallback = '1';
+                  img.src = next;
+                  return;
+                }
+                img.style.display = 'none';
+              }
             }),
             isMovieNowShowing && /*#__PURE__*/React.createElement("span", {
               style: {
@@ -5142,7 +5228,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
               backgroundColor: 'rgba(0,0,0,0.45)', color: '#fff', fontSize: '18px', lineHeight: 1
             }
           }, PencilIcon ? /*#__PURE__*/React.createElement(PencilIcon, { size: 14 }) : "✎"),
-          selected.image && /*#__PURE__*/React.createElement("div", {
+          culturePosterUrl(selected) && /*#__PURE__*/React.createElement("div", {
             role: (anniversaryCategory === 'movie' || selected.genre === 'movie') ? 'button' : undefined,
             tabIndex: (anniversaryCategory === 'movie' || selected.genre === 'movie') ? 0 : undefined,
             onClick: (anniversaryCategory === 'movie' || selected.genre === 'movie') ? () => openMovieVideoSearch(selected) : undefined,
@@ -5151,7 +5237,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
             style: { position: 'relative', width: '100%', flexShrink: 0, cursor: (anniversaryCategory === 'movie' || selected.genre === 'movie') ? 'pointer' : 'default' }
           },
             /*#__PURE__*/React.createElement("img", {
-              src: selected.image, alt: selected.title, loading: 'lazy',
+              src: culturePosterUrl(selected), alt: selected.title, loading: 'lazy',
               style: { width: '100%', maxHeight: '260px', objectFit: 'contain', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)', display: 'block' },
               onError: e => { e.currentTarget.style.display = 'none'; }
             }),
@@ -5438,8 +5524,8 @@ function SharedContentPreviewModal({ item, onClose }) {
             backgroundColor: 'rgba(0,0,0,0.45)', color: '#fff'
           }
         }, SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 18 }) : "✕"),
-        item.image && /*#__PURE__*/React.createElement("img", {
-          src: item.image, alt: item.title, loading: 'lazy',
+        culturePosterUrl(item) && /*#__PURE__*/React.createElement("img", {
+          src: culturePosterUrl(item), alt: item.title, loading: 'lazy',
           style: { width: '100%', maxHeight: '260px', objectFit: 'contain', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-primary)', flexShrink: 0 },
           onError: e => { e.currentTarget.style.display = 'none'; }
         }),

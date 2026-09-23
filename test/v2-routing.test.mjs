@@ -151,8 +151,10 @@ test('V2 PC polish keeps wider rail, fluid content, 3x3 gallery, and participant
   assert.match(shell, /day-head-row/);
   assert.match(shell, /day-meeting-pill/);
   assert.match(shell, /computeFestivalBars/);
-  assert.match(shell, /festival-bar-desktop/);
-  assert.match(shell, /festival-bar-mobile/);
+  assert.match(shell, /ann-range/);
+  assert.match(shell, /is-start/);
+  assert.match(shell, /is-mid/);
+  assert.match(shell, /rowRangeDepth/);
   assert.match(shell, /chat-bubble-modules/);
   assert.match(shell, /ChatBubbleFrame/);
   // 모임확정 stays --cal-schedule. Anniversary bars use per-category colors,

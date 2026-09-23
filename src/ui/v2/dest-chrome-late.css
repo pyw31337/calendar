@@ -3532,3 +3532,132 @@ html:has(.renewal-shell.v2-design) .bp-dday-participant-memo-name {
   padding: 4px 10px !important;
   box-sizing: border-box !important;
 }
+
+/* 연일 bars live inside the day cell, on a shared bottom lane.
+   A grid-sibling bar was what slipped into the row gutter and collapsed
+   to a dash at the start of the next cell. */
+html:has(.renewal-shell.v2-design) .bp-cal-days-grid > .festival-bar-desktop,
+html:has(.renewal-shell.v2-design) .bp-cal-days-grid > .festival-bar-mobile {
+  display: none !important;
+}
+html:has(.renewal-shell.v2-design) .bp-day-cell {
+  position: relative !important;
+  overflow: visible !important;
+}
+html:has(.renewal-shell.v2-design) .bp-day-cell[style*="--ann-lanes"] {
+  padding-bottom: calc(var(--ann-lanes) * (var(--ann-bar-h) + var(--ann-bar-gap)) + 4px) !important;
+}
+html:has(.renewal-shell.v2-design) .bp-day-cell .bp-day-bar-stack .bp-day-anniversary.bp-solo {
+  width: 100% !important;
+  align-self: stretch !important;
+  margin-bottom: 0 !important;
+}
+html:has(.renewal-shell.v2-design) .bp-ann-range {
+  position: absolute !important;
+  top: auto !important;
+  height: var(--ann-bar-h) !important;
+  min-height: var(--ann-bar-h) !important;
+  max-height: var(--ann-bar-h) !important;
+  bottom: calc(var(--ann-level, 0) * (var(--ann-bar-h) + var(--ann-bar-gap)) + 3px) !important;
+  margin: 0 !important;
+  padding: 0 4px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  box-sizing: border-box !important;
+  background: var(--ann-c, var(--ann-birthday)) !important;
+  color: #fff !important;
+  overflow: hidden !important;
+  z-index: 2 !important;
+  pointer-events: none !important;
+  border: 0 !important;
+  width: auto !important;
+}
+html:has(.renewal-shell.v2-design) .bp-ann-range.bp-is-single {
+  left: 3px !important;
+  right: 3px !important;
+  border-radius: 999px !important;
+}
+html:has(.renewal-shell.v2-design) .bp-ann-range.bp-is-start {
+  left: 3px !important;
+  right: -1px !important;
+  border-radius: 999px 0 0 999px !important;
+}
+html:has(.renewal-shell.v2-design) .bp-ann-range.bp-is-end {
+  left: -1px !important;
+  right: 3px !important;
+  border-radius: 0 999px 999px 0 !important;
+}
+html:has(.renewal-shell.v2-design) .bp-ann-range.bp-is-mid {
+  left: -1px !important;
+  right: -1px !important;
+  border-radius: 0 !important;
+}
+html:has(.renewal-shell.v2-design) .bp-ann-range .bp-day-anniversary-label {
+  display: none !important;
+}
+@media (min-width: 460px) {
+  html:has(.renewal-shell.v2-design) .bp-ann-range.bp-is-single {
+    border-radius: 4px !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-ann-range.bp-is-start {
+    border-radius: 4px 0 0 4px !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-ann-range.bp-is-end {
+    border-radius: 0 4px 4px 0 !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-ann-range.bp-cat-birthday {
+    background: color-mix(in srgb, var(--ann-birthday) 22%, var(--bg-card)) !important;
+    color: var(--ann-birthday) !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-ann-range.bp-cat-event {
+    background: color-mix(in srgb, var(--ann-event) 22%, var(--bg-card)) !important;
+    color: var(--ann-event) !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-ann-range.bp-cat-festival {
+    background: color-mix(in srgb, var(--ann-festival) 28%, var(--bg-card)) !important;
+    color: #b45309 !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-ann-range.bp-cat-sports {
+    background: color-mix(in srgb, var(--ann-sports) 22%, var(--bg-card)) !important;
+    color: var(--ann-sports) !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-ann-range.bp-cat-movie {
+    background: color-mix(in srgb, var(--ann-movie) 22%, var(--bg-card)) !important;
+    color: var(--ann-movie) !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-ann-range.bp-cat-travel,
+  html:has(.renewal-shell.v2-design) .bp-ann-range.bp-cat-trip {
+    background: color-mix(in srgb, var(--ann-travel) 22%, var(--bg-card)) !important;
+    color: #047857 !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-ann-range.bp-cat-other,
+  html:has(.renewal-shell.v2-design) .bp-ann-range.bp-cat-custom {
+    background: color-mix(in srgb, var(--ann-c, var(--ann-other)) 22%, var(--bg-card)) !important;
+    color: var(--ann-c, var(--ann-other)) !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-ann-range.bp-has-label .bp-day-anniversary-label {
+    display: block !important;
+    color: inherit !important;
+    font-size: 0.62rem !important;
+    font-weight: 700 !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-width: 100% !important;
+  }
+}
+
+html:has(.renewal-shell.v2-design) .culture-items-grid > button > div:first-child {
+  flex: 0 0 auto !important;
+  width: 100% !important;
+  aspect-ratio: 3 / 4 !important;
+}
+html:has(.renewal-shell.v2-design) .culture-items-grid > button > div:first-child > img {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
