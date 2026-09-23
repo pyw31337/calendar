@@ -6,6 +6,7 @@ import { composeGalleryPhotos, collectMemoryPhotoIdentityKeys, isMemoryPhotoExcl
 import { resolveGalleryLightboxTags } from '../core/photo-index.js';
 import { useScrollHideHeader } from '../core/use-scroll-hide-header.js';
 import { CapsuleTextBadge } from './ui-widgets.js';
+import { TABLER_ICONS } from './v2/tabler-icons.js';
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -2723,13 +2724,6 @@ export function ContentView({
   const [searchQuery, setSearchQuery] = React.useState('');
   const [isContentRegisterOpen, setIsContentRegisterOpen] = React.useState(false);
   const [editingContentItem, setEditingContentItem] = React.useState(null);
-  // v2 shell (PC): side-nav's per-tab submenu needs 컨텐츠 등록 -- otherwise only reachable via
-  // this component's own asPage 메뉴 overlay, which v2 always redirects to the side-nav drawer.
-  React.useEffect(() => {
-    if (typeof onRegisterMenuActions !== 'function') return undefined;
-    onRegisterMenuActions({ register: () => { setEditingContentItem(null); setIsContentRegisterOpen(true); } });
-    return () => onRegisterMenuActions(null);
-  }, [onRegisterMenuActions]);
   const CONTENT_TAB_STORAGE_KEY = 'gather_content_tab';
   const VALID_CONTENT_TABS = ['festival', 'culture', 'sports', 'movies'];
   const [contentTab, setContentTab] = React.useState(() => {
@@ -2873,6 +2867,17 @@ export function ContentView({
     setGridCols(next);
     try { localStorage.setItem(CULTURE_GRID_COLS_STORAGE_KEY, next); } catch (_) { /* best-effort */ }
   };
+  // v2 page header: 지역설정 / 컨텐츠등록 / 그리드·리스트 토글
+  React.useEffect(() => {
+    if (typeof onRegisterMenuActions !== 'function') return undefined;
+    onRegisterMenuActions({
+      register: () => { setEditingContentItem(null); setIsContentRegisterOpen(true); },
+      openRegion: () => setIsRegionFilterOpen(true),
+      setGridCols: persistGridCols,
+      gridCols
+    });
+    return () => onRegisterMenuActions(null);
+  }, [onRegisterMenuActions, gridCols]);
   const handleUseCurrentLocation = () => {
     if (isLocating) return;
     setIsLocating(true);
@@ -3090,6 +3095,21 @@ export function ContentView({
     )
   );
 
+  const regionBadgesOnly = regionSelections.length > 0 ? /*#__PURE__*/React.createElement("div", {
+    className: "region-selection-badges-row"
+  },
+    regionSelections.map((sel, idx) => /*#__PURE__*/React.createElement(RegionSelectionBadge, {
+      key: `${sel.sido}::${sel.gugun}`,
+      sel,
+      onRemove: () => removeRegionSelection(idx)
+    })),
+    /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "region-filter-reset-btn",
+      onClick: resetRegionSelections
+    }, "초기화")
+  ) : null;
+
   const contentHeaderStackEl = /*#__PURE__*/React.createElement("div", {
     ref: headerStackRef,
     className: "history-header-stack",
@@ -3184,7 +3204,7 @@ export function ContentView({
         regionSelections, onItemsLoaded: setRegionFilterItems,
         chipRowSlot, contentPaddingTop, onScroll: handleContentScroll,
         gridCols, focusItemId, focusTitle, searchQuery, onEditContent: openContentEditor,
-        topToolbar: v2Embed ? regionFilterToolbar : null,
+        topToolbar: v2Embed ? regionBadgesOnly : null,
         ...cfg
       }) : null;
     })(),
@@ -3420,14 +3440,17 @@ export function RegionFilterBackdrop({ isOpen, onClose, selections = [], onAdd, 
   };
 
   const sheet = /*#__PURE__*/React.createElement("div", {
-    className: "bottom-sheet-overlay",
+    className: "modal-overlay region-filter-overlay",
     onClick: e => { e.stopPropagation(); onClose(); }
   }, /*#__PURE__*/React.createElement("div", {
-    className: "bottom-sheet region-filter-sheet",
+    className: "modal-container region-filter-sheet",
+    role: "dialog",
+    "aria-modal": "true",
+    "aria-label": "지역 설정",
     onClick: e => e.stopPropagation()
   },
-    /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-header" },
-      /*#__PURE__*/React.createElement("h4", null, "지역 설정"),
+    /*#__PURE__*/React.createElement("div", { className: "modal-header" },
+      /*#__PURE__*/React.createElement("h3", null, "지역 설정"),
       /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '10px' } },
         selections.length > 0 && /*#__PURE__*/React.createElement("button", {
           type: "button",
@@ -3441,7 +3464,7 @@ export function RegionFilterBackdrop({ isOpen, onClose, selections = [], onAdd, 
         }, "✕")
       )
     ),
-    /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-body region-filter-body" },
+    /*#__PURE__*/React.createElement("div", { className: "modal-body region-filter-body" },
       /*#__PURE__*/React.createElement("div", { className: "region-filter-search-row" },
         /*#__PURE__*/React.createElement("input", {
           type: "text",
@@ -3493,7 +3516,7 @@ export function RegionFilterBackdrop({ isOpen, onClose, selections = [], onAdd, 
         )
       )
     ),
-    /*#__PURE__*/React.createElement("div", { className: "bottom-sheet-footer" },
+    /*#__PURE__*/React.createElement("div", { className: "modal-footer region-filter-footer" },
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "region-filter-save-btn",
@@ -3583,12 +3606,42 @@ function filterCultureItemsByRegion(items, regionSelections, category) {
 // ContentView can score every tab without mounting four CulturePerformancesTab instances.
 function mergeCultureCrawledWithExtras(crawledItems, extraItems) {
   const crawled = Array.isArray(crawledItems) ? crawledItems.filter(Boolean) : [];
-  const crawledTitles = new Set(crawled.map(i => String(i.title || '').trim()).filter(Boolean));
-  const extras = (Array.isArray(extraItems) ? extraItems.filter(Boolean) : [])
-    .filter(e => !crawledTitles.has(String(e.title || '').trim()))
-    .map(e => ({ ...e, isCustomRegistered: true }));
-  const seen = new Set(extras.map(e => e && e.id).filter(Boolean));
-  return [...extras, ...crawled.filter(i => i && i.id && !seen.has(i.id))];
+  const extrasRaw = (Array.isArray(extraItems) ? extraItems.filter(Boolean) : []);
+  const extrasById = new Map();
+  const extrasByTitle = new Map();
+  extrasRaw.forEach(e => {
+    if (e && e.id) extrasById.set(e.id, e);
+    const title = String(e && e.title || '').trim();
+    if (title) extrasByTitle.set(title, e);
+  });
+  const usedExtraIds = new Set();
+  const result = [];
+  extrasRaw.forEach(e => {
+    if (!e) return;
+    const title = String(e.title || '').trim();
+    const matchesCrawled = crawled.some(i => i && (i.id === e.id || String(i.title || '').trim() === title));
+    if (matchesCrawled) return;
+    result.push({ ...e, isCustomRegistered: true });
+    if (e.id) usedExtraIds.add(e.id);
+  });
+  crawled.forEach(i => {
+    if (!i || !i.id || usedExtraIds.has(i.id)) return;
+    const title = String(i.title || '').trim();
+    const custom = extrasById.get(i.id) || (title ? extrasByTitle.get(title) : null);
+    if (custom) {
+      if (custom.id) usedExtraIds.add(custom.id);
+      result.push({
+        ...i,
+        ...custom,
+        id: custom.id || i.id,
+        image: custom.image || i.image || '',
+        isCustomRegistered: true
+      });
+    } else {
+      result.push(i);
+    }
+  });
+  return result;
 }
 
 function countCultureSearchMatches(crawledItems, extraItems, anniversaryCategory, regionSelections, searchQuery) {
@@ -3754,6 +3807,28 @@ function parseGatherContentClipboardText(text) {
 // Layer popup for manually registering 문화공연 / 지역축제 items into the archive tabs.
 // Portaled to document.body (same pattern as CulturePerformancesTab's detail sheet) so it sits
 // above the side menu / page chrome. Persists via onSave → app-main customCultureItems write.
+
+function renderOutlineTablerIcon(name, size = 16) {
+  const def = TABLER_ICONS[name];
+  const html = def && (def.off || def.on);
+  if (!html) return null;
+  const React = window.React;
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    "aria-hidden": "true",
+    style: { display: 'block', flexShrink: 0 },
+    dangerouslySetInnerHTML: { __html: html }
+  });
+}
+
 function ContentRegisterModal({ calendar = null, onClose, onSave, showToast = null, initialKind = 'performance', initialItem = null }) {
   const React = window.React;
   const ReactDOM = window.ReactDOM;
@@ -4232,7 +4307,7 @@ function ContentRegisterModal({ calendar = null, onClose, onSave, showToast = nu
                   alignItems: 'center',
                   gap: '4px'
                 }
-              }, "📁 사진 업로드"),
+              }, renderOutlineTablerIcon("photoUp", 16), "사진 업로드"),
               /*#__PURE__*/React.createElement("button", {
                 type: "button",
                 disabled: uploadingImage,
@@ -4250,7 +4325,7 @@ function ContentRegisterModal({ calendar = null, onClose, onSave, showToast = nu
                   alignItems: 'center',
                   gap: '4px'
                 }
-              }, "📋 붙여넣기")
+              }, renderOutlineTablerIcon("clipboardPlus", 16), "붙여넣기")
             ),
             uploadingImage ? /*#__PURE__*/React.createElement("div", {
               style: { fontSize: 'var(--font-size-xs, 12px)', color: 'var(--accent-primary, #7C2FE5)', fontWeight: 600 }
@@ -4261,7 +4336,7 @@ function ContentRegisterModal({ calendar = null, onClose, onSave, showToast = nu
         )),
         field("이미지 URL (선택)", /*#__PURE__*/React.createElement("input", {
           className: "form-input", type: "url", value: image, onChange: e => setImage(e.target.value),
-          placeholder: "https://", maxLength: 500
+          placeholder: "https://", maxLength: 2000
         })),
         /*#__PURE__*/React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' } },
           field("가격 / 요금", /*#__PURE__*/React.createElement("input", {
@@ -4610,33 +4685,61 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
       });
   }, [items, anniversaries, anniversaryCategory]);
 
-  // Merge calendar-owned custom items (컨텐츠 등록) ahead of the crawled snapshot. Custom ids
-  // use custom_perf_/custom_fest_ prefixes so they never collide with crawled perf_/fest_ ids,
-  // but still de-dupe by id in case a write echoes twice.
+  // Merge calendar-owned custom items (컨텐츠 등록) with the crawled snapshot.
+  // Custom ids normally use custom_perf_/custom_fest_ prefixes, but editing a crawled card
+  // reuses its id. Previously same-title customs were DROPPED in favor of crawled rows, which
+  // threw away user-uploaded posters (image) after a successful save -- the card kept showing
+  // "포스터 없음". Prefer custom fields (especially image) when id/title collides, and only
+  // render one card per real-world event.
   const mergedItems = React.useMemo(() => {
     if (items === null) return null;
-    // A self-authored anniversary (기념일 등록으로 직접 typed, no cultureSourceId at all) or a
-    // manually 개별등록-ed card can coincidentally share its title with something that's also
-    // sitting right there in today's live crawled feed -- the user typed/found it independently,
-    // unaware it was already a registerable listing. Without this check both would render as two
-    // separate cards for the same real-world event: the rich crawled one, and the other holding
-    // only whatever the user themselves typed -- exactly the "이중으로 관리되는" duplicate this
-    // caused. Prefer the live crawled version (richer, and always the freshest available data)
-    // over a same-titled self-authored/custom entry.
-    const crawledTitles = new Set((items || []).map(i => i && String(i.title || '').trim()).filter(Boolean));
-    // isCustomRegistered marks every self-authored/컨텐츠-등록 item (as opposed to crawled from
-    // the portal snapshot) so the "개별등록" category chip below can filter on it directly,
-    // instead of guessing from genre/id-prefix which crawled items can also lack.
-    const extras = (Array.isArray(extraItems) ? extraItems.filter(Boolean) : [])
-      .filter(e => !crawledTitles.has(String(e.title || '').trim()))
-      .map(e => ({ ...e, isCustomRegistered: true }));
-    const seen = new Set(extras.map(e => e && e.id).filter(Boolean));
-    const orphaned = orphanedSourceItems
-      .filter(o => o && o.id && !seen.has(o.id))
-      .map(o => ({ ...o, isCustomRegistered: true }));
-    orphaned.forEach(o => seen.add(o.id));
-    const crawled = (items || []).filter(i => i && i.id && !seen.has(i.id));
-    return [...extras, ...orphaned, ...crawled];
+    const extrasRaw = (Array.isArray(extraItems) ? extraItems.filter(Boolean) : []);
+    const extrasById = new Map();
+    const extrasByTitle = new Map();
+    extrasRaw.forEach(e => {
+      if (e && e.id) extrasById.set(e.id, e);
+      const title = String(e && e.title || '').trim();
+      if (title) extrasByTitle.set(title, e);
+    });
+    const usedExtraIds = new Set();
+    const result = [];
+
+    // Custom-only rows (no crawled match) stay at the front so a just-registered card is visible.
+    extrasRaw.forEach(e => {
+      if (!e) return;
+      const title = String(e.title || '').trim();
+      const matchesCrawled = (items || []).some(i => i && (i.id === e.id || String(i.title || '').trim() === title));
+      if (matchesCrawled) return;
+      result.push({ ...e, isCustomRegistered: true });
+      if (e.id) usedExtraIds.add(e.id);
+    });
+
+    orphanedSourceItems.forEach(o => {
+      if (!o || !o.id || usedExtraIds.has(o.id)) return;
+      const title = String(o.title || '').trim();
+      if (title && (items || []).some(i => i && String(i.title || '').trim() === title)) return;
+      result.push({ ...o, isCustomRegistered: true });
+      usedExtraIds.add(o.id);
+    });
+
+    (items || []).forEach(i => {
+      if (!i || !i.id || usedExtraIds.has(i.id)) return;
+      const title = String(i.title || '').trim();
+      const custom = extrasById.get(i.id) || (title ? extrasByTitle.get(title) : null);
+      if (custom) {
+        if (custom.id) usedExtraIds.add(custom.id);
+        result.push({
+          ...i,
+          ...custom,
+          id: custom.id || i.id,
+          image: custom.image || i.image || '',
+          isCustomRegistered: true
+        });
+      } else {
+        result.push(i);
+      }
+    });
+    return result;
   }, [items, extraItems, orphanedSourceItems]);
 
   // Reported unfiltered (crawled snapshot + any custom items merged in above) -- RegionFilterBackdrop's

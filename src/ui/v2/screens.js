@@ -164,6 +164,22 @@ const ICON_NODES = {
     ['path', { d: 'M14 20h-8a3 3 0 0 1 0 -6h11a3 3 0 0 0 -3 3m7 -3v-8a2 2 0 0 0 -2 -2h-10a2 2 0 0 0 -2 2v8' }],
     ['path', { d: 'M19 17v4' }],
   ],
+  // Tabler map-2 outline (지역설정) -- exact paths from product request
+  map2: [
+    ['path', { d: 'M12 18.5l-3 -1.5l-6 3v-13l6 -3l6 3l6 -3v7.5' }],
+    ['path', { d: 'M9 4v13' }],
+    ['path', { d: 'M15 7v5.5' }],
+    ['path', { d: 'M21.121 20.121a3 3 0 1 0 -4.242 0c.418 .419 1.125 1.045 2.121 1.879c1.051 -.89 1.759 -1.516 2.121 -1.879' }],
+    ['path', { d: 'M19 18v.01' }],
+  ],
+  // Same glyphs as culture-grid-cols toggle (2-col / 1-col)
+  layoutColumns: [
+    ['path', { d: 'M3 4a1 1 0 0 1 1 -1h16a1 1 0 0 1 1 1v16a1 1 0 0 1 -1 1h-16a1 1 0 0 1 -1 -1v-16' }],
+    ['path', { d: 'M12 3v18' }],
+  ],
+  layoutRows: [
+    ['path', { d: 'M5 4a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v16a1 1 0 0 1 -1 1h-12a1 1 0 0 1 -1 -1l0 -16' }],
+  ],
   keyboard: [
     ['rect', { x: 2, y: 6, width: 20, height: 12, rx: 2 }],
     ['path', { d: 'M6 10h.01' }],
@@ -205,10 +221,16 @@ export function DesignIcon({ name, size = 18, strokeWidth = 2 }) {
   );
 }
 
-function IconButton({ label, icon, onClick, size = 18 }) {
+function IconButton({ label, icon, onClick, size = 18, active = false }) {
   return h(
     'button',
-    { type: 'button', className: 'bp-icon-btn', 'aria-label': label, onClick },
+    {
+      type: 'button',
+      className: 'bp-icon-btn' + (active ? ' is-active' : ''),
+      'aria-label': label,
+      'aria-pressed': active ? 'true' : 'false',
+      onClick,
+    },
     h(DesignIcon, { name: icon, size })
   );
 }
@@ -1404,7 +1426,16 @@ function makeTabbedScreen(name, title) {
     ensureDestinationStyles(name);
     const extra = p.headerExtra || (name === 'content'
       ? headerExtra([
+        typeof p.onOpenRegion === 'function' && h(IconButton, { label: '지역설정', icon: 'map2', onClick: p.onOpenRegion }),
         typeof p.onOpenRegister === 'function' && h(IconButton, { label: '컨텐츠 등록', icon: 'scriptPlus', onClick: p.onOpenRegister }),
+        typeof p.onSetGridCols === 'function' && h(IconButton, {
+          label: '그리드뷰', icon: 'layoutColumns', active: p.gridCols !== '1',
+          onClick: () => p.onSetGridCols('2'),
+        }),
+        typeof p.onSetGridCols === 'function' && h(IconButton, {
+          label: '리스트뷰', icon: 'layoutRows', active: p.gridCols === '1',
+          onClick: () => p.onSetGridCols('1'),
+        }),
       ])
       : null);
     return h(
