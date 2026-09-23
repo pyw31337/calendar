@@ -3016,6 +3016,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   );
 
   const handleOpenCreateSettlement = () => {
+    console.log('[DEBUG] handleOpenCreateSettlement called', { canUseSettlement, onOpenCreateSettlementType: typeof onOpenCreateSettlement, editingSettlementCard, calendarId: calendar?.id });
     setIsSettlementMenuOpen(false);
     if (!canUseSettlement) {
       if (showToast) showToast('이 캘린더에서는 정산을 사용할 수 없습니다.', 'info');
@@ -3024,6 +3025,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     if (typeof onOpenCreateSettlement === 'function') {
       onOpenCreateSettlement();
     } else {
+      console.log('[DEBUG] calling setIsCreateSettlementOpen(true)');
       setIsCreateSettlementOpen(true);
     }
   };
@@ -4134,6 +4136,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   ))),
 
   /* Create Settlement Layer Popup */
+  console.log('[DEBUG] render gate', { isCreateSettlementOpen, canUseSettlement, editingSettlementCard, CreateSettlementModalCompType: typeof CreateSettlementModalComp }),
   (isCreateSettlementOpen && canUseSettlement && !editingSettlementCard && React.createElement(CreateSettlementModalComp, {
     calendar: calendar,
     onClose: () => setIsCreateSettlementOpen(false),
