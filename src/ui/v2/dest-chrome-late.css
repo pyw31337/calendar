@@ -3392,6 +3392,28 @@ html:has(.renewal-shell.v2-design) .bp-dday-expanded .bp-dday-collapse-btn {
   flex: 0 0 auto !important;
   margin-left: auto !important;
 }
+/* Meeting-day forecast pictogram, left of the fold button (white on the brand banner). */
+html:has(.renewal-shell.v2-design) .bp-dday-expanded .bp-dday-weather {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 20px;
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: default;
+}
+html:has(.renewal-shell.v2-design) .bp-dday-expanded .bp-dday-weather svg {
+  display: block;
+  flex: 0 0 auto;
+}
+html:has(.renewal-shell.v2-design) .bp-dday-expanded .bp-dday-weather + .bp-dday-collapse-btn {
+  margin-left: 0 !important;
+}
 html:has(.renewal-shell.v2-design) .bp-dday-view-btn {
   display: none !important;
 }
