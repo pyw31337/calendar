@@ -1,11 +1,11 @@
 # V2 현재 상태
 
-최종 갱신: 2026-09-23 15:30 KST (`main` @ `cddfe03e`)
+최종 갱신: 2026-09-23 15:40 KST (Phase 1 dark-token branch `fix/v2-dark-tokens-phase1`)
 
 ## 상태
 
 - **기본 URL 컷오버: 아직 하지 않음** — `?id=cw` 는 V1, V2는 `?shell=v2` 옵트인.
-- 다음 작업: **다크모드 토큰 재연결** (`src/ui/v2` → V1 `data-theme` / `--bg-*` 소비).
+- 다음 작업: **다크 Phase 2** (`dest-chrome-late.css` !important 벽 + 페이지 QA). Phase 1(reference-* / 셸 캔버스 / `.renewal-shell` 토큰 상속) PR 진행 중.
 - 상세 계획·금지사항·파일 체크리스트·에이전트 분담: **[`docs/v2-default-cutover-handoff.md`](./v2-default-cutover-handoff.md)** (다른 Grok/Codex/Claude/Gemini가 이어서 볼 문서).
 
 ## 라이브
@@ -20,7 +20,7 @@
 | 데이터 경로 V1과 동일 | 확인 |
 | toast / ConfirmDialog / upload / PIP / lightbox on V2 | 마운트됨 |
 | NotificationPermissionHelpModal on V2 | **#734 완료** |
-| 다크모드 | **P0 미완** — V2 CSS가 `data-theme` 무시 |
+| 다크모드 | **P0 Phase 1 PR** — 표면 토큰 상속 재연결; `dest-chrome-late` 등 Phase 2 잔여 |
 | Safari 채팅 키보드 / visualViewport | **P0 미검증** |
 | 기본 shell 플래그 전환 | **금지** (다크·사파리 후 + `?shell=v1` 한 릴리스) |
 
