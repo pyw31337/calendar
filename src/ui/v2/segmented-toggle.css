@@ -1,0 +1,72 @@
+/* V2 shared segmented / pill switch (SegmentedToggle).
+ *
+ * UnderlineTabs keep the purple bottom-border focus via .underline-tabs rules.
+ * SegmentedToggle reuses role="tablist" but must NOT inherit that underline
+ * chrome — active focus is a filled purple (or option.activeColor) pill.
+ * Scoped to V2 only; default shell keeps inline styles untouched.
+ */
+
+html:has(.renewal-shell.v2-design) .segmented-toggle,
+.renewal-shell.v2-design .segmented-toggle,
+html:has(.renewal-shell.v2-design) .modal-overlay .segmented-toggle {
+  display: inline-flex !important;
+  align-items: stretch !important;
+  width: auto !important;
+  max-width: 100% !important;
+  height: auto !important;
+  flex: 0 0 auto !important;
+  padding: 3px !important;
+  box-sizing: border-box !important;
+  border: 1px solid var(--v2-card-border, #eceaf5) !important;
+  border-radius: 999px !important;
+  background: #fff !important;
+  box-shadow: none !important;
+  gap: 0 !important;
+}
+
+/* Kill any leftover underline-tab hairline / ::after on segmented pills. */
+html:has(.renewal-shell.v2-design) .segmented-toggle > button,
+html:has(.renewal-shell.v2-design) .modal-overlay .segmented-toggle > button,
+.renewal-shell.v2-design .segmented-toggle > button {
+  position: relative !important;
+  flex: 1 1 auto !important;
+  height: auto !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-bottom: 0 !important;
+  border-radius: 999px !important;
+  box-shadow: none !important;
+  /* Do not force background/color — preserve inline activeColor (e.g. 수입/지출). */
+}
+
+html:has(.renewal-shell.v2-design) .segmented-toggle > button::after,
+html:has(.renewal-shell.v2-design) .modal-overlay .segmented-toggle > button::after,
+.renewal-shell.v2-design .segmented-toggle > button::after {
+  content: none !important;
+  display: none !important;
+}
+
+/* Default active fill when the inline accent token is the shared primary
+   (양력/음력, 하루/연일, 목록-adjacent switches). Custom activeColor stays via inline. */
+html:has(.renewal-shell.v2-design) .segmented-toggle > button[aria-selected="true"],
+html:has(.renewal-shell.v2-design) .modal-overlay .segmented-toggle > button[aria-selected="true"],
+.renewal-shell.v2-design .segmented-toggle > button[aria-selected="true"] {
+  border-bottom: 0 !important;
+  font-weight: 800 !important;
+}
+
+/* D-Day mode cards in anniversary form: V1 blue → V2 purple when selected. */
+html:has(.renewal-shell.v2-design) label.anniversary-type-option:has(input:checked),
+.renewal-shell.v2-design label.anniversary-type-option:has(input:checked) {
+  background-color: color-mix(in srgb, var(--brand, #7C2FE5) 8%, #fff) !important;
+  border-color: var(--brand, #7C2FE5) !important;
+  color: var(--text-main, #0F172A) !important;
+}
+
+/* Single-option pill (e.g. 반복) that mirrors SegmentedToggle chrome. */
+html:has(.renewal-shell.v2-design) .segmented-toggle--single > button,
+.renewal-shell.v2-design .segmented-toggle--single > button {
+  border-radius: 999px !important;
+  border-bottom: 0 !important;
+}
