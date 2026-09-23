@@ -3435,3 +3435,30 @@ html:has(.renewal-shell.v2-design) .bp-dday-participant-memo-text {
     background: var(--bg-primary, #f6f4fb) !important;
   }
 }
+
+/* Home gallery bleeds its photos, so the title needs the same side inset as
+   the other summary cards, and the sheet sits flush with the card bottom. */
+html:has(.renewal-shell.v2-design) .bp-bento-card.bp-gallery-bleed {
+  padding-bottom: 0 !important;
+}
+html:has(.renewal-shell.v2-design) .bp-gallery-bleed .bp-renewal-home-summary-heading {
+  box-sizing: border-box !important;
+  padding-left: 14px !important;
+  padding-right: 14px !important;
+}
+html:has(.renewal-shell.v2-design) .bp-gallery-bleed .bp-renewal-home-photo-strip,
+html:has(.renewal-shell.v2-design) .bp-gallery-bleed .bp-thumb-grid {
+  margin-bottom: 0 !important;
+}
+@media (min-width: 768px) {
+  html:has(.renewal-shell.v2-design) .bp-gallery-bleed .bp-renewal-home-summary-heading {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+}
+@media (max-width: 359px) {
+  html:has(.renewal-shell.v2-design) .bp-gallery-bleed .bp-renewal-home-summary-heading {
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+  }
+}
