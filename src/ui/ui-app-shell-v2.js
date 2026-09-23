@@ -2308,8 +2308,12 @@ function clickLegacyAriaButton(ariaLabel, scopeSelector) {
 function ContentPane({ recordsContext, calendarName, onChangeView, onOpenAppSettings, onOpenSideNav, onRegisterMenuActions }) {
   const React = window.React;
   const contentActionsRef = React.useRef({});
+  const [contentGridCols, setContentGridCols] = React.useState('2');
   const registerContentActions = React.useCallback((actions) => {
     contentActionsRef.current = actions || {};
+    if (actions && (actions.gridCols === '1' || actions.gridCols === '2')) {
+      setContentGridCols(actions.gridCols);
+    }
     if (typeof onRegisterMenuActions === 'function') onRegisterMenuActions(actions);
   }, [onRegisterMenuActions]);
   const { ContentView } = bindUiComponentAliases(React);
@@ -2327,7 +2331,13 @@ function ContentPane({ recordsContext, calendarName, onChangeView, onOpenAppSett
     onBack: () => onChangeView('calendar'),
     onMenu: onOpenSideNav || onOpenAppSettings,
     onSearch: () => clickLegacyAriaButton('컨텐츠 검색', '.v2-content'),
+    onOpenRegion: () => contentActionsRef.current.openRegion?.(),
     onOpenRegister: () => contentActionsRef.current.register?.(),
+    onSetGridCols: (cols) => {
+      contentActionsRef.current.setGridCols?.(cols);
+      setContentGridCols(cols);
+    },
+    gridCols: contentGridCols,
     slots: {},
   });
 }

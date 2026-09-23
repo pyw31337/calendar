@@ -172,7 +172,8 @@
 
 .renewal-shell.v2-design .v2-archive .history-page-scroll,
 .renewal-shell.v2-design .v2-archive .history-meetings-grid {
-  padding-top: calc(104px + var(--v2-dest-content-pad-y)) !important;
+  padding-top: 0 !important;
+  margin-top: 36px !important;
 }
 .v2-design .v2-archive .history-bento-grid {
   padding: 0 !important;
@@ -1218,11 +1219,15 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   border: 0 !important;
   box-shadow: none !important;
 }
+.v2-design .v2-content .v2-content-subcat-slot .bp-cat-chip {
+  gap: 6px !important;
+}
 .v2-design .v2-content .v2-content-subcat-slot .bp-cat-chip .section-count-badge {
   min-width: 0 !important;
   height: auto !important;
   min-height: 0 !important;
   padding: 0 !important;
+  margin-left: 2px !important;
   background: transparent !important;
   color: inherit !important;
   font-size: 0.72rem !important;
@@ -2904,3 +2909,33 @@ html:has(.renewal-shell.v2-design) .admin-settings-modal .recent-log-left > .par
 
 
 
+
+
+/* Content header view toggles: active grid/list matches purple chip language */
+.v2-design .v2-page-header .bp-icon-btn.is-active,
+.v2-design .v2-content .v2-page-header .bp-icon-btn.is-active {
+  background: color-mix(in srgb, var(--brand, #7C2FE5) 16%, #fff) !important;
+  color: var(--brand, #7C2FE5) !important;
+  border-radius: 10px !important;
+}
+
+/* Region settings uses shared modal-overlay chrome; keep sheet body scrollable */
+html:has(.renewal-shell.v2-design) .modal-overlay.region-filter-overlay > .modal-container.region-filter-sheet {
+  width: min(520px, calc(100vw - 48px)) !important;
+  max-width: 520px !important;
+}
+html:has(.renewal-shell.v2-design) .region-filter-sheet .modal-body.region-filter-body {
+  overflow-y: auto !important;
+  padding: 14px 18px 8px !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+}
+html:has(.renewal-shell.v2-design) .region-filter-sheet .modal-footer.region-filter-footer {
+  padding: 12px 18px 16px !important;
+  border-top: 1px solid var(--v2-card-border, #eceaf5) !important;
+}
+
+/* Content V2: region/grid controls live in page header — hide legacy trigger row if it leaks */
+.v2-design .v2-content .region-filter-trigger-row {
+  display: none !important;
+}
