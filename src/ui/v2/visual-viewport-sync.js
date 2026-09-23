@@ -10,20 +10,37 @@
 
   const apply = () => {
     const vv = window.visualViewport;
-    const height = Math.max(1, Math.round(vv?.height || window.innerHeight || root.clientHeight || 0));
-    const offsetTop = Math.max(0, Math.round(vv?.offsetTop || 0));
-    const offsetLeft = Math.round(vv?.offsetLeft || 0);
-    root.style.setProperty('--app-vv-height', `${height}px`);
-    root.style.setProperty('--app-vv-offset-top', `${offsetTop}px`);
-    root.style.setProperty('--app-vv-offset-left', `${offsetLeft}px`);
+    const layoutH = window.innerHeight || root.clientHeight || 0;
+    const vvH = Math.max(1, Math.round(vv?.height || layoutH));
+    const rawTop = Math.max(0, Math.round(vv?.offsetTop || 0));
+    const rawLeft = Math.round(vv?.offsetLeft || 0);
+    // A real keyboard is tall. Smaller offsetTop/height drift (scrollbar, address
+    // bar, our own fixed shell moving) must not be written back onto the shell:
+    // that feedback makes the chat header and composer jump in and out.
+    const keyboard = layoutH - vvH - rawTop > 120;
+    const height = keyboard ? vvH : Math.max(vvH, Math.round(layoutH) || vvH);
+    const offsetTop = keyboard ? rawTop : 0;
+    const offsetLeft = keyboard ? rawLeft : 0;
+    const heightPx = `${height}px`;
+    const topPx = `${offsetTop}px`;
+    const leftPx = `${offsetLeft}px`;
+    if (root.style.getPropertyValue('--app-vv-height') !== heightPx) {
+      root.style.setProperty('--app-vv-height', heightPx);
+    }
+    if (root.style.getPropertyValue('--app-vv-offset-top') !== topPx) {
+      root.style.setProperty('--app-vv-offset-top', topPx);
+    }
+    if (root.style.getPropertyValue('--app-vv-offset-left') !== leftPx) {
+      root.style.setProperty('--app-vv-offset-left', leftPx);
+    }
 
     // Keep portaled lightbox overlays inside the visual viewport.
     document.body.querySelectorAll(':scope > .lightbox-overlay').forEach(overlay => {
       overlay.style.setProperty('width', '100vw', 'important');
       overlay.style.setProperty('max-width', 'none', 'important');
-      overlay.style.setProperty('height', `${height}px`, 'important');
-      overlay.style.setProperty('min-height', `${height}px`, 'important');
-      overlay.style.setProperty('top', `${offsetTop}px`, 'important');
+      overlay.style.setProperty('height', `${vvH}px`, 'important');
+      overlay.style.setProperty('min-height', `${vvH}px`, 'important');
+      overlay.style.setProperty('top', `${rawTop}px`, 'important');
       overlay.style.setProperty('left', '0', 'important');
     });
   };

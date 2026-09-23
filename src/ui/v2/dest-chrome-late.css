@@ -2804,6 +2804,31 @@ html:has(.renewal-shell.v2-design) .global-search-page-card > .underline-tabs {
   padding-right: 0 !important;
 }
 
+/* Desktop rail is position:fixed. The viewport pin zeroes shell padding, so
+   every page was full-bleed underneath the menu. Inset the page pane by the
+   live rail width (280 expanded, 64 collapsed) so the content width tracks it. */
+@media (min-width: 1200px) {
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design {
+    --v2-side-nav-width: 280px;
+  }
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design.is-side-collapsed {
+    --v2-side-nav-width: 64px;
+  }
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > .renewal-shell-main,
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > .bp-app-shell {
+    margin-left: var(--v2-side-nav-width, 280px) !important;
+    margin-right: 0 !important;
+    width: calc(100% - var(--v2-side-nav-width, 280px)) !important;
+    max-width: calc(100% - var(--v2-side-nav-width, 280px)) !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design.is-side-collapsed > .bp-side-nav,
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed {
+    width: var(--v2-side-nav-width, 64px) !important;
+  }
+}
+
 /* Calendar settings: no second inset and no card chrome on tab panels.
    Sheet height follows the content up to the viewport (see admin max-height above). */
 @media (max-width: 767px) {

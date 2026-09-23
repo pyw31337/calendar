@@ -276,6 +276,7 @@ function pageSubtitle(calendar, trailing) {
 export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, searchLabel, onShare, onMenu, extra, centerSubtitle = true, hideOnScroll = true, showMenu = false, children }) {
   const React = window.React;
   const headerRef = React.useRef(null);
+  const suppressUntilRef = React.useRef(0);
   const [hidden, setHidden] = React.useState(false);
   React.useEffect(() => {
     if (!hideOnScroll) {
@@ -293,6 +294,10 @@ export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, se
       if (target.closest('.modal-overlay, .bottom-sheet-overlay, .bp-side-nav, textarea, input')) return;
       const top = target.scrollTop;
       if (typeof top !== 'number') return;
+      if (Date.now() < suppressUntilRef.current) {
+        lastTop = top;
+        return;
+      }
       const delta = top - lastTop;
       if (Math.abs(delta) < 6) return;
       // Opening a long list jumps scrollTop from 0 to the bottom in one
@@ -305,9 +310,18 @@ export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, se
       lastTop = top;
       // Collapsing the header gives its box back to the list. Only do it when the
       // scroller still has room, otherwise the shrink clamps scrollTop and snaps back.
-      if (top < 8) setHidden(false);
-      else if (delta > 0 && top > 40 && max > 140) setHidden(true);
-      else if (delta < 0) setHidden(false);
+      // The layout change itself fires another scroll; ignore that echo or the
+      // header hides and shows on every frame.
+      let next = null;
+      if (top < 8) next = false;
+      else if (delta > 0 && top > 40 && max > 140) next = true;
+      else if (delta < 0) next = false;
+      if (next == null) return;
+      setHidden(prev => {
+        if (prev === next) return prev;
+        suppressUntilRef.current = Date.now() + 450;
+        return next;
+      });
     };
     document.addEventListener('scroll', onScroll, true);
     return () => document.removeEventListener('scroll', onScroll, true);
@@ -1101,7 +1115,6 @@ export function ChatScreen(p) {
   const React = window.React;
   const [showScrollBottom, setShowScrollBottom] = React.useState(false);
   const [composerHidden, setComposerHidden] = React.useState(false);
-  const chatScrollTopRef = React.useRef(0);
   const slots = { ...(p.legacyView ? extractChatSlots(p.legacyView) : {}), ...(p.slots || {}) };
   const memberCount = (p.calendar?.participants || []).filter(person => !person.deletedAt).length;
   const subtitle = p.subtitle
@@ -1115,6 +1128,9 @@ export function ChatScreen(p) {
     searchLabel: '대화 검색',
     onMenu: p.onMenu,
     showMenu: true,
+    // Chat keeps the header and composer on screen. Auto-hide here fights the
+    // list's scroll-to-bottom and the two collapse/expand in a loop.
+    hideOnScroll: false,
     extra: typeof p.onOpenNotice === 'function'
       ? h(IconButton, { label: '공지사항', icon: 'megaphone', size: 20, onClick: p.onOpenNotice })
       : null,
@@ -1290,24 +1306,6 @@ export function ChatScreen(p) {
               const el = e.currentTarget;
               if (!el) return;
               setShowScrollBottom(el.scrollHeight - el.scrollTop - el.clientHeight > 160);
-              const top = el.scrollTop || 0;
-              const delta = top - chatScrollTopRef.current;
-              if (Math.abs(delta) < 6) return;
-              if (chatScrollTopRef.current === 0 && delta > 240) {
-                chatScrollTopRef.current = top;
-                return;
-              }
-              chatScrollTopRef.current = top;
-              const typing = document.activeElement && document.activeElement.closest
-                && document.activeElement.closest('.v2-chat-composer, .chat-composer');
-              const draft = String(slots.textarea?.props?.value || '').trim();
-              if (typing || draft) {
-                setComposerHidden(false);
-                return;
-              }
-              if (top < 8) setComposerHidden(false);
-              else if (delta > 0 && top > 40) setComposerHidden(true);
-              else if (delta < 0) setComposerHidden(false);
             }
           })
         ),

@@ -649,7 +649,10 @@ export function ChatRoomView({
   React.useEffect(() => {
     const el = chatComposerRef.current;
     if (!el) return;
-    const measure = () => setComposerHeight(Math.ceil(el.getBoundingClientRect().height));
+    const measure = () => {
+      const next = Math.ceil(el.getBoundingClientRect().height);
+      setComposerHeight(prev => (Math.abs((prev || 0) - next) < 2 ? prev : next));
+    };
     measure();
     if (typeof ResizeObserver === 'function') {
       const observer = new ResizeObserver(measure);
