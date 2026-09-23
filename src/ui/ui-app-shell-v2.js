@@ -224,10 +224,10 @@ function TopHeader({ calendarName, onOpenSearch, onOpenCalendarSettings, onOpenA
       React.createElement('span', { className: bentoClass('brand-name') }, brandName)
     ),
     React.createElement('div', { className: bentoClass('renewal-shell-header-actions bento-title-actions') },
-      React.createElement('button', { type: 'button', className: bentoClass('renewal-shell-header-icon-btn icon-btn'), 'aria-label': '캘린더 설정', title: '캘린더 설정', onClick: onOpenCalendarSettings },
+      React.createElement('button', { type: 'button', className: bentoClass('renewal-shell-header-icon-btn icon-btn hero-plain-icon-btn'), 'aria-label': '캘린더 설정', title: '캘린더 설정', onClick: onOpenCalendarSettings },
         React.createElement(TabIcon, { id: 'calendarSettings', size: 18 })
       ),
-      React.createElement('button', { type: 'button', className: bentoClass('renewal-shell-header-icon-btn icon-btn'), 'aria-label': '기념일 설정', title: '기념일 설정', onClick: onOpenAnniversaries },
+      React.createElement('button', { type: 'button', className: bentoClass('renewal-shell-header-icon-btn icon-btn hero-plain-icon-btn'), 'aria-label': '기념일 설정', title: '기념일 설정', onClick: onOpenAnniversaries },
         React.createElement(TabIcon, { id: 'cake', size: 18 })
       ),
       React.createElement('button', { type: 'button', className: bentoClass('renewal-shell-header-icon-btn icon-btn'), 'aria-label': '검색', onClick: onOpenSearch },
@@ -1099,6 +1099,7 @@ const HERO_QUICK_NAV_ITEMS = [
   { id: 'settlement', label: '정산', icon: 'settlement' },
   { id: 'memo', label: '메모', icon: 'memo' },
   { id: 'gallery', label: '갤러리', icon: 'gallery' },
+  { id: 'content', label: '컨텐츠', icon: 'content' },
 ];
 
 function HeroQuickNav({ onChangeView, settlementBalanceBadge }) {

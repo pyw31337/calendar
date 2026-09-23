@@ -1256,3 +1256,23 @@
     clip-path: none !important;
   }
 }
+
+/* Hero plain settings icons (no glass chrome) — calendar / anniversary */
+@media (max-width: 1199px) {
+  .v2-design .bp-hero-zone .bp-hero-plain-icon-btn.bp-renewal-shell-header-icon-btn,
+  .v2-design .bp-hero-zone .bp-hero-plain-icon-btn.bp-icon-btn {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    padding: 4px !important;
+  }
+  .v2-design .bp-hero-zone .bp-hero-plain-icon-btn.bp-renewal-shell-header-icon-btn:hover,
+  .v2-design .bp-hero-zone .bp-hero-plain-icon-btn.bp-icon-btn:hover {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    opacity: 0.88;
+  }
+}
