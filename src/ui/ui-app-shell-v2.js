@@ -318,7 +318,9 @@ export function buildRenewalCalendarContext(calendar, deps) {
     onSelectVote: (participantId) => handleVotePoll(voteTarget?.pollId, voteTarget?.optionId, participantId),
     onCloseVoteSheet: () => setVoteTarget(null),
     dateModalProps: {
-      calendar: activeCal, chatMessages: displayChatMessages, memos, customCultureItems,
+      calendar: activeCal,
+      anniversaries: anniversariesWithPosters || activeCal?.anniversaries || [],
+      chatMessages: displayChatMessages, memos, customCultureItems,
       onSave: handleSaveAvailability, onDelete: handleDeleteAvailability,
       onReorderAvailability: handleReorderAvailability, onDeleteDate: handleDeleteAllForDate,
       onConfirmMeeting: handleConfirmMeeting, onSaveExpense: handleSaveExpense,
@@ -1675,6 +1677,7 @@ function SharedDateModal({ calendarContext, dateModalDate, initialTab = null, se
   const { DateModal } = bindUiComponentAliases(React);
   return React.createElement(DateModal, {
     ...calendarContext.dateModalProps,
+    anniversaries: calendarContext.anniversaries || calendarContext.dateModalProps?.anniversaries || calendarContext.calendar?.anniversaries || [],
     dateStr: dateModalDate,
     initialTab,
     searchFocus,

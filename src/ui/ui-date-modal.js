@@ -451,7 +451,12 @@ export function DateModal({
   };
   const activeParticipants = getActiveParticipants(calendar);
   const dateEntries = getActiveAvailabilities(calendar).filter(e => e.date === dateStr);
-  const dateAnns = getAnniversariesForDate(dateStr, anniversaries);
+  const effectiveAnniversaries = (Array.isArray(anniversaries) && anniversaries.length > 0)
+    ? anniversaries
+    : (Array.isArray(calendar?.anniversaries) && calendar.anniversaries.length > 0
+      ? calendar.anniversaries
+      : (Array.isArray(calendar?.anniversariesWithPosters) ? calendar.anniversariesWithPosters : []));
+  const dateAnns = getAnniversariesForDate(dateStr, effectiveAnniversaries);
   const getExistingNoteForParticipant = id => (dateEntries.find(entry => entry.participantId === id)?.note || '');
 
   const selectedPart = activeParticipants.find(p => p.id === participantId);
@@ -1992,40 +1997,35 @@ export function DateModal({
     style: { zIndex: 11000 }
   }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
     className: isBentoSheet ? "modal-container bp-event-sheet bp-is-open" : "modal-container",
+    role: "dialog",
+    "aria-modal": "true",
+    "aria-label": `${dateStr} 일정 상세`,
+    style: { maxWidth: '520px', width: '92%', maxHeight: '90vh', display: 'flex', flexDirection: 'column' },
     onClick: e => e.stopPropagation()
-  }, isBentoSheet ? /*#__PURE__*/React.createElement("div", { className: "bp-sheet-handle", "aria-hidden": true }) : null, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("div", {
     className: "modal-header",
     style: {
       display: 'flex',
-      flexDirection: 'column',
-      gap: 0,
-      // Padding lives on the title row only so UnderlineTabs can span the full modal width
-      // (flush hairline underline, matching 참여자|장소|정산|사진 edge-to-edge).
-      padding: 0,
-      borderBottom: 'none',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: '14px 18px',
+      borderBottom: '1px solid var(--border-subtle)',
       backgroundColor: 'var(--bg-card)'
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       alignItems: 'center',
-      justifyContent: 'space-between',
-      width: '100%',
-      padding: '8px 16px 8px 16px',
-      boxSizing: 'border-box'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      alignItems: 'center',
       gap: '8px',
-      flexWrap: 'wrap'
+      flexWrap: 'wrap',
+      minWidth: 0
     }
   }, /*#__PURE__*/React.createElement("span", {
     style: {
-      fontSize: '1.25rem',
-      fontWeight: 900,
-      color: 'var(--text-main)'
+      fontSize: '1.05rem',
+      fontWeight: 800,
+      color: 'var(--text-main)',
+      margin: 0
     }
   }, titleParts.year, /*#__PURE__*/React.createElement("span", {
     style: {
@@ -2069,7 +2069,8 @@ export function DateModal({
     style: {
       display: 'flex',
       alignItems: 'center',
-      gap: '12px'
+      gap: '8px',
+      flexShrink: 0
     }
   }, onAddAnniversaryForDate && /*#__PURE__*/React.createElement("button", {
     type: "button",
@@ -2087,7 +2088,7 @@ export function DateModal({
       display: 'flex',
       alignItems: 'center',
       whiteSpace: 'nowrap',
-      minHeight: 44,
+      minHeight: 34,
       boxSizing: 'border-box'
     },
     title: "이 날짜로 기념일 등록"
@@ -2116,9 +2117,10 @@ export function DateModal({
   }, SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }) : "✕"))), UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
     ariaLabel: "일정 탭",
     variant: "flush",
+    activeColor: "var(--brand, #7C2FE5)",
     value: activeTab,
     onChange: (id) => setActiveTab(id),
-    style: { backgroundColor: 'var(--bg-card)', width: '100%' },
+    style: { backgroundColor: 'var(--bg-card)', width: '100%', borderBottom: '1px solid var(--border-subtle)' },
     options: [
       { value: 'participant', label: /*#__PURE__*/React.createElement(React.Fragment, null, "참석", /*#__PURE__*/React.createElement(SectionCountBadge, { count: dateEntries.length })) },
       { value: 'meeting', label: /*#__PURE__*/React.createElement(React.Fragment, null, "장소", /*#__PURE__*/React.createElement(SectionCountBadge, { count: registeredPlaces.length })) },
@@ -2126,13 +2128,15 @@ export function DateModal({
       { value: 'photo', label: /*#__PURE__*/React.createElement(React.Fragment, null, "사진", /*#__PURE__*/React.createElement(SectionCountBadge, { count: visibleMeetingImages.length })) },
       { value: 'memo', label: /*#__PURE__*/React.createElement(React.Fragment, null, "메모", /*#__PURE__*/React.createElement(SectionCountBadge, { count: dateTaggedMemos.length })) }
     ]
-  })), /*#__PURE__*/React.createElement("form", {
+  }), /*#__PURE__*/React.createElement("form", {
+    style: { display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0, overflow: 'hidden' },
     onSubmit: e => {
       e.preventDefault();
       if (activeTab === 'participant') handleSubmit(e);
     }
   }, /*#__PURE__*/React.createElement("div", {
-    className: "modal-body"
+    className: "modal-body",
+    style: { flex: '1 1 auto', minHeight: 0, overflowY: 'auto', padding: '16px' }
   },
 
     /* TAB CONTENTS */
@@ -2149,7 +2153,7 @@ export function DateModal({
         const cultureLink = (ann.cultureSourceLink && String(ann.cultureSourceLink).trim()) || '';
         const hasDetail = !!(hasRealAnnPlace(ann) || ann.description || getAnnBannerDateDisplay(ann) || cultureLink || (ann.memo && String(ann.memo).trim()));
         const photos = getAnnBannerPhotos(ann);
-        const listIdx = Array.isArray(anniversaries) ? anniversaries.findIndex(a => a && a.id === ann.id) : -1;
+        const listIdx = Array.isArray(effectiveAnniversaries) ? effectiveAnniversaries.findIndex(a => a && a.id === ann.id) : -1;
         const anniversaryIndex = listIdx >= 0 ? listIdx + 1 : (aIdx + 1);
         const openAnniversaryLightbox = (startIndex) => {
           if (typeof setActiveLightbox !== 'function' || photos.length === 0) return;

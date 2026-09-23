@@ -3926,10 +3926,16 @@ function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind =
         className: "modal-container",
         onClick: e => e.stopPropagation(),
         role: "dialog",
-        "aria-label": "컨텐츠 등록"
+        "aria-label": "컨텐츠 등록",
+        style: { maxWidth: '520px', width: '92%', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }
       },
-        /*#__PURE__*/React.createElement("div", { className: "modal-header" },
-          /*#__PURE__*/React.createElement("h3", null, initialItem ? "컨텐츠 수정" : "컨텐츠 등록"),
+        /*#__PURE__*/React.createElement("div", {
+          className: "modal-header",
+          style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)' }
+        },
+          /*#__PURE__*/React.createElement("h3", {
+            style: { fontSize: '1.05rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' }
+          }, initialItem ? "컨텐츠 수정" : "컨텐츠 등록"),
           /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: '4px' } },
             !initialItem && /*#__PURE__*/React.createElement("button", {
               type: "button", onClick: handlePasteContentClick, disabled: saving,
@@ -3945,12 +3951,11 @@ function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind =
             }, SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }) : "✕")
           )
         ),
-        /*#__PURE__*/React.createElement("div", { className: "modal-body" },
         UnderlineTabs && /*#__PURE__*/React.createElement(UnderlineTabs, {
           ariaLabel: "컨텐츠 종류",
           value: kind,
           onChange: v => setKind(v),
-          style: { backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)' },
+          style: { backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)', height: '46px', flexShrink: 0 },
           options: [
             { value: 'performance', label: '문화공연' },
             { value: 'festival', label: '지역축제' },
@@ -3958,6 +3963,10 @@ function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind =
             { value: 'movie', label: '영화' }
           ]
         }),
+        /*#__PURE__*/React.createElement("div", {
+          className: "modal-body",
+          style: { flex: '1 1 auto', minHeight: 0, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }
+        },
         field("제목 *", /*#__PURE__*/React.createElement("input", {
           className: "form-input", type: "text", value: title, onChange: e => setTitle(e.target.value),
           placeholder: kind === 'festival' ? "축제 이름" : (kind === 'sports' ? "경기/대회 이름" : (kind === 'movie' ? "영화 제목" : "공연 제목")), maxLength: 120
@@ -4025,11 +4034,15 @@ function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind =
               onInput: e => autoGrowTextarea(e.target, 240),
               placeholder: "간단한 설명", rows: 3, maxLength: 2000,
               style: { resize: 'none', minHeight: '72px', overflow: 'hidden', width: '100%' }
-            })),
-        /*#__PURE__*/React.createElement("button", {
-          type: "button", className: "btn btn-primary btn-action", disabled: saving, onClick: handleSave,
-          style: { width: '100%', marginTop: '4px', height: '44px', minHeight: '44px', opacity: saving ? 0.7 : 1 }
-        }, saving ? "저장 중..." : "저장")
+            }))),
+        /*#__PURE__*/React.createElement("div", {
+          className: "modal-footer",
+          style: { flexShrink: 0, padding: '12px 18px', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'flex-end' }
+        },
+          /*#__PURE__*/React.createElement("button", {
+            type: "button", className: "btn btn-primary btn-action", disabled: saving, onClick: handleSave,
+            style: { width: '100%', height: '44px', minHeight: '44px', opacity: saving ? 0.7 : 1 }
+          }, saving ? "저장 중..." : "저장")
         )
       )
     ),
@@ -4744,8 +4757,8 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
           className: "modal-container",
           onClick: e => e.stopPropagation(),
           style: {
-            position: 'relative', width: '100%', maxWidth: '480px', maxHeight: '85vh',
-            backgroundColor: 'var(--bg-card)', borderRadius: '16px 16px 0 0', padding: '20px',
+            position: 'relative', width: '100%', maxWidth: '520px', maxHeight: '85vh',
+            backgroundColor: 'var(--bg-card)', borderRadius: '20px', padding: '20px',
             display: 'flex', flexDirection: 'column', gap: '10px', boxSizing: 'border-box'
           }
         },

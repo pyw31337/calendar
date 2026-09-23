@@ -572,16 +572,18 @@
 .renewal-shell.v2-design ~ .modal-overlay .v2-responsive-modal,
 html:has(.renewal-shell.v2-design) .modal-overlay .v2-responsive-modal,
 html:has(.renewal-shell.v2-design) .modal-overlay > .modal-container,
-html:has(.renewal-shell.v2-design) .modal-overlay > .modal {
+html:has(.renewal-shell.v2-design) .modal-overlay > .modal,
+html:has(.renewal-shell.v2-design) .modal-overlay .bp-event-sheet,
+.renewal-shell.v2-design .modal-overlay .bp-event-sheet {
   display: flex !important;
   flex-direction: column !important;
-  width: min(560px, calc(100vw - 48px)) !important;
-  max-width: 560px !important;
+  width: min(520px, calc(100vw - 48px)) !important;
+  max-width: 520px !important;
   max-height: min(86dvh, var(--gather-vv-modal-max, 860px)) !important;
   margin: 0 !important;
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
-  border-radius: 24px !important;
-  box-shadow: 0 24px 72px rgba(30, 27, 46, 0.26) !important;
+  border-radius: 20px !important;
+  box-shadow: 0 24px 64px rgba(30, 27, 46, 0.22) !important;
   background: #fff !important;
   overflow: hidden !important;
 }
@@ -720,11 +722,13 @@ html:has(.renewal-shell.v2-design) .modal-overlay .confirm-dialog-actions {
   .renewal-shell.v2-design ~ .modal-overlay .v2-responsive-modal,
   html:has(.renewal-shell.v2-design) .modal-overlay .v2-responsive-modal,
   html:has(.renewal-shell.v2-design) .modal-overlay > .modal-container,
-  html:has(.renewal-shell.v2-design) .modal-overlay > .modal {
+  html:has(.renewal-shell.v2-design) .modal-overlay > .modal,
+  html:has(.renewal-shell.v2-design) .modal-overlay .bp-event-sheet,
+  .renewal-shell.v2-design .modal-overlay .bp-event-sheet {
     width: 100vw !important;
     max-width: none !important;
     max-height: min(90dvh, var(--gather-vv-modal-max, 860px)) !important;
-    border-radius: 24px 24px 0 0 !important;
+    border-radius: 20px 20px 0 0 !important;
   }
 }
 

@@ -3081,9 +3081,9 @@ export function EditMessageModal({
     className: "modal-container",
     onClick: e => e.stopPropagation(),
     style: {
-      width: '90%',
-      maxWidth: '400px',
-      borderRadius: 'var(--radius-md)',
+      width: '92%',
+      maxWidth: '520px',
+      borderRadius: '20px',
       // Grow with content; ResizableModalContainer also clamps to visualViewport
       maxHeight: 'min(92vh, 100dvh)',
       display: 'flex',
@@ -3091,9 +3091,9 @@ export function EditMessageModal({
     }
   }, /*#__PURE__*/React.createElement("div", {
     className: "modal-header",
-    style: { padding: '16px', marginBottom: 0, flexShrink: 0 }
+    style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)', flexShrink: 0 }
   }, /*#__PURE__*/React.createElement("h3", {
-    style: { fontSize: '1rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }
+    style: { fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }
   }, "채팅 수정"), /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => { if (!isSubmitting) requestClose(); },
@@ -3282,7 +3282,7 @@ export function EditMessageModal({
     }, /*#__PURE__*/React.createElement("path", { d: "M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" }), /*#__PURE__*/React.createElement("rect", { x: "9", y: "3", width: "6", height: "4", rx: "1" }))))
   )), /*#__PURE__*/React.createElement("div", {
     className: "modal-footer",
-    style: { padding: '16px', justifyContent: 'space-between', alignItems: 'center' }
+    style: { display: 'flex', padding: '12px 18px', borderTop: '1px solid var(--border-subtle)', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }
   },
     /* Participant reassignment -- fixes a message posted under the wrong participant */
     /*#__PURE__*/React.createElement(ParticipantPickerButton, {

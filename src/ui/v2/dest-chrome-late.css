@@ -1300,7 +1300,7 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
  * MoreModalsHost (공유/설정) is a sibling of .renewal-shell, not a descendant.
  * Scope via :has() so the v2 chrome still applies.
  */
-html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay):not(.bp-sheet-backdrop) {
+html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -1310,9 +1310,10 @@ html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay):not
   padding: 24px !important;
   box-sizing: border-box !important;
 }
-html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay):not(.bp-sheet-backdrop) > .modal-container,
-html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay):not(.bp-sheet-backdrop) > .v2-responsive-modal,
-html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay):not(.bp-sheet-backdrop) > .modal {
+html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .modal-container,
+html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .v2-responsive-modal,
+html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .modal,
+html:has(.renewal-shell.v2-design) .modal-overlay .bp-event-sheet {
   position: relative !important;
   left: auto !important;
   right: auto !important;
@@ -1320,8 +1321,8 @@ html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay):not
   bottom: auto !important;
   margin: 0 auto !important;
   transform: none !important;
-  width: min(440px, calc(100vw - 48px)) !important;
-  max-width: 440px !important;
+  width: min(520px, calc(100vw - 48px)) !important;
+  max-width: 520px !important;
   max-height: min(86dvh, var(--gather-vv-modal-max, 860px)) !important;
   border-radius: 20px !important;
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
@@ -1345,8 +1346,9 @@ html:has(.renewal-shell.v2-design) .bottom-sheet-header {
 html:has(.renewal-shell.v2-design) .modal-overlay .modal-header h3,
 html:has(.renewal-shell.v2-design) .modal-overlay .modal-header h2,
 html:has(.renewal-shell.v2-design) .modal-overlay .modal-header > span:first-child,
+html:has(.renewal-shell.v2-design) .modal-overlay .modal-header > div:first-child,
 html:has(.renewal-shell.v2-design) .bottom-sheet-header h4 {
-  font-size: 0.96rem !important;
+  font-size: 1.05rem !important;
   font-weight: 800 !important;
   color: #1e1b2e !important;
   line-height: 1.2 !important;
@@ -1451,7 +1453,7 @@ html:has(.renewal-shell.v2-design) .admin-settings-modal .modal-body > div > div
   box-shadow: 0 2px 8px rgba(30, 27, 46, 0.04) !important;
 }
 @media (min-width: 1200px) {
-  html:has(.renewal-shell.v2-design:not(.is-side-collapsed)) .modal-overlay:not(.meme-preview-overlay):not(.bp-sheet-backdrop) {
+  html:has(.renewal-shell.v2-design:not(.is-side-collapsed)) .modal-overlay:not(.meme-preview-overlay) {
     left: 0 !important;
     right: 0 !important;
     width: 100vw !important;
@@ -1460,13 +1462,14 @@ html:has(.renewal-shell.v2-design) .admin-settings-modal .modal-body > div > div
   }
 }
 @media (max-width: 767px) {
-  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay):not(.bp-sheet-backdrop) {
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) {
     align-items: flex-end !important;
     padding: 0 !important;
   }
-  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay):not(.bp-sheet-backdrop) > .modal-container,
-  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay):not(.bp-sheet-backdrop) > .v2-responsive-modal,
-  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay):not(.bp-sheet-backdrop) > .modal {
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .modal-container,
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .v2-responsive-modal,
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .modal,
+  html:has(.renewal-shell.v2-design) .modal-overlay .bp-event-sheet {
     width: 100% !important;
     max-width: none !important;
     border-radius: 20px 20px 0 0 !important;
@@ -2143,8 +2146,8 @@ html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overla
     top: auto !important;
     bottom: auto !important;
     transform: none !important;
-    width: min(560px, calc(100vw - 48px)) !important;
-    max-width: 560px !important;
+    width: min(520px, calc(100vw - 48px)) !important;
+    max-width: 520px !important;
     max-height: 86dvh !important;
     margin: 0 !important;
     border-radius: 20px !important;
@@ -2172,8 +2175,8 @@ html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overla
     top: auto !important;
     bottom: auto !important;
     transform: none !important;
-    width: min(560px, calc(100vw - 32px)) !important;
-    max-width: 560px !important;
+    width: min(520px, calc(100vw - 32px)) !important;
+    max-width: 520px !important;
     max-height: 88dvh !important;
     margin: 0 auto !important;
     border-radius: 20px 20px 0 0 !important;

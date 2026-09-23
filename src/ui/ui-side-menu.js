@@ -130,14 +130,14 @@ export function AppSettingsModal({
       // component's existing presentation because its stylesheet is inert
       // outside `.renewal-shell.v2-design`.
       className: "modal-container v2-responsive-modal v2-settings-modal", onClick: e => e.stopPropagation(),
-      style: { maxWidth: '400px', width: '92%', backgroundColor: 'var(--bg-card)', borderRadius: '16px', border: '1px solid var(--border-subtle)', overflow: 'hidden' }
+      style: { maxWidth: '520px', width: '92%', maxHeight: '90vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg-card)', borderRadius: '20px', border: '1px solid var(--border-subtle)', overflow: 'hidden' }
     },
-      /*#__PURE__*/React.createElement("div", { className: "modal-header", style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border-subtle)' } },
-        /*#__PURE__*/React.createElement("span", { style: { fontWeight: 900, fontSize: '0.98rem' } }, "설정"),
+      /*#__PURE__*/React.createElement("div", { className: "modal-header", style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)' } },
+        /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '1.05rem', margin: 0, color: 'var(--text-main)' } }, "설정"),
         /*#__PURE__*/React.createElement("button", { type: "button", onClick: onClose, className: "modal-close-btn", "aria-label": "설정 닫기", style: { background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' } },
           SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }) : "✕")
       ),
-      /*#__PURE__*/React.createElement("div", { className: "modal-body", style: { padding: '12px 16px 20px', display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '70vh', overflowY: 'auto' } },
+      /*#__PURE__*/React.createElement("div", { className: "modal-body", style: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '4px', flex: '1 1 auto', minHeight: 0, overflowY: 'auto' } },
         /* Weather region — above dark mode */
         /*#__PURE__*/React.createElement("div", { style: { padding: '6px 0 12px', display: 'flex', flexDirection: 'column', gap: '8px' } },
           /*#__PURE__*/React.createElement("div", {
@@ -284,15 +284,15 @@ export function NotificationOnboardingModal({ onClose, isMasterNotifyEnabled, on
   return /*#__PURE__*/React.createElement("div", { className: "modal-overlay", style: { zIndex: 13000 } },
     /*#__PURE__*/React.createElement("div", {
       className: "modal-container", onClick: e => e.stopPropagation(),
-      style: { maxWidth: '400px', width: '92%', backgroundColor: 'var(--bg-card)', borderRadius: '16px', border: '1px solid var(--border-subtle)', overflow: 'hidden' }
+      style: { maxWidth: '520px', width: '92%', maxHeight: '90vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg-card)', borderRadius: '20px', border: '1px solid var(--border-subtle)', overflow: 'hidden' }
     },
-      /*#__PURE__*/React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border-subtle)' } },
-        /*#__PURE__*/React.createElement("span", { style: { fontWeight: 900, fontSize: '0.98rem', display: 'flex', alignItems: 'center', gap: '6px' } },
+      /*#__PURE__*/React.createElement("div", { className: "modal-header", style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)' } },
+        /*#__PURE__*/React.createElement("span", { style: { fontWeight: 800, fontSize: '1.05rem', margin: 0, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' } },
           BellIcon && /*#__PURE__*/React.createElement(BellIcon, null), "알림 허용 안내"),
         /*#__PURE__*/React.createElement("button", { type: "button", onClick: onClose, style: { background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' } },
           SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }) : "✕")
       ),
-      /*#__PURE__*/React.createElement("div", { style: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' } },
+      /*#__PURE__*/React.createElement("div", { className: "modal-body", style: { padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px', flex: '1 1 auto', minHeight: 0, overflowY: 'auto' } },
         /*#__PURE__*/React.createElement("div", {
           className: "admin-side-menu-setting-row",
           style: { padding: '14px 12px', borderRadius: '12px', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)' }

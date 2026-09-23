@@ -1453,15 +1453,15 @@ export function AnniversaryModal({
         style: { zIndex: 11000 }
       }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
         className: "modal-container",
-        style: { maxWidth: '440px', width: '90%', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)' },
+        style: { maxWidth: '520px', width: '92%', maxHeight: '90vh', display: 'flex', flexDirection: 'column' },
         onClick: e => e.stopPropagation()
       },
         /*#__PURE__*/React.createElement("div", {
           className: "modal-header",
-          style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--border-subtle)' }
+          style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)' }
         },
           /*#__PURE__*/React.createElement("span", {
-            style: { fontSize: '0.96rem', fontWeight: '900', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }
+            style: { fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }
           }, /*#__PURE__*/React.createElement("svg", {
             xmlns: "http://www.w3.org/2000/svg", width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round"
           }, /*#__PURE__*/React.createElement("path", { d: "M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8" }), /*#__PURE__*/React.createElement("path", { d: "M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1" }), /*#__PURE__*/React.createElement("path", { d: "M2 21h20" }), /*#__PURE__*/React.createElement("path", { d: "M7 8v3" }), /*#__PURE__*/React.createElement("path", { d: "M12 8v3" }), /*#__PURE__*/React.createElement("path", { d: "M17 8v3" }), /*#__PURE__*/React.createElement("path", { d: "M7 4h.01" }), /*#__PURE__*/React.createElement("path", { d: "M12 4h.01" }), /*#__PURE__*/React.createElement("path", { d: "M17 4h.01" })), "기념일 & 반복 일정 설정"),
@@ -4455,12 +4455,13 @@ export function PollModal({ calendar, poll, onSave, onClose, showToast, onReques
     style: { zIndex: 12000 }
   }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
     className: "modal-container",
+    style: { maxWidth: '520px', width: '92%', maxHeight: '90vh', display: 'flex', flexDirection: 'column' },
     onClick: e => e.stopPropagation()
   }, /*#__PURE__*/React.createElement("div", {
     className: "modal-header",
-    style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' }
+    style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)' }
   }, /*#__PURE__*/React.createElement("h3", {
-    style: { fontSize: '1.1rem', fontWeight: 800 }
+    style: { fontSize: '1.05rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' }
   }, isEditing ? "\uD22C\uD45C \uC218\uC815" : "\uD22C\uD45C \uC0DD\uC131"), /*#__PURE__*/React.createElement("div", {
     style: { display: 'flex', alignItems: 'center', gap: '10px', marginLeft: 'auto' }
   }, createdAtText && /*#__PURE__*/React.createElement("span", {
@@ -4472,9 +4473,11 @@ export function PollModal({ calendar, poll, onSave, onClose, showToast, onReques
     },
     style: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }
   }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 })))), /*#__PURE__*/React.createElement("form", {
-    onSubmit: handleSubmit
+    onSubmit: handleSubmit,
+    style: { display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0, overflow: 'hidden' }
   }, /*#__PURE__*/React.createElement("div", {
-    className: "modal-body"
+    className: "modal-body",
+    style: { flex: '1 1 auto', minHeight: 0, overflowY: 'auto', padding: '16px' }
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     style: { display: 'block', fontSize: 'var(--font-size-base)', fontWeight: 700, marginBottom: '6px', color: 'var(--text-muted)' }
   }, "\uD22C\uD45C\uBA85"), /*#__PURE__*/React.createElement("input", {
@@ -4614,7 +4617,8 @@ export function PollModal({ calendar, poll, onSave, onClose, showToast, onReques
       }
     }
     }, /*#__PURE__*/React.createElement(TrashIcon, { size: 20 })))))), /*#__PURE__*/React.createElement("div", {
-    className: "modal-footer"
+    className: "modal-footer",
+    style: { flexShrink: 0, display: 'flex', justifyContent: 'flex-end', gap: '8px', padding: '12px 18px', borderTop: '1px solid var(--border-subtle)' }
   },
     isEditing && /*#__PURE__*/React.createElement("button", {
       type: "button",

@@ -1460,10 +1460,10 @@ export function AdminUnifiedSearchModal({ onClose, onSearch }) {
   }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
     className: "modal-container",
     onClick: e => e.stopPropagation(),
-    style: { maxWidth: '440px' }
+    style: { maxWidth: '520px', width: '92%', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }
   },
-    /*#__PURE__*/React.createElement("div", { className: "modal-header" },
-      /*#__PURE__*/React.createElement("h3", { style: { fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' } },
+    /*#__PURE__*/React.createElement("div", { className: "modal-header", style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)' } },
+      /*#__PURE__*/React.createElement("h3", { style: { fontSize: '1.05rem', fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' } },
         /*#__PURE__*/React.createElement(SearchIcon, null), "통합검색"
       ),
       /*#__PURE__*/React.createElement("button", {
@@ -1471,7 +1471,7 @@ export function AdminUnifiedSearchModal({ onClose, onSearch }) {
         style: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center' }
       }, /*#__PURE__*/React.createElement(SmallXIcon, { size: 20 }))
     ),
-    /*#__PURE__*/React.createElement("div", { className: "modal-body" },
+    /*#__PURE__*/React.createElement("div", { className: "modal-body", style: { padding: '16px', display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0, overflowY: 'auto' } },
       /*#__PURE__*/React.createElement("p", { style: { fontSize: 'var(--font-size-md)', color: 'var(--text-muted)', margin: '0 0 10px' } },
         "모든 캘린더의 일정, 대화, 투표, 사진 태그를 한번에 검색합니다."
       ),
