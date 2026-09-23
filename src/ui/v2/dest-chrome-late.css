@@ -2473,10 +2473,11 @@ html:has(.renewal-shell.v2-design) .bp-event-sheet .underline-tabs button[aria-s
   background: var(--brand, #7C2FE5) !important;
 }
 
-/* Calendar home: purple circle menu button (same FAB as memo), phone/tablet only.
- * Desktop already keeps the side rail open, so the header hamburger is gone
- * and this button is the mobile opener. */
-.v2-design .bp-home-menu-fab {
+/* Calendar home and destination pages: purple circle menu button, phone/tablet only.
+ * Gallery, content, and archive share .bp-menu-fab and had no size/radius, so the
+ * control collapsed to a small square around the icon. Desktop keeps the side rail. */
+.v2-design .bp-home-menu-fab,
+.v2-design .bp-menu-fab {
   position: fixed !important;
   right: 20px !important;
   bottom: calc(24px + env(safe-area-inset-bottom, 0px)) !important;
@@ -2484,18 +2485,23 @@ html:has(.renewal-shell.v2-design) .bp-event-sheet .underline-tabs button[aria-s
   height: 52px !important;
   min-width: 52px !important;
   min-height: 52px !important;
+  max-width: 52px !important;
+  max-height: 52px !important;
   padding: 0 !important;
   border-radius: 50% !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
+  box-sizing: border-box !important;
   z-index: 40 !important;
   cursor: pointer;
 }
-.v2-design .bp-home-menu-fab svg {
+.v2-design .bp-home-menu-fab svg,
+.v2-design .bp-menu-fab svg {
   width: 22px !important;
   height: 22px !important;
   display: block !important;
+  flex: 0 0 22px !important;
 }
 @media (min-width: 1200px) {
   .v2-design .bp-home-menu-fab,
