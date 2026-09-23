@@ -689,6 +689,7 @@ export function PlacesScreen(p) {
     h(IconButton, {
       label: '지도보기',
       icon: 'map',
+      active: mapOpen,
       onClick: () => {
         setMapOpen(value => !value);
         if (p.onToggleMap) p.onToggleMap();
@@ -1516,12 +1517,13 @@ function makeTabbedScreen(name, title) {
         typeof p.onOpenRegion === 'function' && h(IconButton, { label: '지역설정', icon: 'map2', onClick: p.onOpenRegion }),
         typeof p.onOpenRegister === 'function' && h(IconButton, { label: '컨텐츠 등록', icon: 'scriptPlus', onClick: p.onOpenRegister }),
         typeof p.onSetGridCols === 'function' && h(IconButton, {
-          label: '그리드뷰', icon: 'layoutColumns', active: p.gridCols !== '1',
-          onClick: () => p.onSetGridCols('2'),
-        }),
-        typeof p.onSetGridCols === 'function' && h(IconButton, {
-          label: '리스트뷰', icon: 'layoutRows', active: p.gridCols === '1',
-          onClick: () => p.onSetGridCols('1'),
+          // Single toggle instead of two separate grid/list buttons -- the icon shows the view
+          // it switches TO (list icon while already in grid view, and vice versa), same as the
+          // 지도보기 map toggle: active (purple) reflects the current mode, here "grid view on".
+          label: p.gridCols === '1' ? '그리드뷰로 전환' : '리스트뷰로 전환',
+          icon: p.gridCols === '1' ? 'layoutColumns' : 'layoutRows',
+          active: p.gridCols !== '1',
+          onClick: () => p.onSetGridCols(p.gridCols === '1' ? '2' : '1'),
         }),
       ])
       : null);
