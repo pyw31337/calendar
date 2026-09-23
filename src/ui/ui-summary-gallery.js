@@ -1017,8 +1017,9 @@ export function SummaryList({
     const dateEntries = (dateMap[d] || []).filter(e => (participantsMap[e.participantId] || e.participantId === BULK_NO_PARTICIPANT_ID) && !isTombstone(e));
     const memoEntries = dateEntries.filter(e => e.note && e.note.trim().length > 0);
     const isPast = d < todayStr;
-    const ddayLabel = isPast ? '지난 모임' : (() => {
+    const ddayLabel = (() => {
       const dday = calculateDday(d);
+      if (isPast) return `D+${Math.abs(dday)}`;
       return dday <= 0 ? 'D-DAY' : `D-${dday}`;
     })();
     return /*#__PURE__*/React.createElement("button", {
@@ -2178,8 +2179,9 @@ export function HistoryView({
         const dateEntries = (dateMap[d] || []).filter(e => (participantsMap[e.participantId] || e.participantId === BULK_NO_PARTICIPANT_ID) && !isTombstone(e));
         const memoEntries = dateEntries.filter(e => e.note && e.note.trim().length > 0);
         const isPast = d < todayStr;
-        const ddayLabel = isPast ? '지난 모임' : (() => {
+        const ddayLabel = (() => {
           const dday = calculateDday(d);
+          if (isPast) return `D+${Math.abs(dday)}`;
           return dday <= 0 ? 'D-DAY' : `D-${dday}`;
         })();
         const datePlaces = getCalendarPlaces(calendar).filter(p => doesPlaceMatchDate(p, d));
