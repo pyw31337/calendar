@@ -1553,7 +1553,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 .v2-design .v2-page-header .bp-header-title {
   font-size: 0.98rem !important;
   font-weight: 800 !important;
-  color: #1e1b2e !important;
+  color: var(--text-main) !important;
   line-height: 1.25;
 }
 .v2-design .v2-page-header .bp-header-sub {

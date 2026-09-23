@@ -825,7 +825,7 @@ html:has(.renewal-shell.v2-design) .modal-overlay .confirm-dialog-actions {
 }
 
 .renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-card-title {
-  color: #1e1b2e !important;
+  color: var(--text-main) !important;
   font-size: 1rem !important;
   font-weight: 800 !important;
   line-height: 1.25 !important;
