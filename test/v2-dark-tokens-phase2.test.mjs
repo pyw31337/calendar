@@ -9,6 +9,9 @@ const files = [
   'src/ui/v2/dest-chrome-late.css',
   'src/ui/v2/screens.css',
   'src/ui/v2/design.css',
+  'src/ui/v2/responsive-audit.css',
+  'src/ui/v2/chat-bubble-modules.css',
+  'src/ui/v2/segmented-toggle.css',
 ];
 
 const BG_FFF =

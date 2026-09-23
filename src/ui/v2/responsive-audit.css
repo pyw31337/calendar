@@ -437,13 +437,13 @@
  * third-level chips and cards below them share the explicit 40px / 20px body
  * gutter so the right grid-switcher no longer drifts away from the content. */
 .renewal-shell.v2-design .v2-content .history-header-stack {
-  background: #fff !important;
+  background: var(--bg-card) !important;
   border-bottom: 1px solid var(--v2-card-border, #eceaf5);
 }
 
 .renewal-shell.v2-design .v2-content .underline-tabs {
   min-height: 50px;
-  background: #fff !important;
+  background: var(--bg-card) !important;
   border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
 }
 
@@ -470,13 +470,13 @@
 
 .renewal-shell.v2-design .v2-content .history-header-stack > div:not([class]) {
   padding: 0 !important;
-  background: #fff !important;
+  background: var(--bg-card) !important;
 }
 
 .renewal-shell.v2-design .v2-content .history-header-stack > div:not([class]) > .bp-cat-scroll-row {
   padding-top: 6px !important;
   padding-bottom: 10px !important;
-  background: #fff !important;
+  background: var(--bg-card) !important;
   gap: 6px !important;
 }
 
@@ -584,7 +584,7 @@ html:has(.renewal-shell.v2-design) .modal-overlay .bp-event-sheet,
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
   border-radius: 20px !important;
   box-shadow: 0 24px 64px rgba(30, 27, 46, 0.22) !important;
-  background: #fff !important;
+  background: var(--bg-card) !important;
   overflow: hidden !important;
 }
 
@@ -606,7 +606,7 @@ html:has(.renewal-shell.v2-design) .modal-overlay .modal-header {
   flex-shrink: 0 !important;
   padding: 14px 18px !important;
   border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
-  background: #fff !important;
+  background: var(--bg-card) !important;
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
@@ -636,7 +636,7 @@ html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"] {
   flex-shrink: 0 !important;
   display: flex !important;
   width: 100% !important;
-  background: #fff !important;
+  background: var(--bg-card) !important;
   border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
   box-sizing: border-box !important;
 }
@@ -700,7 +700,7 @@ html:has(.renewal-shell.v2-design) .modal-overlay .confirm-dialog-actions {
   position: sticky !important;
   bottom: 0 !important;
   border-top: 1px solid var(--v2-card-border, #eceaf5) !important;
-  background: #fff !important;
+  background: var(--bg-card) !important;
   padding: 12px 18px !important;
   display: flex !important;
   align-items: center !important;
@@ -779,7 +779,7 @@ html:has(.renewal-shell.v2-design) .modal-overlay .confirm-dialog-actions {
   padding: 0 !important;
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
   border-radius: 999px !important;
-  background: #fff !important;
+  background: var(--bg-card) !important;
   color: #6b6580 !important;
   box-shadow: none !important;
 }
@@ -806,7 +806,7 @@ html:has(.renewal-shell.v2-design) .modal-overlay .confirm-dialog-actions {
  * surface, title/meta rhythm, plain purple tags, hidden writer capsule, and
  * compact soft-purple comment rows. Interactivity remains on live MemoCard. */
 .renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-card-contract {
-  background: #fff !important;
+  background: var(--bg-card) !important;
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
   border-radius: 14px !important;
   box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important;

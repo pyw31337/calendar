@@ -20,7 +20,7 @@ html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"]:not(.underlin
   box-sizing: border-box !important;
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
   border-radius: 999px !important;
-  background: #fff !important;
+  background: var(--bg-card) !important;
   box-shadow: none !important;
   gap: 0 !important;
 }
