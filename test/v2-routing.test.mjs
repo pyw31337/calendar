@@ -177,7 +177,9 @@ test('V2 destination screens keep live feature entry points', async () => {
   assert.match(screens, /Fab\(/);
   assert.match(screens, /label: '메모 등록'|label: '메모 작성'/);
   assert.match(screens, /label: '장소 등록'/);
-  assert.match(screens, /label: '지출 추가'/);
+  // Settlement compose moved off the purple FAB onto header IconButtons (정산 생성 /
+  // 정산 목록); the FAB is now the shared page menu, same as memo/places.
+  assert.match(screens, /label: '정산 생성'/);
   assert.match(screens, /label: '지도보기'|label: '지도로 보기'|icon: 'map'/);
   assert.match(screens, /onShare/);
   assert.match(screens, /bp-composer-input|composer/);
@@ -236,7 +238,11 @@ test('V2 shell renders the same app-wide toast as v1', async () => {
   const appMain = readFileSync(new URL('../src/core/app-main.js', import.meta.url), 'utf8');
   assert.match(shell, /\btoast\b[\s\S]{0,40}dismissToast|dismissToast[\s\S]{0,40}\btoast\b/, 'RenewalAppShell must accept toast + dismissToast as props');
   assert.match(shell, /className:\s*`toast \$\{/, 'RenewalAppShell must render the same .toast markup v1 uses');
-  assert.match(appMain, /renderRenewalShellIfEnabled\([\s\S]*?\btoast,\s*dismissToast\s*\}/, 'CalendarApp must pass its live toast/dismissToast state into the v2 shell');
+  // globalOverlays may grow (confirmDialog/setConfirmDialog were appended after toast);
+  // require toast+dismissToast in that object, not that they are the final keys before '}'.
+  assert.match(appMain, /renderRenewalShellIfEnabled\([\s\S]*?\{\s*chatUploadProgress,\s*operationProgress,\s*toast,\s*dismissToast\b/, 'CalendarApp must pass its live toast/dismissToast state into the v2 shell');
+  assert.match(appMain, /renderRenewalShellIfEnabled\([\s\S]*?\bconfirmDialog,\s*setConfirmDialog\s*\}/, 'CalendarApp must also pass confirmDialog into the v2 shell (anniversary delete etc.)');
+  assert.match(shell, /ConfirmDialog/, 'RenewalAppShell must mount ConfirmDialog when confirmDialog is set');
 });
 
 // Regression: BentoCalendarCard (the V2 캘린더 home tab) reimplements the whole month grid from
