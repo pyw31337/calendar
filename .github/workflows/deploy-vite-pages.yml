@@ -67,12 +67,53 @@ jobs:
       # that way. keep_files: true is what makes root/preview coexistence possible: without it,
       # actions-gh-pages force-orphans the branch on every push and would wipe out any live PR
       # preview folders on the next production deploy.
+      # peaceiris/actions-gh-pages clones gh-pages once and pushes. PR preview
+      # jobs publish the same branch at the same time, so that push is rejected
+      # ("fetch first") and the whole deploy goes red even though the build is
+      # fine. Publish here with a fresh clone on every attempt.
       - name: Publish to gh-pages
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: dist
-          keep_files: true
-          user_name: 'github-actions[bot]'
-          user_email: 'github-actions[bot]@users.noreply.github.com'
-          commit_message: 'deploy: production build from ${{ github.sha }}'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEPLOY_SHA: ${{ github.sha }}
+        run: |
+          set -uo pipefail
+          for attempt in 1 2 3 4 5; do
+            echo "[publish] attempt ${attempt}/5"
+            dir=$(mktemp -d)
+            if ! git clone --depth=1 --single-branch --branch gh-pages \
+              "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$dir"; then
+              echo "[publish] clone failed"
+              rm -rf "$dir"
+              sleep $((attempt * 3))
+              continue
+            fi
+            # Overlay the production build. Keep pr-preview/ and older hashed
+            # assets (same contract as peaceiris keep_files: true).
+            cp -a dist/. "$dir/"
+            rm -rf "$dir/.github"
+            touch "$dir/.nojekyll"
+            git -C "$dir" add --all
+            if git -C "$dir" diff --cached --quiet; then
+              echo "[publish] already up to date"
+              rm -rf "$dir"
+              exit 0
+            fi
+            if ! git -C "$dir" -c user.name='github-actions[bot]' \
+              -c user.email='github-actions[bot]@users.noreply.github.com' \
+              commit -m "deploy: production build from ${DEPLOY_SHA}"; then
+              echo "[publish] commit failed"
+              rm -rf "$dir"
+              sleep $((attempt * 3))
+              continue
+            fi
+            if git -C "$dir" push origin HEAD:gh-pages; then
+              echo "[publish] pushed"
+              rm -rf "$dir"
+              exit 0
+            fi
+            echo "[publish] push rejected; another job updated gh-pages"
+            rm -rf "$dir"
+            sleep $((attempt * 3))
+          done
+          echo "[publish] failed after 5 attempts"
+          exit 1
