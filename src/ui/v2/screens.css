@@ -4,7 +4,7 @@
   /* First-class pane inside renewal-shell-main (beside side rail) — not a viewport overlay. */
   position: relative; inset: auto; z-index: 1; overflow-y: auto; overflow-x: hidden;
   min-height: 100dvh; width: 100%;
-  background: var(--bg-primary); color: #1e1b2e; font-family: var(--font-sans);
+  background: var(--bg-primary); color: var(--text-main); font-family: var(--font-sans);
   padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 .v2-design .v2-fullscreen > .bp-app-shell {
@@ -685,7 +685,7 @@
 .v2-design .v2-archive-legacy .places-view-header [style*="fontWeight"] {
   font-weight: 800 !important;
   font-size: 0.96rem !important;
-  color: #1e1b2e !important;
+  color: var(--text-main) !important;
 }
 .v2-design .v2-embed-frame {
   display: flex;
@@ -1048,7 +1048,7 @@
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
   border-radius: 14px !important;
   box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important;
-  color: #1e1b2e !important;
+  color: var(--text-main) !important;
   font-size: 0.86rem !important;
   line-height: 1.45 !important;
   padding: 8px 12px !important;
@@ -1198,7 +1198,7 @@
 .v2-design .v2-places .place-card-row strong {
   font-size: 0.88rem !important;
   font-weight: 800 !important;
-  color: #1e1b2e !important;
+  color: var(--text-main) !important;
 }
 .v2-design .v2-places .places-list-toolbar {
   padding: 20px var(--v2-dest-content-pad-x) 14px !important;
@@ -2120,7 +2120,7 @@
 .v2-design .v2-chat .msg-row-hover > div > div[style*="background-color"] {
   background: var(--bg-card) !important;
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
-  color: #1e1b2e !important;
+  color: var(--text-main) !important;
   box-shadow: none !important;
 }
 
@@ -2184,7 +2184,7 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  color: #1e1b2e;
+  color: var(--text-main);
   white-space: nowrap;
 }
 .v2-design .v2-page-header .bp-header-brand-mark {

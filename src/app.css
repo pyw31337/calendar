@@ -6625,10 +6625,13 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
   .renewal-shell-side-nav-brand::before { content: none !important; display: none !important; }
 }
 
-/* V2 reference parity overrides (must remain after the shell's base rules). */
+/* V2 reference parity overrides (must remain after the shell's base rules). These re-pin
+   --renewal-bg/card/text/muted after the shell's own base rule above (line ~6268) already set
+   them to theme tokens -- they must stay theme-aware too (var(--bg-primary) etc.), or every V2
+   page silently goes back to hardcoded light colors regardless of dark mode. */
 .renewal-shell {
-  --renewal-page-max: 1080px; --renewal-bg: #FAFAFC; --renewal-card: #FFFFFF;
-  --renewal-border: var(--border-subtle); --renewal-text: #1E1B2E; --renewal-muted: #6B6580;
+  --renewal-page-max: 1080px; --renewal-bg: var(--bg-primary); --renewal-card: var(--bg-card);
+  --renewal-border: var(--border-subtle); --renewal-text: var(--text-main); --renewal-muted: var(--text-muted);
   background: var(--renewal-bg);
   font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Noto Sans KR', sans-serif;
 }

@@ -1,8 +1,8 @@
 # V2 → 기본 URL(`?id=cw`) 덮어쓰기 핸드오프
 
 **이 문서의 독자:** Grok / Codex / Claude / Gemini / 사람 — 세션 없이 이 저장소만 보고 V2를 기본 셸로 올리는 작업을 이어갈 수 있어야 한다.  
-**최종 갱신:** 2026-09-23 16:15 KST (`main` @ `3b805904`, 다크 Phase1–3 #736/#737/#738/#739 머지)  
-**상태 한 줄:** **아직 기본 주소를 V2로 바꾸지 말 것.** V2는 `?shell=v2` 옵트인. 다크 토큰 Phase1–3 머지됨. 다음: **라이브 다크 재QA → 잔여 밝은 표면 → Safari 채팅 VV**. 다크 상세: [`docs/v2-dark-mode-handoff.md`](./v2-dark-mode-handoff.md).
+**최종 갱신:** 2026-09-23 (Claude, PR #741 — 로컬+라이브 프리뷰 재QA 완료, 머지 대기)  
+**상태 한 줄:** **아직 기본 주소를 V2로 바꾸지 말 것.** V2는 `?shell=v2` 옵트인. 다크 토큰 Phase1–3 머지됨 + Phase4(근본원인: `.renewal-shell` 변수 재하드코딩)는 PR #741로 ready-for-review, GitHub Pages 프리뷰에서 8개 화면 라이브 재QA까지 끝남. 다음: **PR #741 머지 → Confirm/토스트/알림헬프 모달 다크 QA → Safari 채팅 VV**. 다크 상세: [`docs/v2-dark-mode-handoff.md`](./v2-dark-mode-handoff.md).
 
 관련 문서:
 
@@ -31,7 +31,7 @@
 3. **지금은 `?id=cw`에 V2를 덮으면 안 된다.** 코드 리뷰(2026-09-23) 결론: P0 다크모드 + P0 사파리 채팅 VV 미검증 + (완화됨) 알림 권한 도움말은 #734로 마운트됨.
 4. 컷오버는 **플래그 한 줄이 아니다.** 플래그 + 라우팅/URL 빌더 + 히스토리 가드 + `index.html` + 테스트/스모크를 같은 predicate로 맞춰야 한다. 탈출구는 한 릴리스 동안 `?shell=v1`.
 5. **절대 Actions “applicator / push_files / base64 패치 워크플로”로 소스에 외과 수술하지 말 것.** #729–#732(갤러리), #733(알림)에서 CI가 도배됐다. 일반 브랜치 → `gh pr` → 머지만 사용.
-6. 다음 착수 유닛: **다크 라이브 재QA + 잔여 표면** (Phase1–3 코드는 머지됨). 상세 [`v2-dark-mode-handoff.md`](./v2-dark-mode-handoff.md). 새 토글 금지 — `themeChoice` 유지. 그다음 Safari 채팅 VV.
+6. 다음 착수 유닛: **PR #741 머지 확인 → 남은 모달/토스트 다크 QA** (Phase1–3 머지됨, Phase4=PR #741은 헤더 타이틀·카드 제목이 안 보이던 근본원인을 잡고 라이브 프리뷰까지 재QA 완료, ready-for-review). 상세 [`v2-dark-mode-handoff.md`](./v2-dark-mode-handoff.md). 새 토글 금지 — `themeChoice` 유지. 그다음 Safari 채팅 VV.
 
 ---
 
@@ -137,7 +137,7 @@ V2 어댑터(`buildRenewal*Context`)가 CalendarApp 상태 + 기존 뷰(`ChatRoo
 
 ---
 
-## 6. 다크모드 (Phase1–3 코드 완료 — 재QA·잔여)
+## 6. 다크모드 (Phase1–3 머지, Phase4 로컬 검증 완료 — PR 대기)
 
 **전용 문서:** [`docs/v2-dark-mode-handoff.md`](./v2-dark-mode-handoff.md) — 여기보다 그쪽을 우선 갱신.
 
@@ -154,15 +154,18 @@ V2 어댑터(`buildRenewal*Context`)가 CalendarApp 상태 + 기존 뷰(`ChatRoo
 | 2 late chrome/screens/design 표면 | #737 | 머지 |
 | 2b audit/bubbles/segmented | #738 | 머지 |
 | 3 `app.css` is-chat/is-records `!important` | #739 | 머지 |
+| 4 `.renewal-shell` `--renewal-*` 변수 재하드코딩 근본원인 + `src/ui/v2` 잔여 리터럴 `#1e1b2e` | **PR #741** | ready-for-review, 라이브 프리뷰 재QA 완료, 머지 대기 |
+
+Phase 4는 Phase 1–3이 놓친 **더 근본적인 원인**이었다: `src/app.css`의 `.renewal-shell { /* V2 reference parity overrides */ }` 블록이 `--renewal-bg`/`--renewal-card`/`--renewal-text`/`--renewal-muted`를 하드코딩 라이트 hex로 재정의하고 있었고, `.renewal-shell-main`을 포함한 대부분의 V2 콘텐츠가 `color: var(--renewal-text)`를 상속하므로 모든 페이지 헤더 타이틀·메모 카드 제목·정산 라벨이 다크에서 거의 안 보였다. 상세는 [`v2-dark-mode-handoff.md`](./v2-dark-mode-handoff.md) §1 Phase 4 행·§2 참고.
 
 ### 다음
 
-1. 라이브 다크 재QA (채팅/메모가 Phase3 전엔 밝았음 — 재확인 필수).
-2. 홈 모임확정 카드 등 잔여 밝은 표면.
-3. 장소·정산·갤러리·컨텐츠·보관함·모달 스윕.
+1. PR #741 머지 확인 (채팅/메모/장소/정산/갤러리/컨텐츠/보관함 8개 화면 텍스트 색은 로컬 빌드 + PR 프리뷰 라이브 배포본 양쪽에서 이미 재확인 완료).
+2. Confirm·토스트·알림헬프 등 모달도 다크에서 스크린샷 확인 (이번 QA에서는 아직 안 봄).
+3. 홈 모임확정 카드 등 남아있을 수 있는 잔여 밝은 표면.
 4. 통과 후 Safari 채팅 VV (§4 순서 유지).
 
-가드 테스트: `test/v2-dark-tokens-phase{1,2,3}.test.mjs`
+가드 테스트: `test/v2-dark-tokens-phase{1,2,3,4}.test.mjs`
 
 ---
 
@@ -172,6 +175,7 @@ V2 어댑터(`buildRenewal*Context`)가 CalendarApp 상태 + 기존 뷰(`ChatRoo
 
 | PR | 내용 |
 | --- | --- |
+| *(대기)* | 다크 Phase4 — `.renewal-shell` `--renewal-*` 변수 재하드코딩 근본원인 수정 + `src/ui/v2` 잔여 리터럴 `#1e1b2e` 정리 |
 | **#739** | 다크 Phase3 — `app.css` chat/memo `#FAFAFC/#FFFFFF !important` → 테마 토큰 |
 | **#738** | 다크 Phase2b — responsive-audit / bubbles / segmented |
 | **#737** | 다크 Phase2 — dest-chrome-late / screens / design 표면 |

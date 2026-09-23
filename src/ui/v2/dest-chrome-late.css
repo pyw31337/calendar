@@ -1356,7 +1356,7 @@ html:has(.renewal-shell.v2-design) .modal-overlay .modal-header > div:first-chil
 html:has(.renewal-shell.v2-design) .bottom-sheet-header h4 {
   font-size: 1.05rem !important;
   font-weight: 800 !important;
-  color: #1e1b2e !important;
+  color: var(--text-main) !important;
   line-height: 1.2 !important;
   margin: 0 !important;
   display: flex !important;
@@ -1408,7 +1408,7 @@ html:has(.renewal-shell.v2-design) .modal-overlay .modal-close-btn:hover,
 html:has(.renewal-shell.v2-design) .modal-overlay .bp-sheet-close:hover,
 html:has(.renewal-shell.v2-design) .bottom-sheet-header button:last-child:hover {
   background-color: rgba(30, 27, 46, 0.06) !important;
-  color: #1e1b2e !important;
+  color: var(--text-main) !important;
 }
 html:has(.renewal-shell.v2-design) .modal-overlay .modal-header button:last-child svg,
 html:has(.renewal-shell.v2-design) .modal-overlay .modal-close-btn svg,
@@ -1522,7 +1522,7 @@ html:has(.renewal-shell.v2-design) .bottom-sheet-header {
 html:has(.renewal-shell.v2-design) .bottom-sheet-header h4 {
   font-size: 1.05rem !important;
   font-weight: 800 !important;
-  color: #1e1b2e !important;
+  color: var(--text-main) !important;
 }
 
 /* Extra labelled pills that share the same 22px geometry. */
@@ -2743,7 +2743,7 @@ html:has(.renewal-shell.v2-design) .v2-chat-jump-row .v2-chat-scroll-bottom-btn 
   background: var(--bg-card) !important;
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12) !important;
-  color: #1e1b2e !important;
+  color: var(--text-main) !important;
   cursor: pointer;
   pointer-events: auto !important;
   z-index: 9 !important;
