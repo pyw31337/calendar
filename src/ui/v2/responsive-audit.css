@@ -648,7 +648,16 @@ html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"] {
 html:has(.renewal-shell.v2-design) .modal-overlay .underline-tabs button,
 html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"] button {
   flex: 1 1 0% !important;
-  height: 46px !important;
+  /* No fixed height here -- the tab row's own height (screens.css min-height:50px,
+     dest-chrome-late.css box-sizing:content-box) is the single source of truth. A
+     fixed height here (previously 46px) fell short of that by 4-5px, so the
+     ::after active-tab underline (bottom:-1px, meant only to cancel a ~1px
+     rounding gap) landed a visible gap above the row's own hairline instead of
+     flush against it -- this is what made the underline look "detached" only in
+     modal/popup tab rows and not in the .v2-content ones. align-self:stretch
+     (the flex row's default anyway) makes the button fill the row exactly, same
+     as every other .underline-tabs instance. */
+  align-self: stretch !important;
   padding: 0 8px !important;
   font-size: var(--font-size-base, 0.95rem) !important;
   font-weight: 800 !important;
