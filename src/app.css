@@ -2735,6 +2735,14 @@ select.form-select {
   /* 모바일 브라우저 하단 주소창/제스처 바에 페이지 번호가 가려지지 않도록 safe-area 만큼
      여백을 더한다 -- 스크롤 컨테이너 자체의 고정 16px padding-bottom만으로는 부족했다. */
   padding: 18px 0 calc(8px + env(safe-area-inset-bottom, 0px));
+  /* .gallery-page-scroll is itself display:flex;flex-direction:column (its own inline style),
+     making this nav a flex item. Its own overflow:hidden below (mobile drag strip) disables
+     the browser's normal content-based automatic min-height for a flex item, collapsing it to
+     ~0 whenever the column's total content (photo grid + this nav) exceeds the scroll
+     container's own height -- exactly the case once enough photos load. That visibly clipped
+     the 40/44px page buttons' top and bottom. flex-shrink:0 keeps this row at its natural
+     content height regardless of how tall the sibling photo grid grows. */
+  flex-shrink: 0;
 }
 
 .gallery-pagination-button {
