@@ -52,6 +52,22 @@ html:has(.v2-design) #root {
   min-height: 100% !important;
 }
 
+/* Calendar / bento home is <main class="bp-app-shell is-bento-home"> — NOT
+ * .renewal-shell-main. Document + shell overflow are locked for chat VV pinning,
+ * so home must own a viewport-bounded scrollport or content below the fold is clipped.
+ */
+.renewal-shell.v2-design > main.bp-app-shell.is-bento-home,
+.renewal-shell.v2-design main.bp-app-shell.is-bento-home {
+  height: 100% !important;
+  max-height: 100% !important;
+  min-height: 0 !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  box-sizing: border-box !important;
+}
+
 .v2-design .renewal-shell-main {
   height: 100% !important;
   min-height: 0 !important;
@@ -104,6 +120,37 @@ html:has(.v2-design) #root {
     bottom: 0 !important;
     top: auto !important;
   }
+}
+
+
+/* Settlement: outer .v2-settlement-body is the scroll owner. Nested
+ * .settlement-page-body used to keep overflow:auto while sizing to content, so
+ * wheel/touch hit an inert scroller and never reached the outer pane (same
+ * pattern as memo-list-scroll in screens.css). */
+.v2-design .v2-settlement .v2-settlement-body .settlement-page-body,
+.v2-design .v2-settlement .v2-dest-body .settlement-page-body {
+  overflow: visible !important;
+  height: auto !important;
+  max-height: none !important;
+  flex: none !important;
+  min-height: 0 !important;
+}
+/* Drop overflow:auto from the shared memo/settlement scroll-owner rule when it
+ * also targeted .settlement-page-body (screens.css). Outer pane still scrolls. */
+.v2-design .v2-settlement .settlement-page-body {
+  overflow: visible !important;
+}
+/* Wrap-legacy settlement: legacy root is the scroll owner (mirrors places). */
+.v2-design .v2-settlement.v2-wrap-legacy .v2-settlement-legacy,
+.v2-design .v2-settlement.v2-wrap-legacy .v2-legacy-body {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Lightbox is portaled to body — scope via :has(.v2-design). */
