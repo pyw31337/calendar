@@ -244,8 +244,24 @@ test('V2 shell renders the same app-wide toast as v1', async () => {
   // globalOverlays may grow (confirmDialog/setConfirmDialog were appended after toast);
   // require toast+dismissToast in that object, not that they are the final keys before '}'.
   assert.match(appMain, /renderRenewalShellIfEnabled\([\s\S]*?\{\s*chatUploadProgress,\s*operationProgress,\s*toast,\s*dismissToast\b/, 'CalendarApp must pass its live toast/dismissToast state into the v2 shell');
-  assert.match(appMain, /renderRenewalShellIfEnabled\([\s\S]*?\bconfirmDialog,\s*setConfirmDialog\s*\}/, 'CalendarApp must also pass confirmDialog into the v2 shell (anniversary delete etc.)');
+  assert.match(appMain, /renderRenewalShellIfEnabled\([\s\S]*?\bconfirmDialog,\s*setConfirmDialog\b/, 'CalendarApp must also pass confirmDialog into the v2 shell (anniversary delete etc.)');
   assert.match(shell, /ConfirmDialog/, 'RenewalAppShell must mount ConfirmDialog when confirmDialog is set');
+});
+
+// Regression: NotificationPermissionHelpModal also lived only in withStickyVideo() /
+// sharedAppOverlays. V2 already wires openNotificationHelp into AppSettings / GlobalSearch,
+// but without remounting the modal, isNotificationHelpOpen updates with nothing on screen.
+// Permission-help only -- NotificationOnboardingModal is dead (setIsNotifOnboardingOpen(true)
+// has no callers) and is intentionally not revived here.
+test('V2 shell mounts NotificationPermissionHelpModal like v1', async () => {
+  const { readFileSync } = await import('node:fs');
+  const shell = readFileSync(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
+  const appMain = readFileSync(new URL('../src/core/app-main.js', import.meta.url), 'utf8');
+  assert.match(shell, /isNotificationHelpOpen/, 'RenewalAppShell must accept isNotificationHelpOpen as a prop');
+  assert.match(shell, /NotificationPermissionHelpModal/, 'RenewalAppShell must mount NotificationPermissionHelpModal when help is open');
+  assert.match(appMain, /renderRenewalShellIfEnabled\([\s\S]*?\bisNotificationHelpOpen,\s*setIsNotificationHelpOpen\b/, 'CalendarApp must pass notification-help open state into the v2 shell');
+  assert.match(appMain, /onNotificationHelpRetry:\s*handleMainToggleNotifications/, 'CalendarApp must pass handleMainToggleNotifications as onNotificationHelpRetry');
+  assert.doesNotMatch(shell, /createElement\([^)]*NotificationOnboardingModal/, 'Do not revive dead NotificationOnboardingModal on v2 (no setIsNotifOnboardingOpen(true) callers)');
 });
 
 // Regression: BentoCalendarCard (the V2 캘린더 home tab) reimplements the whole month grid from
