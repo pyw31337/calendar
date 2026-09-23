@@ -512,6 +512,10 @@ export function AdminModal({
     () => [...getCalendarActivityLogs(calendar)].sort((a, b) => b.timestamp - a.timestamp),
     [calendar.activityLogs]
   );
+  const recoveryTimelineLogs = React.useMemo(
+    () => activityLogsSorted.filter(log => log.action !== 'tag_add'),
+    [activityLogsSorted]
+  );
 
   if (!calendar || !calendar.id) {
     return /*#__PURE__*/React.createElement("div", {
@@ -847,8 +851,8 @@ export function AdminModal({
           /*#__PURE__*/React.createElement("div", {
             style: { display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '4px' }
           },
-            activityLogsSorted.length === 0 ? /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: 'var(--text-light)', fontSize: 'var(--font-size-md)', textAlign: 'center' } }, "기록된 활동 로그가 없어 복구 기능을 이용할 수 없습니다.") :
-            activityLogsSorted.map(log => {
+            recoveryTimelineLogs.length === 0 ? /*#__PURE__*/React.createElement("div", { style: { padding: '30px', color: 'var(--text-light)', fontSize: 'var(--font-size-md)', textAlign: 'center' } }, "기록된 활동 로그가 없어 복구 기능을 이용할 수 없습니다.") :
+            recoveryTimelineLogs.map(log => {
               const resolveParticipant = __deps.resolveLogParticipant || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.resolveLogParticipant) || ((l, map) => (map && map[l.participantId]) || { name: '시스템', color: '#94A3B8' });
               const formatNote = __deps.formatDetailedLogNote || (window.GATHER_APP_UTILS && window.GATHER_APP_UTILS.formatDetailedLogNote) || (l => l.note || '');
               const p = resolveParticipant(log, participantsMap);
@@ -864,14 +868,14 @@ export function AdminModal({
               }[log.action] || '활동';
 
               const actionBadgeColor = {
-                create: 'var(--status-green)', update: '#2563EB', delete: '#EF4444',
+                create: '#16A34A', update: '#2563EB', delete: '#EF4444',
                 poll_create: '#8B5CF6', poll_vote: '#EC4899', poll_cancel: '#F97316',
                 expense_create: '#F59E0B', expense_update: '#F59E0B', expense_delete: '#DC2626',
                 tag_add: '#6366F1', tag_remove: '#DC2626',
                 meeting_confirm: '#8B5CF6', meeting_cancel: '#EF4444',
                 memo_create: '#6366F1', memo_update: '#F59E0B', memo_delete: '#EF4444',
-                place_create: 'var(--status-green)', place_update: '#2563EB', place_delete: '#EF4444'
-              }[log.action] || 'var(--text-muted)';
+                place_create: '#16A34A', place_update: '#2563EB', place_delete: '#EF4444'
+              }[log.action] || '#64748B';
               const actionBadgeBg = `${actionBadgeColor}1F`;
 
               return /*#__PURE__*/React.createElement("div", {
@@ -884,10 +888,11 @@ export function AdminModal({
                 /*#__PURE__*/React.createElement("div", { className: "recent-log-left" },
                   /* Action Badge */
                   /*#__PURE__*/React.createElement("span", {
+                    className: "recent-log-action-badge",
                     style: {
                       fontSize: 'var(--font-size-xs)', fontWeight: 'bold', padding: '2px 6px', borderRadius: '4px',
                       backgroundColor: actionBadgeBg, color: actionBadgeColor, border: `1px solid ${actionBadgeColor}30`,
-                      whiteSpace: 'nowrap'
+                      whiteSpace: 'nowrap', flexShrink: 0
                     }
                   }, actionLabel),
                   /* User */
@@ -987,6 +992,7 @@ export function AdminModal({
           const logs = buildActivityLogsFromAvailabilities(calendar || {});
 
           const filteredLogs = logs.filter(log => {
+            if ((log.action || '') === 'tag_add') return false;
             if (logCategoryFilter !== 'all') {
               const act = log.action || '';
               if (logCategoryFilter === 'schedule' && !['create', 'update', 'delete', 'meeting_confirm', 'meeting_cancel'].includes(act)) return false;

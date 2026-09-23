@@ -261,6 +261,8 @@ export function UrlCapsuleBadge({ url, style = null }) {
 
 export function shortParticipantName(name) {
   const value = String(name || '').trim();
+  // Role labels are not 성+이름. Slicing 시스템 → 스템.
+  if (value === '시스템' || value === '메시지') return value;
   return /^[가-힣]{3,4}$/.test(value) ? value.slice(1) : value;
 }
 

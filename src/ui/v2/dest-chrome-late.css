@@ -2874,5 +2874,33 @@ html:has(.renewal-shell.v2-design) .anniversary-settings-modal .item-edit-delete
   stroke-width: 2 !important;
 }
 
+/* Recovery action pills keep a tinted fill + border (hex alpha on var() was invalid).
+   Name badges in these rows must show the full label, including 시스템. */
+html:has(.renewal-shell.v2-design) .admin-settings-modal .recent-log-action-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex: 0 0 auto !important;
+  box-sizing: border-box !important;
+  min-height: 22px !important;
+  height: auto !important;
+  padding: 2px 8px !important;
+  border-radius: 999px !important;
+  font-weight: 800 !important;
+  line-height: 1.2 !important;
+  white-space: nowrap !important;
+  background: color-mix(in srgb, currentColor 14%, #fff) !important;
+  background-color: color-mix(in srgb, currentColor 14%, #fff) !important;
+  border: 1px solid color-mix(in srgb, currentColor 34%, transparent) !important;
+}
+html:has(.renewal-shell.v2-design) .admin-settings-modal .recent-log-left > .participant-badge {
+  flex: 0 0 auto !important;
+  width: auto !important;
+  max-width: none !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: nowrap !important;
+}
+
 
 
