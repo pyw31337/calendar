@@ -3000,7 +3000,6 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   const WeatherBadge = __comp.WeatherBadge || __deps.WeatherBadge || (function () { return null; });
   const InlineSearchBar = __comp.InlineSearchBar || __deps.InlineSearchBar || (({ value, onChange, placeholder, trailing }) => /*#__PURE__*/React.createElement("div", { className: "inline-search-bar", style: { position: 'fixed', top: 'calc(56px + env(safe-area-inset-top, 0px))', left: 0, right: 0, zIndex: 1008, minHeight: '48px', display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)' } }, /*#__PURE__*/React.createElement("input", { autoFocus: true, type: "text", value: value, onChange: onChange, placeholder: placeholder, style: { flex: 1, height: '36px', border: 'none', outline: 'none', borderRadius: 'var(--radius-full)', padding: '0 12px', background: 'var(--bg-primary)', color: 'var(--text-main)' } }), trailing));
   const SearchIcon = ({ size = 20 }) => /*#__PURE__*/React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true }, /*#__PURE__*/React.createElement("circle", { cx: "11", cy: "11", r: "8" }), /*#__PURE__*/React.createElement("path", { d: "m21 21-4.3-4.3" }));
-  const CreateSettlementModalComp = __comp.CreateSettlementModal || CreateSettlementModal;
   const [isSettlementMenuOpen, setIsSettlementMenuOpen] = React.useState(false);
   const [isSettlementListOpen, setIsSettlementListOpen] = React.useState(false);
   const [isCreateSettlementOpen, setIsCreateSettlementOpen] = React.useState(false);
@@ -4136,8 +4135,17 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   ))),
 
   /* Create Settlement Layer Popup */
-  console.log('[DEBUG] render gate', { isCreateSettlementOpen, canUseSettlement, editingSettlementCard, CreateSettlementModalCompType: typeof CreateSettlementModalComp }),
-  (isCreateSettlementOpen && canUseSettlement && !editingSettlementCard && React.createElement(CreateSettlementModalComp, {
+  // Mirrors the edit modal's fix below: use the local CreateSettlementModal directly
+  // instead of CreateSettlementModalComp (the `__comp.CreateSettlementModal` global-registry
+  // reference). liftOverlays() further down only lifts a node into the ReactDOM portal it
+  // needs when it recognizes it as an overlay, which it does by testing the rendered
+  // element's `type.name`/`type.displayName` against /Modal/ -- a minified production
+  // build's mangled function names can silently defeat that test, so the create-settlement
+  // popup would render (its own internal isCreateSettlementOpen/canUseSettlement gate all
+  // true, confirmed live) but never actually reach the DOM. The edit modal already avoids
+  // this by using the stable local reference; doing the same here fixes "정산 생성" not
+  // visibly doing anything on click.
+  (isCreateSettlementOpen && canUseSettlement && !editingSettlementCard && React.createElement(CreateSettlementModal, {
     calendar: calendar,
     onClose: () => setIsCreateSettlementOpen(false),
     onSave: async (newCard) => {
