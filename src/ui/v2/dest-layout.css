@@ -34,7 +34,7 @@
   margin: 0 !important;
   padding: var(--v2-dest-pad-y) var(--v2-dest-pad-x) !important;
   box-sizing: border-box !important;
-  background: #fafafc;
+  background: var(--bg-primary);
 }
 
 .v2-design .v2-dest-page > .bp-app-shell,
@@ -105,7 +105,7 @@
 .v2-design .renewal-shell-main.is-records {
   min-width: 0 !important;
   min-height: 100dvh !important;
-  background: #fafafc !important;
+  background: var(--bg-primary) !important;
 }
 
 .v2-design .v2-dest-page .v2-dest-body,

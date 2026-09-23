@@ -1,9 +1,10 @@
 /* Generated from SettlementFull.dc.html. Run node scripts/generate-v2-reference-css.mjs. */
+/* Phase1 dark tokens: surface/text vars inherit from V1 :root[data-theme] — do not re-literal light resets. */
 
     .v2-settlement {
-      --bg-primary: #FAFAFC; --bg-card: #FFFFFF; --border-subtle: #ECEAF5;
-      --text-main: #1E1B2E; --text-muted: #6B6580; --text-light: #83798F;
-      --brand: #7C2FE5; --brand-soft: #F3EEFF; --status-green: #16A34A; --surface-success: #ECFDF5;
+        
+        
+      --brand: #7C3AED; --brand-soft: #F3EEFF; --status-green: #16A34A; 
       --radius-lg: 18px; --radius-md: 12px; --radius-sm: 8px; --radius-full: 9999px;
       --p-yeongwoo: #F87171; --p-yuri: #FB923C; --p-manshik: #34D399; --p-eunhye: #22D3EE;
     }
@@ -12,27 +13,26 @@
     .v2-settlement button, .v2-settlement input { font-family: inherit; }
 
     .v2-settlement .bp-app-shell { width: 100%; max-width: 480px; margin: 0 auto; background: var(--bg-primary); min-height: 100%; }
-    .v2-settlement .bp-header { position: sticky; top: 0; height: auto; min-height: 60px; box-sizing: border-box; background: var(--bg-card); z-index: 5; padding: 0 14px; border-bottom: 1px solid var(--v2-card-border, #eceaf5); overflow: visible; }
-    .v2-settlement .bp-header-row { height: auto; min-height: 44px; display: flex; align-items: center; gap: 8px; }
-    .v2-settlement .bp-back-btn { width: 28px; height: 28px; justify-content: center; background: none; border: none; color: var(--text-main); cursor: pointer; padding: 4px; display: inline-flex; }
+    .v2-settlement .bp-header { position: sticky; top: 0; background: var(--bg-card); z-index: 5; padding: 12px 14px 10px; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; gap: 8px; }
+    .v2-settlement .bp-back-btn { background: none; border: none; color: var(--text-main); cursor: pointer; padding: 4px; display: inline-flex; }
     .v2-settlement .bp-header-title { font-weight: 800; font-size: 0.96rem; color: var(--text-main); }
     .v2-settlement .bp-header-actions { margin-left: auto; display: flex; gap: 4px; }
-    .v2-settlement .bp-icon-btn { width: 28px; height: 28px; justify-content: center; background: transparent; border: 0; color: var(--text-muted); padding: 5px; display: inline-flex; cursor: pointer; border-radius: 0; }
-    .v2-settlement .bp-icon-btn:hover { background: transparent; color: var(--brand); }
-    .v2-settlement .bp-fab { position: fixed; right: 20px; bottom: 24px; width: 52px; height: 52px; border-radius: 50%; background: var(--brand); color: #fff; border: 1px solid rgba(255,255,255,0.28); box-shadow: 0 6px 18px rgba(124,47,229,0.40), inset 0 1px 0 rgba(255,255,255,0.28); display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 6; }
+    .v2-settlement .bp-icon-btn { background: none; border: none; color: var(--text-muted); padding: 7px; display: inline-flex; cursor: pointer; border-radius: var(--radius-full); }
+    .v2-settlement .bp-icon-btn:hover { background: var(--bg-primary); color: var(--brand); }
+    .v2-settlement .bp-fab { position: fixed; right: 20px; bottom: 24px; width: 52px; height: 52px; border-radius: 50%; background: var(--brand); color: #fff; border: none; box-shadow: 0 8px 20px rgba(124,58,237,0.35); display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 6; }
 
-    .v2-settlement .bp-content { padding: 8px 16px 96px; }
-    .v2-settlement .bp-month-nav { display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 8px; }
+    .v2-settlement .bp-content { padding: 14px; }
+    .v2-settlement .bp-month-nav { display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 14px; }
     .v2-settlement .bp-month-nav-btn { background: none; border: none; color: var(--text-muted); padding: 4px; cursor: pointer; display: inline-flex; }
     .v2-settlement .bp-month-label { font-weight: 800; font-size: 0.92rem; color: var(--text-main); }
 
-    .v2-settlement .bp-settlement-card { background: var(--bg-card); border: 1px solid var(--v2-card-border, #eceaf5); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 14px; box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)); }
+    .v2-settlement .bp-settlement-card { background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 14px; box-shadow: 0 2px 8px rgba(30,27,46,0.05); }
     .v2-settlement .bp-settlement-card-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px; }
     .v2-settlement .bp-settlement-card-title { font-weight: 800; font-size: 0.88rem; color: var(--text-main); }
     .v2-settlement .bp-settlement-card-badge { font-size: 0.62rem; font-weight: 800; color: var(--brand); background: var(--brand-soft); padding: 2px 8px; border-radius: var(--radius-full); }
     .v2-settlement .bp-settlement-total-row { font-size: 0.72rem; color: var(--text-muted); margin-bottom: 10px; }
     .v2-settlement .bp-settlement-total-row b { color: var(--text-main); font-variant-numeric: tabular-nums; }
-    .v2-settlement .bp-settlement-card-row { display: flex; align-items: center; justify-content: space-between; padding: 7px 0; border-top: 1px solid var(--v2-card-border, #eceaf5); }
+    .v2-settlement .bp-settlement-card-row { display: flex; align-items: center; justify-content: space-between; padding: 7px 0; border-top: 1px solid var(--border-subtle); }
     .v2-settlement .bp-settlement-card-row:first-of-type { border-top: none; }
     .v2-settlement .bp-settlement-card-row .bp-name-wrap { display: flex; align-items: center; gap: 6px; }
     .v2-settlement .bp-settlement-card-row .bp-dot { width: 8px; height: 8px; border-radius: 50%; }
@@ -43,7 +43,7 @@
     .v2-settlement .bp-settlement-share-btn { width: 100%; margin-top: 12px; background: var(--brand-soft); color: var(--brand); font-weight: 800; font-size: 0.76rem; border: none; border-radius: var(--radius-full); padding: 10px; cursor: pointer; }
 
     .v2-settlement .bp-expense-section-label { font-size: 0.66rem; font-weight: 800; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.04em; margin: 18px 0 8px; padding: 0 2px; }
-    .v2-settlement .bp-expense-row { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: var(--bg-card); border: 1px solid var(--v2-card-border, #eceaf5); border-radius: var(--radius-md); margin-bottom: 6px; }
+    .v2-settlement .bp-expense-row { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); margin-bottom: 6px; }
     .v2-settlement .bp-expense-row .bp-cat-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
     .v2-settlement .bp-expense-row-label { font-weight: 700; font-size: 0.78rem; color: var(--text-main); flex: 1; min-width: 0; }
     .v2-settlement .bp-expense-row-payer { font-size: 0.64rem; color: var(--text-light); }
