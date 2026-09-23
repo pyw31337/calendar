@@ -532,9 +532,8 @@ export function UnderlineTabs({ options = [], value, onChange, ariaLabel, classN
   const React = window.React;
   const list = Array.isArray(options) ? options : [];
   // 'flush' sits edge-to-edge on the modal/page width with equal flex children and no extra
-  // horizontal padding so the active 2px underline can land on the container's bottom hairline
-  // (marginBottom: -1px below). Callers that nest tabs inside a padded header should move the
-  // padding onto the title row (or pass negative horizontal margins) so the bar stays full-bleed.
+  // horizontal padding. The active 2px underline stays inside the tab (margin 0) so it rests
+  // on top of the container hairline instead of hanging below it.
   const isFlush = variant === 'flush';
   return /*#__PURE__*/React.createElement('div', {
     className: `underline-tabs${isFlush ? ' underline-tabs--flush' : ''}${className ? ' ' + className : ''}`,
@@ -581,7 +580,7 @@ export function UnderlineTabs({ options = [], value, onChange, ariaLabel, classN
         alignItems: 'center',
         justifyContent: 'center',
         gap: '6px',
-        marginBottom: '-1px',
+        marginBottom: '0',
         minWidth: 0
       }
     },

@@ -199,7 +199,6 @@ function headerExtra(nodes) {
 }
 
 function layerPopup({ label, title, onClose, children }) {
-  const React = window.React;
   const ReactDOM = window.ReactDOM;
   const Box = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer) || 'div';
   const dialog = h(

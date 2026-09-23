@@ -208,21 +208,27 @@ export function SearchCategoryTabs({ tabs, activeKey, onSelect, containerStyle, 
   const React = window.React;
 
   return /*#__PURE__*/React.createElement("div", {
+    className: "underline-tabs",
+    role: "tablist",
     style: { display: 'grid', gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))`, overflow: 'hidden', borderBottom: '1px solid var(--border-subtle)', ...containerStyle }
   }, tabs.map(tab => {
     const count = Number(tab.count || 0);
+    const isActive = activeKey === tab.key;
     return /*#__PURE__*/React.createElement("button", {
       key: tab.key,
       type: "button",
+      role: "tab",
+      "aria-selected": isActive,
       onClick: () => onSelect(tab.key),
       style: {
         minWidth: 0,
+        flex: '1 1 0',
         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
         padding: tabPadding || '10px 4px', fontSize: 'var(--font-size-md)', fontWeight: 800,
         background: 'none', border: 'none', cursor: 'pointer',
-        color: activeKey === tab.key ? activeColor : '#64748B',
-        borderBottom: activeKey === tab.key ? `3px solid ${activeColor}` : '3px solid transparent',
-        marginBottom: '-1px',
+        color: isActive ? activeColor : '#64748B',
+        borderBottom: isActive ? `2px solid ${activeColor}` : '2px solid transparent',
+        marginBottom: '0',
         whiteSpace: 'nowrap',
         overflow: 'hidden',
         ...tabTextStyle

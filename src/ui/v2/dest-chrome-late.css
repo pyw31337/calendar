@@ -1142,11 +1142,8 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   height: 48px !important;
   min-width: 0 !important;
   padding: 0 8px !important;
-  /* -1px bottom margin overlaps the container's own 1px border-bottom so the active
-     tab's 2px underline lands flush against the gray hairline instead of leaving a gap. */
-  margin: 0 0 -1px !important;
+  margin: 0 !important;
   border: 0 !important;
-  border-bottom: 2px solid transparent !important;
   background: none !important;
   color: #6b6580 !important;
   font-size: 0.9rem !important;
@@ -1160,7 +1157,6 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
 .v2-design .v2-content .underline-tabs [role="tab"][aria-selected="true"],
 .v2-design .v2-archive .underline-tabs [role="tab"][aria-selected="true"] {
   color: var(--brand, #7C2FE5) !important;
-  border-bottom-color: var(--brand, #7C2FE5) !important;
 }
 .v2-design .v2-content .underline-tabs [role="tab"] > span,
 .v2-design .v2-archive .underline-tabs [role="tab"] > span {
@@ -2350,6 +2346,131 @@ html:has(.renewal-shell.v2-design) .bottom-sheet-overlay.emoji-sheet-overlay > .
     border-right: none !important;
     border-bottom: none !important;
   }
+}
+
+/* --------------------------------------------------------------------------
+ * Title + underline-tab hairlines, site-wide.
+ * The title row owns one full-bleed gray line. Each underline tab bar owns
+ * exactly one more, also full-bleed. The active purple bar is a 2px ::after
+ * painted on the top edge of that gray line — never below it, never gapped.
+ * Stacked borders on the header / history stack are cleared so the chip row
+ * does not pick up a 2–3px line.
+ * -------------------------------------------------------------------------- */
+html:has(.renewal-shell.v2-design) .v2-places .places-category-sticky-tabs,
+html:has(.renewal-shell.v2-design) .v2-places-legacy .places-category-sticky-tabs {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+html:has(.renewal-shell.v2-design) .v2-page-header {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  padding-bottom: 0 !important;
+  border-bottom: none !important;
+  box-shadow: none !important;
+  background: #fff !important;
+}
+html:has(.renewal-shell.v2-design) .v2-page-header > .bp-header-row {
+  width: 100% !important;
+  box-sizing: border-box !important;
+  padding: 0 16px !important;
+  min-height: 56px !important;
+  height: 56px !important;
+  max-height: 56px !important;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
+  background: #fff !important;
+}
+html:has(.renewal-shell.v2-design) .v2-content-tabs-slot,
+html:has(.renewal-shell.v2-design) .v2-archive-tabs-slot,
+html:has(.renewal-shell.v2-design) .v2-gallery-tabs-slot,
+html:has(.renewal-shell.v2-design) #v2-content-header-tabs-slot,
+html:has(.renewal-shell.v2-design) #v2-archive-header-tabs-slot,
+html:has(.renewal-shell.v2-design) #v2-gallery-header-tabs-slot,
+html:has(.renewal-shell.v2-design) .history-header-stack,
+html:has(.renewal-shell.v2-design) .gallery-page-tabs,
+html:has(.renewal-shell.v2-design) .gallery-page-tabs-mobile,
+html:has(.renewal-shell.v2-design) .settlement-page-tabs {
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+html:has(.renewal-shell.v2-design) .underline-tabs,
+html:has(.renewal-shell.v2-design) .modal-overlay .underline-tabs,
+html:has(.renewal-shell.v2-design) .modal-overlay .v2-responsive-modal .underline-tabs,
+html:has(.renewal-shell.v2-design) .bp-event-sheet .underline-tabs,
+html:has(.renewal-shell.v2-design) .global-search-page-card > .underline-tabs {
+  display: flex !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  /* content-box + auto height keeps the 1px hairline OUTSIDE the tab row,
+     so the active ::after (bottom: 0) sits on top of that line. */
+  box-sizing: content-box !important;
+  height: auto !important;
+  background: #fff !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
+  box-shadow: none !important;
+}
+html:has(.renewal-shell.v2-design) .underline-tabs > button,
+html:has(.renewal-shell.v2-design) .underline-tabs > [role="tab"],
+html:has(.renewal-shell.v2-design) .v2-content .underline-tabs [role="tab"],
+html:has(.renewal-shell.v2-design) .v2-archive .underline-tabs [role="tab"],
+html:has(.renewal-shell.v2-design) .renewal-shell .v2-content .underline-tabs [role="tab"],
+html:has(.renewal-shell.v2-design) .modal-overlay .underline-tabs > button,
+html:has(.renewal-shell.v2-design) .modal-overlay .v2-responsive-modal .underline-tabs > button,
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"] > button,
+html:has(.renewal-shell.v2-design) .bp-event-sheet .underline-tabs > button,
+html:has(.renewal-shell.v2-design) .underline-tabs > button[aria-selected="true"],
+html:has(.renewal-shell.v2-design) .underline-tabs > [role="tab"][aria-selected="true"],
+html:has(.renewal-shell.v2-design) .v2-content .underline-tabs [role="tab"][aria-selected="true"],
+html:has(.renewal-shell.v2-design) .v2-archive .underline-tabs [role="tab"][aria-selected="true"],
+html:has(.renewal-shell.v2-design) .renewal-shell .v2-content .underline-tabs [role="tab"][aria-selected="true"],
+html:has(.renewal-shell.v2-design) .modal-overlay .underline-tabs > button[aria-selected="true"],
+html:has(.renewal-shell.v2-design) .modal-overlay .v2-responsive-modal .underline-tabs > button[aria-selected="true"],
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"] > button[aria-selected="true"],
+html:has(.renewal-shell.v2-design) .bp-event-sheet .underline-tabs > button[aria-selected="true"] {
+  position: relative !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-bottom: 0 !important;
+  border-bottom-color: transparent !important;
+  box-shadow: none !important;
+  box-sizing: border-box !important;
+}
+html:has(.renewal-shell.v2-design) .underline-tabs > button::after,
+html:has(.renewal-shell.v2-design) .underline-tabs > [role="tab"]::after,
+html:has(.renewal-shell.v2-design) .v2-content .underline-tabs [role="tab"]::after,
+html:has(.renewal-shell.v2-design) .v2-archive .underline-tabs [role="tab"]::after,
+html:has(.renewal-shell.v2-design) .renewal-shell .v2-content .underline-tabs [role="tab"]::after,
+html:has(.renewal-shell.v2-design) .modal-overlay .underline-tabs button::after,
+html:has(.renewal-shell.v2-design) .modal-overlay .v2-responsive-modal .underline-tabs button::after,
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"] > button::after,
+html:has(.renewal-shell.v2-design) .bp-event-sheet .underline-tabs button::after {
+  content: "" !important;
+  position: absolute !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  height: 2px !important;
+  margin: 0 !important;
+  background: transparent !important;
+  pointer-events: none !important;
+  border-radius: 0 !important;
+}
+html:has(.renewal-shell.v2-design) .underline-tabs > button[aria-selected="true"]::after,
+html:has(.renewal-shell.v2-design) .underline-tabs > [role="tab"][aria-selected="true"]::after,
+html:has(.renewal-shell.v2-design) .v2-content .underline-tabs [role="tab"][aria-selected="true"]::after,
+html:has(.renewal-shell.v2-design) .v2-archive .underline-tabs [role="tab"][aria-selected="true"]::after,
+html:has(.renewal-shell.v2-design) .renewal-shell .v2-content .underline-tabs [role="tab"][aria-selected="true"]::after,
+html:has(.renewal-shell.v2-design) .modal-overlay .underline-tabs button[aria-selected="true"]::after,
+html:has(.renewal-shell.v2-design) .modal-overlay .v2-responsive-modal .underline-tabs button[aria-selected="true"]::after,
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"] > button[aria-selected="true"]::after,
+html:has(.renewal-shell.v2-design) .bp-event-sheet .underline-tabs button[aria-selected="true"]::after {
+  background: var(--brand, #7C2FE5) !important;
 }
 
 
