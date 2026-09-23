@@ -253,7 +253,7 @@
  * fade instead of the flat --surface-confirmed tint, matching the calendar home's own
  * gradient-forward visual language. */
 .v2-design .bp-day-cell.bp-confirmed {
-  background: linear-gradient(180deg, #f3eeff 0%, var(--bg-card) 80%);
+  background: linear-gradient(180deg, var(--brand-soft, #f3eeff) 0%, var(--bg-card) 80%);
 }
 /* Participant availability dots sit right under the day number / 모임확정 pill row -- a little
  * more breathing room above them so they don't read as glued to that row. */
