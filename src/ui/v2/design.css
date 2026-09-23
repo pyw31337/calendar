@@ -117,8 +117,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 14px;
-  padding: 2px 16px 10px;
+  gap: 0;
+  padding: 0 16px 10px;
 }
 .v2-design .bp-hero-quick-nav-item { position: relative; }
 .v2-design .bp-hero-quick-nav-badge {
