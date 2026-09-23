@@ -38,7 +38,6 @@ html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"]:not(.underlin
   border-bottom: 0 !important;
   border-radius: 999px !important;
   box-shadow: none !important;
-  /* Do not force background/color — preserve inline activeColor (e.g. 수입/지출). */
 }
 
 html:has(.renewal-shell.v2-design) .segmented-toggle > button::after,
@@ -49,25 +48,39 @@ html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"]:not(.underlin
   display: none !important;
 }
 
-html:has(.renewal-shell.v2-design) .segmented-toggle > button[aria-selected="true"],
-.renewal-shell.v2-design .segmented-toggle > button[aria-selected="true"],
-html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"]:not(.underline-tabs):not(.renewal-shell-subtab-row) > button[aria-selected="true"],
-.renewal-shell.v2-design .modal-overlay [role="tablist"]:not(.underline-tabs):not(.renewal-shell-subtab-row) > button[aria-selected="true"] {
+/* Force fill focus (beats underline-tab background:transparent !important).
+ * Custom activeColor (수입/지출) still wins when present as an inline style containing
+ * a concrete color — those toggles set backgroundColor to green/red strings. */
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"]:not(.underline-tabs) > button[aria-selected="true"],
+.renewal-shell.v2-design .modal-overlay [role="tablist"]:not(.underline-tabs) > button[aria-selected="true"] {
   border-bottom: 0 !important;
   font-weight: 800 !important;
+  background: var(--brand, #7C2FE5) !important;
+  color: #fff !important;
+}
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"]:not(.underline-tabs) > button:not([aria-selected="true"]),
+.renewal-shell.v2-design .modal-overlay [role="tablist"]:not(.underline-tabs) > button:not([aria-selected="true"]) {
+  background: transparent !important;
+  color: var(--text-muted, #64748B) !important;
+  font-weight: 500 !important;
 }
 
-/* D-Day mode cards in anniversary form: V1 blue → V2 purple when selected. */
+/* Preserve semantic 수입/지출 colors when activeColor is inlined. */
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"]:not(.underline-tabs) > button[aria-selected="true"][style*="status-green"],
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"]:not(.underline-tabs) > button[aria-selected="true"][style*="--status-green"] {
+  background: var(--status-green, #16A34A) !important;
+}
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"]:not(.underline-tabs) > button[aria-selected="true"][style*="DC2626"],
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"]:not(.underline-tabs) > button[aria-selected="true"][style*="#DC2626"] {
+  background: #DC2626 !important;
+}
+
 html:has(.renewal-shell.v2-design) label.anniversary-type-option:has(input:checked),
 .renewal-shell.v2-design label.anniversary-type-option:has(input:checked) {
   background-color: color-mix(in srgb, var(--brand, #7C2FE5) 8%, #fff) !important;
   border-color: var(--brand, #7C2FE5) !important;
-  color: var(--text-main, #0F172A) !important;
 }
 
-/* Single-option pill (e.g. 반복) mirroring SegmentedToggle chrome. */
-html:has(.renewal-shell.v2-design) .segmented-toggle--single > button,
-.renewal-shell.v2-design .segmented-toggle--single > button,
 html:has(.renewal-shell.v2-design) [role="group"][aria-label="반복 여부"],
 .renewal-shell.v2-design [role="group"][aria-label="반복 여부"] {
   border-radius: 999px !important;
@@ -76,4 +89,16 @@ html:has(.renewal-shell.v2-design) [role="group"][aria-label="반복 여부"] > 
 .renewal-shell.v2-design [role="group"][aria-label="반복 여부"] > button {
   border-radius: 999px !important;
   border-bottom: 0 !important;
+}
+
+html:has(.renewal-shell.v2-design) .v2-bubble-comment-badge,
+html:has(.renewal-shell.v2-design) .v2-memo .memo-card-comment-badge,
+.renewal-shell.v2-design .v2-bubble-comment-badge,
+.renewal-shell.v2-design .v2-memo .memo-card-comment-badge {
+  background: var(--brand, #7C2FE5) !important;
+}
+
+.renewal-shell.v2-design {
+  --acc-chat: #7C2FE5;
+  --acc-chat-soft: #F3EEFF;
 }
