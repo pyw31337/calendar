@@ -1,3 +1,4 @@
+@import './viewport-shell.css';
 /* Shared ChatFull-style bubble modules — usable by home chat/memo and memo/chat screens.
  * Every selector is rooted under .v2-design | .v2-chat | .v2-memo (style isolation).
  */
