@@ -3799,9 +3799,24 @@ html:has(.renewal-shell.v2-design) .history-meetings-grid .memo-capsule-badge.is
  *
  * Scoped to html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design only -- V1's own
  * dark theme (app.css) is untouched. */
-html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design {
+html:has(.renewal-shell.v2-design)[data-theme="dark"] body,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-design,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-memo,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-chat,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-places,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-settlement {
+  /* body: modals are portaled to <body>, outside .renewal-shell, and read these tokens too.
+     The .v2-* destination roots are generated from reference mocks (reference-*.css) and
+     re-declare --brand/--brand-soft/--acc-* locally, so they need the dark values restated. */
+  --acc-cal: var(--brand);
+  --acc-cal-soft: var(--brand-soft);
+  --acc-chat-soft: color-mix(in srgb, #2563EB 18%, var(--bg-card));
+  --acc-gallery-soft: color-mix(in srgb, #0D9488 18%, var(--bg-card));
+  --acc-memo-soft: color-mix(in srgb, #D97706 18%, var(--bg-card));
+  --acc-places-soft: color-mix(in srgb, #E11D48 18%, var(--bg-card));
   /* Fixes .bp-side-nav-head's undefined --bg-surface fallback (#fff) above. */
-  --bg-surface: #10140F;
+  --bg-surface: var(--bg-card);
 
   --brand: #22C55E;
   --brand-soft: #0F2318;
@@ -3816,7 +3831,7 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design {
 
   /* Was "light glass (on white / near-white pages)" -- now dark glass on
      near-black pages. Fixes the collapse button (사이드메뉴 하단 접기) above. */
-  --v2-glass-light-fill: rgba(16, 22, 16, 0.86);
+  --v2-glass-light-fill: color-mix(in srgb, var(--bg-card) 86%, transparent);
   --v2-glass-light-border: #24312A;
   --v2-glass-light-inset: inset 0 1px 0 rgba(255, 255, 255, 0.05);
   --v2-glass-light-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
@@ -3879,25 +3894,25 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone::before {
   background:
     radial-gradient(ellipse 85% 78% at 20% 30%, rgba(34, 197, 94, 0.85) 0%, transparent 58%),
-    radial-gradient(ellipse 80% 72% at 78% 18%, rgba(249, 115, 22, 0.55) 0%, transparent 55%),
+    radial-gradient(ellipse 80% 72% at 78% 18%, rgba(249, 115, 22, 0.22) 0%, transparent 55%),
     radial-gradient(ellipse 74% 80% at 42% 88%, rgba(21, 128, 61, 0.9) 0%, transparent 60%) !important;
 }
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone::after {
   background:
-    radial-gradient(ellipse 82% 74% at 76% 74%, rgba(249, 115, 22, 0.5) 0%, transparent 56%),
+    radial-gradient(ellipse 82% 74% at 76% 74%, rgba(249, 115, 22, 0.2) 0%, transparent 56%),
     radial-gradient(ellipse 28% 26% at 12% 70%, rgba(34, 197, 94, 0.5) 0%, transparent 48%),
     radial-gradient(ellipse 70% 64% at 90% 28%, rgba(21, 128, 61, 0.8) 0%, transparent 54%) !important;
 }
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone > .bp-hero-aurora {
   background:
     radial-gradient(ellipse 58% 42% at 18% 72%, rgba(21, 128, 61, 0.85) 0%, transparent 64%),
-    radial-gradient(ellipse 52% 46% at 82% 24%, rgba(249, 115, 22, 0.45) 0%, transparent 62%),
+    radial-gradient(ellipse 52% 46% at 82% 24%, rgba(249, 115, 22, 0.18) 0%, transparent 62%),
     radial-gradient(ellipse 40% 38% at 56% 54%, rgba(34, 197, 94, 0.75) 0%, transparent 68%) !important;
 }
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone {
   background:
     linear-gradient(180deg, rgba(4, 10, 6, 0.35) 0%, rgba(3, 8, 5, 0.6) 100%),
-    linear-gradient(90deg, #15803D 0%, #0A1A11 44%, #F97316 100%) !important;
+    linear-gradient(90deg, #166534 0%, #0B1D13 48%, #15803D 88%, #C2410C 100%) !important;
 }
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-head,
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand {
@@ -3923,4 +3938,81 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .
   background-color: var(--bg-card) !important;
   color: var(--text-main) !important;
   border-color: var(--border-subtle) !important;
+}
+
+/* Remaining light literals found by a dark-mode scan of every V2 page (light values untouched):
+   hero D-day badges (#fff), glass hero chips/buttons (white outlines on a now-dark hero),
+   dashed empty-state borders mixed against #eceaf5, content category chips and grid toggle
+   (#f7f6fa), content/archive tab count pills (#eceaf5), and the OSM map tiles/attribution. */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-dday-expanded-badge {
+  background: rgba(0, 0, 0, 0.55) !important;
+  color: var(--brand) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-dday-compact,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-dday-chip,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-icon-btn,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-renewal-shell-header-icon-btn {
+  background: rgba(0, 0, 0, 0.28) !important;
+  border-color: rgba(34, 197, 94, 0.38) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 6px 18px rgba(0, 0, 0, 0.35) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-dday-compact::before,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-dday-chip::before {
+  opacity: 0.25 !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-empty,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-renewal-home-empty,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-places .places-list-body > div > div[style*="text-align"] {
+  border-color: color-mix(in srgb, var(--brand) 30%, var(--border-subtle)) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-content .bp-cat-scroll-row > button,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-content .culture-grid-cols-toggle {
+  background: var(--bg-secondary) !important;
+  color: var(--text-muted) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-content .bp-cat-scroll-row > button[style*="background: var(--accent-primary)"] {
+  background: var(--brand) !important;
+  color: #0A0C0B !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-content .culture-grid-cols-btn {
+  color: var(--text-muted) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-content .underline-tabs [role="tab"] > span,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-archive .underline-tabs [role="tab"] > span {
+  background: var(--bg-secondary) !important;
+  color: var(--text-muted) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9);
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .leaflet-control-attribution {
+  background: rgba(10, 12, 11, 0.72) !important;
+  color: var(--text-muted) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .leaflet-control-attribution a {
+  color: var(--text-main) !important;
+}
+/* Integrated search page paints its whole canvas #f4f3f8 (light page tint). */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-destination.v2-search,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .global-search-page,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .global-search-page-card,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .global-search-page-card .modal-body,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .global-search-page-card .modal-body.is-empty {
+  background: var(--bg-primary) !important;
+}
+/* ToggleSwitch (ui-shared.js) paints its off-state track #CBD5E1 inline. */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] button[role="switch"][aria-checked="false"] {
+  background-color: #38423D !important;
+}
+/* Settlement card status chip ("진행중") sets its purple text inline (ui-event-modals.js);
+   on the dark theme's green card that reads poorly. */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .settlement-page-body span[style*="color: rgb(91, 75, 235)"] {
+  color: #052E16 !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-design,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-settlement {
+  --settlement-hero-start: #15803D !important;
+  --settlement-hero-mid: #166534 !important;
+  --settlement-hero-end: #14532D !important;
 }

@@ -1563,9 +1563,9 @@ export function PlacesView({
       /* Desktop Category Bar (Only on PC) */
       !isMobile && /*#__PURE__*/React.createElement("div", { className: "place-category-tabs-desktop-only" },
         /*#__PURE__*/React.createElement(SearchCategoryTabs, {
-          activeColor: typeof renderV2 === 'function' ? '#7C2FE5' : undefined,
+          activeColor: typeof renderV2 === 'function' ? 'var(--v2-primary, #7C2FE5)' : undefined,
           tabs: [
-            { key: 'all', label: '전체', count: searchedPlaces.length, color: typeof renderV2 === 'function' ? '#7C2FE5' : '#2563EB' },
+            { key: 'all', label: '전체', count: searchedPlaces.length, color: typeof renderV2 === 'function' ? 'var(--v2-primary, #7C2FE5)' : '#2563EB' },
             ...categories.map(category => ({
               key: category.id,
               // Desktop tab bar uses plain text labels (V2 reference) -- the emoji icon

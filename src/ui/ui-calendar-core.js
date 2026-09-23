@@ -2630,7 +2630,7 @@ export function GlobalSearchModal({
   }, [inline, onClose]);
 
   const SEARCH_KIND = {
-    schedules: { label: '일정', color: '#7C2FE5' },
+    schedules: { label: '일정', color: 'var(--v2-primary, #7C2FE5)' },
     chat: { label: '채팅', color: '#2563EB' },
     photos: { label: '사진', color: '#8B5CF6' },
     places: { label: '장소', color: '#0D9488' },
@@ -2775,7 +2775,7 @@ export function GlobalSearchModal({
     options: tabDefs.map(t => ({ value: t.key, label: t.label, badge: t.count })),
     value: activeTab,
     onChange: setActiveTab,
-    activeColor: inline ? '#7C2FE5' : '#7C3AED',
+    activeColor: inline ? 'var(--v2-primary, #7C2FE5)' : '#7C3AED',
     variant: 'flush',
     className: 'global-search-tabs'
   }) : /*#__PURE__*/React.createElement(SearchCategoryTabs, { tabs: tabDefs, activeKey: activeTab, onSelect: setActiveTab, containerStyle: { width: '100%' } }))) : null;

@@ -90,11 +90,11 @@
    themselves with hardcoded colors rather than these tokens and are not part of this pass. */
 @media (prefers-color-scheme: dark) {
   :root[data-theme="dark"] {
-    --bg-primary: #0B1120;
-    --bg-secondary: #131B2E;
-    --bg-card: #131B2E;
-    --border-subtle: #232F49;
-    --border-hover: #34405C;
+    --bg-primary: #0A0C0B;
+    --bg-secondary: #141816;
+    --bg-card: #141816;
+    --border-subtle: #262E2A;
+    --border-hover: #38423D;
     --text-main: #F1F5F9;
     --text-muted: #94A3B8;
     --text-light: #64748B;
@@ -109,9 +109,9 @@
     --text-danger: #F87171;
     --border-confirmed-soft: #5B21B6;
     --border-available-soft: #1D4ED8;
-    --surface-available-soft: #16233E;
+    --surface-available-soft: #15201B;
     --border-success-soft: #065F46;
-    --surface-hover-tint: #1E2A4D;
+    --surface-hover-tint: #1F2723;
     --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.25);
     --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
     --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.45), 0 8px 10px -6px rgba(0, 0, 0, 0.35);
@@ -122,28 +122,28 @@
      .btn-secondary/.btn-danger/.form-input alone cover most of the app including admin
      screens (they're shared utility classes), and .day-cell covers the calendar grid,
      the single most central, most-used surface in the app. */
-  :root[data-theme="dark"] .day-cell { background: #1B2540; }
-  :root[data-theme="dark"] .day-cell:hover { background: #212D4D; }
-  :root[data-theme="dark"] .day-cell.today { background: #1E2648; }
-  :root[data-theme="dark"] .btn-secondary { background: #1B2540; color: var(--text-main); }
-  :root[data-theme="dark"] .btn-secondary:hover { background: #232F49; }
+  :root[data-theme="dark"] .day-cell { background: #1C221F; }
+  :root[data-theme="dark"] .day-cell:hover { background: #242C28; }
+  :root[data-theme="dark"] .day-cell.today { background: #1B2A21; }
+  :root[data-theme="dark"] .btn-secondary { background: #1C221F; color: var(--text-main); }
+  :root[data-theme="dark"] .btn-secondary:hover { background: #262E2A; }
   :root[data-theme="dark"] .form-select,
-  :root[data-theme="dark"] .form-input { background: #1B2540; }
-  :root[data-theme="dark"] .poll-progress { background: #1B2540; }
+  :root[data-theme="dark"] .form-input { background: #1C221F; }
+  :root[data-theme="dark"] .poll-progress { background: #1C221F; }
   :root[data-theme="dark"] .modal-header.is-confirmed-theme,
   :root[data-theme="dark"] .modal-footer.is-confirmed-theme { background-color: #241B3D; }
   :root[data-theme="dark"] .modal-header.is-all-available-theme,
   :root[data-theme="dark"] .modal-footer.is-all-available-theme { background-color: #0F2E22; }
-  :root[data-theme="dark"] .poll-list-row { background-color: #1B2540; border-color: #232F49; }
+  :root[data-theme="dark"] .poll-list-row { background-color: #1C221F; border-color: #262E2A; }
 }
-:root[data-theme="dark"] .day-cell { background: #1B2540; }
-:root[data-theme="dark"] .day-cell:hover { background: #212D4D; }
-:root[data-theme="dark"] .day-cell.today { background: #1E2648; }
-:root[data-theme="dark"] .btn-secondary { background: #1B2540; color: var(--text-main); }
-:root[data-theme="dark"] .btn-secondary:hover { background: #232F49; }
+:root[data-theme="dark"] .day-cell { background: #1C221F; }
+:root[data-theme="dark"] .day-cell:hover { background: #242C28; }
+:root[data-theme="dark"] .day-cell.today { background: #1B2A21; }
+:root[data-theme="dark"] .btn-secondary { background: #1C221F; color: var(--text-main); }
+:root[data-theme="dark"] .btn-secondary:hover { background: #262E2A; }
 :root[data-theme="dark"] .form-select,
-:root[data-theme="dark"] .form-input { background: #1B2540; }
-:root[data-theme="dark"] .poll-progress { background: #1B2540; }
+:root[data-theme="dark"] .form-input { background: #1C221F; }
+:root[data-theme="dark"] .poll-progress { background: #1C221F; }
 :root[data-theme="dark"] .modal-header.is-confirmed-theme,
 :root[data-theme="dark"] .modal-footer.is-confirmed-theme { background-color: #241B3D; }
 :root[data-theme="dark"] .modal-header.is-all-available-theme,
@@ -153,16 +153,16 @@
 .modal-header.is-confirmed-theme, .modal-footer.is-confirmed-theme { background-color: #F3E8FF; }
 .modal-header.is-all-available-theme, .modal-footer.is-all-available-theme { background-color: #D1FAE5; }
 .poll-list-row { background-color: #F8FAFC; border: 1px solid #F1F5F9; }
-:root[data-theme="dark"] .poll-list-row { background-color: #1B2540; border-color: #232F49; }
+:root[data-theme="dark"] .poll-list-row { background-color: #1C221F; border-color: #262E2A; }
 /* Status/date-count badges (확정/전원/N명 가능 etc.) set pastel light-mode colors inline;
    darkening them in place (rather than threading dark variants through every call site)
    keeps every one of these chips legible without a per-badge color prop. */
 :root[data-theme="dark"] .status-badge { filter: brightness(0.85) saturate(1.15); }
 :root[data-theme="dark"] .date-item-badge { filter: none; }
 :root[data-theme="dark"] .date-item-badge.is-past {
-  background: #1B2540 !important;
+  background: #1C221F !important;
   color: #CBD5E1 !important;
-  border: 1px solid #34405C !important;
+  border: 1px solid #38423D !important;
 }
 :root[data-theme="dark"] .date-item-badge.is-confirmed {
   background: #3B1E69 !important;
@@ -181,11 +181,11 @@
 }
 :root[data-theme="dark"] {
   --status-green: #4ADE80;
-  --bg-primary: #0B1120;
-  --bg-secondary: #131B2E;
-  --bg-card: #131B2E;
-  --border-subtle: #232F49;
-  --border-hover: #34405C;
+  --bg-primary: #0A0C0B;
+  --bg-secondary: #141816;
+  --bg-card: #141816;
+  --border-subtle: #262E2A;
+  --border-hover: #38423D;
   --text-main: #F1F5F9;
   --text-muted: #94A3B8;
   --text-light: #64748B;
@@ -200,9 +200,9 @@
   --text-danger: #F87171;
   --border-confirmed-soft: #5B21B6;
   --border-available-soft: #1D4ED8;
-  --surface-available-soft: #16233E;
+  --surface-available-soft: #15201B;
   --border-success-soft: #065F46;
-  --surface-hover-tint: #1E2A4D;
+  --surface-hover-tint: #1F2723;
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.25);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
   --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.45), 0 8px 10px -6px rgba(0, 0, 0, 0.35);
@@ -2618,7 +2618,7 @@ select.form-select {
 :root[data-theme="dark"] .poll-voter-option:hover,
 :root[data-theme="dark"] .poll-voter-option:focus-visible,
 :root[data-theme="dark"] .poll-voter-option:hover,
-:root[data-theme="dark"] .poll-voter-option:focus-visible { background: #212D4D; border-color: var(--accent-primary); }
+:root[data-theme="dark"] .poll-voter-option:focus-visible { background: #242C28; border-color: var(--accent-primary); }
 @media (max-width: 640px) {
   .poll-option-row {
     grid-template-columns: 1fr;
@@ -3515,7 +3515,7 @@ select.form-select {
 :root[data-theme="dark"] .admin-side-menu-setting-icon,
 :root[data-theme="dark"] .admin-side-menu-setting-icon {
   color: #CBD5E1;
-  background: #1B2540;
+  background: #1C221F;
 }
 .admin-side-menu-font-controls {
   display: inline-flex;
@@ -4383,7 +4383,7 @@ select.form-select {
   opacity: 0.92;
 }
 :root[data-theme="dark"] .date-item-btn.confirmed-meeting-card.is-past {
-  background: #1B2540 !important;
+  background: #1C221F !important;
   border: none !important;
   color: #CBD5E1;
   box-shadow: none;
@@ -4425,7 +4425,7 @@ select.form-select {
   box-shadow: none;
 }
 :root[data-theme="dark"] .date-item-btn.confirmed-meeting-card .dday-badge.is-past {
-  background: #1B2540 !important;
+  background: #1C221F !important;
   color: #CBD5E1 !important;
   border: 1px solid rgba(52, 64, 93, 0.9) !important;
   box-shadow: none;
@@ -4589,16 +4589,16 @@ select.form-select {
   background-color: #EEF2FF;
 }
 :root[data-theme="dark"] .search-result-row {
-  background-color: #1B2540;
+  background-color: #1C221F;
 }
 :root[data-theme="dark"] .search-result-row:hover {
-  background-color: #212D4D;
+  background-color: #242C28;
 }
 @media (prefers-color-scheme: dark) {
   :root[data-theme="dark"] .date-item-badge.is-past {
-    background: #1B2540 !important;
+    background: #1C221F !important;
     color: #CBD5E1 !important;
-    border: 1px solid #34405C !important;
+    border: 1px solid #38423D !important;
   }
   :root[data-theme="dark"] .date-item-badge.is-confirmed {
     background: #3B1E69 !important;
@@ -4622,10 +4622,10 @@ select.form-select {
     box-shadow: none;
   }
   :root[data-theme="dark"] .search-result-row {
-    background-color: #1B2540;
+    background-color: #1C221F;
   }
   :root[data-theme="dark"] .search-result-row:hover {
-    background-color: #212D4D;
+    background-color: #242C28;
   }
 }
 
@@ -5881,7 +5881,7 @@ textarea.form-input {
 
 [data-theme="dark"] .btn-secondary,
 :root[data-theme="dark"] .btn-secondary {
-  background: #1B2540; color: var(--text-main); border-color: var(--border-subtle);
+  background: #1C221F; color: var(--text-main); border-color: var(--border-subtle);
 }
 [data-theme="dark"] .form-input,
 [data-theme="dark"] input.form-input,
@@ -5891,7 +5891,7 @@ textarea.form-input {
 :root[data-theme="dark"] input.form-input,
 :root[data-theme="dark"] textarea.form-input,
 :root[data-theme="dark"] select.form-input {
-  background: #131B2E !important;
+  background: #141816 !important;
   color: var(--text-main) !important;
   border-color: var(--border-subtle) !important;
 }
@@ -5914,7 +5914,7 @@ textarea.form-input {
 }
 [data-theme="dark"] .url-capsule-badge,
 :root[data-theme="dark"] .url-capsule-badge {
-  background: #1B2540 !important; color: #A5B4FC !important; border-color: #312E81 !important;
+  background: #1C221F !important; color: #A5B4FC !important; border-color: #312E81 !important;
 }
 
 
@@ -5942,7 +5942,7 @@ textarea.form-input {
 }
 :root[data-theme="dark"] .admin-side-menu,
 :root[data-theme="dark"] .admin-side-menu {
-  background: #131B2E !important;
+  background: #141816 !important;
   color: var(--text-main) !important;
   box-shadow: -12px 0 34px rgba(0, 0, 0, 0.45);
 }
@@ -5955,12 +5955,12 @@ textarea.form-input {
 :root[data-theme="dark"] .admin-side-menu-item:hover,
 :root[data-theme="dark"] .admin-side-menu-item:focus-visible,
 :root[data-theme="dark"] .admin-side-menu-item:hover,
-:root[data-theme="dark"] .admin-side-menu-item:focus-visible { background: #1B2540; }
+:root[data-theme="dark"] .admin-side-menu-item:focus-visible { background: #1C221F; }
 :root[data-theme="dark"] .admin-side-menu-close-btn,
 :root[data-theme="dark"] .admin-side-menu-close-btn { color: var(--text-muted); }
 :root[data-theme="dark"] .admin-side-menu-font-btn,
 :root[data-theme="dark"] .admin-side-menu-font-btn {
-  background: #1B2540; color: var(--text-main); border-color: var(--border-subtle);
+  background: #1C221F; color: var(--text-main); border-color: var(--border-subtle);
 }
 :root[data-theme="dark"] .settlement-base-budget-card,
 :root[data-theme="dark"] .settlement-base-budget-card {
@@ -5971,7 +5971,7 @@ textarea.form-input {
 :root[data-theme="dark"] .poll-progress,
 :root[data-theme="dark"] .poll-progress,
 :root[data-theme="dark"] .admin-progress,
-:root[data-theme="dark"] .admin-progress { background: #1B2540 !important; }
+:root[data-theme="dark"] .admin-progress { background: #1C221F !important; }
 :root[data-theme="dark"] a.link-preview-card,
 :root[data-theme="dark"] a.link-preview-card {
   border-color: var(--border-subtle) !important;
@@ -6004,7 +6004,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 
 :root[data-theme="dark"] .admin-side-menu-item-icon,
 :root[data-theme="dark"] .admin-side-menu-item-icon {
-  background: #1B2540 !important;
+  background: #1C221F !important;
   color: #E2E8F0 !important;
 }
 :root[data-theme="dark"] .admin-side-menu-item:hover .admin-side-menu-item-icon,
@@ -6036,7 +6036,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 }
 :root[data-theme="dark"] .admin-side-menu-setting-icon,
 :root[data-theme="dark"] .admin-side-menu-setting-icon {
-  background: #1B2540 !important;
+  background: #1C221F !important;
   color: #E2E8F0 !important;
 }
 
@@ -6065,7 +6065,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 }
 :root[data-theme="dark"] .admin-side-menu,
 :root[data-theme="dark"] .admin-side-menu {
-  --border-subtle: #232F49;
+  --border-subtle: #262E2A;
 }
 :root[data-theme="dark"] .summary-section-divider,
 :root[data-theme="dark"] .summary-section-divider,
@@ -6193,7 +6193,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 :root[data-theme="dark"] .admin-top-bar,
 :root[data-theme="dark"] .admin-side-menu,
 :root[data-theme="dark"] .poll-sortable-row.is-dragging {
-  background: #131B2E !important;
+  background: #141816 !important;
   color: var(--text-main) !important;
 }
 :root[data-theme="dark"] .admin-menu-toggle-btn { color: var(--text-main); }

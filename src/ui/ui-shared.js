@@ -528,7 +528,7 @@ export function FormAddEditActionButtons({ isEditing, isSaving, onCancel, onSubm
   );
 }
 
-export function UnderlineTabs({ options = [], value, onChange, ariaLabel, className = '', style = null, activeColor = '#7C3AED', variant = null }) {
+export function UnderlineTabs({ options = [], value, onChange, ariaLabel, className = '', style = null, activeColor = 'var(--v2-primary, #7C3AED)', variant = null }) {
   const React = window.React;
   const list = Array.isArray(options) ? options : [];
   // 'flush' sits edge-to-edge on the modal/page width with equal flex children and no extra
