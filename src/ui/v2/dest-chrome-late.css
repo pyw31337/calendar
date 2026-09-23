@@ -270,7 +270,7 @@
 .v2-design .bp-day-bar-stack .bp-day-anniversary[class*="cat-"],
 .v2-design .bp-day-bar-stack .bp-day-anniversary[class*="genre-"],
 .v2-design .festival-bar-desktop .bp-day-anniversary {
-  background: color-mix(in srgb, var(--cal-anniversary, #F76AAD) 16%, #fff) !important;
+  background: color-mix(in srgb, var(--cal-anniversary, #F76AAD) 16%, var(--bg-card)) !important;
   color: var(--cal-anniversary, #F76AAD) !important;
 }
 .v2-design .bp-day-anniversary-label,
@@ -409,7 +409,7 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   .v2-design .bp-day-bar-stack .bp-day-anniversary,
   .v2-design .bp-day-bar-stack .bp-day-anniversary[class*="cat-"],
   .v2-design .festival-bar-desktop .bp-day-anniversary {
-    background: color-mix(in srgb, var(--cal-anniversary, #F76AAD) 16%, #fff) !important;
+    background: color-mix(in srgb, var(--cal-anniversary, #F76AAD) 16%, var(--bg-card)) !important;
     color: var(--cal-anniversary, #F76AAD) !important;
     height: auto !important;
     min-height: 1.16rem !important;
@@ -798,7 +798,7 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   font-size: 0.88rem !important;
   font-weight: 600;
   line-height: 1.45;
-  background: color-mix(in srgb, var(--brand, #7C2FE5) 4%, #fff);
+  background: color-mix(in srgb, var(--brand, #7C2FE5) 4%, var(--bg-card));
   border: 1px dashed color-mix(in srgb, var(--brand, #7C2FE5) 18%, #eceaf5);
   border-radius: 16px;
   box-sizing: border-box;
@@ -811,14 +811,14 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
 .v2-design .bp-renewal-home-empty {
   padding: 20px 14px !important;
   font-size: 0.8rem !important;
-  background: color-mix(in srgb, var(--brand, #7C2FE5) 5%, #fff);
+  background: color-mix(in srgb, var(--brand, #7C2FE5) 5%, var(--bg-card));
 }
 .v2-design .v2-places .places-list-body > div > div[style*="text-align"] {
   padding: 36px 16px !important;
   color: var(--text-muted, #6b6580) !important;
   font-size: 0.88rem !important;
   font-weight: 600;
-  background: color-mix(in srgb, var(--brand, #7C2FE5) 4%, #fff);
+  background: color-mix(in srgb, var(--brand, #7C2FE5) 4%, var(--bg-card));
   border: 1px dashed color-mix(in srgb, var(--brand, #7C2FE5) 18%, #eceaf5);
   border-radius: 16px;
 }
@@ -1171,7 +1171,7 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
 }
 .v2-design .v2-content .underline-tabs [role="tab"][aria-selected="true"] > span,
 .v2-design .v2-archive .underline-tabs [role="tab"][aria-selected="true"] > span {
-  background: color-mix(in srgb, var(--brand, #7C2FE5) 14%, #fff) !important;
+  background: color-mix(in srgb, var(--brand, #7C2FE5) 14%, var(--bg-card)) !important;
   color: var(--brand, #7C2FE5) !important;
 }
 
@@ -2999,7 +2999,7 @@ html:has(.renewal-shell.v2-design) .admin-settings-modal .recent-log-left > .par
 /* Content header view toggles: active grid/list matches purple chip language */
 .v2-design .v2-page-header .bp-icon-btn.is-active,
 .v2-design .v2-content .v2-page-header .bp-icon-btn.is-active {
-  background: color-mix(in srgb, var(--brand, #7C2FE5) 16%, #fff) !important;
+  background: color-mix(in srgb, var(--brand, #7C2FE5) 16%, var(--bg-card)) !important;
   color: var(--brand, #7C2FE5) !important;
   border-radius: 10px !important;
 }

@@ -253,7 +253,7 @@
  * fade instead of the flat --surface-confirmed tint, matching the calendar home's own
  * gradient-forward visual language. */
 .v2-design .bp-day-cell.bp-confirmed {
-  background: linear-gradient(180deg, #f3eeff 0%, #fff 80%);
+  background: linear-gradient(180deg, #f3eeff 0%, var(--bg-card) 80%);
 }
 /* Participant availability dots sit right under the day number / 모임확정 pill row -- a little
  * more breathing room above them so they don't read as glued to that row. */
@@ -341,7 +341,7 @@
 .v2-design .bp-renewal-home-footer { text-align: center; color: var(--text-light, #83798f); font-size: 0.62rem; padding: 18px 14px 28px; }
 .v2-design .bp-renewal-home-footer-links { display: flex; gap: 12px; justify-content: center; margin-top: 8px; flex-wrap: wrap; }
 .v2-design .bp-renewal-home-empty { color: var(--text-muted); font-size: 0.75rem; }
-.v2-design .bp-month-picker { position: absolute; z-index: 10; top: 36px; left: 0; padding: 12px; border: 1px solid var(--v2-card-border, #eceaf5); border-radius: 12px; background: white; box-shadow: 0 8px 24px #1e1b2e20; }
+.v2-design .bp-month-picker { position: absolute; z-index: 10; top: 36px; left: 0; padding: 12px; border: 1px solid var(--v2-card-border, #eceaf5); border-radius: 12px; background: var(--bg-card); box-shadow: 0 8px 24px #1e1b2e20; }
 .v2-design .bp-month-picker input { font: inherit; padding: 6px; max-width: 180px; }
 .v2-design .v2-destination { padding: 0; min-height: 100dvh; }
 .v2-design .renewal-shell-subtab-row { position: relative; z-index: 1; }
@@ -460,7 +460,7 @@
   transform: translate(-50%, 0) !important;
   border-radius: 20px 20px 0 0 !important;
   box-shadow: 0 -16px 44px rgba(76, 29, 149, 0.28) !important;
-  background: var(--bg-card, #fff);
+  background: var(--bg-card, var(--bg-card));
   overflow: hidden !important;
   padding: 0 !important;
   display: flex;
@@ -471,7 +471,7 @@
   display: none !important;
 }
 .v2-design .bp-event-sheet .modal-header {
-  background: var(--bg-card, #fff);
+  background: var(--bg-card, var(--bg-card));
   border-bottom: 1px solid var(--border-subtle);
   padding: 14px 18px;
   display: flex;
@@ -603,7 +603,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
  * dark category text; narrow layouts intentionally collapse to a solid bar. */
 @media (min-width: 768px) {
   .v2-design .bp-day-bar-stack .bp-day-anniversary:not(.bp-bar-only) {
-    background: color-mix(in srgb, var(--cal-anniversary, #F76AAD) 15%, #fff) !important;
+    background: color-mix(in srgb, var(--cal-anniversary, #F76AAD) 15%, var(--bg-card)) !important;
     color: var(--cal-anniversary, #F76AAD);
   }
   .v2-design .bp-day-bar-stack .bp-day-anniversary:not(.bp-bar-only) > .bp-day-anniversary-label {
@@ -833,7 +833,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  background: color-mix(in srgb, var(--cal-anniversary, #F76AAD) 16%, #fff) !important;
+  background: color-mix(in srgb, var(--cal-anniversary, #F76AAD) 16%, var(--bg-card)) !important;
   color: var(--cal-anniversary, #F76AAD) !important;
   border-radius: 999px !important; /* single-day / solo default */
   /* Mobile / narrow default: labelled color badge (title shown through tablet). */
@@ -1429,7 +1429,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   align-self: flex-start;
   max-height: none;
   overflow: visible;
-  background: var(--bg-card, #fff);
+  background: var(--bg-card, var(--bg-card));
   border: 1px solid var(--border, #e8e7f0);
   border-radius: 18px;
   box-shadow: 0 12px 36px rgba(46, 27, 88, .08);
@@ -1756,7 +1756,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 
 /* Apple-like card: thin crisp border + optional light shadow (not heavy drop) */
 .v2-design .v2-card-glass {
-  background: var(--bg-card, #fff);
+  background: var(--bg-card, var(--bg-card));
   border: 1px solid var(--v2-card-border, #eceaf5);
   box-shadow: var(--v2-card-shadow);
 }
@@ -1863,7 +1863,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
 @media (min-width: 768px) {
   .v2-design .bp-day-bar-stack .bp-day-anniversary,
   .v2-design .festival-bar-desktop .bp-day-anniversary {
-    background: color-mix(in srgb, var(--cal-anniversary, #F76AAD) 16%, #fff) !important;
+    background: color-mix(in srgb, var(--cal-anniversary, #F76AAD) 16%, var(--bg-card)) !important;
     color: var(--cal-anniversary, #F76AAD) !important;
   }
   .v2-design .bp-day-bar-stack .bp-day-anniversary > .bp-day-anniversary-label,
@@ -2001,7 +2001,7 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   gap: 10px;
   padding: 0 22px;
   border-bottom: 1px solid var(--border-subtle, #ebe8f3);
-  background: var(--bg-card, #fff);
+  background: var(--bg-card, var(--bg-card));
 }
 .v2-design .global-search-page-card .global-search-header h3 {
   flex: 0 0 auto;

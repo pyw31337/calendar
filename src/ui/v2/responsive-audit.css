@@ -210,7 +210,7 @@
 @media (min-width: 768px) {
   .v2-design .bp-day-bar-stack .bp-day-anniversary,
   .v2-design .festival-bar-desktop .bp-day-anniversary {
-    background: color-mix(in srgb, var(--anniversary-color, #a855f7) 16%, #fff) !important;
+    background: color-mix(in srgb, var(--anniversary-color, #a855f7) 16%, var(--bg-card)) !important;
   }
   .v2-design .bp-day-bar-stack .bp-day-anniversary > .bp-day-anniversary-label,
   .v2-design .festival-bar-desktop .bp-day-anniversary-label {
@@ -787,7 +787,7 @@ html:has(.renewal-shell.v2-design) .modal-overlay .confirm-dialog-actions {
 .renewal-shell.v2-design .v2-chat .v2-chat-tool-icons > .v2-tool-icon-btn:hover,
 .renewal-shell.v2-design .v2-chat .v2-chat-tool-icons > .v2-tool-icon-btn:focus-visible {
   color: var(--brand, #7c2fe5) !important;
-  border-color: color-mix(in srgb, var(--brand, #7c2fe5) 35%, #fff) !important;
+  border-color: color-mix(in srgb, var(--brand, #7c2fe5) 35%, var(--bg-card)) !important;
   outline: none !important;
 }
 

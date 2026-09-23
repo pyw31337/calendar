@@ -18,7 +18,7 @@ const BG_FFF =
   /background(?:-color)?\s*:\s*#(?:fff|ffffff)\b/i;
 const BG_FAFAFC =
   /background(?:-color)?\s*:\s*#(?:fafafc)\b/i;
-const COLOR_MIX_FFF = /color-mix\([^)]*#(?:fff|ffffff)/i;
+const COLOR_MIX_FFF = /,\s*#(?:fff|ffffff)\s*\)/i;
 
 for (const rel of files) {
   test(`${rel} surfaces use theme tokens (no #fff/#fafafc backgrounds)`, () => {
