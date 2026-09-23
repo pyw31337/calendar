@@ -4,12 +4,12 @@
   /* First-class pane inside renewal-shell-main (beside side rail) — not a viewport overlay. */
   position: relative; inset: auto; z-index: 1; overflow-y: auto; overflow-x: hidden;
   min-height: 100dvh; width: 100%;
-  background: #fafafc; color: #1e1b2e; font-family: var(--font-sans);
+  background: var(--bg-primary); color: #1e1b2e; font-family: var(--font-sans);
   padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 .v2-design .v2-fullscreen > .bp-app-shell {
   width: 100%; max-width: none; padding: 0 0 90px; margin: 0; min-height: 100%;
-  background: #fafafc; position: relative;
+  background: var(--bg-primary); position: relative;
 }
 .v2-design .v2-page-header {
   display: block;
@@ -68,7 +68,7 @@
 .v2-design .v2-fullscreen button { font-family: inherit; }
 .v2-design .v2-empty { font-size: var(--font-size-md); color: #83798f; padding: 24px 14px; text-align: center; }
 .v2-design .v2-load-more {
-  display: block; border: 1px solid var(--v2-card-border, #eceaf5); border-radius: 9999px; background: #fff;
+  display: block; border: 1px solid var(--v2-card-border, #eceaf5); border-radius: 9999px; background: var(--bg-card);
   color: var(--brand, #7C2FE5); font-size: var(--font-size-sm); font-weight: 700; margin: 12px auto; padding: 10px 18px; cursor: pointer;
 }
 .v2-design .v2-compose-backdrop {
@@ -133,7 +133,7 @@
 /* Memo cards */
 .v2-design .v2-memo-card-wrap { min-width: 0; }
 .v2-design .v2-memo-card-wrap .memo-card-hover {
-  background: #fff !important; border-left: 4px solid var(--memo-author-color) !important;
+  background: var(--bg-card) !important; border-left: 4px solid var(--memo-author-color) !important;
   border-radius: 0 14px 14px 0 !important; padding: 14px !important;
   box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important; min-height: 100%;
 }
@@ -184,15 +184,15 @@
 .v2-design .v2-settlement-legacy .settlement-running-balance,
 .v2-design .v2-settlement-legacy [class*="settlement-card"] {
   border: 1px solid var(--v2-card-border, #eceaf5) !important; border-radius: 18px !important;
-  box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important; background: #fff !important;
+  box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important; background: var(--bg-card) !important;
 }
 
 /* Chat */
-.v2-design .v2-chat { background: #fafafc; }
+.v2-design .v2-chat { background: var(--bg-primary); }
 .v2-design .v2-chat-shell { max-width: none; width: 100%; padding-bottom: 0 !important; }
 .v2-design .v2-chat-root,
 .v2-design .v2-chat-legacy {
-  background: #fafafc !important;
+  background: var(--bg-primary) !important;
 }
 .v2-design .v2-chat .v2-page-header { flex-shrink: 0; display: block; position: sticky; top: 0; z-index: 30; }
 /* The live ChatRoomView renders its message list as `position:absolute;inset:0` inside a
@@ -216,10 +216,10 @@
   left: 50% !important; right: auto !important; transform: translateX(-50%);
   width: 100%; max-width: 480px;
 }
-.v2-design .v2-chat-composer { position: relative; bottom: auto; left: auto; right: auto; z-index: 35; background: var(--bg-card, #fff); width: 100%; flex: 0 0 auto; padding: 10px 12px; }
+.v2-design .v2-chat-composer { position: relative; bottom: auto; left: auto; right: auto; z-index: 35; background: var(--bg-card); width: 100%; flex: 0 0 auto; padding: 10px 12px; }
 .v2-design .v2-chat-compose-row { display: flex; align-items: center; gap: 8px; }
 .v2-design .v2-chat-compose-row > textarea {
-  min-width: 0; flex: 1; box-shadow: none !important; background: #fafafc !important;
+  min-width: 0; flex: 1; box-shadow: none !important; background: var(--bg-primary) !important;
   border: 1px solid var(--v2-card-border, #eceaf5) !important; overflow-y: auto !important; scrollbar-width: none;
   border-radius: var(--radius-md) !important;
 }
@@ -244,12 +244,12 @@
 .v2-design .v2-chat-legacy .chat-composer {
   position: relative !important; left: auto !important; right: auto !important; bottom: auto !important;
   transform: none !important; max-width: none !important; width: 100% !important;
-  background: #fff !important; border-top: 1px solid var(--v2-card-border, #eceaf5) !important;
+  background: var(--bg-card) !important; border-top: 1px solid var(--v2-card-border, #eceaf5) !important;
   padding: 10px 12px !important; flex-shrink: 0;
 }
 .v2-design .v2-chat-legacy .chat-composer textarea {
   border: 1px solid var(--v2-card-border, #eceaf5) !important; border-radius: var(--radius-md) !important;
-  background: #fafafc !important; font-size: var(--font-size-md) !important;
+  background: var(--bg-primary) !important; font-size: var(--font-size-md) !important;
   padding: 9px 14px !important; box-shadow: none !important;
 }
 .v2-design .v2-chat-legacy .msg-row-hover {
@@ -265,7 +265,7 @@
 .v2-design .v2-chat-legacy .msg-row-hover [style*="background-color: var(--bg-card)"] {
   font-size: var(--font-size-md) !important; line-height: 1.45 !important;
   border-radius: 0 12px 12px 12px !important; padding: 8px 11px !important;
-  box-shadow: none !important; border: 1px solid var(--v2-card-border, #eceaf5) !important; background: #fff !important;
+  box-shadow: none !important; border: 1px solid var(--v2-card-border, #eceaf5) !important; background: var(--bg-card) !important;
   max-width: 260px !important;
 }
 .v2-design .v2-chat-legacy .msg-row-hover [style*="backgroundColor: 'var(--brand)'"],
@@ -288,7 +288,7 @@
 /* Date divider pills */
 .v2-design .v2-chat-legacy div[style*="margin: 24px 0 16px"] > span,
 .v2-design .v2-chat-legacy div:has(> span[style*="borderRadius"]) > span {
-  background: #fafafc !important; color: #83798f !important;
+  background: var(--bg-primary) !important; color: #83798f !important;
   font-size: var(--font-size-2xs) !important; font-weight: 700 !important;
   padding: 4px 12px !important; border-radius: 9999px !important;
 }
@@ -363,7 +363,7 @@
   padding-top: 12px !important;
 }
 .v2-design .v2-places-legacy .places-category-sticky-tabs {
-  position: sticky; top: 0; z-index: 5; background: #fafafc;
+  position: sticky; top: 0; z-index: 5; background: var(--bg-primary);
 }
 .v2-design .v2-chat-legacy > div[style*="flex: 1"] {
   flex: 1 1 auto !important; min-height: 0 !important;
@@ -485,7 +485,7 @@
   border-radius: 16px !important;
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
   box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important;
-  background: #fff !important;
+  background: var(--bg-card) !important;
 }
 .v2-design .v2-places .bp-place-name {
   font-weight: 800 !important;
@@ -508,7 +508,7 @@
   border-radius: 16px !important;
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
   box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important;
-  background: #fff !important;
+  background: var(--bg-card) !important;
   padding: 14px !important;
 }
 .v2-design .v2-settlement .bp-settlement-card-title {
@@ -527,7 +527,7 @@
   border-radius: 12px !important;
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
   box-shadow: var(--v2-card-shadow);
-  background: #fff !important;
+  background: var(--bg-card) !important;
   padding: 10px 12px !important;
   margin-bottom: 8px !important;
 }
@@ -541,7 +541,7 @@
   border-radius: 16px;
   border-color: var(--v2-card-border, #eceaf5);
   box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03));
-  background: #fff;
+  background: var(--bg-card);
 }
 .v2-design .v2-records-overview .renewal-records-overview-icon {
   background: #f3eeff;
@@ -558,7 +558,7 @@
 /* Gallery page (ChatGalleryModal asPage) restyle chrome only */
 .v2-design .v2-records-media {
   min-height: 100%;
-  background: #fafafc;
+  background: var(--bg-primary);
 }
 .v2-design .v2-records-media .chat-gallery-page,
 .v2-design .v2-records-media [class*="gallery"][class*="page"],
@@ -583,7 +583,7 @@
   min-height: 100dvh;
   width: 100%;
   isolation: isolate;
-  background: #fafafc;
+  background: var(--bg-primary);
 }
 
 .v2-design .renewal-shell-main .chat-room-container,
@@ -673,7 +673,7 @@
 .v2-design .v2-archive-legacy .places-view-header {
   height: 52px !important;
   padding: 0 14px !important;
-  background: #fff !important;
+  background: var(--bg-card) !important;
   border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
   box-shadow: none !important;
 }
@@ -688,7 +688,7 @@
   display: flex;
   flex-direction: column;
   min-height: 100%;
-  background: #fafafc;
+  background: var(--bg-primary);
 }
 .v2-design .v2-embed-frame > .v2-legacy-body {
   flex: 1 1 auto;
@@ -700,7 +700,7 @@
   position: sticky;
   top: 0;
   z-index: 6;
-  background: #fafafc;
+  background: var(--bg-primary);
   border-bottom: 1px solid var(--v2-card-border, #eceaf5);
   padding: 8px 12px;
   display: flex;
@@ -731,7 +731,7 @@
 .v2-design .v2-gallery .bp-header,
 .v2-design .v2-content .bp-header,
 .v2-design .v2-archive .bp-header {
-  background: #fff;
+  background: var(--bg-card);
   border-bottom: 1px solid var(--v2-card-border, #eceaf5);
   padding: 10px 14px 8px;
 }
@@ -772,7 +772,7 @@
 @media (min-width: 1200px) {
   .v2-design .v2-chat.v2-dest-page,
   .v2-design .renewal-shell-main.v2-chat {
-    background: #fafafc;
+    background: var(--bg-primary);
   }
   .v2-design .v2-chat-shell,
   .v2-design .v2-chat .v2-chat-root,
@@ -781,7 +781,7 @@
     width: 100% !important;
     margin-left: 0 !important;
     margin-right: 0 !important;
-    background: #fafafc !important;
+    background: var(--bg-primary) !important;
     box-shadow: none;
   }
   .v2-design .v2-chat .chat-composer {
@@ -805,7 +805,7 @@
     max-width: none !important;
     margin: 0 !important;
     width: 100% !important;
-    background: #fafafc;
+    background: var(--bg-primary);
   }
   /* tag cloud removed — inner content pad via dest-layout tokens */
   .v2-design .v2-memo .v2-dest-body,
@@ -849,7 +849,7 @@
   height: 52px !important;
 }
 .v2-design .v2-gallery .gallery-page-container {
-  background: #fafafc !important;
+  background: var(--bg-primary) !important;
 }
 @media (min-width: 1200px) {
   .v2-design .v2-gallery .gallery-page-inner,
@@ -925,7 +925,7 @@
   height: 100dvh;
   min-height: 100dvh;
   overflow: hidden;
-  background: #fafafc;
+  background: var(--bg-primary);
 }
 .v2-design .v2-records-frame > .renewal-shell-subtab-row { flex: 0 0 auto; }
 .v2-design .v2-records-frame > .v2-records-body {
@@ -1041,7 +1041,7 @@
 /* White ChatFull bubbles (own + others); slight radius bump */
 .v2-design .v2-chat .msg-row-hover > div > div[style*="backgroundColor"],
 .v2-design .v2-chat .msg-row-hover > div > div[style*="background-color"] {
-  background: #fff !important;
+  background: var(--bg-card) !important;
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
   border-radius: 14px !important;
   box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important;
@@ -1062,7 +1062,7 @@
 .v2-design .v2-chat-root .chat-messages-scroll,
 .v2-design .v2-chat-scroll {
   padding: 8px 14px 100px !important;
-  background: #fafafc !important;
+  background: var(--bg-primary) !important;
 }
 
 /* Gallery: tighten records subtab + page header stack (when strip visible on 전체) */
@@ -1070,7 +1070,7 @@
   padding: 4px 10px !important;
   gap: 4px !important;
   border-bottom: 1px solid var(--v2-card-border, #eceaf5);
-  background: #fff;
+  background: var(--bg-card);
 }
 .v2-design .v2-records-frame .renewal-shell-subtab-item {
   font-size: 0.72rem !important;
@@ -1169,7 +1169,7 @@
   border-radius: 12px !important;
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
   box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important;
-  background: #fff !important;
+  background: var(--bg-card) !important;
   margin-bottom: 6px !important;
 }
 .v2-design .v2-places .place-card-row > div {
@@ -1226,19 +1226,19 @@
 .v2-design .v2-archive-legacy .places-view-header {
   height: 52px !important;
   padding: 0 14px !important;
-  background: #fff !important;
+  background: var(--bg-card) !important;
   border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
   box-shadow: none !important;
 }
 .v2-design .v2-content .places-view-container,
 .v2-design .v2-archive .places-view-container {
-  background: #fafafc !important;
+  background: var(--bg-primary) !important;
 }
 .v2-design .v2-content [class*="category-chip"],
 .v2-design .v2-archive [class*="category-chip"],
 .v2-design .v2-content .underline-tabs,
 .v2-design .v2-archive .underline-tabs {
-  background: #fff !important;
+  background: var(--bg-card) !important;
   border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
 }
 /* Content page's category row ("전체 개별등록 클래식/전통 ...") still scrolls horizontally by
@@ -1255,7 +1255,7 @@
   border-radius: 14px !important;
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
   box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important;
-  background: #fff !important;
+  background: var(--bg-card) !important;
 }
 .v2-design .v2-records-no-subtab .v2-records-body {
   /* full height when strip removed */
@@ -1318,7 +1318,7 @@
   position: sticky;
   top: 0;
   z-index: 20;
-  background: #fff;
+  background: var(--bg-card);
   border-bottom: 1px solid var(--v2-card-border, #eceaf5);
   padding: 10px 14px 8px;
 }
@@ -1467,7 +1467,7 @@
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
   border-radius: 14px !important;
   border-right: 1px solid var(--v2-card-border, #eceaf5) !important;
-  background: #fff !important;
+  background: var(--bg-card) !important;
   box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important;
   padding: 12px 10px !important;
 }
@@ -1480,12 +1480,12 @@
   padding: 10px 12px !important;
   border-radius: 12px !important;
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
-  background: #fff !important;
+  background: var(--bg-card) !important;
   box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important;
   margin-bottom: 6px !important;
 }
 .v2-design .v2-settlement .settlement-page-body section {
-  background: #fff !important;
+  background: var(--bg-card) !important;
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
   border-radius: 16px !important;
   padding: 12px !important;
@@ -1780,7 +1780,7 @@
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
   box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important;
   overflow: hidden;
-  background: #fff !important;
+  background: var(--bg-card) !important;
 }
 .v2-design .v2-archive .history-bento-grid > * {
   border-radius: 12px !important;
@@ -1969,7 +1969,7 @@
   border-radius: 12px !important;
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
   box-shadow: var(--v2-card-shadow) !important;
-  background: #fff !important;
+  background: var(--bg-card) !important;
   max-width: none !important;
   width: 100% !important;
   margin: 0 !important;
@@ -1984,7 +1984,7 @@
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
   border-left: 4px solid var(--memo-author-color, #eceaf5) !important;
   box-shadow: var(--v2-card-shadow, 0 1px 3px rgba(30,27,46,0.04), 0 4px 12px rgba(30,27,46,0.03)) !important;
-  background: #fff !important;
+  background: var(--bg-card) !important;
 }
 
 .v2-design .v2-memo .memo-card-hover [style*="marginBottom"],
@@ -2089,7 +2089,7 @@
   opacity: 0.55;
 }
 .v2-design .places-map-sticky-area .panel-resize-bar {
-  background: #ffffff !important;
+  background: var(--bg-card) !important;
   border: 0 !important;
   border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
 }
@@ -2099,7 +2099,7 @@
 .v2-design .v2-chat-scroll,
 .v2-design .v2-chat-root .chat-messages-scroll,
 .v2-design .v2-chat .chat-messages-scroll {
-  background: #fafafc !important;
+  background: var(--bg-primary) !important;
 }
 
 /* Author name pills denser (own/other participant colors kept) */
@@ -2115,7 +2115,7 @@
 /* White bubbles + subtle border for own + others */
 .v2-design .v2-chat .msg-row-hover > div > div[style*="backgroundColor"],
 .v2-design .v2-chat .msg-row-hover > div > div[style*="background-color"] {
-  background: #fff !important;
+  background: var(--bg-card) !important;
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
   color: #1e1b2e !important;
   box-shadow: none !important;
@@ -2128,7 +2128,7 @@
   min-height: 60px;
   padding: 0 16px;
   box-sizing: border-box;
-  background: #fff;
+  background: var(--bg-card);
   border-bottom: 1px solid var(--v2-card-border, #eceaf5);
   position: sticky;
   top: 0;
