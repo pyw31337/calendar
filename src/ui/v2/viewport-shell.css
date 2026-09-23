@@ -1,14 +1,16 @@
-/* Viewport pin + bottom-gap kill switch for V2 (loaded with chat-bubble-modules.css). */
+/* Viewport pin + bottom-gap kill switch for V2 (loaded with chat-bubble-modules.css).
+ * Selectors use html/body:has(.v2-design) so portaled/document chrome stays V2-scoped
+ * (see test/v2-style-isolation.test.mjs). */
 
-html.v2-html-active,
-html.v2-html-active body.v2-body-active {
+html:has(.v2-design),
+html:has(.v2-design) body {
   height: 100%;
   max-height: 100%;
   overflow: hidden;
   overscroll-behavior: none;
   background: #fafafc;
 }
-html.v2-html-active #root {
+html:has(.v2-design) #root {
   height: 100%;
   max-height: 100%;
   overflow: hidden;
@@ -103,25 +105,18 @@ html.v2-html-active #root {
   }
 }
 
-/* Lightbox: one slide per stage width; hide neighbor bleed. */
-.lightbox-overlay [data-lightbox-stage],
-.lightbox-overlay .lightbox-stage,
-.lightbox-overlay .lightbox-image-stage {
-  width: 100% !important;
-  max-width: 100% !important;
-  overflow: hidden !important;
-}
-
-.lightbox-overlay .lightbox-stage {
+/* Lightbox is portaled to body — scope via :has(.v2-design). */
+body:has(.v2-design) .lightbox-overlay .lightbox-stage,
+body:has(.v2-design) .lightbox-overlay .lightbox-image-stage {
   width: 100% !important;
   max-width: 100% !important;
   overflow: hidden !important;
   position: relative !important;
 }
-.lightbox-overlay .lightbox-track {
+body:has(.v2-design) .lightbox-overlay .lightbox-track {
   display: flex !important;
 }
-.lightbox-overlay .lightbox-slide {
+body:has(.v2-design) .lightbox-overlay .lightbox-slide {
   overflow: hidden !important;
   box-sizing: border-box !important;
 }
