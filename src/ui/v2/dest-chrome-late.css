@@ -2901,10 +2901,16 @@ html:has(.renewal-shell.v2-design) .admin-settings-modal .recent-log-left > .par
   border-radius: 10px !important;
 }
 
-/* Region settings uses shared modal-overlay chrome; keep sheet body scrollable */
-html:has(.renewal-shell.v2-design) .modal-overlay.region-filter-overlay > .modal-container.region-filter-sheet {
-  width: min(520px, calc(100vw - 48px)) !important;
-  max-width: 520px !important;
+/* Region settings uses shared modal-overlay chrome; keep sheet body scrollable.
+   The 48px-reserved centered width below is desktop-only -- on mobile it left an unwanted
+   ~24px gutter on each side (the plain .modal-container it overrides is already full-bleed
+   at mobile widths, same as the date/event sheet's own mobile rule right above), so phones
+   now keep the sheet edge-to-edge like every other mobile modal in the app. */
+@media (min-width: 768px) {
+  html:has(.renewal-shell.v2-design) .modal-overlay.region-filter-overlay > .modal-container.region-filter-sheet {
+    width: min(520px, calc(100vw - 48px)) !important;
+    max-width: 520px !important;
+  }
 }
 html:has(.renewal-shell.v2-design) .region-filter-sheet .modal-body.region-filter-body {
   overflow-y: auto !important;
