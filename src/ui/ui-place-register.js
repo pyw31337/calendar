@@ -33,10 +33,6 @@ function getDisplayPlaceAddress(...args) {
   const f = __gatherUiDeps().getDisplayPlaceAddress || GATHER_APP_UTILS.getDisplayPlaceAddress;
   return typeof f === 'function' ? f(...args) : undefined;
 }
-function getPlaceCategoryLabel(...args) {
-  const f = __gatherUiDeps().getPlaceCategoryLabel || GATHER_APP_UTILS.getPlaceCategoryLabel;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
 function reformatMemoIntoDateLines(...args) {
   const f = __gatherUiDeps().reformatMemoIntoDateLines || GATHER_APP_UTILS.reformatMemoIntoDateLines;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -315,7 +311,7 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
     }
   };
 
-  const categoryOptions = categories.map(c => ({ value: c.id, label: getPlaceCategoryLabel(c) }));
+  const categoryOptions = categories.map(c => ({ value: c.id, label: /*#__PURE__*/React.createElement(window.GATHER_UI_COMPONENTS.PlaceCategoryOptionLabel, { category: c, size: 18 }) }));
 
   return /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",

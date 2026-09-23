@@ -155,14 +155,18 @@ test('V2 PC polish keeps wider rail, fluid content, 3x3 gallery, and participant
   assert.match(shell, /festival-bar-mobile/);
   assert.match(shell, /chat-bubble-modules/);
   assert.match(shell, /ChatBubbleFrame/);
-  // V2 badge colors: 모임확정/일정·여행 = --cal-schedule; 기념일 = --cal-anniversary (pink)
+  // 모임확정 stays --cal-schedule. Anniversary bars use per-category colors,
+  // not one shared --cal-anniversary fill.
   assert.match(design, /bp-day-meeting-pill/);
   assert.match(design, /--cal-schedule:\s*#7C2FE5/);
   assert.match(design, /--cal-anniversary:\s*#F76AAD/);
   assert.match(design, /background:\s*var\(--cal-schedule/);
   assert.match(design, /background:\s*var\(--cal-anniversary/);
   assert.match(shell, /cal-schedule/);
-  assert.match(shell, /cal-anniversary/);
+  assert.match(shell, /ANNIVERSARY_BAR_COLORS/);
+  assert.match(shell, /anniversaryBarPaint/);
+  assert.match(shell, /event:\s*'#3B82F6'/);
+  assert.match(shell, /travel:\s*'#10B981'/);
   assert.match(shell, /dday-compact-prefix/);
   assert.doesNotMatch(design, /#F472B6/);
   assert.doesNotMatch(design, /background:\s*var\(--status-green/);

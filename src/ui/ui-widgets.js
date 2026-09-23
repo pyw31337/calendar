@@ -296,9 +296,7 @@ export function ParticipantPickerButton({ participant, onClick, placeholder = '�
       boxSizing: 'border-box',
       flexShrink: 0
     }
-  }, label, /*#__PURE__*/React.createElement("span", {
-    style: { fontSize: 'var(--font-size-2xs)' }
-  }, "▼"));
+  }, label, /*#__PURE__*/React.createElement(window.GATHER_UI_COMPONENTS.ChevronIcon, { size: 14, direction: 'down' }));
 }
 
 // The single shared "참여자 뱃지" -- a solid pill showing a participant's name on their own color,

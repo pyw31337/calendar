@@ -32,10 +32,6 @@ function getDisplayPlaceAddress(...args) {
   const f = __gatherUiDeps().getDisplayPlaceAddress || GATHER_APP_UTILS.getDisplayPlaceAddress;
   return typeof f === 'function' ? f(...args) : undefined;
 }
-function getPlaceCategoryIcon(...args) {
-  const f = __gatherUiDeps().getPlaceCategoryIcon || GATHER_APP_UTILS.getPlaceCategoryIcon;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
 function isDomesticLatLng(...args) {
   const f = __gatherUiDeps().isDomesticLatLng || GATHER_APP_UTILS.isDomesticLatLng;
   return typeof f === 'function' ? f(...args) : undefined;
@@ -1614,7 +1610,8 @@ export function PlacesView({
               return {
                 value: category.id,
                 label: /*#__PURE__*/React.createElement(React.Fragment, null,
-                  `${getPlaceCategoryIcon(category)} ${category.name} `,
+                  /*#__PURE__*/React.createElement(window.GATHER_UI_COMPONENTS.PlaceCategoryOptionLabel, { category, size: 18 }),
+                  " ",
                   /*#__PURE__*/React.createElement("span", {
                     className: "section-count-badge",
                     style: {

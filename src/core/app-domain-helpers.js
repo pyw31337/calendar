@@ -141,9 +141,7 @@ const getPlaceCategoryIcon = GATHER_APP_UTILS.getPlaceCategoryIcon || function g
   return matchedDefault ? PLACE_CATEGORY_ICONS[matchedDefault.id] : PLACE_CATEGORY_ICONS.etc;
 };
 const getPlaceCategoryLabel = GATHER_APP_UTILS.getPlaceCategoryLabel || function getPlaceCategoryLabel(category) {
-  const name = sanitizeText(category?.name || '기타', 24) || '기타';
-  const icon = getPlaceCategoryIcon(category);
-  return icon ? icon + '\u00a0\u00a0' + name : name;
+  return sanitizeText(category?.name || '기타', 24) || '기타';
 };
 
 const KOREA_BBOX = GATHER_APP_UTILS.KOREA_BBOX || { minLat: 33, maxLat: 39, minLng: 124, maxLng: 132 };
