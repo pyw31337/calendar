@@ -2502,8 +2502,8 @@ html:has(.renewal-shell.v2-design) .bp-event-sheet .underline-tabs button[aria-s
   .v2-design .bp-menu-fab { display: none !important; }
 }
 
-/* Mobile/tablet drawer uses the PC rail's expanded layout, from the left.
- * Close stays; collapse stays a desktop-only control. */
+/* Mobile/tablet drawer uses the same expanded PC rail (brand, search, groups,
+ * 공유/설정/접기). No separate close control — 접기 dismisses the overlay. */
 @media (max-width: 1199px) {
   html:has(.renewal-shell.v2-design) .renewal-shell.v2-design {
     padding-left: 0 !important;
@@ -2549,10 +2549,25 @@ html:has(.renewal-shell.v2-design) .bp-event-sheet .underline-tabs button[aria-s
     pointer-events: auto !important;
   }
   html:has(.renewal-shell.v2-design) .bp-side-nav-close-btn {
-    display: inline-flex !important;
+    display: none !important;
   }
   html:has(.renewal-shell.v2-design) .bp-side-nav-collapse-btn {
-    display: none !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: calc(100% - 8px) !important;
+    height: 36px !important;
+    min-height: 36px !important;
+    max-height: 36px !important;
+    margin: 8px 4px 0 !important;
+    padding: 0 12px !important;
+    box-sizing: border-box !important;
+    border-radius: 999px !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav-collapse-label,
+  html:has(.renewal-shell.v2-design) .bp-side-nav.bp-is-collapsed .bp-side-nav-collapse-label {
+    display: inline !important;
+    opacity: 1 !important;
   }
   html:has(.renewal-shell.v2-design) .bp-side-nav-head {
     height: var(--v2-side-head-h) !important;
@@ -2562,7 +2577,7 @@ html:has(.renewal-shell.v2-design) .bp-event-sheet .underline-tabs button[aria-s
     box-sizing: border-box !important;
     display: flex !important;
     align-items: center !important;
-    justify-content: space-between !important;
+    justify-content: flex-start !important;
     overflow: hidden !important;
   }
   html:has(.renewal-shell.v2-design) .bp-side-nav-brand {
@@ -2691,23 +2706,29 @@ html:has(.renewal-shell.v2-design) .v2-has-page-header > .v2-legacy-body {
 }
 
 html:has(.renewal-shell.v2-design) .v2-chat-jump-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  flex: 0 0 auto;
-  padding: 6px 12px 4px;
-  background: transparent;
-  z-index: 6;
+  position: absolute !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  gap: 0 !important;
+  display: block !important;
+  flex: none !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  pointer-events: none !important;
+  overflow: visible !important;
+  z-index: 8 !important;
 }
 html:has(.renewal-shell.v2-design) .v2-chat-jump-row .v2-chat-keyboard-btn,
 html:has(.renewal-shell.v2-design) .v2-chat-jump-row .v2-chat-scroll-bottom-btn {
-  position: relative !important;
-  inset: auto !important;
+  position: absolute !important;
   top: auto !important;
-  right: auto !important;
-  bottom: auto !important;
-  left: auto !important;
+  bottom: 8px !important;
   width: 36px !important;
   height: 36px !important;
   margin: 0 !important;
@@ -2720,6 +2741,21 @@ html:has(.renewal-shell.v2-design) .v2-chat-jump-row .v2-chat-scroll-bottom-btn 
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12) !important;
   color: var(--brand, #7C2FE5) !important;
   cursor: pointer;
+  pointer-events: auto !important;
+  z-index: 9 !important;
+}
+/* Same X as the header back button (.bp-header-row padding-left: 16px).
+   The right inset of the jump-to-latest button matches that left inset. */
+html:has(.renewal-shell.v2-design) .v2-chat-jump-row .v2-chat-keyboard-btn {
+  left: 16px !important;
+  right: auto !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat-jump-row .v2-chat-scroll-bottom-btn {
+  right: 16px !important;
+  left: auto !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat-scroll > button[aria-label="최근 대화로 이동"] {
+  display: none !important;
 }
 html:has(.renewal-shell.v2-design) .v2-chat .v2-chat-composer {
   position: relative !important;
@@ -2731,16 +2767,60 @@ html:has(.renewal-shell.v2-design) .v2-chat .v2-chat-composer {
   flex: 0 0 auto !important;
   transform: none !important;
 }
-html:has(.renewal-shell.v2-design) .v2-chat .v2-chat-composer.is-scroll-hidden {
-  height: 0 !important;
-  min-height: 0 !important;
-  max-height: 0 !important;
-  overflow: hidden !important;
-  padding: 0 !important;
+html:has(.renewal-shell.v2-design) .v2-chat .v2-chat-root {
+  position: relative !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat .v2-page-header {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 30 !important;
+  width: 100% !important;
+  background: var(--bg-card, #fff) !important;
+  transition: transform 0.22s ease !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat .v2-page-header.is-scroll-hidden {
+  position: absolute !important;
+  top: 0 !important;
+  height: auto !important;
+  min-height: 56px !important;
+  max-height: none !important;
+  flex: none !important;
   margin: 0 !important;
-  border: 0 !important;
-  opacity: 0 !important;
+  opacity: 1 !important;
+  overflow: hidden !important;
+  transform: translateY(-110%) !important;
   pointer-events: none !important;
+  box-shadow: none !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat .v2-chat-composer {
+  position: absolute !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  top: auto !important;
+  z-index: 20 !important;
+  width: 100% !important;
+  transition: transform 0.22s ease !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat .v2-chat-composer.is-scroll-hidden {
+  height: auto !important;
+  min-height: unset !important;
+  max-height: none !important;
+  overflow: visible !important;
+  margin: 0 !important;
+  opacity: 1 !important;
+  transform: translateY(110%) !important;
+  pointer-events: none !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat-jump-row .v2-chat-keyboard-btn,
+html:has(.renewal-shell.v2-design) .v2-chat-jump-row .v2-chat-scroll-bottom-btn {
+  bottom: calc(var(--v2-chat-composer-space, 168px) + 8px) !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat.is-composer-hidden .v2-chat-jump-row .v2-chat-keyboard-btn,
+html:has(.renewal-shell.v2-design) .v2-chat.is-composer-hidden .v2-chat-jump-row .v2-chat-scroll-bottom-btn {
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important;
 }
 
 /* Header action icons sit close together on every page (mobile used to force 12px). */

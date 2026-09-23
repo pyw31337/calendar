@@ -3436,7 +3436,15 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
         React.createElement('span', { className: bentoClass('side-nav-item-icon') }, React.createElement(TabIcon, { id: 'settings' })),
         React.createElement('span', { className: bentoClass('side-nav-item-title') }, '설정')
       ),
-      React.createElement('button', { type: 'button', className: bentoClass('side-nav-collapse-btn renewal-shell-side-collapse'), title: isSideNavCollapsed ? '메뉴 펼치기' : '메뉴 접기', 'aria-label': isSideNavCollapsed ? '메뉴 펼치기' : '메뉴 접기', onClick: () => setIsSideNavCollapsed(v => !v) },
+      React.createElement('button', { type: 'button', className: bentoClass('side-nav-collapse-btn renewal-shell-side-collapse'), title: isSideNavCollapsed ? '메뉴 펼치기' : '메뉴 접기', 'aria-label': isSideNavCollapsed ? '메뉴 펼치기' : '메뉴 접기', onClick: () => {
+        // Phone/tablet keeps the expanded PC rail as an overlay. 접기 dismisses
+        // that drawer. Desktop still collapses the persistent rail to icons.
+        if (window.matchMedia('(max-width: 1199px)').matches) {
+          setIsSideNavOpen(false);
+          return;
+        }
+        setIsSideNavCollapsed(v => !v);
+      } },
         React.createElement(TabIcon, { id: isSideNavCollapsed ? 'chevronRight' : 'chevronLeft' }),
         React.createElement('span', { className: bentoClass('side-nav-collapse-label') }, isSideNavCollapsed ? '펼치기' : '접기')
       )

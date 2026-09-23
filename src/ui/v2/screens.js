@@ -295,14 +295,15 @@ function pageSubtitle(calendar, trailing) {
   return name || extra || undefined;
 }
 
-export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, searchLabel, onShare, onMenu, extra, centerSubtitle = true, hideOnScroll = true, showMenu = false, children }) {
+export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, searchLabel, onShare, onMenu, extra, centerSubtitle = true, hideOnScroll = true, showMenu = false, forcedHidden = null, children }) {
   const React = window.React;
   const headerRef = React.useRef(null);
   const suppressUntilRef = React.useRef(0);
   const [hidden, setHidden] = React.useState(false);
+  const headerControlled = typeof forcedHidden === 'boolean';
   React.useEffect(() => {
-    if (!hideOnScroll) {
-      setHidden(false);
+    if (!hideOnScroll || headerControlled) {
+      if (!headerControlled) setHidden(false);
       return undefined;
     }
     const header = headerRef.current;
@@ -347,8 +348,8 @@ export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, se
     };
     document.addEventListener('scroll', onScroll, true);
     return () => document.removeEventListener('scroll', onScroll, true);
-  }, [hideOnScroll]);
-  const shown = !hideOnScroll || !hidden;
+  }, [hideOnScroll, headerControlled]);
+  const shown = headerControlled ? !forcedHidden : (!hideOnScroll || !hidden);
   return h(
     'header',
     {
@@ -1136,11 +1137,21 @@ export function SettlementScreen(p) {
 export function ChatScreen(p) {
   const React = window.React;
   const [showScrollBottom, setShowScrollBottom] = React.useState(false);
-  const [composerHidden, setComposerHidden] = React.useState(false);
+  // null: composer follows scroll. 'on': always shown. 'off': always hidden.
+  const [keyboardPin, setKeyboardPin] = React.useState(null);
+  const [headerHidden, setHeaderHidden] = React.useState(false);
+  const [inputActive, setInputActive] = React.useState(false);
+  const scrollMetricsRef = React.useRef({ top: 0, height: 0 });
+  const suppressUntilRef = React.useRef(0);
   const slots = { ...(p.legacyView ? extractChatSlots(p.legacyView) : {}), ...(p.slots || {}) };
   const memberCount = (p.calendar?.participants || []).filter(person => !person.deletedAt).length;
   const subtitle = p.subtitle
     || pageSubtitle(p.calendar, memberCount ? `${memberCount}명` : '');
+  const composerHidden = keyboardPin === 'on'
+    ? false
+    : keyboardPin === 'off'
+      ? true
+      : (headerHidden && !inputActive);
   const chatHeader = {
     title: '채팅',
     subtitle,
@@ -1150,9 +1161,9 @@ export function ChatScreen(p) {
     searchLabel: '대화 검색',
     onMenu: p.onMenu,
     showMenu: true,
-    // Chat keeps the header and composer on screen. Auto-hide here fights the
-    // list's scroll-to-bottom and the two collapse/expand in a loop.
+    // Chat owns hide direction (up into history hides, down toward latest shows).
     hideOnScroll: false,
+    forcedHidden: headerHidden,
     extra: typeof p.onOpenNotice === 'function'
       ? h(IconButton, { label: '공지사항', icon: 'megaphone', size: 20, onClick: p.onOpenNotice })
       : null,
@@ -1164,6 +1175,25 @@ export function ChatScreen(p) {
       if (el) el.scrollTop = el.scrollHeight;
     }, 60);
     return () => clearTimeout(timer);
+  }, []);
+
+  React.useEffect(() => {
+    const inComposer = (node) => !!(node && node.closest && node.closest('.v2-chat-composer'));
+    const onFocusIn = (event) => {
+      if (inComposer(event.target)) setInputActive(true);
+    };
+    const onFocusOut = (event) => {
+      if (!inComposer(event.target)) return;
+      setTimeout(() => {
+        setInputActive(inComposer(document.activeElement));
+      }, 80);
+    };
+    document.addEventListener('focusin', onFocusIn);
+    document.addEventListener('focusout', onFocusOut);
+    return () => {
+      document.removeEventListener('focusin', onFocusIn);
+      document.removeEventListener('focusout', onFocusOut);
+    };
   }, []);
 
   // Preferred path: mock header + live message list + composer slots (ChatFull structure).
@@ -1300,7 +1330,7 @@ export function ChatScreen(p) {
 
     return h(
       'section',
-      { className: `v2-chat v2-dest-page${p.isSearchOpen ? ' v2-chat-search-open' : ''}` },
+      { className: `v2-chat v2-dest-page${composerHidden ? ' is-composer-hidden' : ''}${p.isSearchOpen ? ' v2-chat-search-open' : ''}` },
       clone(
         originalRoot,
         {
@@ -1321,46 +1351,76 @@ export function ChatScreen(p) {
             className: 'v2-chat-scroll',
             style: {
               ...(slots.body.props.style || {}),
-              paddingTop: 8,
+              paddingTop: 'calc(68px + env(safe-area-inset-top, 0px))',
+              ...(keyboardPin === 'off' ? { paddingBottom: '72px' } : {}),
             },
             onScroll: (e) => {
               if (typeof slots.body.props.onScroll === 'function') slots.body.props.onScroll(e);
               const el = e.currentTarget;
               if (!el) return;
-              setShowScrollBottom(el.scrollHeight - el.scrollTop - el.clientHeight > 160);
+              const top = el.scrollTop;
+              const height = el.clientHeight || 0;
+              const distance = el.scrollHeight - top - height;
+              setShowScrollBottom(distance > 160);
+              const prev = scrollMetricsRef.current;
+              const delta = top - prev.top;
+              const heightDelta = height - prev.height;
+              scrollMetricsRef.current = { top, height };
+              if (Date.now() < suppressUntilRef.current) return;
+              // Opening the room jumps to the newest message. Not a user gesture.
+              if (prev.top === 0 && Math.abs(delta) > 240) return;
+              // Header/composer collapsing changes the scroller box and echoes a scroll.
+              if (heightDelta !== 0 && Math.abs(delta + heightDelta) < 12) return;
+              if (Math.abs(delta) < 8) return;
+              // 올라감 = toward older messages (scrollTop decreases) → hide.
+              // 내림 = toward the latest messages (scrollTop increases) → show.
+              // Stay shown near the newest messages so a hide cannot bounce off the bottom anchor.
+              let next = null;
+              if (top < 8 || distance < 96) next = false;
+              else if (delta < 0) next = true;
+              else if (delta > 0) next = false;
+              if (next == null) return;
+              setHeaderHidden(prevHidden => {
+                if (prevHidden === next) return prevHidden;
+                suppressUntilRef.current = Date.now() + 480;
+                return next;
+              });
             }
-          })
-        ),
-        h(
-          'div',
-          { className: 'v2-chat-jump-row' },
-          h('button', {
-            type: 'button',
-            className: 'v2-chat-keyboard-btn',
-            'aria-label': composerHidden ? '키보드 열기' : '키보드 닫기',
-            title: composerHidden ? '키보드 열기' : '키보드 닫기',
-            onClick: () => {
-              setComposerHidden(hiddenNow => {
-                if (hiddenNow) {
+          }),
+          h(
+            'div',
+            { className: 'v2-chat-jump-row' },
+            h('button', {
+              type: 'button',
+              className: 'v2-chat-keyboard-btn',
+              'aria-pressed': keyboardPin === 'on' ? 'true' : keyboardPin === 'off' ? 'false' : undefined,
+              'aria-label': composerHidden ? '키보드 열기' : '키보드 닫기',
+              title: composerHidden ? '키보드 열기' : '키보드 닫기',
+              onClick: () => {
+                const willHide = !composerHidden;
+                setKeyboardPin(willHide ? 'off' : 'on');
+                const input = document.querySelector('.v2-chat .bp-composer-input');
+                if (willHide) {
+                  if (input && typeof input.blur === 'function') input.blur();
+                } else {
                   requestAnimationFrame(() => {
-                    const input = document.querySelector('.v2-chat .bp-composer-input');
-                    if (input && typeof input.focus === 'function') input.focus();
+                    const field = document.querySelector('.v2-chat .bp-composer-input');
+                    if (field && typeof field.focus === 'function') field.focus();
                   });
                 }
-                return !hiddenNow;
-              });
-            },
-          }, h(DesignIcon, { name: composerHidden ? 'keyboard' : 'keyboardOff', size: 18 })),
-          showScrollBottom ? h('button', {
-            type: 'button',
-            className: 'v2-chat-scroll-bottom-btn',
-            'aria-label': '최근 대화로 이동',
-            title: '최근 대화로 이동',
-            onClick: () => {
-              const el = document.querySelector('.v2-chat-scroll, .chat-messages-scroll');
-              if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-            },
-          }, h(DesignIcon, { name: 'chevronDown', size: 20 })) : h('span', { className: 'v2-chat-jump-spacer' })
+              },
+            }, h(DesignIcon, { name: composerHidden ? 'keyboard' : 'keyboardOff', size: 18 })),
+            showScrollBottom ? h('button', {
+              type: 'button',
+              className: 'v2-chat-scroll-bottom-btn',
+              'aria-label': '최근 대화로 이동',
+              title: '최근 대화로 이동',
+              onClick: () => {
+                const el = document.querySelector('.v2-chat-scroll, .chat-messages-scroll');
+                if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+              },
+            }, h(DesignIcon, { name: 'chevronDown', size: 20 })) : null
+          )
         ),
         composer,
         ...keptRootKids

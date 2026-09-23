@@ -632,6 +632,11 @@ export function ChatRoomView({
   // when keyboard is up. On some Android browsers (Samsung Internet, Chrome), the keyboard
   // appears without a scroll event, so isHeaderVisible must be forced here too.
   React.useEffect(() => {
+    // Only follow layout growth while the reader is already on the newest
+    // messages. Hiding the composer while reading history used to set
+    // scrollTop = scrollHeight, which flipped the scroll direction and
+    // showed the chrome again on the next frame.
+    if (!isAtBottomRef.current) return;
     if (chatMessagesContainerRef.current) {
       const container = chatMessagesContainerRef.current;
       container.scrollTop = container.scrollHeight;
@@ -651,6 +656,8 @@ export function ChatRoomView({
     if (!el) return;
     const measure = () => {
       const next = Math.ceil(el.getBoundingClientRect().height);
+      const root = el.closest && el.closest('.v2-chat');
+      if (root) root.style.setProperty('--v2-chat-composer-space', `${Math.max(next, 0)}px`);
       setComposerHeight(prev => (Math.abs((prev || 0) - next) < 2 ? prev : next));
     };
     measure();
