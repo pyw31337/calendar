@@ -1,8 +1,8 @@
 # V2 → 기본 URL(`?id=cw`) 덮어쓰기 핸드오프
 
 **이 문서의 독자:** Grok / Codex / Claude / Gemini / 사람 — 세션 없이 이 저장소만 보고 V2를 기본 셸로 올리는 작업을 이어갈 수 있어야 한다.  
-**최종 갱신:** 2026-09-23 15:55 KST (`main` @ #736 Phase1 머지 후, Phase2 진행)  
-**상태 한 줄:** **아직 기본 주소를 V2로 바꾸지 말 것.** V2는 `?shell=v2` 옵트인. Phase1(#736) 표면 토큰 상속 완료. 다음: Phase2 `dest-chrome-late`/`screens`/`design` !important·캔버스 → 토큰 + 다크 QA.
+**최종 갱신:** 2026-09-23 16:15 KST (`main` @ `3b805904`, 다크 Phase1–3 #736/#737/#738/#739 머지)  
+**상태 한 줄:** **아직 기본 주소를 V2로 바꾸지 말 것.** V2는 `?shell=v2` 옵트인. 다크 토큰 Phase1–3 머지됨. 다음: **라이브 다크 재QA → 잔여 밝은 표면 → Safari 채팅 VV**. 다크 상세: [`docs/v2-dark-mode-handoff.md`](./v2-dark-mode-handoff.md).
 
 관련 문서:
 
@@ -31,7 +31,7 @@
 3. **지금은 `?id=cw`에 V2를 덮으면 안 된다.** 코드 리뷰(2026-09-23) 결론: P0 다크모드 + P0 사파리 채팅 VV 미검증 + (완화됨) 알림 권한 도움말은 #734로 마운트됨.
 4. 컷오버는 **플래그 한 줄이 아니다.** 플래그 + 라우팅/URL 빌더 + 히스토리 가드 + `index.html` + 테스트/스모크를 같은 predicate로 맞춰야 한다. 탈출구는 한 릴리스 동안 `?shell=v1`.
 5. **절대 Actions “applicator / push_files / base64 패치 워크플로”로 소스에 외과 수술하지 말 것.** #729–#732(갤러리), #733(알림)에서 CI가 도배됐다. 일반 브랜치 → `gh pr` → 머지만 사용.
-6. 다음 착수 유닛: **다크 Phase 2** — `dest-chrome-late.css` / `screens.css` / `design.css`의 `#fff`/`#fafafc` 표면을 `var(--bg-card)`/`var(--bg-primary)`로. 새 토글 금지 — `themeChoice` 유지. Phase1(#736) 완료.
+6. 다음 착수 유닛: **다크 라이브 재QA + 잔여 표면** (Phase1–3 코드는 머지됨). 상세 [`v2-dark-mode-handoff.md`](./v2-dark-mode-handoff.md). 새 토글 금지 — `themeChoice` 유지. 그다음 Safari 채팅 VV.
 
 ---
 
@@ -137,33 +137,32 @@ V2 어댑터(`buildRenewal*Context`)가 CalendarApp 상태 + 기존 뷰(`ChatRoo
 
 ---
 
-## 6. 다크모드 우선 계획 (다음 유닛 — 착수 가능)
+## 6. 다크모드 (Phase1–3 코드 완료 — 재QA·잔여)
 
-### 원칙
+**전용 문서:** [`docs/v2-dark-mode-handoff.md`](./v2-dark-mode-handoff.md) — 여기보다 그쪽을 우선 갱신.
 
-- **새 토글 금지.** V1 `themeChoice` / `data-theme="dark"` / `gather_theme_preference_*_v1` 그대로.
-- V2는 토큰을 **소비**만 한다. 두 번째 팔레트 포크 금지.
-- V1 `src/app.css` `:root[data-theme="dark"]` 블록을 소스 오브 트루스로 유지.
+### 원칙 (불변)
 
-### 1차 레버리지 (먼저 고칠 것)
+- **새 토글 금지.** V1 `themeChoice` / `data-theme="dark"` / `gather_theme_preference_*_v1`.
+- V2는 토큰 소비만. `src/app.css` `:root[data-theme="dark"]` = 소스 오브 트루스.
 
-1. `reference-home.css` / `reference-chat.css` / `reference-memo.css` / `reference-places.css` / `reference-settlement.css` — `.v2-*` 아래 `--bg-primary` / `--bg-card` / `--border-subtle` **라이트 리터럴 리셋 제거** (상속 또는 테마 변수만).
-2. 셸 캔버스 하드코드 → `var(--bg-primary)` / `var(--bg-card)`:
-   - `viewport-shell.css` (`background: #fafafc` 등)
-   - `dest-layout.css`, `screens.css`, `design.css`
-3. 텍스트/보더: `#1e1b2e` / `#eceaf5` 대신 `var(--text-main)` / `var(--border-subtle)` 선호.
+### 코드 상태 (2026-09-23)
 
-### `!important` 전쟁 (최악 우선)
+| Phase | PR | 상태 |
+| --- | --- | --- |
+| 1 reference/viewport/`.renewal-shell` 상속 | #736 | 머지 |
+| 2 late chrome/screens/design 표면 | #737 | 머지 |
+| 2b audit/bubbles/segmented | #738 | 머지 |
+| 3 `app.css` is-chat/is-records `!important` | #739 | 머지 |
 
-- `dest-chrome-late.css` (가장 큼)
-- `screens.css`, `design.css`, `responsive-audit.css`, `aurora-theme.css`, `viewport-shell.css`
-- 패턴: `background: #fff !important`, `color-mix(..., #fff)` 라이트 베이스 → `var(--bg-card)` 또는 테마 인지 표면으로.
+### 다음
 
-### 완료 조건
+1. 라이브 다크 재QA (채팅/메모가 Phase3 전엔 밝았음 — 재확인 필수).
+2. 홈 모임확정 카드 등 잔여 밝은 표면.
+3. 장소·정산·갤러리·컨텐츠·보관함·모달 스윕.
+4. 통과 후 Safari 채팅 VV (§4 순서 유지).
 
-- 설정에서 시스템/라이트/다크 전환 시 V2 홈·채팅·메모·장소·정산·갤러리·컨텐츠·보관함·Confirm/토스트/알림헬프가 일관되게 보임.
-- 보라 FAB / 말풍선 / 이름 뱃지가 다크에서도 대비 유지.
-- 컷오버 플래그는 이 조건 충족 **전**에 켜지 않음.
+가드 테스트: `test/v2-dark-tokens-phase{1,2,3}.test.mjs`
 
 ---
 
@@ -173,6 +172,9 @@ V2 어댑터(`buildRenewal*Context`)가 CalendarApp 상태 + 기존 뷰(`ChatRoo
 
 | PR | 내용 |
 | --- | --- |
+| **#739** | 다크 Phase3 — `app.css` chat/memo `#FAFAFC/#FFFFFF !important` → 테마 토큰 |
+| **#738** | 다크 Phase2b — responsive-audit / bubbles / segmented |
+| **#737** | 다크 Phase2 — dest-chrome-late / screens / design 표면 |
 | **#736** | 다크 Phase1 — reference-* / viewport / `.renewal-shell` 표면 토큰 상속 |
 | **#734** | V2에 `NotificationPermissionHelpModal` remount (일반 코드 PR) |
 | **#733** | 알림 applicator 워크플로 삭제 (CI 도배 정리) |
@@ -211,7 +213,7 @@ V2 어댑터(`buildRenewal*Context`)가 CalendarApp 상태 + 기존 뷰(`ChatRoo
 
 | 트랙 | 주 터치 파일 | 병행 가능? |
 | --- | --- | --- |
-| **A. 다크 토큰** (다음) | `src/ui/v2/**/*.css`, 가능하면 `src/app.css` 토큰만 읽기 | B/C와 **파일 겹치면 안 됨** |
+| **A. 다크 재QA·잔여** (다음) | `src/app.css` `.renewal-shell*`, `src/ui/v2/**/*.css`, phase 테스트 | B와 `viewport-shell` 충돌 주의; C와 **절대 동시 금지** |
 | **B. Safari VV/채팅** | `viewport-shell.css`, `visual-viewport-sync.js`, 채팅 셸 JS | A와 `viewport-shell.css` 충돌 주의 — 순차 권장 |
 | **C. 컷오버 플래그** | `app-feature-flags.js`, `app-routing-state.js`, `ui-app-shell-v2.js` history, `app-main.js` 게이트, `index.html`, tests/smoke | **A·B 완료 후만** |
 | **D. 시안 패리티 유닛** | 화면별 `screens.js` / dest chrome (다크 하드코드 건드릴 때 A와 조율) | A 진행 중이면 하드코드 색 변경은 A에 맡길 것 |
@@ -250,9 +252,10 @@ git fetch origin && git checkout main && git pull --ff-only
 open 'https://pyw31337.github.io/calendar/?id=cw&shell=v2'
 # 게이트 확인:
 rg -n "isRenewalShellEnabled|shell === 'v2'|shell !== 'v1'" src/core src/ui/ui-app-shell-v2.js src/index.html
-# 다크 무시 증거:
-rg -n "data-theme" src/ui/v2 || true
-rg -n "--bg-primary: #FAFAFC|--bg-card: #FFF" src/ui/v2/reference-*.css
+# 다크 가드 + 잔여 라이트 표면:
+node --test test/v2-dark-tokens-phase1.test.mjs test/v2-dark-tokens-phase2.test.mjs test/v2-dark-tokens-phase3.test.mjs
+grep -nE 'background(-color)?:\s*(#fff|#ffffff|#fafafc|white)\b' src/ui/v2/*.css src/app.css | head
+# 다크 강제: localStorage gather_theme_preference_cw_v1 = dark
 ```
 
 ---
