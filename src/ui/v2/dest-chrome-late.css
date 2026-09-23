@@ -3153,24 +3153,30 @@ html:has(.renewal-shell.v2-design) .bp-hero-zone .bp-dday-chip {
   min-width: 68px !important;
 }
 
-/* Quick nav stays inside the hero. Items shrink instead of spilling past the viewport. */
+/* Quick nav: the group from the left edge of 채팅 to the right edge of 컨텐츠
+   is one centered band (about 90% of the hero), not five equal columns.
+   Equal columns centered each label in its slot, so the longer last label
+   pulled the visual group to the right. */
 html:has(.renewal-shell.v2-design) .bp-hero-zone .bp-hero-quick-nav {
   width: 100% !important;
   max-width: 100% !important;
   min-width: 0 !important;
-  margin-left: 0 !important;
-  margin-right: 0 !important;
-  padding-left: 0 !important;
-  padding-right: 0 !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  padding: 0 5% 10px !important;
   box-sizing: border-box !important;
   justify-content: space-between !important;
-  gap: 0 !important;
+  align-items: center !important;
+  gap: clamp(6px, 2vw, 18px) !important;
 }
 html:has(.renewal-shell.v2-design) .bp-hero-zone .bp-hero-quick-nav-item {
-  flex: 1 1 0 !important;
+  flex: 0 1 auto !important;
+  width: auto !important;
   min-width: 0 !important;
-  max-width: 20% !important;
+  max-width: none !important;
   padding: 0 !important;
+  justify-content: center !important;
+  align-items: center !important;
 }
 html:has(.renewal-shell.v2-design) .bp-hero-zone .bp-hero-quick-nav-item .bp-hero-quick-nav-icon {
   width: clamp(32px, 9vw, 48px) !important;
@@ -3212,7 +3218,13 @@ html:has(.renewal-shell.v2-design) .bp-dday-chip-card {
   overflow: hidden !important;
   background: rgba(255, 255, 255, 0.16) !important;
   border: 1px solid rgba(255, 255, 255, 0.52) !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.58), 0 8px 24px rgba(25, 8, 85, 0.24) !important;
+  border-radius: 18px !important;
+  /* Outer drop-shadow was clipped by the rectangular reveal wrapper, so a
+     dark translucent square stuck out past the rounded corners. The closed
+     capsule only has an inset highlight — match that, and crop the
+     backdrop-filter to the same radius. */
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.58) !important;
+  clip-path: inset(0 round 18px) !important;
   backdrop-filter: blur(18px) saturate(165%) !important;
   -webkit-backdrop-filter: blur(18px) saturate(165%) !important;
   opacity: 0;
@@ -3301,19 +3313,24 @@ html:has(.renewal-shell.v2-design) .bp-dday-view-btn {
 }
 html:has(.renewal-shell.v2-design) .bp-dday-participant-memo {
   display: flex !important;
-  align-items: flex-start !important;
+  align-items: center !important;
   white-space: normal !important;
   overflow: visible !important;
   text-overflow: unset !important;
   border-radius: 14px !important;
   max-width: 100% !important;
+  padding: 3px 12px 3px 3px !important;
 }
 html:has(.renewal-shell.v2-design) .bp-dday-participant-memo-text {
   flex: 1 1 8em !important;
   min-width: 0 !important;
+  align-self: center !important;
+  display: block !important;
   white-space: normal !important;
   overflow: visible !important;
   text-overflow: unset !important;
+  line-height: 1.35 !important;
+  padding: 3px 0 !important;
 }
 
 /* Phone home: the purple hero stays put. The calendar and the cards below
@@ -3333,10 +3350,14 @@ html:has(.renewal-shell.v2-design) .bp-dday-participant-memo-text {
   }
 }
 
-/* Home gallery bleeds its photos, so the title needs the same side inset as
-   the other summary cards, and the sheet sits flush with the card bottom. */
+/* Home gallery: square, edge-to-edge thumbs sit flush (no bottom pad).
+   From 460px the thumbs round, so the card gets the same bottom pad as the
+   other summary sections. */
 html:has(.renewal-shell.v2-design) .bp-bento-card.bp-gallery-bleed {
   padding-bottom: 0 !important;
+}
+html:has(.renewal-shell.v2-design) .bp-gallery-bleed .bp-thumb {
+  border-radius: 0 !important;
 }
 html:has(.renewal-shell.v2-design) .bp-gallery-bleed .bp-renewal-home-summary-heading {
   box-sizing: border-box !important;
@@ -3357,6 +3378,28 @@ html:has(.renewal-shell.v2-design) .bp-gallery-bleed .bp-thumb-grid {
   html:has(.renewal-shell.v2-design) .bp-gallery-bleed .bp-renewal-home-summary-heading {
     padding-left: 10px !important;
     padding-right: 10px !important;
+  }
+}
+@media (min-width: 460px) {
+  html:has(.renewal-shell.v2-design) .bp-bento-card.bp-gallery-bleed {
+    padding-bottom: 28px !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-gallery-bleed .bp-thumb {
+    border-radius: 12px !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-gallery-bleed .bp-renewal-home-photo-strip,
+  html:has(.renewal-shell.v2-design) .bp-gallery-bleed .bp-thumb-grid {
+    gap: 8px !important;
+  }
+}
+@media (min-width: 768px) {
+  html:has(.renewal-shell.v2-design) .bp-bento-card.bp-gallery-bleed {
+    padding-bottom: 18px !important;
+  }
+}
+@media (min-width: 1200px) {
+  html:has(.renewal-shell.v2-design) .bp-bento-card.bp-gallery-bleed {
+    padding-bottom: 24px !important;
   }
 }
 
@@ -3520,7 +3563,7 @@ html:has(.renewal-shell.v2-design) .recent-log-date {
   font-style: normal !important;
 }
 html:has(.renewal-shell.v2-design) .bp-dday-participant-memo {
-  align-items: stretch !important;
+  align-items: center !important;
 }
 html:has(.renewal-shell.v2-design) .bp-dday-participant-memo-name {
   align-self: stretch !important;
@@ -3529,7 +3572,8 @@ html:has(.renewal-shell.v2-design) .bp-dday-participant-memo-name {
   justify-content: center !important;
   height: auto !important;
   min-height: 100% !important;
-  padding: 4px 10px !important;
+  padding: 0 10px !important;
+  line-height: 1 !important;
   box-sizing: border-box !important;
 }
 
@@ -3660,4 +3704,73 @@ html:has(.renewal-shell.v2-design) .culture-items-grid > button > div:first-chil
   width: 100% !important;
   height: 100% !important;
   object-fit: cover !important;
+}
+
+/* V2 rule: text sits in the vertical middle of its own control.
+   line-height above 1 leaves a fractional line box that the browser rounds
+   toward the top, which is why pills looked top-heavy.
+   Exception: past-meeting participant memos stay top-aligned — the card
+   and the wrapping memo keep flex-start / text-align left. */
+html:has(.renewal-shell.v2-design) :where(
+  .v2-name-pill,
+  .bp-chat-name-pill,
+  .participant-badge,
+  .status-badge,
+  .dday-badge,
+  .date-item-badge,
+  .bp-dday-compact-badge,
+  .bp-dday-pill,
+  .bp-dday-expanded-badge,
+  .bp-dday-participant-memo-name,
+  .section-count-badge,
+  .main-menu-badge,
+  .side-menu-meta-pill,
+  .poll-voter-badge,
+  .poll-deadline-badge,
+  .poll-confirmed-badge,
+  .bp-tag-chip,
+  .bp-place-tag,
+  .bp-ann-cat-chip,
+  .bp-expense-cat-chip,
+  .memo-capsule-badge:not(.is-multiline),
+  .url-capsule-badge:not(.is-multiline),
+  .calendar-loading-pill,
+  .bp-side-nav-item-badge,
+  .bp-hero-quick-nav-badge,
+  .bp-comment-badge,
+  .confirmed-meeting-label-badge
+) {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  line-height: 1 !important;
+}
+html:has(.renewal-shell.v2-design) :where(
+  .bp-icon-btn,
+  .bp-renewal-shell-header-icon-btn,
+  .bp-ghost-btn,
+  .bp-dday-collapse-btn,
+  .bp-hero-quick-nav-item,
+  .bp-hero-quick-nav-icon,
+  .underline-tabs [role="tab"],
+  .bp-more-link,
+  .bp-cal-nav-btn,
+  .bp-cal-today-btn
+) {
+  align-items: center !important;
+  justify-content: center !important;
+}
+html:has(.renewal-shell.v2-design) .history-meetings-grid .date-item-btn,
+html:has(.renewal-shell.v2-design) .history-meetings-grid .date-item-btn .place-memo-stack {
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
+}
+html:has(.renewal-shell.v2-design) .memo-capsule-badge.is-multiline,
+html:has(.renewal-shell.v2-design) .history-meetings-grid .memo-capsule-badge.is-multiline {
+  display: inline-block !important;
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
+  text-align: left !important;
+  line-height: 1.3 !important;
+  height: auto !important;
 }
