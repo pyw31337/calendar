@@ -3211,3 +3211,65 @@ html:has(.renewal-shell.v2-design) .bp-event-sheet:not(:has(> .bp-sheet-handle))
   flex: 0 0 4px !important;
   align-self: center !important;
 }
+
+/* Reply and edit stay border-only, on the same line as the timestamp. */
+html:has(.renewal-shell.v2-design) .v2-chat .msg-actions-group {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: 1px solid var(--border-subtle, #d9d4e6) !important;
+  box-shadow: none !important;
+  border-radius: 6px !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat .msg-row-hover:not([style*="flex-end"]) {
+  align-items: flex-end !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat .msg-row-hover:not([style*="flex-end"]) > div:nth-child(3),
+html:has(.renewal-shell.v2-design) .v2-chat .msg-row-hover[style*="flex-end"] > div:first-child {
+  flex-direction: row !important;
+  align-items: center !important;
+  align-self: flex-end !important;
+  justify-content: flex-start !important;
+  gap: 4px !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat .msg-row-hover[style*="flex-end"] > div:first-child {
+  justify-content: flex-end !important;
+}
+
+/* Hero D-day chips scroll sideways instead of being clipped by the zone. */
+html:has(.renewal-shell.v2-design) .bp-hero-zone .bp-dday-strip {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: stretch !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  touch-action: pan-x !important;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+html:has(.renewal-shell.v2-design) .bp-hero-zone .bp-dday-chip {
+  flex: 0 0 auto !important;
+  width: 68px !important;
+  min-width: 68px !important;
+}
+html:has(.renewal-shell.v2-design) .bp-hero-zone .bp-dday-chip.is-selected {
+  background: rgba(255, 255, 255, 0.34) !important;
+  border-color: #fff !important;
+}
+
+/* Quick nav spans ~90% of the hero (about 95% of the D-day capsule) and
+   lets the gaps grow with the viewport. */
+html:has(.renewal-shell.v2-design) .bp-hero-zone .bp-hero-quick-nav {
+  width: 90% !important;
+  max-width: 90% !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  box-sizing: border-box !important;
+  justify-content: space-between !important;
+  gap: clamp(8px, 2.5vw, 36px) !important;
+}
