@@ -175,10 +175,10 @@ test('V2 destination screens keep live feature entry points', async () => {
   assert.match(screens, /placeholder: '장소 검색'/);
   assert.match(screens, /placeholder: '메모 검색'|메모 검색/);
   assert.match(screens, /Fab\(/);
-  assert.match(screens, /label: '메모 작성'/);
+  assert.match(screens, /label: '메모 등록'|label: '메모 작성'/);
   assert.match(screens, /label: '장소 등록'/);
   assert.match(screens, /label: '지출 추가'/);
-  assert.match(screens, /label: '지도로 보기'|icon: 'map'/);
+  assert.match(screens, /label: '지도보기'|label: '지도로 보기'|icon: 'map'/);
   assert.match(screens, /onShare/);
   assert.match(screens, /bp-composer-input|composer/);
   assert.match(screens, /대화 검색/);
