@@ -56,7 +56,10 @@ assert(undefinedProbe.list.length === 2 && undefinedProbe.list[1] === null, 'Fir
 }
 
 assert(getInitialAppView({ pathname: '/', search: '?view=gallery' }, () => null) === 'gallery', 'route state must initialize from the view query');
-assert(buildAppViewUrl({ pathname: '/calendar/', search: '?id=cw&date=2026-09-08&msg=x' }, 'gallery', new Date(2026, 8, 1)) === '/calendar/?id=cw&year=2026&month=09&view=gallery', 'route changes must retain calendar/month and clear stale deep-link state');
+// V2 is the default shell (cutover): a bare (no shell=v1) route change now also carries the
+// V2 tab/sub mapping (gallery -> tab=records&sub=media), same as an explicit shell=v2 caller.
+assert(buildAppViewUrl({ pathname: '/calendar/', search: '?id=cw&date=2026-09-08&msg=x' }, 'gallery', new Date(2026, 8, 1)) === '/calendar/?id=cw&year=2026&month=09&view=gallery&tab=records&sub=media', 'route changes must retain calendar/month, clear stale deep-link state, and default to V2 tab/sub mapping');
+assert(buildAppViewUrl({ pathname: '/calendar/', search: '?shell=v1&id=cw&date=2026-09-08&msg=x' }, 'gallery', new Date(2026, 8, 1)) === '/calendar/?shell=v1&id=cw&year=2026&month=09&view=gallery', 'shell=v1 escape hatch must keep legacy route changes free of V2 tab/sub params');
 assert(getInitialDataLoadingState({ firebaseDb: {}, activeCalId: 'cached', loadLocalCache: () => [{ id: 'cached', title: 'ready' }], isUsableCalendarRecord: row => row?.title === 'ready' }) === false, 'cached usable calendar must render without a loading shell');
 assert(getInitialDataLoadingState({ firebaseDb: {}, activeCalId: 'missing', loadLocalCache: () => [], isUsableCalendarRecord: () => false }) === true, 'missing calendar must retain its initial loading state');
 

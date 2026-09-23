@@ -6,10 +6,23 @@ import { photoLightbox, timestampMs } from '../src/ui/v2/view-data.js';
 import { resolveV2Destination, V2_PRIMARY } from '../src/ui/v2/shell-nav.js';
 
 const location = search => ({ pathname: '/calendar/', search });
-test('default routes ignore V2 tab/sub parameters', () => {
-  assert.equal(getInitialAppView(location('?id=example&tab=records&sub=memo')), 'calendar');
-  assert.equal(getInitialAppView(location('?view=chat&tab=records&sub=memo')), 'chat');
-  assert.equal(buildAppViewUrl(location('?id=example'), 'memo'), '/calendar/?id=example&view=memo');
+test('default (no shell param) behaves like V2 -- cutover, shell=v1 is the escape hatch', () => {
+  assert.equal(getInitialAppView(location('?id=example&tab=records&sub=memo')), 'memo');
+  assert.equal(getInitialAppView(location('?tab=chat')), 'chat');
+  const url = buildAppViewUrl(location('?id=example'), 'memo');
+  const params = new URL(url, 'https://example.test').searchParams;
+  assert.equal(params.get('tab'), 'memo');
+  assert.equal(params.has('sub'), false);
+  assert.equal(params.get('id'), 'example');
+});
+test('shell=v1 escape hatch restores legacy routing (V2 tab/sub ignored)', () => {
+  assert.equal(getInitialAppView(location('?shell=v1&id=example&tab=records&sub=memo')), 'calendar');
+  assert.equal(getInitialAppView(location('?shell=v1&view=chat&tab=records&sub=memo')), 'chat');
+  const url = buildAppViewUrl(location('?shell=v1&id=example'), 'memo');
+  const params = new URL(url, 'https://example.test').searchParams;
+  assert.equal(params.get('shell'), 'v1');
+  assert.equal(params.has('tab'), false);
+  assert.equal(params.get('view'), 'memo');
 });
 test('V2 first-class destinations use ?tab=memo|places (not records sub)', () => {
   assert.equal(getInitialAppView(location('?shell=v2&tab=memo')), 'memo');

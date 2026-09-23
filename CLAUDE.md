@@ -18,14 +18,18 @@ Firebase(Firestore/Storage/Functions)가 유일한 데이터 소스다. Vite로 
 
 ## 지금 가장 중요한 진행 중 작업 (2026-09-23)
 
-**V2 셸을 기본 URL(`?id=cw`)에 덮어쓰기(컷오버)하는 작업이 진행 중이나, 아직 기본은 V1이다.**
-상세·계획·현재 블로커·다음 유닛·다른 에이전트 분담은 반드시 먼저 읽을 것:
+**V2 셸이 기본 URL(`?id=cw`)의 기본값이 됐다 (컷오버 완료).** `isRenewalShellEnabled()`는
+이제 `shell !== 'v1'`(부재 시 V2) 이다. `?shell=v1`이 한 릴리스 동안 유지되는 V1 폴백
+탈출구다. **Safari 실기기 서명은 사용자가 직접 나중에 진행하기로 하고, 그 게이트를 건너뛰고
+컷오버를 진행하라는 사용자의 명시적 지시로 플립했다** — 이전까지의 "실기기 서명 전엔 금지"
+원칙은 이 특정 지시로 대체됐다. 문제가 발견되면 `?shell=v1`로 즉시 V1로 되돌릴 수 있다.
+
+상세·계획·실행한 diff·다음 단계는:
 
 → [`docs/v2-default-cutover-handoff.md`](docs/v2-default-cutover-handoff.md)
-→ [`docs/v2-dark-mode-handoff.md`](docs/v2-dark-mode-handoff.md) — **다크모드 재QA·잔여 표면** (Phase1–3 코드 머지 후)
+→ [`docs/v2-dark-mode-handoff.md`](docs/v2-dark-mode-handoff.md) — 다크모드 P0는 완료됨
 
 짧은 현황: [`docs/V2-STATUS.md`](docs/V2-STATUS.md).  
-**다크모드 토큰 재연결 전에 `isRenewalShellEnabled` / 기본 shell을 뒤집지 말 것.**  
 **`.github/workflows/apply-*.yml` applicator로 소스 패치하지 말 것** (#732/#733).
 
 ## 지금 상태 (2026-09-12 기준)
