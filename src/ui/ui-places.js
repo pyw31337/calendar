@@ -32,10 +32,6 @@ function getDisplayPlaceAddress(...args) {
   const f = __gatherUiDeps().getDisplayPlaceAddress || GATHER_APP_UTILS.getDisplayPlaceAddress;
   return typeof f === 'function' ? f(...args) : undefined;
 }
-function getPlaceCategoryIcon(...args) {
-  const f = __gatherUiDeps().getPlaceCategoryIcon || GATHER_APP_UTILS.getPlaceCategoryIcon;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
 function isDomesticLatLng(...args) {
   const f = __gatherUiDeps().isDomesticLatLng || GATHER_APP_UTILS.isDomesticLatLng;
   return typeof f === 'function' ? f(...args) : undefined;

@@ -151,10 +151,6 @@ function getPlaceMemoEntryForDate(...args) {
   const f = __gatherUiDeps().getPlaceMemoEntryForDate || GATHER_APP_UTILS.getPlaceMemoEntryForDate;
   return typeof f === 'function' ? f(...args) : undefined;
 }
-function getPlaceCategoryLabel(...args) {
-  const f = __gatherUiDeps().getPlaceCategoryLabel || GATHER_APP_UTILS.getPlaceCategoryLabel;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
 function isTombstone(...args) {
   const f = __gatherUiDeps().isTombstone || GATHER_APP_UTILS.isTombstone;
   return typeof f === 'function' ? f(...args) : undefined;

@@ -33,10 +33,6 @@ function getDisplayPlaceAddress(...args) {
   const f = __gatherUiDeps().getDisplayPlaceAddress || GATHER_APP_UTILS.getDisplayPlaceAddress;
   return typeof f === 'function' ? f(...args) : undefined;
 }
-function getPlaceCategoryLabel(...args) {
-  const f = __gatherUiDeps().getPlaceCategoryLabel || GATHER_APP_UTILS.getPlaceCategoryLabel;
-  return typeof f === 'function' ? f(...args) : undefined;
-}
 function reformatMemoIntoDateLines(...args) {
   const f = __gatherUiDeps().reformatMemoIntoDateLines || GATHER_APP_UTILS.reformatMemoIntoDateLines;
   return typeof f === 'function' ? f(...args) : undefined;
