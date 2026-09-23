@@ -1003,17 +1003,23 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
             const roundRight = atEnd && bar.isLastSegment;
             const edge = roundLeft && roundRight ? 'is-single' : roundLeft ? 'is-start' : roundRight ? 'is-end' : 'is-mid';
             const title = bar.title || '기념일';
+            // Each day cell paints its own segment, so only the row's first segment carries the
+            // title, stretched across every remaining cell of the bar in this row (--ann-span) so
+            // the full text fits and centers on the whole bar instead of repeating per day.
+            const span = bar.endCol - col + 1;
+            const spansCells = atStart && span > 1;
             return React.createElement('div', {
               key: `ann-range-${bar.id}-${dateStr}`,
-              className: bentoClass(`ann-range day-anniversary ${edge}${atStart ? ' has-label' : ''} cat-${paint.category}`),
+              className: bentoClass(`ann-range day-anniversary ${edge}${atStart ? ' has-label' : ''}${spansCells ? ' label-spans' : ''} cat-${paint.category}`),
               title,
               'aria-label': title,
               style: {
                 '--ann-level': bar.level || 0,
                 '--anniversary-color': paint.color,
                 '--ann-c': paint.color,
+                ...(spansCells ? { '--ann-span': span, '--ann-rend': bar.isLastSegment ? '3px' : '-1px' } : {}),
               },
-            }, React.createElement('span', { className: bentoClass('day-anniversary-label') }, title));
+            }, atStart ? React.createElement('span', { className: bentoClass('day-anniversary-label') }, title) : null);
           });
         const cellClasses = [
           'day-cell',
