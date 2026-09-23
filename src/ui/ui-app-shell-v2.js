@@ -2989,6 +2989,10 @@ export function renderRenewalShellIfEnabled(activeCalId, calendar, moreContextDe
     dismissToast: globalOverlays?.dismissToast || null,
     confirmDialog: globalOverlays?.confirmDialog || null,
     setConfirmDialog: globalOverlays?.setConfirmDialog || null,
+    isNotificationHelpOpen: globalOverlays?.isNotificationHelpOpen || false,
+    setIsNotificationHelpOpen: globalOverlays?.setIsNotificationHelpOpen || null,
+    onNotificationHelpRetry: globalOverlays?.onNotificationHelpRetry || null,
+    showToast: globalOverlays?.showToast || null,
   });
 }
 
@@ -3003,7 +3007,7 @@ export function renderRenewalShellIfEnabled(activeCalId, calendar, moreContextDe
  *   `buildRenewalSettlementContext`) is the 정산 tab's; `recordsContext` (see
  *   `buildRenewalRecordsContext`) is the 기록 탭's -- all built the same way.
  */
-export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarContext, chatContext, settlementContext, recordsContext, chatUploadProgress, operationProgress, toast, dismissToast, confirmDialog, setConfirmDialog }) {
+export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarContext, chatContext, settlementContext, recordsContext, chatUploadProgress, operationProgress, toast, dismissToast, confirmDialog, setConfirmDialog, isNotificationHelpOpen, setIsNotificationHelpOpen, onNotificationHelpRetry, showToast }) {
   const React = window.React;
   const [activeTab, setActiveTabState] = React.useState(readTabFromLocation);
   const [recordsSubTab, setRecordsSubTabState] = React.useState(readRecordsSubTabFromLocation);
@@ -3718,6 +3722,17 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
       onCancel: () => { if (typeof setConfirmDialog === 'function') setConfirmDialog(null); },
       showPasswordInput: confirmDialog.showPasswordInput,
       alertOnly: confirmDialog.alertOnly,
+    }),
+    // Same reason as ConfirmDialog/toast: v2 returns before app-main's withStickyVideo(),
+    // which is where NotificationPermissionHelpModal used to mount. openNotificationHelp()
+    // (wired into AppSettings / GlobalSearch already) flips isNotificationHelpOpen, but
+    // without this remount nothing renders under ?shell=v2.
+    // Note: NotificationOnboardingModal is intentionally NOT remounted -- setIsNotifOnboardingOpen(true)
+    // has no callers (onboarding is dead); permission-help alone unblocks the cutover checklist.
+    isNotificationHelpOpen && React.createElement(bindUiComponentAliases(React).NotificationPermissionHelpModal, {
+      onClose: () => { if (typeof setIsNotificationHelpOpen === 'function') setIsNotificationHelpOpen(false); },
+      onRetry: onNotificationHelpRetry,
+      showToast,
     })
   );
 }
