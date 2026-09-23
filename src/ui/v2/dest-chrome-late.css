@@ -223,11 +223,6 @@
   box-shadow: none !important;
   white-space: nowrap;
 }
-.v2-design .v2-content .v2-content-subcat-slot .bp-cat-chip.bp-is-selected {
-  background: #7C2FE5 !important;
-  color: #fff !important;
-  border: 0 !important;
-}
 .v2-design .v2-content .region-filter-trigger-row {
   padding: 10px 20px 12px 20px !important;
   margin: 0 !important;
