@@ -1,0 +1,104 @@
+/* V2 shared segmented / pill switch (SegmentedToggle).
+ *
+ * UnderlineTabs keep purple bottom-border focus via .underline-tabs rules.
+ * SegmentedToggle also uses role="tablist" but must NOT inherit underline chrome —
+ * active focus is a filled purple (or option.activeColor) pill.
+ * Selectors avoid requiring shared-JS class changes; class hooks are optional extras.
+ */
+
+html:has(.renewal-shell.v2-design) .segmented-toggle,
+.renewal-shell.v2-design .segmented-toggle,
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"]:not(.underline-tabs):not(.renewal-shell-subtab-row),
+.renewal-shell.v2-design .modal-overlay [role="tablist"]:not(.underline-tabs):not(.renewal-shell-subtab-row) {
+  display: inline-flex !important;
+  align-items: stretch !important;
+  width: auto !important;
+  max-width: 100% !important;
+  height: auto !important;
+  flex: 0 0 auto !important;
+  padding: 3px !important;
+  box-sizing: border-box !important;
+  border: 1px solid var(--v2-card-border, #eceaf5) !important;
+  border-radius: 999px !important;
+  background: #fff !important;
+  box-shadow: none !important;
+  gap: 0 !important;
+}
+
+html:has(.renewal-shell.v2-design) .segmented-toggle > button,
+.renewal-shell.v2-design .segmented-toggle > button,
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"]:not(.underline-tabs):not(.renewal-shell-subtab-row) > button,
+.renewal-shell.v2-design .modal-overlay [role="tablist"]:not(.underline-tabs):not(.renewal-shell-subtab-row) > button {
+  position: relative !important;
+  flex: 1 1 auto !important;
+  height: auto !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-bottom: 0 !important;
+  border-radius: 999px !important;
+  box-shadow: none !important;
+}
+
+html:has(.renewal-shell.v2-design) .segmented-toggle > button::after,
+.renewal-shell.v2-design .segmented-toggle > button::after,
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"]:not(.underline-tabs):not(.renewal-shell-subtab-row) > button::after,
+.renewal-shell.v2-design .modal-overlay [role="tablist"]:not(.underline-tabs):not(.renewal-shell-subtab-row) > button::after {
+  content: none !important;
+  display: none !important;
+}
+
+/* Force fill focus (beats underline-tab background:transparent !important).
+ * Custom activeColor (수입/지출) still wins when present as an inline style containing
+ * a concrete color — those toggles set backgroundColor to green/red strings. */
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"]:not(.underline-tabs) > button[aria-selected="true"],
+.renewal-shell.v2-design .modal-overlay [role="tablist"]:not(.underline-tabs) > button[aria-selected="true"] {
+  border-bottom: 0 !important;
+  font-weight: 800 !important;
+  background: var(--brand, #7C2FE5) !important;
+  color: #fff !important;
+}
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"]:not(.underline-tabs) > button:not([aria-selected="true"]),
+.renewal-shell.v2-design .modal-overlay [role="tablist"]:not(.underline-tabs) > button:not([aria-selected="true"]) {
+  background: transparent !important;
+  color: var(--text-muted, #64748B) !important;
+  font-weight: 500 !important;
+}
+
+/* Preserve semantic 수입/지출 colors when activeColor is inlined. */
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"]:not(.underline-tabs) > button[aria-selected="true"][style*="status-green"],
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"]:not(.underline-tabs) > button[aria-selected="true"][style*="--status-green"] {
+  background: var(--status-green, #16A34A) !important;
+}
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"]:not(.underline-tabs) > button[aria-selected="true"][style*="DC2626"],
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"]:not(.underline-tabs) > button[aria-selected="true"][style*="#DC2626"] {
+  background: #DC2626 !important;
+}
+
+html:has(.renewal-shell.v2-design) label.anniversary-type-option:has(input:checked),
+.renewal-shell.v2-design label.anniversary-type-option:has(input:checked) {
+  background-color: color-mix(in srgb, var(--brand, #7C2FE5) 8%, #fff) !important;
+  border-color: var(--brand, #7C2FE5) !important;
+}
+
+html:has(.renewal-shell.v2-design) [role="group"][aria-label="반복 여부"],
+.renewal-shell.v2-design [role="group"][aria-label="반복 여부"] {
+  border-radius: 999px !important;
+}
+html:has(.renewal-shell.v2-design) [role="group"][aria-label="반복 여부"] > button,
+.renewal-shell.v2-design [role="group"][aria-label="반복 여부"] > button {
+  border-radius: 999px !important;
+  border-bottom: 0 !important;
+}
+
+html:has(.renewal-shell.v2-design) .v2-bubble-comment-badge,
+html:has(.renewal-shell.v2-design) .v2-memo .memo-card-comment-badge,
+.renewal-shell.v2-design .v2-bubble-comment-badge,
+.renewal-shell.v2-design .v2-memo .memo-card-comment-badge {
+  background: var(--brand, #7C2FE5) !important;
+}
+
+.renewal-shell.v2-design {
+  --acc-chat: #7C2FE5;
+  --acc-chat-soft: #F3EEFF;
+}

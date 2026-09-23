@@ -1,3 +1,4 @@
+@import './segmented-toggle.css';
 /* Viewport pin + bottom-gap kill switch for V2 (loaded with chat-bubble-modules.css).
  * Selectors use html/body:has(.v2-design) so portaled/document chrome stays V2-scoped
  * (see test/v2-style-isolation.test.mjs). */
