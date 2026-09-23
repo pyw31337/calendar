@@ -1,4 +1,4 @@
-/* Viewport pin + bottom-gap kill switch for V2 (loaded with view-data.js). */
+/* Viewport pin + bottom-gap kill switch for V2 (loaded with chat-bubble-modules.css). */
 
 html.v2-html-active,
 html.v2-html-active body.v2-body-active {
@@ -110,4 +110,18 @@ html.v2-html-active #root {
   width: 100% !important;
   max-width: 100% !important;
   overflow: hidden !important;
+}
+
+.lightbox-overlay .lightbox-stage {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  position: relative !important;
+}
+.lightbox-overlay .lightbox-track {
+  display: flex !important;
+}
+.lightbox-overlay .lightbox-slide {
+  overflow: hidden !important;
+  box-sizing: border-box !important;
 }

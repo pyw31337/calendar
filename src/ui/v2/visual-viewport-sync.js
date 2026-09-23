@@ -1,6 +1,6 @@
 /**
  * Pin V2 chrome to the visual viewport and keep lightbox overlays flush.
- * Side-effect import from view-data.js (loaded with RenewalAppShell).
+ * Side-effect import from chat-bubble-modules.js (loaded with RenewalAppShell).
  */
 (function syncVisualViewport() {
   if (typeof window === 'undefined' || typeof document === 'undefined') return;
@@ -62,4 +62,56 @@
   syncActive();
   new MutationObserver(syncActive).observe(root, { attributes: true, attributeFilter: ['class'] });
   new MutationObserver(apply).observe(document.body, { childList: true });
+})();
+
+
+(function fixLightboxSlideWidths() {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
+
+  const applyStage = (stage) => {
+    const w = Math.round(stage.getBoundingClientRect().width || 0);
+    if (w < 1) return;
+    stage.querySelectorAll('.lightbox-slide').forEach(slide => {
+      slide.style.setProperty('flex', `0 0 ${w}px`, 'important');
+      slide.style.setProperty('width', `${w}px`, 'important');
+      slide.style.setProperty('max-width', `${w}px`, 'important');
+    });
+    const track = stage.querySelector('.lightbox-track');
+    if (!track) return;
+    track.style.setProperty('width', `${w * 3}px`, 'important');
+    const transform = String(track.style.transform || '');
+    const match = transform.match(/translate3d\(\s*(-?[\d.]+)px/);
+    const x = match ? Number(match[1]) : -w;
+    // Extract drag relative to React's intended -stageWidth base by taking residue mod w
+    // after shifting by +w (idle position).
+    let drag = x + w;
+    // If React used a larger stageWidth (0.92*vw), x is more negative; normalize into (-w/2, w/2].
+    while (drag > w / 2) drag -= w;
+    while (drag <= -w / 2) drag += w;
+    const next = -w + drag;
+    if (!match || Math.abs(x - next) > 0.5) {
+      track.style.setProperty('transform', `translate3d(${next}px, 0, 0)`, 'important');
+    }
+  };
+
+  const scan = () => {
+    document.querySelectorAll('.lightbox-overlay .lightbox-stage').forEach(applyStage);
+  };
+
+  const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => scan()) : null;
+  const watch = () => {
+    scan();
+    if (ro) {
+      document.querySelectorAll('.lightbox-overlay .lightbox-stage').forEach(el => ro.observe(el));
+    }
+  };
+  new MutationObserver(watch).observe(document.body, { childList: true, subtree: true });
+  window.addEventListener('resize', scan);
+  window.visualViewport?.addEventListener('resize', scan);
+  // Re-assert after React writes inline transform during drag/nav.
+  new MutationObserver(scan).observe(document.body, {
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['style'],
+  });
 })();
