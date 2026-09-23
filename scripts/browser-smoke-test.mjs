@@ -431,7 +431,9 @@ async function checkDeferredManual(browser, baseUrl) {
   const context = await browser.newContext(mobileContextOptions());
   const page = await context.newPage();
   try {
-    await page.goto(`${baseUrl}?id=kkot`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    // Cutover: default shell is now V2, which has no .admin-side-menu-overlay --
+    // explicit shell=v1 keeps testing the legacy admin side menu this check targets.
+    await page.goto(`${baseUrl}?id=kkot&shell=v1`, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForFunction(() => window.__GATHER_BOOT_READY__ === true, { timeout: 35000 });
     const menuButton = page.locator('button[aria-label$="메뉴 열기"]:visible').first();
     await menuButton.waitFor({ state: 'visible', timeout: 8000 });
@@ -453,7 +455,10 @@ async function checkMemoTagInput(browser, baseUrl) {
   const context = await browser.newContext(mobileContextOptions());
   const page = await context.newPage();
   try {
-    await gotoBootReady(page, `${baseUrl}?id=kkot&view=memo`);
+    // Cutover: default shell is now V2, whose extra chrome around the reused V1 memo
+    // composer makes the '닫기' button selector below match 2 elements instead of 1.
+    // shell=v1 keeps this check scoped to the legacy composer it was written against.
+    await gotoBootReady(page, `${baseUrl}?id=kkot&shell=v1&view=memo`);
     await page.getByText('새로운 메모를 남겨보세요...', { exact: true }).click();
 
     const participantButton = page.getByRole('button', { name: '작성자 선택' });
@@ -500,7 +505,9 @@ async function checkSettlementModalEntryPoints(browser, baseUrl) {
       else errors.push(err.message);
     });
     try {
-      await gotoBootReady(page, `${baseUrl}?id=kkot&view=settlement`);
+      // Cutover: default shell is now V2, which has no .admin-side-menu-overlay --
+      // explicit shell=v1 keeps testing the legacy admin side menu this check targets.
+      await gotoBootReady(page, `${baseUrl}?id=kkot&shell=v1&view=settlement`);
 
       const editButton = page.locator('[data-settlement-edit-button="true"]').first();
       // Hosted runners may intentionally have no production settlement fixture. This is a
@@ -583,7 +590,9 @@ async function checkSideMenuNavigation(browser, baseUrl) {
         page.on('requestfailed', request => failedRequests.push(`${request.url()} (${request.failure()?.errorText || 'failed'})`));
         page.on('response', response => collectSameOriginAsset404(response, baseUrl, asset404s));
         try {
-          await gotoBootReady(page, `${baseUrl}?id=${calId}${suffix}`);
+          // Cutover: default shell is now V2, which has no .admin-side-menu-overlay --
+          // explicit shell=v1 keeps testing the legacy admin side menu this check targets.
+          await gotoBootReady(page, `${baseUrl}?id=${calId}&shell=v1${suffix}`);
           const menuButton = page.locator('button[aria-label$="메뉴 열기"]:visible, button[aria-label="메뉴"]:visible').first();
           await menuButton.waitFor({ state: 'visible', timeout: 8000 });
           // Mobile headers can still be settling after a view transition; dispatch the semantic
