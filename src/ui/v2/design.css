@@ -356,7 +356,7 @@
 @media (max-width: 1199px) {
   .v2-design.v2-has-detail > .bp-side-nav-backdrop.bp-is-open { display: block; }
 }
-.v2-design .bp-bento-title-actions svg { width: 15px; height: 15px; }
+.v2-design .bp-bento-title-actions svg { width: 20px; height: 20px; }
 .v2-design .bp-chat-text { overflow-wrap: anywhere; }
 
 /* 320px: no horizontal overflow / overlapping hero controls */
