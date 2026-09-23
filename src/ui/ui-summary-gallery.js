@@ -3,6 +3,7 @@
  */
 
 import { composeGalleryPhotos, collectMemoryPhotoIdentityKeys, isMemoryPhotoExcluded, expandMemoryPhotoExclusionKeys, dedupeMemoryPhotoEntries, photoBelongsToMemory, isMemeKeyboardPhotoEntry } from '../core/gallery-data.js';
+import { resolveGalleryThumbUrl } from '../core/gallery-thumb.js';
 import { resolveGalleryLightboxTags } from '../core/photo-index.js';
 import { useScrollHideHeader } from '../core/use-scroll-hide-header.js';
 import { CapsuleTextBadge } from './ui-widgets.js';
@@ -595,14 +596,15 @@ export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalG
         displayedEntries.map((entry, idx) => {
           const identity = getPhotoCommentIdentity(entry, visibleEntries, { source: entry.source, meetingDate: entry.meetingDate }) || {};
           const commentCount = getPhotoCommentCount(identity, photoCommentCounts);
+          const resolvedThumb = resolveGalleryThumbUrl(entry);
           return /*#__PURE__*/React.createElement("div", {
           key: entry.mediaKey || entry.refKey || entry.full || entry.thumb,
           className: commentCount ? 'gallery-comment-heartbeat' : '',
           style: { position: 'relative', animationDelay: `${(idx % 7) * 0.9}s` }
         },
           /*#__PURE__*/React.createElement(MediaThumb, {
-            src: (entry.thumb && String(entry.thumb)) || (entry.full && String(entry.full)) || '',
-            fallbackSrc: (entry.full && String(entry.full)) || (entry.thumb && String(entry.thumb)) || '',
+            src: resolvedThumb.src,
+            fallbackSrc: resolvedThumb.fallbackSrc,
             alt: "채팅에 첨부된 사진",
             loading: "lazy",
             decoding: "async",

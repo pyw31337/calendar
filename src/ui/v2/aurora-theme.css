@@ -1036,6 +1036,22 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   grid-auto-rows: 1fr;
 }
+/* Home gallery strip: loading skeletons instead of blank grey squares while photoIndex resolves.
+ * Broken/missing media is filtered by resolveHomeGalleryStripState — never opacity:0 ghosts. */
+.v2-design .bp-renewal-home-photo-strip.bp-thumb-grid .bp-thumb.is-skeleton,
+.v2-design .bp-renewal-home-photo-strip.bp-thumb-grid.is-loading .bp-thumb.is-skeleton {
+  aspect-ratio: 1;
+  background: linear-gradient(90deg, #e8e6f0 0%, #f4f2f8 45%, #e8e6f0 100%);
+  background-size: 200% 100%;
+  animation: bp-gallery-thumb-shimmer 1.2s ease-in-out infinite;
+  border: none;
+  pointer-events: none;
+}
+@keyframes bp-gallery-thumb-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
 
 /* Fold/tablet home contract (768–1199px): the hero and calendar are the two
  * full-bleed, single-column lead surfaces.  Supporting modules remain a
