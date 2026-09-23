@@ -20,7 +20,7 @@ index a067f22..d5cf8f6 100644
  });
 +
 +
-test('V2 gallery/archive navigation writes one history entry (no records hub stop)', async () => {
++test('V2 gallery/archive navigation writes one history entry (no records hub stop)', async () => {
 +  const { readFileSync } = await import('node:fs');
 +  const shell = readFileSync(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
 +  assert.match(shell, /function navigateV2Destination/);
@@ -32,7 +32,7 @@ test('V2 gallery/archive navigation writes one history entry (no records hub sto
 +  assert.match(shell, /snap to calendar via replace|replace it with calendar/);
 +});
 +
-test('gallery thumb resolver module is the single render-resolution path', async () => {
++test('gallery thumb resolver module is the single render-resolution path', async () => {
 +  const { readFileSync } = await import('node:fs');
 +  const thumb = readFileSync(new URL('../src/core/gallery-thumb.js', import.meta.url), 'utf8');
 +  const shell = readFileSync(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
