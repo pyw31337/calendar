@@ -386,7 +386,7 @@ function RenewalHero({ meetings, calendar, onSelectDate }) {
   const React = window.React;
   const list = Array.isArray(meetings) ? meetings : [];
   const [primaryOpen, setPrimaryOpen] = React.useState(false);
-  const [chipOpenDate, setChipOpenDate] = React.useState(null);
+  const [openChips, setOpenChips] = React.useState({});
   const primary = list[0];
   const participants = getActiveParticipants(calendar || {});
 
@@ -477,8 +477,6 @@ function RenewalHero({ meetings, calendar, onSelectDate }) {
     };
   };
 
-  const chipOpenMeeting = chipOpenDate ? list.find(meeting => meeting && meeting.date === chipOpenDate) : null;
-
   const renderExpandedCard = (meeting, onClose, extraClass) => {
     const places = placesForDate(meeting.date);
     const placeName = places[0]
@@ -528,8 +526,21 @@ function RenewalHero({ meetings, calendar, onSelectDate }) {
     );
   };
 
-  // The nearest capsule and the chip row open independently. A chip never
-  // replaces the nearest card, and the nearest date stays in the chip row.
+  const toggleChip = (date) => {
+    setOpenChips(prev => ({ ...prev, [date]: !prev[date] }));
+  };
+
+  const renderReveal = (meeting, open, onClose, extraClass) => React.createElement('div', {
+    key: extraClass ? meeting.date : 'primary',
+    className: bentoClass(`dday-reveal${open ? ' is-open' : ''}`),
+  },
+    React.createElement('div', { className: bentoClass('dday-reveal-inner') },
+      renderExpandedCard(meeting, onClose, extraClass)
+    )
+  );
+
+  // Every confirmed date opens and closes on its own. A tap never replaces
+  // another card, including the nearest capsule.
   return React.createElement(React.Fragment, null,
     React.createElement('div', { className: bentoClass(`dday-toggle-wrap ${primaryOpen ? 'is-open' : ''}`.trim()), 'aria-label': '가까운 확정 일정' },
       React.createElement('button', { type: 'button', className: bentoClass('dday-compact'), onClick: () => setPrimaryOpen(true), 'aria-expanded': primaryOpen },
@@ -541,17 +552,22 @@ function RenewalHero({ meetings, calendar, onSelectDate }) {
           React.createElement('path', { d: 'M6 9l6 6l6 -6' })
         )
       ),
-      primaryOpen ? renderExpandedCard(primary, () => setPrimaryOpen(false)) : null
+      renderReveal(primary, primaryOpen, () => setPrimaryOpen(false))
     ),
 
     React.createElement('div', { className: bentoClass('dday-chip-stack') },
-      chipOpenMeeting ? renderExpandedCard(chipOpenMeeting, () => setChipOpenDate(null), 'dday-chip-card') : null,
+      list.map(meeting => renderReveal(
+        meeting,
+        !!openChips[meeting.date],
+        () => toggleChip(meeting.date),
+        'dday-chip-card'
+      )),
       React.createElement('div', { className: bentoClass('dday-strip renewal-home-hero-chips') }, list.map(meeting => {
         const chipDate = chipDateFor(meeting.date);
-        const chipOpen = chipOpenDate === meeting.date;
+        const chipOpen = !!openChips[meeting.date];
         return React.createElement('button', {
-          key: meeting.date, type: 'button', className: bentoClass(`dday-chip renewal-home-hero-chip${chipOpen ? ' is-selected' : ''}`),
-          onClick: () => setChipOpenDate(chipOpen ? null : meeting.date),
+          key: meeting.date, type: 'button', className: bentoClass('dday-chip renewal-home-hero-chip'),
+          onClick: () => toggleChip(meeting.date),
           'aria-expanded': chipOpen,
           title: labelFor(meeting)
         },
