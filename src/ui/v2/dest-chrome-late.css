@@ -2244,6 +2244,17 @@ html:has(.renewal-shell.v2-design) .v2-modal-drag-handle::before {
   border-radius: 999px !important;
   background: #d4d0de !important;
 }
+/* Forms that are still the dialog shell (can't be a Resizable div) still show the gray bar. */
+html:has(.renewal-shell.v2-design) .modal-overlay > form.modal-container:not(:has(> .v2-modal-drag-handle)):not(:has(> .bp-sheet-handle))::before {
+  content: "" !important;
+  display: block;
+  width: 40px;
+  height: 4px;
+  margin: 10px auto 8px;
+  border-radius: 999px;
+  background: #d4d0de;
+  flex-shrink: 0;
+}
 @media (min-width: 1200px) {
   html:has(.renewal-shell.v2-design) .bp-sheet-handle,
   html:has(.renewal-shell.v2-design) .v2-modal-drag-handle {

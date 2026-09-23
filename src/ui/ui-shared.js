@@ -997,7 +997,7 @@ export function LinkPreviewProgressOverlay({ progress, remainingSec }) {
       className: "modal-overlay",
       style: { zIndex: 12000, display: 'flex', alignItems: 'center', justifyContent: 'center' }
     },
-      /*#__PURE__*/React.createElement("div", {
+      /*#__PURE__*/React.createElement((window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer) || "div", {
         className: "modal-container",
         style: { width: '100%', maxWidth: '360px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)' }
       },

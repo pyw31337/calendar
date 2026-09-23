@@ -2056,7 +2056,7 @@ export function PlacesView({
       className: "modal-overlay",
       style: { zIndex: 30000 },
       onClick: () => { if (!isSavingGatherPlacesPaste) setGatherPlacesPastePreview(null); }
-    }, /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement((window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer) || "div", {
       className: "modal-container confirm-dialog-modal",
       onClick: e => e.stopPropagation(),
       style: { maxWidth: '400px', borderRadius: 'var(--radius-md)' }
@@ -2098,7 +2098,7 @@ export function PlacesView({
       className: "modal-overlay",
       style: { zIndex: 30000 },
       onClick: () => setBulkShareResultUrl('')
-    }, /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement((window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer) || "div", {
       className: "modal-container confirm-dialog-modal",
       onClick: e => e.stopPropagation(),
       style: { maxWidth: '400px', borderRadius: 'var(--radius-md)' }

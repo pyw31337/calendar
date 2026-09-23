@@ -2105,15 +2105,25 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   );
 
   if (typeof renderV2 === 'function') {
-    return renderV2({
+    const lifted = [];
+    React.Children.toArray(__memoLegacyTree.props.children).forEach(node => {
+      if (!node || !React.isValidElement(node)) return;
+      const cls = String(node.props?.className || '');
+      if (/memo-view-header|memo-view-body|admin-side-menu-overlay/.test(cls)) return;
+      if (node.type === 'button') return;
+      lifted.push(node);
+    });
+    const ReactDOM = window.ReactDOM;
+    const extraTree = lifted.length
+      ? (ReactDOM && typeof ReactDOM.createPortal === 'function'
+        ? ReactDOM.createPortal(React.createElement(React.Fragment, null, ...lifted), document.body)
+        : lifted)
+      : null;
+    return React.createElement(React.Fragment, null, renderV2({
       legacyView: __memoLegacyTree,
       calendar,
       allMemos: memos || [],
       memos: memos || [],
-      // V2 renders the live cards through its own grid, so pass the existing
-      // share/jump target through explicitly instead of losing it with the
-      // legacy sharedMemo slot.  MemoScreen turns this into the same focused
-      // card treatment used by navigation from the home summary.
       focusedMemo: sharedMemo || null,
       renderCard: (memo) => /*#__PURE__*/React.createElement(MemoCard, {
         memo,
@@ -2139,8 +2149,10 @@ const [isSearchOpen, setIsSearchOpen] = React.useState(false);
       onSearch: (value) => { setSearchQuery(value); setIsSearchOpen(!!value || isSearchOpen); },
       onSelectTag: (tag) => { setSelectedTag(tag); if (tag) setIsSearchOpen(true); },
       onCompose: () => setIsComposerExpanded(true),
+      isComposerExpanded,
+      onCloseComposer: () => setIsComposerExpanded(false),
       slots: {},
-    });
+    }), extraTree);
   }
   return __memoLegacyTree;
 }

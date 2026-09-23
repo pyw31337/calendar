@@ -296,9 +296,7 @@ export function DocumentLightbox(props) {
     setZoomLevel(ZOOM_DEFAULT);
   };
 
-  var ModalBox = (!isMobile && window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer)
-    ? window.GATHER_UI_COMPONENTS.ResizableModalContainer
-    : "div";
+  var ModalBox = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer) || "div";
 
   return React.createElement("div", {
     role: "dialog", "aria-modal": "true", "aria-label": "파일 미리보기", onClick: onClose,

@@ -2236,6 +2236,11 @@ export function buildRenewalRecordsContext(calendar, deps) {
  */
 function MediaPane({ recordsContext, calendarName, onChangeView, onOpenAppSettings, onOpenSideNav, onRegisterMenuActions }) {
   const React = window.React;
+  const galleryActionsRef = React.useRef({});
+  const registerGalleryActions = React.useCallback((actions) => {
+    galleryActionsRef.current = actions || {};
+    if (typeof onRegisterMenuActions === 'function') onRegisterMenuActions(actions);
+  }, [onRegisterMenuActions]);
   const loaded = useLazyUi(
     'gallery',
     () => !!(window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ChatGalleryModal),
@@ -2253,7 +2258,7 @@ function MediaPane({ recordsContext, calendarName, onChangeView, onOpenAppSettin
     onOpenShare: recordsContext.onOpenGalleryShare,
     onOpenAppSettings,
     v2Embed: true,
-    onRegisterMenuActions,
+    onRegisterMenuActions: registerGalleryActions,
   });
   return React.createElement(React.Fragment, null,
     React.createElement('div', { className: 'v2-records-media' },
@@ -2265,6 +2270,8 @@ function MediaPane({ recordsContext, calendarName, onChangeView, onOpenAppSettin
         onShare: recordsContext.onOpenGalleryShare,
         onMenu: onOpenSideNav || onOpenAppSettings,
         onSearch: () => clickLegacyAriaButton('갤러리 검색', '.v2-gallery'),
+        onUploadFiles: () => galleryActionsRef.current.uploadMixed?.(),
+        onUploadLink: () => galleryActionsRef.current.uploadLink?.(),
         slots: {},
       })
     ),
@@ -2289,13 +2296,18 @@ function clickLegacyAriaButton(ariaLabel, scopeSelector) {
 /** 콘텐츠 subtab body (WP-06 continuation): the existing ContentView with unchanged app-main props. */
 function ContentPane({ recordsContext, calendarName, onChangeView, onOpenAppSettings, onOpenSideNav, onRegisterMenuActions }) {
   const React = window.React;
+  const contentActionsRef = React.useRef({});
+  const registerContentActions = React.useCallback((actions) => {
+    contentActionsRef.current = actions || {};
+    if (typeof onRegisterMenuActions === 'function') onRegisterMenuActions(actions);
+  }, [onRegisterMenuActions]);
   const { ContentView } = bindUiComponentAliases(React);
   const contentView = React.createElement(ContentView, {
     ...recordsContext.contentProps,
     onBack: () => onChangeView('calendar'),
     onOpenAppSettings,
     v2Embed: true,
-    onRegisterMenuActions,
+    onRegisterMenuActions: registerContentActions,
   });
   return renderContentScreen({
     legacyView: contentView,
@@ -2304,6 +2316,7 @@ function ContentPane({ recordsContext, calendarName, onChangeView, onOpenAppSett
     onBack: () => onChangeView('calendar'),
     onMenu: onOpenSideNav || onOpenAppSettings,
     onSearch: () => clickLegacyAriaButton('컨텐츠 검색', '.v2-content'),
+    onOpenRegister: () => contentActionsRef.current.register?.(),
     slots: {},
   });
 }
@@ -3237,30 +3250,16 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   // 캘린더's three items are static (openMoreModalById covers them directly); every other tab's
   // items dispatch through tabMenuActionsRef, keyed by `action`, since that tab's own screen
   // component registers the actual handler (search toggle, upload trigger, etc.) itself.
+  // Gray side-nav submenu is gone on every tab (PC rail and mobile drawer).
+  // Those actions live on each page header. Calendar settings / 기념일 / 매뉴얼 stay in 더보기.
   const TAB_MENU_ITEM_CONFIGS = {
-    calendar: [
-      { key: 'calendar-settings', label: '캘린더 설정', icon: 'calendarSettings', onClick: () => openMoreModalById('calendar-settings') },
-      { key: 'anniversaries', label: '기념일 설정', icon: 'anniversary', onClick: () => openMoreModalById('anniversaries') },
-      { key: 'manual', label: '사용자 매뉴얼', icon: 'manual', onClick: () => { setIsSideNavOpen(false); openMoreModalById('manual'); } },
-    ],
-    // 공지사항 lives on the chat header (icon, right end) — not this side-nav group.
+    calendar: [],
     chat: [],
-    settlement: [
-      { key: 'settlement-create', label: '정산 생성', icon: 'cashPlus', action: 'create' },
-      { key: 'settlement-list', label: '정산 목록', icon: 'receipt', action: 'list' },
-    ],
-    gallery: [
-      { key: 'gallery-upload-image', label: '이미지 업로드', icon: 'photoUp', action: 'uploadImage' },
-      { key: 'gallery-upload-file', label: '파일 업로드', icon: 'fileUpload', action: 'uploadFile' },
-      { key: 'gallery-upload-link', label: '링크 업로드', icon: 'link', action: 'uploadLink' },
-    ],
-    places: [
-      { key: 'places-register', label: '장소 등록', icon: 'mapPinPlus', action: 'register' },
-    ],
+    settlement: [],
+    gallery: [],
+    places: [],
     memo: [],
-    content: [
-      { key: 'content-register', label: '컨텐츠 등록', icon: 'scriptPlus', action: 'register' },
-    ],
+    content: [],
     archive: [],
   };
 

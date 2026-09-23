@@ -3515,7 +3515,7 @@ export function DateModal({
     className: "modal-overlay",
     style: { zIndex: 30000 },
     onClick: handleCancelPastePreview
-  }, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement((window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer) || "div", {
     className: "modal-container confirm-dialog-modal",
     onClick: e => e.stopPropagation(),
     style: { maxWidth: '360px', borderRadius: 'var(--radius-md)' }

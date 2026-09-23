@@ -1183,7 +1183,8 @@ export function ChatGalleryModal({
     if (!pastePreview) return;
     const files = pastePreview.files;
     setPastePreview(null);
-    await uploadFiles(files);
+    const ok = await uploadFiles(files);
+    if (ok) setActiveTab('photos');
   };
   const handleCancelGatherPhotoPaste = () => setGatherPhotoPastePreview(null);
   const handleConfirmGatherPhotoPaste = async () => {
@@ -1422,15 +1423,58 @@ export function ChatGalleryModal({
     }
   };
   const uploadFiles = async files => {
-    if (!files.length || typeof onUploadImages !== 'function') return;
+    if (!files.length || typeof onUploadImages !== 'function') return false;
     setIsMenuOpen(false);
-    await Promise.resolve(onUploadImages(files));
-    setActiveTab('photos');
+    const result = await Promise.resolve(onUploadImages(files));
+    return result !== false;
   };
   const handleUploadChange = async event => {
     const files = Array.from(event.target.files || []);
     event.target.value = '';
-    await uploadFiles(files);
+    if (!files.length) return;
+    const api = (typeof window !== 'undefined' && window.GATHER_CHAT_FILE_ATTACHMENTS) || {};
+    const classify = api.classifyChatComposerFiles;
+    if (typeof classify !== 'function') {
+      const ok = await uploadFiles(files);
+      if (ok) setActiveTab('photos');
+      return;
+    }
+    const { images, documents, rejected } = classify(files);
+    if (rejected && rejected.length && showToast) {
+      const videos = rejected.filter(item => item.reason === 'video').length;
+      const large = rejected.filter(item => item.reason === 'too-large').length;
+      const unsupported = rejected.filter(item => item.reason === 'unsupported').length;
+      const bits = [];
+      if (videos) bits.push('동영상은 올릴 수 없습니다');
+      if (large) bits.push('20MB를 넘는 파일은 제외했습니다');
+      if (unsupported) bits.push('지원하지 않는 형식은 제외했습니다');
+      if (bits.length) showToast(bits.join(' · '), 'info');
+    }
+    setIsMenuOpen(false);
+    let imageOk = false;
+    let fileOk = false;
+    if (images.length) imageOk = await uploadFiles(images);
+    if (documents.length && typeof api.uploadChatFileAttachments === 'function' && calendar && calendar.id && typeof onAddFiles === 'function') {
+      try {
+        const ready = await api.uploadChatFileAttachments(calendar.id, documents);
+        if (ready && ready.length) {
+          const saved = await onAddFiles(ready);
+          fileOk = saved !== false;
+          if (showToast && fileOk) {
+            showToast(saved === 'queued'
+              ? '네트워크가 불안정하여 파일을 대기열에 저장했습니다. 연결되면 자동으로 반영됩니다.'
+              : `파일 ${ready.length}개를 올렸습니다.`, saved === 'queued' ? 'info' : 'success');
+          }
+        }
+      } catch (err) {
+        console.error('gallery file upload failed', err);
+        if (showToast) showToast('파일 업로드에 실패했습니다.', 'error');
+      }
+    } else if (documents.length && showToast) {
+      showToast('파일 업로드를 사용할 수 없습니다.', 'error');
+    }
+    if (images.length && imageOk) setActiveTab('photos');
+    else if (fileOk) setActiveTab('files');
   };
 
   // 링크 tab's '추가'/'붙여넣기' -- unlike photos (uploaded as their own message), a "link" here
@@ -1455,8 +1499,9 @@ export function ChatGalleryModal({
     if (typeof onRegisterMenuActions !== 'function') return undefined;
     onRegisterMenuActions({
       search: () => setIsSearchOpen(true),
-      uploadImage: () => { setActiveTab('photos'); handleUploadClick(); },
-      uploadFile: () => { setActiveTab('files'); handleUploadClick(); },
+      uploadMixed: () => handleUploadClick(),
+      uploadImage: () => handleUploadClick(),
+      uploadFile: () => handleUploadClick(),
       uploadLink: () => { setActiveTab('links'); setIsAddingLink(true); },
     });
     return () => onRegisterMenuActions(null);
@@ -1621,7 +1666,7 @@ export function ChatGalleryModal({
     className: "modal-overlay",
     style: { zIndex: 30000 },
     onClick: handleCancelPastePreview
-  }, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement((window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer) || "div", {
     className: "modal-container confirm-dialog-modal",
     onClick: e => e.stopPropagation(),
     style: { maxWidth: '360px', borderRadius: 'var(--radius-md)' }
@@ -1663,7 +1708,7 @@ export function ChatGalleryModal({
     className: "modal-overlay",
     style: { zIndex: 30000 },
     onClick: handleCancelGatherPhotoPaste
-  }, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement((window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer) || "div", {
     className: "modal-container confirm-dialog-modal",
     onClick: e => e.stopPropagation(),
     style: { maxWidth: '360px', borderRadius: 'var(--radius-md)' }
@@ -1713,7 +1758,7 @@ export function ChatGalleryModal({
     className: "modal-overlay",
     style: { zIndex: 30000 },
     onClick: handleCancelGatherPhotosPaste
-  }, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement((window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer) || "div", {
     className: "modal-container confirm-dialog-modal",
     onClick: e => e.stopPropagation(),
     style: { maxWidth: '400px', borderRadius: 'var(--radius-md)' }
@@ -1756,7 +1801,7 @@ export function ChatGalleryModal({
     className: "modal-overlay",
     style: { zIndex: 30000 },
     onClick: () => setBulkShareResultUrl('')
-  }, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement((window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer) || "div", {
     className: "modal-container confirm-dialog-modal",
     onClick: e => e.stopPropagation(),
     style: { maxWidth: '400px', borderRadius: 'var(--radius-md)' }
@@ -2470,7 +2515,7 @@ export function ChatGalleryModal({
   /*#__PURE__*/React.createElement("input", {
     ref: uploadInputRef,
     type: "file",
-    accept: "image/jpeg, image/png, image/gif, image/webp, image/heic, image/heif, image/*",
+    accept: (typeof window !== 'undefined' && window.GATHER_CHAT_FILE_ATTACHMENTS && window.GATHER_CHAT_FILE_ATTACHMENTS.CHAT_COMPOSER_ACCEPT) || "image/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.csv,.rtf,application/pdf",
     multiple: true,
     onChange: handleUploadChange,
     style: { display: 'none' }

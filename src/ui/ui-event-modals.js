@@ -4216,19 +4216,53 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   );
 
   if (typeof renderV2 === 'function') {
-    return renderV2({
-      legacyView: __settlementLegacyTree,
-      calendar,
-      onBack,
-      onSearch: () => setIsSettlementSearchOpen(value => !value),
-      onShare: onOpenShare,
-      onMenu: () => setIsSettlementMenuOpen(true),
-      onCompose: () => {
-        if (typeof onOpenCreateSettlement === 'function') onOpenCreateSettlement();
-        else setIsCreateSettlementOpen(true);
-      },
-      slots: {},
-    });
+    const lifted = [];
+    const liftOverlays = (node) => {
+      if (!node || !React.isValidElement(node)) return node;
+      const cls = String(node.props?.className || '');
+      const typeName = typeof node.type === 'function' ? (node.type.displayName || node.type.name || '') : '';
+      if (/modal-overlay|bottom-sheet-overlay|admin-side-menu-overlay/.test(cls) || /Modal/.test(typeName)) {
+        lifted.push(node);
+        return null;
+      }
+      const children = node.props?.children;
+      if (children == null) return node;
+      const list = React.Children.toArray(children);
+      let changed = false;
+      const next = [];
+      list.forEach(child => {
+        const stripped = liftOverlays(child);
+        if (stripped !== child) changed = true;
+        if (stripped != null && stripped !== false) next.push(stripped);
+      });
+      if (!changed) return node;
+      return React.cloneElement(node, null, ...next);
+    };
+    const legacyView = liftOverlays(__settlementLegacyTree);
+    const ReactDOM = window.ReactDOM;
+    const modalTree = lifted.length
+      ? (ReactDOM && typeof ReactDOM.createPortal === 'function'
+        ? ReactDOM.createPortal(React.createElement(React.Fragment, null, ...lifted), document.body)
+        : lifted)
+      : null;
+    return React.createElement(React.Fragment, null,
+      renderV2({
+        legacyView,
+        calendar,
+        onBack,
+        onSearch: () => setIsSettlementSearchOpen(value => !value),
+        onShare: onOpenShare,
+        onMenu: () => setIsSettlementMenuOpen(true),
+        onOpenCreate: handleOpenCreateSettlement,
+        onOpenList: () => { setIsSettlementMenuOpen(false); setIsSettlementListOpen(true); },
+        onCompose: () => {
+          if (typeof onOpenCreateSettlement === 'function') onOpenCreateSettlement();
+          else setIsCreateSettlementOpen(true);
+        },
+        slots: {},
+      }),
+      modalTree
+    );
   }
   return __settlementLegacyTree;
 }

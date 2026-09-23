@@ -117,9 +117,50 @@ const ICON_NODES = {
   chevronRight: [['path', { d: 'm9 18 6-6-6-6' }]],
   chevronDown: [['path', { d: 'm6 9 6 6 6-6' }]],
   megaphone: [
-    ['path', { d: 'M18 8a3 3 0 0 1 0 6' }],
-    ['path', { d: 'M10 8v11a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-5' }],
-    ['path', { d: 'M12 8l4.524-3.77a.9.9 0 0 1 1.476.692v12.156a.9.9 0 0 1-1.476.692L12 14H4a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1h8' }],
+    ['path', { d: 'M11 6a13 13 0 0 0 8.4-2.8A1 1 0 0 1 21 4v12a1 1 0 0 1-1.6.8A13 13 0 0 0 11 14H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z' }],
+    ['path', { d: 'M6 14a12 12 0 0 0 2.4 7.2 2 2 0 0 0 3.2-2.4A8 8 0 0 1 10 14' }],
+    ['path', { d: 'M8 6v8' }],
+  ],
+  clipboardPlus: [
+    ['path', { d: 'M9 5h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2h-2' }],
+    ['path', { d: 'M9 5a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2' }],
+    ['path', { d: 'M10 14h4' }],
+    ['path', { d: 'M12 12v4' }],
+  ],
+  cashPlus: [
+    ['path', { d: 'M7 15h-3a1 1 0 0 1 -1 -1v-8a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v3' }],
+    ['path', { d: 'M12 19h-4a1 1 0 0 1 -1 -1v-8a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v2.5' }],
+    ['path', { d: 'M12 14a2 2 0 1 0 4 0a2 2 0 0 0 -4 0' }],
+    ['path', { d: 'M16 19h6' }],
+    ['path', { d: 'M19 16v6' }],
+  ],
+  receipt: [
+    ['path', { d: 'M5 21v-16a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v16l-3 -2l-2 2l-2 -2l-2 2l-2 -2l-3 2' }],
+    ['path', { d: 'M9 7h6' }],
+    ['path', { d: 'M9 11h6' }],
+    ['path', { d: 'M13 15h2' }],
+  ],
+  fileUpload: [
+    ['path', { d: 'M14 3v4a1 1 0 0 0 1 1h4' }],
+    ['path', { d: 'M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2' }],
+    ['path', { d: 'M12 11v6' }],
+    ['path', { d: 'M9.5 13.5l2.5 -2.5l2.5 2.5' }],
+  ],
+  link: [
+    ['path', { d: 'M9 15l6 -6' }],
+    ['path', { d: 'M11 6l.463 -.536a5 5 0 0 1 7.071 7.072l-.534 .464' }],
+    ['path', { d: 'M13 18l-.397 .534a5.068 5.068 0 0 1 -7.127 0a4.972 4.972 0 0 1 0 -7.071l.524 -.463' }],
+  ],
+  mapPinPlus: [
+    ['path', { d: 'M9 11a3 3 0 1 0 6 0a3 3 0 0 0 -6 0' }],
+    ['path', { d: 'M12.794 21.322a2 2 0 0 1 -2.207 -.422l-4.244 -4.243a8 8 0 1 1 13.59 -4.616' }],
+    ['path', { d: 'M16 19h6' }],
+    ['path', { d: 'M19 16v6' }],
+  ],
+  scriptPlus: [
+    ['path', { d: 'M17 19h4' }],
+    ['path', { d: 'M14 20h-8a3 3 0 0 1 0 -6h11a3 3 0 0 0 -3 3m7 -3v-8a2 2 0 0 0 -2 -2h-10a2 2 0 0 0 -2 2v8' }],
+    ['path', { d: 'M19 17v4' }],
   ],
 };
 
@@ -149,6 +190,44 @@ function IconButton({ label, icon, onClick, size = 18 }) {
     { type: 'button', className: 'bp-icon-btn', 'aria-label': label, onClick },
     h(DesignIcon, { name: icon, size })
   );
+}
+
+function headerExtra(nodes) {
+  const items = (nodes || []).filter(Boolean);
+  if (!items.length) return null;
+  return h(window.React.Fragment, null, ...items);
+}
+
+function layerPopup({ label, title, onClose, children }) {
+  const React = window.React;
+  const ReactDOM = window.ReactDOM;
+  const Box = (window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer) || 'div';
+  const dialog = h(
+    'div',
+    { className: 'modal-overlay', onClick: onClose, style: { zIndex: 12000 } },
+    h(
+      Box,
+      {
+        className: 'modal-container',
+        role: 'dialog',
+        'aria-modal': true,
+        'aria-label': label || title,
+        onClick: event => event.stopPropagation(),
+        style: { maxWidth: '560px', width: '92%', maxHeight: '86vh', display: 'flex', flexDirection: 'column' },
+      },
+      h(
+        'div',
+        { className: 'modal-header', style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)' } },
+        h('h3', { style: { margin: 0, fontSize: '1.02rem', fontWeight: 900, color: 'var(--text-main)' } }, title),
+        h(IconButton, { label: '닫기', icon: 'close', onClick: onClose })
+      ),
+      h('div', { className: 'modal-body', style: { overflowY: 'auto', padding: '14px 16px 18px' } }, children)
+    )
+  );
+  if (ReactDOM && typeof ReactDOM.createPortal === 'function' && typeof document !== 'undefined') {
+    return ReactDOM.createPortal(dialog, document.body);
+  }
+  return dialog;
 }
 
 /** Strip leading emoji/symbols from calendar title for header/side badges. */
@@ -375,6 +454,20 @@ export function MemoScreen(p) {
   const dedicatedComposerSlot = useDedicatedCards && p.legacyView
     ? extractMemoSlots(p.legacyView).composer
     : null;
+  const memoHeaderExtra = headerExtra([
+    typeof p.onCompose === 'function' && h(IconButton, { label: '메모 등록', icon: 'clipboardPlus', onClick: p.onCompose }),
+  ]);
+  const closeComposer = () => {
+    if (typeof p.onCloseComposer === 'function') p.onCloseComposer();
+  };
+  const memoComposePopup = p.isComposerExpanded && dedicatedComposerSlot
+    ? layerPopup({
+      label: '메모 등록',
+      title: '메모 등록',
+      onClose: closeComposer,
+      children: dedicatedComposerSlot,
+    })
+    : null;
 
   if (!useDedicatedCards && p.legacyView) {
     const slots = { ...extractMemoSlots(p.legacyView), ...(p.slots || {}) };
@@ -397,6 +490,7 @@ export function MemoScreen(p) {
               searchLabel: '메모 검색',
               onShare: p.onShare,
               onMenu: p.onMenu,
+              extra: memoHeaderExtra,
             },
             isSearchOpen && h(Search, {
               value: p.searchQuery || '',
@@ -427,6 +521,7 @@ export function MemoScreen(p) {
             searchLabel: '메모 검색',
             onShare: p.onShare,
             onMenu: p.onMenu,
+            extra: memoHeaderExtra,
           },
           isSearchOpen && h(Search, {
             value: p.searchQuery || '',
@@ -457,6 +552,7 @@ export function MemoScreen(p) {
           searchLabel: '메모 검색',
           onShare: p.onShare,
           onMenu: p.onMenu,
+          extra: memoHeaderExtra,
         },
         isSearchOpen && h(Search, {
           value: p.searchQuery,
@@ -472,7 +568,7 @@ export function MemoScreen(p) {
       h(
         'div',
         { className: 'v2-dest-body v2-memo-body' },
-        (p.slots && p.slots.shared) || dedicatedComposerSlot,
+        p.isComposerExpanded ? ((p.slots && p.slots.shared) || null) : ((p.slots && p.slots.shared) || dedicatedComposerSlot),
         h(
           'div',
           { className: 'bp-memo-grid' },
@@ -510,22 +606,7 @@ export function MemoScreen(p) {
       ),
       h(Fab, { label: '메모 작성', onClick: p.onCompose })
     ),
-    p.isComposerExpanded &&
-      h(
-        'div',
-        { className: 'v2-compose-backdrop' },
-        h(
-          'section',
-          { className: 'v2-compose-dialog', role: 'dialog', 'aria-modal': true, 'aria-label': '메모 작성' },
-          h(
-            'div',
-            { className: 'v2-dialog-heading' },
-            h('strong', null, '메모 작성'),
-            h(IconButton, { label: '닫기', icon: 'close', onClick: p.onCloseComposer })
-          ),
-          p.slots && p.slots.composer
-        )
-      ),
+    memoComposePopup,
     overlays(p.slots, ['composer', 'shared'])
   );
 }
@@ -545,14 +626,17 @@ export function PlacesScreen(p) {
   };
   // Keep the map entry point in the page content so the shared header stays
   // identical across every destination screen.
-  const mapToggle = h(IconButton, {
-    label: '지도로 보기',
-    icon: 'map',
-    onClick: () => {
-      setMapOpen(value => !value);
-      if (p.onToggleMap) p.onToggleMap();
-    },
-  });
+  const placeHeaderExtra = headerExtra([
+    h(IconButton, {
+      label: '지도보기',
+      icon: 'map',
+      onClick: () => {
+        setMapOpen(value => !value);
+        if (p.onToggleMap) p.onToggleMap();
+      },
+    }),
+    typeof p.onCompose === 'function' && h(IconButton, { label: '장소 등록', icon: 'mapPinPlus', onClick: p.onCompose }),
+  ]);
 
   if (!Array.isArray(p.places) && p.legacyView) {
     // Do not steal Leaflet map / list nodes out of the live PlacesView tree.
@@ -576,7 +660,7 @@ export function PlacesScreen(p) {
             searchLabel: '장소 검색',
             onShare: p.onShare,
             onMenu: p.onMenu,
-            extra: mapToggle,
+            extra: placeHeaderExtra,
           },
           isSearchOpen && h(Search, {
             value: p.searchQuery || '',
@@ -607,7 +691,7 @@ export function PlacesScreen(p) {
           searchLabel: '장소 검색',
           onShare: p.onShare,
           onMenu: p.onMenu,
-          extra: mapToggle,
+          extra: placeHeaderExtra,
         },
         isSearchOpen && h(Search, {
           value: p.searchQuery,
@@ -733,6 +817,10 @@ function settlementRows(card, calendar, fallbackExpense) {
 const won = amount => `${Math.abs(Number(amount) || 0).toLocaleString('ko-KR')}원`;
 
 export function SettlementScreen(p) {
+  const settlementHeaderExtra = headerExtra([
+    typeof p.onOpenCreate === 'function' && h(IconButton, { label: '정산 생성', icon: 'cashPlus', onClick: p.onOpenCreate }),
+    typeof p.onOpenList === 'function' && h(IconButton, { label: '정산 목록', icon: 'receipt', onClick: p.onOpenList }),
+  ]);
   if (p.legacyView && !Array.isArray(p.cards)) {
     const slots = { ...extractSettlementSlots(p.legacyView), ...(p.slots || {}) };
     if (slots.body) {
@@ -778,6 +866,7 @@ export function SettlementScreen(p) {
             searchLabel: '정산 검색',
             onShare: p.onShare,
             onMenu: p.onMenu,
+            extra: settlementHeaderExtra,
           }, flushTabs),
           h('div', { className: 'v2-dest-body v2-settlement-body' }, flushBody),
           h(Fab, { label: '지출 추가', onClick: p.onCompose })
@@ -800,6 +889,7 @@ export function SettlementScreen(p) {
           searchLabel: '정산 검색',
           onShare: p.onShare,
           onMenu: p.onMenu,
+          extra: settlementHeaderExtra,
         }),
         wrapLegacy(p.legacyView, 'v2-legacy-body v2-settlement-legacy'),
         h(Fab, { label: '지출 추가', onClick: p.onCompose })
@@ -827,6 +917,7 @@ export function SettlementScreen(p) {
       searchLabel: '정산 검색',
       onShare: p.onShare,
         onMenu: p.onMenu,
+        extra: settlementHeaderExtra,
       }),
       h(
         'div',
@@ -1243,7 +1334,17 @@ export function GalleryScreen(p) {
   return h(
     'section',
     { className: 'v2-gallery v2-dest-page v2-embed-frame v2-records-media v2-has-page-header' },
-    h(PageHeader, { title: '갤러리', searchLabel: '갤러리 검색', onBack: p.onBack, onMenu: p.onMenu, onSearch: p.onSearch },
+    h(PageHeader, {
+      title: '갤러리',
+      searchLabel: '갤러리 검색',
+      onBack: p.onBack,
+      onMenu: p.onMenu,
+      onSearch: p.onSearch,
+      extra: headerExtra([
+        typeof p.onUploadFiles === 'function' && h(IconButton, { label: '파일 업로드', icon: 'fileUpload', onClick: p.onUploadFiles }),
+        typeof p.onUploadLink === 'function' && h(IconButton, { label: '링크 업로드', icon: 'link', onClick: p.onUploadLink }),
+      ]),
+    },
       h('div', { id: 'v2-gallery-header-tabs-slot', className: 'v2-gallery-tabs-slot' })
     ),
     wrapLegacy(p.legacyView, 'v2-legacy-body v2-gallery-legacy'),
@@ -1254,10 +1355,15 @@ export function GalleryScreen(p) {
 function makeTabbedScreen(name, title) {
   return function(p) {
     ensureDestinationStyles(name);
+    const extra = p.headerExtra || (name === 'content'
+      ? headerExtra([
+        typeof p.onOpenRegister === 'function' && h(IconButton, { label: '컨텐츠 등록', icon: 'scriptPlus', onClick: p.onOpenRegister }),
+      ])
+      : null);
     return h(
       'section',
       { className: `v2-${name} v2-dest-page v2-embed-frame v2-has-page-header` },
-      h(PageHeader, { title, onBack: p.onBack, onMenu: p.onMenu },
+      h(PageHeader, { title, onBack: p.onBack, onMenu: p.onMenu, extra },
         h('div', { id: `v2-${name}-header-tabs-slot`, className: `v2-${name}-tabs-slot` })
       ),
       wrapLegacy(p.legacyView, `v2-legacy-body v2-${name}-legacy`),

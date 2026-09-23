@@ -282,7 +282,7 @@ export function NotificationOnboardingModal({ onClose, isMasterNotifyEnabled, on
   const ToggleSwitch = __deps.ToggleSwitch;
   const BellIcon = __deps.BellIcon;
   return /*#__PURE__*/React.createElement("div", { className: "modal-overlay", style: { zIndex: 13000 } },
-    /*#__PURE__*/React.createElement("div", {
+    /*#__PURE__*/React.createElement((window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer) || "div", {
       className: "modal-container", onClick: e => e.stopPropagation(),
       style: { maxWidth: '520px', width: '92%', maxHeight: '90vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg-card)', borderRadius: '20px', border: '1px solid var(--border-subtle)', overflow: 'hidden' }
     },

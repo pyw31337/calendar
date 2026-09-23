@@ -4065,7 +4065,7 @@ function ContentRegisterModal({ calendar = null, onClose, onSave, showToast = nu
       onClick: () => !saving && onClose && onClose(),
       style: { zIndex: 14000 }
     },
-      /*#__PURE__*/React.createElement("div", {
+      /*#__PURE__*/React.createElement((window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer) || "div", {
         className: "modal-container",
         onClick: e => e.stopPropagation(),
         role: "dialog",
@@ -5013,7 +5013,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
         onClick: () => setSelected(null),
         style: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 13000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }
       },
-        /*#__PURE__*/React.createElement("div", {
+        /*#__PURE__*/React.createElement((window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer) || "div", {
           className: "modal-container",
           onClick: e => e.stopPropagation(),
           style: {
@@ -5272,7 +5272,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
         className: "modal-overlay",
         onClick: () => setContentShareUrl(''),
         style: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 30000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }
-      }, /*#__PURE__*/React.createElement("div", {
+      }, /*#__PURE__*/React.createElement((window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer) || "div", {
         className: "modal-container",
         onClick: e => e.stopPropagation(),
         style: { width: '100%', maxWidth: '400px', backgroundColor: 'var(--bg-card)', borderRadius: 'var(--radius-md)', padding: '20px', boxSizing: 'border-box' }
@@ -5319,7 +5319,7 @@ function SharedContentPreviewModal({ item, onClose }) {
       onClick: onClose,
       style: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)', zIndex: 40000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }
     },
-      /*#__PURE__*/React.createElement("div", {
+      /*#__PURE__*/React.createElement((window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer) || "div", {
         className: "modal-container",
         onClick: e => e.stopPropagation(),
         style: {

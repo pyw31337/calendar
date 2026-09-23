@@ -518,7 +518,7 @@ export function AdminModal({
       className: "modal-overlay",
       onClick: onClose,
       style: { zIndex: 10000 }
-    }, /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement((window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.ResizableModalContainer) || "div", {
       className: "modal-container confirm-dialog-modal",
       style: { maxWidth: '360px', padding: '20px' }
     }, /*#__PURE__*/React.createElement("p", { style: { margin: 0 } }, "캘린더 데이터를 불러오는 중입니다."),
