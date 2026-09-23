@@ -1,3 +1,5 @@
+import './visual-viewport-sync.js';
+import './viewport-shell.css';
 // Presentation-only normalization. Never writes or changes the source records.
 export function timestampMs(value) {
   if (value == null || value === '') return 0;
