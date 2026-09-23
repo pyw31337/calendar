@@ -5,7 +5,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="build-sha" content="c78fe7ef9ea388120ede90638c9fc43bcc55ea6a" />
+    <meta name="build-sha" content="6acf847feb3140d89aa595045e7556fc70d54771" />
     <meta name="v2-polish" content="2026-09-21-search-page" />
     <title>모여라 캘린더</title>
     <!-- PWA manifest + icons. Previously present only in the legacy root index.html (not the
@@ -26,16 +26,19 @@
     <script>
       (function () {
         try {
-          // Production github.io stays v1 unless ?shell=v2. Local/preview smoke
-          // (127.0.0.1, localhost) must also stay on the requested shell.
+          // V2 is the default shell everywhere now (isRenewalShellEnabled: absent shell param
+          // = V2, `?shell=v1` is the escape hatch) -- this script no longer needs to force
+          // `shell=v2` itself, and MUST NOT touch the `shell` param at all, or it would silently
+          // clobber an explicit `?shell=v1` opt-out on non-github.io hosts. Its only remaining
+          // job is defaulting `id` for old bookmarked/shared links on custom domains that predate
+          // the `id`/`cal` param. Production github.io / local preview already carry an explicit
+          // `id`, so this only ever fires for other hosts.
           var host = String(location.hostname || '');
           if (host === 'pyw31337.github.io' || host === 'localhost' || host === '127.0.0.1' || host === '::1') return;
           var params = new URLSearchParams(location.search);
           var missingId = !params.get('id') && !params.get('cal');
-          var missingShell = params.get('shell') !== 'v2';
-          if (!missingId && !missingShell) return;
-          if (missingId) params.set('id', 'cw');
-          params.set('shell', 'v2');
+          if (!missingId) return;
+          params.set('id', 'cw');
           location.replace(location.pathname + '?' + params.toString() + location.hash);
         } catch (_) {}
       })();
@@ -111,12 +114,12 @@
          visitor, that no longer holds up Firebase SDK loading or anything else. -->
     <script async src="https://cdn.jsdelivr.net/npm/korean-lunar-calendar/dist/korean-lunar-calendar.min.js"></script>
     <script async src="https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode.js"></script>
-    <script type="module" crossorigin src="/calendar/assets/index-CmiF4ufp.js"></script>
+    <script type="module" crossorigin src="/calendar/assets/index-MYszjTgZ.js"></script>
     <link rel="modulepreload" crossorigin href="/calendar/assets/rolldown-runtime-D1y7pCx4.js">
     <link rel="modulepreload" crossorigin href="/calendar/assets/vendor-react-DfXFE28X.js">
-    <link rel="modulepreload" crossorigin href="/calendar/assets/index-CmiF4ufp.js">
-    <link rel="modulepreload" crossorigin href="/calendar/assets/vendor-BDL_1j3L.js">
-    <link rel="modulepreload" crossorigin href="/calendar/assets/vendor-react-dom-DvvvCqlU.js">
+    <link rel="modulepreload" crossorigin href="/calendar/assets/index-MYszjTgZ.js">
+    <link rel="modulepreload" crossorigin href="/calendar/assets/vendor-C1UrUCmN.js">
+    <link rel="modulepreload" crossorigin href="/calendar/assets/vendor-react-dom-BRVGY95c.js">
     <link rel="stylesheet" crossorigin href="/calendar/assets/index-BvH-EqOz.css">
   </head>
   <body>
