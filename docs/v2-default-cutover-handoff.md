@@ -135,6 +135,41 @@ V2 어댑터(`buildRenewal*Context`)가 CalendarApp 상태 + 기존 뷰(`ChatRoo
 
 **한 릴리스 동안 `?shell=v1` 유지 후** V1 트리/`withStickyVideo` 경로 제거는 별도 WP.
 
+### 5.1 사전 조사 완료 (2026-09-23, Claude) — Safari 서명 후 바로 적용할 정확한 diff
+
+**코드는 아직 건드리지 않았음** (위 "지금은 구현하지 말 것" 원칙 준수). 7개 파일 전부 실제 라인을 확인해 정확히 뭘 바꿔야 하는지만 미리 적어둠 — 서명 나오면 이 목록 그대로 적용하면 됨.
+
+1. **`src/core/app-feature-flags.js`** (13줄, 간단) — `isRenewalShellEnabled()`의
+   `return ... .get('shell') === 'v2';` → `return ... .get('shell') !== 'v1';`.
+2. **`src/core/app-routing-state.js`** — 2곳:
+   - `getInitialAppView` 6번째 줄: `params.get('shell') === 'v2' && params.has('tab')` →
+     `params.get('shell') !== 'v1' && params.has('tab')`. (주의: 이 가드가 없으면 기본 V2에서
+     `?tab=chat` 같은 딥링크가 15번째 줄의 `view` 기반 폴백으로 떨어져 무시됨 — 문서에 적힌
+     "탭 회귀" 리스크가 정확히 이 지점.)
+   - `buildAppViewUrl` 31번째 줄: `if (params.get('shell') === 'v2')` → `if (params.get('shell') !== 'v1')`.
+3. **`src/ui/ui-app-shell-v2.js`** — 2곳 (history rewrite 가드, 3366/3388번째 줄 부근):
+   `params.get('shell') === 'v2' && params.get('tab') === 'records'` →
+   `params.get('shell') !== 'v1' && params.get('tab') === 'records'` (2곳 동일 패턴).
+4. **`src/core/app-main.js`** — 1곳 (7018번째 줄 부근, memo adapter 게이트):
+   `new URLSearchParams(window.location.search).get('shell') === 'v2'` →
+   `new URLSearchParams(window.location.search).get('shell') !== 'v1'`.
+5. **`src/index.html`** — **여기서 새로 발견한 실제 버그 후보**: 26-42번째 줄의 host별
+   auto-force 스크립트가 `pyw31337.github.io`/`localhost`/`127.0.0.1`/`::1`이 아닌 커스텀
+   도메인(다른 캘린더가 자체 도메인에 배포된 경우)에서 `missingShell = params.get('shell') !== 'v2'`
+   로 판정한다. 컷오버 후에도 이 조건을 그대로 두면, 사용자가 명시적으로 `?shell=v1` 탈출구를
+   써도 `!== 'v2'`가 참이 되어 **강제로 다시 `shell=v2`로 리다이렉트해버려 탈출구가 막힌다.**
+   반드시 `missingShell` 판정을 `params.get('shell') === 'v1'`일 때는 건드리지 않도록 바꿔야
+   함 (예: `var explicitV1 = params.get('shell') === 'v1'; ... if (!missingId && (!missingShell || explicitV1)) return; ... if (!explicitV1) params.set('shell', 'v2');`
+   형태 — 정확한 최종 형태는 적용 시점에 index.html 최신본 기준으로 재작성).
+6. **`test/v2-routing.test.mjs`** — 신규 케이스 2개 추가 필요: `shell` 파라미터 없음 →
+   `getInitialAppView`가 V2 라우팅 규칙(예: `?tab=chat`)을 따르는지, `shell=v1` → V1(레거시
+   `view` 기반) 규칙을 따르는지. **지금 추가하면 현재 구현(아직 `=== 'v2'`)과 어긋나 CI가
+   깨지므로, 반드시 1-4번 구현과 같은 커밋/PR에서 함께 추가할 것.**
+7. **`scripts/browser-smoke-test.mjs`** — 281/288/297/313/326번째 줄의 하드코딴 `&shell=v2`는
+   컷오버 후에도 명시적으로 V2를 요청하는 것이므로 그대로 둬도 동작은 함(선택적 정리 — 기본
+   URL도 이제 V2이니 `&shell=v2`를 뺀 케이스를 하나 추가하는 게 "기본이 V2다"를 실제로
+   검증하는 유일한 방법).
+
 ---
 
 ## 6. 다크모드 (완료 — Phase1–4 전부 머지 + 재발방지 가드)
