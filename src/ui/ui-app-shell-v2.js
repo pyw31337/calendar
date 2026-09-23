@@ -385,7 +385,8 @@ export function buildRenewalCalendarContext(calendar, deps) {
 function RenewalHero({ meetings, calendar, onSelectDate }) {
   const React = window.React;
   const list = Array.isArray(meetings) ? meetings : [];
-  const [openDate, setOpenDate] = React.useState(null);
+  const [primaryOpen, setPrimaryOpen] = React.useState(false);
+  const [chipOpenDate, setChipOpenDate] = React.useState(null);
   const primary = list[0];
   const participants = getActiveParticipants(calendar || {});
 
@@ -412,23 +413,22 @@ function RenewalHero({ meetings, calendar, onSelectDate }) {
     : (typeof primary?.place === 'string' ? primary.place.trim() : '');
 
   const collapsedLabel = firstPlaceName ? `${formattedDate} / ${firstPlaceName}` : formattedDate;
-  const openMeeting = openDate ? list.find(meeting => meeting && meeting.date === openDate) : null;
-  const isOpen = !!openMeeting;
-  const focusPlaces = openMeeting
-    ? getCalendarPlaces(calendar).filter(p => doesPlaceMatchDate(p, openMeeting.date)).slice().sort((a, b) => {
+  const placesForDate = (dateStr) => {
+    if (!dateStr) return [];
+    return getCalendarPlaces(calendar).filter(p => doesPlaceMatchDate(p, dateStr)).slice().sort((a, b) => {
       const ao = Number.isFinite(Number(a.order)) ? Number(a.order) : Number.POSITIVE_INFINITY;
       const bo = Number.isFinite(Number(b.order)) ? Number(b.order) : Number.POSITIVE_INFINITY;
       return ao !== bo ? ao - bo : (a.createdAt || 0) - (b.createdAt || 0);
-    })
-    : primaryPlaces;
-  const focusDateLabel = openMeeting
-    ? ((formatConfirmedMeetingLabel(openMeeting.date) || '').replace(/^\[?모임확정\]?\s*/u, '').trim() || String(openMeeting.date))
-    : formattedDate;
-  const focusPlaceName = focusPlaces[0]
-    ? String(focusPlaces[0].name || focusPlaces[0].alias || '').trim()
-    : (typeof openMeeting?.place === 'string' ? openMeeting.place.trim() : '');
-  const expandedPrefix = focusPlaceName ? `[${focusPlaceName}]` : '[모임확정]';
-  const focusDate = openMeeting?.date || primary.date;
+    });
+  };
+  const fullDateLabel = (dateValue) => {
+    const date = new Date(`${dateValue}T00:00:00`);
+    if (Number.isNaN(date.getTime())) return String(dateValue || '');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const weekday = ['일', '월', '화', '수', '목', '금', '토'][date.getDay()];
+    return `${date.getFullYear()}.${month}.${day} (${weekday})`;
+  };
 
   const participantMemosFor = (dateStr) => getActiveAvailabilities(calendar || {})
     .filter(e => e.date === dateStr && e.note && String(e.note).trim() && e.participantId !== BULK_NO_PARTICIPANT_ID)
@@ -477,10 +477,62 @@ function RenewalHero({ meetings, calendar, onSelectDate }) {
     };
   };
 
-  // Match BentoPinkFinal: dday-toggle-wrap + dday-strip are direct hero-zone children (no extra wrapper).
+  const chipOpenMeeting = chipOpenDate ? list.find(meeting => meeting && meeting.date === chipOpenDate) : null;
+
+  const renderExpandedCard = (meeting, onClose, extraClass) => {
+    const places = placesForDate(meeting.date);
+    const placeName = places[0]
+      ? String(places[0].name || places[0].alias || '').trim()
+      : (typeof meeting.place === 'string' ? meeting.place.trim() : '');
+    const prefix = placeName ? `[${placeName}]` : '[모임확정]';
+    const memos = participantMemosFor(meeting.date);
+    return React.createElement('div', { className: bentoClass(`dday-expanded${extraClass ? ` ${extraClass}` : ''}`) },
+      React.createElement('div', { className: bentoClass('dday-expanded-head') },
+        React.createElement('button', {
+          type: 'button',
+          className: bentoClass('dday-expanded-open'),
+          onClick: () => onSelectDate(meeting.date)
+        },
+          React.createElement('span', { className: bentoClass('dday-compact-prefix') }, prefix),
+          React.createElement('span', { className: bentoClass('dday-expanded-date-row') },
+            React.createElement('span', { className: bentoClass('dday-compact-detail') }, fullDateLabel(meeting.date)),
+            React.createElement('span', { className: bentoClass('dday-expanded-badge') }, formatDDayLabel(meeting.date))
+          )
+        ),
+        React.createElement('button', {
+          type: 'button',
+          className: bentoClass('dday-collapse-btn'),
+          onClick: onClose,
+          'aria-label': '접기'
+        }, '⌃')
+      ),
+      meeting.note && React.createElement('div', { className: bentoClass('dday-expanded-tags') },
+        React.createElement('span', { className: bentoClass('dday-expanded-tag') }, meeting.note.trim())
+      ),
+      memos.length ? React.createElement('div', { className: bentoClass('dday-participant-memos'), 'aria-label': '참여자 일정 메모' },
+        memos.map(m => React.createElement('span', {
+          key: m.id,
+          className: bentoClass('dday-participant-memo'),
+          title: `${m.name}: ${m.fullNote || m.note}`,
+          style: { borderColor: m.color },
+        },
+          React.createElement('span', {
+            className: bentoClass('dday-participant-memo-name'),
+            style: { backgroundColor: m.color }
+          }, m.name),
+          React.createElement('span', {
+            className: bentoClass('dday-participant-memo-text')
+          }, m.note)
+        ))
+      ) : null
+    );
+  };
+
+  // The nearest capsule and the chip row open independently. A chip never
+  // replaces the nearest card, and the nearest date stays in the chip row.
   return React.createElement(React.Fragment, null,
-    React.createElement('div', { className: bentoClass(`dday-toggle-wrap ${isOpen ? 'is-open' : ''}`.trim()), 'aria-label': '가까운 확정 일정' },
-      React.createElement('button', { type: 'button', className: bentoClass('dday-compact'), onClick: () => setOpenDate(primary.date), 'aria-expanded': isOpen },
+    React.createElement('div', { className: bentoClass(`dday-toggle-wrap ${primaryOpen ? 'is-open' : ''}`.trim()), 'aria-label': '가까운 확정 일정' },
+      React.createElement('button', { type: 'button', className: bentoClass('dday-compact'), onClick: () => setPrimaryOpen(true), 'aria-expanded': primaryOpen },
         React.createElement('span', { className: bentoClass('dday-compact-badge') }, formatDDayLabel(primary.date)),
         React.createElement('span', { className: bentoClass('dday-compact-text') },
           React.createElement('span', { className: bentoClass('dday-compact-detail') }, collapsedLabel)
@@ -489,60 +541,25 @@ function RenewalHero({ meetings, calendar, onSelectDate }) {
           React.createElement('path', { d: 'M6 9l6 6l6 -6' })
         )
       ),
-      React.createElement('div', { className: bentoClass('dday-expanded') },
-        React.createElement('div', { className: bentoClass('dday-expanded-main') },
-          React.createElement('div', { className: bentoClass('dday-expanded-title-row') },
-            React.createElement('span', { className: bentoClass('dday-expanded-title') },
-              React.createElement('span', { className: bentoClass('dday-compact-prefix') }, expandedPrefix),
-              React.createElement('span', { className: bentoClass('dday-compact-detail') }, focusDateLabel)
-            )
-          ),
-          openMeeting?.note && React.createElement('div', { className: bentoClass('dday-expanded-tags') },
-            React.createElement('span', { className: bentoClass('dday-expanded-tag') }, openMeeting.note.trim())
-          ),
-          (() => {
-            const memos = participantMemosFor(focusDate);
-            if (!memos.length) return null;
-            return React.createElement('div', { className: bentoClass('dday-participant-memos'), 'aria-label': '참여자 일정 메모' },
-              memos.map(m => React.createElement('span', {
-                key: m.id,
-                className: bentoClass('dday-participant-memo'),
-                title: `${m.name}: ${m.fullNote || m.note}`,
-                style: { borderColor: m.color },
-              },
-                React.createElement('span', {
-                  className: bentoClass('dday-participant-memo-name'),
-                  style: { backgroundColor: m.color }
-                }, m.name),
-                React.createElement('span', {
-                  className: bentoClass('dday-participant-memo-text')
-                }, m.note)
-              ))
-            );
-          })()
-        ),
-        React.createElement('div', { className: bentoClass('dday-expanded-side') },
-          React.createElement('button', { type: 'button', className: bentoClass('dday-collapse-btn'), onClick: () => setOpenDate(null), 'aria-label': '접기' }, '⌃'),
-          React.createElement('span', { className: bentoClass('dday-expanded-badge') }, formatDDayLabel(focusDate)),
-          React.createElement('button', { type: 'button', className: bentoClass('dday-view-btn'), onClick: () => onSelectDate(focusDate) }, '일정보기')
-        )
-      )
+      primaryOpen ? renderExpandedCard(primary, () => setPrimaryOpen(false)) : null
     ),
 
-    React.createElement('div', { className: bentoClass('dday-strip renewal-home-hero-chips') }, list.slice(1).map(meeting => {
-
-      const chipDate = chipDateFor(meeting.date);
-      const chipOpen = openDate === meeting.date;
-      return React.createElement('button', {
-        key: meeting.date, type: 'button', className: bentoClass(`dday-chip renewal-home-hero-chip${chipOpen ? ' is-selected' : ''}`),
-        onClick: () => setOpenDate(chipOpen ? null : meeting.date),
-        'aria-expanded': chipOpen,
-        title: labelFor(meeting)
-      },
-      React.createElement('strong', { className: bentoClass('dday-date renewal-home-hero-chip-date') }, chipDate.date),
-      React.createElement('span', { className: bentoClass('dday-dow renewal-home-hero-chip-day') }, chipDate.day),
-      React.createElement('small', { className: bentoClass('dday-pill renewal-home-hero-chip-dday') }, formatDDayLabel(meeting.date)));
-    }))
+    React.createElement('div', { className: bentoClass('dday-chip-stack') },
+      chipOpenMeeting ? renderExpandedCard(chipOpenMeeting, () => setChipOpenDate(null), 'dday-chip-card') : null,
+      React.createElement('div', { className: bentoClass('dday-strip renewal-home-hero-chips') }, list.map(meeting => {
+        const chipDate = chipDateFor(meeting.date);
+        const chipOpen = chipOpenDate === meeting.date;
+        return React.createElement('button', {
+          key: meeting.date, type: 'button', className: bentoClass(`dday-chip renewal-home-hero-chip${chipOpen ? ' is-selected' : ''}`),
+          onClick: () => setChipOpenDate(chipOpen ? null : meeting.date),
+          'aria-expanded': chipOpen,
+          title: labelFor(meeting)
+        },
+        React.createElement('strong', { className: bentoClass('dday-date renewal-home-hero-chip-date') }, chipDate.date),
+        React.createElement('span', { className: bentoClass('dday-dow renewal-home-hero-chip-day') }, chipDate.day),
+        React.createElement('small', { className: bentoClass('dday-pill renewal-home-hero-chip-dday') }, formatDDayLabel(meeting.date)));
+      }))
+    )
   );
 }
 
