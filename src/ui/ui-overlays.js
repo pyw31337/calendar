@@ -335,6 +335,40 @@ export function EmojiPickerSheet({ onSelect, onClose }) {
     };
   }, []);
 
+  const dragCleanupRef = React.useRef(null);
+  const onHandlePointerDown = (event) => {
+    if (event.button != null && event.button !== 0) return;
+    event.stopPropagation();
+    const panel = sheetPanelRef.current;
+    if (!panel) return;
+    const startY = event.clientY;
+    const pointerId = event.pointerId;
+    const onMove = (ev) => {
+      if (ev.pointerId !== pointerId) return;
+      const dy = Math.max(0, ev.clientY - startY);
+      panel.style.setProperty('--emoji-sheet-drag', dy ? `${dy}px` : '0px');
+    };
+    const finish = (ev) => {
+      if (ev.pointerId !== pointerId) return;
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', finish);
+      dragCleanupRef.current = null;
+      const dy = Math.max(0, (ev.clientY || startY) - startY);
+      panel.style.removeProperty('--emoji-sheet-drag');
+      if (dy > 72 && typeof onClose === 'function') onClose();
+    };
+    dragCleanupRef.current = () => {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', finish);
+      panel.style.removeProperty('--emoji-sheet-drag');
+    };
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', finish);
+  };
+  React.useEffect(() => () => {
+    if (dragCleanupRef.current) dragCleanupRef.current();
+  }, []);
+
   const sheet = /*#__PURE__*/React.createElement('div', {
     className: 'bottom-sheet-overlay emoji-sheet-overlay',
     onClick: onClose
@@ -344,6 +378,13 @@ export function EmojiPickerSheet({ onSelect, onClose }) {
     onMouseDown: e => e.preventDefault(),
     onClick: e => e.stopPropagation()
   },
+    /*#__PURE__*/React.createElement('div', {
+      className: 'bp-sheet-handle v2-modal-drag-handle',
+      role: 'separator',
+      'aria-label': '아래로 드래그해서 닫기',
+      onPointerDown: onHandlePointerDown,
+      onMouseDown: e => e.stopPropagation()
+    }),
     /*#__PURE__*/React.createElement('div', { className: 'bottom-sheet-header' },
       /*#__PURE__*/React.createElement('h4', null, '이모티콘'),
       /*#__PURE__*/React.createElement('button', {

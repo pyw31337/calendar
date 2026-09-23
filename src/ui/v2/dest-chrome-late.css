@@ -2310,7 +2310,6 @@ html:has(.renewal-shell.v2-design) .bottom-sheet-overlay.emoji-sheet-overlay > .
   right: auto !important;
   top: auto !important;
   bottom: auto !important;
-  transform: none !important;
   width: min(560px, 100%) !important;
   max-width: 560px !important;
   max-height: min(520px, 100%) !important;
@@ -2318,11 +2317,12 @@ html:has(.renewal-shell.v2-design) .bottom-sheet-overlay.emoji-sheet-overlay > .
   border-radius: 24px !important;
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
   background: #fff !important;
-  box-shadow: 0 24px 72px rgba(30, 27, 46, 0.26) !important;
+  box-shadow: none !important;
   overflow: hidden !important;
   display: flex !important;
   flex-direction: column !important;
   animation: none !important;
+  transform: translateY(var(--emoji-sheet-drag, 0px)) !important;
 }
 html:has(.renewal-shell.v2-design) .bottom-sheet-overlay.emoji-sheet-overlay > .emoji-sheet > div:last-child {
   flex: 1 1 auto !important;
@@ -2743,7 +2743,7 @@ html:has(.renewal-shell.v2-design) .v2-chat-jump-row .v2-chat-scroll-bottom-btn 
   background: #fff !important;
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12) !important;
-  color: var(--brand, #7C2FE5) !important;
+  color: #1e1b2e !important;
   cursor: pointer;
   pointer-events: auto !important;
   z-index: 9 !important;
@@ -3137,4 +3137,77 @@ html:has(.renewal-shell.v2-design) .v2-archive .archive-photo-cell > [role="img"
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
+}
+
+/* Last bubble must clear the composer and the menu FAB above it.
+   The scroller fills the pane (composer is overlaid), so bottom padding
+   is the only way to scroll that bubble out from under the button. */
+html:has(.renewal-shell.v2-design) .v2-chat .v2-chat-scroll,
+html:has(.renewal-shell.v2-design) .v2-chat .chat-messages-scroll {
+  padding-bottom: calc(var(--v2-chat-composer-space, 168px) + 76px) !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat.is-composer-hidden .v2-chat-scroll,
+html:has(.renewal-shell.v2-design) .v2-chat.is-composer-hidden .chat-messages-scroll {
+  padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+/* v1 meta: time / edit / reply sit beside the bubble, not under it.
+   Incoming (left) → meta on the right. Own (right) → meta on the left. */
+html:has(.renewal-shell.v2-design) .v2-chat .msg-row-hover {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: flex-start !important;
+  row-gap: 0 !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat .msg-row-hover:not([style*="flex-end"]) {
+  justify-content: flex-start !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat .msg-row-hover[style*="flex-end"] {
+  justify-content: flex-end !important;
+  align-items: flex-end !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat .msg-row-hover > div {
+  grid-row: auto !important;
+  grid-column: auto !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat .msg-row-hover:not([style*="flex-end"]) > div:nth-child(3) {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: flex-end !important;
+  align-items: flex-start !important;
+  align-self: stretch !important;
+  flex: 0 0 auto !important;
+  width: auto !important;
+  max-width: none !important;
+  margin: 0 0 0 6px !important;
+  padding: 0 !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat .msg-row-hover[style*="flex-end"] > div:first-child {
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: flex-end !important;
+  align-items: flex-end !important;
+  align-self: flex-end !important;
+  flex: 0 0 auto !important;
+  width: auto !important;
+  max-width: none !important;
+  margin: 0 6px 0 0 !important;
+  padding: 0 !important;
+}
+
+/* Sheets that are not Resizable still get the same gray drag pill. */
+html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.meme-preview-overlay) > .bottom-sheet:not(:has(> .bp-sheet-handle)):not(:has(> .v2-modal-drag-handle))::before,
+html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .modal-container:not(:has(> .bp-sheet-handle)):not(:has(> .v2-modal-drag-handle))::before,
+html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .modal:not(:has(> .bp-sheet-handle)):not(:has(> .v2-modal-drag-handle))::before,
+html:has(.renewal-shell.v2-design) .bp-event-sheet:not(:has(> .bp-sheet-handle)):not(:has(> .v2-modal-drag-handle))::before {
+  content: "" !important;
+  display: block !important;
+  width: 40px !important;
+  height: 4px !important;
+  margin: 10px auto 8px !important;
+  border-radius: 999px !important;
+  background: #d4d0de !important;
+  flex: 0 0 4px !important;
+  align-self: center !important;
 }
