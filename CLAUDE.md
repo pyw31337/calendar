@@ -22,6 +22,7 @@ Firebase(Firestore/Storage/Functions)가 유일한 데이터 소스다. Vite로 
 상세·계획·현재 블로커·다음 유닛·다른 에이전트 분담은 반드시 먼저 읽을 것:
 
 → [`docs/v2-default-cutover-handoff.md`](docs/v2-default-cutover-handoff.md)
+→ [`docs/v2-dark-mode-handoff.md`](docs/v2-dark-mode-handoff.md) — **다크모드 재QA·잔여 표면** (Phase1–3 코드 머지 후)
 
 짧은 현황: [`docs/V2-STATUS.md`](docs/V2-STATUS.md).  
 **다크모드 토큰 재연결 전에 `isRenewalShellEnabled` / 기본 shell을 뒤집지 말 것.**  

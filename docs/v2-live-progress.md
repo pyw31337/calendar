@@ -577,3 +577,9 @@ style + `screens.css`의 `history-header-stack` 칩 오버라이드, 총 3곳)�
 - 검증: `npm run lint`, `npm run check:all`(격리/디자인/보안/사이즈/아키텍처/모바일/CI시나리오/npm audit 전부), `npm run safety:test`, `npm run regression:test`(빌드 포함) 전부 통과.
 - 범위: `src/ui/v2/tabler-icons.js`, `src/ui/v2/aurora-theme.css`, `src/ui/ui-app-shell-v2.js`만 변경. Firebase/Storage 데이터, 원본(비-v2) 셸 렌더링, 캘린더 격리 로직은 전혀 건드리지 않음.
 - 남은 작업: 사이드메뉴 Y좌표 드리프트(퀵아이템 그룹 1-3px)는 이전 세션에 이미 적용된 수동 보정 `translate3d` 핵으로 대부분 해소된 상태이나 근본 원인(펼침/접힘 상태의 자연 padding/margin 불일치) 자체는 남아있음 — 라이브 확인 후 필요시 추가 조정.
+
+## 2026-09-23 — 다크 Phase1–3 + 핸드오프
+
+- Phase1–3 머지: #736 #737 #738 #739
+- 전용 문서: `docs/v2-dark-mode-handoff.md`
+- 컷오버/STATUS 동기화. 다음: 라이브 다크 재QA → 잔여 → Safari VV. 기본 shell 플래그 금지.
