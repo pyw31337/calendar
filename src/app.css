@@ -6245,17 +6245,10 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
    this plan calls for); >=1024px swaps to the same 5 destinations as a left side rail instead
    (§4.1) and hides the bottom nav. */
 .renewal-shell {
-  --bg-primary: #FAFAFC;
-  --bg-card: #FFFFFF;
-  --border-subtle: #ECEAF5;
-  --text-main: #1E1B2E;
-  --text-muted: #6B6580;
-  --text-light: #83798F;
+  /* Phase1 dark: surface/text inherit from :root[data-theme]; do not re-literal light resets. */
   --brand: #7C3AED;
   --brand-soft: #F3EEFF;
   --status-green: #16A34A;
-  --surface-success: #ECFDF5;
-  --surface-confirmed: #F3EEFF;
   --radius-lg: 18px;
   --radius-md: 12px;
   --radius-sm: 8px;
@@ -6273,10 +6266,10 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
   --acc-places-soft: #FFE4E9;
 
   --renewal-page-max: 1180px;
-  --renewal-border: #ECEAF5;
-  --renewal-card: #FFFFFF;
-  --renewal-text: #1E1B2E;
-  --renewal-muted: #6B6580;
+  --renewal-border: var(--border-subtle);
+  --renewal-card: var(--bg-card);
+  --renewal-text: var(--text-main);
+  --renewal-muted: var(--text-muted);
   --renewal-hero-gradient: linear-gradient(135deg, #4C1D95 0%, #7C3AED 58%, #22D3B8 100%);
   min-height: 100%;
   padding-bottom: 64px;
