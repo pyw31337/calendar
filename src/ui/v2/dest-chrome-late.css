@@ -65,7 +65,7 @@
   right: 0 !important;
   z-index: 40 !important;
   padding: 0 !important;
-  background: #ffffff !important;
+  background: var(--bg-card) !important;
 }
 .v2-design .v2-archive .v2-page-header.is-scroll-hidden,
 .v2-design .v2-content .v2-page-header.is-scroll-hidden,
@@ -191,7 +191,7 @@
   width: 100% !important;
   padding: 8px 20px !important;
   margin: 0 !important;
-  background: #fff !important;
+  background: var(--bg-card) !important;
   border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
   box-sizing: border-box !important;
 }
@@ -232,7 +232,7 @@
   padding: 10px 20px 12px 20px !important;
   margin: 0 !important;
   gap: 8px !important;
-  background: #fff !important;
+  background: var(--bg-card) !important;
   border-top: none !important;
   border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
   box-sizing: border-box !important;
@@ -586,7 +586,7 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
 .v2-design .v2-home-chat-bubble {
   position: relative;
   z-index: 1;
-  background: var(--bg-card, #fff);
+  background: var(--bg-card);
   border: 1px solid var(--border-subtle, rgba(30,27,46,0.08));
   border-radius: var(--radius-md, 10px);
   padding: 8px 12px;
@@ -621,7 +621,7 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   top: 11px;
   border-top: 6px solid transparent;
   border-bottom: 6px solid transparent;
-  border-right: 6px solid var(--bg-card, #fff);
+  border-right: 6px solid var(--bg-card);
   z-index: 3;
 }
 .v2-design .v2-home-chat-image {
@@ -752,7 +752,7 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   height: 44px !important;
   border-radius: 50% !important;
   position: static !important;
-  background: var(--bg-primary, #f8f7fb) !important;
+  background: var(--bg-primary) !important;
   font-size: 1.1rem !important;
 }
 
@@ -872,7 +872,7 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   width: 36px !important;
   height: 36px !important;
   border-radius: 50% !important;
-  background: #fff !important;
+  background: var(--bg-card) !important;
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
   box-shadow: 0 2px 8px rgba(0,0,0,0.12) !important;
   display: flex !important;
@@ -928,7 +928,7 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   min-height: 56px !important;
   height: 56px !important;
   padding: 0 16px !important;
-  background-color: #ffffff !important;
+  background-color: var(--bg-card) !important;
   border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
   box-sizing: border-box !important;
 }
@@ -1139,7 +1139,7 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   min-height: 48px !important;
   margin: 0 !important;
   padding: 0 !important;
-  background: #fff !important;
+  background: var(--bg-card) !important;
   border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
 }
 .v2-design .v2-content .underline-tabs [role="tab"],
@@ -1183,7 +1183,7 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   min-height: 0 !important;
   padding: 8px 16px !important;
   margin: 0 !important;
-  background: #fff !important;
+  background: var(--bg-card) !important;
   border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
 }
 .v2-design .v2-content .v2-content-subcat-slot .bp-cat-scroll-row {
@@ -1243,7 +1243,7 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   gap: 8px !important;
   padding: 8px 16px 10px !important;
   margin: 0 !important;
-  background: #fff !important;
+  background: var(--bg-card) !important;
   border-bottom: 1px solid var(--v2-card-border, #eceaf5);
 }
 .v2-design .v2-content .current-location-btn {
@@ -1259,7 +1259,7 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   min-height: 40px !important;
   padding: 0 12px !important;
   border-radius: 12px !important;
-  background: #fff !important;
+  background: var(--bg-card) !important;
   color: var(--text-main, #1e1b2e) !important;
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
   font-weight: 800 !important;
@@ -1269,7 +1269,7 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   padding: 3px !important;
   border-radius: 12px !important;
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
-  background: #fff !important;
+  background: var(--bg-card) !important;
   overflow: hidden;
 }
 .v2-design .v2-content .culture-grid-cols-btn {
@@ -1332,7 +1332,7 @@ html:has(.renewal-shell.v2-design) .modal-overlay .bp-event-sheet {
   max-height: min(86dvh, var(--gather-vv-modal-max, 860px)) !important;
   border-radius: 20px !important;
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
-  background: #fff !important;
+  background: var(--bg-card) !important;
   box-shadow: 0 24px 64px rgba(30, 27, 46, 0.22) !important;
   display: flex !important;
   flex-direction: column !important;
@@ -1342,7 +1342,7 @@ html:has(.renewal-shell.v2-design) .modal-overlay .modal-header,
 html:has(.renewal-shell.v2-design) .bottom-sheet-header {
   padding: 14px 18px !important;
   border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
-  background: #fff !important;
+  background: var(--bg-card) !important;
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
@@ -1424,7 +1424,7 @@ html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay):not
   max-height: calc(100dvh - 8px) !important;
 }
 html:has(.renewal-shell.v2-design) .admin-settings-modal > div:has(> button:nth-child(4)) {
-  background: #fff !important;
+  background: var(--bg-card) !important;
   border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
 }
 html:has(.renewal-shell.v2-design) .admin-settings-modal > div:has(> button:nth-child(4)) button {
@@ -1517,7 +1517,7 @@ html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overla
 }
 html:has(.renewal-shell.v2-design) .bottom-sheet-header {
   border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
-  background: #fff !important;
+  background: var(--bg-card) !important;
 }
 html:has(.renewal-shell.v2-design) .bottom-sheet-header h4 {
   font-size: 1.05rem !important;
@@ -1968,7 +1968,7 @@ html:has(.renewal-shell.v2-design) .modal-overlay input.form-input {
   padding: 0 20px !important;
   margin: 0 !important;
   border-bottom: 1px solid var(--border-subtle, #ebe8f3) !important;
-  background: var(--bg-card, #fff) !important;
+  background: var(--bg-card) !important;
   flex: 0 0 64px !important;
 }
 .renewal-shell.v2-design .global-search-page-card .global-search-header h3 {
@@ -2010,7 +2010,7 @@ html:has(.renewal-shell.v2-design) .modal-overlay input.form-input {
   width: 100% !important;
   margin: 0 !important;
   min-height: 48px !important;
-  background: #fff !important;
+  background: var(--bg-card) !important;
 }
 .renewal-shell.v2-design .global-search-page-card .global-search-tabs button,
 .renewal-shell.v2-design .global-search-page-card > .underline-tabs button {
@@ -2051,7 +2051,7 @@ html:has(.renewal-shell.v2-design) .modal-overlay input.form-input {
 .renewal-shell.v2-design .global-search-result {
   padding: 14px 16px !important;
   border-radius: 14px !important;
-  background: #fff !important;
+  background: var(--bg-card) !important;
   border: 1px solid var(--border-subtle, #ebe8f3) !important;
 }
 .renewal-shell.v2-design .global-search-result-kind {
@@ -2316,7 +2316,7 @@ html:has(.renewal-shell.v2-design) .bottom-sheet-overlay.emoji-sheet-overlay > .
   margin: 0 !important;
   border-radius: 24px !important;
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
-  background: #fff !important;
+  background: var(--bg-card) !important;
   box-shadow: none !important;
   overflow: hidden !important;
   display: flex !important;
@@ -2365,7 +2365,7 @@ html:has(.renewal-shell.v2-design) .v2-page-header {
   padding-bottom: 0 !important;
   border-bottom: none !important;
   box-shadow: none !important;
-  background: #fff !important;
+  background: var(--bg-card) !important;
 }
 html:has(.renewal-shell.v2-design) .v2-page-header > .bp-header-row {
   width: 100% !important;
@@ -2375,7 +2375,7 @@ html:has(.renewal-shell.v2-design) .v2-page-header > .bp-header-row {
   height: 56px !important;
   max-height: 56px !important;
   border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
-  background: #fff !important;
+  background: var(--bg-card) !important;
 }
 html:has(.renewal-shell.v2-design) .v2-content-tabs-slot,
 html:has(.renewal-shell.v2-design) .v2-archive-tabs-slot,
@@ -2408,7 +2408,7 @@ html:has(.renewal-shell.v2-design) .global-search-page-card > .underline-tabs {
      so the active ::after (bottom: 0) sits on top of that line. */
   box-sizing: content-box !important;
   height: auto !important;
-  background: #fff !important;
+  background: var(--bg-card) !important;
   border: 0 !important;
   border-bottom: 1px solid var(--v2-card-border, #eceaf5) !important;
   box-shadow: none !important;
@@ -2533,7 +2533,7 @@ html:has(.renewal-shell.v2-design) .bp-event-sheet .underline-tabs button[aria-s
     padding: 0 !important;
     border-left: none !important;
     border-right: 1px solid var(--v2-card-border, #eceaf5) !important;
-    background: #fff !important;
+    background: var(--bg-card) !important;
     box-shadow: 12px 0 32px rgba(30, 27, 46, 0.18) !important;
     transform: translateX(-105%) !important;
     z-index: 500 !important;
@@ -2740,7 +2740,7 @@ html:has(.renewal-shell.v2-design) .v2-chat-jump-row .v2-chat-scroll-bottom-btn 
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  background: #fff !important;
+  background: var(--bg-card) !important;
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12) !important;
   color: #1e1b2e !important;
@@ -2782,7 +2782,7 @@ html:has(.renewal-shell.v2-design) .v2-chat .v2-page-header {
   right: 0 !important;
   z-index: 30 !important;
   width: 100% !important;
-  background: var(--bg-card, #fff) !important;
+  background: var(--bg-card) !important;
   transition: transform 0.22s ease !important;
 }
 html:has(.renewal-shell.v2-design) .v2-chat .v2-page-header.is-scroll-hidden {
@@ -2979,8 +2979,8 @@ html:has(.renewal-shell.v2-design) .admin-settings-modal .recent-log-action-badg
   font-weight: 800 !important;
   line-height: 1.2 !important;
   white-space: nowrap !important;
-  background: color-mix(in srgb, currentColor 14%, #fff) !important;
-  background-color: color-mix(in srgb, currentColor 14%, #fff) !important;
+  background: color-mix(in srgb, currentColor 14%, var(--bg-card)) !important;
+  background-color: color-mix(in srgb, currentColor 14%, var(--bg-card)) !important;
   border: 1px solid color-mix(in srgb, currentColor 34%, transparent) !important;
 }
 html:has(.renewal-shell.v2-design) .admin-settings-modal .recent-log-left > .participant-badge {
@@ -3034,7 +3034,7 @@ html:has(.renewal-shell.v2-design) .v2-page-header.bp-header {
   height: auto !important;
   padding-top: env(safe-area-inset-top, 0px) !important;
   padding-bottom: 0 !important;
-  background: var(--bg-card, #fff) !important;
+  background: var(--bg-card) !important;
 }
 html:has(.renewal-shell.v2-design) .v2-chat .bp-header.v2-page-header:not(.is-scroll-hidden) {
   min-height: 0 !important;
@@ -3046,7 +3046,7 @@ html:has(.renewal-shell.v2-design) .v2-chat .bp-header.v2-page-header:not(.is-sc
   padding-bottom: 0 !important;
   border: 0 !important;
   box-shadow: none !important;
-  background: var(--bg-card, #fff) !important;
+  background: var(--bg-card) !important;
   overflow: visible !important;
 }
 html:has(.renewal-shell.v2-design) .v2-chat .v2-page-header > .bp-header-row {

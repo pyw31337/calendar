@@ -1,8 +1,8 @@
 # V2 → 기본 URL(`?id=cw`) 덮어쓰기 핸드오프
 
 **이 문서의 독자:** Grok / Codex / Claude / Gemini / 사람 — 세션 없이 이 저장소만 보고 V2를 기본 셸로 올리는 작업을 이어갈 수 있어야 한다.  
-**최종 갱신:** 2026-09-23 15:30 KST (`main` @ `cddfe03e`, PR #734 머지 직후)  
-**상태 한 줄:** **아직 기본 주소를 V2로 바꾸지 말 것.** V2는 `?shell=v2` 옵트인. 다음 작업은 **다크모드 토큰 재연결**이다.
+**최종 갱신:** 2026-09-23 15:55 KST (`main` @ #736 Phase1 머지 후, Phase2 진행)  
+**상태 한 줄:** **아직 기본 주소를 V2로 바꾸지 말 것.** V2는 `?shell=v2` 옵트인. Phase1(#736) 표면 토큰 상속 완료. 다음: Phase2 `dest-chrome-late`/`screens`/`design` !important·캔버스 → 토큰 + 다크 QA.
 
 관련 문서:
 
@@ -31,7 +31,7 @@
 3. **지금은 `?id=cw`에 V2를 덮으면 안 된다.** 코드 리뷰(2026-09-23) 결론: P0 다크모드 + P0 사파리 채팅 VV 미검증 + (완화됨) 알림 권한 도움말은 #734로 마운트됨.
 4. 컷오버는 **플래그 한 줄이 아니다.** 플래그 + 라우팅/URL 빌더 + 히스토리 가드 + `index.html` + 테스트/스모크를 같은 predicate로 맞춰야 한다. 탈출구는 한 릴리스 동안 `?shell=v1`.
 5. **절대 Actions “applicator / push_files / base64 패치 워크플로”로 소스에 외과 수술하지 말 것.** #729–#732(갤러리), #733(알림)에서 CI가 도배됐다. 일반 브랜치 → `gh pr` → 머지만 사용.
-6. 다음 착수 유닛: **다크 토큰 재연결** (`src/ui/v2/**/*.css`가 V1 `data-theme` / `--bg-primary` 등을 소비). 새 토글 만들지 말 것 — 기존 `themeChoice` 사용.
+6. 다음 착수 유닛: **다크 Phase 2** — `dest-chrome-late.css` / `screens.css` / `design.css`의 `#fff`/`#fafafc` 표면을 `var(--bg-card)`/`var(--bg-primary)`로. 새 토글 금지 — `themeChoice` 유지. Phase1(#736) 완료.
 
 ---
 
@@ -173,6 +173,7 @@ V2 어댑터(`buildRenewal*Context`)가 CalendarApp 상태 + 기존 뷰(`ChatRoo
 
 | PR | 내용 |
 | --- | --- |
+| **#736** | 다크 Phase1 — reference-* / viewport / `.renewal-shell` 표면 토큰 상속 |
 | **#734** | V2에 `NotificationPermissionHelpModal` remount (일반 코드 PR) |
 | **#733** | 알림 applicator 워크플로 삭제 (CI 도배 정리) |
 | **#732** | 갤러리 thumbs one-shot applicator 삭제 |
