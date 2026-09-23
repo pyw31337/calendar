@@ -2258,4 +2258,84 @@ html:has(.renewal-shell.v2-design) .v2-modal-drag-handle::before {
   }
 }
 
+/* Chat header is pinned. Scroll-hide (negative margin + translateY) fights the
+   room's scroll-to-bottom and the composer ResizeObserver, so the header jumps
+   in and out. Other destinations still collapse on scroll. */
+.v2-design .v2-chat .v2-page-header,
+.v2-design .v2-chat .v2-page-header.is-scroll-hidden {
+  transform: none !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  margin-top: 0 !important;
+}
+.v2-design .v2-chat .bp-floating-back-btn {
+  display: none !important;
+}
+
+/* Emoji picker uses the same dimmed backdrop card as other V2 layer popups,
+   but the overlay stops at the composer (--v2-composer-reserve) so the chat
+   input and the OS keyboard stay visible while an emoji is inserted. */
+html:has(.renewal-shell.v2-design) .bottom-sheet-overlay.emoji-sheet-overlay {
+  position: fixed !important;
+  left: 0 !important;
+  right: 0 !important;
+  top: 0 !important;
+  bottom: var(--v2-composer-reserve, 148px) !important;
+  width: auto !important;
+  height: auto !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 24px 16px 12px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: rgba(30, 27, 46, 0.48) !important;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  box-sizing: border-box !important;
+  z-index: 40000 !important;
+  animation: none !important;
+}
+html:has(.renewal-shell.v2-design) .bottom-sheet-overlay.emoji-sheet-overlay > .bottom-sheet.emoji-sheet {
+  position: relative !important;
+  left: auto !important;
+  right: auto !important;
+  top: auto !important;
+  bottom: auto !important;
+  transform: none !important;
+  width: min(560px, 100%) !important;
+  max-width: 560px !important;
+  max-height: min(520px, 100%) !important;
+  margin: 0 !important;
+  border-radius: 20px !important;
+  border: 1px solid var(--v2-card-border, #eceaf5) !important;
+  background: #fff !important;
+  box-shadow: 0 24px 64px rgba(30, 27, 46, 0.22) !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+  animation: none !important;
+}
+html:has(.renewal-shell.v2-design) .bottom-sheet-overlay.emoji-sheet-overlay > .emoji-sheet > div:last-child {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+@media (max-width: 1199px) {
+  html:has(.renewal-shell.v2-design) .bottom-sheet-overlay.emoji-sheet-overlay {
+    align-items: flex-end !important;
+    padding: 12px 0 0 !important;
+  }
+  html:has(.renewal-shell.v2-design) .bottom-sheet-overlay.emoji-sheet-overlay > .bottom-sheet.emoji-sheet {
+    width: 100% !important;
+    max-width: none !important;
+    max-height: 100% !important;
+    border-radius: 20px 20px 0 0 !important;
+    border-left: none !important;
+    border-right: none !important;
+    border-bottom: none !important;
+  }
+}
+
 

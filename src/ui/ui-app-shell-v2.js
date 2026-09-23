@@ -3240,9 +3240,8 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
       { key: 'anniversaries', label: '기념일 설정', icon: 'anniversary', onClick: () => openMoreModalById('anniversaries') },
       { key: 'manual', label: '사용자 매뉴얼', icon: 'manual', onClick: () => { setIsSideNavOpen(false); openMoreModalById('manual'); } },
     ],
-    chat: [
-      { key: 'chat-notice', label: '공지사항', icon: 'speakerphone', action: 'notice' },
-    ],
+    // 공지사항 lives on the chat header (icon, right end) — not this side-nav group.
+    chat: [],
     settlement: [
       { key: 'settlement-create', label: '정산 생성', icon: 'cashPlus', action: 'create' },
       { key: 'settlement-list', label: '정산 목록', icon: 'receipt', action: 'list' },

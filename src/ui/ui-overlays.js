@@ -240,10 +240,13 @@ export function EmojiPickerSheet({ onSelect, onClose }) {
     )
   );
 
-  // Keep chat input (main section or chat room) visible above the sheet
+  // V2: keep the composer (and the OS keyboard under it) outside the sheet so the
+  // input stays visible while emojis are inserted. V1 still lifts the composer
+  // above a bottom-docked sheet via --emoji-sheet-h.
   React.useEffect(() => {
     const root = document.documentElement;
     root.classList.add('emoji-sheet-open');
+    const v2 = !!document.querySelector('.renewal-shell.v2-design');
 
     const findPanels = () => {
       const list = [];
@@ -252,6 +255,25 @@ export function EmojiPickerSheet({ onSelect, onClose }) {
     };
 
     const updateLift = () => {
+      if (v2) {
+        const composer = document.querySelector('.v2-chat-composer, .chat-composer');
+        const vv = window.visualViewport;
+        const offsetTop = vv ? (vv.offsetTop || 0) : 0;
+        const layoutH = window.innerHeight || root.clientHeight || 0;
+        let reserve = 148;
+        if (composer) {
+          const rect = composer.getBoundingClientRect();
+          const raw = Math.round(layoutH - (rect.top + offsetTop));
+          const maxReserve = Math.max(96, layoutH - 160);
+          reserve = Math.max(96, Math.min(raw > 0 ? raw : 148, maxReserve));
+        } else if (vv) {
+          reserve = Math.max(96, Math.round(Math.max(0, layoutH - vv.height - offsetTop) + 120));
+        }
+        root.style.setProperty('--v2-composer-reserve', reserve + 'px');
+        root.style.removeProperty('--emoji-sheet-h');
+        return;
+      }
+
       const panel = sheetPanelRef.current;
       let h = 0;
       if (panel) {
@@ -264,11 +286,9 @@ export function EmojiPickerSheet({ onSelect, onClose }) {
 
       findPanels().forEach(el => {
         el.classList.add('emoji-sheet-lifted');
-        // scroll-margin so scrollIntoView leaves room above the sheet
         el.style.scrollMarginBottom = (h + 16) + 'px';
       });
 
-      // Prefer the focused field's panel, else first panel
       const active = document.activeElement;
       let target = null;
       if (active && active.closest) {
@@ -288,18 +308,26 @@ export function EmojiPickerSheet({ onSelect, onClose }) {
       updateLift();
       requestAnimationFrame(updateLift);
     });
-    // sheet layout may settle after fonts/images
     const t1 = setTimeout(updateLift, 50);
     const t2 = setTimeout(updateLift, 200);
     window.addEventListener('resize', updateLift);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', updateLift);
+      window.visualViewport.addEventListener('scroll', updateLift);
+    }
 
     return () => {
       cancelAnimationFrame(raf);
       clearTimeout(t1);
       clearTimeout(t2);
       window.removeEventListener('resize', updateLift);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', updateLift);
+        window.visualViewport.removeEventListener('scroll', updateLift);
+      }
       root.classList.remove('emoji-sheet-open');
       root.style.removeProperty('--emoji-sheet-h');
+      root.style.removeProperty('--v2-composer-reserve');
       findPanels().forEach(el => {
         el.classList.remove('emoji-sheet-lifted');
         el.style.scrollMarginBottom = '';
@@ -309,18 +337,12 @@ export function EmojiPickerSheet({ onSelect, onClose }) {
 
   const sheet = /*#__PURE__*/React.createElement('div', {
     className: 'bottom-sheet-overlay emoji-sheet-overlay',
-    onClick: onClose,
-    style: {
-      background: 'transparent',
-      backgroundColor: 'transparent',
-      backdropFilter: 'none',
-      WebkitBackdropFilter: 'none'
-    }
+    onClick: onClose
   }, /*#__PURE__*/React.createElement('div', {
     ref: sheetPanelRef,
     className: 'bottom-sheet emoji-sheet',
-    onClick: e => e.stopPropagation(),
-    style: { maxHeight: '60vh', boxShadow: '0 -8px 30px rgba(0,0,0,0.18)' }
+    onMouseDown: e => e.preventDefault(),
+    onClick: e => e.stopPropagation()
   },
     /*#__PURE__*/React.createElement('div', { className: 'bottom-sheet-header' },
       /*#__PURE__*/React.createElement('h4', null, '이모티콘'),

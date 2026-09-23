@@ -1868,6 +1868,7 @@ export function ChatRoomView({
           /* Emoji Button */
           /*#__PURE__*/React.createElement("button", {
             type: "button",
+            onMouseDown: e => e.preventDefault(),
             onClick: () => setIsEmojiPickerOpen(true),
             title: "이모티콘",
             "aria-label": "이모티콘",
@@ -1920,52 +1921,6 @@ export function ChatRoomView({
           }, /*#__PURE__*/React.createElement("path", {
             d: "m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551"
           }))),
-
-          /* Keyboard show/hide toggle: blur the composer textarea to dismiss the OS virtual
-             keyboard without losing the draft, or refocus it to bring the keyboard back --
-             called from a click handler so the refocus still counts as a user gesture. */
-          /*#__PURE__*/React.createElement("button", {
-            type: "button",
-            onClick: () => {
-              const el = chatTextareaRef.current;
-              if (!el) return;
-              if (isInputFocused) el.blur();
-              else el.focus();
-            },
-            title: isInputFocused ? "키보드 숨기기" : "키보드 보이기",
-            "aria-label": isInputFocused ? "키보드 숨기기" : "키보드 보이기",
-            style: {
-              width: '32px',
-              height: '32px',
-              borderRadius: '50%',
-              border: '1px solid var(--border-subtle)',
-              backgroundColor: 'var(--bg-card)',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-              padding: 0,
-              color: 'var(--text-muted)'
-            }
-          }, /*#__PURE__*/React.createElement("svg", {
-            xmlns: "http://www.w3.org/2000/svg",
-            width: "18",
-            height: "18",
-            viewBox: "0 0 24 24",
-            fill: "none",
-            stroke: "currentColor",
-            strokeWidth: "2",
-            strokeLinecap: "round",
-            strokeLinejoin: "round"
-          },
-            /*#__PURE__*/React.createElement("rect", { x: "2", y: "6", width: "20", height: "13", rx: "2" }),
-            /*#__PURE__*/React.createElement("line", { x1: "6", y1: "10", x2: "6", y2: "10" }),
-            /*#__PURE__*/React.createElement("line", { x1: "10", y1: "10", x2: "10", y2: "10" }),
-            /*#__PURE__*/React.createElement("line", { x1: "14", y1: "10", x2: "14", y2: "10" }),
-            /*#__PURE__*/React.createElement("line", { x1: "18", y1: "10", x2: "18", y2: "10" }),
-            /*#__PURE__*/React.createElement("line", { x1: "8", y1: "15", x2: "16", y2: "15" })
-          )),
 
           /* Clipboard Paste Button (mobile has no Ctrl+V, so this reads the OS clipboard directly) */
           /*#__PURE__*/React.createElement("button", {
@@ -2189,6 +2144,13 @@ export function ChatRoomView({
       onMenu: () => setIsChatSideMenuOpen(true),
       onSearch: () => { setIsSearchOpen(true); setSearchQuery(''); },
       onOpenGallery,
+      onOpenNotice: () => {
+        if (pinnedNotices.length > 0) setNoticePanelMode('list');
+        else {
+          setNoticeInput('');
+          setNoticePanelMode('add');
+        }
+      },
       isSearchOpen,
       slots: {},
     });

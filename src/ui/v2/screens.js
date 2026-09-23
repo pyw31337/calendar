@@ -116,6 +116,11 @@ const ICON_NODES = {
   chevronLeft: [['path', { d: 'm15 18-6-6 6-6' }]],
   chevronRight: [['path', { d: 'm9 18 6-6-6-6' }]],
   chevronDown: [['path', { d: 'm6 9 6 6 6-6' }]],
+  megaphone: [
+    ['path', { d: 'M18 8a3 3 0 0 1 0 6' }],
+    ['path', { d: 'M10 8v11a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-5' }],
+    ['path', { d: 'M12 8l4.524-3.77a.9.9 0 0 1 1.476.692v12.156a.9.9 0 0 1-1.476.692L12 14H4a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1h8' }],
+  ],
 };
 
 export function DesignIcon({ name, size = 18, strokeWidth = 2 }) {
@@ -169,21 +174,20 @@ function pageSubtitle(calendar, trailing) {
   return name || extra || undefined;
 }
 
-export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, searchLabel, onShare, onMenu, extra, centerSubtitle = true, children }) {
+export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, searchLabel, onShare, onMenu, extra, centerSubtitle = true, hideOnScroll = true, children }) {
   const React = window.React;
   const [isVisible, setIsVisible] = React.useState(true);
   const headerRef = React.useRef(null);
   const [headerHeight, setHeaderHeight] = React.useState(60);
 
   React.useLayoutEffect(() => {
-    if (headerRef.current) {
-      const h = headerRef.current.offsetHeight;
-      if (h > 0) setHeaderHeight(h);
-    }
+    if (!hideOnScroll || !headerRef.current) return;
+    const h = headerRef.current.offsetHeight;
+    if (h > 0) setHeaderHeight(h);
   });
 
   React.useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
+    if (!hideOnScroll || typeof window === 'undefined') return undefined;
     let lastTop = 0;
     const onScroll = event => {
       const target = event.target;
@@ -215,7 +219,8 @@ export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, se
       document.removeEventListener('scroll', onScroll, true);
       window.removeEventListener('scroll', onScroll);
     };
-  }, []);
+  }, [hideOnScroll]);
+  const shown = !hideOnScroll || isVisible;
   return h(
     React.Fragment,
     null,
@@ -223,8 +228,8 @@ export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, se
       'header',
       {
         ref: headerRef,
-        className: `bp-header v2-page-header${centerSubtitle ? ' v2-page-header--centered' : ''}${isVisible ? '' : ' is-scroll-hidden'}`,
-        style: !isVisible ? { marginTop: `-${headerHeight}px` } : undefined,
+        className: `bp-header v2-page-header${centerSubtitle ? ' v2-page-header--centered' : ''}${shown ? '' : ' is-scroll-hidden'}`,
+        style: shown ? undefined : { marginTop: `-${headerHeight}px` },
       },
       h(
         'div',
@@ -265,7 +270,7 @@ export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, se
     // new containing block for position:fixed descendants -- a fixed child of the hidden header
     // would anchor to the header's own (now off-screen) box instead of the real viewport, landing
     // this button at the wrong coordinates instead of the true top-left corner it needs.
-    !isVisible && onBack ? h('button', {
+    !shown && onBack ? h('button', {
       type: 'button', className: 'bp-floating-back-btn', 'aria-label': '뒤로가기', onClick: onBack,
     }, h(DesignIcon, { name: 'back', size: 18 })) : null
   );
@@ -1010,6 +1015,21 @@ export function ChatScreen(p) {
   const memberCount = (p.calendar?.participants || []).filter(person => !person.deletedAt).length;
   const subtitle = p.subtitle
     || pageSubtitle(p.calendar, memberCount ? `${memberCount}명` : '');
+  const chatHeader = {
+    title: '채팅',
+    subtitle,
+    brand: pageBrand(p.calendar),
+    onBack: p.onBack,
+    onSearch: p.onSearch,
+    searchLabel: '대화 검색',
+    onMenu: p.onMenu,
+    // Chat pins the header. Scroll-hide plus the room's scroll-to-bottom / composer
+    // ResizeObserver loop makes this header jump in and out.
+    hideOnScroll: false,
+    extra: typeof p.onOpenNotice === 'function'
+      ? h(IconButton, { label: '공지사항', icon: 'megaphone', size: 20, onClick: p.onOpenNotice })
+      : null,
+  };
 
   React.useEffect(() => {
     const timer = setTimeout(() => {
@@ -1121,12 +1141,6 @@ export function ChatScreen(p) {
                 title: '이모티콘',
               }, h(DesignIcon, { name: 'emoji', size: 18 }))
             : null,
-          slots.keyboard
-            ? clone(slots.keyboard, {
-                className: 'v2-tool-icon-btn',
-                type: 'button',
-              })
-            : null,
           slots.attach
             ? clone(slots.attach, {
                 className: 'v2-tool-icon-btn',
@@ -1161,15 +1175,7 @@ export function ChatScreen(p) {
       clone(
         originalRoot,
         { className: 'chat-room-container v2-chat-root' },
-        h(PageHeader, {
-          title: '채팅',
-          subtitle,
-          brand: pageBrand(p.calendar),
-          onBack: p.onBack,
-          onSearch: p.onSearch,
-          searchLabel: '대화 검색',
-          onMenu: p.onMenu,
-        }),
+        h(PageHeader, chatHeader),
         slots.notice,
         h(
           'div',
@@ -1215,15 +1221,7 @@ export function ChatScreen(p) {
     h(
       'div',
       { className: 'bp-app-shell v2-chat-shell' },
-      h(PageHeader, {
-        title: '채팅',
-        subtitle,
-        brand: pageBrand(p.calendar),
-        onBack: p.onBack,
-        onSearch: p.onSearch,
-        searchLabel: '대화 검색',
-        onMenu: p.onMenu,
-      }),
+      h(PageHeader, chatHeader),
       wrapLegacy(p.legacyView, 'v2-legacy-body v2-chat-legacy')
     )
   );
