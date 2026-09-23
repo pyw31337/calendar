@@ -1,0 +1,77 @@
+diff --git a/src/ui/ui-app-shell-v2.js b/src/ui/ui-app-shell-v2.js
+index c27b1c9..bacaf0d 100644
+--- a/src/ui/ui-app-shell-v2.js
++++ b/src/ui/ui-app-shell-v2.js
+@@ -46,7 +46,9 @@ import {
+   calculateSettlementBalance, formatBalanceBadge,
+   getCalendarPlaces, doesPlaceMatchDate, unionPlaces,
+ } from '../core/app-domain-helpers.js';
+-import { getMeetingOwnedPhotoMessageIds, isChatRenderableMessage, isMemeKeyboardPhotoEntry } from '../core/gallery-data.js';
++import { getMeetingOwnedPhotoMessageIds, isChatRenderableMessage } from '../core/gallery-data.js';
++import { resolveGalleryThumbUrl, resolveHomeGalleryStripState } from '../core/gallery-thumb.js';
++import { MediaThumb } from './ui-overlays.js';
+ import { computeKoreanHolidaysForYear, getKoreanSolarTermsForYear } from '../core/app-calendar-holidays.js';
+ import { getAnniversariesForDate } from '../core/app-anniversary-dates.js';
+ import { buildMainCalendarScreenState } from '../core/app-calendar-screen-state.js';
+@@ -90,9 +92,12 @@ function readTabFromLocation() {
+     const fromView = ({ memo: 'memo', places: 'places', gallery: 'records', history: 'records', content: 'records', chat: 'chat', settlement: 'settlement' })[view];
+     let raw = params.get('tab') || fromView || view;
+     // Old bookmarks: ?tab=records&sub=memo|places → promote to first-class tabs.
++    // Bare records hub (?tab=records / sub=all) is not a V2 destination — treat as calendar
++    // so browser Back never resurfaces the mystery "모아엘가 기록" overview.
+     if (raw === 'records') {
+       const sub = params.get('sub');
+       if (sub === 'memo' || sub === 'places') raw = sub;
++      else if (!sub || sub === 'all') raw = DEFAULT_TAB;
+     }
+     return raw === 'search' || TAB_IDS.includes(raw) ? raw : DEFAULT_TAB;
+   } catch (_) {
+@@ -140,6 +145,36 @@ function writeLocationState(tabId, subTabId, { push } = { push: true }) {
+   window.dispatchEvent(new PopStateEvent('popstate'));
+ }
+ 
++/**
++ * Single history entry for a V2 destination. Gallery/archive/content used to call
++ * setActiveTab('records') then setRecordsSubTab(sub), which pushed the records hub
++ * (`?tab=records` with default sub=all) as an intermediate Back stop. Always write
++ * tab+sub together; never push the hub overview.
++ */
++function navigateV2Destination(viewOrId, { push = true, setTab, setSub } = {}) {
++  const dest = resolveV2Destination(viewOrId);
++  let tabId = dest.tab || DEFAULT_TAB;
++  let subTabId = dest.sub;
++  if (tabId === 'records') {
++    if (!subTabId || subTabId === 'all' || subTabId === 'memo' || subTabId === 'places') {
++      // Hub / legacy subs are not navigable destinations under shell=v2.
++      if (subTabId === 'memo' || subTabId === 'places') {
++        tabId = subTabId;
++        subTabId = DEFAULT_RECORDS_SUBTAB;
++      } else {
++        tabId = DEFAULT_TAB;
++        subTabId = DEFAULT_RECORDS_SUBTAB;
++      }
++    }
++  } else {
++    subTabId = DEFAULT_RECORDS_SUBTAB;
++  }
++  writeLocationState(tabId, subTabId, { push });
++  if (typeof setTab === 'function') setTab(tabId);
++  if (typeof setSub === 'function') setSub(tabId === 'records' ? subTabId : DEFAULT_RECORDS_SUBTAB);
++  return { tab: tabId, sub: subTabId };
++}
++
+ // Every v2 icon (nav categories, side-nav settings/footer/submenu items, chevrons, form
+ // controls) now comes from ONE registry (src/ui/v2/tabler-icons.js, TABLER_ICONS) -- a single
+ // Tabler icon set the user hand-picked with matching off/outline + on/filled pairs per glyph.
+@@ -1157,7 +1192,13 @@ function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeVie
+         displayChatMessages: recordsContext?.mediaProps?.chatMessages,
+         memos: recordsContext?.memoProps?.memos,
+         places: recordsContext?.placesProps?.calendar?.places,
+-        galleryPhotoIndex: recordsContext?.mediaProps?.indexedPhotos ? { items: recordsContext.mediaProps.indexedPhotos } : null,
++        galleryPhotoIndex: {
++          items: Array.isArray(recordsContext?.mediaProps?.indexedPhotos)
++            ? recordsContext.mediaProps.indexedPhotos
++            : [],
++          status: recordsContext?.mediaProps?.indexedPhotoStatus,
++          loading: !!recordsContext?.mediaProps?.indexedPhotoLoading,
++        },
