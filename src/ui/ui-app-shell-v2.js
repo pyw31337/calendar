@@ -606,6 +606,22 @@ function RenewalHero({ meetings, calendar, onSelectDate }) {
  * rendered a label in BOTH its start and end cell (both "not mid"), reading as duplicated,
  * visually-cut text. One spanning bar per row row fixes both the duplication and the seam.
  */
+const ANNIVERSARY_BAR_COLORS = {
+  birthday: '#EF4444',
+  event: '#3B82F6',
+  festival: '#F59E0B',
+  sports: '#0EA5E9',
+  movie: '#8B5CF6',
+  travel: '#10B981',
+  trip: '#10B981',
+  other: '#6B7280'
+};
+
+function anniversaryBarPaint(ann) {
+  const category = ann && ANNIVERSARY_BAR_COLORS[ann.category] ? ann.category : 'birthday';
+  return { category, color: ANNIVERSARY_BAR_COLORS[category] };
+}
+
 function computeFestivalBars(days, anniversariesList) {
   const bars = [];
   const rowCount = Math.ceil(days.length / 7);
@@ -1061,13 +1077,13 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
           anns.length > 0 ? React.createElement('div', { className: bentoClass('day-bar-stack') },
             anns.slice(0, 4).map((ann, annIdx) => {
               const title = ann.title || '기념일';
-              const displayColor = 'var(--cal-anniversary, #F76AAD)';
+              const paint = anniversaryBarPaint(ann);
               return React.createElement('div', {
                 key: ann.id || `${dateStr}_ann_${annIdx}`,
-                className: bentoClass('day-anniversary solo'),
+                className: bentoClass(`day-anniversary solo cat-${paint.category}`),
                 title,
                 'aria-label': title,
-                style: { '--anniversary-color': displayColor },
+                style: { '--anniversary-color': paint.color, background: paint.color },
               }, React.createElement('span', {
                 className: bentoClass('day-anniversary-label'),
               }, title));
@@ -1086,7 +1102,8 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
       // or repeats its title, and reuses app.css's .festival-bar-desktop/-mobile display toggle
       // (PC = translucent fill + solid title text; mobile = solid color line, no text).
       festivalBars.flatMap(bar => {
-        const displayColor = 'var(--cal-anniversary, #F76AAD)';
+        const paint = anniversaryBarPaint(bar);
+        const displayColor = paint.color;
         const gridPlacementStyle = {
           gridRowStart: bar.row + 1,
           gridColumnStart: bar.startCol + 1,
@@ -1111,15 +1128,15 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
             className: 'festival-bar-desktop',
             style: { ...gridPlacementStyle, display: 'flex' },
           }, React.createElement('div', {
-            className: bentoClass('day-anniversary'),
+            className: bentoClass(`day-anniversary cat-${paint.category}`),
             title: bar.title,
             'aria-label': bar.title,
             style: {
               width: '100%',
-              height: '1.1rem',
-              minHeight: '1.1rem',
-              marginBottom: bar.level > 0 ? `calc((1.1rem + 2px) * ${bar.level})` : undefined,
-              background: `color-mix(in srgb, ${displayColor} 15%, #fff)`,
+              height: '0.34rem',
+              minHeight: '0.34rem',
+              marginBottom: bar.level > 0 ? 'calc((0.34rem + 2px) * ' + bar.level + ')' : undefined,
+              background: displayColor,
               borderRadius: barRadius,
               padding: '0.08rem 0.32rem',
               display: 'flex',
@@ -1127,6 +1144,7 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
               justifyContent: 'flex-start',
               boxSizing: 'border-box',
               color: displayColor,
+              '--anniversary-color': displayColor,
             },
           }, React.createElement('span', {
             className: bentoClass('day-anniversary-label'),
@@ -1143,6 +1161,7 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
               minHeight: '0.34rem',
               marginBottom: bar.level > 0 ? `calc((0.34rem + 2px) * ${bar.level})` : undefined,
               background: displayColor,
+              '--anniversary-color': displayColor,
               borderRadius: barRadius,
               boxSizing: 'border-box',
             },
@@ -1156,11 +1175,7 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
       participants.map(p => React.createElement('span', { key: p.id },
         React.createElement('span', { className: bentoClass('dot'), style: { background: p.color || '#A78BFA' } }),
         p.name
-      )),
-      React.createElement('span', null,
-        React.createElement('span', { className: bentoClass('dot'), style: { background: 'var(--cal-anniversary, #F76AAD)', borderRadius: 'var(--radius-full)', width: '12px', height: '5px' } }),
-        '기념일'
-      )
+      ))
     )
   );
 

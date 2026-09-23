@@ -513,7 +513,7 @@ export function AdminModal({
     [calendar.activityLogs]
   );
   const recoveryTimelineLogs = React.useMemo(
-    () => activityLogsSorted.filter(log => log.action !== 'tag_add'),
+    () => activityLogsSorted.filter(log => !String(log.action || '').includes('tag')),
     [activityLogsSorted]
   );
 
@@ -943,7 +943,6 @@ export function AdminModal({
             { id: 'all', label: '전체' },
             { id: 'schedule', label: '일정' },
             { id: 'place', label: '장소' },
-            { id: 'tag', label: '사진태그' },
             { id: 'expense', label: '정산' },
             { id: 'poll', label: '투표' },
             { id: 'memo', label: '메모' }
@@ -992,12 +991,11 @@ export function AdminModal({
           const logs = buildActivityLogsFromAvailabilities(calendar || {});
 
           const filteredLogs = logs.filter(log => {
-            if ((log.action || '') === 'tag_add') return false;
+            if (String(log.action || '').includes('tag')) return false;
             if (logCategoryFilter !== 'all') {
               const act = log.action || '';
               if (logCategoryFilter === 'schedule' && !['create', 'update', 'delete', 'meeting_confirm', 'meeting_cancel'].includes(act)) return false;
               if (logCategoryFilter === 'place' && !['place_create', 'place_update', 'place_delete'].includes(act)) return false;
-              if (logCategoryFilter === 'tag' && !['tag_add', 'tag_remove'].includes(act)) return false;
               if (logCategoryFilter === 'expense' && !['expense_create', 'expense_update', 'expense_delete'].includes(act)) return false;
               if (logCategoryFilter === 'poll' && !['poll_create', 'poll_vote', 'poll_cancel'].includes(act)) return false;
               if (logCategoryFilter === 'memo' && !['memo_create', 'memo_update', 'memo_delete'].includes(act)) return false;
@@ -1047,7 +1045,7 @@ export function AdminModal({
               style: { fontSize: 'var(--font-size-md)', color: '#475569' }
             }, logDateText || null), noteText && /*#__PURE__*/React.createElement("span", {
               className: "recent-log-note",
-              style: { fontSize: 'var(--font-size-md)', color: 'var(--text-muted)', fontStyle: 'italic' }
+              style: { fontSize: 'var(--font-size-md)', color: 'var(--text-muted)', fontStyle: 'normal' }
             }, "\"", noteText, "\"")), /*#__PURE__*/React.createElement("div", {
               className: "recent-log-right"
             }, /*#__PURE__*/React.createElement("span", {

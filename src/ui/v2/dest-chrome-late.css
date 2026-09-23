@@ -3462,3 +3462,42 @@ html:has(.renewal-shell.v2-design) .bp-gallery-bleed .bp-thumb-grid {
     padding-right: 10px !important;
   }
 }
+
+/* Anniversary bars share one thin height and a 2px gap, painted with the
+   category color instead of a single pink. */
+html:has(.renewal-shell.v2-design) .bp-day-bar-stack,
+html:has(.renewal-shell.v2-design) .bp-day-cell .bp-day-bar-stack {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+  margin-top: 2px !important;
+  margin-bottom: 0 !important;
+}
+html:has(.renewal-shell.v2-design) .bp-day-bar-stack .bp-day-anniversary,
+html:has(.renewal-shell.v2-design) .festival-bar-desktop .bp-day-anniversary,
+html:has(.renewal-shell.v2-design) .festival-bar-mobile > div {
+  height: 0.34rem !important;
+  min-height: 0.34rem !important;
+  max-height: 0.34rem !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: var(--anniversary-color, #EF4444) !important;
+  color: transparent !important;
+  box-sizing: border-box !important;
+}
+html:has(.renewal-shell.v2-design) .bp-day-anniversary-label,
+html:has(.renewal-shell.v2-design) .festival-bar-desktop .bp-day-anniversary-label {
+  display: none !important;
+}
+html:has(.renewal-shell.v2-design) .festival-bar-spacer,
+html:has(.renewal-shell.v2-design) .bp-day-bar-stack + .festival-bar-spacer {
+  height: calc(var(--festival-stack-depth, 0) * (0.34rem + 2px) - 2px) !important;
+  margin-top: 2px !important;
+}
+html:has(.renewal-shell.v2-design) .recent-log-row,
+html:has(.renewal-shell.v2-design) .recent-log-note,
+html:has(.renewal-shell.v2-design) .recent-log-left,
+html:has(.renewal-shell.v2-design) .recent-log-action,
+html:has(.renewal-shell.v2-design) .recent-log-date {
+  font-style: normal !important;
+}
