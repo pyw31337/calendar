@@ -1890,8 +1890,8 @@ body:has(.v2-design) .v2-avail-drag-ghost {
   .v2-design .bp-day-bar-stack .bp-day-anniversary > .bp-day-anniversary-label {
     display: none !important;
   }
-  .v2-design .festival-bar-desktop { display: none !important; }
-  .v2-design .festival-bar-mobile { display: flex !important; }
+  /* festival-bar-desktop/mobile display split for this breakpoint already lives at the
+     top of this file (byte-identical rule) -- removed as a same-file dead duplicate. */
 }
 
 /* --------------------------------------------------------------------------

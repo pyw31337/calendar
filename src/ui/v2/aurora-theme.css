@@ -1112,17 +1112,9 @@
   }
 }
 
-/* Participant pills: one consistent readable scale wherever the calendar grid
-   has room for names (the small-phone mode intentionally remains dot-only). */
-@media (min-width: 560px) and (max-width: 767px) {
-  .v2-design .bp-dot-row { gap: 4px !important; }
-  .v2-design .bp-p-dot {
-    width: 8px !important;
-    height: 8px !important;
-    border-radius: 50% !important;
-    padding: 0 !important;
-  }
-}
+/* Participant pills at this breakpoint: same-file dead duplicate of .bp-dot-row/.bp-p-dot
+   removed -- the tablet-treatment block below (same media query) already fully re-declares
+   both selectors and wins the cascade (later wins at equal specificity/importance). */
 
 /* Keep the tablet calendar treatment until two participant pills per row no
    longer fit. The old 768px cut-over made a 3+1 arrangement jump to the
