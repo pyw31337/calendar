@@ -3213,6 +3213,7 @@ export function ContentView({
       onOpenAppSettings
     }),
     isContentRegisterOpen && /*#__PURE__*/React.createElement(ContentRegisterModal, {
+      calendar: calendar,
       onClose: () => { setIsContentRegisterOpen(false); setEditingContentItem(null); },
       onSave: onSaveCustomCultureItem,
       showToast: showToast,
@@ -3747,7 +3748,7 @@ function parseGatherContentClipboardText(text) {
 // Layer popup for manually registering 문화공연 / 지역축제 items into the archive tabs.
 // Portaled to document.body (same pattern as CulturePerformancesTab's detail sheet) so it sits
 // above the side menu / page chrome. Persists via onSave → app-main customCultureItems write.
-function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind = 'performance', initialItem = null }) {
+function ContentRegisterModal({ calendar = null, onClose, onSave, showToast = null, initialKind = 'performance', initialItem = null }) {
   const React = window.React;
   const ReactDOM = window.ReactDOM;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -3769,6 +3770,9 @@ function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind =
   const [link, setLink] = React.useState('');
   const [description, setDescription] = React.useState('');
   const [image, setImage] = React.useState('');
+  const [uploadingImage, setUploadingImage] = React.useState(false);
+  const [uploadProgress, setUploadProgress] = React.useState(null);
+  const fileInputRef = React.useRef(null);
   const [price, setPrice] = React.useState('');
   const [contact, setContact] = React.useState('');
   const [director, setDirector] = React.useState('');
@@ -3823,14 +3827,153 @@ function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind =
     applyPastedContent(item);
     if (typeof showToast === 'function') showToast('컨텐츠 정보를 붙여넣었습니다. 확인 후 등록해 주세요.', 'success');
   };
+
+  const handleProcessAndUploadImage = async (file) => {
+    if (!file) return;
+    if (!/^image\//i.test(file.type || '') && !file.name?.toLowerCase().endsWith('.heic')) {
+      if (typeof showToast === 'function') showToast('이미지 파일만 업로드할 수 있습니다.', 'error');
+      return;
+    }
+    setUploadingImage(true);
+    setUploadProgress({ pct: 10, text: '이미지 최적화 중...' });
+    try {
+      const deps = window.GATHER_UI_DEPS || {};
+      const utils = window.GATHER_APP_UTILS || {};
+      const processImages = deps.processImageFilesSequentially || utils.processImageFilesSequentially;
+      const resolveBatch = deps.resolveAnniversaryImageBatch || utils.resolveAnniversaryImageBatch || deps.resolveMemoImageBatch || utils.resolveMemoImageBatch;
+
+      let processed = null;
+      if (typeof processImages === 'function') {
+        const { succeeded } = await processImages([file], p => {
+          if (p && p.total) {
+            setUploadProgress({ pct: Math.round((p.current / p.total) * 45), text: '이미지 압축 중...' });
+          }
+        });
+        if (succeeded && succeeded.length > 0) {
+          processed = succeeded;
+        }
+      }
+
+      if (!processed || processed.length === 0) {
+        const reader = new FileReader();
+        const dataUrl = await new Promise(resolve => {
+          reader.onload = e => resolve(e.target.result);
+          reader.onerror = () => resolve(null);
+          reader.readAsDataURL(file);
+        });
+        if (dataUrl) {
+          setImage(dataUrl);
+          if (typeof showToast === 'function') showToast('이미지가 등록되었습니다.', 'success');
+        }
+        return;
+      }
+
+      setUploadProgress({ pct: 50, text: '업로드 중...' });
+      const calId = calendar?.id || 'common';
+      let uploadResult = null;
+      if (typeof resolveBatch === 'function') {
+        const res = await resolveBatch(calId, processed, p => {
+          if (p && typeof p.pct === 'number') {
+            setUploadProgress({ pct: Math.min(99, 50 + Math.round(p.pct * 0.49)), text: `업로드 중... ${p.pct}%` });
+          }
+        });
+        if (res && res[0]) {
+          uploadResult = res[0].imageUrl || res[0].thumbUrl || res[0].original;
+        }
+      }
+
+      if (!uploadResult) {
+        uploadResult = processed[0].original || processed[0].thumbnail;
+      }
+
+      if (uploadResult) {
+        setImage(uploadResult);
+        if (typeof showToast === 'function') showToast('이미지가 등록되었습니다.', 'success');
+      } else {
+        if (typeof showToast === 'function') showToast('이미지 업로드에 실패했습니다.', 'error');
+      }
+    } catch (err) {
+      console.error('Failed to upload image:', err);
+      if (typeof showToast === 'function') showToast('이미지 업로드 중 오류가 발생했습니다.', 'error');
+    } finally {
+      setUploadingImage(false);
+      setUploadProgress(null);
+    }
+  };
+
+  const handleProcessAndUploadImageRef = React.useRef(handleProcessAndUploadImage);
+  handleProcessAndUploadImageRef.current = handleProcessAndUploadImage;
+
+  const handlePasteEvent = async (e) => {
+    const deps = window.GATHER_UI_DEPS || {};
+    const utils = window.GATHER_APP_UTILS || {};
+    const getFiles = deps.getImageFilesFromClipboardEvent || utils.getImageFilesFromClipboardEvent;
+    let files = [];
+    if (typeof getFiles === 'function') {
+      files = getFiles(e);
+    } else if (e.clipboardData && e.clipboardData.files && e.clipboardData.files.length > 0) {
+      files = Array.from(e.clipboardData.files).filter(f => /^image\//i.test(f.type));
+    }
+    if (files && files.length > 0) {
+      e.preventDefault();
+      await handleProcessAndUploadImageRef.current(files[0]);
+    }
+  };
+
+  const handleClickPaste = async () => {
+    try {
+      const deps = window.GATHER_UI_DEPS || {};
+      const utils = window.GATHER_APP_UTILS || {};
+      const readClipboard = deps.readClipboardImageFiles || utils.readClipboardImageFiles;
+      if (typeof readClipboard === 'function') {
+        const files = await readClipboard(showToast);
+        if (files && files.length > 0) {
+          await handleProcessAndUploadImage(files[0]);
+          return;
+        }
+      }
+      if (navigator?.clipboard?.read) {
+        const items = await navigator.clipboard.read();
+        for (const item of items) {
+          const imageType = item.types.find(t => t.startsWith('image/'));
+          if (imageType) {
+            const blob = await item.getType(imageType);
+            const file = new File([blob], `clipboard-${Date.now()}.${imageType.split('/')[1] || 'png'}`, { type: imageType });
+            await handleProcessAndUploadImage(file);
+            return;
+          }
+        }
+      }
+      if (typeof showToast === 'function') showToast('클립보드에 이미지가 없습니다. 복사 후 다시 시도해 주세요.', 'info');
+    } catch (err) {
+      console.warn('Clipboard read failed:', err);
+      if (typeof showToast === 'function') showToast('클립보드 접근 권한이 필요합니다. 사진을 복사한 뒤 영역에 Ctrl+V로 붙여넣어 주세요.', 'info');
+    }
+  };
+
   React.useEffect(() => {
-    const handlePaste = e => {
+    const handlePaste = async e => {
       const text = e.clipboardData ? e.clipboardData.getData('text/plain') : '';
       const item = parseGatherContentClipboardText(text);
-      if (!item) return;
-      e.preventDefault();
-      applyPastedContent(item);
-      if (typeof showToast === 'function') showToast('컨텐츠 정보를 붙여넣었습니다. 확인 후 등록해 주세요.', 'success');
+      if (item) {
+        e.preventDefault();
+        applyPastedContent(item);
+        if (typeof showToast === 'function') showToast('컨텐츠 정보를 붙여넣었습니다. 확인 후 등록해 주세요.', 'success');
+        return;
+      }
+      const deps = window.GATHER_UI_DEPS || {};
+      const utils = window.GATHER_APP_UTILS || {};
+      const getFiles = deps.getImageFilesFromClipboardEvent || utils.getImageFilesFromClipboardEvent;
+      let files = [];
+      if (typeof getFiles === 'function') {
+        files = getFiles(e);
+      } else if (e.clipboardData && e.clipboardData.files && e.clipboardData.files.length > 0) {
+        files = Array.from(e.clipboardData.files).filter(f => /^image\//i.test(f.type));
+      }
+      if (files && files.length > 0) {
+        e.preventDefault();
+        await handleProcessAndUploadImageRef.current(files[0]);
+      }
     };
     document.addEventListener('paste', handlePaste);
     return () => document.removeEventListener('paste', handlePaste);
@@ -3993,6 +4136,123 @@ function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind =
           className: "form-input", type: "url", value: link, onChange: e => setLink(e.target.value),
           placeholder: "https://", maxLength: 500
         })),
+        field("이미지 직접 등록 / 붙여넣기", /*#__PURE__*/React.createElement("div", {
+          onPaste: handlePasteEvent,
+          tabIndex: 0,
+          style: {
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            padding: '10px 12px',
+            border: '1px dashed var(--border-subtle, #E5E7EB)',
+            borderRadius: 'var(--radius-md, 8px)',
+            backgroundColor: 'var(--bg-primary, #F9FAFB)',
+            outline: 'none',
+            boxSizing: 'border-box'
+          }
+        },
+          /*#__PURE__*/React.createElement("input", {
+            ref: fileInputRef,
+            type: "file",
+            accept: "image/*",
+            style: { display: 'none' },
+            onChange: e => {
+              if (e.target.files && e.target.files[0]) {
+                handleProcessAndUploadImage(e.target.files[0]);
+              }
+              e.target.value = '';
+            }
+          }),
+          image ? /*#__PURE__*/React.createElement("div", {
+            style: { position: 'relative', width: '56px', height: '56px', flexShrink: 0 }
+          },
+            /*#__PURE__*/React.createElement("img", {
+              src: image,
+              alt: "미리보기",
+              onError: e => { e.target.style.display = 'none'; },
+              style: {
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                borderRadius: 'var(--radius-sm, 6px)',
+                border: '1px solid var(--border-subtle, #E5E7EB)',
+                backgroundColor: 'var(--bg-card, #FFFFFF)'
+              }
+            }),
+            /*#__PURE__*/React.createElement("button", {
+              type: "button",
+              onClick: e => { e.stopPropagation(); setImage(''); },
+              title: "이미지 삭제",
+              "aria-label": "이미지 삭제",
+              style: {
+                position: 'absolute',
+                top: '-6px',
+                right: '-6px',
+                width: '18px',
+                height: '18px',
+                borderRadius: '50%',
+                border: 'none',
+                backgroundColor: 'rgba(0, 0, 0, 0.65)',
+                color: '#FFFFFF',
+                fontSize: '11px',
+                lineHeight: '18px',
+                textAlign: 'center',
+                cursor: 'pointer',
+                padding: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }
+            }, SmallXIcon ? /*#__PURE__*/React.createElement(SmallXIcon, { size: 10 }) : "✕")
+          ) : null,
+          /*#__PURE__*/React.createElement("div", {
+            style: { display: 'flex', flexDirection: 'column', gap: '6px', flex: 1, minWidth: 0 }
+          },
+            /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
+              /*#__PURE__*/React.createElement("button", {
+                type: "button",
+                disabled: uploadingImage,
+                onClick: () => fileInputRef.current && fileInputRef.current.click(),
+                style: {
+                  padding: '6px 12px',
+                  borderRadius: 'var(--radius-sm, 6px)',
+                  border: '1px solid var(--border-subtle, #D1D5DB)',
+                  backgroundColor: 'var(--bg-card, #FFFFFF)',
+                  color: 'var(--text-primary, #1F2937)',
+                  fontSize: 'var(--font-size-sm, 13px)',
+                  fontWeight: 600,
+                  cursor: uploadingImage ? 'not-allowed' : 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }
+              }, "📁 사진 업로드"),
+              /*#__PURE__*/React.createElement("button", {
+                type: "button",
+                disabled: uploadingImage,
+                onClick: handleClickPaste,
+                style: {
+                  padding: '6px 12px',
+                  borderRadius: 'var(--radius-sm, 6px)',
+                  border: '1px solid var(--border-subtle, #D1D5DB)',
+                  backgroundColor: 'var(--bg-card, #FFFFFF)',
+                  color: 'var(--text-primary, #1F2937)',
+                  fontSize: 'var(--font-size-sm, 13px)',
+                  fontWeight: 600,
+                  cursor: uploadingImage ? 'not-allowed' : 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }
+              }, "📋 붙여넣기")
+            ),
+            uploadingImage ? /*#__PURE__*/React.createElement("div", {
+              style: { fontSize: 'var(--font-size-xs, 12px)', color: 'var(--accent-primary, #7C2FE5)', fontWeight: 600 }
+            }, uploadProgress?.text || "업로드 중...") : /*#__PURE__*/React.createElement("div", {
+              style: { fontSize: 'var(--font-size-xs, 12px)', color: 'var(--text-muted, #6B7280)', lineHeight: '1.4' }
+            }, "사진 파일을 선택하거나 복사한 이미지를 붙여넣기(Ctrl+V) 하세요.")
+          )
+        )),
         field("이미지 URL (선택)", /*#__PURE__*/React.createElement("input", {
           className: "form-input", type: "url", value: image, onChange: e => setImage(e.target.value),
           placeholder: "https://", maxLength: 500
@@ -4040,9 +4300,9 @@ function ContentRegisterModal({ onClose, onSave, showToast = null, initialKind =
           style: { flexShrink: 0, padding: '12px 18px', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'flex-end' }
         },
           /*#__PURE__*/React.createElement("button", {
-            type: "button", className: "btn btn-primary btn-action", disabled: saving, onClick: handleSave,
-            style: { width: '100%', height: '44px', minHeight: '44px', opacity: saving ? 0.7 : 1 }
-          }, saving ? "저장 중..." : "저장")
+            type: "button", className: "btn btn-primary btn-action", disabled: saving || uploadingImage, onClick: handleSave,
+            style: { width: '100%', height: '44px', minHeight: '44px', opacity: (saving || uploadingImage) ? 0.7 : 1 }
+          }, saving ? "저장 중..." : (uploadingImage ? "이미지 업로드 중..." : "저장"))
         )
       )
     ),
