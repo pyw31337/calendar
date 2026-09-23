@@ -252,53 +252,10 @@ function pageSubtitle(calendar, trailing) {
   return name || extra || undefined;
 }
 
-export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, searchLabel, onShare, onMenu, extra, centerSubtitle = true, hideOnScroll = true, children }) {
+export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, searchLabel, onShare, onMenu, extra, centerSubtitle = true, hideOnScroll = false, children }) {
   const React = window.React;
-  const [isVisible, setIsVisible] = React.useState(true);
   const headerRef = React.useRef(null);
-  const [headerHeight, setHeaderHeight] = React.useState(60);
-
-  React.useLayoutEffect(() => {
-    if (!hideOnScroll || !headerRef.current) return;
-    const h = headerRef.current.offsetHeight;
-    if (h > 0) setHeaderHeight(h);
-  });
-
-  React.useEffect(() => {
-    if (!hideOnScroll || typeof window === 'undefined') return undefined;
-    let lastTop = 0;
-    const onScroll = event => {
-      const target = event.target;
-      let top;
-      let scrollHeight;
-      let clientHeight;
-      if (!target || target === document || target === document.documentElement || target === window) {
-        top = window.scrollY || document.documentElement.scrollTop || (document.body ? document.body.scrollTop : 0) || 0;
-        scrollHeight = Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0);
-        clientHeight = window.innerHeight || document.documentElement.clientHeight;
-      } else if (typeof target.scrollTop === 'number') {
-        top = target.scrollTop;
-        scrollHeight = target.scrollHeight;
-        clientHeight = target.clientHeight;
-      } else {
-        return;
-      }
-      if (scrollHeight <= clientHeight + 10) return;
-      const delta = top - lastTop;
-      if (Math.abs(delta) < 4) return;
-      lastTop = top;
-      if (top < 12) setIsVisible(true);
-      else if (delta > 6 && top > 40) setIsVisible(false);
-      else if (delta < -8) setIsVisible(true);
-    };
-    document.addEventListener('scroll', onScroll, true);
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => {
-      document.removeEventListener('scroll', onScroll, true);
-      window.removeEventListener('scroll', onScroll);
-    };
-  }, [hideOnScroll]);
-  const shown = !hideOnScroll || isVisible;
+  const shown = true;
   return h(
     React.Fragment,
     null,
@@ -306,8 +263,7 @@ export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, se
       'header',
       {
         ref: headerRef,
-        className: `bp-header v2-page-header${centerSubtitle ? ' v2-page-header--centered' : ''}${shown ? '' : ' is-scroll-hidden'}`,
-        style: shown ? undefined : { marginTop: `-${headerHeight}px` },
+        className: `bp-header v2-page-header${centerSubtitle ? ' v2-page-header--centered' : ''}`,
       },
       h(
         'div',
@@ -1178,6 +1134,7 @@ export function ChatScreen(p) {
         className: 'chat-composer v2-chat-composer',
         style: {
           ...(slots.composer.props?.style || {}),
+          bottom: p.viewportBottom ? `${p.viewportBottom}px` : 0,
           transform: 'none',
           opacity: 1,
           pointerEvents: 'auto',
@@ -1264,7 +1221,15 @@ export function ChatScreen(p) {
       { className: `v2-chat v2-dest-page${p.isSearchOpen ? ' v2-chat-search-open' : ''}` },
       clone(
         originalRoot,
-        { className: 'chat-room-container v2-chat-root' },
+        {
+          className: 'chat-room-container v2-chat-root',
+          style: {
+            ...(originalRoot.props?.style || {}),
+            bottom: p.viewportBottom ? `${p.viewportBottom}px` : 0,
+            height: '100%',
+            overflow: 'hidden',
+          },
+        },
         h(PageHeader, chatHeader),
         slots.notice,
         h(

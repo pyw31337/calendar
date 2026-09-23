@@ -323,8 +323,11 @@ body {
   overflow-x: hidden;
   overscroll-behavior-x: none;
 }
+html.v2-html-active,
+body.v2-body-active,
 body.no-body-padding {
   padding: 0 !important;
+  margin: 0 !important;
 }
 #root {
   width: 100%;
@@ -7269,8 +7272,14 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
   }
 }
 
-/* ===== BentoPinkFinal exact responsive home composition ===== */
-body:has(.renewal-shell) { padding: 0; }
+body:has(.renewal-shell),
+body:has(.v2-design) {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+.renewal-shell.v2-design {
+  padding-bottom: 0 !important;
+}
 .renewal-shell-main.is-calendar { background: #fafafc; }
 .renewal-shell-main.is-calendar > .renewal-shell-section { display: none; }
 .renewal-shell-main.is-calendar > .renewal-home-hero,

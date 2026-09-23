@@ -2888,6 +2888,16 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   // bypassed here.  It preserves the exact home memo selected during the tab
   // handoff, even before the outer app has a chance to rebuild its contexts.
   const [homeFocusedMemo, setHomeFocusedMemo] = React.useState(null);
+
+  React.useEffect(() => {
+    document.documentElement.classList.add('v2-html-active');
+    document.body.classList.add('v2-body-active');
+    return () => {
+      document.documentElement.classList.remove('v2-html-active');
+      document.body.classList.remove('v2-body-active');
+    };
+  }, []);
+
   // The shared Lightbox is a portal child of <body>, outside the V2 CSS root.
   // Keep its mobile viewport sizing local to this mounted shell, then restore
   // its inline declarations on unmount so the original V1 page is untouched.

@@ -40,8 +40,7 @@
 .v2-design .v2-page-header .bp-header-count { font-size: var(--font-size-2xs); color: #83798f; font-weight: 700; margin-left: 4px; }
 .v2-design .v2-page-header .bp-header-sub { font-size: var(--font-size-2xs); color: #83798f; font-weight: 700; }
 .v2-design .v2-page-header button { flex-shrink: 0; }
-.v2-design .v2-page-header { transition: transform 200ms ease, opacity 200ms ease, margin-top 200ms ease; }
-.v2-design .v2-page-header.is-scroll-hidden { transform: translateY(-100%) !important; opacity: 0 !important; pointer-events: none !important; }
+.v2-design .v2-page-header.is-scroll-hidden { transform: none !important; opacity: 1 !important; pointer-events: auto !important; margin-top: 0 !important; }
 .v2-design .bp-floating-back-btn {
   display: inline-flex; position: fixed; z-index: 120; top: calc(12px + env(safe-area-inset-top, 0px)); left: 16px;
   width: 44px; height: 44px; align-items: center; justify-content: center;
@@ -1947,7 +1946,7 @@
 
 .v2-design .v2-memo .v2-memo-body,
 .v2-design .v2-memo .v2-dest-body {
-  padding-bottom: 88px !important;
+  padding-bottom: 0 !important;
 }
 
 .v2-design .v2-memo .v2-memo-body .memo-list-scroll,

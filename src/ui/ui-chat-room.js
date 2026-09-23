@@ -545,11 +545,31 @@ export function ChatRoomView({
   React.useEffect(() => {
     const updateViewport = () => {
       if (!window.visualViewport) return;
+      const active = document.activeElement;
+      const isInputActive = !!(
+        active &&
+        (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA') &&
+        active.closest &&
+        (active.closest('.chat-room-container') || active.closest('.chat-composer'))
+      );
+      // If no input inside the chat is focused, the virtual keyboard is definitely not open.
+      // Reset viewportBottom to 0 to prevent mobile browser bottom toolbars/tab bars
+      // (e.g. Samsung Internet, Chrome Android) from causing a false positive keyboard offset.
+      if (!isInputActive) {
+        setViewportBottom(0);
+        return;
+      }
       // offsetTop is non-zero on iOS when the browser scrolls the page to keep the input
       // in view -- that scroll portion is NOT keyboard, so subtract it.
       const offsetTop = window.visualViewport.offsetTop || 0;
-      const kbHeight = window.innerHeight - window.visualViewport.height - offsetTop;
-      setViewportBottom(Math.max(0, kbHeight));
+      const diff = window.innerHeight - window.visualViewport.height - offsetTop;
+      // Real mobile virtual keyboards are at least ~120px tall. Small differences (< 120px)
+      // are browser chrome (address/tab bars) and must not shift the layout.
+      if (diff > 120) {
+        setViewportBottom(Math.round(diff));
+      } else {
+        setViewportBottom(0);
+      }
     };
     const onVpEvent = () => {
       if (vpRafRef.current) cancelAnimationFrame(vpRafRef.current);
@@ -574,16 +594,19 @@ export function ChatRoomView({
         if (related && related.closest && related.closest('.chat-composer')) {
           return;
         }
+        setIsInputFocused(false);
+        setViewportBottom(0);
         setTimeout(() => {
           const a = document.activeElement;
           if (a && (a.tagName === 'TEXTAREA' || a.tagName === 'INPUT') && a.closest &&
               (a.closest('.chat-composer') || a.closest('.chat-room-container'))) {
             setIsInputFocused(true);
+            updateViewport();
             return;
           }
           setIsInputFocused(false);
-          setTimeout(updateViewport, 300);
-        }, 50);
+          setViewportBottom(0);
+        }, 60);
       }
     };
 
@@ -1212,7 +1235,9 @@ export function ChatRoomView({
       flexDirection: 'column',
       width: '100%',
       maxWidth: '100%',
+      height: '100%',
       overflowX: 'hidden',
+      overflowY: 'hidden',
       zIndex: 1005,
       transition: 'bottom 0.12s ease-out'
     }
@@ -1349,7 +1374,7 @@ export function ChatRoomView({
       padding: '0 16px',
       zIndex: 1010,
       transition: 'transform 0.3s ease',
-      transform: isHeaderVisible ? 'translateY(0)' : 'translateY(-100%)'
+      transform: 'translateY(0)'
     }
   }, /*#__PURE__*/React.createElement("div", { style: { width: '32px', flexShrink: 0 } }), /*#__PURE__*/React.createElement("div", {
     style: PAGE_HEADER_TITLE_STYLE
@@ -2152,6 +2177,7 @@ export function ChatRoomView({
         }
       },
       isSearchOpen,
+      viewportBottom,
       slots: {},
     });
   }

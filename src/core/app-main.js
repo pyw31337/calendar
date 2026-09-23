@@ -3042,14 +3042,7 @@ function CalendarApp() {
       lastScrollTopRef.current = scrollTop;
       return;
     }
-    const lastScrollTop = lastScrollTopRef.current;
-    if (scrollTop < 10) {
-      setIsHeaderVisible(true);
-    } else if (scrollTop > lastScrollTop && scrollTop > 56) {
-      setIsHeaderVisible(false);
-    } else if (scrollTop < lastScrollTop) {
-      setIsHeaderVisible(true);
-    }
+    setIsHeaderVisible(true);
     lastScrollTopRef.current = scrollTop;
   };
 
