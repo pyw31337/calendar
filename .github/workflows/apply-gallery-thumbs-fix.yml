@@ -1,0 +1,32 @@
+name: Apply gallery thumbs back-nav fix
+on:
+  workflow_dispatch:
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/v2-gallery-thumbs-back-nav
+          fetch-depth: 0
+      - name: Apply patch and push
+        run: |
+          set -euo pipefail
+          git config user.name "pyw31337"
+          git config user.email "pyw31337@users.noreply.github.com"
+          if git apply --check patches/gallery-thumbs-back-nav.patch; then
+            git apply patches/gallery-thumbs-back-nav.patch
+          else
+            git apply --3way patches/gallery-thumbs-back-nav.patch
+          fi
+          rm -f patches/gallery-thumbs-back-nav.patch
+          rm -f .github/workflows/apply-gallery-thumbs-fix.yml
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Nothing to commit"
+            exit 0
+          fi
+          git commit -m "fix(v2): redesign gallery thumb resolver and stop records-hub Back"
+          git push origin HEAD:fix/v2-gallery-thumbs-back-nav
