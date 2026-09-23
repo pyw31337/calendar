@@ -68,23 +68,29 @@
   background: #ffffff !important;
 }
 .v2-design .v2-archive .v2-page-header.is-scroll-hidden,
-.v2-design .v2-content .v2-page-header.is-scroll-hidden {
-  transform: none !important;
-  opacity: 1 !important;
-  pointer-events: auto !important;
-  margin-top: 0 !important;
-}
+.v2-design .v2-content .v2-page-header.is-scroll-hidden,
 .v2-design .v2-page-header.is-scroll-hidden,
 .v2-design .v2-memo .v2-page-header.is-scroll-hidden,
 .v2-design .v2-chat .v2-page-header.is-scroll-hidden,
 .v2-design .v2-settlement .v2-page-header.is-scroll-hidden,
 .v2-design .v2-places .v2-page-header.is-scroll-hidden,
-.v2-design .v2-gallery .v2-page-header.is-scroll-hidden,
-.v2-design .v2-content .v2-page-header.is-scroll-hidden {
+.v2-design .v2-gallery .v2-page-header.is-scroll-hidden {
+  /* Collapse out of the flex column so the list viewport grows into this
+     space. A sticky box left behind is what was covering scrolled cards. */
+  position: relative !important;
+  top: auto !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  max-height: 0 !important;
+  flex: 0 0 0px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
   transform: none !important;
-  opacity: 1 !important;
-  pointer-events: auto !important;
-  margin-top: 0 !important;
+  box-shadow: none !important;
 }
 .v2-design .v2-page-header .bp-header-row,
 .v2-design .v2-memo .v2-page-header .bp-header-row,
@@ -297,8 +303,7 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   padding-top: 12px !important;
 }
 
-.v2-design .v2-chat button[aria-label*="키보드"],
-.v2-design .v2-chat-legacy button[aria-label*="키보드"] {
+.v2-design .v2-chat .chat-keyboard-reopen-btn {
   display: none !important;
 }
 .v2-design .v2-chat .chat-composer:not(.v2-chat-composer) {
@@ -313,10 +318,6 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
 
 /* Dest header right-end icons: match home mobile gap/edge pad. */
 @media (max-width: 767px) {
-  .v2-design .v2-page-header {
-    padding-left: 14px !important;
-    padding-right: 16px !important;
-  }
   .v2-design .v2-page-header .bp-header-actions {
     gap: 12px !important;
     padding-right: 4px !important;
@@ -912,7 +913,7 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
 .v2-design .v2-gallery .v2-page-header,
 .v2-design .v2-content .v2-page-header {
   min-height: 56px !important;
-  padding: 0 16px !important;
+  padding: 0 !important;
 }
 .v2-design .v2-archive .v2-page-header {
   min-height: 56px !important;
@@ -2269,16 +2270,7 @@ html:has(.renewal-shell.v2-design) .modal-overlay > form.modal-container:not(:ha
   }
 }
 
-/* Chat header is pinned. Scroll-hide (negative margin + translateY) fights the
-   room's scroll-to-bottom and the composer ResizeObserver, so the header jumps
-   in and out. Other destinations still collapse on scroll. */
-.v2-design .v2-chat .v2-page-header,
-.v2-design .v2-chat .v2-page-header.is-scroll-hidden {
-  transform: none !important;
-  opacity: 1 !important;
-  pointer-events: auto !important;
-  margin-top: 0 !important;
-}
+/* Chat header collapses with every other destination header (see .is-scroll-hidden). */
 .v2-design .v2-chat .bp-floating-back-btn {
   display: none !important;
 }
@@ -2455,7 +2447,7 @@ html:has(.renewal-shell.v2-design) .bp-event-sheet .underline-tabs button::after
   position: absolute !important;
   left: 0 !important;
   right: 0 !important;
-  bottom: 0 !important;
+  bottom: -1px !important;
   height: 2px !important;
   margin: 0 !important;
   background: transparent !important;
@@ -2659,5 +2651,89 @@ html:has(.renewal-shell.v2-design) .bp-event-sheet .underline-tabs button[aria-s
     padding: 8px 8px 16px !important;
   }
 }
+
+/* Header side padding lives on the title row only. The header element itself
+   stays flush so tabs and lists are not double-inset (settlement/memo/places). */
+html:has(.renewal-shell.v2-design) .v2-page-header,
+html:has(.renewal-shell.v2-design) .v2-memo .v2-page-header.bp-header,
+html:has(.renewal-shell.v2-design) .v2-settlement .v2-page-header.bp-header,
+html:has(.renewal-shell.v2-design) .v2-places .v2-page-header.bp-header,
+html:has(.renewal-shell.v2-design) .v2-chat .v2-page-header.bp-header {
+  padding: 0 !important;
+}
+
+/* Legacy destination bodies were position:absolute;top:0, so they painted
+   underneath the sticky header and stayed covered after the header collapsed. */
+html:has(.renewal-shell.v2-design) .v2-places .places-view-container,
+html:has(.renewal-shell.v2-design) .v2-memo .memo-view-container,
+html:has(.renewal-shell.v2-design) .v2-settlement .settlement-page-container,
+html:has(.renewal-shell.v2-design) .v2-gallery .gallery-page-container,
+html:has(.renewal-shell.v2-design) .v2-has-page-header > .v2-legacy-body {
+  position: relative !important;
+  inset: auto !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: auto !important;
+  width: 100% !important;
+  max-width: none !important;
+}
+
+html:has(.renewal-shell.v2-design) .v2-chat-jump-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex: 0 0 auto;
+  padding: 6px 12px 4px;
+  background: transparent;
+  z-index: 6;
+}
+html:has(.renewal-shell.v2-design) .v2-chat-jump-row .v2-chat-keyboard-btn,
+html:has(.renewal-shell.v2-design) .v2-chat-jump-row .v2-chat-scroll-bottom-btn {
+  position: relative !important;
+  inset: auto !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+  width: 36px !important;
+  height: 36px !important;
+  margin: 0 !important;
+  border-radius: 50% !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: #fff !important;
+  border: 1px solid var(--v2-card-border, #eceaf5) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12) !important;
+  color: var(--brand, #7C2FE5) !important;
+  cursor: pointer;
+}
+html:has(.renewal-shell.v2-design) .v2-chat .v2-chat-composer {
+  position: relative !important;
+  left: auto !important;
+  right: auto !important;
+  top: auto !important;
+  bottom: auto !important;
+  width: 100% !important;
+  flex: 0 0 auto !important;
+  transform: none !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat .v2-chat-composer.is-scroll-hidden {
+  height: 0 !important;
+  min-height: 0 !important;
+  max-height: 0 !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
 
 

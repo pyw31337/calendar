@@ -40,7 +40,15 @@
 .v2-design .v2-page-header .bp-header-count { font-size: var(--font-size-2xs); color: #83798f; font-weight: 700; margin-left: 4px; }
 .v2-design .v2-page-header .bp-header-sub { font-size: var(--font-size-2xs); color: #83798f; font-weight: 700; }
 .v2-design .v2-page-header button { flex-shrink: 0; }
-.v2-design .v2-page-header.is-scroll-hidden { transform: none !important; opacity: 1 !important; pointer-events: auto !important; margin-top: 0 !important; }
+.v2-design .v2-page-header.is-scroll-hidden {
+  height: 0;
+  min-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  padding: 0;
+  border: 0;
+}
 .v2-design .bp-floating-back-btn {
   display: inline-flex; position: fixed; z-index: 120; top: calc(12px + env(safe-area-inset-top, 0px)); left: 16px;
   width: 44px; height: 44px; align-items: center; justify-content: center;
@@ -208,7 +216,7 @@
   left: 50% !important; right: auto !important; transform: translateX(-50%);
   width: 100%; max-width: 480px;
 }
-.v2-design .v2-chat-composer { position: sticky !important; bottom: 0 !important; left: auto !important; right: auto !important; z-index: 35 !important; background: var(--bg-card, #fff) !important; transform: none !important; opacity: 1 !important; pointer-events: auto !important; padding: 10px 12px !important; }
+.v2-design .v2-chat-composer { position: relative; bottom: auto; left: auto; right: auto; z-index: 35; background: var(--bg-card, #fff); width: 100%; flex: 0 0 auto; padding: 10px 12px; }
 .v2-design .v2-chat-compose-row { display: flex; align-items: center; gap: 8px; }
 .v2-design .v2-chat-compose-row > textarea {
   min-width: 0; flex: 1; box-shadow: none !important; background: #fafafc !important;

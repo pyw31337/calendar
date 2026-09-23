@@ -164,6 +164,25 @@ const ICON_NODES = {
     ['path', { d: 'M14 20h-8a3 3 0 0 1 0 -6h11a3 3 0 0 0 -3 3m7 -3v-8a2 2 0 0 0 -2 -2h-10a2 2 0 0 0 -2 2v8' }],
     ['path', { d: 'M19 17v4' }],
   ],
+  keyboard: [
+    ['rect', { x: 2, y: 6, width: 20, height: 12, rx: 2 }],
+    ['path', { d: 'M6 10h.01' }],
+    ['path', { d: 'M10 10h.01' }],
+    ['path', { d: 'M14 10h.01' }],
+    ['path', { d: 'M18 10h.01' }],
+    ['path', { d: 'M8 14h8' }],
+  ],
+  keyboardOff: [
+    ['path', { d: 'M20 4H6' }],
+    ['path', { d: 'M4 8h.01' }],
+    ['path', { d: 'M8 8h.01' }],
+    ['path', { d: 'M12 8h.01' }],
+    ['path', { d: 'M16 8h.01' }],
+    ['path', { d: 'M7 12h6' }],
+    ['path', { d: 'm2 2 20 20' }],
+    ['path', { d: 'M20 16V6a2 2 0 0 0-2-2' }],
+    ['path', { d: 'M4 6v10a2 2 0 0 0 2 2h10' }],
+  ],
 };
 
 export function DesignIcon({ name, size = 18, strokeWidth = 2 }) {
@@ -254,19 +273,52 @@ function pageSubtitle(calendar, trailing) {
   return name || extra || undefined;
 }
 
-export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, searchLabel, onShare, onMenu, extra, centerSubtitle = true, hideOnScroll = false, children }) {
+export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, searchLabel, onShare, onMenu, extra, centerSubtitle = true, hideOnScroll = true, children }) {
   const React = window.React;
   const headerRef = React.useRef(null);
-  const shown = true;
+  const [hidden, setHidden] = React.useState(false);
+  React.useEffect(() => {
+    if (!hideOnScroll) {
+      setHidden(false);
+      return undefined;
+    }
+    const header = headerRef.current;
+    if (!header) return undefined;
+    const root = header.closest('section') || header.parentElement;
+    let lastTop = 0;
+    const onScroll = (event) => {
+      const target = event.target;
+      if (!target || target === document || target === window || typeof target.closest !== 'function') return;
+      if (!root || !root.contains(target) || header.contains(target) || target.contains(header)) return;
+      if (target.closest('.modal-overlay, .bottom-sheet-overlay, .bp-side-nav, textarea, input')) return;
+      const top = target.scrollTop;
+      if (typeof top !== 'number') return;
+      const delta = top - lastTop;
+      if (Math.abs(delta) < 6) return;
+      // Opening a long list jumps scrollTop from 0 to the bottom in one
+      // assignment. That is not a user gesture and must not collapse the header.
+      if (lastTop === 0 && delta > 240) {
+        lastTop = top;
+        return;
+      }
+      const max = Math.max(0, (target.scrollHeight || 0) - (target.clientHeight || 0));
+      lastTop = top;
+      // Collapsing the header gives its box back to the list. Only do it when the
+      // scroller still has room, otherwise the shrink clamps scrollTop and snaps back.
+      if (top < 8) setHidden(false);
+      else if (delta > 0 && top > 40 && max > 140) setHidden(true);
+      else if (delta < 0) setHidden(false);
+    };
+    document.addEventListener('scroll', onScroll, true);
+    return () => document.removeEventListener('scroll', onScroll, true);
+  }, [hideOnScroll]);
+  const shown = !hideOnScroll || !hidden;
   return h(
-    React.Fragment,
-    null,
-    h(
-      'header',
-      {
-        ref: headerRef,
-        className: `bp-header v2-page-header${centerSubtitle ? ' v2-page-header--centered' : ''}`,
-      },
+    'header',
+    {
+      ref: headerRef,
+      className: `bp-header v2-page-header${centerSubtitle ? ' v2-page-header--centered' : ''}${shown ? '' : ' is-scroll-hidden'}`,
+    },
       h(
         'div',
         { className: 'bp-header-row' },
@@ -300,16 +352,7 @@ export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, se
         )
       ),
       children
-    ),
-    // Rendered as a SIBLING of <header>, not a child: the header itself gets `transform:
-    // translateY(-100%)` while hidden (.is-scroll-hidden), and a transformed ancestor creates a
-    // new containing block for position:fixed descendants -- a fixed child of the hidden header
-    // would anchor to the header's own (now off-screen) box instead of the real viewport, landing
-    // this button at the wrong coordinates instead of the true top-left corner it needs.
-    !shown && onBack ? h('button', {
-      type: 'button', className: 'bp-floating-back-btn', 'aria-label': '뒤로가기', onClick: onBack,
-    }, h(DesignIcon, { name: 'back', size: 18 })) : null
-  );
+    );
 }
 
 function Search({ value, onChange, placeholder }) {
@@ -1059,6 +1102,8 @@ export function SettlementScreen(p) {
 export function ChatScreen(p) {
   const React = window.React;
   const [showScrollBottom, setShowScrollBottom] = React.useState(false);
+  const [composerHidden, setComposerHidden] = React.useState(false);
+  const chatScrollTopRef = React.useRef(0);
   const slots = { ...(p.legacyView ? extractChatSlots(p.legacyView) : {}), ...(p.slots || {}) };
   const memberCount = (p.calendar?.participants || []).filter(person => !person.deletedAt).length;
   const subtitle = p.subtitle
@@ -1071,9 +1116,6 @@ export function ChatScreen(p) {
     onSearch: p.onSearch,
     searchLabel: '대화 검색',
     onMenu: p.onMenu,
-    // Chat pins the header. Scroll-hide plus the room's scroll-to-bottom / composer
-    // ResizeObserver loop makes this header jump in and out.
-    hideOnScroll: false,
     extra: typeof p.onOpenNotice === 'function'
       ? h(IconButton, { label: '공지사항', icon: 'megaphone', size: 20, onClick: p.onOpenNotice })
       : null,
@@ -1132,14 +1174,15 @@ export function ChatScreen(p) {
     const composer = clone(
       slots.composer,
       {
-        // Chat composer stays permanently pinned to the bottom during scroll
-        className: 'chat-composer v2-chat-composer',
+        className: `chat-composer v2-chat-composer${composerHidden ? ' is-scroll-hidden' : ''}`,
         style: {
           ...(slots.composer.props?.style || {}),
-          bottom: p.viewportBottom ? `${p.viewportBottom}px` : 0,
+          position: 'relative',
+          left: 'auto',
+          right: 'auto',
+          top: 'auto',
+          bottom: 'auto',
           transform: 'none',
-          opacity: 1,
-          pointerEvents: 'auto',
         },
       },
       slots.resize,
@@ -1246,9 +1289,49 @@ export function ChatScreen(p) {
             onScroll: (e) => {
               if (typeof slots.body.props.onScroll === 'function') slots.body.props.onScroll(e);
               const el = e.currentTarget;
-              if (el) setShowScrollBottom(el.scrollHeight - el.scrollTop - el.clientHeight > 160);
+              if (!el) return;
+              setShowScrollBottom(el.scrollHeight - el.scrollTop - el.clientHeight > 160);
+              const top = el.scrollTop || 0;
+              const delta = top - chatScrollTopRef.current;
+              if (Math.abs(delta) < 6) return;
+              if (chatScrollTopRef.current === 0 && delta > 240) {
+                chatScrollTopRef.current = top;
+                return;
+              }
+              chatScrollTopRef.current = top;
+              const typing = document.activeElement && document.activeElement.closest
+                && document.activeElement.closest('.v2-chat-composer, .chat-composer');
+              const draft = String(slots.textarea?.props?.value || '').trim();
+              if (typing || draft) {
+                setComposerHidden(false);
+                return;
+              }
+              if (top < 8) setComposerHidden(false);
+              else if (delta > 0 && top > 40) setComposerHidden(true);
+              else if (delta < 0) setComposerHidden(false);
             }
-          }),
+          })
+        ),
+        h(
+          'div',
+          { className: 'v2-chat-jump-row' },
+          h('button', {
+            type: 'button',
+            className: 'v2-chat-keyboard-btn',
+            'aria-label': composerHidden ? '키보드 열기' : '키보드 닫기',
+            title: composerHidden ? '키보드 열기' : '키보드 닫기',
+            onClick: () => {
+              setComposerHidden(hiddenNow => {
+                if (hiddenNow) {
+                  requestAnimationFrame(() => {
+                    const input = document.querySelector('.v2-chat .bp-composer-input');
+                    if (input && typeof input.focus === 'function') input.focus();
+                  });
+                }
+                return !hiddenNow;
+              });
+            },
+          }, h(DesignIcon, { name: composerHidden ? 'keyboard' : 'keyboardOff', size: 18 })),
           showScrollBottom ? h('button', {
             type: 'button',
             className: 'v2-chat-scroll-bottom-btn',
@@ -1258,7 +1341,7 @@ export function ChatScreen(p) {
               const el = document.querySelector('.v2-chat-scroll, .chat-messages-scroll');
               if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
             },
-          }, h(DesignIcon, { name: 'chevronDown', size: 20 })) : null
+          }, h(DesignIcon, { name: 'chevronDown', size: 20 })) : h('span', { className: 'v2-chat-jump-spacer' })
         ),
         composer,
         ...keptRootKids
