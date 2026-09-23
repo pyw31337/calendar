@@ -266,18 +266,7 @@
   word-break: break-word !important;
 }
 
-.v2-design .bp-day-bar-stack .bp-day-anniversary,
-.v2-design .bp-day-bar-stack .bp-day-anniversary[class*="cat-"],
-.v2-design .bp-day-bar-stack .bp-day-anniversary[class*="genre-"],
-.v2-design .festival-bar-desktop .bp-day-anniversary {
-  background: color-mix(in srgb, var(--cal-anniversary, #F76AAD) 16%, var(--bg-card)) !important;
-  color: var(--cal-anniversary, #F76AAD) !important;
-}
-.v2-design .bp-day-anniversary-label,
-.v2-design .bp-day-bar-stack .bp-day-anniversary .bp-day-anniversary-label,
-.v2-design .festival-bar-desktop .bp-day-anniversary-label {
-  color: var(--cal-anniversary, #F76AAD) !important;
-}
+/* Category color and size live in the anniversary lock at the end of this file. */
 
 .v2-design .bottom-sheet-overlay.emoji-sheet-overlay,
 body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
@@ -376,60 +365,16 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   position: relative;
   z-index: 3;
 }
+/* Anniversary thickness, gap, and the 460px text switch are owned by the lock at the end of this file. */
 .v2-design .bp-day-bar-stack,
 .v2-design .bp-day-cell .bp-day-bar-stack {
-  gap: 2px !important;
-  margin-top: 3px !important;
   z-index: 2;
 }
 .v2-design .festival-bar-desktop,
 .v2-design .festival-bar-mobile {
   z-index: 1;
 }
-/* Reserves room, inside the day-cell's own flow, for the festival-bar-desktop/-mobile stack.
-   Topmost festival bar top is at `depth * (barHeight + 2px) - 2px`.
-   We align spacer height to the topmost bar and set margin-top relative to cell gap
-   so the gap between solo anniversary and range anniversary is exactly 2px. */
-.v2-design .festival-bar-spacer {
-  height: calc(var(--festival-stack-depth, 0) * (1.1rem + 2px) - 2px);
-  flex-shrink: 0;
-  width: 100%;
-  pointer-events: none;
-}
-.v2-design .bp-day-bar-stack + .festival-bar-spacer {
-  margin-top: -8px !important;
-}
-@media (min-width: 1200px) {
-  .v2-design .bp-day-bar-stack + .festival-bar-spacer {
-    margin-top: -9px !important;
-  }
-}
-
 @media (min-width: 768px) {
-  .v2-design .bp-day-bar-stack .bp-day-anniversary,
-  .v2-design .bp-day-bar-stack .bp-day-anniversary[class*="cat-"],
-  .v2-design .festival-bar-desktop .bp-day-anniversary {
-    background: color-mix(in srgb, var(--cal-anniversary, #F76AAD) 16%, var(--bg-card)) !important;
-    color: var(--cal-anniversary, #F76AAD) !important;
-    height: auto !important;
-    min-height: 1.16rem !important;
-    padding: 0.16rem 0.42rem !important;
-  }
-  .v2-design .bp-day-bar-stack .bp-day-anniversary > .bp-day-anniversary-label,
-  .v2-design .festival-bar-desktop .bp-day-anniversary-label {
-    display: block !important;
-    color: var(--cal-anniversary, #F76AAD) !important;
-  }
-  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-mid > .bp-day-anniversary-label,
-  .v2-design .bp-day-bar-stack .bp-day-anniversary.bp-bar-only > .bp-day-anniversary-label {
-    display: none !important;
-  }
-  .v2-design .festival-bar-desktop { display: flex !important; }
-  .v2-design .festival-bar-mobile { display: none !important; }
-  .v2-design .bp-day-cell:has(.bp-day-bar-stack),
-  .v2-design .bp-day-cell:has(.festival-bar-spacer) {
-    min-height: 92px !important;
-  }
   .v2-design .bp-p-dot {
     width: 7px !important;
     height: 7px !important;
@@ -443,35 +388,6 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   .v2-design .bp-p-dot::after {
     content: none !important;
     display: none !important;
-  }
-}
-
-@media (max-width: 767px) {
-  .v2-design .bp-day-bar-stack .bp-day-anniversary,
-  .v2-design .bp-day-bar-stack .bp-day-anniversary[class*="cat-"],
-  .v2-design .bp-day-bar-stack .bp-day-anniversary:not(.bp-mid):not(.bp-bar-only) {
-    background: var(--cal-anniversary, #F76AAD) !important;
-    color: transparent !important;
-    height: 0.34rem !important;
-    min-height: 0.34rem !important;
-    padding: 0 !important;
-    border-radius: 999px !important;
-  }
-  .v2-design .bp-day-bar-stack .bp-day-anniversary > .bp-day-anniversary-label,
-  .v2-design .bp-day-bar-stack .bp-day-anniversary:not(.bp-mid):not(.bp-bar-only) > .bp-day-anniversary-label {
-    display: none !important;
-  }
-  .v2-design .festival-bar-desktop { display: none !important; }
-  .v2-design .festival-bar-mobile { display: flex !important; }
-  .v2-design .festival-bar-spacer {
-    height: calc(var(--festival-stack-depth, 0) * (0.34rem + 2px) - 2px);
-  }
-  .v2-design .bp-day-bar-stack + .festival-bar-spacer {
-    margin-top: -6px !important;
-  }
-  .v2-design .bp-day-cell:has(.bp-day-bar-stack),
-  .v2-design .bp-day-cell:has(.festival-bar-spacer) {
-    min-height: 64px !important;
   }
 }
 
@@ -1114,21 +1030,7 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   transform: translateX(-50%) translateY(0) !important;
 }
 
-/* Anniversary labelled badges: type dead-center in the bar. */
-.v2-design .bp-day-bar-stack .bp-day-anniversary,
-.v2-design .festival-bar-desktop .bp-day-anniversary {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  line-height: 1 !important;
-}
-.v2-design .bp-day-anniversary-label {
-  display: block !important;
-  line-height: 1 !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  text-align: center;
-}
+/* Anniversary labelled badges: size and label visibility are owned by the lock at the end of this file. */
 
 /* ---- Content 2nd-level tabs: underline, equal columns, brand purple ---- */
 .v2-design .v2-content .underline-tabs,
@@ -3463,36 +3365,157 @@ html:has(.renewal-shell.v2-design) .bp-gallery-bleed .bp-thumb-grid {
   }
 }
 
-/* Anniversary bars share one thin height and a 2px gap, painted with the
-   category color instead of a single pink. */
-html:has(.renewal-shell.v2-design) .bp-day-bar-stack,
+/* Anniversary bars: one height, one 2px gap, category color.
+   Under 460px they are full-width lines. At 460px and up they are text badges.
+   Solo bars and multi-day bars share the same tokens so a later stylesheet
+   cannot paint one of them pink or a different thickness. */
+html:has(.renewal-shell.v2-design) {
+  --ann-bar-h: 4px;
+  --ann-bar-gap: 2px;
+  --ann-birthday: #EF4444;
+  --ann-event: #3B82F6;
+  --ann-festival: #F59E0B;
+  --ann-sports: #0EA5E9;
+  --ann-movie: #8B5CF6;
+  --ann-travel: #10B981;
+  --ann-other: #6B7280;
+}
+html:has(.renewal-shell.v2-design) .bp-cat-birthday { --ann-c: var(--ann-birthday); }
+html:has(.renewal-shell.v2-design) .bp-cat-event { --ann-c: var(--ann-event); }
+html:has(.renewal-shell.v2-design) .bp-cat-festival { --ann-c: var(--ann-festival); }
+html:has(.renewal-shell.v2-design) .bp-cat-sports { --ann-c: var(--ann-sports); }
+html:has(.renewal-shell.v2-design) .bp-cat-movie { --ann-c: var(--ann-movie); }
+html:has(.renewal-shell.v2-design) .bp-cat-travel,
+html:has(.renewal-shell.v2-design) .bp-cat-trip { --ann-c: var(--ann-travel); }
+html:has(.renewal-shell.v2-design) .bp-cat-other,
+html:has(.renewal-shell.v2-design) .bp-cat-custom { --ann-c: var(--anniversary-color, var(--ann-other)); }
+
+html:has(.renewal-shell.v2-design) .bp-day-cell .bp-day-bar-stack,
+html:has(.renewal-shell.v2-design) .bp-day-bar-stack .festival-bar-spacer {
+  align-self: stretch !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
 html:has(.renewal-shell.v2-design) .bp-day-cell .bp-day-bar-stack {
   display: flex !important;
   flex-direction: column !important;
-  gap: 2px !important;
-  margin-top: 2px !important;
+  align-items: stretch !important;
+  gap: var(--ann-bar-gap) !important;
+  margin-top: auto !important;
   margin-bottom: 0 !important;
+}
+html:has(.renewal-shell.v2-design) .bp-day-bar-stack .festival-bar-spacer {
+  height: calc(var(--festival-stack-depth, 0) * (var(--ann-bar-h) + var(--ann-bar-gap)) - var(--ann-bar-gap)) !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  flex: 0 0 auto !important;
+  pointer-events: none !important;
 }
 html:has(.renewal-shell.v2-design) .bp-day-bar-stack .bp-day-anniversary,
 html:has(.renewal-shell.v2-design) .festival-bar-desktop .bp-day-anniversary,
-html:has(.renewal-shell.v2-design) .festival-bar-mobile > div {
-  height: 0.34rem !important;
-  min-height: 0.34rem !important;
-  max-height: 0.34rem !important;
-  padding: 0 !important;
+html:has(.renewal-shell.v2-design) .festival-bar-mobile > .bp-day-anniversary {
+  position: relative !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  align-self: stretch !important;
+  width: 100% !important;
+  height: var(--ann-bar-h) !important;
+  min-height: var(--ann-bar-h) !important;
+  max-height: var(--ann-bar-h) !important;
+  margin-top: 0 !important;
+  margin-bottom: calc(var(--ann-level, 0) * (var(--ann-bar-h) + var(--ann-bar-gap))) !important;
+  padding: 0 4px !important;
   border: 0 !important;
-  background: var(--anniversary-color, #EF4444) !important;
-  color: transparent !important;
+  border-radius: 999px !important;
+  background: var(--ann-c, var(--ann-birthday)) !important;
+  color: #fff !important;
   box-sizing: border-box !important;
+  overflow: hidden !important;
+  flex: 0 0 var(--ann-bar-h) !important;
+}
+html:has(.renewal-shell.v2-design) .festival-bar-desktop,
+html:has(.renewal-shell.v2-design) .festival-bar-mobile {
+  padding: 0 3px 3px !important;
+  box-sizing: border-box !important;
+  min-width: 0 !important;
 }
 html:has(.renewal-shell.v2-design) .bp-day-anniversary-label,
 html:has(.renewal-shell.v2-design) .festival-bar-desktop .bp-day-anniversary-label {
   display: none !important;
 }
-html:has(.renewal-shell.v2-design) .festival-bar-spacer,
-html:has(.renewal-shell.v2-design) .bp-day-bar-stack + .festival-bar-spacer {
-  height: calc(var(--festival-stack-depth, 0) * (0.34rem + 2px) - 2px) !important;
-  margin-top: 2px !important;
+
+@media (max-width: 459px) {
+  html:has(.renewal-shell.v2-design) .festival-bar-desktop { display: none !important; }
+  html:has(.renewal-shell.v2-design) .festival-bar-mobile { display: flex !important; }
+}
+@media (min-width: 460px) {
+  html:has(.renewal-shell.v2-design) {
+    --ann-bar-h: 16px;
+  }
+  html:has(.renewal-shell.v2-design) .festival-bar-desktop { display: flex !important; }
+  html:has(.renewal-shell.v2-design) .festival-bar-mobile { display: none !important; }
+  html:has(.renewal-shell.v2-design) .bp-day-bar-stack .bp-day-anniversary,
+  html:has(.renewal-shell.v2-design) .festival-bar-desktop .bp-day-anniversary {
+    border-radius: 4px !important;
+    padding: 0 6px !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-day-bar-stack .bp-day-anniversary.bp-cat-birthday,
+  html:has(.renewal-shell.v2-design) .festival-bar-desktop .bp-day-anniversary.bp-cat-birthday {
+    background: color-mix(in srgb, var(--ann-birthday) 22%, #fff) !important;
+    color: var(--ann-birthday) !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-day-bar-stack .bp-day-anniversary.bp-cat-event,
+  html:has(.renewal-shell.v2-design) .festival-bar-desktop .bp-day-anniversary.bp-cat-event {
+    background: color-mix(in srgb, var(--ann-event) 22%, #fff) !important;
+    color: var(--ann-event) !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-day-bar-stack .bp-day-anniversary.bp-cat-festival,
+  html:has(.renewal-shell.v2-design) .festival-bar-desktop .bp-day-anniversary.bp-cat-festival {
+    background: color-mix(in srgb, var(--ann-festival) 28%, #fff) !important;
+    color: #b45309 !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-day-bar-stack .bp-day-anniversary.bp-cat-sports,
+  html:has(.renewal-shell.v2-design) .festival-bar-desktop .bp-day-anniversary.bp-cat-sports {
+    background: color-mix(in srgb, var(--ann-sports) 22%, #fff) !important;
+    color: var(--ann-sports) !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-day-bar-stack .bp-day-anniversary.bp-cat-movie,
+  html:has(.renewal-shell.v2-design) .festival-bar-desktop .bp-day-anniversary.bp-cat-movie {
+    background: color-mix(in srgb, var(--ann-movie) 22%, #fff) !important;
+    color: var(--ann-movie) !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-day-bar-stack .bp-day-anniversary.bp-cat-travel,
+  html:has(.renewal-shell.v2-design) .bp-day-bar-stack .bp-day-anniversary.bp-cat-trip,
+  html:has(.renewal-shell.v2-design) .festival-bar-desktop .bp-day-anniversary.bp-cat-travel,
+  html:has(.renewal-shell.v2-design) .festival-bar-desktop .bp-day-anniversary.bp-cat-trip {
+    background: color-mix(in srgb, var(--ann-travel) 22%, #fff) !important;
+    color: #047857 !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-day-bar-stack .bp-day-anniversary.bp-cat-other,
+  html:has(.renewal-shell.v2-design) .bp-day-bar-stack .bp-day-anniversary.bp-cat-custom,
+  html:has(.renewal-shell.v2-design) .festival-bar-desktop .bp-day-anniversary.bp-cat-other,
+  html:has(.renewal-shell.v2-design) .festival-bar-desktop .bp-day-anniversary.bp-cat-custom {
+    background: color-mix(in srgb, var(--ann-c, var(--ann-other)) 22%, #fff) !important;
+    color: var(--ann-c, var(--ann-other)) !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-day-anniversary-label,
+  html:has(.renewal-shell.v2-design) .festival-bar-desktop .bp-day-anniversary-label,
+  html:has(.renewal-shell.v2-design) .bp-day-bar-stack .bp-day-anniversary .bp-day-anniversary-label {
+    display: block !important;
+    color: inherit !important;
+    font-size: 0.62rem !important;
+    font-weight: 700 !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-width: 100% !important;
+  }
 }
 html:has(.renewal-shell.v2-design) .recent-log-row,
 html:has(.renewal-shell.v2-design) .recent-log-note,

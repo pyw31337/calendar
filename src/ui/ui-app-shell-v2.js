@@ -618,8 +618,14 @@ const ANNIVERSARY_BAR_COLORS = {
 };
 
 function anniversaryBarPaint(ann) {
-  const category = ann && ANNIVERSARY_BAR_COLORS[ann.category] ? ann.category : 'birthday';
-  return { category, color: ANNIVERSARY_BAR_COLORS[category] };
+  const raw = String(ann && ann.category || '').toLowerCase();
+  const category = raw === 'trip' ? 'travel' : raw;
+  if (ANNIVERSARY_BAR_COLORS[category]) {
+    return { category, color: ANNIVERSARY_BAR_COLORS[category] };
+  }
+  const badge = String(ann && ann.badgeColor || '').trim();
+  if (/^#[0-9a-f]{6}$/i.test(badge)) return { category: 'custom', color: badge };
+  return { category: 'birthday', color: ANNIVERSARY_BAR_COLORS.birthday };
 }
 
 function computeFestivalBars(days, anniversariesList) {
@@ -1073,8 +1079,9 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
               });
             })
           ) : null,
-          // Solo (single-day) anniversary bars only. Meeting pill lives in day-head-row.
-          anns.length > 0 ? React.createElement('div', { className: bentoClass('day-bar-stack') },
+          // Solo bars and the range-bar spacer share one stack so the gap between
+          // them is the stack gap, not the day-cell gap.
+          (anns.length > 0 || festivalStackDepth > 0) ? React.createElement('div', { className: bentoClass('day-bar-stack') },
             anns.slice(0, 4).map((ann, annIdx) => {
               const title = ann.title || '기념일';
               const paint = anniversaryBarPaint(ann);
@@ -1083,16 +1090,16 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
                 className: bentoClass(`day-anniversary solo cat-${paint.category}`),
                 title,
                 'aria-label': title,
-                style: { '--anniversary-color': paint.color, background: paint.color },
+                style: { '--anniversary-color': paint.color, '--ann-c': paint.color },
               }, React.createElement('span', {
                 className: bentoClass('day-anniversary-label'),
               }, title));
-            })
-          ) : null,
-          festivalStackDepth > 0 ? React.createElement('div', {
-            className: 'festival-bar-spacer',
-            style: { '--festival-stack-depth': festivalStackDepth, flexShrink: 0, width: '100%' },
-          }) : null
+            }),
+            festivalStackDepth > 0 ? React.createElement('div', {
+              className: 'festival-bar-spacer',
+              style: { '--festival-stack-depth': festivalStackDepth },
+            }) : null
+          ) : null
         );
       }),
 
@@ -1132,36 +1139,28 @@ function BentoCalendarCard({ calendarContext, onSelectDate }) {
             title: bar.title,
             'aria-label': bar.title,
             style: {
-              width: '100%',
-              height: '0.34rem',
-              minHeight: '0.34rem',
-              marginBottom: bar.level > 0 ? 'calc((0.34rem + 2px) * ' + bar.level + ')' : undefined,
-              background: displayColor,
-              borderRadius: barRadius,
-              padding: '0.08rem 0.32rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'flex-start',
-              boxSizing: 'border-box',
-              color: displayColor,
+              '--ann-level': bar.level,
               '--anniversary-color': displayColor,
+              '--ann-c': displayColor,
+              width: '100%',
+              borderRadius: barRadius,
+              boxSizing: 'border-box',
             },
           }, React.createElement('span', {
             className: bentoClass('day-anniversary-label'),
-            style: { color: displayColor, opacity: 1 },
           }, bar.title))),
           React.createElement('div', {
             key: `festival-bar-mobile-${bar.id}-${bar.row}`,
             className: 'festival-bar-mobile',
             style: { ...gridPlacementStyle, display: 'none' },
           }, React.createElement('div', {
+            className: bentoClass(`day-anniversary cat-${paint.category}`),
+            title: bar.title,
             style: {
-              width: '100%',
-              height: '0.34rem',
-              minHeight: '0.34rem',
-              marginBottom: bar.level > 0 ? `calc((0.34rem + 2px) * ${bar.level})` : undefined,
-              background: displayColor,
+              '--ann-level': bar.level,
               '--anniversary-color': displayColor,
+              '--ann-c': displayColor,
+              width: '100%',
               borderRadius: barRadius,
               boxSizing: 'border-box',
             },
