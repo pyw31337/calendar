@@ -46,7 +46,9 @@ import {
   calculateSettlementBalance, formatBalanceBadge,
   getCalendarPlaces, doesPlaceMatchDate, unionPlaces,
 } from '../core/app-domain-helpers.js';
-import { getMeetingOwnedPhotoMessageIds, isChatRenderableMessage, isMemeKeyboardPhotoEntry } from '../core/gallery-data.js';
+import { getMeetingOwnedPhotoMessageIds, isChatRenderableMessage } from '../core/gallery-data.js';
+import { resolveGalleryThumbUrl, resolveHomeGalleryStripState } from '../core/gallery-thumb.js';
+import { MediaThumb } from './ui-overlays.js';
 import { computeKoreanHolidaysForYear, getKoreanSolarTermsForYear } from '../core/app-calendar-holidays.js';
 import { getAnniversariesForDate } from '../core/app-anniversary-dates.js';
 import { buildMainCalendarScreenState } from '../core/app-calendar-screen-state.js';
@@ -90,9 +92,12 @@ function readTabFromLocation() {
     const fromView = ({ memo: 'memo', places: 'places', gallery: 'records', history: 'records', content: 'records', chat: 'chat', settlement: 'settlement' })[view];
     let raw = params.get('tab') || fromView || view;
     // Old bookmarks: ?tab=records&sub=memo|places → promote to first-class tabs.
+    // Bare records hub (?tab=records / sub=all) is not a V2 destination — treat as calendar
+    // so browser Back never resurfaces the mystery "모아엘가 기록" overview.
     if (raw === 'records') {
       const sub = params.get('sub');
       if (sub === 'memo' || sub === 'places') raw = sub;
+      else if (!sub || sub === 'all') raw = DEFAULT_TAB;
     }
     return raw === 'search' || TAB_IDS.includes(raw) ? raw : DEFAULT_TAB;
   } catch (_) {
@@ -138,6 +143,36 @@ function writeLocationState(tabId, subTabId, { push } = { push: true }) {
   window.history[method](window.history.state, '', url);
   // Existing core subscribers use popstate to select the correct data collection.
   window.dispatchEvent(new PopStateEvent('popstate'));
+}
+
+/**
+ * Single history entry for a V2 destination. Gallery/archive/content used to call
+ * setActiveTab('records') then setRecordsSubTab(sub), which pushed the records hub
+ * (`?tab=records` with default sub=all) as an intermediate Back stop. Always write
+ * tab+sub together; never push the hub overview.
+ */
+function navigateV2Destination(viewOrId, { push = true, setTab, setSub } = {}) {
+  const dest = resolveV2Destination(viewOrId);
+  let tabId = dest.tab || DEFAULT_TAB;
+  let subTabId = dest.sub;
+  if (tabId === 'records') {
+    if (!subTabId || subTabId === 'all' || subTabId === 'memo' || subTabId === 'places') {
+      // Hub / legacy subs are not navigable destinations under shell=v2.
+      if (subTabId === 'memo' || subTabId === 'places') {
+        tabId = subTabId;
+        subTabId = DEFAULT_RECORDS_SUBTAB;
+      } else {
+        tabId = DEFAULT_TAB;
+        subTabId = DEFAULT_RECORDS_SUBTAB;
+      }
+    }
+  } else {
+    subTabId = DEFAULT_RECORDS_SUBTAB;
+  }
+  writeLocationState(tabId, subTabId, { push });
+  if (typeof setTab === 'function') setTab(tabId);
+  if (typeof setSub === 'function') setSub(tabId === 'records' ? subTabId : DEFAULT_RECORDS_SUBTAB);
+  return { tab: tabId, sub: subTabId };
 }
 
 // Every v2 icon (nav categories, side-nav settings/footer/submenu items, chevrons, form
@@ -1157,7 +1192,13 @@ function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeVie
         displayChatMessages: recordsContext?.mediaProps?.chatMessages,
         memos: recordsContext?.memoProps?.memos,
         places: recordsContext?.placesProps?.calendar?.places,
-        galleryPhotoIndex: recordsContext?.mediaProps?.indexedPhotos ? { items: recordsContext.mediaProps.indexedPhotos } : null,
+        galleryPhotoIndex: {
+          items: Array.isArray(recordsContext?.mediaProps?.indexedPhotos)
+            ? recordsContext.mediaProps.indexedPhotos
+            : [],
+          status: recordsContext?.mediaProps?.indexedPhotoStatus,
+          loading: !!recordsContext?.mediaProps?.indexedPhotoLoading,
+        },
         setActiveLightbox: recordsContext?.mediaProps?.setActiveLightbox,
         onMemoCommentsChange: recordsContext?.memoProps?.onMemoCommentsChange,
         // HomeActivitySummary always passes the complete memo record.  Keep
@@ -1355,17 +1396,46 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
     return selected;
   }, [memoItems]);
   const photoItems = calendarContext?.galleryPhotoIndex?.items;
-  const photos = React.useMemo(() => (Array.isArray(photoItems)
-    ? photoItems
-      .filter(photo => !isMemeKeyboardPhotoEntry(photo))
-      .slice()
-      .sort((a, b) => {
-        const aTime = timestampMs(a?.timestamp ?? a?.createdAt ?? a?.updatedAt ?? a?.uploadedAt ?? a?.messageTimestamp);
-        const bTime = timestampMs(b?.timestamp ?? b?.createdAt ?? b?.updatedAt ?? b?.uploadedAt ?? b?.messageTimestamp);
-        return bTime - aTime || String(b?.id || b?.mediaKey || '').localeCompare(String(a?.id || a?.mediaKey || ''));
-      })
-      .slice(0, 9)
-    : []), [photoItems]);
+  const photoIndexStatus = calendarContext?.galleryPhotoIndex?.status;
+  const photoIndexLoading = !!calendarContext?.galleryPhotoIndex?.loading;
+  const [brokenThumbUrls, setBrokenThumbUrls] = React.useState(() => new Set());
+  const markBrokenThumb = React.useCallback((...urls) => {
+    setBrokenThumbUrls(prev => {
+      let changed = false;
+      const next = new Set(prev);
+      urls.flat().forEach(url => {
+        const key = String(url || '').trim();
+        if (!key || next.has(key)) return;
+        next.add(key);
+        changed = true;
+        try {
+          window.GATHER_APP_UTILS?.savePersistentBrokenPhotoUrl?.(key);
+        } catch (_) { /* ignore */ }
+      });
+      return changed ? next : prev;
+    });
+  }, []);
+  const isBrokenThumb = React.useCallback(url => {
+    const key = String(url || '').trim();
+    if (!key) return true;
+    if (brokenThumbUrls.has(key)) return true;
+    try {
+      const persistent = window.GATHER_APP_UTILS?.getPersistentBrokenPhotoUrls?.();
+      if (persistent && typeof persistent.has === 'function' && persistent.has(key)) return true;
+    } catch (_) { /* ignore */ }
+    return false;
+  }, [brokenThumbUrls]);
+  const homeGalleryStrip = React.useMemo(
+    () => resolveHomeGalleryStripState({
+      items: photoItems,
+      status: photoIndexStatus,
+      loading: photoIndexLoading,
+      limit: 9,
+      isBroken: isBrokenThumb,
+    }),
+    [photoItems, photoIndexStatus, photoIndexLoading, isBrokenThumb]
+  );
+  const photos = homeGalleryStrip.photos;
   const placeItems = calendarContext?.places;
   const places = React.useMemo(
     () => (Array.isArray(placeItems) ? latestRows(placeItems).slice(0, 2) : []),
@@ -1642,30 +1712,56 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
       })) : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '최근 메모가 없습니다.')
     ),
     React.createElement(HomeSummarySection, { title: '갤러리', kind: 'gallery', delay: '0.16s', onMore: () => onChangeView?.('gallery') },
-      photos.length ? React.createElement('div', { className: bentoClass('renewal-home-photo-strip thumb-grid') }, photos.map((photo, i) => React.createElement('button', {
-        type: 'button',
-        className: bentoClass(`thumb ${photo.commentCount > 0 ? 'gallery-comment-heartbeat' : ''}`.trim()),
-        key: photo.id || photo.mediaKey || i,
-        onClick: () => calendarContext.setActiveLightbox?.(photoLightbox(photo, photos)),
-        style: photo.commentCount > 0 ? galleryCommentMotion(photo, i) : undefined,
-        'aria-label': `사진 ${i + 1} 크게 보기`
-      },
-        React.createElement('img', {
-          src: photo.thumb || photo.thumbnailUrl || photo.thumbUrl || photo.full || photo.url || photo.imageUrl || photo.downloadURL,
-          alt: '',
-          loading: 'lazy',
-          decoding: 'async',
-          onError: e => {
-            const fb = photo.full || photo.url || photo.imageUrl || photo.downloadURL;
-            if (fb && e.currentTarget.src !== fb) {
-              e.currentTarget.src = fb;
-            } else {
-              e.currentTarget.style.opacity = '0';
-            }
-          }
-        }),
-        photo.commentCount > 0 ? React.createElement('span', { className: bentoClass('comment-badge') }, photo.commentCount) : null
-      ))) : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '등록된 사진이 없습니다.')
+      homeGalleryStrip.state === 'loading'
+        ? React.createElement('div', {
+          className: bentoClass('renewal-home-photo-strip thumb-grid is-loading'),
+          'aria-busy': 'true',
+          'aria-label': '갤러리 불러오는 중',
+        }, Array.from({ length: 9 }, (_, i) => React.createElement('div', {
+          key: `gallery-skel-${i}`,
+          className: bentoClass('thumb is-skeleton'),
+          'aria-hidden': 'true',
+        })))
+        : photos.length
+          ? React.createElement('div', { className: bentoClass('renewal-home-photo-strip thumb-grid') }, photos.map((photo, i) => {
+            const resolved = photo.__thumbResolved || resolveGalleryThumbUrl(photo, { isBroken: isBrokenThumb });
+            return React.createElement('button', {
+              type: 'button',
+              className: bentoClass(`thumb ${photo.commentCount > 0 ? 'gallery-comment-heartbeat' : ''}`.trim()),
+              key: photo.id || photo.mediaKey || resolved.src || i,
+              onClick: () => calendarContext.setActiveLightbox?.(photoLightbox(photo, photos)),
+              style: photo.commentCount > 0 ? galleryCommentMotion(photo, i) : undefined,
+              'aria-label': `사진 ${i + 1} 크게 보기`
+            },
+              MediaThumb
+                ? React.createElement(MediaThumb, {
+                  src: resolved.src,
+                  fallbackSrc: resolved.fallbackSrc,
+                  alt: '',
+                  loading: 'lazy',
+                  decoding: 'async',
+                  referrerPolicy: 'no-referrer',
+                  onBroken: (_e, info) => markBrokenThumb(info?.src, info?.fallbackSrc, info?.currentSrc, resolved.src, resolved.fallbackSrc),
+                  style: { width: '100%', height: '100%', objectFit: 'cover', display: 'block' },
+                })
+                : React.createElement('img', {
+                  src: resolved.src,
+                  alt: '',
+                  loading: 'lazy',
+                  decoding: 'async',
+                  referrerPolicy: 'no-referrer',
+                  onError: (e) => {
+                    if (resolved.fallbackSrc && e.currentTarget.src !== resolved.fallbackSrc) {
+                      e.currentTarget.src = resolved.fallbackSrc;
+                      return;
+                    }
+                    markBrokenThumb(resolved.src, resolved.fallbackSrc);
+                  },
+                }),
+              photo.commentCount > 0 ? React.createElement('span', { className: bentoClass('comment-badge') }, photo.commentCount) : null
+            );
+          }))
+          : React.createElement('p', { className: bentoClass('renewal-home-empty') }, '등록된 사진이 없습니다.')
     ),
     React.createElement(HomeSummarySection, { title: '장소', kind: 'places', delay: '0.20s', onMore: () => onChangeView?.('places') },
       places.length ? React.createElement('div', { className: bentoClass('renewal-home-place-list') }, places.map((place, i) => React.createElement(HomePlaceCard, {
@@ -3075,8 +3171,11 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   // 콘텐츠 서브탭으로만 이동시킨다 -- 특정 항목을 펼쳐서 보여주는 것은 그 화면이 실제로
   // 연결될 때 함께 다룬다.
   const onFocusCultureSource = () => {
-    setActiveTab('records');
-    setRecordsSubTab('content');
+    navigateV2Destination('content', {
+      push: true,
+      setTab: setActiveTabState,
+      setSub: setRecordsSubTabState,
+    });
   };
 
   // ChatRoomView's internal side menu (ChatSideMenu) calls this the same way app-main.js's own
@@ -3085,9 +3184,14 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   // reimplementing navigation. `onBack`/`onOpenGallery` (ChatPane) reuse this same mapping.
   const onChangeView = (view) => {
     const dest = resolveV2Destination(view);
-    if (dest.tab === 'records' && dest.sub) {
-      setActiveTab('records');
-      setRecordsSubTab(dest.sub);
+    // Atomic history write: never push records hub then sub as two entries.
+    if (dest.tab === 'records') {
+      if (activeTab === 'records' && dest.sub && dest.sub === recordsSubTab) return;
+      navigateV2Destination(view, {
+        push: true,
+        setTab: setActiveTabState,
+        setSub: setRecordsSubTabState,
+      });
       return;
     }
     setActiveTab(dest.tab);
@@ -3199,11 +3303,44 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   // Correct an invalid/stale ?tab=/?sub= on first mount without adding a history entry, then
   // listen for the back/forward buttons for the rest of this shell's lifetime.
   React.useEffect(() => {
-    writeLocationState(activeTab, recordsSubTab, { push: false });
+    // If history/bookmark left us on the records hub overview, replace it with calendar
+    // so Back from gallery/archive never resurfaces "모아엘가 기록".
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('shell') === 'v2' && params.get('tab') === 'records') {
+        const sub = params.get('sub');
+        if (!sub || sub === 'all') {
+          setActiveTabState(DEFAULT_TAB);
+          setRecordsSubTabState(DEFAULT_RECORDS_SUBTAB);
+          writeLocationState(DEFAULT_TAB, DEFAULT_RECORDS_SUBTAB, { push: false });
+        } else {
+          writeLocationState(activeTab, recordsSubTab, { push: false });
+        }
+      } else {
+        writeLocationState(activeTab, recordsSubTab, { push: false });
+      }
+    } catch (_) {
+      writeLocationState(activeTab, recordsSubTab, { push: false });
+    }
     prefetchDestinationUi();
     const onPopState = () => {
-      setActiveTabState(readTabFromLocation());
-      setRecordsSubTabState(readRecordsSubTabFromLocation());
+      const nextTab = readTabFromLocation();
+      const nextSub = readRecordsSubTabFromLocation();
+      // Popping onto the hub (legacy history entries) → snap to calendar via replace.
+      try {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('shell') === 'v2' && params.get('tab') === 'records') {
+          const sub = params.get('sub');
+          if (!sub || sub === 'all') {
+            setActiveTabState(DEFAULT_TAB);
+            setRecordsSubTabState(DEFAULT_RECORDS_SUBTAB);
+            writeLocationState(DEFAULT_TAB, DEFAULT_RECORDS_SUBTAB, { push: false });
+            return;
+          }
+        }
+      } catch (_) { /* ignore */ }
+      setActiveTabState(nextTab);
+      setRecordsSubTabState(nextSub);
     };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
@@ -3235,9 +3372,13 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   const selectSideItem = (id) => {
     setIsSideNavOpen(false);
     const dest = resolveV2Destination(id);
-    if (dest.tab === 'records' && dest.sub) {
-      setActiveTab('records');
-      setRecordsSubTab(dest.sub);
+    if (dest.tab === 'records') {
+      if (activeTab === 'records' && dest.sub && dest.sub === recordsSubTab) return;
+      navigateV2Destination(id, {
+        push: true,
+        setTab: setActiveTabState,
+        setSub: setRecordsSubTabState,
+      });
       return;
     }
     setActiveTab(dest.tab);
@@ -3505,7 +3646,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
       onJumpToChatMessage: v2RecordsContext.historyProps?.onJumpToChatMessage,
       onJumpToMemo: v2RecordsContext.historyProps?.onJumpToMemo,
       onJumpToMeetingDate: v2RecordsContext.historyProps?.onJumpToMeetingDate,
-      onJumpToGallery: () => { setActiveTab('records'); setRecordsSubTab('media'); },
+      onJumpToGallery: () => { navigateV2Destination('gallery', { push: true, setTab: setActiveTabState, setSub: setRecordsSubTabState }); },
       onGetChatMessageOrdinal: v2RecordsContext.historyProps?.onGetChatMessageOrdinal,
       onGetGalleryPhotoOrdinal: v2RecordsContext.historyProps?.onGetGalleryPhotoOrdinal,
       onRequestConfirm: v2RecordsContext.historyProps?.onRequestConfirm,

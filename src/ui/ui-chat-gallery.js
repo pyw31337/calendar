@@ -3,6 +3,7 @@
  */
 
 import { composeGalleryPhotos, getPaginationWindow, isMemeKeyboardPhotoEntry } from '../core/gallery-data.js';
+import { resolveGalleryThumbUrl } from '../core/gallery-thumb.js';
 import { resolveGalleryLightboxTags } from '../core/photo-index.js';
 import { useScrollHideHeader } from '../core/use-scroll-hide-header.js';
 
@@ -1905,12 +1906,15 @@ export function ChatGalleryModal({
       ...commentIdentity,
       legacyKeys: [...(commentIdentity.legacyKeys || []), legacyMeetingKey].filter(Boolean)
     }, photoCommentCounts));
+    const resolvedThumb = resolveGalleryThumbUrl(photo, {
+      isBroken: value => isBrokenPhotoValue(value),
+    });
     const thumb = /*#__PURE__*/React.createElement(MediaThumb, {
       key: isBulkShareMode ? undefined : itemKey,
       "data-photo-url": photo.full || photo.thumb,
       "data-message-id": photo.messageId || photo.sourceMessageId,
-      src: (photo.thumb && String(photo.thumb)) || (photo.full && String(photo.full)) || '',
-      fallbackSrc: (photo.full && String(photo.full)) || (photo.thumb && String(photo.thumb)) || '',
+      src: resolvedThumb.src,
+      fallbackSrc: resolvedThumb.fallbackSrc,
       alt: "공유사진",
       loading: "lazy",
       decoding: "async",
