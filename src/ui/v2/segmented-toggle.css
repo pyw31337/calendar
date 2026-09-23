@@ -1,14 +1,15 @@
 /* V2 shared segmented / pill switch (SegmentedToggle).
  *
- * UnderlineTabs keep the purple bottom-border focus via .underline-tabs rules.
- * SegmentedToggle reuses role="tablist" but must NOT inherit that underline
- * chrome — active focus is a filled purple (or option.activeColor) pill.
- * Scoped to V2 only; default shell keeps inline styles untouched.
+ * UnderlineTabs keep purple bottom-border focus via .underline-tabs rules.
+ * SegmentedToggle also uses role="tablist" but must NOT inherit underline chrome —
+ * active focus is a filled purple (or option.activeColor) pill.
+ * Selectors avoid requiring shared-JS class changes; class hooks are optional extras.
  */
 
 html:has(.renewal-shell.v2-design) .segmented-toggle,
 .renewal-shell.v2-design .segmented-toggle,
-html:has(.renewal-shell.v2-design) .modal-overlay .segmented-toggle {
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"]:not(.underline-tabs):not(.renewal-shell-subtab-row),
+.renewal-shell.v2-design .modal-overlay [role="tablist"]:not(.underline-tabs):not(.renewal-shell-subtab-row) {
   display: inline-flex !important;
   align-items: stretch !important;
   width: auto !important;
@@ -24,10 +25,10 @@ html:has(.renewal-shell.v2-design) .modal-overlay .segmented-toggle {
   gap: 0 !important;
 }
 
-/* Kill any leftover underline-tab hairline / ::after on segmented pills. */
 html:has(.renewal-shell.v2-design) .segmented-toggle > button,
-html:has(.renewal-shell.v2-design) .modal-overlay .segmented-toggle > button,
-.renewal-shell.v2-design .segmented-toggle > button {
+.renewal-shell.v2-design .segmented-toggle > button,
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"]:not(.underline-tabs):not(.renewal-shell-subtab-row) > button,
+.renewal-shell.v2-design .modal-overlay [role="tablist"]:not(.underline-tabs):not(.renewal-shell-subtab-row) > button {
   position: relative !important;
   flex: 1 1 auto !important;
   height: auto !important;
@@ -41,17 +42,17 @@ html:has(.renewal-shell.v2-design) .modal-overlay .segmented-toggle > button,
 }
 
 html:has(.renewal-shell.v2-design) .segmented-toggle > button::after,
-html:has(.renewal-shell.v2-design) .modal-overlay .segmented-toggle > button::after,
-.renewal-shell.v2-design .segmented-toggle > button::after {
+.renewal-shell.v2-design .segmented-toggle > button::after,
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"]:not(.underline-tabs):not(.renewal-shell-subtab-row) > button::after,
+.renewal-shell.v2-design .modal-overlay [role="tablist"]:not(.underline-tabs):not(.renewal-shell-subtab-row) > button::after {
   content: none !important;
   display: none !important;
 }
 
-/* Default active fill when the inline accent token is the shared primary
-   (양력/음력, 하루/연일, 목록-adjacent switches). Custom activeColor stays via inline. */
 html:has(.renewal-shell.v2-design) .segmented-toggle > button[aria-selected="true"],
-html:has(.renewal-shell.v2-design) .modal-overlay .segmented-toggle > button[aria-selected="true"],
-.renewal-shell.v2-design .segmented-toggle > button[aria-selected="true"] {
+.renewal-shell.v2-design .segmented-toggle > button[aria-selected="true"],
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"]:not(.underline-tabs):not(.renewal-shell-subtab-row) > button[aria-selected="true"],
+.renewal-shell.v2-design .modal-overlay [role="tablist"]:not(.underline-tabs):not(.renewal-shell-subtab-row) > button[aria-selected="true"] {
   border-bottom: 0 !important;
   font-weight: 800 !important;
 }
@@ -64,9 +65,15 @@ html:has(.renewal-shell.v2-design) label.anniversary-type-option:has(input:check
   color: var(--text-main, #0F172A) !important;
 }
 
-/* Single-option pill (e.g. 반복) that mirrors SegmentedToggle chrome. */
+/* Single-option pill (e.g. 반복) mirroring SegmentedToggle chrome. */
 html:has(.renewal-shell.v2-design) .segmented-toggle--single > button,
-.renewal-shell.v2-design .segmented-toggle--single > button {
+.renewal-shell.v2-design .segmented-toggle--single > button,
+html:has(.renewal-shell.v2-design) [role="group"][aria-label="반복 여부"],
+.renewal-shell.v2-design [role="group"][aria-label="반복 여부"] {
+  border-radius: 999px !important;
+}
+html:has(.renewal-shell.v2-design) [role="group"][aria-label="반복 여부"] > button,
+.renewal-shell.v2-design [role="group"][aria-label="반복 여부"] > button {
   border-radius: 999px !important;
   border-bottom: 0 !important;
 }
