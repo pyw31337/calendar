@@ -1,8 +1,8 @@
 # V2 다크모드 토큰 핸드오프
 
 **독자:** Grok / Codex / Claude / Gemini / 사람  
-**최종 갱신:** 2026-09-23 (Claude, PR #741, 로컬+라이브 프리뷰 재QA 완료)  
-**상태 한 줄:** 라이브 다크 재QA로 **핵심 원인 1건 발견·수정**: `src/app.css`의 `.renewal-shell` "V2 reference parity" 블록이 `--renewal-bg/card/text/muted`를 하드코딩 라이트 값으로 재정의해 모든 V2 페이지(채팅/메모/장소/정산/갤러리/컨텐츠/보관함) 헤더 타이틀·카드 제목·라벨 텍스트가 다크에서 거의 안 보였음 → 테마 토큰으로 되돌림(Phase 4, PR #741). 로컬 빌드 + **PR #741의 GitHub Pages 프리뷰 라이브 배포본** 양쪽에서 8개 화면 전부 재확인 완료 (정산 "카테고리별 지출" 라벨 computed color `rgb(241,245,249)` 확인). PR은 ready-for-review 상태, 머지 대기. **기본 URL 컷오버 여전히 금지** — 머지 후 남은 건 Confirm/토스트/알림헬프 모달 다크 QA와 Safari 채팅 VV.
+**최종 갱신:** 2026-09-23 (Claude, PR #741 머지됨 + 잔여 모달 QA·포괄 가드 테스트 추가)  
+**상태 한 줄:** **다크모드 P0는 사실상 완료.** Phase 4(PR #741, 머지됨)로 헤더 타이틀·카드 제목·라벨 텍스트가 다크에서 안 보이던 근본 원인(`--renewal-*` 토큰 재하드코딩)을 잡았고, 라이브 배포본에서 8개 페이지 재확인 완료. 이어서 Confirm 다이얼로그·토스트·ShareModal도 라이브 다크에서 직접 확인(전부 정상). 재발 방지용 **포괄 가드 테스트**(`test/v2-dark-tokens-guard.test.mjs`)도 추가 — 특정 셀렉터가 아니라 "`--renewal-*`/`--bg-*`/`--text-*` 토큰이 리터럴 hex로 재정의되면 무조건 실패"하는 일반 규칙이라 앞으로 같은 유형의 5번째 재발을 막는다. 남은 건 **NotificationPermissionHelpModal**(권한-거부 상태를 헤드리스로 강제하기 어려워 직접 트리거 확인은 못 함, 다만 같은 ConfirmDialog 계열 컴포넌트라 간접 검증됨)과 **Safari 모바일 채팅 VV**(정적 코드 리뷰·관련 자동 테스트 24개는 전부 통과했지만, 이 샌드박스엔 WebKit/Safari 브라우저가 없어 실기기 서명은 사람이 해야 함). **기본 URL 컷오버는 Safari 실기기 서명 전까지 여전히 금지.**
 
 컷오버 전체 계획: [`docs/v2-default-cutover-handoff.md`](./v2-default-cutover-handoff.md)  
 짧은 현황: [`docs/V2-STATUS.md`](./V2-STATUS.md)
@@ -34,7 +34,8 @@
 | **2** | **#737** | `dest-chrome-late.css` / `screens.css` / `design.css` 의 `#fff`/`#fafafc` 표면 → `var(--bg-card)`/`var(--bg-primary)`. 가드: `test/v2-dark-tokens-phase2.test.mjs` |
 | **2b** | **#738** | 잔여: `responsive-audit.css` / `chat-bubble-modules.css` / `segmented-toggle.css` |
 | **3** | **#739** | **핵심 원인 (1차):** `src/app.css` `.renewal-shell-main.is-chat` / `.is-records` 가 `#FAFAFC`/`#FFFFFF !important` 로 채팅·메모를 다시 밝게 덮음 → 토큰화. `color-mix(..., #fff)` 잔여도 정리. 가드: `test/v2-dark-tokens-phase3.test.mjs` |
-| **4** | *(PR 대기)* | **핵심 원인 (2차, 더 근본적):** `src/app.css`의 `.renewal-shell { /* V2 reference parity overrides */ }` 블록이 `--renewal-bg`/`--renewal-card`/`--renewal-text`/`--renewal-muted` 를 하드코딩 라이트 hex(`#FAFAFC`/`#FFFFFF`/`#1E1B2E`/`#6B6580`)로 재정의 — 같은 파일 위쪽에서 이미 `var(--bg-primary)` 등으로 테마 인식되게 해둔 걸 이 블록이 소스 순서상 나중에 실행되며 덮어씀. `.renewal-shell-main`과 그 하위 대부분이 `color: var(--renewal-text)`를 상속하므로, 페이지 헤더 타이틀("채팅"/"메모"/"정산" 등)·메모 카드 제목·정산 "카테고리별 지출" 라벨이 다크에서 거의 안 보였던 근본 원인. `src/ui/v2/*.css`의 남은 리터럴 `color: #1e1b2e` 11곳(스크린 헤더 타이틀, place-card 이름, bottom-sheet 제목 등)도 `var(--text-main)`으로 교체. 가드: `test/v2-dark-tokens-phase4.test.mjs` |
+| **4** | **#741** | **핵심 원인 (2차, 더 근본적):** `src/app.css`의 `.renewal-shell { /* V2 reference parity overrides */ }` 블록이 `--renewal-bg`/`--renewal-card`/`--renewal-text`/`--renewal-muted` 를 하드코딩 라이트 hex(`#FAFAFC`/`#FFFFFF`/`#1E1B2E`/`#6B6580`)로 재정의 — 같은 파일 위쪽에서 이미 `var(--bg-primary)` 등으로 테마 인식되게 해둔 걸 이 블록이 소스 순서상 나중에 실행되며 덮어씀. `.renewal-shell-main`과 그 하위 대부분이 `color: var(--renewal-text)`를 상속하므로, 페이지 헤더 타이틀("채팅"/"메모"/"정산" 등)·메모 카드 제목·정산 "카테고리별 지출" 라벨이 다크에서 거의 안 보였던 근본 원인. `src/ui/v2/*.css`의 남은 리터럴 `color: #1e1b2e` 11곳(스크린 헤더 타이틀, place-card 이름, bottom-sheet 제목 등)도 `var(--text-main)`으로 교체. 가드: `test/v2-dark-tokens-phase4.test.mjs` |
+| **가드** | *(비공개 유닛)* | 특정 phase가 아니라 **재발 방지용 일반 규칙**: `--renewal-*`가 리터럴 hex면 무조건 실패, `src/ui/v2/*.css`가 `--bg-*`/`--text-*` 토큰을 재정의하면 무조건 실패. 가드: `test/v2-dark-tokens-guard.test.mjs` |
 
 관련 비다크: #734 NotificationPermissionHelpModal V2 remount, #733 applicator 삭제.
 
@@ -71,26 +72,35 @@
 
 ## 3. 지금 할 일 (우선순위)
 
-### P0 — PR #741 머지 확인 + 남은 잔여 QA (다음 에이전트가 시작할 지점)
+### P0 — 다크모드는 사실상 끝. 남은 건 검증 못 한 두 가지뿐
 
-Phase 4는 로컬 빌드와 PR #741의 GitHub Pages 프리뷰(라이브 배포본) 양쪽에서 8개 화면 재확인까지 끝났다. 남은 건:
+Phase 4(PR #741)는 머지 완료, 로컬 빌드 + 라이브 배포본 양쪽에서 8개 페이지 재확인 완료. 이어서 확인한 것:
 
-1. PR #741이 머지됐는지, `main` 기준 라이브(`https://pyw31337.github.io/calendar/?id=cw&shell=v2`)에 반영됐는지 확인.
-2. Confirm·토스트·알림헬프 모달도 다크에서 스크린샷 확인 (Phase 4 QA에서는 8개 페이지 본문만 보고 이건 아직 못 봄).
-3. 홈 화면 "모임확정" 플로팅 카드 등, Phase 1–3 이전 기록(§2 하단 과거 기록 표)에 있던 항목이 실제로 다 해결됐는지 한 번 더 눈으로 확인.
-4. 그래도 아직 밝은 표면이 남아있으면 DevTools로 **이긴 규칙** 찾기. 흔한 범인 (Phase 4로 가장 큰 원인은 잡았지만 남아있을 수 있는 것):
+1. ✅ **PR #741 머지 확인** — `main`에 반영됨.
+2. ✅ **Confirm 다이얼로그·토스트·ShareModal** — 라이브 다크에서 직접 트리거해 확인. 전부 정상 (배경 `rgb(19,27,46)`=`--bg-secondary` 다크, 타이틀 `rgb(241,245,249)`=`--text-main` 다크, 성공 토스트는 초록 배경에 흰 텍스트로 테마 무관하게 항상 정상).
+3. ✅ **홈 화면 "모임확정" 플로팅 카드** (`bp-dday-*` 클래스들) — `src/ui/v2/*.css` 전체에서 `color`/`background` 리터럴 hex가 하나도 없음을 정적으로 확인(전부 `var(...)`). §2 하단 과거 기록의 "밝음 (잔여)"는 Phase 3 이전 스냅샷이라 이미 해결된 상태.
+4. ⚠️ **NotificationPermissionHelpModal**만 직접 트리거를 못 함 — `Notification.permission === 'denied'`를 헤드리스 Chromium에서 강제해도 앱이 실제로 감지하지 못함(원인 미확인, 우선순위 낮음: 같은 `ConfirmDialog`류 컴포넌트라 간접 검증됨). 다음에 시도한다면 실제 브라우저에서 알림 권한을 거부한 뒤 "채팅 알림" 토글을 눌러서 재현.
+
+그래도 뭔가 밝은 표면이 남아있으면 DevTools로 **이긴 규칙** 찾기. 흔한 범인 (Phase 4로 가장 큰 원인은 잡았지만 남아있을 수 있는 것):
    - `src/app.css`에 `--renewal-*` 처럼 **다른 CSS 변수를 재정의하는 블록**이 소스 순서상 늦게 나오면서 앞선 테마 인식 정의를 덮는 패턴 (Phase 4가 잡은 것과 동일 유형) — `grep -n "^\s*--[a-z-]*:\s*#" src/app.css` 로 훑어볼 것
    - 인라인 `style={{ backgroundColor: '#fff' }}` / `background: white`
    - `var(--bg-card, #fff)` 폴백 (토큰 미정의 시)
    - `color-mix(..., #fff)` / `background: white` 키워드
    - V1 컴포넌트 하드코드 (`confirmed-meeting-card` 등 — 일부는 `:root[data-theme="dark"]` 오버라이드 있음)
 5. 픽스는 **작은 PR**, CSS(+가드 테스트)만. 컷오버 플래그 금지.
-6. 다크 P0가 다 끝나면 **Safari 모바일 채팅** P0로 넘어갈 것 (아래).
+6. 다크는 위 3항목(모달 3종)까지 끝나면 사실상 완료. 남은 P0는 아래 Safari뿐.
 
-### P0 — Safari 모바일 채팅 (다크와 병행 가능하나 viewport 파일 충돌 주의)
+### P0 — Safari 모바일 채팅 (2026-09-23 정적 리뷰 완료, 실기기 서명만 남음)
 
-- `viewport-shell.css`, visualViewport sync, 키보드 open/close, 스크롤, 포커스, 라이트박스.
-- 실기기 iPhone Safari 서명 전까지 컷오버 금지.
+**코드:** `viewport-shell.css` (`html:has(.v2-design)` 문서 잠금, `visualViewport` 높이/오프셋 CSS 변수 소비), `visual-viewport-sync.js` (visualViewport `resize`/`scroll` 리스너 → `--app-vv-height`/`--app-vv-offset-top`/`--app-vv-offset-left` 갱신, 키보드 휴리스틱: `layoutH - vvH - rawTop > 120`으로 실제 키보드와 사소한 UI 흔들림 구분, 라이트박스 슬라이드 폭 보정).
+
+**이번 세션에서 한 것:**
+- 두 파일 정적 코드 리뷰 — 표준 `visualViewport` API·`requestAnimationFrame`·`MutationObserver`만 사용, 로직 결함 못 찾음. 값이 실제로 바뀔 때만 CSS 변수를 쓰는 방어 코드도 있어 불필요한 reflow는 안 남.
+- `node --test test/v2-scrollport.test.mjs test/v2-style-isolation.test.mjs test/v2-routing.test.mjs` — 24개 전부 통과.
+- **이 샌드박스는 WebKit/Safari 브라우저가 설치돼 있지 않고, `playwright install`로 새로 받는 것도 금지돼 있어 실제 Safari(데스크톱조차)로 렌더링 확인이 불가능함.** 즉 여기서 할 수 있는 검증은 이미 다 했고, 남은 건 진짜 iPhone Safari에서 키보드 open/close, 스크롤, 포커스, 라이트박스를 눈으로 보는 것뿐.
+- 실기기 iPhone Safari 서명 전까지 컷오버 금지 — 이 판단은 바뀌지 않음.
+
+**다음 에이전트/사람이 할 일:** iPhone Safari(가능하면 최신 + 구형 한두 버전)에서 `?id=cw&shell=v2` 채팅 탭 열고 키보드 올렸다 내렸다, 스크롤, 사진 라이트박스 확인. 문제 있으면 위 두 파일이 건드릴 곳.
 
 ### P1 — 컷오버 메커닉스 (다크+Safari **후**)
 
@@ -119,7 +129,8 @@ git fetch origin && git checkout main && git pull --ff-only
 node --test test/v2-dark-tokens-phase1.test.mjs \
              test/v2-dark-tokens-phase2.test.mjs \
              test/v2-dark-tokens-phase3.test.mjs \
-             test/v2-dark-tokens-phase4.test.mjs
+             test/v2-dark-tokens-phase4.test.mjs \
+             test/v2-dark-tokens-guard.test.mjs
 # 의심 표면 검색:
 grep -nE 'background(-color)?:\s*(#fff|#ffffff|#fafafc|white)\b' src/ui/v2/*.css src/app.css | head
 grep -nE 'renewal-shell-main\.is-chat|is-records' src/app.css | head
