@@ -1,9 +1,8 @@
 /* Generated from SettlementFull.dc.html. Run node scripts/generate-v2-reference-css.mjs. */
+/* Phase1 dark tokens: surface/text vars inherit from V1 :root[data-theme] — do not re-literal light resets. */
 
     .v2-settlement {
-      --bg-primary: #FAFAFC; --bg-card: #FFFFFF; --border-subtle: #ECEAF5;
-      --text-main: #1E1B2E; --text-muted: #6B6580; --text-light: #83798F;
-      --brand: #7C2FE5; --brand-soft: #F3EEFF; --status-green: #16A34A; --surface-success: #ECFDF5;
+      --brand: #7C2FE5; --brand-soft: #F3EEFF; --status-green: #16A34A;
       --radius-lg: 18px; --radius-md: 12px; --radius-sm: 8px; --radius-full: 9999px;
       --p-yeongwoo: #F87171; --p-yuri: #FB923C; --p-manshik: #34D399; --p-eunhye: #22D3EE;
     }
