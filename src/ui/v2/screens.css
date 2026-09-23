@@ -17,6 +17,9 @@
   min-height: 60px;
   padding: 0 14px;
   box-sizing: border-box;
+  background: var(--bg-card);
+  color: var(--text-main);
+  border-bottom: 1px solid var(--border-subtle);
 }
 .v2-design .v2-page-header .bp-header-row { height: 100%; display: flex; align-items: center; gap: 8px; }
 .v2-design .v2-page-header .bp-back-btn { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; padding: 4px; }
@@ -77,7 +80,7 @@
 }
 .v2-design .v2-compose-dialog {
   width: 100%; max-width: 560px; max-height: 90dvh; overflow: auto;
-  background: white; border-radius: 18px; padding: 16px;
+  background: var(--bg-card); border-radius: 18px; padding: 16px;
 }
 .v2-design .v2-dialog-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
 
@@ -174,7 +177,7 @@
 /* Settlement */
 .v2-design .v2-period-toggle {
   font-size: var(--font-size-2xs); padding: 4px 8px; border: 1px solid var(--v2-card-border, #eceaf5);
-  background: white; color: var(--brand, #7C2FE5); border-radius: 999px; cursor: pointer; margin-left: 8px;
+  background: var(--bg-card); color: var(--brand, #7C2FE5); border-radius: 999px; cursor: pointer; margin-left: 8px;
 }
 .v2-design .v2-settlement .bp-expense-row { width: 100%; text-align: left; cursor: pointer; font-family: inherit; }
 .v2-design .v2-settlement .bp-expense-row-payer { display: block; font-weight: 400; margin-top: 3px; }
