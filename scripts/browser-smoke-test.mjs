@@ -412,7 +412,7 @@ async function checkPhotoCommentIsolation(browser, baseUrl) {
 }
 
 async function checkDeferredManual(browser, baseUrl) {
-  const label = '사용자 매뉴얼 지연 chunk 로딩';
+  const label = '사용자 매뉴얼 메뉴 제거';
   const context = await browser.newContext(mobileContextOptions());
   const page = await context.newPage();
   try {
@@ -423,9 +423,9 @@ async function checkDeferredManual(browser, baseUrl) {
     await menuButton.dispatchEvent('click');
     const menu = page.locator('.admin-side-menu-overlay > .admin-side-menu:visible').last();
     await menu.waitFor({ state: 'visible', timeout: 8000 });
-    await menu.locator('text=사용자 매뉴얼').first().click();
-    await page.locator('.manual-panel:visible').waitFor({ state: 'visible', timeout: 10000 });
-    pass(label);
+    const manualCount = await menu.locator('text=사용자 매뉴얼').count();
+    if (manualCount !== 0) fail(label, '사용자 매뉴얼 항목이 아직 사이드 메뉴에 있습니다.');
+    else pass(label);
   } catch (err) {
     fail(label, err.message);
   } finally {

@@ -209,7 +209,7 @@ function TabIcon({ id, active, size = 16 }) {
  * 더보기만 둔다"). Shared across all 5 tabs, sitting above wherever each tab's own summary badge
  * (예: 캘린더 tab의 D-day 요약, WP-03) will render.
  */
-function TopHeader({ calendarName, onOpenSearch, onOpenMore }) {
+function TopHeader({ calendarName, onOpenSearch, onOpenCalendarSettings, onOpenAnniversaries }) {
   const React = window.React;
   const brandName = String(calendarName || '모여라 캘린더')
     .replace(/^[^\p{L}\p{N}]+/u, '')
@@ -224,14 +224,17 @@ function TopHeader({ calendarName, onOpenSearch, onOpenMore }) {
       React.createElement('span', { className: bentoClass('brand-name') }, brandName)
     ),
     React.createElement('div', { className: bentoClass('renewal-shell-header-actions bento-title-actions') },
+      React.createElement('button', { type: 'button', className: bentoClass('renewal-shell-header-icon-btn icon-btn'), 'aria-label': '캘린더 설정', title: '캘린더 설정', onClick: onOpenCalendarSettings },
+        React.createElement(TabIcon, { id: 'calendarSettings', size: 18 })
+      ),
+      React.createElement('button', { type: 'button', className: bentoClass('renewal-shell-header-icon-btn icon-btn'), 'aria-label': '기념일 설정', title: '기념일 설정', onClick: onOpenAnniversaries },
+        React.createElement(TabIcon, { id: 'cake', size: 18 })
+      ),
       React.createElement('button', { type: 'button', className: bentoClass('renewal-shell-header-icon-btn icon-btn'), 'aria-label': '검색', onClick: onOpenSearch },
         React.createElement('svg', { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' },
           React.createElement('circle', { cx: 11, cy: 11, r: 8 }),
           React.createElement('path', { d: 'm21 21-4.3-4.3' })
         )
-      ),
-      React.createElement('button', { type: 'button', className: bentoClass('renewal-shell-header-icon-btn icon-btn side-nav-toggle-btn'), 'aria-label': '더보기', onClick: onOpenMore },
-        React.createElement(TabIcon, { id: 'more' })
       )
     )
   );
@@ -1122,7 +1125,7 @@ function HeroQuickNav({ onChangeView, settlementBalanceBadge }) {
   );
 }
 
-function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeView, onOpenMemo, calendarName, onOpenSearch, onOpenMore, settlementBalanceBadge }) {
+function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeView, onOpenMemo, calendarName, onOpenSearch, onOpenCalendarSettings, onOpenAnniversaries, onOpenSideNav, settlementBalanceBadge }) {
   const React = window.React;
   const mergedCalendar = React.useMemo(() => {
     const base = calendarContext?.calendar || {};
@@ -1135,10 +1138,17 @@ function CalendarPane({ calendarContext, recordsContext, onOpenDate, onChangeVie
   return React.createElement(React.Fragment, null,
     React.createElement('div', { className: 'bp-hero-zone' },
       React.createElement('span', { className: 'bp-hero-aurora', 'aria-hidden': 'true' }),
-      React.createElement(TopHeader, { calendarName, onOpenSearch, onOpenMore }),
+      React.createElement(TopHeader, { calendarName, onOpenSearch, onOpenCalendarSettings, onOpenAnniversaries }),
       React.createElement(HeroQuickNav, { onChangeView, settlementBalanceBadge }),
       React.createElement(RenewalHero, { meetings: calendarContext.upcomingMeetings, calendar: mergedCalendar, onSelectDate: onOpenDate })
     ),
+    React.createElement('button', {
+      type: 'button',
+      className: 'bp-fab bp-home-menu-fab',
+      'aria-label': '메뉴',
+      title: '메뉴',
+      onClick: onOpenSideNav,
+    }, React.createElement(TabIcon, { id: 'more', size: 22 })),
 
     React.createElement(HomeActivitySummary, {
       calendarContext: {
@@ -2521,7 +2531,6 @@ const MORE_ITEMS = [
   { id: 'anniversaries', label: '기념일 설정' },
   { id: 'calendar-settings', label: '캘린더 설정' },
   { id: 'app-settings', label: '앱 설정' },
-  { id: 'manual', label: '사용자 매뉴얼' },
   { id: 'admin', label: '관리자 진입' },
 ];
 
@@ -2531,7 +2540,6 @@ const MORE_ITEM_ICONS = {
   anniversaries: 'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2ZM8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01',
   'calendar-settings': 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.13.36.35.68.63.94.28.26.62.44 1 .5H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z',
   'app-settings': 'M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6',
-  manual: 'M4 19.5A2.5 2.5 0 0 1 6.5 17H20V2H6.5A2.5 2.5 0 0 0 4 4.5v15ZM8 7h8M8 11h8',
   admin: 'M12 2 3 6v6c0 5 3.8 8.7 9 10 5.2-1.3 9-5 9-10V6l-9-4Z',
 };
 
@@ -2557,7 +2565,7 @@ function MoreItemIcon({ id }) {
  * permission, weather location), so it's wired for real here using the exact same handlers/
  * utilities CalendarApp's own old menu uses (no reimplementation).
  */
-const REAL_MORE_MODAL_IDS = ['share', 'anniversaries', 'manual', 'app-settings', 'calendar-settings', 'search'];
+const REAL_MORE_MODAL_IDS = ['share', 'anniversaries', 'app-settings', 'calendar-settings', 'search'];
 
 /**
  * Builds the 더보기 list's real destinations from CalendarApp's own state/helpers, passed in as
@@ -2766,10 +2774,9 @@ export function buildRenewalMoreContext(calendar, deps) {
 function MoreModalsHost({ openModal, onClose, modalProps, anniversaryOverride, calendarSettingsExtra, searchExtra }) {
   const React = window.React;
   if (!openModal) return null;
-  const { ShareModal, AnniversaryModal, UserManualOverlay, AppSettingsModal, AdminModal, GlobalSearchModal } = bindUiComponentAliases(React);
+  const { ShareModal, AnniversaryModal, AppSettingsModal, AdminModal, GlobalSearchModal } = bindUiComponentAliases(React);
   if (openModal === 'share') return React.createElement(ShareModal, { ...modalProps.share, onClose });
   if (openModal === 'anniversaries') return React.createElement(AnniversaryModal, { ...modalProps.anniversaries, ...anniversaryOverride, onClose });
-  if (openModal === 'manual') return React.createElement(UserManualOverlay, { ...modalProps.manual, onClose });
   if (openModal === 'app-settings') return React.createElement(AppSettingsModal, { ...modalProps['app-settings'], onClose });
   if (openModal === 'calendar-settings') return React.createElement(AdminModal, { ...modalProps['calendar-settings'], ...calendarSettingsExtra, onClose });
   if (openModal === 'search') return React.createElement(GlobalSearchModal, { ...modalProps.search, ...searchExtra, onClose });
@@ -3014,7 +3021,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
   const openMoreModalById = (id) => {
     const trigger = {
       share: moreContext.onSelectShare, anniversaries: moreContext.onSelectAnniversaries,
-      manual: moreContext.onSelectManual, 'app-settings': moreContext.onSelectAppSettings,
+      'app-settings': moreContext.onSelectAppSettings,
       'calendar-settings': moreContext.onSelectCalendarSettings,
       search: moreContext.onSelectSearch,
     }[id];
@@ -3424,7 +3431,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
       React.createElement('main', { className: activeTab === 'calendar' ? 'bp-app-shell is-bento-home' : `renewal-shell-main v2-destination ${hasFullScreen ? `v2-${activeTab}` : (activeTab === 'records' ? `is-records v2-records-${recordsSubTab}` : `is-${activeTab}`)}` },
 
         activeTab === 'calendar'
-          ? React.createElement(CalendarPane, { calendarContext: v2CalendarContext, recordsContext: v2RecordsContext, onOpenDate: (d) => { setDateModalTab(null); setDateModalDate(d); }, onChangeView, onOpenMemo: onOpenMemoFromHome, calendarName, onOpenSearch: () => setActiveTab('search'), onOpenMore: () => setIsSideNavOpen(true), settlementBalanceBadge })
+          ? React.createElement(CalendarPane, { calendarContext: v2CalendarContext, recordsContext: v2RecordsContext, onOpenDate: (d) => { setDateModalTab(null); setDateModalDate(d); }, onChangeView, onOpenMemo: onOpenMemoFromHome, calendarName, onOpenSearch: () => setActiveTab('search'), onOpenCalendarSettings: () => openMoreModalById('calendar-settings'), onOpenAnniversaries: () => openMoreModalById('anniversaries'), onOpenSideNav: () => setIsSideNavOpen(true), settlementBalanceBadge })
           : activeTab === 'search'
           ? React.createElement(SearchPage, { modalProps: moreContext.modalProps.search, searchExtra, onClose: () => setActiveTab('calendar') })
           : activeTab === 'chat'

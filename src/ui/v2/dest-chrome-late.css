@@ -2474,4 +2474,190 @@ html:has(.renewal-shell.v2-design) .bp-event-sheet .underline-tabs button[aria-s
   background: var(--brand, #7C2FE5) !important;
 }
 
+/* Calendar home: purple circle menu button (same FAB as memo), phone/tablet only.
+ * Desktop already keeps the side rail open, so the header hamburger is gone
+ * and this button is the mobile opener. */
+.v2-design .bp-home-menu-fab {
+  position: fixed !important;
+  right: 20px !important;
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px)) !important;
+  width: 52px !important;
+  height: 52px !important;
+  min-width: 52px !important;
+  min-height: 52px !important;
+  padding: 0 !important;
+  border-radius: 50% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 40 !important;
+  cursor: pointer;
+}
+.v2-design .bp-home-menu-fab svg {
+  width: 22px !important;
+  height: 22px !important;
+  display: block !important;
+}
+@media (min-width: 1200px) {
+  .v2-design .bp-home-menu-fab { display: none !important; }
+}
+
+/* Mobile/tablet drawer uses the PC rail's expanded layout, from the left.
+ * Close stays; collapse stays a desktop-only control. */
+@media (max-width: 1199px) {
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design {
+    padding-left: 0 !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav,
+  html:has(.renewal-shell.v2-design) .bp-side-nav.bp-is-collapsed {
+    --v2-side-head-h: 64px;
+    --v2-side-search-h: 40px;
+    --v2-side-search-my: 12px;
+    --v2-side-item-h: 44px;
+    --v2-side-item-gap: 2px;
+    --v2-side-icon: 20px;
+    display: flex !important;
+    flex-direction: column !important;
+    position: fixed !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: auto !important;
+    width: 280px !important;
+    max-width: min(280px, 88vw) !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border-left: none !important;
+    border-right: 1px solid var(--v2-card-border, #eceaf5) !important;
+    background: #fff !important;
+    box-shadow: 12px 0 32px rgba(30, 27, 46, 0.18) !important;
+    transform: translateX(-105%) !important;
+    z-index: 500 !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav.bp-is-open,
+  html:has(.renewal-shell.v2-design) .bp-side-nav.bp-is-collapsed.bp-is-open {
+    transform: translateX(0) !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav-backdrop {
+    z-index: 490 !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav-backdrop.bp-is-open {
+    display: block !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav-close-btn {
+    display: inline-flex !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav-collapse-btn {
+    display: none !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav-head {
+    height: var(--v2-side-head-h) !important;
+    min-height: var(--v2-side-head-h) !important;
+    max-height: var(--v2-side-head-h) !important;
+    padding: 12px !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    overflow: hidden !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav-brand {
+    height: 40px !important;
+    min-height: 40px !important;
+    gap: 8px !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav-brand-icon,
+  html:has(.renewal-shell.v2-design) .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-icon {
+    width: 40px !important;
+    height: 40px !important;
+    min-width: 40px !important;
+    min-height: 40px !important;
+    flex: 0 0 40px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav-brand-icon svg,
+  html:has(.renewal-shell.v2-design) .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-icon svg {
+    width: 26px !important;
+    height: 26px !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav .bp-side-nav-brand-text,
+  html:has(.renewal-shell.v2-design) .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-text,
+  html:has(.renewal-shell.v2-design) .bp-side-nav .bp-side-nav-item-title,
+  html:has(.renewal-shell.v2-design) .bp-side-nav.bp-is-collapsed .bp-side-nav-item-title,
+  html:has(.renewal-shell.v2-design) .bp-side-nav .bp-side-nav-item-meta,
+  html:has(.renewal-shell.v2-design) .bp-side-nav.bp-is-collapsed .bp-side-nav-item-meta,
+  html:has(.renewal-shell.v2-design) .bp-side-nav .bp-side-nav-global-search-label,
+  html:has(.renewal-shell.v2-design) .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search-label,
+  html:has(.renewal-shell.v2-design) .bp-side-nav .bp-side-nav-cal-badge,
+  html:has(.renewal-shell.v2-design) .bp-side-nav.bp-is-collapsed .bp-side-nav-cal-badge,
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design.is-side-collapsed .bp-side-nav-cal-badge {
+    display: inline-flex !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav-global-search,
+  html:has(.renewal-shell.v2-design) .bp-side-nav.bp-is-collapsed .bp-side-nav-global-search {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    width: calc(100% - 24px) !important;
+    height: var(--v2-side-search-h) !important;
+    min-height: var(--v2-side-search-h) !important;
+    margin: var(--v2-side-search-my) 12px !important;
+    padding: 0 14px 0 9px !important;
+    gap: 10px !important;
+    border-radius: 999px !important;
+    box-sizing: border-box !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav-global-search-icon,
+  html:has(.renewal-shell.v2-design) .bp-side-nav-global-search-icon svg {
+    width: 20px !important;
+    height: 20px !important;
+    min-width: 20px !important;
+    min-height: 20px !important;
+    flex: 0 0 20px !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav-group {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: var(--v2-side-item-gap) !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav-item,
+  html:has(.renewal-shell.v2-design) .bp-side-nav.bp-is-collapsed .bp-side-nav-item {
+    height: var(--v2-side-item-h) !important;
+    min-height: var(--v2-side-item-h) !important;
+    max-height: var(--v2-side-item-h) !important;
+    width: calc(100% - 20px) !important;
+    margin: 0 10px !important;
+    padding: 0 12px !important;
+    gap: 12px !important;
+    justify-content: flex-start !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    align-items: center !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav-item-icon,
+  html:has(.renewal-shell.v2-design) .bp-side-nav-item-icon svg {
+    width: var(--v2-side-icon) !important;
+    height: var(--v2-side-icon) !important;
+    min-width: var(--v2-side-icon) !important;
+    flex: 0 0 var(--v2-side-icon) !important;
+  }
+  html:has(.renewal-shell.v2-design) .bp-side-nav-footer {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: var(--v2-side-item-gap) !important;
+    margin-top: auto !important;
+    padding: 8px 8px 16px !important;
+  }
+}
+
 

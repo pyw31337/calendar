@@ -143,13 +143,15 @@ const ICON_NODES = {
   fileUpload: [
     ['path', { d: 'M14 3v4a1 1 0 0 0 1 1h4' }],
     ['path', { d: 'M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2' }],
-    ['path', { d: 'M12 11v6' }],
-    ['path', { d: 'M9.5 13.5l2.5 -2.5l2.5 2.5' }],
+    ['path', { d: 'M12 11l0 6' }],
+    ['path', { d: 'M9 14l6 0' }],
   ],
   link: [
     ['path', { d: 'M9 15l6 -6' }],
-    ['path', { d: 'M11 6l.463 -.536a5 5 0 0 1 7.071 7.072l-.534 .464' }],
-    ['path', { d: 'M13 18l-.397 .534a5.068 5.068 0 0 1 -7.127 0a4.972 4.972 0 0 1 0 -7.071l.524 -.463' }],
+    ['path', { d: 'M11 6l.463 -.536a5 5 0 0 1 7.072 0a4.993 4.993 0 0 1 -.001 7.072' }],
+    ['path', { d: 'M12.603 18.534a5.07 5.07 0 0 1 -7.127 0a4.972 4.972 0 0 1 0 -7.071l.524 -.463' }],
+    ['path', { d: 'M16 19h6' }],
+    ['path', { d: 'M19 16v6' }],
   ],
   mapPinPlus: [
     ['path', { d: 'M9 11a3 3 0 1 0 6 0a3 3 0 0 0 -6 0' }],
@@ -326,11 +328,11 @@ function Search({ value, onChange, placeholder }) {
   );
 }
 
-function Fab({ label, onClick }) {
+function Fab({ label, onClick, icon = 'plus' }) {
   return h(
     'button',
     { type: 'button', className: 'bp-fab', 'aria-label': label, onClick },
-    h(DesignIcon, { name: 'plus', size: 22, strokeWidth: 2.4 })
+    h(DesignIcon, { name: icon, size: 22, strokeWidth: 2.4 })
   );
 }
 
@@ -454,7 +456,7 @@ export function MemoScreen(p) {
             })
           ),
           h('div', { className: 'v2-dest-body v2-memo-body' }, slots.body),
-          h(Fab, { label: '메모 작성', onClick: p.onCompose })
+          h(Fab, { label: '메뉴', icon: 'menu', onClick: p.onMenu })
         ),
         overlays(slots, ['body', 'composer', 'list'])
       );
@@ -485,7 +487,7 @@ export function MemoScreen(p) {
           })
         ),
         wrapLegacy(p.legacyView, 'v2-legacy-body v2-memo-legacy'),
-        h(Fab, { label: '메모 작성', onClick: p.onCompose })
+        h(Fab, { label: '메뉴', icon: 'menu', onClick: p.onMenu })
       )
     );
   }
@@ -559,7 +561,7 @@ export function MemoScreen(p) {
         p.hasMoreMemos &&
           h('button', { type: 'button', className: 'v2-load-more', onClick: p.onLoadMoreMemos }, '메모 더 보기')
       ),
-      h(Fab, { label: '메모 작성', onClick: p.onCompose })
+      h(Fab, { label: '메뉴', icon: 'menu', onClick: p.onMenu })
     ),
     memoComposePopup,
     overlays(p.slots, ['composer', 'shared'])
