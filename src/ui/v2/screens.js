@@ -350,7 +350,30 @@ export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, se
     return () => document.removeEventListener('scroll', onScroll, true);
   }, [hideOnScroll, headerControlled]);
   const shown = headerControlled ? !forcedHidden : (!hideOnScroll || !hidden);
+  const floatingBack = !shown && typeof onBack === 'function'
+    ? h(
+      'button',
+      {
+        type: 'button',
+        className: 'bp-floating-back-btn',
+        'aria-label': '뒤로가기',
+        onClick: onBack,
+      },
+      h(DesignIcon, { name: 'back', size: 18 })
+    )
+    : null;
+  // Chat (and any overflow:hidden pane) clips a fixed button that stays in the
+  // header's parent. Portal to body so the stand-in < is actually visible.
+  const floatingBackNode = floatingBack
+    && typeof document !== 'undefined'
+    && window.ReactDOM
+    && typeof window.ReactDOM.createPortal === 'function'
+    ? window.ReactDOM.createPortal(floatingBack, document.body)
+    : floatingBack;
   return h(
+    React.Fragment,
+    null,
+    h(
     'header',
     {
       ref: headerRef,
@@ -375,10 +398,9 @@ export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, se
             !centerSubtitle && subtitle ? h('div', { className: 'bp-header-sub' }, subtitle) : null
           )
         ),
-        // Center brand text and search/share icons are not rendered. Destination
-        // pages open the side menu from the purple FAB, so the header menu button
-        // stays off unless `showMenu` is set (chat has no FAB). Chat renders the
-        // notice icon first, then the menu button.
+        // Center brand text and search/share icons are not rendered. Every
+        // destination, including chat, opens the side menu from the purple FAB.
+        // `extra` is the page's own tools (공지, 업로드, 정산 생성, …).
         h(
           'div',
           { className: 'bp-header-actions' },
@@ -387,7 +409,9 @@ export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, se
         )
       ),
       children
-    );
+    ),
+    floatingBackNode
+  );
 }
 
 function Search({ value, onChange, placeholder }) {
@@ -1160,7 +1184,8 @@ export function ChatScreen(p) {
     onSearch: p.onSearch,
     searchLabel: '대화 검색',
     onMenu: p.onMenu,
-    showMenu: true,
+    // Menu is the shared purple FAB, same as every other destination.
+    showMenu: false,
     // Chat owns hide direction (up into history hides, down toward latest shows).
     hideOnScroll: false,
     forcedHidden: headerHidden,
@@ -1351,7 +1376,7 @@ export function ChatScreen(p) {
             className: 'v2-chat-scroll',
             style: {
               ...(slots.body.props.style || {}),
-              paddingTop: 'calc(68px + env(safe-area-inset-top, 0px))',
+              paddingTop: 'calc(56px + env(safe-area-inset-top, 0px))',
               ...(keyboardPin === 'off' ? { paddingBottom: '72px' } : {}),
             },
             onScroll: (e) => {
@@ -1425,6 +1450,7 @@ export function ChatScreen(p) {
         composer,
         ...keptRootKids
       ),
+      h(Fab, { label: '메뉴', icon: 'menu', className: 'bp-menu-fab', onClick: p.onMenu }),
       ...passthrough,
       overlays(slots, [
         'notice', 'body', 'composer', 'lightbox', 'resize', 'memes', 'reply', 'textarea',
@@ -1441,7 +1467,8 @@ export function ChatScreen(p) {
       'div',
       { className: 'bp-app-shell v2-chat-shell' },
       h(PageHeader, chatHeader),
-      wrapLegacy(p.legacyView, 'v2-legacy-body v2-chat-legacy')
+      wrapLegacy(p.legacyView, 'v2-legacy-body v2-chat-legacy'),
+      h(Fab, { label: '메뉴', icon: 'menu', className: 'bp-menu-fab', onClick: p.onMenu })
     )
   );
 }

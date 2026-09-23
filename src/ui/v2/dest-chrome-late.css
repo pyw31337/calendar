@@ -173,7 +173,7 @@
 .renewal-shell.v2-design .v2-archive .history-page-scroll,
 .renewal-shell.v2-design .v2-archive .history-meetings-grid {
   padding-top: 0 !important;
-  margin-top: 36px !important;
+  margin-top: 0 !important;
 }
 .v2-design .v2-archive .history-bento-grid {
   padding: 0 !important;
@@ -707,7 +707,7 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
  * Floating back btn (position:fixed) must mirror the header back btn's y-position:
  * (56px row − 44px btn) / 2 = 6px from viewport top → matches header btn exactly. */
 .v2-design .bp-floating-back-btn {
-  top: 6px !important;
+  top: calc(6px + env(safe-area-inset-top, 0px)) !important;
 }
 
 
@@ -2277,10 +2277,8 @@ html:has(.renewal-shell.v2-design) .modal-overlay > form.modal-container:not(:ha
   }
 }
 
-/* Chat header collapses with every other destination header (see .is-scroll-hidden). */
-.v2-design .v2-chat .bp-floating-back-btn {
-  display: none !important;
-}
+/* Chat header collapses with every other destination header (see .is-scroll-hidden).
+   The floating back button is the shared stand-in while that header is off screen. */
 
 /* Emoji picker uses the same dimmed backdrop card as other V2 layer popups,
    but the overlay stops at the composer (--v2-composer-reserve) so the chat
@@ -2757,8 +2755,9 @@ html:has(.renewal-shell.v2-design) .v2-chat-jump-row .v2-chat-keyboard-btn {
   right: auto !important;
 }
 html:has(.renewal-shell.v2-design) .v2-chat-jump-row .v2-chat-scroll-bottom-btn {
-  right: 16px !important;
-  left: auto !important;
+  left: 50% !important;
+  right: auto !important;
+  transform: translateX(-50%) !important;
 }
 html:has(.renewal-shell.v2-design) .v2-chat-scroll > button[aria-label="최근 대화로 이동"] {
   display: none !important;
@@ -3024,4 +3023,88 @@ html:has(.renewal-shell.v2-design) .region-filter-sheet .modal-footer.region-fil
 /* Content V2: region/grid controls live in page header — hide legacy trigger row if it leaks */
 .v2-design .v2-content .region-filter-trigger-row {
   display: none !important;
+}
+
+/* Every destination header is exactly the 56px title row (plus the notch).
+   A larger min-height, or scroll padding that includes a safe-area the header
+   does not, left a white band under the hairline. Category tabs stay children
+   of the header, flush under that line. Chat/memo have no category row. */
+html:has(.renewal-shell.v2-design) .v2-page-header.bp-header {
+  min-height: 0 !important;
+  height: auto !important;
+  padding-top: env(safe-area-inset-top, 0px) !important;
+  padding-bottom: 0 !important;
+  background: var(--bg-card, #fff) !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat .bp-header.v2-page-header:not(.is-scroll-hidden) {
+  min-height: 0 !important;
+  height: auto !important;
+  max-height: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  padding-top: env(safe-area-inset-top, 0px) !important;
+  padding-bottom: 0 !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  background: var(--bg-card, #fff) !important;
+  overflow: visible !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat .v2-page-header > .bp-header-row {
+  height: 56px !important;
+  min-height: 56px !important;
+  max-height: 56px !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat .v2-chat-scroll,
+html:has(.renewal-shell.v2-design) .v2-chat .chat-messages-scroll {
+  padding-top: calc(56px + env(safe-area-inset-top, 0px)) !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat:not(.v2-chat-search-open) .v2-chat-scroll > div:first-child,
+html:has(.renewal-shell.v2-design) .v2-chat:not(.v2-chat-search-open) .chat-messages-scroll > div:first-child {
+  padding-top: 0 !important;
+  margin-top: 0 !important;
+}
+
+/* Chat uses the same purple menu FAB. It sits in the old jump-to-latest
+   slot, just above the composer; the jump button itself is centered. */
+html:has(.renewal-shell.v2-design) .v2-chat .bp-menu-fab {
+  right: 16px !important;
+  bottom: calc(var(--v2-chat-composer-space, 168px) + 8px) !important;
+}
+html:has(.renewal-shell.v2-design) .v2-chat.is-composer-hidden .bp-menu-fab {
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+/* Stand-in back control while the shared header is scrolled away.
+   Portaled to document.body, so it cannot depend on a .v2-design ancestor. */
+html:has(.renewal-shell.v2-design) .bp-floating-back-btn {
+  display: inline-flex !important;
+  position: fixed !important;
+  z-index: 80 !important;
+  top: calc(6px + env(safe-area-inset-top, 0px)) !important;
+  left: 16px !important;
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  min-height: 44px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border: 1px solid var(--border, #e7e4ef) !important;
+  border-radius: 50% !important;
+  background: rgba(255, 255, 255, 0.94) !important;
+  color: var(--text, #2c2740) !important;
+  box-shadow: 0 4px 14px rgba(35, 20, 64, 0.14) !important;
+  cursor: pointer;
+  pointer-events: auto !important;
+}
+@media (min-width: 1200px) {
+  html:has(.renewal-shell.v2-design:not(.is-side-collapsed)) .bp-floating-back-btn {
+    left: calc(280px + 16px) !important;
+  }
+  html:has(.renewal-shell.v2-design.is-side-collapsed) .bp-floating-back-btn {
+    left: calc(64px + 16px) !important;
+  }
 }
