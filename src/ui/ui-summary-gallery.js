@@ -2144,7 +2144,7 @@ export function HistoryView({
     ariaLabel: "보관함 탭",
     value: historyTab,
     onChange: changeHistoryTab,
-    activeColor: v2Embed ? '#7C2FE5' : undefined,
+    activeColor: v2Embed ? 'var(--v2-primary, #7C2FE5)' : undefined,
     options: [
       { value: 'memories', label: '추억', badge: travelMemoryGroups.length },
       { value: 'people', label: '인물', badge: personTagChips.length },
@@ -3161,7 +3161,7 @@ export function ContentView({
       ariaLabel: "컨텐츠 탭",
       value: contentTab,
       onChange: changeContentTab,
-      activeColor: v2Embed ? '#7C2FE5' : undefined,
+      activeColor: v2Embed ? 'var(--v2-primary, #7C2FE5)' : undefined,
       options: contentTabOptions
     }),
     /*#__PURE__*/React.createElement("div", { ref: setChipRowSlot, className: "v2-content-subcat-slot" }),
