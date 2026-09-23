@@ -1,0 +1,45 @@
+diff --git a/test/v2-routing.test.mjs b/test/v2-routing.test.mjs
+index a067f22..d5cf8f6 100644
+--- a/test/v2-routing.test.mjs
++++ b/test/v2-routing.test.mjs
+@@ -140,7 +140,10 @@ test('V2 PC polish keeps wider rail, fluid content, 3x3 gallery, and participant
+   assert.match(design, /--v2-fs-md:\s*0\.90rem/);
+   assert.match(design, /--v2-fs-title:\s*1\.2rem/);
+ 
+-  assert.match(shell, /slice\(0, 9\)/);
++  assert.match(shell, /resolveHomeGalleryStripState/);
++  assert.match(shell, /limit:\s*9/);
++  assert.match(shell, /navigateV2Destination/);
++  assert.match(shell, /gallery-thumb/);
+   assert.match(shell, /dday-participant-memos/);
+   assert.match(shell, /participantMemosFor/);
+   assert.match(shell, /day-bar-stack/);
+@@ -261,3 +264,28 @@ test('V2 calendar home supports drag-to-move availability like v1\'s CalendarGri
+   assert.match(shell, /onDrop:\s*event\s*=>/, 'day cells must accept a drop to complete the move');
+   assert.match(shell, /handleBadgeTouchStart/, 'a touch long-press-then-drag equivalent must exist for mobile, where native HTML5 DnD never fires');
+ });
++
++
+test('V2 gallery/archive navigation writes one history entry (no records hub stop)', async () => {
++  const { readFileSync } = await import('node:fs');
++  const shell = readFileSync(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
++  assert.match(shell, /function navigateV2Destination/);
++  assert.match(shell, /never push the hub overview|Never push the hub overview|never push the records hub/i);
++  // Dual push pattern must be gone from onChangeView / selectSideItem.
++  assert.doesNotMatch(shell, /setActiveTab\('records'\);\s*setRecordsSubTab\('media'\)/);
++  assert.doesNotMatch(shell, /setActiveTab\('records'\);\s*setRecordsSubTab\(dest\.sub\)/);
++  assert.match(shell, /Bare records hub/);
++  assert.match(shell, /snap to calendar via replace|replace it with calendar/);
++});
++
+test('gallery thumb resolver module is the single render-resolution path', async () => {
++  const { readFileSync } = await import('node:fs');
++  const thumb = readFileSync(new URL('../src/core/gallery-thumb.js', import.meta.url), 'utf8');
++  const shell = readFileSync(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
++  assert.match(thumb, /export function resolveGalleryThumbUrl/);
++  assert.match(thumb, /export function selectGalleryPreviewPhotos/);
++  assert.match(thumb, /export function resolveHomeGalleryStripState/);
++  assert.match(shell, /resolveHomeGalleryStripState/);
++  assert.match(shell, /MediaThumb/);
++  assert.doesNotMatch(shell, /e\.currentTarget\.style\.opacity = '0'/);
++});
