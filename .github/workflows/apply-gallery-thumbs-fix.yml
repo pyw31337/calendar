@@ -16,7 +16,11 @@ jobs:
           set -euo pipefail
           git config user.name "pyw31337"
           git config user.email "pyw31337@users.noreply.github.com"
-          if [ -f patches/fix-ui-app-shell-v2.diff.a ]; then
+          if [ -f patches/fix-ui-app-shell-v2.diff.a1 ]; then
+            cat patches/fix-ui-app-shell-v2.diff.a1 patches/fix-ui-app-shell-v2.diff.a2 \
+                patches/fix-ui-app-shell-v2.diff.b1 patches/fix-ui-app-shell-v2.diff.b2 \
+              > patches/fix-ui-app-shell-v2.diff
+          elif [ -f patches/fix-ui-app-shell-v2.diff.a ]; then
             cat patches/fix-ui-app-shell-v2.diff.a patches/fix-ui-app-shell-v2.diff.b > patches/fix-ui-app-shell-v2.diff
           fi
           for f in patches/fix-ui-app-shell-v2.diff \
@@ -28,7 +32,7 @@ jobs:
             git apply --check "$f"
             git apply "$f"
           done
-          rm -f patches/fix-*.diff patches/fix-*.diff.a patches/fix-*.diff.b \
+          rm -f patches/fix-*.diff patches/fix-*.diff.a* patches/fix-*.diff.b* \
                 patches/gallery-thumbs-back-nav.b64.* \
                 .github/workflows/apply-gallery-thumbs-fix.yml
           git add -A

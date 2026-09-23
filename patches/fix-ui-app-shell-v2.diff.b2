@@ -1,0 +1,86 @@
+-      setRecordsSubTab(dest.sub);
++    // Atomic history write: never push records hub then sub as two entries.
++    if (dest.tab === 'records') {
++      if (activeTab === 'records' && dest.sub && dest.sub === recordsSubTab) return;
++      navigateV2Destination(view, {
++        push: true,
++        setTab: setActiveTabState,
++        setSub: setRecordsSubTabState,
++      });
+       return;
+     }
+     setActiveTab(dest.tab);
+@@ -3199,11 +3303,44 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
+   // Correct an invalid/stale ?tab=/?sub= on first mount without adding a history entry, then
+   // listen for the back/forward buttons for the rest of this shell's lifetime.
+   React.useEffect(() => {
+-    writeLocationState(activeTab, recordsSubTab, { push: false });
++    // If history/bookmark left us on the records hub overview, replace it with calendar
++    // so Back from gallery/archive never resurfaces "모아엘가 기록".
++    try {
++      const params = new URLSearchParams(window.location.search);
++      if (params.get('shell') === 'v2' && params.get('tab') === 'records') {
++        const sub = params.get('sub');
++        if (!sub || sub === 'all') {
++          setActiveTabState(DEFAULT_TAB);
++          setRecordsSubTabState(DEFAULT_RECORDS_SUBTAB);
++          writeLocationState(DEFAULT_TAB, DEFAULT_RECORDS_SUBTAB, { push: false });
++        } else {
++          writeLocationState(activeTab, recordsSubTab, { push: false });
++        }
++      } else {
++        writeLocationState(activeTab, recordsSubTab, { push: false });
++      }
++    } catch (_) {
++      writeLocationState(activeTab, recordsSubTab, { push: false });
++    }
+     prefetchDestinationUi();
+     const onPopState = () => {
+-      setActiveTabState(readTabFromLocation());
+-      setRecordsSubTabState(readRecordsSubTabFromLocation());
++      const nextTab = readTabFromLocation();
++      const nextSub = readRecordsSubTabFromLocation();
++      // Popping onto the hub (legacy history entries) → snap to calendar via replace.
++      try {
++        const params = new URLSearchParams(window.location.search);
++        if (params.get('shell') === 'v2' && params.get('tab') === 'records') {
++          const sub = params.get('sub');
++          if (!sub || sub === 'all') {
++            setActiveTabState(DEFAULT_TAB);
++            setRecordsSubTabState(DEFAULT_RECORDS_SUBTAB);
++            writeLocationState(DEFAULT_TAB, DEFAULT_RECORDS_SUBTAB, { push: false });
++            return;
++          }
++        }
++      } catch (_) { /* ignore */ }
++      setActiveTabState(nextTab);
++      setRecordsSubTabState(nextSub);
+     };
+     window.addEventListener('popstate', onPopState);
+     return () => window.removeEventListener('popstate', onPopState);
+@@ -3235,9 +3372,13 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
+   const selectSideItem = (id) => {
+     setIsSideNavOpen(false);
+     const dest = resolveV2Destination(id);
+-    if (dest.tab === 'records' && dest.sub) {
+-      setActiveTab('records');
+-      setRecordsSubTab(dest.sub);
++    if (dest.tab === 'records') {
++      if (activeTab === 'records' && dest.sub && dest.sub === recordsSubTab) return;
++      navigateV2Destination(id, {
++        push: true,
++        setTab: setActiveTabState,
++        setSub: setRecordsSubTabState,
++      });
+       return;
+     }
+     setActiveTab(dest.tab);
+@@ -3505,7 +3646,7 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
+       onJumpToChatMessage: v2RecordsContext.historyProps?.onJumpToChatMessage,
+       onJumpToMemo: v2RecordsContext.historyProps?.onJumpToMemo,
+       onJumpToMeetingDate: v2RecordsContext.historyProps?.onJumpToMeetingDate,
+-      onJumpToGallery: () => { setActiveTab('records'); setRecordsSubTab('media'); },
++      onJumpToGallery: () => { navigateV2Destination('gallery', { push: true, setTab: setActiveTabState, setSub: setRecordsSubTabState }); },
+       onGetChatMessageOrdinal: v2RecordsContext.historyProps?.onGetChatMessageOrdinal,
+       onGetGalleryPhotoOrdinal: v2RecordsContext.historyProps?.onGetGalleryPhotoOrdinal,
+       onRequestConfirm: v2RecordsContext.historyProps?.onRequestConfirm,
