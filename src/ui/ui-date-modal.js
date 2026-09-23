@@ -2764,7 +2764,7 @@ export function DateModal({
             /*#__PURE__*/React.createElement(SimpleBottomSheetPicker, {
               title: "카테고리 선택",
               value: placeCategoryId,
-              options: getPlaceCategories(calendar).map(c => ({ value: c.id, label: getPlaceCategoryLabel(c) })),
+              options: getPlaceCategories(calendar).map(c => ({ value: c.id, label: /*#__PURE__*/React.createElement(window.GATHER_UI_COMPONENTS.PlaceCategoryOptionLabel, { category: c, size: 18 }) })),
               onSelect: setPlaceCategoryId,
               placeholder: "카테고리 선택"
             })

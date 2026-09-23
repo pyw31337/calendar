@@ -3877,14 +3877,14 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
             /*#__PURE__*/React.createElement("button", {
               type: "button", className: "btn btn-secondary", style: { padding: '4px 10px', fontSize: 'var(--font-size-base)' },
               onClick: () => setPickerYear(y => y - 1)
-            }, "◀"),
+            }, /*#__PURE__*/React.createElement(window.GATHER_UI_COMPONENTS.ChevronIcon, { size: 15, direction: 'left' })),
             /*#__PURE__*/React.createElement("span", {
               style: { fontWeight: 800, fontSize: '1.1rem', minWidth: '60px', textAlign: 'center' }
             }, pickerYear, "년"),
             /*#__PURE__*/React.createElement("button", {
               type: "button", className: "btn btn-secondary", style: { padding: '4px 10px', fontSize: 'var(--font-size-base)' },
               onClick: () => setPickerYear(y => y + 1)
-            }, "▶")
+            }, /*#__PURE__*/React.createElement(window.GATHER_UI_COMPONENTS.ChevronIcon, { size: 15, direction: 'right' }))
           )
         ),
         /*#__PURE__*/React.createElement("div", { style: { marginBottom: '16px' } },

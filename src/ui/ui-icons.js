@@ -215,11 +215,28 @@ export function BuildingIcon({ size = 14 } = {}) {
 export function BackArrowIcon({ size = 24 } = {}) {
   const React = window.React;
 
+  return /*#__PURE__*/React.createElement(ChevronIcon, { size, direction: 'left' });
+}
+
+export function ChevronIcon({ size = 15, direction = 'down' } = {}) {
+  const React = window.React;
+  const rotate = { down: '0deg', left: '90deg', up: '180deg', right: '-90deg' }[direction] || '0deg';
+
   return /*#__PURE__*/React.createElement("svg", {
     xmlns: "http://www.w3.org/2000/svg", width: String(size), height: String(size), viewBox: "0 0 24 24",
     fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round",
-    style: { transform: 'rotate(90deg)', display: 'inline-block' }
-  }, /*#__PURE__*/React.createElement("path", { stroke: "none", d: "M0 0h24v24H0z", fill: "none" }), /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" }));
+    "aria-hidden": "true",
+    style: { display: 'inline-block', transform: `rotate(${rotate})` }
+  }, /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" }));
+}
+
+export function PlayIcon({ size = 15 } = {}) {
+  const React = window.React;
+
+  return /*#__PURE__*/React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg", width: String(size), height: String(size), viewBox: "0 0 24 24",
+    fill: "currentColor", stroke: "none", "aria-hidden": "true", style: { display: 'inline-block', verticalAlign: 'middle' }
+  }, /*#__PURE__*/React.createElement("path", { d: "M8 5.5v13l11-6.5z" }));
 }
 
 export function SunIcon({ size = 16 }) {
@@ -1372,6 +1389,19 @@ export function ThreeLinesIcon({ size = 22 } = {}) {
     /*#__PURE__*/React.createElement("line", { x1: "4", y1: "17", x2: "20", y2: "17" }));
 }
 
+export function PlaceCategoryOptionLabel({ category, size = 16 } = {}) {
+  const React = window.React;
+  const color = category?.color || 'currentColor';
+
+  return /*#__PURE__*/React.createElement("span", {
+    style: { display: 'inline-flex', alignItems: 'center', gap: '8px', minWidth: 0, color: 'var(--text-main)' }
+  }, /*#__PURE__*/React.createElement("span", {
+    "aria-hidden": "true",
+    style: { display: 'inline-flex', color, flex: '0 0 auto' }
+  }, /*#__PURE__*/React.createElement(PlaceCategoryMarkerIcon, { category, size, strokeColor: 'currentColor' })),
+    /*#__PURE__*/React.createElement("span", null, category?.name || '기타'));
+}
+
 export function PlaceCategoryMarkerIcon({ category, size = 14, strokeColor = "#fff" } = {}) {
   const React = window.React;
 
@@ -1748,6 +1778,8 @@ export function PhotoCommentCountBadge({ count = 0 } = {}) {
     ReplyIcon: ReplyIcon,
     BuildingIcon: BuildingIcon,
     BackArrowIcon: BackArrowIcon,
+    ChevronIcon: ChevronIcon,
+    PlayIcon: PlayIcon,
     SunIcon: SunIcon,
     CloudIcon: CloudIcon,
     MistIcon: MistIcon,
@@ -1798,6 +1830,7 @@ export function PhotoCommentCountBadge({ count = 0 } = {}) {
     MemoSectionIcon: MemoSectionIcon,
     ThreeLinesIcon: ThreeLinesIcon,
     PlaceCategoryMarkerIcon: PlaceCategoryMarkerIcon,
+    PlaceCategoryOptionLabel: PlaceCategoryOptionLabel,
     CctvIcon: CctvIcon,
     DicesIcon: DicesIcon,
   });

@@ -1614,7 +1614,8 @@ export function PlacesView({
               return {
                 value: category.id,
                 label: /*#__PURE__*/React.createElement(React.Fragment, null,
-                  `${getPlaceCategoryIcon(category)} ${category.name} `,
+                  /*#__PURE__*/React.createElement(window.GATHER_UI_COMPONENTS.PlaceCategoryOptionLabel, { category, size: 18 }),
+                  " ",
                   /*#__PURE__*/React.createElement("span", {
                     className: "section-count-badge",
                     style: {

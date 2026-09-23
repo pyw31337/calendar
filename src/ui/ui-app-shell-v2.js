@@ -502,7 +502,7 @@ function RenewalHero({ meetings, calendar, onSelectDate }) {
           className: bentoClass('dday-collapse-btn'),
           onClick: onClose,
           'aria-label': '접기'
-        }, '⌃')
+        }, React.createElement(window.GATHER_UI_COMPONENTS.ChevronIcon, { size: 15, direction: 'up' }))
       ),
       meeting.note && React.createElement('div', { className: bentoClass('dday-expanded-tags') },
         React.createElement('span', { className: bentoClass('dday-expanded-tag') }, meeting.note.trim())
@@ -1645,7 +1645,7 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
                 isVideo && React.createElement('button', {
                   type: 'button', className: 'v2-memo-video-toggle',
                   onClick: () => setOpenVideoByUrl(prev => ({ ...prev, [url]: !prev[url] }))
-                }, isOpen ? '영상 닫기' : '▶ 영상 바로보기'),
+                }, isOpen ? '영상 닫기' : React.createElement('span', { style: { display: 'inline-flex', alignItems: 'center', gap: '4px' } }, React.createElement(window.GATHER_UI_COMPONENTS.PlayIcon, { size: 14 }), '영상 바로보기')),
                 isVideo && isOpen && ClickToPlayVideoCard && React.createElement(ClickToPlayVideoCard, {
                   url, mediaInfo, cachedData
                 })
@@ -2195,7 +2195,7 @@ function RecordsOverviewPane({ recordsContext, calendarName, onSelectSubTab, onC
           React.createElement('span', { className: 'renewal-records-overview-card-count' }, `${card.count}개`),
           React.createElement('span', { className: 'renewal-records-overview-card-hint' }, card.hint)
         ),
-        React.createElement('span', { className: 'renewal-records-overview-arrow', 'aria-hidden': 'true' }, '›')
+        React.createElement('span', { className: 'renewal-records-overview-arrow', 'aria-hidden': 'true' }, React.createElement(window.GATHER_UI_COMPONENTS.ChevronIcon, { size: 16, direction: 'right' }))
       )
     ))
   );

@@ -619,12 +619,12 @@ export function MemeAdminPanel({ pool = [], onPoolChange, password, showToast })
             type: "button", className: "btn btn-secondary", onClick: () => goToAdjacent(-1),
             disabled: computeAdjacentIndex(-1) === -1,
             style: { height: '40px', padding: '0 14px', fontWeight: 800, flex: 1 }
-          }, "◀ 이전 (Shift+Tab)"),
+          }, /*#__PURE__*/React.createElement(window.GATHER_UI_COMPONENTS.ChevronIcon, { size: 15, direction: 'left' }), " 이전 (Shift+Tab)"),
           /*#__PURE__*/React.createElement("button", {
             type: "button", className: "btn btn-secondary", onClick: () => goToAdjacent(1),
             disabled: computeAdjacentIndex(1) === -1,
             style: { height: '40px', padding: '0 14px', fontWeight: 800, flex: 1 }
-          }, "다음 (Tab) ▶")
+          }, "다음 (Tab) ", /*#__PURE__*/React.createElement(window.GATHER_UI_COMPONENTS.ChevronIcon, { size: 15, direction: 'right' }))
         )
       )
     )

@@ -315,7 +315,7 @@ export function PlaceRegisterModal({ calendar, editingPlace, onClose, onSave, on
     }
   };
 
-  const categoryOptions = categories.map(c => ({ value: c.id, label: getPlaceCategoryLabel(c) }));
+  const categoryOptions = categories.map(c => ({ value: c.id, label: /*#__PURE__*/React.createElement(window.GATHER_UI_COMPONENTS.PlaceCategoryOptionLabel, { category: c, size: 18 }) }));
 
   return /*#__PURE__*/React.createElement("div", {
     className: "modal-overlay",

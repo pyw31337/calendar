@@ -3501,3 +3501,16 @@ html:has(.renewal-shell.v2-design) .recent-log-action,
 html:has(.renewal-shell.v2-design) .recent-log-date {
   font-style: normal !important;
 }
+html:has(.renewal-shell.v2-design) .bp-dday-participant-memo {
+  align-items: stretch !important;
+}
+html:has(.renewal-shell.v2-design) .bp-dday-participant-memo-name {
+  align-self: stretch !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: auto !important;
+  min-height: 100% !important;
+  padding: 4px 10px !important;
+  box-sizing: border-box !important;
+}

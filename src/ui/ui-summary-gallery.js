@@ -5162,7 +5162,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
                 backgroundColor: 'rgba(0,0,0,0.55)', color: '#fff', fontSize: '25px', paddingLeft: '4px', boxSizing: 'border-box',
                 boxShadow: '0 2px 10px rgba(0,0,0,0.3)', pointerEvents: 'none'
               }
-            }, "▶")
+            }, /*#__PURE__*/React.createElement(window.GATHER_UI_COMPONENTS.PlayIcon, { size: 22 }))
           ),
           /*#__PURE__*/React.createElement("div", { style: { fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)', flexShrink: 0, paddingRight: '36px' } }, selected.title),
           // 기간~설명까지 한 블록으로 스크롤 -- 예전엔 설명 칸만 따로 120px 높이로 스크롤돼서
