@@ -16,6 +16,17 @@ Firebase(Firestore/Storage/Functions)가 유일한 데이터 소스다. Vite로 
 스크립트(`check-asset-mirrors.mjs` 등)가 `assets/`와 `public/assets/`의 바이트 동일성만
 확인하니, 그 둘을 건드릴 일이 생기면 서로 동기화해야 한다.
 
+## 지금 가장 중요한 진행 중 작업 (2026-09-23)
+
+**V2 셸을 기본 URL(`?id=cw`)에 덮어쓰기(컷오버)하는 작업이 진행 중이나, 아직 기본은 V1이다.**
+상세·계획·현재 블로커·다음 유닛·다른 에이전트 분담은 반드시 먼저 읽을 것:
+
+→ [`docs/v2-default-cutover-handoff.md`](docs/v2-default-cutover-handoff.md)
+
+짧은 현황: [`docs/V2-STATUS.md`](docs/V2-STATUS.md).  
+**다크모드 토큰 재연결 전에 `isRenewalShellEnabled` / 기본 shell을 뒤집지 말 것.**  
+**`.github/workflows/apply-*.yml` applicator로 소스 패치하지 말 것** (#732/#733).
+
 ## 지금 상태 (2026-09-12 기준)
 
 `src/core/app-main.js`를 여러 개의 작은 `src/core/app-*.js` 모듈로 나누는 대규모 리팩터가
