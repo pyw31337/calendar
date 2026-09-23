@@ -7,7 +7,46 @@ import { resolveGalleryThumbUrl } from '../core/gallery-thumb.js';
 import { resolveGalleryLightboxTags } from '../core/photo-index.js';
 import { useScrollHideHeader } from '../core/use-scroll-hide-header.js';
 import { CapsuleTextBadge } from './ui-widgets.js';
+import { MediaThumb } from './ui-overlays.js';
 import { TABLER_ICONS } from './v2/tabler-icons.js';
+
+/** One fill for every archive cell. Gallery already resolves through MediaThumb;
+ *  people/memory grids used a raw <img> that left a tiny broken bitmap in the corner
+ *  when the thumb 404'd and never tried the full-size URL. */
+function archivePhotoFillStyle() {
+  return {
+    position: 'absolute',
+    inset: 0,
+    width: '100%',
+    height: '100%',
+    maxWidth: 'none',
+    objectFit: 'cover',
+    display: 'block',
+  };
+}
+
+function ArchivePhotoThumb({ photo }) {
+  const React = window.React;
+  const resolved = resolveGalleryThumbUrl(photo || {});
+  if (resolved.state !== 'ready') {
+    return React.createElement('div', {
+      className: 'archive-photo-fallback',
+      role: 'img',
+      'aria-label': '이미지를 불러오지 못했습니다.',
+      style: { ...archivePhotoFillStyle(), background: 'var(--bg-primary, #f3f1f8)' },
+    });
+  }
+  return React.createElement(MediaThumb, {
+    src: resolved.src,
+    fallbackSrc: resolved.fallbackSrc,
+    alt: '',
+    loading: 'lazy',
+    decoding: 'async',
+    referrerPolicy: 'no-referrer',
+    draggable: false,
+    style: archivePhotoFillStyle(),
+  });
+}
 
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
@@ -1955,21 +1994,12 @@ export function HistoryView({
       style: {
         position: 'relative', aspectRatio: '1 / 1', borderRadius: 'var(--radius-lg)', overflow: 'hidden',
         border: isChecked ? '2px solid var(--accent-primary)' : 'none', padding: 0, cursor: 'pointer', backgroundColor: 'var(--bg-card)'
-      }
+      },
+      className: 'archive-photo-cell'
     },
       /*#__PURE__*/React.createElement("span", { style: { position: 'absolute', top: '6px', right: '6px', zIndex: 3, minWidth: '24px', height: '24px', padding: '0 6px', borderRadius: '999px', background: 'rgba(15,23,42,0.78)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, String(group.photos.length)),
       cover
-        ? /*#__PURE__*/React.createElement("img", {
-            src: cover.thumb || cover.full, alt: "", loading: "lazy", decoding: "async",
-            style: { width: '100%', height: '100%', objectFit: 'cover' },
-            onError: e => {
-              if (cover.full && e.target.src !== cover.full) {
-                e.target.src = cover.full;
-              } else {
-                e.target.style.display = 'none';
-              }
-            }
-          })
+        ? /*#__PURE__*/React.createElement(ArchivePhotoThumb, { photo: cover })
         : /*#__PURE__*/React.createElement("div", {
             style: {
               width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -2064,14 +2094,11 @@ export function HistoryView({
       const commentCount = getPhotoCommentCount(identity, photoCommentCounts) || Math.max(0, Number(photo.commentCount || 0));
       return /*#__PURE__*/React.createElement("button", {
         key: photoKey, type: "button",
-        className: commentCount ? 'gallery-comment-heartbeat' : '',
+        className: `${commentCount ? 'gallery-comment-heartbeat ' : ''}archive-photo-cell`,
         onClick: () => checkable ? onToggle(photoKey) : onOpen(idx),
         style: { position: 'relative', padding: 0, border: 'none', borderRadius: 'var(--radius-sm)', overflow: 'hidden', aspectRatio: '1 / 1', cursor: 'pointer', backgroundColor: 'var(--bg-primary)', animationDelay: `${(idx % 7) * 0.9}s` }
       },
-        /*#__PURE__*/React.createElement("img", {
-          src: photo.thumb || photo.full, alt: "", loading: "lazy", decoding: "async",
-          style: { width: '100%', height: '100%', objectFit: 'cover' }
-        }),
+        /*#__PURE__*/React.createElement(ArchivePhotoThumb, { photo }),
         PhotoCommentCountBadge && /*#__PURE__*/React.createElement(PhotoCommentCountBadge, { count: commentCount }),
         checkable && (EditSelectCheckbox
           ? /*#__PURE__*/React.createElement(EditSelectCheckbox, { checked: isChecked, variant: "onMedia" })
@@ -2482,21 +2509,12 @@ export function HistoryView({
                 style: {
                   position: 'relative', aspectRatio: '1 / 1', borderRadius: 'var(--radius-lg)', overflow: 'hidden',
                   border: 'none', padding: 0, cursor: 'pointer', backgroundColor: tag.color
-                }
+                },
+                className: 'archive-photo-cell'
               },
                 /*#__PURE__*/React.createElement("span", { style: { position: 'absolute', top: '6px', right: '6px', zIndex: 3, minWidth: '24px', height: '24px', padding: '0 6px', borderRadius: '999px', background: 'rgba(15,23,42,0.78)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, String(tagPhotos.length)),
                 cover
-                  ? /*#__PURE__*/React.createElement("img", {
-                      src: cover.thumb || cover.full, alt: "", loading: "lazy", decoding: "async",
-                      style: { width: '100%', height: '100%', objectFit: 'cover' },
-                      onError: e => {
-                        if (cover.full && e.target.src !== cover.full) {
-                          e.target.src = cover.full;
-                        } else {
-                          e.target.style.display = 'none';
-                        }
-                      }
-                    })
+                  ? /*#__PURE__*/React.createElement(ArchivePhotoThumb, { photo: cover })
                   : /*#__PURE__*/React.createElement("div", {
                       style: {
                         width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -2604,14 +2622,11 @@ export function HistoryView({
             return /*#__PURE__*/React.createElement("button", {
               key: photo.mediaKey || photo.refKey || `person_${idx}`,
               type: "button",
-              className: commentCount ? 'gallery-comment-heartbeat' : '',
+              className: `${commentCount ? 'gallery-comment-heartbeat ' : ''}archive-photo-cell`,
               onClick: () => openHistoryLightbox(photosForPersonTag, idx),
               style: { position: 'relative', padding: 0, border: 'none', borderRadius: 'var(--radius-sm)', overflow: 'hidden', aspectRatio: '1 / 1', cursor: 'pointer', backgroundColor: 'var(--bg-primary)', animationDelay: `${(idx % 7) * 0.9}s` }
             },
-              /*#__PURE__*/React.createElement("img", {
-                src: photo.thumb || photo.full, alt: "", loading: "lazy", decoding: "async",
-                style: { width: '100%', height: '100%', objectFit: 'cover' }
-              }),
+              /*#__PURE__*/React.createElement(ArchivePhotoThumb, { photo }),
               PhotoCommentCountBadge && /*#__PURE__*/React.createElement(PhotoCommentCountBadge, { count: commentCount })
             );
           })

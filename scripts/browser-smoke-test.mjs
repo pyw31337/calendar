@@ -257,14 +257,20 @@ async function checkManifests(browser, baseUrl) {
 
 async function checkRenewalShellRoutes(browser, baseUrl) {
   const routes = [
-    ['', '캘린더'], ['&tab=chat', '대화'], ['&tab=records', '기록'],
+    ['', '캘린더'], ['&tab=chat', '대화'],
     ['&tab=memo', '메모'], ['&tab=places', '장소'],
     ['&tab=settlement', '정산'], ['&tab=more', '더보기']
   ];
-  // Chip-row subtabs keep role=tablist visible under 기록. memo/places are first-class
-  // ?tab= destinations (not records subs) and must not be clicked mid-loop — otherwise the
-  // next getByRole('tab') times out and the catch used to mislabel the failure as "V2 목적지".
-  const chipSubtabs = [['사진·영상', 'media'], ['보관함', 'archive'], ['콘텐츠', 'content']];
+  // Gallery / archive / content are destinations under ?tab=records&sub=.
+  // The old 기록 chip row (전체 / 사진·영상 / 보관함 / 콘텐츠) is hidden on those
+  // pages, and a bare ?tab=records hub is rewritten to the calendar so Back
+  // never stops on the overview. Assert that contract instead of clicking chips
+  // that are no longer rendered.
+  const recordDests = [
+    ['media', '갤러리'],
+    ['archive', '보관함'],
+    ['content', '컨텐츠'],
+  ];
   // Legacy ?tab=records&sub=memo|places bookmarks promote on load to tab=memo|places with sub cleared.
   const firstClassDests = [['places', '장소'], ['memo', '메모']];
   for (const viewport of VIEWPORTS) {
@@ -278,26 +284,29 @@ async function checkRenewalShellRoutes(browser, baseUrl) {
         if (overflow > 2) throw new Error(`가로 스크롤 ${overflow}px`);
         pass(`[${viewport.name}] V2 ${label}`);
       }
+
       await gotoBootReady(page, `${baseUrl}?id=cw&shell=v2&tab=records`);
-      for (const [label, expected] of chipSubtabs) {
-        // Always land on 전체 first so the chip row is present even if a prior full-chrome
-        // navigation left it hidden.
-        const allTab = page.getByRole('tab', { name: '전체', exact: true });
-        if (await allTab.count()) {
-          await allTab.dispatchEvent('click');
-          await page.waitForTimeout(150);
-        } else {
-          await gotoBootReady(page, `${baseUrl}?id=cw&shell=v2&tab=records`);
-        }
-        // The records panes intentionally overlap the tab strip while settling; dispatch the
-        // semantic click so this state-transition assertion is not dependent on hit-testing.
-        await page.getByRole('tab', { name: label, exact: true }).dispatchEvent('click');
-        // CI runners can spend a few seconds mounting the mobile records pane after the
-        // synthetic click. The route transition is the assertion; keep the timeout generous
-        // enough to avoid a false negative while still failing a genuinely broken navigation.
-        await page.waitForFunction(expectedSub => new URL(window.location.href).searchParams.get('sub') === expectedSub, expected, { timeout: 10000 });
+      await page.locator('.renewal-shell').waitFor({ state: 'visible', timeout: 10000 });
+      const hub = new URL(page.url()).searchParams;
+      if (hub.get('tab') === 'records') {
+        throw new Error(`기록 허브가 남아 있음 sub=${hub.get('sub') || '(없음)'}`);
       }
-      pass(`[${viewport.name}] V2 기록 서브탭 클릭 전환`);
+      pass(`[${viewport.name}] V2 기록 허브는 캘린더로`);
+
+      for (const [sub, title] of recordDests) {
+        await gotoBootReady(page, `${baseUrl}?id=cw&shell=v2&tab=records&sub=${sub}`);
+        await page.locator('.renewal-shell').waitFor({ state: 'visible', timeout: 10000 });
+        const params = new URL(page.url()).searchParams;
+        if (params.get('tab') !== 'records' || params.get('sub') !== sub) {
+          throw new Error(`${title} 진입 후 tab=${params.get('tab') || '(없음)'} sub=${params.get('sub') || '(없음)'}`);
+        }
+        await page.locator('.bp-header-title', { hasText: title }).first().waitFor({ state: 'visible', timeout: 10000 });
+        const tablistCount = await page.locator('.renewal-shell-subtab-row[role="tablist"]').count();
+        if (tablistCount !== 0) throw new Error(`${title}에서 기록 서브탭 행이 보이면 안 됨 (count=${tablistCount})`);
+        const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+        if (overflow > 2) throw new Error(`${title} 가로 스크롤 ${overflow}px`);
+      }
+      pass(`[${viewport.name}] V2 갤러리/보관함/컨텐츠`);
 
       for (const [dest, label] of firstClassDests) {
         // Legacy bookmark URL — shell promotes to first-class tab and clears sub.

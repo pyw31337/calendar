@@ -3108,3 +3108,33 @@ html:has(.renewal-shell.v2-design) .bp-floating-back-btn {
     left: calc(64px + 16px) !important;
   }
 }
+
+/* Archive people/memory cells share the gallery thumb contract: the bitmap
+   fills the square. A failed thumb used to shrink to a tiny broken icon in
+   the corner because percentage height never resolved. */
+html:has(.renewal-shell.v2-design) .v2-archive .archive-photo-cell {
+  position: relative !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+html:has(.renewal-shell.v2-design) .v2-archive .archive-photo-cell > img,
+html:has(.renewal-shell.v2-design) .v2-archive .archive-photo-cell > .media-thumb {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  object-fit: cover !important;
+  display: block !important;
+}
+html:has(.renewal-shell.v2-design) .v2-archive .archive-photo-cell > .archive-photo-fallback,
+html:has(.renewal-shell.v2-design) .v2-archive .archive-photo-cell > [role="img"] {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
