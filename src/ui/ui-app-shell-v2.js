@@ -477,8 +477,18 @@ function RenewalHero({ meetings, calendar, onSelectDate }) {
     };
   };
 
-  const renderExpandedCard = (meeting, onClose, extraClass) => {
+  const weatherCoordsFor = (places) => {
+    const withCoords = places.find(p => Number.isFinite(Number(p?.lat)) && Number.isFinite(Number(p?.lng)) && p.lat != null && p.lng != null);
+    if (withCoords) return { lat: Number(withCoords.lat), lon: Number(withCoords.lng), name: String(withCoords.name || withCoords.alias || '').trim() };
+    const loc = calendar && calendar.weatherLocation;
+    if (loc && loc.lat != null && loc.lon != null) return { lat: Number(loc.lat), lon: Number(loc.lon), name: loc.name || '' };
+    return { lat: 37.566, lon: 126.9784, name: '서울' };
+  };
+
+  const renderExpandedCard = (meeting, onClose, extraClass, open) => {
     const places = placesForDate(meeting.date);
+    const DailyWeatherIcon = window.GATHER_UI_COMPONENTS && window.GATHER_UI_COMPONENTS.DailyWeatherIcon;
+    const weatherCoords = open && DailyWeatherIcon ? weatherCoordsFor(places) : null;
     const placeName = places[0]
       ? String(places[0].name || places[0].alias || '').trim()
       : (typeof meeting.place === 'string' ? meeting.place.trim() : '');
@@ -497,6 +507,14 @@ function RenewalHero({ meetings, calendar, onSelectDate }) {
             React.createElement('span', { className: bentoClass('dday-expanded-badge') }, formatDDayLabel(meeting.date))
           )
         ),
+        weatherCoords ? React.createElement(DailyWeatherIcon, {
+          date: meeting.date,
+          lat: weatherCoords.lat,
+          lon: weatherCoords.lon,
+          locationName: weatherCoords.name,
+          className: bentoClass('dday-weather'),
+          size: 18,
+        }) : null,
         React.createElement('button', {
           type: 'button',
           className: bentoClass('dday-collapse-btn'),
@@ -535,7 +553,7 @@ function RenewalHero({ meetings, calendar, onSelectDate }) {
     className: bentoClass(`dday-reveal${open ? ' is-open' : ''}`),
   },
     React.createElement('div', { className: bentoClass('dday-reveal-inner') },
-      renderExpandedCard(meeting, onClose, extraClass)
+      renderExpandedCard(meeting, onClose, extraClass, open)
     )
   );
 
