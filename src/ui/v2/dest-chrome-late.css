@@ -763,6 +763,80 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   --settlement-hero-mid: var(--brand, #7C2FE5) !important;
   --settlement-hero-end: var(--brand, #7C2FE5) !important;
 }
+
+/* ---- 2026-09-23 polish batch ------------------------------------------------------------- */
+/* Hero brand title: the BentoPinkFinal mock (reference-home.css, generated) hides it at desktop
+   because the side rail already shows the brand; keep it visible at every width. */
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-hero-zone .bp-bento-title-brand {
+  display: inline-flex !important;
+}
+/* Hero 캘린더 설정 / 기념일 설정: plain icons (no border, fill or shadow) at every width -- the
+   original rule only applied below 1200px. Higher than the dark theme's hero glass rule so the
+   dark palette cannot put the chrome back. Search keeps its glass chip. */
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-hero-zone .bp-hero-plain-icon-btn.bp-renewal-shell-header-icon-btn,
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-hero-zone .bp-hero-plain-icon-btn.bp-icon-btn,
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-hero-zone .bp-hero-plain-icon-btn.bp-renewal-shell-header-icon-btn:hover,
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-hero-zone .bp-hero-plain-icon-btn.bp-icon-btn:hover {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+/* Chat keyboard + jump-to-latest icons use the header back button's icon color. */
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-chat-jump-row .v2-chat-keyboard-btn,
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-chat-jump-row .v2-chat-scroll-bottom-btn {
+  color: #6b6580 !important;
+}
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-chat-jump-row .v2-chat-keyboard-btn:hover,
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-chat-jump-row .v2-chat-scroll-bottom-btn:hover {
+  color: var(--brand, #7C2FE5) !important;
+}
+/* One tab-row height everywhere (settlement/gallery were 50, archive 49, content/places 51):
+   50px border-box including the 1px hairline, buttons fill the 49px above it, so the active
+   underline (::after bottom:-1px) stays flush on the hairline. Applies to portaled modals too. */
+html:has(.renewal-shell.v2-design) body .underline-tabs.underline-tabs {
+  box-sizing: border-box !important;
+  height: 50px !important;
+  min-height: 50px !important;
+  max-height: 50px !important;
+}
+html:has(.renewal-shell.v2-design) body .underline-tabs.underline-tabs > button,
+html:has(.renewal-shell.v2-design) body .underline-tabs.underline-tabs > [role="tab"] {
+  height: auto !important;
+  min-height: 0 !important;
+  align-self: stretch !important;
+}
+/* Gallery body used 16px side padding while every other destination uses the shared
+   --v2-dest-content-pad-x (40px desktop / 20px mobile). Bottom keeps its FAB clearance. */
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-gallery .gallery-page-scroll,
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-records-media .gallery-page-scroll {
+  padding-left: var(--v2-dest-content-pad-x) !important;
+  padding-right: var(--v2-dest-content-pad-x) !important;
+}
+/* Places: the 전체/방문/예정 filter row already has its own padding; the list body's full 40px
+   top pad on top of it left a large empty band before the first place card. */
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-places .places-list-body {
+  padding-top: 12px !important;
+}
+/* Places desktop: the sticky container's own bottom border doubled the tab row's hairline
+   (2px line). The tab row keeps the single line (the active underline sits on it); mobile's
+   select-based bar has no tab row, so its container border stays. */
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-places .places-category-sticky-tabs:has(> .place-category-tabs-desktop-only .underline-tabs) {
+  border-bottom: 0 !important;
+}
+/* Side nav group divider uses the same hairline color as every tab row, so the places bar
+   line and this divider read as one continuous line. */
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-side-nav-group:not(:first-of-type) {
+  border-top-color: var(--v2-card-border, #eceaf5) !important;
+}
+/* Past-meeting D+N badge: same pill as the upcoming D-day badge (dark pill, bright text), in
+   a gray monotone. */
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .date-item-btn.confirmed-meeting-card .dday-badge.is-past {
+  background: rgba(51, 65, 85, 0.88) !important;
+  color: #E2E8F0 !important;
+  border: none !important;
+}
 .renewal-shell.v2-design .v2-settlement [data-settlement-edit-button="true"],
 .v2-design .v2-settlement [data-settlement-edit-button="true"] {
   background: var(--brand, #7C2FE5) !important;

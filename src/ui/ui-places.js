@@ -953,6 +953,25 @@ export function PlacesView({
     mapHeightRef.current = mapHeight;
   }, [mapHeight]);
 
+  // V2 desktop: size the map once so the category bar's bottom hairline sits on the same pixel
+  // row as the side nav's divider under 메모 -- one continuous line across rail and page.
+  // The drag handle still resizes freely afterwards; other layouts keep the 40% default.
+  const mapAreaRef = React.useRef(null);
+  const categoryTabsRef = React.useRef(null);
+  const mapAlignedRef = React.useRef(false);
+  React.useLayoutEffect(() => {
+    if (mapAlignedRef.current || typeof renderV2 !== 'function' || isMobile) return;
+    const area = mapAreaRef.current;
+    const tabs = categoryTabsRef.current;
+    if (!area || !tabs) return;
+    const divider = [...document.querySelectorAll('.bp-side-nav-group')]
+      .find(group => parseFloat(getComputedStyle(group).borderTopWidth) > 0 && group.getBoundingClientRect().height > 0);
+    if (!divider) return;
+    mapAlignedRef.current = true;
+    const target = divider.getBoundingClientRect().top + 1 - area.getBoundingClientRect().top - tabs.getBoundingClientRect().height;
+    if (target >= 160) setMapHeight(Math.round(target));
+  });
+
   const beginMapResize = event => {
     event.preventDefault();
     isDraggingRef.current = true;
@@ -1511,6 +1530,7 @@ export function PlacesView({
     /* Sticky Map Area */
     /*#__PURE__*/React.createElement("div", {
       className: "places-map-sticky-area",
+      ref: mapAreaRef,
       style: mapExpanded
         ? { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1005 }
         : { position: 'relative', width: '100%', height: `${mapHeight}px`, minHeight: '160px', flexShrink: 0, zIndex: 10 }
@@ -1558,6 +1578,7 @@ export function PlacesView({
     /* Sticky Category Tabs */
     !mapExpanded && categories.length > 0 && /*#__PURE__*/React.createElement("div", {
       className: "places-category-sticky-tabs",
+      ref: categoryTabsRef,
       style: { flexShrink: 0, zIndex: 9, backgroundColor: 'var(--bg-card)' }
     },
       /* Desktop Category Bar (Only on PC) */
