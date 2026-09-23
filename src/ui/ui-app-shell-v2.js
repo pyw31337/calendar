@@ -2881,6 +2881,8 @@ export function renderRenewalShellIfEnabled(activeCalId, calendar, moreContextDe
     operationProgress: globalOverlays?.operationProgress || null,
     toast: globalOverlays?.toast || null,
     dismissToast: globalOverlays?.dismissToast || null,
+    confirmDialog: globalOverlays?.confirmDialog || null,
+    setConfirmDialog: globalOverlays?.setConfirmDialog || null,
   });
 }
 
@@ -2895,7 +2897,7 @@ export function renderRenewalShellIfEnabled(activeCalId, calendar, moreContextDe
  *   `buildRenewalSettlementContext`) is the 정산 tab's; `recordsContext` (see
  *   `buildRenewalRecordsContext`) is the 기록 탭's -- all built the same way.
  */
-export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarContext, chatContext, settlementContext, recordsContext, chatUploadProgress, operationProgress, toast, dismissToast }) {
+export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarContext, chatContext, settlementContext, recordsContext, chatUploadProgress, operationProgress, toast, dismissToast, confirmDialog, setConfirmDialog }) {
   const React = window.React;
   const [activeTab, setActiveTabState] = React.useState(readTabFromLocation);
   const [recordsSubTab, setRecordsSubTabState] = React.useState(readRecordsSubTabFromLocation);
@@ -3546,6 +3548,17 @@ export function RenewalAppShell({ activeCalId, calendar, moreContext, calendarCo
           Promise.resolve(action()).catch(console.warn);
         },
         className: 'toast-action'
-      }, toast.actionLabel || '되돌리기'))
+      }, toast.actionLabel || '되돌리기')),
+    // v2 returns before app-main's withStickyVideo(), which is the only place ConfirmDialog
+    // used to mount. Without this, showConfirmDialog() updates state that nothing renders
+    // (anniversary delete, participant delete, poll delete, ...).
+    confirmDialog && React.createElement(bindUiComponentAliases(React).ConfirmDialog, {
+      title: confirmDialog.title,
+      message: confirmDialog.message,
+      onConfirm: confirmDialog.onConfirm,
+      onCancel: () => { if (typeof setConfirmDialog === 'function') setConfirmDialog(null); },
+      showPasswordInput: confirmDialog.showPasswordInput,
+      alertOnly: confirmDialog.alertOnly,
+    })
   );
 }

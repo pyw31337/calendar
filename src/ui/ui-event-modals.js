@@ -1452,7 +1452,7 @@ export function AnniversaryModal({
         onClick: overlayOnClick,
         style: { zIndex: 11000 }
       }, /*#__PURE__*/React.createElement(ResizableModalContainer, {
-        className: "modal-container",
+        className: "modal-container anniversary-settings-modal",
         style: { maxWidth: '520px', width: '92%', maxHeight: '90vh', display: 'flex', flexDirection: 'column' },
         onClick: e => e.stopPropagation()
       },

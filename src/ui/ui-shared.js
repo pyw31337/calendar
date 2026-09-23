@@ -322,7 +322,7 @@ export function ResizableModalContainer({ className, style, children, ...props }
       const isMemoEdit = containerRef.current && containerRef.current.classList.contains('memo-edit-modal-container');
       const reserved = window.matchMedia && window.matchMedia('(max-width: 640px)').matches ? 20 : 32;
       const maxPx = Math.max(180, Math.floor(isAdminSettings
-        ? Math.min(720, vvH - reserved)
+        ? Math.max(180, vvH - 8)
         : isMemoEdit
           ? Math.min(780, vvH - reserved)
         : Math.min(860, vvH - reserved)));
