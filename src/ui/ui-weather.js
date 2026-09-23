@@ -264,6 +264,89 @@ export function WeatherBadge({ weatherLocation }) {
   );
 }
 
+/**
+ * Daily forecast for a single date (confirmed-meeting banner). Open-Meteo only forecasts ~16 days
+ * ahead, so past dates and dates further out render nothing. Memory-only cache (no Firestore /
+ * localStorage) keyed by rounded coords + date; concurrent banners share one in-flight request.
+ */
+const DAILY_FORECAST_MAX_DAYS = 15;
+const __dailyWeatherMem = typeof Map !== 'undefined' ? new Map() : null;
+
+function daysAheadOf(dateStr) {
+  const target = new Date(`${dateStr}T00:00:00`);
+  if (Number.isNaN(target.getTime())) return NaN;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((target.getTime() - today.getTime()) / 86400000);
+}
+
+function fetchDailyForecast(lat, lon, dateStr) {
+  const key = `${weatherCacheKey(lat, lon)}_${dateStr}`;
+  const hit = __dailyWeatherMem && __dailyWeatherMem.get(key);
+  if (hit && (hit.promise || (Date.now() - hit.fetchedAt) < WEATHER_CACHE_TTL_MS)) {
+    return hit.promise || Promise.resolve(hit.value);
+  }
+  const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + Number(lat).toFixed(3)
+    + '&longitude=' + Number(lon).toFixed(3)
+    + '&daily=weather_code,temperature_2m_max,temperature_2m_min'
+    + '&timezone=Asia%2FSeoul&start_date=' + dateStr + '&end_date=' + dateStr;
+  const promise = withWeatherTimeout(fetch(url))
+    .then((res) => {
+      if (!res.ok) throw new Error('daily forecast failed');
+      return res.json();
+    })
+    .then((data) => {
+      const daily = (data && data.daily) || {};
+      const code = Array.isArray(daily.weather_code) ? daily.weather_code[0] : null;
+      if (code == null) return null;
+      const max = Array.isArray(daily.temperature_2m_max) ? daily.temperature_2m_max[0] : null;
+      const min = Array.isArray(daily.temperature_2m_min) ? daily.temperature_2m_min[0] : null;
+      return { code, max, min };
+    });
+  if (__dailyWeatherMem) __dailyWeatherMem.set(key, { promise, fetchedAt: Date.now() });
+  promise.then(
+    (value) => { if (__dailyWeatherMem) __dailyWeatherMem.set(key, { value, fetchedAt: Date.now() }); },
+    () => { if (__dailyWeatherMem) __dailyWeatherMem.delete(key); }
+  );
+  return promise;
+}
+
+export function DailyWeatherIcon({ date, lat, lon, locationName, className, size = 18 }) {
+  const React = window.React;
+  const latNum = Number(lat);
+  const lonNum = Number(lon);
+  const hasCoords = lat != null && lon != null && Number.isFinite(latNum) && Number.isFinite(lonNum);
+  const ahead = date ? daysAheadOf(date) : NaN;
+  const inRange = hasCoords && Number.isFinite(ahead) && ahead >= 0 && ahead <= DAILY_FORECAST_MAX_DAYS;
+  const [forecast, setForecast] = React.useState(null);
+
+  React.useEffect(() => {
+    setForecast(null);
+    if (!inRange) return undefined;
+    let active = true;
+    fetchDailyForecast(latNum, lonNum, date)
+      .then((value) => { if (active) setForecast(value); })
+      .catch(() => { if (active) setForecast(null); });
+    return () => { active = false; };
+  }, [inRange, latNum, lonNum, date]);
+
+  if (!inRange || !forecast) return null;
+  const maxT = forecast.max != null ? Math.round(forecast.max) : null;
+  const minT = forecast.min != null ? Math.round(forecast.min) : null;
+  const place = locationName ? `${locationName} ` : '';
+  const range = maxT != null && minT != null ? ` 최고 ${maxT}° / 최저 ${minT}°` : '';
+  const label = `${place}예보${range}`;
+  return React.createElement('span', {
+    className: className || 'daily-weather-icon',
+    title: label,
+    'aria-label': label,
+    role: 'img',
+  },
+    getWeatherIcon(forecast.code, size),
+    maxT != null ? React.createElement('span', { className: 'daily-weather-temp', 'aria-hidden': 'true' }, `${maxT}°`) : null
+  );
+}
+
 export function WeatherLocationModal({ onClose, onSelectLocation, onDeleteRecentLocation, showToast, recentLocations = [] }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -488,5 +571,6 @@ export function WeatherLocationModal({ onClose, onSelectLocation, onDeleteRecent
   window.GATHER_UI_COMPONENTS = Object.assign({}, window.GATHER_UI_COMPONENTS || {}, {
     WeatherBadge: WeatherBadge,
     WeatherLocationModal: WeatherLocationModal,
+    DailyWeatherIcon: DailyWeatherIcon,
   });
 }
