@@ -6,6 +6,7 @@
  */
 import { GATHER_APP_UTILS } from './app-utils.js';
 import { GATHER_APP_CONFIG as MODULE_APP_CONFIG } from './app-config.js';
+import { canonicalPhotoAssetKey } from './photo-asset.js';
 const omitUndefinedDeep = GATHER_APP_UTILS.omitUndefinedDeep;
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
 // firebaseConfig/firebaseDb live in app-main.js (firebaseDb is mutable, reassigned by
@@ -2373,6 +2374,23 @@ function withTimeout(promise, ms, timeoutMessage) {
   });
 }
 
+function stampPhotoAssetIdentity(entry, slotKeys = {}) {
+  const canonicalKey = getPhotoAssetCommentKey(entry);
+  const positional = [slotKeys.assetKey, slotKeys.mediaKey, slotKeys.refKey]
+    .map(key => String(key || '').trim())
+    .filter(Boolean);
+  const legacyKeys = Array.from(new Set(positional.filter(key => key !== canonicalKey)));
+  const identity = canonicalKey || positional[0] || '';
+  return {
+    ...entry,
+    assetKey: identity,
+    mediaKey: identity,
+    refKey: identity,
+    slotKey: positional[0] || '',
+    legacyKeys,
+  };
+}
+
 function getMessageImageEntries(msg) {
   // Prefer multi-image arrays; fall back to legacy singular fields.
   // Do NOT require thumbnails — slimMessageForClient may drop oversized base64 thumbs
@@ -2411,7 +2429,7 @@ function getMessageImageEntries(msg) {
       source: sourceHint
     }, { source: sourceHint, messageId: msg.id });
     const tagState = getMessagePhotoTagState(msg, { full: full || thumb, imageUrl: full || thumb, thumb: thumb || full }, i);
-    entries.push({
+    entries.push(stampPhotoAssetIdentity({
       full: full || thumb,
       thumb: thumb || full,
       imageIndex: i,
@@ -2419,9 +2437,6 @@ function getMessageImageEntries(msg) {
       timestamp: msg.timestamp,
       tags: tagState.tags,
       tagAuthority: tagState.authoritative ? 'editable' : '',
-      assetKey: keys.assetKey,
-      mediaKey: keys.mediaKey,
-      refKey: keys.refKey,
       // Callers building non-chat entries (e.g. memo pseudo-messages) override `source`
       // explicitly -- see ui-chat-gallery.js/ui-summary-gallery.js's sharedPhotos/photoEntries.
       source: sourceHint,
@@ -2430,7 +2445,7 @@ function getMessageImageEntries(msg) {
       // automatically (see getPhotosForTagLabel in ui-summary-gallery.js) instead of relying
       // only on manually-added hashtags, which almost nothing had actually been tagged with.
       participantId: msg.participantId || null
-    });
+    }, keys));
   }
   return entries;
 }
@@ -2529,40 +2544,8 @@ function getDirectMediaTagKey(url) {
 // image changing) and use two independent 32-bit hashes plus the source length. The resulting
 // key is compact, Firestore-document-id safe, deterministic, and effectively collision-proof for
 // the scale of this app without depending on async WebCrypto during render.
-function normalizePhotoAssetUrl(value) {
-  const raw = String(value || '').trim();
-  if (!raw) return '';
-  if (raw.startsWith('data:') || raw.startsWith('blob:')) return raw;
-  try {
-    const parsed = new URL(raw, typeof window !== 'undefined' ? window.location?.href : undefined);
-    parsed.hash = '';
-    if (parsed.hostname === 'firebasestorage.googleapis.com' || parsed.hostname.endsWith('.firebasestorage.app')) {
-      parsed.search = '';
-    }
-    return parsed.toString();
-  } catch (_) {
-    return raw.split('#')[0];
-  }
-}
-
-function hashPhotoAssetIdentity(value) {
-  const source = String(value || '');
-  let fnv = 2166136261;
-  let djb = 5381;
-  for (let i = 0; i < source.length; i++) {
-    const code = source.charCodeAt(i);
-    fnv ^= code;
-    fnv = Math.imul(fnv, 16777619);
-    djb = Math.imul(djb, 33) ^ code;
-  }
-  return `${(fnv >>> 0).toString(36)}-${(djb >>> 0).toString(36)}-${source.length.toString(36)}`;
-}
-
 function getPhotoAssetCommentKey(photo = {}) {
-  const url = normalizePhotoAssetUrl(
-    photo?.full || photo?.imageUrl || photo?.url || photo?.src || photo?.thumb || photo?.thumbUrl || ''
-  );
-  return url ? `asset:v1:${hashPhotoAssetIdentity(url)}` : '';
+  return canonicalPhotoAssetKey(photo);
 }
 
 function getDirectMediaTagsForUrl(msg, url) {
@@ -2751,7 +2734,7 @@ function getMessageDirectMediaEntry(msg, options = {}) {
     imageIndex: 0,
     directMediaUrl: mediaInfo.url
   }, { source: sourceHint, messageId: msg.id });
-  return {
+  return stampPhotoAssetIdentity({
     full: mediaInfo.url,
     thumb: mediaInfo.url,
     imageIndex: 0,
@@ -2760,11 +2743,8 @@ function getMessageDirectMediaEntry(msg, options = {}) {
     tags: getDirectMediaTagsForUrl(msg, mediaInfo.url),
     directMediaUrl: mediaInfo.url,
     source: sourceHint,
-    uploadSource: msg.uploadSource || null,
-    assetKey: keys.assetKey,
-    mediaKey: keys.mediaKey,
-    refKey: keys.refKey
-  };
+    uploadSource: msg.uploadSource || null
+  }, keys);
 }
 
 function formatBytes(...args) {

@@ -1,4 +1,6 @@
 import { shortParticipantName } from './v2/view-data.js';
+import { canonicalPhotoAssetKey } from '../core/photo-asset.js';
+import { PhotoAssetThumb } from './photo-asset-thumb.js';
 
 /**
  * Calendar grid, comments, memo card, polls, search (P4-19)
@@ -1531,7 +1533,6 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
   const ClickToPlayVideoCard = __comp.ClickToPlayVideoCard || __deps.ClickToPlayVideoCard;
     const MessageCommentIcon = __comp.MessageCommentIcon || __deps.MessageCommentIcon;
   const ParticipantPickerButton = __comp.ParticipantPickerButton || __deps.ParticipantPickerButton;
-  const MediaThumb = __comp.MediaThumb || __deps.MediaThumb;
   const PencilIcon = __comp.PencilIcon || __deps.PencilIcon;
   const ShareIcon = __comp.ShareIcon || __deps.ShareIcon;
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
@@ -1695,24 +1696,34 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     if (typeof setActiveLightbox !== 'function' || imageUrls.length === 0) return;
     const urls = imageUrls.slice();
     const memoImageTags = Array.isArray(memo.imageTags) ? memo.imageTags : [];
-    const meta = urls.map((_, imageIndex) => ({
-      timestamp: memo.updatedAt || memo.createdAt || 0,
-      messageId: memo.id,
-      imageIndex,
-      thumb: thumbUrls[imageIndex] || urls[imageIndex],
-      tags: String(memoImageTags[imageIndex] || ''),
-      source: 'memo',
-      uploadSource: 'memo'
-    }));
+    const meta = urls.map((full, imageIndex) => {
+      const thumb = thumbUrls[imageIndex] || full;
+      const assetKey = canonicalPhotoAssetKey({ full, thumb, imageUrl: full });
+      const slotKey = memo.id ? `memo:${memo.id}:${imageIndex}` : '';
+      return {
+        timestamp: memo.updatedAt || memo.createdAt || 0,
+        messageId: memo.id,
+        imageIndex,
+        thumb,
+        full,
+        tags: String(memoImageTags[imageIndex] || ''),
+        source: 'memo',
+        uploadSource: 'memo',
+        assetKey,
+        mediaKey: assetKey,
+        refKey: assetKey,
+        slotKey,
+        legacyKeys: slotKey && slotKey !== assetKey ? [slotKey] : []
+      };
+    });
     setActiveLightbox({ urls, index: Math.max(0, Math.min(index, urls.length - 1)), meta });
   };
 
   const renderMemoCardImages = () => {
     if (imageUrls.length === 0) return null;
     if (imageUrls.length === 1) {
-      return /*#__PURE__*/React.createElement(MediaThumb, {
-        src: thumbUrls[0] || imageUrls[0],
-        fallbackSrc: imageUrls[0] || thumbUrls[0],
+      return /*#__PURE__*/React.createElement(PhotoAssetThumb, {
+        photo: { full: imageUrls[0], thumb: thumbUrls[0] || imageUrls[0], imageUrl: imageUrls[0], thumbUrl: thumbUrls[0] || '' },
         alt: "메모 첨부 이미지",
         loading: 'lazy',
         decoding: 'async',
@@ -1735,10 +1746,9 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         maxWidth: maxW,
         marginBottom: '8px'
       }
-    }, imageUrls.slice(0, count).map((_, idx) => /*#__PURE__*/React.createElement(MediaThumb, {
-      key: idx,
-      src: thumbUrls[idx] || imageUrls[idx],
-      fallbackSrc: imageUrls[idx] || thumbUrls[idx],
+    }, imageUrls.slice(0, count).map((full, idx) => /*#__PURE__*/React.createElement(PhotoAssetThumb, {
+      key: canonicalPhotoAssetKey({ full, thumb: thumbUrls[idx] || full, imageUrl: full }) || idx,
+      photo: { full, thumb: thumbUrls[idx] || full, imageUrl: full, thumbUrl: thumbUrls[idx] || '' },
       alt: `메모 첨부 이미지 ${idx + 1}`,
       loading: 'lazy',
       decoding: 'async',

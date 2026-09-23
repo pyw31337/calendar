@@ -1,5 +1,6 @@
 import { highlightTextWithYellowMarker } from './app-search.js';
 import { extractFirstUrl, getMediaIdentityKeys, getMessageImageEntries, formatBytes, getDataUrlInfo } from './app-domain-helpers.js';
+import { resolvePhotoAsset } from './gallery-thumb.js';
 import { bindUiComponentAliases } from './app-ui-wrappers.js';
 
 const React = window.React;
@@ -152,6 +153,17 @@ function computeChatImageGridMaxWidth(count) {
   // genuinely narrower than this value.
   return isMobile ? '280px' : `calc(${activeCols} * 76px + (${activeCols} - 1) * 4px)`;
 }
+function bindChatPhotoFallback(resolved) {
+  return (event) => {
+    const img = event && event.currentTarget;
+    if (!img || img.dataset.photoFallbackTried === '1') return;
+    const next = String(resolved?.fallbackSrc || '');
+    if (!next || img.getAttribute('src') === next) return;
+    img.dataset.photoFallbackTried = '1';
+    img.src = next;
+  };
+}
+
 function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) {
   const entries = getMessageImageEntries(msg);
   if (entries.length === 0) return null;
@@ -161,21 +173,42 @@ function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) 
   const isMemeAsset = msg?.uploadSource === 'meme'
     || entries.some(entry => /\/memePool(?:%2F|\/)/i.test(String(entry.full || entry.thumb || '')));
   const imageLoading = isMemeAsset ? 'eager' : 'lazy';
-  const thumbs = entries.map(e => e.thumb);
-  const displayUrls = entries.map(e => e.full);
-  const meta = entries.map(e => ({ timestamp: msg.timestamp, messageId: msg.id, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, source: e.source, uploadSource: e.uploadSource, assetKey: e.assetKey, mediaKey: e.mediaKey, refKey: e.refKey }));
-  if (thumbs.length === 1) {
+  const resolvedEntries = entries.map(entry => ({ entry, resolved: resolvePhotoAsset(entry) }))
+    .filter(item => item.resolved.state === 'ready' && item.resolved.displaySrc);
+  if (resolvedEntries.length === 0) return null;
+  const displayUrls = resolvedEntries.map(item => item.entry.full || item.resolved.full);
+  const meta = resolvedEntries.map(item => ({
+    timestamp: msg.timestamp,
+    messageId: msg.id,
+    imageIndex: item.entry.imageIndex,
+    thumb: item.entry.thumb,
+    full: item.entry.full,
+    tags: item.entry.tags,
+    source: item.entry.source,
+    uploadSource: item.entry.uploadSource,
+    assetKey: item.entry.assetKey,
+    mediaKey: item.entry.mediaKey,
+    refKey: item.entry.refKey,
+    slotKey: item.entry.slotKey,
+    legacyKeys: item.entry.legacyKeys
+  }));
+  if (resolvedEntries.length === 1) {
+    const resolved = resolvedEntries[0].resolved;
     // The bubble caps display to maxWidth 420px/60vh (singleImageStyle below), so the small
     // thumb (480px cap) is already higher resolution than this ever needs to render at -- using
     // the full/original asset here (up to a 2000px-capped JPEG, or an untouched original up to
     // 1.5MB) downloads and decodes several times more data than the bubble can even show. The
     // lightbox onClick below still opens `displayUrls` (the full asset) when the user taps in.
+    // If the thumb 404s, bindChatPhotoFallback swaps in the original of the same pair.
     return /*#__PURE__*/React.createElement('img', {
-      src: thumbs[0] || displayUrls[0],
+      src: resolved.displaySrc,
       alt: '첨부이미지',
       loading: imageLoading,
       decoding: 'async',
       referrerPolicy: 'no-referrer',
+      'data-asset-key': resolved.assetKey || undefined,
+      'data-photo-fallback': resolved.fallbackSrc || '',
+      onError: bindChatPhotoFallback(resolved),
       onClick: () => setActiveLightbox && setActiveLightbox({ urls: displayUrls, index: 0, meta }),
       style: {
         display: 'block',
@@ -201,13 +234,14 @@ function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) 
 
   // Multi-image layout: PC gets denser rows (4/5/6 cols) while Mobile uses compact 2/3 cols with minmax(0, 1fr)
   // so thumbnails never overflow the chat speech bubble or the right edge of mobile screens.
-  const mobileCols = thumbs.length === 2 ? 2 : 3;
+  const count = resolvedEntries.length;
+  const mobileCols = count === 2 ? 2 : 3;
   const isMobile = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 640px)').matches;
-  const activeCols = isMobile ? mobileCols : (thumbs.length >= 12 ? 6 : thumbs.length >= 5 ? 5 : mobileCols);
-  const maxW = computeChatImageGridMaxWidth(thumbs.length);
+  const activeCols = isMobile ? mobileCols : (count >= 12 ? 6 : count >= 5 ? 5 : mobileCols);
+  const maxW = computeChatImageGridMaxWidth(count);
 
   return /*#__PURE__*/React.createElement('div', {
-    className: `chat-message-image-grid${thumbs.length >= 5 ? ' is-wide' : ''}`,
+    className: `chat-message-image-grid${count >= 5 ? ' is-wide' : ''}`,
     style: {
       width: '100%',
       maxWidth: maxW,
@@ -223,13 +257,16 @@ function renderChatMessageImages(msg, setActiveLightbox, singleImageStyle = {}) 
       boxSizing: 'border-box',
       marginBottom: singleImageStyle.marginBottom || '0'
     }
-  }, thumbs.map((thumb, idx) => /*#__PURE__*/React.createElement('img', {
-    key: idx,
-    src: thumb,
+  }, resolvedEntries.map(({ entry, resolved }, idx) => /*#__PURE__*/React.createElement('img', {
+    key: entry.assetKey || entry.slotKey || entry.imageIndex,
+    src: resolved.displaySrc,
     alt: `첨부이미지 ${idx + 1}`,
     loading: imageLoading,
     decoding: 'async',
     referrerPolicy: 'no-referrer',
+    'data-asset-key': resolved.assetKey || undefined,
+    'data-photo-fallback': resolved.fallbackSrc || '',
+    onError: bindChatPhotoFallback(resolved),
     onClick: () => setActiveLightbox && setActiveLightbox({ urls: displayUrls, index: idx, meta }),
     style: {
       display: 'block',

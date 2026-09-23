@@ -2,6 +2,8 @@
  * Date modal (schedule popup) (P4-14)
  */
 
+import { PhotoAssetThumb } from './photo-asset-thumb.js';
+
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
@@ -293,7 +295,6 @@ export function DateModal({
   const UnderlineTabs = __comp.UnderlineTabs || __deps.UnderlineTabs;
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
   const SimpleBottomSheetPicker = __comp.SimpleBottomSheetPicker || __deps.SimpleBottomSheetPicker;
-  const MediaThumb = __comp.MediaThumb || __deps.MediaThumb;
   const PhotoCommentCountBadge = __comp.PhotoCommentCountBadge || __deps.PhotoCommentCountBadge;
   const MemoCard = __comp.MemoCard || __deps.MemoCard;
   const PencilIcon = __comp.PencilIcon || __deps.PencilIcon;
@@ -2335,7 +2336,7 @@ export function DateModal({
           ),
           // 첨부된 사진 전부를 카드 하단에 썸네일로 보여준다 -- 예전엔 titleRow 안에 photos[0]
           // 하나만 (폴딩 화살표 왼쪽에) 보여줘서 2장 이상 첨부해도 나머지는 확인할 방법이 없었음.
-          photos.length > 0 && MediaThumb && /*#__PURE__*/React.createElement("div", {
+          photos.length > 0 && /*#__PURE__*/React.createElement("div", {
             style: {
               display: 'flex', flexWrap: 'wrap', gap: '6px', padding: '10px 12px',
               backgroundColor: `color-mix(in srgb, ${displayColor} 12%, white)`
@@ -2354,9 +2355,15 @@ export function DateModal({
                 animationDelay: commentCount > 0 ? `${(pIdx % 8) * 90}ms` : undefined
               }
             },
-              /*#__PURE__*/React.createElement(MediaThumb, {
-                src: p.thumbUrl || p.url,
-                fallbackSrc: p.url || p.thumbUrl,
+              /*#__PURE__*/React.createElement(PhotoAssetThumb, {
+                photo: {
+                  full: p.url || p.imageUrl || p.full || '',
+                  thumb: p.thumbUrl || p.thumb || p.url || p.imageUrl || '',
+                  imageUrl: p.url || p.imageUrl || '',
+                  thumbUrl: p.thumbUrl || p.thumb || '',
+                  assetKey: p.assetKey,
+                  tags: p.tags
+                },
                 alt: "기념일 사진",
                 onClick: e => {
                   e.stopPropagation();
@@ -3324,10 +3331,9 @@ export function DateModal({
         },
           title && /*#__PURE__*/React.createElement("div", { style: { fontWeight: 800, marginBottom: '6px', color: 'var(--text-main)' } }, title),
           body && /*#__PURE__*/React.createElement("div", { style: { whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.5, color: 'var(--text-main)' } }, body),
-          imageEntries.length > 0 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px' } }, imageEntries.map((entry, imageIndex) => /*#__PURE__*/React.createElement(MediaThumb, {
-            key: `${memo.id || index}-${imageIndex}`,
-            src: entry.thumb || entry.full || entry.imageUrl,
-            fallbackSrc: entry.full || entry.imageUrl,
+          imageEntries.length > 0 && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px' } }, imageEntries.map((entry, imageIndex) => /*#__PURE__*/React.createElement(PhotoAssetThumb, {
+            key: entry.assetKey || `${memo.id || index}-${imageIndex}`,
+            photo: entry,
             alt: '메모 첨부 이미지',
             loading: 'lazy',
             decoding: 'async',
@@ -3335,7 +3341,25 @@ export function DateModal({
             onClick: () => {
               if (typeof setActiveLightbox !== 'function') return;
               const urls = imageEntries.map(item => item.full || item.thumb || item.imageUrl).filter(Boolean);
-              if (urls.length) setActiveLightbox({ urls, index: imageIndex, meta: urls.map(() => ({ source: 'date-memo', memoId: memo.id })) });
+              if (urls.length) setActiveLightbox({
+                urls,
+                index: imageIndex,
+                meta: imageEntries.map(item => ({
+                  timestamp: memo.updatedAt || memo.createdAt || 0,
+                  messageId: memo.id,
+                  imageIndex: item.imageIndex,
+                  thumb: item.thumb,
+                  full: item.full,
+                  tags: item.tags,
+                  source: 'memo',
+                  uploadSource: 'memo',
+                  assetKey: item.assetKey,
+                  mediaKey: item.mediaKey,
+                  refKey: item.refKey,
+                  slotKey: item.slotKey,
+                  legacyKeys: item.legacyKeys
+                }))
+              });
             }
           })))
         );
@@ -3414,9 +3438,15 @@ export function DateModal({
         className: commentCount ? 'gallery-comment-heartbeat' : '',
         style: { position: 'relative', minWidth: 0, animationDelay: `${(index % 7) * 0.9}s` }
       },
-        /*#__PURE__*/React.createElement(MediaThumb, {
-          src: photo.thumbUrl || photo.imageUrl,
-          fallbackSrc: photo.imageUrl || photo.thumbUrl,
+        /*#__PURE__*/React.createElement(PhotoAssetThumb, {
+          photo: {
+            full: photo.imageUrl || photo.full || '',
+            thumb: photo.thumbUrl || photo.thumb || photo.imageUrl || '',
+            imageUrl: photo.imageUrl || '',
+            thumbUrl: photo.thumbUrl || '',
+            assetKey: photo.assetKey,
+            tags: photo.tags
+          },
           alt: "일정 사진",
           loading: "lazy",
           decoding: "async",

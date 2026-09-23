@@ -3,7 +3,9 @@
 // changing photo identity or deduplication rules. This file must stay importable under plain
 // Node (no `window`) -- firebase-safety-tests.mjs imports it directly to unit-test these
 // functions -- so it never imports app-domain-helpers.js, which touches window at module-eval
-// time.
+// time. photo-asset.js is pure and is the shared asset:v1 identity.
+
+import { canonicalPhotoAssetKey } from './photo-asset.js';
 
 export function coerceGalleryImageIndex(value) {
   if (Number.isInteger(value)) return value;
@@ -448,6 +450,15 @@ export function isMemeKeyboardPhotoEntry(photo) {
   return [photo.imageUrls, photo.thumbUrls].some(urls => Array.isArray(urls) && urls.some(isMemePoolAssetUrl));
 }
 
+function photoAssetLegacyKeys(assetKey, keys) {
+  const out = [];
+  (Array.isArray(keys) ? keys : []).forEach((key) => {
+    const value = typeof key === 'string' ? key.trim() : '';
+    if (value && value !== assetKey && !out.includes(value)) out.push(value);
+  });
+  return out;
+}
+
 export function composeGalleryPhotos({
   chatMessages = [], memos = [], calendar = null, anniversaries = [],
   isTombstone, getMessageImageEntries, getAllDirectMediaImageEntries,
@@ -515,11 +526,25 @@ export function composeGalleryPhotos({
       const sourceImageIndex = coerceGalleryImageIndex(
         photo?.sourceImageIndex ?? resolved?.sourceImageIndex
       );
-      const mediaKey = resolved?.mediaKey || photo?.mediaKey
-        || (photo?.sourceMessageId && sourceImageIndex != null
-          ? `chat:${photo.sourceMessageId}:${sourceImageIndex}`
-          : `meeting:${meeting.date || 'date'}:${photo?.id || index}`);
-      const refKey = resolved?.refKey || photo?.refKey || `meeting:${meeting.date || 'date'}:${photo?.id || index}`;
+      const slotMediaKey = photo?.sourceMessageId && sourceImageIndex != null
+        ? `chat:${photo.sourceMessageId}:${sourceImageIndex}`
+        : '';
+      const positionalKey = (value) => {
+        const key = typeof value === 'string' ? value.trim() : '';
+        return key && !key.startsWith('asset:v1:') ? key : '';
+      };
+      const mediaKey = slotMediaKey
+        || positionalKey(photo?.mediaKey)
+        || positionalKey(resolved?.mediaKey)
+        || `meeting:${meeting.date || 'date'}:${photo?.id || index}`;
+      const refKey = positionalKey(photo?.refKey)
+        || positionalKey(resolved?.refKey)
+        || `meeting:${meeting.date || 'date'}:${photo?.id || index}`;
+      const assetKey = canonicalPhotoAssetKey({
+        full: full || thumb,
+        thumb: thumb || full,
+        imageUrl: full || thumb
+      });
       list.push({
         full: full || thumb,
         thumb: thumb || full,
@@ -544,7 +569,9 @@ export function composeGalleryPhotos({
         meetingDate: meeting.date || '',
         mediaKey,
         refKey,
-        assetKey: resolved?.assetKey || photo?.assetKey || mediaKey
+        assetKey,
+        slotKey: mediaKey,
+        legacyKeys: photoAssetLegacyKeys(assetKey, [mediaKey, refKey, resolved?.assetKey, photo?.assetKey])
       });
     });
   });
@@ -558,6 +585,11 @@ export function composeGalleryPhotos({
       if ((!full && !thumb) || broken(full) || broken(thumb)) return;
       const mediaKey = photo?.mediaKey || `anniversary:${anniversary?.id || anniversaryDate || 'date'}:${photo?.id || index}`;
       const refKey = photo?.refKey || mediaKey;
+      const assetKey = canonicalPhotoAssetKey({
+        full: full || thumb,
+        thumb: thumb || full,
+        imageUrl: full || thumb
+      });
       list.push({
         full: full || thumb,
         thumb: thumb || full,
@@ -575,7 +607,10 @@ export function composeGalleryPhotos({
         anniversaryId: anniversary?.id || '',
         meetingDate: anniversaryDate,
         mediaKey,
-        refKey
+        refKey,
+        assetKey,
+        slotKey: mediaKey,
+        legacyKeys: photoAssetLegacyKeys(assetKey, [mediaKey, refKey, photo?.assetKey])
       });
     });
   });

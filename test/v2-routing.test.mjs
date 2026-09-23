@@ -297,11 +297,20 @@ test('V2 gallery/archive navigation writes one history entry (no records hub sto
 test('gallery thumb resolver module is the single render-resolution path', async () => {
   const { readFileSync } = await import('node:fs');
   const thumb = readFileSync(new URL('../src/core/gallery-thumb.js', import.meta.url), 'utf8');
+  const asset = readFileSync(new URL('../src/core/photo-asset.js', import.meta.url), 'utf8');
+  const paint = readFileSync(new URL('../src/ui/photo-asset-thumb.js', import.meta.url), 'utf8');
   const shell = readFileSync(new URL('../src/ui/ui-app-shell-v2.js', import.meta.url), 'utf8');
+  const gallery = readFileSync(new URL('../src/ui/ui-chat-gallery.js', import.meta.url), 'utf8');
+  const archive = readFileSync(new URL('../src/ui/ui-summary-gallery.js', import.meta.url), 'utf8');
   assert.match(thumb, /export function resolveGalleryThumbUrl/);
+  assert.match(thumb, /export function resolvePhotoAsset/);
   assert.match(thumb, /export function selectGalleryPreviewPhotos/);
   assert.match(thumb, /export function resolveHomeGalleryStripState/);
+  assert.match(asset, /export function canonicalPhotoAssetKey/);
+  assert.match(paint, /resolvePhotoAsset/);
   assert.match(shell, /resolveHomeGalleryStripState/);
-  assert.match(shell, /MediaThumb/);
+  assert.match(shell, /PhotoAssetThumb/);
+  assert.match(gallery, /PhotoAssetThumb/);
+  assert.match(archive, /PhotoAssetThumb/);
   assert.doesNotMatch(shell, /e\.currentTarget\.style\.opacity = '0'/);
 });

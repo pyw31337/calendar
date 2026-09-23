@@ -3,7 +3,7 @@
  */
 
 import { composeGalleryPhotos, getPaginationWindow, isMemeKeyboardPhotoEntry } from '../core/gallery-data.js';
-import { resolveGalleryThumbUrl } from '../core/gallery-thumb.js';
+import { PhotoAssetThumb } from './photo-asset-thumb.js';
 import { resolveGalleryLightboxTags } from '../core/photo-index.js';
 import { useScrollHideHeader } from '../core/use-scroll-hide-header.js';
 
@@ -514,7 +514,6 @@ export function ChatGalleryModal({
   const DocumentLightbox = __comp.DocumentLightbox || __deps.DocumentLightbox;
   const collectChatFileAttachmentsFromMessages = __deps.collectChatFileAttachmentsFromMessages || (window.GATHER_CHAT_FILE_ATTACHMENTS && window.GATHER_CHAT_FILE_ATTACHMENTS.collectChatFileAttachmentsFromMessages);
         const MenuIcon = __deps.MenuIcon || __comp.MenuIcon;
-  const MediaThumb = __comp.MediaThumb || __deps.MediaThumb;
   const getMessageImageEntries = __deps.getMessageImageEntries;
   const resolveMeetingPhotoDisplay = __deps.resolveMeetingPhotoDisplay;
     const formatChatHeaderTitle = __deps.formatChatHeaderTitle;
@@ -1906,15 +1905,12 @@ export function ChatGalleryModal({
       ...commentIdentity,
       legacyKeys: [...(commentIdentity.legacyKeys || []), legacyMeetingKey].filter(Boolean)
     }, photoCommentCounts));
-    const resolvedThumb = resolveGalleryThumbUrl(photo, {
-      isBroken: value => isBrokenPhotoValue(value),
-    });
-    const thumb = /*#__PURE__*/React.createElement(MediaThumb, {
+    const thumb = /*#__PURE__*/React.createElement(PhotoAssetThumb, {
       key: isBulkShareMode ? undefined : itemKey,
+      photo: photo,
+      isBroken: value => isBrokenPhotoValue(value),
       "data-photo-url": photo.full || photo.thumb,
       "data-message-id": photo.messageId || photo.sourceMessageId,
-      src: resolvedThumb.src,
-      fallbackSrc: resolvedThumb.fallbackSrc,
       alt: "공유사진",
       loading: "lazy",
       decoding: "async",
@@ -1922,7 +1918,7 @@ export function ChatGalleryModal({
       onClick: () => isBulkShareMode ? toggleBulkShareSelected(photoKey) : (setActiveLightbox && setActiveLightbox({
         urls: (lightboxItems || []).map(p => p.full),
         index: lightboxIndex >= 0 ? lightboxIndex : idx,
-        meta: (lightboxItems || []).map(p => ({ timestamp: p.timestamp, messageId: p.messageId, imageIndex: p.imageIndex, thumb: p.thumb, tags: p.tags, directMediaUrl: p.directMediaUrl, source: p.source, uploadSource: p.uploadSource, meetingDate: p.meetingDate, photoId: p.photoId, sourceMessageId: p.sourceMessageId, sourceImageIndex: p.sourceImageIndex, assetKey: p.assetKey, mediaKey: p.mediaKey, refKey: p.refKey, legacyKeys: p.legacyKeys }))
+        meta: (lightboxItems || []).map(p => ({ timestamp: p.timestamp, messageId: p.messageId, imageIndex: p.imageIndex, thumb: p.thumb, tags: p.tags, directMediaUrl: p.directMediaUrl, source: p.source, uploadSource: p.uploadSource, meetingDate: p.meetingDate, photoId: p.photoId, sourceMessageId: p.sourceMessageId, sourceImageIndex: p.sourceImageIndex, assetKey: p.assetKey, mediaKey: p.mediaKey, refKey: p.refKey, legacyKeys: p.legacyKeys, slotKey: p.slotKey }))
       })),
       onBroken: (e, brokenInfo) => handleBrokenPhoto(photo, brokenInfo),
       style: {

@@ -1,13 +1,13 @@
 /**
- * Single gallery thumbnail resolution layer for home preview + gallery grids.
+ * Single photo render-resolution layer.
  *
- * photoIndex / composeGalleryPhotos own *identity* and storage contracts; this module
- * owns *render readiness*: never hand the UI a URL that is empty, non-http(s), or
- * already known-broken. Callers paint loading skeletons until ready, and only paint
- * a permanent empty cell when resolution returns `missing`.
+ * Identity (asset:v1) lives in photo-asset.js. This module owns pixels: the UI
+ * paints the stored thumb+original pair and nothing else (no sibling imageUrls).
+ * Callers paint a placeholder when resolution returns `missing`.
  */
 
 import { isMemeKeyboardPhotoEntry } from './gallery-data.js';
+import { canonicalPhotoAssetKey } from './photo-asset.js';
 
 const THUMB_FIELD_ORDER = [
   'thumb',
@@ -85,6 +85,43 @@ export function resolveGalleryThumbUrl(item, options = {}) {
   const src = candidates[0];
   const fallbackSrc = candidates.find((url) => url !== src) || '';
   return { state: 'ready', src, fallbackSrc, candidates };
+}
+
+function firstPhotoString(...values) {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return '';
+}
+
+/** The stored pair only. Sibling imageUrls/thumbUrls belong to other photos. */
+export function projectPhotoAssetPair(item = {}) {
+  return {
+    thumb: firstPhotoString(item.thumb, item.thumbnailUrl, item.thumbUrl),
+    full: firstPhotoString(item.full, item.imageUrl, item.url, item.downloadURL, item.src, item.directMediaUrl),
+  };
+}
+
+/**
+ * One photo, one key, one pair.
+ * displaySrc is the first ready candidate (thumb preferred). fallbackSrc is the
+ * other URL in the pair. assetKey matches getPhotoAssetCommentKey / the server index.
+ */
+export function resolvePhotoAsset(item, options = {}) {
+  const pair = projectPhotoAssetPair(item || {});
+  const display = resolveGalleryThumbUrl({ thumb: pair.thumb, full: pair.full }, options);
+  const full = pair.full || pair.thumb;
+  const thumb = pair.thumb || pair.full;
+  return {
+    assetKey: canonicalPhotoAssetKey({ full, thumb, imageUrl: pair.full }),
+    full,
+    thumb,
+    displaySrc: display.src,
+    fallbackSrc: display.fallbackSrc,
+    state: display.state,
+    tags: typeof item?.tags === 'string' ? item.tags : '',
+    candidates: display.candidates,
+  };
 }
 
 function photoTimeMs(photo) {

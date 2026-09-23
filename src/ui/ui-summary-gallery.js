@@ -3,48 +3,20 @@
  */
 
 import { composeGalleryPhotos, collectMemoryPhotoIdentityKeys, isMemoryPhotoExcluded, expandMemoryPhotoExclusionKeys, dedupeMemoryPhotoEntries, photoBelongsToMemory, isMemeKeyboardPhotoEntry } from '../core/gallery-data.js';
-import { resolveGalleryThumbUrl } from '../core/gallery-thumb.js';
+import { canonicalPhotoAssetKey } from '../core/photo-asset.js';
 import { resolveGalleryLightboxTags } from '../core/photo-index.js';
 import { useScrollHideHeader } from '../core/use-scroll-hide-header.js';
 import { CapsuleTextBadge } from './ui-widgets.js';
-import { MediaThumb } from './ui-overlays.js';
+import { PhotoAssetThumb } from './photo-asset-thumb.js';
 import { TABLER_ICONS } from './v2/tabler-icons.js';
-
-/** One fill for every archive cell. Gallery already resolves through MediaThumb;
- *  people/memory grids used a raw <img> that left a tiny broken bitmap in the corner
- *  when the thumb 404'd and never tried the full-size URL. */
-function archivePhotoFillStyle() {
-  return {
-    position: 'absolute',
-    inset: 0,
-    width: '100%',
-    height: '100%',
-    maxWidth: 'none',
-    objectFit: 'cover',
-    display: 'block',
-  };
-}
 
 function ArchivePhotoThumb({ photo }) {
   const React = window.React;
-  const resolved = resolveGalleryThumbUrl(photo || {});
-  if (resolved.state !== 'ready') {
-    return React.createElement('div', {
-      className: 'archive-photo-fallback',
-      role: 'img',
-      'aria-label': '이미지를 불러오지 못했습니다.',
-      style: { ...archivePhotoFillStyle(), background: 'var(--bg-primary, #f3f1f8)' },
-    });
-  }
-  return React.createElement(MediaThumb, {
-    src: resolved.src,
-    fallbackSrc: resolved.fallbackSrc,
+  return React.createElement(PhotoAssetThumb, {
+    photo,
     alt: '',
-    loading: 'lazy',
-    decoding: 'async',
-    referrerPolicy: 'no-referrer',
+    fill: true,
     draggable: false,
-    style: archivePhotoFillStyle(),
   });
 }
 
@@ -496,7 +468,6 @@ export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalG
   const __comp = window.GATHER_UI_COMPONENTS || {};
   const GalleryIcon = __deps.GalleryIcon;
   const Lightbox = __comp.Lightbox || __deps.Lightbox;
-  const MediaThumb = __comp.MediaThumb || __deps.MediaThumb;
   const PhotoCommentCountBadge = __comp.PhotoCommentCountBadge || __deps.PhotoCommentCountBadge || function InlinePhotoCommentCountBadge({ count = 0 } = {}) {
     if (!count) return null;
     return React.createElement('span', {
@@ -635,22 +606,20 @@ export function PhotoGallery({ chatMessages, memos = [], calendar = null, totalG
         displayedEntries.map((entry, idx) => {
           const identity = getPhotoCommentIdentity(entry, visibleEntries, { source: entry.source, meetingDate: entry.meetingDate }) || {};
           const commentCount = getPhotoCommentCount(identity, photoCommentCounts);
-          const resolvedThumb = resolveGalleryThumbUrl(entry);
           return /*#__PURE__*/React.createElement("div", {
-          key: entry.mediaKey || entry.refKey || entry.full || entry.thumb,
+          key: entry.assetKey || entry.mediaKey || entry.refKey || entry.full || entry.thumb,
           className: commentCount ? 'gallery-comment-heartbeat' : '',
           style: { position: 'relative', animationDelay: `${(idx % 7) * 0.9}s` }
         },
-          /*#__PURE__*/React.createElement(MediaThumb, {
-            src: resolvedThumb.src,
-            fallbackSrc: resolvedThumb.fallbackSrc,
+          /*#__PURE__*/React.createElement(PhotoAssetThumb, {
+            photo: entry,
             alt: "채팅에 첨부된 사진",
             loading: "lazy",
             decoding: "async",
             referrerPolicy: 'no-referrer',
             onClick: () => setLightbox({
               urls: displayedEntries.map(e => e.full),
-              meta: displayedEntries.map(e => ({ timestamp: e.timestamp, messageId: e.messageId, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, directMediaUrl: e.directMediaUrl, source: e.source, uploadSource: e.uploadSource, meetingDate: e.meetingDate, photoId: e.photoId, sourceMessageId: e.sourceMessageId, sourceImageIndex: e.sourceImageIndex, assetKey: e.assetKey, mediaKey: e.mediaKey, refKey: e.refKey, legacyKeys: e.legacyKeys })),
+              meta: displayedEntries.map(e => ({ timestamp: e.timestamp, messageId: e.messageId, imageIndex: e.imageIndex, thumb: e.thumb, tags: e.tags, directMediaUrl: e.directMediaUrl, source: e.source, uploadSource: e.uploadSource, meetingDate: e.meetingDate, photoId: e.photoId, sourceMessageId: e.sourceMessageId, sourceImageIndex: e.sourceImageIndex, assetKey: e.assetKey, mediaKey: e.mediaKey, refKey: e.refKey, legacyKeys: e.legacyKeys, slotKey: e.slotKey })),
               index: idx
             }),
             onBroken: (e, brokenInfo) => handleBrokenPhoto(entry, brokenInfo),
@@ -1646,6 +1615,9 @@ export function HistoryView({
           const mediaKey = photo.mediaKey
             || (photo.sourceMessageId && sourceImageIndex != null ? `chat:${photo.sourceMessageId}:${sourceImageIndex}` : `meeting-index:${date}:${photo.id || index}`);
           const refKey = photo.refKey || `meeting-index:${photo.id || `${date}:${index}`}`;
+          const assetKey = photo.assetKey && String(photo.assetKey).startsWith('asset:v1:')
+            ? photo.assetKey
+            : canonicalPhotoAssetKey({ full: full || thumb, thumb: thumb || full, imageUrl: full || thumb });
           entries.push({
             full: full || thumb,
             thumb: thumb || full,
@@ -1660,7 +1632,10 @@ export function HistoryView({
             source: 'meeting',
             meetingDate: date,
             mediaKey,
-            refKey
+            refKey,
+            assetKey,
+            slotKey: mediaKey,
+            legacyKeys: [mediaKey, refKey].filter(key => key && key !== assetKey)
           });
         });
       });

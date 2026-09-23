@@ -47,8 +47,8 @@ import {
   getCalendarPlaces, doesPlaceMatchDate, unionPlaces,
 } from '../core/app-domain-helpers.js';
 import { getMeetingOwnedPhotoMessageIds, isChatRenderableMessage } from '../core/gallery-data.js';
-import { resolveGalleryThumbUrl, resolveHomeGalleryStripState } from '../core/gallery-thumb.js';
-import { MediaThumb } from './ui-overlays.js';
+import { resolveHomeGalleryStripState } from '../core/gallery-thumb.js';
+import { PhotoAssetThumb } from './photo-asset-thumb.js';
 import { computeKoreanHolidaysForYear, getKoreanSolarTermsForYear } from '../core/app-calendar-holidays.js';
 import { getAnniversariesForDate } from '../core/app-anniversary-dates.js';
 import { buildMainCalendarScreenState } from '../core/app-calendar-screen-state.js';
@@ -1724,40 +1724,24 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
         })))
         : photos.length
           ? React.createElement('div', { className: bentoClass('renewal-home-photo-strip thumb-grid') }, photos.map((photo, i) => {
-            const resolved = photo.__thumbResolved || resolveGalleryThumbUrl(photo, { isBroken: isBrokenThumb });
             return React.createElement('button', {
               type: 'button',
               className: bentoClass(`thumb ${photo.commentCount > 0 ? 'gallery-comment-heartbeat' : ''}`.trim()),
-              key: photo.id || photo.mediaKey || resolved.src || i,
+              key: photo.assetKey || photo.id || photo.mediaKey || i,
               onClick: () => calendarContext.setActiveLightbox?.(photoLightbox(photo, photos)),
               style: photo.commentCount > 0 ? galleryCommentMotion(photo, i) : undefined,
               'aria-label': `사진 ${i + 1} 크게 보기`
             },
-              MediaThumb
-                ? React.createElement(MediaThumb, {
-                  src: resolved.src,
-                  fallbackSrc: resolved.fallbackSrc,
-                  alt: '',
-                  loading: 'lazy',
-                  decoding: 'async',
-                  referrerPolicy: 'no-referrer',
-                  onBroken: (_e, info) => markBrokenThumb(info?.src, info?.fallbackSrc, info?.currentSrc, resolved.src, resolved.fallbackSrc),
-                  style: { width: '100%', height: '100%', objectFit: 'cover', display: 'block' },
-                })
-                : React.createElement('img', {
-                  src: resolved.src,
-                  alt: '',
-                  loading: 'lazy',
-                  decoding: 'async',
-                  referrerPolicy: 'no-referrer',
-                  onError: (e) => {
-                    if (resolved.fallbackSrc && e.currentTarget.src !== resolved.fallbackSrc) {
-                      e.currentTarget.src = resolved.fallbackSrc;
-                      return;
-                    }
-                    markBrokenThumb(resolved.src, resolved.fallbackSrc);
-                  },
-                }),
+              React.createElement(PhotoAssetThumb, {
+                photo,
+                isBroken: isBrokenThumb,
+                alt: '',
+                loading: 'lazy',
+                decoding: 'async',
+                referrerPolicy: 'no-referrer',
+                onBroken: (_e, info) => markBrokenThumb(info?.src, info?.fallbackSrc, info?.currentSrc),
+                style: { width: '100%', height: '100%', objectFit: 'cover', display: 'block' },
+              }),
               photo.commentCount > 0 ? React.createElement('span', { className: bentoClass('comment-badge') }, photo.commentCount) : null
             );
           }))
