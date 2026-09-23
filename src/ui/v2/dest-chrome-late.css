@@ -172,7 +172,11 @@
 
 .renewal-shell.v2-design .v2-archive .history-page-scroll,
 .renewal-shell.v2-design .v2-archive .history-meetings-grid {
-  padding-top: 0 !important;
+  /* Was 0 -- the list (전체/일자 filter row, cards) sat flush against the tab strip's own
+     bottom hairline with no breathing room. A small top gap, same idea as the gallery page's
+     own padding-top under its tabs (screens.css), without reopening the "absolute header"
+     double-spacing this rule was originally added to kill. */
+  padding-top: 12px !important;
   margin-top: 0 !important;
 }
 .v2-design .v2-archive .history-bento-grid {
