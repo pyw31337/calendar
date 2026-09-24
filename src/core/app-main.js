@@ -1262,9 +1262,13 @@ function CalendarApp() {
   // show up in the admin 감사 로그 tab as action "client_error", same place as every other
   // audit event. Registered once for the page's lifetime, not per calendar.
   React.useEffect(() => {
+    // One report per distinct message, max 5 per page load (a failed Firestore client repeats).
+    const reportedClientErrors = new Set();
     const reportClientError = (message, extra) => {
       const calId = activeCalRef.current?.id || 'unknown';
       const note = sanitizeText(`${message || '알 수 없는 오류'} ${extra || ''}`.trim(), 200);
+      if (reportedClientErrors.has(note) || reportedClientErrors.size >= 5) return;
+      reportedClientErrors.add(note);
       queueServerAuditEvent(calId, 'client_error', note, getClientAuditContext());
     };
     const onError = (event) => {
@@ -1274,11 +1278,20 @@ function CalendarApp() {
       const reason = event?.reason;
       reportClientError(reason?.message || String(reason || '').slice(0, 160));
     };
+    // SDK internal assertion = realtime stops for this page (firestore-listener-guard.js): offer reload.
+    const onFirestoreBroken = (event) => {
+      reportClientError(event?.detail?.message || 'FIRESTORE INTERNAL ASSERTION FAILED');
+      showToast('실시간 연결에 문제가 생겼습니다. 새로고침하면 복구됩니다.', 'error', 60000,
+        () => { window.location.reload(); }, null, '새로고침');
+    };
     window.addEventListener('error', onError);
     window.addEventListener('unhandledrejection', onRejection);
+    window.addEventListener('gather:firestore-broken', onFirestoreBroken);
+    if (window.__gatherFirestoreBroken) onFirestoreBroken({ detail: { message: window.__gatherFirestoreBroken } });
     return () => {
       window.removeEventListener('error', onError);
       window.removeEventListener('unhandledrejection', onRejection);
+      window.removeEventListener('gather:firestore-broken', onFirestoreBroken);
     };
   }, []);
 
