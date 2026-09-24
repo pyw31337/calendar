@@ -4,6 +4,7 @@ name: Deploy Firebase backend (manual)
 # runs only when started by hand, and deploys only after the emulator test suite passes.
 # Requires the repository secret FIREBASE_SERVICE_ACCOUNT (JSON key of a service account with
 # Firebase Admin + Cloud Functions Admin + Service Account User roles on metro-live-2918e).
+# No --force: if the deploy would delete a function that is missing from source, it stops instead.
 on:
   workflow_dispatch:
     inputs:
@@ -50,4 +51,4 @@ jobs:
           test -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON" || { echo "FIREBASE_SERVICE_ACCOUNT secret is not set"; exit 1; }
           printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/sa.json"
           export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
-          npx --yes firebase-tools@14 deploy --project metro-live-2918e --only "${{ inputs.targets }}" --non-interactive --force
+          npx --yes firebase-tools@14 deploy --project metro-live-2918e --only "${{ inputs.targets }}" --non-interactive
