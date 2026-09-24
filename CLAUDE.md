@@ -32,6 +32,16 @@ Firebase(Firestore/Storage/Functions)가 유일한 데이터 소스다. Vite로 
 짧은 현황: [`docs/V2-STATUS.md`](docs/V2-STATUS.md).  
 **`.github/workflows/apply-*.yml` applicator로 소스 패치하지 말 것** (#732/#733).
 
+## 데이터 무결성 재설계 (2026-09-24)
+
+사진 썸네일 깨짐·태그/댓글 미스매칭이 반복되는 근본 원인(사본 기반 모델, 배열 위치 식별, 비원자적
+다문서 쓰기, 참조 확인 없는 Storage 삭제, 인증 부재)과 단계별 재설계(P0~P5)는
+→ [`docs/data-architecture-v3.md`](docs/data-architecture-v3.md)
+
+사진 삭제/교체/태그 저장은 `src/core/media-reference-integrity.js` 규칙을 거쳐야 한다(같은 파일의 모든
+사본을 함께 처리, 다른 참조가 남아 있으면 Storage 파일을 지우지 않음). `npm run ops:integrity-audit`로
+현황 확인, 데이터 복구 `ops:integrity-repair`는 dry-run 기본이며 APPLY=1 전에 반드시 `ops:export` 백업.
+
 ## 지금 상태 (2026-09-12 기준)
 
 `src/core/app-main.js`를 여러 개의 작은 `src/core/app-*.js` 모듈로 나누는 대규모 리팩터가

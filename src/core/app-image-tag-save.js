@@ -32,8 +32,16 @@ export function createImageTagSaveHandler(context) {
     parseFlexibleDateTokens,
     linkTaggedImageToMeetingDates,
     createActivityLog,
-    writeActivityLogsToFirestore
+    writeActivityLogsToFirestore,
+    syncMeetingCopyTags
   } = context;
+  // Meeting albums still hold copies of a photo's tags (docs/data-architecture-v3.md). A save on
+  // the owning message/memo is written through to those copies so 일정/인물/추억 never show an
+  // older tag set than 채팅/갤러리. Best-effort: the owning document is already saved.
+  const writeThroughMeetingCopies = async (asset, tags) => {
+    if (typeof syncMeetingCopyTags !== 'function' || !(asset?.imageUrl || asset?.thumbUrl)) return;
+    try { await syncMeetingCopyTags(asset, tags); } catch (err) { console.warn('Meeting copy tag sync skipped:', err); }
+  };
   const toIndex = value => {
     if (Number.isInteger(value)) return value;
     const number = Number(value);
@@ -116,6 +124,7 @@ export function createImageTagSaveHandler(context) {
         setMemos(previous => previous.map(item => item.id === memoId ? { ...item, imageTags, imageTagMap: nextMap } : item));
         patchGalleryArchiveMemo(memoId, { imageTags, imageTagMap: nextMap });
         patchIndex(memoId, targetIndex, tags, { ...meta, assetKey: meta.assetKey || assetKey });
+        await writeThroughMeetingCopies({ imageUrl: entry.full || '', thumbUrl: entry.thumb || '' }, tags);
         showToast('태그 저장완료', 'success');
         return true;
       } catch (err) {
@@ -191,6 +200,9 @@ export function createImageTagSaveHandler(context) {
       showToast('태그 저장 실패', 'error');
       return false;
     }
+    // Before the date-link step: that step writes the tagged dates' meetings with these same tags,
+    // so running it last means a meeting touched by both still ends with the new tags.
+    if (!direct) await writeThroughMeetingCopies({ imageUrl: entry.full || '', thumbUrl: entry.thumb || '' }, tags);
     const imageUrl = String(meta.imageUrl || meta.directMediaUrl || entry?.full || entry?.thumb || '').trim();
     if (imageUrl) {
       try { await linkTaggedImageToMeetingDates(parseFlexibleDateTokens(tagsText), { imageUrl, thumbUrl: String(meta.thumb || entry?.thumb || imageUrl), imageIndex: targetIndex }, message, tags); }
