@@ -276,3 +276,14 @@ Message/Meeting/Memo는 `assetIds: string[]`만 가진다. 기존 `imageUrls/thu
 - 남은 설정: Firebase 콘솔에서 Authentication 시작 + 익명 로그인 사용 설정.
 - P2-B(약 1주 뒤, 캐시된 PWA가 새 버전으로 바뀐 뒤): 규칙에 `request.auth != null` 요구(에뮬레이터 테스트 동반),
   운영 스크립트·백업 워크플로는 서비스 계정 토큰으로 인증.
+
+### 2026-09-24 P2-B 준비 — 운영 스크립트·워크플로 익명 인증
+- 익명 로그인 제공자 활성화 확인: 실제 앱에서 익명 사용자로 로그인, Firestore REST 24건 모두 토큰 첨부·200.
+- `scripts/lib/firestore-anon-auth.mjs`: 운영 스크립트가 공개 웹 API 키로 익명 가입 → ID 토큰을 Firestore REST에
+  붙이고 만료 전 갱신. 서비스 계정 비밀키를 백업/점검 워크플로에 나눠주지 않고, 권한도 앱 사용자와 동일.
+  `NODE_OPTIONS=--import ./scripts/lib/firestore-anon-auth.mjs`로 스크립트 수정 없이 적용.
+- 적용: `backup-daily`, `live-smoke-daily`, `verify-calendar`(smoke:live). 공연정보 동기화·OG 생성은 Firestore를
+  직접 쓰지 않아(함수 경유) 해당 없음.
+- 확인: `ops:integrity-audit`(10건)·`ops:export`(61건, 14MB 백업) 모두 토큰 첨부·200.
+- **규칙 변경(request.auth 요구)은 아직 하지 않았다** — 이 에이전트 환경에서 보안 규칙 파일 수정이 차단되었고,
+  규칙 변경은 에뮬레이터 테스트 + 사용자 명시 승인 후 진행한다(예정: 2026-10-01).
