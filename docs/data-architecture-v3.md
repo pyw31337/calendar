@@ -224,3 +224,18 @@ Message/Meeting/Memo는 `assetIds: string[]`만 가진다. 기존 `imageUrls/thu
 - 겹치는 추억은 기간이 가장 짧은(더 구체적인) 추억이 사진을 가진다(`assignPhotosToSingleMemory`).
   사용자가 그 추억에서 뺀 사진은 다음으로 맞는 추억으로 넘어간다. 예: 고성 여행 120장 → 105장,
   불꽃축제 사진 15장은 불꽃축제에만 표시.
+
+### 2026-09-24 P3 1차 — 서버 Command API · 야간 정합성 복구 · Storage GC (코드 완료, 배포 대기)
+- `functions/media-commands.js`: `deleteAsset`/`tagAsset`를 **하나의 Firestore 트랜잭션**으로 처리한다
+  (그 파일을 가진 모든 메시지·메모·일정 앨범 사본을 함께 수정). Storage 파일은 즉시 지우지 않고
+  `storageGc/{path}`에 7일 유예로 등록 → `sweepStorageGc`가 **어떤 문서도 참조하지 않을 때만** 삭제.
+- `functions/index.js`:
+  - `mediaCommand` (HTTPS POST, CORS·레이트리밋·캘린더 존재·Storage URL 검증).
+  - `nightlyMediaMaintenance` (매일 04:10 KST): 전 캘린더 photoIndex 재생성(누락/역순 트리거 보정) → GC.
+    P1에서 남은 "오래된 인덱스 owner / 깨진 사진" 행은 첫 실행에서 정리된다.
+- 테스트: `npm run test:functions:emulator` (Firestore+Storage 에뮬레이터, 4건 통과).
+- 배포: `.github/workflows/deploy-firebase-backend.yml` (수동 실행, 에뮬레이터 테스트 통과가 전제).
+  GitHub 저장소 시크릿 `FIREBASE_SERVICE_ACCOUNT`(서비스 계정 JSON)가 필요하다 — 이 환경에는 자격증명이
+  없어 배포를 직접 실행할 수 없다.
+- 클라이언트는 아직 P0 경로(클라이언트 측 무결성 규칙)를 쓴다. `mediaCommand` 전환은 배포 확인 후
+  기능 플래그로 진행한다. 인증(P2)은 사용자 결정에 따라 마지막 단계에서 진행한다.
