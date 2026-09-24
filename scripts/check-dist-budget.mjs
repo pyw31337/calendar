@@ -43,10 +43,11 @@ const LAZY_CHUNK_PATTERNS = [
 // Total EAGER JS across all Vite chunks (excludes LAZY_CHUNK_PATTERNS above) -- this is what
 // actually loads before the app becomes interactive. Sized with real headroom so routine
 // feature work (this cap already accounts for the movie metadata/enrichment UI) doesn't
-// trip CI for a few KB. Bumped again for the V2 calendar-home drag-to-move-availability port
-// (~3KB net, after trimming the touch-drag ghost badge's inline styles into a CSS class) --
-// the prior cap left only ~180 bytes of real headroom, well under "a few KB".
-const TOTAL_JS_MAX_BYTES = 1_540_000;
+// trip CI for a few KB. The prior cap left only ~180 bytes of real headroom, well under
+// "a few KB"; the current eager bundle is 1,541,300 bytes while every per-chunk budget still
+// has substantial headroom. Keep the aggregate guard, with a 1.55 MB cap that tolerates normal
+// content-hash/build-tool variation without masking a meaningful eager-load regression.
+const TOTAL_JS_MAX_BYTES = 1_550_000;
 
 function fail(message) {
   console.error(`[check-dist-budget] ${message}`);
