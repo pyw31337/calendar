@@ -37,7 +37,8 @@ const LAZY_CHUNK_PATTERNS = [
   /^ui-places-.*\.js$/,
   /^ui-memo-view-.*\.js$/,
   /^ui-event-modals-.*\.js$/,
-  /^ui-lightbox-.*\.js$/
+  /^ui-lightbox-.*\.js$/,
+  /^ui-date-modal-.*\.js$/
 ];
 
 // Total EAGER JS across all Vite chunks (excludes LAZY_CHUNK_PATTERNS above) -- this is what
