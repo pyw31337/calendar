@@ -204,3 +204,38 @@ Message/Meeting/Memo는 `assetIds: string[]`만 가진다. 기존 `imageUrls/thu
 - 인물 카드 커버도 추억 카드와 같은 자동 대체.
 - `npm run ops:integrity-audit`: 위 1장의 표를 재현하는 읽기 전용 감사.
 - `npm run ops:integrity-repair`: P1 복구 도구 (기본 dry-run).
+
+## 7. 실행 기록
+
+### 2026-09-24 P1 일정 앨범 복구 (사용자 승인)
+- 백업: `npm run ops:export` (14MB, sha256 검증, 일정 앨범 사진 1,675장 포함) 후 적용.
+- `REPAIR_CALENDAR_IDS=cw,kkot,jhair APPLY=1 npm run ops:integrity-repair` → 일정 문서 80개 갱신,
+  동시수정으로 건너뛴 문서 0, 죽은 앨범 항목 38개 제거, 앨범 태그 1,472건 원본 기준 통일.
+- 재감사: 사본 태그 불일치 cw 562→1, kkot 434→0, jhair 403→0 / 깨진 사진 cw 31→18.
+- 남은 것:
+  - 깨진 사진 18건·오래된 인덱스 owner 31건(cw): 서버 인덱스(photoIndex)가 이미 사라진 참조를 들고
+    있는 것 → 관리자 `rebuildPhotoIndex`(관리자 비밀번호 필요)로 재생성하면 정리된다.
+  - 메시지 안의 죽은 사진 칸: 자동 생성 문구뿐인 메시지 4개(삭제 대상)와 21장 중 4장이 사라진 메시지 1개.
+    `REPAIR_MESSAGES=1`로 처리 가능(dry-run 확인 완료: 그 메시지를 위치로 가리키는 일정 참조 24건 중
+    14건이 이미 엉뚱한 사진을 가리키고 있었고, 파일 기준으로 다시 연결된다). 메시지 삭제가 포함돼
+    자동 실행이 차단되어 **사용자 직접 실행 대기**.
+
+### 2026-09-24 추억 멤버십 규칙 (사용자 결정: 한 곳에만)
+- 겹치는 추억은 기간이 가장 짧은(더 구체적인) 추억이 사진을 가진다(`assignPhotosToSingleMemory`).
+  사용자가 그 추억에서 뺀 사진은 다음으로 맞는 추억으로 넘어간다. 예: 고성 여행 120장 → 105장,
+  불꽃축제 사진 15장은 불꽃축제에만 표시.
+
+### 2026-09-24 P3 1차 — 서버 Command API · 야간 정합성 복구 · Storage GC (코드 완료, 배포 대기)
+- `functions/media-commands.js`: `deleteAsset`/`tagAsset`를 **하나의 Firestore 트랜잭션**으로 처리한다
+  (그 파일을 가진 모든 메시지·메모·일정 앨범 사본을 함께 수정). Storage 파일은 즉시 지우지 않고
+  `storageGc/{path}`에 7일 유예로 등록 → `sweepStorageGc`가 **어떤 문서도 참조하지 않을 때만** 삭제.
+- `functions/index.js`:
+  - `mediaCommand` (HTTPS POST, CORS·레이트리밋·캘린더 존재·Storage URL 검증).
+  - `nightlyMediaMaintenance` (매일 04:10 KST): 전 캘린더 photoIndex 재생성(누락/역순 트리거 보정) → GC.
+    P1에서 남은 "오래된 인덱스 owner / 깨진 사진" 행은 첫 실행에서 정리된다.
+- 테스트: `npm run test:functions:emulator` (Firestore+Storage 에뮬레이터, 4건 통과).
+- 배포: `.github/workflows/deploy-firebase-backend.yml` (수동 실행, 에뮬레이터 테스트 통과가 전제).
+  GitHub 저장소 시크릿 `FIREBASE_SERVICE_ACCOUNT`(서비스 계정 JSON)가 필요하다 — 이 환경에는 자격증명이
+  없어 배포를 직접 실행할 수 없다.
+- 클라이언트는 아직 P0 경로(클라이언트 측 무결성 규칙)를 쓴다. `mediaCommand` 전환은 배포 확인 후
+  기능 플래그로 진행한다. 인증(P2)은 사용자 결정에 따라 마지막 단계에서 진행한다.

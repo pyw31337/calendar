@@ -82,3 +82,20 @@ test('Storage deletion is blocked while any other document still references the 
   assert.deepEqual(listOtherAssetReferences(asset, { ...base, meetings: [{ date: '2026-09-20', photos: [{ ...asset, deletedAt: 1 }] }] }), []);
   assert.deepEqual(listOtherAssetReferences(asset, { ...base, indexOwners: ['message:m1:3', 'meeting:2026-09-19:4', 'memo:n1:0'] }), ['memo:n1']);
 });
+
+test('overlapping memories: a photo appears only in the most specific one', async () => {
+  globalThis.window = globalThis.window || {};
+  const { assignPhotosToSingleMemory } = await import('../src/core/gallery-data.js');
+  const fireworksPhoto = { imageUrl: url('fw_original.jpg'), thumbUrl: url('fw_thumb.jpg'), tags: '260905' };
+  const beachPhoto = { imageUrl: url('beach_original.jpg'), thumbUrl: url('beach_thumb.jpg'), tags: '260904' };
+  const groups = [
+    { id: 'trip', startDate: '2026-09-04', endDate: '2026-09-06', photos: [fireworksPhoto, beachPhoto] },
+    { id: 'fireworks', startDate: '2026-09-05', endDate: '2026-09-05', photos: [fireworksPhoto] },
+  ];
+  const [trip, fireworks] = assignPhotosToSingleMemory(groups);
+  assert.deepEqual(trip.photos, [beachPhoto]);
+  assert.deepEqual(fireworks.photos, [fireworksPhoto]);
+  // Removed from the festival by the user -> falls through to the trip instead of vanishing.
+  const [trip2] = assignPhotosToSingleMemory([groups[0], { ...groups[1], photos: [] }]);
+  assert.equal(trip2.photos.length, 2);
+});

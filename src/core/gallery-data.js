@@ -681,3 +681,35 @@ export function isChatRenderableMessage(message, meetingPhotoMessageIds = null) 
   if (meetingPhotoMessageIds && meetingPhotoMessageIds.has(message.id)) return false;
   return true;
 }
+
+function memorySpanDays(group) {
+  const start = Date.parse(`${String(group?.startDate || '').slice(0, 10)}T00:00:00Z`);
+  const end = Date.parse(`${String(group?.endDate || group?.startDate || '').slice(0, 10)}T00:00:00Z`);
+  return Number.isFinite(start) && Number.isFinite(end) ? Math.max(0, end - start) / 86400000 : Number.POSITIVE_INFINITY;
+}
+
+// A photo is shown in exactly ONE memory. When memories overlap (a 1-day festival inside a
+// 3-day trip) the most specific one owns it: shortest span first, then the later start, then id.
+// `groups` are { id, startDate, endDate, photos } already filtered by range and exclusions, so a
+// photo the user removed from the specific memory falls through to the next matching one.
+export function assignPhotosToSingleMemory(groups, getPhotoAssetCommentKey) {
+  const list = Array.isArray(groups) ? groups : [];
+  const ranked = list.slice().sort((a, b) => (
+    memorySpanDays(a) - memorySpanDays(b)
+    || String(b.startDate || '').localeCompare(String(a.startDate || ''))
+    || String(a.id || '').localeCompare(String(b.id || ''))
+  ));
+  const owner = new Map();
+  ranked.forEach(group => (group.photos || []).forEach(photo => {
+    const keys = collectMemoryPhotoIdentityKeys(photo, getPhotoAssetCommentKey);
+    if (!keys.length || keys.some(key => owner.has(key))) return;
+    keys.forEach(key => owner.set(key, group.id));
+  }));
+  return list.map(group => ({
+    ...group,
+    photos: (group.photos || []).filter(photo => {
+      const keys = collectMemoryPhotoIdentityKeys(photo, getPhotoAssetCommentKey);
+      return !keys.length || keys.some(key => owner.get(key) === group.id);
+    }),
+  }));
+}
