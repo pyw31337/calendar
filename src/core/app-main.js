@@ -21,6 +21,8 @@ import {
 } from './gallery-data.js';
 import { bindUiComponentAliases } from './app-ui-wrappers.js';
 import { createImageTagSaveHandler } from './app-image-tag-save.js';
+import { findImageSlotByAsset, removeAssetFromMeetings, replaceAssetInMeetings, syncAssetTagsInMeetings, listOtherAssetReferences } from './media-reference-integrity.js';
+import { canonicalPhotoAssetKey } from './photo-asset.js';
 import { renderRenewalShellIfEnabled } from '../ui/ui-app-shell-v2.js';
 import { useTapRevealedMsgId, useModalDirtyGuard, useChatSendGuard } from './app-ui-hooks.js';
 import { highlightTextWithYellowMarker, highlightKeyword, formatLogTimestamp, computeCalendarSearchMatches, getAdminSearchResultTargetUrl } from './app-search.js';
@@ -4122,7 +4124,12 @@ function CalendarApp() {
     getPhotoAssetCommentKey, getDirectMediaTagKey, getDirectMediaTagsForUrl, getMediaIdentityKeys,
     sanitizeText, invalidatePhotoIndexCache, rememberPhotoIndexTags, schedulePhotoIndexTagReload,
     patchLocalChatMessage, parseFlexibleDateTokens, linkTaggedImageToMeetingDates,
-    createActivityLog, writeActivityLogsToFirestore
+    createActivityLog, writeActivityLogsToFirestore,
+    syncMeetingCopyTags: async (asset, tags) => {
+      const { meetings, changed } = syncAssetTagsInMeetings(getConfirmedMeetings(activeCalRef.current || activeCal), asset, tags);
+      if (!changed) return true;
+      return commitConfirmedMeetings(meetings, null, [], 'write', 'success');
+    }
   });
   React.useEffect(() => {
     const rawId = getRawCalendarIdFromURL();
@@ -4891,10 +4898,11 @@ function CalendarApp() {
     const shouldDeleteStorage = !restoreSourceMessageId && !deletedPhoto?.sourceMessageId;
     const finalizeStorageDeletion = () => {
       if (!shouldDeleteStorage) return;
-      deleteChatImageFromStorage(deletedPhoto.imageUrl || imageUrl);
-      if (deletedPhoto.thumbUrl && deletedPhoto.thumbUrl !== (deletedPhoto.imageUrl || imageUrl)) {
-        deleteChatImageFromStorage(deletedPhoto.thumbUrl);
-      }
+      // Same file may also sit in another meeting's album or a chat/memo message.
+      void deleteAssetFilesIfUnreferenced(
+        { imageUrl: deletedPhoto.imageUrl || imageUrl, thumbUrl: deletedPhoto.thumbUrl || '' },
+        { excludeMeetingDates: [targetDate] }
+      );
     };
     const undoDelete = async () => {
       try {
@@ -5008,6 +5016,67 @@ function CalendarApp() {
     }
   }, [activeCalId, firebaseDb]);
 
+  // Photo mutations (delete/replace/retag) must act on the server's CURRENT message, never on a
+  // possibly stale local copy -- another device may have removed or reordered photos, and acting
+  // on the old array positions is what deleted/retagged neighbouring photos
+  // (docs/data-architecture-v3.md, root cause 2).
+  const memosRef = React.useRef(memos);
+  memosRef.current = memos;
+  const readFreshChatMessage = async messageId => {
+    try {
+      if (firebaseDb) {
+        const snap = await withTimeout(firebaseDb.collection('calendars').doc(`cal_${activeCalId}`).collection('messages').doc(messageId).get(), 9000, 'photo edit fresh message read');
+        if (snap) return snap.exists ? { id: messageId, ...snap.data() } : null;
+      }
+      const rest = await fetchMessageRest(activeCalId, messageId);
+      if (rest) return rest;
+    } catch (readErr) {
+      console.warn('readFreshChatMessage fell back to local copy:', readErr);
+    }
+    return findChatMessageById(messageId);
+  };
+  // photoIndex owners of one asset (server view of every document that references the file).
+  // Returns null when the index cannot be read, so callers keep the file rather than guess.
+  const fetchAssetIndexOwners = async asset => {
+    const assetKey = canonicalPhotoAssetKey(asset);
+    if (!assetKey) return [];
+    try {
+      const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/calendars/cal_${activeCalId}/photoIndex/${encodeURIComponent(assetKey)}`;
+      const res = await withTimeout(fetch(url), 8000, 'photo index owners read');
+      if (res.status === 404) return [];
+      if (!res.ok) return null;
+      const doc = firestoreDocumentToJs(await res.json()) || {};
+      return (Array.isArray(doc.owners) ? doc.owners : []).map(owner => String(owner?.sourceOwner || '')).filter(Boolean);
+    } catch (err) {
+      console.warn('fetchAssetIndexOwners failed:', err);
+      return null;
+    }
+  };
+  // The only Storage deletion path for user photos: the file goes only when no other message,
+  // memo or meeting album still points at it (otherwise that reference becomes a permanent 404
+  // thumbnail). A leaked file costs a few KB; a dangling reference breaks every screen.
+  const deleteAssetFilesIfUnreferenced = async (asset, exclusions = {}) => {
+    const full = String(asset?.imageUrl || asset?.full || '');
+    const thumb = String(asset?.thumbUrl || asset?.thumb || '');
+    if (!full && !thumb) return false;
+    const indexOwners = await fetchAssetIndexOwners({ imageUrl: full || thumb });
+    if (indexOwners === null) return false;
+    const others = listOtherAssetReferences({ imageUrl: full, thumbUrl: thumb }, {
+      messages: [...(chatMessagesRef.current || []), ...(galleryChatMessagesRef.current || [])],
+      memos: memosRef.current || [],
+      meetings: getConfirmedMeetings(activeCalRef.current || activeCal),
+      indexOwners,
+      ...exclusions
+    });
+    if (others.length) {
+      console.info('Storage file kept; still referenced by', others);
+      return false;
+    }
+    if (full) deleteChatImageFromStorage(full);
+    if (thumb && thumb !== full) deleteChatImageFromStorage(thumb);
+    return true;
+  };
+
   // Keeps confirmedMeeting.photos[] REFERENCES (see linkTaggedImageToMeetingDates) pointing at
   // the right photo after the chat message they trace back to loses an image -- the entry at
   // the deleted index is dropped (that photo is gone everywhere now, not just here), and every
@@ -5016,41 +5085,14 @@ function CalendarApp() {
   // regardless of index.
   const unlinkMeetingPhotoReferences = async (messageId, deletedImageIndex, deletedPhoto = {}) => {
     if (!activeCal || !messageId) return true;
-    const existingMeetings = getConfirmedMeetings(activeCal);
-    let changed = false;
-    const deletedIdentity = {
-      photoId: deletedPhoto.photoId || '',
-      mediaKey: deletedPhoto.mediaKey || '',
-      refKey: deletedPhoto.refKey || '',
-      imageUrl: deletedPhoto.imageUrl || '',
-      thumbUrl: deletedPhoto.thumbUrl || ''
-    };
-    const nextConfirmedMeetings = existingMeetings.map(meeting => {
-      const photos = Array.isArray(meeting.photos) ? meeting.photos : [];
-      let meetingChanged = false;
-      const nextPhotos = photos.reduce((acc, p) => {
-        if (p?.sourceMessageId !== messageId) {
-          acc.push(p);
-          return acc;
-        }
-        const identityMatch = photoMatchesIdentityPayload(p, deletedIdentity);
-        const indexMatch = deletedImageIndex === null || p.sourceImageIndex === deletedImageIndex;
-        if (identityMatch || indexMatch) {
-          meetingChanged = true;
-          return acc;
-        }
-        if (Number.isInteger(deletedImageIndex) && p.sourceImageIndex > deletedImageIndex) {
-          meetingChanged = true;
-          acc.push({ ...p, sourceImageIndex: p.sourceImageIndex - 1 });
-          return acc;
-        }
-        acc.push(p);
-        return acc;
-      }, []);
-      if (!meetingChanged) return meeting;
-      changed = true;
-      return { ...meeting, photos: nextPhotos };
-    });
+    // Every album entry of the deleted file goes, including copies made by other paths or in a
+    // second meeting (removeAssetFromMeetings matches by Storage identity, not only by
+    // sourceMessageId) -- those leftovers were the 404 thumbnails in 추억/갤러리.
+    const { meetings: nextConfirmedMeetings, changed } = removeAssetFromMeetings(
+      getConfirmedMeetings(activeCal),
+      { imageUrl: deletedPhoto.imageUrl || '', thumbUrl: deletedPhoto.thumbUrl || '' },
+      { messageId, deletedIndex: deletedImageIndex, dropAllFromMessage: deletedImageIndex === null }
+    );
     if (!changed) return true;
     const ok = await commitConfirmedMeetings(nextConfirmedMeetings, null, [], 'write', 'success');
     if (!ok) {
@@ -5062,11 +5104,26 @@ function CalendarApp() {
   const handleDeleteChatMessagePhoto = async (messageId, imageIndex, options) => {
     const silent = !!(options && options.silent);
     if (!messageId || !Number.isInteger(imageIndex)) return false;
-    const sourceMessage = await findChatMessageById(messageId);
+    // The caller's view of the photo (possibly from a stale local copy) says WHICH file to
+    // delete; the fresh server copy says WHERE it is now.
+    const localMessage = await findChatMessageById(messageId);
+    const localTarget = localMessage ? getMessageImageEntries(localMessage).find(entry => entry.imageIndex === imageIndex) : null;
+    const sourceMessage = await readFreshChatMessage(messageId);
     if (!sourceMessage) {
       return false;
     }
     const entries = getMessageImageEntries(sourceMessage);
+    const expected = localTarget
+      ? { imageUrl: localTarget.full || '', thumbUrl: localTarget.thumb || '' }
+      : { imageUrl: options?.imageUrl || '', thumbUrl: options?.thumbUrl || '' };
+    if (expected.imageUrl || expected.thumbUrl) {
+      const slot = findImageSlotByAsset(sourceMessage, expected, imageIndex);
+      if (slot < 0) {
+        if (!silent) showToast('이미 삭제되었거나 변경된 사진입니다. 화면을 새로고침해 주세요.', 'error', 4000);
+        return false;
+      }
+      imageIndex = slot;
+    }
     const target = entries.find(entry => entry.imageIndex === imageIndex);
     if (!target) return false;
     // Keep the three persisted arrays aligned by their source slot. `entries` is a render list
@@ -5118,10 +5175,10 @@ function CalendarApp() {
       }
       return sanitizeMessageForFirestore(out);
     };
-    const finalizeStorageDeletion = () => {
-      deleteChatImageFromStorage(target.full);
-      if (target.thumb !== target.full) deleteChatImageFromStorage(target.thumb);
-    };
+    const finalizeStorageDeletion = () => deleteAssetFilesIfUnreferenced(
+      { imageUrl: target.full, thumbUrl: target.thumb },
+      { excludeMessageId: messageId, excludeMeetingDates: getConfirmedMeetings(activeCalRef.current || activeCal).map(m => m.date) }
+    );
     // `writeCollectionDocumentWithFallback` can also return { queued: true } when neither the
     // SDK nor REST attempt could complete in time (see FIRESTORE_WRITE_DEADLINE_MS/
     // shouldQueueCollectionWrite) -- the operation is durably saved for a later automatic retry,
@@ -5214,7 +5271,7 @@ function CalendarApp() {
           }
         }
         if (!meetingCleanupOk) return;
-        finalizeStorageDeletion();
+        await finalizeStorageDeletion();
       };
       if (wasQueued) {
         if (!silent) showToast('네트워크가 불안정하여 삭제를 대기열에 저장했습니다. 연결되면 자동으로 반영됩니다.', 'info', 6000);
@@ -5235,10 +5292,20 @@ function CalendarApp() {
 
   const handleReplaceChatMessagePhoto = async (messageId, imageIndex, file) => {
     if (!messageId || !Number.isInteger(imageIndex) || !file) return false;
-    const sourceMessage = await findChatMessageById(messageId);
+    const localMessage = await findChatMessageById(messageId);
+    const localTarget = localMessage ? getMessageImageEntries(localMessage).find(entry => entry.imageIndex === imageIndex) : null;
+    const sourceMessage = await readFreshChatMessage(messageId);
     if (!sourceMessage) {
       showToast('교체 대상 이미지를 찾지 못했습니다.', 'error', 4000);
       return false;
+    }
+    if (localTarget) {
+      const slot = findImageSlotByAsset(sourceMessage, { imageUrl: localTarget.full || '', thumbUrl: localTarget.thumb || '' }, imageIndex);
+      if (slot < 0) {
+        showToast('이미 삭제되었거나 변경된 사진입니다. 화면을 새로고침해 주세요.', 'error', 4000);
+        return false;
+      }
+      imageIndex = slot;
     }
     const entries = getMessageImageEntries(sourceMessage);
     const target = entries.find(entry => entry.imageIndex === imageIndex);
@@ -5262,7 +5329,14 @@ function CalendarApp() {
       const nextThumbs = rawThumbs.map((url, index) => index === imageIndex ? (resolved.thumbUrl || resolved.imageUrl) : url);
       const nextImageTags = Array.isArray(sourceMessage.imageTags) ? [...sourceMessage.imageTags] : [];
       while (nextImageTags.length < Math.max(nextUrls.length, nextThumbs.length)) nextImageTags.push('');
-      nextImageTags[imageIndex] = '';
+      // Replacing the pixels does not change what the photo is: keep its tags (they used to be
+      // wiped here) and re-key them to the new file.
+      const keptTags = String(target.tags || nextImageTags[imageIndex] || '');
+      nextImageTags[imageIndex] = keptTags;
+      const oldAssetKey = canonicalPhotoAssetKey({ full: target.full, thumb: target.thumb });
+      const newAssetKey = canonicalPhotoAssetKey({ full: resolved.imageUrl, thumb: resolved.thumbUrl });
+      const seededTagMap = { ...(sourceMessage.imageTagMap && typeof sourceMessage.imageTagMap === 'object' && !Array.isArray(sourceMessage.imageTagMap) ? sourceMessage.imageTagMap : {}) };
+      if (newAssetKey && keptTags) seededTagMap[newAssetKey] = keptTags;
       const nextImageTagMap = reconcileMessageImageTagMap({
         ...sourceMessage,
         imageUrls: nextUrls,
@@ -5270,7 +5344,7 @@ function CalendarApp() {
         imageTags: nextImageTags,
         imageUrl: nextUrls.find(Boolean) || nextThumbs.find(Boolean) || null,
         thumbUrl: nextThumbs.find(Boolean) || nextUrls.find(Boolean) || null
-      }, sourceMessage.imageTagMap);
+      }, seededTagMap);
       const data = sanitizeMessageForFirestore({
         imageUrls: nextUrls,
         thumbUrls: nextThumbs,
@@ -5282,8 +5356,33 @@ function CalendarApp() {
       const ok = await writeCollectionDocumentWithFallback('messages', activeCalId, messageId, data, 'update', '사진 교체');
       if (!ok) throw new Error('Photo replace update failed');
       patchLocalChatMessage(messageId, data);
-      deleteChatImageFromStorage(target.full);
-      if (target.thumb !== target.full) deleteChatImageFromStorage(target.thumb);
+      const oldAsset = { imageUrl: target.full, thumbUrl: target.thumb };
+      // Every meeting album copy follows the replacement; otherwise it keeps pointing at the
+      // old file, which is deleted below -> a broken thumbnail in 일정/추억.
+      let meetingsMoved = true;
+      try {
+        const moved = replaceAssetInMeetings(getConfirmedMeetings(activeCalRef.current || activeCal), oldAsset, { imageUrl: resolved.imageUrl, thumbUrl: resolved.thumbUrl || resolved.imageUrl });
+        if (moved.changed) meetingsMoved = Boolean(await commitConfirmedMeetings(moved.meetings, null, [], 'write', 'success'));
+      } catch (moveErr) {
+        meetingsMoved = false;
+        console.warn('handleReplaceChatMessagePhoto meeting copies not moved:', moveErr);
+      }
+      // Comments follow the photo, not the file.
+      if (oldAssetKey && newAssetKey && oldAssetKey !== newAssetKey) {
+        try {
+          const previousComments = await handleFetchPhotoComments(oldAssetKey);
+          const list = Array.isArray(previousComments) ? previousComments : (Array.isArray(previousComments?.comments) ? previousComments.comments : []);
+          if (list.length && await handleSavePhotoComments(newAssetKey, list)) await handleSavePhotoComments(oldAssetKey, []);
+        } catch (commentErr) {
+          console.warn('handleReplaceChatMessagePhoto comments not moved:', commentErr);
+        }
+      }
+      if (meetingsMoved) {
+        await deleteAssetFilesIfUnreferenced(oldAsset, {
+          excludeMessageId: messageId,
+          excludeMeetingDates: getConfirmedMeetings(activeCalRef.current || activeCal).map(m => m.date)
+        });
+      }
       showToast('사진 교체완료', 'success');
       return resolved.imageUrl;
     } catch (err) {

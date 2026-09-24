@@ -20,6 +20,26 @@ function ArchivePhotoThumb({ photo }) {
   });
 }
 
+// A memory's cover is "its first photo that actually loads": a deleted/missing file must not
+// turn the whole card into a broken-image tile when the group has other good photos.
+const MEMORY_COVER_MAX_ATTEMPTS = 8;
+function MemoryCoverThumb({ photos }) {
+  const React = window.React;
+  const list = Array.isArray(photos) ? photos : [];
+  const [attempt, setAttempt] = React.useState(0);
+  const photo = list[Math.min(attempt, list.length - 1)];
+  if (!photo) return null;
+  const canAdvance = attempt + 1 < Math.min(list.length, MEMORY_COVER_MAX_ATTEMPTS);
+  return React.createElement(PhotoAssetThumb, {
+    key: `cover-${attempt}`,
+    photo,
+    alt: '',
+    fill: true,
+    draggable: false,
+    onBroken: canAdvance ? () => setAttempt(value => value + 1) : undefined,
+  });
+}
+
 /* P6 ESM classic-compat: free names that live scripts shared via global lexical scope */
 const GATHER_APP_UTILS = window.GATHER_APP_UTILS || {};
 const GATHER_APP_CONSTANTS = window.GATHER_APP_CONSTANTS || {};
@@ -1975,7 +1995,7 @@ export function HistoryView({
     },
       /*#__PURE__*/React.createElement("span", { style: { position: 'absolute', top: '6px', right: '6px', zIndex: 3, minWidth: '24px', height: '24px', padding: '0 6px', borderRadius: '999px', background: 'rgba(15,23,42,0.78)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, String(group.photos.length)),
       cover
-        ? /*#__PURE__*/React.createElement(ArchivePhotoThumb, { photo: cover })
+        ? /*#__PURE__*/React.createElement(MemoryCoverThumb, { photos: group.photos })
         : /*#__PURE__*/React.createElement("div", {
             style: {
               width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -2491,7 +2511,7 @@ export function HistoryView({
               },
                 /*#__PURE__*/React.createElement("span", { style: { position: 'absolute', top: '6px', right: '6px', zIndex: 3, minWidth: '24px', height: '24px', padding: '0 6px', borderRadius: '999px', background: 'rgba(15,23,42,0.78)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, String(tagPhotos.length)),
                 cover
-                  ? /*#__PURE__*/React.createElement(ArchivePhotoThumb, { photo: cover })
+                  ? /*#__PURE__*/React.createElement(MemoryCoverThumb, { photos: tagPhotos })
                   : /*#__PURE__*/React.createElement("div", {
                       style: {
                         width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
