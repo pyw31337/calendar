@@ -5,7 +5,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="build-sha" content="1ce9a9120e3522521274bf363bd19214a0bc6cd3" />
+    <meta name="build-sha" content="a259c7c2918deb34d9f55984d7f82bdd9fddb26b" />
     <meta name="v2-polish" content="2026-09-21-search-page" />
     <title>모여라 캘린더</title>
     <!-- PWA manifest + icons. Previously present only in the legacy root index.html (not the
@@ -16,8 +16,10 @@
          custom install-prompt UI (see PR #236), so Chromium's own default install affordance
          (address-bar icon / mini-infobar) is left to handle itself undisturbed. -->
     <link rel="apple-touch-icon" href="icons/icon-v3-apple-touch.png" />
+    <!-- Browser tab only. No large rel="icon" here: Samsung Internet uses the biggest rel="icon"
+         for "홈 화면에 추가" instead of the manifest, which put the transparent favicon on the
+         home screen. Home-screen icons come from manifest*.json / apple-touch-icon. -->
     <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-v3-32.png" />
-    <link rel="icon" type="image/png" sizes="192x192" href="icons/favicon-v3-192.png" />
     <link rel="icon" href="favicon.ico" />
     <meta name="theme-color" content="#4F46E5" />
     <meta name="mobile-web-app-capable" content="yes" />
