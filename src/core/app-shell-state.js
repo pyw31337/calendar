@@ -11,6 +11,37 @@ function applyThemeChoice(choice) {
   document.documentElement.setAttribute('data-theme', resolveThemeChoice(choice));
 }
 
+// User-initiated theme switches animate instead of snapping. Where the View Transitions API
+// exists (Chromium/Edge/Whale, Safari 18+) the whole page cross-fades, which also covers
+// gradient <-> solid backgrounds that CSS transitions can't interpolate; elsewhere a short-lived
+// .theme-transitioning class on <html> turns on color transitions (app.css). Initial load and
+// system-preference changes still apply instantly.
+const THEME_TRANSITION_MS = 450;
+let themeTransitionTimer = null;
+function applyThemeChoiceAnimated(choice) {
+  const root = document.documentElement;
+  let reduceMotion = false;
+  try { reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) {}
+  if (reduceMotion) {
+    applyThemeChoice(choice);
+    return;
+  }
+  if (typeof document.startViewTransition === 'function') {
+    try {
+      document.startViewTransition(() => applyThemeChoice(choice));
+      return;
+    } catch (_) {}
+  }
+  root.classList.add('theme-transitioning');
+  void root.offsetWidth; // commit the transition declarations before the colors change
+  applyThemeChoice(choice);
+  if (themeTransitionTimer) clearTimeout(themeTransitionTimer);
+  themeTransitionTimer = setTimeout(() => {
+    root.classList.remove('theme-transitioning');
+    themeTransitionTimer = null;
+  }, THEME_TRANSITION_MS + 80);
+}
+
 export function useDisplayPreferences({
   React,
   activeCalId,
@@ -35,7 +66,7 @@ export function useDisplayPreferences({
     if (isAdminDashboardRoute() || !activeCalId) return;
     const next = resolveThemeChoice(themeChoice) === 'dark' ? 'light' : 'dark';
     getLocalStorage().setItem(`gather_theme_preference_${activeCalId}_v1`, next);
-    applyThemeChoice(next);
+    applyThemeChoiceAnimated(next);
     setThemeChoice(next);
   }, [activeCalId, getLocalStorage, isAdminDashboardRoute, themeChoice]);
 

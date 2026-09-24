@@ -283,11 +283,23 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
       // `Unexpected token '<'` inside the MapLibre worker. The raster layer above is complete
       // and interactive, so prefer it on WebKit rather than letting an optional vector overlay
       // break the entire Places view.
-      if (!isAppleWebKit && typeof loadMapLibreLeaflet === 'function') {
+      // MapLibre needs WebGL. Without it (GPU acceleration off, some Firefox/Linux setups,
+      // locked-down WebViews) the bridge layer is left half-attached with no GL map, and every
+      // later pan/zoom throws "this._glMap is undefined". Keep the raster layer instead.
+      const hasWebGL = (() => {
+        try {
+          const canvas = document.createElement('canvas');
+          return !!(canvas.getContext('webgl2') || canvas.getContext('webgl'));
+        } catch (_) {
+          return false;
+        }
+      })();
+      if (!isAppleWebKit && hasWebGL && typeof loadMapLibreLeaflet === 'function') {
+        let monoVectorLayer = null;
         try {
           await loadMapLibreLeaflet();
           if (!cancelled && mapRef.current && L.maplibreGL) {
-            const monoVectorLayer = L.maplibreGL({
+            monoVectorLayer = L.maplibreGL({
               style: MINIMAL_MONO_MAP_STYLE,
               className: 'places-map-vector-basemap',
               attribution: '<a href="https://openfreemap.org/">OpenFreeMap</a> &copy; <a href="https://www.openmaptiles.org/">OpenMapTiles</a> Data from <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
@@ -295,6 +307,7 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
               padding: 0.08
             }).addTo(map);
             const vectorMap = monoVectorLayer.getMaplibreMap();
+            if (!vectorMap) throw new Error('MapLibre map was not created');
             let vectorReady = false;
             const vectorLoadTimer = window.setTimeout(() => {
               if (vectorReady || cancelled) return;
@@ -316,6 +329,7 @@ export function PlaceMapView({ places, calendar, onSelectPlace, scrollWheelZoom 
             });
           }
         } catch (err) {
+          if (monoVectorLayer) { try { map.removeLayer(monoVectorLayer); } catch (_) {} }
           console.warn('Minimal vector basemap unavailable, keeping raster fallback:', err);
         }
       }
@@ -1620,7 +1634,7 @@ export function PlacesView({
                 style: {
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '20px', height: '18px',
                   borderRadius: 'var(--radius-full)',
-                  backgroundColor: searchedPlaces.length >= 1 ? '#2563EB' : '#E2E8F0',
+                  backgroundColor: searchedPlaces.length >= 1 ? 'var(--v2-primary, #2563EB)' : '#E2E8F0',
                   color: searchedPlaces.length >= 1 ? '#FFFFFF' : '#475569',
                   fontSize: 'var(--font-size-sm)', fontWeight: 'bold', padding: '0 6px', marginLeft: '4px'
                 }

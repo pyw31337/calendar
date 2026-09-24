@@ -3975,7 +3975,8 @@ html:has(.renewal-shell.v2-design) .history-meetings-grid .memo-capsule-badge.is
 }
 
 /* ============================================================================
- * V2 dark mode: black/green/orange system (2026-09-23)
+ * V2 dark mode = "Theme 2": black / neon lime / coral, solid (2026-09-24;
+ * was a black/green/orange gradient system on 2026-09-23)
  * ----------------------------------------------------------------------------
  * V2 never had its own dark-mode palette -- .renewal-shell.v2-design's tokens
  * (--brand, --v2-glass-*, --v2-primary, --v2-card-border, the hero gradient)
@@ -4017,36 +4018,40 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .
   /* Fixes .bp-side-nav-head's undefined --bg-surface fallback (#fff) above. */
   --bg-surface: var(--bg-card);
 
-  --brand: #22C55E;
-  --brand-soft: #0F2318;
-  --cal-schedule: #22C55E;
+  /* Theme 2 (reference: black / neon lime / coral, all solid, no gradients). */
+  --brand: #C9FD58;
+  --brand-soft: #1F2A0E;
+  --on-brand: #0D0D0D;
+  --cal-schedule: #C9FD58;
   --accent-primary: var(--brand);
-  --accent-orange: #F97316;
+  --accent-orange: #FC5545;
+  --accent-secondary: #FC5545;
+  --border-confirmed-soft: #4A5E1C;
 
-  --v2-glass-dark-fill: rgba(34, 197, 94, 0.16);
-  --v2-glass-dark-border: rgba(34, 197, 94, 0.42);
-  --v2-glass-dark-inset: inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  --v2-glass-dark-glow: 0 4px 14px rgba(0, 0, 0, 0.5);
+  --v2-glass-dark-fill: #0D0D0D;
+  --v2-glass-dark-border: #0D0D0D;
+  --v2-glass-dark-inset: none;
+  --v2-glass-dark-glow: none;
 
   /* Was "light glass (on white / near-white pages)" -- now dark glass on
      near-black pages. Fixes the collapse button (사이드메뉴 하단 접기) above. */
-  --v2-glass-light-fill: color-mix(in srgb, var(--bg-card) 86%, transparent);
-  --v2-glass-light-border: #24312A;
-  --v2-glass-light-inset: inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  --v2-glass-light-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --v2-glass-light-hover-fill: rgba(34, 74, 44, 0.55);
-  --v2-glass-light-hover-border: #2E4A38;
+  --v2-glass-light-fill: #131313;
+  --v2-glass-light-border: #2C2C2C;
+  --v2-glass-light-inset: none;
+  --v2-glass-light-shadow: none;
+  --v2-glass-light-hover-fill: #1F1F1F;
+  --v2-glass-light-hover-border: #3A3A3A;
 
-  --v2-glass-purple-fill: rgba(34, 197, 94, 0.12);
-  --v2-glass-purple-border: rgba(34, 197, 94, 0.30);
-  --v2-glass-purple-inset: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --v2-glass-purple-fill: #1F2A0E;
+  --v2-glass-purple-border: #4A5E1C;
+  --v2-glass-purple-inset: none;
 
-  --v2-primary: #22C55E;
-  --v2-primary-glow: 0 6px 18px rgba(34, 197, 94, 0.35);
-  --v2-primary-glow-sm: 0 3px 10px rgba(34, 197, 94, 0.28);
+  --v2-primary: #C9FD58;
+  --v2-primary-glow: none;
+  --v2-primary-glow-sm: none;
 
-  --v2-card-border: #202B20;
-  --v2-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 4px 12px rgba(0, 0, 0, 0.25);
+  --v2-card-border: #2C2C2C;
+  --v2-card-shadow: none;
 
   /* --bg-primary/--bg-card/--text-main etc are deliberately NOT redefined here --
      they already go dark via app.css's own :root[data-theme="dark"] block (V1's
@@ -4055,77 +4060,54 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .
      them" rule (test/v2-dark-tokens-guard.test.mjs) -- V2 legacy-embedded content
      shares these tokens with V1, so diverging them here would desync the two. The
      border/surface tokens below aren't part of that guarded set. */
-  --border-subtle: #202B20;
-  --border-hover: #2C3D2C;
-  --surface-confirmed: #12271A;
+  --border-subtle: #2C2C2C;
+  --border-hover: #3A3A3A;
+  --surface-confirmed: #1F2A0E;
   --border-confirmed: var(--brand);
 }
 
-/* Hero zone: the light theme's cyan/blue/purple aurora replaced with a dark
-   green/black sweep plus a low orange glint, instead of carrying the purple
-   gradient into a shell that's meant to read as black+green+orange. */
+/* Hero zone: one solid lime slab (Theme 2 reference) instead of the light theme's animated
+   aurora. The aurora is three layered blobs (::before/::after and a .bp-hero-aurora child,
+   aurora-theme.css, each with its own !important radial-gradient + mix-blend-mode), so all
+   three are switched off rather than re-hued. */
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone {
-  background: linear-gradient(-45deg, #060907 0%, #0F2417 38%, #163B26 62%, #0A1A11 100%) 0 0 / 300% 300% !important;
+  background: var(--brand) !important;
+  animation: none !important;
+  color: var(--on-brand) !important;
 }
-html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-side-nav-head::after {
-  background: linear-gradient(-45deg, #060907 0%, #123A22 42%, #1F5C34 76%, #123A22 100%) 0 0 / 300% 300% !important;
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone::before,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone::after,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone > .bp-hero-aurora {
+  background: none !important;
+  animation: none !important;
+  opacity: 0 !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-side-nav-head::after,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-head,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand {
+  background: var(--bg-card) !important;
+  animation: none !important;
 }
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-dday-compact-badge {
-  background: linear-gradient(135deg, #22C55E 0%, #16A34A 55%, #F97316 100%) !important;
+  background: var(--accent-orange) !important;
+  color: #fff !important;
 }
 
-/* Today's date ring/fill and the brand-gradient D-day badge reused the light
-   purple gradient directly (not a token) in a couple of places; repoint them
-   to the green/orange pair above instead of leaving them purple. */
+/* Today's date: solid lime disc with black numerals (was a purple gradient literal). */
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-day-cell.bp-today .bp-day-num {
   background: var(--brand) !important;
+  color: var(--on-brand) !important;
 }
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-day-cell.bp-today .bp-day-num::after {
   border-color: var(--brand) !important;
 }
 
-/* The hero's real visual color comes from three layered aurora blobs (::before/::after and a
-   .bp-hero-aurora child, all with their own !important purple/cyan/blue radial-gradient +
-   mix-blend-mode:screen, aurora-theme.css), not from .bp-hero-zone's own background alone --
-   overriding just the base gradient above still left the hero reading purple/cyan because these
-   three keep painting on top of it. Re-hued to the green/orange dark palette, same blur/blend/
-   animation staging so the "aurora drift" motion is unchanged. */
-html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone::before {
-  background:
-    radial-gradient(ellipse 85% 78% at 20% 30%, rgba(34, 197, 94, 0.85) 0%, transparent 58%),
-    radial-gradient(ellipse 80% 72% at 78% 18%, rgba(249, 115, 22, 0.22) 0%, transparent 55%),
-    radial-gradient(ellipse 74% 80% at 42% 88%, rgba(21, 128, 61, 0.9) 0%, transparent 60%) !important;
-}
-html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone::after {
-  background:
-    radial-gradient(ellipse 82% 74% at 76% 74%, rgba(249, 115, 22, 0.2) 0%, transparent 56%),
-    radial-gradient(ellipse 28% 26% at 12% 70%, rgba(34, 197, 94, 0.5) 0%, transparent 48%),
-    radial-gradient(ellipse 70% 64% at 90% 28%, rgba(21, 128, 61, 0.8) 0%, transparent 54%) !important;
-}
-html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone > .bp-hero-aurora {
-  background:
-    radial-gradient(ellipse 58% 42% at 18% 72%, rgba(21, 128, 61, 0.85) 0%, transparent 64%),
-    radial-gradient(ellipse 52% 46% at 82% 24%, rgba(249, 115, 22, 0.18) 0%, transparent 62%),
-    radial-gradient(ellipse 40% 38% at 56% 54%, rgba(34, 197, 94, 0.75) 0%, transparent 68%) !important;
-}
-html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone {
-  background:
-    linear-gradient(180deg, rgba(4, 10, 6, 0.35) 0%, rgba(3, 8, 5, 0.6) 100%),
-    linear-gradient(90deg, #166534 0%, #0B1D13 48%, #15803D 88%, #C2410C 100%) !important;
-}
-html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-head,
-html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand {
-  background: linear-gradient(-45deg, #060907 0%, #123A22 42%, #1F5C34 76%, #123A22 100%) 0 0 / 300% 300% !important;
-}
-
-/* Two more hardcoded-purple/white spots the token overrides above don't reach on their own:
-   the active side-nav item background is a literal rgba(124,47,229,...) (not var(--brand-soft)
-   the way reference-home.css's own copy of this rule is -- design.css's copy, which wins since
-   it loads later, hardcodes the purple directly), and .btn-action-outline (app.css, shared with
-   V1, used for 편집/추가 등 outline buttons across gallery/places/archive) has no dark variant
-   at all. */
+/* Hardcoded purple/white spots the tokens above don't reach: the active side-nav item is a
+   literal rgba(124,47,229,...) in design.css, .btn-action-outline (app.css, shared with V1)
+   has no dark variant, and Leaflet's zoom controls are white. */
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-side-nav-item.bp-is-active {
-  background: rgba(34, 197, 94, 0.14) !important;
+  background: var(--brand-soft) !important;
+  color: var(--brand) !important;
 }
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .btn-action-outline {
   background: var(--bg-card) !important;
@@ -4139,30 +4121,61 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .
   border-color: var(--border-subtle) !important;
 }
 
-/* Remaining light literals found by a dark-mode scan of every V2 page (light values untouched):
-   hero D-day badges (#fff), glass hero chips/buttons (white outlines on a now-dark hero),
-   dashed empty-state borders mixed against #eceaf5, content category chips and grid toggle
-   (#f7f6fa), content/archive tab count pills (#eceaf5), and the OSM map tiles/attribution. */
-html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-dday-expanded-badge {
-  background: rgba(0, 0, 0, 0.55) !important;
-  color: var(--brand) !important;
+/* Hero contents on the solid lime slab, following the reference: text/icons go black; the
+   capsule, date chips and expanded meeting card become solid black pills/cards (white text,
+   lime/coral accents) instead of translucent glass. */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-bento-title,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-bento-title-brand,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-brand-name,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-bento-title-actions,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-hero-plain-icon-btn {
+  color: var(--on-brand) !important;
 }
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-dday-compact,
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-dday-chip,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-dday-expanded,
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-icon-btn:not(.bp-hero-plain-icon-btn),
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-renewal-shell-header-icon-btn:not(.bp-hero-plain-icon-btn) {
-  background: rgba(0, 0, 0, 0.28) !important;
-  border-color: rgba(34, 197, 94, 0.38) !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 6px 18px rgba(0, 0, 0, 0.35) !important;
+  background: var(--on-brand) !important;
+  border-color: var(--on-brand) !important;
+  color: #fff !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-icon-btn:not(.bp-hero-plain-icon-btn),
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-renewal-shell-header-icon-btn:not(.bp-hero-plain-icon-btn) {
+  color: var(--brand) !important;
 }
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-dday-compact::before,
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-dday-chip::before {
-  opacity: 0.25 !important;
+  display: none !important;
 }
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-dday-expanded-badge {
+  background: var(--accent-orange) !important;
+  color: #fff !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-dday-pill {
+  background: var(--brand) !important;
+  color: var(--on-brand) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-dday-expanded .bp-dday-collapse-btn,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-dday-expanded-tag,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-dday-participant-memo {
+  background: #2C2C2C !important;
+  color: #fff !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-dday-expanded .bp-dday-compact-prefix {
+  color: var(--brand) !important;
+}
+
+/* Remaining light literals found by a dark-mode scan of every V2 page (light values untouched):
+   dashed empty-state borders mixed against #eceaf5, content category chips and grid toggle
+   (#f7f6fa), content/archive tab count pills (#eceaf5), and the OSM map tiles/attribution. */
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-empty,
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-renewal-home-empty,
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-places .places-list-body > div > div[style*="text-align"] {
-  border-color: color-mix(in srgb, var(--brand) 30%, var(--border-subtle)) !important;
+  border-color: #3A3A3A !important;
 }
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-content .bp-cat-scroll-row > button,
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-content .culture-grid-cols-toggle {
@@ -4171,7 +4184,7 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .
 }
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-content .bp-cat-scroll-row > button[style*="background: var(--accent-primary)"] {
   background: var(--brand) !important;
-  color: #0A0C0B !important;
+  color: var(--on-brand) !important;
 }
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-content .culture-grid-cols-btn {
   color: var(--text-muted) !important;
@@ -4182,10 +4195,10 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .
   color: var(--text-muted) !important;
 }
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .leaflet-tile-pane {
-  filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9);
+  filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9) grayscale(0.6);
 }
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .leaflet-control-attribution {
-  background: rgba(10, 12, 11, 0.72) !important;
+  background: rgba(13, 13, 13, 0.72) !important;
   color: var(--text-muted) !important;
 }
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .leaflet-control-attribution a {
@@ -4201,17 +4214,176 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .
 }
 /* ToggleSwitch (ui-shared.js) paints its off-state track #CBD5E1 inline. */
 html:has(.renewal-shell.v2-design)[data-theme="dark"] button[role="switch"][aria-checked="false"] {
-  background-color: #38423D !important;
+  background-color: #3A3A3A !important;
 }
-/* Settlement card status chip ("진행중") sets its purple text inline (ui-event-modals.js);
-   on the dark theme's green card that reads poorly. */
+/* Settlement card status chip ("진행중") sets its purple text inline (ui-event-modals.js). */
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .settlement-page-body span[style*="color: rgb(91, 75, 235)"] {
-  color: #052E16 !important;
+  color: var(--on-brand) !important;
 }
+/* Settlement hero: same solid lime slab as the home hero (start = mid = end, no gradient). */
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design,
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-design,
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-settlement {
-  --settlement-hero-start: #15803D !important;
-  --settlement-hero-mid: #166534 !important;
-  --settlement-hero-end: #14532D !important;
+  --settlement-hero-start: var(--brand) !important;
+  --settlement-hero-mid: var(--brand) !important;
+  --settlement-hero-end: var(--brand) !important;
+}
+
+/* Theme 2 page-level fixes found by scanning every V2 page (light theme untouched):
+   solid confirmed-date cells, black text on every lime fill, lime visited-place tags. */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-day-cell.bp-confirmed {
+  background: var(--brand-soft) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-day-meeting-pill,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-day-meeting-pill *,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-side-nav-cal-badge {
+  color: var(--on-brand) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-place-tag.bp-is-visited {
+  background: var(--brand-soft) !important;
+  color: var(--brand) !important;
+  border-color: var(--border-confirmed-soft) !important;
+}
+/* Anything filled with the brand color gets black ink: lime (#C9FD58) with the light theme's
+   white text is ~1.2:1. Covers components that set the fill inline (count badges, segmented
+   buttons, category chips) and the class-driven ones (FAB, pagination, comment badges). */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design [style*="background-color: var(--v2-primary"],
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design [style*="background: var(--v2-primary"],
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design [style*="background-color: var(--accent-primary)"],
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design [style*="background: var(--accent-primary)"],
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design [style*="background-color: var(--brand"],
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design [style*="background: var(--brand"],
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-fab,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .gallery-pagination-button.is-active,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .memo-card-comment-badge {
+  color: var(--on-brand) !important;
+}
+/* Settlement hero on the solid lime slab: black text, solid black member/total cards. */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] body,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-settlement {
+  --status-green: #C9FD58;
+  --settlement-hero-text: #0D0D0D;
+  --settlement-hero-muted: rgba(13, 13, 13, 0.72);
+  --settlement-hero-surface: #0D0D0D;
+  --settlement-hero-surface-text: #FFFFFF;
+  --settlement-hero-surface-muted: #A3A3A3;
+  --settlement-hero-action-bg: #0D0D0D;
+  --settlement-hero-action-border: #0D0D0D;
+  --settlement-hero-action-text: #FFFFFF;
+  --settlement-person-capsule-bg: #2C2C2C;
+  --settlement-person-capsule-text: #FFFFFF;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-settlement .settlement-total-card {
+  background: var(--settlement-hero-surface) !important;
+  color: var(--settlement-hero-surface-text) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-settlement .settlement-total-card .settlement-person-amount {
+  color: var(--brand) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-settlement .settlement-transfer-guide {
+  background: var(--on-brand) !important;
+  border-color: var(--on-brand) !important;
+  color: #fff !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-settlement .settlement-transfer-guide b {
+  color: var(--brand) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .settlement-page-body span[style*="color: rgb(91, 75, 235)"] {
+  background: var(--on-brand) !important;
+  color: var(--brand) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-cat-scroll-row > button[style*="background: var(--accent-primary)"] .section-count-badge,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-cat-chip.bp-is-selected .section-count-badge {
+  background: var(--on-brand) !important;
+  color: var(--brand) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-cat-chip.bp-is-selected {
+  color: var(--on-brand) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .v2-content .v2-content-subcat-slot .bp-cat-chip.bp-is-selected .section-count-badge {
+  background: transparent !important;
+  color: var(--on-brand) !important;
+}
+/* Mobile hero quick-nav (채팅/정산/메모/...) sits on the lime slab. */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-hero-quick-nav-item,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-hero-quick-nav-label,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-zone .bp-hero-quick-nav-icon {
+  color: var(--on-brand) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-hero-quick-nav-badge {
+  box-shadow: 0 0 0 2px var(--brand) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-fab {
+  box-shadow: none !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design > nav.bp-side-nav,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-side-nav {
+  box-shadow: -12px 0 32px rgba(0, 0, 0, 0.55) !important;
+}
+/* Portaled modals/sheets render under <body>, outside .renewal-shell, so Theme 2's modal rules
+   are scoped to the page (html:has(.renewal-shell.v2-design)) rather than the shell. */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .btn-primary,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .modal-overlay .btn-primary,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .modal-overlay button.btn-primary {
+  background: var(--brand) !important;
+  border-color: var(--brand) !important;
+  color: var(--on-brand) !important;
+  box-shadow: none !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .modal-overlay {
+  background-color: rgba(0, 0, 0, 0.62) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .modal-container,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .modal-overlay .modal-container,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .modal-overlay > .modal-container.v2-responsive-modal {
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*="color: rgb(124, 58, 237)"],
+html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*="color: rgb(124, 47, 229)"],
+html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*="color: rgb(139, 92, 246)"]:not(svg):not(path) {
+  color: var(--brand) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*="background-color: var(--v2-primary"],
+html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*="background: var(--v2-primary"],
+html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*="background-color: var(--accent-primary)"],
+html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*="background: var(--accent-primary)"] {
+  color: var(--on-brand) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .url-capsule-badge {
+  color: var(--text-main) !important;
+}
+/* Light-theme slate ink set inline (#334155/#475569) reads ~2:1 on Theme 2's black cards. */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*="color: rgb(71, 85, 105)"],
+html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*="color: rgb(51, 65, 85)"] {
+  color: var(--text-muted) !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*="color: rgb(22, 163, 74)"] {
+  color: var(--brand) !important;
+}
+/* Map cluster counts (inline #3B82F6 + white ring in ui-places.js): black chip, lime ring/ink. */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .place-cluster-icon > div {
+  background: var(--on-brand) !important;
+  border-color: var(--brand) !important;
+  color: var(--brand) !important;
+  box-shadow: none !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*="background-color: rgb(226, 232, 240)"] {
+  background-color: #2C2C2C !important;
+  color: var(--text-muted) !important;
+}
+
+/* PC home uses the same 40px page gutter as every other destination body (.v2-dest-body,
+   .gallery-page-scroll, .places-list-body all pad 40px at desktop widths) instead of running
+   the hero and calendar edge-to-edge. Tablet/phone contracts (<1200px) are unchanged. */
+@media (min-width: 1200px) {
+  .renewal-shell.v2-design > .bp-app-shell.is-bento-home,
+  .renewal-shell.v2-design .bp-app-shell.is-bento-home {
+    padding: 40px !important;
+    box-sizing: border-box !important;
+  }
+  .renewal-shell.v2-design .bp-app-shell.is-bento-home .bp-hero-zone {
+    margin: 0 0 16px !important;
+    border-radius: 20px !important;
+  }
 }
