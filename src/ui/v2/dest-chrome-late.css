@@ -485,13 +485,11 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   flex-shrink: 0;
   align-self: flex-start;
   margin-top: 2px;
-  /* Match ChatRoomView's real (inline-styled) name badge exactly -- font-size: var(--font-size-md),
-     padding: 3px 8px, font-weight: bold -- instead of the shared .v2-name-pill defaults (0.62rem/
-     2px 6px/800), which is what made this preview's bubble read as a different design from the
-     actual chat room's "v2 new spec" bubble. */
-  font-size: var(--font-size-md, 0.8rem);
-  font-weight: bold;
-  padding: 3px 8px;
+  /* Same name badge as the V2 chat room (screens.css, .msg-row-hover > span:first-child). */
+  font-size: var(--font-size-2xs, 0.62rem);
+  font-weight: 800;
+  padding: 2px 6px;
+  margin-top: 1px;
 }
 .v2-design .v2-home-chat-row:last-child { margin-bottom: 0; }
 .v2-design .v2-home-chat-bubble-wrap {
@@ -500,46 +498,23 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   max-width: 72%;
   flex: 1 1 auto;
 }
+/* Same bubble as the V2 chat room's "other person" message (screens.css .v2-message-bubble):
+   square top-left corner as the tail, hairline card border, no shadow, 0.8rem / 1.45. */
 .v2-design .v2-home-chat-bubble {
   position: relative;
   z-index: 1;
   background: var(--bg-card);
-  border: 1px solid var(--border-subtle, rgba(30,27,46,0.08));
-  border-radius: var(--radius-md, 10px);
-  padding: 8px 12px;
-  /* Matches ChatRoomView's own bubble font-size exactly (was 0.86rem, a near-miss). */
-  font-size: 0.9rem;
-  line-height: 1.4;
+  border: 1px solid var(--v2-card-border, #eceaf5);
+  border-radius: 0 12px 12px 12px;
+  padding: 8px 11px;
+  font-size: 0.8rem;
+  line-height: 1.45;
   color: var(--text-main, #1e1b2e);
   word-break: keep-all;
   overflow-wrap: break-word;
   white-space: pre-wrap;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+  box-shadow: none;
   overflow: hidden;
-}
-.v2-design .v2-home-chat-bubble-wrap::before,
-.v2-design .v2-home-chat-bubble-wrap::after {
-  content: '';
-  position: absolute;
-  top: 10px;
-  width: 0;
-  height: 0;
-  pointer-events: none;
-}
-.v2-design .v2-home-chat-bubble-wrap::before {
-  left: -7px;
-  border-top: 7px solid transparent;
-  border-bottom: 7px solid transparent;
-  border-right: 7px solid var(--border-subtle, rgba(30,27,46,0.08));
-  z-index: 2;
-}
-.v2-design .v2-home-chat-bubble-wrap::after {
-  left: -5px;
-  top: 11px;
-  border-top: 6px solid transparent;
-  border-bottom: 6px solid transparent;
-  border-right: 6px solid var(--bg-card);
-  z-index: 3;
 }
 .v2-design .v2-home-chat-image {
   display: block;
@@ -568,9 +543,9 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   padding: 2px 0;
 }
 .v2-design .v2-home-chat-time {
-  /* Matches ChatRoomView's own timestamp (var(--font-size-xs), 0.68rem) exactly (was 0.62rem). */
-  font-size: var(--font-size-xs, 0.68rem);
-  color: var(--text-light, #9a93a8);
+  /* Same timestamp as the V2 chat room. */
+  font-size: var(--font-size-2xs, 0.62rem);
+  color: #9ca3af;
   line-height: 1.25;
   white-space: nowrap;
 }
@@ -832,6 +807,11 @@ html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .v2-places .places-c
    line and this divider read as one continuous line. */
 html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-side-nav-group:not(:first-of-type) {
   border-top-color: var(--v2-card-border, #eceaf5) !important;
+}
+/* No hairline between 통합검색 and the first menu group at any width -- the PC rail already
+   drops it (design.css, >=1200px); the phone drawer now matches it. */
+html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .bp-side-nav-group.bp-is-main {
+  border-top: 0 !important;
 }
 /* Past-meeting D+N badge: same pill as the upcoming D-day badge (dark pill, bright text), in
    a gray monotone. */
@@ -3605,7 +3585,8 @@ html:has(.renewal-shell.v2-design) .festival-bar-desktop .bp-day-anniversary-lab
   html:has(.renewal-shell.v2-design) .festival-bar-mobile { display: none !important; }
   html:has(.renewal-shell.v2-design) .bp-day-bar-stack .bp-day-anniversary,
   html:has(.renewal-shell.v2-design) .festival-bar-desktop .bp-day-anniversary {
-    border-radius: 4px !important;
+    /* Capsule, same as the thin phone bars. */
+    border-radius: 999px !important;
     padding: 0 6px !important;
   }
   html:has(.renewal-shell.v2-design) .bp-day-bar-stack .bp-day-anniversary.bp-cat-birthday,
@@ -3748,13 +3729,13 @@ html:has(.renewal-shell.v2-design) .bp-ann-range .bp-day-anniversary-label {
 }
 @media (min-width: 460px) {
   html:has(.renewal-shell.v2-design) .bp-ann-range.bp-is-single {
-    border-radius: 4px !important;
+    border-radius: 999px !important;
   }
   html:has(.renewal-shell.v2-design) .bp-ann-range.bp-is-start {
-    border-radius: 4px 0 0 4px !important;
+    border-radius: 999px 0 0 999px !important;
   }
   html:has(.renewal-shell.v2-design) .bp-ann-range.bp-is-end {
-    border-radius: 0 4px 4px 0 !important;
+    border-radius: 0 999px 999px 0 !important;
   }
   html:has(.renewal-shell.v2-design) .bp-ann-range.bp-cat-birthday {
     background: color-mix(in srgb, var(--ann-birthday) 22%, var(--bg-card)) !important;

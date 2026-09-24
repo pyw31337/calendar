@@ -2112,6 +2112,10 @@ export function Lightbox({ urls, index, onClose, onNavigate, meta, calendar = nu
     }
   }, /*#__PURE__*/React.createElement("div", {
     className: "lightbox-track",
+    // The slot width this transform was computed from; visual-viewport-sync.js resizes the
+    // slots to the measured stage and needs it to tell the finger's drag apart from the width
+    // difference (portrait photos use 0.92 x viewport here, but V2 stretches the stage).
+    "data-stage-width": stageWidthPx,
     onTransitionEnd: handleTrackTransitionEnd,
     style: {
       display: 'flex',

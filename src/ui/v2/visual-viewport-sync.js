@@ -97,18 +97,31 @@
     if (!track) return;
     track.style.setProperty('width', `${w * 3}px`, 'important');
     const transform = String(track.style.transform || '');
+    // Our own correction triggers this observer again; only React's writes need rebasing.
+    if (transform && transform === track.__gatherSyncedTransform) return;
     const match = transform.match(/translate3d\(\s*(-?[\d.]+)px/);
     const x = match ? Number(match[1]) : -w;
-    // Extract drag relative to React's intended -stageWidth base by taking residue mod w
-    // after shifting by +w (idle position).
-    let drag = x + w;
-    // If React used a larger stageWidth (0.92*vw), x is more negative; normalize into (-w/2, w/2].
-    while (drag > w / 2) drag -= w;
-    while (drag <= -w / 2) drag += w;
+    // React writes translate3d(-stageWidth + drag). Its stageWidth (data-stage-width) can
+    // differ from the measured slot width w -- a portrait photo uses 0.92 x viewport while V2
+    // stretches the stage to 100% -- so take the drag relative to React's own base; treating
+    // the width difference as drag left every portrait photo off-centre (shifted right).
+    const reactWidth = Number(track.getAttribute('data-stage-width')) || 0;
+    let drag;
+    if (reactWidth > 0) {
+      drag = x + reactWidth;
+    } else {
+      // Older markup without the attribute: best effort, residue modulo w.
+      drag = x + w;
+      while (drag > w / 2) drag -= w;
+      while (drag <= -w / 2) drag += w;
+    }
+    // A completed slide animates to +-reactWidth; scale that to the measured slot width.
+    if (reactWidth > 0 && Math.abs(Math.abs(drag) - reactWidth) < 1) drag = Math.sign(drag) * w;
     const next = -w + drag;
     if (!match || Math.abs(x - next) > 0.5) {
       track.style.setProperty('transform', `translate3d(${next}px, 0, 0)`, 'important');
     }
+    track.__gatherSyncedTransform = String(track.style.transform || '');
   };
 
   const scan = () => {
