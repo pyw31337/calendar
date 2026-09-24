@@ -1,5 +1,13 @@
 import './react-globals.js';
 import './app.css';
+import { installStaleChunkRecovery } from './core/stale-chunk-recovery.js';
+
+// A deploy while this tab was open leaves it asking for chunk names that no longer exist the
+// first time it opens a lazy screen; reload once to pick up the current build.
+const reloadForStaleChunk = installStaleChunkRecovery(window);
+function recoverStaleChunk(err) {
+  try { reloadForStaleChunk(err); } catch (_) {}
+}
 
 const BOOT_RETRY_KEY = 'gather_boot_auto_retry';
 const FIREBASE_SDK_VERSION = (() => {
@@ -163,6 +171,7 @@ function loadAdminUi() {
       import('./ui/ui-admin-dashboard.js')
     ]).catch(err => {
       adminUiLoadPromise = null;
+      recoverStaleChunk(err);
       throw err;
     });
   }
@@ -178,6 +187,7 @@ function loadManualUi() {
   if (!manualUiLoadPromise) {
     manualUiLoadPromise = import('./ui/ui-user-manual.js').catch(err => {
       manualUiLoadPromise = null;
+      recoverStaleChunk(err);
       throw err;
     });
   }
@@ -196,6 +206,7 @@ function loadEventUi() {
   if (!eventUiLoadPromise) {
     eventUiLoadPromise = import('./ui/ui-event-modals.js').catch(error => {
       eventUiLoadPromise = null;
+      recoverStaleChunk(error);
       throw error;
     });
   }
@@ -217,6 +228,7 @@ function loadChatUi() {
       import('./ui/ui-chat-room.js')
     ]).catch(err => {
       chatUiLoadPromise = null;
+      recoverStaleChunk(err);
       throw err;
     });
   }
@@ -239,6 +251,7 @@ function loadViewUi(view) {
   if (!viewUiLoadPromises.has(view)) {
     viewUiLoadPromises.set(view, loader().catch(err => {
       viewUiLoadPromises.delete(view);
+      recoverStaleChunk(err);
       throw err;
     }));
   }
