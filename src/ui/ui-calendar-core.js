@@ -1524,6 +1524,39 @@ export function CommentsSection({
   }) : null));
 }
 
+// One fold rule for memo comments everywhere a memo is shown (memo page, date sheet, home,
+// search): the latest comment is visible (the "is anyone reacting?" signal) and the earlier ones
+// sit behind a single 더보기/접기 toggle placed where they unfold, above it.
+// While the viewer is writing a comment the whole thread is shown.
+export const MEMO_COMMENT_PREVIEW_COUNT = 1;
+export function MemoCommentFold({ comments, renderComment, forceExpanded = false }) {
+  const React = window.React;
+  const [expanded, setExpanded] = React.useState(false);
+  const list = Array.isArray(comments) ? comments : [];
+  const hiddenCount = Math.max(0, list.length - MEMO_COMMENT_PREVIEW_COUNT);
+  const open = expanded || forceExpanded;
+  const offset = open || !hiddenCount ? 0 : hiddenCount;
+  const visible = list.slice(offset);
+  return /*#__PURE__*/React.createElement(React.Fragment, null,
+    hiddenCount > 0 && !forceExpanded && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "memo-comment-fold-toggle",
+      "aria-expanded": open,
+      "data-stop-card-open": "true",
+      onClick: e => { e.stopPropagation(); setExpanded(v => !v); }
+    },
+      /*#__PURE__*/React.createElement("svg", {
+        width: "12", height: "12", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2",
+        strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true",
+        style: { transform: open ? 'none' : 'rotate(180deg)', transition: 'transform 200ms ease' }
+      }, /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" })),
+      open ? '댓글 접기' : `이전 댓글 ${hiddenCount}개 더보기`
+    ),
+    // Index stays the comment's position in the whole thread so row keys/dividers are stable.
+    visible.map((comment, index) => renderComment(comment, index + offset))
+  );
+}
+
 export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onSelectTag, onCommentsChange, getBorderColor, onRequestConfirm, showToast, effectivePinned, hidePinButton = false, variant = 'page', setActiveLightbox = null, searchQuery = '' }) {
   const React = window.React;
   const __deps = window.GATHER_UI_DEPS || {};
@@ -1540,6 +1573,9 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
   const AutoGrowTextarea = __comp.AutoGrowTextarea || __deps.AutoGrowTextarea;
   // 'page' = memo-page standard module; 'preview' = main-screen section customization.
   const isPreview = variant === 'preview';
+  // The date sheet shows the memo exactly like the memo page: date in the footer, one comment
+  // action there (not a second one in the tag row).
+  const isPageLayout = variant === 'v2-page' || variant === 'date-modal';
   const sanitizeText = __deps.sanitizeText;
   const extractFirstUrl = __deps.extractFirstUrl;
   const extractAllUrlInfosLoose = __deps.extractAllUrlInfosLoose || __deps.extractAllUrlInfos;
@@ -1578,10 +1614,6 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     if (memoFirstUrl && text === memo.text) text = removeFirstUrl(text);
     return text.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
   })();
-  const memoTextLineCount = displayMemoText ? displayMemoText.split(/\r?\n/).length : 0;
-  const hasLongMemoText = (variant === 'v2-page' || variant === 'preview')
-    ? false
-    : (displayMemoText.length > 280 || memoTextLineCount > 8);
   const memoMeta = (() => {
     const value = memo.updatedAt ?? memo.createdAt;
     if (!value) return '';
@@ -1592,7 +1624,6 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     const pad = value => String(value).padStart(2, '0');
     return `${pad(date.getMonth() + 1)}.${pad(date.getDate())}(${weekday}) ${pad(date.getHours())}:${pad(date.getMinutes())}`;
   })();
-  const [isMemoTextExpanded, setIsMemoTextExpanded] = React.useState(false);
   const [openVideoByUrl, setOpenVideoByUrl] = React.useState({});
 
   // Comments: stored inline on the memo doc as a size-capped array (see hasValidMemoShape in
@@ -1610,12 +1641,6 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
     || __deps.refocusComposerField
     || ((ref) => { const el = ref && ref.current; if (el && el.focus) { try { el.focus({ preventScroll: true }); } catch (_) { el.focus(); } } });
   const commentPart = (calendar?.participants || []).find(p => p.id === commentParticipantId);
-  // Long comment threads otherwise push the composer far below the fold -- collapse to the most
-  // recent COMMENT_COLLAPSE_LIMIT by default, with a toggle above the list to see the rest.
-  const COMMENT_COLLAPSE_LIMIT = 3;
-  const [isCommentsExpanded, setIsCommentsExpanded] = React.useState(variant === 'v2-page');
-  const hasMoreComments = comments.length > COMMENT_COLLAPSE_LIMIT;
-  const visibleComments = (!hasMoreComments || isCommentsExpanded) ? comments : comments.slice(-COMMENT_COLLAPSE_LIMIT);
 
   const handleSaveComment = async (e) => {
     e.stopPropagation();
@@ -1851,7 +1876,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       className: "v2-memo-card-title",
       style: { fontSize: '1rem', fontWeight: 'bold', color: 'var(--text-main)', marginBottom: '8px', paddingRight: hidePinButton ? '30px' : '44px', wordBreak: 'break-all' }
     }, highlightKeyword(memo.title, searchQuery)),
-    variant !== 'preview' && variant !== 'v2-page' && memoMeta && /*#__PURE__*/React.createElement("div", {
+    variant !== 'preview' && !isPageLayout && memoMeta && /*#__PURE__*/React.createElement("div", {
       className: "v2-memo-card-meta",
     }, memoMeta),
 
@@ -1870,37 +1895,10 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         lineHeight: '1.4',
         whiteSpace: 'pre-wrap',
         overflowWrap: 'break-word',
-        wordBreak: 'break-all',
-        ...(hasLongMemoText && !isMemoTextExpanded ? {
-          display: '-webkit-box',
-          WebkitLineClamp: 8,
-          WebkitBoxOrient: 'vertical',
-          overflow: 'hidden'
-        } : {})
+        wordBreak: 'break-all'
       }
     }, parseTextWithLinks(displayMemoText, searchQuery)),
 
-    hasLongMemoText && /*#__PURE__*/React.createElement("button", {
-      type: "button",
-      onClick: (e) => {
-        e.stopPropagation();
-        setIsMemoTextExpanded(v => !v);
-      },
-      "data-stop-card-open": "true",
-      style: {
-        width: '100%',
-        marginTop: '8px',
-        padding: '8px 12px',
-        border: 'none',
-        borderRadius: 'var(--radius-md)',
-        background: 'var(--bg-primary)',
-        color: 'var(--text-main)',
-        fontSize: 'var(--font-size-md)',
-        fontWeight: 800,
-        cursor: 'pointer',
-        textAlign: 'center'
-      }
-    }, isMemoTextExpanded ? "접기" : "더 보기"),
 
     /* Media Embed or Link Preview Card under the card content if applicable */
     memoPreviewUrls.length > 0 && /*#__PURE__*/React.createElement("div", {
@@ -2042,26 +2040,10 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       className: "v2-memo-card-comments",
       style: { display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '8px' }
     },
-      hasMoreComments && /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: e => { e.stopPropagation(); setIsCommentsExpanded(v => !v); },
-        style: {
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
-          width: '100%', boxSizing: 'border-box', alignSelf: 'stretch',
-          background: 'none', cursor: 'pointer', padding: '6px',
-          border: '1px solid color-mix(in srgb, var(--bg-primary) 96%, black)',
-          borderRadius: '8px',
-          fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--text-muted)'
-        }
-      },
-        /*#__PURE__*/React.createElement("svg", {
-          width: "12", height: "12", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2",
-          strokeLinecap: "round", strokeLinejoin: "round",
-          style: { transform: isCommentsExpanded ? 'none' : 'rotate(180deg)' }
-        }, /*#__PURE__*/React.createElement("path", { d: "M6 9l6 6l6 -6" })),
-        isCommentsExpanded ? '댓글 접기' : `댓글 더보기 (${comments.length - COMMENT_COLLAPSE_LIMIT}개)`
-      ),
-      visibleComments.map((comment, commentIdx) => {
+      /*#__PURE__*/React.createElement(MemoCommentFold, {
+        comments,
+        forceExpanded: isCommentComposerOpen,
+        renderComment: (comment, commentIdx) => {
       const author = (calendar?.participants || []).find(p => p.id === comment.participantId);
       return /*#__PURE__*/React.createElement("div", {
         key: comment.id || `${comment.participantId || 'comment'}-${comment.createdAt || 'undated'}-${commentIdx}`,
@@ -2092,13 +2074,14 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
           style: { background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center', color: 'var(--text-muted)', flexShrink: 0 }
         }, /*#__PURE__*/React.createElement(TrashIcon, { size: 12 }))
       );
-    })),
+        }
+      })),
 
     variant !== 'preview' && /*#__PURE__*/React.createElement("div", {
       className: "memo-card-comment-footer",
       onClick: e => e.stopPropagation()
     },
-      /*#__PURE__*/React.createElement("span", { className: "memo-card-comment-count" }, variant === 'v2-page' ? (memoMeta || '') : `댓글 ${comments.length}개`),
+      /*#__PURE__*/React.createElement("span", { className: "memo-card-comment-count" }, isPageLayout ? (memoMeta || '') : `댓글 ${comments.length}개`),
       /*#__PURE__*/React.createElement("button", {
         type: "button",
         className: "memo-card-comment-toggle",
@@ -2110,9 +2093,9 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         },
         title: "댓글 입력",
         "aria-label": comments.length ? `댓글 ${comments.length}개` : "댓글 입력"
-      }, variant === 'v2-page'
+      }, isPageLayout
         ? /*#__PURE__*/React.createElement("svg", { width: 14, height: 14, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true" }, /*#__PURE__*/React.createElement("path", { d: "M20 11.5a7.5 7.5 0 0 1-8 7.45 8.4 8.4 0 0 1-3.4-.7L4 19.5l1.25-3.2A7.3 7.3 0 0 1 4.5 12 7.5 7.5 0 0 1 12 4.5a7.5 7.5 0 0 1 8 7Z" }))
-        : /*#__PURE__*/React.createElement(MessageCommentIcon, { size: 16 }), "댓글", (variant === 'v2-page' && comments.length > 0) ? /*#__PURE__*/React.createElement("span", {
+        : /*#__PURE__*/React.createElement(MessageCommentIcon, { size: 16 }), "댓글", (isPageLayout && comments.length > 0) ? /*#__PURE__*/React.createElement("span", {
         className: "memo-card-comment-badge",
         "aria-hidden": "true"
       }, String(comments.length)) : null)
@@ -2158,7 +2141,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
       }),
       /*#__PURE__*/React.createElement("div", { className: "comment-composer-footer" },
         /*#__PURE__*/React.createElement(ParticipantPickerButton, {
-          participant: commentPart && variant === 'v2-page'
+          participant: commentPart && isPageLayout
             ? { ...commentPart, name: shortParticipantName(commentPart.name) }
             : commentPart,
           onClick: () => setIsCommentPartOpen(true)
@@ -3344,6 +3327,7 @@ export function EditMessageModal({
     CalendarGrid: CalendarGrid,
     CommentsSection: CommentsSection,
     MemoCard: MemoCard,
+    MemoCommentFold: MemoCommentFold,
     PollList: PollList,
     GlobalSearchModal: GlobalSearchModal,
     EditMessageModal: EditMessageModal,

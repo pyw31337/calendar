@@ -733,6 +733,7 @@ export function SegmentedToggle({ options, value, onChange, disabled, style, ari
   const safeOptions = Array.isArray(options) ? options : [];
   return /*#__PURE__*/React.createElement("div", {
     role: "tablist",
+    className: "segmented-toggle",
     "aria-label": ariaLabel,
     style: {
       display: 'flex', alignItems: 'stretch', padding: '3px', boxSizing: 'border-box',

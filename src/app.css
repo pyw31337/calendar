@@ -5519,6 +5519,34 @@ select.form-select {
   overflow-y: auto;
   overscroll-behavior: contain;
 }
+/* The list scrolls; its cards must keep their full height instead of being squeezed to fit
+   it (they are overflow-clipped, so a flex item would otherwise shrink to a sliver and hide
+   the link/video preview, text and comments). */
+.date-modal-memo-list > * {
+  flex-shrink: 0;
+}
+/* Shared "이전 댓글 n개 더보기 / 댓글 접기" toggle (MemoCommentFold, ui-calendar-core.js). */
+.memo-comment-fold-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  box-sizing: border-box;
+  align-self: stretch;
+  min-height: 32px;
+  margin: 2px 0;
+  padding: 6px 10px;
+  background: none;
+  border: 1px solid color-mix(in srgb, var(--bg-primary) 92%, black);
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+.memo-comment-fold-toggle:hover { background: var(--bg-primary); color: var(--text-main); }
 .date-modal-memo-list .memo-card-hover {
   background: var(--bg-card) !important;
   border: 1px solid var(--border-subtle) !important;

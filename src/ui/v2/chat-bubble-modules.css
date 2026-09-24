@@ -266,7 +266,8 @@
   font-size: .62rem;
   font-weight: 500;
 }
-.v2-design .v2-memo .memo-card-comment-count { margin-right: auto; color: #9793a3; font-weight: 500; }
+.v2-design .v2-memo .memo-card-comment-count,
+.v2-design .date-modal-memo-list .memo-card-comment-count { margin-right: auto; color: #9793a3; font-weight: 500; }
 .v2-design .v2-home-memo-bubble .v2-bubble-comment-action {
   display: inline-flex;
   align-items: center;
@@ -282,7 +283,8 @@
 }
 .v2-design .v2-home-memo-bubble .v2-bubble-comment-action:hover { text-decoration: underline; }
 /* The full V2 memo page uses the same quiet count/action footer without changing V1. */
-.v2-design .v2-memo .memo-card-comment-footer {
+.v2-design .v2-memo .memo-card-comment-footer,
+.v2-design .date-modal-memo-list .memo-card-comment-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -292,8 +294,10 @@
   font-size: .62rem;
   font-weight: 500;
 }
-.v2-design .v2-memo .memo-card-comment-count { margin-right: auto; color: #9793a3; font-weight: 500; }
-.v2-design .v2-memo .memo-card-comment-footer .memo-card-comment-toggle {
+.v2-design .v2-memo .memo-card-comment-count,
+.v2-design .date-modal-memo-list .memo-card-comment-count { margin-right: auto; color: #9793a3; font-weight: 500; }
+.v2-design .v2-memo .memo-card-comment-footer .memo-card-comment-toggle,
+.v2-design .date-modal-memo-list .memo-card-comment-footer .memo-card-comment-toggle {
   display: inline-flex;
   align-items: center;
   gap: 3px;
@@ -369,10 +373,12 @@
   grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
   gap: 16px !important;
 }
-.v2-memo .v2-memo-card-wrap .v2-memo-card-tags > .memo-card-comment-toggle {
+.v2-memo .v2-memo-card-wrap .v2-memo-card-tags > .memo-card-comment-toggle,
+.v2-design .date-modal-memo-list .v2-memo-card-tags > .memo-card-comment-toggle {
   display: none !important;
 }
-.v2-design .v2-memo .v2-memo-card-wrap .memo-card-comment-footer > .memo-card-comment-toggle {
+.v2-design .v2-memo .v2-memo-card-wrap .memo-card-comment-footer > .memo-card-comment-toggle,
+.v2-design .date-modal-memo-list .memo-card-comment-footer > .memo-card-comment-toggle {
   border: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
@@ -386,7 +392,8 @@
 .v2-design .v2-memo .comment-composer-buttons button {
   font-size: .7rem !important;
 }
-.v2-memo .v2-memo-card-wrap .v2-memo-card-tags > button:not(.memo-card-comment-toggle) {
+.v2-memo .v2-memo-card-wrap .v2-memo-card-tags > button:not(.memo-card-comment-toggle),
+.v2-design .date-modal-memo-list .v2-memo-card-tags > button:not(.memo-card-comment-toggle) {
   border-radius: 999px;
   background: var(--brand-soft, #f3eeff) !important;
   color: var(--brand, #7c2fe5) !important;
@@ -415,12 +422,14 @@
   overflow: visible !important;
   flex-shrink: 0 !important;
 }
-.v2-memo .v2-memo-card-wrap .v2-memo-card-comments {
+.v2-memo .v2-memo-card-wrap .v2-memo-card-comments,
+.v2-design .date-modal-memo-list .v2-memo-card-comments {
   margin-top: 8px !important;
   padding-top: 0 !important;
   border-top: 0 !important;
 }
-.v2-memo .v2-memo-card-wrap .v2-memo-card-comments > div {
+.v2-memo .v2-memo-card-wrap .v2-memo-card-comments > div,
+.v2-design .date-modal-memo-list .v2-memo-card-comments > div {
   background: var(--brand-soft, #f3eeff);
   border-radius: 10px !important;
   border-top: 0 !important;
