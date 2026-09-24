@@ -258,6 +258,14 @@ Message/Meeting/Memo는 `assetIds: string[]`만 가진다. 기존 `imageUrls/thu
 - **P2(인증·규칙)**: 사용자 결정에 따라 마지막. Firebase 콘솔에서 인증 활성화 + 규칙 배포가 필요하다.
 - 운영 데이터 쓰기(메시지 칸 복구, 인덱스 재구축 apply)는 이 에이전트 환경의 안전장치가 차단한다 — 관리자 화면에서 실행.
 
+### 2026-09-24 백엔드 첫 배포 (GitHub Actions `deploy-firebase-backend.yml`, targets=functions)
+- 1차 실패: 선택 파라미터 `TOUR_API_SERVICE_KEY` 값이 없어 non-interactive 배포가 멈춤 → 라이브 함수의 값을
+  이어받도록 워크플로 수정(읽지 못하면 중단). `--force` 제거(소스에 없는 라이브 함수를 조용히 지우지 않게).
+- 2차 성공: `mediaCommand`, `nightlyMediaMaintenance`(매일 04:10 KST) 신규 생성, 기존 함수 전부 업데이트.
+- 확인(비변경 호출): mediaCommand 입력 검증 400, rebuildPhotoIndex dry-run 정상(cw stale 0),
+  tourApiSearchProxy 정상 응답(배포 전에는 "TourAPI request failed"였음).
+- 클라이언트 삭제/교체 경로는 P0(클라이언트 무결성 규칙) 유지: 현재 경로에는 되돌리기(undo)·오프라인 재시도 큐가
+  있어 서버 명령으로 바로 바꾸면 그 기능을 잃는다. 서버 명령은 되돌리기 설계(휴지통/복원 명령) 후 전환한다.
 ### 2026-09-24 P2-A — 보이지 않는 자동(익명) 로그인 (사용자 결정: 화면 변화 없는 자동 로그인)
 - `src/core/app-auth.js`: 부팅 후(첫 렌더 뒤) `vendor/firebase-auth-compat.js`(10.14.1, 같은 출처)를 지연 로드하고
   익명 로그인. SDK가 기기에 세션을 유지하므로 방문마다 같은 사용자. Firestore/Storage SDK는 자동으로 토큰을 사용하고,
