@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const webpush = require('web-push');
 const KoreanLunarCalendar = require('korean-lunar-calendar');
 const { pickCanonicalPhotoIndexTagState } = require('./photo-index-tag-contract');
+const mediaCommands = require('./media-commands');
 
 admin.initializeApp();
 
@@ -2318,6 +2319,61 @@ exports.pruneStaleRateLimitDocs = functions.pubsub.schedule('30 9 * * *').timeZo
 // Production admin path: same rebuild as the emulator helper, but gated by the admin password
 // (identical check to listAllCalendars / listServerAuditLogs). Dry-run by default; pass
 // apply:true to write. Never relaxes Firestore photoIndex write:false for clients.
+// P3 photo commands (docs/data-architecture-v3.md §3.5): multi-document photo edits run here in
+// one transaction instead of as a chain of client writes. No auth yet (P2 adds membership
+// checks); rate limited per IP and scoped to one calendar id per request.
+const MEDIA_COMMAND_OPS = new Set(['deleteAsset', 'tagAsset']);
+exports.mediaCommand = functions.runWith({ timeoutSeconds: 60, memory: '256MB' }).https.onRequest(async (req, res) => {
+  setAdminCorsHeaders(res);
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  if (req.method !== 'POST') { res.status(405).json({ ok: false }); return; }
+  const { calendarId, op, asset, tags } = req.body || {};
+  if (!CALENDAR_ID_RE.test(String(calendarId || '')) || !MEDIA_COMMAND_OPS.has(op)) { res.status(400).json({ ok: false, reason: 'invalid' }); return; }
+  const imageUrl = String(asset?.imageUrl || '');
+  const thumbUrl = String(asset?.thumbUrl || '');
+  if (![imageUrl, thumbUrl].some(value => /^https:\/\/firebasestorage\.googleapis\.com\//.test(value))) { res.status(400).json({ ok: false, reason: 'invalid-asset' }); return; }
+  if (!(await checkProxyRateLimit('mediaCommand', req.ip, 60 * 1000, 60))) { res.status(429).json({ ok: false }); return; }
+  const db = admin.firestore();
+  const calendarDocId = `cal_${calendarId}`;
+  const calendarSnap = await db.collection('calendars').doc(calendarDocId).get();
+  if (!calendarSnap.exists) { res.status(404).json({ ok: false, reason: 'calendar' }); return; }
+  const cleanAsset = {
+    imageUrl, thumbUrl,
+    messageId: typeof asset?.messageId === 'string' ? asset.messageId.slice(0, 200) : '',
+    memoId: typeof asset?.memoId === 'string' ? asset.memoId.slice(0, 200) : '',
+  };
+  try {
+    const result = op === 'deleteAsset'
+      ? await mediaCommands.deleteAsset({ db, calendarDocId, asset: cleanAsset })
+      : await mediaCommands.tagAsset({ db, calendarDocId, asset: cleanAsset, tags: String(tags || '') });
+    res.status(result.ok ? 200 : 400).json(result);
+  } catch (err) {
+    console.error(`mediaCommand ${op} failed:`, err);
+    res.status(500).json({ ok: false, reason: 'error' });
+  }
+});
+
+// Nightly reconciliation (invariant I6): rebuild every calendar's photoIndex from its source
+// documents, so owners that incremental triggers missed or processed out of order cannot
+// linger (they were ~2% of owners and every stale 404 row), then sweep the Storage GC queue.
+exports.nightlyMediaMaintenance = functions.runWith({ timeoutSeconds: 540, memory: '1GB' })
+  .pubsub.schedule('10 4 * * *').timeZone('Asia/Seoul').onRun(async () => {
+    const calendars = await admin.firestore().collection('calendars').select().get();
+    for (const doc of calendars.docs) {
+      const calendarId = doc.id.startsWith('cal_') ? doc.id.slice(4) : doc.id;
+      if (!CALENDAR_ID_RE.test(calendarId)) continue;
+      try {
+        const report = await rebuildPhotoIndexForCalendarAdmin(calendarId, true);
+        console.log('nightly photoIndex rebuild', JSON.stringify({ calendarId, indexedPhotos: report.indexedPhotos, staleRows: report.staleRows }));
+      } catch (err) {
+        console.error(`nightly photoIndex rebuild failed for ${calendarId}:`, err);
+      }
+    }
+    const gc = await mediaCommands.sweepStorageGc({ db: admin.firestore(), bucket: admin.storage().bucket() });
+    console.log('nightly storage GC', JSON.stringify(gc));
+    return null;
+  });
+
 exports.rebuildPhotoIndex = functions.runWith({ timeoutSeconds: 300, memory: '1GB' }).https.onRequest(async (req, res) => {
   setAdminCorsHeaders(res);
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }

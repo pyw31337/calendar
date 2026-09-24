@@ -1,0 +1,53 @@
+name: Deploy Firebase backend (manual)
+
+# Cloud Functions / Firestore rules / Storage rules are never deployed implicitly. This workflow
+# runs only when started by hand, and deploys only after the emulator test suite passes.
+# Requires the repository secret FIREBASE_SERVICE_ACCOUNT (JSON key of a service account with
+# Firebase Admin + Cloud Functions Admin + Service Account User roles on metro-live-2918e).
+on:
+  workflow_dispatch:
+    inputs:
+      targets:
+        description: 'firebase deploy --only targets'
+        required: true
+        default: 'functions'
+        type: choice
+        options:
+          - functions
+          - firestore:rules,storage
+          - functions,firestore:rules,storage
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-firebase-backend
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm --prefix functions ci
+      - name: Emulator tests (gate)
+        run: npm run test:functions:emulator
+      - name: Deploy
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          test -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON" || { echo "FIREBASE_SERVICE_ACCOUNT secret is not set"; exit 1; }
+          printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/sa.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          npx --yes firebase-tools@14 deploy --project metro-live-2918e --only "${{ inputs.targets }}" --non-interactive --force
