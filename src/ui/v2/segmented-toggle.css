@@ -16,6 +16,8 @@ html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"]:not(.underlin
   max-width: 100% !important;
   height: auto !important;
   flex: 0 0 auto !important;
+  /* Same height as the form controls it sits next to (inputs, pickers: 42px). */
+  min-height: var(--v2-segmented-h, 42px) !important;
   padding: 3px !important;
   box-sizing: border-box !important;
   border: 1px solid var(--v2-card-border, #eceaf5) !important;
@@ -31,8 +33,14 @@ html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"]:not(.underlin
 .renewal-shell.v2-design .modal-overlay [role="tablist"]:not(.underline-tabs):not(.renewal-shell-subtab-row) > button {
   position: relative !important;
   flex: 1 1 auto !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
   height: auto !important;
-  min-height: 0 !important;
+  /* The underline-tab rule for modal tablists (padding: 0 8px) also matches these buttons;
+     a pill needs its own touch-sized box. */
+  min-height: calc(var(--v2-segmented-h, 42px) - 8px) !important;
+  padding: 0 16px !important;
   margin: 0 !important;
   border: 0 !important;
   border-bottom: 0 !important;
@@ -89,6 +97,10 @@ html:has(.renewal-shell.v2-design) [role="group"][aria-label="반복 여부"] > 
 .renewal-shell.v2-design [role="group"][aria-label="반복 여부"] > button {
   border-radius: 999px !important;
   border-bottom: 0 !important;
+  /* Sits on the same row as 양력/음력: same 42px pill. */
+  min-height: calc(var(--v2-segmented-h, 42px) - 8px) !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
 }
 
 html:has(.renewal-shell.v2-design) .v2-bubble-comment-badge,

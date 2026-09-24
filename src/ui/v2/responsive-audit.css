@@ -899,12 +899,14 @@ html:has(.renewal-shell.v2-design) .modal-overlay .confirm-dialog-actions {
   line-height: 1.2 !important;
 }
 
-.renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-card-comments {
+.renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-card-comments,
+.renewal-shell.v2-design .date-modal-memo-list .v2-memo-card-comments {
   gap: 4px !important;
   margin-top: 8px !important;
 }
 
-.renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-card-comments > div {
+.renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .v2-memo-card-comments > div,
+.renewal-shell.v2-design .date-modal-memo-list .v2-memo-card-comments > div {
   gap: 8px !important;
   padding: 7px 10px !important;
   border: 0 !important;
@@ -912,7 +914,8 @@ html:has(.renewal-shell.v2-design) .modal-overlay .confirm-dialog-actions {
   background: var(--brand-soft, #f3eeff) !important;
 }
 
-.renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .memo-card-comment-footer {
+.renewal-shell.v2-design .v2-memo .v2-memo-card-wrap .memo-card-comment-footer,
+.renewal-shell.v2-design .date-modal-memo-list .memo-card-comment-footer {
   margin-top: 8px !important;
   padding-top: 0 !important;
 }

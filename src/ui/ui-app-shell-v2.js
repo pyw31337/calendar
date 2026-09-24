@@ -1570,7 +1570,19 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
         // 요구사항 -- 메모에 댓글이 달리면 최신 댓글을 미리보기로 바로 노출한다(전체보기 없이도
         // 반응이 왔다는 걸 즉시 알 수 있게).
         const memoComments = Array.isArray(memo.comments) ? memo.comments : [];
-        const visibleComments = memoComments;
+        // Same fold rule as every memo card (MemoCommentFold, ui-calendar-core.js).
+        const MemoCommentFold = window.GATHER_UI_COMPONENTS?.MemoCommentFold;
+        const renderMemoComment = (comment, commentIndex) => React.createElement('div', { className: 'v2-bubble-comment-preview', key: comment.id || commentIndex },
+              React.createElement('span', {
+                className: 'v2-author-dot v2-bubble-comment-author',
+                role: 'img',
+                'data-author-name': participantFor(comment)?.name || '댓글',
+                title: participantFor(comment)?.name || '댓글',
+                onClick: e => e.stopPropagation(),
+                style: { backgroundColor: participantFor(comment)?.color || '#94A3B8' }
+              }),
+              React.createElement('span', { className: 'v2-bubble-comment-text' }, String(comment.text || ''))
+        );
         return React.createElement(ChatBubbleFrame, {
           key: memo.id || i,
           name: displayName(memo),
@@ -1632,18 +1644,10 @@ function HomeActivitySummary({ calendarContext, onOpenDate, onChangeView }) {
             }) : null,
             tags.map(tag => React.createElement('em', { className: 'v2-bubble-tag', key: tag }, `#${String(tag).replace(/^#/, '')}`))
           ) : null,
-          visibleComments.length ? React.createElement('div', { className: 'v2-bubble-comment-list' },
-            visibleComments.map((comment, commentIndex) => React.createElement('div', { className: 'v2-bubble-comment-preview', key: comment.id || commentIndex },
-              React.createElement('span', {
-                className: 'v2-author-dot v2-bubble-comment-author',
-                role: 'img',
-                'data-author-name': participantFor(comment)?.name || '댓글',
-                title: participantFor(comment)?.name || '댓글',
-                onClick: e => e.stopPropagation(),
-                style: { backgroundColor: participantFor(comment)?.color || '#94A3B8' }
-              }),
-              React.createElement('span', { className: 'v2-bubble-comment-text' }, String(comment.text || ''))
-            )),
+          memoComments.length ? React.createElement('div', { className: 'v2-bubble-comment-list' },
+            MemoCommentFold
+              ? React.createElement(MemoCommentFold, { comments: memoComments, renderComment: renderMemoComment, forceExpanded: commentOpenId === memo.id })
+              : memoComments.map(renderMemoComment),
           ) : null,
           React.createElement('div', { className: 'v2-bubble-comment-footer' },
             React.createElement('span', { className: 'v2-bubble-comment-count' }, memoMeta || ''),

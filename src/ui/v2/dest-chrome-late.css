@@ -580,7 +580,8 @@ body:has(.v2-design) > .bottom-sheet-overlay.emoji-sheet-overlay {
   display: none !important;
 }
 .v2-design .v2-bubble-comment-badge,
-.v2-design .v2-memo .memo-card-comment-badge {
+.v2-design .v2-memo .memo-card-comment-badge,
+.v2-design .date-modal-memo-list .memo-card-comment-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1274,9 +1275,6 @@ html:has(.renewal-shell.v2-design) .renewal-shell.v2-design .date-item-btn.confi
   padding-top: 4px !important;
   padding-bottom: 4px !important;
   gap: 8px !important;
-}
-.v2-design .v2-archive .visit-filter-toggle-mobile {
-  height: 36px !important;
 }
 
 /* ---- Backdrop popups: glass card, content-centered (not right-docked) ----
