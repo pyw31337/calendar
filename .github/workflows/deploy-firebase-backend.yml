@@ -47,8 +47,22 @@ jobs:
       - name: Deploy
         env:
           GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          TOUR_API_SERVICE_KEY_SECRET: ${{ secrets.TOUR_API_SERVICE_KEY }}
         run: |
           test -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON" || { echo "FIREBASE_SERVICE_ACCOUNT secret is not set"; exit 1; }
           printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/sa.json"
           export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          # functions/index.js declares the optional param TOUR_API_SERVICE_KEY. A non-interactive
+          # deploy needs a value, and an empty one would wipe the key the live function already has.
+          # Use the TOUR_API_SERVICE_KEY repo secret when set; otherwise carry over the deployed value.
+          tour_key="$TOUR_API_SERVICE_KEY_SECRET"
+          if [ -z "$tour_key" ]; then
+            gcloud auth activate-service-account --key-file="$RUNNER_TEMP/sa.json" --quiet >/dev/null 2>&1
+            # If the live function cannot be read, stop rather than deploy an empty key over it.
+            live=$(gcloud functions describe tourApiSearchProxy --project metro-live-2918e --region us-central1 --format=json 2>"$RUNNER_TEMP/describe.err") \
+              || { echo "Could not read the live tourApiSearchProxy config:"; cat "$RUNNER_TEMP/describe.err"; exit 1; }
+            tour_key=$(printf '%s' "$live" | jq -r '.environmentVariables.TOUR_API_SERVICE_KEY // .serviceConfig.environmentVariables.TOUR_API_SERVICE_KEY // ""')
+          fi
+          if [ -n "$tour_key" ]; then echo "::add-mask::$tour_key"; echo "TourAPI key: carried over"; else echo "TourAPI key: none (feature stays off)"; fi
+          printf 'TOUR_API_SERVICE_KEY="%s"\n' "$tour_key" > functions/.env.metro-live-2918e
           npx --yes firebase-tools@14 deploy --project metro-live-2918e --only "${{ inputs.targets }}" --non-interactive
