@@ -2095,10 +2095,9 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
         "aria-label": comments.length ? `댓글 ${comments.length}개` : "댓글 입력"
       }, isPageLayout
         ? /*#__PURE__*/React.createElement("svg", { width: 14, height: 14, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true" }, /*#__PURE__*/React.createElement("path", { d: "M20 11.5a7.5 7.5 0 0 1-8 7.45 8.4 8.4 0 0 1-3.4-.7L4 19.5l1.25-3.2A7.3 7.3 0 0 1 4.5 12 7.5 7.5 0 0 1 12 4.5a7.5 7.5 0 0 1 8 7Z" }))
-        : /*#__PURE__*/React.createElement(MessageCommentIcon, { size: 16 }), "댓글", (isPageLayout && comments.length > 0) ? /*#__PURE__*/React.createElement("span", {
-        className: "memo-card-comment-badge",
-        "aria-hidden": "true"
-      }, String(comments.length)) : null)
+        : /*#__PURE__*/React.createElement(MessageCommentIcon, { size: 16 }), /* Count as plain brand-coloured text ("댓글 2"), same as the home memo section -- no
+           filled badge. */
+        comments.length > 0 ? `댓글 ${comments.length}` : "댓글")
     ),
 
     /* Comment composer -- always column (input, then picker left / cancel+save right).

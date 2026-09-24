@@ -3414,7 +3414,12 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
       style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: isCollapsed ? 0 : '10px' }
     }, /*#__PURE__*/React.createElement("strong", {
       style: { fontSize: '0.92rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }
-    }, /*#__PURE__*/React.createElement(CalendarCheckIcon, null), formatShortDateWithDayName(row.meeting.date)), /*#__PURE__*/React.createElement("span", {
+    }, /*#__PURE__*/React.createElement(CalendarCheckIcon, null),
+      /* Phones drop the century (26.09.20 (일)) so the date never wraps beside the total;
+         same full/short pair as the month title above (.month-display-year-*). */
+      /*#__PURE__*/React.createElement("span", { className: "month-display-year-full" }, formatShortDateWithDayName(row.meeting.date)),
+      /*#__PURE__*/React.createElement("span", { className: "month-display-year-short", style: { whiteSpace: 'nowrap' } }, String(formatShortDateWithDayName(row.meeting.date) || '').replace(/^\d{2}(\d{2}\.)/, '$1'))
+    ), /*#__PURE__*/React.createElement("span", {
       style: { display: 'inline-flex', alignItems: 'center', gap: '6px', marginLeft: 'auto', whiteSpace: 'nowrap' }
     }, /*#__PURE__*/React.createElement("span", {
       // Capsule badge (not plain colored text) so this per-date total reads distinctly from the
@@ -4274,6 +4279,12 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   }
   return __settlementLegacyTree;
 }
+
+// SettlementSummaryModal's V2 path lifts overlays out of the legacy tree by testing
+// type.displayName/type.name against /Modal/ (liftOverlays). The production minifier renames
+// functions, so without an explicit displayName the 정산 생성/수정 popup is silently dropped
+// with the rest of the legacy tree and the header button appears to do nothing.
+CreateSettlementModal.displayName = 'CreateSettlementModal';
 
 export function PollModal({ calendar, poll, onSave, onClose, showToast, onRequestConfirm }) {
   const React = window.React;
