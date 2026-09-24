@@ -54,4 +54,5 @@ jobs:
         run: npm run smoke:live
         continue-on-error: true
         env:
+          NODE_OPTIONS: --import ./scripts/lib/firestore-anon-auth.mjs
           EXPECTED_BUILD_SHA: ${{ github.sha }}

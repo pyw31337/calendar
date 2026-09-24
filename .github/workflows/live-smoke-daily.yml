@@ -11,6 +11,10 @@ permissions:
 jobs:
   smoke:
     runs-on: ubuntu-latest
+    env:
+      # P2-B prep: Firestore REST calls sign in anonymously (scripts/lib/firestore-anon-auth.mjs)
+      # so this job keeps working once the rules require request.auth.
+      NODE_OPTIONS: --import ./scripts/lib/firestore-anon-auth.mjs
     steps:
       - name: Checkout
         uses: actions/checkout@v5
