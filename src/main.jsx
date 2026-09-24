@@ -280,6 +280,14 @@ async function boot() {
       import('./core/app-notifications.js'),
       import('./core/firebase-services.js')
     ]);
+    // DateModal (tap a date) and Lightbox (open a photo) are ~300KB of source that the first
+    // screen never renders. Register placeholders that load the real chunk on first use, and
+    // prefetch both once the calendar is on screen (src/core/lazy-ui-proxy.js).
+    const { registerLazyUiComponents } = await import('./core/lazy-ui-proxy.js');
+    const prefetchLazyUi = registerLazyUiComponents(window.React, {
+      dateModal: { load: () => import('./ui/ui-date-modal.js'), components: ['DateModal'] },
+      lightbox: { load: () => import('./ui/ui-lightbox.js'), components: ['Lightbox', 'LightboxInfoPanel', 'LightboxTagPanel'] }
+    });
     await Promise.all([
       import('./ui/ui-icons.js'),
       import('./ui/ui-confirm-dialog.js'),
@@ -290,11 +298,9 @@ async function boot() {
       import('./ui/ui-side-menu.js'),
       import('./ui/ui-misc.js'),
       import('./ui/ui-place-register.js'),
-      import('./ui/ui-lightbox.js'),
       import('./ui/ui-remaining.js'),
       import('./ui/ui-summary-gallery.js'),
       import('./ui/ui-shared.js'),
-      import('./ui/ui-date-modal.js'),
       import('./ui/ui-calendar-core.js'),
       // ChatParticipantSheet (the actual participant-selection bottom sheet, vs. the button
       // that opens it) lives in this file, but it isn't chat-specific -- the memo composer/edit
@@ -336,6 +342,8 @@ async function boot() {
     // Sign in after the first render so the auth SDK never delays the calendar. Failure is
     // harmless in P2-A: the rules still accept unauthenticated requests.
     setTimeout(() => { appAuth.startAnonymousAuth({ loadScript: src => loadScriptWithRetry(src, 15000) }); }, 0);
+    if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(() => { prefetchLazyUi(); }, { timeout: 2500 });
+    else setTimeout(() => { prefetchLazyUi(); }, 1200);
     // The ready contract means app-main has bound all shared helpers and started the React tree,
     // not merely that its prerequisite chunks finished. Vite 8/Rolldown made the final dynamic
     // import boundary visible enough for tests and fast clients to observe the old premature flag.
