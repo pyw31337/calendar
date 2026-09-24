@@ -1,6 +1,7 @@
 import './react-globals.js';
 import './app.css';
 import { installStaleChunkRecovery } from './core/stale-chunk-recovery.js';
+import { installOverlayExitMotion } from './core/overlay-exit-motion.js';
 
 // A deploy while this tab was open leaves it asking for chunk names that no longer exist the
 // first time it opens a lazy screen; reload once to pick up the current build.
@@ -352,6 +353,8 @@ async function boot() {
     // import) can safely assume window.firebase exists.
     await import('./core/app-main.js');
     if (typeof window.__gatherStartApp === 'function') window.__gatherStartApp();
+    // Closing sheets/modals fade and slide out instead of vanishing in one frame (V2 only).
+    installOverlayExitMotion(document, { isEnabled: () => !!document.querySelector('.renewal-shell.v2-design') });
     // Sign in after the first render so the auth SDK never delays the calendar. Failure is
     // harmless in P2-A: the rules still accept unauthenticated requests.
     setTimeout(() => { appAuth.startAnonymousAuth({ loadScript: src => loadScriptWithRetry(src, 15000) }); }, 0);
