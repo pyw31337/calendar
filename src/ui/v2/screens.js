@@ -295,15 +295,42 @@ function pageSubtitle(calendar, trailing) {
   return name || extra || undefined;
 }
 
+// `max-height: none` cannot be animated, so the header's collapse/expand animates between 0
+// and its measured content height (--v2-header-h, see .is-scroll-hidden in
+// dest-chrome-late.css). Hiding needs that start value committed to style before the class
+// flips, hence the forced layout read.
+function primeHeaderHeight(header, hiding) {
+  if (!header || typeof getComputedStyle !== 'function') return;
+  const cs = getComputedStyle(header);
+  const content = header.scrollHeight - (parseFloat(cs.paddingTop) || 0) - (parseFloat(cs.paddingBottom) || 0);
+  if (!(content > 0)) return;
+  header.style.setProperty('--v2-header-h', `${Math.ceil(content)}px`);
+  if (hiding) void header.offsetHeight;
+}
+
 export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, searchLabel, onShare, onMenu, extra, centerSubtitle = true, hideOnScroll = true, showMenu = false, forcedHidden = null, children }) {
   const React = window.React;
   const headerRef = React.useRef(null);
   const suppressUntilRef = React.useRef(0);
   const [hidden, setHidden] = React.useState(false);
+  const hiddenRef = React.useRef(false);
   const headerControlled = typeof forcedHidden === 'boolean';
   React.useEffect(() => {
+    const header = headerRef.current;
+    if (!header) return undefined;
+    // Once the header has grown back, drop the height cap so later content (tabs, filters)
+    // can never be clipped by a stale measurement.
+    const onEnd = (event) => {
+      if (event.target === header && event.propertyName === 'max-height' && !header.classList.contains('is-scroll-hidden')) {
+        header.style.removeProperty('--v2-header-h');
+      }
+    };
+    header.addEventListener('transitionend', onEnd);
+    return () => header.removeEventListener('transitionend', onEnd);
+  }, []);
+  React.useEffect(() => {
     if (!hideOnScroll || headerControlled) {
-      if (!headerControlled) setHidden(false);
+      if (!headerControlled) { hiddenRef.current = false; setHidden(false); }
       return undefined;
     }
     const header = headerRef.current;
@@ -340,6 +367,8 @@ export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, se
       else if (delta > 0 && top > 40 && max > 140) next = true;
       else if (delta < 0) next = false;
       if (next == null) return;
+      if (next !== hiddenRef.current) primeHeaderHeight(header, next);
+      hiddenRef.current = next;
       setHidden(prev => {
         if (prev === next) return prev;
         suppressUntilRef.current = Date.now() + 450;
@@ -350,13 +379,17 @@ export function PageHeader({ title, subtitle, brand, count, onBack, onSearch, se
     return () => document.removeEventListener('scroll', onScroll, true);
   }, [hideOnScroll, headerControlled]);
   const shown = headerControlled ? !forcedHidden : (!hideOnScroll || !hidden);
-  const floatingBack = !shown && typeof onBack === 'function'
+  // Stays mounted while the page has a back action so it can fade/scale in and out with the
+  // header instead of popping; hidden from touch and assistive tech while the header shows.
+  const floatingBack = typeof onBack === 'function'
     ? h(
       'button',
       {
         type: 'button',
-        className: 'bp-floating-back-btn',
+        className: `bp-floating-back-btn${shown ? '' : ' is-visible'}`,
         'aria-label': '뒤로가기',
+        'aria-hidden': shown ? 'true' : undefined,
+        tabIndex: shown ? -1 : undefined,
         onClick: onBack,
       },
       h(DesignIcon, { name: 'back', size: 18 })

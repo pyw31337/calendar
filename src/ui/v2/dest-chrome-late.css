@@ -76,13 +76,15 @@
 .v2-design .v2-places .v2-page-header.is-scroll-hidden,
 .v2-design .v2-gallery .v2-page-header.is-scroll-hidden {
   /* Collapse out of the flex column so the list viewport grows into this
-     space. A sticky box left behind is what was covering scrolled cards. */
+     space. A sticky box left behind is what was covering scrolled cards.
+     The collapse is animated through max-height (see "Header collapse motion"
+     at the end of this file), so height/flex-basis stay auto here. */
   position: relative !important;
   top: auto !important;
-  height: 0 !important;
+  height: auto !important;
   min-height: 0 !important;
   max-height: 0 !important;
-  flex: 0 0 0px !important;
+  flex: 0 0 auto !important;
   margin: 0 !important;
   padding: 0 !important;
   border: 0 !important;
@@ -2758,7 +2760,7 @@ html:has(.renewal-shell.v2-design) .v2-chat .v2-page-header {
   z-index: 30 !important;
   width: 100% !important;
   background: var(--bg-card) !important;
-  transition: transform 0.22s ease !important;
+  transition: transform 0.32s var(--motion-ease-soft, cubic-bezier(.22, 1, .36, 1)) !important;
 }
 html:has(.renewal-shell.v2-design) .v2-chat .v2-page-header.is-scroll-hidden {
   position: absolute !important;
@@ -2782,7 +2784,7 @@ html:has(.renewal-shell.v2-design) .v2-chat .v2-chat-composer {
   top: auto !important;
   z-index: 20 !important;
   width: 100% !important;
-  transition: transform 0.22s ease !important;
+  transition: transform 0.32s var(--motion-ease-soft, cubic-bezier(.22, 1, .36, 1)) !important;
 }
 html:has(.renewal-shell.v2-design) .v2-chat .v2-chat-composer.is-scroll-hidden {
   height: auto !important;
@@ -4385,5 +4387,147 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] [style*="background-color:
   .renewal-shell.v2-design .bp-app-shell.is-bento-home .bp-hero-zone {
     margin: 0 0 16px !important;
     border-radius: 20px !important;
+  }
+}
+
+/* Header collapse motion ----------------------------------------------------
+   Destination headers slide away on scroll instead of vanishing in one frame.
+   PageHeader (screens.js) writes the measured content height to --v2-header-h
+   just before it hides/shows, so max-height animates between 0 and the real
+   height; once expanded the variable is removed and max-height is none again.
+   Chat keeps its own translate-based slide (.v2-chat rules above win). */
+.v2-design .v2-page-header {
+  transition:
+    max-height 320ms var(--motion-ease-soft, cubic-bezier(.22, 1, .36, 1)),
+    min-height 320ms var(--motion-ease-soft, cubic-bezier(.22, 1, .36, 1)),
+    padding-top 320ms var(--motion-ease-soft, cubic-bezier(.22, 1, .36, 1)),
+    opacity 240ms ease,
+    box-shadow 240ms ease !important;
+}
+.v2-design .v2-page-header:not(.is-scroll-hidden)[style*="--v2-header-h"] {
+  max-height: calc(var(--v2-header-h) + env(safe-area-inset-top, 0px) + 2px) !important;
+}
+.v2-design .v2-page-header > .bp-header-row {
+  transition: transform 320ms var(--motion-ease-soft, cubic-bezier(.22, 1, .36, 1)), opacity 200ms ease;
+}
+.v2-design .v2-page-header.is-scroll-hidden:not(.v2-chat *) > .bp-header-row {
+  transform: translate3d(0, -12px, 0);
+  opacity: 0;
+}
+
+/* The floating back button stands in for the header's back arrow; it scales in
+   as the header leaves and out as it returns. */
+html:has(.renewal-shell.v2-design) .bp-floating-back-btn {
+  transition:
+    opacity 220ms ease,
+    transform 320ms var(--motion-ease-spring, cubic-bezier(.34, 1.56, .64, 1)),
+    background-color 220ms ease !important;
+}
+html:has(.renewal-shell.v2-design) .bp-floating-back-btn:not(.is-visible) {
+  opacity: 0 !important;
+  transform: translate3d(0, -6px, 0) scale(.82) !important;
+  pointer-events: none !important;
+  visibility: hidden;
+  transition:
+    opacity 180ms ease,
+    transform 200ms ease,
+    visibility 0s linear 200ms !important;
+}
+html:has(.renewal-shell.v2-design) .bp-floating-back-btn:active {
+  transform: scale(.94) !important;
+}
+
+/* Sheet / page / tab motion --------------------------------------------------
+   Individual `translate`/`scale` properties are used where the element's own
+   `transform` is pinned with !important (the event sheet centres itself with
+   translate(-50%, 0) !important), so the motion composes instead of fighting it.
+   No animation-fill-mode on page/sheet entrances: a filling opacity animation
+   would keep a stacking context on the page and re-layer its fixed FAB. */
+@keyframes bp-sheet-up {
+  from { translate: 0 100%; }
+  to { translate: 0 0; }
+}
+@keyframes bp-page-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes bp-exit-fade {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes bp-exit-sheet {
+  from { translate: 0 0; }
+  to { translate: 0 100%; }
+}
+@keyframes bp-exit-pop {
+  from { opacity: 1; translate: 0 0; scale: 1; }
+  to { opacity: 0; translate: 0 18px; scale: .98; }
+}
+.v2-design .bp-event-sheet.modal-container {
+  animation: bp-sheet-up 380ms var(--motion-ease-out, cubic-bezier(.16, 1, .3, 1));
+}
+.v2-design .v2-dest-page {
+  animation: bp-page-in 240ms ease-out;
+}
+/* Overlay exit: src/core/overlay-exit-motion.js re-inserts a just-closed overlay
+   with .is-exit-ghost for 240ms.
+   The dim layer's colour fades inline (JS); the sheet/dialog moves out opaque.
+   Phones show every modal as a bottom sheet, so it slides down; wider screens
+   centre dialogs, which shrink and fade instead. */
+/* Re-inserting an element restarts its CSS animations; the overlay's own fade-in
+   and the cards' entrance must not replay while it leaves. */
+html:has(.renewal-shell.v2-design) .is-exit-ghost,
+html:has(.renewal-shell.v2-design) .is-exit-ghost * {
+  animation: none !important;
+}
+html:has(.renewal-shell.v2-design) .is-exit-ghost {
+  pointer-events: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+html:has(.renewal-shell.v2-design) .is-exit-ghost.lightbox-overlay {
+  animation: bp-exit-fade 220ms ease-in forwards !important;
+}
+html:has(.renewal-shell.v2-design) .is-exit-ghost .modal-container,
+html:has(.renewal-shell.v2-design) .is-exit-ghost .bottom-sheet,
+html:has(.renewal-shell.v2-design) .is-exit-ghost .bp-event-sheet.modal-container {
+  animation: bp-exit-sheet 230ms cubic-bezier(.4, 0, 1, 1) forwards !important;
+}
+@media (min-width: 768px) {
+  html:has(.renewal-shell.v2-design) .is-exit-ghost .modal-container,
+  html:has(.renewal-shell.v2-design) .is-exit-ghost .bp-event-sheet.modal-container {
+    animation: bp-exit-pop 200ms cubic-bezier(.4, 0, 1, 1) forwards !important;
+  }
+}
+/* Tab underline grows from the centre instead of switching on. */
+html:has(.renewal-shell.v2-design) .underline-tabs > button::after,
+html:has(.renewal-shell.v2-design) .underline-tabs > [role="tab"]::after,
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"] > button::after,
+html:has(.renewal-shell.v2-design) .bp-event-sheet .underline-tabs button::after {
+  scale: .3 1;
+  transition: scale 280ms var(--motion-ease-out, cubic-bezier(.16, 1, .3, 1)), background-color 180ms ease;
+}
+html:has(.renewal-shell.v2-design) .underline-tabs > button[aria-selected="true"]::after,
+html:has(.renewal-shell.v2-design) .underline-tabs > [role="tab"][aria-selected="true"]::after,
+html:has(.renewal-shell.v2-design) .modal-overlay [role="tablist"] > button[aria-selected="true"]::after,
+html:has(.renewal-shell.v2-design) .bp-event-sheet .underline-tabs button[aria-selected="true"]::after {
+  scale: 1 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v2-design .v2-page-header,
+  .v2-design .v2-page-header > .bp-header-row,
+  html:has(.renewal-shell.v2-design) .bp-floating-back-btn,
+  html:has(.renewal-shell.v2-design) .bp-floating-back-btn:not(.is-visible),
+  html:has(.renewal-shell.v2-design) .underline-tabs > button::after,
+  html:has(.renewal-shell.v2-design) .underline-tabs > [role="tab"]::after {
+    transition: none !important;
+  }
+  .v2-design .bp-event-sheet.modal-container,
+  .v2-design .v2-dest-page,
+  html:has(.renewal-shell.v2-design) .is-exit-ghost,
+  html:has(.renewal-shell.v2-design) .is-exit-ghost .modal-container,
+  html:has(.renewal-shell.v2-design) .is-exit-ghost .bottom-sheet {
+    animation: none !important;
   }
 }
