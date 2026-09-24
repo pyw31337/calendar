@@ -848,11 +848,12 @@ async function listServerAuditLogsRemote(password, options = {}) {
 }
 
 async function rebuildPhotoIndexRemote(password, calendarId, options = {}) {
+  // A full rebuild of a large calendar outlasts the 25s default; the function itself allows 300s.
   const result = await callAdminFunction('rebuildPhotoIndex', {
     password,
     calendarId,
     apply: options.apply === true
-  });
+  }, 300000);
   return result || { ok: false };
 }
 
