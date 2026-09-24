@@ -168,3 +168,96 @@ body:has(.v2-design) .lightbox-overlay .lightbox-slide {
   overflow: hidden !important;
   box-sizing: border-box !important;
 }
+
+/* --------------------------------------------------------------------------
+ * iOS standalone safe-area contract
+ * --------------------------------------------------------------------------
+ *
+ * `viewport-fit=cover` deliberately lets a home-screen web app paint behind
+ * the status bar and home indicator.  The shell itself is viewport-pinned, so
+ * applying a notch inset separately in every page header made the result
+ * depend on the page: calendar painted its title under the status bar while
+ * gallery happened to be protected by its legacy header; some destinations
+ * also paid the bottom inset twice.
+ *
+ * Keep the visual treatment intentional:
+ * - calendar's gradient continues behind the status bar, but its controls do
+ *   not;
+ * - every destination gets one bounded, safe content viewport;
+ * - fixed, document-level affordances (drawer/FAB/portal) retain their own
+ *   `env()` positioning because they are not children of that viewport.
+ *
+ * On browsers without a display cutout the env() values resolve to 0px, so
+ * this is a no-op.  Desktop retains its rail/viewport sizing unchanged.
+ */
+@media (max-width: 1199px) {
+  .renewal-shell.v2-design {
+    --v2-safe-top: env(safe-area-inset-top, 0px);
+    --v2-safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* The home is its own scrollport.  Keep the purple hero under the status
+     bar, then move only its interactive/content padding below the indicator. */
+  .renewal-shell.v2-design > main.bp-app-shell.is-bento-home {
+    padding-bottom: var(--v2-safe-bottom) !important;
+  }
+  .renewal-shell.v2-design > main.bp-app-shell.is-bento-home > .bp-hero-zone {
+    padding-top: calc(10px + var(--v2-safe-top)) !important;
+  }
+
+  /* All destination panes share the same usable visual viewport.  Moving the
+     pane (rather than adding padding to arbitrary bodies) also keeps its
+     internal absolute/flex scroll owners and composers above the home
+     indicator. */
+  .renewal-shell.v2-design > main.renewal-shell-main {
+    height: calc(var(--app-vv-height, 100dvh) - var(--v2-safe-top) - var(--v2-safe-bottom)) !important;
+    min-height: calc(var(--app-vv-height, 100dvh) - var(--v2-safe-top) - var(--v2-safe-bottom)) !important;
+    max-height: calc(var(--app-vv-height, 100dvh) - var(--v2-safe-top) - var(--v2-safe-bottom)) !important;
+    margin-top: var(--v2-safe-top) !important;
+    margin-bottom: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  /* PageHeader now lives inside the safe destination viewport.  Leaving its
+     former inset in place produces the visible blank band that differed from
+     page to page. */
+  .renewal-shell.v2-design > main.renewal-shell-main .v2-page-header,
+  .renewal-shell.v2-design > main.renewal-shell-main .v2-page-header.bp-header {
+    padding-top: 0 !important;
+  }
+
+  /* `v2-fullscreen` is nested in the bounded pane.  It must not grow back to
+     the full physical viewport or add a second pair of safe-area gutters. */
+  .renewal-shell.v2-design > main.renewal-shell-main .v2-fullscreen {
+    min-height: 100% !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  /* The shared header already takes up a 56px flex row.  Preserve that
+     established list offset but remove only the duplicate standalone inset.
+     The hidden-composer controls are positioned inside the safe pane too. */
+  .renewal-shell.v2-design > main.renewal-shell-main .v2-chat .v2-chat-scroll,
+  .renewal-shell.v2-design > main.renewal-shell-main .v2-chat .chat-messages-scroll {
+    padding-top: 56px !important;
+  }
+  .renewal-shell.v2-design > main.renewal-shell-main .v2-chat.is-composer-hidden .v2-chat-scroll,
+  .renewal-shell.v2-design > main.renewal-shell-main .v2-chat.is-composer-hidden .chat-messages-scroll {
+    padding-bottom: 80px !important;
+  }
+  .renewal-shell.v2-design > main.renewal-shell-main .v2-chat.is-composer-hidden .v2-chat-jump-row .v2-chat-keyboard-btn,
+  .renewal-shell.v2-design > main.renewal-shell-main .v2-chat.is-composer-hidden .v2-chat-jump-row .v2-chat-scroll-bottom-btn {
+    bottom: 12px !important;
+  }
+  .renewal-shell.v2-design > main.renewal-shell-main .v2-wrap-legacy .v2-chat-legacy {
+    height: calc(100% - 58px) !important;
+  }
+
+  /* The drawer is fixed to the physical viewport.  Its surface remains full
+     height while its first/last controls clear the iOS indicators. */
+  .renewal-shell.v2-design .bp-side-nav {
+    box-sizing: border-box !important;
+    padding-top: var(--v2-safe-top) !important;
+    padding-bottom: var(--v2-safe-bottom) !important;
+  }
+}
