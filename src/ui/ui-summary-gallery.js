@@ -2,7 +2,7 @@
  * Summary list, photo gallery, category tabs (P4-11)
  */
 
-import { composeGalleryPhotos, collectMemoryPhotoIdentityKeys, isMemoryPhotoExcluded, expandMemoryPhotoExclusionKeys, dedupeMemoryPhotoEntries, photoBelongsToMemory, isMemeKeyboardPhotoEntry } from '../core/gallery-data.js';
+import { composeGalleryPhotos, collectMemoryPhotoIdentityKeys, isMemoryPhotoExcluded, expandMemoryPhotoExclusionKeys, dedupeMemoryPhotoEntries, photoBelongsToMemory, isMemeKeyboardPhotoEntry, assignPhotosToSingleMemory } from '../core/gallery-data.js';
 import { canonicalPhotoAssetKey } from '../core/photo-asset.js';
 import { resolveGalleryLightboxTags } from '../core/photo-index.js';
 import { useScrollHideHeader } from '../core/use-scroll-hide-header.js';
@@ -1835,7 +1835,7 @@ export function HistoryView({
     // a.startDate/a.endDate가 비어 있고 대신 a.date에 날짜가 저장된다 (컨텐츠 상세 시트의
     // "기간: 정보없음" 버그와 같은 원인) -- a.date를 폴백으로 읽지 않으면 하루짜리로 등록한
     // 여행은 사진이 있어도 추억 탭에서 통째로 사라진다.
-    return (anniversaries || [])
+    return assignPhotosToSingleMemory((anniversaries || [])
       .filter(a => a && (a.startDate || a.date) && !a.hiddenFromMemories)
       .map(a => {
         const start = a.startDate || a.date;
@@ -1851,7 +1851,8 @@ export function HistoryView({
         const photos = photosInRange.filter(entry => !isMemoryPhotoExcluded(entry, excluded, getPhotoAssetCommentKey));
         const excludedPhotos = photosInRange.filter(entry => isMemoryPhotoExcluded(entry, excluded, getPhotoAssetCommentKey));
         return { id: a.id, title: a.title || '기록', startDate: start, endDate: end, photos, excludedPhotos };
-      })
+      }), getPhotoAssetCommentKey)
+      // 겹치는 추억(예: 여행 기간 중 하루짜리 축제)에서는 사진이 더 구체적인 한 곳에만 보인다.
       // 등록된 사진이 없는 여행은 목록에서 아예 숨긴다 -- 빈 여행 카드를 계속 보여주는 것보다
       // 실제로 추억(사진)이 쌓인 여행만 보여주는 게 이 탭의 취지에 맞다.
       .filter(group => group.photos.length > 0)

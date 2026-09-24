@@ -9,8 +9,10 @@
 //   2. reset each album copy's tags to the owning chat/gallery message's current tags for the
 //      same file (imageTagMap by asset key first, then the positional imageTags mirror) -- the
 //      copies drifted and made 인물/추억 disagree with 채팅/갤러리.
-// Messages that still reference missing files are REPORTED, not modified: their arrays are
-// positional and are left to the in-app delete (which now checks references) or the P3 migration.
+// Messages that still reference missing files are REPORTED by default. With REPAIR_MESSAGES=1 the
+// dead slots are removed (imageUrls/thumbUrls/imageTags stay aligned, imageTagMap entry dropped),
+// a message whose only content was that photo ("갤러리 사진"/"일정 사진" placeholder) is deleted,
+// and every meeting album reference into that message by position is renumbered.
 //
 // Every write is a guarded PATCH (currentDocument.updateTime), so a meeting edited by someone
 // between the read and the write is skipped, never overwritten.
@@ -21,6 +23,8 @@ const ROOT = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databas
 const CALENDAR_IDS = (process.env.REPAIR_CALENDAR_IDS || '')
   .split(',').map(value => value.trim()).filter(value => /^[a-z0-9_-]{1,60}$/i.test(value));
 const APPLY = process.env.APPLY === '1';
+const REPAIR_MESSAGES = process.env.REPAIR_MESSAGES === '1';
+const PLACEHOLDER_TEXTS = new Set(['', '갤러리 사진', '일정 사진', '사진']);
 
 if (!CALENDAR_IDS.length) {
   console.error('Set REPAIR_CALENDAR_IDS (comma separated). Nothing is repaired implicitly.');
@@ -158,10 +162,80 @@ for (const calendarId of CALENDAR_IDS) {
     }
   }
 
+  // Re-read meetings: step 1 may just have rewritten them.
+  const liveMeetings = REPAIR_MESSAGES ? await listRaw(`${base}/confirmedMeetings`) : meetingDocs;
+  result.messagesSlotRepaired = 0;
+  result.messagesDeleted = 0;
+  result.meetingRefsRenumbered = 0;
+  result.meetingRefsAlreadyMisaligned = 0;
   for (const doc of messageDocs) {
     const m = fieldsOf(doc);
     const urls = [...(m.imageUrls || []), ...(m.thumbUrls || []), m.imageUrl, m.thumbUrl].filter(Boolean);
     for (const url of new Set(urls.map(norm))) if (!(await fileExists(url))) result.messageRefsToMissingFiles += 1;
+    if (!REPAIR_MESSAGES) continue;
+    const imageUrls = Array.isArray(m.imageUrls) && m.imageUrls.length ? m.imageUrls : (m.imageUrl ? [m.imageUrl] : []);
+    const thumbUrls = Array.isArray(m.thumbUrls) && m.thumbUrls.length ? m.thumbUrls : (m.thumbUrl ? [m.thumbUrl] : []);
+    const slots = Math.max(imageUrls.length, thumbUrls.length);
+    const dead = [];
+    for (let index = 0; index < slots; index += 1) {
+      const full = imageUrls[index] || '';
+      const thumb = thumbUrls[index] || full;
+      if ((full || thumb) && !(await fileExists(full || thumb)) && !(await fileExists(thumb))) dead.push(index);
+    }
+    if (!dead.length) continue;
+    const messageId = doc.name.split('/').pop();
+    const deadSet = new Set(dead);
+    const keep = index => !deadSet.has(index);
+    const nextUrls = imageUrls.filter((_, i) => keep(i));
+    const nextThumbs = thumbUrls.filter((_, i) => keep(i));
+    const nextTags = (Array.isArray(m.imageTags) ? m.imageTags : []).filter((_, i) => keep(i));
+    const deadKeys = new Set(dead.map(i => canonicalPhotoAssetKey({ full: imageUrls[i], thumb: thumbUrls[i] })).filter(Boolean));
+    const nextMap = Object.fromEntries(Object.entries(m.imageTagMap && typeof m.imageTagMap === 'object' && !Array.isArray(m.imageTagMap) ? m.imageTagMap : {}).filter(([key]) => !deadKeys.has(key)));
+    const onlyPlaceholder = !nextUrls.length && !nextThumbs.length && PLACEHOLDER_TEXTS.has(String(m.text || '').trim())
+      && !(Array.isArray(m.fileAttachments) && m.fileAttachments.length);
+    // New position of an old slot: old index minus the number of removed slots before it.
+    const shift = oldIndex => oldIndex - dead.filter(d => d < oldIndex).length;
+    const meetingPatches = [];
+    for (const meetingDoc of liveMeetings) {
+      const mf = fieldsOf(meetingDoc);
+      const photos = Array.isArray(mf.photos) ? mf.photos : [];
+      let touched = false;
+      const nextPhotos = [];
+      photos.forEach(photo => {
+        if (!photo || photo.sourceMessageId !== messageId || !Number.isInteger(photo.sourceImageIndex)) { nextPhotos.push(photo); return; }
+        if (deadSet.has(photo.sourceImageIndex) || onlyPlaceholder) { touched = true; return; }
+        // Prefer the slot that actually holds this entry's file; positional refs were found to be
+        // misaligned already, and a pure shift would carry that error forward.
+        const byFile = nextUrls.findIndex((url, i) => norm(url) === norm(photo.imageUrl || photo.full || '') || norm(nextThumbs[i]) === norm(photo.thumbUrl || photo.thumb || ''));
+        const shifted = shift(photo.sourceImageIndex);
+        if (byFile >= 0 && byFile !== shifted) result.meetingRefsAlreadyMisaligned += 1;
+        const moved = byFile >= 0 ? byFile : shifted;
+        if (moved !== photo.sourceImageIndex) { touched = true; result.meetingRefsRenumbered += 1; nextPhotos.push({ ...photo, sourceImageIndex: moved }); return; }
+        nextPhotos.push(photo);
+      });
+      if (touched) meetingPatches.push([meetingDoc, nextPhotos]);
+    }
+    if (result.samples.length < 12) result.samples.push(`${onlyPlaceholder ? 'delete' : 'trim'} message ${messageId} dead slots [${dead.join(',')}] of ${slots}; meeting docs to renumber: ${meetingPatches.length}`);
+    if (onlyPlaceholder) result.messagesDeleted += 1; else result.messagesSlotRepaired += 1;
+    if (!APPLY) continue;
+    if (onlyPlaceholder) {
+      const query = new URLSearchParams({ 'currentDocument.updateTime': doc.updateTime });
+      const res = await fetch(`https://firestore.googleapis.com/v1/${doc.name}?${query}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(`guarded delete failed ${doc.name}: ${res.status} ${await res.text()}`);
+    } else {
+      const fields = { imageUrls: nextUrls, thumbUrls: nextThumbs, imageTags: nextTags, imageTagMap: nextMap, imageUrl: nextUrls[0] || nextThumbs[0] || null, thumbUrl: nextThumbs[0] || nextUrls[0] || null };
+      const query = new URLSearchParams({ 'currentDocument.updateTime': doc.updateTime });
+      Object.keys(fields).forEach(field => query.append('updateMask.fieldPaths', field));
+      const res = await fetch(`https://firestore.googleapis.com/v1/${doc.name}?${query}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, encode(v)])) }),
+      });
+      if (!res.ok) throw new Error(`guarded message patch failed ${doc.name}: ${res.status} ${await res.text()}`);
+    }
+    for (const [meetingDoc, nextPhotos] of meetingPatches) {
+      const outcome = await guardedPatchPhotos(meetingDoc, nextPhotos);
+      if (outcome.skipped) throw new Error(`meeting ${meetingDoc.name} changed concurrently after message ${messageId} was repaired -- restore from backup and re-run`);
+    }
   }
   summary.push(result);
 }
