@@ -130,44 +130,104 @@ export function filterGalleryPhotoIndexItems(items) {
   return (Array.isArray(items) ? items : []).filter(item => !isGalleryContentPosterRow(item));
 }
 
-export async function fetchPhotoIndexPage({ calendarId, projectId, page = 1, decodeDocument, force = false }) {
-  const safePage = Math.max(1, Number(page) || 1);
-  const key = cacheId(calendarId, safePage);
-  const cached = pageCache.get(key);
-  if (!force && cached && Date.now() - cached.savedAt < 2 * 60 * 1000) return cached.items;
+// Page N+1 continues after the last raw row of page N (Firestore cursor). An `offset` query bills
+// every skipped document, so walking a large gallery with offsets costs O(pages^2) reads; the cursor
+// keeps each page at PAGE_SIZE reads. A page opened without a known cursor (a direct jump) still
+// falls back to offset and then seeds the cursor for the pages after it.
+const cursorCache = new Map();
+
+function mapPhotoIndexRow(row, decodeDocument) {
+  const data = decodeDocument(row.document) || {};
+  return {
+    ...data,
+    full: data.full || data.imageUrl || data.thumb || data.thumbUrl || '',
+    thumb: data.thumb || data.thumbUrl || data.full || data.imageUrl || '',
+    mediaKey: data.assetKey || row.document.name.split('/').pop(),
+    refKey: data.assetKey || row.document.name.split('/').pop(),
+    indexBacked: true
+  };
+}
+
+function cursorAfterRow(row) {
+  const timestamp = row?.document?.fields?.timestamp;
+  const name = row?.document?.name;
+  return timestamp && name ? [timestamp, { referenceValue: name }] : null;
+}
+
+export function buildPhotoIndexPageQuery({ cursor = null, offset = 0, limit = PAGE_SIZE } = {}) {
+  const structuredQuery = {
+    from: [{ collectionId: 'photoIndex' }],
+    orderBy: [
+      { field: { fieldPath: 'timestamp' }, direction: 'DESCENDING' },
+      { field: { fieldPath: '__name__' }, direction: 'DESCENDING' }
+    ],
+    limit
+  };
+  if (cursor) structuredQuery.startAt = { values: cursor, before: false };
+  else if (offset > 0) structuredQuery.offset = offset;
+  return structuredQuery;
+}
+
+async function runPhotoIndexQuery({ calendarId, projectId, structuredQuery }) {
   const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/calendars/cal_${calendarId}:runQuery`;
   const rows = await fetchJsonWithRetry(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      structuredQuery: {
-        from: [{ collectionId: 'photoIndex' }],
-        orderBy: [
-          { field: { fieldPath: 'timestamp' }, direction: 'DESCENDING' },
-          { field: { fieldPath: '__name__' }, direction: 'DESCENDING' }
-        ],
-        offset: (safePage - 1) * PAGE_SIZE,
-        limit: PAGE_SIZE
-      }
-    })
+    body: JSON.stringify({ structuredQuery })
   });
-  const items = filterGalleryPhotoIndexItems((Array.isArray(rows) ? rows : []).filter(row => row?.document).map(row => {
-    const data = decodeDocument(row.document) || {};
-    return {
-      ...data,
-      full: data.full || data.imageUrl || data.thumb || data.thumbUrl || '',
-      thumb: data.thumb || data.thumbUrl || data.full || data.imageUrl || '',
-      mediaKey: data.assetKey || row.document.name.split('/').pop(),
-      refKey: data.assetKey || row.document.name.split('/').pop(),
-      indexBacked: true
-    };
-  }));
-  pageCache.set(key, { savedAt: Date.now(), items });
-  return items;
+  return (Array.isArray(rows) ? rows : []).filter(row => row?.document);
+}
+
+// Store raw rows as consecutive PAGE_SIZE pages starting at firstPage, seeding each next cursor.
+function rememberPhotoIndexPages(calendarId, firstPage, rows, decodeDocument) {
+  const chunks = [];
+  for (let index = 0; index < rows.length; index += PAGE_SIZE) chunks.push(rows.slice(index, index + PAGE_SIZE));
+  if (!chunks.length) chunks.push([]);
+  return chunks.map((pageRows, offset) => {
+    const page = firstPage + offset;
+    const items = filterGalleryPhotoIndexItems(pageRows.map(row => mapPhotoIndexRow(row, decodeDocument)));
+    pageCache.set(cacheId(calendarId, page), { savedAt: Date.now(), items });
+    const next = pageRows.length === PAGE_SIZE ? cursorAfterRow(pageRows[pageRows.length - 1]) : null;
+    if (next) cursorCache.set(cacheId(calendarId, page + 1), next);
+    return items;
+  });
+}
+
+export async function fetchPhotoIndexPage({ calendarId, projectId, page = 1, decodeDocument, force = false }) {
+  const safePage = Math.max(1, Number(page) || 1);
+  const key = cacheId(calendarId, safePage);
+  const cached = pageCache.get(key);
+  if (!force && cached && Date.now() - cached.savedAt < CACHE_TTL_MS) return cached.items;
+  const cursor = safePage > 1 ? cursorCache.get(key) || null : null;
+  const rows = await runPhotoIndexQuery({
+    calendarId,
+    projectId,
+    structuredQuery: buildPhotoIndexPageQuery({ cursor, offset: cursor ? 0 : (safePage - 1) * PAGE_SIZE })
+  });
+  return rememberPhotoIndexPages(calendarId, safePage, rows, decodeDocument)[0];
+}
+
+// Every page of the calendar, walked with cursors in chunks of a few pages per request.
+export async function fetchAllPhotoIndexPages({ calendarId, projectId, pageCount, decodeDocument, pagesPerRequest = 3 }) {
+  const all = [];
+  let cursor = null;
+  for (let page = 1; page <= pageCount; page += pagesPerRequest) {
+    const count = Math.min(pagesPerRequest, pageCount - page + 1);
+    const rows = await runPhotoIndexQuery({
+      calendarId,
+      projectId,
+      structuredQuery: buildPhotoIndexPageQuery({ cursor, limit: count * PAGE_SIZE })
+    });
+    all.push(...rememberPhotoIndexPages(calendarId, page, rows, decodeDocument));
+    if (rows.length < count * PAGE_SIZE) break;
+    cursor = cursorAfterRow(rows[rows.length - 1]);
+  }
+  return all;
 }
 
 export function invalidatePhotoIndexCache(calendarId) {
   for (const key of pageCache.keys()) if (key.startsWith(`${calendarId}:`)) pageCache.delete(key);
+  for (const key of cursorCache.keys()) if (key.startsWith(`${calendarId}:`)) cursorCache.delete(key);
 }
 
 // Client cannot write photoIndex (Firestore rules: write false). Tag saves land on messages/memos
@@ -383,16 +443,9 @@ export function useGalleryPhotoIndex({ React, calendarId, activeView, projectId,
         return false;
       }
       const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
-      // Full hydration is reserved for an explicit search or month view. Fetch in small waves so
-      // a slow mobile connection is not hit with every Firestore request at once.
-      const pages = [];
-      for (let start = 1; start <= pageCount; start += 3) {
-        const wave = [];
-        for (let page = start; page < Math.min(start + 3, pageCount + 1); page += 1) {
-          wave.push(fetchPhotoIndexPage({ calendarId, projectId, page, decodeDocument }));
-        }
-        pages.push(...await Promise.all(wave));
-      }
+      // Full hydration is reserved for an explicit search or month view. It is walked with cursors,
+      // three pages per request, so the cost stays at one read per photo.
+      const pages = await fetchAllPhotoIndexPages({ calendarId, projectId, pageCount, decodeDocument });
       setState(previous => ({
         status: 'ready',
         items: reconcilePhotoIndexTagItems(
