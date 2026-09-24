@@ -1793,9 +1793,9 @@ function buildDynamicManifest(calendar) {
     background_color: '#F8FAFC',
     theme_color: '#4F46E5',
     icons: [
-      { src: `${base}icons/icon-192.png`, sizes: '192x192', type: 'image/png', purpose: 'any' },
-      { src: `${base}icons/icon-512.png`, sizes: '512x512', type: 'image/png', purpose: 'any' },
-      { src: `${base}icons/icon-512-maskable.png`, sizes: '512x512', type: 'image/png', purpose: 'maskable' }
+      { src: `${base}icons/icon-v3-192.png`, sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: `${base}icons/icon-v3-512.png`, sizes: '512x512', type: 'image/png', purpose: 'any' },
+      { src: `${base}icons/icon-v3-512-maskable.png`, sizes: '512x512', type: 'image/png', purpose: 'maskable' }
     ]
   };
 }

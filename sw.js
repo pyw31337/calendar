@@ -20,10 +20,10 @@ const STATIC_ASSETS = [
   'manifest-kkot.json',
   'manifest-cw.json',
   'manifest-jhair.json',
-  'icons/icon-192.png',
-  'icons/icon-512.png',
-  'icons/icon-512-maskable.png',
-  'icons/apple-touch-icon.png'
+  'icons/icon-v3-192.png',
+  'icons/icon-v3-512.png',
+  'icons/icon-v3-512-maskable.png',
+  'icons/icon-v3-apple-touch.png'
 ];
 
 self.addEventListener('install', event => {
@@ -86,6 +86,27 @@ self.addEventListener('fetch', event => {
   const isViteAsset = url.origin === self.location.origin && /\/assets\/[^/]+\.(?:js|css)$/.test(url.pathname);
   if (!isStaticAsset && !isViteAsset) return;
 
+  // The web app manifests decide the home-screen icon and name. Serving them cache-first meant
+  // "홈 화면에 추가" right after an icon change still installed the previous icon, so they are
+  // network-first and fall back to the cached copy only when offline.
+  if (/\/manifest(?:-[A-Za-z0-9_-]+)?\.json$/.test(url.pathname)) {
+    event.respondWith((async () => {
+      try {
+        const res = await fetch(req, { cache: 'no-store' });
+        if (res && res.ok) {
+          try {
+            const cache = await caches.open(STATIC_CACHE);
+            await cache.put(req, res.clone());
+          } catch (_) {}
+        }
+        return res;
+      } catch (e) {
+        return (await caches.match(req)) || Response.error();
+      }
+    })());
+    return;
+  }
+
   // Cache-first for the static set, with a background revalidation so an icon/manifest update
   // still reaches users on their next load rather than being stuck forever.
   event.respondWith((async () => {
@@ -135,8 +156,8 @@ self.addEventListener('push', event => {
   const title = payload.title || '모여라 캘린더';
   const options = {
     body: payload.body || '',
-    icon: 'icons/icon-192.png',
-    badge: 'icons/icon-192.png',
+    icon: 'icons/icon-v3-192.png',
+    badge: 'icons/icon-v3-192.png',
     tag: payload.tag || 'gather-push',
     renotify: true,
     data: payload.url || './',
