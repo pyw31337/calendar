@@ -260,6 +260,15 @@ async function boot() {
     // Installed before any data chunk runs; it passes requests through untouched until then.
     const appAuth = await import('./core/app-auth.js');
     appAuth.installFirestoreAuthFetch(window);
+    // Firestore listener guard (src/core/firestore-listener-guard.js): defer real unlistens so an
+    // identical query re-attached by the next effect reuses the target instead of racing it, and
+    // surface the SDK's unrecoverable "INTERNAL ASSERTION FAILED" once so the app can offer a reload.
+    const listenerGuard = await import('./core/firestore-listener-guard.js');
+    if (window.firebase && window.firebase.firestore) listenerGuard.installDeferredUnsubscribe(window.firebase.firestore);
+    listenerGuard.watchFirestoreAssertion(window, message => {
+      window.__gatherFirestoreBroken = message;
+      try { window.dispatchEvent(new CustomEvent('gather:firestore-broken', { detail: { message } })); } catch (_) {}
+    });
     await Promise.all([
       import('./core/app-constants.js'),
       import('./core/app-config.js'),
