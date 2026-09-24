@@ -257,3 +257,14 @@ Message/Meeting/Memo는 `assetIds: string[]`만 가진다. 기존 `imageUrls/thu
   백업/복구 리허설이 필요하다.
 - **P2(인증·규칙)**: 사용자 결정에 따라 마지막. Firebase 콘솔에서 인증 활성화 + 규칙 배포가 필요하다.
 - 운영 데이터 쓰기(메시지 칸 복구, 인덱스 재구축 apply)는 이 에이전트 환경의 안전장치가 차단한다 — 관리자 화면에서 실행.
+
+### 2026-09-24 P2-A — 보이지 않는 자동(익명) 로그인 (사용자 결정: 화면 변화 없는 자동 로그인)
+- `src/core/app-auth.js`: 부팅 후(첫 렌더 뒤) `vendor/firebase-auth-compat.js`(10.14.1, 같은 출처)를 지연 로드하고
+  익명 로그인. SDK가 기기에 세션을 유지하므로 방문마다 같은 사용자. Firestore/Storage SDK는 자동으로 토큰을 사용하고,
+  앱의 직접 REST 호출(firestore.googleapis.com, ~50곳)은 `installFirestoreAuthFetch`가 ID 토큰을 붙인다.
+- P2-A만으로는 아무것도 막지 않는다: 규칙은 아직 비인증 요청을 허용하고, 토큰이 거부(401/403)되면 토큰 없이 1회 재시도,
+  SDK 로드 실패·제공자 비활성·오프라인이면 기존과 동일하게 동작.
+- 확인: 실제 빌드 부팅·갤러리 정상, 로그인 제공자 미설정 상태에서 `auth/configuration-not-found` → 앱은 정상 동작.
+- 남은 설정: Firebase 콘솔에서 Authentication 시작 + 익명 로그인 사용 설정.
+- P2-B(약 1주 뒤, 캐시된 PWA가 새 버전으로 바뀐 뒤): 규칙에 `request.auth != null` 요구(에뮬레이터 테스트 동반),
+  운영 스크립트·백업 워크플로는 서비스 계정 토큰으로 인증.

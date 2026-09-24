@@ -256,6 +256,10 @@ async function boot() {
     // often, not less. Loading it first and alone most closely matches the original behavior
     // (a render-blocking <script> in <head>, which reliably worked) while still adding retries.
     await loadFirebaseSdk();
+    // P2-A: Firestore REST calls carry the anonymous user's ID token once sign-in completes.
+    // Installed before any data chunk runs; it passes requests through untouched until then.
+    const appAuth = await import('./core/app-auth.js');
+    appAuth.installFirestoreAuthFetch(window);
     await Promise.all([
       import('./core/app-constants.js'),
       import('./core/app-config.js'),
@@ -320,6 +324,9 @@ async function boot() {
     // import) can safely assume window.firebase exists.
     await import('./core/app-main.js');
     if (typeof window.__gatherStartApp === 'function') window.__gatherStartApp();
+    // Sign in after the first render so the auth SDK never delays the calendar. Failure is
+    // harmless in P2-A: the rules still accept unauthenticated requests.
+    setTimeout(() => { appAuth.startAnonymousAuth({ loadScript: src => loadScriptWithRetry(src, 15000) }); }, 0);
     // The ready contract means app-main has bound all shared helpers and started the React tree,
     // not merely that its prerequisite chunks finished. Vite 8/Rolldown made the final dynamic
     // import boundary visible enough for tests and fast clients to observe the old premature flag.
