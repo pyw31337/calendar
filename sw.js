@@ -12,7 +12,7 @@
 // assets resolve instantly/offline without touching the freshness of the app itself.
 // Replaced at build time by scripts/copy-static-to-dist.mjs. A commit-scoped cache
 // prevents an older PWA shell from surviving a deployment.
-const BUILD_SHA = 'a259c7c2918deb34d9f55984d7f82bdd9fddb26b';
+const BUILD_SHA = 'a6f66b929118dfb63fb8ecac23d8628c5f77ffe4';
 const STATIC_CACHE = `moyeora-static-${BUILD_SHA}`;
 const STATIC_ASSETS = [
   'favicon.ico',
@@ -20,10 +20,10 @@ const STATIC_ASSETS = [
   'manifest-kkot.json',
   'manifest-cw.json',
   'manifest-jhair.json',
-  'icons/icon-v3-192.png',
-  'icons/icon-v3-512.png',
-  'icons/icon-v3-512-maskable.png',
-  'icons/icon-v3-apple-touch.png'
+  'icons/icon-v5-192.png',
+  'icons/icon-v5-512.png',
+  'icons/icon-v5-512-maskable.png',
+  'icons/icon-v5-apple-touch.png'
 ];
 
 self.addEventListener('install', event => {
@@ -156,8 +156,8 @@ self.addEventListener('push', event => {
   const title = payload.title || '모여라 캘린더';
   const options = {
     body: payload.body || '',
-    icon: 'icons/icon-v3-192.png',
-    badge: 'icons/icon-v3-192.png',
+    icon: 'icons/icon-v5-192.png',
+    badge: 'icons/icon-v5-192.png',
     tag: payload.tag || 'gather-push',
     renotify: true,
     data: payload.url || './',
