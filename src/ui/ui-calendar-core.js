@@ -2409,6 +2409,10 @@ export function GlobalSearchModal({
   const SearchIcon = __comp.SearchIcon || __deps.SearchIcon;
   const SearchResultLogRow = __comp.SearchResultLogRow || __deps.SearchResultLogRow;
   const SmallXIcon = __comp.SmallXIcon || __deps.SmallXIcon;
+  const formatChatFileSize = __deps.formatChatFileSize
+    || (window.GATHER_CHAT_FILE_ATTACHMENTS && window.GATHER_CHAT_FILE_ATTACHMENTS.formatChatFileSize);
+  const getChatFileTypeLabel = __deps.getChatFileTypeLabel
+    || (window.GATHER_CHAT_FILE_ATTACHMENTS && window.GATHER_CHAT_FILE_ATTACHMENTS.getChatFileTypeLabel);
 
   const [query, setQuery] = React.useState(initialQuery);
   const inputRef = React.useRef(null);
@@ -2498,6 +2502,7 @@ export function GlobalSearchModal({
     { key: 'tags', label: '사진 태그', count: (matches.tags || []).length },
     { key: 'expenses', label: '정산', count: (matches.expenses || []).length },
     { key: 'memos', label: '메모', count: (matches.memos || []).length },
+    { key: 'files', label: '파일', count: (matches.files || []).length },
     { key: 'content', label: '콘텐츠', count: contentMatches.length }
   ];
   const hasResults = tabDefs.some(t => t.count > 0);
@@ -2513,7 +2518,7 @@ export function GlobalSearchModal({
       const firstNonEmpty = tabDefs.find(t => t.count > 0);
       return firstNonEmpty ? firstNonEmpty.key : prev;
     });
-  }, [q, matches.schedules.length, matches.chat.length, (matches.photos || []).length, (matches.places || []).length, (matches.tags || []).length, matches.expenses.length, matches.memos.length, contentMatches.length]);
+  }, [q, matches.schedules.length, matches.chat.length, (matches.photos || []).length, (matches.places || []).length, (matches.tags || []).length, matches.expenses.length, matches.memos.length, (matches.files || []).length, contentMatches.length]);
 
   // The default view is a single chronological result stream. Category tabs remain
   // available for drilling down, but users no longer need to guess which tab contains
@@ -2548,6 +2553,11 @@ export function GlobalSearchModal({
       id: `memo_${item.id}`, badgeName: `메모 · ${item.participantName}`, badgeColor: item.participantColor,
       timeStr: formatLogTimestamp(item.createdAt), content: [item.title, item.text].filter(Boolean).join(' · '),
       onClick: () => { onOpenMemo?.(item.id); onClose(); }, sortStamp: String(item.createdAt || 0).padStart(14, '0')
+    }));
+    (matches.files || []).forEach(item => rows.push({
+      id: `file_${item.messageId}_${item.id}`, badgeName: `파일 · ${item.participantName}`, badgeColor: item.participantColor,
+      timeStr: formatLogTimestamp(item.uploadedAt), content: item.name || '파일',
+      onClick: () => { onOpenChatMessage?.(item.messageId); onClose(); }, sortStamp: String(item.uploadedAt || 0).padStart(14, '0')
     }));
     contentMatches.forEach(item => rows.push({
       id: `content_${item.id}`, badgeName: `콘텐츠 · ${item.title || '제목 없음'}`, badgeColor: '#F97316',
@@ -2590,7 +2600,7 @@ export function GlobalSearchModal({
         type: "text",
         className: "form-input",
         style: { width: '100%' },
-        placeholder: "일정, 채팅, 사진, 장소, 정산, 메모 검색...",
+        placeholder: "일정, 채팅, 사진, 장소, 정산, 메모, 파일 검색...",
         value: query,
         onChange: e => setQuery(e.target.value)
       }),
@@ -2728,6 +2738,18 @@ export function GlobalSearchModal({
           memo.title && /*#__PURE__*/React.createElement("div", { style: { fontWeight: 800, marginBottom: '2px' } }, highlightKeyword(memo.title, q)),
           memo.text && highlightKeyword(memo.text.length > 80 ? memo.text.slice(0, 80) + '...' : memo.text, q)
         ))
+      ),
+
+      q && hasResults && activeTab === 'files' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
+        (matches.files || []).map(file => /*#__PURE__*/React.createElement(SearchResultLogRow, {
+          key: `${file.messageId}_${file.id}`,
+          badgeName: file.participantName,
+          badgeColor: file.participantColor,
+          timeStr: formatLogTimestamp(file.uploadedAt),
+          onClick: () => { onOpenChatMessage?.(file.messageId); onClose(); }
+        }, highlightKeyword(file.name || '파일', q), ' · ', /*#__PURE__*/React.createElement("span", {
+          style: { color: 'var(--text-muted)' }
+        }, [typeof getChatFileTypeLabel === 'function' ? getChatFileTypeLabel(file) : '', typeof formatChatFileSize === 'function' ? formatChatFileSize(file.size) : ''].filter(Boolean).join(' · '))))
       ),
 
       q && hasResults && activeTab === 'content' && /*#__PURE__*/React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
