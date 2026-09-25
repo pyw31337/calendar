@@ -8,6 +8,30 @@
   let raf = 0;
   const root = document.documentElement;
 
+  // iOS home-screen apps (display-mode: standalone + black-translucent status bar) paint edge to
+  // edge, yet WebKit reports innerHeight / visualViewport.height one status bar short. Sizing the
+  // shell to that number left an empty band at the bottom of every page. In standalone there is
+  // no browser chrome, so the screen height for the current orientation is the real app height.
+  // Only trusted when the window spans the full screen width and the shortfall is a status bar
+  // (<= 100px) -- an iPad split-view window is narrower/shorter and keeps its reported size.
+  const standaloneScreenHeight = (layoutH) => {
+    try {
+      const standalone = window.navigator.standalone === true
+        || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+      if (!standalone || !window.screen) return 0;
+      const landscape = window.matchMedia && window.matchMedia('(orientation: landscape)').matches;
+      const sw = Number(window.screen.width) || 0;
+      const sh = Number(window.screen.height) || 0;
+      const screenW = landscape ? Math.max(sw, sh) : Math.min(sw, sh);
+      const screenH = landscape ? Math.min(sw, sh) : Math.max(sw, sh);
+      if (!screenH || Math.abs((window.innerWidth || 0) - screenW) > 2) return 0;
+      const shortfall = screenH - layoutH;
+      return shortfall > 0 && shortfall <= 100 ? Math.round(screenH) : 0;
+    } catch (_) {
+      return 0;
+    }
+  };
+
   const apply = () => {
     const vv = window.visualViewport;
     const layoutH = window.innerHeight || root.clientHeight || 0;
@@ -18,8 +42,21 @@
     // bar, our own fixed shell moving) must not be written back onto the shell:
     // that feedback makes the chat header and composer jump in and out.
     const keyboard = layoutH - vvH - rawTop > 120;
-    const height = keyboard ? vvH : Math.max(vvH, Math.round(layoutH) || vvH);
+    const height = keyboard ? vvH : Math.max(vvH, Math.round(layoutH) || vvH, standaloneScreenHeight(layoutH));
     const offsetTop = keyboard ? rawTop : 0;
+    // How far the real screen extends past what WebKit reports (iOS standalone only, see
+    // standaloneScreenHeight). viewport-shell.css uses the class to stretch fixed layers too.
+    const extended = !keyboard && height > Math.round(layoutH) + 1;
+    if (root.hasAttribute('data-v2-keyboard') !== keyboard) {
+      if (keyboard) root.setAttribute('data-v2-keyboard', '');
+      else root.removeAttribute('data-v2-keyboard');
+    }
+    // A data attribute, not a class: the root's class list is watched below (syncActive) and
+    // rewritten by other code, and a class here fed that observer into an endless loop.
+    if (root.hasAttribute('data-v2-standalone-extended') !== extended) {
+      if (extended) root.setAttribute('data-v2-standalone-extended', '');
+      else root.removeAttribute('data-v2-standalone-extended');
+    }
     const offsetLeft = keyboard ? rawLeft : 0;
     const heightPx = `${height}px`;
     const topPx = `${offsetTop}px`;
@@ -38,8 +75,8 @@
     document.body.querySelectorAll(':scope > .lightbox-overlay').forEach(overlay => {
       overlay.style.setProperty('width', '100vw', 'important');
       overlay.style.setProperty('max-width', 'none', 'important');
-      overlay.style.setProperty('height', `${vvH}px`, 'important');
-      overlay.style.setProperty('min-height', `${vvH}px`, 'important');
+      overlay.style.setProperty('height', `${keyboard ? vvH : height}px`, 'important');
+      overlay.style.setProperty('min-height', `${keyboard ? vvH : height}px`, 'important');
       overlay.style.setProperty('top', `${rawTop}px`, 'important');
       overlay.style.setProperty('left', '0', 'important');
     });
@@ -50,7 +87,10 @@
     raf = requestAnimationFrame(apply);
   };
 
+  let started = false;
   const start = () => {
+    if (started) return;
+    started = true;
     apply();
     if (window.visualViewport) {
       window.visualViewport.addEventListener('resize', onVp);
@@ -60,6 +100,8 @@
   };
 
   const stop = () => {
+    if (!started) return;
+    started = false;
     if (raf) cancelAnimationFrame(raf);
     if (window.visualViewport) {
       window.visualViewport.removeEventListener('resize', onVp);
@@ -69,6 +111,8 @@
     root.style.removeProperty('--app-vv-height');
     root.style.removeProperty('--app-vv-offset-top');
     root.style.removeProperty('--app-vv-offset-left');
+    root.removeAttribute('data-v2-standalone-extended');
+    root.removeAttribute('data-v2-keyboard');
   };
 
   const syncActive = () => {
