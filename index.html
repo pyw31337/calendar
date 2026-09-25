@@ -5,7 +5,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="build-sha" content="c12d5f9f9dd3d1e6f64acb81d6dcfee2c3442706" />
+    <meta name="build-sha" content="e37ef69fca3c4b042c15cf148d246e548070e603" />
     <meta name="v2-polish" content="2026-09-21-search-page" />
     <title>모여라 캘린더</title>
     <!-- PWA manifest + icons. Previously present only in the legacy root index.html (not the
@@ -20,6 +20,10 @@
          for "홈 화면에 추가" instead of the manifest, which put the transparent favicon on the
          home screen. Home-screen icons come from manifest*.json / apple-touch-icon. -->
     <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-v3-32.png" />
+    <!-- 96px transparent M: large enough that mobile browsers (tab strip, history) use it
+         instead of borrowing the filled apple-touch/manifest icon, still well below the
+         192px they take for a home-screen shortcut. -->
+    <link rel="icon" type="image/png" sizes="96x96" href="icons/favicon-v3-96.png" />
     <link rel="icon" href="favicon.ico" />
     <meta name="theme-color" content="#4F46E5" />
     <meta name="mobile-web-app-capable" content="yes" />
@@ -117,13 +121,13 @@
          visitor, that no longer holds up Firebase SDK loading or anything else. -->
     <script async src="https://cdn.jsdelivr.net/npm/korean-lunar-calendar/dist/korean-lunar-calendar.min.js"></script>
     <script async src="https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode.js"></script>
-    <script type="module" crossorigin src="/calendar/assets/index-CmfZVuG2.js"></script>
+    <script type="module" crossorigin src="/calendar/assets/index-1ws4t4N7.js"></script>
     <link rel="modulepreload" crossorigin href="/calendar/assets/rolldown-runtime-D1y7pCx4.js">
     <link rel="modulepreload" crossorigin href="/calendar/assets/vendor-react-DfXFE28X.js">
-    <link rel="modulepreload" crossorigin href="/calendar/assets/index-CmfZVuG2.js">
-    <link rel="modulepreload" crossorigin href="/calendar/assets/vendor-C7Z4ZyjO.js">
-    <link rel="modulepreload" crossorigin href="/calendar/assets/vendor-react-dom-DVYCJidR.js">
-    <link rel="stylesheet" crossorigin href="/calendar/assets/index-BYfpR_BN.css">
+    <link rel="modulepreload" crossorigin href="/calendar/assets/index-1ws4t4N7.js">
+    <link rel="modulepreload" crossorigin href="/calendar/assets/vendor-B-ZIuez7.js">
+    <link rel="modulepreload" crossorigin href="/calendar/assets/vendor-react-dom-DTFpk3RE.js">
+    <link rel="stylesheet" crossorigin href="/calendar/assets/index-CrG42-Dz.css">
   </head>
   <body>
     <div id="root"><div style="min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif;color:#64748B;font-size:0.88rem;">모여라 캘린더 불러오는 중…</div></div>
