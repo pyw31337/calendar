@@ -3164,32 +3164,45 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
     const items = meetingMatches ? row.items : row.items.filter(item => [item.label, item.category?.name, item.category?.id, item.url].filter(Boolean).join(' ').toLowerCase().includes(settlementSearchNeedle));
     return { ...row, items, expenseTotal: items.filter(item => !item.isIncome && !item.isSelfPay).reduce((sum, item) => sum + Math.abs(item.amount), 0), incomeTotal: items.filter(item => item.isIncome).reduce((sum, item) => sum + Math.abs(item.amount), 0) };
   };
-    const allTimeRows = getConfirmedMeetings(calendar).slice().sort((a, b) => b.date.localeCompare(a.date))
+  // One item builder for both the ledger that is shown and the running balance behind it, so
+  // 잔액 always follows the exact on-screen order (saved `order`, then createdAt; carry-over last).
+  // The running balance used to be computed over an unsorted copy, so rows a user had reordered
+  // showed balances belonging to a different sequence.
+  const buildSettlementItems = meeting => orderSettlementItemsForDisplay((Array.isArray(meeting.expenses) ? meeting.expenses : [])
+    // Keep each entry's raw array position: CreateSettlementModal keys saved selections by it.
+    .map((expense, rawIndex) => ({ expense, rawIndex }))
+    .filter(({ expense }) => expense && !isTombstone(expense) && Number.isFinite(Number(expense.amount)) && Number(expense.amount) !== 0)
+    .sort((a, b) => {
+      const aOrder = Number.isFinite(Number(a.expense.order)) ? Number(a.expense.order) : Number.POSITIVE_INFINITY;
+      const bOrder = Number.isFinite(Number(b.expense.order)) ? Number(b.expense.order) : Number.POSITIVE_INFINITY;
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      return (a.expense.createdAt || 0) - (b.expense.createdAt || 0);
+    })
+    .map(({ expense, rawIndex }) => {
+      const amount = Number(expense.amount || 0);
+      const isIncome = isExpenseIncomeEntry(expense);
+      return {
+        ...expense,
+        amount,
+        isIncome,
+        category: getExpenseCategory(calendar, expense.categoryId),
+        label: getExpenseLabel(expense) || '정산 항목',
+        url: getExpenseUrl(expense),
+        // CreateSettlementModal persists this exact identity in checkedItemKeys. Keep it with
+        // the summary item so a saved payerId can be counted as that participant's prepayment.
+        settlementCardItemKey: `${meeting.date}_${expense.id || rawIndex}_${expense.amount || 0}`,
+        ledgerKey: `${meeting.date}|${expense.id || rawIndex}|${expense.createdAt || ''}|${amount}`
+      };
+    }));
+  const allTimeLedgerRows = getConfirmedMeetings(calendar).slice().sort((a, b) => b.date.localeCompare(a.date))
     .map(meeting => {
-      const items = orderSettlementItemsForDisplay((Array.isArray(meeting.expenses) ? meeting.expenses : [])
-        .filter(expense => !isTombstone(expense) && Number.isFinite(Number(expense.amount)) && Number(expense.amount) !== 0)
-        .map((expense, index) => {
-          const amount = Number(expense.amount || 0);
-          const isIncome = isExpenseIncomeEntry(expense);
-          return {
-            ...expense,
-            amount,
-            isIncome,
-            category: getExpenseCategory(calendar, expense.categoryId),
-            label: getExpenseLabel(expense) || '정산 항목',
-            url: getExpenseUrl(expense),
-            // CreateSettlementModal persists this exact identity in
-            // checkedItemKeys. Keep it with the summary item so a saved
-            // payerId can be counted as that participant's real prepayment.
-            settlementCardItemKey: `${meeting.date}_${expense.id || index}_${expense.amount || 0}`,
-            ledgerKey: `${meeting.date}|${expense.id || index}|${expense.createdAt || ''}|${amount}`
-          };
-        }));
+      const items = buildSettlementItems(meeting);
       const expenseTotal = items.filter(item => !item.isIncome && !item.isSelfPay).reduce((sum, item) => sum + Math.abs(item.amount), 0);
       const incomeTotal = items.filter(item => item.isIncome).reduce((sum, item) => sum + Math.abs(item.amount), 0);
       return { meeting, items, expenseTotal, incomeTotal, net: incomeTotal - expenseTotal };
     })
-    .filter(row => row.items.length > 0)
+    .filter(row => row.items.length > 0);
+  const allTimeRows = allTimeLedgerRows
     .map(filterSettlementRow)
     .filter(row => row.items.length > 0);
   const allTimeItems = allTimeRows.flatMap(row => row.items.map(item => ({ ...item, date: row.meeting.date, meetingNote: row.meeting.note || '' })));
@@ -3222,7 +3235,8 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   const settlementBalanceByKey = new Map();
   let runningSettlementBalance = baseBudget;
   // 자비부담(isSelfPay) stays visible in the ledger but never moves 공금 running balance.
-  allTimeItems.slice().reverse().forEach(item => {
+  // Balances run over the whole ledger (oldest first), never over a search-filtered subset.
+  allTimeLedgerRows.flatMap(row => row.items).reverse().forEach(item => {
     if (item.isSelfPay) {
       settlementBalanceByKey.set(item.ledgerKey, null);
       return;
@@ -3257,27 +3271,7 @@ export function SettlementSummaryModal({ calendar, onBack, onSelectDate, onOpenS
   const rows = getConfirmedMeetings(calendar).slice().sort((a, b) => b.date.localeCompare(a.date))
     .filter(meeting => activeTab === 'total' || meeting.date.startsWith(targetPrefix))
     .map(meeting => {
-      const items = orderSettlementItemsForDisplay((Array.isArray(meeting.expenses) ? meeting.expenses : [])
-        .filter(expense => !isTombstone(expense) && Number.isFinite(Number(expense.amount)) && Number(expense.amount) !== 0)
-        .sort((a, b) => {
-          const aOrder = Number.isFinite(Number(a.order)) ? Number(a.order) : Number.POSITIVE_INFINITY;
-          const bOrder = Number.isFinite(Number(b.order)) ? Number(b.order) : Number.POSITIVE_INFINITY;
-          if (aOrder !== bOrder) return aOrder - bOrder;
-          return (a.createdAt || 0) - (b.createdAt || 0);
-        })
-        .map((expense, index) => {
-          const amount = Number(expense.amount || 0);
-          const isIncome = isExpenseIncomeEntry(expense);
-          return {
-            ...expense,
-            amount,
-            isIncome,
-            category: getExpenseCategory(calendar, expense.categoryId),
-            label: getExpenseLabel(expense) || '정산 항목',
-            url: getExpenseUrl(expense),
-            ledgerKey: `${meeting.date}|${expense.id || index}|${expense.createdAt || ''}|${amount}`
-          };
-        }));
+      const items = buildSettlementItems(meeting);
       const expenseTotal = items.filter(item => !item.isIncome && !item.isSelfPay).reduce((sum, item) => sum + Math.abs(item.amount), 0);
       const incomeTotal = items.filter(item => item.isIncome).reduce((sum, item) => sum + Math.abs(item.amount), 0);
       return { meeting, items, expenseTotal, incomeTotal, net: incomeTotal - expenseTotal };

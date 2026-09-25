@@ -247,7 +247,7 @@ body:has(.v2-design) .lightbox-overlay .lightbox-slide {
   }
   .renewal-shell.v2-design > main.renewal-shell-main .v2-chat.is-composer-hidden .v2-chat-jump-row .v2-chat-keyboard-btn,
   .renewal-shell.v2-design > main.renewal-shell-main .v2-chat.is-composer-hidden .v2-chat-jump-row .v2-chat-scroll-bottom-btn {
-    bottom: 12px !important;
+    bottom: calc(12px + var(--v2-pane-bottom, 0px)) !important;
   }
   .renewal-shell.v2-design > main.renewal-shell-main .v2-wrap-legacy .v2-chat-legacy {
     height: calc(100% - 58px) !important;
@@ -259,5 +259,106 @@ body:has(.v2-design) .lightbox-overlay .lightbox-slide {
     box-sizing: border-box !important;
     padding-top: var(--v2-safe-top) !important;
     padding-bottom: var(--v2-safe-bottom) !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+ * iOS standalone: WebKit reports the viewport one status bar short
+ * --------------------------------------------------------------------------
+ * visual-viewport-sync.js sizes the shell to the real screen and sets
+ * .v2-standalone-extended while that correction is active (never while the
+ * keyboard is open). Fixed layers would still stop at the short reported
+ * height, leaving the same empty band under sheets, drawers and the FAB:
+ * - inside the shell, the shell itself becomes their containing block;
+ * - layers portaled to <body> take the corrected height explicitly. */
+html:has(.renewal-shell.v2-design)[data-v2-standalone-extended] .renewal-shell.v2-design {
+  transform: translateZ(0);
+}
+html:has(.renewal-shell.v2-design)[data-v2-standalone-extended] body > .modal-overlay,
+html:has(.renewal-shell.v2-design)[data-v2-standalone-extended] body > .bottom-sheet-overlay,
+html:has(.renewal-shell.v2-design)[data-v2-standalone-extended] body > .admin-side-menu-overlay,
+html:has(.renewal-shell.v2-design)[data-v2-standalone-extended] body > .manual-overlay,
+html:has(.renewal-shell.v2-design)[data-v2-standalone-extended] body > [role="dialog"][aria-modal="true"] {
+  top: 0 !important;
+  bottom: auto !important;
+  height: var(--app-vv-height, 100dvh) !important;
+  min-height: var(--app-vv-height, 100dvh) !important;
+  max-height: var(--app-vv-height, 100dvh) !important;
+}
+
+@media (max-width: 1199px) {
+  /* Chat used its own header rule that re-added the notch inset on top of the
+     safe pane offset above, so its title sat one status bar lower than every
+     other destination. Same contract as the other headers: no inset here. */
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > main.renewal-shell-main .v2-chat .bp-header.v2-page-header,
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > main.renewal-shell-main .v2-chat .bp-header.v2-page-header:not(.is-scroll-hidden) {
+    padding-top: 0 !important;
+  }
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > main.renewal-shell-main .v2-chat .v2-chat-scroll,
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > main.renewal-shell-main .v2-chat .chat-messages-scroll {
+    padding-top: 56px !important;
+  }
+
+  /* 기록(gallery/archive/content) frame was 100dvh tall inside the pane that
+     already starts below the status bar, so its bottom (photos, pagination)
+     ran one status bar + home indicator past the screen. Fill the pane. */
+  .renewal-shell.v2-design > main.renewal-shell-main .v2-records-frame {
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+  }
+
+  /* The status-bar strip above a destination pane showed the gray page
+     background, cutting it off from the white header below. Paint it with the
+     header surface so the two read as one bar (home keeps its hero gradient). */
+  .renewal-shell.v2-design:has(> main.renewal-shell-main)::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--v2-safe-top);
+    background: var(--bg-card);
+    pointer-events: none;
+    z-index: 1;
+  }
+}
+
+@media (max-width: 1199px) {
+  /* Home-indicator strip: destination panes used to stop above it, leaving an
+     empty gray band on every page. The pane now runs to the screen edge and
+     each scroll owner / the chat composer pads its end by the same inset, so
+     lists scroll under the indicator like native iOS lists. While the keyboard
+     is open the indicator is hidden behind it, so the inset drops to 0. */
+  .renewal-shell.v2-design {
+    --v2-pane-bottom: var(--v2-safe-bottom);
+  }
+  html:has(.renewal-shell.v2-design)[data-v2-keyboard] .renewal-shell.v2-design {
+    --v2-pane-bottom: 0px;
+  }
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > main.renewal-shell-main {
+    height: calc(var(--app-vv-height, 100dvh) - var(--v2-safe-top)) !important;
+    min-height: calc(var(--app-vv-height, 100dvh) - var(--v2-safe-top)) !important;
+    max-height: calc(var(--app-vv-height, 100dvh) - var(--v2-safe-top)) !important;
+  }
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > main.renewal-shell-main .v2-dest-body {
+    padding-bottom: calc(var(--v2-dest-content-pad-y, 20px) + var(--v2-pane-bottom)) !important;
+  }
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > main.renewal-shell-main .v2-legacy-body,
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > main.renewal-shell-main .history-page-scroll {
+    padding-bottom: var(--v2-pane-bottom) !important;
+  }
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > main.renewal-shell-main .gallery-page-scroll {
+    padding-bottom: calc(88px + var(--v2-pane-bottom)) !important;
+  }
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > main.renewal-shell-main .culture-items-grid {
+    padding-bottom: calc(20px + var(--v2-pane-bottom)) !important;
+  }
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > main.renewal-shell-main .v2-chat .v2-chat-composer {
+    padding-bottom: calc(8px + var(--v2-pane-bottom)) !important;
+  }
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > main.renewal-shell-main .v2-chat.is-composer-hidden .v2-chat-scroll,
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > main.renewal-shell-main .v2-chat.is-composer-hidden .chat-messages-scroll {
+    padding-bottom: calc(80px + var(--v2-pane-bottom)) !important;
   }
 }

@@ -1495,8 +1495,14 @@ export function ToggleSwitch({ checked, onChange, label }) {
     "aria-checked": checked,
     "aria-label": label,
     onClick: onChange,
+    // The track is exactly the 20px knob + 2px on each side. Generic touch-target rules
+    // (e.g. `.modal-body button { min-height: 36px }`) stretched it into an oval on phones, so
+    // the size is pinned here and in the .toggle-switch CSS guard.
+    className: "toggle-switch",
     style: {
-      width: '44px', height: '24px', borderRadius: 'var(--radius-full)', border: 'none', cursor: 'pointer',
+      width: '44px', height: '24px', minHeight: '24px', maxHeight: '24px', minWidth: '44px',
+      boxSizing: 'border-box', lineHeight: 0, alignSelf: 'center', WebkitAppearance: 'none', appearance: 'none',
+      borderRadius: 'var(--radius-full)', border: 'none', cursor: 'pointer',
       backgroundColor: checked ? 'var(--accent-primary)' : '#CBD5E1',
       position: 'relative', transition: 'background-color 0.2s ease', padding: 0, flexShrink: 0
     }
