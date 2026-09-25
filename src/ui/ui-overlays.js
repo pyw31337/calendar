@@ -449,7 +449,7 @@ class AppErrorBoundary extends ReactComponentBase {
           textAlign: 'center',
           margin: '20px auto',
           maxWidth: '600px',
-          background: '#FFFFFF',
+          background: 'var(--bg-card)',
           borderRadius: '16px',
           border: '1px solid var(--border-subtle)',
           boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.08)'

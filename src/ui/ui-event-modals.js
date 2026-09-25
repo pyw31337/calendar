@@ -2772,7 +2772,7 @@ export function CreateSettlementModal({ calendar, initialData, onClose, onSave, 
 
           React.createElement('div', {
             className: 'settlement-personal-expense-summary',
-            style: { display: 'flex', flexDirection: 'column', gap: '6px', overflowX: 'hidden', padding: '8px 6px', backgroundColor: '#FFFFFF', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', boxSizing: 'border-box' }
+            style: { display: 'flex', flexDirection: 'column', gap: '6px', overflowX: 'hidden', padding: '8px 6px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', boxSizing: 'border-box' }
           },
             personalParticipantPickerOptions.map(option => {
               const total = personalExpenseTotals.get(option.value) || 0;

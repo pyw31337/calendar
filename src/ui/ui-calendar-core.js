@@ -2129,7 +2129,7 @@ export function MemoCard({ memo, calendar, onOpenEdit, onTogglePin, onShare, onS
           border: '1px solid var(--border-subtle)',
           borderRadius: 'var(--radius-sm)',
           padding: '6px 8px',
-          backgroundColor: '#fff',
+          backgroundColor: 'var(--bg-card)',
           color: 'var(--text-main)',
           outline: 'none',
           boxSizing: 'border-box'
