@@ -2065,7 +2065,7 @@ export function HistoryView({
       const isCollapsed = collapsedMemoryDates.has(section.dateKey);
       return /*#__PURE__*/React.createElement("section", {
         key: section.dateKey,
-        style: { border: 'none', borderRadius: 'var(--radius-md)', padding: '12px', backgroundColor: '#FFFFFF', marginBottom: '10px' }
+        style: { border: 'none', borderRadius: 'var(--radius-md)', padding: '12px', backgroundColor: 'var(--bg-card)', marginBottom: '10px' }
       },
         /*#__PURE__*/React.createElement("div", {
           style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: isCollapsed ? 0 : '10px' }
@@ -5212,6 +5212,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
               }, item.venue || CULTURE_MISSING_LABEL)
             ),
             registered && /*#__PURE__*/React.createElement("div", {
+              className: "culture-registered-badge",
               title: "캘린더 등록됨",
               "aria-label": "캘린더 등록됨",
               style: { position: 'absolute', top: '6px', right: '6px', backgroundColor: '#7C3AED', color: '#fff', borderRadius: 'var(--radius-full)', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.25)' }

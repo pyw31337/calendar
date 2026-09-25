@@ -2365,7 +2365,7 @@ export function ChatGalleryModal({
           const isCollapsed = collapsedGalleryDates.has(section.dateKey);
           return /*#__PURE__*/React.createElement("section", {
           key: section.dateKey,
-          style: { border: 'none', borderRadius: 'var(--radius-md)', padding: '12px', backgroundColor: '#FFFFFF' }
+          style: { border: 'none', borderRadius: 'var(--radius-md)', padding: '12px', backgroundColor: 'var(--bg-card)' }
         },
             /*#__PURE__*/React.createElement("div", {
               style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: isCollapsed ? 0 : '10px' }

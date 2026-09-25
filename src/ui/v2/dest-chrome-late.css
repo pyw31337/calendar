@@ -4592,7 +4592,7 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .date-item-btn.confirmed-m
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .date-item-btn.confirmed-meeting-card:not(.is-past)::before {
   display: none !important;
 }
-html:has(.renewal-shell.v2-design)[data-theme="dark"] .date-item-btn.confirmed-meeting-card:not(.is-past) :is(div, strong, span, small, p):not(.memo-capsule-badge):not(.memo-capsule-badge *):not(.dday-badge):not(.dday-badge *):not(.url-capsule-badge):not(.url-capsule-badge *) {
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .date-item-btn.confirmed-meeting-card:not(.is-past) :is(div, strong, span, small, p, a):not(.memo-capsule-badge):not(.memo-capsule-badge *):not(.dday-badge):not(.dday-badge *):not(.url-capsule-badge):not(.url-capsule-badge *) {
   color: var(--on-brand) !important;
 }
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .date-item-btn.confirmed-meeting-card:not(.is-past) svg {

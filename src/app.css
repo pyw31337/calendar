@@ -179,6 +179,13 @@
   color: #A7F3D0 !important;
   border: 1px solid var(--status-green) !important;
 }
+/* 컨텐츠 카드 포스터의 "캘린더 등록됨" 뱃지: 라이트에서 쓰는 생생한 보라(#7C3AED)가 다크
+   배경 위에서는 튀는 네온 점으로 보여, .date-item-badge.is-confirmed와 같은 톤 다운된
+   보라 팔레트로 맞춘다. */
+:root[data-theme="dark"] .culture-registered-badge {
+  background: #3B1E69 !important;
+  color: #E9D5FF !important;
+}
 :root[data-theme="dark"] {
   --status-green: #4ADE80;
   --bg-primary: #0D0D0D;
