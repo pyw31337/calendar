@@ -1334,9 +1334,9 @@ html:has(.renewal-shell.v2-design) .modal-overlay .modal-body {
 }
 html:has(.renewal-shell.v2-design) .modal-overlay .btn-primary,
 html:has(.renewal-shell.v2-design) .modal-overlay button.btn-primary {
-  background: #7C2FE5 !important;
-  border-color: var(--v2-accent, #7C2FE5) !important;
-  color: #fff !important;
+  background: var(--cta-fill, #7C2FE5) !important;
+  border-color: var(--cta-fill, var(--v2-accent, #7C2FE5)) !important;
+  color: var(--on-cta, white) !important;
   min-height: 44px !important;
   border-radius: 12px !important;
   font-weight: 800 !important;
@@ -4692,4 +4692,14 @@ html:has(.renewal-shell.v2-design) .v2-chat .msg-actions-group > svg {
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-side-nav-manual-banner-icon-wrap {
   background: var(--bg-primary) !important;
   box-shadow: none !important;
+}
+
+/* Call-to-action fill for things painted with a hard-coded brand purple (inline styles in
+   ui-misc/ui-summary-gallery/ui-overlays/ui-chat-room, and the rules below). Defined only for
+   the Theme 2 dark shell and on <html>, so body-level portals (the "새 버전이 있어요" banner,
+   modals) inherit it; everywhere else var(--cta-fill, <original purple>) keeps the light look. */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] {
+  --cta-fill: #C9FD58;
+  --cta-fill-hover: #B8EC47;
+  --on-cta: #0D0D0D;
 }

@@ -67,3 +67,15 @@ test('inline styles never paint a literal white/light-gray surface (dark mode wo
   }
   assert.deepEqual(offenders, [], "use 'var(--bg-card)' / 'var(--bg-primary)'");
 });
+
+test('inline styles never paint a literal brand purple (dark Theme 2 has no purple)', () => {
+  const PURPLE = /background(?:Color)?:\s*'(#7C3AED|#4F46E5|#6366F1|#7C2FE5|#6D28D9|#9333EA)'/i;
+  const offenders = [];
+  for (const file of listFiles('src/ui', '.js')) {
+    if (/admin/.test(file)) continue;
+    fs.readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
+      if (PURPLE.test(line)) offenders.push(`${file}:${i + 1}`);
+    });
+  }
+  assert.deepEqual(offenders, [], "use 'var(--cta-fill, #7C3AED)' with color 'var(--on-cta, #fff)'");
+});

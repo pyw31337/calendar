@@ -189,8 +189,13 @@
    배경 위에서는 튀는 네온 점으로 보여, .date-item-badge.is-confirmed와 같은 톤 다운된
    보라 팔레트로 맞춘다. */
 :root[data-theme="dark"] .culture-registered-badge {
-  background: #3B1E69 !important;
-  color: #E9D5FF !important;
+  background: var(--cta-fill, #3B1E69) !important;
+  color: var(--on-cta, #E9D5FF) !important;
+}
+:root[data-theme="dark"] .culture-registered-badge svg,
+:root[data-theme="dark"] .culture-registered-badge svg * {
+  color: var(--on-cta, #E9D5FF) !important;
+  stroke: currentColor !important;
 }
 :root[data-theme="dark"] {
   --status-green: #4ADE80;
@@ -2487,8 +2492,8 @@ select.form-select {
   text-decoration: underline;
 }
 .poll-confirmed-badge {
-  background: #8B5CF6;
-  color: #FFFFFF;
+  background: var(--cta-fill, #8B5CF6);
+  color: var(--on-cta, white);
   font-size: 0.68rem;
   font-weight: 800;
   padding: 2px 8px;
@@ -4217,7 +4222,7 @@ select.form-select {
   background: transparent; color: var(--text-muted);
 }
 .culture-grid-cols-btn.is-active {
-  background: #4F46E5; color: #FFFFFF;
+  background: var(--cta-fill, #4F46E5); color: var(--on-cta, white);
 }
 /* RegionFilterBackdrop: search field + tap-target chip lists (시/도, then that province's
    군/구), modeled on Culture Flow's own region picker referenced by the product ask -- laid out
@@ -4376,8 +4381,8 @@ select.form-select {
   border: none;
   /* Flat brand purple, not the blue/purple/pink 정산 hero gradient -- 모임확정 reads as a
      solid purple card (V2 reference), distinct from 지난모임's flat gray below. */
-  background: #7C2FE5;
-  color: #FFFFFF;
+  background: var(--cta-fill, #7C2FE5);
+  color: var(--on-cta, white);
   box-shadow: none;
 }
 .date-item-btn.confirmed-meeting-card::before {
@@ -6964,8 +6969,8 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 }
 .renewal-shell-main.is-chat .msg-row-hover [style*="backgroundColor: 'var(--brand)'"],
 .renewal-shell-main.is-chat .msg-row-hover [style*="background-color: var(--brand)"] {
-  background: #7C3AED !important;
-  color: #FFFFFF !important;
+  background: var(--cta-fill, #7C3AED) !important;
+  color: var(--on-cta, white) !important;
   border-radius: 12px 0 12px 12px !important;
   padding: 8px 11px !important;
   font-size: 0.8rem !important;
@@ -7034,8 +7039,8 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
 }
 .renewal-shell-main.is-chat .chat-send-btn,
 .renewal-shell-main.is-chat .chat-composer button[type="submit"] {
-  background: #7C3AED !important;
-  color: #FFFFFF !important;
+  background: var(--cta-fill, #7C3AED) !important;
+  color: var(--on-cta, white) !important;
   border: none !important;
   border-radius: 50% !important;
   width: 34px !important;
@@ -7289,8 +7294,8 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
   width: 52px !important;
   height: 52px !important;
   border-radius: 50% !important;
-  background: #7C3AED !important;
-  color: #FFFFFF !important;
+  background: var(--cta-fill, #7C3AED) !important;
+  color: var(--on-cta, white) !important;
   border: none !important;
   box-shadow: 0 8px 20px rgba(124,58,237,0.35) !important;
   display: flex !important;
