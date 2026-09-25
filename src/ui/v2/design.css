@@ -75,6 +75,9 @@
   min-height: 100%;
   box-sizing: border-box;
   overflow-x: hidden;
+  /* Bottom nav is hidden on this shell (hamburger + side drawer instead), so nothing else
+   * keeps the last bento card clear of the home indicator in iOS standalone mode. */
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 .v2-design .bp-app-shell { box-sizing: border-box; max-width: 100%; }
@@ -147,6 +150,11 @@
   background-size: auto, 300% 300% !important;
   animation: bp-hero-mesh-shift 8.6s ease-in-out infinite !important;
   isolation: isolate;
+  /* Home shell sits flush at the very top of .renewal-shell.v2-design (padding:0), so in iOS
+   * "Add to Home Screen" standalone mode (status-bar-style black-translucent draws content
+   * under the status bar) the title/hamburger row would render directly under the status bar
+   * icons/notch without this. env() is 0 in a normal Safari tab, so this is a no-op there. */
+  padding-top: env(safe-area-inset-top, 0px);
 }
 .v2-design .bp-hero-zone::before {
   content: "" !important;
