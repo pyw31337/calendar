@@ -59,8 +59,10 @@ test('inline styles never paint a literal white/light-gray surface (dark mode wo
   for (const file of listFiles('src/ui', '.js')) {
     if (/admin/.test(file)) continue; // the admin dashboard pins its own light palette
     fs.readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
-      // The toggle switch's knob is white in both themes by design.
-      if (LIGHT.test(line) && !/borderRadius: '50%', backgroundColor: '#FFFFFF'/.test(line)) offenders.push(`${file}:${i + 1}`);
+      // Allowed: the toggle switch's knob (white in both themes by design), and a white chip that
+      // pins its own dark ink on the same line (e.g. the lightbox tag-delete disc over a photo).
+      const pinnedInk = /(?<![\w-])color:\s*'#(0|1|2|3)[0-9a-f]{5}'/i.test(line);
+      if (LIGHT.test(line) && !pinnedInk && !/borderRadius: '50%', backgroundColor: '#FFFFFF'/.test(line)) offenders.push(`${file}:${i + 1}`);
     });
   }
   assert.deepEqual(offenders, [], "use 'var(--bg-card)' / 'var(--bg-primary)'");

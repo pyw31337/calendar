@@ -577,7 +577,7 @@ export function LightboxTagPanel({ tags = '', onSaveTags, onSearchTag, showToast
         onClick: e => { e.stopPropagation(); setConfirmDeleteTag(tag); },
         style: {
           width: '22px', height: '22px', minWidth: '22px', border: 0, borderRadius: '50%',
-          background: 'var(--bg-card)', color: 'var(--text-main)', display: 'inline-flex',
+          background: '#FFFFFF', color: '#1E293B', display: 'inline-flex',
           alignItems: 'center', justifyContent: 'center', padding: 0, cursor: 'pointer',
           flexShrink: 0
         }

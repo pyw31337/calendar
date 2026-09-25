@@ -5249,6 +5249,7 @@ export function CulturePerformancesTab({ calendar, anniversaries = [], memos = [
               }, item.venue || CULTURE_MISSING_LABEL)
             ),
             registered && /*#__PURE__*/React.createElement("div", {
+              className: "culture-registered-badge",
               title: "캘린더 등록됨",
               "aria-label": "캘린더 등록됨",
               style: { position: 'absolute', top: '6px', right: '6px', backgroundColor: '#7C3AED', color: '#fff', borderRadius: 'var(--radius-full)', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.25)' }
