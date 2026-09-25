@@ -79,3 +79,16 @@ test('inline styles never paint a literal brand purple (dark Theme 2 has no purp
   }
   assert.deepEqual(offenders, [], "use 'var(--cta-fill, #7C3AED)' with color 'var(--on-cta, #fff)'");
 });
+
+test('inline purple gradients go through --cta-fill (the dark Theme 2 shell repaints them lime)', () => {
+  const GRADIENT = /background:\s*'(var\(--(accent-gradient|v2-accent-fill)[,)]|linear-gradient\([^']*#(7C3AED|4F46E5|6366F1|7C2FE5|6D28D9|9333EA))/i;
+  const offenders = [];
+  for (const file of listFiles('src/ui', '.js')) {
+    if (/admin/.test(file)) continue;
+    fs.readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
+      // The settlement preview hero has its own dark rule (.settlement-card-preview-hero).
+      if (GRADIENT.test(line) && !/settlement-card-preview-hero/.test(line)) offenders.push(`${file}:${i + 1}`);
+    });
+  }
+  assert.deepEqual(offenders, [], "use 'var(--cta-fill, <gradient>)' with color 'var(--on-cta, #fff)'");
+});

@@ -53,6 +53,9 @@ for (const [name, scope, output] of [
     }
   });
   let cssText = css.toString();
+  // The design exports name 'Pretendard'; the loaded web font (index.html, jsDelivr dynamic
+  // subset) registers as 'Pretendard Variable'.
+  cssText = cssText.replace(/'Pretendard',/g, "'Pretendard Variable', 'Pretendard',");
   // Phase1 dark tokens: do not re-literal V1 theme surface/text tokens under .v2-*.
   cssText = cssText.replace(
     /(--(?:bg-primary|bg-card|border-subtle|text-main|text-muted|text-light|surface-success|surface-confirmed))\s*:\s*#[0-9A-Fa-f]+\s*;?/g,

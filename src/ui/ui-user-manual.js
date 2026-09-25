@@ -116,7 +116,7 @@ export function UserManualOverlay({ calendar, onClose }) {
       }, "전원")), /*#__PURE__*/React.createElement("div", {
         style: { border: '1px solid transparent', background: 'linear-gradient(var(--bg-card), var(--bg-card)) padding-box, var(--accent-gradient) border-box', borderRadius: 'var(--radius-md)', padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }
       }, /*#__PURE__*/React.createElement("strong", { style: { color: '#4F46E5' } }, "[모임확정] 26.08.22 (토)"), /*#__PURE__*/React.createElement("span", {
-        style: { padding: '5px 10px', borderRadius: 'var(--radius-full)', background: 'linear-gradient(135deg, #6366F1, #EC4899)', color: '#FFFFFF', fontWeight: 900, fontSize: 'var(--font-size-sm)' }
+        style: { padding: '5px 10px', borderRadius: 'var(--radius-full)', background: 'var(--cta-fill, linear-gradient(135deg, #6366F1, #EC4899))', color: 'var(--on-cta, #FFFFFF)', fontWeight: 900, fontSize: 'var(--font-size-sm)' }
       }, "D-11")))
     }
   ];

@@ -10,7 +10,7 @@
       --p-doeun: #A78BFA; --p-seojun: #FBBF24;
     }
     .v2-memo * { box-sizing: border-box; }
-    .v2-memo { margin: 0; font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Noto Sans KR', sans-serif; background: var(--bg-primary); }
+    .v2-memo { margin: 0; font-family: 'Pretendard Variable', 'Pretendard', -apple-system, BlinkMacSystemFont, 'Noto Sans KR', sans-serif; background: var(--bg-primary); }
     .v2-memo button, .v2-memo input { font-family: inherit; }
 
     .v2-memo .bp-app-shell { width: 100%; max-width: 480px; margin: 0 auto; background: var(--bg-primary); min-height: 100%; }

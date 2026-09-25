@@ -30,7 +30,7 @@
       --acc-places-soft: #FFE4E9;
     }
     .v2-design * { box-sizing: border-box; }
-    .v2-design { margin: 0; font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Noto Sans KR', sans-serif; background: var(--bg-primary); }
+    .v2-design { margin: 0; font-family: 'Pretendard Variable', 'Pretendard', -apple-system, BlinkMacSystemFont, 'Noto Sans KR', sans-serif; background: var(--bg-primary); }
     .v2-design a { color: var(--brand); } .v2-design a:hover { color: #6D28D9; }
 
     .v2-design .bp-ellipsis-1 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

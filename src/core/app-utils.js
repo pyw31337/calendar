@@ -968,7 +968,7 @@ const DAY_NAMES_KO = ['일', '월', '화', '수', '목', '금', '토'];
   function getAppBaseUrl(locationLike) {
     const loc = locationLike || (typeof window !== 'undefined' ? window.location : null);
     if (!loc) return '/';
-    let basePath = String(loc.pathname || '/').replace(/\/share(?:\/.*)?$/, '/').replace(/\/(?:index\.html)?$/, '/');
+    let basePath = String(loc.pathname || '/').replace(/\/app\/[A-Za-z0-9_-]+\/?$/, '/').replace(/\/share(?:\/.*)?$/, '/').replace(/\/(?:index\.html)?$/, '/');
     if (!basePath.endsWith('/')) basePath += '/';
     return `${loc.origin || ''}${basePath}`;
   }

@@ -2890,8 +2890,12 @@ html:has(.renewal-shell.v2-design) .global-search-page-card > .underline-tabs {
   html:has(.renewal-shell.v2-design) .renewal-shell.v2-design {
     --v2-side-nav-width: 280px;
   }
+  /* The pane's margin-left below is the only inset. design.css's collapsed
+     `padding-left: 64px` outranked the viewport pin's `padding: 0` and stacked
+     on top of it, leaving a 64px blank strip beside the collapsed rail. */
   html:has(.renewal-shell.v2-design) .renewal-shell.v2-design.is-side-collapsed {
     --v2-side-nav-width: 64px;
+    padding-left: 0 !important;
   }
   html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > .renewal-shell-main,
   html:has(.renewal-shell.v2-design) .renewal-shell.v2-design > .bp-app-shell {
@@ -3288,7 +3292,8 @@ html:has(.renewal-shell.v2-design) .bp-hero-zone .bp-hero-quick-nav-item .bp-her
   overflow: hidden !important;
   text-overflow: ellipsis !important;
   white-space: nowrap !important;
-  font-size: clamp(0.62rem, 3vw, 0.8rem) !important;
+  /* rem + vw so it still narrows on small phones but follows the 글자크기 setting. */
+  font-size: clamp(0.62rem, 0.45rem + 1.2vw, 0.8rem) !important;
 }
 
 /* Expanded D-day cards keep the closed capsule's glass, and each one
@@ -3597,6 +3602,16 @@ html:has(.renewal-shell.v2-design) .festival-bar-mobile > .bp-day-anniversary {
   color: #fff !important;
   box-sizing: border-box !important;
   overflow: hidden !important;
+  flex: 0 0 var(--ann-bar-h) !important;
+}
+/* design.css / aurora-theme.css pin solo bars to 0.34rem with a (0,5,0) selector, which outranked
+   the shared token above: single-day bars drew 5.44px while multi-day (range) bars drew 4px. The
+   :not(#_) lifts this over them so every bar, solo or range, uses the same --ann-bar-h. */
+html:has(.renewal-shell.v2-design) .bp-day-bar-stack .bp-day-anniversary:not(#_),
+html:has(.renewal-shell.v2-design) .festival-bar-mobile > .bp-day-anniversary:not(#_) {
+  height: var(--ann-bar-h) !important;
+  min-height: var(--ann-bar-h) !important;
+  max-height: var(--ann-bar-h) !important;
   flex: 0 0 var(--ann-bar-h) !important;
 }
 html:has(.renewal-shell.v2-design) .festival-bar-desktop,
@@ -4702,4 +4717,17 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] {
   --cta-fill: #C9FD58;
   --cta-fill-hover: #B8EC47;
   --on-cta: #0D0D0D;
+}
+
+/* Collapsed rail, dark Theme 2: the brand tile is the lime slab with a black mark (the expanded
+   rail keeps the lime glyph on the black rail). */
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand {
+  background: #C9FD58 !important;
+  animation: none !important;
+  color: #0D0D0D !important;
+}
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-icon,
+html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-icon svg {
+  color: #0D0D0D !important;
+  stroke: currentColor !important;
 }

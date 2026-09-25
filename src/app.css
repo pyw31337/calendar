@@ -1,5 +1,5 @@
 :root {
-  --font-sans: 'Plus Jakarta Sans', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-sans: 'Pretendard Variable', 'Pretendard', 'Plus Jakarta Sans', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
 
   /* White / Light Theme Colors */
   --bg-primary: #F8FAFC;
@@ -6346,7 +6346,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
   padding-bottom: 64px;
   background: var(--bg-primary);
   color: var(--text-main);
-  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Noto Sans KR', sans-serif;
+  font-family: 'Pretendard Variable', 'Pretendard', -apple-system, BlinkMacSystemFont, 'Noto Sans KR', sans-serif;
 }
 .renewal-shell-side-nav { display: none; }
 .renewal-shell-main { padding: 0; background: var(--bg-primary); color: var(--text-main); }
@@ -6704,7 +6704,7 @@ a.link-preview-card[data-no-press-feedback].is-pressing {
   --renewal-page-max: 1080px; --renewal-bg: var(--bg-primary); --renewal-card: var(--bg-card);
   --renewal-border: var(--border-subtle); --renewal-text: var(--text-main); --renewal-muted: var(--text-muted);
   background: var(--renewal-bg);
-  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Noto Sans KR', sans-serif;
+  font-family: 'Pretendard Variable', 'Pretendard', -apple-system, BlinkMacSystemFont, 'Noto Sans KR', sans-serif;
 }
 .renewal-shell-main { background: var(--renewal-bg); color: var(--renewal-text); }
 .renewal-shell-main:not(.is-calendar) > .renewal-shell-header {

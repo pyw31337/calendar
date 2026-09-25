@@ -2556,8 +2556,8 @@ export function GlobalSearchModal({
   // content tab's 60-card render window.
   React.useEffect(() => {
     if (!q || catalogContent.length > 0) return;
-    const path = (typeof window !== 'undefined' && window.location.pathname) || '/';
-    const base = path.endsWith('/') ? path : path.slice(0, path.lastIndexOf('/') + 1);
+    // document.baseURI, not location: under /app/<id>/ the page's <base> points at the site root.
+    const base = (typeof document !== 'undefined' && document.baseURI) ? new URL('./', document.baseURI).href : '/';
     Promise.all(['culture-performances', 'culture-festivals', 'culture-sports', 'culture-movies'].map(name =>
       fetch(`${base}data/${name}.json`, { cache: 'no-store' }).then(res => res.ok ? res.json() : { items: [] }).catch(() => ({ items: [] }))
     )).then(payloads => {

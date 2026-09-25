@@ -1030,7 +1030,8 @@ function getFirebaseSdkVersion() {
   return version;
 }
 function resolveFirebaseSdkUrl(src) {
-  const absolute = new URL(src, window.location.href);
+  // document.baseURI: relative vendor/ paths resolve against the site root, also under /app/<id>/.
+  const absolute = new URL(src, document.baseURI || window.location.href);
   absolute.searchParams.set('v', getFirebaseSdkVersion());
   return absolute.toString();
 }

@@ -76,11 +76,38 @@
       (function () {
         var params = new URLSearchParams(window.location.search);
         var id = params.get('id') || params.get('cal');
+        var appMatch = window.location.pathname.match(/\/app\/([A-Za-z0-9_-]+)\/?$/);
+        if (!id && appMatch) {
+          id = appMatch[1];
+          params.set('id', id);
+          try { history.replaceState(history.state, '', window.location.pathname + '?' + params.toString() + window.location.hash); } catch (_) {}
+        }
         if (!id) {
           var shareMatch = window.location.pathname.match(/\/share\/([A-Za-z0-9_-]+)/);
           if (shareMatch) id = shareMatch[1];
         }
         var manifestByCalendar = { kkot: 'manifest-kkot.json', cw: 'manifest-cw.json', jhair: 'manifest-jhair.json' };
+        // Per-calendar install scope. Every manifest used to share scope "./" (/calendar/), so on
+        // Android (Chrome/Samsung Internet/Whale) the first installed calendar claimed every
+        // /calendar/ URL: visiting ?id=cw offered "open 제이헤어" instead of installing 모아엘가.
+        // Each calendar now lives under its own path, /calendar/app/<id>/ (a copy of this page
+        // with <base href="../../">, written by copy-static-to-dist.mjs), and its manifest's scope
+        // is that path. A root visit is moved there in place -- a <base> keeps relative URLs on the
+        // root, then replaceState swaps the address; no reload. Only when the build shipped the
+        // app/ copies (the meta below), so vite dev and older deploys are left alone.
+        var hasAppPaths = !!document.querySelector('meta[name="gather-app-paths"]');
+        if (hasAppPaths && id && manifestByCalendar[id] && !appMatch && window.top === window
+          && !/\/share\//.test(window.location.pathname) && !params.has('admin') && params.get('mode') !== 'admin') {
+          var rootPath = window.location.pathname.replace(/[^/]*$/, '');
+          try {
+            if (!document.querySelector('base')) {
+              var baseEl = document.createElement('base');
+              baseEl.setAttribute('href', rootPath);
+              document.head.insertBefore(baseEl, document.head.firstChild);
+            }
+            history.replaceState(history.state, '', rootPath + 'app/' + id + '/' + window.location.search + window.location.hash);
+          } catch (_) {}
+        }
         var titleByCalendar = { kkot: '꽃잎반', cw: '모아엘가', jhair: '제이헤어' };
         var manifestHref = (id && manifestByCalendar[id]) || 'manifest.json';
         var link = document.createElement('link');
@@ -97,6 +124,12 @@
         }
       })();
     </script>
+    <!-- Pretendard: the V2 font stack (design.css --font-sans) names it first, but it was never
+         loaded -- Mac/iOS then took line metrics from SF while drawing Hangul in Noto Sans KR, so
+         Korean text sat visibly high in every fixed-height badge/pill/field. Dynamic subset: the
+         browser downloads only the unicode-range chunks a page actually uses. -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" rel="stylesheet" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet" />
     <!-- Same-origin Firebase SDK preload. main.jsx skips these when they are already ready, so

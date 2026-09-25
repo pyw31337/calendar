@@ -50,7 +50,7 @@ function getDeps() { return window.GATHER_UI_DEPS || {}; }
       return `${base}${encodeURIComponent(view)}/`;
     };
     const getCalendarShareUrl = deps.getCalendarShareUrl || function (id) {
-      const basePath = String(window.location.pathname || '/').replace(/\/share(?:\/.*)?$/, '/').replace(/\/(?:index\.html)?$/, '/');
+      const basePath = String(window.location.pathname || '/').replace(/\/app\/[A-Za-z0-9_-]+\/?$/, '/').replace(/\/share(?:\/.*)?$/, '/').replace(/\/(?:index\.html)?$/, '/');
       const normalizedBasePath = basePath.endsWith('/') ? basePath : `${basePath}/`;
       return `${window.location.origin}${normalizedBasePath}share/${encodeURIComponent(id)}/`;
     };
