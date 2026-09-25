@@ -23,6 +23,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { compactItem, isVisible, mergeDuplicates, normalizeItem } from './lib/culture-normalize.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SOURCE_URL = 'https://pyw31337.github.io/culture/data/performances.json';
@@ -43,68 +44,18 @@ const PERFORMANCE_SOURCES = new Set([
   'timeticket',
   'yes24-exclusive'
 ]);
+// dedupe: merge the same show listed more than once (see mergeDuplicates in
+// scripts/lib/culture-normalize.mjs). Sports stays off -- "LG vs 두산" at the same stadium is a
+// different game every day, and single-day ranges only overlap for a true double listing anyway.
 const FEEDS = [
-  { file: 'culture-performances.json', sources: PERFORMANCE_SOURCES, label: 'performances' },
-  { file: 'culture-festivals.json', sources: new Set(['festival']), label: 'festivals' },
+  { file: 'culture-performances.json', sources: PERFORMANCE_SOURCES, label: 'performances', dedupe: true },
+  { file: 'culture-festivals.json', sources: new Set(['festival']), label: 'festivals', dedupe: true },
   { file: 'culture-sports.json', genres: SPORTS_GENRES, label: 'sports' },
-  { file: 'culture-movies.json', sources: new Set(['movie']), label: 'movies', keepHistorical: true }
+  // requiredFields: announced films with no release date yet ship date "" -- still worth listing
+  // (sorted last as 개봉 미정), so movies only need a title and a link.
+  { file: 'culture-movies.json', sources: new Set(['movie']), label: 'movies', keepHistorical: true, requiredFields: ['title', 'link'] }
 ];
 
-
-// TimeTicket (and similar) university-ro / open-ended shows often ship date="OPEN RUN"
-// with no YYYY.MM.DD tokens. Treat those as currently-visible open-ended listings rather
-// than dropping them in isVisible (which previously required a parseable end/start).
-function isOpenRunDate(raw) {
-  return /OPEN\s*RUN|상시\s*공연|상설\s*공연|연중무휴|기간\s*미정/i.test(String(raw || '').trim());
-}
-
-function parseDateRange(raw) {
-  // Culture Flow date strings look like "2026.08.28 (금) ~ 2027.02.09 (화)" or a single
-  // "2026.08.28 (금)" -- pull out plain YYYY.MM.DD tokens and ignore the day-name parens.
-  const matches = String(raw || '').match(/\d{4}\.\d{2}\.\d{2}/g) || [];
-  const toIso = s => s.replaceAll('.', '-');
-  const startDate = matches[0] ? toIso(matches[0]) : null;
-  const endDate = matches[1] ? toIso(matches[1]) : startDate;
-  return { startDate, endDate };
-}
-
-function addDaysIso(iso, days) {
-  const d = new Date(`${iso}T00:00:00Z`);
-  if (Number.isNaN(d.getTime())) return iso;
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
-function isVisible(endDate, startDate, todayIso, { openEnded = false } = {}) {
-  // Keep shared-pool items through endDate + 30 days. The calendar UI hides past portal
-  // festival/performance items from lists immediately, while this grace window keeps the JSON
-  // available for anniversary badge deep-links / cultureSnapshot orphans. After 30 days past
-  // end, drop from the service pool. Calendar-owned custom cards and anniversary cultureSnapshot
-  // docs are never written here -- they live in Firestore per calendar.
-  // Open-ended / OPEN RUN listings have no parseable end date by design -- keep them while
-  // upstream still publishes them (Culture Flow collect is the lifecycle owner for those).
-  if (openEnded) return true;
-  const effectiveEnd = endDate || startDate;
-  if (!effectiveEnd) return false;
-  const retainUntil = addDaysIso(effectiveEnd, 30);
-  return retainUntil >= todayIso;
-}
-
-// Culture Flow's own site is served at basePath '/culture' (Next export on GitHub Pages), and most
-// of its poster images are root-relative paths meant to resolve against ITS domain
-// ("/images/posters/festivals/....webp", "/images/fallbacks/exhibition.jpg") -- not an absolute
-// https:// URL like the few externally-hotlinked ones are. Fetched as-is from our own domain, a
-// relative path 404s silently (every festival item, and the large majority of kopis/culture-portal
-// items -- checked directly against a live pull: 1510/1510 kopis, 68/80 culture-portal, 155/155
-// festival were relative), which is why every poster in both tabs was blank. Resolve against
-// Culture Flow's own origin so the browser fetches the real image from where it actually lives.
-const CULTURE_FLOW_ORIGIN = 'https://pyw31337.github.io/culture';
-function resolveImageUrl(raw) {
-  const value = String(raw || '').trim();
-  if (!value) return '';
-  if (/^https?:\/\//i.test(value)) return value;
-  return `${CULTURE_FLOW_ORIGIN}${value.startsWith('/') ? '' : '/'}${value}`;
-}
 
 function isFallbackPoster(url) {
   return !url || /fallbacks\/movie\.(svg|png|jpg)$/i.test(String(url));
@@ -137,152 +88,6 @@ async function enrichMovieFromNaver(item) {
   return item;
 }
 
-function normalizeItem(raw) {
-  const openRun = isOpenRunDate(raw.date);
-  const { startDate, endDate } = parseDateRange(raw.date);
-  const movie = raw.genre === 'movie';
-  const openEnded = movie || openRun;
-  const normalizedStartDate = openRun ? null : startDate;
-  const normalizedEndDate = openEnded ? null : endDate;
-  return {
-    startDate: normalizedStartDate, endDate: normalizedEndDate, openEnded,
-    item: {
-      id: String(raw.id || `${raw.title}::${raw.date}`),
-      title: String(raw.title),
-      dateLabel: String(raw.date),
-      startDate: normalizedStartDate,
-      endDate: normalizedEndDate,
-      venue: raw.venue || raw.venueKey || '',
-      address: raw.address || '',
-      region: raw.region || '',
-      lat: typeof raw.lat === 'number' ? raw.lat : null,
-      lng: typeof raw.lng === 'number' ? raw.lng : null,
-      genre: raw.genre || '',
-      image: resolveImageUrl(raw.image || raw.backupPoster || raw.posterUrl || raw.poster),
-      link: String(raw.link),
-      price: raw.price || '',
-      contact: raw.contact || '',
-      organizer: raw.organizer || raw.host || '',
-      website: raw.website || '',
-      // KOPIS alone pushed this feed from ~80 to ~1300 items -- capping description (routinely
-      // several paragraphs, the single biggest field) keeps the payload reasonable for a tab
-      // that's fetched fresh on open rather than paginated.
-      description: String(raw.description || '').slice(0, 600),
-      source: raw.source || '',
-      // 스포츠 경기 전용 필드 -- Culture Flow의 KBO/K리그/KBL/KOVO/핸드볼코리아 스크레이퍼가 이미
-      // 홈/원정팀과 팀 로고를 함께 수집하고 있어 그대로 전달한다 (culture-performances.json/
-      // culture-festivals.json에는 없던 정보이므로 두 필드가 없는 항목에서는 빈 값으로 남는다).
-      homeTeam: raw.homeTeam || '',
-      awayTeam: raw.awayTeam || '',
-      homeTeamLogo: resolveImageUrl(raw.homeTeamLogo),
-      awayTeamLogo: resolveImageUrl(raw.awayTeamLogo)
-      ,releaseDate: movie ? (raw.dateRaw ? String(raw.dateRaw).replace(/^(\d{4})(\d{2})(\d{2}).*$/, '$1-$2-$3') : startDate) : '',
-      isOpenEnded: openEnded,
-      director: raw.director || '',
-      cast: Array.isArray(raw.cast) ? raw.cast : [],
-      ageRating: raw.ageRating || '',
-      audienceCount: raw.audienceCount ?? raw.audience ?? '',
-      bookingRate: raw.bookingRate ?? raw.reservationRate ?? '',
-      runningTime: raw.runningTime || '',
-      subGenre: raw.subGenre || '',
-      originalTitle: raw.originalTitle || '',
-      synopsis: raw.synopsis || '',
-      posterSources: [raw.image, raw.backupPoster, raw.posterUrl, raw.poster].filter(Boolean)
-    }
-  };
-}
-
-// Strips bracketed prefixes ("[뮤지컬] ", "(대학로)"), whitespace, and punctuation so
-// "[뮤지컬] 써니텐" (culture-portal) and "써니텐" (kopis) compare equal. Not a full fuzzy-match --
-// deliberately exact-after-normalization, so it only merges titles that really are the same show
-// rather than guessing at near-misses that could just as easily merge two different ones.
-function normalizeTitleForMatch(title) {
-  return String(title || '')
-    .replace(/[[(【][^\])】]*[\])】]/g, '')
-    .replace(/[\s\u3000·,.\-_/!?'"“”‘’]/g, '')
-    .toLowerCase();
-}
-
-// KOPIS venue names routinely repeat themselves in parens, e.g.
-// "세티 라이브홀 (SETI LIVE HALL) (세티 라이브홀 (SETI LIVE HALL) )" -- take everything before the
-// first paren as the comparable venue name.
-function normalizeVenueForMatch(venue) {
-  return String(venue || '').split('(')[0].replace(/\s/g, '').toLowerCase();
-}
-
-function dateRangesOverlap(aStart, aEnd, bStart, bEnd) {
-  if (!aStart || !bStart) return false;
-  const aE = aEnd || aStart, bE = bEnd || bStart;
-  return aStart <= bE && bStart <= aE;
-}
-
-// Prefer whichever value is actually present; when both are, prefer the longer/richer one (a
-// real https poster over a source's own placeholder path, a fuller description, etc.) without
-// needing to know per-field which source tends to be better.
-function pickRicher(a, b) {
-  const av = (a ?? '').toString().trim();
-  const bv = (b ?? '').toString().trim();
-  if (!av) return b;
-  if (!bv) return a;
-  return bv.length > av.length ? b : a;
-}
-
-// culture-portal / kopis / interpark / timeticket / yes24-exclusive independently list many of
-// the same show with no shared id, under venue-name formatting that never matches exactly.
-// Groups items by (normalized title, calendar
-// month of start date) -- month bucketing keeps groups small on a feed this size (1000+ items)
-// without needing an O(n^2) scan of the whole feed -- then within each group merges any pair
-// whose normalized venue matches AND whose date ranges overlap. Deliberately conservative: title
-// match alone is not enough (two different productions can share a generic title), so a
-// venue+date mismatch is left as two separate items rather than risk merging unrelated shows.
-function mergeDuplicates(items) {
-  const groups = new Map();
-  for (const it of items) {
-    const key = `${normalizeTitleForMatch(it.title)}::${(it.startDate || '').slice(0, 7)}`;
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(it);
-  }
-
-  const merged = [];
-  let mergedCount = 0;
-  for (const group of groups.values()) {
-    if (group.length === 1) { merged.push(group[0]); continue; }
-    const used = new Array(group.length).fill(false);
-    for (let i = 0; i < group.length; i++) {
-      if (used[i]) continue;
-      let base = group[i];
-      used[i] = true;
-      for (let j = i + 1; j < group.length; j++) {
-        if (used[j]) continue;
-        const other = group[j];
-        if (base.source === other.source) continue; // same-source "duplicates" aren't this bug's target
-        const venueMatch = normalizeVenueForMatch(base.venue) && normalizeVenueForMatch(base.venue) === normalizeVenueForMatch(other.venue);
-        if (!venueMatch || !dateRangesOverlap(base.startDate, base.endDate, other.startDate, other.endDate)) continue;
-        used[j] = true;
-        mergedCount++;
-        base = {
-          ...base,
-          venue: pickRicher(base.venue, other.venue),
-          address: pickRicher(base.address, other.address),
-          region: pickRicher(base.region, other.region),
-          lat: base.lat ?? other.lat,
-          lng: base.lng ?? other.lng,
-          image: pickRicher(base.image, other.image),
-          price: pickRicher(base.price, other.price),
-          contact: pickRicher(base.contact, other.contact),
-          organizer: pickRicher(base.organizer, other.organizer),
-          website: pickRicher(base.website, other.website),
-          description: pickRicher(base.description, other.description),
-          source: [...new Set([base.source, other.source])].join('+')
-        };
-      }
-      merged.push(base);
-    }
-  }
-  if (mergedCount > 0) console.log(`[sync-culture-performances] merged ${mergedCount} cross-source duplicate(s) across performance ticket/portal sources`);
-  return merged;
-}
-
 function writeFeedIfHealthy(outputPath, items, label) {
   // A near-empty result is far more likely to be an upstream problem (feed truncated mid-build,
   // a filter regression) than a real feed genuinely shrinking to a handful overnight -- refuse to
@@ -291,10 +96,25 @@ function writeFeedIfHealthy(outputPath, items, label) {
     console.error(`[sync-culture-performances] ${label}: only ${items.length} visible items -- looks like an upstream problem, keeping existing snapshot`);
     return;
   }
-  const output = { generatedAt: new Date().toISOString(), sourceUrl: SOURCE_URL, count: items.length, items };
+  // Same idea for a sudden collapse (one upstream scraper failing wipes most of a feed): losing
+  // over 60% of yesterday's items in one night is kept out; a real shrink passes on a later run
+  // once it's gradual, or by deleting the file / running with CULTURE_SYNC_FORCE=1.
+  try {
+    const previous = JSON.parse(fs.readFileSync(outputPath, 'utf8'));
+    const previousCount = Array.isArray(previous?.items) ? previous.items.length : 0;
+    if (previousCount >= 50 && items.length < previousCount * 0.4 && process.env.CULTURE_SYNC_FORCE !== '1') {
+      console.error(`[sync-culture-performances] ${label}: ${items.length} items vs ${previousCount} in the current snapshot -- looks like an upstream problem, keeping existing snapshot`);
+      return;
+    }
+  } catch {
+    // No readable previous snapshot -- nothing to compare against.
+  }
+  const output = { generatedAt: new Date().toISOString(), sourceUrl: SOURCE_URL, count: items.length, items: items.map(compactItem) };
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   const tmpPath = `${outputPath}.tmp`;
-  fs.writeFileSync(tmpPath, JSON.stringify(output, null, 2));
+  // Compact, not pretty-printed: these are fetched whole by the content tab on open, and the
+  // indentation alone was ~a third of culture-performances.json.
+  fs.writeFileSync(tmpPath, `${JSON.stringify(output)}\n`);
   fs.renameSync(tmpPath, outputPath);
   console.log(`[sync-culture-performances] ${label}: wrote ${items.length} items to ${path.relative(process.cwd(), outputPath)}`);
 }
@@ -329,16 +149,27 @@ async function main() {
   const REQUIRED_FIELDS = ['title', 'date', 'link'];
   for (const feed of FEEDS) {
     let normalized = [];
+    const seenIds = new Set();
+    let skipped = 0;
     for (const raw of all) {
       if (!raw) continue;
       const matches = feed.genres ? feed.genres.has(raw.genre) : feed.sources.has(raw.source);
       if (!matches) continue;
-      if (REQUIRED_FIELDS.some(f => !raw[f])) continue;
+      if ((feed.requiredFields || REQUIRED_FIELDS).some(f => !String(raw[f] ?? '').trim())) { skipped++; continue; }
       const { startDate, endDate, openEnded, item } = normalizeItem(raw);
+      // A title that is only entities/whitespace upstream, or a repeated id, would render as a
+      // blank card or collide on the card's React key / cultureSourceId.
+      if (!item.title || seenIds.has(item.id)) { skipped++; continue; }
       if (!feed.keepHistorical && !isVisible(endDate, startDate, todayIso, { openEnded })) continue;
+      seenIds.add(item.id);
       normalized.push(item);
     }
-    if (feed.sources && feed.sources.size > 1) normalized = mergeDuplicates(normalized);
+    if (skipped > 0) console.log(`[sync-culture-performances] ${feed.label}: skipped ${skipped} item(s) missing title/date/link or with a repeated id`);
+    if (feed.dedupe) {
+      const result = mergeDuplicates(normalized);
+      normalized = result.items;
+      if (result.mergedCount > 0) console.log(`[sync-culture-performances] ${feed.label}: merged ${result.mergedCount} duplicate listing(s)`);
+    }
     if (feed.label === 'movies') {
       for (const item of normalized) await enrichMovieFromNaver(item);
     }
