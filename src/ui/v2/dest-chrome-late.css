@@ -2174,6 +2174,20 @@ html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overla
   }
 }
 
+/* Phone/tablet sheets sit flush on the bottom edge. In an iOS home-screen app that edge is the
+   home indicator, so the footer buttons (모임 확정, 저장/닫기, 초대 메시지 복사, 자세히보기 ...) were
+   drawn under it. Pad the sheet itself by the inset (0 on devices without one). */
+@media (max-width: 1199px) {
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .modal-container,
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .v2-responsive-modal,
+  html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay) > .modal,
+  html:has(.renewal-shell.v2-design) .bp-event-sheet,
+  html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overlay) > .bottom-sheet {
+    padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+    box-sizing: border-box !important;
+  }
+}
+
 @media (max-width: 767px) {
   html:has(.renewal-shell.v2-design) .modal-overlay:not(.meme-preview-overlay),
   html:has(.renewal-shell.v2-design) .bottom-sheet-overlay:not(.emoji-sheet-overlay) {
@@ -2518,7 +2532,11 @@ html:has(.renewal-shell.v2-design) .bp-event-sheet .underline-tabs button[aria-s
     width: 280px !important;
     max-width: min(280px, 88vw) !important;
     margin: 0 !important;
-    padding: 0 !important;
+    /* The drawer is fixed to the physical screen (top/bottom 0), so in an iOS home-screen app
+       (black-translucent status bar) its brand row sat under the status bar and 접기 under the
+       home indicator. The insets are 0 everywhere else. */
+    padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) 0 !important;
+    box-sizing: border-box !important;
     border-right: none !important;
     border-left: 1px solid var(--v2-card-border, #eceaf5) !important;
     background: var(--bg-card) !important;
@@ -3073,7 +3091,7 @@ html:has(.renewal-shell.v2-design) .v2-chat:not(.v2-chat-search-open) .chat-mess
 /* Chat uses the same purple menu FAB. It sits in the old jump-to-latest
    slot, just above the composer; the jump button itself is centered. */
 html:has(.renewal-shell.v2-design) .v2-chat .bp-menu-fab {
-  right: 16px !important;
+  right: calc(16px + env(safe-area-inset-right, 0px)) !important;
   bottom: calc(var(--v2-chat-composer-space, 168px) + 8px) !important;
 }
 html:has(.renewal-shell.v2-design) .v2-chat.is-composer-hidden .bp-menu-fab {
@@ -4732,4 +4750,20 @@ html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .
 html:has(.renewal-shell.v2-design)[data-theme="dark"] .renewal-shell.v2-design .bp-side-nav.bp-is-collapsed .bp-side-nav-brand-icon svg {
   color: #0D0D0D !important;
   stroke: currentColor !important;
+}
+
+/* iPhone landscape (viewport-fit=cover): the notch / Dynamic Island moves to a side edge and the
+   page header's back button and right-hand icons were drawn under it. Inset the whole shell by
+   the side safe areas (0 in portrait and on devices without a cutout); the fixed menu FAB sits
+   outside the shell's flow, so it takes the right inset itself. */
+@media (max-width: 1199px) {
+  html:has(.renewal-shell.v2-design) .renewal-shell.v2-design {
+    padding-left: env(safe-area-inset-left, 0px) !important;
+    padding-right: env(safe-area-inset-right, 0px) !important;
+    box-sizing: border-box !important;
+  }
+  .v2-design .bp-home-menu-fab,
+  .v2-design .bp-menu-fab {
+    right: calc(20px + env(safe-area-inset-right, 0px)) !important;
+  }
 }
