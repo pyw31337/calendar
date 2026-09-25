@@ -802,6 +802,46 @@ function recordUsage(kind, value = 1, detail = '') {
   // Unscoped for the same reason as fetchRecentChatMessages above: this feeds the same shared
   // olderChatMessages state that the 갤러리 페이지's full photo grid and HistoryView depend on
   // containing every message regardless of uploadSource.
+  // The single newest message document (any channel, no chat-channel filter), for the chat
+  // listener watchdog's cheap health probe: 1 read instead of re-reading the whole live window.
+  // Deliberately unfiltered and without fetchRecentChatMessages's fallbacks -- the live listener
+  // it is compared against is unscoped too, and an empty/failed probe just means "do the full
+  // reconcile", never a wider scan.
+  async function fetchNewestMessage(calId) {
+    if (!isValidCalId(calId)) return null;
+    const firebaseDb = getDb();
+    if (firebaseDb) {
+      try {
+        const snap = await withSdkTimeout(firebaseDb.collection('calendars').doc('cal_' + calId).collection('messages')
+          .orderBy('timestamp', 'desc').limit(1).get(), FIRESTORE_REST_TIMEOUT_MS);
+        let newest = null;
+        snap.forEach(function (doc) { newest = slimMessage({ id: doc.id, ...doc.data() }); });
+        return newest;
+      } catch (err) {
+        console.warn('fetchNewestMessage sdk', err);
+      }
+    }
+    try {
+      const parent = 'projects/' + projectId() + '/databases/(default)/documents/calendars/cal_' + calId;
+      const res = await fetchWithTimeout('https://firestore.googleapis.com/v1/' + parent + ':runQuery', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ structuredQuery: {
+          from: [{ collectionId: 'messages' }],
+          orderBy: [{ field: { fieldPath: 'timestamp' }, direction: 'DESCENDING' }],
+          limit: 1
+        } })
+      });
+      if (!res.ok) return null;
+      const rows = await res.json();
+      const row = (Array.isArray(rows) ? rows : []).find(function (r) { return r && r.document && r.document.name; });
+      return row ? slimMessage({ id: row.document.name.split('/').pop(), ...docToJs(row.document) }) : null;
+    } catch (err) {
+      console.warn('fetchNewestMessage rest', err);
+      return null;
+    }
+  }
+
   async function fetchOlderChatMessages(calId, beforeTimestamp, pageSize) {
     if (!isValidCalId(calId) || !beforeTimestamp) return [];
     const size = pageSize != null ? pageSize : olderPageSize();
@@ -1065,6 +1105,7 @@ function recordUsage(kind, value = 1, detail = '') {
     fetchMeetingPhotoIndex: fetchMeetingPhotoIndex,
     fetchSubcollectionCount: fetchSubcollectionCount,
     fetchOlderChatMessages: fetchOlderChatMessages,
+    fetchNewestMessage: fetchNewestMessage,
     fetchMessageOrdinal: fetchMessageOrdinal,
     fetchGalleryPhotoOrdinal: fetchGalleryPhotoOrdinal,
     fetchGalleryItemCount: fetchGalleryItemCount,

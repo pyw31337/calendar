@@ -1505,6 +1505,14 @@ async function fetchSubcollectionCount() {
   return null;
 }
 
+async function fetchNewestMessage() {
+  const svc = window.GATHER_FIREBASE_SERVICES;
+  if (svc && typeof svc.fetchNewestMessage === 'function' && !svc.isScaffold) {
+    return svc.fetchNewestMessage.apply(null, arguments);
+  }
+  return null;
+}
+
 async function fetchOlderChatMessages() {
   const svc = window.GATHER_FIREBASE_SERVICES;
   if (svc && typeof svc.fetchOlderChatMessages === 'function' && !svc.isScaffold) {
@@ -3959,6 +3967,7 @@ export {
   MAX_OLDER_CHAT_MESSAGES,
   fetchSubcollectionCount,
   fetchOlderChatMessages,
+  fetchNewestMessage,
   fetchMessageOrdinal,
   fetchGalleryPhotoOrdinal,
   fetchGalleryItemCount,

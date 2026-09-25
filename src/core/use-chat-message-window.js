@@ -23,10 +23,26 @@ import {
   subscribeMessages,
   fetchRecentChatMessages,
   fetchOlderChatMessages,
+  fetchNewestMessage,
   CHAT_OLDER_PAGE_SIZE,
   MAX_OLDER_CHAT_MESSAGES,
   invalidateGalleryItemCount
 } from './app-firebase-data.js';
+
+// What the watchdog probe compares: the newest message's identity plus the fields an edit or a
+// soft delete changes. Equal signatures mean the live listener already has the head of the list.
+export function chatMessageSignature(message) {
+  if (!message || !message.id) return '';
+  const images = Array.isArray(message.images) ? message.images.length : (message.imageUrl ? 1 : 0);
+  return [
+    message.id,
+    Number(message.timestamp) || 0,
+    Number(message.updatedAt || message.editedAt) || 0,
+    String(message.text || ''),
+    images,
+    message.deleted || message.isDeleted ? 1 : 0
+  ].join('|');
+}
 
 export function useChatMessageWindow({
   React,
@@ -65,6 +81,9 @@ export function useChatMessageWindow({
   // app-main.js) where the realtime stream goes quiet while everything else keeps working, so
   // creates/edits/deletes and other participants' messages stop showing up until a manual reload.
   const lastChatSnapshotAtRef = React.useRef(0);
+  // When the window was last known complete (a listener snapshot or a full watchdog reconcile);
+  // the watchdog does a full re-read only when this is older than FULL_RECONCILE_EVERY_MS.
+  const lastFullReconcileAtRef = React.useRef(0);
 
   // Render the newest five messages first. On capable networks, widen the realtime window after
   // the critical first paint; on save-data/2G/3G connections keep the compact window and let the
@@ -95,14 +114,20 @@ export function useChatMessageWindow({
   // settle on real content and stayed on "최근 채팅을 불러오는 중…" no matter how long you waited.
   // The chat room gets a wider raw window because a calendar can have a long run of hidden
   // gallery/meeting uploads at the head of the collection. The calendar preview remains bounded.
+  //
+  // The effective window is derived here and the listener depends on IT, not on chatLiveLimit:
+  // in the chat room the window is max(chatLiveLimit, 60), so the 5 -> 20 widening above never
+  // changes it, yet depending on chatLiveLimit tore the 60-message listener down and attached
+  // an identical one ~0.7s after every chat entry (a second full read of the window).
+  const liveChatLimit = activeView === 'chat'
+    ? Math.max(chatLiveLimit, 60)
+    : activeView === 'gallery' ? Math.min(12, CHAT_LIVE_MESSAGE_LIMIT) : CHAT_LIVE_MESSAGE_LIMIT;
   React.useEffect(() => {
     if (!activeCalId) {
       setChatMessages([]);
       return;
     }
-    const chatLimit = activeView === 'chat'
-      ? Math.max(chatLiveLimit, 60)
-      : activeView === 'gallery' ? Math.min(12, CHAT_LIVE_MESSAGE_LIMIT) : CHAT_LIVE_MESSAGE_LIMIT;
+    const chatLimit = liveChatLimit;
     if (!getFirebaseDb()) {
       // No live SDK channel at all (not just a stalled stream -- see the watchdog below for
       // that case) -- without this poll, a device stuck on this path never saw the other
@@ -133,6 +158,8 @@ export function useChatMessageWindow({
     }, snapshot => {
         if (!isMounted) return;
         lastChatSnapshotAtRef.current = Date.now();
+        // A snapshot is a complete, current copy of the window -- as good as a full reconcile.
+        lastFullReconcileAtRef.current = Date.now();
         const list = [];
         snapshot.forEach(doc => {
           list.push(slimMessageForClient({ id: doc.id, ...doc.data() }));
@@ -168,7 +195,7 @@ export function useChatMessageWindow({
   // render. Without this dependency, a page that initially fell back to REST never
   // attached onSnapshot until a full reload, so messages from other users appeared
   // only after refreshing.
-  }, [activeCalId, activeView, chatLiveLimit, firebaseDb, firebaseConnectionVersion, CHAT_INITIAL_MESSAGE_LIMIT]);
+  }, [activeCalId, activeView, liveChatLimit, firebaseDb, firebaseConnectionVersion]);
 
   // Gallery media has its own unscoped live window. Keeping this separate from the channel-
   // scoped chat listener prevents photo uploads from displacing the main screen's recent chat,
@@ -196,18 +223,38 @@ export function useChatMessageWindow({
 
   // Chat listener watchdog: throttled self-healing for stalled onSnapshot stream.
   // Reconciles on tab visibility/online return, and runs 60s backup only while viewing chat.
+  //
+  // "No snapshot for 60s" is also what a perfectly healthy listener on a quiet chat looks like,
+  // so the stale check used to re-read the whole window (60 docs in the chat room) every ~90s
+  // of idle time and on every return to the tab. It now probes first: one read of the newest
+  // message; if it matches the newest one the listener already delivered, the stream is fine and
+  // nothing else is read. Only a mismatch (a missed create/edit/delete at the head), a failed
+  // probe, an `online` event, or FULL_RECONCILE_EVERY_MS since the last full pass (a backstop for
+  // edits/deletes further down the window) re-reads the full window as before.
+  const watchdogLimit = activeView === 'chat' ? Math.max(chatLiveLimit, 60) : CHAT_INITIAL_MESSAGE_LIMIT;
+  const chatMessagesRef = React.useRef(chatMessages);
+  chatMessagesRef.current = chatMessages;
   React.useEffect(() => {
     if (!activeCalId || !getFirebaseDb()) return undefined;
     const isChatView = activeView === 'chat';
-    const chatLimit = isChatView ? Math.max(chatLiveLimit, 60) : CHAT_INITIAL_MESSAGE_LIMIT;
+    const chatLimit = watchdogLimit;
     const STALE_AFTER_MS = 60000;
     const CHECK_INTERVAL_MS = 30000;
+    const FULL_RECONCILE_EVERY_MS = 15 * 60000;
     let isMounted = true;
     let reconciling = false;
-    const reconcile = async () => {
+    const reconcile = async ({ full = false } = {}) => {
       if (reconciling || !isMounted) return;
       reconciling = true;
       try {
+        const known = chatMessagesRef.current;
+        const knownNewest = Array.isArray(known) && known.length ? known[known.length - 1] : null;
+        if (!full && knownNewest && Date.now() - lastFullReconcileAtRef.current < FULL_RECONCILE_EVERY_MS) {
+          const probe = await fetchNewestMessage(activeCalId);
+          if (!isMounted) return;
+          if (probe && chatMessageSignature(probe) === chatMessageSignature(knownNewest)) return;
+        }
+        lastFullReconcileAtRef.current = Date.now();
         const fresh = await fetchRecentChatMessages(activeCalId, chatLimit);
         if (!isMounted || !Array.isArray(fresh) || fresh.length === 0) return;
         const freshIds = new Set(fresh.map(m => m.id));
@@ -238,7 +285,7 @@ export function useChatMessageWindow({
     const handleVisible = () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible' && Date.now() - lastChatSnapshotAtRef.current > 10000) void reconcile();
     };
-    const handleOnline = () => { void reconcile(); };
+    const handleOnline = () => { void reconcile({ full: true }); };
 
     document.addEventListener('visibilitychange', handleVisible);
     window.addEventListener('online', handleOnline);
@@ -248,7 +295,7 @@ export function useChatMessageWindow({
       document.removeEventListener('visibilitychange', handleVisible);
       window.removeEventListener('online', handleOnline);
     };
-  }, [activeCalId, activeView, chatLiveLimit, firebaseDb, CHAT_INITIAL_MESSAGE_LIMIT]);
+  }, [activeCalId, activeView, watchdogLimit, firebaseDb]);
 
   // Per-calendar reset of the paged history and the gallery live window. Same dependencies as
   // CalendarApp's count/maintenance effect it was split out of (which still resets the totals).
