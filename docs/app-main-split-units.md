@@ -166,7 +166,7 @@ safety 테스트: JPEG 경로, chunk 바이트, GPS 없을 때 날짜태그, des
 
 ## 로그 (2026-09-12 최신화)
 
-U0~U11은 완료됐다. U8과 U12~U14는 아래 이유로 보류/금지 상태 그대로다 — 자세한 내용은
+U0~U12는 완료됐다. U8과 U13~U14는 아래 이유로 보류/금지 상태 그대로다 — 자세한 내용은
 루트 `CLAUDE.md` 참고.
 
 | 유닛 | 상태 | PR | 비고 |
@@ -196,7 +196,8 @@ U0~U11은 완료됐다. U8과 U12~U14는 아래 이유로 보류/금지 상태 �
 | U9i | 완료 | #590 |  |
 | U9j | 완료 | #591 |  |
 | U10 | 완료 | (이 PR) | 2026-09-25 사용자 "U10 시작해". `useChatMessageWindow` → `src/core/use-chat-message-window.js`: 채팅 상태, 실시간 구독, 갤러리 라이브 창, 워치독, 이전 메시지 페이지, `chatMessagesContainerRef`. 동작 불변(기존 빌드와 헤드리스 비교: 홈 미리보기·채팅 53→129 페이지·딥링크·갤러리 썸네일 98개 동일). 미리보기 복구 루프와 로컬 patch/upsert/remove는 CalendarApp에 남음 |
-| U11 | 완료 | (이 PR) | 2026-09-25 사용자 "U11 시작해". `useMemoCollections` → `src/core/use-memo-collections.js`: memos/memosLimit/hasMoreMemos 상태, 캘린더 전환 시 페이지 크기 초기화, needsMemoCollection 게이트, 고정/최근댓글/최신순 메모 구독 3종. 동작 불변(기존 빌드와 헤드리스 비교: 홈 메모 미리보기·메모 페이지 목록·갤러리 썸네일 동일). 로컬 patch/upsert/remove, 공유 메모 단건 조회, 보관함 REST 스냅샷은 CalendarApp에 남음 |
-| U12–U14 | **금지** | | CalendarApp 핵심 훅 — 유닛별 사용자 명시 승인 전 시작 금지 |
+| U11 | 완료 | #794 | 2026-09-25 사용자 "U11 시작해". `useMemoCollections` → `src/core/use-memo-collections.js`: memos/memosLimit/hasMoreMemos 상태, 캘린더 전환 시 페이지 크기 초기화, needsMemoCollection 게이트, 고정/최근댓글/최신순 메모 구독 3종. 동작 불변(기존 빌드와 헤드리스 비교: 홈 메모 미리보기·메모 페이지 목록·갤러리 썸네일 동일). 로컬 patch/upsert/remove, 공유 메모 단건 조회, 보관함 REST 스냅샷은 CalendarApp에 남음 |
+| U12 | 완료 | (이 PR) | 2026-09-25 사용자 "U12 시작해". `useGalleryIndexBindings` → `src/core/use-gallery-index-bindings.js`: 서버 photoIndex(`useGalleryPhotoIndex`) 호출, 사진 댓글 개수/미리 받은 댓글 상태·ready 플래그·store ref, 캘린더 전환 시 초기화, 캘린더/갤러리/보관함에서만 도는 photoComments 구독. 동작 불변(기존 빌드와 헤드리스 비교: 갤러리 썸네일 집합·댓글 뱃지 7개 숫자·라이트박스 첫 댓글 표시 동일, 34화면 오류 0). 태그 저장 패치(app-image-tag-save.js), 사진 삭제 patchItems, handleSavePhotoComments는 CalendarApp에 남음 |
+| U13–U14 | **금지** | | CalendarApp 핵심 훅 — 유닛별 사용자 명시 승인 전 시작 금지 |
 
 `app-main.js`: 12,065줄(U0 기준) → 8,838줄. 최상위 REAL(비-CalendarApp) 선언 30개 → 15개.
